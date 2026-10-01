@@ -1,6 +1,6 @@
 {
   "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
-  "$description": "デザイントークンの正（DTCG）。仕組みは Adobe Spectrum（Spectrum 2）にならい、見た目は Hermes Teal（深いティールとクリーム、金はごく控えめ、見出しだけレトロな Fraunces）。2層: primitive（生の値。実装から参照しない）と semantic（用途の名前。値はエイリアス）。Spectrum の global → primitive、alias → semantic、component → semantic.scale.{medium,large}.component。実装が参照してよいのは semantic だけ。make tokens が packages/ui-tokens に vanilla-extract のテーマ契約（Web）・Unistyles のテーマ（スマホ）・react-pdf の定数（PDF）を生成する（ADR-018）。Spectrum の配色・書体・アイコンは使わない（アイコンは Lucide）",
+  "$description": "デザイントークンの正（DTCG）。具体値（色・書体・大きさ・余白・角丸・影・動き・スライドの寸法）はこのファイルだけが持つ。方針（Spectrum の仕組みと Hermes Teal の見た目）は design-spec 4.4、トークンの階層・生成先・参照の決まりは System Design Doc ADR-018。",
   "primitive": {
     "$description": "生の値のスケール（Spectrum の global に当たる）。実装から直接参照しない",
     "color": {
@@ -373,7 +373,7 @@
           "focus": { "$value": "{primitive.color.teal.600}", "$description": "フォーカスの表示（Spectrum の focus-indicator）" }
         },
         "accent": {
-          "$description": "Spectrum の accent。金。1画面に1つの Button variant=accent とブランドマークだけ",
+          "$description": "Spectrum の accent。金。使いどころは design-spec 4.5（Button の accent とブランドマーク）",
           "default": { "$value": "{primitive.color.gold.600}" },
           "hover": { "$value": "{primitive.color.gold.700}" },
           "pressed": { "$value": "{primitive.color.gold.800}" }
@@ -571,7 +571,7 @@
           "focus": { "$value": "{primitive.color.teal.300}", "$description": "フォーカスの表示（Spectrum の focus-indicator）" }
         },
         "accent": {
-          "$description": "Spectrum の accent。金。1画面に1つの Button variant=accent とブランドマークだけ",
+          "$description": "Spectrum の accent。金。使いどころは design-spec 4.5（Button の accent とブランドマーク）",
           "default": { "$value": "{primitive.color.gold.400}" },
           "hover": { "$value": "{primitive.color.gold.300}" },
           "pressed": { "$value": "{primitive.color.gold.500}" }
@@ -1151,13 +1151,13 @@
             "$description": "Toast の高さ（最小）",
             "min-height": { "$value": "{primitive.dimension.60}" }
           },
-          "target-min": { "$value": "{primitive.dimension.44}", "$description": "当たり判定の最小（タップ領域は 44px 以上: design-spec 4.3）。小さい部品は余白で広げる" }
+          "target-min": { "$value": "{primitive.dimension.44}", "$description": "当たり判定の最小。タッチの端末は 44px（WCAG 2.5.5 と各 OS の指針）。デスクトップ（scale.medium）は 24px（WCAG 2.2 の 2.5.8）。小さい部品は余白で広げる" }
         }
       }
     },
     "density": {
       "$type": "dimension",
-      "$description": "表とリストとフォームの密度（Spectrum の density）。書く画面（11・19・21・M1〜M8）は spacious、表と数字の画面（5・6・7・8・14・17・18・22・26〜28）は regular、compact は予備。既定は regular",
+      "$description": "表とリストとフォームの密度（Spectrum の density）。どの画面にどの密度を使うかは design-spec 4.4「密度とスケールの対応」。既定は regular",
       "compact": {
         "$description": "予備（いまは使わない）。キーの意味は regular と同じ",
         "row-height": { "$value": "{semantic.scale.medium.component.table.row-height.compact}" },
@@ -1501,7 +1501,7 @@
       "stroke-width": { "$type": "number", "$value": "{primitive.stroke.icon}" }
     },
     "print": {
-      "$description": "Pitch Deck の PDF（react-pdf）。表示モードにかかわらず常にライト。画面のスライド表示も同じ値（ADR-012）",
+      "$description": "Pitch Deck の PDF（react-pdf）と画面のスライド表示の値。ライトの値だけを参照する（design-spec 6.14）",
       "color": {
         "$type": "color",
         "page": { "$value": "{semantic.color.light.surface.canvas}", "$description": "スライドの地" },

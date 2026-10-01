@@ -20,13 +20,13 @@
 
 ### Non-Goal
 
-- アプリへの AI の組み込み（AI の呼び出しは一切しない。外部の AI との往復だけを支える）
-- リアルタイムの共同編集（同じ欄を同時に打つと、後から保存した人に衝突を知らせる。カーソルの共有や即時反映はしない）
-- プッシュ通知・メール通知（通知はアプリ内だけ。メールは招待とパスワード再設定だけ）
-- オフラインでの閲覧（保存できなかった入力の再送だけをする）
-- 多言語の UI（初期は英語だけ。多言語化できる作りは残す。9章）
-- 決済・課金、複数通貨の換算、Google Drive との連携
-- 運営者がワークスペースの中身を見る機能
+プロダクトとして作らないもの（AI の組み込み、メール通知、決済、Drive との連携など）は `01_prd.md` 6章が正。ここには、技術の上で作らない仕組みだけを書く。
+
+- AI の API の呼び出し（サーバーにもクライアントにも置かない）
+- リアルタイムの共同編集の仕組み（WebSocket・CRDT。同じ欄を同時に打つと、後から保存した人に衝突を知らせるだけ。ADR-019）
+- プッシュ通知の仕組み（APNs・FCM。通知はアプリ内の一覧と未読数の取得だけ）
+- オフラインでの閲覧のための同期（保存できなかった入力の再送だけ。ADR-021）
+- 2つ目以降の言語のカタログ（作りは残す。ADR-026）
 
 ---
 
@@ -265,7 +265,7 @@ moonx/
 
 **審査の判断（ユーザーと合意、2026-10-01）:**
 - Apple の審査基準 4.8（他社のログインを出すアプリは、条件を満たす別のログインも並べる）に対して、Sign in with Apple は足さずに提出する（メール＋パスワードがあるため）。審査で求められたら、そのときに足すか、iOS はストアで配らず Web で使う（ユーザーはストアで配れなくても構わないとした）。
-- Google Play は**個人の開発者アカウント**で登録する（ユーザーの選択。組織のアカウントに要る D-U-N-S 番号の取得を待たずに始められる。後で組織へ移すときは、アプリの移管の手続きが要る）。個人アカウントは、製品版の公開の前に「12人以上のテスターが14日間続けて使うクローズドテスト」が必須なので、BCDX のメンバーとアドバイザーで足りなければ、テスターを集めてから公開する（04_deployment-procedure.md）。
+- Google Play は**個人の開発者アカウント**で登録する（ユーザーの選択。組織のアカウントに要る D-U-N-S 番号の取得を待たずに始められる。後で組織へ移すときは、アプリの移管の手続きが要る）。個人アカウントは、製品版の公開の前にクローズドテストが必須（条件と手順は 04_deployment-procedure.md 4.3）。
 - Apple Developer Program の登録の区分（個人 / 組織）は、ストアにアプリを登録する前にユーザーが決める（個人はストアに個人名が出る。組織は D-U-N-S 番号が要る）。
 
 ### ADR-004: Web は「静的ファイル＋/api の転送」で配り、Cloudflare に置く
@@ -342,7 +342,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-012: Pitch Deck の PDF は API サーバーで作る
 
-**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web・スマホ）と PDF が同じ素材を使う。フォントは見出し用の表示用書体と、日本語を含む代替フォント（Noto Sans / Noto Sans JP）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。
+**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web・スマホ）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。
 
 **理由:** Web とスマホで同じ PDF を作るには、作る場所を1つにするのが確実。ブラウザ・スマホのどちらで作っても、日本語のフォントの埋め込みと16:9のページの再現がそろわない。react-pdf は Chromium を使わないので、コンテナが軽く、0台からの起動も遅くならない。
 
@@ -392,7 +392,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **決定:**
 
-- **参考にするもの**: Adobe Spectrum（Spectrum 2）の仕組みを取り入れる。部品の種類と名前（design-spec 4.5）、部品の大きさの段階 S / M / L / XL、端末で切り替えるスケール（デスクトップは `medium`、タッチの端末は `large`）、表とリストの密度（`compact` / `regular` / `spacious`）、状態の色の名前（`accent` / `informative` / `positive` / `negative` / `notice` / `neutral`）、トークンの階層（全体の値 → 用途 → 部品）、スマホではポップオーバーをトレイにする振る舞い、キーボード操作とフォーカスの表示。見た目（配色・書体・質感）は design-spec 4.4 の Hermes Teal で、Spectrum の配色・Adobe Clean・Workflow のアイコンは使わない（ユーザーと合意、2026-10-01）。
+- **参考にするもの**: Adobe Spectrum（Spectrum 2）の仕組みを取り入れ、見た目は Hermes Teal にする（ユーザーと合意、2026-10-01）。取り入れる範囲は design-spec 4.4「デザインシステムの参考」、部品の一覧は design-spec 4.5 が正。この ADR は、それを実装する方法（トークンの階層・生成・ライト / ダーク）を決める。
 - **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.scale.{medium,large}.component`。実装が参照してよいのは `semantic` だけ。`semantic` の値はエイリアスだけで、たどると必ず `primitive` に着く（書体のスタイルや密度は `semantic.scale.medium` を参照し、生成のときに large へ差し替える）。
 - **生成**: `make tokens` が `packages/ui-tokens` に次を生成する（変換は自前の小さなスクリプト。Style Dictionary は使わない）。
   - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク × medium / large の値。CSS 変数として出る）
@@ -461,7 +461,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **決定:**
 
-- **Web（`packages/ui-web`）**: 振る舞いとアクセシビリティは **React Aria Components**（キーボード操作・フォーカスの管理・ARIA・国際化された数値と日付の入力）。見た目は **vanilla-extract**（`*.css.ts` に型付きで書き、ビルド時に静的な CSS になる。実行時の処理なし）。大きさや種類の出し分けは `@vanilla-extract/recipes` の `recipe()`（例: `size: S | M | L | XL`、`variant: accent | primary | secondary | negative`）。React Aria の状態は `data-*` 属性（`[data-hovered]`・`[data-pressed]`・`[data-focus-visible]`・`[data-disabled]` など）で書く。Popover と Tray の切り替えは、幅 768px 未満で Tray（下からのシート）にする共通の部品で行う。
+- **Web（`packages/ui-web`）**: 振る舞いとアクセシビリティは **React Aria Components**（キーボード操作・フォーカスの管理・ARIA・国際化された数値と日付の入力）。見た目は **vanilla-extract**（`*.css.ts` に型付きで書き、ビルド時に静的な CSS になる。実行時の処理なし）。大きさや種類の出し分けは `@vanilla-extract/recipes` の `recipe()`（例: `size: S | M | L | XL`、`variant: accent | primary | secondary | negative`）。React Aria の状態は `data-*` 属性（`[data-hovered]`・`[data-pressed]`・`[data-focus-visible]`・`[data-disabled]` など）で書く。Popover と Tray の切り替えは、幅がトークンの `semantic.breakpoint.tablet` より狭いときに Tray（下からのシート）にする共通の部品で行う。
 - **スマホ（`packages/ui-native`）**: 振る舞いは **@rn-primitives**（Dialog・Popover・Select・Tabs・Checkbox・RadioGroup・Switch・Tooltip・Accordion など、見た目の無い部品）と、React Native 標準のアクセシビリティの属性（`accessibilityRole`・`accessibilityState` など）。トレイ（ボトムシート）は **@gorhom/bottom-sheet**。見た目は **react-native-unistyles**（v3。`StyleSheet.create` と同じ書き方でテーマとブレークポイントを使え、`variants` で大きさと種類を出し分ける）。
 - **部品の名前と API**: design-spec 4.5 の Spectrum の名前にそろえ、Web とスマホで同じ props（例: `<Button variant="accent" size="M">`、`<StatusLight variant="positive">`）にする。props の型は `packages/ui-web` と `packages/ui-native` のそれぞれで定義し、共通の部分（`size`・`variant` などの値の型）は `packages/ui-tokens` に手で書いて置く（`packages/ui-tokens/src/generated/` が `make tokens` の生成物、`src/types.ts` などそれ以外は手で書くファイル）。
 - **画面にスタイルを書かない**: `apps/web` と `apps/mobile` の画面は、部品と、レイアウトの部品（`Flex`・`Grid`・`View` 相当。間隔はトークンの名前だけを受け取る。例: `gap="space-300"`）の組み合わせで作る。画面で `@vanilla-extract/css`・`StyleSheet`・Unistyles を直接使うこと、`style` 属性に値を書くことは、Biome の `noRestrictedImports` と CI の検査で禁止する。必要な見た目が無ければ、design-spec 4.5 に部品を足してから `packages/ui-*` に作る。
@@ -515,19 +515,19 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 | ルート | 画面（design-spec 参照） | 補足 |
 |---|---|---|
-| `/` | 1 ランディング | ビルド時に HTML を作る。ログイン済みなら `/w/{最後に開いたワークスペース}` へ移る |
+| `/` | 1 ランディング | ビルド時に HTML を作る |
 | `/login` | 2 ログイン / 新規登録（ログイン） | `?next=` |
 | `/forgot-password` | 2（パスワード再設定のメールを送る） | |
 | `/reset-password` | 2（新しいパスワードを決める） | `?token=`（メールのリンク） |
-| `/invite/$token` | 2（新規登録）、または 3 の ①（ログイン済み） | 未ログイン: 招待の内容と新規登録（メールとパスワード / Google）。ログイン済み: 3 の ① へ |
+| `/invite/$token` | 2（新規登録）、または 3 の ①（ログイン済み） | 出し分けは design-spec 6.16 |
 | `/welcome` | 3 オンボーディング | `?step=invite|profile|done&token=` |
 | `/account` | 4 アカウント設定 | |
-| `/notifications` | 8 通知 | ワークスペースをまたぐ一覧。`?filter=unread` |
+| `/notifications` | 8 通知 | `?filter=unread` |
 | `/w/$workspaceId` | 5 ダッシュボード | |
 | `/w/$workspaceId/ideas` | 6 アイデア一覧 | `?stage=&decision=&proposer=&archived=&sort=&q=&selected=` |
 | `/w/$workspaceId/decisions` | 7 決定ログ | `?kind=&idea=&recordedBy=&from=&to=&selected=` |
 | `/w/$workspaceId/settings` | 9 ワークスペース設定 | |
-| `/w/$workspaceId/self-analysis` | 10 自己分析ホーム | Viewer として開いているワークスペースでは出さない |
+| `/w/$workspaceId/self-analysis` | 10 自己分析ホーム | |
 | `/w/$workspaceId/self-analysis/$sectionKey` | 11 設問フォーム（自己分析） | `?q=<設問 ID>`（フォーカスする設問） |
 | `/w/$workspaceId/team` | 12 メンバーの自己分析 | `/w/$workspaceId/team/$userId` で選んだ人を開く |
 | `/w/$workspaceId/ideas/$ideaId` | 13 検証ホーム | |
@@ -537,7 +537,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 | `/w/$workspaceId/ideas/$ideaId/assumptions` | 16 前提・リスク | `?tab=assumptions|risks&row=` |
 | `/w/$workspaceId/ideas/$ideaId/costs` | 17 費用 | `?row=<cost_item の id か template_key>` |
 | `/w/$workspaceId/ideas/$ideaId/economics` | 18 損益・シナリオ | `?field=` |
-| `/w/$workspaceId/ideas/$ideaId/decide` | 19 判定 | Viewer は入れない |
+| `/w/$workspaceId/ideas/$ideaId/decide` | 19 判定 | |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId` | 20 プランホーム | `?version=<plan_version の id>`（版の読み取り専用表示） |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo` | 21 プラン項目の編集 | `$itemNo` は 1〜30。`?q=` |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/execution` | 22 実行管理 | `?tab=milestones|launch|kpis|questions|actions&item=` |
@@ -556,7 +556,8 @@ API のルートは5章、Worker が配る静的なファイル（`/.well-known/
 
 | 項目 | 決まり |
 |---|---|
-| 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、Cloud Scheduler 用は `/internal/cron`（Worker を通らない） |
+| 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、API の仕様書は `/api/docs`（staging だけ。ADR-006）、Cloud Scheduler 用は `/internal/cron`（Worker を通らない） |
+| 値の正 | API が検査する期限・文字数・件数などの値（招待の期限7日、パスワード再設定のリンク1時間など）の正は design-spec。ここの値は design-spec に合わせ、変えるときは design-spec を先に直す |
 | 認証 | Better Auth のセッション。Web は HttpOnly Cookie、スマホは Expo プラグインが付ける `Cookie` ヘッダー。公開と書いたもの以外はログインが要る（未ログインは 401 `UNAUTHENTICATED`） |
 | 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601（表示はクライアントが利用者のタイムゾーンで行う） |
 | 金額・率 | 金額は number（ワークスペースの通貨。自己分析は自己分析の通貨）。率は 0〜1 の小数（35% は `0.35`）。DB は numeric、API で number に変換する |
@@ -849,13 +850,13 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | 信頼するオリジン | `TRUSTED_ORIGINS`（2章） |
 | IP の取得 | `CF-Connecting-IP`（Worker が付ける。2章 通信フロー 3） |
 
-エラーの対応（クライアントが design-spec 6.16 の文言を出す）:
+エラーの対応（文言は design-spec 6.16「状態とエラー」）:
 
-| Better Auth の応答 | 画面の文言 |
+| Better Auth の応答 | design-spec 6.16 の状態 |
 |---|---|
-| メールかパスワードが違う | 「Email or password is incorrect」 |
-| `ACCOUNT_SUSPENDED` | 「This account is suspended」 |
-| `INVITATION_REQUIRED`（Google の新規登録） | 「This invitation is invalid or expired. Ask the person who invited you for a new one.」 |
+| メールかパスワードが違う | 2 の認証の失敗 |
+| `ACCOUNT_SUSPENDED` | 2 の停止されたユーザー |
+| `INVITATION_REQUIRED`（Google の新規登録） | 2 の招待リンクが無効・期限切れ |
 
 **U1 `GET /api/v1/me`** → `200 Me`
 
@@ -2061,7 +2062,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目 | 決定 |
 |---|---|
 | 入力バリデーション | API は必須（`packages/schemas` の Zod。範囲・長さ・形式・列挙）。クライアントは同じスキーマで入力中に補助として検査する。最後の守りは DB の check 制約（6.3）。文字列の長さの上限は、短文200字・長文20,000字・理由とコメント5,000字 |
-| シークレット | 置き場所の方針は ADR-027。local は `.env`（コミットしない。`.env.example` だけコミットする）。staging / production は Secret Manager に置き、Cloud Run の環境変数として渡す。Worker の `PROXY_SHARED_SECRET` は `wrangler secret`。GitHub Actions は Workload Identity Federation で Google Cloud に入る（鍵を置かない）。Cloudflare の API トークン・Expo のトークン・マイグレーション用の `DATABASE_URL_DIRECT` は、GitHub の環境（staging / production）のシークレットに置く。ローテーションの手順は 05_operation-runbook.md |
+| シークレット | 置き場所の方針は ADR-027、CI の置き場所の一覧は2章「CI のシークレットと変数」が正。local は `.env`（コミットしない。`.env.example` だけコミットする）。staging / production の API のシークレットは Secret Manager から Cloud Run の環境変数として渡す。ローテーションの手順は 05_operation-runbook.md |
 | CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる。Cookie は SameSite=Lax。スマホは `Origin` を送らないが、Cookie を自動では送らない（SecureStore から付ける）ので対象外 |
 | CORS | 使わない（Web と API は同じオリジン。ADR-004）。CORS のヘッダーを返さないので、他のオリジンからのブラウザのリクエストは届かない。local は Vite の転送で同じオリジンにする |
 | レート制限 | 仕組みは ADR-029。認証（Better Auth）は IP ごとに1分10回（DB に記録）。アプリの API は、ユーザーごとに次の上限を同じ仕組みで持つ: 招待の送信・再送 1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回。超えたら 429 `RATE_LIMITED`。外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` に付ける |
@@ -2069,7 +2070,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。スマホは SecureStore。ログアウトしたら送信待ちの列（ADR-021）も消す |
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、5MB まで。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
 | セキュリティヘッダー | 静的アセットの `_headers` ファイル（`apps/web/public/_headers`。ADR-004）で付ける: `Content-Security-Policy`（`default-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy`。HSTS は Cloudflare で有効にする |
-| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者もアプリからは中身を見られない。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Cloudflare のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は `sendDefaultPii: false` で、リクエストの本文と Cookie を落とす）。アカウントの削除は U7。バックアップは30日で消える（05_operation-runbook.md）ので、削除した情報は30日以内にバックアップからも消える |
+| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者もアプリからは中身を見られない。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Cloudflare のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は `sendDefaultPii: false` で、リクエストの本文と Cookie を落とす）。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
 | ストアの要件 | プライバシーポリシー（`/privacy`）とサポート（`/support`）の静的ページを Worker で配る（`apps/web/public/`。中身はストアへの提出までに用意する）。App Store のプライバシーの申告と Google Play のデータセーフティは、上の「個人情報」に合わせて書く。アプリ内のアカウント削除（U7）と、Google Play 向けの Web の削除の入口（`/account`）を用意する |
 | 依存の脆弱性 | GitHub の Dependabot のアラートを有効にする。Better Auth・Elysia・Drizzle のセキュリティ修正は速やかに取り込む（05_operation-runbook.md） |
 
@@ -2139,19 +2140,19 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 文言と置き場所は design-spec 6.0.6 と各画面の「状態」が正。ここはエラーの種類から表示の方法への対応だけを決める。
 
-| エラー種別 | 表示方法 |
+| エラー種別 | 表示方法（文言は design-spec の該当の状態） |
 |---|---|
 | バリデーションエラー（422 `VALIDATION_FAILED` など） | 入力欄の下に理由を出し、保存しない（design-spec 6.0.6「入力値が範囲外」）。クライアントの Zod の検査で送る前に止めるのが基本で、API の 422 は最後の守り |
-| 業務の決まり（409・422 の個別のコード） | 画面ごとに決めた文言（design-spec の各画面の「状態」）。例: `LAST_OWNER` →「Make someone else Owner first」 |
-| 同時編集の衝突（409 `CONFLICT`） | design-spec 6.0.2 の確認（相手の名前と時刻、「相手の内容を読み込む」「自分の内容で上書きする」） |
-| 通信・サーバーエラー（ネットワーク断・5xx・`UPSTREAM_UNAVAILABLE`） | 保存: 項目の横とヘッダーに「Couldn't save — Retry」。入力は送信待ちの列に残して自動で再送する（ADR-021）。オフラインは画面上部の帯。読み込み: 「Couldn't load this page」と再試行（ブロックごと） |
-| 認証エラー（401） | `/login?next=<今のパス>` へ移る。送信待ちの列は残し、同じユーザーでログインし直したら再送する |
-| 認可エラー（403 `FORBIDDEN` / `NO_ACCESS`） | 「You don't have access to this」とダッシュボードへのリンク。編集の途中で権限が変わったときは、読み取りの表示に切り替える |
-| 見つからない（404） | 「Not found. Check the link.」 |
-| アーカイブ（409 `ARCHIVED`） | 上部に「This idea is archived」を出し、読み取りの表示に切り替える |
-| アプリの更新が必要（426） | 全画面で更新を促し、ストアへのリンクを出す |
-| 回数制限（429） | 「Too many attempts. Try again in a minute.」 |
-| 想定外のエラー | 「Something went wrong」と再試行。小さく `Ref: <requestId の先頭8文字>` を出し、問い合わせに使えるようにする。画面のブロックごとにエラーの境界（Error Boundary）を置き、1つの失敗で全体を壊さない。Sentry に送る |
+| 業務の決まり（409・422 の個別のコード） | コードごとに design-spec の各画面の「状態」の文言を出す。対応はカタログのキー `errors.<CODE>`（9章） |
+| 同時編集の衝突（409 `CONFLICT` / `CONFLICT_MULTI`） | design-spec 6.0.2 の確認 |
+| 通信・サーバーエラー（ネットワーク断・5xx・`UPSTREAM_UNAVAILABLE`） | 保存: design-spec 6.0.2 の保存エラー（入力は送信待ちの列に残して自動で再送する。ADR-021）。読み込み: design-spec 6.0.6「読み込みエラー」（ブロックごと） |
+| 認証エラー（401） | `/login?next=<今のパス>` へ移る（design-spec 5章「認証」）。送信待ちの列の扱いは ADR-021 |
+| 認可エラー（403 `FORBIDDEN` / `NO_ACCESS`） | design-spec 6.0.6「権限がない」。編集の途中で権限が変わったときは、読み取りの表示に切り替える |
+| 見つからない（404） | design-spec 6.0.6「見つからない」 |
+| アーカイブ（409 `ARCHIVED`） | design-spec 6.1「アーカイブ済み」の表示に切り替える |
+| アプリの更新が必要（426） | design-spec 6.0.6「アプリの更新が必要」 |
+| 回数制限（429） | design-spec 6.0.6「回数の上限」 |
+| 想定外のエラー（500 など） | design-spec 6.0.6「想定外のエラー」。`Ref` には `requestId` の先頭8文字を出す。画面のブロックごとにエラーの境界（Error Boundary）を置き、1つの失敗で全体を壊さない。Sentry に送る |
 
 ### 8.3 ログとの対応
 
@@ -2170,7 +2171,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | ライブラリ | i18next ＋ react-i18next（Web とスマホで同じ）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
 | カタログ | `packages/i18n/locales/en/*.json`。キーは画面と部品ごと（例: `validation.home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors.<CODE>` を引く |
-| 書式 | 初期は en-PH に固定（design-spec 1.2）。`packages/i18n` の書式関数に集める: 金額 `formatMoney(amount, currency)`（通貨記号と桁区切り。整数。変動費/件と粗利/件だけ小数2桁）、件数 `formatUnits()`（小数第1位。末尾の .0 を省く）、率 `formatPercent()`（小数第1位）、日付「Sep 30, 2026」、時刻は12時間制。AI 書き出しとファイル名の日付は ISO 8601。下限・上限は「+」「≤」を付ける（design-spec 6.4） |
+| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatPercent()`・`formatDate()`・`formatTime()`・`formatIsoDate()`）に集め、画面・PDF・AI 書き出しのすべてがこれを使う |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（スマホの Hermes も対応）。金額の入力は桁区切りのカンマを受け付ける |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |
@@ -2194,7 +2195,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | E2E（スマホ） | Phase 5 で Maestro の導入を判断する（ADR-001）。それまでは、ストアへの提出前に TestFlight / Play の内部テストで手で確かめる（04_deployment-procedure.md のチェックリスト） | — | コアフロー |
 | デザイントークン | `make tokens` の生成と検査 | — | エイリアスの参照先が実在すること、意味色のコントラスト（WCAG AA） |
 
-CI（GitHub Actions）は PR ごとに `make lint`・`make typecheck`・`make test`・`make test-e2e` を動かす。`main` への取り込みは、すべて通ったときだけ。
+CI（GitHub Actions）が PR ごとに動かすターゲットは 04_deployment-procedure.md 2章（`ci.yml`）が正。`main` への取り込みは、すべて通ったときだけ。
 
 ---
 

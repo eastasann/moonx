@@ -4,7 +4,7 @@
 
 - 入力: `docs/concept.md`（Phase 0）、`docs/brainstorm-notes.md`（Phase 1）、Phase 2 の深掘りでの合意（9.1）
 - 画面遷移図: `docs/screen_flow.mermaid`（別紙）
-- この文書は画面・UX の正（生きたソース）。データモデル章（7章）は Phase 3 で System Design Doc に移る
+- この文書は画面・UX の正（生きたソース）。データモデルは Phase 3 で System Design Doc（`docs/02-01_system-design-doc.md` の6章）に移った
 
 ---
 
@@ -124,6 +124,8 @@ UI は英語なので、仕様書の用語と画面に出す英語表記を対�
 | AI 書き出し・取り込み（検証・プラン） | ○ | ○ | — | |
 | 自分の自己分析の編集・共有・AI 往復 | ○ | ○ | ○※ | ※自己分析はワークスペースに属さない。Viewer として所属するワークスペースを開いている間は自己分析タブを出さないが、自分が Owner の個人用ワークスペースからは使える |
 | 共有された自己分析の閲覧・コメント | ○ | ○ | — | |
+| 自分のアカウントの削除（4） | ○ | ○ | ○ | 誰でも。ストアの規則でアプリ内に必須。ほかにメンバーのいるワークスペースの最後の Owner は、先に Owner を譲る |
+| 新しいワークスペースの作成（M7） | ○ | ○ | ○ | ログインしている人なら誰でも。作った人がそのワークスペースの Owner になる |
 | ワークスペース名・通貨の変更、招待、ロール変更、メンバー削除 | ○ | — | — | 最後の Owner は自分を降格・削除できない |
 | テンプレート・ユーザー・ワークスペースの管理、招待の発行 | — | — | — | 運営者（Admin）だけ |
 
@@ -169,9 +171,9 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 | # | 画面名 | UI 表示名 | 目的 | レイアウト | 認証 | 対象 |
 |---|---|---|---|---|---|---|
 | 1 | ランディング | Home | アプリの紹介。何ができるか、招待制であること、ログインへの入口 | J 公開ページ | 不要 | 全員 |
-| 2 | ログイン / 新規登録 | Log in / Sign up | 認証。新規登録は招待リンクからのみ。パスワード再設定もここから | B 中央集中 | 不要 | 全員 |
+| 2 | ログイン / 新規登録 | Log in / Sign up | 認証（メールとパスワード、または Google）。新規登録は招待リンクからのみ。パスワード再設定もここから | B 中央集中 | 不要 | 全員 |
 | 3 | オンボーディング | Welcome | 招待の受諾とプロフィール設定。個人用ワークスペースを自動で作る | G ステップ | 要 | 全員 |
-| 4 | アカウント設定 | Account | プロフィール・パスワード・表示モード・所属ワークスペース | H 設定フォーム | 要 | 全員 |
+| 4 | アカウント設定 | Account | プロフィール・パスワード・表示モード・所属ワークスペース・アカウントの削除 | H 設定フォーム | 要 | 全員 |
 
 ### 3.2 ワークスペース共通
 
@@ -239,7 +241,7 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 | M4 | Go / No-Go の記録 | Record Go / No-Go | 20 | Launch / Delay / Stop と理由。§24 の3つの条件と主要指標を表示し、決定ログに残す |
 | M5 | プラン下書きの作成 | Create plan draft | 19（Proceed の直後）/ 13 / 20 | 案の名前を決めて下書きを作る。検証から文章をコピーし、実行管理の初期行を作る |
 | M6 | 共有先の選択 | Share | 10 | 自己分析を共有するワークスペースを選ぶ |
-| M7 | ワークスペース切替 | Switch workspace | 共通ナビ | 所属するワークスペースの一覧と切替 |
+| M7 | ワークスペース切替 | Switch workspace | 共通ナビ | 所属するワークスペースの一覧と切替。「New workspace」で新しいワークスペースを作る（名前・通貨。作った人が Owner） |
 | M8 | テンプレートの移行 | Update template | 10 / 13 / 20 | 新しい版のテンプレートへ移る。引き継げない回答を事前に示す |
 | PNL-1 | コメントパネル | Comments | 10〜23 の各項目 | 項目ごとのスレッド。返信・メンション・解決 |
 | PNL-2 | 変更履歴パネル | History | 10〜22 の各項目 | 項目ごとの変更（誰が・いつ・差分）と元に戻す |
@@ -344,6 +346,7 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 - **認証**: ログインなしで開けるのは 1・2 と招待リンクだけ。ログインしていない状態で他の画面の URL を開くと 2 へ移り、ログイン後に元の画面へ戻る。
 - **新規登録**: 招待リンク経由に限る。招待はワークスペースの Owner（9）か運営者（28）が出す。
 - **登録時**: 個人用ワークスペースを自動で作る（本人が Owner、名前は「{表示名}'s workspace」、通貨 PHP。9 で後から変えられる）。招待元のワークスペースがあれば、招待で指定されたロールで所属する。
+- **ワークスペースの作成**: M7 の「New workspace」から、ログインしている人なら誰でもチームのワークスペースを作れる（名前は必須・1〜60文字、通貨は既定 PHP）。作った人が Owner になり、作ったワークスペースの 5（Getting started）へ移る。BCDX のようなチームは、最初の1人がここで作ってから 9 でメンバーを招待する（Phase 3 で決定）。
 - **ログイン後**: 最後に開いたワークスペースの 5 へ進む。初回は招待元のワークスペース（なければ個人用）。ワークスペースは M7 で切り替える。
 - **共通ナビ**: スマホは下のタブ、Web は左のサイドバー。
   - タブ: 5 Dashboard / 6 Ideas / 10 Self Analysis / 8 Notifications（未読数のバッジ）
@@ -1626,9 +1629,9 @@ Web（パターン A）                                        スマホは縦�
 | 画面 | 内容 | 状態とエラー |
 |---|---|---|
 | 1 ランディング | 何ができるか（自己分析 → 検証 → プランの3段階と、その場の計算・足りないものの見える化）、招待制であること、[Log in]。新規登録の入口は出さない | — |
-| 2 ログイン / 新規登録 | ログイン: メールとパスワード、「Forgot password?」（再設定のメールを送る。リンクの期限は1時間。リンクを開くとこの画面で新しいパスワードを決め、ログインした状態で 5 へ）。新規登録: 招待リンクからだけ開く。メール（招待のメールで固定）・表示名・パスワード | 認証の失敗: 「Email or password is incorrect」。招待リンクが無効・期限切れ: 「This invitation is invalid or expired. Ask the person who invited you for a new one.」。停止されたユーザー: 「This account is suspended」 |
+| 2 ログイン / 新規登録 | ログイン: メールとパスワード、または「Continue with Google」。「Forgot password?」（再設定のメールを送る。リンクの期限は1時間。リンクを開くとこの画面で新しいパスワードを決め、ログインした状態で 5 へ）。新規登録: 招待リンクからだけ開く。メール（招待のメールで固定）・表示名・パスワード、または「Continue with Google」（招待のメールと同じメールの Google アカウントだけ） | 認証の失敗: 「Email or password is incorrect」。招待のメールと違う Google アカウント、または招待なしに Google で新規登録しようとした: 「This invitation is invalid or expired. Ask the person who invited you for a new one.」。招待リンクが無効・期限切れ: 「This invitation is invalid or expired. Ask the person who invited you for a new one.」。停止されたユーザー: 「This account is suspended」 |
 | 3 オンボーディング | ① 招待の内容（ワークスペース名・招待した人・ロール）と [Join] ② プロフィール（表示名・写真は任意、タイムゾーンは端末から取る）③ 完了 → 招待元のワークスペースの 5。運営者が出したワークスペースなしの招待なら ① を飛ばし、個人用ワークスペースへ。すでにアカウントがある人が招待リンクを開いたら、ログインの後に ① だけを出す | 招待がすでに使われている: 「Already accepted」と 5 へ。ログイン中のアカウントのメールが招待のメールと違う: 「This invitation was sent to {email}. Log in with that email.」。すでにそのワークスペースのメンバー: 「You're already a member」と 5 へ（ロールは変えない） |
-| 4 アカウント設定 | プロフィール（表示名・写真）、メールの表示、パスワード変更（今のパスワードが必要）、タイムゾーン、表示モード（System / Light / Dark）、所属ワークスペースの一覧（ロール。個人用以外は「Leave」）、ログアウト | 最後の Owner は Leave できない（「Make someone else Owner first」）。今開いているワークスペースから Leave したら、個人用ワークスペースの 5 へ |
+| 4 アカウント設定 | プロフィール（表示名・写真）、メールの表示、パスワード変更（今のパスワードが必要。Google だけで登録した人には「Set password」を出し、メールとパスワードでもログインできるようにする）、タイムゾーン、表示モード（System / Light / Dark）、所属ワークスペースの一覧（ロール。個人用以外は「Leave」）、ログアウト、Delete account（下の「アカウントの削除」） | 最後の Owner は Leave できない（「Make someone else Owner first」）。今開いているワークスペースから Leave したら、個人用ワークスペースの 5 へ |
 | 9 ワークスペース設定 | 名前、通貨（ISO 4217 の一覧から。変えても金額は換算しないと警告）、メンバー（ロールの変更・削除）、招待（メール・ロールを入れて送る。リンクのコピー・再送・取り消し。期限7日。状態: 送信済み / 受諾 / 期限切れ / 取り消し。リンクのコピーと再送のたびにトークンを作り直し、前のリンクは無効にする） | 最後の Owner を降格・削除できない。招待の送信の失敗は再試行。招待が0件なら「No pending invitations」 |
 
 メンバーを削除したとき・本人が Leave したとき（外れたとき）と、Viewer に降格したとき:
@@ -1639,6 +1642,21 @@ Web（パターン A）                                        スマホは縦�
 | その人が担当の実行管理の項目 | 担当を名前の自由記述（その人の表示名）に置き換え、期限の通知を止める | 同じ（Viewer は担当に選べないため） |
 | 提案者・記録者・コメント・変更履歴の名前 | 名前のまま残し、「(former member)」を添える | そのまま（メンバーのまま） |
 | その人に届いていたこのワークスペースの通知 | 残すが、押すと「You no longer have access」 | そのまま。自己分析へのコメントの通知だけ、押すと「You no longer have access」 |
+
+**アカウントの削除（4 の「Delete account」）**: App Store と Google Play の規則で、アプリの中から削除できる必要がある（Phase 3 で追加）。
+
+- 確認: 削除で消えるもの・残るものを示し、メールアドレスを入力させる。さらに本人の確認として、パスワードがある人はパスワードを入れる。Google だけで登録した人は、直近10分以内にログインし直していること（していなければ「Log in again to delete your account」と、ログインし直しへの案内）。
+- 止める条件: ほかにメンバーのいるワークスペースで最後の Owner なら削除できない（「Make someone else Owner of {workspace} first」と、そのワークスペースの 9 へのリンク）。
+- 削除すると、すぐにログアウトし、1 ランディングへ移る。元に戻せない。
+
+| 対象 | 削除したときの扱い |
+|---|---|
+| メール・表示名・写真・パスワード・Google との連携・セッション | 消す。表示名は「Deleted user」に置き換える（メールは復元できない値に置き換える） |
+| 自己分析（回答・共有・その回答へのコメント・変更履歴） | すべて消す |
+| 個人用ワークスペース | 本人しかいなければ、中身ごと消す。ほかにメンバーがいれば、チームのワークスペースと同じ扱い |
+| チームのワークスペースの所属 | 外す（上の表の「外れたとき」と同じ。担当は名前の自由記述「Deleted user」に置き換える） |
+| チームに書いたもの（アイデア・検証・プラン・実行管理・コメント・決定ログ・変更履歴） | チームの記録として残す。名前は「Deleted user」と出す |
+| 本人あての通知・送った招待のうち有効なもの | 通知は消す。有効な招待は取り消す |
 
 ---
 
@@ -1673,315 +1691,7 @@ Web（パターン A）                                        スマホは縦�
 
 ## 7. データモデル
 
-論理設計。型は論理型（uuid / text / int / decimal / bool / date / timestamp / enum / json）。全テーブルに `id`（uuid）、`created_at`、`updated_at` を持つ（下の表では省略）。`deleted_at` を持つテーブルは論理削除で、変更履歴から戻せる。
-
-### ER図
-
-```
-users ─┬─ N:M ─ workspaces            （中間: memberships。ロール owner / member / viewer）
-       ├─ 1:0..1 ─ self_analyses ─┬─ 1:N self_analysis_answers（最初に 10 を開いたときに作る）
-       │                       └─ N:M workspaces（中間: self_analysis_shares）
-       └─ 1:N ─ notifications（workspace_id も持つ）
-
-workspaces ─┬─ 1:N invitations（運営者の招待は workspace なしも可）
-            ├─ 1:N ideas ─┬─ 1:1 validations ─┬─ 1:N validation_answers
-            │             │                   ├─ 1:N research_log_entries
-            │             │                   ├─ 1:N competitors
-            │             │                   ├─ 1:N assumptions
-            │             │                   ├─ 1:N risks
-            │             │                   ├─ 1:N cost_items
-            │             │                   └─ 1:N economics_inputs（7つの入力。field_key で一意）
-            │             │      evidence_links（workspace_id も持つ）: validation_answers / cost_items / economics_inputs /
-            │             │                      competitors / assumptions → research_log_entries（N:M）または URL
-            │             ├─ 1:N business_plans ─┬─ 1:N plan_answers（小項目ごと）  ※ created_from_decision_id → decision_log_entries
-            │             │                      ├─ 1:N plan_versions
-            │             │                      └─ 1:N execution_items
-            │             └─ 0..1 ideas（duplicated_from: 複製元）
-            ├─ 1:N decision_log_entries（idea、business_plan、plan_version を参照）
-            ├─ 1:N comments ─ 1:N comment_mentions
-            └─ 1:N change_history（自己分析の履歴は workspace なし・本人のみ）
-
-templates ─ 1:N template_versions ─┬─ 1:N template_sections ─ 1:N template_questions
-                                   ├─ 1:N template_cost_defaults（検証）
-                                   ├─ 1:N template_check_rules（検証）
-                                   └─ 1:N template_execution_presets（プラン）
-self_analyses / validations / business_plans ─ N:1 template_versions（作成時の版に固定）
-```
-
-### テーブル定義
-
-#### アカウントとワークスペース
-
-| テーブル | カラム | 型 | 備考 |
-|---|---|---|---|
-| users | email | text | 一意 |
-| | display_name | text | 必須 |
-| | avatar_url | text | 任意 |
-| | password_hash | text | 認証方式は Phase 3 で決める（外部の認証サービスを使うなら持たない） |
-| | is_admin | bool | 運営者。既定 false |
-| | status | enum(active, suspended) | 既定 active |
-| | theme | enum(system, light, dark) | 既定 system |
-| | timezone | text | IANA 名（例: Asia/Manila）。登録時に端末から取り、4 で変えられる。期限の通知の時刻に使う |
-| | last_workspace_id | uuid → workspaces | ログイン後に開くワークスペース |
-| | last_active_at | timestamp | 28 の利用状況 |
-| workspaces | name | text | 必須 |
-| | currency | text | ISO 4217。既定 PHP |
-| | is_personal | bool | 登録時に自動で作った個人用 |
-| | created_by | uuid → users | |
-| | last_active_at | timestamp | 中の何かが最後に変わった日時（28 の最終利用日） |
-| memberships | workspace_id | uuid → workspaces | (workspace_id, user_id) で一意 |
-| | user_id | uuid → users | |
-| | role | enum(owner, member, viewer) | |
-| invitations | workspace_id | uuid → workspaces | null 可（運営者がワークスペースなしで招待） |
-| | email | text | |
-| | role | enum(owner, member, viewer) | workspace_id があるとき必須 |
-| | token_hash | text | 一意。リンクのトークンはハッシュで持つ |
-| | invited_by | uuid → users | |
-| | status | enum(pending, accepted, revoked, expired) | |
-| | expires_at | timestamp | 発行から7日 |
-| | accepted_by / accepted_at | uuid → users / timestamp | |
-
-#### テンプレート
-
-| テーブル | カラム | 型 | 備考 |
-|---|---|---|---|
-| templates | kind | enum(self_analysis, validation, business_plan) | 一意 |
-| | name | text | |
-| template_versions | template_id | uuid → templates | (template_id, version_number) で一意 |
-| | version_number | int | 1, 2, … |
-| | status | enum(draft, published) | 下書きはテンプレートごとに1つまで |
-| | ai_prompt | text | AI 用の対話プロンプト |
-| | published_at / published_by | timestamp / uuid → users | |
-| template_sections | template_version_id | uuid → template_versions | |
-| | key | text | 例: `WHY`、`01`、プランは `01`〜`30` |
-| | part | enum(a, b) | プランだけ。Part A / Part B |
-| | title / guidance | text | |
-| | sort_order | int | |
-| template_questions | template_section_id | uuid → template_sections | |
-| | question_key | text | 設問 ID（6.6）。版の中で一意。公開後は変えない |
-| | title / prompt / example / hint | text | |
-| | answer_type | enum(long_text, short_text, choice, amount_with_reason, table, linked_metric, execution_view) | |
-| | options | json | 選択肢、表の列、表示する主要指標のキー、実行管理の種類など |
-| | display_condition | json | 例: `{"V.02.OCEAN": ["Red", "Mixed"]}` |
-| | has_fau | bool | 検証の設問は true |
-| | copy_from | json | プラン: 下書きでコピーする元（設問 ID、`IDEA.ONE_LINE_CONCEPT`、`IDEA.PROPOSED_SOLUTION`、`V.09.ASSUMPTIONS` など） |
-| | reference | json | プラン: 参照に出すもの（自己分析のセクション、費用行、決定ログなど） |
-| | sort_order | int | |
-| template_cost_defaults | template_version_id | uuid → template_versions | |
-| | category | enum(initial, monthly_fixed, variable) | |
-| | key | text | 例: `initial.permits`、`monthly.rent` |
-| | name | text | 例: Permits |
-| | sort_order | int | |
-| template_check_rules | template_version_id | uuid → template_versions | |
-| | check_key | enum(competitors, local_price, costs, break_even, permits, demand_signal) | |
-| | params | json | 基準値。例: `{"min": 3}` |
-| template_execution_presets | template_version_id | uuid → template_versions | |
-| | type | enum(milestone, launch, kpi) | |
-| | title | text | 例: Business decision、30 days before launch、Revenue |
-| | area | text | KPI だけ（Financial / Customer / Operations） |
-| | launch_timing | enum(t_minus_30, t_minus_7, launch_day, first_30, days_31_90, other) | ローンチだけ |
-| | sort_order | int | |
-
-#### 自己分析
-
-| テーブル | カラム | 型 | 備考 |
-|---|---|---|---|
-| self_analyses | user_id | uuid → users | 一意（1人に1つ） |
-| | template_version_id | uuid → template_versions | |
-| | currency | text | 金額の設問（Q15〜17）の通貨。既定 PHP |
-| | status | enum(not_started, in_progress, done) | |
-| | completed_at | timestamp | |
-| self_analysis_answers | self_analysis_id | uuid → self_analyses | (self_analysis_id, question_key) で一意 |
-| | question_key | text | 例: `SA.INCOME.1` |
-| | text | text | 回答。金額＋理由の設問では理由 |
-| | amount | decimal | 金額＋理由の設問だけ |
-| | lock_version | int | 同時編集の検出 |
-| self_analysis_shares | self_analysis_id | uuid → self_analyses | (self_analysis_id, workspace_id) で一意 |
-| | workspace_id | uuid → workspaces | |
-| | shared_at | timestamp | |
-
-#### アイデアと検証
-
-| テーブル | カラム | 型 | 備考 |
-|---|---|---|---|
-| ideas | workspace_id | uuid → workspaces | |
-| | name / one_line_concept | text | 必須 |
-| | proposed_solution | text | 任意。00 Summary の Proposed Solution |
-| | proposer_id | uuid → users | |
-| | duplicated_from_id | uuid → ideas | 複製元 |
-| | latest_decision | enum(proceed, hold, drop) | null = 未判定。決定ログの最新を写した値 |
-| | archived_at | timestamp | |
-| | last_activity_at | timestamp | 検証・プランの中の何かが最後に変わった日時（6 の更新順と「updated 2h ago」） |
-| | lock_version | int | 概要の同時編集の検出 |
-| | （工程は保存しない） | — | プランの有無と Go / No-Go から毎回決める |
-| validations | idea_id | uuid → ideas | 一意 |
-| | template_version_id | uuid → template_versions | |
-| validation_answers | validation_id | uuid → validations | (validation_id, question_key) で一意 |
-| | question_key | text | 例: `V.01.WHO`、`V.08.WORTH` |
-| | text | text | 選択の設問は選んだ値 |
-| | fau | enum(fact, assumption, unknown) | null = 未分類（text あり）か未入力（text なし） |
-| | confidence | enum(low, medium, high) | fau = assumption のときだけ |
-| | lock_version | int | |
-| research_log_entries | validation_id | uuid → validations | |
-| | observed_on | date | |
-| | topic | text | 必須 |
-| | observation | text | |
-| | source_type | enum(google_maps_reviews, website, social_media, public_data, news_report, store_observation, price_check, other) | |
-| | source_url | text | |
-| | supports_checks | enum[](local_price, permits, demand_signal) | 裏付ける確認項目。複数可 |
-| | supports_note | text | What It Supports（自由記述） |
-| | created_by | uuid → users | |
-| | lock_version / deleted_at | int / timestamp | |
-| competitors | validation_id | uuid → validations | |
-| | name | text | 必須 |
-| | type | enum(direct, indirect, substitute) | |
-| | target_customer / offering / strength / weakness / why_chosen / why_survive | text | |
-| | typical_price | decimal | |
-| | price_note | text | 例: per box |
-| | sort_order / lock_version / deleted_at | int / int / timestamp | |
-| assumptions | validation_id | uuid → validations | |
-| | statement | text | 必須 |
-| | why_believe / evidence_note / disprove_condition / next_check | text | |
-| | confidence | enum(low, medium, high) | |
-| | sort_order / lock_version / deleted_at | int / int / timestamp | |
-| risks | validation_id | uuid → validations | |
-| | statement | text | 必須 |
-| | probability / impact | enum(low, medium, high) | |
-| | why_matters / mitigation / how_to_validate | text | |
-| | sort_order / lock_version / deleted_at | int / int / timestamp | |
-| cost_items | validation_id | uuid → validations | |
-| | category | enum(initial, monthly_fixed, variable) | |
-| | template_key | text | テンプレートの初期行のキー（例: `initial.permits`）。追加した行は null |
-| | name | text | 必須 |
-| | input_mode | enum(amount, percent_of_price) | percent_of_price は variable だけ |
-| | amount | decimal | input_mode = amount のとき |
-| | percent | decimal | input_mode = percent_of_price のとき（0.35 = 35%） |
-| | is_lump_sum | bool | まとめ額の印 |
-| | why_needed | text | initial |
-| | can_reduce | enum(yes, partly, no) | initial |
-| | notes | text | |
-| | fau / confidence | enum / enum | validation_answers と同じ。fau = unknown のとき amount と percent は null |
-| | sort_order / lock_version / deleted_at | int / int / timestamp | |
-| economics_inputs | validation_id | uuid → validations | (validation_id, field_key) で一意。壁打ちメモの Economics |
-| | field_key | enum(selling_price, operating_days, target_margin, units_conservative, units_expected, units_strong, units_capacity) | |
-| | value | decimal | null = 未入力（営業日数・目標利益率は既定値で計算）。target_margin は 0.15 = 15% として持つ |
-| | fau / confidence | enum / enum | fau = unknown のとき value は null |
-| | lock_version | int | |
-| evidence_links | workspace_id | uuid → workspaces | |
-| | target_type | enum(validation_answer, cost_item, economics_input, competitor, assumption) | |
-| | target_id | uuid | |
-| | research_log_entry_id | uuid → research_log_entries | research_log_entry_id か url のどちらか必須。調査ログが論理削除されても紐づけは残し、数えない |
-| | url | text | |
-| | note | text | |
-| | created_by | uuid → users | |
-
-#### プランと実行管理
-
-| テーブル | カラム | 型 | 備考 |
-|---|---|---|---|
-| business_plans | idea_id | uuid → ideas | |
-| | name | text | 案の名前（Plan A など）。アイデアの中で一意 |
-| | business_name / prepared_by | text | ヘッダ。Prepared By は自由記述 |
-| | template_version_id | uuid → template_versions | |
-| | created_from_decision_id | uuid → decision_log_entries | 下書きのもとになった Proceed |
-| | archived_at | timestamp | |
-| | last_activity_at | timestamp | プランの中の何かが最後に変わった日時（ヘッダの Date） |
-| | lock_version | int | ヘッダの同時編集の検出 |
-| | created_by | uuid → users | |
-| plan_answers | business_plan_id | uuid → business_plans | (business_plan_id, question_key) で一意。小項目ごと |
-| | question_key | text | `P.01.1` など |
-| | text | text | 文章の小項目 |
-| | rows | json | 表の小項目（§11・§13・§21・§22）の行 |
-| | copied_from | json | 下書きでコピーした元と日時 |
-| | lock_version | int | |
-| plan_versions | business_plan_id | uuid → business_plans | |
-| | version_number | int | 1, 2, …（(business_plan_id, version_number) で一意） |
-| | name | text | 版の名前（例: 「v1 For advisors」）。必須 |
-| | snapshot | json | 30項目の回答・主要指標・シナリオ表・実行管理の項目・検証の競合の上位5件 |
-| | saved_by / saved_at | uuid → users / timestamp | |
-| execution_items | business_plan_id | uuid → business_plans | |
-| | type | enum(milestone, launch, kpi, open_question, next_action) | |
-| | title | text | 必須。Milestone / Timing / KPI / Open Question / Action の文言 |
-| | assignee_user_id | uuid → users | 担当をメンバーから選んだとき |
-| | assignee_name | text | 担当を自由に書いたとき |
-| | due_date | date | Deadline / Target Date。任意 |
-| | status | enum(todo, doing, done, open, resolved) | 種類ごとに使う値が決まる（6.13）。KPI は null |
-| | goal / exit_condition | text | milestone |
-| | launch_timing | enum(t_minus_30, t_minus_7, launch_day, first_30, days_31_90, other) | launch。まとめて出すための区分。Timing の文言は title |
-| | actions / completion_criteria | text | launch |
-| | kpi_area | text | kpi（Financial / Customer / Operations） |
-| | kpi_target | text | kpi（例: 「₱120,000 / month」。原本どおり文章） |
-| | kpi_review_frequency | text | kpi（例: Weekly） |
-| | kpi_actual / kpi_actual_updated_at | text / timestamp | kpi。アプリで足した実績 |
-| | why_it_matters / answer | text | open_question |
-| | from_preset | bool | テンプレートの初期行から作った行 |
-| | completed_at | timestamp | |
-| | sort_order / lock_version / deleted_at | int / int / timestamp | |
-
-#### 決定ログ・コメント・通知・変更履歴
-
-| テーブル | カラム | 型 | 備考 |
-|---|---|---|---|
-| decision_log_entries | workspace_id | uuid → workspaces | 追記のみ。更新・削除しない |
-| | idea_id | uuid → ideas | |
-| | business_plan_id | uuid → business_plans | Go / No-Go と版の保存のとき |
-| | plan_version_id | uuid → plan_versions | 版の保存、Go / No-Go の対象の版 |
-| | kind | enum(validation_decision, go_no_go, version_saved) | |
-| | value | enum(proceed, hold, drop, launch, delay, stop) | version_saved は null |
-| | reason | text | 判定と Go / No-Go は必須 |
-| | snapshot | json | その時点の不足項目・主要指標・F/A/U の内訳。Go / No-Go では §24 の3つの条件の文章も |
-| | recorded_by / recorded_at | uuid → users / timestamp | |
-| comments | workspace_id | uuid → workspaces | 自己分析へのコメントは共有先のワークスペース |
-| | target_type | enum(self_analysis_answer, validation_answer, research_log_entry, competitor, assumption, risk, cost_item, economics_input, plan_answer, execution_item, pitch_slide, idea) | |
-| | target_id | uuid | 持ち主のレコード（例: 回答なら validation の id） |
-| | target_key | text | 設問 ID や、スライドの「版の種類 + キー」（例: `five.market`）など。未回答の設問にもコメントできるようにする |
-| | parent_id | uuid → comments | 返信（1段まで） |
-| | author_id | uuid → users | |
-| | body | text | |
-| | resolved_at / resolved_by | timestamp / uuid → users | |
-| | edited_at / deleted_at | timestamp | |
-| comment_mentions | comment_id | uuid → comments | |
-| | user_id | uuid → users | |
-| notifications | user_id | uuid → users | 受け取る人 |
-| | workspace_id | uuid → workspaces | |
-| | kind | enum(mention, comment, decision, due) | |
-| | actor_id | uuid → users | |
-| | comment_id | uuid → comments | |
-| | decision_log_entry_id | uuid → decision_log_entries | |
-| | execution_item_id | uuid → execution_items | |
-| | due_stage | enum(three_days_before, due_day, overdue) | kind = due のとき。(execution_item_id, due_date, due_stage) で一意にし、二重に送らない |
-| | due_date | date | kind = due のとき。期限を変えたら新しい日付で送り直す |
-| | link | json | 開く先（画面と対象） |
-| | read_at | timestamp | |
-| change_history | workspace_id | uuid → workspaces | 自己分析の履歴は null |
-| | owner_user_id | uuid → users | 自己分析の履歴の持ち主。本人だけが見られる |
-| | target_type | text | 変更したレコードの種類 |
-| | target_id | uuid | |
-| | target_key | text | 設問 ID・field_key など |
-| | action | enum(create, update, delete, restore) | |
-| | before / after | json | 変更前と変更後 |
-| | source | enum(manual, ai_import, revert, template_migration, duplicate, plan_draft) | |
-| | changed_by / changed_at | uuid → users / timestamp | |
-| | reverted_from_id | uuid → change_history | 「この時点に戻す」の元 |
-
-### 保存しないもの（毎回計算・生成する）
-
-- 損益分岐・シナリオ表・投資回収・ROI（6.4）
-- 確認項目の状態と F/A/U の内訳（6.1）
-- アイデアの工程
-- プランに表示する検証の数字（常に検証から読む）
-- Pitch Deck
-- 例外: 決定ログ（snapshot）と版（plan_versions.snapshot）には、その時点の値を残す
-
-### データのルール
-
-- **数字の正は検証に置く。** プランは数字を持たず、検証を参照する。数字の違う案は「アイデアを複製」して別の検証にする。
-- **テンプレートを改訂しても、既存の回答は作成時の版に固定する。** 最新版への移行は任意で、設問 ID が一致する回答を引き継ぐ。
-- **変更はすべて履歴に残す。** 対象は自己分析・検証・プラン・実行管理。自己分析の履歴は本人だけが見られる。
-- **決定ログは追記だけ。** 記録した判定・Go / No-Go・版の保存は編集・削除しない。
-- **Fact には根拠が必須**（Fact にするときに、有効な evidence_links が1件以上）。例外は、調査ログの削除で根拠が0件になった「Fact（根拠なし）」で、警告の状態として残す（6.0.3）。Assumption にだけ確信度を付ける。数字の Unknown は値を持たない。
-- **選択肢の値は原本を踏襲する。** 判定 Proceed / Hold / Drop、市場の種類 Red / Blue / Mixed、確信度 Low / Medium / High、Can Reduce? Yes / Partly / No、競合の種類 Direct Competitor / Indirect Competitor / Substitute、出典の種類（14 の一覧）。
-- **ワークスペースの通貨を変えても金額は換算しない。**
+データモデルは `docs/02-01_system-design-doc.md` の6章が所有する（Phase 3 で移管。以降のスキーマ変更はそちらだけを更新する）。
 
 ---
 
@@ -2083,7 +1793,10 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 | §24 Go / No-Go | 条件は3つの文章、決定（Launch / Delay / Stop）は決定ログへ | 同じ趣旨 |
 | Pitch Deck | 1分版（8枚）と5分版（12枚）を切り替え | 2回目は「標準10枚」 |
 | AI 書き出しの形式 | Markdown ＋ JSON（壁打ちで決定済み）。見出し規則・JSON のスキーマ・設問 ID は 6.6 の案で確定 | — |
-| データモデル | 7章の内容で確定（Phase 3 で System Design Doc へ移す） | — |
+| データモデル | 確定し、Phase 3 で System Design Doc の6章へ移した | — |
+| チームのワークスペースの作成 | M7 の「New workspace」から誰でも作れる（作った人が Owner）。Phase 3 で抜けが見つかり決定 | — |
+| ログインの方法 | メールとパスワード＋Google ログイン（Phase 3 で決定） | — |
+| アカウントの削除 | 4 から削除できる（ストアの規則で必須）。個人の情報と自己分析・個人用ワークスペースは消し、チームの記録は「Deleted user」として残す（Phase 3 で決定。6.16） | — |
 
 ### 9.2 方針として後で決めるもの
 
@@ -2092,13 +1805,12 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 - メール通知（一般公開のときに検討）
 - UI の多言語化（初期は英語のみ。多言語化できる作りは残す）
 - 最初の運営者（Admin）の割り当て方。既定案: 初期設定（シードか環境設定）で1人を運営者にし、運営者が他のユーザーを運営者にする機能は作らない
-- 認証方式（メールとパスワードの自前か、外部の認証サービスか。Google でのログインを足すか）→ Phase 3
 - 最後の Owner が停止されたワークスペースの扱い（運営者が Owner を付け替える機能を作るか）
 - moonx のロゴと、ランディングで画像を使うかどうか
 
 ### 9.3 Phase 3 以降に渡すもの
 
-- 技術スタック、認証方式、PDF の生成方式、オフライン時の一時保存の方式 → Phase 3
+- 技術スタック、認証方式、PDF の生成方式、オフライン時の一時保存の方式 → Phase 3 で決定済み（`docs/02-01_system-design-doc.md` の ADR。認証はメールとパスワード＋Google ログイン）
 - デザイントークン（Hermes Teal 系の色・見出しの表示用書体・余白の具体値、意味色のライト / ダーク両方の値、Pitch Deck のスライドの型ごとの最小の文字の大きさ）→ Phase 3 の `docs/06_design-tokens.json`。参照元: Hermes Agent のサイト（https://hermes-agent.nousresearch.com/）と、その既定テーマ「Hermes Teal」
 - テンプレート v1 の中身（自己分析36問・検証の設問・プランの小項目の問いと Example・セクションのガイダンス・AI 用プロンプト）は、Drive の原本から転記してシードにする。プランの小項目の名前と表の列・初期行は 6.12 / 6.13 に記録済み。問いの本文と Example は Drive の原本を読んで転記する
 - 日時の表示はユーザーの端末のタイムゾーン。期限は日付だけで持つ
@@ -2111,7 +1823,7 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 
 ### 9.4 拡張候補（初期リリースのスコープ外）
 
-- アイデア・プラン・ワークスペースの削除（初期リリースはアーカイブだけ）。アカウントの削除
+- アイデア・プラン・ワークスペースの削除（初期リリースはアーカイブだけ）
 - プランの版どうしの差分表示
 - 決定ログや一覧の CSV 書き出し
 - Pitch Deck の使うスライドを選ぶ・並べ替える機能

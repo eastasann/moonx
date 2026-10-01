@@ -468,6 +468,7 @@ API のルートは5章、Worker が配る静的なファイル（`/.well-known/
 | 計算 | 損益分岐・シナリオ・確認項目・F/A/U の内訳・工程は `packages/domain` の関数で計算して返す（保存しない）。クライアントは入力中は同じ関数で自分で計算し、保存の応答では計算結果を返さない（画面を開いたときと、保存の後に必要な画面だけ取り直す） |
 | 変更履歴 | 変更履歴の対象（design-spec 6.0.5）を変える API は、すべて `change_history` に書く（ADR-020）。下の「履歴」列に書いた `source` を付ける |
 | キャッシュ | 応答はすべて `Cache-Control: no-store`（ADR-011） |
+| クライアントの種類 | Web とスマホは `X-Moonx-Client: web|ios|android` と `X-Moonx-App-Version`（スマホのアプリの版）を付ける。API は変更履歴の `client` に記録し（PRD の「スマホからの入力の割合」の集計に使う）、ログにも出す。古すぎるスマホの版は 426 `APP_UPDATE_REQUIRED` で更新を促す（最低の版は環境変数ではなくコードの定数で持つ） |
 
 **対象の指し方（TargetRef）**: コメント・変更履歴・根拠は、同じ形で項目を指す。
 
@@ -517,7 +518,7 @@ interface Page<T> { items: T[]; nextCursor: string | null; }
 
 interface UserRef {
   id: UUID; displayName: string; avatarUrl: string | null;
-  badge: null | "former_member" | "suspended";   // 名前に添える表示（design-spec 6.16・6.17）
+  badge: null | "former_member" | "suspended" | "deleted";   // 名前に添える表示（design-spec 6.16・6.17）。deleted のとき displayName は "Deleted user"
 }
 
 interface Versioned { lockVersion: number; updatedAt: DateTime | null; updatedBy: UserRef | null; }
@@ -635,7 +636,9 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | U4 | GET | `/api/v1/invitations/by-token/{token}` | 公開 | 2・3 |
 | U5 | POST | `/api/v1/invitations/by-token/{token}/sign-up` | 公開 | 2 |
 | U6 | POST | `/api/v1/invitations/by-token/{token}/accept` | ログイン | 3 |
+| U7 | POST | `/api/v1/me/delete` | ログイン（本人） | 4 |
 | **ワークスペース（5.5）** | | | | |
+| W0 | POST | `/api/v1/workspaces` | ログイン | M7 |
 | W1 | GET / PATCH | `/api/v1/workspaces/{workspaceId}` | O,M,V / O | 9・M7 |
 | W2 | GET | `/api/v1/workspaces/{workspaceId}/members` | O,M,V | 9・22 |
 | W3 | PATCH / DELETE | `/api/v1/workspaces/{workspaceId}/members/{userId}` | O（DELETE は本人も。`userId` に `me`） | 4・9 |
@@ -789,6 +792,12 @@ interface InvitationPreview {
 
 **U6 `POST /api/v1/invitations/by-token/{token}/accept`** 本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。エラー: `410 INVITATION_INVALID`、`409 INVITATION_ALREADY_ACCEPTED`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）。
 
+**U7 `POST /api/v1/me/delete`**（アカウントの削除。design-spec 6.16）本体 `{ confirmEmail: string; password?: string }` → `204`（セッションの Cookie を消す）。
+- `confirmEmail` が自分のメールと違えば `422 CONFIRMATION_MISMATCH`。パスワードがある人は `password` が必須で、違えば `403 INVALID_PASSWORD`。パスワードが無い人（Google だけ）は、セッションが10分以内に作られたものでなければ `403 REAUTH_REQUIRED`。
+- ほかにメンバーのいるワークスペースで最後の Owner なら `409 LAST_OWNER`（`error.workspaces: { id; name }[]`）。
+- 1つのトランザクションで次を行う: `users` の行は残して個人の情報を消す（`email` を `deleted+{id}@deleted.invalid`、`display_name` を `Deleted user`、`avatar_url` を null、`status` を `deleted`）。`sessions`・`accounts`・自己分析（回答・共有・その回答へのコメントと履歴）・本人あての通知を消す。本人しかいない個人用ワークスペースを中身ごと消す。所属を外す（W3 DELETE と同じ処理。担当は名前「Deleted user」）。有効な招待を取り消す。写真を Cloud Storage から消す。
+- Better Auth の `deleteUser`（行ごと消す）は使わない（チームの記録が `users` を参照しているため）。
+
 ### 5.5 ワークスペース・メンバー・招待
 
 ```ts
@@ -804,6 +813,7 @@ interface Invitation {
 
 | API | 本体 | 応答 | エラーと副作用 |
 |---|---|---|---|
+| W0 | `{ name: string (1〜60); currency?: string (ISO 4217。既定 PHP) }` | `201 Workspace` | 作った人を Owner にし、`last_workspace_id` を新しいワークスペースにする（`is_personal = false`） |
 | W1 GET | — | `200 Workspace` | |
 | W1 PATCH | `{ name?: string (1〜60); currency?: string (ISO 4217) }` | `200 Workspace` | 通貨を変えても金額は換算しない |
 | W2 GET | — | `200 { items: Member[] }` | |
@@ -1233,7 +1243,676 @@ interface AdminWorkspace { id: UUID; name: string; isPersonal: boolean; owners: 
 
 ## 6. データモデル
 
-（執筆中）
+**データモデルの正はこの章。** Phase 2 の design-spec 7章（論理設計）を Phase 3 で引き継いだ。スキーマを変えるときはこの章と `packages/db/src/schema.ts` を一緒に更新し、`make db-generate` でマイグレーションを作る。
+
+### 6.1 ER図
+
+```
+users ─┬─ 1:N sessions / accounts（Better Auth）        verifications・rate_limits（Better Auth。単独）
+       ├─ N:M workspaces（中間: memberships。role = owner / member / viewer）
+       ├─ 1:0..1 self_analyses ─┬─ 1:N self_analysis_answers
+       │                        └─ N:M workspaces（中間: self_analysis_shares）
+       └─ 1:N notifications
+
+workspaces ─┬─ 1:N invitations（運営者の招待は workspace_id = null）
+            ├─ 1:N ideas ─┬─ 1:1 validations ─┬─ 1:N validation_answers
+            │             │                   ├─ 1:N research_log_entries
+            │             │                   ├─ 1:N competitors
+            │             │                   ├─ 1:N assumptions
+            │             │                   ├─ 1:N risks
+            │             │                   ├─ 1:N cost_items
+            │             │                   ├─ 1:N economics_inputs（field_key で一意）
+            │             │                   └─ 1:N evidence_links ─ N:1 research_log_entries（または URL）
+            │             │                        （対象: validation_answer / cost_item / economics_input / competitor / assumption）
+            │             ├─ 1:N business_plans ─┬─ 1:N plan_answers
+            │             │                      ├─ 1:N plan_versions
+            │             │                      └─ 1:N execution_items
+            │             └─ 0..1 ideas（duplicated_from: 複製元）
+            ├─ 1:N decision_log_entries（idea・business_plan・plan_version を参照）
+            ├─ 1:N comments ─ 1:N comment_mentions
+            └─ 1:N change_history（自己分析の履歴は workspace_id = null、owner_user_id = 本人）
+
+templates ─ 1:N template_versions ─┬─ 1:N template_sections ─ 1:N template_questions
+                                   ├─ 1:N template_cost_defaults（検証）
+                                   ├─ 1:N template_check_rules（検証）
+                                   └─ 1:N template_execution_presets（プラン）
+self_analyses / validations / business_plans ─ N:1 template_versions（作成時の版に固定。移行で変わる）
+```
+
+### 6.2 Phase 2 の論理設計（移管前の design-spec 7章）からの変更
+
+| 対象 | 変更 | 理由 |
+|---|---|---|
+| `users` | `password_hash` をやめ、パスワードは `accounts.password` に置く。`email_verified` を足す。`display_name` / `avatar_url` は Better Auth の `name` / `image` に対応させる。`status` に `deleted` を足す | Better Auth（ADR-010）。アカウントの削除（design-spec 6.16） |
+| `sessions`・`accounts`・`verifications`・`rate_limits` | 追加 | Better Auth のテーブル |
+| 版を持つ項目のテーブル | `updated_by_id` を足す | 衝突のときに「Paolo updated this answer…」を出す（design-spec 6.0.2） |
+| `template_questions` | `template_version_id` を足す | 版の中で設問 ID を一意にする制約のため |
+| `evidence_links` | `validation_id`・`target_key`・`deleted_at` を足す | 回答・数字を「検証の id ＋ キー」で指す（5.1 TargetRef）。根拠の付け外しを履歴から戻せるようにする |
+| `change_history` | `container_type`・`container_id`・`section_key`・`batch_id`・`client` を足す | 画面全体の履歴（design-spec 6.0.5）、1回の操作の単位で戻す（AI 取り込み・移行）、スマホからの入力の割合（PRD の KPI） |
+| `risks.sort_order` | null を許す | null は自動の並び（Impact → Probability） |
+| `workspaces` | ユーザーが作るチームのワークスペースは `is_personal = false` | M7 の「New workspace」（Phase 3 で追加） |
+
+### 6.3 Drizzle のスキーマ（`packages/db/src/schema.ts`）
+
+`drizzle.config.ts` と `drizzle()` の初期化で `casing: "snake_case"` を指定する（TypeScript の camelCase がそのまま snake_case の列名になる）。リレーションの定義（`relations()`）は `packages/db/src/relations.ts` に置く（外部キーと同じ対応なので省略する）。
+
+```ts
+// packages/db/src/schema.ts
+import { sql } from "drizzle-orm";
+import {
+  type AnyPgColumn, bigint, boolean, check, date, index, integer, jsonb, numeric,
+  pgEnum, pgTable, text, timestamp, uniqueIndex, uuid,
+} from "drizzle-orm/pg-core";
+
+// ---------- 共通の列 ----------
+const pk = () => uuid().primaryKey().defaultRandom();
+const ts = () => timestamp({ withTimezone: true });
+const timestamps = () => ({
+  createdAt: ts().notNull().defaultNow(),
+  updatedAt: ts().notNull().defaultNow().$onUpdate(() => new Date()),
+});
+// 版を持つ項目（ADR-019）
+const versioned = () => ({
+  lockVersion: integer().notNull().default(0),
+  updatedById: uuid().references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+});
+const money = () => numeric({ precision: 14, scale: 2, mode: "number" });    // 金額
+const ratio = () => numeric({ precision: 7, scale: 4, mode: "number" });     // 0.3500 = 35%
+const quantity = () => numeric({ precision: 12, scale: 2, mode: "number" }); // 1日の販売数など
+
+// ---------- enum ----------
+export const userStatus = pgEnum("user_status", ["active", "suspended", "deleted"]);
+export const themePref = pgEnum("theme_pref", ["system", "light", "dark"]);
+export const workspaceRole = pgEnum("workspace_role", ["owner", "member", "viewer"]);
+export const invitationStatus = pgEnum("invitation_status", ["pending", "accepted", "revoked", "expired"]);
+export const templateKind = pgEnum("template_kind", ["self_analysis", "validation", "business_plan"]);
+export const templateVersionStatus = pgEnum("template_version_status", ["draft", "published"]);
+export const planPart = pgEnum("plan_part", ["a", "b"]);
+export const answerType = pgEnum("answer_type", [
+  "long_text", "short_text", "choice", "amount_with_reason", "table", "linked_metric", "execution_view",
+]);
+export const costCategory = pgEnum("cost_category", ["initial", "monthly_fixed", "variable"]);
+export const checkKey = pgEnum("check_key", ["competitors", "local_price", "costs", "break_even", "permits", "demand_signal"]);
+export const executionType = pgEnum("execution_type", ["milestone", "launch", "kpi", "open_question", "next_action"]);
+export const presetType = pgEnum("preset_type", ["milestone", "launch", "kpi"]);
+export const launchTiming = pgEnum("launch_timing", ["t_minus_30", "t_minus_7", "launch_day", "first_30", "days_31_90", "other"]);
+export const selfAnalysisStatus = pgEnum("self_analysis_status", ["not_started", "in_progress", "done"]);
+export const decisionValue = pgEnum("decision_value", ["proceed", "hold", "drop"]);
+export const fau = pgEnum("fau", ["fact", "assumption", "unknown"]);
+export const level = pgEnum("level", ["low", "medium", "high"]);          // 確信度・確率・影響
+export const sourceType = pgEnum("source_type", [
+  "google_maps_reviews", "website", "social_media", "public_data", "news_report", "store_observation", "price_check", "other",
+]);
+export const supportsCheck = pgEnum("supports_check", ["local_price", "permits", "demand_signal"]);
+export const competitorType = pgEnum("competitor_type", ["direct", "indirect", "substitute"]);
+export const canReduce = pgEnum("can_reduce", ["yes", "partly", "no"]);
+export const costInputMode = pgEnum("cost_input_mode", ["amount", "percent_of_price"]);
+export const economicsField = pgEnum("economics_field", [
+  "selling_price", "operating_days", "target_margin",
+  "units_conservative", "units_expected", "units_strong", "units_capacity",
+]);
+export const evidenceTargetType = pgEnum("evidence_target_type", [
+  "validation_answer", "cost_item", "economics_input", "competitor", "assumption",
+]);
+export const executionStatus = pgEnum("execution_status", ["todo", "doing", "done", "open", "resolved"]);
+export const decisionKind = pgEnum("decision_kind", ["validation_decision", "go_no_go", "version_saved"]);
+export const decisionLogValue = pgEnum("decision_log_value", ["proceed", "hold", "drop", "launch", "delay", "stop"]);
+export const commentTargetType = pgEnum("comment_target_type", [
+  "self_analysis_answer", "validation_answer", "research_log_entry", "competitor", "assumption", "risk",
+  "cost_item", "economics_input", "plan_answer", "execution_item", "pitch_slide", "idea",
+]);
+export const notificationKind = pgEnum("notification_kind", ["mention", "comment", "decision", "due"]);
+export const dueStage = pgEnum("due_stage", ["three_days_before", "due_day", "overdue"]);
+export const historyAction = pgEnum("history_action", ["create", "update", "delete", "restore"]);
+export const historySource = pgEnum("history_source", [
+  "manual", "ai_import", "revert", "template_migration", "duplicate", "plan_draft",
+]);
+export const historyContainer = pgEnum("history_container", ["self_analysis", "validation", "business_plan", "idea"]);
+export const clientKind = pgEnum("client_kind", ["web", "ios", "android", "unknown"]);
+
+// ---------- 認証（Better Auth。auth の設定で列名を対応させる） ----------
+export const users = pgTable("users", {
+  id: pk(),
+  email: text().notNull(),
+  emailVerified: boolean().notNull().default(false),
+  displayName: text().notNull(),                  // Better Auth の name
+  avatarUrl: text(),                              // Better Auth の image
+  isAdmin: boolean().notNull().default(false),
+  status: userStatus().notNull().default("active"),
+  theme: themePref().notNull().default("system"),
+  timezone: text().notNull().default("Asia/Manila"),   // IANA 名。登録時に端末から取る
+  lastWorkspaceId: uuid().references((): AnyPgColumn => workspaces.id, { onDelete: "set null" }),
+  lastActiveAt: ts(),
+  ...timestamps(),
+}, (t) => [uniqueIndex("users_email_lower_uq").on(sql`lower(${t.email})`)]);
+
+export const sessions = pgTable("sessions", {
+  id: pk(),
+  userId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text().notNull().unique(),
+  expiresAt: ts().notNull(),
+  ipAddress: text(),
+  userAgent: text(),
+  ...timestamps(),
+}, (t) => [index().on(t.userId)]);
+
+export const accounts = pgTable("accounts", {
+  id: pk(),
+  userId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
+  accountId: text().notNull(),                    // プロバイダ側の ID
+  providerId: text().notNull(),                   // "credential" | "google"
+  accessToken: text(),
+  refreshToken: text(),
+  idToken: text(),
+  accessTokenExpiresAt: ts(),
+  refreshTokenExpiresAt: ts(),
+  scope: text(),
+  password: text(),                               // ハッシュ（credential のときだけ）
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.providerId, t.accountId), index().on(t.userId)]);
+
+export const verifications = pgTable("verifications", {
+  id: pk(),
+  identifier: text().notNull(),
+  value: text().notNull(),
+  expiresAt: ts().notNull(),
+  ...timestamps(),
+}, (t) => [index().on(t.identifier)]);
+
+export const rateLimits = pgTable("rate_limits", {
+  id: pk(),
+  key: text().notNull().unique(),
+  count: integer().notNull(),
+  lastRequest: bigint({ mode: "number" }).notNull(),
+});
+
+// ---------- ワークスペース ----------
+export const workspaces = pgTable("workspaces", {
+  id: pk(),
+  name: text().notNull(),
+  currency: text().notNull().default("PHP"),      // ISO 4217
+  isPersonal: boolean().notNull().default(false),
+  createdById: uuid().notNull().references((): AnyPgColumn => users.id),
+  lastActiveAt: ts(),                             // 中の何かが最後に変わった日時（28）
+  ...timestamps(),
+});
+
+export const memberships = pgTable("memberships", {
+  id: pk(),
+  workspaceId: uuid().notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: workspaceRole().notNull(),
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.workspaceId, t.userId), index().on(t.userId)]);
+
+export const invitations = pgTable("invitations", {
+  id: pk(),
+  workspaceId: uuid().references(() => workspaces.id, { onDelete: "cascade" }),   // null = 運営者のワークスペースなしの招待
+  email: text().notNull(),
+  role: workspaceRole(),
+  tokenHash: text().notNull().unique(),           // SHA-256。トークンそのものは持たない
+  invitedById: uuid().notNull().references(() => users.id),
+  status: invitationStatus().notNull().default("pending"),
+  expiresAt: ts().notNull(),                      // 発行（再送）から7日
+  acceptedById: uuid().references(() => users.id),
+  acceptedAt: ts(),
+  ...timestamps(),
+}, (t) => [
+  index().on(t.workspaceId),
+  index("invitations_email_lower_idx").on(sql`lower(${t.email})`),
+  check("invitations_role_required", sql`${t.workspaceId} is null or ${t.role} is not null`),
+]);
+
+// ---------- テンプレート ----------
+export const templates = pgTable("templates", {
+  id: pk(),
+  kind: templateKind().notNull().unique(),
+  name: text().notNull(),
+  ...timestamps(),
+});
+
+export const templateVersions = pgTable("template_versions", {
+  id: pk(),
+  templateId: uuid().notNull().references(() => templates.id),
+  versionNumber: integer().notNull(),
+  status: templateVersionStatus().notNull().default("draft"),
+  aiPrompt: text().notNull().default(""),
+  publishedAt: ts(),
+  publishedById: uuid().references(() => users.id),
+  ...timestamps(),
+}, (t) => [
+  uniqueIndex().on(t.templateId, t.versionNumber),
+  uniqueIndex("template_versions_one_draft_uq").on(t.templateId).where(sql`${t.status} = 'draft'`),
+]);
+
+export const templateSections = pgTable("template_sections", {
+  id: pk(),
+  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  key: text().notNull(),                          // 例: "WHY"、"01"、プランは "01"〜"30"
+  part: planPart(),                               // プランだけ
+  title: text().notNull(),
+  guidance: text(),
+  sortOrder: integer().notNull(),
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.templateVersionId, t.key)]);
+
+export const templateQuestions = pgTable("template_questions", {
+  id: pk(),
+  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  templateSectionId: uuid().notNull().references(() => templateSections.id, { onDelete: "cascade" }),
+  questionKey: text().notNull(),                  // 設問 ID（design-spec 6.6）。公開後は変えない
+  title: text().notNull(),
+  prompt: text().notNull(),
+  example: text(),
+  hint: text(),
+  answerType: answerType().notNull(),
+  options: jsonb(),                               // 5.2 QuestionOptions
+  displayCondition: jsonb(),                      // 例: { "V.02.OCEAN": ["Red", "Mixed"] }
+  hasFau: boolean().notNull().default(false),
+  copyFrom: jsonb(),                              // プラン: 下書きでコピーする元（設問 ID・IDEA.*・LIST.*）
+  reference: jsonb(),                             // プラン: 参照に出すもの
+  sortOrder: integer().notNull(),
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.templateVersionId, t.questionKey), index().on(t.templateSectionId)]);
+
+export const templateCostDefaults = pgTable("template_cost_defaults", {
+  id: pk(),
+  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  category: costCategory().notNull(),
+  key: text().notNull(),                          // 例: "initial.permits"、"monthly.rent"
+  name: text().notNull(),
+  sortOrder: integer().notNull(),
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.templateVersionId, t.key)]);
+
+export const templateCheckRules = pgTable("template_check_rules", {
+  id: pk(),
+  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  checkKey: checkKey().notNull(),
+  params: jsonb().notNull(),                      // 基準値。例: { "min": 3, "max": 5 }
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.templateVersionId, t.checkKey)]);
+
+export const templateExecutionPresets = pgTable("template_execution_presets", {
+  id: pk(),
+  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  type: presetType().notNull(),
+  title: text().notNull(),                        // 例: "Business decision"、"30 days before launch"、"Revenue"
+  area: text(),                                   // KPI だけ（Financial / Customer / Operations）
+  launchTiming: launchTiming(),                   // ローンチだけ
+  sortOrder: integer().notNull(),
+  ...timestamps(),
+});
+
+// ---------- 自己分析 ----------
+export const selfAnalyses = pgTable("self_analyses", {
+  id: pk(),
+  userId: uuid().notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  templateVersionId: uuid().notNull().references(() => templateVersions.id),
+  currency: text().notNull().default("PHP"),
+  status: selfAnalysisStatus().notNull().default("not_started"),
+  completedAt: ts(),
+  ...timestamps(),
+});
+
+export const selfAnalysisAnswers = pgTable("self_analysis_answers", {
+  id: pk(),
+  selfAnalysisId: uuid().notNull().references(() => selfAnalyses.id, { onDelete: "cascade" }),
+  questionKey: text().notNull(),                  // 例: "SA.INCOME.1"
+  text: text(),                                   // 金額＋理由の設問では理由
+  amount: money(),                                // 金額＋理由の設問だけ
+  ...versioned(),
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.selfAnalysisId, t.questionKey)]);
+
+export const selfAnalysisShares = pgTable("self_analysis_shares", {
+  id: pk(),
+  selfAnalysisId: uuid().notNull().references(() => selfAnalyses.id, { onDelete: "cascade" }),
+  workspaceId: uuid().notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  sharedAt: ts().notNull().defaultNow(),
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.selfAnalysisId, t.workspaceId), index().on(t.workspaceId)]);
+
+// ---------- アイデアと検証 ----------
+export const ideas = pgTable("ideas", {
+  id: pk(),
+  workspaceId: uuid().notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text().notNull(),
+  oneLineConcept: text().notNull(),
+  proposedSolution: text(),
+  proposerId: uuid().notNull().references(() => users.id),
+  duplicatedFromId: uuid().references((): AnyPgColumn => ideas.id, { onDelete: "set null" }),
+  latestDecision: decisionValue(),                // null = 未判定。決定ログの最新を写した値
+  archivedAt: ts(),
+  lastActivityAt: ts().notNull().defaultNow(),
+  ...versioned(),                                 // 概要の同時編集
+  ...timestamps(),
+}, (t) => [index().on(t.workspaceId, t.lastActivityAt)]);
+// 工程（stage）は保存しない（プランの有無と Go / No-Go から毎回決める）
+
+export const validations = pgTable("validations", {
+  id: pk(),
+  ideaId: uuid().notNull().unique().references(() => ideas.id, { onDelete: "cascade" }),
+  templateVersionId: uuid().notNull().references(() => templateVersions.id),
+  ...timestamps(),
+});
+
+const fauColumns = () => ({ fau: fau(), confidence: level() });   // fau = null は未分類か未入力
+const fauCheck = (name: string, t: { fau: AnyPgColumn; confidence: AnyPgColumn }) =>
+  check(name, sql`(coalesce(${t.fau}::text, '') = 'assumption') = (${t.confidence} is not null)`);
+
+export const validationAnswers = pgTable("validation_answers", {
+  id: pk(),
+  validationId: uuid().notNull().references(() => validations.id, { onDelete: "cascade" }),
+  questionKey: text().notNull(),                  // 例: "V.01.WHO"、"V.08.WORTH"
+  text: text(),                                   // 選択の設問は選んだ値
+  ...fauColumns(),
+  ...versioned(),
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.validationId, t.questionKey), fauCheck("validation_answers_confidence", t)]);
+
+export const researchLogEntries = pgTable("research_log_entries", {
+  id: pk(),
+  validationId: uuid().notNull().references(() => validations.id, { onDelete: "cascade" }),
+  observedOn: date({ mode: "string" }),
+  topic: text().notNull(),
+  observation: text(),
+  sourceType: sourceType(),
+  sourceUrl: text(),
+  supportsChecks: supportsCheck().array().notNull().default(sql`'{}'`),   // 裏付ける確認項目
+  supportsNote: text(),                           // What It Supports（自由記述）
+  createdById: uuid().notNull().references(() => users.id),
+  deletedAt: ts(),
+  ...versioned(),
+  ...timestamps(),
+}, (t) => [index().on(t.validationId, t.observedOn)]);
+
+export const competitors = pgTable("competitors", {
+  id: pk(),
+  validationId: uuid().notNull().references(() => validations.id, { onDelete: "cascade" }),
+  name: text().notNull(),
+  type: competitorType(),
+  targetCustomer: text(),
+  offering: text(),
+  typicalPrice: money(),
+  priceNote: text(),                              // 例: "per box"
+  strength: text(),
+  weakness: text(),
+  whyChosen: text(),
+  whySurvive: text(),
+  sortOrder: integer().notNull(),
+  deletedAt: ts(),
+  ...versioned(),
+  ...timestamps(),
+}, (t) => [index().on(t.validationId)]);
+
+export const assumptions = pgTable("assumptions", {
+  id: pk(),
+  validationId: uuid().notNull().references(() => validations.id, { onDelete: "cascade" }),
+  statement: text().notNull(),
+  whyBelieve: text(),
+  evidenceNote: text(),                           // 根拠（evidence_links）とは別の自由記述
+  confidence: level(),
+  disproveCondition: text(),
+  nextCheck: text(),
+  sortOrder: integer().notNull(),
+  deletedAt: ts(),
+  ...versioned(),
+  ...timestamps(),
+}, (t) => [index().on(t.validationId)]);
+
+export const risks = pgTable("risks", {
+  id: pk(),
+  validationId: uuid().notNull().references(() => validations.id, { onDelete: "cascade" }),
+  statement: text().notNull(),
+  probability: level(),
+  impact: level(),
+  whyMatters: text(),
+  mitigation: text(),
+  howToValidate: text(),
+  sortOrder: integer(),                           // null = 自動の並び（Impact → Probability の高い順）
+  deletedAt: ts(),
+  ...versioned(),
+  ...timestamps(),
+}, (t) => [index().on(t.validationId)]);
+
+export const costItems = pgTable("cost_items", {
+  id: pk(),
+  validationId: uuid().notNull().references(() => validations.id, { onDelete: "cascade" }),
+  category: costCategory().notNull(),
+  templateKey: text(),                            // テンプレートの初期行のキー。追加した行は null
+  name: text().notNull(),
+  inputMode: costInputMode().notNull().default("amount"),
+  amount: money(),
+  percent: ratio(),                               // 0〜1
+  isLumpSum: boolean().notNull().default(false),
+  whyNeeded: text(),                              // initial
+  canReduce: canReduce(),                         // initial
+  notes: text(),
+  ...fauColumns(),
+  sortOrder: integer().notNull(),
+  deletedAt: ts(),
+  ...versioned(),
+  ...timestamps(),
+}, (t) => [
+  index().on(t.validationId, t.category),
+  fauCheck("cost_items_confidence", t),
+  check("cost_items_percent_variable", sql`${t.inputMode} = 'amount' or ${t.category} = 'variable'`),
+  check("cost_items_unknown_no_value", sql`coalesce(${t.fau}::text, '') <> 'unknown' or (${t.amount} is null and ${t.percent} is null)`),
+  check("cost_items_ranges", sql`(${t.amount} is null or ${t.amount} >= 0) and (${t.percent} is null or (${t.percent} >= 0 and ${t.percent} <= 1))`),
+]);
+
+export const economicsInputs = pgTable("economics_inputs", {
+  id: pk(),
+  validationId: uuid().notNull().references(() => validations.id, { onDelete: "cascade" }),
+  fieldKey: economicsField().notNull(),
+  value: numeric({ precision: 14, scale: 4, mode: "number" }),   // null = 未入力。target_margin は 0.15 = 15%
+  ...fauColumns(),
+  ...versioned(),
+  ...timestamps(),
+}, (t) => [
+  uniqueIndex().on(t.validationId, t.fieldKey),
+  fauCheck("economics_inputs_confidence", t),
+  check("economics_inputs_unknown_no_value", sql`coalesce(${t.fau}::text, '') <> 'unknown' or ${t.value} is null`),
+]);
+
+export const evidenceLinks = pgTable("evidence_links", {
+  id: pk(),
+  workspaceId: uuid().notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  validationId: uuid().notNull().references(() => validations.id, { onDelete: "cascade" }),
+  targetType: evidenceTargetType().notNull(),
+  targetId: uuid().notNull(),                     // 回答・数字は検証の id、行は行の id（5.1 TargetRef）
+  targetKey: text(),                              // 回答は設問 ID、数字は field_key
+  researchLogEntryId: uuid().references(() => researchLogEntries.id),
+  url: text(),
+  note: text(),
+  createdById: uuid().notNull().references(() => users.id),
+  deletedAt: ts(),                                // 根拠を外したとき（履歴から戻せる）
+  ...timestamps(),
+}, (t) => [
+  index().on(t.targetType, t.targetId, t.targetKey),
+  index().on(t.researchLogEntryId),
+  check("evidence_links_one_source", sql`(${t.researchLogEntryId} is not null) <> (${t.url} is not null)`),
+]);
+
+// ---------- プランと実行管理 ----------
+export const businessPlans = pgTable("business_plans", {
+  id: pk(),
+  ideaId: uuid().notNull().references(() => ideas.id, { onDelete: "cascade" }),
+  name: text().notNull(),                         // 案の名前（Plan A など）
+  businessName: text().notNull(),
+  preparedBy: text().notNull(),
+  templateVersionId: uuid().notNull().references(() => templateVersions.id),
+  createdFromDecisionId: uuid().references((): AnyPgColumn => decisionLogEntries.id),
+  archivedAt: ts(),
+  lastActivityAt: ts().notNull().defaultNow(),
+  createdById: uuid().notNull().references(() => users.id),
+  ...versioned(),                                 // ヘッダの同時編集
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.ideaId, t.name)]);
+
+export const planAnswers = pgTable("plan_answers", {
+  id: pk(),
+  businessPlanId: uuid().notNull().references(() => businessPlans.id, { onDelete: "cascade" }),
+  questionKey: text().notNull(),                  // 例: "P.01.1"
+  text: text(),
+  rows: jsonb(),                                  // 表の小項目（§11・§13・§21・§22）の行の配列
+  copiedFrom: jsonb(),                            // { source, copiedAt }
+  ...versioned(),
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.businessPlanId, t.questionKey)]);
+
+export const planVersions = pgTable("plan_versions", {
+  id: pk(),
+  businessPlanId: uuid().notNull().references(() => businessPlans.id, { onDelete: "cascade" }),
+  versionNumber: integer().notNull(),
+  name: text().notNull(),                         // 例: "v1 For advisors"
+  snapshot: jsonb().notNull(),                    // 30項目の回答・主要指標・シナリオ表・実行管理の項目・競合の上位5件
+  savedById: uuid().notNull().references(() => users.id),
+  savedAt: ts().notNull().defaultNow(),
+  ...timestamps(),
+}, (t) => [uniqueIndex().on(t.businessPlanId, t.versionNumber)]);
+
+export const executionItems = pgTable("execution_items", {
+  id: pk(),
+  businessPlanId: uuid().notNull().references(() => businessPlans.id, { onDelete: "cascade" }),
+  type: executionType().notNull(),
+  title: text().notNull(),                        // Milestone / Timing / KPI / Open Question / Action の文言
+  assigneeUserId: uuid().references(() => users.id, { onDelete: "set null" }),
+  assigneeName: text(),                           // 担当を自由に書いたとき
+  dueDate: date({ mode: "string" }),
+  status: executionStatus(),                      // 種類ごとに使う値が決まる。KPI は null
+  goal: text(),                                   // milestone
+  exitCondition: text(),                          // milestone
+  launchTiming: launchTiming(),                   // launch
+  actions: text(),                                // launch
+  completionCriteria: text(),                     // launch
+  kpiArea: text(),                                // kpi
+  kpiTarget: text(),                              // kpi（原本どおり文章）
+  kpiReviewFrequency: text(),                     // kpi
+  kpiActual: text(),                              // kpi（アプリで足した実績）
+  kpiActualUpdatedAt: ts(),
+  whyItMatters: text(),                           // open_question
+  answer: text(),                                 // open_question
+  fromPreset: boolean().notNull().default(false),
+  completedAt: ts(),
+  sortOrder: integer().notNull(),
+  deletedAt: ts(),
+  ...versioned(),
+  ...timestamps(),
+}, (t) => [
+  index().on(t.businessPlanId, t.type),
+  index("execution_items_due_idx").on(t.dueDate).where(sql`${t.dueDate} is not null and ${t.deletedAt} is null`),
+  check("execution_items_one_assignee", sql`${t.assigneeUserId} is null or ${t.assigneeName} is null`),
+]);
+
+// ---------- 決定ログ・コメント・通知・変更履歴 ----------
+export const decisionLogEntries = pgTable("decision_log_entries", {
+  id: pk(),
+  workspaceId: uuid().notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  ideaId: uuid().notNull().references(() => ideas.id, { onDelete: "cascade" }),
+  businessPlanId: uuid().references((): AnyPgColumn => businessPlans.id, { onDelete: "cascade" }),
+  planVersionId: uuid().references(() => planVersions.id),
+  kind: decisionKind().notNull(),
+  value: decisionLogValue(),                      // version_saved は null
+  reason: text(),                                 // 判定と Go / No-Go は必須（API で検査）
+  snapshot: jsonb().notNull(),                    // 不足項目・主要指標・F/A/U の内訳（Go / No-Go は §24 の条件も）
+  recordedById: uuid().notNull().references(() => users.id),
+  recordedAt: ts().notNull().defaultNow(),
+  createdAt: ts().notNull().defaultNow(),         // 追記だけ（updatedAt を持たない）
+}, (t) => [index().on(t.workspaceId, t.recordedAt), index().on(t.ideaId, t.recordedAt), index().on(t.businessPlanId)]);
+
+export const comments = pgTable("comments", {
+  id: pk(),
+  workspaceId: uuid().notNull().references(() => workspaces.id, { onDelete: "cascade" }),  // 自己分析へのコメントは共有先
+  targetType: commentTargetType().notNull(),
+  targetId: uuid().notNull(),
+  targetKey: text(),
+  parentId: uuid().references((): AnyPgColumn => comments.id, { onDelete: "cascade" }),  // 返信（1段まで）
+  authorId: uuid().notNull().references(() => users.id),
+  body: text().notNull(),
+  resolvedAt: ts(),
+  resolvedById: uuid().references(() => users.id),
+  editedAt: ts(),
+  deletedAt: ts(),
+  ...timestamps(),
+}, (t) => [index().on(t.targetType, t.targetId, t.targetKey), index().on(t.workspaceId, t.createdAt)]);
+
+export const commentMentions = pgTable("comment_mentions", {
+  id: pk(),
+  commentId: uuid().notNull().references(() => comments.id, { onDelete: "cascade" }),
+  userId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: ts().notNull().defaultNow(),
+}, (t) => [uniqueIndex().on(t.commentId, t.userId)]);
+
+export const notifications = pgTable("notifications", {
+  id: pk(),
+  userId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),     // 受け取る人
+  workspaceId: uuid().notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  kind: notificationKind().notNull(),
+  actorId: uuid().references(() => users.id),
+  commentId: uuid().references(() => comments.id, { onDelete: "cascade" }),
+  decisionLogEntryId: uuid().references(() => decisionLogEntries.id, { onDelete: "cascade" }),
+  executionItemId: uuid().references(() => executionItems.id, { onDelete: "cascade" }),
+  dueStage: dueStage(),                           // kind = due のとき
+  dueDate: date({ mode: "string" }),              // kind = due のとき（期限を変えたら新しい日付で送り直す）
+  link: jsonb().notNull(),                        // 開く先（5.2 LinkTarget）
+  readAt: ts(),
+  createdAt: ts().notNull().defaultNow(),
+}, (t) => [
+  index().on(t.userId, t.createdAt),
+  index("notifications_unread_idx").on(t.userId).where(sql`${t.readAt} is null`),
+  uniqueIndex("notifications_due_once_uq").on(t.executionItemId, t.dueDate, t.dueStage).where(sql`${t.kind} = 'due'`),
+]);
+
+export const changeHistory = pgTable("change_history", {
+  id: pk(),
+  workspaceId: uuid().references(() => workspaces.id, { onDelete: "cascade" }),     // 自己分析の履歴は null
+  ownerUserId: uuid().references(() => users.id, { onDelete: "cascade" }),          // 自己分析の履歴の持ち主
+  containerType: historyContainer().notNull(),    // 画面全体の履歴を引くため
+  containerId: uuid().notNull(),
+  sectionKey: text(),                             // 例: "01"、"costs"、"economics"、プランは項目番号
+  targetType: text().notNull(),                   // 5.1 TargetRef の type
+  targetId: uuid().notNull(),
+  targetKey: text(),
+  action: historyAction().notNull(),
+  before: jsonb(),
+  after: jsonb(),
+  source: historySource().notNull(),
+  batchId: uuid(),                                // 1回の操作（AI 取り込み・移行・下書き作成・複製）のまとまり
+  client: clientKind().notNull().default("unknown"),
+  revertedFromId: uuid().references((): AnyPgColumn => changeHistory.id),
+  changedById: uuid().notNull().references(() => users.id),
+  changedAt: ts().notNull().defaultNow(),
+}, (t) => [
+  index().on(t.targetType, t.targetId, t.targetKey, t.changedAt),
+  index().on(t.containerType, t.containerId, t.changedAt),
+  index().on(t.workspaceId, t.changedAt),
+  index().on(t.batchId),
+]);
+```
+
+### 6.4 保存しないもの（毎回計算・生成する）
+
+- 損益分岐・シナリオ表・投資回収・ROI（design-spec 6.4）
+- 確認項目の状態・Next steps・F/A/U の内訳（design-spec 6.1）
+- アイデアの工程（プランの有無と、アーカイブしていない案の最新の Go / No-Go から決める）
+- プランに表示する検証の数字（常に検証から読む）
+- Pitch Deck（PDF を含む）
+- 例外: 決定ログ（`decision_log_entries.snapshot`）と版（`plan_versions.snapshot`）には、その時点の値を残す
+
+### 6.5 データのルール
+
+- **数字の正は検証に置く。** プランは数字を持たず、検証を参照する。数字の違う案は「アイデアを複製」して別の検証にする。
+- **テンプレートを改訂しても、既存の回答は作成時の版に固定する。** 最新版への移行は任意で、設問 ID が一致する回答を引き継ぐ（design-spec 6.0.7）。
+- **変更はすべて履歴に残す。** 対象は自己分析・検証・プラン・実行管理。自己分析の履歴は本人だけが見られる（ADR-020）。
+- **決定ログは追記だけ。** 更新・削除しない（API を作らない。アカウントの削除でも記録者は「Deleted user」として残す）。
+- **Fact には根拠が必須**（Fact にするときに、有効な `evidence_links` が1件以上）。例外は、調査ログの削除で根拠が0件になった「Fact（根拠なし）」で、警告の状態として残す。Assumption にだけ確信度を付ける（DB の check 制約でも守る）。数字の Unknown は値を持たない（同上）。
+- **論理削除**: `deleted_at` を持つテーブルは論理削除で、履歴から戻せる。一覧・計算・確認項目の判定では数えない。
+- **選択肢の値は原本を踏襲する。** 判定 Proceed / Hold / Drop、市場の種類 Red / Blue / Mixed、確信度 Low / Medium / High、Can Reduce? Yes / Partly / No、競合の種類 Direct / Indirect / Substitute、出典の種類（design-spec 6.10）。
+- **ワークスペースの通貨を変えても金額は換算しない。**
+- **アカウントの削除**: `users` の行は残して個人の情報を消す（5.4 U7）。外部キーは `users` を参照し続ける。
+- **シード**: `make db-seed` は design-spec 8章のデモデータを入れる。テンプレート v1 の中身は Drive の原本から転記したもの（design-spec 9.3）を `packages/db/seed/templates/` に置く。
 
 ## 7. セキュリティ・パフォーマンス
 

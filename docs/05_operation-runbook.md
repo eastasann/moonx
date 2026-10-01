@@ -18,11 +18,11 @@
 | Cloud Run のリクエストのログ | Cloud Logging | 30日 | URL・ステータス・時間。アプリのログが出ない失敗（起動の失敗・タイムアウト・メモリ不足）もここと system のログに出る |
 | Cloud Scheduler | Cloud Logging | 30日 | ジョブ `moonx-{env}-due-notifications` の実行の結果 |
 | 稼働時間チェック | Cloud Monitoring | Cloud Monitoring の保持期間 | `https://{DOMAIN}/api/health` の結果 |
-| Worker（`moonx-web`） | `wrangler tail`（その場で見るだけ） | 保存しない | 転送の失敗・例外 |
+| Worker（`moonx-web-production`。staging は `moonx-web-staging`） | Cloudflare Workers Logs（ダッシュボード）と `wrangler tail`（その場で追う） | 3日（無料プラン） | 転送の失敗・例外 |
 | エラー（web / mobile / api） | Sentry の3つのプロジェクト | Sentry の無料プランの保持期間 | 例外・リクエスト ID・リリース（版）・environment |
 | メール | Resend の管理画面（Emails） | Resend のプランの保持期間（短い） | 送信・配達・バウンス |
 | DB | Neon のコンソール（Monitoring・Usage） | Neon のプランによる | 接続数・容量・計算時間 |
-| デプロイ | GitHub Actions | 90日 | `deploy.yml`・`build.yml` の記録 |
+| デプロイ・バックアップ | GitHub Actions | 90日 | `deploy.yml`・`build.yml`・`db-backup.yml` の記録 |
 
 リクエスト ID は Worker が付け（`X-Request-Id`）、エラーの応答・Cloud Logging・Sentry に入る（ADR-023）。利用者からエラーの連絡を受けたら、画面に出たリクエスト ID をもらう。
 
@@ -41,12 +41,12 @@
 
 ## 2. 監視ポイントとアラート
 
-アラートの定義は Terraform（Cloud Monitoring）。閾値を変えたら、この表と Terraform を同じ PR で直す。アラート先はすべて、一次対応の担当のメール（04 7章）。
+アラートの定義は Terraform。環境ごとのアラート（Cloud Monitoring）は `envs/production`、予算アラートと通知のチャンネルは `envs/shared`。閾値を変えたら、この表と Terraform を同じ PR で直す。アラート先はすべて、一次対応の担当のメール（04 7章）。
 
 | 監視対象 | メトリクス | 閾値 | アラート先 / 確かめ方 |
 |---|---|---|---|
 | API の死活（production） | 稼働時間チェック `https://{DOMAIN}/api/health`（5分ごと。Worker を通して Cloud Run まで届く） | 2つ以上の地域で失敗が5分続く | メール |
-| API のエラー | Cloud Run の `request_count`（`response_code_class` = 5xx） | 10分間に5件以上 | メール |
+| API のエラー | ログベースの指標（5xx の件数と割合） | 10分間で全体の1%を超える、または5分で5件を超える（System Design Doc 11章） | メール |
 | API の遅さ | Cloud Run の `request_latencies` の p95 | 3秒を超えて15分続く | メール |
 | ダッシュボードの遅さ | ログの `latencyMs`（ダッシュボードの `route`） | p95 が 1秒を超える（ADR-011 の見直しの条件） | 週1回、4章のコマンドで見る |
 | Cloud Run のメモリ | `container/memory/utilizations` | 90% を超える（PDF の作成。3.6） | メール |
@@ -55,11 +55,11 @@
 | 新しいエラー | Sentry の新しい issue | 新しい issue が出たら | Sentry からメール |
 | Sentry の枠 | 月のイベント数（無料枠 5,000） | 4,000 を超える | Sentry の使用量の通知・週1回 |
 | Neon の容量 | Storage（無料枠 0.5 GB。production と staging のブランチの合計） | 0.4 GB を超える | 週1回、Neon のコンソール |
-| Neon の計算時間 | Compute（無料枠。使い切ると DB が止まる） | 月の枠の 80% を超える | 週1回、Neon のコンソール |
+| Neon の計算時間 | Compute（無料枠。production と staging のブランチの合計。使い切ると DB が止まる） | 月の枠の 80% を超える | 週1回、Neon のコンソール |
 | Resend の送信数 | 1日の送信数（無料枠 1日100通・月3,000通） | 1日80通・月2,400通を超える | 週1回と、まとめて招待する前に Resend の管理画面 |
-| Worker のリクエスト数 | 1日のリクエスト数（無料枠 10万。`/api` だけが数える） | 1日7万を超える | 週1回、Cloudflare の管理画面 |
+| Worker のリクエスト数 | 1日のリクエスト数（無料枠 10万。`moonx-web-staging` と `moonx-web-production` の合計。`/api` だけが数える） | 1日7万を超える | 週1回、Cloudflare の管理画面 |
 | Cloud Run の無料枠 | リクエスト（月200万）・vCPU 秒（18万）・GiB 秒（36万） | 枠の 80% を超える | 月1回、請求のレポート |
-| 費用 | Cloud Billing の予算（月 $10） | 50%・90%・100% | メール（03 5.4 L） |
+| 費用 | Cloud Billing の予算（Terraform の `envs/shared`） | SDD 11章の金額 | メール（03 5.4 G） |
 
 - 稼働時間チェックの `/api/health` は DB に触れないこと。触れると Neon が休めず、無料枠の計算時間を使い切る
 - staging にはアラートを付けない（Sentry の issue だけ見る）
@@ -120,8 +120,8 @@ limit 10;
 
 **対処:**
 1. すぐに戻すなら、Neon を有料プランに上げる（ADR-008）。費用は月の確認（6章）で見直す
-2. 容量: `change_history` が大きい想定（ADR-008）。staging のブランチの分も同じ枠に入るので、staging の要らないデータを消す。staging を production から作り直さない（実データが入る）
-3. 計算時間: DB を起こし続けているもの（`/api/health` が DB に触れていないか、手元からの接続の放置）を探す
+2. 容量: `change_history` が大きい想定（ADR-008）。枠はプロジェクト単位で、staging のブランチの分も同じ枠に入るので、staging の要らないデータを消す。staging を production から作り直さない（実データが入る）
+3. 計算時間: これもプロジェクト単位で staging と分け合う。DB を起こし続けているもの（`/api/health` が DB に触れていないか、手元からの接続の放置、staging での長い作業）を探す
 4. 続くようなら、別の PostgreSQL への移行を考える（ADR-008）
 
 ### 3.4 Cloud Run: コールドスタートで遅い
@@ -138,7 +138,8 @@ gcloud logging read \
 
 **対処:**
 - 許容する（ADR-007）
-- 利用者が遅いと感じるなら最小1台にする（月数ドル。ADR-007）。急ぐときは CLI で変え、同じ値を Terraform にも入れる
+- 利用者が遅いと感じるなら、Terraform の `min_instance_count` を1にする（常に1台。月数ドルかかるので予算と相談して決める。時間帯での自動の切り替えは作らない。ADR-007）。PR → `make infra-plan ENV=production` → `make infra-apply ENV=production`
+- 急ぐときだけ CLI で先に変え、同じ値を Terraform にも入れる（入れないと次の apply で0台に戻る）
 
   ```bash
   gcloud run services update moonx-api-production --region=asia-southeast1 --min-instances=1
@@ -196,7 +197,7 @@ Cloud Monitoring で Cloud Run のメモリの使用率も見る。
 
 ### 3.7 Cloud Run: 新しいリビジョンが起動しない
 
-**症状:** `deploy.yml` の `gcloud run deploy` が失敗する（`failed to start and listen on the port defined provided by the PORT=8080` など）。Cloud Run は前のリビジョンに流したままなので、利用者への影響は無い。
+**症状:** `deploy.yml` の `make deploy-api` が失敗する（`failed to start and listen on the port defined provided by the PORT=8080` など）。Cloud Run は前のリビジョンに流したままなので、利用者への影響は無い。
 
 **確認:**
 
@@ -211,14 +212,14 @@ gcloud logging read \
 
 | ログに出るもの | 原因 | 対処 |
 |---|---|---|
-| シークレットが見つからない・権限が無い | Secret Manager に値（有効な版）が無い、実行用のサービスアカウントの権限 | 値を入れる（03 5.4 H）。権限は Terraform で直す |
+| シークレットが見つからない・権限が無い | Secret Manager に値（有効な版）が無い、実行用のサービスアカウントの権限 | 値を入れる（03 5.4 I）。権限は Terraform で直す |
 | 起動のときの設定の検査で終了する | 新しい環境変数を Terraform に入れ忘れた | Terraform に入れて `make infra-apply` → `deploy.yml` を再実行（`gh run rerun <RUN_ID>`） |
-| `exec format error` | 手元（Apple シリコン）で作った arm64 のイメージ | イメージは `build.yml` が作ったものだけを使う |
+| `exec format error` | 手元（Apple シリコン）で `make build-api-image` を動かして作った arm64 のイメージ | イメージは `build.yml` が作ったものだけを使う |
 | ポートで待ち受けていない | アプリが `PORT` を読んでいない | コードを直す |
 
 ### 3.8 DB のマイグレーションが失敗した
 
-**症状:** `deploy.yml` の最初の段（`make db-migrate`）で失敗する。API・Web・スマホは前の版のまま。
+**症状:** `deploy.yml` の最初の段（`make deploy-api` の中のマイグレーション）で失敗する。API・Web・スマホは前の版のまま。
 
 **確認:**
 
@@ -249,14 +250,14 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://{DOMAIN}/api/health
 run_url="$(gcloud run services describe moonx-api-production --region=asia-southeast1 --format='value(status.url)')"
 curl -sS -o /dev/null -w '%{http_code}\n' "$run_url/api/health"
 
-# 3. Worker のログ
-cd apps/web && bunx wrangler tail moonx-web --env production --status=error --format=pretty
+# 3. Worker（moonx-web-production）のログ
+cd apps/web && bunx wrangler tail --env production --status=error --format=pretty
 ```
 
 | 1（Worker） | 2（直接） | ほかの `/api` | 原因 | 対処 |
 |---|---|---|---|---|
-| 失敗 | 成功 | — | 転送先（`API_ORIGIN`）が違う、Worker の例外 | `wrangler.jsonc` の production の `API_ORIGIN` を 2 の URL と比べ、直して PR → 昇格。急ぐなら前の Worker に戻す（04 5.3） |
-| 成功 | 成功 | 拒否される | 共有シークレットの不一致（`X-Moonx-Proxy-Secret`）。`/api/health` は検査しないので通る | Worker と Secret Manager の `PROXY_SHARED_SECRET` をそろえる。Worker のシークレットは読み出せないので、新しい値で両方を入れ直す（3.15） |
+| 失敗 | 成功 | — | 転送先（`API_ORIGIN`）が違う、Worker の例外 | `wrangler.jsonc` の env `production` の `API_ORIGIN` を 2 の URL と比べ、直して PR → 昇格（`make deploy-web` で出る）。急ぐなら前の Worker に戻す（04 5.3） |
+| 成功 | 成功 | 拒否される | 共有シークレットの不一致（`X-Moonx-Proxy-Secret`）。`/api/health` は検査しないので通る | Worker と Secret Manager の `PROXY_SHARED_SECRET` をそろえる。Worker のシークレットは読み出せないので、3.15 の手順で新しい値を入れる |
 | 失敗 | 失敗（403） | — | Cloud Run が認証なしの呼び出しを受けない設定 | `gcloud run services get-iam-policy moonx-api-production --region=asia-southeast1` に `allUsers` の `roles/run.invoker` があるか。Terraform で直す |
 | 失敗 | 失敗 | — | API 側の問題 | 3.5・3.7 |
 
@@ -385,19 +386,32 @@ Cloud Run はシークレットを起動のときに読む。値を変えたら�
 | シークレット | 入れ替えの影響と注意 |
 |---|---|
 | `BETTER_AUTH_SECRET`（`moonx-{env}-better-auth-secret`） | **全員がログアウトする**（Web もスマホも）。漏れたときだけ替える。先に BCDX の窓口へ知らせる |
-| `PROXY_SHARED_SECRET`（Secret Manager と Worker） | 両方を替え終わるまで `/api` が拒否される（API は1つの値しか受けない）。使われていない時間に、手順 1・2 の直後に Worker を替える（下） |
+| `PROXY_SHARED_SECRET`（`moonx-{env}-proxy-shared-secret` と Worker） | 止まらない。API はカンマ区切りで2つまで受け付ける（SDD 2章「環境変数」）ので、API に「新,旧」→ Worker を新 → API を新だけ、の順に替える（下） |
 | `GOOGLE_CLIENT_SECRET`（`moonx-{env}-google-client-secret`） | 止まらない。Google のクライアントにシークレットを足す → 手順 1〜3 → Google 側で古いシークレットを無効にして消す |
 | `RESEND_API_KEY`（`moonx-{env}-resend-api-key`） | 止まらない。Resend で新しいキー → 手順 1〜3 → Resend で古いキーを消す |
-| `DATABASE_URL`（Neon のロールのパスワード） | Neon でパスワードを替えると、古い接続文字列はすぐに使えない。替えたら直ちに `moonx-{env}-database-url` と GitHub の `DATABASE_URL_DIRECT` を直し、手順 2 |
+| `DATABASE_URL`（Neon のロールのパスワード） | Neon でパスワードを替えると、古い接続文字列はすぐに使えない。替えたら直ちに `moonx-{env}-database-url` と GitHub の環境のシークレット `DATABASE_URL_DIRECT`（マイグレーションとバックアップが使う）を直し、手順 2 |
+| CI のトークン（`CLOUDFLARE_API_TOKEN`・`EXPO_TOKEN`・`SENTRY_AUTH_TOKEN`） | 止まらない。Secret Manager の手順は要らない。各サービスで新しいトークンを作る → `gh secret set <名前> --env staging` と `--env production` で入れる → 古いトークンを消す |
+
+**`PROXY_SHARED_SECRET` の入れ替え（止めずに行う）:**
 
 ```bash
-# PROXY_SHARED_SECRET
-proxy_secret="$(openssl rand -hex 32)"
-printf '%s' "$proxy_secret" | gcloud secrets versions add moonx-production-proxy-shared-secret --data-file=-
-# ここで共通の手順 2（新しいリビジョン）。終わったらすぐに Worker を替える
-(cd apps/web && printf '%s' "$proxy_secret" | bunx wrangler secret put PROXY_SHARED_SECRET --env production)
-unset proxy_secret
+SECRET=moonx-production-proxy-shared-secret
+old="$(gcloud secrets versions access latest --secret=$SECRET)"   # カンマを含まない1つの値であること（前の入れ替えが終わっている）
+new="$(openssl rand -hex 32)"
+
+# 1. API に新旧の両方を受けさせる。「新,旧」の版を足し、共通の手順 2（新しいリビジョン）
+printf '%s,%s' "$new" "$old" | gcloud secrets versions add $SECRET --data-file=-
+
+# 2. Worker を新しい値にする（入れるとすぐに新しい版の Worker に替わる）
+(cd apps/web && printf '%s' "$new" | bunx wrangler secret put PROXY_SHARED_SECRET --env production)
+curl -sS -o /dev/null -w '%{http_code}\n' https://{DOMAIN}/api/auth/get-session   # 拒否されないこと（/api/health は検査しないので使わない）
+
+# 3. 古い値を外す。「新」だけの版を足し、共通の手順 2 → 手順 3（古い版を無効にする）
+printf '%s' "$new" | gcloud secrets versions add $SECRET --data-file=-
+unset old new
 ```
+
+漏れたときも同じ手順で替える。手順 1 から 3 までの間は古い値も通るので、続けて行う。
 
 ### 3.16 停止した利用者がログインしたまま
 
@@ -416,8 +430,8 @@ unset proxy_secret
 
 | 見え方 | 原因 | 対処 |
 |---|---|---|
-| スマホだけ、すべての通信が失敗（Web は動く） | アプリに埋め込まれた `EXPO_PUBLIC_API_BASE_URL` が違う（EAS Update で値を渡し忘れた。04 2章） | Sentry（mobile）で呼んでいる URL を確かめる。前の更新に戻す（04 5.4）→ 正しい値で出し直す |
-| staging のアプリが production を呼ぶ（その逆） | profile とチャンネルの取り違え | `eas channel:view staging`・`eas update:list --branch staging` で確かめる |
+| スマホだけ、すべての通信が失敗（Web は動く） | アプリに埋め込まれた `EXPO_PUBLIC_API_BASE_URL` が違う（EAS の環境変数の値の誤り。04 2章） | Sentry（mobile）で呼んでいる URL を確かめ、`eas env:list --environment production` で値を見る。前の更新に戻し（04 5.4）、EAS の環境変数を直してから `make mobile-update ENV=production` で出し直す |
+| staging のアプリが production を呼ぶ（その逆） | profile・チャンネル・EAS の環境の取り違え（staging は profile とチャンネルが `staging`、EAS の環境が `preview`） | `eas channel:view staging`・`eas update:list --branch staging`・`eas env:list --environment preview` で確かめる |
 | 特定の古い版だけ失敗する | API が古い版との互換を壊した（ADR-006） | Sentry（mobile）のリリース（版）で範囲を確かめる。API を直して互換を戻す（項目を戻す、`/api/v2` に分ける）。古い版の利用者にストアでの更新をお願いする |
 | 新しい EAS Update が届かない | runtime が違う（ネイティブの変更の後の更新は、新しいバイナリにしか届かない） | `eas update:list --branch production` で runtime を確かめる |
 | ログインだけ失敗 | — | 3.11・3.12 |
@@ -478,12 +492,12 @@ gcloud logging read \
 
 ```bash
 cd apps/web
-bunx wrangler tail moonx-web --env production --format=pretty
-bunx wrangler tail moonx-web --env production --status=error
+bunx wrangler tail --env production --format=pretty      # moonx-web-production
+bunx wrangler tail --env production --status=error
 bunx wrangler deployments list --env production
 ```
 
-`wrangler tail` はその場で流れるものだけを見せる。過去のログは残らない。
+`wrangler tail` はその場で流れるものだけを見せる。過去3日分は Cloudflare のダッシュボードの Workers Logs で見る。staging は `--env staging`（`moonx-web-staging`）。
 
 ### Neon
 
@@ -556,23 +570,25 @@ bunx wrangler deployments list --env production
 | Better Auth のセキュリティ修正 | 公開されたら数日以内 | GitHub で better-auth の Releases と Security advisories を Watch し、Dependabot alerts を ON にしておく。上げたら staging でログイン・招待・パスワード再設定を確かめる（ADR-010） |
 | Expo SDK の更新 | 新しい SDK が出たら検討。遅くとも年1回 | ネイティブの変更になる。EAS Build ＋ ストアへの提出（04 4.3） |
 | ストアの要件への追従 | 年1回 | Google Play の target API level の期限（毎年8月末）と、Apple の新しい SDK でのビルドの要件を、Expo SDK の更新で満たす |
-| DB のバックアップの確認 | 週1回（バックアップ自体は毎日） | `db-backup.yml` が成功しているか。四半期に1回は復元を試す（6.2） |
-| Neon の容量・計算時間 | 週1回 | 2章の閾値と比べる |
+| DB のバックアップの確認 | 週1回（バックアップ自体は毎日） | `db-backup.yml`（`make db-backup ENV=production`）が成功しているか。四半期に1回は復元を試す（6.2） |
+| Neon の容量・計算時間 | 週1回 | 2章の閾値と比べる（枠は staging のブランチと分け合う） |
 | `change_history` の増え方 | 月1回 | 3.3 の SQL で大きさを見る。前の月からの増え方で、0.5 GB に届く時期を見積もる。近ければ Neon の有料プランか移行を決める（ADR-008） |
 | Sentry の issue の棚卸し | 週1回 | 新しい issue・増えている issue を見て、直すか無視するかを決める |
 | ダッシュボードの遅さ | 週1回 | 4章の遅いリクエストのコマンド。p95 が 1秒を超えたら ADR-011 の手順 |
 | Artifact Registry の整理 | 月1回 | 古いイメージが自動で消えているか確かめる（下）。`deploy/staging/version`・`deploy/production/version` の SHA と、戻し先の直前の版が消えていないこと |
-| IaC のずれの確認 | 月1回 | `make infra-plan ENV=staging`・`make infra-plan ENV=production` に差分が無いこと（あれば CLI で変えたものを Terraform に入れる） |
+| IaC のずれの確認 | 月1回 | `make infra-plan ENV=shared`・`ENV=staging`・`ENV=production` に差分が無いこと（あれば CLI で変えたものを Terraform に入れる。`shared` は Cloudflare の Terraform 用のトークンが要る。03 5.1） |
 | 費用の確認 | 月1回 | 予算 月 $0〜10（ストアの登録費は含めない）と比べる（下） |
 | アラートの通知の確認 | 四半期に1回 | Cloud Monitoring・Sentry から試しの通知を出し、メールが届くか |
 | 古いスマホの版の確認 | 月1回 | Sentry（mobile）のリリースごとの利用を見て、API の互換を外してよいかを決める（ADR-006） |
-| シークレットの入れ替え | `GOOGLE_CLIENT_SECRET`・`RESEND_API_KEY`・`PROXY_SHARED_SECRET` は年1回、漏れたらすぐ。`BETTER_AUTH_SECRET` は漏れたときだけ | 3.15 |
+| シークレットの入れ替え | `GOOGLE_CLIENT_SECRET`・`RESEND_API_KEY`・`PROXY_SHARED_SECRET` と CI のトークン（`CLOUDFLARE_API_TOKEN`・`EXPO_TOKEN`・`SENTRY_AUTH_TOKEN`）は年1回、漏れたらすぐ。`BETTER_AUTH_SECRET` は漏れたときだけ | 3.15 |
 | OAuth クライアントの確認 | 年1回 | 使っていないクライアントは Google 側で消されることがある（local 用に注意）。同意画面の情報が古くないか |
 | ドメインの更新 | 年1回（期限の1か月前） | Cloudflare Registrar で自動更新が ON か、支払い方法が有効か。切れるとメールもアプリも止まる（ADR-013） |
 | Apple Developer Program の更新 | 年1回 | 自動更新が ON か。切れるとアプリがストアから消える |
 | Apple の配布証明書 | 年1回 | EAS が管理する（`eas credentials --platform ios`）。期限切れはビルドのときに分かる。公開済みのアプリには影響しない |
 
 **Artifact Registry の確認:**
+
+リポジトリ `moonx` と古いイメージを消す決まりは Terraform の `envs/shared` が持つ。
 
 ```bash
 gcloud artifacts docker images list asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api --include-tags
@@ -583,42 +599,30 @@ gcloud artifacts repositories describe moonx --location=asia-southeast1
 
 | 見る先 | 見ること |
 |---|---|
-| Google Cloud の請求のレポート | Cloud Run（無料枠）・Secret Manager（月 $1 程度。ADR-007）・Artifact Registry の保存量・Cloud Storage・ネットワーク |
+| Google Cloud の請求のレポート | Cloud Run（無料枠）・Secret Manager（月 $1 程度。ADR-007）・Artifact Registry の保存量・Cloud Storage（写真のバケットは月 $0.1 未満。asia-southeast1 は無料枠の対象外。ADR-024。バックアップのバケット）・ネットワーク |
 | Neon・Cloudflare・Resend・Sentry・Expo の管理画面 | 無料枠の中か（2章の閾値） |
 | GitHub | Actions の利用時間（private のリポジトリの無料枠） |
 | ドメイン | 年 $10〜15（ADR-013） |
 
 ### 6.2 DB のバックアップ（`pg_dump` → Cloud Storage）
 
-Neon の無料プランは、過去の時点に戻せる期間が短い。そのため production の DB を毎日 `pg_dump` し、Cloud Storage に残す。動かすのは GitHub Actions の定期実行のワークフロー `db-backup.yml`。
+Neon の無料プランは、過去の時点に戻せる期間が短い。そのため production の DB を毎日 `pg_dump` し、Cloud Storage のバケット `{GCP_PROJECT_ID}-moonx-backups`（Terraform の `envs/shared`）に残す。動かすのは GitHub Actions の定期実行のワークフロー `db-backup.yml` で、中身は `make db-backup ENV=production`（[SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)）。
 
 **ワークフローがすること（毎日1回）:**
 
 1. Workload Identity Federation で Google Cloud に入る
-2. environment `production` のシークレット `DATABASE_URL_DIRECT` で `pg_dump` する（PostgreSQL 17 のクライアントを使う。サーバーより古い版は使えない）
+2. `make db-backup ENV=production`: GitHub の環境 `production` のシークレット `DATABASE_URL_DIRECT` で `pg_dump` し、バケットに上げる（PostgreSQL 17 のクライアントを使う。サーバーより古い版は使えない）
 
-   ```bash
-   pg_dump --format=custom --no-owner --no-privileges \
-     --file=moonx-production.dump "$DATABASE_URL_DIRECT"
-   ```
-
-3. バックアップ用のバケットに置く
-
-   ```bash
-   gcloud storage cp moonx-production.dump \
-     "gs://<バックアップ用のバケット>/production/$(date -u +%Y%m%dT%H%MZ).dump"
-   ```
-
-**バケットの決まり:**
+**バケットの決まり**（Terraform の `envs/shared` で設定する）:
 - 公開しない（個人情報を含む）。均一なアクセス制御・公開アクセスの防止を ON
-- 書けるのはバックアップのワークフローのサービスアカウントだけ。読めるのは運用の担当だけ
+- 書けるのはバックアップのワークフローが使うサービスアカウントだけ。読めるのは運用の担当だけ
 - 古いものはライフサイクルで消す（例: 90日）
 
-**復元の練習（四半期に1回。手元で行い、終わったら消す）:**
+**復元の練習（四半期に1回。手元で行い、終わったら消す。`make db-backup` が `pg_dump` の custom 形式で取っている前提）:**
 
 ```bash
-gcloud storage ls "gs://<バックアップ用のバケット>/production/" | tail -n 3
-gcloud storage cp "gs://<バックアップ用のバケット>/production/<ファイル>.dump" ./restore.dump
+gcloud storage ls "gs://{GCP_PROJECT_ID}-moonx-backups/**" | tail -n 3
+gcloud storage cp "<上で選んだファイルの gs:// の URL>" ./restore.dump
 
 make db-up
 psql "postgres://moonx:moonx@localhost:5432/moonx" -c 'create database moonx_restore'
@@ -631,4 +635,4 @@ psql "postgres://moonx:moonx@localhost:5432/moonx" -c 'drop database moonx_resto
 rm ./restore.dump
 ```
 
-**本番に戻すとき（最後の手段）:** Neon で新しいブランチを作って `pg_restore` し、中身を確かめてから、そのブランチの接続文字列を `moonx-production-database-url` と `DATABASE_URL_DIRECT` に入れて新しいリビジョンを作る（3.15 の手順 2）。バックアップより後に書かれたデータは消える。
+**本番に戻すとき（最後の手段）:** Neon で新しいブランチを作って `pg_restore` し、中身を確かめてから、そのブランチの接続文字列を `moonx-production-database-url` と GitHub の環境 `production` の `DATABASE_URL_DIRECT` に入れて新しいリビジョンを作る（3.15 の手順 2）。バックアップより後に書かれたデータは消える。

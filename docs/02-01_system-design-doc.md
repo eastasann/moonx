@@ -116,7 +116,7 @@ moonx/
 | メール | コンソールに出す | Resend（送信先は許可リストのメールだけ） | Resend |
 | スマホ | Expo の開発ビルド（EAS の profile `development`） | EAS の profile `staging`・チャンネル `staging`・EAS の環境 `preview`。アプリ `{APP_ID}.staging`（TestFlight / Play の内部テスト） | profile `production`・チャンネル `production`・EAS の環境 `production`。アプリ `{APP_ID}`（App Store / Google Play） |
 | API のイメージ | — | `asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:<コミット SHA>`（両方の環境で同じイメージ） | 同左 |
-| GitHub の環境 | — | `staging` | `production`（デプロイに承認を要する） |
+| GitHub の環境 | — | `staging` | `production`（デプロイに承認を要する）と `production-backup`（承認なし。`db-backup.yml` だけが使う） |
 | Sentry の environment | なし | `staging` | `production` |
 
 未確定の名前（決まったらこの表と、使っている箇所を一緒に置き換える）:
@@ -146,7 +146,7 @@ moonx/
 | `MAIL_ALLOWLIST` | api | staging でだけ使う送信先の許可リスト（カンマ区切り。空なら制限なし） | 空 | staging だけ設定 |
 | `PROXY_SHARED_SECRET` | api, Worker | Worker が付ける共有シークレット。API 側はカンマ区切りで2つまで受け付ける（ローテーションの間だけ新旧の両方を入れる。05_operation-runbook.md） | 空（local では検査しない） | Secret Manager `moonx-{env}-proxy-shared-secret` と Worker のシークレット |
 | `API_ORIGIN` | Worker | 転送先の Cloud Run の URL | 不要（Vite の転送を使う） | `wrangler.jsonc` の環境ごとの `vars` |
-| `CRON_OIDC_AUDIENCE` | api | cron の OIDC トークンの audience（Cloud Run の URL） | 空（local では `make cron-due` が直接呼ぶ） | Cloud Run の環境変数 |
+| `CRON_OIDC_AUDIENCE` | api | cron の OIDC トークンの audience。Cloud Run の決まった形の URL `https://moonx-api-{env}-{プロジェクト番号}.asia-southeast1.run.app`（Terraform がプロジェクト番号から組み立てる。サービス自身の出力を参照すると循環するため） | 空（local では `make cron-due` が直接呼ぶ） | Cloud Run の環境変数 |
 | `CRON_INVOKER_EMAIL` | api | cron を呼ぶサービスアカウントのメール | 空 | Cloud Run の環境変数 |
 | `AVATAR_BUCKET` | api | プロフィール写真のバケット | 空（local はディスク `./.data/avatars`） | `moonx-{env}-avatars` |
 | `SENTRY_DSN` | api | Sentry（API） | 空 | Cloud Run の環境変数 |
@@ -155,18 +155,19 @@ moonx/
 | `EXPO_PUBLIC_API_BASE_URL` | mobile | API の基準 URL | `http://<開発 PC の IP>:3000/api`（`apps/mobile/.env`） | `https://staging.{DOMAIN}/api` / `https://{DOMAIN}/api`（EAS の環境変数。`preview` / `production`。`eas build` と `eas update --environment` の両方が読む） |
 | `EXPO_PUBLIC_APP_ENV` / `EXPO_PUBLIC_SENTRY_DSN` | mobile | 環境名と Sentry（スマホ） | `local` / 空（`apps/mobile/.env`） | 同上（EAS の環境変数） |
 
-`.env` の置き場所: `apps/mobile` 以外の変数はリポジトリの直下の `.env`、`EXPO_PUBLIC_*` は `apps/mobile/.env`（Expo が読む場所）。`make setup` が、それぞれの `.env.example` をコピーする。
+`.env` の置き場所: `apps/mobile` 以外の変数はリポジトリの直下の `.env`、`EXPO_PUBLIC_*` は `apps/mobile/.env`（Expo が読む場所）。`make setup` が、それぞれの `.env.example` をコピーする。直下の `.env` は Makefile が読み込んで各コマンドに渡し、Vite は `envDir` をリポジトリの直下にする。
 
-**CI（GitHub Actions）のシークレットと変数**（GitHub の環境 `staging` / `production` に置く。リポジトリには置かない）:
+**CI（GitHub Actions）のシークレットと変数**: 環境ごとに値が違うものは GitHub の環境（`staging` / `production` / `production-backup`）に、環境をまたいで同じものはリポジトリに置く。
 
-| 名前 | 用途 |
-|---|---|
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT`（変数） | Workload Identity Federation で Google Cloud に入る（鍵を置かない） |
-| `DATABASE_URL_DIRECT`（シークレット） | マイグレーションとバックアップ |
-| `CLOUDFLARE_API_TOKEN`（シークレット）/ `CLOUDFLARE_ACCOUNT_ID`（変数） | `wrangler deploy`。トークンは Worker のデプロイだけの権限。DNS 用の Terraform のトークンは別（`envs/shared` の実行者だけが持つ） |
-| `EXPO_TOKEN`（シークレット） | EAS Build / Submit / Update |
-| `SENTRY_AUTH_TOKEN`（シークレット） | ソースマップのアップロード（Web・スマホ・API） |
-| `VITE_SENTRY_DSN`（変数） | Web のビルド |
+| 名前 | 置き場所 | 用途 |
+|---|---|---|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT`（変数） | リポジトリ | Workload Identity Federation で Google Cloud に入る（鍵を置かない）。`build.yml` のイメージの作成と、各環境のデプロイが使う |
+| `SENTRY_AUTH_TOKEN`（シークレット） | リポジトリ（スマホのビルドは EAS で動くので、EAS の環境変数にも secret として置く） | ソースマップのアップロード（Web・スマホ・API） |
+| `CLOUDFLARE_ACCOUNT_ID`（変数） | リポジトリ | `wrangler deploy` |
+| `EXPO_TOKEN`（シークレット） | リポジトリ | EAS Build / Submit / Update |
+| `DATABASE_URL_DIRECT`（シークレット） | `staging` / `production`（マイグレーション）、`production-backup`（バックアップ。production の読み取り専用のロールの接続文字列） | マイグレーションとバックアップ |
+| `CLOUDFLARE_API_TOKEN`（シークレット） | `staging` / `production` | `wrangler deploy`。権限は Workers のスクリプトの編集と、`{DOMAIN}` のゾーンの Workers のルート・カスタムドメイン・DNS の編集（カスタムドメインが DNS レコードを作るため）。メールの DNS 用の Terraform のトークンは別（`envs/shared` の実行者だけが持つ） |
+| `VITE_APP_ENV` / `VITE_SENTRY_DSN`（変数） | `staging` / `production` | Web のビルド |
 
 ストアへの提出の鍵（App Store Connect の API キー、Google Play の提出用のサービスアカウントの JSON）は EAS に置く（`eas credentials`）。
 
@@ -183,7 +184,7 @@ moonx/
 | `build-api-image SHA=...` | API の Docker イメージを作って Artifact Registry に上げる |
 | `test` | `test-domain`・`test-api`・`test-web`・`test-mobile` をまとめて実行 |
 | `test-domain` / `test-api` / `test-web` / `test-mobile` | 単体・結合テスト（`test-api` は `DATABASE_URL_TEST` の DB を作り直して使う） |
-| `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して） |
+| `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
 | `lint` / `format` / `typecheck` | Biome の検査・整形、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
@@ -198,7 +199,7 @@ moonx/
 | `deploy-api ENV=... SHA=...` | マイグレーションの後、Cloud Run に新しいリビジョンを出す（CI が使う） |
 | `deploy-web ENV=...` | `build-web` の結果を `wrangler deploy --env` で出す（CI が使う） |
 | `mobile-update ENV=...` / `mobile-build ENV=...` | EAS Update（JS だけ）/ EAS Build と Submit（ネイティブの変更があるとき）（CI か手元） |
-| `db-backup ENV=...` | `pg_dump` を取ってバックアップのバケットに上げる（定期実行の GitHub Actions が使う。05_operation-runbook.md） |
+| `db-backup ENV=...` | `pg_dump -Fc` を取り、`gs://{GCP_PROJECT_ID}-moonx-backups/{env}/<日付>.dump` に上げる（バケットは30日で自動削除。定期実行の GitHub Actions が使う。05_operation-runbook.md） |
 
 ---
 
@@ -358,7 +359,7 @@ moonx/
 
 ### ADR-015: IaC は Terraform（ユーザー指定）
 
-**決定:** Google Cloud の資源と Cloudflare の DNS（メールのレコード）を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート・メールの DNS）、`staging` / `production` は環境ごとの資源（2章「インフラ管理」）。Cloud Run のイメージは CI が出すので、Terraform は `image` の変更を無視する（`lifecycle.ignore_changes`）。初回は、イメージとシークレットの値が無いので2回に分けて apply する（1回目でシークレットの入れ物とリポジトリを作り、値とイメージを入れてから2回目で Cloud Run と Scheduler を作る。`CRON_OIDC_AUDIENCE` は Cloud Run のサービス自身の URL）。Cloudflare の Worker と Web のドメインは `wrangler.jsonc`、スマホのビルドは `eas.json`、Neon と Google の OAuth の設定はコンソールで管理する。
+**決定:** Google Cloud の資源と Cloudflare の DNS（メールのレコード）を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート・メールの DNS）、`staging` / `production` は環境ごとの資源（2章「インフラ管理」）。Cloud Run のイメージは CI が出すので、Terraform は `image` の変更を無視する（`lifecycle.ignore_changes`）。初回は、イメージとシークレットの値が無いので次の順に apply する: ① `ENV=shared`（Artifact Registry など）、② 環境ごとに変数 `bootstrap = true` で apply（シークレットの入れ物・サービスアカウント・写真のバケットだけを作り、Cloud Run と Scheduler は作らない）、③ シークレットの値を入れ、`make build-api-image` で最初のイメージを上げる、④ `bootstrap = false` と変数 `api_image`（最初のイメージ。以後は `ignore_changes` で無視される）で apply し、Cloud Run と Scheduler を作る。`CRON_OIDC_AUDIENCE` はプロジェクト番号から組み立てる（2章「環境変数」）。Cloudflare の Worker と Web のドメインは `wrangler.jsonc`、スマホのビルドは `eas.json`、Neon と Google の OAuth の設定はコンソールで管理する。
 
 **理由:** ユーザーが Terraform を選んだ。環境を作り直せて、設定の変更をレビューできる。
 
@@ -366,7 +367,7 @@ moonx/
 
 ### ADR-016: staging と production の2環境。バージョン宣言ファイルで昇格する（ユーザー指定）
 
-**決定:** 環境は staging と production（2章「環境と命名」）。ブランチは GitHub Flow（`main` ＋作業ブランチ、マージは常に squash）。`main` に入ると CI がテストし、API のイメージ（タグはコミット SHA。両方の環境で同じイメージを使う）を作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR。ブランチ名 `promote/{env}-<SHA の先頭7文字>`）をマージしたときに GitHub Actions が行う（DB のマイグレーション → API → Web の順）。Web はビルドに環境の値（`VITE_*`）を埋め込むので、デプロイのときにその SHA から環境ごとにビルドする（`make build-web ENV=...`）。戻すときは昇格の PR を revert する。スマホは、ネイティブの変更があれば EAS Build と Submit、JS だけなら EAS Update を同じ昇格で出す。
+**決定:** 環境は staging と production（2章「環境と命名」）。ブランチは GitHub Flow（`main` ＋作業ブランチ、マージは常に squash）。`main` に入ると CI がテストし、API のイメージ（タグはコミット SHA。両方の環境で同じイメージを使う）を作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR。ブランチ名 `promote/{env}-<SHA の先頭7文字>`）をマージしたときに GitHub Actions が行う（DB のマイグレーション → API → Web の順）。Web はビルドに環境の値（`VITE_*`）を埋め込むので、デプロイのときにその SHA から環境ごとにビルドする（`make build-web ENV=...`）。戻すときは昇格の PR を revert する。スマホは同じ昇格で出す。アプリの `runtimeVersion` は Expo の fingerprint の方針にし、`deploy.yml` はその SHA の fingerprint が、その環境で最後にビルドしたアプリと同じなら `make mobile-update`（JS だけ）、違えば `make mobile-build`（EAS Build と Submit。ストアの審査を待つ）を選ぶ。
 
 **理由:** ユーザーが staging ＋ production を選んだ。BCDX の実データに触れずに確かめられる。どの環境にどの版が出ているかが、リポジトリのファイルで分かる。
 
@@ -385,7 +386,7 @@ moonx/
 **決定:**
 
 - **参考にするもの**: Adobe Spectrum（Spectrum 2）の仕組みを取り入れる。部品の種類と名前（design-spec 4.5）、部品の大きさの段階 S / M / L / XL、端末で切り替えるスケール（デスクトップは `medium`、タッチの端末は `large`）、表とリストの密度（`compact` / `regular` / `spacious`）、状態の色の名前（`accent` / `informative` / `positive` / `negative` / `notice` / `neutral`）、トークンの階層（全体の値 → 用途 → 部品）、スマホではポップオーバーをトレイにする振る舞い、キーボード操作とフォーカスの表示。見た目（配色・書体・質感）は design-spec 4.4 の Hermes Teal で、Spectrum の配色・Adobe Clean・Workflow のアイコンは使わない（ユーザーと合意、2026-10-01）。
-- **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.component`。実装が参照してよいのは `semantic` だけ。
+- **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.scale.{medium,large}.component`。実装が参照してよいのは `semantic` だけ。`semantic` の値はエイリアスだけで、たどると必ず `primitive` に着く（書体のスタイルや密度は `semantic.scale.medium` を参照し、生成のときに large へ差し替える）。
 - **生成**: `make tokens` が `packages/ui-tokens` に次を生成する（変換は自前の小さなスクリプト。Style Dictionary は使わない）。
   - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク × medium / large の値。CSS 変数として出る）
   - スマホ: Unistyles のテーマ（ライト / ダーク）とブレークポイント。large のスケールを既定にする
@@ -2161,10 +2162,10 @@ CI（GitHub Actions）は PR ごとに `make lint`・`make typecheck`・`make te
 | API のエラー | Sentry（プロジェクト `moonx-api`） | `environment` = staging / production、`release` = コミット SHA、タグに `requestId`・`route`。ユーザーは `userId` だけ。新しい issue でメール通知 |
 | Web・スマホのエラー | Sentry（`moonx-web` / `moonx-mobile`） | CI でソースマップを上げる。スマホの `release` はアプリの版、`dist` は EAS Update の ID |
 | API のログ | Cloud Logging | 標準出力に1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`appVersion`）。保持は既定の30日 |
-| Worker のログ | Cloudflare Workers Logs | `/api/*` の転送の失敗（`UPSTREAM_UNAVAILABLE`）を見る。調べるときは `wrangler tail` |
-| 死活 | Cloud Monitoring の稼働時間チェック | `https://{DOMAIN}/api/health`（Z1。DB に触れない）を5分ごと。2回続けて失敗したらメール |
+| Worker のログ | Cloudflare Workers Logs（`wrangler.jsonc` の `observability` を有効にする。無料プランの保持は3日） | `/api/*` の転送の失敗（`UPSTREAM_UNAVAILABLE`）を見る。その場で追うときは `wrangler tail` |
+| 死活 | Cloud Monitoring の稼働時間チェック | `https://{DOMAIN}/api/health`（Z1。DB に触れない）を5分ごと、3つの地域から。2つ以上の地域で失敗が5分続いたらメール |
 | エラー率 | Cloud Monitoring（ログベースの指標） | 5xx が10分間で全体の1%を超える、または5分で5件を超えたらメール |
-| レイテンシ | Cloud Run の指標 | リクエストの p95 が15分続けて2秒を超えたらメール |
+| レイテンシ | Cloud Run の指標 | リクエストの p95 が15分続けて3秒を超えたらメール（0台からの起動を含むため、目標の 7.3 より緩くする） |
 | 定期実行 | Cloud Scheduler のジョブの結果（ログベースの指標） | `moonx-{env}-due-notifications` の失敗でメール |
 | DB の容量 | Neon のコンソール | 無料プランの 0.5GB に対して 400MB を超えたら対応する（確かめ方は 05_operation-runbook.md） |
 | メール | Resend のダッシュボード | 送信の失敗と戻り（バウンス）。API のログにも送信の失敗を出す |

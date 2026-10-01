@@ -1,7 +1,7 @@
 # Deployment Procedure — moonx
 
 - この文書が持つもの: デプロイの流れ（GitHub Actions）、リリース前の確認、昇格の PR、ストアへの公開、ロールバック、デプロイ後の確認、緊急時の連絡先
-- 環境の名前・環境変数・make ターゲット・ADR の正は [SDD 2章](02-01_system-design-doc.md#2-アーキテクチャ概要) と [SDD 3章](02-01_system-design-doc.md#3-技術選定と判断理由adr)。ここには書き写さない
+- 環境の名前・環境変数（CI のシークレットを含む）・make ターゲット・ADR の正は [SDD 2章](02-01_system-design-doc.md#2-アーキテクチャ概要) と [SDD 3章](02-01_system-design-doc.md#3-技術選定と判断理由adr)。ここには書き写さない
 - 初回のクラウドのセットアップとブランチ戦略は [03_dev-setup.md](03_dev-setup.md)（5.4・9章）
 - 表記: `{DOMAIN}`・`{GCP_PROJECT_ID}`・`{APP_ID}` は SDD 2章のプレースホルダ。`<...>` はその場で調べて入れる値。`$TARGET` は `staging` か `production`
 
@@ -13,47 +13,49 @@
 
 | 環境 | URL | サービス | DB | デプロイ方法 |
 |---|---|---|---|---|
-| local | `http://localhost:5173`（API `http://localhost:3000`） | `make dev`・`make dev-mobile` | Docker の PostgreSQL 17 | 手元で起動 |
-| staging | `https://staging.{DOMAIN}` | Cloud Run `moonx-api-staging`・Worker `moonx-web`（env: staging）・EAS チャンネル `staging`（`{APP_ID}.staging`。TestFlight / Play 内部テスト） | Neon `moonx` のブランチ `staging` | `deploy/staging/version` を変える昇格の PR をマージ |
-| production | `https://{DOMAIN}` | Cloud Run `moonx-api-production`・Worker `moonx-web`（env: production）・EAS チャンネル `production`（`{APP_ID}`。App Store / Google Play） | Neon `moonx` のブランチ `production` | `deploy/production/version` を変える昇格の PR をマージ |
+| local | `http://localhost:5173`（API `http://localhost:3000`） | `make dev`・`make dev-mobile`（Expo の開発ビルド。EAS の profile `development`） | Docker の PostgreSQL 17（DB `moonx`） | 手元で起動 |
+| staging | `https://staging.{DOMAIN}` | Cloud Run `moonx-api-staging`・Worker `moonx-web-staging`・EAS の profile / チャンネル `staging`、EAS の環境 `preview`（`{APP_ID}.staging`。TestFlight / Play 内部テスト） | Neon `moonx` のブランチ `staging` | `deploy/staging/version` を変える昇格の PR をマージ |
+| production | `https://{DOMAIN}` | Cloud Run `moonx-api-production`・Worker `moonx-web-production`・EAS の profile / チャンネル / 環境 `production`（`{APP_ID}`。App Store / Google Play） | Neon `moonx` のブランチ `production` | `deploy/production/version` を変える昇格の PR をマージし、GitHub の環境 `production` で承認する |
 
 - Cloud Run と Cloud Scheduler のリージョンは asia-southeast1
-- wrangler は環境ごとに別の Worker を作る。Cloudflare の画面では `moonx-web-staging` / `moonx-web-production` と表示される（`--env` を付ければ `moonx-web` で操作できる）
+- API のイメージは両方の環境で同じもの（`asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:<SHA>`）。Web はビルドに環境の値を埋め込むので、環境ごとにビルドする
+- wrangler で Worker を手で操作するときは、`apps/web` で `--env staging` / `--env production` を付ける（`wrangler.jsonc` の env から Worker の名前が決まる）
 
 ---
 
 ## 2. CI/CD パイプライン
 
-リリースはブランチではなく、`deploy/{env}/version`（デプロイするコミット SHA）の変更をきっかけにする（ADR-016）。staging も production も、昇格の PR をマージしたときにだけデプロイする。
+リリースはブランチではなく、`deploy/{env}/version`（デプロイするコミット SHA）の変更をきっかけにする（ADR-016）。staging も production も、昇格の PR をマージしたときにだけデプロイする。CI はデプロイを含めて make のターゲットを呼ぶ（ADR-017。ターゲットの中身は [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)）。
 
 ```
 [作業ブランチの PR]
-    └── ci.yml: make lint → make typecheck → make test → make build → make test-e2e
+    └── ci.yml: make install → make lint → make typecheck → make test → make build → make test-e2e
                 ＋ make tokens の差分の確認
 
 [main へ squash マージ]（deploy/ だけの変更は除く）
-    └── build.yml: テスト → API のイメージを作って Artifact Registry へ push（タグ = コミット SHA）
-                    → Web のビルドの確認
+    └── build.yml: テスト → make build-api-image SHA=<SHA>（Artifact Registry へ。タグ = コミット SHA）
 
 [昇格の PR（deploy/{env}/version = SHA）をマージ]
-    └── deploy.yml（GitHub の environment: staging / production）
-          1. DB のマイグレーション（make db-migrate）
-          2. API: Cloud Run に新しいリビジョン（イメージ = その SHA）
-          3. Web: 環境の値でビルド → wrangler deploy --env $TARGET
-          4. スマホ: EAS Update（JS だけ）/ EAS Build ＋ Submit（ネイティブの変更）
-          5. デプロイ後の確認（/api/health）
+    └── deploy.yml（GitHub の環境 staging / production。production は承認を待つ）
+          1. make deploy-api ENV=$TARGET SHA=$SHA（DB のマイグレーション → Cloud Run の新しいリビジョン）
+          2. make build-web ENV=$TARGET → make deploy-web ENV=$TARGET
+          3. スマホ: make mobile-update ENV=$TARGET（JS だけ）/ make mobile-build ENV=$TARGET（ネイティブの変更）
+          4. デプロイ後の確認（/api/health）
         （戻す = 昇格の PR を revert）
+
+[毎日]
+    └── db-backup.yml: make db-backup ENV=production
 ```
 
 ### CI/CD ワークフロー
 
 | ワークフロー | きっかけ | やること |
 |---|---|---|
-| `ci.yml` | すべての PR | `make db-up` → `make db-migrate` → `make lint` → `make typecheck` → `make test` → `make build` → `make test-e2e`（`make dev` を裏で起動してから）。`make tokens` で差分が出たら失敗（ADR-018） |
-| `build.yml` | `main` への push（`deploy/**` だけの変更は除く） | テスト → API のイメージ `asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:<SHA>` を作って push → Web のビルドの確認 |
-| `deploy.yml` | `main` への push で `deploy/staging/version` か `deploy/production/version` が変わったとき | 下の「deploy.yml の順番」。環境ごとに同時に1つだけ動かす（後から来たものは待つ）。1つのコミットで両方の環境のファイルが変わっていたら失敗させる |
-| `db-backup.yml` | 毎日（schedule） | production の DB を `pg_dump` して Cloud Storage へ（05 6.2） |
-| （Terraform） | — | CI では動かさない。人が `make infra-plan` / `make infra-apply` で動かす（03 5.2） |
+| `ci.yml` | すべての PR | `make install` → `make lint` → `make typecheck` → `make test` → `make build` → `make test-e2e`。`DATABASE_URL_TEST` はサービスコンテナの PostgreSQL。`make tokens` で差分が出たら失敗（ADR-018） |
+| `build.yml` | `main` への push（`deploy/**` だけの変更は除く） | テスト → `make build-api-image SHA=<SHA>`（イメージ `asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:<SHA>`） |
+| `deploy.yml` | `main` への push で `deploy/staging/version` か `deploy/production/version` が変わったとき | 下の「deploy.yml の順番」。GitHub の環境 `staging` / `production` で動き、`production` は承認されるまで待つ。環境ごとに同時に1つだけ動かす（後から来たものは待つ）。1つのコミットで両方の環境のファイルが変わっていたら失敗させる |
+| `db-backup.yml` | 毎日（schedule） | `make db-backup ENV=production`（`pg_dump` をバケット `{GCP_PROJECT_ID}-moonx-backups` に上げる。05 6.2） |
+| （Terraform） | — | CI では動かさない。人が `make infra-plan` / `make infra-apply`（`ENV` は `shared` / `staging` / `production`）で動かす（03 5.2） |
 
 Google Cloud へは Workload Identity Federation で入る（GitHub に鍵を置かない。ADR-007）。
 
@@ -64,56 +66,50 @@ DB → API → Web → スマホの順。前の段が失敗したら、後の段
 ```bash
 TARGET=staging                       # 変わったファイルで決まる
 SHA="$(cat deploy/$TARGET/version)"
-IMAGE="asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:$SHA"
 
 # 0. その SHA のコードを取り、イメージがあることを確かめる
 git checkout "$SHA"
-gcloud artifacts docker images describe "$IMAGE"
+gcloud artifacts docker images describe "asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:$SHA"
 
-# 1. DB のマイグレーション（DATABASE_URL_DIRECT は environment のシークレット）
-make db-migrate
-
-# 2. API。イメージだけを変える（他の設定は Terraform が持つ）
-gcloud run deploy moonx-api-$TARGET --image="$IMAGE" --region=asia-southeast1 --quiet
+# 1. DB のマイグレーション → API の新しいリビジョン（DATABASE_URL_DIRECT は環境のシークレット）
+make deploy-api ENV=$TARGET SHA=$SHA
 curl -fsS https://staging.{DOMAIN}/api/health      # production は https://{DOMAIN}/api/health
 
-# 3. Web。VITE_APP_ENV・VITE_SENTRY_DSN は environment の変数
-make build
-(cd apps/web && bunx wrangler deploy --env $TARGET)
+# 2. Web。その SHA から環境の値（VITE_*。環境の変数）でビルドして出す
+make build-web ENV=$TARGET
+make deploy-web ENV=$TARGET
 
-# 4. スマホ（JS だけの変更のとき）
-(cd apps/mobile && eas update --channel $TARGET --message "$SHA" --non-interactive)
+# 3. スマホ（JS だけの変更のとき）
+make mobile-update ENV=$TARGET
 ```
 
-- **1. マイグレーション**は「追加してから使い、使わなくなってから消す」で書いたものだけを流す（4.1）。これで、API を前のリビジョンに戻しても動く
-- **2. API** の新しいリビジョンが起動しないときは、Cloud Run は前のリビジョンに流したままにする。`/api/health` が失敗したら 5.2 で戻す
-- **3. Web** は main のビルドを使い回さず、同じ SHA から環境ごとに作る。`VITE_*` はビルドのときに埋め込まれ、環境ごとに値が違うため
-- **4. スマホ**: ネイティブの部分（ネイティブのライブラリ・`app.config.ts` のネイティブの設定・Expo SDK）が変わったかで分ける
+- **1. マイグレーション**（`make deploy-api` の最初に動く）は「追加してから使い、使わなくなってから消す」で書いたものだけを流す（4.1）。これで、API を前のリビジョンに戻しても動く
+- **1. API** の新しいリビジョンが起動しないときは、Cloud Run は前のリビジョンに流したままにする。`/api/health` が失敗したら 5.2 で戻す
+- **2. Web** は main のビルドを使い回さず、同じ SHA から環境ごとに作る。`VITE_*` はビルドのときに埋め込まれ、環境ごとに値が違うため。`{DOMAIN}` / `staging.{DOMAIN}` の DNS レコードは、最初の `make deploy-web` で Worker のカスタムドメインとして作られる
+- **3. スマホ**: ネイティブの部分（ネイティブのライブラリ・`app.config.ts` のネイティブの設定・Expo SDK）が変わったかで分ける
 
   | ネイティブの変更 | やること |
   |---|---|
-  | 無い（同じ runtime のビルドがある） | `eas update --channel $TARGET`。同じ runtime のアプリに、次の起動から届く |
-  | ある | `eas build --platform all --profile $TARGET --auto-submit --non-interactive`。staging は TestFlight と Play 内部テストに届く。production は審査を経て公開する（4.3） |
+  | 無い（同じ runtime のビルドがある） | `make mobile-update ENV=$TARGET`（EAS Update。チャンネル `$TARGET`）。同じ runtime のアプリに、次の起動から届く |
+  | ある | `make mobile-build ENV=$TARGET`（EAS Build ＋ Submit。`deploy.yml` か手元から）。staging は TestFlight と Play 内部テストに届く。production は審査を経て公開する（4.3） |
 
-- `eas update` は `eas.json` の profile の `env` を読まない。`EXPO_PUBLIC_API_BASE_URL`・`EXPO_PUBLIC_APP_ENV`・`EXPO_PUBLIC_SENTRY_DSN` を、その profile と同じ値で環境変数として渡す（値は SDD 2章「環境変数」）。渡し忘れると、届いたアプリが違う API を呼ぶ
+- `EXPO_PUBLIC_*` は EAS の環境変数（staging は `preview`、production は `production`）に置き、EAS Build も `eas update --environment` もそこから読む。GitHub には置かない。値を変えるときは EAS の環境変数を直してから出す（03 5.4 K）
 
 ---
 
 ## 3. 初回クラウドセットアップ（IaC）
 
-手順は [03_dev-setup.md 5.4](03_dev-setup.md) のチェックリスト。Terraform と CI の分担は 03 5.2。ここには CI/CD が使う設定だけを書く。
+手順は [03_dev-setup.md 5.4](03_dev-setup.md) のチェックリスト。Terraform と CI の分担は 03 5.2。
 
-### GitHub の environment とシークレット
+### CI が使う値の置き場所
 
-| 置き場所 | 名前 | 種類 | 内容 | 名前の出どころ |
-|---|---|---|---|---|
-| environment `staging` / `production` | `DATABASE_URL_DIRECT` | シークレット | Neon のプールを通さない接続（マイグレーション用） | SDD 2章 |
-| environment `staging` / `production` | `VITE_APP_ENV` | 変数 | `staging` / `production` | SDD 2章 |
-| environment `staging` / `production` | `VITE_SENTRY_DSN` | 変数 | Sentry（web）の DSN | SDD 2章 |
-| リポジトリ | `CLOUDFLARE_API_TOKEN` | シークレット | wrangler が使うトークン（Workers の編集） | wrangler が決めた名前。SDD 2章に未記載 |
-| リポジトリ | `CLOUDFLARE_ACCOUNT_ID` | シークレット | Cloudflare のアカウント ID | 同上 |
-| リポジトリ | `EXPO_TOKEN` | シークレット | EAS CLI が使うトークン | EAS CLI が決めた名前。SDD 2章に未記載 |
-| `.github/workflows/` の中 | WIF のプロバイダ名・デプロイ用サービスアカウントのメール | 秘密ではない | Google Cloud への認証 | Terraform が作る（03 5.4 G） |
+名前と用途の正は [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数) の CI の表。ここには置くときの決まりだけを書く。
+
+- CI のシークレットと変数は、GitHub の環境 `staging` / `production` に置く。リポジトリには置かない（入れ方は 03 5.4 H・K）
+- 環境 `production` はデプロイに承認を要する（03 5.4 H で承認する人を入れる）
+- Google Cloud へは Workload Identity Federation で入る。`GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` は秘密でない変数で、値は Terraform の `envs/shared` が作ったもの（03 5.4 G）
+- CI 用の Cloudflare のトークンは Worker のデプロイだけの権限。メールの DNS を扱う Terraform 用のトークンは GitHub に置かない（`envs/shared` を動かす人だけが持つ）
+- スマホの `EXPO_PUBLIC_*` は EAS の環境変数、ストアへの提出の鍵（App Store Connect の API キー、Google Play の提出用のサービスアカウントの JSON）は EAS の credentials に置く
 
 ---
 
@@ -125,13 +121,19 @@ make build
 - [ ] その SHA の API のイメージが Artifact Registry にある
 - [ ] マイグレーションがある場合: `make db-generate` で作った SQL を読んだ。下の「expand / contract」に沿っている
 - [ ] API の変更が、出回っているスマホの版を壊さない（項目の追加だけ。壊すなら `/api/v2`。ADR-006）
-- [ ] 新しい環境変数・シークレットがある場合: SDD 2章の表に足し、Terraform・Secret Manager・`wrangler.jsonc`・`eas.json`・GitHub の environment に staging と production の両方で入れた
-- [ ] `infra/terraform/` の変更がある場合: 先に `make infra-apply ENV=$TARGET` を済ませた
+- [ ] 新しい環境変数・シークレットがある場合: SDD 2章の表に足し、Terraform・Secret Manager・`wrangler.jsonc`・EAS の環境変数（`preview` / `production`）・GitHub の環境に、staging と production の両方で入れた
+- [ ] `infra/terraform/` の変更がある場合: 先に `make infra-apply ENV=$TARGET`（`shared` の変更なら `ENV=shared`）を済ませた
 - [ ] ネイティブの変更の有無を確かめた。ある場合はストアの段取りを決めた（4.3）
 - [ ] Better Auth の更新を含む場合: staging でログイン（メール・Google）・招待・パスワード再設定を確かめた
-- [ ] 期限の通知に関わる変更の場合: staging でジョブを手で動かして確かめた（`gcloud scheduler jobs run moonx-staging-due-notifications --location=asia-southeast1`）
+- [ ] 期限の通知に関わる変更の場合: staging で Cloud Scheduler のジョブを手で動かして確かめた（`make cron-due` は local だけ）
+
+  ```bash
+  gcloud scheduler jobs run moonx-staging-due-notifications --location=asia-southeast1
+  ```
+
 - [ ] staging でデプロイ後の確認（6章）が済んだ
 - [ ] 昇格の PR に、対象の SHA・出す変更の一覧・staging での確認の結果・マイグレーションとネイティブの変更の有無・戻し方を書いた（`.github/PULL_REQUEST_TEMPLATE.md`）
+- [ ] production の昇格は、承認する人が `deploy.yml` を承認できる時間に出す
 
 #### マイグレーションの書き方（expand / contract）
 
@@ -193,29 +195,53 @@ gh run list --workflow=deploy.yml --limit=1
 gh run watch <RUN_ID>
 ```
 
-`deploy.yml` が終わったら 6章の確認をする。
+production の `deploy.yml` は、GitHub の環境 `production` の承認を待って止まる。GitHub の Actions のその実行の画面で「Review deployments」から承認する。`deploy.yml` が終わったら 6章の確認をする。
 
 ### 4.3 スマホのストアへの公開
 
-ネイティブの変更があるとき、またはストアの版を上げるとき（`app.config.ts` の version）に行う。JS だけの修正は EAS Update で済む（2章）。
+ネイティブの変更があるとき、またはストアの版を上げるとき（`app.config.ts` の version）に行う。ビルドと提出は `make mobile-build ENV=...`（EAS Build ＋ Submit）。JS だけの修正は EAS Update で済む（2章）。
+
+#### 最初の公開までの段取り
+
+Google Play は個人の開発者アカウントなので、`{APP_ID}` を製品版で初めて公開する前に、**12人以上のテスターが14日間続けて参加するクローズドテスト**が要る（ADR-003）。テスターがそろってから Android の公開まで、少なくとも3週間ほどかかる。BCDX のメンバーとアドバイザーで12人に足りなければ、テスターを集めてから始める。
+
+| 時期 | iOS | Android |
+|---|---|---|
+| 準備 | App Store Connect の版の情報と、審査用のデモアカウント（下）を用意する | テスターを12人以上集め、参加に使う Google アカウントのメールを控える。`{APP_ID}` の最初の版を Play Console に手で上げる（下） |
+| 1日目 | production の昇格で TestFlight に届いた版を、内部テスターで確かめる | `{APP_ID}` のクローズドテストのトラックに版を出し、テスターに参加してもらう（14日の数え始め） |
+| 1〜14日目 | 審査に出す（1〜数日）。公開を Android とそろえるなら、審査が通っても「手動でリリース」で待たせる | 12人以上が参加したまま14日間続ける（途中で12人を下回らないようにする）。テスターに実際に使ってもらい、反応を記録する |
+| 15日目〜 | — | Play Console のダッシュボードから製品版へのアクセスを申請する（テストの内容を聞かれる。Google の確認に数日かかる） |
+| 公開 | 手動でリリース（段階的リリース） | 製品版へ段階的に公開する |
+
+クローズドテストが要るのは最初の1回だけ。製品版へのアクセスが認められた後は、下の手順で内部テストから製品版へ昇格する。
 
 #### iOS
 
 1. staging の昇格で TestFlight（`{APP_ID}.staging`）に届いた版を確かめる
-2. production の昇格で `deploy.yml` が `{APP_ID}` をビルドし、TestFlight に提出する（手で動かすときは `eas build --platform ios --profile production` → `eas submit --platform ios --profile production --latest`）
+2. production の昇格で `make mobile-build ENV=production` が `{APP_ID}` をビルドし、TestFlight に提出する（`deploy.yml` か手元から）
 3. TestFlight の内部テスターで、6章のスマホの確認をする
 4. App Store Connect で新しい版を作る: リリースノート・スクリーンショット・App Review に関する情報（デモのアカウント。下）
 5. 審査に出す。公開は「手動でリリース」＋「段階的リリース」にする
 
+#### Apple の審査基準 4.8 で差し戻されたとき
+
+Sign in with Apple は足さずに出す（メール＋パスワードのログインがあるため。ADR-003）。4.8（他社のログインを出すアプリは、条件を満たす別のログインも並べる）で差し戻されたら、ユーザーと次のどちらかを決める。
+
+| 選ぶもの | やること |
+|---|---|
+| Sign in with Apple を足す | 認証の変更なので、SDD（ADR-003・ADR-010）を直してから実装する。ネイティブの変更になるので、版を上げて `make mobile-build ENV=production` で出し直し、もう一度審査に出す |
+| iOS はストアで配らない | App Store Connect で審査の申請を取り下げる。iOS の利用者には Web（`https://{DOMAIN}`）を案内する（ユーザーはストアで配れなくても構わないとした）。Android の配布は続ける |
+
 #### Android
 
 1. staging の昇格で Play の内部テスト（`{APP_ID}.staging`）に届いた版を確かめる
-2. production の昇格で `deploy.yml` が `{APP_ID}` をビルドし、内部テストのトラックに提出する（手で動かすときは `eas build --platform android --profile production` → `eas submit --platform android --profile production --latest`）
+2. production の昇格で `make mobile-build ENV=production` が `{APP_ID}` をビルドし、内部テストのトラックに提出する（`deploy.yml` か手元から）
 3. 内部テストで、6章のスマホの確認をする
-4. Play Console で内部テストのリリースを製品版に昇格する。「アプリのアクセス権」にデモのアカウントを入れる
-5. 審査のあと、段階的な公開（例: 20% → 100%）で出す
+4. 最初の製品版の前だけ: クローズドテスト（12人以上・14日間続けて）を通し、製品版へのアクセスを申請する（上の「最初の公開までの段取り」）
+5. Play Console でリリースを製品版に昇格する。「アプリのアクセス権」にデモのアカウントを入れる
+6. 審査のあと、段階的な公開（例: 20% → 100%）で出す
 
-最初の1回だけは、ビルドした AAB を Play Console に手で上げる（EAS Submit は2回目から使える）。
+最初の1回だけは、Google Play の API で提出できない。`{APP_ID}` と `{APP_ID}.staging` のそれぞれで、EAS のビルドの画面から AAB を取って Play Console に手で上げる（EAS Submit は2回目から使える）。
 
 #### 審査用のデモアカウント
 
@@ -236,7 +262,8 @@ gh run watch <RUN_ID>
 | 集めるデータの申告 | App のプライバシー | データ セーフティ |
 | ログインが要るアプリのデモアカウント | App Review に関する情報 | アプリのアクセス権 |
 | アカウントを作れるアプリの、アカウント削除の手段 | 必須。アプリ内で削除できること（ガイドライン 5.1.1(v)） | 必須。アプリ内の手段と、Web で申し込める URL |
-| 第三者のログイン（Google）があるときの同等のログイン手段 | ガイドライン 4.8 で指摘されることがある。出す前に方針を決める | — |
+| 第三者のログイン（Google）があるときの同等のログイン手段 | ガイドライン 4.8。Sign in with Apple は足さずに出す。差し戻されたら上の「4.8 で差し戻されたとき」 | — |
+| 製品版の前のクローズドテスト | — | 個人の開発者アカウントは最初の1回だけ必須（12人以上・14日間続けて） |
 | 暗号化の申告 | HTTPS だけなら輸出規制の対象外と答える | — |
 | コンテンツのレーティング | 年齢の区分 | レーティングの質問票 |
 
@@ -249,13 +276,13 @@ gh run watch <RUN_ID>
 基本の戻し方。`deploy/{env}/version` を前の SHA に戻す PR をマージすると、デプロイと同じ `deploy.yml` が前の版を出す。
 
 1. GitHub で、戻したい昇格の PR を開き「Revert」を押す（新しい PR ができる）
-2. PR の本文に理由を書き、squash でマージする
+2. PR の本文に理由を書き、squash でマージする（production は `deploy.yml` の承認が要る）
 3. 6章の確認をする
 
 - マイグレーションは前の版に戻らない（新しい列などは残る）。expand / contract を守っていれば、前の版の API はそのまま動く
-- スマホの JS は前の版の EAS Update が出る。ストアのバイナリは戻らない（5.5）
+- スマホの JS は、`deploy.yml` の `make mobile-update` が前の版の EAS Update を出す。ストアのバイナリは戻らない（5.5）
 
-以下は、PR を待てない緊急時に CLI で直接戻す手順。戻したあとで、必ず 5.1 の revert もしてリポジトリと合わせる。
+以下は、PR を待てない緊急時（承認する人がすぐにいないときを含む）に CLI で直接戻す手順。戻したあとで、必ず 5.1 の revert もしてリポジトリと合わせる。
 
 ### 5.2 API（Cloud Run）
 
@@ -269,13 +296,15 @@ gcloud run services update-traffic moonx-api-production --region=asia-southeast1
   --to-revisions=<REVISION>=100
 ```
 
-リビジョンを指定して流すと、次の `gcloud run deploy` で新しいリビジョンに流れなくなる。直した版を出すときは、最新に戻す。
+リビジョンを指定して流すと、次の `make deploy-api` で出た新しいリビジョンに流れなくなる。直した版を出すときは、最新に戻す。
 
 ```bash
 gcloud run services update-traffic moonx-api-production --region=asia-southeast1 --to-latest
 ```
 
 ### 5.3 Web（Cloudflare Worker）
+
+Worker `moonx-web-production`（staging は `--env staging` で `moonx-web-staging`）。
 
 ```bash
 cd apps/web
@@ -306,20 +335,20 @@ eas update:republish --group <前の GROUP_ID> --message "rollback to <短い SH
 
 1. 広がるのを止める: App Store は「段階的リリースを一時停止」、Google Play は「公開を停止」
 2. JS だけで直せるなら、その runtime 向けに EAS Update を出す（5.4・2章）
-3. ネイティブの修正が要るなら、版を上げて作り直して出す（4.3）。iOS は急ぎの審査（Expedited Review）を申し込める
+3. ネイティブの修正が要るなら、版を上げて `make mobile-build ENV=production` で作り直して出す（4.3）。iOS は急ぎの審査（Expedited Review）を申し込める
 4. API 側で古い版に合わせられるなら、先に API を直す（ADR-006）
 
 ### 5.6 DB
 
 - 戻さない。直すマイグレーションを足して前へ進める（expand / contract）
-- データが壊れた・消えたときは、Neon の復元か `pg_dump` のバックアップから戻す（05 5章・6.2）。戻した時点より後に書かれたデータは消えるので、まず影響の範囲を確かめる
+- データが壊れた・消えたときは、Neon の復元か、バケット `{GCP_PROJECT_ID}-moonx-backups` の `pg_dump` のバックアップから戻す（05 5章・6.2）。戻した時点より後に書かれたデータは消えるので、まず影響の範囲を確かめる
 
 ### 5.7 インフラ（Terraform）
 
 ```bash
 # Terraform の変更の PR を revert してマージしてから
 git switch main && git pull
-make infra-plan ENV=production    # 戻る差分を確かめる
+make infra-plan ENV=production    # 戻る差分を確かめる（shared の変更なら ENV=shared）
 make infra-apply ENV=production
 ```
 
@@ -370,12 +399,13 @@ gcloud logging read \
 | 役割 | 担当 | 連絡手段 | 持っている権限 |
 |---|---|---|---|
 | 開発・運用の担当（一次対応。アラートの通知先） | `<氏名>` | `<連絡手段>` | GitHub・Google Cloud・Cloudflare・Neon・Resend・Sentry・Expo |
-| 予備の担当 | `<氏名>` | `<連絡手段>` | 同上（少なくとも Google Cloud と Cloudflare） |
+| 予備の担当 | `<氏名>` | `<連絡手段>` | 同上（少なくとも Google Cloud と Cloudflare）。GitHub の環境 `production` の承認者にも入れておく |
 | BCDX の窓口（利用者への連絡） | `<氏名>` | `<連絡手段>` | 運営者（アプリの管理画面） |
 | Google Cloud の請求先の管理者 | `<氏名>` | `<連絡手段>` | 請求先アカウント |
 | Cloudflare のアカウントの持ち主（`{DOMAIN}`） | `<氏名>` | `<連絡手段>` | Registrar・DNS |
 | Apple Developer の Account Holder | `<氏名>` | `<連絡手段>` | App Store Connect・会員の更新 |
-| Google Play Console のアカウントの持ち主 | `<氏名>` | `<連絡手段>` | Play Console |
+| Google Play Console のアカウントの持ち主（個人の開発者アカウント） | `<氏名>` | `<連絡手段>` | Play Console |
+| クローズドテストのテスターの取りまとめ（Android の最初の公開の前） | `<氏名>` | `<連絡手段>` | Play Console のテスターの一覧 |
 
 - アラートは一次対応の担当にメールで届く（05 2章）。1人で運用するときは、予備の担当に少なくとも Google Cloud と Cloudflare の権限を渡しておく
 - 外部サービスの障害の確かめ方は 05 5章

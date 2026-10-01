@@ -161,12 +161,12 @@ moonx/
 
 | 名前 | 置き場所 | 用途 |
 |---|---|---|
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT`（変数） | リポジトリ | Workload Identity Federation で Google Cloud に入る（鍵を置かない）。`build.yml` のイメージの作成と、各環境のデプロイが使う |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT`（変数） | リポジトリ | Workload Identity Federation で Google Cloud に入る（鍵を置かない）。`build.yml` のイメージの作成、各環境のデプロイ、`db-backup.yml` のバックアップのバケットへの書き込みが使う |
 | `SENTRY_AUTH_TOKEN`（シークレット） | リポジトリ（スマホのビルドは EAS で動くので、EAS の環境変数にも secret として置く） | ソースマップのアップロード（Web・スマホ・API） |
 | `CLOUDFLARE_ACCOUNT_ID`（変数） | リポジトリ | `wrangler deploy` |
 | `EXPO_TOKEN`（シークレット） | リポジトリ | EAS Build / Submit / Update |
 | `DATABASE_URL_DIRECT`（シークレット） | `staging` / `production`（マイグレーション）、`production-backup`（バックアップ。production の読み取り専用のロール `moonx_backup_ro` の接続文字列） | マイグレーションとバックアップ |
-| `CLOUDFLARE_API_TOKEN`（シークレット） | `staging` / `production` | `wrangler deploy`。権限は Workers のスクリプトの編集と、`{DOMAIN}` のゾーンの Workers のルート・カスタムドメイン・DNS の編集（カスタムドメインが DNS レコードを作るため）。メールの DNS 用の Terraform のトークンは別（`envs/shared` の実行者だけが持つ） |
+| `CLOUDFLARE_API_TOKEN`（シークレット） | `staging` / `production` | `wrangler deploy`。権限は Workers のスクリプトの編集と、`{DOMAIN}` のゾーンの Workers のルート・カスタムドメイン・DNS の編集（カスタムドメインが DNS レコードを作るため）。Cloudflare のゾーンの設定（2章「インフラ管理」）用の Terraform のトークンは別（`envs/shared` の実行者だけが持つ） |
 | `VITE_APP_ENV` / `VITE_SENTRY_DSN`（変数） | `staging` / `production` | Web のビルド |
 
 ストアへの提出の鍵（App Store Connect の API キー、Google Play の提出用のサービスアカウントの JSON）は EAS に置く（`eas credentials`）。

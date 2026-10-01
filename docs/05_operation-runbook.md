@@ -22,7 +22,7 @@
 | エラー（web / mobile / api） | Sentry の3つのプロジェクト | Sentry の無料プランの保持期間 | 例外・リクエスト ID・リリース（版）・environment |
 | メール | Resend の管理画面（Emails） | Resend のプランの保持期間（短い） | 送信・配達・バウンス |
 | DB | Neon のコンソール（Monitoring・Usage） | Neon のプランによる | 接続数・容量・計算時間 |
-| デプロイ・バックアップ | GitHub Actions | 90日 | `deploy.yml`・`build.yml`・`db-backup.yml` の記録 |
+| デプロイ・バックアップのワークフローの実行記録 | GitHub Actions | 90日 | `deploy.yml`・`build.yml`・`db-backup.yml` の記録 |
 
 リクエスト ID がどこに入るかは [SDD 8.3](02-01_system-design-doc.md#83-ログとの対応)。利用者からエラーの連絡を受けたら、画面に出た `Ref`（リクエスト ID の先頭）をもらい、4章のコマンドで追う。
 
@@ -404,6 +404,7 @@ Cloud Run はシークレットを起動のときに読む。値を変えたら�
 | シークレット | 入れ方 |
 |---|---|
 | `CLOUDFLARE_API_TOKEN`（GitHub の環境） | `gh secret set CLOUDFLARE_API_TOKEN --env staging` と `gh secret set CLOUDFLARE_API_TOKEN --env production` |
+| Terraform 用の Cloudflare のトークン（`envs/shared` の実行者の手元だけ） | Cloudflare のダッシュボードで新しいトークンを作り（権限は SDD 2章「インフラ管理」のゾーンの設定をすべて変えられるもの）、手元の環境変数を置き換えて `make infra-plan ENV=shared` で差分が無いことを確かめてから、古いトークンを消す |
 | `EXPO_TOKEN`（リポジトリ） | `gh secret set EXPO_TOKEN` |
 | `SENTRY_AUTH_TOKEN`（リポジトリと EAS の環境変数） | `gh secret set SENTRY_AUTH_TOKEN`。さらに EAS の環境変数 `SENTRY_AUTH_TOKEN`（visibility は secret）を、`preview` と `production` の両方で新しい値にする（expo.dev のプロジェクトの Environment variables。03 5.4 K） |
 
@@ -609,7 +610,7 @@ bunx wrangler deployments list --env production
 | 費用の確認 | 月1回 | 予算（SDD 1章 Goal。予算アラートの金額は SDD 11章）と比べる（下） |
 | アラートの通知の確認 | 四半期に1回 | Cloud Monitoring・Sentry から試しの通知を出し、メールが届くか |
 | 古いスマホの版の確認 | 月1回 | Sentry（mobile）のリリースごとの利用を見て、API の互換を外してよいかを決める（ADR-006） |
-| シークレットの入れ替え | `GOOGLE_CLIENT_SECRET`・`RESEND_API_KEY`・`PROXY_SHARED_SECRET` と CI のトークン（`CLOUDFLARE_API_TOKEN`・`EXPO_TOKEN`・`SENTRY_AUTH_TOKEN`）は年1回、漏れたらすぐ。`BETTER_AUTH_SECRET` は漏れたときだけ | 3.15 |
+| シークレットの入れ替え | `GOOGLE_CLIENT_SECRET`・`RESEND_API_KEY`・`PROXY_SHARED_SECRET` と CI のトークン（`CLOUDFLARE_API_TOKEN`・`EXPO_TOKEN`・`SENTRY_AUTH_TOKEN`）と Terraform 用の Cloudflare のトークンは年1回、漏れたらすぐ。`BETTER_AUTH_SECRET` は漏れたときだけ | 3.15 |
 | OAuth クライアントの確認 | 年1回 | 使っていないクライアントは Google 側で消されることがある（local 用に注意）。同意画面の情報が古くないか |
 | ドメインの更新 | 年1回（期限の1か月前） | Cloudflare Registrar で自動更新が ON か、支払い方法が有効か。切れるとメールもアプリも止まる（ADR-013） |
 | Apple Developer Program の更新 | 年1回 | 自動更新が ON か。切れるとアプリがストアから消える |

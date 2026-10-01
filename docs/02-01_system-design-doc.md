@@ -71,10 +71,12 @@
 
 | 対象 | 管理方法 |
 |---|---|
-| Google Cloud（Cloud Run・Artifact Registry・Secret Manager・Cloud Scheduler・Cloud Storage・サービスアカウント・Workload Identity Federation・Monitoring のアラート） | **Terraform**（`infra/terraform/`。状態は Cloud Storage のバケットに置く） |
-| Cloudflare（DNS レコード） | **Terraform**（Cloudflare provider） |
-| Cloudflare Worker と静的アセット | `apps/web/wrangler.jsonc`（デプロイは `wrangler deploy`） |
-| Neon（プロジェクトとブランチ） | Neon のコンソールで作り、接続文字列を Secret Manager に入れる（無料プランは Terraform の対象にしない。手順は 03_dev-setup.md） |
+| Google Cloud の環境ごとの資源（Cloud Run・Secret Manager・Cloud Scheduler・写真のバケット・サービスアカウント・Monitoring のアラート） | **Terraform**（`infra/terraform/envs/{staging,production}/`） |
+| Google Cloud の共有の資源（Artifact Registry のリポジトリ `moonx`・Workload Identity Federation・バックアップのバケット `{GCP_PROJECT_ID}-moonx-backups`・予算アラートと通知のチャンネル） | **Terraform**（`infra/terraform/envs/shared/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`） |
+| Cloudflare の DNS（メールの SPF・DKIM・DMARC と Resend の確認のレコード） | **Terraform**（Cloudflare provider。`envs/shared/`） |
+| Cloudflare Worker・静的アセット・Web のドメイン（`{DOMAIN}` と `staging.{DOMAIN}` の DNS レコードは Worker のカスタムドメインが作る） | `apps/web/wrangler.jsonc`（デプロイは `make deploy-web`） |
+| Google の OAuth の同意画面とクライアント | Google Cloud のコンソール（Terraform では作れないため。手順は 03_dev-setup.md） |
+| Neon（プロジェクトとブランチ。DB 名 `moonx`） | Neon のコンソールで作り、接続文字列を Secret Manager に入れる（無料プランは Terraform の対象にしない。手順は 03_dev-setup.md） |
 | スマホのビルドと配布 | `apps/mobile/eas.json`・`app.config.ts` |
 | DB のスキーマ | Drizzle のマイグレーション（`packages/db/migrations/`。CI がデプロイ前に適用する） |
 | デプロイのきっかけ | `deploy/{staging,production}/version` の更新（GitHub Actions。04_deployment-procedure.md） |
@@ -97,7 +99,7 @@ moonx/
 │  ├─ ui-tokens/  06_design-tokens.json から生成するテーマ（vanilla-extract・Unistyles・react-pdf 用。生成物）
 │  ├─ ui-web/     Web の部品（React Aria Components ＋ vanilla-extract。design-spec 4.5 の部品）
 │  └─ ui-native/  スマホの部品（@rn-primitives ＋ Unistyles ＋ @gorhom/bottom-sheet。同じ部品名）
-├─ infra/terraform/  modules/ と envs/{staging,production}/
+├─ infra/terraform/  modules/ と envs/{shared,staging,production}/
 ├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA
 ├─ e2e/           Playwright（Web）
 └─ Makefile
@@ -109,10 +111,12 @@ moonx/
 |---|---|---|---|
 | Web・API の URL | Web `http://localhost:5173`（Vite が `/api` を API へ転送）・API `http://localhost:3000` | `https://staging.{DOMAIN}` | `https://{DOMAIN}` |
 | API（Cloud Run） | `bun --watch` | `moonx-api-staging` | `moonx-api-production` |
-| Cloudflare Worker | `vite dev` | `moonx-web`（env: staging） | `moonx-web`（env: production） |
+| Cloudflare Worker | `vite dev` | `moonx-web-staging`（`wrangler.jsonc` の env `staging`） | `moonx-web-production`（env `production`） |
 | DB | Docker の PostgreSQL 17（`localhost:5432`、DB 名 `moonx`） | Neon プロジェクト `moonx` のブランチ `staging` | 同じプロジェクトのブランチ `production` |
 | メール | コンソールに出す | Resend（送信先は許可リストのメールだけ） | Resend |
-| スマホ | Expo の開発ビルド | EAS のチャンネル `staging`（TestFlight / Play 内部テスト） | EAS のチャンネル `production`（App Store / Google Play） |
+| スマホ | Expo の開発ビルド（EAS の profile `development`） | EAS の profile `staging`・チャンネル `staging`・EAS の環境 `preview`。アプリ `{APP_ID}.staging`（TestFlight / Play の内部テスト） | profile `production`・チャンネル `production`・EAS の環境 `production`。アプリ `{APP_ID}`（App Store / Google Play） |
+| API のイメージ | — | `asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:<コミット SHA>`（両方の環境で同じイメージ） | 同左 |
+| GitHub の環境 | — | `staging` | `production`（デプロイに承認を要する） |
 | Sentry の environment | なし | `staging` | `production` |
 
 未確定の名前（決まったらこの表と、使っている箇所を一緒に置き換える）:
@@ -130,7 +134,8 @@ moonx/
 | `APP_ENV` | api | `local` / `staging` / `production` | `local` | Cloud Run の環境変数 |
 | `PORT` | api | 待ち受けるポート | `3000` | Cloud Run が `8080` を渡す |
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
-| `DATABASE_URL_DIRECT` | db（マイグレーション） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
+| `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
+| `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直す） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
 | `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32バイト以上の乱数） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
 | `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://staging.{DOMAIN}` / `https://{DOMAIN}` |
 | `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り） | `http://localhost:5173,moonx://,exp://` | `https://{DOMAIN},moonx://`（staging は `https://staging.{DOMAIN},moonx-staging://`） |
@@ -139,28 +144,46 @@ moonx/
 | `RESEND_API_KEY` | api | Resend の API キー | 不要 | Secret Manager `moonx-{env}-resend-api-key` |
 | `MAIL_FROM` | api | 送信元 | `moonx <no-reply@localhost>` | `moonx <no-reply@{DOMAIN}>` |
 | `MAIL_ALLOWLIST` | api | staging でだけ使う送信先の許可リスト（カンマ区切り。空なら制限なし） | 空 | staging だけ設定 |
-| `PROXY_SHARED_SECRET` | api, Worker | Worker が付ける共有シークレット | 空（local では検査しない） | Secret Manager `moonx-{env}-proxy-shared-secret` と Worker のシークレット |
+| `PROXY_SHARED_SECRET` | api, Worker | Worker が付ける共有シークレット。API 側はカンマ区切りで2つまで受け付ける（ローテーションの間だけ新旧の両方を入れる。05_operation-runbook.md） | 空（local では検査しない） | Secret Manager `moonx-{env}-proxy-shared-secret` と Worker のシークレット |
 | `API_ORIGIN` | Worker | 転送先の Cloud Run の URL | 不要（Vite の転送を使う） | `wrangler.jsonc` の環境ごとの `vars` |
 | `CRON_OIDC_AUDIENCE` | api | cron の OIDC トークンの audience（Cloud Run の URL） | 空（local では `make cron-due` が直接呼ぶ） | Cloud Run の環境変数 |
 | `CRON_INVOKER_EMAIL` | api | cron を呼ぶサービスアカウントのメール | 空 | Cloud Run の環境変数 |
 | `AVATAR_BUCKET` | api | プロフィール写真のバケット | 空（local はディスク `./.data/avatars`） | `moonx-{env}-avatars` |
 | `SENTRY_DSN` | api | Sentry（API） | 空 | Cloud Run の環境変数 |
 | `LOG_LEVEL` | api | `debug` / `info` / `warn` / `error` | `debug` | `info` |
-| `VITE_APP_ENV` / `VITE_SENTRY_DSN` | web（ビルド時） | 環境名と Sentry（Web） | `local` / 空 | GitHub Actions の環境の変数 |
-| `EXPO_PUBLIC_API_BASE_URL` | mobile | API の基準 URL | `http://<開発 PC の IP>:3000/api` | `https://staging.{DOMAIN}/api` / `https://{DOMAIN}/api`（eas.json の profile ごと） |
-| `EXPO_PUBLIC_APP_ENV` / `EXPO_PUBLIC_SENTRY_DSN` | mobile | 環境名と Sentry（スマホ） | `local` / 空 | eas.json の profile ごと |
+| `VITE_APP_ENV` / `VITE_SENTRY_DSN` | web（ビルド時） | 環境名と Sentry（Web）。ビルドに埋め込むので、Web はデプロイのときに環境ごとにビルドする（ADR-016） | `local` / 空 | GitHub Actions の環境の変数 |
+| `EXPO_PUBLIC_API_BASE_URL` | mobile | API の基準 URL | `http://<開発 PC の IP>:3000/api`（`apps/mobile/.env`） | `https://staging.{DOMAIN}/api` / `https://{DOMAIN}/api`（EAS の環境変数。`preview` / `production`。`eas build` と `eas update --environment` の両方が読む） |
+| `EXPO_PUBLIC_APP_ENV` / `EXPO_PUBLIC_SENTRY_DSN` | mobile | 環境名と Sentry（スマホ） | `local` / 空（`apps/mobile/.env`） | 同上（EAS の環境変数） |
+
+`.env` の置き場所: `apps/mobile` 以外の変数はリポジトリの直下の `.env`、`EXPO_PUBLIC_*` は `apps/mobile/.env`（Expo が読む場所）。`make setup` が、それぞれの `.env.example` をコピーする。
+
+**CI（GitHub Actions）のシークレットと変数**（GitHub の環境 `staging` / `production` に置く。リポジトリには置かない）:
+
+| 名前 | 用途 |
+|---|---|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT`（変数） | Workload Identity Federation で Google Cloud に入る（鍵を置かない） |
+| `DATABASE_URL_DIRECT`（シークレット） | マイグレーションとバックアップ |
+| `CLOUDFLARE_API_TOKEN`（シークレット）/ `CLOUDFLARE_ACCOUNT_ID`（変数） | `wrangler deploy`。トークンは Worker のデプロイだけの権限。DNS 用の Terraform のトークンは別（`envs/shared` の実行者だけが持つ） |
+| `EXPO_TOKEN`（シークレット） | EAS Build / Submit / Update |
+| `SENTRY_AUTH_TOKEN`（シークレット） | ソースマップのアップロード（Web・スマホ・API） |
+| `VITE_SENTRY_DSN`（変数） | Web のビルド |
+
+ストアへの提出の鍵（App Store Connect の API キー、Google Play の提出用のサービスアカウントの JSON）は EAS に置く（`eas credentials`）。
 
 ### make ターゲット
 
 | ターゲット | 内容 |
 |---|---|
-| `setup` | 依存の取得（`bun install`）、`.env` の雛形のコピー、`db-up`、`db-migrate`、`db-seed`、`tokens` |
+| `install` | 依存の取得だけ（`bun install --frozen-lockfile`）。CI が使う |
+| `setup` | `install`、`.env` の雛形のコピー（直下と `apps/mobile`）、`db-up`、`db-migrate`、`db-seed`、`tokens`、Playwright のブラウザの取得 |
 | `dev` | API と Web を同時に起動（`dev-api` と `dev-web`） |
 | `dev-api` / `dev-web` / `dev-mobile` | それぞれを単独で起動（`dev-mobile` は Expo の開発サーバー） |
-| `build` | 全パッケージの型チェックとビルド（API の Docker イメージは CI が作る） |
+| `build` | 全パッケージの型チェックとビルド（Web は local の設定） |
+| `build-web ENV=...` | Web を環境ごとにビルドする（`VITE_*` を埋め込む） |
+| `build-api-image SHA=...` | API の Docker イメージを作って Artifact Registry に上げる |
 | `test` | `test-domain`・`test-api`・`test-web`・`test-mobile` をまとめて実行 |
-| `test-domain` / `test-api` / `test-web` / `test-mobile` | 単体・結合テスト |
-| `test-e2e` | Playwright（Web。API・DB を起動した状態で） |
+| `test-domain` / `test-api` / `test-web` / `test-mobile` | 単体・結合テスト（`test-api` は `DATABASE_URL_TEST` の DB を作り直して使う） |
+| `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して） |
 | `lint` / `format` / `typecheck` | Biome の検査・整形、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
@@ -169,9 +192,13 @@ moonx/
 | `db-studio` | Drizzle Studio |
 | `tokens` | `docs/06_design-tokens.json` から `packages/ui-tokens` を生成する |
 | `openapi` | API の OpenAPI 仕様を `apps/api/openapi.json` に書き出す |
-| `cron-due` | 期限の通知の処理を手で1回動かす（local・staging の確認用） |
-| `admin-create EMAIL=...` | 最初の運営者を作るための招待（ワークスペースなし）を発行し、リンクを表示する |
-| `infra-plan ENV=...` / `infra-apply ENV=...` | Terraform の plan / apply |
+| `cron-due` | 期限の通知の処理を手で1回動かす（local だけ。staging では Cloud Scheduler のジョブを手で実行する。04・05） |
+| `admin-create EMAIL=...` | 最初の運営者を作るための招待（ワークスペースなし）を発行し、リンクを表示する。接続先は `DATABASE_URL`、リンクの基準は `BETTER_AUTH_URL`（staging / production では、この2つを上書きして手元から実行する。03_dev-setup.md） |
+| `infra-plan ENV=...` / `infra-apply ENV=...` | Terraform の plan / apply（`ENV` は `shared` / `staging` / `production`） |
+| `deploy-api ENV=... SHA=...` | マイグレーションの後、Cloud Run に新しいリビジョンを出す（CI が使う） |
+| `deploy-web ENV=...` | `build-web` の結果を `wrangler deploy --env` で出す（CI が使う） |
+| `mobile-update ENV=...` / `mobile-build ENV=...` | EAS Update（JS だけ）/ EAS Build と Submit（ネイティブの変更があるとき）（CI か手元） |
+| `db-backup ENV=...` | `pg_dump` を取ってバックアップのバケットに上げる（定期実行の GitHub Actions が使う。05_operation-runbook.md） |
 
 ---
 
@@ -265,7 +292,7 @@ moonx/
 
 **理由:** ユーザーが Cloud Run を選んだ。コンテナなので Bun と PDF のライブラリが制約なく動き、無料枠（月200万リクエスト、CPU 18万秒）に試運転は十分収まる。
 
-**トレードオフ:** 0台から起動するときに数秒待つ（コールドスタート）。最初の利用者が遅く感じたら、営業時間だけ最小1台にする（月数ドル）。Secret Manager は無料枠（有効な版6つ）を超えるため、月 $1 程度かかる。
+**トレードオフ:** 0台から起動するときに数秒待つ（コールドスタート）。最初の利用者が遅く感じたら、Terraform の `min_instance_count` を1にする（常に1台。月数ドルかかるので、予算と相談して決める。時間帯での自動の切り替えは作らない）。Secret Manager は無料枠（有効な版6つ）を超えるため、月 $1 程度かかる。
 
 ### ADR-008: DB は Neon。ただし標準の PostgreSQL として使う
 
@@ -273,7 +300,7 @@ moonx/
 
 **理由:** 無料で、使われないときは休むので $0 で運用できる。ユーザーが「Neon を後から変えられるようにしたい」とした。接続文字列（`DATABASE_URL`）以外に Neon への依存を作らなければ、Cloud SQL・Supabase・自前の PostgreSQL へ、データを書き出して移し `DATABASE_URL` を変えるだけで乗り換えられる。
 
-**トレードオフ:** しばらく使われないと DB が休み、最初の応答が1秒ほど遅れる。無料プランの容量は 0.5 GB で、変更履歴（`change_history`）が増え続けると足りなくなる可能性がある（05_operation-runbook.md で容量を監視する。超えそうなら Neon の有料プランか、別の PostgreSQL へ移る）。ブランチは Neon の機能だが、staging 用の別 DB で代わりがきくので、乗り換えの妨げにはならない。
+**トレードオフ:** しばらく使われないと DB が休み、最初の応答が1秒ほど遅れる。無料プランの容量（0.5 GB）と計算時間の枠は**プロジェクト単位**で、staging のブランチと分け合う。変更履歴（`change_history`）が増え続けると足りなくなる可能性がある（05_operation-runbook.md で容量を監視する。超えそうなら Neon の有料プランか、別の PostgreSQL へ移る）。ブランチは Neon の機能だが、staging 用の別 DB で代わりがきくので、乗り換えの妨げにはならない。
 
 ### ADR-009: ORM は Drizzle、入力チェックは Zod v4
 
@@ -295,7 +322,7 @@ moonx/
 
 **理由:** ユーザーが Better Auth で最初から Google ログインを入れると指定した。ライブラリなので $0 で、ユーザー情報は自分の DB に残り、乗り換えの妨げにならない。招待制のような独自の決まりを、フックで確実に組み込める。
 
-**トレードオフ:** 認証の画面（ログイン・新規登録・パスワード再設定）は自分で作る（design-spec 2 の仕様どおり）。Google の OAuth クライアントを環境ごとに作り、同意画面の設定と、スマホから戻るディープリンクの設定が要る。Better Auth の更新でセキュリティ修正が出たら速やかに上げる。
+**トレードオフ:** 認証の画面（ログイン・新規登録・パスワード再設定）は自分で作る（design-spec 2 の仕様どおり）。Google の OAuth クライアントを環境ごとに作り、同意画面の設定と、スマホから戻るディープリンクの設定が要る。local の `BETTER_AUTH_URL`（localhost）では実機やエミュレータから Google ログインが戻れないので、スマホの Google ログインは staging で確かめる。Apple の審査基準 4.8 への対応は ADR-003 のとおり（Sign in with Apple は足さない）。Better Auth の更新でセキュリティ修正が出たら速やかに上げる。
 
 ### ADR-011: サーバー側のキャッシュは置かない
 
@@ -331,15 +358,15 @@ moonx/
 
 ### ADR-015: IaC は Terraform（ユーザー指定）
 
-**決定:** Google Cloud の資源と Cloudflare の DNS を Terraform で管理する（`infra/terraform/modules/` と `envs/{staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。Cloudflare の Worker は `wrangler.jsonc`、スマホのビルドは `eas.json`、Neon はコンソールで管理する。
+**決定:** Google Cloud の資源と Cloudflare の DNS（メールのレコード）を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート・メールの DNS）、`staging` / `production` は環境ごとの資源（2章「インフラ管理」）。Cloud Run のイメージは CI が出すので、Terraform は `image` の変更を無視する（`lifecycle.ignore_changes`）。初回は、イメージとシークレットの値が無いので2回に分けて apply する（1回目でシークレットの入れ物とリポジトリを作り、値とイメージを入れてから2回目で Cloud Run と Scheduler を作る。`CRON_OIDC_AUDIENCE` は Cloud Run のサービス自身の URL）。Cloudflare の Worker と Web のドメインは `wrangler.jsonc`、スマホのビルドは `eas.json`、Neon と Google の OAuth の設定はコンソールで管理する。
 
 **理由:** ユーザーが Terraform を選んだ。環境を作り直せて、設定の変更をレビューできる。
 
-**トレードオフ:** Terraform の学習コストがある。Neon の無料プランと Expo は Terraform の外に残るので、手順を 03_dev-setup.md に書いて補う。
+**トレードオフ:** Terraform の学習コストがある。Neon の無料プラン・Expo・Google の OAuth の設定は Terraform の外に残るので、手順を 03_dev-setup.md に書いて補う。
 
 ### ADR-016: staging と production の2環境。バージョン宣言ファイルで昇格する（ユーザー指定）
 
-**決定:** 環境は staging と production（2章「環境と命名」）。ブランチは GitHub Flow（`main` ＋作業ブランチ、マージは常に squash）。`main` に入ると CI がテストし、API のイメージ（タグはコミット SHA）と Web のビルドを作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR）をマージしたときに GitHub Actions が行う（DB のマイグレーション → API → Web の順）。戻すときは昇格の PR を revert する。スマホは、ネイティブの変更があれば EAS Build と Submit、JS だけなら EAS Update を同じ昇格で出す。
+**決定:** 環境は staging と production（2章「環境と命名」）。ブランチは GitHub Flow（`main` ＋作業ブランチ、マージは常に squash）。`main` に入ると CI がテストし、API のイメージ（タグはコミット SHA。両方の環境で同じイメージを使う）を作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR。ブランチ名 `promote/{env}-<SHA の先頭7文字>`）をマージしたときに GitHub Actions が行う（DB のマイグレーション → API → Web の順）。Web はビルドに環境の値（`VITE_*`）を埋め込むので、デプロイのときにその SHA から環境ごとにビルドする（`make build-web ENV=...`）。戻すときは昇格の PR を revert する。スマホは、ネイティブの変更があれば EAS Build と Submit、JS だけなら EAS Update を同じ昇格で出す。
 
 **理由:** ユーザーが staging ＋ production を選んだ。BCDX の実データに触れずに確かめられる。どの環境にどの版が出ているかが、リポジトリのファイルで分かる。
 
@@ -347,7 +374,7 @@ moonx/
 
 ### ADR-017: モノレポは Bun workspaces ＋ Makefile
 
-**決定:** Bun workspaces で `apps/*` と `packages/*` をまとめる。パッケージ名は `@moonx/*`。タスクの実行は Makefile に集め（2章「make ターゲット」）、CI も Makefile のターゲットを呼ぶ。
+**決定:** Bun workspaces で `apps/*` と `packages/*` をまとめる。パッケージ名は `@moonx/*`。タスクの実行は Makefile に集め（2章「make ターゲット」）、CI もデプロイを含めて Makefile のターゲットを呼ぶ（GitHub Actions のワークフローは `ci.yml`（PR）・`build.yml`（`main`）・`deploy.yml`（昇格）・`db-backup.yml`（定期のバックアップ））。
 
 **理由:** API が Bun で動くので、パッケージ管理も Bun にそろえる。Expo と Vite も Bun のワークスペースで動く。Makefile を正にすれば、ドキュメント・CI・CLAUDE.md がターゲット名だけを参照できる。
 
@@ -404,7 +431,7 @@ moonx/
 
 ### ADR-023: 監視とログは Sentry と Cloud Logging
 
-**決定:** エラーは Sentry（無料枠。プロジェクトは web / mobile / api の3つ）に送る。API のログは1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`）で標準出力に書き、Cloud Logging が集める。リクエスト ID は Worker で付け（`X-Request-Id`）、エラーの応答と Sentry にも入れる。死活確認は Cloud Monitoring の稼働時間チェック（`/api/health`）。詳細は11章。
+**決定:** エラーは Sentry（無料枠。プロジェクトは web / mobile / api の3つ）に送る。API のログは1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`appVersion`）で標準出力に書き、Cloud Logging が集める。リクエスト ID は Worker で付け（`X-Request-Id`）、エラーの応答と Sentry にも入れる。死活確認は Cloud Monitoring の稼働時間チェック（`/api/health`）。詳細は11章。
 
 **理由:** どれも無料枠で足りる。リクエスト ID で、利用者が見たエラーとログ・Sentry をつなげられる。
 
@@ -414,7 +441,7 @@ moonx/
 
 **決定:** 4 アカウント設定の写真は、API が受け取って 512×512 の WebP に縮め、Cloud Storage のバケット `moonx-{env}-avatars`（公開読み取り、ファイル名は推測できない乱数）に置く。URL を `users.avatar_url` に入れる。
 
-**理由:** 写真は任意で小さいので、Cloud Storage の無料枠でほぼ $0。
+**理由:** 写真は任意で小さいので、費用は月 $0.1 未満（Cloud Storage の無料枠は米国の3リージョンだけなので、asia-southeast1 のバケットには少しかかる）。
 
 **トレードオフ:** 公開読み取りなので、URL を知っていれば誰でも見られる（プロフィール写真なので許容する。乱数のファイル名で推測を防ぐ）。
 
@@ -2133,7 +2160,7 @@ CI（GitHub Actions）は PR ごとに `make lint`・`make typecheck`・`make te
 |---|---|---|
 | API のエラー | Sentry（プロジェクト `moonx-api`） | `environment` = staging / production、`release` = コミット SHA、タグに `requestId`・`route`。ユーザーは `userId` だけ。新しい issue でメール通知 |
 | Web・スマホのエラー | Sentry（`moonx-web` / `moonx-mobile`） | CI でソースマップを上げる。スマホの `release` はアプリの版、`dist` は EAS Update の ID |
-| API のログ | Cloud Logging | 標準出力に1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`）。保持は既定の30日 |
+| API のログ | Cloud Logging | 標準出力に1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`appVersion`）。保持は既定の30日 |
 | Worker のログ | Cloudflare Workers Logs | `/api/*` の転送の失敗（`UPSTREAM_UNAVAILABLE`）を見る。調べるときは `wrangler tail` |
 | 死活 | Cloud Monitoring の稼働時間チェック | `https://{DOMAIN}/api/health`（Z1。DB に触れない）を5分ごと。2回続けて失敗したらメール |
 | エラー率 | Cloud Monitoring（ログベースの指標） | 5xx が10分間で全体の1%を超える、または5分で5件を超えたらメール |

@@ -87,14 +87,16 @@ Bun workspaces のモノレポ。実コマンドは `Makefile` が唯一の正�
 moonx/
 ├─ apps/
 │  ├─ web/        TanStack Start（SPA モード）。worker/ に Cloudflare Worker（/api の転送）、wrangler.jsonc
-│  ├─ mobile/     Expo（Expo Router・NativeWind）。eas.json・app.config.ts
+│  ├─ mobile/     Expo（Expo Router）。eas.json・app.config.ts
 │  └─ api/        ElysiaJS（Bun）。Better Auth・REST API・cron・PDF。Dockerfile
 ├─ packages/
 │  ├─ domain/     計算・確認項目・F/A/U・工程・Pitch Deck の組み立て・AI 書き出し / 取り込みの書式（純粋関数）
 │  ├─ schemas/    Zod のスキーマ（API の入出力とフォームの入力チェック）
 │  ├─ db/         Drizzle のスキーマ・マイグレーション・シード
 │  ├─ i18n/       英語のメッセージカタログと書式（en-PH）
-│  └─ ui-tokens/  06_design-tokens.json から生成する Tailwind / NativeWind のテーマ（生成物）
+│  ├─ ui-tokens/  06_design-tokens.json から生成するテーマ（vanilla-extract・Unistyles・react-pdf 用。生成物）
+│  ├─ ui-web/     Web の部品（React Aria Components ＋ vanilla-extract。design-spec 4.5 の部品）
+│  └─ ui-native/  スマホの部品（@rn-primitives ＋ Unistyles ＋ @gorhom/bottom-sheet。同じ部品名）
 ├─ infra/terraform/  modules/ と envs/{staging,production}/
 ├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA
 ├─ e2e/           Playwright（Web）
@@ -180,8 +182,8 @@ moonx/
 | # | 領域 | 決定 |
 |---|---|---|
 | ADR-001 | クライアントの構成 | Web とスマホのネイティブアプリを**別々のコード**で作り、計算・入力チェック・型を共有パッケージで共有する |
-| ADR-002 | Web | **TanStack Start**（SPA モード）＋ Tailwind CSS |
-| ADR-003 | スマホ | **Expo**（React Native）＋ Expo Router ＋ NativeWind。**iOS と Android を最初からストアで配る** |
+| ADR-002 | Web | **TanStack Start**（SPA モード） |
+| ADR-003 | スマホ | **Expo**（React Native）＋ Expo Router。**iOS と Android を最初からストアで配る** |
 | ADR-004 | Web の配信 | **静的ファイル＋`/api` の転送**の形に固定し、Cloudflare（Worker の静的アセット）で配る |
 | ADR-005 | API | **ElysiaJS**（Bun） |
 | ADR-006 | 通信方式 | **REST**。クライアントは **Eden Treaty**、仕様書は OpenAPI。常時接続は使わない |
@@ -196,13 +198,14 @@ moonx/
 | ADR-015 | IaC | **Terraform**（GCP と Cloudflare の DNS）＋ wrangler / EAS の設定ファイル |
 | ADR-016 | 環境とリリース | **staging ＋ production**。`deploy/{env}/version` による昇格 |
 | ADR-017 | モノレポ | **Bun workspaces** ＋ Makefile |
-| ADR-018 | スタイルとデザイントークン | 06_design-tokens.json から Tailwind（Web）と NativeWind（スマホ）のテーマを生成する。アイコンは Lucide |
+| ADR-018 | デザインシステムとトークン | **Adobe Spectrum の仕組み**を取り入れ、見た目は Hermes Teal。06_design-tokens.json から Web（vanilla-extract）・スマホ（Unistyles）・PDF のテーマを生成する。アイコンは Lucide |
 | ADR-019 | 同時編集 | 項目単位の楽観ロック（`lock_version`）。衝突は 409 で返し、利用者に選ばせる |
 | ADR-020 | 変更履歴の記録 | アプリのコードで、本体の更新と同じトランザクションの中で `change_history` に書く |
 | ADR-021 | 保存できなかった入力の再送 | クライアントの送信待ちの列（Web: IndexedDB、スマホ: SQLite）に残して再送する |
 | ADR-022 | テスト・リント | Bun test・Vitest・Jest（jest-expo）・Playwright・Biome |
 | ADR-023 | 監視・ログ | Sentry ＋ Cloud Logging（構造化 JSON・リクエスト ID） |
 | ADR-024 | 画像の保存 | プロフィール写真は Cloud Storage |
+| ADR-025 | 部品の作り方 | **Tailwind を使わない**。振る舞いは headless の部品（Web は **React Aria Components**、スマホは **@rn-primitives**）、見た目は **vanilla-extract**（Web）と **Unistyles**（スマホ）で部品の中にだけ書き、画面にはスタイルを書かない |
 
 ### ADR-001: Web とスマホを別々に作り、ロジックを共有する（ユーザー指定）
 
@@ -214,7 +217,7 @@ moonx/
 
 ### ADR-002: Web は TanStack Start の SPA モード（ユーザー指定）
 
-**決定:** `apps/web` は TanStack Start（React・TanStack Router・Vite）を **SPA モード**で使い、静的ファイルとして出力する。ランディング（1）だけはビルド時に HTML を作る（プリレンダー）。データはすべて API（Eden Treaty ＋ TanStack Query）から取る。TanStack Start のサーバー関数・サーバー描画は使わない。フォームは TanStack Form（Zod のスキーマをそのまま使う）。UI 部品は Radix UI のプリミティブを土台に自作する（見た目は 06_design-tokens.json）。
+**決定:** `apps/web` は TanStack Start（React・TanStack Router・Vite）を **SPA モード**で使い、静的ファイルとして出力する。ランディング（1）だけはビルド時に HTML を作る（プリレンダー）。データはすべて API（Eden Treaty ＋ TanStack Query）から取る。TanStack Start のサーバー関数・サーバー描画は使わない。フォームは TanStack Form（Zod のスキーマをそのまま使う）。画面の部品は `packages/ui-web`（ADR-025）だけを使う。
 
 **理由:** ユーザーが Next.js 以外として TanStack Start を選んだ。ログイン後の画面がほぼすべてで、検索エンジン向けのサーバー描画は要らない。データの取得口を Elysia の API 1つにまとめれば、スマホと同じ API を使える。ルートの型安全（パスと検索パラメータ）が、画面数の多いアプリで効く。
 
@@ -222,11 +225,15 @@ moonx/
 
 ### ADR-003: スマホは Expo、iOS と Android を最初からストアで配る（ユーザー指定）
 
-**決定:** `apps/mobile` は Expo（React Native、New Architecture）＋ Expo Router ＋ NativeWind。ビルドとストアへの提出は EAS Build / EAS Submit、JS だけの修正は EAS Update（チャンネル `staging` / `production`）。iOS（App Store・TestFlight）と Android（Google Play）を最初から両方配る。セッションは Better Auth の Expo プラグインで SecureStore に保存する。保存できなかった入力は expo-sqlite に残す（ADR-021）。PDF は API から受け取り、expo-sharing で共有する。
+**決定:** `apps/mobile` は Expo（React Native、New Architecture。開発ビルドを使い、Expo Go は使わない）＋ Expo Router。画面の部品は `packages/ui-native`（ADR-025）だけを使う。ビルドとストアへの提出は EAS Build / EAS Submit、JS だけの修正は EAS Update（チャンネル `staging` / `production`）。iOS（App Store・TestFlight）と Android（Google Play）を最初から両方配る。セッションは Better Auth の Expo プラグインで SecureStore に保存する。保存できなかった入力は expo-sqlite に残す（ADR-021）。PDF は API から受け取り、expo-sharing で共有する。
 
 **理由:** ユーザーが「ネイティブアプリ」「最初から iOS と Android の両方」を選んだ。Expo は TypeScript・React で書けて Web と知識を共有でき、ネイティブのビルド環境（Mac など）を持たずにクラウドでビルド・提出できる。EAS の無料枠で試運転の規模は足りる。
 
 **トレードオフ:** ストアの審査があるので、修正の公開に1〜数日かかることがある（JS だけの修正は EAS Update で即時に出せる）。Apple の登録費（年 $99）と Google の登録費（$25 の1回だけ）がかかる（運用費の予算には含めない。ユーザーと合意済み）。招待制のアプリなので、審査用のデモアカウント（staging ではなく production の、審査専用のワークスペース）を用意する（04_deployment-procedure.md）。
+
+**審査の判断（ユーザーと合意、2026-10-01）:**
+- Apple の審査基準 4.8（他社のログインを出すアプリは、条件を満たす別のログインも並べる）に対して、Sign in with Apple は足さずに提出する（メール＋パスワードがあるため）。審査で求められたら、そのときに足すか、iOS はストアで配らず Web で使う（ユーザーはストアで配れなくても構わないとした）。
+- Google Play は**個人の開発者アカウント**で登録する。個人アカウントは、製品版の公開の前に「12人以上のテスターが14日間続けて使うクローズドテスト」が必須なので、BCDX のメンバーとアドバイザーで足りなければ、テスターを集めてから公開する（04_deployment-procedure.md）。
 
 ### ADR-004: Web は「静的ファイル＋/api の転送」で配り、Cloudflare に置く
 
@@ -346,13 +353,22 @@ moonx/
 
 **トレードオフ:** Turborepo のような差分ビルドのキャッシュは無い。ビルドが遅くなったら導入を考える。
 
-### ADR-018: スタイルは 06_design-tokens.json から生成する
+### ADR-018: デザインシステムは Adobe Spectrum の仕組み、見た目は Hermes Teal
 
-**決定:** デザイントークンの正は `docs/06_design-tokens.json`（DTCG 形式）。`make tokens` が、Web 用の Tailwind CSS v4 のテーマ（CSS 変数）と、スマホ用の NativeWind のテーマを `packages/ui-tokens` に生成する（変換は自前の小さなスクリプト。Style Dictionary は使わない）。ライト / ダークはトークンのセマンティック層の `light` / `dark` で切り替える。アイコンは Lucide（`lucide-react` / `lucide-react-native`）にそろえる。
+**決定:**
 
-**理由:** Web とスマホで見た目をそろえ、値の二重管理を避ける。Lucide は Web とスマホで同じ線のアイコンのセットを使える（design-spec 4.4「線のアイコンの1つのセット」）。
+- **参考にするもの**: Adobe Spectrum（Spectrum 2）の仕組みを取り入れる。部品の種類と名前（design-spec 4.5）、部品の大きさの段階 S / M / L / XL、端末で切り替えるスケール（デスクトップは `medium`、タッチの端末は `large`）、表とリストの密度（`compact` / `regular` / `spacious`）、状態の色の名前（`accent` / `informative` / `positive` / `negative` / `notice` / `neutral`）、トークンの階層（全体の値 → 用途 → 部品）、スマホではポップオーバーをトレイにする振る舞い、キーボード操作とフォーカスの表示。見た目（配色・書体・質感）は design-spec 4.4 の Hermes Teal で、Spectrum の配色・Adobe Clean・Workflow のアイコンは使わない（ユーザーと合意、2026-10-01）。
+- **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.component`。実装が参照してよいのは `semantic` だけ。
+- **生成**: `make tokens` が `packages/ui-tokens` に次を生成する（変換は自前の小さなスクリプト。Style Dictionary は使わない）。
+  - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク × medium / large の値。CSS 変数として出る）
+  - スマホ: Unistyles のテーマ（ライト / ダーク）とブレークポイント。large のスケールを既定にする
+  - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
+- **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は `<html data-theme>` と `prefers-color-scheme`、スマホは Unistyles の適応テーマ（4 アカウント設定の System / Light / Dark に従う）。
+- **アイコン**: Lucide（`lucide-react` / `lucide-react-native`）にそろえる。大きさと線の太さはトークン（`semantic.icon`）。
 
-**トレードオフ:** 生成スクリプトを保守する必要がある。生成物はコミットし、`make tokens` の実行忘れを CI で検出する（生成し直して差分が出たら失敗）。
+**理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は Phase 2 で決めた Hermes Teal を保つことを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、Web とスマホで同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは一段ゆったり」をそのまま表せる。
+
+**トレードオフ:** Spectrum の部品をそのまま使う（React Spectrum S2）案に比べ、部品の見た目を自分で作る手間がかかる。S2 は配色と書体をほぼ変えられないので、Hermes Teal を保つためにこの手間を受け入れた。生成スクリプトを保守する必要がある。生成物はコミットし、`make tokens` の実行忘れを CI で検出する（生成し直して差分が出たら失敗）。
 
 ### ADR-019: 同時編集は項目単位の楽観ロック
 
@@ -401,6 +417,20 @@ moonx/
 **理由:** 写真は任意で小さいので、Cloud Storage の無料枠でほぼ $0。
 
 **トレードオフ:** 公開読み取りなので、URL を知っていれば誰でも見られる（プロフィール写真なので許容する。乱数のファイル名で推測を防ぐ）。
+
+### ADR-025: 部品は headless の部品＋自前のスタイル。Tailwind は使わない（ユーザー指定）
+
+**決定:**
+
+- **Web（`packages/ui-web`）**: 振る舞いとアクセシビリティは **React Aria Components**（キーボード操作・フォーカスの管理・ARIA・国際化された数値と日付の入力）。見た目は **vanilla-extract**（`*.css.ts` に型付きで書き、ビルド時に静的な CSS になる。実行時の処理なし）。大きさや種類の出し分けは `@vanilla-extract/recipes` の `recipe()`（例: `size: S | M | L | XL`、`variant: accent | primary | secondary | negative`）。React Aria の状態は `data-*` 属性（`[data-hovered]`・`[data-pressed]`・`[data-focus-visible]`・`[data-disabled]` など）で書く。Popover と Tray の切り替えは、幅 768px 未満で Tray（下からのシート）にする共通の部品で行う。
+- **スマホ（`packages/ui-native`）**: 振る舞いは **@rn-primitives**（Dialog・Popover・Select・Tabs・Checkbox・RadioGroup・Switch・Tooltip・Accordion など、見た目の無い部品）と、React Native 標準のアクセシビリティの属性（`accessibilityRole`・`accessibilityState` など）。トレイ（ボトムシート）は **@gorhom/bottom-sheet**。見た目は **react-native-unistyles**（v3。`StyleSheet.create` と同じ書き方でテーマとブレークポイントを使え、`variants` で大きさと種類を出し分ける）。
+- **部品の名前と API**: design-spec 4.5 の Spectrum の名前にそろえ、Web とスマホで同じ props（例: `<Button variant="accent" size="M">`、`<StatusLight variant="positive">`）にする。props の型は `packages/ui-web` と `packages/ui-native` のそれぞれで定義し、共通の部分（`size`・`variant` などの値の型）は `packages/ui-tokens` に置く。
+- **画面にスタイルを書かない**: `apps/web` と `apps/mobile` の画面は、部品と、レイアウトの部品（`Flex`・`Grid`・`View` 相当。間隔はトークンの名前だけを受け取る。例: `gap="space-300"`）の組み合わせで作る。画面で `@vanilla-extract/css`・`StyleSheet`・Unistyles を直接使うこと、`style` 属性に値を書くことは、Biome の `noRestrictedImports` と CI の検査で禁止する。必要な見た目が無ければ、design-spec 4.5 に部品を足してから `packages/ui-*` に作る。
+- **Tailwind・NativeWind・CSS-in-JS の実行時ライブラリは使わない。**
+
+**理由:** ユーザーが「Tailwind のクラスを画面に直接書かない」「React Aria などの headless の部品を使う」と指定した。振る舞いを実績のある部品に任せると、ダイアログのフォーカスの閉じ込め・キーボード操作・スクリーンリーダー対応を自分で作らずに済む（design-spec 4.1 の設問フォームのキーボード操作、6.0.6 のモーダルの決まり）。見た目を部品の中に閉じ込めると、画面ごとのばらつきが出ず、Spectrum を参考にしたデザインシステム（ADR-018）を守りやすい。vanilla-extract はトークンを型として扱えるので、`semantic` 以外の値を使うと型エラーになる。
+
+**トレードオフ:** React Aria はスマホ（React Native）では動かないので、Web とスマホで振る舞いの部品が別になる（@rn-primitives は React Aria より機能が少なく、NumberField・DatePicker・ComboBox はスマホ側で自作する部分がある）。部品のライブラリを最初に作る手間がかかり、Phase 5 の最初のステップで主要な部品（Button・TextField・TextArea・NumberField・Dialog / Tray・StatusLight・TableView など）をそろえる必要がある。vanilla-extract の Vite プラグインを TanStack Start のビルドに組み込む（動かない場合は、部品の CSS を `packages/ui-web` で事前にビルドして読み込む）。Unistyles v3 は New Architecture と開発ビルドが前提。
 
 ---
 
@@ -2085,6 +2115,8 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
 | API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 分岐 80% 以上 | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、cron の重複防止、テンプレートの移行と戻し、PDF が作れること（ページ数と文字の抽出） |
+| Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作、axe の検査 |
+| スマホの部品（`packages/ui-native`） | Jest（jest-expo）＋ React Native Testing Library | 部品ごとに主要な状態 | 同じ名前の部品の種類・大きさ・アクセシビリティの属性、トレイの開閉 |
 | Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と送信待ちの列、衝突の確認、権限による表示の出し分け |
 | スマホ（`apps/mobile`） | Jest（jest-expo）＋ React Native Testing Library | 主要な部品 50% 以上 | 1問ずつのカード、ボトムシートでの行の編集、自動保存と送信待ちの列、セッションの保存 |
 | E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査 |

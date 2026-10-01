@@ -332,8 +332,58 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 | カラーの方向性 | **Hermes Agent の既定テーマ「Hermes Teal」系**。ダーク: 深いティールの背景、クリームの文字と罫線、金色はごく控えめなアクセント（ブランドと主要な操作だけ）。ライト: クリームの背景に深いティールの文字。これとは別に意味色を用意する: F/A/U と 未分類（4色。未入力はグレー）、確認項目の状態（未着手・途中・達成）、警告（粗利マイナス・Capacity 超過・保存失敗）。判定（Proceed / Hold / Drop）は勝ち負けに見えないよう控えめな色にし、Drop を危険色（赤）にしない。金色のアクセントと「途中」の色は区別できるようにする。色だけで意味を伝えず、必ずラベルかアイコンを添える（WCAG AA のコントラスト） |
 | タイポグラフィの方向性 | **見出しだけ個性的な書体**。Hermes のサイトのように、見出し・ロゴ周りだけレトロな表示用書体にし、本文・回答・入力欄・表はシステムのサンセリフにする。回答にタガログ語・Hiligaynon・日本語が混ざるため、日本語を含む多言語を表示できる代替フォントを必ず用意する（表示用書体に日本語が無い場合も、見出しが崩れないようにする）。数字（表・指標・金額）は等幅数字にして桁をそろえる。金額は通貨記号と桁区切りを付ける。長文の回答は行間を広めにする。背景の粒子やグローなどの質感は使わない |
 | ライト/ダークモード | **両対応（OS 追従＋手動切替）**。既定は OS の設定に従い、4 アカウント設定で System / Light / Dark を選んで固定できる（夜にスマホで少しずつ進める使い方に合わせる）。意味色はどちらのモードでも区別できるように両方の値を用意する。**Pitch Deck の PDF は常にライト** |
-| アイコン | 線のアイコンの1つのセットにそろえる（具体的なセットは Phase 3）。この文書の ASCII 図の絵文字は位置を示す仮置き |
+| アイコン | 線のアイコンの1つのセットにそろえる（Phase 3 で Lucide に決定）。この文書の ASCII 図の絵文字は位置を示す仮置き |
 | 情報密度 | **画面で使い分け**。設問フォーム・判定・プラン項目など書く画面はゆったり（考えるための余白）。費用・損益・調査ログ・一覧・ダッシュボードなど表と数字の画面は中密度（比べて読むため）。スマホは全体を一段ゆったりにする |
+| デザインシステムの参考 | **Adobe Spectrum の仕組みを取り入れ、見た目は上の Hermes Teal にする**（Phase 3 で決定）。取り入れるもの: 部品の種類と名前（4.5）、部品の大きさの段階（S / M / L / XL）、端末で切り替える2つのスケール（デスクトップは medium、タッチの端末は large）、表とリストの密度（compact / regular / spacious）、状態の色の名前（accent / informative / positive / negative / notice / neutral）、スマホではポップオーバーを下からのトレイ（ボトムシート）にする振る舞い、キーボード操作とフォーカスの表示の決まり。Spectrum の配色・書体（Adobe Clean）・アイコン（Workflow）は使わない |
+| 密度とスケールの対応 | 書く画面（11・19・21・M1〜M8）は spacious、表と数字の画面（5・6・7・8・14・17・18・22・26〜28）は regular。スマホとタブレットは large のスケール（部品が一段大きくなる）、デスクトップは medium。具体的な値は `docs/06_design-tokens.json` |
+
+### 4.5 部品（Spectrum を参考にした一覧）
+
+画面はこの一覧の部品の組み合わせで作り、画面ごとに独自の見た目を作らない。名前は Spectrum の部品名にそろえる（Web とスマホで同じ名前）。表にない部品が要るときは、この表に足してから作る。具体的な値は `docs/06_design-tokens.json`、作り方は `docs/02-01_system-design-doc.md`（ADR-018・ADR-025）。
+
+| 部品（Spectrum の名前） | moonx での使いどころ | 種類・大きさ | スマホでの振る舞い |
+|---|---|---|---|
+| Button / ButtonGroup | 主要な操作（Record decision・Apply n changes・Save version など） | accent（1画面に1つまで。金色）/ primary / secondary / negative（削除の確認だけ）。S / M / L / XL | 主要な操作は下部に固定（4.1） |
+| ActionButton / ActionGroup | ツールバーの操作（💬・🕘・⋯） | quiet あり。S / M / L / XL | 同じ |
+| ActionMenu / Menu | 行の ⋯、アイデアの ⋯（複製・アーカイブ・移行）、AI ▼ | — | トレイで開く |
+| Link | 確認項目・Next steps・「Edit in validation」 | — | 同じ |
+| TextField / TextArea | 短文・長文の回答、名前、理由 | TextArea は入力に合わせて広がる | キーボードで隠れない（4.3） |
+| NumberField | 金額（通貨記号・桁区切り）、%、日数、販売数 | 書式は en-PH（1.2） | 数字のキーボード |
+| SearchField | 一覧の検索、M2 の調査ログの検索 | — | 同じ |
+| Picker | 通貨・出典の種類・ロール・確信度（Risks の Probability / Impact） | — | トレイで選ぶ |
+| ComboBox | 担当（メンバーか自由記述）、25 の「Choose question」、メンション | — | トレイで選ぶ |
+| RadioGroup | 判定（Proceed / Hold / Drop）、Go / No-Go、02 OCEAN | — | 同じ |
+| Checkbox / CheckboxGroup | 24 の範囲、25 の「反映する」、M6 の共有先 | — | 同じ |
+| Switch | Focus の切替、テーマ（System / Light / Dark は Picker） | — | 同じ |
+| ToggleButtonGroup | F/A/U の3つのボタン（もう一度押すと外れる。6.0.3） | — | 同じ |
+| SegmentedControl | 確信度（Low / Medium / High）、1分版 / 5分版、Markdown / JSON、Cards / Table | — | 同じ |
+| TagGroup | 調査ログの「裏付ける確認項目」、絞り込みの条件 | 削除できるタグ | 同じ |
+| DatePicker | 期限（Deadline / Target Date）、調査ログの日付 | — | トレイで選ぶ |
+| Dialog / AlertDialog | M1〜M8、削除の確認、衝突の確認（6.0.2） | small / medium / large / fullscreen | トレイ（ボトムシート）か全画面シート（3.8） |
+| Popover / Tray | ポップオーバーはデスクトップ、トレイはスマホ（自動で切り替える） | — | — |
+| Tooltip / ContextualHelp | アイコンだけのボタンの説明 / 設問のヒント（▸ Hint） | — | ContextualHelp はトレイ |
+| Disclosure / Accordion | EXAMPLE・関連する調査ログの開閉、解決済みのスレッド | — | 同じ |
+| Tabs | 16 の Assumptions / Risks、22 の5つのタブ、28 の3つのタブ | — | 横にスクロールできるタブ |
+| Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | — | 出さない（← 戻る） |
+| StatusLight | F/A/U（Fact / Assumption / Unknown / Unclassified / Empty）、確認項目の状態（Not started / Partial / Done）、保存状態 | 色の点＋ラベル（色だけで伝えない） | 同じ |
+| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、「Overdue」「Lump sum」「(former member)」 | neutral と用途ごとの色。Drop を negative にしない | 同じ |
+| InlineAlert | 粗利のマイナス・Capacity 超過・費用の下限の注意・「Latest decision is Hold」・アーカイブ中 | informative / notice / negative / neutral | 同じ |
+| Toast | 「Decision recorded」「2 answers updated · 1 needs F/A/U」 | — | 下部（タブの上） |
+| ProgressBar / ProgressCircle | 「Preparing PDF…」、送信中のボタン | — | 同じ |
+| Meter（積み上げ） | F/A/U の内訳の帯（13・19）。Spectrum の Meter を内訳の数だけ積み上げる moonx 独自の拡張 | — | 同じ |
+| Skeleton | ローディングの骨組み（6.0.6） | — | 同じ |
+| IllustratedMessage | 空の状態・0件・権限がない・見つからない（6.0.6）。絵は使わず、Lucide のアイコンと見出しと説明 | — | 同じ |
+| Avatar | 提案者・記録者・コメントの書き手 | S / M | 同じ |
+| TableView | 17 費用・18 シナリオ表・7 決定ログ・28 の一覧 | 密度 compact / regular / spacious | 行ごとのカード（4.3） |
+| ListView | 6 アイデア一覧・14 調査ログ・8 通知・22 の各リスト | 同上 | 全画面のリスト |
+| Card / CardView | 15 競合・代替のカード、5 のブロック、23 のサムネイル | — | 1列 |
+| Well | 判断材料の要約（19）、AI 書き出しのプレビュー（24） | — | 同じ |
+| Divider | 区切り | S / M / L | 同じ |
+| Tree | 27 のセクションと設問のツリー | — | 全画面のリスト |
+| 独自: SideNav / TabBar | 共通ナビ（6.0.1）。デスクトップは左のサイドバー、スマホは下のタブ | — | 下のタブ |
+| 独自: Panel | コメント・変更履歴のパネル（PNL-1・PNL-2） | — | トレイ |
+| 独自: QuestionCard | 設問フォームの1問（4.1 パターン C のフォーカスの表示と控えめな表示） | — | 1問ずつのカード |
+| 独自: Slide | Pitch Deck のスライドの4つの型（6.14） | — | 幅に合わせる |
 
 ---
 
@@ -1796,6 +1846,7 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 | データモデル | 確定し、Phase 3 で System Design Doc の6章へ移した | — |
 | チームのワークスペースの作成 | M7 の「New workspace」から誰でも作れる（作った人が Owner）。Phase 3 で抜けが見つかり決定 | — |
 | ログインの方法 | メールとパスワード＋Google ログイン（Phase 3 で決定） | — |
+| デザインシステム | Adobe Spectrum の仕組み（部品・大きさ・スケール・密度・状態の色の名前・振る舞い）を取り入れ、見た目は Hermes Teal（Phase 3 で決定。4.4・4.5） | — |
 | アカウントの削除 | 4 から削除できる（ストアの規則で必須）。個人の情報と自己分析・個人用ワークスペースは消し、チームの記録は「Deleted user」として残す（Phase 3 で決定。6.16） | — |
 
 ### 9.2 方針として後で決めるもの

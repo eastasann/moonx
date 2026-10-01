@@ -316,11 +316,11 @@ moonx/
 
 ### ADR-014: 期限の通知は Cloud Scheduler から API を呼ぶ
 
-**決定:** Cloud Scheduler（無料枠: 3ジョブ）のジョブ `moonx-{env}-due-notifications` が、1時間ごと（毎時0分）に `POST /internal/cron/due-notifications` を OIDC トークン付きで呼ぶ。API は、利用者のタイムゾーン（`users.timezone`）で「期限の3日前・当日・超過」になった実行管理の項目について通知を作る（同じ段階の通知は `(execution_item_id, due_date, due_stage)` の一意制約で二重に作らない）。
+**決定:** Cloud Scheduler（無料枠: 3ジョブ）のジョブ `moonx-{env}-due-notifications` が、1時間ごと（毎時0分）に `POST /internal/cron/due-notifications` を OIDC トークン付きで呼ぶ。API は、担当者のタイムゾーン（`users.timezone`）で**朝8時以降**になっている担当者について、「期限の3日前・当日・期限切れ」になった実行管理の項目の通知を作る（design-spec 6.13）。同じ段階の通知は `(execution_item_id, due_date, due_stage)` の一意制約で二重に作らない。
 
 **理由:** Cloud Run は常駐しないので、定期実行は外から呼ぶ必要がある。Cloud Scheduler は同じ Google Cloud の中で完結し、OIDC で呼び出し元を確かめられる。
 
-**トレードオフ:** 毎時の実行なので、通知が届くのは条件を満たしてから最大1時間後。ジョブが失敗すると、その回の通知は次の回でまとめて作る（取りこぼさないように、条件は「その段階をまだ通知していない」で選ぶ）。
+**トレードオフ:** 毎時の実行なので、朝8時ちょうどではなく8時台に届く。ジョブが失敗すると、その回の通知は次の回でまとめて作る（取りこぼさないように、条件は「朝8時を過ぎていて、その段階をまだ通知していない」で選ぶ）。
 
 ### ADR-015: IaC は Terraform（ユーザー指定）
 
@@ -406,11 +406,830 @@ moonx/
 
 ## 4. ルーティング
 
-（執筆中）
+画面の存在・目的・レイアウト・認証要否は design-spec 3章が正。ここはルートと画面の対応だけを持つ。Web は TanStack Router のファイルルート、スマホは Expo Router のファイルルートで、**パスは Web とスマホで同じ**にする（招待やパスワード再設定のメールのリンク、通知のリンクを同じパスで開けるように）。スマホは `https://{DOMAIN}/...` のリンク（iOS の Universal Links・Android の App Links。必要なファイルは Worker が静的アセットとして配る）と `moonx://...`（staging は `moonx-staging://`）で開く。
+
+- `$workspaceId` などは URL のパラメータ。ワークスペースに属する画面は `/w/$workspaceId/` の下に置き、他のワークスペースの URL を開いたら design-spec 6.0.6 の「権限がない」を出す。
+- モーダル（M1〜M8）とパネル（PNL-1・PNL-2）はルートを作らず、検索パラメータで開く: `?modal=new-idea|evidence|save-version|go-no-go|create-plan|share|switch-workspace|update-template`、`?panel=comments|history&target=<targetType>:<targetId>[:<targetKey>]`。
+- 認証が要るルートで未ログインなら `/login?next=<元のパス>` へ移る。
+
+| ルート | 画面（design-spec 参照） | 補足 |
+|---|---|---|
+| `/` | 1 ランディング | ビルド時に HTML を作る。ログイン済みなら `/w/{最後に開いたワークスペース}` へ移る |
+| `/login` | 2 ログイン / 新規登録（ログイン） | `?next=` |
+| `/forgot-password` | 2（パスワード再設定のメールを送る） | |
+| `/reset-password` | 2（新しいパスワードを決める） | `?token=`（メールのリンク） |
+| `/invite/$token` | 2（新規登録）、または 3 の ①（ログイン済み） | 未ログイン: 招待の内容と新規登録（メールとパスワード / Google）。ログイン済み: 3 の ① へ |
+| `/welcome` | 3 オンボーディング | `?step=invite|profile|done&token=` |
+| `/account` | 4 アカウント設定 | |
+| `/notifications` | 8 通知 | ワークスペースをまたぐ一覧。`?filter=unread` |
+| `/w/$workspaceId` | 5 ダッシュボード | |
+| `/w/$workspaceId/ideas` | 6 アイデア一覧 | `?stage=&decision=&proposer=&archived=&sort=&q=&selected=` |
+| `/w/$workspaceId/decisions` | 7 決定ログ | `?kind=&idea=&recordedBy=&from=&to=&selected=` |
+| `/w/$workspaceId/settings` | 9 ワークスペース設定 | |
+| `/w/$workspaceId/self-analysis` | 10 自己分析ホーム | Viewer として開いているワークスペースでは出さない |
+| `/w/$workspaceId/self-analysis/$sectionKey` | 11 設問フォーム（自己分析） | `?q=<設問 ID>`（フォーカスする設問） |
+| `/w/$workspaceId/team` | 12 メンバーの自己分析 | `/w/$workspaceId/team/$userId` で選んだ人を開く |
+| `/w/$workspaceId/ideas/$ideaId` | 13 検証ホーム | |
+| `/w/$workspaceId/ideas/$ideaId/questions/$sectionKey` | 11 設問フォーム（検証の 01 / 02 / 10） | `?q=` |
+| `/w/$workspaceId/ideas/$ideaId/research` | 14 調査ログ | `?supports=&source=&entry=&new=1` |
+| `/w/$workspaceId/ideas/$ideaId/competitors` | 15 競合・代替 | `?view=cards|table&q=V.04.SURVIVOR_PATTERNS` |
+| `/w/$workspaceId/ideas/$ideaId/assumptions` | 16 前提・リスク | `?tab=assumptions|risks&row=` |
+| `/w/$workspaceId/ideas/$ideaId/costs` | 17 費用 | `?row=<cost_item の id か template_key>` |
+| `/w/$workspaceId/ideas/$ideaId/economics` | 18 損益・シナリオ | `?field=` |
+| `/w/$workspaceId/ideas/$ideaId/decide` | 19 判定 | Viewer は入れない |
+| `/w/$workspaceId/ideas/$ideaId/plans/$planId` | 20 プランホーム | `?version=<plan_version の id>`（版の読み取り専用表示） |
+| `/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo` | 21 プラン項目の編集 | `$itemNo` は 1〜30。`?q=` |
+| `/w/$workspaceId/ideas/$ideaId/plans/$planId/execution` | 22 実行管理 | `?tab=milestones|launch|kpis|questions|actions&item=` |
+| `/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch` | 23 Pitch Deck | `?variant=one|five&version=` |
+| `/w/$workspaceId/ai/export` | 24 AI 書き出し | `?source=self_analysis|validation|business_plan&id=&scope=` |
+| `/w/$workspaceId/ai/import` | 25 AI 取り込み | `?target=self_analysis|validation|business_plan&id=&scope=&returnTo=` |
+| `/admin/templates` | 26 管理: テンプレート一覧 | `?kind=` |
+| `/admin/templates/versions/$versionId` | 27 管理: テンプレート編集 | `?node=<section か question の id>` |
+| `/admin/users` | 28 管理: ユーザーとワークスペース | `?tab=users|workspaces|invitations` |
+
+API のルートは5章、Worker が配る静的なファイル（`/.well-known/apple-app-site-association`、`/.well-known/assetlinks.json`、`/robots.txt`）は `apps/web/public/` に置く。
 
 ## 5. API設計
 
-（執筆中）
+### 5.1 共通の決まり
+
+| 項目 | 決まり |
+|---|---|
+| 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、Cloud Scheduler 用は `/internal/cron`（Worker を通らない） |
+| 認証 | Better Auth のセッション。Web は HttpOnly Cookie、スマホは Expo プラグインが付ける `Cookie` ヘッダー。公開と書いたもの以外はログインが要る（未ログインは 401 `UNAUTHENTICATED`） |
+| 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601（表示はクライアントが利用者のタイムゾーンで行う） |
+| 金額・率 | 金額は number（ワークスペースの通貨。自己分析は自己分析の通貨）。率は 0〜1 の小数（35% は `0.35`）。DB は numeric、API で number に変換する |
+| 部分更新 | 1つの項目は `PATCH`（送った項目だけ変える）、キーで決まる項目（回答・数字）は `PUT .../{key}` で作るか更新する |
+| 同時編集 | 項目を更新するリクエストは、読んだときの `lockVersion` を送る。違えば 409 `CONFLICT` と相手の内容を返す。「自分の内容で上書きする」は同じ内容に `force: true` を付けて送る（ADR-019）。まだ行が無い項目（未回答の設問など）の `lockVersion` は `0` |
+| 一覧 | `?cursor=&limit=`（既定50、上限200）。応答は `{ items, nextCursor }`。件数の少ない一覧（競合・費用行など）はページに分けず `{ items }` |
+| 権限 | 下の表の記号。O = Owner、M = Member、V = Viewer（いずれもその資源が属するワークスペースのロール）、本人 = 自己分析の持ち主、Admin = 運営者、公開 = ログイン不要。足りなければ 403 `FORBIDDEN`、ワークスペースに所属していなければ 403 `NO_ACCESS`、無ければ 404 `NOT_FOUND`。権限の対応の全体は 7.1 |
+| アーカイブ | アーカイブしたアイデア・プランの中身を変えるリクエスト（コメントを書く・元に戻すを含む）は 409 `ARCHIVED`（design-spec 6.8） |
+| エラー | 8章の形式（`{ "error": { "code", "message", "requestId", ... } }`） |
+| 計算 | 損益分岐・シナリオ・確認項目・F/A/U の内訳・工程は `packages/domain` の関数で計算して返す（保存しない）。クライアントは入力中は同じ関数で自分で計算し、保存の応答では計算結果を返さない（画面を開いたときと、保存の後に必要な画面だけ取り直す） |
+| 変更履歴 | 変更履歴の対象（design-spec 6.0.5）を変える API は、すべて `change_history` に書く（ADR-020）。下の「履歴」列に書いた `source` を付ける |
+| キャッシュ | 応答はすべて `Cache-Control: no-store`（ADR-011） |
+
+**対象の指し方（TargetRef）**: コメント・変更履歴・根拠は、同じ形で項目を指す。
+
+| `type` | `id` | `key` |
+|---|---|---|
+| `self_analysis_answer` | 自己分析の id | 設問 ID（例: `SA.WHY.1`） |
+| `validation_answer` | 検証の id | 設問 ID（例: `V.01.WHO`、`V.08.WORTH`） |
+| `economics_input` | 検証の id | `field_key`（例: `selling_price`） |
+| `plan_answer` | プランの id | 設問 ID（例: `P.01.1`） |
+| `pitch_slide` | プランの id | `{版の種類}.{スライドのキー}`（例: `five.market`） |
+| `idea` | アイデアの id | なし（アイデアの概要） |
+| `research_log_entry` / `competitor` / `assumption` / `risk` / `cost_item` / `execution_item` | 行の id | なし |
+
+キーで決まる項目は、まだ行が無くても（未回答でも）指せる。
+
+### 5.2 共通の型
+
+```ts
+// ---- 基本 ----
+type UUID = string;
+type DateOnly = string;   // "2026-10-01"
+type DateTime = string;   // "2026-10-01T02:00:00.000Z"
+type Role = "owner" | "member" | "viewer";
+type Fau = "fact" | "assumption" | "unknown";
+type FauState = "empty" | "unclassified" | "fact" | "fact_no_evidence" | "assumption" | "unknown"; // design-spec 6.0.3
+type Confidence = "low" | "medium" | "high";
+type DecisionValue = "proceed" | "hold" | "drop";
+type GoNoGoValue = "launch" | "delay" | "stop";
+type Stage = "validation" | "planning" | "launch_prep";
+type CheckKey = "competitors" | "local_price" | "costs" | "break_even" | "permits" | "demand_signal";
+type CheckState = "not_started" | "partial" | "done";
+type SupportsCheck = "local_price" | "permits" | "demand_signal";
+type SourceType = "google_maps_reviews" | "website" | "social_media" | "public_data" | "news_report" | "store_observation" | "price_check" | "other";
+type CostCategory = "initial" | "monthly_fixed" | "variable";
+type EconomicsField = "selling_price" | "operating_days" | "target_margin" | "units_conservative" | "units_expected" | "units_strong" | "units_capacity";
+type ExecutionType = "milestone" | "launch" | "kpi" | "open_question" | "next_action";
+type ExecutionStatus = "todo" | "doing" | "done" | "open" | "resolved";
+type LaunchTiming = "t_minus_30" | "t_minus_7" | "launch_day" | "first_30" | "days_31_90" | "other";
+type TemplateKind = "self_analysis" | "validation" | "business_plan";
+type AnswerType = "long_text" | "short_text" | "choice" | "amount_with_reason" | "table" | "linked_metric" | "execution_view";
+type HistorySource = "manual" | "ai_import" | "revert" | "template_migration" | "duplicate" | "plan_draft";
+type TargetType = "self_analysis_answer" | "validation_answer" | "economics_input" | "plan_answer" | "pitch_slide" | "idea"
+  | "research_log_entry" | "competitor" | "assumption" | "risk" | "cost_item" | "execution_item";
+
+interface TargetRef { type: TargetType; id: UUID; key?: string | null; }
+interface Page<T> { items: T[]; nextCursor: string | null; }
+
+interface UserRef {
+  id: UUID; displayName: string; avatarUrl: string | null;
+  badge: null | "former_member" | "suspended";   // 名前に添える表示（design-spec 6.16・6.17）
+}
+
+interface Versioned { lockVersion: number; updatedAt: DateTime | null; updatedBy: UserRef | null; }
+
+// 画面の移動先。クライアントが4章のルートに変換する
+interface LinkTarget {
+  screen: number;                 // design-spec の画面番号
+  workspaceId?: UUID; ideaId?: UUID; planId?: UUID; userId?: UUID;
+  sectionKey?: string; questionKey?: string; rowId?: UUID; field?: EconomicsField;
+  tab?: string; itemNo?: number; panel?: "comments" | "history"; target?: TargetRef;
+}
+
+// ---- F/A/U と根拠 ----
+interface Evidence {
+  id: UUID;                                   // evidence_links.id
+  kind: "research_log" | "url";
+  researchLog: { id: UUID; observedOn: DateOnly | null; topic: string; sourceType: SourceType | null; deleted: boolean } | null;
+  url: string | null;
+  note: string | null;
+}
+interface Classification {
+  fau: Fau | null;
+  confidence: Confidence | null;              // fau = "assumption" のときだけ
+  state: FauState;                            // 値の有無・fau・有効な根拠の数から決まる
+  evidence: Evidence[];                       // 削除済みの調査ログを指すものも含む（deleted: true）
+}
+interface ClassificationInput { fau: Fau | null; confidence?: Confidence | null; }
+interface FauBreakdown {
+  fact: number; factNoEvidence: number;        // factNoEvidence は fact の内数
+  assumption: { total: number; low: number; medium: number; high: number };
+  unknown: number; unclassified: number; empty: number;
+}
+
+// ---- テンプレート ----
+interface TemplateQuestion {
+  key: string;                    // 設問 ID（design-spec 6.6）
+  sectionKey: string;
+  title: string; prompt: string; example: string | null; hint: string | null;
+  answerType: AnswerType;
+  options: QuestionOptions | null;
+  displayCondition: Record<string, string[]> | null;  // 例: { "V.02.OCEAN": ["Red", "Mixed"] }
+  hasFau: boolean;
+}
+type QuestionOptions =
+  | { kind: "choice"; choices: string[] }                                   // 例: ["Red", "Blue", "Mixed"]
+  | { kind: "table"; columns: { key: string; label: string; type: "text" | "number" | "percent" | "money" }[] }
+  | { kind: "linked_metric"; metricKeys: string[] }                         // design-spec 6.4 の主要指標のキー
+  | { kind: "execution_view"; executionType: ExecutionType };
+interface TemplateSection { key: string; part: "a" | "b" | null; title: string; guidance: string | null; questions: TemplateQuestion[]; }
+interface TemplateRef { versionId: UUID; versionNumber: number; newerVersion: { versionId: UUID; versionNumber: number } | null; }
+
+// ---- 計算結果（packages/domain。design-spec 6.4 の計算仕様） ----
+type MetricReason = "needs_price" | "needs_monthly_costs" | "needs_expected_sales" | "needs_startup_costs"
+  | "margin_not_positive" | "target_margin_unreachable" | "not_recovered" | "empty";
+interface MetricValue {
+  value: number | null;                       // 丸める前の値。計算できなければ null
+  bound: "exact" | "lower" | "upper";         // lower = 「+」、upper = 「≤」（費用に未入力・Unknown の行があるとき）
+  reason: MetricReason | null;                // value が null の理由
+}
+interface CostTotal { amount: number | null; isLowerBound: boolean; unknownRows: number; emptyRows: number; }
+interface ScenarioColumn {
+  key: "break_even" | "conservative" | "expected" | "strong" | "capacity";
+  unitsPerDay: MetricValue; unitsPerMonth: MetricValue; revenue: MetricValue;
+  variableCostTotal: MetricValue; operatingProfit: MetricValue; operatingMargin: MetricValue;
+  exceedsCapacity: boolean;
+}
+interface EconomicsResult {
+  variableCostPerUnit: MetricValue; contributionMargin: MetricValue; contributionMarginRate: MetricValue;
+  breakEvenUnitsMonth: MetricValue; breakEvenUnitsDay: MetricValue; breakEvenRevenue: MetricValue;
+  targetMarginUnitsMonth: MetricValue; targetMarginUnitsDay: MetricValue;
+  scenarios: ScenarioColumn[];                 // 5列
+  paybackMonths: MetricValue; simpleRoi: MetricValue;
+  totals: { initial: CostTotal; monthlyFixed: CostTotal; variablePerUnit: CostTotal };
+  defaultsUsed: { operatingDays: boolean; targetMargin: boolean };
+  warnings: ("margin_not_positive" | "target_margin_unreachable" | "break_even_above_capacity"
+    | "conservative_exceeds_capacity" | "expected_exceeds_capacity" | "strong_exceeds_capacity" | "costs_incomplete")[];
+}
+type KeyMetrics = Record<string, MetricValue>;   // キーは design-spec 6.4「主要指標」（initial_cost_total など）
+
+// ---- 確認項目と Next steps（design-spec 6.1） ----
+interface CheckResult {
+  key: CheckKey; state: CheckState;
+  count: number | null;                        // 競合の件数・シグナルの件数など
+  params: Record<string, number>;              // テンプレートの基準値（例: { min: 3, max: 5 }）
+  detail: { emptyRows?: number; missing?: ("price" | "monthly_costs" | "initial_amount" | "monthly_amount")[] } | null;
+  link: LinkTarget;
+}
+interface NextStep {
+  kind: "add_evidence" | "classify" | "start_customer_problem" | "check" | "start_section" | "check_unknowns" | "ready_to_decide";
+  count: number | null; checkKey: CheckKey | null; sectionKey: string | null;
+  link: LinkTarget;
+}
+
+// ---- 衝突（409 CONFLICT の error.current） ----
+interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: DateTime; updatedBy: UserRef | null; }
+```
+
+### 5.3 エンドポイント一覧
+
+| # | メソッド | パス | 権限 | 画面 |
+|---|---|---|---|---|
+| **認証（Better Auth。5.4）** | | | | |
+| A1 | POST | `/api/auth/sign-in/email` | 公開 | 2 |
+| A2 | POST | `/api/auth/sign-in/social` | 公開 | 2 |
+| A3 | GET | `/api/auth/callback/google` | 公開 | — |
+| A4 | POST | `/api/auth/sign-out` | ログイン | 共通ナビ・4 |
+| A5 | GET | `/api/auth/get-session` | ログイン | 共通 |
+| A6 | POST | `/api/auth/request-password-reset` | 公開 | 2 |
+| A7 | POST | `/api/auth/reset-password` | 公開（トークン） | 2 |
+| A8 | POST | `/api/auth/change-password` | ログイン | 4 |
+| **アカウントと招待（5.4）** | | | | |
+| U1 | GET | `/api/v1/me` | ログイン | 共通・4 |
+| U2 | PATCH | `/api/v1/me` | ログイン | 3・4 |
+| U3 | PUT / DELETE | `/api/v1/me/avatar` | ログイン | 3・4 |
+| U4 | GET | `/api/v1/invitations/by-token/{token}` | 公開 | 2・3 |
+| U5 | POST | `/api/v1/invitations/by-token/{token}/sign-up` | 公開 | 2 |
+| U6 | POST | `/api/v1/invitations/by-token/{token}/accept` | ログイン | 3 |
+| **ワークスペース（5.5）** | | | | |
+| W1 | GET / PATCH | `/api/v1/workspaces/{workspaceId}` | O,M,V / O | 9・M7 |
+| W2 | GET | `/api/v1/workspaces/{workspaceId}/members` | O,M,V | 9・22 |
+| W3 | PATCH / DELETE | `/api/v1/workspaces/{workspaceId}/members/{userId}` | O（DELETE は本人も。`userId` に `me`） | 4・9 |
+| W4 | GET / POST | `/api/v1/workspaces/{workspaceId}/invitations` | O | 9 |
+| W5 | POST | `/api/v1/invitations/{invitationId}/resend` | O・Admin | 9・28 |
+| W6 | POST | `/api/v1/invitations/{invitationId}/link` | O・Admin | 9・28 |
+| W7 | DELETE | `/api/v1/invitations/{invitationId}` | O・Admin | 9・28 |
+| W8 | GET | `/api/v1/workspaces/{workspaceId}/mention-candidates` | O,M,V | PNL-1 |
+| **ダッシュボードとアイデア（5.6）** | | | | |
+| D1 | GET | `/api/v1/workspaces/{workspaceId}/dashboard/ideas` | O,M,V | 5 |
+| D2 | GET | `/api/v1/workspaces/{workspaceId}/dashboard/self-analyses` | O,M | 5 |
+| D3 | GET | `/api/v1/workspaces/{workspaceId}/dashboard/due-soon` | O,M,V | 5 |
+| D4 | GET | `/api/v1/workspaces/{workspaceId}/dashboard/activity` | O,M,V | 5 |
+| I1 | GET / POST | `/api/v1/workspaces/{workspaceId}/ideas` | O,M,V / O,M | 6・M1 |
+| I2 | GET / PATCH | `/api/v1/ideas/{ideaId}` | O,M,V / O,M | 6・13 |
+| I3 | POST | `/api/v1/ideas/{ideaId}/duplicate` | O,M | 6・13 |
+| I4 | POST | `/api/v1/ideas/{ideaId}/archive`・`/restore` | O,M | 6・13 |
+| **検証（5.7）** | | | | |
+| V1 | GET | `/api/v1/ideas/{ideaId}/validation` | O,M,V | 13 |
+| V2 | GET | `/api/v1/validations/{validationId}/questions/{sectionKey}` | O,M,V | 11 |
+| V3 | PUT | `/api/v1/validations/{validationId}/answers/{questionKey}` | O,M | 11・15・18 |
+| V4 | POST | `/api/v1/validations/{validationId}/evidence` | O,M | M2 |
+| V5 | DELETE | `/api/v1/evidence/{evidenceId}` | O,M | M2 |
+| V6 | GET / POST | `/api/v1/validations/{validationId}/research-log` | O,M,V / O,M | 14・M2 |
+| V7 | GET / PATCH / DELETE | `/api/v1/research-log/{entryId}` | O,M,V / O,M / O,M | 14 |
+| V8 | GET / POST | `/api/v1/validations/{validationId}/competitors` | O,M,V / O,M | 15 |
+| V9 | PATCH / DELETE | `/api/v1/competitors/{competitorId}` | O,M | 15 |
+| V10 | GET / POST | `/api/v1/validations/{validationId}/assumptions`・`/risks` | O,M,V / O,M | 16 |
+| V11 | PATCH / DELETE | `/api/v1/assumptions/{id}`・`/api/v1/risks/{id}` | O,M | 16 |
+| V12 | GET | `/api/v1/validations/{validationId}/costs` | O,M,V | 17 |
+| V13 | POST | `/api/v1/validations/{validationId}/cost-items` | O,M | 17 |
+| V14 | PATCH / DELETE | `/api/v1/cost-items/{costItemId}` | O,M | 17 |
+| V15 | GET | `/api/v1/validations/{validationId}/economics` | O,M,V | 18 |
+| V16 | PUT | `/api/v1/validations/{validationId}/economics/{fieldKey}` | O,M | 18 |
+| V17 | PUT | `/api/v1/validations/{validationId}/{list}/order`（`list` = `competitors` / `assumptions` / `risks` / `cost-items`） | O,M | 15・16・17 |
+| V18 | GET | `/api/v1/ideas/{ideaId}/decision-context` | O,M | 19 |
+| V19 | POST | `/api/v1/ideas/{ideaId}/decisions` | O,M | 19 |
+| **自己分析（5.8）** | | | | |
+| S1 | GET / PATCH | `/api/v1/me/self-analysis` | 本人 | 10 |
+| S2 | GET | `/api/v1/me/self-analysis/sections/{sectionKey}` | 本人 | 11 |
+| S3 | PUT | `/api/v1/me/self-analysis/answers/{questionKey}` | 本人 | 11 |
+| S4 | POST | `/api/v1/me/self-analysis/complete`・`/reopen` | 本人 | 10 |
+| S5 | PUT | `/api/v1/me/self-analysis/shares` | 本人 | M6 |
+| S6 | GET | `/api/v1/workspaces/{workspaceId}/self-analyses` | O,M | 12 |
+| S7 | GET | `/api/v1/workspaces/{workspaceId}/self-analyses/{userId}` | O,M（共有済みのみ） | 12 |
+| **プラン（5.9）** | | | | |
+| P1 | GET / POST | `/api/v1/ideas/{ideaId}/plans` | O,M,V / O,M | 13・20・M5 |
+| P2 | GET / PATCH | `/api/v1/plans/{planId}` | O,M,V / O,M | 20 |
+| P3 | POST | `/api/v1/plans/{planId}/archive`・`/restore` | O,M | 20 |
+| P4 | GET | `/api/v1/plans/{planId}/items/{itemNo}` | O,M,V | 21 |
+| P5 | PUT | `/api/v1/plans/{planId}/answers/{questionKey}` | O,M | 21 |
+| P6 | GET / POST | `/api/v1/plans/{planId}/versions` | O,M,V / O,M | 20・M3 |
+| P7 | GET | `/api/v1/plans/{planId}/go-no-go-context` | O,M | M4 |
+| P8 | POST | `/api/v1/plans/{planId}/go-no-go` | O,M | M4 |
+| P9 | GET / POST | `/api/v1/plans/{planId}/execution-items` | O,M,V / O,M | 21・22 |
+| P10 | PATCH / DELETE | `/api/v1/execution-items/{itemId}` | O,M | 21・22 |
+| P11 | PUT | `/api/v1/plans/{planId}/execution-items/order` | O,M | 22 |
+| P12 | GET | `/api/v1/plans/{planId}/pitch-deck` | O,M,V | 23 |
+| P13 | GET | `/api/v1/plans/{planId}/pitch-deck.pdf` | O,M,V | 23 |
+| **AI 往復（5.10）** | | | | |
+| X1 | GET | `/api/v1/ai/export` | O,M（自己分析は本人） | 24 |
+| X2 | GET | `/api/v1/ai/import/context` | O,M（自己分析は本人） | 25 |
+| X3 | POST | `/api/v1/ai/import/apply` | O,M（自己分析は本人） | 25 |
+| **決定ログ・コメント・履歴・通知（5.11）** | | | | |
+| L1 | GET | `/api/v1/workspaces/{workspaceId}/decision-log` | O,M,V | 7・13 |
+| L2 | GET | `/api/v1/decision-log/{entryId}` | O,M,V | 7 |
+| C1 | GET / POST | `/api/v1/comments` | 対象を読める人 | PNL-1 |
+| C2 | PATCH / DELETE | `/api/v1/comments/{commentId}` | 書いた人 | PNL-1 |
+| C3 | POST / DELETE | `/api/v1/comments/{commentId}/resolve` | コメントできる人 | PNL-1 |
+| H1 | GET | `/api/v1/history` | 対象を読める人（自己分析は本人だけ） | PNL-2 |
+| H2 | POST | `/api/v1/history/{entryId}/revert` | O,M（自己分析は本人） | PNL-2 |
+| H3 | POST | `/api/v1/history/batches/{batchId}/revert` | O,M（自己分析は本人） | PNL-2・M8 |
+| N1 | GET | `/api/v1/notifications` | ログイン | 8 |
+| N2 | GET | `/api/v1/notifications/unread-count` | ログイン | 共通ナビ |
+| N3 | POST | `/api/v1/notifications/{id}/read`・`/api/v1/notifications/read-all` | ログイン | 8 |
+| **テンプレートの移行（5.12）** | | | | |
+| T1 | GET | `/api/v1/template-migrations/preview` | O,M（自己分析は本人） | M8 |
+| T2 | POST | `/api/v1/template-migrations` | O,M（自己分析は本人） | M8 |
+| **運営者（5.13）** | | | | |
+| M1 | GET | `/api/v1/admin/templates` | Admin | 26 |
+| M2 | POST | `/api/v1/admin/template-versions/{versionId}/draft` | Admin | 26 |
+| M3 | GET / PATCH | `/api/v1/admin/template-versions/{versionId}` | Admin | 27 |
+| M4 | POST / PATCH / DELETE | `/api/v1/admin/template-versions/{versionId}/sections`、`/api/v1/admin/template-sections/{id}`、`/api/v1/admin/template-sections/{id}/questions`、`/api/v1/admin/template-questions/{id}` | Admin | 27 |
+| M5 | PUT | `/api/v1/admin/template-versions/{versionId}/order`・`/cost-defaults`・`/check-rules`・`/execution-presets` | Admin | 27 |
+| M6 | POST | `/api/v1/admin/template-versions/{versionId}/validate`・`/publish` | Admin | 27 |
+| M7 | GET | `/api/v1/admin/users`・`/api/v1/admin/workspaces`・`/api/v1/admin/invitations` | Admin | 28 |
+| M8 | POST | `/api/v1/admin/users/{userId}/suspend`・`/reactivate` | Admin | 28 |
+| M9 | POST | `/api/v1/admin/invitations` | Admin | 28 |
+| **内部** | | | | |
+| Z1 | GET | `/api/health` | 公開（DB に触れない） | 監視 |
+| Z2 | GET | `/api/health/db` | 公開（Worker の共有シークレットが要る） | デプロイ後の確認 |
+| Z3 | POST | `/internal/cron/due-notifications` | Cloud Scheduler（OIDC） | — |
+
+### 5.4 認証・アカウント・招待
+
+**Better Auth のエンドポイント（A1〜A8）**: 本体と応答の形は Better Auth が決める（版で名前が変わることがあるので、実装時は使う版のドキュメントに合わせる）。moonx の設定は次のとおり。
+
+| 項目 | 設定 |
+|---|---|
+| メール＋パスワード | 有効。`disableSignUp: true`（新規登録は U5 だけ）。パスワードは8文字以上・128文字以下。パスワード再設定のリンクの期限は1時間（design-spec 6.16）。再設定すると他のセッションを消す |
+| Google | 有効。`disableImplicitSignUp: true`。新規登録は招待の画面（`/invite/$token`）からだけ `requestSignUp: true` で始め、`callbackURL` を `/welcome?step=invite&token=…`、`errorCallbackURL` を `/login?error=…` にする |
+| 新規登録の制限 | `databaseHooks.user.create.before`: そのメールあての有効な招待（`pending` かつ期限内。大文字小文字を区別しない）が無ければ `INVITATION_REQUIRED` で拒否する |
+| 登録の後 | `databaseHooks.user.create.after`: 個人用ワークスペース（名前「{表示名}'s workspace」、通貨 PHP、本人が Owner）を作り、`last_workspace_id` に入れる |
+| ログインの制限 | `databaseHooks.session.create.before`: `users.status = suspended` なら `ACCOUNT_SUSPENDED` で拒否する |
+| セッション | 有効期限30日、毎日更新。Cookie は `__Secure-` 接頭辞・HttpOnly・Secure・SameSite=Lax（local は Secure なし） |
+| 回数制限 | 有効。保存先は DB（`rate_limits`）。ログイン・パスワード再設定・新規登録は IP ごとに1分10回 |
+| 信頼するオリジン | `TRUSTED_ORIGINS`（2章） |
+| IP の取得 | `CF-Connecting-IP`（Worker が付ける。2章 通信フロー 3） |
+
+エラーの対応（クライアントが design-spec 6.16 の文言を出す）:
+
+| Better Auth の応答 | 画面の文言 |
+|---|---|
+| メールかパスワードが違う | 「Email or password is incorrect」 |
+| `ACCOUNT_SUSPENDED` | 「This account is suspended」 |
+| `INVITATION_REQUIRED`（Google の新規登録） | 「This invitation is invalid or expired. Ask the person who invited you for a new one.」 |
+
+**U1 `GET /api/v1/me`** → `200 Me`
+
+```ts
+interface Me {
+  id: UUID; email: string; displayName: string; avatarUrl: string | null;
+  timezone: string;                 // IANA 名
+  theme: "system" | "light" | "dark";
+  isAdmin: boolean;
+  hasPassword: boolean;             // Google だけで登録した人は false（4 では「パスワードを設定する」に変わる）
+  lastWorkspaceId: UUID | null;
+  memberships: { workspace: { id: UUID; name: string; isPersonal: boolean; currency: string }; role: Role }[];
+}
+```
+
+**U2 `PATCH /api/v1/me`** 本体 `{ displayName?: string (1〜60文字); timezone?: string; theme?: "system" | "light" | "dark"; lastWorkspaceId?: UUID }` → `200 Me`。`lastWorkspaceId` は所属するワークスペースだけ（違えば 422 `VALIDATION_FAILED`）。
+
+**U3 `PUT /api/v1/me/avatar`** 本体は `multipart/form-data` の `file`（JPEG / PNG / WebP、5MB まで）→ `200 { avatarUrl: string }`。512×512 の WebP に縮めて保存する（ADR-024）。`DELETE` → `204`。
+
+**U4 `GET /api/v1/invitations/by-token/{token}`**（公開）→ `200 InvitationPreview`。トークンが見つからない・取り消し・期限切れは `410 INVITATION_INVALID`。
+
+```ts
+interface InvitationPreview {
+  status: "pending" | "accepted";
+  email: string;
+  workspace: { id: UUID; name: string } | null;   // 運営者のワークスペースなしの招待は null
+  role: Role | null;
+  invitedBy: { displayName: string };
+  expiresAt: DateTime;
+  accountExists: boolean;                          // そのメールのアカウントがあればログインへ案内する
+}
+```
+
+**U5 `POST /api/v1/invitations/by-token/{token}/sign-up`**（公開）本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie（スマホは Better Auth の Expo プラグインが受け取る）。メールは招待のメールに固定する。招待はまだ受諾しない（3 の ① で U6）。エラー: `410 INVITATION_INVALID`、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
+
+**U6 `POST /api/v1/invitations/by-token/{token}/accept`** 本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。エラー: `410 INVITATION_INVALID`、`409 INVITATION_ALREADY_ACCEPTED`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）。
+
+### 5.5 ワークスペース・メンバー・招待
+
+```ts
+interface Workspace { id: UUID; name: string; currency: string; isPersonal: boolean; myRole: Role; memberCount: number; }
+interface Member { user: UserRef; email: string | null /* Owner にだけ返す */; role: Role; joinedAt: DateTime; }
+interface Invitation {
+  id: UUID; email: string; role: Role | null;
+  workspace: { id: UUID; name: string } | null;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  invitedBy: UserRef; createdAt: DateTime; expiresAt: DateTime; acceptedAt: DateTime | null;
+}
+```
+
+| API | 本体 | 応答 | エラーと副作用 |
+|---|---|---|---|
+| W1 GET | — | `200 Workspace` | |
+| W1 PATCH | `{ name?: string (1〜60); currency?: string (ISO 4217) }` | `200 Workspace` | 通貨を変えても金額は換算しない |
+| W2 GET | — | `200 { items: Member[] }` | |
+| W3 PATCH | `{ role: Role }` | `200 Member` | `409 LAST_OWNER`（最後の Owner を降格できない）。Viewer に降格したら design-spec 6.16 の表のとおり処理する（自己分析の共有を解除、担当を名前に置き換え） |
+| W3 DELETE | — | `204` | `409 LAST_OWNER`、`409 CANNOT_LEAVE_PERSONAL`。外れたときの処理は design-spec 6.16 の表 |
+| W4 GET | `?status=pending|all` | `200 { items: Invitation[] }` | |
+| W4 POST | `{ email: string; role: Role }` | `201 { invitation: Invitation; link: string }` | 招待のメールを送る。`409 ALREADY_MEMBER`、`409 INVITATION_PENDING`（同じメールの有効な招待がある。W5 で再送する） |
+| W5 | — | `200 { invitation: Invitation; link: string }` | トークンを作り直してメールを再送する（前のリンクは無効）。期限を7日に延ばす |
+| W6 | — | `200 { link: string }` | トークンを作り直す（メールは送らない） |
+| W7 | — | `204` | `revoked` にする |
+| W8 | `?targetType=&targetId=` | `200 { items: UserRef[] }` | 自己分析への対象なら、その自己分析を読める Owner / Member だけ（design-spec 6.0.4） |
+
+招待のリンクは `https://{DOMAIN}/invite/{token}`。トークンは32バイトの乱数で、DB には SHA-256 のハッシュだけを持つ。
+
+### 5.6 ダッシュボードとアイデア
+
+```ts
+interface IdeaSummary {
+  id: UUID; name: string; oneLineConcept: string;
+  proposer: UserRef; stage: Stage; latestDecision: DecisionValue | null; archived: boolean;
+  checks: { key: CheckKey; state: CheckState }[];          // 6つ。合計や点数は返さない
+  keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months">;
+  plans: { id: UUID; name: string; latestVersionName: string | null; latestGoNoGo: GoNoGoValue | null }[];
+  lastActivityAt: DateTime; createdAt: DateTime;
+}
+interface IdeaDetail extends IdeaSummary, Versioned {
+  workspaceId: UUID; validationId: UUID; proposedSolution: string | null;
+  duplicatedFrom: { id: UUID; name: string } | null;
+}
+interface DueItem {
+  id: UUID; type: ExecutionType; title: string; dueDate: DateOnly; overdue: boolean;
+  assignee: { user: UserRef } | { name: string } | null; isMine: boolean;
+  idea: { id: UUID; name: string }; plan: { id: UUID; name: string };
+}
+interface Activity {
+  kind: "change" | "comment" | "decision" | "go_no_go" | "version_saved";
+  actor: UserRef; at: DateTime; summary: string /* 例: "Paolo commented on WHO" の材料 */;
+  idea: { id: UUID; name: string } | null; plan: { id: UUID; name: string } | null; link: LinkTarget;
+}
+```
+
+| API | 本体・クエリ | 応答 | 補足 |
+|---|---|---|---|
+| D1 | — | `200 { items: IdeaSummary[]; droppedCount: number }` | アーカイブ・Drop を除く。更新順 |
+| D2 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | Owner / Member の一覧。共有していない人の `status` は null（進み具合を見せない） |
+| D3 | — | `200 { items: DueItem[] }` | 期限切れか7日以内、Done / Resolved でない、アーカイブを除く。自分の担当を先、次に期限順 |
+| D4 | — | `200 { items: Activity[] }` | 直近20件。自己分析に関わる動きは除く |
+| I1 GET | `?stage=&decision=not_dropped|all|undecided|proceed|hold|drop&proposerId=&includeArchived=true&sort=updated|created|name&q=&cursor=&limit=` | `200 Page<IdeaSummary> & { hiddenDroppedCount: number }` | `decision` の既定は `not_dropped` |
+| I1 POST | `{ name: string (1〜100); oneLineConcept: string (1〜200); proposedSolution?: string }` | `201 IdeaDetail` | 最新の検証のテンプレートの版で検証を作り、費用の初期行を Empty で作る（履歴なし: 作成の記録だけ） |
+| I2 GET | — | `200 IdeaDetail` | |
+| I2 PATCH | `{ name?; oneLineConcept?; proposedSolution?; lockVersion: number; force?: boolean }` | `200 IdeaDetail` | 履歴 `manual`（対象 `idea`） |
+| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail` | design-spec 6.8 の複製。履歴 `duplicate`（1つの `batchId`） |
+| I4 | — | `200 IdeaDetail` | |
+
+### 5.7 検証
+
+```ts
+interface ValidationHome {
+  validationId: UUID; idea: IdeaDetail; template: TemplateRef;
+  summary: { customer: string | null; problem: string | null; solution: string | null; marketType: string | null };
+  keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months">;
+  economicsWarnings: EconomicsResult["warnings"];
+  nextSteps: NextStep[];                     // 最大3件
+  checks: CheckResult[];                     // 6つ
+  fau: FauBreakdown;
+  sections: {
+    key: "01" | "02" | "03" | "04" | "05" | "06-08" | "09" | "10";
+    title: string;
+    answered: number | null; total: number | null;   // 03 / 04 / 09 は null（件数だけ）
+    count: number | null;                             // 03 / 04 / 09 の件数（09 は前提とリスクの2つ: countB）
+    countB?: number | null;
+    fau: FauBreakdown | null;
+  }[];
+  decisions: DecisionLogSummary[];           // 新しい順に最大5件
+  plans: PlanSummary[];                      // アーカイブした案を除く
+  canAddPlan: boolean;                       // 最新の判定が Proceed
+}
+interface ValidationAnswer extends Versioned {
+  questionKey: string; text: string | null;
+  classification: Classification;
+  hidden: boolean;                           // 02 OCEAN の出し分け・テンプレートの移行で隠れている
+  commentCount: number;
+}
+interface ResearchLogInput {
+  observedOn?: DateOnly | null; topic: string; observation?: string | null;
+  sourceType?: SourceType | null; sourceUrl?: string | null;
+  supportsChecks?: SupportsCheck[]; supportsNote?: string | null;
+}
+interface ResearchLogEntry extends Versioned {
+  id: UUID; observedOn: DateOnly | null; topic: string; observation: string | null;
+  sourceType: SourceType | null; sourceUrl: string | null;
+  supportsChecks: SupportsCheck[]; supportsNote: string | null;
+  createdBy: UserRef; usedAsEvidenceCount: number; commentCount: number;
+}
+interface EvidenceUsage { target: TargetRef; label: string; link: LinkTarget; isOnlyEvidenceOfFact: boolean; }
+interface Competitor extends Versioned {
+  id: UUID; name: string; type: "direct" | "indirect" | "substitute" | null;
+  targetCustomer: string | null; offering: string | null;
+  typicalPrice: number | null; priceNote: string | null;
+  strength: string | null; weakness: string | null; whyChosen: string | null; whySurvive: string | null;
+  evidence: Evidence[]; sortOrder: number; commentCount: number;
+}
+interface Assumption extends Versioned {
+  id: UUID; statement: string; whyBelieve: string | null;
+  evidence: Evidence[]; evidenceNote: string | null;
+  confidence: Confidence | null; disproveCondition: string | null; nextCheck: string | null;
+  sortOrder: number; commentCount: number;
+}
+interface Risk extends Versioned {
+  id: UUID; statement: string; probability: Confidence | null; impact: Confidence | null;
+  whyMatters: string | null; mitigation: string | null; howToValidate: string | null;
+  sortOrder: number | null; commentCount: number;   // null = 自動の並び（Impact → Probability の高い順）
+}
+interface CostItem extends Versioned {
+  id: UUID; category: CostCategory; templateKey: string | null; name: string;
+  inputMode: "amount" | "percent_of_price";          // percent_of_price は variable だけ
+  amount: number | null; percent: number | null;      // percent は 0〜1
+  isLumpSum: boolean; whyNeeded: string | null; canReduce: "yes" | "partly" | "no" | null; notes: string | null;
+  classification: Classification; sortOrder: number; commentCount: number;
+}
+interface EconomicsInput extends Versioned {
+  fieldKey: EconomicsField; value: number | null; classification: Classification; commentCount: number;
+}
+```
+
+| API | 本体・クエリ | 応答 | エラー・副作用 |
+|---|---|---|---|
+| V1 | — | `200 ValidationHome` | 確認項目・Next steps・F/A/U・主要指標は `packages/domain` で計算する |
+| V2 | — | `200 { section: TemplateSection; answers: ValidationAnswer[] }` | `sectionKey` は `01` / `02` / `10`（`04` のパターンと `08` は V8・V15 が返す）。設問ごとに必ず1件返す（未回答は `text: null`, `lockVersion: 0`） |
+| V3 | `{ text?: string | null; classification?: ClassificationInput; lockVersion: number; force?: boolean }` | `200 ValidationAnswer` | `422 FACT_REQUIRES_EVIDENCE`（有効な根拠が無いのに `fact`。Fact は V4 の `setFact` で付ける）、`422 CONFIDENCE_REQUIRED`、`422 INVALID_CHOICE`（選択の設問）、`422 QUESTION_NOT_FOUND`。`text` を null にすると F/A/U も外す（`unknown` を除く）。履歴 `manual` |
+| V4 | `{ target: TargetRef; researchLogEntryId?: UUID; newResearchLog?: ResearchLogInput; url?: string; note?: string; setFact?: boolean; lockVersion: number }` | `201 { evidence: Evidence; classification: Classification; lockVersion: number }` | `researchLogEntryId` / `newResearchLog` / `url` のどれか1つ。`setFact: true` なら対象を Fact にする（M2 で根拠を付けて閉じたとき）。対象は `validation_answer` / `economics_input` / `cost_item` / `competitor` / `assumption`。履歴 `manual` |
+| V5 | `?lockVersion=` | `200 { classification: Classification; lockVersion: number }` | Fact の最後の根拠を外すと未分類に戻す（クライアントは事前に確認を出す）。履歴 `manual` |
+| V6 GET | `?supports=&sourceType=&q=&cursor=&limit=` | `200 Page<ResearchLogEntry>` | 日付の新しい順 |
+| V6 POST | `ResearchLogInput` | `201 ResearchLogEntry` | 履歴 `manual` |
+| V7 GET | — | `200 ResearchLogEntry & { usages: EvidenceUsage[] }` | |
+| V7 PATCH | `Partial<ResearchLogInput> & { lockVersion; force? }` | `200 ResearchLogEntry` | 履歴 `manual` |
+| V7 DELETE | — | `200 { affected: EvidenceUsage[] }` | 論理削除。根拠の紐づけは残し、数えなくなる。その根拠しかなかった Fact は「Fact（根拠なし）」になる（design-spec 6.0.3）。クライアントは事前に V7 GET の `usages` で確認を出す。履歴 `manual`（`delete`） |
+| V8 GET | — | `200 { items: Competitor[]; patterns: ValidationAnswer[]; guidance: { min: number; max: number } }` | `patterns` は `V.04.SURVIVOR_PATTERNS` と `V.04.FAILURE_PATTERNS`（更新は V3） |
+| V8 POST | `{ name: string; type?; targetCustomer?; offering?; typicalPrice?: number (≥0); priceNote?; strength?; weakness?; whyChosen?; whySurvive? }` | `201 Competitor` | 履歴 `manual` |
+| V9 PATCH | 上の項目の一部 ＋ `{ lockVersion; force? }` | `200 Competitor` | 履歴 `manual` |
+| V9 DELETE | — | `204` | 論理削除（行へのコメントも隠れる）。履歴 `manual`（`delete`） |
+| V10 GET | — | `200 { items: Assumption[] }` / `200 { items: Risk[] }` | Risks は並び順を適用済み |
+| V10 POST | 前提: `{ statement; whyBelieve?; evidenceNote?; confidence?; disproveCondition?; nextCheck? }`。リスク: `{ statement; probability?; impact?; whyMatters?; mitigation?; howToValidate? }` | `201 Assumption` / `201 Risk` | 履歴 `manual` |
+| V11 | PATCH: 上の項目の一部 ＋ `{ lockVersion; force? }`。DELETE: なし | `200` / `204` | 履歴 `manual` |
+| V12 | — | `200 { items: CostItem[]; result: EconomicsResult; economicsInputs: EconomicsInput[] }` | `result` は Totals と 18 の損益分岐の表示用。`economicsInputs` はクライアントがその場で計算し直すために返す |
+| V13 | `{ category: CostCategory; name: string }` | `201 CostItem` | 表の末尾に Empty の行を作る。履歴 `manual` |
+| V14 PATCH | `{ name?; inputMode?; amount?: number | null (≥0); percent?: number | null (0〜1); isLumpSum?; whyNeeded?; canReduce?; notes?; classification?; lockVersion; force? }` | `200 CostItem` | `422 PERCENT_ONLY_FOR_VARIABLE`、`422 OUT_OF_RANGE`、F/A/U の決まりは V3 と同じ。`unknown` にすると金額と % を null にする。履歴 `manual` |
+| V14 DELETE | — | `204` | 論理削除。履歴 `manual`（`delete`） |
+| V15 | — | `200 { inputs: EconomicsInput[]; worth: ValidationAnswer; result: EconomicsResult; costItems: CostItem[] }` | `inputs` は7つすべて（未入力は `value: null`）。`worth` は `V.08.WORTH`（更新は V3） |
+| V16 | `{ value: number | null; classification?: ClassificationInput; lockVersion; force? }` | `200 EconomicsInput` | 範囲は design-spec 6.4（価格 > 0、営業日数は整数 1〜31、目標利益率 0〜0.99、販売数 ≥ 0）。外れたら `422 OUT_OF_RANGE`。履歴 `manual` |
+| V17 | `{ ids: UUID[]; category?: CostCategory }`（費用行は表ごと） | `204` | `sort_order` を振り直す（リスクは手の並びに切り替わる）。履歴は残さない（並べ替えは対象外） |
+| V18 | — | `200 DecisionContext` | |
+| V19 | `{ value: DecisionValue; reason: string (1〜5000); basedOnDecisionId: UUID | null; confirmNewer?: boolean }` | `201 { entry: DecisionLogEntry; latestDecision: DecisionValue; canCreatePlan: boolean }` | 画面を開いた後に別の判定が記録されていて `confirmNewer` が無ければ `409 DECISION_CHANGED`（`error.latest: DecisionLogSummary`）。決定ログに記録し、`ideas.latest_decision` を変え、ワークスペースの他のメンバーに通知（`decision`）を作る |
+
+```ts
+interface DecisionContext {
+  summary: { oneLineConcept: string; customer: string | null; problem: string | null; solution: string | null;
+             marketType: string | null; biggestOpportunity: string | null; biggestRisk: string | null; biggestUnknown: string | null };
+  keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months" | "simple_roi">;
+  missingChecks: CheckResult[];          // 達成していないものだけ
+  fau: FauBreakdown;
+  lastDecision: DecisionLogSummary | null;
+}
+```
+
+### 5.8 自己分析
+
+```ts
+interface SelfAnalysisHome {
+  id: UUID; status: "not_started" | "in_progress" | "done"; completedAt: DateTime | null;
+  currency: string; template: TemplateRef;
+  answered: number; total: number;
+  sections: { key: string; title: string; answered: number; total: number }[];
+  firstUnanswered: { sectionKey: string; questionKey: string } | null;
+  shares: { workspace: { id: UUID; name: string }; sharedAt: DateTime }[];
+  shareableWorkspaces: { id: UUID; name: string }[];   // 自分が Owner / Member の、個人用以外のワークスペース
+}
+interface SelfAnalysisAnswer extends Versioned {
+  questionKey: string; text: string | null; amount: number | null;   // amount は金額＋理由の設問だけ
+  commentCounts: { workspaceId: UUID; workspaceName: string; count: number }[];  // 本人には共有先ごとの件数
+}
+```
+
+| API | 本体 | 応答 | エラー・副作用 |
+|---|---|---|---|
+| S1 GET | — | `200 SelfAnalysisHome` | 初めて開いたときに自己分析を作る（最新の版、`not_started`） |
+| S1 PATCH | `{ currency: string }` | `200 SelfAnalysisHome` | 換算しない |
+| S2 | — | `200 { section: TemplateSection; answers: SelfAnalysisAnswer[] }` | |
+| S3 | `{ text?: string | null; amount?: number | null (≥0); lockVersion; force? }` | `200 SelfAnalysisAnswer` | 最初の回答で `in_progress` にする。履歴 `manual`（本人だけが見られる） |
+| S4 complete | `{ confirmEmpty?: boolean }` | `200 SelfAnalysisHome` | 未回答があり `confirmEmpty` が無ければ `409 HAS_EMPTY_QUESTIONS`（`error.emptyCount`） |
+| S4 reopen | — | `200 SelfAnalysisHome` | 共有は続く |
+| S5 | `{ workspaceIds: UUID[] }`（共有先の全体） | `200 SelfAnalysisHome` | 新しく足すのは `done` のときだけ（`422 MUST_BE_DONE_TO_SHARE`）。外すのはいつでも。Owner / Member でないワークスペースは `422 NOT_SHAREABLE` |
+| S6 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | 今のワークスペースの Owner / Member |
+| S7 | — | `200 { user: UserRef; status; currency: string; sections: (TemplateSection & { answers: { questionKey: string; text: string | null; amount: number | null; commentCount: number }[] })[] }` | 今のワークスペースに共有済みでなければ `403 NOT_SHARED`。変更履歴は返さない |
+
+### 5.9 プラン
+
+```ts
+interface PlanSummary {
+  id: UUID; name: string; archived: boolean;
+  latestVersion: { id: UUID; name: string; savedAt: DateTime } | null;
+  hasChangesSinceVersion: boolean;
+  latestGoNoGo: { value: GoNoGoValue; recordedAt: DateTime; recordedBy: UserRef } | null;
+}
+interface PlanHome extends PlanSummary, Versioned {   // Versioned はヘッダ（名前・Business Name・Prepared By）
+  ideaId: UUID; workspaceId: UUID; template: TemplateRef;
+  businessName: string; preparedBy: string; date: DateTime;   // 最終更新日（版の表示中は保存日）
+  latestDecision: DecisionValue | null;
+  viewingVersion: { id: UUID; name: string; savedAt: DateTime } | null;   // ?versionId= のとき
+  keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months">;
+  versions: PlanVersionSummary[];
+  execution: { dueSoon: number; overdue: number };
+  parts: { part: "a" | "b"; completeItems: number; totalItems: number;
+           items: { itemNo: number; title: string; marks: ("V" | "S")[]; filled: number; total: number; commentCount: number }[] }[];
+}
+interface PlanVersionSummary { id: UUID; versionNumber: number; name: string; savedBy: UserRef; savedAt: DateTime; }
+interface PlanAnswer extends Versioned {
+  questionKey: string;
+  text: string | null;
+  rows: Record<string, string | number | null>[] | null;   // 表の小項目（§11・§13・§21・§22）。列のキーはテンプレートの options.columns
+  copiedFrom: { source: string; copiedAt: DateTime } | null;
+  commentCount: number;
+}
+interface PlanReference {
+  kind: "validation_answers" | "competitors" | "cost_rows" | "research_log" | "decision_log"
+      | "self_analysis" | "metrics" | "assumptions" | "risks" | "go_no_go_history" | "totals";
+  title: string;
+  data: unknown;           // kind ごとの形（例: cost_rows は CostItem の一部の配列、self_analysis は { user, sections }[]）
+  link: LinkTarget | null;
+}
+interface PlanItem {
+  itemNo: number; title: string; guidance: string | null; readOnly: boolean;   // 版の表示中・アーカイブ・Viewer
+  prompts: TemplateQuestion[]; answers: PlanAnswer[];
+  metrics: KeyMetrics;                          // linked_metric の小項目が使う主要指標
+  execution: ExecutionItem[];                   // execution_view の小項目の種類の項目
+  references: PlanReference[];                  // [S] の自己分析は Owner / Member にだけ返す
+}
+interface ExecutionItem extends Versioned {
+  id: UUID; type: ExecutionType; title: string;
+  assignee: { user: UserRef } | { name: string } | null;
+  dueDate: DateOnly | null; status: ExecutionStatus | null; overdue: boolean;
+  goal: string | null; exitCondition: string | null;                       // milestone
+  launchTiming: LaunchTiming | null; actions: string | null; completionCriteria: string | null;  // launch
+  kpiArea: string | null; kpiTarget: string | null; kpiReviewFrequency: string | null;
+  kpiActual: string | null; kpiActualUpdatedAt: DateTime | null;           // kpi
+  whyItMatters: string | null; answer: string | null;                      // open_question
+  fromPreset: boolean; completedAt: DateTime | null; sortOrder: number; commentCount: number;
+}
+interface ExecutionItemInput {
+  title?: string; assigneeUserId?: UUID | null; assigneeName?: string | null;   // どちらか一方
+  dueDate?: DateOnly | null; status?: ExecutionStatus | null;
+  goal?; exitCondition?; launchTiming?: LaunchTiming; actions?; completionCriteria?;
+  kpiArea?; kpiTarget?; kpiReviewFrequency?; kpiActual?; whyItMatters?; answer?;
+}
+interface PitchDeck {
+  variant: "one" | "five";
+  source: { kind: "latest" } | { kind: "version"; versionId: UUID; name: string; savedAt: DateTime };
+  businessName: string; generatedAt: DateTime;
+  footer: { businessName: string; versionLabel: string /* 版の名前か "Draft" */; date: DateOnly };
+  speakerNotes: string | null;                 // §30 の One-minute / Five-minute explanation（PDF には入れない）
+  slides: {
+    key: string;                               // design-spec 6.14 のキー（title / problem / …）
+    type: "title" | "text" | "number" | "table";
+    title: string; subtitle?: string | null;
+    bullets?: { text: string; empty: boolean }[];
+    numbers?: { label: string; metricKey: string; value: MetricValue }[];
+    table?: { columns: string[]; rows: (string | null)[][] };
+    emptySources: string[];                    // 「Not written yet」を出す素材の名前
+    overflow: boolean;                         // 収まらず「…」で切った（アプリの表示だけに注意を出す）
+    editSource: { itemNo: number } | null; editInValidation: "costs" | "economics" | null;
+    commentCount: number;
+  }[];
+}
+```
+
+| API | 本体・クエリ | 応答 | エラー・副作用 |
+|---|---|---|---|
+| P1 GET | `?includeArchived=true` | `200 { items: PlanSummary[] }` | |
+| P1 POST（M5） | `{ name: string }` | `201 PlanHome` | 最新の判定が Proceed でなければ `409 DECISION_NOT_PROCEED`。名前の重複は `409 NAME_TAKEN`（アーカイブした案の名前も数える）。テンプレートの `copy_from` で検証から文章をコピーし、実行管理の初期行を作る。`created_from_decision_id` に最新の Proceed を入れる。履歴 `plan_draft`（1つの `batchId`） |
+| P2 GET | `?versionId=` | `200 PlanHome` | 版を指定したら、`parts` などを版のスナップショットから作る |
+| P2 PATCH | `{ name?; businessName?; preparedBy?; lockVersion; force? }` | `200 PlanHome` | 履歴 `manual` |
+| P3 | — | `200 PlanSummary` | |
+| P4 | `?versionId=` | `200 PlanItem` | `itemNo` は 1〜30 |
+| P5 | `{ text?: string | null; rows?: Record<string, string | number | null>[] | null; lockVersion; force? }` | `200 PlanAnswer` | 数字・実行管理の小項目は `422 NOT_EDITABLE`。表の列にないキーは `422 VALIDATION_FAILED`。履歴 `manual` |
+| P6 GET | — | `200 { items: PlanVersionSummary[] }` | |
+| P6 POST（M3） | `{ name: string (1〜80) }` | `201 PlanVersionSummary` | スナップショット（30項目の回答・主要指標・シナリオ表・実行管理の項目・検証の競合の上位5件）を保存し、決定ログに `version_saved` を記録して通知する |
+| P7 | — | `200 { conditions: { launchIf: string | null; delayIf: string | null; stopIf: string | null }; keyMetrics: KeyMetrics; currentVersion: PlanVersionSummary | null; hasChangesSinceVersion: boolean; history: DecisionLogSummary[] }` | |
+| P8（M4） | `{ value: GoNoGoValue; reason: string (1〜5000) }` | `201 { entry: DecisionLogEntry; stage: Stage }` | 対象の版は最新の保存済みの版（無ければ null）。決定ログに `go_no_go` を記録して通知する |
+| P9 GET | `?type=&assignee=me|<userId>&status=` | `200 { items: ExecutionItem[] }` | Next Actions は期限順、ローンチは区分ごと、KPI は Area ごとに並べて返す |
+| P9 POST | `ExecutionItemInput & { type: ExecutionType; title: string }` | `201 ExecutionItem` | 担当のメンバーは Owner / Member だけ（`422 INVALID_ASSIGNEE`）。状態は種類ごとの値だけ（`422 INVALID_STATUS`。milestone / launch / next_action は todo・doing・done、open_question は open・resolved、kpi は null）。履歴 `manual` |
+| P10 | PATCH: `ExecutionItemInput & { lockVersion; force? }`。DELETE: なし | `200 ExecutionItem` / `204` | `done` / `resolved` にしたら `completed_at` を入れる。期限を変えたら期限の通知を送り直せるようにする。`kpiActual` を変えたら `kpi_actual_updated_at` を入れる。履歴 `manual` |
+| P11 | `{ type: ExecutionType; ids: UUID[] }` | `204` | |
+| P12 | `?variant=one|five&versionId=` | `200 PitchDeck` | `packages/domain` の `buildPitchDeck()` |
+| P13 | 同上 | `200 application/pdf`（`Content-Disposition: attachment; filename="{businessName}-{one|five}-{版の名前|draft}-{日付}.pdf"`） | ADR-012。常にライトの配色 |
+
+### 5.10 AI 往復
+
+書き出しの Markdown と JSON の書式、設問 ID、取り込みの振り分けの決まりは design-spec 6.6・6.7 が正。貼り付けた内容の解析と振り分けは、クライアントが `packages/domain` の `parseAiReply()` と `matchBlocks()` で行い（貼り付けた全文をサーバーに送らない）、反映（X3）でサーバーがもう一度検査する。
+
+| API | 本体・クエリ | 応答 | エラー・副作用 |
+|---|---|---|---|
+| X1 | `?source=self_analysis|validation|business_plan&id=<検証かプランの id。自己分析は省く>&sections=01,02&items=1,3&part=a|b&includeEmpty=true&includeExamples=true&includeReference=true` | `200 { markdown: string; json: object; fileBaseName: string; questionCount: number; allEmpty: boolean }` | `json` は design-spec 6.6 の `moonx-export`。範囲が空なら `422 EMPTY_SCOPE`。記録しない |
+| X2 | `?target=self_analysis|validation|business_plan&id=` | `200 ImportContext` | |
+| X3 | `{ target: { type: TemplateKind; id?: UUID }; changes: ImportChange[] }` | `200 { applied: number; needsClassification: number; batchId: UUID }` | 1つのトランザクションで全部反映するか、何もしない。どれかの `baseLockVersion` が古ければ `409 CONFLICT_MULTI`（`error.conflicts: { questionKey; current: ConflictCurrent }[]`）。取り込めない設問・隠れた設問は `422 NOT_IMPORTABLE`、金額・選択の値が読めなければ `422 VALIDATION_FAILED`。検証の回答で本文が変わったものは F/A/U を外して未分類にする（`classification` を送ったらそれを使う。`fact` は根拠が残っているときだけ）。履歴 `ai_import`（1つの `batchId`） |
+
+```ts
+interface ImportContext {
+  target: { type: TemplateKind; id: UUID; name: string };
+  questions: {
+    questionKey: string; title: string; sectionKey: string;
+    answerType: AnswerType; options: QuestionOptions | null;
+    importable: boolean;                   // 表・数字・実行管理は false
+    hidden: boolean;                       // OCEAN の出し分け・移行で隠れている
+    current: { text: string | null; amount: number | null; classification: Classification | null } & Versioned;
+  }[];
+}
+interface ImportChange {
+  questionKey: string;
+  text?: string | null; amount?: number | null;            // 金額＋理由は amount と text（理由）
+  classification?: ClassificationInput;                      // 検証で差分確認のときに付け直したとき
+  baseLockVersion: number;
+}
+```
+
+### 5.11 決定ログ・コメント・変更履歴・通知
+
+```ts
+interface DecisionLogSummary {
+  id: UUID; kind: "validation_decision" | "go_no_go" | "version_saved";
+  value: DecisionValue | GoNoGoValue | null; versionName: string | null;
+  idea: { id: UUID; name: string }; plan: { id: UUID; name: string } | null;
+  reasonExcerpt: string | null; recordedBy: UserRef; recordedAt: DateTime;
+}
+interface DecisionLogEntry extends DecisionLogSummary {
+  reason: string | null;
+  snapshot: {
+    missingChecks: CheckResult[]; keyMetrics: KeyMetrics; fau: FauBreakdown;
+    conditions?: { launchIf: string | null; delayIf: string | null; stopIf: string | null };  // go_no_go
+    planVersion?: { id: UUID; name: string } | null;
+  };
+}
+interface Comment {
+  id: UUID; workspace: { id: UUID; name: string }; target: TargetRef;
+  parentId: UUID | null; author: UserRef; body: string; mentions: UserRef[];
+  resolvedAt: DateTime | null; resolvedBy: UserRef | null;
+  editedAt: DateTime | null; deleted: boolean; createdAt: DateTime;
+}
+interface HistoryEntry {
+  id: UUID; batchId: UUID | null; target: TargetRef; label: string;   // 例: "01 WHO"、"Costs · Rent"
+  action: "create" | "update" | "delete" | "restore";
+  source: HistorySource;
+  before: unknown | null; after: unknown | null;   // 本文・数字・F/A/U・確信度・根拠の id の一覧など（差分の強調はクライアント）
+  changedBy: UserRef; changedAt: DateTime; revertible: boolean;
+}
+interface Notification {
+  id: UUID; kind: "mention" | "comment" | "decision" | "due";
+  workspace: { id: UUID; name: string }; actor: UserRef | null;
+  title: string;          // 表示用の短い文（英語。例: "Paolo mentioned you on WHO"）
+  excerpt: string | null; link: LinkTarget;
+  accessible: boolean;    // 外れた・権限がなくなったら false（「You no longer have access」）
+  readAt: DateTime | null; createdAt: DateTime;
+}
+```
+
+| API | 本体・クエリ | 応答 | エラー・副作用 |
+|---|---|---|---|
+| L1 | `?kind=&ideaId=&planId=&recordedBy=&from=&to=&cursor=&limit=` | `200 Page<DecisionLogSummary>` | 新しい順 |
+| L2 | — | `200 DecisionLogEntry` | 更新・削除の API は無い |
+| C1 GET | `?targetType=&targetId=&targetKey=&workspaceId=` | `200 { threads: { root: Comment; replies: Comment[] }[] }` | 自己分析の回答へのコメントは、共有先の Owner / Member には `workspaceId` のワークスペースの分だけ、本人には全部を返す。削除した行へのコメントは返さない |
+| C1 POST | `{ workspaceId: UUID; target: TargetRef; parentId?: UUID; body: string (1〜5000); mentionUserIds: UUID[] }` | `201 Comment` | 返信は1段まで（`422 REPLY_DEPTH`）。メンションできない人は `422 INVALID_MENTION`。通知（`mention` / `comment`）を作る（design-spec 6.15 の条件） |
+| C2 PATCH | `{ body: string; mentionUserIds: UUID[] }` | `200 Comment` | 新しくメンションした人にだけ通知する |
+| C2 DELETE | — | `204` | 「deleted」として残す |
+| C3 | — | `200 Comment` | スレッドの最初のコメントだけ |
+| H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan&containerId=&sectionKey=&cursor=` | `200 Page<HistoryEntry>` | 新しい順 |
+| H2 | — | `200 { entry: HistoryEntry; target: unknown }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す。衝突の検査はしない（戻すのは意図した上書き） |
+| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・下書き作成・複製を、1回の操作の単位でまとめて戻す |
+| N1 | `?filter=all|unread&cursor=&limit=` | `200 Page<Notification>` | ワークスペースをまたいで新しい順 |
+| N2 | — | `200 { total: number }` | クライアントは画面を開いたとき・前面に戻ったとき・60秒ごとに呼ぶ |
+| N3 | — | `204` | |
+
+### 5.12 テンプレートの移行（M8）
+
+| API | 本体・クエリ | 応答 | エラー・副作用 |
+|---|---|---|---|
+| T1 | `?targetType=self_analysis|validation|business_plan&targetId=` | `200 { from: { versionNumber: number }; to: { versionId: UUID; versionNumber: number }; carried: number; hiddenQuestions: { questionKey: string; title: string; hasAnswer: boolean }[]; addedQuestions: number; addedCostRows: string[] }` | 新しい版が無ければ `409 ALREADY_LATEST` |
+| T2 | `{ targetType; targetId; toVersionId: UUID }` | `200 { batchId: UUID; template: TemplateRef }` | design-spec 6.0.7 の表のとおり移す。履歴 `template_migration`（1つの `batchId`。H3 で戻せる） |
+
+### 5.13 運営者
+
+```ts
+interface TemplateVersionDetail {
+  id: UUID; kind: TemplateKind; versionNumber: number; status: "draft" | "published"; aiPrompt: string;
+  sections: (Omit<TemplateSection, "questions"> & { id: UUID; sortOrder: number;
+    questions: (TemplateQuestion & { id: UUID; sortOrder: number; copyFrom: unknown | null; reference: unknown | null })[] })[];
+  costDefaults: { id: UUID; category: CostCategory; key: string; name: string; sortOrder: number }[];
+  checkRules: { checkKey: CheckKey; params: Record<string, number> }[];
+  executionPresets: { id: UUID; type: "milestone" | "launch" | "kpi"; title: string; area: string | null; launchTiming: LaunchTiming | null; sortOrder: number }[];
+}
+interface AdminUser { id: UUID; displayName: string; email: string; createdAt: DateTime; lastActiveAt: DateTime | null;
+  workspaceCount: number; status: "active" | "suspended"; isAdmin: boolean; }
+interface AdminWorkspace { id: UUID; name: string; isPersonal: boolean; owners: UserRef[]; memberCount: number; ideaCount: number; lastActiveAt: DateTime | null; }
+```
+
+| API | 本体・クエリ | 応答 | エラー・副作用 |
+|---|---|---|---|
+| M1 | — | `200 { items: { kind: TemplateKind; name: string; versions: { id: UUID; versionNumber: number; status: "draft" | "published"; publishedAt: DateTime | null; publishedBy: UserRef | null; usageCount: number }[] }[] }` | |
+| M2 | — | `201 { id: UUID }` | その版をコピーした下書きを作る。下書きがすでにあれば `409 DRAFT_EXISTS` |
+| M3 GET | — | `200 TemplateVersionDetail` | |
+| M3 PATCH | `{ aiPrompt: string }` | `200 TemplateVersionDetail` | 公開済みの版は `409 PUBLISHED_READ_ONLY`（M4〜M6 も同じ） |
+| M4 | セクション: `{ key; title; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（PATCH は一部） | `201` / `200` / `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`） |
+| M5 | order: `{ sections: { id: UUID; questionIds: UUID[] }[] }`。cost-defaults: `{ items: { category; key; name }[] }`。check-rules: `{ items: { checkKey; params }[] }`。execution-presets: `{ items: { type; title; area?; launchTiming? }[] }` | `200 TemplateVersionDetail` | 一覧ごと置き換える |
+| M6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 設問 ID の重複・形式、前の版から消えた ID |
+| M6 publish | — | `200 { versionNumber: number; publishedAt: DateTime }` | 検査のエラーがあれば `422 TEMPLATE_INVALID`。既存の回答は変わらない |
+| M7 users | `?q=&status=&cursor=` | `200 Page<AdminUser>` | 中身（アイデア・回答）は返さない |
+| M7 workspaces | `?q=&cursor=` | `200 Page<AdminWorkspace>` | |
+| M7 invitations | `?status=&cursor=` | `200 Page<Invitation>` | |
+| M8 | — | `200 AdminUser` | 停止: セッションを全部消す。通知を作らない。再開で元どおり。自分自身は停止できない（`422 CANNOT_SUSPEND_SELF`） |
+| M9 | `{ email: string; workspaceId?: UUID; role?: Role }` | `201 { invitation: Invitation; link: string }` | `workspaceId` があれば `role` は必須 |
+
+### 5.14 内部・死活確認
+
+| API | 本体 | 応答 | 補足 |
+|---|---|---|---|
+| Z1 `GET /api/health` | — | `200 { status: "ok"; version: string /* コミット SHA */; env: string }` | **DB に触れない**（監視のたびに Neon を起こさないため。ADR-008） |
+| Z2 `GET /api/health/db` | — | `200 { status: "ok"; latencyMs: number }` / `503` | デプロイ後の確認に使う |
+| Z3 `POST /internal/cron/due-notifications` | — | `200 { checkedItems: number; created: number }` | `Authorization: Bearer <OIDC トークン>` の発行者（`https://accounts.google.com`）・audience（`CRON_OIDC_AUDIENCE`）・メール（`CRON_INVOKER_EMAIL`）を確かめる。対象は ADR-014。停止されたユーザー・アーカイブしたアイデアとプランの項目・担当が名前だけの項目は除く |
 
 ## 6. データモデル
 

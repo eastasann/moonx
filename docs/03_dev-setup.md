@@ -138,6 +138,7 @@ make admin-create EMAIL=<自分のメール>
 3. API と Expo の開発サーバーを起動し、端末の開発ビルドから接続する。
 
    ```bash
+   # リポジトリのルートで
    make dev          # ターミナル1（API と Web）
    make dev-mobile   # ターミナル2（Expo の開発サーバー。QR コードが出る）
    ```
@@ -203,7 +204,7 @@ make infra-apply ENV=staging    # 適用
 
 ### 5.4 初回セットアップのチェックリスト（最初のデプロイの前に1回）
 
-上から順に進める。staging を先に作り、同じ手順を production でもくり返す（`staging` を `production` に読み替える）。
+上から順に進める。環境ごとに分かれる手順（G・H・I・M）は、staging で通してから production でくり返す（`staging` を `production` に読み替える）。
 
 #### A. アカウントとドメイン
 
@@ -279,11 +280,11 @@ make infra-apply ENV=staging    # 適用
 - [ ] DMARC のレコードを同じく加える: 名前 `_dmarc`、TXT `v=DMARC1; p=none; rua=mailto:<受け取るメール>`（様子を見て `p=quarantine` に上げる）
 - [ ] 環境ごとに API キー（送信だけ・`{DOMAIN}` に限る）を作り、控える
 
-#### G. Terraform（staging → production）
+#### G. Terraform
 
 - [ ] `infra/terraform/envs/staging/` の変数に、秘密でない値を入れる（`{GCP_PROJECT_ID}`・`{DOMAIN}`・`GOOGLE_CLIENT_ID`・`SENTRY_DSN`・アラートの通知先など）
 - [ ] `make infra-plan ENV=staging` で差分を読み、`make infra-apply ENV=staging`
-- [ ] Cloud Run の作成がシークレットの値が無いために失敗したら、E の値を入れて（H）からもう一度 `make infra-apply ENV=staging`
+- [ ] Cloud Run の作成が、シークレットの値が無いために失敗することがある。そのときは H で値を入れてから、もう一度 `make infra-apply ENV=staging`
 - [ ] Workload Identity Federation（GitHub Actions 用）ができたことを確かめる
 
   ```bash
@@ -303,7 +304,6 @@ make infra-apply ENV=staging    # 適用
   dig +short TXT _dmarc.{DOMAIN}
   ```
 
-- [ ] production でも同じことをする（`ENV=production`）
 
 #### H. シークレットの値（Secret Manager）
 
@@ -321,8 +321,8 @@ read -rs VALUE; printf '%s' "$VALUE" | gcloud secrets versions add moonx-$TARGET
 openssl rand -base64 32 | tr -d '\n' | gcloud secrets versions add moonx-$TARGET-better-auth-secret --data-file=-
 
 # Worker と API の共有シークレット（同じ値を Worker にも入れる。I）
-PROXY_SECRET="$(openssl rand -hex 32)"
-printf '%s' "$PROXY_SECRET" | gcloud secrets versions add moonx-$TARGET-proxy-shared-secret --data-file=-
+proxy_secret="$(openssl rand -hex 32)"
+printf '%s' "$proxy_secret" | gcloud secrets versions add moonx-$TARGET-proxy-shared-secret --data-file=-
 ```
 
 #### I. Cloudflare Worker
@@ -332,8 +332,8 @@ printf '%s' "$PROXY_SECRET" | gcloud secrets versions add moonx-$TARGET-proxy-sh
   ```bash
   cd apps/web
   bunx wrangler login
-  printf '%s' "$PROXY_SECRET" | bunx wrangler secret put PROXY_SHARED_SECRET --env $TARGET
-  unset PROXY_SECRET
+  printf '%s' "$proxy_secret" | bunx wrangler secret put PROXY_SHARED_SECRET --env $TARGET
+  unset proxy_secret
   ```
 
 - [ ] Cloud Run の URL を `apps/web/wrangler.jsonc` の環境ごとの `vars` の `API_ORIGIN` に書き、PR で入れる
@@ -364,6 +364,7 @@ printf '%s' "$PROXY_SECRET" | gcloud secrets versions add moonx-$TARGET-proxy-sh
   gh secret set DATABASE_URL_DIRECT --env staging        # 値を聞かれるので貼る
   gh variable set VITE_APP_ENV --env staging --body staging
   gh variable set VITE_SENTRY_DSN --env staging --body '<Sentry web の DSN>'
+  # production も同じように入れる（VITE_APP_ENV の値は production）
 
   gh secret set CLOUDFLARE_API_TOKEN     # A で作った CI 用のトークン
   gh secret set CLOUDFLARE_ACCOUNT_ID

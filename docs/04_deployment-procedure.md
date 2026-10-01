@@ -49,7 +49,7 @@
 
 | ワークフロー | きっかけ | やること |
 |---|---|---|
-| `ci.yml` | すべての PR | `make db-up` → `make db-migrate` → `make lint` → `make typecheck` → `make test` → `make build` → `make test-e2e`。`make tokens` で差分が出たら失敗（ADR-018） |
+| `ci.yml` | すべての PR | `make db-up` → `make db-migrate` → `make lint` → `make typecheck` → `make test` → `make build` → `make test-e2e`（`make dev` を裏で起動してから）。`make tokens` で差分が出たら失敗（ADR-018） |
 | `build.yml` | `main` への push（`deploy/**` だけの変更は除く） | テスト → API のイメージ `asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:<SHA>` を作って push → Web のビルドの確認 |
 | `deploy.yml` | `main` への push で `deploy/staging/version` か `deploy/production/version` が変わったとき | 下の「deploy.yml の順番」。環境ごとに同時に1つだけ動かす（後から来たものは待つ）。1つのコミットで両方の環境のファイルが変わっていたら失敗させる |
 | `db-backup.yml` | 毎日（schedule） | production の DB を `pg_dump` して Cloud Storage へ（05 6.2） |
@@ -79,10 +79,10 @@ curl -fsS https://staging.{DOMAIN}/api/health      # production は https://{DOM
 
 # 3. Web。VITE_APP_ENV・VITE_SENTRY_DSN は environment の変数
 make build
-cd apps/web && bunx wrangler deploy --env $TARGET
+(cd apps/web && bunx wrangler deploy --env $TARGET)
 
 # 4. スマホ（JS だけの変更のとき）
-cd apps/mobile && eas update --channel $TARGET --message "$SHA" --non-interactive
+(cd apps/mobile && eas update --channel $TARGET --message "$SHA" --non-interactive)
 ```
 
 - **1. マイグレーション**は「追加してから使い、使わなくなってから消す」で書いたものだけを流す（4.1）。これで、API を前のリビジョンに戻しても動く
@@ -92,7 +92,7 @@ cd apps/mobile && eas update --channel $TARGET --message "$SHA" --non-interactiv
 
   | ネイティブの変更 | やること |
   |---|---|
-  | 無い（同じ runtime のビルドがある） | `eas update --channel $TARGET`。開いている版のアプリに次の起動から届く |
+  | 無い（同じ runtime のビルドがある） | `eas update --channel $TARGET`。同じ runtime のアプリに、次の起動から届く |
   | ある | `eas build --platform all --profile $TARGET --auto-submit --non-interactive`。staging は TestFlight と Play 内部テストに届く。production は審査を経て公開する（4.3） |
 
 - `eas update` は `eas.json` の profile の `env` を読まない。`EXPO_PUBLIC_API_BASE_URL`・`EXPO_PUBLIC_APP_ENV`・`EXPO_PUBLIC_SENTRY_DSN` を、その profile と同じ値で環境変数として渡す（値は SDD 2章「環境変数」）。渡し忘れると、届いたアプリが違う API を呼ぶ

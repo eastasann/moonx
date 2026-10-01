@@ -1,7 +1,7 @@
 # System Design Doc — moonx
 
 - 入力: `docs/design-spec.md`（画面・UX の正）、`docs/screen_flow.mermaid`
-- この文書が正として持つもの: アーキテクチャ、技術選定（ADR）、ルーティング、API、**データモデル**、セキュリティ、エラーハンドリング、i18n、テスト、モニタリング
+- この文書が正として持つもの: アーキテクチャ、技術選定（ADR）、環境と命名・環境変数・CI のシークレット・make ターゲット、ルーティング、API、**データモデル**、権限マトリクス（API の単位）、セキュリティ、エラーハンドリング、i18n、テスト、モニタリング（監視の項目と閾値を含む）
 - 画面の存在・目的・レイアウト・認証要否は design-spec が正。ここには転記せず、画面番号（例: 13 検証ホーム）で参照する
 - デザイントークンの具体値は `docs/06_design-tokens.json` が正
 
@@ -34,7 +34,7 @@
 
 ```
                     ┌───────────────────────── Cloudflare（DNS・CDN・無料枠）──────────────────────────┐
- Web ブラウザ ─────▶ │ Worker「moonx-web」                                                              │
+ Web ブラウザ ─────▶ │ Worker「moonx-web-{env}」                                                        │
                     │  ├ /*      → 静的アセット（apps/web の SPA。見つからないパスは index.html）       │
  スマホアプリ ─────▶ │  └ /api/*  → Cloud Run へ転送（Cookie・ヘッダーはそのまま。共有シークレットを付ける）│
  (Expo, iOS/Android) └──────────────────────────────────────────┬────────────────────────────────────┘
@@ -73,7 +73,7 @@
 |---|---|
 | Google Cloud の環境ごとの資源（Cloud Run・Secret Manager・Cloud Scheduler・写真のバケット・サービスアカウント・Monitoring のアラート） | **Terraform**（`infra/terraform/envs/{staging,production}/`） |
 | Google Cloud の共有の資源（Artifact Registry のリポジトリ `moonx`・Workload Identity Federation・バックアップのバケット `{GCP_PROJECT_ID}-moonx-backups`・予算アラートと通知のチャンネル） | **Terraform**（`infra/terraform/envs/shared/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`） |
-| Cloudflare の DNS（メールの SPF・DKIM・DMARC と Resend の確認のレコード） | **Terraform**（Cloudflare provider。`envs/shared/`） |
+| Cloudflare のゾーンの設定（メールの SPF・DKIM・DMARC と Resend の確認のレコード、HSTS、`/api/auth/*` のレート制限ルール） | **Terraform**（Cloudflare provider。`envs/shared/`） |
 | Cloudflare Worker・静的アセット・Web のドメイン（`{DOMAIN}` と `staging.{DOMAIN}` の DNS レコードは Worker のカスタムドメインが作る） | `apps/web/wrangler.jsonc`（デプロイは `make deploy-web`） |
 | Google の OAuth の同意画面とクライアント | Google Cloud のコンソール（Terraform では作れないため。手順は 03_dev-setup.md） |
 | Neon（プロジェクトとブランチ。DB 名 `moonx`） | Neon のコンソールで作り、接続文字列を Secret Manager に入れる（無料プランは Terraform の対象にしない。手順は 03_dev-setup.md） |
@@ -183,7 +183,7 @@ moonx/
 | `build-web ENV=...` | Web を環境ごとにビルドする（`VITE_*` を埋め込む） |
 | `build-api-image SHA=...` | API の Docker イメージを作って Artifact Registry に上げる |
 | `test` | `test-domain`・`test-api`・`test-web`・`test-mobile` をまとめて実行 |
-| `test-domain` / `test-api` / `test-web` / `test-mobile` | 単体・結合テスト（`test-api` は `DATABASE_URL_TEST` の DB を作り直して使う） |
+| `test-domain` / `test-api` / `test-web` / `test-mobile` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`、`test-api` は `apps/api`（`DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web`、`test-mobile` は `apps/mobile`・`packages/ui-native` |
 | `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
 | `lint` / `format` / `typecheck` | Biome の検査・整形、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
@@ -399,7 +399,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
   - スマホ: Unistyles のテーマ（ライト / ダーク）とブレークポイント。large のスケールを既定にする
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
 - **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は `<html data-theme>` と `prefers-color-scheme`、スマホは Unistyles の適応テーマ（4 アカウント設定の System / Light / Dark に従う）。
-- **アイコン**: Lucide（`lucide-react` / `lucide-react-native`）にそろえる。大きさと線の太さはトークン（`semantic.icon`）。
+- **アイコン**: Lucide（`lucide-react` / `lucide-react-native`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。
 
 **理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は Phase 2 で決めた Hermes Teal を保つことを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、Web とスマホで同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは一段ゆったり」をそのまま表せる。Lucide は Web（`lucide-react`）とスマホ（`lucide-react-native`）に同じ絵柄の版があり、線の太さと大きさを props で変えられる（Spectrum の Workflow アイコンは使わないと合意した）。変換を自前のスクリプトにするのは、出力が3種類（vanilla-extract・Unistyles・react-pdf）に限られ、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため（Style Dictionary は設定と拡張の方が大きくなる）。
 
@@ -443,7 +443,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-023: 監視とログは Sentry と Cloud Logging
 
-**決定:** エラーは Sentry（無料枠。プロジェクトは web / mobile / api の3つ）に送る。API のログは1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`appVersion`）で標準出力に書き、Cloud Logging が集める。リクエスト ID は Worker で付け（`X-Request-Id`）、エラーの応答と Sentry にも入れる。死活確認は Cloud Monitoring の稼働時間チェック（`/api/health`）。Worker の転送の失敗は Cloudflare の Workers Logs で見る。詳細は11章。
+**決定:** エラーは Sentry（無料枠。プロジェクトは `moonx-web` / `moonx-mobile` / `moonx-api` の3つ）に送る。API のログは1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`appVersion`）で標準出力に書き、Cloud Logging が集める。リクエスト ID は Worker で付け（`X-Request-Id`）、エラーの応答と Sentry にも入れる。死活確認は Cloud Monitoring の稼働時間チェック（`/api/health`）。Worker の転送の失敗は Cloudflare の Workers Logs で見る。詳細は11章。
 
 **理由:** どれも無料枠で足りる。リクエスト ID で、利用者が見たエラーとログ・Sentry をつなげられる。
 
@@ -489,7 +489,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-028: DB のバックアップは毎日の pg_dump
 
-**決定:** 定期実行の GitHub Actions（`db-backup.yml`。環境 `production-backup`）が毎日1回、production の DB を読み取り専用のロールで `pg_dump -Fc` し、`gs://{GCP_PROJECT_ID}-moonx-backups/production/<日付>.dump` に上げる（`make db-backup ENV=production`）。バケットは30日で自動削除する。戻し方と、月1回の戻す練習は 05_operation-runbook.md。
+**決定:** 定期実行の GitHub Actions（`db-backup.yml`。環境 `production-backup`）が毎日1回、production の DB を読み取り専用のロールで `pg_dump -Fc` し、`gs://{GCP_PROJECT_ID}-moonx-backups/production/<日付>.dump` に上げる（`make db-backup ENV=production`）。バケットは30日で自動削除する。戻し方と、戻す練習（頻度を含む）は 05_operation-runbook.md。
 
 **理由:** Neon の無料プランの履歴からの復元は期間が短い。標準の `pg_dump` なら、DB を乗り換えても同じ方法で取れて戻せる（ADR-008）。
 
@@ -582,6 +582,8 @@ API のルートは5章、Worker が配る静的なファイル（`/.well-known/
 | `plan_answer` | プランの id | 設問 ID（例: `P.01.1`） |
 | `pitch_slide` | プランの id | `{版の種類}.{スライドのキー}`（例: `five.market`） |
 | `idea` | アイデアの id | なし（アイデアの概要） |
+| `business_plan` | プランの id | なし（プランのヘッダ。変更履歴だけ） |
+| `template_version` | 自己分析・検証・プランの id | `self_analysis` / `validation` / `business_plan`（固定している版。テンプレートの移行の履歴だけ） |
 | `research_log_entry` / `competitor` / `assumption` / `risk` / `cost_item` / `execution_item` | 行の id | なし |
 
 キーで決まる項目は、まだ行が無くても（未回答でも）指せる。
@@ -613,7 +615,9 @@ type TemplateKind = "self_analysis" | "validation" | "business_plan";
 type AnswerType = "long_text" | "short_text" | "choice" | "amount_with_reason" | "table" | "linked_metric" | "execution_view";
 type HistorySource = "manual" | "ai_import" | "revert" | "template_migration" | "duplicate" | "plan_draft";
 type TargetType = "self_analysis_answer" | "validation_answer" | "economics_input" | "plan_answer" | "pitch_slide" | "idea"
-  | "research_log_entry" | "competitor" | "assumption" | "risk" | "cost_item" | "execution_item";
+  | "research_log_entry" | "competitor" | "assumption" | "risk" | "cost_item" | "execution_item"
+  | "business_plan"       // プランのヘッダ（案の名前・Business Name・Prepared By）。変更履歴だけ
+  | "template_version";   // 自己分析・検証・プランが固定しているテンプレートの版。テンプレートの移行の履歴だけ
 
 interface TargetRef { type: TargetType; id: UUID; key?: string | null; }
 interface Page<T> { items: T[]; nextCursor: string | null; }
@@ -730,7 +734,8 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | A5 | GET | `/api/auth/get-session` | ログイン | 共通 |
 | A6 | POST | `/api/auth/request-password-reset` | 公開 | 2 |
 | A7 | POST | `/api/auth/reset-password` | 公開（トークン） | 2 |
-| A8 | POST | `/api/auth/change-password` | ログイン | 4 |
+| A8 | POST | `/api/auth/change-password` | ログイン（パスワードがある人） | 4 |
+| U8 | POST | `/api/v1/me/password` | ログイン（パスワードが無い人） | 4 |
 | **アカウントと招待（5.4）** | | | | |
 | U1 | GET | `/api/v1/me` | ログイン | 共通・4 |
 | U2 | PATCH | `/api/v1/me` | ログイン | 3・4 |
@@ -820,15 +825,15 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | T1 | GET | `/api/v1/template-migrations/preview` | O,M（自己分析は本人） | M8 |
 | T2 | POST | `/api/v1/template-migrations` | O,M（自己分析は本人） | M8 |
 | **運営者（5.13）** | | | | |
-| M1 | GET | `/api/v1/admin/templates` | Admin | 26 |
-| M2 | POST | `/api/v1/admin/template-versions/{versionId}/draft` | Admin | 26 |
-| M3 | GET / PATCH | `/api/v1/admin/template-versions/{versionId}` | Admin | 27 |
-| M4 | POST / PATCH / DELETE | `/api/v1/admin/template-versions/{versionId}/sections`、`/api/v1/admin/template-sections/{id}`、`/api/v1/admin/template-sections/{id}/questions`、`/api/v1/admin/template-questions/{id}` | Admin | 27 |
-| M5 | PUT | `/api/v1/admin/template-versions/{versionId}/order`・`/cost-defaults`・`/check-rules`・`/execution-presets` | Admin | 27 |
-| M6 | POST | `/api/v1/admin/template-versions/{versionId}/validate`・`/publish` | Admin | 27 |
-| M7 | GET | `/api/v1/admin/users`・`/api/v1/admin/workspaces`・`/api/v1/admin/invitations` | Admin | 28 |
-| M8 | POST | `/api/v1/admin/users/{userId}/suspend`・`/reactivate` | Admin | 28 |
-| M9 | POST | `/api/v1/admin/invitations` | Admin | 28 |
+| AD1 | GET | `/api/v1/admin/templates` | Admin | 26 |
+| AD2 | POST | `/api/v1/admin/template-versions/{versionId}/draft` | Admin | 26 |
+| AD3 | GET / PATCH | `/api/v1/admin/template-versions/{versionId}` | Admin | 27 |
+| AD4 | POST / PATCH / DELETE | `/api/v1/admin/template-versions/{versionId}/sections`、`/api/v1/admin/template-sections/{id}`、`/api/v1/admin/template-sections/{id}/questions`、`/api/v1/admin/template-questions/{id}` | Admin | 27 |
+| AD5 | PUT | `/api/v1/admin/template-versions/{versionId}/order`・`/cost-defaults`・`/check-rules`・`/execution-presets` | Admin | 27 |
+| AD6 | POST | `/api/v1/admin/template-versions/{versionId}/validate`・`/publish` | Admin | 27 |
+| AD7 | GET | `/api/v1/admin/users`・`/api/v1/admin/workspaces`・`/api/v1/admin/invitations` | Admin | 28 |
+| AD8 | POST | `/api/v1/admin/users/{userId}/suspend`・`/reactivate` | Admin | 28 |
+| AD9 | POST | `/api/v1/admin/invitations` | Admin | 28 |
 | **内部** | | | | |
 | Z1 | GET | `/api/health` | 公開（DB に触れない） | 監視 |
 | Z2 | GET | `/api/health/db` | 公開（Worker の共有シークレットが要る） | デプロイ後の確認 |
@@ -840,7 +845,7 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 
 | 項目 | 設定 |
 |---|---|
-| メール＋パスワード | 有効。`disableSignUp: true`（新規登録は U5 だけ）。パスワードは8文字以上・128文字以下。パスワード再設定のリンクの期限は1時間（design-spec 6.16）。再設定すると他のセッションを消す |
+| メール＋パスワード | 有効。`disableSignUp: true`（新規登録は U5 だけ）。パスワードは8文字以上・128文字以下。パスワード再設定のリンクの期限は1時間（design-spec 6.16）。再設定すると他のセッションを消し、`hooks.after`（`/reset-password`）でそのユーザーの新しいセッションを作って Cookie を返す（ログインした状態で 5 へ。design-spec 6.16） |
 | Google | 有効。`disableImplicitSignUp: true`。新規登録は招待の画面（`/invite/$token`）からだけ `requestSignUp: true` で始め、`callbackURL` を `/welcome?step=invite&token=…`、`errorCallbackURL` を `/login?error=…` にする |
 | 新規登録の制限 | `databaseHooks.user.create.before`: そのメールあての有効な招待（`pending` かつ期限内。大文字小文字を区別しない）が無ければ `INVITATION_REQUIRED` で拒否する |
 | 登録の後 | `databaseHooks.user.create.after`: 個人用ワークスペース（名前「{表示名}'s workspace」、通貨 PHP、本人が Owner）を作り、`last_workspace_id` に入れる |
@@ -893,6 +898,8 @@ interface InvitationPreview {
 **U5 `POST /api/v1/invitations/by-token/{token}/sign-up`**（公開）本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie（スマホは Better Auth の Expo プラグインが受け取る）。メールは招待のメールに固定する。招待はまだ受諾しない（3 の ① で U6）。エラー: `410 INVITATION_INVALID`、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
 
 **U6 `POST /api/v1/invitations/by-token/{token}/accept`** 本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。エラー: `410 INVITATION_INVALID`、`409 INVITATION_ALREADY_ACCEPTED`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）。
+
+**U8 `POST /api/v1/me/password`**（Set password。design-spec 6.16）本体 `{ newPassword: string }` → `204`。Google だけで登録した人（`hasPassword: false`）がパスワードを足す。パスワードがある人は `409 PASSWORD_ALREADY_SET`（A8 で変える）。セッションが10分以内に作られたものでなければ `403 REAUTH_REQUIRED`。サーバーから Better Auth の `setPassword` を呼ぶ。
 
 **U7 `POST /api/v1/me/delete`**（アカウントの削除。design-spec 6.16）本体 `{ confirmEmail: string; password?: string }` → `204`（セッションの Cookie を消す）。
 - `confirmEmail` が自分のメールと違えば `422 CONFIRMATION_MISMATCH`。パスワードがある人は `password` が必須で、違えば `403 INVALID_PASSWORD`。パスワードが無い人（Google だけ）は、セッションが10分以内に作られたものでなければ `403 REAUTH_REQUIRED`。
@@ -1289,7 +1296,7 @@ interface Notification {
 | C2 PATCH | `{ body: string; mentionUserIds: UUID[] }` | `200 Comment` | 新しくメンションした人にだけ通知する |
 | C2 DELETE | — | `204` | 「deleted」として残す |
 | C3 | — | `200 Comment` | スレッドの最初のコメントだけ |
-| H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan&containerId=&sectionKey=&cursor=` | `200 Page<HistoryEntry>` | 新しい順 |
+| H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKey=&cursor=` | `200 Page<HistoryEntry>` | 新しい順 |
 | H2 | — | `200 { entry: HistoryEntry; target: unknown }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す。衝突の検査はしない（戻すのは意図した上書き） |
 | H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・下書き作成・複製を、1回の操作の単位でまとめて戻す |
 | N1 | `?filter=all|unread&cursor=&limit=` | `200 Page<Notification>` | ワークスペースをまたいで新しい順 |
@@ -1315,25 +1322,25 @@ interface TemplateVersionDetail {
   executionPresets: { id: UUID; type: "milestone" | "launch" | "kpi"; title: string; area: string | null; launchTiming: LaunchTiming | null; sortOrder: number }[];
 }
 interface AdminUser { id: UUID; displayName: string; email: string; createdAt: DateTime; lastActiveAt: DateTime | null;
-  workspaceCount: number; status: "active" | "suspended"; isAdmin: boolean; }
+  workspaceCount: number; status: "active" | "suspended" | "deleted"; isAdmin: boolean; }   // deleted は一覧の末尾に「Deleted user」として出し、操作を出さない
 interface AdminWorkspace { id: UUID; name: string; isPersonal: boolean; owners: UserRef[]; memberCount: number; ideaCount: number; lastActiveAt: DateTime | null; }
 ```
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| M1 | — | `200 { items: { kind: TemplateKind; name: string; versions: { id: UUID; versionNumber: number; status: "draft" | "published"; publishedAt: DateTime | null; publishedBy: UserRef | null; usageCount: number }[] }[] }` | |
-| M2 | — | `201 { id: UUID }` | その版をコピーした下書きを作る。下書きがすでにあれば `409 DRAFT_EXISTS` |
-| M3 GET | — | `200 TemplateVersionDetail` | |
-| M3 PATCH | `{ aiPrompt: string }` | `200 TemplateVersionDetail` | 公開済みの版は `409 PUBLISHED_READ_ONLY`（M4〜M6 も同じ） |
-| M4 | セクション: `{ key; title; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（PATCH は一部） | `201` / `200` / `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`） |
-| M5 | order: `{ sections: { id: UUID; questionIds: UUID[] }[] }`。cost-defaults: `{ items: { category; key; name }[] }`。check-rules: `{ items: { checkKey; params }[] }`。execution-presets: `{ items: { type; title; area?; launchTiming? }[] }` | `200 TemplateVersionDetail` | 一覧ごと置き換える |
-| M6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 設問 ID の重複・形式、前の版から消えた ID |
-| M6 publish | — | `200 { versionNumber: number; publishedAt: DateTime }` | 検査のエラーがあれば `422 TEMPLATE_INVALID`。既存の回答は変わらない |
-| M7 users | `?q=&status=&cursor=` | `200 Page<AdminUser>` | 中身（アイデア・回答）は返さない |
-| M7 workspaces | `?q=&cursor=` | `200 Page<AdminWorkspace>` | |
-| M7 invitations | `?status=&cursor=` | `200 Page<Invitation>` | |
-| M8 | — | `200 AdminUser` | 停止: セッションを全部消す。通知を作らない。再開で元どおり。自分自身は停止できない（`422 CANNOT_SUSPEND_SELF`） |
-| M9 | `{ email: string; workspaceId?: UUID; role?: Role }` | `201 { invitation: Invitation; link: string }` | `workspaceId` があれば `role` は必須 |
+| AD1 | — | `200 { items: { kind: TemplateKind; name: string; versions: { id: UUID; versionNumber: number; status: "draft" | "published"; publishedAt: DateTime | null; publishedBy: UserRef | null; usageCount: number }[] }[] }` | |
+| AD2 | — | `201 { id: UUID }` | その版をコピーした下書きを作る。下書きがすでにあれば `409 DRAFT_EXISTS` |
+| AD3 GET | — | `200 TemplateVersionDetail` | |
+| AD3 PATCH | `{ aiPrompt: string }` | `200 TemplateVersionDetail` | 公開済みの版は `409 PUBLISHED_READ_ONLY`（AD4〜AD6 も同じ） |
+| AD4 | セクション: `{ key; title; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（PATCH は一部） | `201` / `200` / `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`） |
+| AD5 | order: `{ sections: { id: UUID; questionIds: UUID[] }[] }`。cost-defaults: `{ items: { category; key; name }[] }`。check-rules: `{ items: { checkKey; params }[] }`。execution-presets: `{ items: { type; title; area?; launchTiming? }[] }` | `200 TemplateVersionDetail` | 一覧ごと置き換える |
+| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 設問 ID の重複・形式、前の版から消えた ID |
+| AD6 publish | — | `200 { versionNumber: number; publishedAt: DateTime }` | 検査のエラーがあれば `422 TEMPLATE_INVALID`。既存の回答は変わらない |
+| AD7 users | `?q=&status=&cursor=` | `200 Page<AdminUser>` | 中身（アイデア・回答）は返さない |
+| AD7 workspaces | `?q=&cursor=` | `200 Page<AdminWorkspace>` | |
+| AD7 invitations | `?status=&cursor=` | `200 Page<Invitation>` | |
+| AD8 | — | `200 AdminUser` | 停止: セッションを全部消す。通知を作らない。再開で元どおり。自分自身は停止できない（`422 CANNOT_SUSPEND_SELF`） |
+| AD9 | `{ email: string; workspaceId?: UUID; role?: Role }` | `201 { invitation: Invitation; link: string }` | `workspaceId` があれば `role` は必須 |
 
 ### 5.14 内部・死活確認
 
@@ -2046,14 +2053,14 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 変更履歴の閲覧（H1。自己分析の履歴は本人だけ） | — | ○ | ○ | ○ | 所属していれば |
 | 変更履歴から戻す（H2・H3） | — | — | ○ | ○ | 所属していれば |
 | 通知（N1〜N3） | — | 本人 | 本人 | 本人 | 本人 |
-| テンプレート・ユーザー・ワークスペース・招待の管理（M1〜M9） | — | — | — | — | ○ |
+| テンプレート・ユーザー・ワークスペース・招待の管理（AD1〜AD9） | — | — | — | — | ○ |
 | DB の死活確認（Z2） | Worker の共有シークレットがあるときだけ | | | | |
 | 期限の通知の処理（Z3） | Cloud Scheduler の OIDC トークンだけ | | | | |
 
 追加の決まり:
 
 - **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は、ロールにかかわらず 409 `ARCHIVED`（コメントを書く・元に戻すを含む。design-spec 6.8）。読む・複製・Restore・Pitch Deck はできる。
-- **運営者**: `is_admin` で開けるのは運営者の画面（M1〜M9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。`is_admin` は API では変えられない（`make admin-create` とシードだけ）。
+- **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。`is_admin` は API では変えられない（`make admin-create` とシードだけ）。
 - **停止・削除したユーザー**: セッションを消し、ログインを拒否する。残ったリクエストも、認証のミドルウェアが `users.status` を確かめて 401 にする。
 - **実装**: 認可は、リソースからワークスペースを引く共通の関数（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）を通して判定し、クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
 
@@ -2210,8 +2217,10 @@ CI（GitHub Actions）が PR ごとに動かすターゲットは 04_deployment-
 | 死活 | Cloud Monitoring の稼働時間チェック | `https://{DOMAIN}/api/health`（Z1。DB に触れない）を5分ごと、3つの地域から。2つ以上の地域で失敗が5分続いたらメール |
 | エラー率 | Cloud Monitoring（ログベースの指標） | 5xx が10分間で全体の1%を超える、または5分で5件を超えたらメール |
 | レイテンシ | Cloud Run の指標 | リクエストの p95 が15分続けて3秒を超えたらメール（0台からの起動を含むため、目標の 7.3 より緩くする） |
-| 定期実行 | Cloud Scheduler のジョブの結果（ログベースの指標） | `moonx-{env}-due-notifications` の失敗でメール |
+| 定期実行 | Cloud Scheduler のジョブの結果（ログベースの指標） | production の `moonx-production-due-notifications` が2回続けて失敗したらメール（staging にはアラートを付けない） |
+| メモリ | Cloud Run の指標 | メモリの使用率が5分続けて90%を超えたらメール（PDF の作成で足りなくなる兆し） |
+| 台数 | Cloud Run の指標 | 台数が上限の3台に10分続けて張り付いたらメール |
 | DB の容量 | Neon のコンソール | 無料プランの 0.5GB に対して 400MB を超えたら対応する（確かめ方は 05_operation-runbook.md） |
 | メール | Resend のダッシュボード | 送信の失敗と戻り（バウンス）。API のログにも送信の失敗を出す |
 | 費用 | Google Cloud の予算アラート（Terraform） | 月 $5 と $10 でメール（予算にストアの登録費は含めない） |
-| KPI（01_prd.md） | `packages/db/queries/kpi.sql` | 件数だけを数える SQL（回答の中身は読まない）。運営者が月に1回、production に読み取り専用の接続で実行する |
+| KPI（01_prd.md） | `packages/db/queries/kpi.sql` | 件数だけを数える SQL（回答の中身は読まない）。DB に入れる開発者（7.2）が月に1回、production に読み取り専用の接続で実行し、件数だけを運営者に渡す |

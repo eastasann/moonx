@@ -373,7 +373,7 @@
           "focus": { "$value": "{primitive.color.teal.600}", "$description": "フォーカスの表示（Spectrum の focus-indicator）" }
         },
         "accent": {
-          "$description": "Spectrum の accent。金。使いどころは design-spec 4.5（Button の accent とブランドマーク）",
+          "$description": "Spectrum の accent。金。使いどころは design-spec 4.5（Button の accent とブランドマーク）。canvas と raised の上だけで使い、sunken（入力欄）の上には置かない（ライトの sunken とのコントラストが 3:1 に届かないため）",
           "default": { "$value": "{primitive.color.gold.600}" },
           "hover": { "$value": "{primitive.color.gold.700}" },
           "pressed": { "$value": "{primitive.color.gold.800}" }
@@ -571,7 +571,7 @@
           "focus": { "$value": "{primitive.color.teal.300}", "$description": "フォーカスの表示（Spectrum の focus-indicator）" }
         },
         "accent": {
-          "$description": "Spectrum の accent。金。使いどころは design-spec 4.5（Button の accent とブランドマーク）",
+          "$description": "Spectrum の accent。金。使いどころは design-spec 4.5（Button の accent とブランドマーク）。canvas と raised の上だけで使い、sunken（入力欄）の上には置かない（ライトの sunken とのコントラストが 3:1 に届かないため）",
           "default": { "$value": "{primitive.color.gold.400}" },
           "hover": { "$value": "{primitive.color.gold.300}" },
           "pressed": { "$value": "{primitive.color.gold.500}" }

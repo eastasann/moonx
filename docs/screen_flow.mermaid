@@ -32,6 +32,8 @@ graph TD
     S5 <--> S8
     S5 --> S7
     S5 --> S4
+    S4 -->|"Leave（今のワークスペース）"| S5
+    S4 -->|"Delete account の後"| S1
     S5 --> M7
     M7 -->|"切替 / New workspace（作った人が Owner）"| S5
 
@@ -109,6 +111,9 @@ graph TD
     S20 --> S21
     S21 --> S20
     S20 --> S22
+    S5 -->|"Due soon"| S22
+    S20 -->|"Edit in validation [OM]"| S17
+    S20 -->|"Edit in validation [OM]"| S18
     S21 -->|"Open in Execution（§23・25・26・28・29）"| S22
     S20 --> S23
     S23 -->|"Edit source [OM]"| S21

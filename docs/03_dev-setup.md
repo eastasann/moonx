@@ -652,6 +652,7 @@ fix/xxx     ──squash──▶   │
 | TypeScript | 全パッケージの型チェック（Eden Treaty の型を含む） | `make typecheck` | 各パッケージの tsconfig |
 | 画面のスタイルの禁止 | `apps/web`・`apps/mobile` の画面で `@vanilla-extract/css`・`StyleSheet`・Unistyles を直接使わない、`style` 属性に値を書かない（見た目は `packages/ui-web` / `packages/ui-native` の部品だけで作る。ADR-025） | `make lint`（Biome の `noRestrictedImports`）と CI の検査 | リポジトリのルートの Biome の設定 |
 | デザイントークンの生成物 | `packages/ui-tokens`（vanilla-extract・Unistyles・react-pdf のテーマ）が `docs/06_design-tokens.json` と合っているか | CI が `make tokens` を動かし、差分が出たら失敗（ADR-018） | — |
+| doc-lint | コミットの前: 先送りのマーカー・不要な `.gitkeep`・`.env` や既知の形式のトークン・ドキュメントの文体（本文の em dash・表の1列目の太字・長すぎる太字）。随時: ドキュメントと実体の食い違い（存在しない make ターゲットの参照・`docs/README.md` のリンク切れ） | コミットのたびに `.githooks/pre-commit`（`make setup` が配線する）、随時 `make doc-lint` | `scripts/doc-lint.sh` |
 
 エディタは Biome の拡張を入れ、保存のときに整形する。
 

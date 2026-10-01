@@ -27,6 +27,7 @@
 | [04_deployment-procedure.md](04_deployment-procedure.md) | デプロイとリリース（ストアを含む）・ロールバック |
 | [05_operation-runbook.md](05_operation-runbook.md) | 監視・障害の対処・ログの見方・定期メンテナンス |
 | [06_design-tokens.json](06_design-tokens.json) | デザイントークン（色・書体・余白などの具体値。DTCG 形式、ライトとダーク） |
+| [claude-code-prompts.md](claude-code-prompts.md) | 実装のステップ別プロンプト（Phase 4 の派生。ステップごとの進み具合の記録先） |
 
 ## ドキュメント体系
 
@@ -35,7 +36,7 @@
 | 層 | ファイル | 扱い |
 |---|---|---|
 | ソース（正） | `design-spec.md`・`screen_flow.mermaid`・`01_prd.md`・`02-01_system-design-doc.md`・`03_dev-setup.md`・`04_deployment-procedure.md`・`05_operation-runbook.md`・`06_design-tokens.json` | 事実ごとに正は1つ（下の所有権マップ）。変更のたびに更新する生きた文書 |
-| 派生 | ソースから生成・要約するもの（06 から `make tokens` で作るテーマ `packages/ui-tokens`（vanilla-extract・Unistyles・react-pdf 用）、`make openapi` の書き出し、Phase 4 の実装準備で作るもの） | 直接直さない。ソースを直してから作り直す |
+| 派生 | ソースから生成・要約するもの（06 から `make tokens` で作るテーマ `packages/ui-tokens`（vanilla-extract・Unistyles・react-pdf 用）、`make openapi` の書き出し、Phase 4 の実装準備で作る `CLAUDE.md`（リポジトリの直下）と `claude-code-prompts.md`） | 直接直さない。ソースを直してから作り直す |
 | アーカイブ | `concept.md`・`brainstorm-notes.md` | 決めた経緯の記録。更新しない。今の正はソースを読む |
 
 ### 事実の所有権マップ

@@ -176,7 +176,7 @@ moonx/
 | ターゲット | 内容 |
 |---|---|
 | `install` | 依存の取得だけ（`bun install --frozen-lockfile`）。CI が使う |
-| `setup` | `install`、`.env` の雛形のコピー（直下と `apps/mobile`）、`db-up`、`db-migrate`、`db-seed`、`tokens`、Playwright のブラウザの取得 |
+| `setup` | `install`、`.env` の雛形のコピー（直下と `apps/mobile`）、`db-up`、`db-migrate`、`db-seed`、`tokens`、Playwright のブラウザの取得、Git のフックの配線（`git config core.hooksPath .githooks`） |
 | `dev` | API と Web を同時に起動（`dev-api` と `dev-web`） |
 | `dev-api` / `dev-web` / `dev-mobile` | それぞれを単独で起動（`dev-mobile` は Expo の開発サーバー） |
 | `build` | 全パッケージの型チェックとビルド（Web は local の設定） |
@@ -193,6 +193,7 @@ moonx/
 | `db-studio` | Drizzle Studio |
 | `tokens` | `docs/06_design-tokens.json` から `packages/ui-tokens` を生成する |
 | `openapi` | API の OpenAPI 仕様を `apps/api/openapi.json` に書き出す |
+| `doc-lint` | ドキュメントと実体の食い違いを検査する（`scripts/doc-lint.sh --docs`: ドキュメントが参照する make ターゲットの実在・`docs/README.md` のリンク切れ・`docs/features/` の命名）。コミットの前の検査（`--staged`）は `.githooks/pre-commit` が動かす |
 | `cron-due` | 期限の通知の処理を手で1回動かす（local だけ。staging では Cloud Scheduler のジョブを手で実行する。04・05） |
 | `admin-create EMAIL=...` | 最初の運営者を作るための招待（ワークスペースなし）を発行し、リンクを表示する。接続先は `DATABASE_URL`、リンクの基準は `BETTER_AUTH_URL`（staging / production では、この2つを上書きして手元から実行する。03_dev-setup.md） |
 | `infra-plan ENV=...` / `infra-apply ENV=...` | Terraform の plan / apply（`ENV` は `shared` / `staging` / `production`） |

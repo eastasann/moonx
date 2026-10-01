@@ -1,7 +1,7 @@
 # Dev Setup — moonx
 
 - この文書が持つもの: 開発に要るツールとアカウント、ローカルで動かす手順、初回のクラウドのセットアップ、テストの回し方、ブランチ戦略、つまずいたときの対処
-- アーキテクチャ・環境と命名・環境変数・make ターゲット・ADR の正は [System Design Doc（SDD）](02-01_system-design-doc.md)。ここには書き写さず、節へのリンクで参照する
+- アーキテクチャ・環境と命名・環境変数・CI のシークレットと変数（置き場所を含む）・make ターゲット・ADR の正は [System Design Doc（SDD）](02-01_system-design-doc.md)。ここには書き写さず、節へのリンクで参照する
 - 画面と UX の正は [design-spec](design-spec.md)
 - デプロイの手順は [04_deployment-procedure.md](04_deployment-procedure.md)、運用は [05_operation-runbook.md](05_operation-runbook.md)
 - 表記: `{DOMAIN}`・`{GCP_PROJECT_ID}`・`{APP_ID}` は SDD 2章のプレースホルダ。`<...>` はその場で調べて入れる値
@@ -23,7 +23,7 @@
 | Expo の開発ビルド（端末に入れるアプリ） | 開発中のコードと同じ runtime | 実機・エミュレーターで動かす（3.5）。Expo Go は使わない（ADR-003） | スマホを触る人 |
 | Xcode | 最新の安定版（macOS のみ） | iOS シミュレーター。任意（EAS の開発ビルドで代わりがきく） | 任意 |
 | Android Studio | 最新の安定版 | Android エミュレーター。任意 | 任意 |
-| Playwright のブラウザ | リポジトリの Playwright に合う版 | `make test-e2e`。`make setup` が入れる | E2E を回す人 |
+| Playwright のブラウザ | リポジトリの Playwright に合う版 | `make test-e2e`（取得するターゲットは SDD 2章「make ターゲット」） | E2E を回す人 |
 | Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
 | wrangler | 4 以上（`bunx wrangler` で使う） | Worker のシークレット・ログ・ロールバック（デプロイは `make deploy-web`） | デプロイ・運用をする人 |
 | Terraform | 1.x の最新 | `make infra-plan` / `make infra-apply` | インフラを触る人 |
@@ -38,12 +38,12 @@
 | Google Cloud | Cloud Run・Artifact Registry・Secret Manager・Cloud Scheduler・Cloud Storage・Cloud Logging / Monitoring | プロジェクト `{GCP_PROJECT_ID}` を staging と production で共有する。請求先アカウントが要る |
 | Google OAuth クライアント | Google ログイン | `{GCP_PROJECT_ID}` の中で環境ごとに、コンソールで作る（6章） |
 | Cloudflare | `{DOMAIN}` の取得（Registrar）・DNS・Worker `moonx-web-staging` / `moonx-web-production` | |
-| Neon | PostgreSQL（プロジェクト `moonx`、DB 名 `moonx`、ブランチ `production` / `staging`） | 無料プラン。容量と計算時間の枠はプロジェクト単位で、2つのブランチで分け合う（ADR-008） |
+| Neon | PostgreSQL（プロジェクト `moonx`、DB 名 `moonx`、ブランチ `production` / `staging`） | 無料プラン（枠の扱いは ADR-008） |
 | Resend | 招待とパスワード再設定のメール | 無料プラン。`{DOMAIN}` の確認が要る |
 | Sentry | エラーの追跡（プロジェクト web / mobile / api） | 無料プラン |
 | Expo | EAS Build / Submit / Update・開発ビルド | 無料プラン。スマホを触る人はローカル開発でも要る（開発ビルドを EAS で作るため） |
-| Apple Developer Program | App Store・TestFlight | 年 $99。組織で登録する（D-U-N-S 番号が要る） |
-| Google Play Console | Google Play | $25（1回）。**個人の開発者アカウント**で登録する（ADR-003）。製品版の最初の公開の前に、12人以上のテスターが14日間続けて参加するクローズドテストが要る（04 4.3） |
+| Apple Developer Program | App Store・TestFlight | 年会費がかかる（ADR-003）。登録の区分（個人 / 組織）は、登録の前にユーザーが決める（ADR-003。5.4 A） |
+| Google Play Console | Google Play | 登録費がかかる（ADR-003）。**個人の開発者アカウント**で登録する（ADR-003）。製品版の最初の公開の前にクローズドテストが要る（条件と手順は 04 4.3） |
 
 ---
 
@@ -62,8 +62,6 @@
 ```bash
 git clone git@github.com:<org>/moonx.git
 cd moonx
-
-# 依存の取得・.env の雛形のコピー（直下と apps/mobile）・DB の起動・マイグレーション・シード・トークンの生成・Playwright のブラウザの取得
 make setup
 ```
 
@@ -71,7 +69,7 @@ make setup
 
 ### 3.2 `.env` を埋める
 
-`make setup` が雛形（`.env.example`）から `.env` を2つ作る。`EXPO_PUBLIC_*` は `apps/mobile/.env`（Expo が読む場所）、それ以外はリポジトリの直下の `.env`。値の正は [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数) の「local の値」の列で、雛形のままでよいものが多い。
+`.env` の置き場所（2つある）と値の正は [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数)（値は「local の値」の列）。雛形のままでよいものが多く、`make setup` のあとで次だけを埋める。
 
 | ファイル | 変数 | やること |
 |---|---|---|
@@ -106,7 +104,7 @@ make admin-create EMAIL=<自分のメール>
 
 ### 3.5 スマホで動かす
 
-スマホは Expo の開発ビルド（EAS の profile `development`）で動かす。Expo Go は使わない（Unistyles v3 などのネイティブのモジュールが開発ビルドを前提にする。ADR-003・ADR-025）。
+スマホは Expo の開発ビルド（EAS の profile `development`）で動かす。Expo Go は使わない（ADR-003）。
 
 1. 開発ビルドを端末に入れる（ネイティブの依存が変わったときだけ作り直す）。
 
@@ -151,7 +149,7 @@ make admin-create EMAIL=<自分のメール>
 
 ### 3.6 デモデータ
 
-`make db-seed` が design-spec 8章のデモデータを入れる（`make setup` の中でも動く）。最初からやり直すときは `make db-reset`。
+デモデータ（design-spec 8章）を入れ直すときは `make db-seed`、DB を最初からやり直すときは `make db-reset`。
 
 ---
 
@@ -167,7 +165,7 @@ make admin-create EMAIL=<自分のメール>
 | デモデータを入れ直したい | `make db-seed` |
 | DB を作り直したい（ローカルのデータは消える） | `make db-reset` |
 | 中身を見たい | `make db-studio` |
-| テストを動かす | `make test-api`・`make test-e2e` が、テスト用の DB（`DATABASE_URL_TEST`。local は `moonx_test`）を毎回作り直して使う。開発用の DB `moonx` のデータは消えない |
+| テストを動かす | `make test-api`・`make test-e2e`（テスト用の DB `DATABASE_URL_TEST` を使う。開発用の DB `moonx` のデータは消えない。7章） |
 | staging / production に当てる | 手では当てない。昇格のときに `deploy.yml` が `make deploy-api` の中でマイグレーションを当てる（04 2章） |
 
 マイグレーションは「追加してから使い、使わなくなってから消す」の2段階で書く（ADR-016。04 4.1）。適用済みのマイグレーションの SQL は書き換えない。
@@ -186,8 +184,8 @@ gcloud auth login
 gcloud auth application-default login
 gcloud auth application-default set-quota-project {GCP_PROJECT_ID}
 
-# ENV=shared のときだけ: メールの DNS を扱う Terraform 用の Cloudflare のトークン
-# （CI 用のトークンとは別。シェルにだけ置き、ファイルに書かない）
+# ENV=shared のときだけ: Cloudflare のゾーンの設定（SDD 2章「インフラ管理」）を扱う
+# Terraform 用の Cloudflare のトークン（5.4 A。CI 用とは別。シェルにだけ置き、ファイルに書かない）
 read -rs CLOUDFLARE_API_TOKEN && export CLOUDFLARE_API_TOKEN
 
 make infra-plan ENV=staging     # 差分の確認（ENV は shared / staging / production）
@@ -202,7 +200,7 @@ make infra-apply ENV=staging    # 適用
 | Cloud Run のイメージ（リビジョン） | CI（`deploy.yml` の `make deploy-api`）。Terraform はイメージの変更を無視する（`lifecycle.ignore_changes`。ADR-015） |
 | Cloud Run のそれ以外の設定（環境変数・シークレットの参照・台数・メモリ） | Terraform。緊急で `gcloud` から変えたら、あとで Terraform にも同じ変更を入れる（入れないと次の apply で戻る） |
 | Worker・静的アセット・Web のドメイン | CI（`deploy.yml` の `make build-web` → `make deploy-web`）。設定は `apps/web/wrangler.jsonc`。`{DOMAIN}` と `staging.{DOMAIN}` の DNS レコードは Worker のカスタムドメインが作る |
-| メールの DNS レコード（SPF・DKIM・DMARC・Resend の確認） | Terraform（`envs/shared`） |
+| Cloudflare のゾーンの設定（メールの DNS レコード・HSTS・`/api/auth/*` のレート制限ルール。正は [SDD 2章「インフラ管理」](02-01_system-design-doc.md#インフラ管理)） | Terraform（`envs/shared`。Terraform 用の Cloudflare のトークンで動かす。5.1） |
 | Google の OAuth の同意画面とクライアント・Neon | コンソール（6章・5.4 E） |
 | スマホのビルドと配布 | CI と人（`make mobile-update` / `make mobile-build`。04 2章・4.3） |
 
@@ -216,9 +214,18 @@ make infra-apply ENV=staging    # 適用
 
 #### A. アカウントとドメイン
 
-- [ ] 1章のアカウントを作る（Apple は組織、Google Play は個人の開発者アカウントで登録する。本人確認と審査に数日かかるので早めに）
+- [ ] 1章のアカウントを作る（本人確認と審査に数日かかるので早めに）。Google Play は個人の開発者アカウントで登録する（ADR-003）
+- [ ] Apple Developer Program は、登録の区分（個人 / 組織）をユーザーに決めてもらってから登録する（ADR-003。ストアにアプリを登録する（K）より前に決める）。区分ごとに要るもの:
+
+  | 区分 | 要るもの |
+  |---|---|
+  | 個人 | 本人の Apple Account（2ファクタ認証を ON）と本人確認。ストアの販売元に個人名が出る |
+  | 組織 | 組織の D-U-N-S 番号（取得に日数がかかる）、組織を代表して契約できる権限、組織のウェブサイト |
+
 - [ ] Cloudflare Registrar で `{DOMAIN}` を取る（ゾーンが自動で作られる）。自動更新を ON にする
-- [ ] Cloudflare で API トークンを2つ作る: Terraform 用（対象ゾーンの DNS の編集。`ENV=shared` を動かす人だけが持つ）と CI 用（Worker のデプロイだけ。「Edit Cloudflare Workers」のテンプレート）
+- [ ] Cloudflare で API トークンを2つ作る（どちらも対象のゾーンは `{DOMAIN}` だけにする）
+  - Terraform 用: `envs/shared` が管理する Cloudflare のゾーンの設定（[SDD 2章「インフラ管理」](02-01_system-design-doc.md#インフラ管理) の Cloudflare の行。メールの DNS レコード・HSTS・`/api/auth/*` のレート制限ルール）をすべて変えられる権限にする。`ENV=shared` を動かす人だけが持ち、GitHub には置かない（5.1）
+  - CI 用: 権限は [SDD 2章「CI のシークレットと変数」](02-01_system-design-doc.md#環境変数) の `CLOUDFLARE_API_TOKEN` の行のとおり。H で入れる
 
 #### B. Google Cloud の土台
 
@@ -267,7 +274,7 @@ make infra-apply ENV=staging    # 適用
 
 - [ ] 組織とプロジェクト web / mobile / api を作る（ADR-023）
 - [ ] 各プロジェクトの DSN を控える（web → GitHub の環境の変数 `VITE_SENTRY_DSN`（H）、mobile → EAS の環境変数 `EXPO_PUBLIC_SENTRY_DSN`（K）、api → Cloud Run の `SENTRY_DSN`（Terraform の変数。I））
-- [ ] ソースマップのアップロード用の Auth Token を作る（GitHub の環境のシークレット `SENTRY_AUTH_TOKEN`。H）
+- [ ] ソースマップのアップロード用の Auth Token を作る（`SENTRY_AUTH_TOKEN`。リポジトリのシークレット（H）と EAS の環境変数（K）の両方に入れる。置き場所の正は [SDD 2章「CI のシークレットと変数」](02-01_system-design-doc.md#環境変数)）
 - [ ] 新しい issue のメール通知と、急増の抑制（Spike Protection）を ON にする
 
 #### E. Neon（コンソールで操作する）
@@ -280,7 +287,36 @@ make infra-apply ENV=staging    # 適用
   | 種類 | 見分け方 | 入れる先 |
   |---|---|---|
   | プール接続 | Connection pooling を ON。ホスト名に `-pooler` が付く | Secret Manager `moonx-{env}-database-url`（`DATABASE_URL`。I） |
-  | 直接の接続 | Connection pooling を OFF | GitHub の環境のシークレット `DATABASE_URL_DIRECT`（マイグレーションとバックアップ。H） |
+  | 直接の接続 | Connection pooling を OFF | GitHub の環境 `staging` / `production` のシークレット `DATABASE_URL_DIRECT`（H） |
+
+- [ ] production のブランチに、バックアップ用の読み取り専用のロールを作る（ADR-028。接続文字列は GitHub の環境 `production-backup` の `DATABASE_URL_DIRECT` に入れる。H）。Neon のコンソールの Roles で作ったロールは書き込みもできるので、SQL で作る。`moonx_backup_ro` はロールの名前（ここで決める）。上で控えた production の直接の接続（所有者のロール。マイグレーションを当てるロール）で実行する。`ALTER DEFAULT PRIVILEGES` は実行したロールがこれから作るもの（マイグレーションで作るスキーマ・テーブル・シーケンス）に効く
+
+  ```bash
+  ro_password="$(openssl rand -hex 24)"
+  psql "<production の直接の接続文字列>" -v ro_password="$ro_password" <<'SQL'
+  CREATE ROLE moonx_backup_ro WITH LOGIN PASSWORD :'ro_password';
+  GRANT CONNECT ON DATABASE moonx TO moonx_backup_ro;
+  GRANT USAGE ON SCHEMA public TO moonx_backup_ro;
+  ALTER DEFAULT PRIVILEGES GRANT USAGE ON SCHEMAS TO moonx_backup_ro;
+  ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO moonx_backup_ro;
+  ALTER DEFAULT PRIVILEGES GRANT SELECT ON SEQUENCES TO moonx_backup_ro;
+  SQL
+
+  # H で production-backup に入れる接続文字列（ホストは上の直接の接続と同じ）。控えたら変数を消す
+  echo "postgresql://moonx_backup_ro:${ro_password}@<直接の接続のホスト>/moonx?sslmode=require"
+  unset ro_password
+
+  # 書けないことを確かめる（permission denied になること）
+  psql "<上の接続文字列>" -c 'create table ro_check (x int)'
+  ```
+
+  テーブルがすでにある DB に後から作るとき（05 6.2 の戻し方など）は、すでにあるものにも権限を付ける:
+
+  ```sql
+  GRANT USAGE ON SCHEMA public, drizzle TO moonx_backup_ro;
+  GRANT SELECT ON ALL TABLES IN SCHEMA public, drizzle TO moonx_backup_ro;
+  GRANT SELECT ON ALL SEQUENCES IN SCHEMA public, drizzle TO moonx_backup_ro;
+  ```
 
 #### F. Resend（ドメインの追加）
 
@@ -291,7 +327,7 @@ make infra-apply ENV=staging    # 適用
 
 #### G. Terraform（`shared`。1回だけ）
 
-`shared` は、Artifact Registry のリポジトリ `moonx`・Workload Identity Federation・バックアップのバケット `{GCP_PROJECT_ID}-moonx-backups`・予算アラートと通知のチャンネル・メールの DNS レコードを作る。環境ごとの Terraform（I）より先に動かす。
+`shared` が作るものは [SDD 2章「インフラ管理」](02-01_system-design-doc.md#インフラ管理)（Google Cloud の共有の資源と、Cloudflare のゾーンの設定）。環境ごとの Terraform（I）より先に動かす。
 
 - [ ] `infra/terraform/envs/shared/` の変数に、秘密でない値を入れる（`{GCP_PROJECT_ID}`・`{DOMAIN}`・請求先アカウントの ID・アラートの通知先のメール・GitHub のリポジトリ `<org>/moonx`・F の DNS レコードの値など）
 - [ ] Terraform 用の Cloudflare のトークンをシェルに入れ（5.1）、`make infra-plan ENV=shared` で差分を読み、`make infra-apply ENV=shared`
@@ -311,8 +347,9 @@ make infra-apply ENV=staging    # 適用
 
   - バックアップのバケットが公開されない設定になっていること（05 6.2）
   - 予算アラートの金額が SDD 11章のとおりであること
-  - WIF の `attributeCondition` がこのリポジトリ（`<org>/moonx`）に限っていること。プロバイダの `name` とデプロイ用のサービスアカウントのメールは、GitHub の環境の変数 `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` に入れる（H。GitHub に鍵は置かない。ADR-007）
+  - WIF の `attributeCondition` がこのリポジトリ（`<org>/moonx`）に限っていること。プロバイダの `name` とデプロイ用のサービスアカウントのメールは、リポジトリの変数 `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` に入れる（H。鍵は作らない。ADR-027）
 
+- [ ] Cloudflare のダッシュボードで、`{DOMAIN}` のゾーンに SDD 2章「インフラ管理」の設定（HSTS・`/api/auth/*` のレート制限ルール）ができていることを確かめる
 - [ ] Resend の画面でドメインの確認（Verify）が通ったことを確かめる
 
   ```bash
@@ -331,51 +368,64 @@ make infra-apply ENV=staging    # 適用
   ```
 
 - [ ] Settings → Rules で `main` を守る（PR 必須・`ci.yml` の成功が必須・直接 push しない）
-- [ ] 環境 `staging` と `production` を作る。`production` はデプロイに承認を要する（1人で運用するときは自分を承認者にする）
+- [ ] GitHub の環境を3つ作る（名前と役割は [SDD 2章「環境と命名」](02-01_system-design-doc.md#環境と命名) の「GitHub の環境」の行）。`production` はデプロイに承認を要する（1人で運用するときは自分を承認者にする）。`production-backup` は承認を付けず、`main` からだけ使えるようにする（`db-backup.yml` は `main` で動く）
 
   ```bash
   gh api -X PUT repos/<org>/moonx/environments/staging
   gh api -X PUT repos/<org>/moonx/environments/production --input - <<EOF
   {"reviewers":[{"type":"User","id":$(gh api user --jq .id)}]}
   EOF
+  gh api -X PUT repos/<org>/moonx/environments/production-backup --input - <<EOF
+  {"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
+  EOF
+  gh api -X POST repos/<org>/moonx/environments/production-backup/deployment-branch-policies \
+    -f name=main -f type=branch
   ```
 
-- [ ] 両方の環境に、CI のシークレットと変数を入れる。名前と用途の正は [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数) の CI の表。リポジトリには置かない
+- [ ] CI のシークレットと変数を入れる。名前・置き場所（リポジトリか、どの環境か）・用途の正は [SDD 2章「CI のシークレットと変数」](02-01_system-design-doc.md#環境変数) の表。下のコマンドはその置き場所に合わせている。`build.yml` は GitHub の環境を使わずに動くので、リポジトリに置いたものだけを読む
 
   ```bash
-  TARGET=staging   # production でもくり返す（値は環境ごとのもの）
-
-  gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER --env $TARGET --body '<G で確かめたプロバイダの name>'
-  gh variable set GCP_DEPLOY_SERVICE_ACCOUNT     --env $TARGET --body '<デプロイ用のサービスアカウントのメール>'
-  gh secret set   DATABASE_URL_DIRECT            --env $TARGET   # E の直接の接続（値を聞かれるので貼る）
-  gh secret set   CLOUDFLARE_API_TOKEN           --env $TARGET   # A の CI 用のトークン
-  gh variable set CLOUDFLARE_ACCOUNT_ID          --env $TARGET --body '<Cloudflare のアカウント ID>'
-  gh secret set   SENTRY_AUTH_TOKEN              --env $TARGET   # D
-  gh variable set VITE_SENTRY_DSN                --env $TARGET --body '<Sentry web の DSN>'
-  gh variable set VITE_APP_ENV                   --env $TARGET --body "$TARGET"
+  # リポジトリ（値を聞かれるものは貼る）
+  gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER --body '<G で確かめたプロバイダの name>'
+  gh variable set GCP_DEPLOY_SERVICE_ACCOUNT     --body '<デプロイ用のサービスアカウントのメール>'
+  gh variable set CLOUDFLARE_ACCOUNT_ID          --body '<Cloudflare のアカウント ID>'
+  gh secret set   SENTRY_AUTH_TOKEN              # D の Auth Token（EAS にも入れる。K）
   # EXPO_TOKEN は K で入れる
+
+  # 環境 staging / production
+  TARGET=staging   # production でもくり返す（値は環境ごとのもの）
+  gh secret set   DATABASE_URL_DIRECT  --env $TARGET   # E の直接の接続（所有者のロール）
+  gh secret set   CLOUDFLARE_API_TOKEN --env $TARGET   # A の CI 用のトークン
+  gh variable set VITE_SENTRY_DSN      --env $TARGET --body '<Sentry web の DSN>'
+  gh variable set VITE_APP_ENV         --env $TARGET --body "$TARGET"
+
+  # 環境 production-backup（db-backup.yml だけが使う）
+  gh secret set   DATABASE_URL_DIRECT --env production-backup   # E の読み取り専用のロールの接続文字列
+
+  gh variable list && gh secret list
+  gh secret list --env production-backup
   ```
 
 #### I. Terraform（`staging` / `production`。初回は2回に分けて apply する）
 
 初回は API のイメージとシークレットの値がまだ無いので、2回に分ける（ADR-015）。1回目でシークレットの入れ物などを作り、値とイメージを入れてから、2回目で Cloud Run と Cloud Scheduler を作る。
 
-1. - [ ] `infra/terraform/envs/staging/` の変数に、秘密でない値を入れる（`{GCP_PROJECT_ID}`・`{DOMAIN}`・`GOOGLE_CLIENT_ID`・`SENTRY_DSN`・staging の `MAIL_ALLOWLIST` など）
-2. - [ ] 1回目: `make infra-plan ENV=staging` で差分を読み、`make infra-apply ENV=staging`。シークレットの入れ物・サービスアカウント・写真のバケット `moonx-staging-avatars` などができる
+1. - [ ] `infra/terraform/envs/staging/` の変数に、秘密でない値を入れる（`{GCP_PROJECT_ID}`・`{DOMAIN}`・`GOOGLE_CLIENT_ID`・`SENTRY_DSN`・staging の `MAIL_ALLOWLIST` など）と、`bootstrap = true`
+2. - [ ] 1回目: `make infra-plan ENV=staging` で差分を読み、`make infra-apply ENV=staging`（できるものは ADR-015 の②）
 3. - [ ] シークレットの値を入れる（下の「シークレットの値」）
-4. - [ ] API のイメージがあることを確かめる。H のあとで `main` にマージすると、`build.yml` が作って Artifact Registry に置く（production は staging と同じイメージを使う）
+4. - [ ] API のイメージがあることを確かめる。H のあとで `main` にマージすると、`build.yml` が作って Artifact Registry に置く（`build.yml` はリポジトリの変数の WIF で入る。H。production は staging と同じイメージを使う）
 
    ```bash
    gcloud artifacts docker images list \
      asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api --include-tags
    ```
 
-5. - [ ] 2回目: 4 のイメージを Terraform に渡して `make infra-apply ENV=staging`。Cloud Run `moonx-api-staging` と Cloud Scheduler のジョブ `moonx-staging-due-notifications` ができる。以後のイメージは CI が出し、Terraform はイメージの変更を無視する
-6. - [ ] cron の設定を確かめる。`CRON_OIDC_AUDIENCE` は Cloud Run のサービス自身の URL で、ジョブの `oidcToken.audience` と同じであること（ADR-015）。ジョブを手で1回動かし、成功を確かめる
+5. - [ ] 2回目: `bootstrap = false` と、変数 `api_image` に 4 のイメージを入れて `make infra-apply ENV=staging`。Cloud Run `moonx-api-staging` と Cloud Scheduler のジョブ `moonx-staging-due-notifications` ができる。以後のイメージは CI が出す（ADR-015）
+6. - [ ] cron の設定を確かめる。Cloud Run の環境変数 `CRON_OIDC_AUDIENCE` と、ジョブの `oidcToken.audience` が1文字も違わないこと（値の決まりは [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数)）。ジョブの `oidcToken.serviceAccountEmail` が `CRON_INVOKER_EMAIL` と同じこと。ジョブを手で1回動かし、成功を確かめる
 
    ```bash
    gcloud run services describe moonx-api-staging --region=asia-southeast1 \
-     --format="yaml(status.url,spec.template.spec.containers[0].env)" | grep -E 'url:|CRON_' -A1
+     --format="yaml(spec.template.spec.containers[0].env)" | grep -A1 -E 'CRON_OIDC_AUDIENCE|CRON_INVOKER_EMAIL'
    gcloud scheduler jobs describe moonx-staging-due-notifications --location=asia-southeast1 \
      --format="yaml(httpTarget.uri,httpTarget.oidcToken)"
    gcloud scheduler jobs run moonx-staging-due-notifications --location=asia-southeast1
@@ -434,8 +484,8 @@ printf '%s' "$proxy_secret" | gcloud secrets versions add moonx-$TARGET-proxy-sh
   eas channel:create production
   ```
 
-- [ ] `eas.json` の profile を [SDD 2章「環境と命名」](02-01_system-design-doc.md#環境と命名) に合わせる: `development`（開発ビルド）、`staging`（チャンネル `staging`・EAS の環境 `preview`）、`production`（チャンネル `production`・EAS の環境 `production`）
-- [ ] EAS の環境変数に `EXPO_PUBLIC_*` を入れる（`eas build` も `eas update --environment` もここから読む。値は SDD 2章「環境変数」）
+- [ ] `eas.json` の profile・チャンネル・EAS の環境を、[SDD 2章「環境と命名」](02-01_system-design-doc.md#環境と命名) の「スマホ」の行に合わせる
+- [ ] EAS の環境変数を、`preview` と `production` の両方に入れる。名前と値の正は [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数)（`EXPO_PUBLIC_*`）と「CI のシークレットと変数」（`SENTRY_AUTH_TOKEN`）
 
   ```bash
   # staging（EAS の環境 preview）
@@ -444,22 +494,28 @@ printf '%s' "$proxy_secret" | gcloud secrets versions add moonx-$TARGET-proxy-sh
   eas env:create --environment preview --name EXPO_PUBLIC_SENTRY_DSN --value '<Sentry mobile の DSN>' --visibility plaintext
   # production（EAS の環境 production）も同じく入れる。URL は https://{DOMAIN}/api、APP_ENV は production
 
+  # SENTRY_AUTH_TOKEN（D の Auth Token。visibility は secret。両方の環境に入れる）
+  read -rs VALUE
+  eas env:create --environment preview    --name SENTRY_AUTH_TOKEN --value "$VALUE" --visibility secret
+  eas env:create --environment production --name SENTRY_AUTH_TOKEN --value "$VALUE" --visibility secret
+  unset VALUE
+
   eas env:list --environment preview
   eas env:list --environment production
   ```
 
-- [ ] expo.dev の Access tokens で CI 用のトークンを作り、GitHub の両方の環境に入れる: `gh secret set EXPO_TOKEN --env staging`・`gh secret set EXPO_TOKEN --env production`
-- [ ] App Store Connect でアプリを2つ作る: `{APP_ID}`（production）と `{APP_ID}.staging`（staging。TestFlight だけで使う）
+- [ ] expo.dev の Access tokens で CI 用のトークンを作り、リポジトリのシークレットに入れる: `gh secret set EXPO_TOKEN`
+- [ ] App Store Connect でアプリを2つ作る（A で決めた区分で Apple Developer Program に登録してから）: `{APP_ID}`（production）と `{APP_ID}.staging`（staging。TestFlight だけで使う）
 - [ ] App Store Connect の API キー（App Manager）を作り、EAS に登録する: `eas credentials --platform ios`
 - [ ] Google Play Console（個人の開発者アカウント）でアプリを2つ作る: `{APP_ID}` と `{APP_ID}.staging`（staging は内部テストだけで使う）
 - [ ] Google Play に提出するためのサービスアカウントと JSON 鍵を作り、Play Console の「ユーザーと権限」で招待し、EAS に登録する: `eas credentials --platform android`（鍵は EAS にだけ置き、手元のファイルは消す）
 - [ ] Android の最初の1回は、それぞれのアプリで Play Console に手で上げる（EAS Submit は2回目から使える。04 4.3）
-- [ ] `{APP_ID}` のクローズドテストのテスターを12人以上集め始める（製品版の最初の公開の前に、14日間続けて参加してもらう必要がある。ADR-003。段取りは 04 4.3）
+- [ ] `{APP_ID}` のクローズドテストのテスターを集め始める（条件と段取りは 04 4.3）
 
 #### L. 最初のデプロイと運営者
 
 - [ ] `build.yml` が API のイメージを作ったことを確かめる（I の 4）
-- [ ] staging の昇格の PR を出してマージし、デプロイ後の確認をする（04 4.2・6章）。最初の `make deploy-web` で `staging.{DOMAIN}` のカスタムドメインができる
+- [ ] staging の昇格の PR を出してマージする（04 4.2）。最初の `make deploy-web` で `staging.{DOMAIN}` のカスタムドメインができる
 - [ ] staging の運営者を作る。`make admin-create` は `DATABASE_URL` と `BETTER_AUTH_URL` を使うので、この2つを上書きして手元から動かす（リンクが staging の URL になっていることを確かめる）
 
   ```bash
@@ -468,8 +524,16 @@ printf '%s' "$proxy_secret" | gcloud secrets versions add moonx-$TARGET-proxy-sh
   make admin-create EMAIL=<運営者のメール>
   ```
 
+- [ ] 運営者でログインし、デプロイ後の確認（04 6章）だけに使うワークスペースを1つ作る（M7）。以後の確認は毎回このワークスペースで行う。審査用のワークスペース（04 4.3）とは別にする
 - [ ] staging の `MAIL_ALLOWLIST` に、確かめに使うメールを入れる（Terraform の変数。`make infra-apply ENV=staging`）
-- [ ] production でも昇格（GitHub の環境 `production` の承認が要る）と運営者の作成をする（`moonx-production-database-url`・`https://{DOMAIN}`）
+- [ ] デプロイ後の確認をする（04 6章）
+- [ ] production でも、昇格（GitHub の環境 `production` の承認が要る）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・確認用のワークスペースの作成・デプロイ後の確認をする
+- [ ] production の最初のデプロイのあとで、`db-backup.yml` を手で1回動かし、バックアップができることを確かめる（GitHub の環境 `production-backup` の確認を兼ねる。05 6.2）
+
+  ```bash
+  gh workflow run db-backup.yml
+  gh run list --workflow=db-backup.yml --limit=1
+  ```
 
 ---
 
@@ -502,21 +566,21 @@ Google Auth Platform → クライアント → クライアントを作成 → 
 ## 7. テスト実行
 
 ```bash
-make test          # test-domain・test-api・test-web・test-mobile をまとめて
-make test-domain   # 計算と判定（packages/domain）
-make test-api      # API の結合テスト。テスト用の DB（DATABASE_URL_TEST）を作り直して使う（make db-up 済みであること）
-make test-web      # Web（Vitest）
-make test-mobile   # スマホ（Jest）
+make db-up         # test-api・test-e2e の前に（DB が起動していなければ）
 
-# E2E（Playwright）。テスト用の DB で API と Web を起動して動かす
+make test
+make test-domain
+make test-api
+make test-web
+make test-mobile
 make test-e2e
 
-make lint          # Biome の検査
-make format        # Biome の整形
-make typecheck     # TypeScript の型チェック
+make lint
+make format
+make typecheck
 ```
 
-テスト用の DB は、local では同じ Docker の PostgreSQL の `moonx_test`（開発用の `moonx` とは別。テストのたびに作り直す）。CI はサービスコンテナの PostgreSQL を使う。ツールの選定は ADR-022、テストの方針は SDD 10章。PR では CI が同じターゲットを動かす（04 2章）。
+各ターゲットが何を動かすかは [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)、テスト用の DB（`DATABASE_URL_TEST`）は SDD 2章「環境変数」、ツールの選定は ADR-022、テストの方針は SDD 10章。PR では CI が同じターゲットを動かす（04 2章）。
 
 ---
 
@@ -561,7 +625,7 @@ fix/xxx     ──squash──▶   │
 3. staging で確かめたら、同じ SHA を `deploy/production/version` に書いた昇格の PR をマージ → GitHub の環境 `production` の承認のあと、production にデプロイする
 4. 戻すときは昇格の PR を revert する
 
-スマホは同じ昇格で、JS だけなら EAS Update、ネイティブの変更があれば EAS Build と Submit を出す。版の呼び方は、Web と API がコミット SHA。スマホのストアの版は `app.config.ts` の version（SemVer）。手順の詳細は [04_deployment-procedure.md](04_deployment-procedure.md)。
+スマホも同じ昇格で出す（EAS Update か、EAS Build と Submit かは、`deploy.yml` が Expo の fingerprint で選ぶ。04 2章）。版の呼び方は、Web と API がコミット SHA。スマホのストアの版は `app.config.ts` の version（SemVer）。手順の詳細は [04_deployment-procedure.md](04_deployment-procedure.md)。
 
 ### PR のルール
 
@@ -611,7 +675,7 @@ fix/xxx     ──squash──▶   │
 | スマホの実機で Google ログインから戻らない | `BETTER_AUTH_URL` が `localhost` で、実機から届かない | ローカルではメール＋パスワードで確かめる。Google ログインは staging で確かめる |
 | スマホから API に繋がらない | IP が違う、別の Wi-Fi、PC のファイアウォール | `apps/mobile/.env` の `EXPO_PUBLIC_API_BASE_URL` を見直し、`make dev-mobile` を起動し直す。端末のブラウザで `http://<開発 PC の IP>:3000/api/health` が開くか確かめる |
 | iPhone から API に繋がらない（IP は正しい） | ローカルネットワークの許可が無い | iPhone の設定 → プライバシーとセキュリティ → ローカルネットワークで開発ビルドを許可する |
-| Expo Go で開くと動かない（Unistyles などのエラー） | ネイティブのモジュールが開発ビルドを前提にしている（Expo Go は使わない。ADR-003） | 開発ビルドで開く（3.5） |
+| Expo Go で開くと動かない（Unistyles などのエラー） | Expo Go は使わない作り（ADR-003） | 開発ビルドで開く（3.5） |
 | スマホで `http://` に繋がらない | ストア用（release）のビルドで動かしている | 開発ビルド（`--profile development`）を使う |
 | 開発ビルドで「ネイティブのモジュールが無い」 | ネイティブの依存が変わった | 開発ビルドを作り直す（3.5 の `eas build --profile development`） |
 | `.env` を変えてもスマホに反映されない | `EXPO_PUBLIC_*` を直下の `.env` に書いた、Metro を起動し直していない | `apps/mobile/.env` に書き、`make dev-mobile` を起動し直す |

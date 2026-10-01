@@ -165,7 +165,7 @@ moonx/
 | `SENTRY_AUTH_TOKEN`（シークレット） | リポジトリ（スマホのビルドは EAS で動くので、EAS の環境変数にも secret として置く） | ソースマップのアップロード（Web・スマホ・API） |
 | `CLOUDFLARE_ACCOUNT_ID`（変数） | リポジトリ | `wrangler deploy` |
 | `EXPO_TOKEN`（シークレット） | リポジトリ | EAS Build / Submit / Update |
-| `DATABASE_URL_DIRECT`（シークレット） | `staging` / `production`（マイグレーション）、`production-backup`（バックアップ。production の読み取り専用のロールの接続文字列） | マイグレーションとバックアップ |
+| `DATABASE_URL_DIRECT`（シークレット） | `staging` / `production`（マイグレーション）、`production-backup`（バックアップ。production の読み取り専用のロール `moonx_backup_ro` の接続文字列） | マイグレーションとバックアップ |
 | `CLOUDFLARE_API_TOKEN`（シークレット） | `staging` / `production` | `wrangler deploy`。権限は Workers のスクリプトの編集と、`{DOMAIN}` のゾーンの Workers のルート・カスタムドメイン・DNS の編集（カスタムドメインが DNS レコードを作るため）。メールの DNS 用の Terraform のトークンは別（`envs/shared` の実行者だけが持つ） |
 | `VITE_APP_ENV` / `VITE_SENTRY_DSN`（変数） | `staging` / `production` | Web のビルド |
 
@@ -489,7 +489,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-028: DB のバックアップは毎日の pg_dump
 
-**決定:** 定期実行の GitHub Actions（`db-backup.yml`。環境 `production-backup`）が毎日1回、production の DB を読み取り専用のロールで `pg_dump -Fc` し、`gs://{GCP_PROJECT_ID}-moonx-backups/production/<日付>.dump` に上げる（`make db-backup ENV=production`）。バケットは30日で自動削除する。戻し方と、戻す練習（頻度を含む）は 05_operation-runbook.md。
+**決定:** 定期実行の GitHub Actions（`db-backup.yml`。環境 `production-backup`）が毎日1回、production の DB を読み取り専用のロール `moonx_backup_ro` で `pg_dump -Fc` し、`gs://{GCP_PROJECT_ID}-moonx-backups/production/<日付>.dump` に上げる（`make db-backup ENV=production`）。バケットは30日で自動削除する。戻し方と、戻す練習（頻度を含む）は 05_operation-runbook.md。
 
 **理由:** Neon の無料プランの履歴からの復元は期間が短い。標準の `pg_dump` なら、DB を乗り換えても同じ方法で取れて戻せる（ADR-008）。
 
@@ -2222,5 +2222,6 @@ CI（GitHub Actions）が PR ごとに動かすターゲットは 04_deployment-
 | 台数 | Cloud Run の指標 | 台数が上限の3台に10分続けて張り付いたらメール |
 | DB の容量 | Neon のコンソール | 無料プランの 0.5GB に対して 400MB を超えたら対応する（確かめ方は 05_operation-runbook.md） |
 | メール | Resend のダッシュボード | 送信の失敗と戻り（バウンス）。API のログにも送信の失敗を出す |
+| 無料枠の使用量（週1回、手で見る。アラートは付けない） | 各サービスのダッシュボード | 次の目安を超えたら、05_operation-runbook.md の手順で原因を探し、有料プランか構成の見直しを検討する: Sentry 月4,000件（無料枠の80%）、Neon の計算時間 80%、Resend 1日80通・月2,400通、Worker 1日7万回、Cloud Run の無料枠 80% |
 | 費用 | Google Cloud の予算アラート（Terraform） | 月 $5 と $10 でメール（予算にストアの登録費は含めない） |
 | KPI（01_prd.md） | `packages/db/queries/kpi.sql` | 件数だけを数える SQL（回答の中身は読まない）。DB に入れる開発者（7.2）が月に1回、production に読み取り専用の接続で実行し、件数だけを運営者に渡す |

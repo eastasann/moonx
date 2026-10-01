@@ -1914,22 +1914,200 @@ export const changeHistory = pgTable("change_history", {
 - **アカウントの削除**: `users` の行は残して個人の情報を消す（5.4 U7）。外部キーは `users` を参照し続ける。
 - **シード**: `make db-seed` は design-spec 8章のデモデータを入れる。テンプレート v1 の中身は Drive の原本から転記したもの（design-spec 9.3）を `packages/db/seed/templates/` に置く。
 
+---
+
 ## 7. セキュリティ・パフォーマンス
 
-（執筆中）
+### 7.1 認可（権限マトリクス）
+
+design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証要否）と同じ内容を、API の単位で書く。実装後の独立レビュー（認可漏れの確認）はこの表と照らし合わせる。○ = できる、— = できない（403）、本人 = 自分のものだけ。
+
+| リソース / 操作（API） | 未認証 | Viewer | Member | Owner | Admin（運営者） |
+|---|---|---|---|---|---|
+| ログイン・パスワード再設定・招待の内容・招待からの新規登録（A1〜A3・A6・A7・U4・U5） | ○ | ○ | ○ | ○ | ○ |
+| 死活確認（Z1） | ○ | ○ | ○ | ○ | ○ |
+| 自分のアカウント（U1〜U3・U7・A4・A5・A8）・招待の受諾（U6。招待のメールと同じ人だけ） | — | 本人 | 本人 | 本人 | 本人 |
+| ワークスペースの作成（W0） | — | ○ | ○ | ○ | ○ |
+| ワークスペースの閲覧・メンバー一覧・メンションの候補（W1 GET・W2・W8） | — | ○ | ○ | ○ | 所属していれば、そのロールのとおり |
+| ワークスペースの設定・ロール変更・メンバーの削除・招待（W1 PATCH・W3・W4〜W7） | — | 自分の Leave だけ | 自分の Leave だけ | ○ | W5〜W7 だけ（運営者が出した招待を含むすべての招待） |
+| ダッシュボード（D1・D3・D4） | — | ○ | ○ | ○ | 所属していれば |
+| ダッシュボードの自己分析（D2）・メンバーの自己分析（S6・S7。S7 は共有済みのみ） | — | — | ○ | ○ | 所属していれば |
+| アイデア・検証・プラン・実行管理・Pitch Deck・決定ログの閲覧（I1 GET・I2 GET・V1・V2・V6 GET・V7 GET・V8 GET・V10 GET・V12・V15・P1 GET・P2 GET・P4・P6 GET・P9 GET・P12・P13・L1・L2） | — | ○ | ○ | ○ | 所属していれば |
+| アイデア・検証・プラン・実行管理の作成と編集（I1 POST・I2 PATCH・I3・I4・V3〜V17 の書き込み・P1 POST・P2 PATCH・P3・P5・P9 POST・P10・P11） | — | — | ○ | ○ | 所属していれば |
+| 判定・版の保存・Go / No-Go（V18・V19・P6 POST・P7・P8） | — | — | ○ | ○ | 所属していれば |
+| AI 往復・テンプレートの移行（検証・プラン）（X1〜X3・T1・T2） | — | — | ○ | ○ | 所属していれば |
+| 自分の自己分析（S1〜S5、自己分析の X1〜X3・T1・T2・H1〜H3） | — | 本人 | 本人 | 本人 | 本人 |
+| コメントを読む・書く（C1。自己分析へのコメントを除く） | — | ○ | ○ | ○ | 所属していれば |
+| 自己分析へのコメント（C1） | — | — | ○（共有先のワークスペースで） | ○（同左） | 所属していれば |
+| コメントの編集・削除（C2） | — | 本人 | 本人 | 本人 | 本人 |
+| スレッドの解決（C3） | — | ○ | ○ | ○ | 所属していれば |
+| 変更履歴の閲覧（H1。自己分析の履歴は本人だけ） | — | ○ | ○ | ○ | 所属していれば |
+| 変更履歴から戻す（H2・H3） | — | — | ○ | ○ | 所属していれば |
+| 通知（N1〜N3） | — | 本人 | 本人 | 本人 | 本人 |
+| テンプレート・ユーザー・ワークスペース・招待の管理（M1〜M9） | — | — | — | — | ○ |
+| DB の死活確認（Z2） | Worker の共有シークレットがあるときだけ | | | | |
+| 期限の通知の処理（Z3） | Cloud Scheduler の OIDC トークンだけ | | | | |
+
+追加の決まり:
+
+- **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は、ロールにかかわらず 409 `ARCHIVED`（コメントを書く・元に戻すを含む。design-spec 6.8）。読む・複製・Restore・Pitch Deck はできる。
+- **運営者**: `is_admin` で開けるのは運営者の画面（M1〜M9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。`is_admin` は API では変えられない（`make admin-create` とシードだけ）。
+- **停止・削除したユーザー**: セッションを消し、ログインを拒否する。残ったリクエストも、認証のミドルウェアが `users.status` を確かめて 401 にする。
+- **実装**: 認可は、リソースからワークスペースを引く共通の関数（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）を通して判定し、クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
+
+### 7.2 その他の設計判断
+
+| 項目 | 決定 |
+|---|---|
+| 入力バリデーション | API は必須（`packages/schemas` の Zod。範囲・長さ・形式・列挙）。クライアントは同じスキーマで入力中に補助として検査する。最後の守りは DB の check 制約（6.3）。文字列の長さの上限は、短文200字・長文20,000字・理由とコメント5,000字 |
+| シークレット | local は `.env`（コミットしない。`.env.example` だけコミットする）。staging / production は Secret Manager に置き、Cloud Run の環境変数として渡す。Worker の `PROXY_SHARED_SECRET` は `wrangler secret`。GitHub Actions は Workload Identity Federation で Google Cloud に入る（鍵を置かない）。Cloudflare の API トークン・Expo のトークン・マイグレーション用の `DATABASE_URL_DIRECT` は、GitHub の環境（staging / production）のシークレットに置く。ローテーションの手順は 05_operation-runbook.md |
+| CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる。Cookie は SameSite=Lax。スマホは `Origin` を送らないが、Cookie を自動では送らない（SecureStore から付ける）ので対象外 |
+| CORS | 使わない（Web と API は同じオリジン。ADR-004）。CORS のヘッダーを返さないので、他のオリジンからのブラウザのリクエストは届かない。local は Vite の転送で同じオリジンにする |
+| レート制限 | 認証（Better Auth）は IP ごとに1分10回（DB に記録）。アプリの API は、ユーザーごとに次の上限を同じ仕組みで持つ: 招待の送信・再送 1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回。超えたら 429 `RATE_LIMITED`。外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` に付ける |
+| 直接のアクセス | Cloud Run の URL を直接呼ばれないように、Worker の共有シークレットを確かめる（2章 通信フロー 3）。`CF-Connecting-IP` は、共有シークレットのあるリクエストのときだけ信じる |
+| セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。スマホは SecureStore。ログアウトしたら送信待ちの列（ADR-021）も消す |
+| アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、5MB まで。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
+| セキュリティヘッダー | Worker が静的アセットに付ける: `Content-Security-Policy`（`default-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy`。HSTS は Cloudflare で有効にする |
+| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者もアプリからは中身を見られない。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Cloudflare のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は `sendDefaultPii: false` で、リクエストの本文と Cookie を落とす）。アカウントの削除は U7。バックアップは30日で消える（05_operation-runbook.md）ので、削除した情報は30日以内にバックアップからも消える |
+| ストアの要件 | プライバシーポリシー（`/privacy`）とサポート（`/support`）の静的ページを Worker で配る（`apps/web/public/`。中身はストアへの提出までに用意する）。App Store のプライバシーの申告と Google Play のデータセーフティは、上の「個人情報」に合わせて書く。アプリ内のアカウント削除（U7）と、Google Play 向けの Web の削除の入口（`/account`）を用意する |
+| 依存の脆弱性 | GitHub の Dependabot のアラートを有効にする。Better Auth・Elysia・Drizzle のセキュリティ修正は速やかに取り込む（05_operation-runbook.md） |
+
+### 7.3 パフォーマンス
+
+想定の規模: 初期は BCDX の数人、ワークスペース数個、アイデア数十件、変更履歴は数万行まで。過剰な仕組みは入れない（ADR-011）。
+
+| 対象 | 目標 | 守る設計 |
+|---|---|---|
+| 項目の保存（V3・V14・V16 など） | p95 300ms 以内（コールドスタートを除く） | 1項目＋変更履歴の1トランザクション。クライアントは表示を先に変え（楽観的更新）、約1秒の入力の止まりで送る（design-spec 6.0.2） |
+| ハブの画面（V1・P2・D1） | p95 800ms 以内 | 検証1件分のデータを決まった数のクエリでまとめて読み（N+1 をしない）、`packages/domain` でメモリ上で計算する。アイデアの一覧は検証ごとのデータを `IN (...)` でまとめて読む。一覧はページに分ける（I1 は50件） |
+| 0台からの最初の応答 | 5秒以内（Cloud Run の起動＋Neon の起動） | Bun で起動を速くし、Cloud Run の起動時の CPU ブーストを有効にする。死活確認（Z1）は DB に触れない |
+| Web の最初の表示 | 4G のミドルクラスのスマホで LCP 2.5秒以内 | ランディングはプリレンダー。アプリはルートごとにコードを分割し、静的アセットは CDN で長期キャッシュ |
+| PDF の作成（P13） | 5秒以内（12枚） | react-pdf をサーバーで実行。フォントは起動時に読み込んでおく |
+| DB の接続 | Neon のプールの上限を超えない | postgres.js のプールはインスタンスごとに最大5。Cloud Run は最大3台なので最大15接続 |
+| クライアントのデータ | 画面の移動を速くする | TanStack Query。一覧は `staleTime` 30秒、編集中の画面は保存の応答で該当のキャッシュだけを更新する。通知の未読数は60秒ごと |
+
+インデックスは 6.3 のスキーマに書いたもの。遅いクエリが見つかったら、Cloud Logging の `latencyMs` とクエリの実行計画で確かめてから足す。
+
+---
 
 ## 8. エラーハンドリング
 
-（執筆中）
+### 8.1 APIエラーレスポンス
+
+すべてのエラーを同じ形で返す（Better Auth の `/api/auth/*` は Better Auth の形のまま。クライアントが 5.4 の表で対応させる）。
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "amount must be greater than or equal to 0",
+    "requestId": "8f14e45f-ea9e-4c5b-9a1f-2c7e1d5a3b6c",
+    "details": [{ "path": "amount", "code": "too_small", "message": "Must be 0 or more" }]
+  }
+}
+```
+
+- `code`: 機械が読むコード（下の表）。クライアントはこのコードで画面の文言を決める（`message` を画面に出さない）。
+- `message`: 開発者向けの英語の説明（ログと同じ）。
+- `requestId`: 8.3。
+- エラーごとの追加の項目: `current`（`CONFLICT`）、`conflicts`（`CONFLICT_MULTI`）、`latest`（`DECISION_CHANGED`）、`invitedEmail`（`INVITATION_EMAIL_MISMATCH`）、`emptyCount`（`HAS_EMPTY_QUESTIONS`）、`workspaces`（アカウントの削除の `LAST_OWNER`）、`retryAfterSeconds`（`RATE_LIMITED`）。
+
+| HTTP | コード | 使う場面 |
+|---|---|---|
+| 400 | `BAD_REQUEST` | JSON として読めない、`Content-Type` が違う |
+| 401 | `UNAUTHENTICATED` | 未ログイン、セッション切れ、停止・削除されたユーザー |
+| 403 | `FORBIDDEN` | ロールが足りない（例: Viewer の編集） |
+| 403 | `NO_ACCESS` | そのワークスペースに所属していない |
+| 403 | `INVITATION_EMAIL_MISMATCH`・`INVALID_PASSWORD`・`REAUTH_REQUIRED`・`NOT_SHARED` | 5章の各 API |
+| 404 | `NOT_FOUND` | 資源が無い |
+| 409 | `CONFLICT`・`CONFLICT_MULTI` | 同時編集の衝突（ADR-019） |
+| 409 | `ARCHIVED` | アーカイブしたものを変えようとした |
+| 409 | `LAST_OWNER`・`CANNOT_LEAVE_PERSONAL`・`ALREADY_MEMBER`・`INVITATION_PENDING`・`INVITATION_ALREADY_ACCEPTED`・`EMAIL_TAKEN`・`DECISION_CHANGED`・`DECISION_NOT_PROCEED`・`NAME_TAKEN`・`HAS_EMPTY_QUESTIONS`・`ALREADY_LATEST`・`DRAFT_EXISTS`・`PUBLISHED_READ_ONLY` | 状態がその操作を許さない（5章） |
+| 410 | `INVITATION_INVALID` | 招待のトークンが無い・取り消し・期限切れ |
+| 413 | `PAYLOAD_TOO_LARGE` | 本体が大きすぎる（JSON は1MB、写真は5MB） |
+| 422 | `VALIDATION_FAILED` | 入力の検査に失敗（`details` に項目ごとの理由） |
+| 422 | `FACT_REQUIRES_EVIDENCE`・`CONFIDENCE_REQUIRED`・`INVALID_CHOICE`・`QUESTION_NOT_FOUND`・`PERCENT_ONLY_FOR_VARIABLE`・`OUT_OF_RANGE`・`NOT_EDITABLE`・`INVALID_ASSIGNEE`・`INVALID_STATUS`・`MUST_BE_DONE_TO_SHARE`・`NOT_SHAREABLE`・`EMPTY_SCOPE`・`NOT_IMPORTABLE`・`REPLY_DEPTH`・`INVALID_MENTION`・`INVALID_QUESTION_KEY`・`TEMPLATE_INVALID`・`CANNOT_SUSPEND_SELF`・`CONFIRMATION_MISMATCH` | 業務の決まりに合わない（5章） |
+| 426 | `APP_UPDATE_REQUIRED` | スマホのアプリの版が古すぎる（5.1） |
+| 429 | `RATE_LIMITED` | 7.2 のレート制限 |
+| 500 | `INTERNAL` | 想定外のエラー（詳細は返さない） |
+| 502 / 503 / 504 | `UPSTREAM_UNAVAILABLE` | Worker が API に届かない・タイムアウト（Worker が同じ形で返す） |
+
+コードの一覧は `packages/schemas/src/errors.ts` に型として置き、API とクライアントが共有する。Better Auth のフックで拒否するとき（`INVITATION_REQUIRED`・`ACCOUNT_SUSPENDED`）は、Better Auth のエラーの `code` に同じ名前を入れる。
+
+### 8.2 フロントエンドでの表示方針
+
+文言と置き場所は design-spec 6.0.6 と各画面の「状態」が正。ここはエラーの種類から表示の方法への対応だけを決める。
+
+| エラー種別 | 表示方法 |
+|---|---|
+| バリデーションエラー（422 `VALIDATION_FAILED` など） | 入力欄の下に理由を出し、保存しない（design-spec 6.0.6「入力値が範囲外」）。クライアントの Zod の検査で送る前に止めるのが基本で、API の 422 は最後の守り |
+| 業務の決まり（409・422 の個別のコード） | 画面ごとに決めた文言（design-spec の各画面の「状態」）。例: `LAST_OWNER` →「Make someone else Owner first」 |
+| 同時編集の衝突（409 `CONFLICT`） | design-spec 6.0.2 の確認（相手の名前と時刻、「相手の内容を読み込む」「自分の内容で上書きする」） |
+| 通信・サーバーエラー（ネットワーク断・5xx・`UPSTREAM_UNAVAILABLE`） | 保存: 項目の横とヘッダーに「Couldn't save — Retry」。入力は送信待ちの列に残して自動で再送する（ADR-021）。オフラインは画面上部の帯。読み込み: 「Couldn't load this page」と再試行（ブロックごと） |
+| 認証エラー（401） | `/login?next=<今のパス>` へ移る。送信待ちの列は残し、同じユーザーでログインし直したら再送する |
+| 認可エラー（403 `FORBIDDEN` / `NO_ACCESS`） | 「You don't have access to this」とダッシュボードへのリンク。編集の途中で権限が変わったときは、読み取りの表示に切り替える |
+| 見つからない（404） | 「Not found. Check the link.」 |
+| アーカイブ（409 `ARCHIVED`） | 上部に「This idea is archived」を出し、読み取りの表示に切り替える |
+| アプリの更新が必要（426） | 全画面で更新を促し、ストアへのリンクを出す |
+| 回数制限（429） | 「Too many attempts. Try again in a minute.」 |
+| 想定外のエラー | 「Something went wrong」と再試行。小さく `Ref: <requestId の先頭8文字>` を出し、問い合わせに使えるようにする。画面のブロックごとにエラーの境界（Error Boundary）を置き、1つの失敗で全体を壊さない。Sentry に送る |
+
+### 8.3 ログとの対応
+
+- **リクエスト ID**: Worker が `X-Request-Id`（無ければ UUID を作る）を付けて API へ渡す。API は全ログ行・エラーの応答・Sentry のタグに同じ値を入れ、応答のヘッダーにも返す。スマホも Worker を通るので同じ。Cloud Scheduler からの呼び出しは API が作る。
+- **レベル**: 4xx は `info`（401・403 が多発したら `warn`）、5xx は `error`（スタックトレース付き）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。
+- **探し方**: 利用者の画面の `Ref` → Cloud Logging で `jsonPayload.requestId` を検索 → 同じ ID の Sentry のイベント。手順は 05_operation-runbook.md。
+
+---
 
 ## 9. i18n（国際化）
 
-（執筆中）
+**決定: UI は英語のみで始める。ただし多言語化できる作りにする**（design-spec 1.2）。回答の言語は自由で、アプリは翻訳しない。
+
+| 項目 | 決定 |
+|---|---|
+| ライブラリ | i18next ＋ react-i18next（Web とスマホで同じ）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
+| カタログ | `packages/i18n/locales/en/*.json`。キーは画面と部品ごと（例: `validation.home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
+| エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors.<CODE>` を引く |
+| 書式 | 初期は en-PH に固定（design-spec 1.2）。`packages/i18n` の書式関数に集める: 金額 `formatMoney(amount, currency)`（通貨記号と桁区切り。整数。変動費/件と粗利/件だけ小数2桁）、件数 `formatUnits()`（小数第1位。末尾の .0 を省く）、率 `formatPercent()`（小数第1位）、日付「Sep 30, 2026」、時刻は12時間制。AI 書き出しとファイル名の日付は ISO 8601。下限・上限は「+」「≤」を付ける（design-spec 6.4） |
+| タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
+| 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（スマホの Hermes も対応）。金額の入力は桁区切りのカンマを受け付ける |
+| 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |
+| テンプレートの中身 | 設問・EXAMPLE・ガイダンスは1言語（英語）でテンプレートに持ち、UI の多言語化とは別に扱う（design-spec 1.2） |
+| 言語を足すとき | `locales/<lang>/` を足し、`users.locale` 列と 4 アカウント設定の言語の選択を足す（今は作らない） |
+
+---
 
 ## 10. テスト戦略
 
-（執筆中）
+| レイヤー | ツール | カバレッジ目標 | 対象 |
+|---|---|---|---|
+| 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
+| 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
+| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 分岐 80% 以上 | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、cron の重複防止、テンプレートの移行と戻し、PDF が作れること（ページ数と文字の抽出） |
+| Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と送信待ちの列、衝突の確認、権限による表示の出し分け |
+| スマホ（`apps/mobile`） | Jest（jest-expo）＋ React Native Testing Library | 主要な部品 50% 以上 | 1問ずつのカード、ボトムシートでの行の編集、自動保存と送信待ちの列、セッションの保存 |
+| E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査 |
+| E2E（スマホ） | Phase 5 で Maestro の導入を判断する（ADR-001）。それまでは、ストアへの提出前に TestFlight / Play の内部テストで手で確かめる（04_deployment-procedure.md のチェックリスト） | — | コアフロー |
+| デザイントークン | `make tokens` の生成と検査 | — | エイリアスの参照先が実在すること、意味色のコントラスト（WCAG AA） |
+
+CI（GitHub Actions）は PR ごとに `make lint`・`make typecheck`・`make test`・`make test-e2e` を動かす。`main` への取り込みは、すべて通ったときだけ。
+
+---
 
 ## 11. モニタリング・ログ
 
-（執筆中）
+| 項目 | ツール | 設定 |
+|---|---|---|
+| API のエラー | Sentry（プロジェクト `moonx-api`） | `environment` = staging / production、`release` = コミット SHA、タグに `requestId`・`route`。ユーザーは `userId` だけ。新しい issue でメール通知 |
+| Web・スマホのエラー | Sentry（`moonx-web` / `moonx-mobile`） | CI でソースマップを上げる。スマホの `release` はアプリの版、`dist` は EAS Update の ID |
+| API のログ | Cloud Logging | 標準出力に1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`）。保持は既定の30日 |
+| Worker のログ | Cloudflare Workers Logs | `/api/*` の転送の失敗（`UPSTREAM_UNAVAILABLE`）を見る。調べるときは `wrangler tail` |
+| 死活 | Cloud Monitoring の稼働時間チェック | `https://{DOMAIN}/api/health`（Z1。DB に触れない）を5分ごと。2回続けて失敗したらメール |
+| エラー率 | Cloud Monitoring（ログベースの指標） | 5xx が10分間で全体の1%を超える、または5分で5件を超えたらメール |
+| レイテンシ | Cloud Run の指標 | リクエストの p95 が15分続けて2秒を超えたらメール |
+| 定期実行 | Cloud Scheduler のジョブの結果（ログベースの指標） | `moonx-{env}-due-notifications` の失敗でメール |
+| DB の容量 | Neon のコンソール | 無料プランの 0.5GB に対して 400MB を超えたら対応する（確かめ方は 05_operation-runbook.md） |
+| メール | Resend のダッシュボード | 送信の失敗と戻り（バウンス）。API のログにも送信の失敗を出す |
+| 費用 | Google Cloud の予算アラート（Terraform） | 月 $5 と $10 でメール（予算にストアの登録費は含めない） |
+| KPI（01_prd.md） | `packages/db/queries/kpi.sql` | 件数だけを数える SQL（回答の中身は読まない）。運営者が月に1回、production に読み取り専用の接続で実行する |

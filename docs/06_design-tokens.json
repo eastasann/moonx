@@ -1,0 +1,1057 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "$description": "デザイントークンの正（DTCG）。色・タイポグラフィ・余白・角丸・影・モーション・レイアウト・Pitch Deck の具体値はこのファイルが所有する（方針は design-spec 4.4）。実装が参照してよいのは semantic 層のみで、make tokens が Tailwind CSS v4（Web）と NativeWind（スマホ）のテーマを packages/ui-tokens に生成する（ADR-018）。アイコンは Lucide。配色は深いティールとクリーム、金はごく控えめなアクセント。粒子やグローの質感は使わない",
+  "primitive": {
+    "$description": "生の値のスケール。実装から直接参照しない（semantic 層を経由する）",
+    "color": {
+      "$type": "color",
+      "teal": {
+        "$description": "ブランドの深いティール。ダークの地とライトの文字",
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.847, 0.937, 0.929], "hex": "#d8efed" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.557, 0.827, 0.8], "hex": "#8ed3cc" } },
+        "600": { "$value": { "colorSpace": "srgb", "components": [0.102, 0.392, 0.384], "hex": "#1a6462" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.129, 0.286, 0.278], "hex": "#214947" } },
+        "750": { "$value": { "colorSpace": "srgb", "components": [0.106, 0.239, 0.235], "hex": "#1b3d3c" } },
+        "800": { "$value": { "colorSpace": "srgb", "components": [0.078, 0.2, 0.192], "hex": "#143331" } },
+        "850": { "$value": { "colorSpace": "srgb", "components": [0.059, 0.165, 0.161], "hex": "#0f2a29" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.043, 0.133, 0.129], "hex": "#0b2221" } },
+        "950": { "$value": { "colorSpace": "srgb", "components": [0.024, 0.094, 0.09], "hex": "#061817" } }
+      },
+      "mist": {
+        "$description": "彩度を落としたティールグレー",
+        "600": { "$value": { "colorSpace": "srgb", "components": [0.271, 0.353, 0.349], "hex": "#455a59" } }
+      },
+      "cream": {
+        "$description": "クリーム。ライトの地とダークの文字",
+        "50": { "$value": { "colorSpace": "srgb", "components": [0.988, 0.976, 0.949], "hex": "#fcf9f2" } },
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.961, 0.933, 0.875], "hex": "#f5eedf" } },
+        "200": { "$value": { "colorSpace": "srgb", "components": [0.922, 0.886, 0.804], "hex": "#ebe2cd" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.863, 0.816, 0.71], "hex": "#dcd0b5" } },
+        "400": { "$value": { "colorSpace": "srgb", "components": [0.753, 0.722, 0.655], "hex": "#c0b8a7" } }
+      },
+      "gold": {
+        "$description": "金。ごく控えめなアクセント（ブランドと主要な操作）だけ",
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.894, 0.765, 0.475], "hex": "#e4c379" } },
+        "400": { "$value": { "colorSpace": "srgb", "components": [0.847, 0.706, 0.392], "hex": "#d8b464" } },
+        "500": { "$value": { "colorSpace": "srgb", "components": [0.78, 0.643, 0.341], "hex": "#c7a457" } },
+        "600": { "$value": { "colorSpace": "srgb", "components": [0.651, 0.51, 0.165], "hex": "#a6822a" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.627, 0.49, 0.157], "hex": "#a07d28" } },
+        "800": { "$value": { "colorSpace": "srgb", "components": [0.612, 0.478, 0.153], "hex": "#9c7a27" } }
+      },
+      "stone": {
+        "$description": "温かみのあるグレー。未入力・未着手・罫線・無効",
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.91, 0.902, 0.867], "hex": "#e8e6dd" } },
+        "200": { "$value": { "colorSpace": "srgb", "components": [0.788, 0.78, 0.753], "hex": "#c9c7c0" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.651, 0.647, 0.62], "hex": "#a6a59e" } },
+        "400": { "$value": { "colorSpace": "srgb", "components": [0.58, 0.573, 0.541], "hex": "#94928a" } },
+        "500": { "$value": { "colorSpace": "srgb", "components": [0.51, 0.502, 0.471], "hex": "#828078" } },
+        "600": { "$value": { "colorSpace": "srgb", "components": [0.455, 0.447, 0.416], "hex": "#74726a" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.365, 0.357, 0.325], "hex": "#5d5b53" } },
+        "800": { "$value": { "colorSpace": "srgb", "components": [0.247, 0.239, 0.212], "hex": "#3f3d36" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.196, 0.188, 0.169], "hex": "#32302b" } }
+      },
+      "sage": {
+        "$description": "緑（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.851, 0.929, 0.831], "hex": "#d9edd4" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.655, 0.843, 0.612], "hex": "#a7d79c" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.227, 0.408, 0.188], "hex": "#3a6830" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.145, 0.208, 0.133], "hex": "#253522" } }
+      },
+      "sky": {
+        "$description": "青（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.839, 0.914, 0.976], "hex": "#d6e9f9" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.612, 0.804, 0.973], "hex": "#9ccdf8" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.122, 0.373, 0.561], "hex": "#1f5f8f" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.118, 0.196, 0.263], "hex": "#1e3243" } }
+      },
+      "plum": {
+        "$description": "紫（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.922, 0.882, 0.98], "hex": "#ebe1fa" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.835, 0.718, 1], "hex": "#d5b7ff" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.412, 0.278, 0.569], "hex": "#694791" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.208, 0.169, 0.263], "hex": "#352b43" } }
+      },
+      "rose": {
+        "$description": "ピンク（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.98, 0.867, 0.91], "hex": "#fadde8" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.996, 0.671, 0.8], "hex": "#feabcc" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.549, 0.224, 0.373], "hex": "#8c395f" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.259, 0.153, 0.196], "hex": "#422732" } }
+      },
+      "amber": {
+        "$description": "橙（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [1, 0.875, 0.796], "hex": "#ffdfcb" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.996, 0.71, 0.51], "hex": "#feb582" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.545, 0.271, 0.004], "hex": "#8b4501" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.259, 0.165, 0.098], "hex": "#422a19" } }
+      },
+      "red": {
+        "$description": "赤（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [1, 0.867, 0.859], "hex": "#ffdddb" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [1, 0.584, 0.573], "hex": "#ff9592" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.631, 0.145, 0.184], "hex": "#a1252f" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.275, 0.149, 0.145], "hex": "#462625" } }
+      },
+      "sea": {
+        "$description": "青緑（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.82, 0.929, 0.922], "hex": "#d1edeb" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.51, 0.851, 0.827], "hex": "#82d9d3" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.02, 0.412, 0.396], "hex": "#056965" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.098, 0.212, 0.204], "hex": "#193634" } }
+      },
+      "sand": {
+        "$description": "砂色（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.969, 0.89, 0.773], "hex": "#f7e3c5" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.859, 0.769, 0.627], "hex": "#dbc4a0" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.427, 0.341, 0.2], "hex": "#6d5733" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.224, 0.184, 0.122], "hex": "#392f1f" } }
+      },
+      "slate": {
+        "$description": "青灰（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.882, 0.902, 0.961], "hex": "#e1e6f5" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.745, 0.776, 0.898], "hex": "#bec6e5" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.322, 0.349, 0.467], "hex": "#525977" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.173, 0.184, 0.247], "hex": "#2c2f3f" } }
+      },
+      "alpha": {
+        "$description": "透明度つき（hex は透明度を除いた色）。影とスクリム用",
+        "transparent": { "$value": { "colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0, "hex": "#000000" } },
+        "teal-950-08": { "$value": { "colorSpace": "srgb", "components": [0.024, 0.094, 0.09], "alpha": 0.08, "hex": "#061817" } },
+        "teal-950-14": { "$value": { "colorSpace": "srgb", "components": [0.024, 0.094, 0.09], "alpha": 0.14, "hex": "#061817" } },
+        "teal-900-40": { "$value": { "colorSpace": "srgb", "components": [0.043, 0.133, 0.129], "alpha": 0.4, "hex": "#0b2221" } },
+        "teal-950-72": { "$value": { "colorSpace": "srgb", "components": [0.024, 0.094, 0.09], "alpha": 0.72, "hex": "#061817" } },
+        "black-55": { "$value": { "colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0.55, "hex": "#000000" } }
+      }
+    },
+    "font": {
+      "family": {
+        "$type": "fontFamily",
+        "display": {
+          "$value": ["Fraunces", "Georgia", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", "serif"],
+          "$description": "見出し用のレトロなソフトセリフ Fraunces（Undercase Type / SIL Open Font License 1.1 / Google Fonts）。Web は self-host（可変 wght・opsz）、Expo は静的 TTF を同梱、PDF に埋め込む。日本語の字形はないので Noto Sans JP（SIL OFL 1.1）に落ちる（スマホは OS の日本語フォント）。行間は日本語が混ざっても詰まらない値にしてある"
+        },
+        "sans": {
+          "$value": ["system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "Noto Sans", "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "sans-serif"],
+          "$description": "システムのサンセリフ。日本語は Noto Sans JP（Web は self-host）か OS の日本語フォントに落ちる。RN では指定せず OS の既定を使う"
+        },
+        "mono": {
+          "$value": ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", "Noto Sans Mono", "monospace"],
+          "$description": "システムの等幅。RN では iOS は Menlo、Android は monospace"
+        },
+        "print-display": { "$value": ["Fraunces", "Noto Sans JP"], "$description": "PDF 用。react-pdf に登録し、使った文字だけ埋め込む（ADR-012）" },
+        "print-sans": { "$value": ["Noto Sans", "Noto Sans JP"], "$description": "PDF 用。Noto Sans / Noto Sans JP（ともに SIL OFL 1.1）を埋め込む（ADR-012）" }
+      },
+      "size": {
+        "$type": "dimension",
+        "$description": "画面の文字サイズ（1rem = 16px）",
+        "xs": { "$value": { "value": 0.75, "unit": "rem" } },
+        "sm": { "$value": { "value": 0.875, "unit": "rem" } },
+        "md": { "$value": { "value": 1, "unit": "rem" } },
+        "lg": { "$value": { "value": 1.125, "unit": "rem" } },
+        "xl": { "$value": { "value": 1.25, "unit": "rem" } },
+        "2xl": { "$value": { "value": 1.5, "unit": "rem" } },
+        "3xl": { "$value": { "value": 1.875, "unit": "rem" } },
+        "4xl": { "$value": { "value": 2.25, "unit": "rem" } }
+      },
+      "slide-size": {
+        "$type": "dimension",
+        "$description": "スライドの文字サイズ。PDF では 1px = 1pt",
+        "10": { "$value": { "value": 10, "unit": "px" } },
+        "12": { "$value": { "value": 12, "unit": "px" } },
+        "14": { "$value": { "value": 14, "unit": "px" } },
+        "16": { "$value": { "value": 16, "unit": "px" } },
+        "18": { "$value": { "value": 18, "unit": "px" } },
+        "22": { "$value": { "value": 22, "unit": "px" } },
+        "26": { "$value": { "value": 26, "unit": "px" } },
+        "32": { "$value": { "value": 32, "unit": "px" } },
+        "36": { "$value": { "value": 36, "unit": "px" } },
+        "44": { "$value": { "value": 44, "unit": "px" } },
+        "48": { "$value": { "value": 48, "unit": "px" } }
+      },
+      "weight": {
+        "$type": "fontWeight",
+        "regular": { "$value": 400 },
+        "medium": { "$value": 500 },
+        "semibold": { "$value": 600 }
+      },
+      "line-height": {
+        "$type": "number",
+        "tight": { "$value": 1.25 },
+        "snug": { "$value": 1.35 },
+        "normal": { "$value": 1.5 },
+        "relaxed": { "$value": 1.65 },
+        "loose": { "$value": 1.85 }
+      },
+      "letter-spacing": {
+        "$type": "dimension",
+        "tighter": { "$value": { "value": -0.5, "unit": "px" } },
+        "tight": { "$value": { "value": -0.25, "unit": "px" } },
+        "normal": { "$value": { "value": 0, "unit": "px" } },
+        "wide": { "$value": { "value": 0.25, "unit": "px" } }
+      },
+      "feature": {
+        "$description": "DTCG に型がないため文字列。CSS font-variant-numeric / RN fontVariant / OpenType tnum に変換する",
+        "tabular-nums": { "$value": "tabular-nums" }
+      }
+    },
+    "space": {
+      "$type": "dimension",
+      "$description": "余白スケール。4px 基準（0-5 だけ 2px）",
+      "0": { "$value": { "value": 0, "unit": "px" } },
+      "0-5": { "$value": { "value": 2, "unit": "px" } },
+      "1": { "$value": { "value": 4, "unit": "px" } },
+      "2": { "$value": { "value": 8, "unit": "px" } },
+      "3": { "$value": { "value": 12, "unit": "px" } },
+      "4": { "$value": { "value": 16, "unit": "px" } },
+      "5": { "$value": { "value": 20, "unit": "px" } },
+      "6": { "$value": { "value": 24, "unit": "px" } },
+      "8": { "$value": { "value": 32, "unit": "px" } },
+      "10": { "$value": { "value": 40, "unit": "px" } },
+      "12": { "$value": { "value": 48, "unit": "px" } },
+      "14": { "$value": { "value": 56, "unit": "px" } },
+      "16": { "$value": { "value": 64, "unit": "px" } },
+      "20": { "$value": { "value": 80, "unit": "px" } }
+    },
+    "size": {
+      "$type": "dimension",
+      "$description": "幅・高さ。スライドの 960 / 540 は PDF で 1px = 1pt",
+      "40": { "$value": { "value": 40, "unit": "px" } },
+      "44": { "$value": { "value": 44, "unit": "px" } },
+      "48": { "$value": { "value": 48, "unit": "px" } },
+      "52": { "$value": { "value": 52, "unit": "px" } },
+      "56": { "$value": { "value": 56, "unit": "px" } },
+      "64": { "$value": { "value": 64, "unit": "px" } },
+      "256": { "$value": { "value": 256, "unit": "px" } },
+      "360": { "$value": { "value": 360, "unit": "px" } },
+      "540": { "$value": { "value": 540, "unit": "px" } },
+      "640": { "$value": { "value": 640, "unit": "px" } },
+      "960": { "$value": { "value": 960, "unit": "px" } },
+      "1280": { "$value": { "value": 1280, "unit": "px" } }
+    },
+    "radius": {
+      "$type": "dimension",
+      "sm": { "$value": { "value": 4, "unit": "px" } },
+      "md": { "$value": { "value": 6, "unit": "px" } },
+      "lg": { "$value": { "value": 10, "unit": "px" } },
+      "xl": { "$value": { "value": 16, "unit": "px" } },
+      "full": { "$value": { "value": 9999, "unit": "px" } }
+    },
+    "border-width": {
+      "$type": "dimension",
+      "1": { "$value": { "value": 1, "unit": "px" } },
+      "2": { "$value": { "value": 2, "unit": "px" } }
+    },
+    "breakpoint": {
+      "$type": "dimension",
+      "md": { "$value": { "value": 768, "unit": "px" } },
+      "lg": { "$value": { "value": 1024, "unit": "px" } }
+    },
+    "ratio": {
+      "$type": "number",
+      "half": { "$value": 0.5 }
+    },
+    "stroke": {
+      "$type": "number",
+      "icon": { "$value": 1.75 }
+    },
+    "shadow": {
+      "$type": "shadow",
+      "none": {
+        "$value": {
+          "color": "{primitive.color.alpha.transparent}",
+          "offsetX": { "value": 0, "unit": "px" },
+          "offsetY": { "value": 0, "unit": "px" },
+          "blur": { "value": 0, "unit": "px" },
+          "spread": { "value": 0, "unit": "px" }
+        }
+      },
+      "sm-light": {
+        "$value": {
+          "color": "{primitive.color.alpha.teal-950-08}",
+          "offsetX": { "value": 0, "unit": "px" },
+          "offsetY": { "value": 1, "unit": "px" },
+          "blur": { "value": 2, "unit": "px" },
+          "spread": { "value": 0, "unit": "px" }
+        }
+      },
+      "md-light": {
+        "$value": {
+          "color": "{primitive.color.alpha.teal-950-14}",
+          "offsetX": { "value": 0, "unit": "px" },
+          "offsetY": { "value": 8, "unit": "px" },
+          "blur": { "value": 24, "unit": "px" },
+          "spread": { "value": -4, "unit": "px" }
+        }
+      },
+      "md-dark": {
+        "$value": {
+          "color": "{primitive.color.alpha.black-55}",
+          "offsetX": { "value": 0, "unit": "px" },
+          "offsetY": { "value": 12, "unit": "px" },
+          "blur": { "value": 32, "unit": "px" },
+          "spread": { "value": -8, "unit": "px" }
+        }
+      }
+    },
+    "duration": {
+      "$type": "duration",
+      "0": { "$value": { "value": 0, "unit": "ms" } },
+      "100": { "$value": { "value": 100, "unit": "ms" } },
+      "150": { "$value": { "value": 150, "unit": "ms" } },
+      "200": { "$value": { "value": 200, "unit": "ms" } },
+      "300": { "$value": { "value": 300, "unit": "ms" } },
+      "400": { "$value": { "value": 400, "unit": "ms" } }
+    },
+    "easing": {
+      "$type": "cubicBezier",
+      "standard": { "$value": [0.2, 0, 0, 1] },
+      "decelerate": { "$value": [0, 0, 0, 1] },
+      "accelerate": { "$value": [0.3, 0, 1, 1] },
+      "smooth": { "$value": [0.45, 0, 0.25, 1] }
+    }
+  },
+  "semantic": {
+    "$description": "用途の名前で参照する層。実装が参照してよいのはここだけ。値は primitive へのエイリアス。color は light / dark の同じキーで切り替える（OS 追従＋手動切替）",
+    "color": {
+      "$type": "color",
+      "$description": "意味色は色だけで意味を伝えない（必ずラベルかアイコンを添える）。本文の組み合わせは WCAG AA（4.5:1）、コントロールの枠・フォーカスは 3:1 以上",
+      "light": {
+        "$description": "ライトモード。クリームの地に深いティールの文字",
+        "surface": {
+          "canvas": { "$value": "{primitive.color.cream.100}", "$description": "画面の地" },
+          "raised": { "$value": "{primitive.color.cream.50}", "$description": "パネル・カード" },
+          "sunken": { "$value": "{primitive.color.cream.200}", "$description": "入力欄・表の見出し行・くぼんだ地" },
+          "overlay": { "$value": "{primitive.color.cream.50}", "$description": "ポップオーバー・シート・モーダル" },
+          "hover": { "$value": "{primitive.color.cream.200}", "$description": "行・項目のホバー" },
+          "selected": { "$value": "{primitive.color.teal.100}", "$description": "リストで選択中の行・現在のナビ" },
+          "scrim": { "$value": "{primitive.color.alpha.teal-900-40}", "$description": "モーダル・シートの背後" }
+        },
+        "text": {
+          "primary": { "$value": "{primitive.color.teal.900}" },
+          "secondary": { "$value": "{primitive.color.mist.600}", "$description": "補足・メタ情報・フォーカス外の設問" },
+          "placeholder": { "$value": "{primitive.color.stone.700}", "$description": "入力欄の既定値・プレースホルダー" },
+          "disabled": { "$value": "{primitive.color.stone.400}", "$description": "無効（コントラスト基準の対象外）" },
+          "on-accent": { "$value": "{primitive.color.teal.950}", "$description": "accent の上の文字" },
+          "on-danger": { "$value": "{primitive.color.cream.50}", "$description": "notice.danger.solid の上の文字" },
+          "link": { "$value": "{primitive.color.teal.600}", "$description": "リンク。下線を付ける" }
+        },
+        "border": {
+          "hairline": { "$value": "{primitive.color.cream.300}", "$description": "区切り線（装飾）" },
+          "strong": { "$value": "{primitive.color.stone.600}", "$description": "入力欄・コントロールの枠（3:1 以上）" },
+          "focus": { "$value": "{primitive.color.teal.600}", "$description": "フォーカスリング" }
+        },
+        "accent": {
+          "$description": "金。1画面に1つの主要な操作とブランドマークだけに使う",
+          "default": { "$value": "{primitive.color.gold.600}" },
+          "hover": { "$value": "{primitive.color.gold.700}" },
+          "pressed": { "$value": "{primitive.color.gold.800}" }
+        },
+        "fau": {
+          "$description": "F/A/U と未分類・未入力（6.0.3）。fg は文字・アイコン・内訳の帯、bg はラベルの淡い地",
+          "fact": {
+            "fg": { "$value": "{primitive.color.sage.700}" },
+            "bg": { "$value": "{primitive.color.sage.100}" }
+          },
+          "assumption": {
+            "fg": { "$value": "{primitive.color.sky.700}" },
+            "bg": { "$value": "{primitive.color.sky.100}" }
+          },
+          "unknown": {
+            "fg": { "$value": "{primitive.color.plum.700}" },
+            "bg": { "$value": "{primitive.color.plum.100}" }
+          },
+          "unclassified": {
+            "fg": { "$value": "{primitive.color.rose.700}" },
+            "bg": { "$value": "{primitive.color.rose.100}" }
+          },
+          "empty": {
+            "$description": "未入力（Empty）。グレー",
+            "fg": { "$value": "{primitive.color.stone.700}" },
+            "bg": { "$value": "{primitive.color.stone.100}" }
+          }
+        },
+        "check": {
+          "$description": "確認項目の状態（6.1）",
+          "not-started": {
+            "fg": { "$value": "{primitive.color.stone.700}" },
+            "bg": { "$value": "{primitive.color.stone.100}" }
+          },
+          "partial": {
+            "$description": "金の accent と区別するため青系",
+            "fg": { "$value": "{primitive.color.sky.700}" },
+            "bg": { "$value": "{primitive.color.sky.100}" }
+          },
+          "done": {
+            "fg": { "$value": "{primitive.color.sage.700}" },
+            "bg": { "$value": "{primitive.color.sage.100}" }
+          }
+        },
+        "notice": {
+          "$description": "お知らせと警告。必ずアイコンと文言を添える",
+          "info": {
+            "fg": { "$value": "{primitive.color.sky.700}" },
+            "bg": { "$value": "{primitive.color.sky.100}" }
+          },
+          "warning": {
+            "$description": "一般の警告（Fact · No evidence、下限の注意など）",
+            "fg": { "$value": "{primitive.color.amber.700}" },
+            "bg": { "$value": "{primitive.color.amber.100}" }
+          },
+          "negative-margin": {
+            "$description": "粗利がゼロ以下（6.4）",
+            "fg": { "$value": "{primitive.color.amber.700}" },
+            "bg": { "$value": "{primitive.color.amber.100}" }
+          },
+          "capacity-exceeded": {
+            "$description": "Capacity 超過・損益分岐が Capacity を超える（6.4）",
+            "fg": { "$value": "{primitive.color.amber.700}" },
+            "bg": { "$value": "{primitive.color.amber.100}" }
+          },
+          "save-failed": {
+            "$description": "保存状態の「保存できませんでした」",
+            "fg": { "$value": "{primitive.color.red.700}" },
+            "bg": { "$value": "{primitive.color.red.100}" }
+          },
+          "danger": {
+            "$description": "破壊的な操作の確認・エラー",
+            "fg": { "$value": "{primitive.color.red.700}" },
+            "bg": { "$value": "{primitive.color.red.100}" },
+            "solid": { "$value": "{primitive.color.red.700}", "$description": "破壊的な操作のボタンの地（文字は text.on-danger）" }
+          }
+        },
+        "decision": {
+          "$description": "判定。勝ち負けに見えない控えめな色。Drop は赤（danger）にしない",
+          "proceed": {
+            "fg": { "$value": "{primitive.color.sea.700}" },
+            "bg": { "$value": "{primitive.color.sea.100}" }
+          },
+          "hold": {
+            "fg": { "$value": "{primitive.color.sand.700}" },
+            "bg": { "$value": "{primitive.color.sand.100}" }
+          },
+          "drop": {
+            "fg": { "$value": "{primitive.color.slate.700}" },
+            "bg": { "$value": "{primitive.color.slate.100}" }
+          },
+          "undecided": {
+            "$description": "未判定",
+            "fg": { "$value": "{primitive.color.stone.700}" },
+            "bg": { "$value": "{primitive.color.stone.100}" }
+          }
+        }
+      },
+      "dark": {
+        "$description": "ダークモード。深いティールの地にクリームの文字と罫線。金はブランドと主要な操作だけ",
+        "surface": {
+          "canvas": { "$value": "{primitive.color.teal.900}", "$description": "画面の地" },
+          "raised": { "$value": "{primitive.color.teal.850}", "$description": "パネル・カード（影ではなく hairline で区切る）" },
+          "sunken": { "$value": "{primitive.color.teal.950}", "$description": "入力欄・表の見出し行・くぼんだ地" },
+          "overlay": { "$value": "{primitive.color.teal.800}", "$description": "ポップオーバー・シート・モーダル" },
+          "hover": { "$value": "{primitive.color.teal.750}", "$description": "行・項目のホバー" },
+          "selected": { "$value": "{primitive.color.teal.700}", "$description": "リストで選択中の行・現在のナビ" },
+          "scrim": { "$value": "{primitive.color.alpha.teal-950-72}", "$description": "モーダル・シートの背後" }
+        },
+        "text": {
+          "primary": { "$value": "{primitive.color.cream.100}" },
+          "secondary": { "$value": "{primitive.color.cream.400}", "$description": "補足・メタ情報・フォーカス外の設問" },
+          "placeholder": { "$value": "{primitive.color.stone.300}", "$description": "入力欄の既定値・プレースホルダー" },
+          "disabled": { "$value": "{primitive.color.stone.700}", "$description": "無効（コントラスト基準の対象外）" },
+          "on-accent": { "$value": "{primitive.color.teal.950}", "$description": "accent の上の文字" },
+          "on-danger": { "$value": "{primitive.color.teal.950}", "$description": "notice.danger.solid の上の文字" },
+          "link": { "$value": "{primitive.color.teal.300}", "$description": "リンク。下線を付ける" }
+        },
+        "border": {
+          "hairline": { "$value": "{primitive.color.stone.800}", "$description": "区切り線（装飾）" },
+          "strong": { "$value": "{primitive.color.stone.500}", "$description": "入力欄・コントロールの枠（3:1 以上）" },
+          "focus": { "$value": "{primitive.color.teal.300}", "$description": "フォーカスリング" }
+        },
+        "accent": {
+          "$description": "金。1画面に1つの主要な操作とブランドマークだけに使う",
+          "default": { "$value": "{primitive.color.gold.400}" },
+          "hover": { "$value": "{primitive.color.gold.300}" },
+          "pressed": { "$value": "{primitive.color.gold.500}" }
+        },
+        "fau": {
+          "$description": "F/A/U と未分類・未入力（6.0.3）。fg は文字・アイコン・内訳の帯、bg はラベルの淡い地",
+          "fact": {
+            "fg": { "$value": "{primitive.color.sage.300}" },
+            "bg": { "$value": "{primitive.color.sage.900}" }
+          },
+          "assumption": {
+            "fg": { "$value": "{primitive.color.sky.300}" },
+            "bg": { "$value": "{primitive.color.sky.900}" }
+          },
+          "unknown": {
+            "fg": { "$value": "{primitive.color.plum.300}" },
+            "bg": { "$value": "{primitive.color.plum.900}" }
+          },
+          "unclassified": {
+            "fg": { "$value": "{primitive.color.rose.300}" },
+            "bg": { "$value": "{primitive.color.rose.900}" }
+          },
+          "empty": {
+            "$description": "未入力（Empty）。グレー",
+            "fg": { "$value": "{primitive.color.stone.200}" },
+            "bg": { "$value": "{primitive.color.stone.900}" }
+          }
+        },
+        "check": {
+          "$description": "確認項目の状態（6.1）",
+          "not-started": {
+            "fg": { "$value": "{primitive.color.stone.200}" },
+            "bg": { "$value": "{primitive.color.stone.900}" }
+          },
+          "partial": {
+            "$description": "金の accent と区別するため青系",
+            "fg": { "$value": "{primitive.color.sky.300}" },
+            "bg": { "$value": "{primitive.color.sky.900}" }
+          },
+          "done": {
+            "fg": { "$value": "{primitive.color.sage.300}" },
+            "bg": { "$value": "{primitive.color.sage.900}" }
+          }
+        },
+        "notice": {
+          "$description": "お知らせと警告。必ずアイコンと文言を添える",
+          "info": {
+            "fg": { "$value": "{primitive.color.sky.300}" },
+            "bg": { "$value": "{primitive.color.sky.900}" }
+          },
+          "warning": {
+            "$description": "一般の警告（Fact · No evidence、下限の注意など）",
+            "fg": { "$value": "{primitive.color.amber.300}" },
+            "bg": { "$value": "{primitive.color.amber.900}" }
+          },
+          "negative-margin": {
+            "$description": "粗利がゼロ以下（6.4）",
+            "fg": { "$value": "{primitive.color.amber.300}" },
+            "bg": { "$value": "{primitive.color.amber.900}" }
+          },
+          "capacity-exceeded": {
+            "$description": "Capacity 超過・損益分岐が Capacity を超える（6.4）",
+            "fg": { "$value": "{primitive.color.amber.300}" },
+            "bg": { "$value": "{primitive.color.amber.900}" }
+          },
+          "save-failed": {
+            "$description": "保存状態の「保存できませんでした」",
+            "fg": { "$value": "{primitive.color.red.300}" },
+            "bg": { "$value": "{primitive.color.red.900}" }
+          },
+          "danger": {
+            "$description": "破壊的な操作の確認・エラー",
+            "fg": { "$value": "{primitive.color.red.300}" },
+            "bg": { "$value": "{primitive.color.red.900}" },
+            "solid": { "$value": "{primitive.color.red.300}", "$description": "破壊的な操作のボタンの地（文字は text.on-danger）" }
+          }
+        },
+        "decision": {
+          "$description": "判定。勝ち負けに見えない控えめな色。Drop は赤（danger）にしない",
+          "proceed": {
+            "fg": { "$value": "{primitive.color.sea.300}" },
+            "bg": { "$value": "{primitive.color.sea.900}" }
+          },
+          "hold": {
+            "fg": { "$value": "{primitive.color.sand.300}" },
+            "bg": { "$value": "{primitive.color.sand.900}" }
+          },
+          "drop": {
+            "fg": { "$value": "{primitive.color.slate.300}" },
+            "bg": { "$value": "{primitive.color.slate.900}" }
+          },
+          "undecided": {
+            "$description": "未判定",
+            "fg": { "$value": "{primitive.color.stone.200}" },
+            "bg": { "$value": "{primitive.color.stone.900}" }
+          }
+        }
+      }
+    },
+    "font": {
+      "family": {
+        "$type": "fontFamily",
+        "display": { "$value": "{primitive.font.family.display}", "$description": "見出しとブランドだけ" },
+        "body": { "$value": "{primitive.font.family.sans}", "$description": "本文・回答・入力欄・表" },
+        "mono": { "$value": "{primitive.font.family.mono}", "$description": "ID" }
+      },
+      "numeric": {
+        "$description": "表・指標・金額の等幅数字（DTCG に型がないため文字列）",
+        "tabular": { "$value": "{primitive.font.feature.tabular-nums}" }
+      }
+    },
+    "typography": {
+      "$type": "typography",
+      "$description": "見出し（display・heading-*）だけ Fraunces。本文・回答・入力欄・表はシステムのサンセリフ。入力欄の文字は 16px 以上（iOS のズーム防止）。等幅数字は $extensions の fontVariantNumeric",
+      "display": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.display}",
+          "fontSize": "{primitive.font.size.4xl}",
+          "fontWeight": "{primitive.font.weight.semibold}",
+          "letterSpacing": "{primitive.font.letter-spacing.tighter}",
+          "lineHeight": "{primitive.font.line-height.tight}"
+        },
+        "$description": "ランディング・空の状態の大見出し"
+      },
+      "heading-1": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.display}",
+          "fontSize": "{primitive.font.size.3xl}",
+          "fontWeight": "{primitive.font.weight.semibold}",
+          "letterSpacing": "{primitive.font.letter-spacing.tight}",
+          "lineHeight": "{primitive.font.line-height.tight}"
+        },
+        "$description": "画面のタイトル"
+      },
+      "heading-2": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.display}",
+          "fontSize": "{primitive.font.size.2xl}",
+          "fontWeight": "{primitive.font.weight.semibold}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.snug}"
+        },
+        "$description": "ブロックの見出し"
+      },
+      "heading-3": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.display}",
+          "fontSize": "{primitive.font.size.xl}",
+          "fontWeight": "{primitive.font.weight.semibold}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.snug}"
+        },
+        "$description": "パネル・カードの見出し"
+      },
+      "heading-4": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.display}",
+          "fontSize": "{primitive.font.size.lg}",
+          "fontWeight": "{primitive.font.weight.semibold}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.snug}"
+        },
+        "$description": "設問のタイトル・小見出し"
+      },
+      "body": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.md}",
+          "fontWeight": "{primitive.font.weight.regular}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.relaxed}"
+        },
+        "$description": "本文"
+      },
+      "body-long": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.md}",
+          "fontWeight": "{primitive.font.weight.regular}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.loose}"
+        },
+        "$description": "長文の回答（表示と入力欄）。多言語が混ざっても詰まらない行間"
+      },
+      "body-sm": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.sm}",
+          "fontWeight": "{primitive.font.weight.regular}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.normal}"
+        },
+        "$description": "補足文"
+      },
+      "label": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.sm}",
+          "fontWeight": "{primitive.font.weight.medium}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.snug}"
+        },
+        "$description": "入力欄のラベル・ナビ"
+      },
+      "label-sm": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.xs}",
+          "fontWeight": "{primitive.font.weight.medium}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.snug}"
+        },
+        "$description": "F/A/U・状態・判定のラベル"
+      },
+      "button": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.sm}",
+          "fontWeight": "{primitive.font.weight.semibold}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.tight}"
+        },
+        "$description": "ボタン"
+      },
+      "caption": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.xs}",
+          "fontWeight": "{primitive.font.weight.regular}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.normal}"
+        },
+        "$description": "注記・日時・保存状態"
+      },
+      "number": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.md}",
+          "fontWeight": "{primitive.font.weight.medium}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.snug}"
+        },
+        "$description": "金額・件数（入力欄と本文中）",
+        "$extensions": {
+          "app.moonx": { "fontVariantNumeric": "{semantic.font.numeric.tabular}" }
+        }
+      },
+      "metric": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.2xl}",
+          "fontWeight": "{primitive.font.weight.semibold}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.tight}"
+        },
+        "$description": "主要指標の大きな数字",
+        "$extensions": {
+          "app.moonx": { "fontVariantNumeric": "{semantic.font.numeric.tabular}" }
+        }
+      },
+      "table": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.sm}",
+          "fontWeight": "{primitive.font.weight.regular}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.normal}"
+        },
+        "$description": "表のセル",
+        "$extensions": {
+          "app.moonx": { "fontVariantNumeric": "{semantic.font.numeric.tabular}" }
+        }
+      },
+      "table-header": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.xs}",
+          "fontWeight": "{primitive.font.weight.semibold}",
+          "letterSpacing": "{primitive.font.letter-spacing.wide}",
+          "lineHeight": "{primitive.font.line-height.snug}"
+        },
+        "$description": "表の見出し行"
+      },
+      "id": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.mono}",
+          "fontSize": "{primitive.font.size.xs}",
+          "fontWeight": "{primitive.font.weight.medium}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.snug}"
+        },
+        "$description": "設問 ID（V.01.WHO など）"
+      }
+    },
+    "space": {
+      "$type": "dimension",
+      "$description": "汎用の余白（4px 基準）。画面の密度で変わる余白は density を使う",
+      "none": { "$value": "{primitive.space.0}" },
+      "3xs": { "$value": "{primitive.space.0-5}" },
+      "2xs": { "$value": "{primitive.space.1}" },
+      "xs": { "$value": "{primitive.space.2}" },
+      "sm": { "$value": "{primitive.space.3}" },
+      "md": { "$value": "{primitive.space.4}" },
+      "lg": { "$value": "{primitive.space.6}" },
+      "xl": { "$value": "{primitive.space.8}" },
+      "2xl": { "$value": "{primitive.space.12}" },
+      "3xl": { "$value": "{primitive.space.16}" },
+      "4xl": { "$value": "{primitive.space.20}" }
+    },
+    "density": {
+      "$description": "画面ごとの情報密度。書く画面（設問フォーム・判定・プラン項目）は Web=comfortable / スマホ=relaxed、表と数字の画面（費用・損益・調査ログ・一覧・ダッシュボード）は Web=medium / スマホ=comfortable。タッチ端末では 44px 未満のコントロールを touch-target-min まで広げる",
+      "medium": {
+        "$type": "dimension",
+        "$description": "中密度（表と数字を比べて読む）",
+        "control-height": { "$value": "{primitive.size.40}", "$description": "ボタン・入力欄の高さ" },
+        "row-height": { "$value": "{primitive.size.40}", "$description": "表・リストの行の高さ" },
+        "cell-padding-x": { "$value": "{primitive.space.3}" },
+        "cell-padding-y": { "$value": "{primitive.space.2}" },
+        "field-padding-x": { "$value": "{primitive.space.3}" },
+        "field-padding-y": { "$value": "{primitive.space.2}" },
+        "gap": { "$value": "{primitive.space.3}", "$description": "ブロック内の要素の間" },
+        "block-gap": { "$value": "{primitive.space.4}", "$description": "設問・カード・行のまとまりの間" },
+        "section-gap": { "$value": "{primitive.space.8}", "$description": "セクションの間" },
+        "panel-padding": { "$value": "{primitive.space.4}", "$description": "パネル・カードの内側" }
+      },
+      "comfortable": {
+        "$type": "dimension",
+        "$description": "ゆったり（考えるための余白）",
+        "control-height": { "$value": "{primitive.size.48}", "$description": "ボタン・入力欄の高さ" },
+        "row-height": { "$value": "{primitive.size.52}", "$description": "表・リストの行の高さ" },
+        "cell-padding-x": { "$value": "{primitive.space.4}" },
+        "cell-padding-y": { "$value": "{primitive.space.3}" },
+        "field-padding-x": { "$value": "{primitive.space.4}" },
+        "field-padding-y": { "$value": "{primitive.space.3}" },
+        "gap": { "$value": "{primitive.space.4}", "$description": "ブロック内の要素の間" },
+        "block-gap": { "$value": "{primitive.space.8}", "$description": "設問・カード・行のまとまりの間" },
+        "section-gap": { "$value": "{primitive.space.12}", "$description": "セクションの間" },
+        "panel-padding": { "$value": "{primitive.space.6}", "$description": "パネル・カードの内側" }
+      },
+      "relaxed": {
+        "$type": "dimension",
+        "$description": "スマホで一段ゆったり",
+        "control-height": { "$value": "{primitive.size.52}", "$description": "ボタン・入力欄の高さ" },
+        "row-height": { "$value": "{primitive.size.56}", "$description": "表・リストの行の高さ" },
+        "cell-padding-x": { "$value": "{primitive.space.4}" },
+        "cell-padding-y": { "$value": "{primitive.space.4}" },
+        "field-padding-x": { "$value": "{primitive.space.4}" },
+        "field-padding-y": { "$value": "{primitive.space.4}" },
+        "gap": { "$value": "{primitive.space.5}", "$description": "ブロック内の要素の間" },
+        "block-gap": { "$value": "{primitive.space.10}", "$description": "設問・カード・行のまとまりの間" },
+        "section-gap": { "$value": "{primitive.space.14}", "$description": "セクションの間" },
+        "panel-padding": { "$value": "{primitive.space.5}", "$description": "パネル・カードの内側" }
+      }
+    },
+    "layout": {
+      "$type": "dimension",
+      "sidebar-width": { "$value": "{primitive.size.256}", "$description": "デスクトップの左サイドバー" },
+      "sidebar-width-collapsed": { "$value": "{primitive.size.64}", "$description": "タブレットのアイコンだけのサイドバー" },
+      "side-panel-width": { "$value": "{primitive.size.360}", "$description": "コメント・変更履歴の右パネル" },
+      "reading-column-max": { "$value": "{primitive.size.640}", "$description": "設問フォーム・中央集中・設定フォームの読みやすい幅の上限" },
+      "content-max": { "$value": "{primitive.size.1280}", "$description": "本文エリアの最大幅" },
+      "header-height": { "$value": "{primitive.size.56}" },
+      "tab-bar-height": { "$value": "{primitive.size.56}", "$description": "スマホの下のタブ（安全領域は別に足す）" },
+      "bottom-action-height": { "$value": "{primitive.size.64}", "$description": "スマホで下部に固定する主要な操作・結果の要約バー" },
+      "touch-target-min": { "$value": "{primitive.size.44}", "$description": "タップ領域の最小（全ブレイクポイント）" },
+      "page-gutter-mobile": { "$value": "{primitive.space.4}" },
+      "page-gutter-tablet": { "$value": "{primitive.space.6}" },
+      "page-gutter-desktop": { "$value": "{primitive.space.8}" },
+      "focus-anchor": { "$type": "number", "$value": "{primitive.ratio.half}", "$description": "設問フォームで入力中の設問を置く縦位置（0.5 = 画面の縦の中央）" }
+    },
+    "breakpoint": {
+      "$type": "dimension",
+      "$description": "最小幅。<768 モバイル / 768〜1023 タブレット / ≥1024 デスクトップ",
+      "tablet": { "$value": "{primitive.breakpoint.md}" },
+      "desktop": { "$value": "{primitive.breakpoint.lg}" }
+    },
+    "radius": {
+      "$type": "dimension",
+      "control": { "$value": "{primitive.radius.md}", "$description": "ボタン・入力欄" },
+      "chip": { "$value": "{primitive.radius.sm}", "$description": "F/A/U・状態・判定のラベル" },
+      "card": { "$value": "{primitive.radius.lg}", "$description": "パネル・カード・スライドのサムネイル" },
+      "sheet": { "$value": "{primitive.radius.xl}", "$description": "ボトムシートの上の角・モーダル" },
+      "pill": { "$value": "{primitive.radius.full}", "$description": "トグル・アバター" }
+    },
+    "border-width": {
+      "$type": "dimension",
+      "hairline": { "$value": "{primitive.border-width.1}" },
+      "strong": { "$value": "{primitive.border-width.1}" },
+      "focus-ring": { "$value": "{primitive.border-width.2}" },
+      "focus-offset": { "$value": "{primitive.border-width.2}", "$description": "フォーカスリングと部品の間（地の色）" }
+    },
+    "shadow": {
+      "$type": "shadow",
+      "$description": "控えめ。ダークは影を使わず border.hairline と地の明るさで重なりを示す",
+      "light": {
+        "raised": { "$value": "{primitive.shadow.sm-light}" },
+        "overlay": { "$value": "{primitive.shadow.md-light}" }
+      },
+      "dark": {
+        "raised": { "$value": "{primitive.shadow.none}" },
+        "overlay": { "$value": "{primitive.shadow.md-dark}" }
+      }
+    },
+    "icon": {
+      "$description": "Lucide（lucide-react / lucide-react-native）",
+      "size-sm": { "$type": "dimension", "$value": "{primitive.space.4}" },
+      "size-md": { "$type": "dimension", "$value": "{primitive.space.5}" },
+      "size-lg": { "$type": "dimension", "$value": "{primitive.space.6}" },
+      "stroke-width": { "$type": "number", "$value": "{primitive.stroke.icon}" }
+    },
+    "motion": {
+      "$description": "落ち着いた短い動き。prefers-reduced-motion（RN は AccessibilityInfo.isReduceMotionEnabled）のときは reduced を使う",
+      "transition": {
+        "$type": "transition",
+        "hover": {
+          "$value": { "duration": "{primitive.duration.150}", "delay": "{primitive.duration.0}", "timingFunction": "{primitive.easing.standard}" },
+          "$description": "色・地の変化"
+        },
+        "expand": {
+          "$value": { "duration": "{primitive.duration.200}", "delay": "{primitive.duration.0}", "timingFunction": "{primitive.easing.standard}" },
+          "$description": "フォーカスした設問の EXAMPLE・ヒント・F/A/U を開く"
+        },
+        "enter": {
+          "$value": { "duration": "{primitive.duration.300}", "delay": "{primitive.duration.0}", "timingFunction": "{primitive.easing.decelerate}" },
+          "$description": "パネル・シート・モーダルが出る"
+        },
+        "exit": {
+          "$value": { "duration": "{primitive.duration.200}", "delay": "{primitive.duration.0}", "timingFunction": "{primitive.easing.accelerate}" },
+          "$description": "パネル・シート・モーダルが消える"
+        },
+        "focus-scroll": {
+          "$value": { "duration": "{primitive.duration.400}", "delay": "{primitive.duration.0}", "timingFunction": "{primitive.easing.smooth}" },
+          "$description": "入力中の設問を画面の縦の中央（layout.focus-anchor）へなめらかにスクロール（4.1 パターン C）"
+        }
+      },
+      "reduced": {
+        "$type": "duration",
+        "$description": "動きを減らす設定のとき。focus-scroll と移動は即時、色と不透明度の変化だけ fade で残す",
+        "movement": { "$value": "{primitive.duration.0}" },
+        "fade": { "$value": "{primitive.duration.100}" }
+      }
+    },
+    "print": {
+      "$description": "Pitch Deck の PDF 用（react-pdf）。表示モードにかかわらず常にライト。画面のスライド表示も同じ値を使い、PDF と見た目をそろえる（ADR-012）",
+      "color": {
+        "$type": "color",
+        "page": { "$value": "{semantic.color.light.surface.canvas}", "$description": "スライドの地" },
+        "panel": { "$value": "{semantic.color.light.surface.raised}", "$description": "数字のカード・表の地" },
+        "table-header": { "$value": "{semantic.color.light.surface.sunken}", "$description": "表の見出し行" },
+        "text": { "$value": "{semantic.color.light.text.primary}" },
+        "text-secondary": { "$value": "{semantic.color.light.text.secondary}", "$description": "副題・数字のラベル・フッター" },
+        "text-placeholder": { "$value": "{semantic.color.light.fau.empty.fg}", "$description": "Not written yet（グレー）" },
+        "border": { "$value": "{semantic.color.light.border.hairline}" },
+        "border-strong": { "$value": "{semantic.color.light.border.strong}" },
+        "accent": { "$value": "{semantic.color.light.accent.default}", "$description": "表紙の細い罫線などブランドの印だけ" }
+      },
+      "font": {
+        "$type": "fontFamily",
+        "display": { "$value": "{primitive.font.family.print-display}" },
+        "body": { "$value": "{primitive.font.family.print-sans}" }
+      },
+      "slide": {
+        "$type": "dimension",
+        "$description": "16:9。基準 960 × 540（PDF は 1px = 1pt で 13.333 × 7.5 in）。画面では幅に合わせて拡大縮小する",
+        "width": { "$value": "{primitive.size.960}" },
+        "height": { "$value": "{primitive.size.540}" },
+        "margin-x": { "$value": "{primitive.space.12}", "$description": "左右の安全余白" },
+        "margin-y": { "$value": "{primitive.space.10}", "$description": "上下の安全余白（フッターはこの内側）" },
+        "gap": { "$value": "{primitive.space.6}", "$description": "見出しと本文・要素の間" },
+        "footer-height": { "$value": "{primitive.space.6}", "$description": "Business Name・版の名前・日付" },
+        "shrink-step": { "$value": "{primitive.space.0-5}", "$description": "長い文章を縮めるときの1段（最小まで縮めても入らなければ末尾を「…」で切る）" }
+      },
+      "font-size": {
+        "$type": "dimension",
+        "$description": "スライドの型ごとの文字サイズと最小（6.14）。-min より小さくしない",
+        "title": {
+          "title": { "$value": "{primitive.font.slide-size.44}" },
+          "title-min": { "$value": "{primitive.font.slide-size.32}" },
+          "subtitle": { "$value": "{primitive.font.slide-size.22}" },
+          "subtitle-min": { "$value": "{primitive.font.slide-size.18}" }
+        },
+        "text": {
+          "heading": { "$value": "{primitive.font.slide-size.32}" },
+          "heading-min": { "$value": "{primitive.font.slide-size.26}" },
+          "bullet": { "$value": "{primitive.font.slide-size.22}" },
+          "bullet-min": { "$value": "{primitive.font.slide-size.18}" }
+        },
+        "number": {
+          "heading": { "$value": "{primitive.font.slide-size.32}" },
+          "heading-min": { "$value": "{primitive.font.slide-size.26}" },
+          "figure": { "$value": "{primitive.font.slide-size.48}" },
+          "figure-min": { "$value": "{primitive.font.slide-size.36}" },
+          "figure-label": { "$value": "{primitive.font.slide-size.16}" },
+          "figure-label-min": { "$value": "{primitive.font.slide-size.14}" }
+        },
+        "table": {
+          "heading": { "$value": "{primitive.font.slide-size.32}" },
+          "heading-min": { "$value": "{primitive.font.slide-size.26}" },
+          "cell": { "$value": "{primitive.font.slide-size.16}" },
+          "cell-min": { "$value": "{primitive.font.slide-size.12}" }
+        },
+        "footer": { "$value": "{primitive.font.slide-size.10}", "$description": "フッター（固定）" }
+      },
+      "typography": {
+        "$type": "typography",
+        "$description": "既定の大きさの組み合わせ。縮めるときは font-size の -min まで fontSize だけ下げる",
+        "title": {
+          "$value": {
+            "fontFamily": "{primitive.font.family.print-display}",
+            "fontSize": "{primitive.font.slide-size.44}",
+            "fontWeight": "{primitive.font.weight.semibold}",
+            "letterSpacing": "{primitive.font.letter-spacing.normal}",
+            "lineHeight": "{primitive.font.line-height.tight}"
+          }
+        },
+        "heading": {
+          "$value": {
+            "fontFamily": "{primitive.font.family.print-display}",
+            "fontSize": "{primitive.font.slide-size.32}",
+            "fontWeight": "{primitive.font.weight.semibold}",
+            "letterSpacing": "{primitive.font.letter-spacing.normal}",
+            "lineHeight": "{primitive.font.line-height.tight}"
+          }
+        },
+        "subtitle": {
+          "$value": {
+            "fontFamily": "{primitive.font.family.print-sans}",
+            "fontSize": "{primitive.font.slide-size.22}",
+            "fontWeight": "{primitive.font.weight.regular}",
+            "letterSpacing": "{primitive.font.letter-spacing.normal}",
+            "lineHeight": "{primitive.font.line-height.snug}"
+          }
+        },
+        "bullet": {
+          "$value": {
+            "fontFamily": "{primitive.font.family.print-sans}",
+            "fontSize": "{primitive.font.slide-size.22}",
+            "fontWeight": "{primitive.font.weight.regular}",
+            "letterSpacing": "{primitive.font.letter-spacing.normal}",
+            "lineHeight": "{primitive.font.line-height.snug}"
+          }
+        },
+        "figure": {
+          "$value": {
+            "fontFamily": "{primitive.font.family.print-sans}",
+            "fontSize": "{primitive.font.slide-size.48}",
+            "fontWeight": "{primitive.font.weight.semibold}",
+            "letterSpacing": "{primitive.font.letter-spacing.normal}",
+            "lineHeight": "{primitive.font.line-height.tight}"
+          },
+          "$extensions": {
+            "app.moonx": { "fontVariantNumeric": "{semantic.font.numeric.tabular}" }
+          }
+        },
+        "figure-label": {
+          "$value": {
+            "fontFamily": "{primitive.font.family.print-sans}",
+            "fontSize": "{primitive.font.slide-size.16}",
+            "fontWeight": "{primitive.font.weight.medium}",
+            "letterSpacing": "{primitive.font.letter-spacing.normal}",
+            "lineHeight": "{primitive.font.line-height.snug}"
+          }
+        },
+        "cell": {
+          "$value": {
+            "fontFamily": "{primitive.font.family.print-sans}",
+            "fontSize": "{primitive.font.slide-size.16}",
+            "fontWeight": "{primitive.font.weight.regular}",
+            "letterSpacing": "{primitive.font.letter-spacing.normal}",
+            "lineHeight": "{primitive.font.line-height.snug}"
+          },
+          "$extensions": {
+            "app.moonx": { "fontVariantNumeric": "{semantic.font.numeric.tabular}" }
+          }
+        },
+        "footer": {
+          "$value": {
+            "fontFamily": "{primitive.font.family.print-sans}",
+            "fontSize": "{primitive.font.slide-size.10}",
+            "fontWeight": "{primitive.font.weight.regular}",
+            "letterSpacing": "{primitive.font.letter-spacing.normal}",
+            "lineHeight": "{primitive.font.line-height.normal}"
+          }
+        }
+      }
+    }
+  }
+}

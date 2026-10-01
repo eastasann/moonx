@@ -18,7 +18,7 @@
 |---|---|
 | [concept.md](concept.md) | Phase 0 のコンセプトメモ（アーカイブ） |
 | [brainstorm-notes.md](brainstorm-notes.md) | Phase 1 の壁打ちメモと、現行の Drive のテンプレートの構成（アーカイブ） |
-| [design-spec.md](design-spec.md) | 設計仕様書。画面一覧・画面ごとの仕様・ロールと権限・デザインの方針・デモデータ |
+| [design-spec.md](design-spec.md) | 設計仕様書。画面一覧・画面ごとの仕様・ロールと権限・デザインの方針と部品の一覧・デモデータ |
 | [screen_flow.mermaid](screen_flow.mermaid) | 画面遷移図 |
 | [01_prd.md](01_prd.md) | PRD。目的・対象ユーザー・ユーザーストーリーと優先度・KPI・スコープ外 |
 | [02-01_system-design-doc.md](02-01_system-design-doc.md) | System Design Doc。アーキテクチャ・ADR・ルーティング・API・データモデル（Drizzle）・権限マトリクス・エラー・i18n・テスト・監視 |
@@ -35,7 +35,7 @@
 | 層 | ファイル | 扱い |
 |---|---|---|
 | ソース（正） | `design-spec.md`・`screen_flow.mermaid`・`01_prd.md`・`02-01_system-design-doc.md`・`03_dev-setup.md`・`04_deployment-procedure.md`・`05_operation-runbook.md`・`06_design-tokens.json` | 事実ごとに正は1つ（下の所有権マップ）。変更のたびに更新する生きた文書 |
-| 派生 | ソースから生成・要約するもの（06 から作るテーマ `packages/ui-tokens`、`make openapi` の書き出し、Phase 4 の実装準備で作るもの） | 直接直さない。ソースを直してから作り直す |
+| 派生 | ソースから生成・要約するもの（06 から `make tokens` で作るテーマ `packages/ui-tokens`（vanilla-extract・Unistyles・react-pdf 用）、`make openapi` の書き出し、Phase 4 の実装準備で作るもの） | 直接直さない。ソースを直してから作り直す |
 | アーカイブ | `concept.md`・`brainstorm-notes.md` | 決めた経緯の記録。更新しない。今の正はソースを読む |
 
 ### 事実の所有権マップ
@@ -44,7 +44,7 @@
 
 | 事実 | 正のドキュメント |
 |---|---|
-| 画面の存在・目的・レイアウト・認証要否・画面ごとの振る舞い・文言、ロールと権限（画面の単位）、デザインの方針、デモデータ | `design-spec.md` |
+| 画面の存在・目的・レイアウト・認証要否・画面ごとの振る舞い・文言、ロールと権限（画面の単位）、デザインの方針（Spectrum を参考にした仕組みと Hermes Teal の見た目）、部品の一覧（4.5）、デモデータ | `design-spec.md` |
 | 画面の遷移 | `screen_flow.mermaid` |
 | 目的・対象ユーザー・ユーザーストーリーと優先度・KPI・スコープ外 | `01_prd.md` |
 | アーキテクチャ・技術選定（ADR）・環境と命名・環境変数・make ターゲット・ルーティング・API・**データモデル**・権限マトリクス（API の単位）・エラーの形式・i18n・テスト戦略・監視の設計 | `02-01_system-design-doc.md` |

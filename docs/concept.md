@@ -53,3 +53,10 @@ BCDX は「自己分析 → アイデア検証 → ビジネスプラン」の�
   - チーム内の権限と共有範囲（自己分析の公開範囲を含む）
   - AI 向けエクスポートの形式と、AI で整理した回答をアプリに戻す方法（貼り付け・取り込み）
   - 収益化の有無
+- 参照: 現行の BCDX ワークスペース（Google Drive）
+  - フォルダ: https://drive.google.com/drive/folders/11ZEkDvx_h1nx92bqiTywjqmBm13ddOhi
+  - README（手順と原則）: https://docs.google.com/document/d/10uxF7SXIaEyHwaZcOzRHCKgnqikRHtFag-wMMhoNOYY/edit
+  - _initialize prompt（自己分析の対話用プロンプト）: https://docs.google.com/document/d/1scNKIvUt7HbjJMt0vMImAWIUIxVvcYOsZ3W6EPDgdgw/edit
+  - _TEMPLATE - Self Analysis: https://docs.google.com/document/d/1Vl5d2lR-ZCxatsSNllqULPFdaB1EXWib5wmU4iqUC20/edit
+  - TEMPLATE - Business Idea & Validation: https://docs.google.com/spreadsheets/d/1cIUjcOOop3xSyxUK-Vg36pJ--8lQKFX1uNHKhAXxKJs/edit
+  - TEMPLATE - Business Plan: https://docs.google.com/document/d/1q6Mfn8kprXpV74QMx6sKE_6EusH-aLcgW1H2O7WaBDM/edit

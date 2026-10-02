@@ -5,10 +5,11 @@ import {
 } from "@moonx/schemas";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../../access";
 import type { AppContext } from "../../context";
 import { ApiError } from "../../errors";
 import { historyActor } from "../../lib/dto";
-import { requireWritable, resolveScope } from "../../lib/scope";
+
 import {
   buildValidationAnswers,
   loadTemplateSection,
@@ -16,7 +17,6 @@ import {
 } from "../../lib/validation-answers";
 import { loadValidationData } from "../../lib/validation-data";
 import { createEvidence, removeEvidence } from "../../lib/validation-evidence";
-import { authPlugin } from "../../plugins";
 
 /** Sections the question form serves; 04 and 08 are answered through V8 and V15 (SDD 5.7 V2). */
 const FORM_SECTIONS = new Set(["01", "02", "10"]);
@@ -26,11 +26,10 @@ export function validationAnswerRoutes(ctx: AppContext) {
   const { db } = ctx;
   const validationParams = z.object({ validationId: z.uuid() });
   return new Elysia({ name: "moonx-validation-answers" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/validations/:validationId/questions/:sectionKey",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
+      async ({ params, scope }) => {
         if (!FORM_SECTIONS.has(params.sectionKey)) {
           throw new ApiError("NOT_FOUND", "No such section");
         }
@@ -44,13 +43,14 @@ export function validationAnswerRoutes(ctx: AppContext) {
           answers: await buildValidationAnswers(db, scope.workspaceId, data, questions),
         };
       },
-      { params: z.object({ validationId: z.uuid(), sectionKey: z.string().max(10) }) },
+      {
+        params: z.object({ validationId: z.uuid(), sectionKey: z.string().max(10) }),
+        scoped: { to: { validationId: "validationId" }, need: "member" },
+      },
     )
     .put(
       "/validations/:validationId/answers/:questionKey",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
-        requireWritable(scope);
+      async ({ params, body, user, request, scope }) => {
         return db.transaction((tx) =>
           saveAnswer(
             tx,
@@ -69,13 +69,12 @@ export function validationAnswerRoutes(ctx: AppContext) {
       {
         params: z.object({ validationId: z.uuid(), questionKey: z.string().max(100) }),
         body: putAnswerBodySchema,
+        scoped: { to: { validationId: "validationId" }, need: "writable" },
       },
     )
     .post(
       "/validations/:validationId/evidence",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
-        requireWritable(scope);
+      async ({ params, body, user, request, set, scope }) => {
         const result = await db.transaction((tx) =>
           createEvidence(
             tx,
@@ -92,13 +91,15 @@ export function validationAnswerRoutes(ctx: AppContext) {
         set.status = 201;
         return result;
       },
-      { params: validationParams, body: createEvidenceBodySchema },
+      {
+        params: validationParams,
+        body: createEvidenceBodySchema,
+        scoped: { to: { validationId: "validationId" }, need: "writable" },
+      },
     )
     .delete(
       "/evidence/:evidenceId",
-      async ({ params, query, user, request }) => {
-        const scope = await resolveScope(db, user, { evidenceId: params.evidenceId });
-        requireWritable(scope);
+      async ({ params, query, user, request, scope }) => {
         return db.transaction((tx) =>
           removeEvidence(
             tx,
@@ -114,6 +115,10 @@ export function validationAnswerRoutes(ctx: AppContext) {
           ),
         );
       },
-      { params: z.object({ evidenceId: z.uuid() }), query: removeEvidenceQuerySchema },
+      {
+        params: z.object({ evidenceId: z.uuid() }),
+        query: removeEvidenceQuerySchema,
+        scoped: { to: { evidenceId: "evidenceId" }, need: "writable" },
+      },
     );
 }

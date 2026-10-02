@@ -30,7 +30,7 @@ import {
   buildExecutionItems,
 } from "./execution";
 import { type HistoryRow, toHistoryEntries } from "./history-dto";
-import { type HistoryAccess, requireRevertable, resolveContainer } from "./history-target";
+import { containerAccess, containerScopeRef, type HistoryAccess } from "./history-target";
 import { loadIdeas } from "./ideas";
 import { loadPlanBundle } from "./plan-context";
 import { findPlanQuestion } from "./plan-question";
@@ -41,6 +41,7 @@ import {
   namedPlanWrite,
   touchPlanActivity,
 } from "./plan-write";
+import type { Scope, ScopeRef } from "./scope";
 import { buildSelfAnalysisAnswers } from "./self-analysis";
 import { loadTemplateSections } from "./template";
 import { loadValidationAnswers } from "./validation-answers";
@@ -800,6 +801,8 @@ const HANDLERS: Partial<Record<TargetType, Handler>> = {
 /** Who reverts, when, and through which request. */
 export interface RevertContext {
   user: { id: string; timezone: string };
+  /** The container's scope as the route declared it (writable); null for a self analysis. */
+  scope: Scope | null;
   request: Request;
   now: Date;
 }
@@ -862,9 +865,36 @@ async function applyAndRecord(
 const loadRow = async (db: Executor, id: string) =>
   (await db.select().from(schema.changeHistory).where(eq(schema.changeHistory.id, id)))[0];
 
+/** What a revert of one entry needs authorized: the scope of the entry's container (404 when unknown). */
+export async function entryScopeRef(
+  db: Executor,
+  user: { id: string },
+  entryId: string,
+): Promise<ScopeRef | null> {
+  const entry = await loadRow(db, entryId);
+  if (!entry) throw notFound();
+  return containerScopeRef(db, user, entry.containerType, entry.containerId);
+}
+
+/** The same for a batch: its rows share one container, so the newest row stands for it. */
+export async function batchScopeRef(
+  db: Executor,
+  user: { id: string },
+  batchId: string,
+): Promise<ScopeRef | null> {
+  const [first] = await db
+    .select()
+    .from(schema.changeHistory)
+    .where(eq(schema.changeHistory.batchId, batchId))
+    .orderBy(desc(schema.changeHistory.changedAt), desc(schema.changeHistory.id))
+    .limit(1);
+  if (!first) throw notFound();
+  return containerScopeRef(db, user, first.containerType, first.containerId);
+}
+
 /** The history row's container, checked against the row's own workspace. */
-async function accessOf(db: Executor, user: { id: string }, entry: HistoryRow) {
-  const access = await resolveContainer(db, user, entry.containerType, entry.containerId);
+function accessOf(user: { id: string }, entry: HistoryRow, scope: Scope | null) {
+  const access = containerAccess(user, entry.containerType, entry.containerId, scope);
   if (access.workspaceId !== entry.workspaceId) throw notFound();
   return access;
 }
@@ -997,8 +1027,7 @@ export async function revertEntry(
 ): Promise<{ entry: HistoryEntry; target: unknown }> {
   const entry = await loadRow(db, entryId);
   if (!entry) throw notFound();
-  const access = await accessOf(db, ctx.user, entry);
-  requireRevertable(access);
+  const access = accessOf(ctx.user, entry, ctx.scope);
   if (NOT_RESTORABLE.has(entry.targetType as TargetType)) {
     throw refused("entryId", "This entry cannot be reverted one at a time");
   }
@@ -1106,8 +1135,7 @@ export async function revertBatch(
       .orderBy(desc(schema.changeHistory.changedAt), desc(schema.changeHistory.id));
   const first = (await batchRows(db))[0];
   if (!first) throw notFound();
-  const access = await accessOf(db, ctx.user, first);
-  requireRevertable(access);
+  const access = accessOf(ctx.user, first, ctx.scope);
 
   const newBatchId = crypto.randomUUID();
   const env: Env = { access, userId: ctx.user.id, now: ctx.now };

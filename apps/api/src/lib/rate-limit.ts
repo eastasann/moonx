@@ -8,13 +8,26 @@ export const RATE_LIMITS = {
   invitation: { limit: 20, windowSeconds: 3600 },
   pdf: { limit: 30, windowSeconds: 3600 },
   ai: { limit: 60, windowSeconds: 3600 },
-  /** Per IP address, not per user: the caller has no account yet (U5). */
-  signUp: { limit: 10, windowSeconds: 60 },
+  /**
+   * Per IP address, one bucket for every endpoint that takes a secret (`AUTH_SECRET_PATHS` and
+   * U5): the caller may have no account yet, and guesses spread over several paths count together.
+   */
+  authSecret: { limit: 10, windowSeconds: 60 },
   /** Password guesses at U7, per user: a stolen session must not be able to try passwords freely. */
   passwordCheck: { limit: 5, windowSeconds: 600 },
 } as const;
 
-/** The operations that have a per-user limit. */
+/** The Better Auth paths that take a password or a reset token (SDD 5.4, 7.2); POST only. */
+export const AUTH_SECRET_PATHS: ReadonlySet<string> = new Set([
+  "/api/auth/sign-in/email",
+  "/api/auth/sign-in/social",
+  "/api/auth/sign-up/email",
+  "/api/auth/request-password-reset",
+  "/api/auth/reset-password",
+  "/api/auth/change-password",
+]);
+
+/** The operations that have a limit; the key is a user id, or an IP address for `authSecret`. */
 export type RateLimitName = keyof typeof RATE_LIMITS;
 
 /**

@@ -208,7 +208,7 @@ ADR-005・ADR-006・ADR-019・ADR-020・ADR-023・ADR-029 に従って、API の
    - 応答はすべて Cache-Control: no-store。CSRF の決まり（7.2）。Worker の共有シークレットの検査
      （2章 通信フロー 3。PROXY_SHARED_SECRET が空の local では検査しない）
    - X-Moonx-Client / X-Moonx-App-Version の記録と 426 APP_UPDATE_REQUIRED（最低の版はコードの定数）
-   - 認可: resolveScope（7.1「実装」）。クエリは必ずそのワークスペースで絞る。アーカイブは 409 ARCHIVED
+   - 認可: ルートの宣言（`apps/api/src/access.ts`。7.1「実装」）。クエリは必ずそのワークスペースで絞る。アーカイブはロールにかかわらず 409 ARCHIVED
    - 変更履歴の withHistory（ADR-020）と楽観ロック（ADR-019: lockVersion、409 CONFLICT と current、force）
    - アプリの回数制限のミドルウェア（ADR-029 の②。rate_limits に app: の接頭辞）
    - メールの送信（MAIL_TRANSPORT=console は API のログに出す、resend は Resend の HTTP API。
@@ -482,7 +482,7 @@ make test-api・make lint・make typecheck・make doc-lint が通り、AD9 で�
 
 ## Step 13b: 仕様からの劣化を直す（1）: API・計算・PDF
 
-Status:
+Status: done 2026-10-02
 
 ```
 無人ループが Step 1〜12 で自律的に決め、元の仕様（ループの前の docs。コミット 5d85129）より劣化させた点を、
@@ -717,7 +717,9 @@ Step 11 と同じ範囲を、docs/02-01_system-design-doc.md の ADR-003・ADR-0
 
 やること:
 1. API クライアント: Eden Treaty ＋ TanStack Query、EXPO_PUBLIC_API_BASE_URL、X-Moonx-Client: ios / android と
-   X-Moonx-App-Version、Better Auth の Expo プラグイン（SecureStore）、426 の「Update moonx to continue」
+   X-Moonx-App-Version、Better Auth の Expo プラグイン（SecureStore）、426 の「Update moonx to continue」。
+   状態を変えるリクエストには、本文が無くても `Content-Type: application/json` を付ける（SDD 7.2 の CSRF。
+   Web は `apps/web/src/lib/api.ts` の `withJsonType` が同じことをしている）
 2. i18n の組み込み
 3. ルーティング（Expo Router。パスは Web と同じ）、ディープリンク（moonx:// / moonx-staging://、Universal Links と
    App Links の設定。配るファイルは Step 26 で作る）

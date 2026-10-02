@@ -7,6 +7,7 @@ import {
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { type AccessInput, accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError, validationFailed } from "../errors";
 import {
@@ -14,6 +15,7 @@ import {
   type LocatedTarget,
   locateTarget,
   requireCommentable,
+  targetScopeRef,
 } from "../lib/comment-target";
 import {
   type CommentRow,
@@ -24,9 +26,17 @@ import {
   toComments,
   toThreads,
 } from "../lib/comments";
-import { authPlugin } from "../plugins";
+import type { Scope } from "../lib/scope";
 
 const commentParams = z.object({ commentId: z.uuid() });
+
+type ListCommentsQuery = z.infer<typeof listCommentsQuerySchema>;
+
+const queryTarget = (query: ListCommentsQuery) => ({
+  type: query.targetType,
+  id: query.targetId,
+  key: query.targetKey ?? null,
+});
 
 /** C1-C3 (SDD 5.11, 7.1). */
 export function commentRoutes(ctx: AppContext) {
@@ -38,19 +48,24 @@ export function commentRoutes(ctx: AppContext) {
     return row;
   }
 
-  /** The target of a stored comment, authorized for a change by the caller (404 when hidden). */
-  async function accessOf(user: { id: string }, row: CommentRow) {
-    const located = await locateTarget(db, {
-      type: row.targetType,
-      id: row.targetId,
-      key: row.targetKey,
-    });
-    const access = await authorizeTarget(db, user, located, {
+  const locateRow = (row: CommentRow) =>
+    locateTarget(db, { type: row.targetType, id: row.targetId, key: row.targetKey });
+
+  /** The scope of a stored comment's target for a change by the caller (404 when hidden). */
+  const rowScope = async ({ params, user }: AccessInput) => {
+    const row = await loadRow(params.commentId);
+    return targetScopeRef(await locateRow(row), user, {
       workspaceId: row.workspaceId,
       write: true,
+    });
+  };
+
+  /** The target of a stored comment, authorized for a change by the caller (404 when hidden). */
+  async function accessOf(row: CommentRow, scope: Scope | null) {
+    return authorizeTarget(db, await locateRow(row), scope, {
+      workspaceId: row.workspaceId,
       existing: true,
     });
-    return access;
   }
 
   async function one(commentId: string) {
@@ -58,9 +73,14 @@ export function commentRoutes(ctx: AppContext) {
     return comment;
   }
 
-  async function resolveThread(commentId: string, user: { id: string }, resolved: boolean) {
+  async function resolveThread(
+    commentId: string,
+    user: { id: string },
+    scope: Scope | null,
+    resolved: boolean,
+  ) {
     const row = await loadRow(commentId);
-    const access = await accessOf(user, row);
+    const access = await accessOf(row, scope);
     if (row.parentId) {
       throw validationFailed([
         { path: "commentId", code: "invalid_value", message: "Only the first comment of a thread" },
@@ -77,19 +97,16 @@ export function commentRoutes(ctx: AppContext) {
     return one(row.id);
   }
 
+  const commentRow = { to: rowScope, need: "member" } as const;
+
   return new Elysia({ name: "moonx-comments" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/comments",
-      async ({ query, user }) => {
-        const located = await locateTarget(db, {
-          type: query.targetType,
-          id: query.targetId,
-          key: query.targetKey ?? null,
-        });
-        const access = await authorizeTarget(db, user, located, {
+      async ({ query, scope }) => {
+        const located = await locateTarget(db, queryTarget(query as ListCommentsQuery));
+        const access = await authorizeTarget(db, located, scope, {
           workspaceId: query.workspaceId,
-          write: false,
         });
         // Comments of a deleted row or of a question the pinned template no longer has stay
         // stored but are not shown (design-spec 6.0.4, 6.0.7).
@@ -110,16 +127,23 @@ export function commentRoutes(ctx: AppContext) {
           .orderBy(asc(schema.comments.createdAt), asc(schema.comments.id));
         return { threads: await toThreads(db, rows) };
       },
-      { query: listCommentsQuerySchema },
+      {
+        query: listCommentsQuerySchema,
+        located: {
+          to: async ({ query, user }: AccessInput) =>
+            targetScopeRef(await locateTarget(db, queryTarget(query as ListCommentsQuery)), user, {
+              workspaceId: query.workspaceId,
+              write: false,
+            }),
+          need: "member",
+        },
+      },
     )
     .post(
       "/comments",
-      async ({ body, user, set }) => {
+      async ({ body, user, scope, set }) => {
         const located: LocatedTarget = await locateTarget(db, body.target);
-        const access = await authorizeTarget(db, user, located, {
-          workspaceId: body.workspaceId,
-          write: true,
-        });
+        const access = await authorizeTarget(db, located, scope, { workspaceId: body.workspaceId });
         requireCommentable(access, false);
         const id = await createComment(db, {
           access,
@@ -132,13 +156,23 @@ export function commentRoutes(ctx: AppContext) {
         set.status = 201;
         return one(id);
       },
-      { body: createCommentBodySchema },
+      {
+        body: createCommentBodySchema,
+        located: {
+          to: async ({ body, user }: AccessInput) =>
+            targetScopeRef(await locateTarget(db, body.target), user, {
+              workspaceId: body.workspaceId,
+              write: true,
+            }),
+          need: "member",
+        },
+      },
     )
     .patch(
       "/comments/:commentId",
-      async ({ params, body, user }) => {
+      async ({ params, body, user, scope }) => {
         const row = await loadRow(params.commentId);
-        const access = await accessOf(user, row);
+        const access = await accessOf(row, scope);
         if (row.authorId !== user.id) {
           throw new ApiError("FORBIDDEN", "Only the author can change a comment");
         }
@@ -154,13 +188,13 @@ export function commentRoutes(ctx: AppContext) {
         });
         return one(row.id);
       },
-      { params: commentParams, body: updateCommentBodySchema },
+      { params: commentParams, body: updateCommentBodySchema, located: commentRow },
     )
     .delete(
       "/comments/:commentId",
-      async ({ params, user, set }) => {
+      async ({ params, user, scope, set }) => {
         const row = await loadRow(params.commentId);
-        const access = await accessOf(user, row);
+        const access = await accessOf(row, scope);
         if (row.authorId !== user.id) {
           throw new ApiError("FORBIDDEN", "Only the author can delete a comment");
         }
@@ -168,16 +202,16 @@ export function commentRoutes(ctx: AppContext) {
         await deleteComment(db, { access, userId: user.id, now: ctx.now(), comment: row });
         set.status = 204;
       },
-      { params: commentParams },
+      { params: commentParams, located: commentRow },
     )
     .post(
       "/comments/:commentId/resolve",
-      async ({ params, user }) => resolveThread(params.commentId, user, true),
-      { params: commentParams },
+      async ({ params, user, scope }) => resolveThread(params.commentId, user, scope, true),
+      { params: commentParams, located: commentRow },
     )
     .delete(
       "/comments/:commentId/resolve",
-      async ({ params, user }) => resolveThread(params.commentId, user, false),
-      { params: commentParams },
+      async ({ params, user, scope }) => resolveThread(params.commentId, user, scope, false),
+      { params: commentParams, located: commentRow },
     );
 }

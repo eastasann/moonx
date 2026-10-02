@@ -25,7 +25,7 @@ async function toMatch(text: string) {
 
 test("a discarded block drops out and can be restored", async () => {
   api();
-  await toMatch("## [V.01.WHO]\nBPO HR teams\n\n## Customer segments\nBPO firms");
+  await toMatch("## [V.01.WHO]\nBPO HR teams\n\n## [] Customer segments\nBPO firms");
   const [, loose] = matchRows();
   await userEvent.click(within(loose as HTMLElement).getByRole("button", { name: "Discard" }));
   expect(matchRows()[1]).toHaveTextContent("Discarded");

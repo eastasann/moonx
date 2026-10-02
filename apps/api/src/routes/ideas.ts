@@ -8,6 +8,7 @@ import {
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { historyActor } from "../lib/dto";
 import { duplicateIdea } from "../lib/idea-duplicate";
@@ -15,8 +16,6 @@ import { listIdeas } from "../lib/idea-query";
 import { createIdea, setIdeaArchived, updateIdea } from "../lib/idea-write";
 import { loadIdeas } from "../lib/ideas";
 import { decodeCursor } from "../lib/page";
-import { requireEditor, requireWritable, resolveScope } from "../lib/scope";
-import { authPlugin } from "../plugins";
 
 const workspaceParams = z.object({ workspaceId: z.uuid() });
 const ideaParams = z.object({ ideaId: z.uuid() });
@@ -32,11 +31,10 @@ export function ideaRoutes(ctx: AppContext) {
   }
 
   return new Elysia({ name: "moonx-ideas" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/workspaces/:workspaceId/ideas",
-      async ({ params, query, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+      async ({ query, scope }) => {
         return listIdeas(
           db,
           scope.workspaceId,
@@ -52,13 +50,15 @@ export function ideaRoutes(ctx: AppContext) {
           Number(query.limit),
         );
       },
-      { params: workspaceParams, query: listIdeasQuerySchema },
+      {
+        params: workspaceParams,
+        query: listIdeasQuerySchema,
+        scoped: { to: { workspaceId: "workspaceId" }, need: "member" },
+      },
     )
     .post(
       "/workspaces/:workspaceId/ideas",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
-        requireEditor(scope);
+      async ({ body, user, request, set, scope }) => {
         const ideaId = await createIdea(db, {
           workspaceId: scope.workspaceId,
           actor: historyActor(request, user),
@@ -68,21 +68,22 @@ export function ideaRoutes(ctx: AppContext) {
         set.status = 201;
         return detailOf(scope.workspaceId, ideaId);
       },
-      { params: workspaceParams, body: createIdeaBodySchema },
+      {
+        params: workspaceParams,
+        body: createIdeaBodySchema,
+        scoped: { to: { workspaceId: "workspaceId" }, need: "editor" },
+      },
     )
     .get(
       "/ideas/:ideaId",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { ideaId: params.ideaId });
+      async ({ params, scope }) => {
         return detailOf(scope.workspaceId, params.ideaId);
       },
-      { params: ideaParams },
+      { params: ideaParams, scoped: { to: { ideaId: "ideaId" }, need: "member" } },
     )
     .patch(
       "/ideas/:ideaId",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { ideaId: params.ideaId });
-        requireWritable(scope);
+      async ({ params, body, user, request, scope }) => {
         await updateIdea(db, {
           ideaId: params.ideaId,
           workspaceId: scope.workspaceId,
@@ -92,13 +93,15 @@ export function ideaRoutes(ctx: AppContext) {
         });
         return detailOf(scope.workspaceId, params.ideaId);
       },
-      { params: ideaParams, body: updateIdeaBodySchema },
+      {
+        params: ideaParams,
+        body: updateIdeaBodySchema,
+        scoped: { to: { ideaId: "ideaId" }, need: "writable" },
+      },
     )
     .post(
       "/ideas/:ideaId/duplicate",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { ideaId: params.ideaId });
-        requireEditor(scope);
+      async ({ params, body, user, request, set, scope }) => {
         const ideaId = await duplicateIdea(db, {
           sourceId: params.ideaId,
           workspaceId: scope.workspaceId,
@@ -109,13 +112,15 @@ export function ideaRoutes(ctx: AppContext) {
         set.status = 201;
         return detailOf(scope.workspaceId, ideaId);
       },
-      { params: ideaParams, body: duplicateIdeaBodySchema.optional() },
+      {
+        params: ideaParams,
+        body: duplicateIdeaBodySchema.optional(),
+        scoped: { to: { ideaId: "ideaId" }, need: "editor" },
+      },
     )
     .post(
       "/ideas/:ideaId/archive",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { ideaId: params.ideaId });
-        requireEditor(scope);
+      async ({ params, scope }) => {
         await setIdeaArchived(db, {
           ideaId: params.ideaId,
           workspaceId: scope.workspaceId,
@@ -124,13 +129,11 @@ export function ideaRoutes(ctx: AppContext) {
         });
         return detailOf(scope.workspaceId, params.ideaId);
       },
-      { params: ideaParams },
+      { params: ideaParams, scoped: { to: { ideaId: "ideaId" }, need: "editor" } },
     )
     .post(
       "/ideas/:ideaId/restore",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { ideaId: params.ideaId });
-        requireEditor(scope);
+      async ({ params, scope }) => {
         await setIdeaArchived(db, {
           ideaId: params.ideaId,
           workspaceId: scope.workspaceId,
@@ -139,6 +142,6 @@ export function ideaRoutes(ctx: AppContext) {
         });
         return detailOf(scope.workspaceId, params.ideaId);
       },
-      { params: ideaParams },
+      { params: ideaParams, scoped: { to: { ideaId: "ideaId" }, need: "editor" } },
     );
 }

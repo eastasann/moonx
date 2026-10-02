@@ -26,7 +26,11 @@ export interface AppConfig {
   auth: {
     /** Signs sessions and tokens (SDD 2 環境変数). Every environment but the tests must set it. */
     secret: string;
-    /** Empty values leave Google sign-in switched off; everything else keeps working. */
+    /**
+     * Google sign-in is a user-specified requirement (ADR-010): staging and production refuse to
+     * start without both values. Only local and the tests may leave them empty, which switches
+     * Google sign-in off.
+     */
     googleClientId: string;
     googleClientSecret: string;
   };
@@ -50,7 +54,8 @@ const APP_ENVS = ["local", "staging", "production"] as const;
  * Reads the settings from the environment (SDD 2 環境変数). A missing or malformed value never
  * falls back to the local behavior, because that behavior is unsafe when deployed (it accepts the
  * dev-user header and writes invitation links to the log): `APP_ENV` is required, and staging and
- * production refuse to start without the Worker's shared secret and the Resend transport.
+ * production refuse to start without the Worker's shared secret, the Resend transport and Google's
+ * OAuth client.
  */
 export function loadConfig(env: Record<string, string | undefined> = process.env): AppConfig {
   const appEnv = env.APP_ENV;
@@ -78,6 +83,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     if (proxySecrets.length === 0) throw new Error(`PROXY_SHARED_SECRET is required in ${appEnv}`);
     if (transport !== "resend") throw new Error(`MAIL_TRANSPORT must be resend in ${appEnv}`);
     for (const name of [
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
       "BETTER_AUTH_URL",
       "MAIL_FROM",
       "TRUSTED_ORIGINS",

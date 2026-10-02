@@ -64,7 +64,7 @@ test("text without an ID, an unknown ID and an ID outside the scope are not matc
   await toMatch(
     [
       "Here are my thoughts first.",
-      "## Customer segments\nBPO firms",
+      "## [] Customer segments\nBPO firms",
       "## [V.99.NOPE]\nunknown",
       "## [V.10.WHY_WORK]\nout of scope",
     ].join("\n\n"),

@@ -52,7 +52,7 @@ export async function startTestApp(config: Partial<AppConfig> = {}): Promise<Tes
 
 /**
  * Signs in through Better Auth the way a client does and returns the headers that carry the
- * session; `headers` are sent with the sign-in (the Worker's shared secret, for guarded apps). Sends no `CF-Connecting-IP`, so Better Auth's per-IP limit does not count these.
+ * session; `headers` are sent with the sign-in (the Worker's shared secret, for guarded apps).
  */
 export async function loginWith(
   app: Elysia,
@@ -63,7 +63,12 @@ export async function loginWith(
   const response = await app.handle(
     new Request("http://localhost/api/auth/sign-in/email", {
       method: "POST",
-      headers: { "content-type": "application/json", ...headers },
+      // A fresh address each time: the sign-in paths allow ten a minute per IP (SDD 7.2).
+      headers: {
+        "content-type": "application/json",
+        "cf-connecting-ip": nextAddress(),
+        ...headers,
+      },
       body: JSON.stringify({ email, password }),
     }),
   );
@@ -72,6 +77,10 @@ export async function loginWith(
   }
   return { cookie: cookieHeader(response) };
 }
+
+let addressCounter = 0;
+/** A new documentation-range address per call, so no address signs in ten times in a minute. */
+const nextAddress = () => `192.0.2.${(addressCounter++ % 250) + 1}`;
 
 /** The `Cookie` header that replays the cookies a response set. */
 export function cookieHeader(response: Response): string {
@@ -130,6 +139,9 @@ export async function call<T = any>(
   if (options.body !== undefined) {
     headers["content-type"] = "application/json";
     body = JSON.stringify(options.body);
+  } else if (method !== "GET" && method !== "HEAD") {
+    // The API requires the type on every state-changing request, even one with no body (SDD 7.2).
+    headers["content-type"] ??= "application/json";
   }
   const response = await app.handle(
     new Request(`http://localhost${path}`, { method, headers, body }),

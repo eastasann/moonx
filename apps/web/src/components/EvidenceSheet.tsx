@@ -127,7 +127,7 @@ export function EvidenceSheet({
       call(
         api()
           .api.v1.evidence({ evidenceId })
-          .delete(undefined, { query: { lockVersion: getLockVersion() } }),
+          .delete({}, { query: { lockVersion: getLockVersion() } }),
       ),
     onSuccess: (result) => {
       setNotice(null);

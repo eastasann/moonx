@@ -1,40 +1,37 @@
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { loadActivity } from "../lib/dashboard-activity";
 import { loadDueSoon, loadSelfAnalysisOverview } from "../lib/dashboard-data";
 import { listDashboardIdeas } from "../lib/idea-query";
-import { requireEditor, resolveScope } from "../lib/scope";
-import { authPlugin } from "../plugins";
 
-const params = { params: z.object({ workspaceId: z.uuid() }) };
+const workspaceParams = z.object({ workspaceId: z.uuid() });
+
+/** A new object per route: Elysia keys what a macro built on the option object (see access.ts). */
+const workspaceRule = (need: "member" | "editor") => ({
+  params: workspaceParams,
+  scoped: { to: { workspaceId: "workspaceId" }, need },
+});
 
 /** D1-D4 (SDD 5.6). */
 export function dashboardRoutes(ctx: AppContext) {
   const { db } = ctx;
   return new Elysia({ name: "moonx-dashboard" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/workspaces/:workspaceId/dashboard/ideas",
-      async ({ params: p, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: p.workspaceId });
-        return listDashboardIdeas(db, scope.workspaceId);
-      },
-      params,
+      ({ scope }) => listDashboardIdeas(db, scope.workspaceId),
+      workspaceRule("member"),
     )
     .get(
       "/workspaces/:workspaceId/dashboard/self-analyses",
-      async ({ params: p, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: p.workspaceId });
-        requireEditor(scope);
-        return { items: await loadSelfAnalysisOverview(db, scope.workspaceId) };
-      },
-      params,
+      async ({ scope }) => ({ items: await loadSelfAnalysisOverview(db, scope.workspaceId) }),
+      workspaceRule("editor"),
     )
     .get(
       "/workspaces/:workspaceId/dashboard/due-soon",
-      async ({ params: p, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: p.workspaceId });
+      async ({ scope, user }) => {
         return {
           items: await loadDueSoon(db, {
             workspaceId: scope.workspaceId,
@@ -44,14 +41,11 @@ export function dashboardRoutes(ctx: AppContext) {
           }),
         };
       },
-      params,
+      workspaceRule("member"),
     )
     .get(
       "/workspaces/:workspaceId/dashboard/activity",
-      async ({ params: p, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: p.workspaceId });
-        return { items: await loadActivity(db, scope.workspaceId) };
-      },
-      params,
+      async ({ scope }) => ({ items: await loadActivity(db, scope.workspaceId) }),
+      workspaceRule("member"),
     );
 }

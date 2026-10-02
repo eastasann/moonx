@@ -260,6 +260,58 @@ describe("X3 apply", () => {
     expect(answer.classification.evidence.length).toBeGreaterThanOrEqual(0);
   });
 
+  test("a reply whose answer holds a `##` sub-heading is applied as one answer", async () => {
+    const id = await validationId();
+    const reply = [
+      "Here is the update.",
+      "",
+      "## [V.01.SWITCHING]",
+      "They ask a friend today.",
+      "",
+      "## Why they switch",
+      "A courier is faster.",
+      "",
+      "## [V.01.PROOF]",
+      "Two store interviews.",
+    ].join("\n");
+    const parsed = parseAiReply(reply);
+    expect(parsed.blocks.map((b) => b.id)).toEqual([null, "V.01.SWITCHING", "V.01.PROOF"]);
+    const switching = parsed.blocks[1]?.text as string;
+    expect(switching).toBe("They ask a friend today.\n\n## Why they switch\nA courier is faster.");
+
+    const context = (
+      await call(t.app, "GET", `/api/v1/ai/import/context?target=validation&id=${id}`, {
+        as: who.ana,
+      })
+    ).body;
+    const lock = (key: string) =>
+      context.questions.find((q: { questionKey: string }) => q.questionKey === key).current
+        .lockVersion;
+    const res = await call(t.app, "POST", apply, {
+      as: who.ana,
+      body: {
+        target: { type: "validation", id },
+        changes: [
+          {
+            questionKey: "V.01.SWITCHING",
+            text: switching,
+            baseLockVersion: lock("V.01.SWITCHING"),
+          },
+        ],
+      },
+    });
+    expect(res.status).toBe(200);
+    const after = (
+      await call(t.app, "GET", `/api/v1/ai/import/context?target=validation&id=${id}`, {
+        as: who.ana,
+      })
+    ).body;
+    expect(
+      after.questions.find((q: { questionKey: string }) => q.questionKey === "V.01.SWITCHING")
+        .current.text,
+    ).toBe(switching);
+  });
+
   test("a classification sent with the change is used; Fact needs evidence", async () => {
     const id = await validationId();
     const ctx = (

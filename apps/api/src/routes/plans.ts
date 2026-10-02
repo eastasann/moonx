@@ -14,6 +14,7 @@ import {
 } from "@moonx/schemas";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import { todayIn } from "../lib/dashboard-data";
@@ -44,15 +45,8 @@ import {
 } from "../lib/plan-write";
 import { loadPlanSummaries } from "../lib/plans";
 import { enforceRateLimit } from "../lib/rate-limit";
-import {
-  requireEditor,
-  requireNotArchived,
-  requireWritable,
-  resolveScope,
-  type Scope,
-} from "../lib/scope";
+import type { Scope } from "../lib/scope";
 import { renderPitchDeckPdf } from "../pdf/pitch-deck-pdf";
-import { authPlugin } from "../plugins";
 
 const ideaParams = z.object({ ideaId: z.uuid() });
 const planParams = z.object({ planId: z.uuid() });
@@ -93,24 +87,25 @@ export function planRoutes(ctx: AppContext) {
   }
 
   return new Elysia({ name: "moonx-plans" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/ideas/:ideaId/plans",
-      async ({ params, query, user }) => {
-        const scope = await resolveScope(db, user, { ideaId: params.ideaId });
+      async ({ params, query, scope }) => {
         const all = await loadPlanSummaries(db, scope.workspaceId, [params.ideaId]);
         const plans = all.get(params.ideaId) ?? [];
         return {
           items: query.includeArchived === "true" ? plans : plans.filter((p) => !p.archived),
         };
       },
-      { params: ideaParams, query: listPlansQuerySchema },
+      {
+        params: ideaParams,
+        query: listPlansQuerySchema,
+        scoped: { to: { ideaId: "ideaId" }, need: "member" },
+      },
     )
     .post(
       "/ideas/:ideaId/plans",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { ideaId: params.ideaId });
-        requireWritable(scope);
+      async ({ params, body, user, request, set, scope }) => {
         const planId = await db.transaction((tx) =>
           createPlanDraft(
             tx,
@@ -127,54 +122,56 @@ export function planRoutes(ctx: AppContext) {
         set.status = 201;
         return homeOf({ ...scope, planId }, user);
       },
-      { params: ideaParams, body: createPlanBodySchema },
+      {
+        params: ideaParams,
+        body: createPlanBodySchema,
+        scoped: { to: { ideaId: "ideaId" }, need: "writable" },
+      },
     )
     .get(
       "/plans/:planId",
-      async ({ params, query, user }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
+      async ({ query, user, scope }) => {
         return homeOf(scope, user, query.versionId);
       },
-      { params: planParams, query: planVersionQuerySchema },
+      {
+        params: planParams,
+        query: planVersionQuerySchema,
+        scoped: { to: { planId: "planId" }, need: "member" },
+      },
     )
     .patch(
       "/plans/:planId",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
-        requireWritable(scope);
+      async ({ body, user, request, scope }) => {
         await db.transaction((tx) =>
           updatePlanHeader(tx, writeContext(scope, request, user), body),
         );
         return homeOf(scope, user);
       },
-      { params: planParams, body: updatePlanBodySchema },
+      {
+        params: planParams,
+        body: updatePlanBodySchema,
+        scoped: { to: { planId: "planId" }, need: "writable" },
+      },
     )
     .post(
       "/plans/:planId/archive",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
-        requireEditor(scope);
-        requireNotArchived({ ...scope, planArchived: false });
+      async ({ params, scope }) => {
         await db.transaction((tx) => setPlanArchived(tx, params.planId, true, ctx.now()));
         return summaryOf(scope);
       },
-      { params: planParams },
+      { params: planParams, scoped: { to: { planId: "planId" }, need: "plan-archive-toggle" } },
     )
     .post(
       "/plans/:planId/restore",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
-        requireEditor(scope);
-        requireNotArchived({ ...scope, planArchived: false });
+      async ({ params, scope }) => {
         await db.transaction((tx) => setPlanArchived(tx, params.planId, false, ctx.now()));
         return summaryOf(scope);
       },
-      { params: planParams },
+      { params: planParams, scoped: { to: { planId: "planId" }, need: "plan-archive-toggle" } },
     )
     .get(
       "/plans/:planId/items/:itemNo",
-      async ({ params, query, user }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
+      async ({ params, query, user, scope }) => {
         const bundle = await loadPlanBundle(db, params.planId);
         const viewing = await loadViewedVersion(db, params.planId, query.versionId);
         return buildPlanItem(
@@ -188,13 +185,12 @@ export function planRoutes(ctx: AppContext) {
       {
         params: z.object({ planId: z.uuid(), itemNo: z.coerce.number().int().min(1).max(30) }),
         query: planVersionQuerySchema,
+        scoped: { to: { planId: "planId" }, need: "member" },
       },
     )
     .put(
       "/plans/:planId/answers/:questionKey",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
-        requireWritable(scope);
+      async ({ params, body, user, request, scope }) => {
         return db.transaction((tx) =>
           savePlanAnswer(tx, writeContext(scope, request, user), params.questionKey, body),
         );
@@ -202,21 +198,19 @@ export function planRoutes(ctx: AppContext) {
       {
         params: z.object({ planId: z.uuid(), questionKey: z.string().max(100) }),
         body: putPlanAnswerBodySchema,
+        scoped: { to: { planId: "planId" }, need: "writable" },
       },
     )
     .get(
       "/plans/:planId/versions",
-      async ({ params, user }) => {
-        await resolveScope(db, user, { planId: params.planId });
+      async ({ params }) => {
         return { items: await buildVersionSummaries(db, await loadPlanBundle(db, params.planId)) };
       },
-      { params: planParams },
+      { params: planParams, scoped: { to: { planId: "planId" }, need: "member" } },
     )
     .post(
       "/plans/:planId/versions",
-      async ({ params, body, user, set }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
-        requireWritable(scope);
+      async ({ params, body, user, set, scope }) => {
         const saved = await db.transaction((tx) =>
           savePlanVersion(
             tx,
@@ -233,22 +227,22 @@ export function planRoutes(ctx: AppContext) {
         set.status = 201;
         return saved;
       },
-      { params: planParams, body: savePlanVersionBodySchema },
+      {
+        params: planParams,
+        body: savePlanVersionBodySchema,
+        scoped: { to: { planId: "planId" }, need: "writable" },
+      },
     )
     .get(
       "/plans/:planId/go-no-go-context",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
-        requireEditor(scope);
+      async ({ params }) => {
         return loadGoNoGoContext(db, await loadPlanBundle(db, params.planId));
       },
-      { params: planParams },
+      { params: planParams, scoped: { to: { planId: "planId" }, need: "editor" } },
     )
     .post(
       "/plans/:planId/go-no-go",
-      async ({ params, body, user, set }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
-        requireWritable(scope);
+      async ({ params, body, user, set, scope }) => {
         const recorded = await db.transaction((tx) =>
           recordGoNoGo(
             tx,
@@ -265,12 +259,15 @@ export function planRoutes(ctx: AppContext) {
         set.status = 201;
         return recorded;
       },
-      { params: planParams, body: goNoGoBodySchema },
+      {
+        params: planParams,
+        body: goNoGoBodySchema,
+        scoped: { to: { planId: "planId" }, need: "writable" },
+      },
     )
     .get(
       "/plans/:planId/execution-items",
-      async ({ params, query, user }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
+      async ({ params, query, user, scope }) => {
         const bundle = await loadPlanBundle(db, params.planId);
         const assignee = query.assignee === "me" ? user.id : query.assignee;
         const rows = bundle.execution.filter(
@@ -286,13 +283,15 @@ export function planRoutes(ctx: AppContext) {
         );
         return { items: sortExecutionItems(items) };
       },
-      { params: planParams, query: listExecutionItemsQuerySchema },
+      {
+        params: planParams,
+        query: listExecutionItemsQuerySchema,
+        scoped: { to: { planId: "planId" }, need: "member" },
+      },
     )
     .post(
       "/plans/:planId/execution-items",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
-        requireWritable(scope);
+      async ({ body, user, request, set, scope }) => {
         const created = await db.transaction((tx) =>
           createExecutionItem(
             tx,
@@ -303,13 +302,15 @@ export function planRoutes(ctx: AppContext) {
         set.status = 201;
         return created;
       },
-      { params: planParams, body: createExecutionItemBodySchema },
+      {
+        params: planParams,
+        body: createExecutionItemBodySchema,
+        scoped: { to: { planId: "planId" }, need: "writable" },
+      },
     )
     .patch(
       "/execution-items/:itemId",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { executionItemId: params.itemId });
-        requireWritable(scope);
+      async ({ params, body, user, request, scope }) => {
         return db.transaction((tx) =>
           updateExecutionItem(
             tx,
@@ -319,13 +320,15 @@ export function planRoutes(ctx: AppContext) {
           ),
         );
       },
-      { params: itemParams, body: updateExecutionItemBodySchema },
+      {
+        params: itemParams,
+        body: updateExecutionItemBodySchema,
+        scoped: { to: { executionItemId: "itemId" }, need: "writable" },
+      },
     )
     .delete(
       "/execution-items/:itemId",
-      async ({ params, user, request, set }) => {
-        const scope = await resolveScope(db, user, { executionItemId: params.itemId });
-        requireWritable(scope);
+      async ({ params, user, request, set, scope }) => {
         await db.transaction((tx) =>
           deleteExecutionItem(
             tx,
@@ -335,13 +338,11 @@ export function planRoutes(ctx: AppContext) {
         );
         set.status = 204;
       },
-      { params: itemParams },
+      { params: itemParams, scoped: { to: { executionItemId: "itemId" }, need: "writable" } },
     )
     .put(
       "/plans/:planId/execution-items/order",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { planId: params.planId });
-        requireWritable(scope);
+      async ({ body, user, request, set, scope }) => {
         await db.transaction((tx) =>
           reorderExecutionItems(
             tx,
@@ -352,12 +353,15 @@ export function planRoutes(ctx: AppContext) {
         );
         set.status = 204;
       },
-      { params: planParams, body: orderExecutionItemsBodySchema },
+      {
+        params: planParams,
+        body: orderExecutionItemsBodySchema,
+        scoped: { to: { planId: "planId" }, need: "writable" },
+      },
     )
     .get(
       "/plans/:planId/pitch-deck",
-      async ({ params, query, user }) => {
-        await resolveScope(db, user, { planId: params.planId });
+      async ({ params, query }) => {
         const bundle = await loadPlanBundle(db, params.planId);
         return (
           await loadPitchDeck(db, bundle, {
@@ -367,12 +371,15 @@ export function planRoutes(ctx: AppContext) {
           })
         ).deck;
       },
-      { params: planParams, query: pitchDeckQuerySchema },
+      {
+        params: planParams,
+        query: pitchDeckQuerySchema,
+        scoped: { to: { planId: "planId" }, need: "member" },
+      },
     )
     .get(
       "/plans/:planId/pitch-deck.pdf",
       async ({ params, query, user }) => {
-        await resolveScope(db, user, { planId: params.planId });
         await enforceRateLimit(db, "pdf", user.id, ctx.now().getTime());
         const bundle = await loadPlanBundle(db, params.planId);
         const { deck, currency, versionName } = await loadPitchDeck(db, bundle, {
@@ -389,6 +396,10 @@ export function planRoutes(ctx: AppContext) {
           },
         });
       },
-      { params: planParams, query: pitchDeckQuerySchema },
+      {
+        params: planParams,
+        query: pitchDeckQuerySchema,
+        scoped: { to: { planId: "planId" }, need: "member" },
+      },
     );
 }

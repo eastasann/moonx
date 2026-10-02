@@ -401,7 +401,6 @@ const MAX_NEXT_ACTIONS = 3;
 const MAX_MILESTONES = 6;
 const MAX_RISKS = 3;
 const MAX_COMPETITORS = 5;
-const MAX_FOUNDERS = 3;
 const NO_VALUE = t("plan:pitch.noValue");
 
 interface RawBullet {
@@ -459,7 +458,7 @@ const IMPACT_RANK = (value: string | number | null | undefined): number => {
  * type's smallest font size is cut with "…" and the slide gets `overflow: true`.
  *
  * Answer keys read (`P.{item}.{n}`): 01.1, 01.6, 03.1, 03.3, 03.4, 04.1, 04.2, 04.3, 05.1, 05.3,
- * 06.1 to 06.8, 08.1, 08.2, 10.1, 11.1 (rows: name, role), 20.2, 20.10, 20.11, 22.1 (rows: risk,
+ * 06.1 to 06.8, 08.1, 08.2, 08.11, 10.1 to 10.3, 11.1 (rows: name, role), 20.2, 20.10, 20.11, 22.1 (rows: risk,
  * probability, impact, mitigation), 24.1 to 24.3, 30.1 (one-minute notes), 30.2 (five-minute notes).
  * Execution items of type milestone, launch and next_action are read; done next actions are
  * skipped.
@@ -595,29 +594,37 @@ export function buildPitchDeck(input: PitchDeckInput): PitchDeck {
       ],
     });
 
-  const whyNow = () => {
-    const marketType = text("P.06.1") ?? "";
-    const redOnly = /red/i.test(marketType) && !/blue|mixed/i.test(marketType);
-    const captured = bullet(
-      "P.06.8",
-      t("plan:pitch.source.s6IfBlueMixedWhyHasNobodyCapturedIt"),
-      t("plan:pitch.label.whyNobody"),
-    );
-    return base("why_now", {
+  const whyNow = () =>
+    base("why_now", {
       type: "text",
       editSource: 1,
       bullets: [
         bullet("P.01.6", t("plan:pitch.source.s1WhyCanThisWork")),
-        ...(redOnly && captured.text == null ? [] : [captured]),
+        bullet(
+          "P.06.8",
+          t("plan:pitch.source.s6IfBlueMixedWhyHasNobodyCapturedIt"),
+          t("plan:pitch.label.whyNobody"),
+        ),
       ],
     });
-  };
 
   const whyUsOne = () =>
     base("why_us", {
       type: "text",
       editSource: 10,
-      bullets: [bullet("P.10.1", t("plan:pitch.source.s10FounderAdvantages"))],
+      bullets: [
+        bullet("P.10.1", t("plan:pitch.source.s10FounderAdvantages")),
+        bullet(
+          "P.10.2",
+          t("plan:pitch.source.s10MissingCapabilities"),
+          t("plan:pitch.label.missingCapabilities"),
+        ),
+        bullet(
+          "P.10.3",
+          t("plan:pitch.source.s10HowWillWeFillTheGaps"),
+          t("plan:pitch.label.fillGaps"),
+        ),
+      ],
     });
 
   const nextStep = () =>
@@ -740,6 +747,11 @@ export function buildPitchDeck(input: PitchDeckInput): PitchDeck {
           t("plan:pitch.source.s8SecondaryRevenueStreams"),
           t("plan:pitch.label.secondaryRevenue"),
         ),
+        bullet(
+          "P.08.11",
+          t("plan:pitch.source.s8WhyIsTheStartupCostJustified"),
+          t("plan:pitch.label.startupJustified"),
+        ),
       ],
       numbers: [
         {
@@ -838,6 +850,11 @@ export function buildPitchDeck(input: PitchDeckInput): PitchDeck {
           t("plan:pitch.source.s20RunwayIfSalesAreBelowPlan"),
           t("plan:pitch.label.runway"),
         ),
+        bullet(
+          "P.20.11",
+          t("plan:pitch.source.s20TriggerForAdditionalFunding"),
+          t("plan:pitch.label.fundingTrigger"),
+        ),
       ],
     });
   };
@@ -846,16 +863,27 @@ export function buildPitchDeck(input: PitchDeckInput): PitchDeck {
     const founders = rowsOf("P.11.1")
       .map((r) => [cellText(r.name), cellText(r.role)] as const)
       .filter(([name, role]) => name || role)
-      .slice(0, MAX_FOUNDERS)
       .map(([name, role]) => [name, role].filter(Boolean).join(" — "));
     return base("why_us", {
       type: "text",
       editSource: 10,
       bullets: [
         bullet("P.10.1", t("plan:pitch.source.s10FounderAdvantages")),
-        ...(founders.length > 0
-          ? founders.map((f) => ({ source: t("plan:pitch.source.s11Founders"), text: f }))
-          : [{ source: t("plan:pitch.source.s11Founders"), text: null }]),
+        bullet(
+          "P.10.2",
+          t("plan:pitch.source.s10MissingCapabilities"),
+          t("plan:pitch.label.missingCapabilities"),
+        ),
+        bullet(
+          "P.10.3",
+          t("plan:pitch.source.s10HowWillWeFillTheGaps"),
+          t("plan:pitch.label.fillGaps"),
+        ),
+        {
+          source: t("plan:pitch.source.s11Founders"),
+          label: t("plan:pitch.label.founders"),
+          text: founders.length > 0 ? founders.join("; ") : null,
+        },
       ],
     });
   };

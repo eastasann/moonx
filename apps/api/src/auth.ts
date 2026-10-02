@@ -9,14 +9,13 @@ import { eq } from "drizzle-orm";
 import type { AppContext } from "./context";
 import { findUsableInvitation } from "./lib/invitation-gate";
 import { provisionNewUser } from "./lib/provision";
+import { AUTH_SECRET_PATHS } from "./lib/rate-limit";
 import { passwordResetMail } from "./mail/mailer";
 
 /** SDD 5.4: the reset link lives one hour. */
 export const PASSWORD_RESET_TTL_SECONDS = 60 * 60;
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SESSION_REFRESH_SECONDS = 24 * 60 * 60;
-/** Better Auth counts per path and IP; SDD 5.4 allows 10 a minute for the paths that take a secret. */
-const AUTH_PATH_LIMIT = { window: 60, max: 10 };
 const BLOCKED_AUTH_PATHS = new Set(["/update-user", "/delete-user", "/change-email"]);
 
 /**
@@ -86,13 +85,11 @@ export function createAuth(ctx: Omit<AppContext, "auth" | "avatars">) {
       storage: "database",
       window: 60,
       max: 100,
-      customRules: {
-        "/sign-in/email": AUTH_PATH_LIMIT,
-        "/sign-in/social": AUTH_PATH_LIMIT,
-        "/request-password-reset": AUTH_PATH_LIMIT,
-        "/reset-password": AUTH_PATH_LIMIT,
-        "/sign-up/email": AUTH_PATH_LIMIT,
-      },
+      // Better Auth's built-in rules count per path (3 a 10 seconds on sign-in); the base plugin
+      // already counts these paths in one bucket per IP address.
+      customRules: Object.fromEntries(
+        [...AUTH_SECRET_PATHS].map((path) => [path.replace("/api/auth", ""), false as const]),
+      ),
     },
     advanced: {
       database: { generateId: "uuid" },

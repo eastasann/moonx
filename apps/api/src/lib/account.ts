@@ -118,10 +118,11 @@ export async function eraseAccount(
     });
   }
 
-  // A workspace nobody else belongs to would be unreachable once this person is gone, so it
-  // goes with its content, the personal one and any team one alike.
+  // Only a personal workspace nobody else belongs to goes with its content. A team workspace
+  // stays even when this person was its only member: it is the team's record (design-spec 6.16),
+  // so only the membership is removed and the workspace is left without members.
   const doomed = memberships
-    .filter((m) => othersIn(m.workspaceId).length === 0)
+    .filter((m) => m.isPersonal && othersIn(m.workspaceId).length === 0)
     .map((m) => m.workspaceId);
   for (const m of memberships) {
     if (doomed.includes(m.workspaceId)) continue;

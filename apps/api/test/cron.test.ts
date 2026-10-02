@@ -3,7 +3,7 @@ import { schema } from "@moonx/db";
 import { BCDX, ideaId, type PersonKey, planId, seedDemo, userId } from "@moonx/db/seed";
 import { and, count, eq } from "drizzle-orm";
 import type { Elysia } from "elysia";
-import { dueStageOn, EXECUTION_TAB } from "../src/lib/due-notifications";
+import { dueStagesOn, EXECUTION_TAB } from "../src/lib/due-notifications";
 import { hashInvitationToken } from "../src/lib/invitation-token";
 import { createLogger } from "../src/lib/logger";
 import { GOOGLE_ISSUER, googleKeySource, type Jwk } from "../src/lib/oidc";
@@ -161,21 +161,25 @@ beforeEach(async () => {
   now = new Date("2026-10-02T00:30:00Z");
 });
 
-describe("dueStageOn", () => {
-  test("picks the stage of the day and nothing while the date is more than 3 days away", () => {
-    expect(dueStageOn("2026-10-10", "2026-10-02")).toBeNull();
-    expect(dueStageOn("2026-10-06", "2026-10-02")).toBeNull();
-    expect(dueStageOn("2026-10-05", "2026-10-02")).toBe("three_days_before");
-    expect(dueStageOn("2026-10-03", "2026-10-02")).toBe("three_days_before");
-    expect(dueStageOn("2026-10-02", "2026-10-02")).toBe("due_day");
-    expect(dueStageOn("2026-10-01", "2026-10-02")).toBe("overdue");
-    expect(dueStageOn("2025-01-01", "2026-10-02")).toBe("overdue");
+describe("dueStagesOn", () => {
+  test("lists every stage reached, and nothing while the date is more than 3 days away", () => {
+    expect(dueStagesOn("2026-10-10", "2026-10-02")).toEqual([]);
+    expect(dueStagesOn("2026-10-06", "2026-10-02")).toEqual([]);
+    expect(dueStagesOn("2026-10-05", "2026-10-02")).toEqual(["three_days_before"]);
+    expect(dueStagesOn("2026-10-03", "2026-10-02")).toEqual(["three_days_before"]);
+    expect(dueStagesOn("2026-10-02", "2026-10-02")).toEqual(["three_days_before", "due_day"]);
+    expect(dueStagesOn("2026-10-01", "2026-10-02")).toEqual([
+      "three_days_before",
+      "due_day",
+      "overdue",
+    ]);
+    expect(dueStagesOn("2025-01-01", "2026-10-02")).toHaveLength(3);
   });
 
   test("counts days across a month and a year boundary", () => {
-    expect(dueStageOn("2027-01-02", "2026-12-30")).toBe("three_days_before");
-    expect(dueStageOn("2027-01-03", "2026-12-30")).toBeNull();
-    expect(dueStageOn("2026-03-01", "2026-02-26")).toBe("three_days_before");
+    expect(dueStagesOn("2027-01-02", "2026-12-30")).toEqual(["three_days_before"]);
+    expect(dueStagesOn("2027-01-03", "2026-12-30")).toEqual([]);
+    expect(dueStagesOn("2026-03-01", "2026-02-26")).toEqual(["three_days_before"]);
   });
 });
 
@@ -191,7 +195,7 @@ describe("Z3 authentication", () => {
   }
 
   test("a valid token runs the processing and answers the counts", async () => {
-    await addItem({ dueDate: "2026-10-02" });
+    await addItem({ dueDate: "2026-10-05" });
     const res = await post(bearer(await token()));
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ checkedItems: 1, created: 1 });
@@ -440,13 +444,14 @@ describe("Z3 due rules", () => {
 
     const result = await run("2026-10-02T00:30:00Z");
     // The 6th is read (the horizon is 4 days) but in no stage yet; the one without a date is not read.
-    expect(result).toEqual({ checkedItems: 6, created: 5 });
+    expect(result).toEqual({ checkedItems: 6, created: 10 });
     const stage = async (id: string) => (await dueRows(id)).map((r) => r.dueStage);
     expect(await stage(threeDays)).toEqual(["three_days_before"]);
     expect(await stage(tomorrow)).toEqual(["three_days_before"]);
-    expect(await stage(today)).toEqual(["due_day"]);
-    expect(await stage(yesterday)).toEqual(["overdue"]);
-    expect(await stage(longAgo)).toEqual(["overdue"]);
+    const all = ["due_day", "overdue", "three_days_before"];
+    expect((await stage(today)).sort()).toEqual(["due_day", "three_days_before"]);
+    expect((await stage(yesterday)).sort() as string[]).toEqual(all);
+    expect((await stage(longAgo)).sort() as string[]).toEqual(all);
     expect(await stage(later)).toEqual([]);
     expect(await stage(noDate)).toEqual([]);
   });
@@ -458,7 +463,7 @@ describe("Z3 due rules", () => {
       title: "Call the bakery",
     });
     await run("2026-10-02T00:30:00Z");
-    const [row] = await dueRows(id);
+    const row = (await dueRows(id)).find((r) => r.dueStage === "due_day");
     expect(row).toMatchObject({
       userId: userId("kenji"),
       workspaceId: BCDX,
@@ -510,18 +515,22 @@ describe("Z3 due rules", () => {
     await addItem({ dueDate: "2026-10-02", assignee: "kenji", title: "Call the bakery" });
     await addItem({ dueDate: "2026-10-01", assignee: "kenji", title: "Sign the lease" });
     await addItem({ dueDate: "2026-10-04", assignee: "kenji", title: "Order the boxes" });
+    // Every stage reached is notified, so the first two also carry the earlier stages.
     await run("2026-10-02T00:30:00Z");
     const as = await login(app, "kenji");
     const list = await call(app, "GET", "/api/v1/notifications?filter=unread", { as });
     const titles = list.body.items.map((i: { title: string }) => i.title).sort();
     expect(titles).toEqual([
+      "Call the bakery is due in 3 days",
       "Call the bakery is due today",
       "Order the boxes is due in 3 days",
+      "Sign the lease is due in 3 days",
+      "Sign the lease is due today",
       "Sign the lease is overdue",
     ]);
     expect(list.body.items[0]).toMatchObject({ kind: "due", accessible: true, actor: null });
     expect((await call(app, "GET", "/api/v1/notifications/unread-count", { as })).body.total).toBe(
-      3,
+      6,
     );
     expect(
       (await call(app, "GET", "/api/v1/notifications", { as: await login(app, "ana") })).body.items,
@@ -530,7 +539,7 @@ describe("Z3 due rules", () => {
 
   describe("8 am in the assignee's time zone", () => {
     test("waits until 08:00 on the assignee's clock", async () => {
-      const id = await addItem({ dueDate: "2026-10-02", assignee: "ana" });
+      const id = await addItem({ dueDate: "2026-10-05", assignee: "ana" });
       // 07:59:59 in Manila (UTC+8) on 2026-10-02.
       const early = await run("2026-10-01T23:59:59Z");
       expect(early).toEqual({ checkedItems: 1, created: 0 });
@@ -544,9 +553,9 @@ describe("Z3 due rules", () => {
       await setTimeZone("kenji", "America/Los_Angeles");
       await setTimeZone("paolo", "Pacific/Auckland");
       const items = {
-        ana: await addItem({ dueDate: "2026-10-02", assignee: "ana" }),
-        kenji: await addItem({ dueDate: "2026-10-02", assignee: "kenji" }),
-        paolo: await addItem({ dueDate: "2026-10-02", assignee: "paolo" }),
+        ana: await addItem({ dueDate: "2026-10-05", assignee: "ana" }),
+        kenji: await addItem({ dueDate: "2026-10-05", assignee: "kenji" }),
+        paolo: await addItem({ dueDate: "2026-10-05", assignee: "paolo" }),
       };
       // 18:00 in Manila, 03:00 in Los Angeles (UTC-7), 23:00 in Auckland (UTC+13), all on the 2nd.
       expect(await run("2026-10-02T10:00:00Z")).toEqual({ checkedItems: 3, created: 2 });
@@ -556,7 +565,7 @@ describe("Z3 due rules", () => {
       // 08:00 in Los Angeles.
       expect(await run("2026-10-02T15:00:00Z")).toEqual({ checkedItems: 3, created: 1 });
       const [late] = await dueRows(items.kenji);
-      expect(late?.dueStage).toBe("due_day");
+      expect(late?.dueStage).toBe("three_days_before");
       expect(late?.createdAt.toISOString()).toBe("2026-10-02T15:00:00.000Z");
     });
 
@@ -571,23 +580,24 @@ describe("Z3 due rules", () => {
         paolo: await addItem({ dueDate: "2026-10-03", assignee: "paolo" }),
       };
       await run("2026-10-02T20:00:00Z");
-      expect((await dueRows(dueThird.paolo))[0]?.dueStage).toBe("due_day");
-      expect((await dueRows(dueThird.kenji))[0]?.dueStage).toBe("three_days_before");
+      const stages = async (id: string) => (await dueRows(id)).map((r) => r.dueStage).sort();
+      expect(await stages(dueThird.paolo)).toEqual(["due_day", "three_days_before"]);
+      expect(await stages(dueThird.kenji)).toEqual(["three_days_before"]);
       expect(await dueRows(dueThird.ana)).toEqual([]);
     });
 
     test("a zone with daylight saving is read at the instant, not by a fixed offset", async () => {
       await setTimeZone("kenji", "America/Los_Angeles");
-      const id = await addItem({ dueDate: "2026-11-02", assignee: "kenji" });
+      const id = await addItem({ dueDate: "2026-11-05", assignee: "kenji" });
       // The clocks went back on 2026-11-01, so Los Angeles is UTC-8 on the 2nd: 15:59Z is 07:59.
       expect(await run("2026-11-02T15:59:59Z")).toMatchObject({ created: 0 });
       expect(await run("2026-11-02T16:00:00Z")).toMatchObject({ created: 1 });
-      expect((await dueRows(id))[0]?.dueStage).toBe("due_day");
+      expect((await dueRows(id))[0]?.dueStage).toBe("three_days_before");
     });
 
     test("an unknown stored zone is read as Manila and logged", async () => {
       await setTimeZone("ana", "Not/AZone");
-      const id = await addItem({ dueDate: "2026-10-02", assignee: "ana" });
+      const id = await addItem({ dueDate: "2026-10-05", assignee: "ana" });
       expect(await run("2026-10-01T23:59:59Z")).toMatchObject({ created: 0 });
       expect(await run("2026-10-02T00:00:00Z")).toMatchObject({ created: 1 });
       expect(await dueRows(id)).toHaveLength(1);
@@ -613,8 +623,8 @@ describe("Z3 due rules", () => {
   describe("sending each stage once", () => {
     test("a second run creates nothing", async () => {
       await addItem({ dueDate: "2026-10-05", assignee: "ana" });
-      await addItem({ dueDate: "2026-10-02", assignee: "kenji" });
-      await addItem({ dueDate: "2026-10-01", assignee: "paolo" });
+      await addItem({ dueDate: "2026-10-05", assignee: "kenji" });
+      await addItem({ dueDate: "2026-10-04", assignee: "paolo" });
       expect(await run("2026-10-02T00:30:00Z")).toEqual({ checkedItems: 3, created: 3 });
       expect(await run("2026-10-02T00:30:00Z")).toEqual({ checkedItems: 3, created: 0 });
       expect(await run("2026-10-02T05:30:00Z")).toEqual({ checkedItems: 3, created: 0 });
@@ -622,7 +632,7 @@ describe("Z3 due rules", () => {
     });
 
     test("a notice that was read is not made again", async () => {
-      await addItem({ dueDate: "2026-10-02", assignee: "ana" });
+      await addItem({ dueDate: "2026-10-05", assignee: "ana" });
       await run("2026-10-02T00:30:00Z");
       await call(app, "POST", "/api/v1/notifications/read-all", { as: await login(app, "ana") });
       expect(await run("2026-10-02T01:30:00Z")).toMatchObject({ created: 0 });
@@ -630,8 +640,8 @@ describe("Z3 due rules", () => {
     });
 
     test("two runs at once still make one notice", async () => {
-      await addItem({ dueDate: "2026-10-02", assignee: "ana" });
-      await addItem({ dueDate: "2026-10-01", assignee: "kenji" });
+      await addItem({ dueDate: "2026-10-05", assignee: "ana" });
+      await addItem({ dueDate: "2026-10-04", assignee: "kenji" });
       now = new Date("2026-10-02T00:30:00Z");
       const headers = bearer(await token());
       const results = await Promise.all([1, 2, 3].map(() => call(app, "POST", PATH, { headers })));
@@ -665,10 +675,28 @@ describe("Z3 due rules", () => {
       expect(rows.every((r) => r.dueDate === "2026-10-05")).toBe(true);
     });
 
-    test("after missed runs only the current stage is made", async () => {
+    test("a run after an outage creates every stage not yet made, each once", async () => {
       const id = await addItem({ dueDate: "2026-10-02", assignee: "ana" });
-      expect(await run("2026-10-09T00:30:00Z")).toMatchObject({ created: 1 });
-      expect((await dueRows(id)).map((r) => r.dueStage)).toEqual(["overdue"]);
+      // The scheduler ran on the 1st (three days before) and then stopped until the 4th.
+      expect(await run("2026-10-01T00:30:00Z")).toMatchObject({ created: 1 });
+      expect(await run("2026-10-04T00:30:00Z")).toMatchObject({ created: 2 });
+      expect((await dueRows(id)).map((r) => r.dueStage).sort()).toEqual([
+        "due_day",
+        "overdue",
+        "three_days_before",
+      ]);
+      expect(await run("2026-10-09T00:30:00Z")).toMatchObject({ created: 0 });
+      expect(await dueRows(id)).toHaveLength(3);
+    });
+
+    test("an item two days overdue with nothing made gets all three stages", async () => {
+      const id = await addItem({ dueDate: "2026-09-30", assignee: "ana" });
+      expect(await run("2026-10-02T00:30:00Z")).toMatchObject({ created: 3 });
+      expect((await dueRows(id)).map((r) => r.dueStage).sort()).toEqual([
+        "due_day",
+        "overdue",
+        "three_days_before",
+      ]);
     });
 
     test("changing the due date sends again", async () => {
@@ -687,16 +715,16 @@ describe("Z3 due rules", () => {
     });
 
     test("a different item or assignee of the same date and stage is its own notice", async () => {
-      await addItem({ dueDate: "2026-10-02", assignee: "ana" });
-      await addItem({ dueDate: "2026-10-02", assignee: "ana" });
-      await addItem({ dueDate: "2026-10-02", assignee: "kenji" });
+      await addItem({ dueDate: "2026-10-05", assignee: "ana" });
+      await addItem({ dueDate: "2026-10-05", assignee: "ana" });
+      await addItem({ dueDate: "2026-10-05", assignee: "kenji" });
       expect(await run("2026-10-02T00:30:00Z")).toEqual({ checkedItems: 3, created: 3 });
     });
   });
 
   describe("who is left out", () => {
     async function positive() {
-      return addItem({ dueDate: "2026-10-02", assignee: "ana", title: "Control" });
+      return addItem({ dueDate: "2026-10-05", assignee: "ana", title: "Control" });
     }
     async function expectOnlyControl(control: string) {
       const result = await run("2026-10-02T00:30:00Z");
@@ -707,36 +735,36 @@ describe("Z3 due rules", () => {
 
     test("done and resolved items", async () => {
       const control = await positive();
-      await addItem({ dueDate: "2026-10-02", status: "done" });
-      await addItem({ type: "open_question", dueDate: "2026-10-02", status: "resolved" });
+      await addItem({ dueDate: "2026-10-05", status: "done" });
+      await addItem({ type: "open_question", dueDate: "2026-10-05", status: "resolved" });
       await expectOnlyControl(control);
     });
 
     test("items still doing, to do or open are notified", async () => {
-      await addItem({ dueDate: "2026-10-02", status: "doing" });
-      await addItem({ type: "open_question", dueDate: "2026-10-02", status: "open" });
-      await addItem({ type: "kpi", dueDate: "2026-10-02", status: null });
+      await addItem({ dueDate: "2026-10-05", status: "doing" });
+      await addItem({ type: "open_question", dueDate: "2026-10-05", status: "open" });
+      await addItem({ type: "kpi", dueDate: "2026-10-05", status: null });
       expect((await run("2026-10-02T00:30:00Z")).created).toBe(3);
     });
 
     test("items without a member as assignee", async () => {
       const control = await positive();
-      await addItem({ dueDate: "2026-10-02", assignee: null });
-      await addItem({ dueDate: "2026-10-02", assignee: null, assigneeName: "The landlord" });
+      await addItem({ dueDate: "2026-10-05", assignee: null });
+      await addItem({ dueDate: "2026-10-05", assignee: null, assigneeName: "The landlord" });
       await expectOnlyControl(control);
     });
 
     test("deleted items and items without a due date", async () => {
       const control = await positive();
-      await addItem({ dueDate: "2026-10-02", deleted: true });
+      await addItem({ dueDate: "2026-10-05", deleted: true });
       await addItem({ dueDate: null });
       await expectOnlyControl(control);
     });
 
     test("suspended and deleted assignees", async () => {
       const control = await positive();
-      await addItem({ dueDate: "2026-10-02", assignee: "kenji" });
-      await addItem({ dueDate: "2026-10-02", assignee: "paolo" });
+      await addItem({ dueDate: "2026-10-05", assignee: "kenji" });
+      await addItem({ dueDate: "2026-10-05", assignee: "paolo" });
       await t.db
         .update(schema.users)
         .set({ status: "suspended" })
@@ -750,7 +778,7 @@ describe("Z3 due rules", () => {
 
     test("an assignee who has left the workspace", async () => {
       const control = await positive();
-      await addItem({ dueDate: "2026-10-02", assignee: "kenji" });
+      await addItem({ dueDate: "2026-10-05", assignee: "kenji" });
       await t.db
         .delete(schema.memberships)
         .where(
@@ -764,7 +792,7 @@ describe("Z3 due rules", () => {
 
     test("items of an archived idea or an archived plan", async () => {
       const control = await positive();
-      await addItem({ dueDate: "2026-10-02", plan: planB });
+      await addItem({ dueDate: "2026-10-05", plan: planB });
       await t.db
         .update(schema.businessPlans)
         .set({ archivedAt: new Date("2026-09-01T00:00:00Z") })
@@ -779,7 +807,7 @@ describe("Z3 due rules", () => {
     });
 
     test("an item restored from the archive is notified at its next run", async () => {
-      const id = await addItem({ dueDate: "2026-10-02", plan: planB });
+      const id = await addItem({ dueDate: "2026-10-05", plan: planB });
       await t.db
         .update(schema.businessPlans)
         .set({ archivedAt: new Date("2026-09-01T00:00:00Z") })
@@ -852,16 +880,16 @@ describe("local scripts", () => {
       expect(first.code).toBe(0);
       const firstResult = JSON.parse(first.stdout.split("\n").at(-1) as string);
       expect(firstResult.created).toBeGreaterThanOrEqual(1);
-      expect(firstResult.checkedItems).toBeGreaterThanOrEqual(firstResult.created);
+      expect(firstResult.checkedItems).toBeGreaterThanOrEqual(1);
       const rows = await dueRows(id);
-      expect(rows.map((r) => r.dueStage)).toEqual(["due_day"]);
+      expect(rows.map((r) => r.dueStage).sort()).toEqual(["due_day", "three_days_before"]);
 
       const second = await script("cron-due.ts", []);
       expect(second.code).toBe(0);
       const secondResult = JSON.parse(second.stdout.split("\n").at(-1) as string);
       expect(secondResult.created).toBe(0);
       expect(secondResult.checkedItems).toBe(firstResult.checkedItems);
-      expect(await dueRows(id)).toHaveLength(1);
+      expect(await dueRows(id)).toHaveLength(2);
     });
 
     test("on the demo data it only adds notices for items without one yet, then none", async () => {

@@ -340,7 +340,7 @@ describe("V19 record a decision", () => {
     expect((await t.db.select().from(schema.decisionLogEntries)).length).toBe(before);
   });
 
-  test("an archived idea is 409 ARCHIVED, and a Viewer still gets 403", async () => {
+  test("an archived idea is 409 ARCHIVED for every role, a Viewer included", async () => {
     await t.db
       .update(schema.ideas)
       .set({ archivedAt: new Date() })
@@ -351,7 +351,7 @@ describe("V19 record a decision", () => {
     await t.db.update(schema.ideas).set({ archivedAt: null }).where(eq(schema.ideas.id, health));
     expect(owner.status).toBe(409);
     expect(owner.body.error.code).toBe("ARCHIVED");
-    expect(viewer.status).toBe(403);
+    expect(viewer.status).toBe(409);
   });
 
   test("invalid bodies are 422 VALIDATION_FAILED and record nothing", async () => {

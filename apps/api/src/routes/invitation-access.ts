@@ -7,6 +7,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin, openPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import { emailInUse, loadMe } from "../lib/account";
@@ -17,7 +18,6 @@ import { hashInvitationToken } from "../lib/invitation-token";
 import { provisionNewUser } from "../lib/provision";
 import { enforceRateLimit } from "../lib/rate-limit";
 import { clientIp } from "../lib/request-info";
-import { authPlugin } from "../plugins";
 
 const tokenParams = z.object({ token: z.string().min(1).max(200) });
 
@@ -52,6 +52,8 @@ export function invitationAccessRoutes(ctx: AppContext) {
   const invalid = () => new ApiError("INVITATION_INVALID", "This invitation is invalid or expired");
 
   const publicRoutes = new Elysia({ name: "moonx-invitation-public" })
+    .use(openPlugin())
+    .guard({ open: true })
     .get(
       "/invitations/by-token/:token",
       async ({ params }) => {
@@ -85,7 +87,7 @@ export function invitationAccessRoutes(ctx: AppContext) {
       "/invitations/by-token/:token/sign-up",
       async ({ params, body, request }) => {
         const now = ctx.now();
-        await enforceRateLimit(db, "signUp", clientIp(request), now.getTime());
+        await enforceRateLimit(db, "authSecret", clientIp(request), now.getTime());
         const row = usable(await findByToken(db, params.token), now);
         if (row?.status !== "pending") throw invalid();
         if (await emailInUse(db, row.email)) {
@@ -137,40 +139,55 @@ export function invitationAccessRoutes(ctx: AppContext) {
       { params: tokenParams, body: invitationSignUpBodySchema },
     );
 
-  const protectedRoutes = new Elysia({ name: "moonx-invitation-accept" }).use(authPlugin(ctx)).post(
-    "/invitations/by-token/:token/accept",
-    ({ params, user }) =>
-      db.transaction(async (tx) => {
-        const now = ctx.now();
-        const row = usable(await findByToken(tx, params.token, true), now);
-        if (!row) throw invalid();
-        if (row.email.toLowerCase() !== user.email.toLowerCase()) {
-          throw new ApiError("INVITATION_EMAIL_MISMATCH", "This invitation is for another email", {
-            invitedEmail: row.email,
-          });
-        }
-        if (row.status === "accepted") {
-          throw new ApiError("INVITATION_ALREADY_ACCEPTED", "The invitation was already accepted");
-        }
-        let alreadyMember = false;
-        if (row.workspaceId && row.role) {
-          const inserted = await tx
-            .insert(schema.memberships)
-            .values({ workspaceId: row.workspaceId, userId: user.id, role: row.role })
-            .onConflictDoNothing()
-            .returning({ id: schema.memberships.id });
-          alreadyMember = inserted.length === 0;
-        } else if (row.grantsAdmin) {
-          await tx.update(schema.users).set({ isAdmin: true }).where(eq(schema.users.id, user.id));
-        }
-        await tx
-          .update(schema.invitations)
-          .set({ status: "accepted", acceptedById: user.id, acceptedAt: now })
-          .where(and(eq(schema.invitations.id, row.id), eq(schema.invitations.status, "pending")));
-        return { workspaceId: row.workspaceId, alreadyMember };
-      }),
-    { params: tokenParams, response: { 200: acceptInvitationResponseSchema } },
-  );
+  const protectedRoutes = new Elysia({ name: "moonx-invitation-accept" })
+    .use(accessPlugin(ctx))
+    .guard({ signedIn: true })
+    .post(
+      "/invitations/by-token/:token/accept",
+      ({ params, user }) =>
+        db.transaction(async (tx) => {
+          const now = ctx.now();
+          const row = usable(await findByToken(tx, params.token, true), now);
+          if (!row) throw invalid();
+          if (row.email.toLowerCase() !== user.email.toLowerCase()) {
+            throw new ApiError(
+              "INVITATION_EMAIL_MISMATCH",
+              "This invitation is for another email",
+              {
+                invitedEmail: row.email,
+              },
+            );
+          }
+          if (row.status === "accepted") {
+            throw new ApiError(
+              "INVITATION_ALREADY_ACCEPTED",
+              "The invitation was already accepted",
+            );
+          }
+          let alreadyMember = false;
+          if (row.workspaceId && row.role) {
+            const inserted = await tx
+              .insert(schema.memberships)
+              .values({ workspaceId: row.workspaceId, userId: user.id, role: row.role })
+              .onConflictDoNothing()
+              .returning({ id: schema.memberships.id });
+            alreadyMember = inserted.length === 0;
+          } else if (row.grantsAdmin) {
+            await tx
+              .update(schema.users)
+              .set({ isAdmin: true })
+              .where(eq(schema.users.id, user.id));
+          }
+          await tx
+            .update(schema.invitations)
+            .set({ status: "accepted", acceptedById: user.id, acceptedAt: now })
+            .where(
+              and(eq(schema.invitations.id, row.id), eq(schema.invitations.status, "pending")),
+            );
+          return { workspaceId: row.workspaceId, alreadyMember };
+        }),
+      { params: tokenParams, response: { 200: acceptInvitationResponseSchema } },
+    );
 
   return new Elysia({ name: "moonx-invitation-access" }).use(publicRoutes).use(protectedRoutes);
 }

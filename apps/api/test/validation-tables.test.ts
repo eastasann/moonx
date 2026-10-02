@@ -282,7 +282,8 @@ describe("V8 POST and V9 competitors", () => {
     await setArchived(true);
     const archived = await send(ana);
     expect([archived.status, archived.body.error.code]).toEqual([409, "ARCHIVED"]);
-    expect((await send(grace)).body.error.code).toBe("FORBIDDEN");
+    // Archived beats the role: a Viewer gets 409 too (SDD 7.1).
+    expect((await send(grace)).body.error.code).toBe("ARCHIVED");
     await setArchived(false);
   });
 

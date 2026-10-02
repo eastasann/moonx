@@ -246,8 +246,38 @@ export function requireNotArchived(scope: Scope): void {
   }
 }
 
-/** Role check first, then the archive check: a Viewer on an archived idea gets 403. */
-export function requireWritable(scope: Scope): void {
-  requireEditor(scope);
-  requireNotArchived(scope);
+/**
+ * What a route needs from the caller's membership. `writable` changes the content of an idea or
+ * plan: 409 ARCHIVED comes first and applies to every role, then 403 for a Viewer (SDD 7.1).
+ * `plan-archive-toggle` is `writable` for archiving or restoring a plan: the plan's own archived
+ * flag does not block it, an archived idea does.
+ */
+export type Need = "member" | "editor" | "writable" | "owner" | "plan-archive-toggle";
+
+/** Throws when the scope does not satisfy `need`. */
+export function enforce(scope: Scope, need: Need): void {
+  if (need === "owner") requireOwner(scope);
+  else if (need === "editor") requireEditor(scope);
+  else if (need === "writable") {
+    requireNotArchived(scope);
+    requireEditor(scope);
+  } else if (need === "plan-archive-toggle") {
+    requireNotArchived({ ...scope, planArchived: false });
+    requireEditor(scope);
+  }
+}
+
+/**
+ * `resolveScope` plus `enforce`. Routes get this through the `scoped` / `located` declarations
+ * (access.ts); a transaction that must check again after taking its locks calls it directly.
+ */
+export async function authorize(
+  db: Executor,
+  user: Pick<AuthUser, "id">,
+  ref: ScopeRef,
+  need: Need,
+): Promise<Scope> {
+  const scope = await resolveScope(db, user, ref);
+  enforce(scope, need);
+  return scope;
 }

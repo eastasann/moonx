@@ -1,5 +1,6 @@
 import { dueNotificationsResultSchema } from "@moonx/schemas";
 import { Elysia } from "elysia";
+import { openPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import { processDueNotifications } from "../lib/due-notifications";
@@ -11,26 +12,30 @@ import { googleKeySource, type OidcKeySource, verifyOidcToken } from "../lib/oid
  */
 export function internalRoutes(ctx: AppContext, keys: OidcKeySource = googleKeySource()) {
   const { oidcAudience, invokerEmail } = ctx.config.cron;
-  return new Elysia({ name: "moonx-internal", prefix: "/internal/cron" }).post(
-    "/due-notifications",
-    async ({ request }) => {
-      if (!oidcAudience || !invokerEmail) {
-        ctx.logger.log(
-          "error",
-          "cron is not configured: CRON_OIDC_AUDIENCE and CRON_INVOKER_EMAIL",
+  // The route checks Cloud Scheduler's OIDC token itself.
+  return new Elysia({ name: "moonx-internal", prefix: "/internal/cron" })
+    .use(openPlugin())
+    .guard({ open: true })
+    .post(
+      "/due-notifications",
+      async ({ request }) => {
+        if (!oidcAudience || !invokerEmail) {
+          ctx.logger.log(
+            "error",
+            "cron is not configured: CRON_OIDC_AUDIENCE and CRON_INVOKER_EMAIL",
+          );
+          throw new ApiError("FORBIDDEN", "The cron endpoint is not configured");
+        }
+        const token = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
+        if (!token) throw new ApiError("UNAUTHENTICATED", "A bearer token is required");
+        await verifyOidcToken(
+          token,
+          { audience: oidcAudience, email: invokerEmail },
+          keys,
+          ctx.now(),
         );
-        throw new ApiError("FORBIDDEN", "The cron endpoint is not configured");
-      }
-      const token = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
-      if (!token) throw new ApiError("UNAUTHENTICATED", "A bearer token is required");
-      await verifyOidcToken(
-        token,
-        { audience: oidcAudience, email: invokerEmail },
-        keys,
-        ctx.now(),
-      );
-      return processDueNotifications(ctx);
-    },
-    { response: { 200: dueNotificationsResultSchema } },
-  );
+        return processDueNotifications(ctx);
+      },
+      { response: { 200: dueNotificationsResultSchema } },
+    );
 }

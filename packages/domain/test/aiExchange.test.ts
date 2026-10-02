@@ -178,9 +178,9 @@ const view = (blocks: ReplyBlock[]) =>
   blocks.map((b) => ({ id: b.id, text: b.text, reason: b.reason, amount: b.amount }));
 
 describe("parseAiReply markdown", () => {
-  test("splits blocks, keeps preamble and unlabeled headings as unmatched", () => {
+  test("splits blocks, keeps the preamble and `# ` headings as unmatched", () => {
     const r = parseAiReply(
-      "Sure, here you go.\n\n## [V.01.WHO] WHO\nHR teams\n\n## Customer segments\nBPO\n\n# Other\nx\n## [v.01.problem]\nLate",
+      "Sure, here you go.\n\n## [V.01.WHO] WHO\nHR teams\n\n# Customer segments\nBPO\n\n# Other\nx\n## [v.01.problem]\nLate",
     );
     expect(r.format).toBe("markdown");
     expect(r.blocks.map((b) => [b.index, b.id, b.heading, b.text])).toEqual([
@@ -190,6 +190,40 @@ describe("parseAiReply markdown", () => {
       [3, null, "Other", "x"],
       [4, "v.01.problem", null, "Late"],
     ]);
+  });
+
+  test("a `##` sub-heading inside an answer does not split the block", () => {
+    const r = parseAiReply(
+      "## [V.01.WHO] WHO\nHR teams\n\n## Why them\nThey buy gifts\n\n### Detail\nmore\n\n## [V.01.PROBLEM] PROBLEM\nLate",
+    );
+    expect(r.blocks.map((b) => [b.id, b.text])).toEqual([
+      ["V.01.WHO", "HR teams\n\n## Why them\nThey buy gifts\n\n### Detail\nmore"],
+      ["V.01.PROBLEM", "Late"],
+    ]);
+  });
+
+  test("a `##` heading before any ID heading stays in the preamble block", () => {
+    const r = parseAiReply("## Notes\nhello\n## [V.01.WHO]\na");
+    expect(r.blocks.map((b) => [b.id, b.text])).toEqual([
+      [null, "## Notes\nhello"],
+      ["V.01.WHO", "a"],
+    ]);
+  });
+
+  test("a `# ` heading still ends an ID block, and a malformed `## [` heading ends it too", () => {
+    const r = parseAiReply("## [V.01.WHO]\na\n## Sub\nb\n# Next\nc\n## [V.01.PROBLEM\nd");
+    expect(r.blocks.map((b) => [b.id, b.heading, b.text])).toEqual([
+      ["V.01.WHO", null, "a\n## Sub\nb"],
+      [null, "Next", "c"],
+      [null, null, "d"],
+    ]);
+  });
+
+  test("a sub-heading in the reference section of a pasted export is skipped with the section", () => {
+    const r = parseAiReply(
+      "# Questions\n\n## [V.01.WHO] WHO\n\n**Current answer:**\n\n> HR\n> ## Why\n> teams\n\n# Reference (read-only)\n\n## Key numbers\n- x\n\n# How to reply\n\n## [V.01.WHO]\n<x>",
+    );
+    expect(r.blocks.map((b) => [b.id, b.text])).toEqual([["V.01.WHO", "HR\n## Why\nteams"]]);
   });
 
   test("CRLF and BOM", () => {

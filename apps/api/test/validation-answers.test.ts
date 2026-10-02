@@ -515,7 +515,8 @@ describe("V3 answers", () => {
       { text: "y", lockVersion: 1 },
       grace,
     );
-    expect(archivedViewer.status).toBe(403);
+    // Archived beats the role (SDD 7.1).
+    expect(archivedViewer.status).toBe(409);
     await t.db
       .update(schema.ideas)
       .set({ archivedAt: null })

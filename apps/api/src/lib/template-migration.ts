@@ -12,7 +12,8 @@ import { withHistory } from "../history/with-history";
 import type { Db, Executor } from "./db";
 import { historyActor } from "./dto";
 import { touchContainer } from "./history-revert";
-import { type HistoryAccess, requireRevertable, resolveContainer } from "./history-target";
+import { containerAccess, type HistoryAccess } from "./history-target";
+import type { Scope } from "./scope";
 import type { AuthUser } from "./session";
 import { loadTemplateRef, loadTemplateSections } from "./template";
 import { hasText } from "./validation-data";
@@ -33,8 +34,9 @@ async function loadTarget(
   user: Pick<AuthUser, "id">,
   kind: TemplateKind,
   id: string,
+  scope: Scope | null,
 ): Promise<{ access: HistoryAccess; versionId: string }> {
-  const access = await resolveContainer(db, user, kind, id);
+  const access = containerAccess(user, kind, id, scope);
   const table = tableOf(kind);
   const [row] = await db
     .select({ versionId: table.templateVersionId })
@@ -106,9 +108,9 @@ export async function previewTemplateMigration(
   user: Pick<AuthUser, "id">,
   kind: TemplateKind,
   id: string,
+  scope: Scope | null,
 ): Promise<TemplateMigrationPreview> {
-  const { access, versionId } = await loadTarget(db, user, kind, id);
-  if (access.role === "viewer") throw new ApiError("FORBIDDEN", "Viewers cannot make changes");
+  const { versionId } = await loadTarget(db, user, kind, id, scope);
   const ref = await loadTemplateRef(db, versionId);
   if (!ref.newerVersion) throw new ApiError("ALREADY_LATEST", "The template is up to date");
   const [oldQuestions, newQuestions, answered] = await Promise.all([
@@ -145,12 +147,11 @@ export async function previewTemplateMigration(
  */
 export async function migrateTemplate(
   db: Db,
-  ctx: { user: Pick<AuthUser, "id">; request: Request; now: Date },
+  ctx: { user: Pick<AuthUser, "id">; scope: Scope | null; request: Request; now: Date },
   body: TemplateMigrationBody,
 ): Promise<{ batchId: string; template: TemplateRef }> {
   const { targetType: kind, targetId: id } = body;
-  const { access } = await loadTarget(db, ctx.user, kind, id);
-  requireRevertable(access);
+  const { access } = await loadTarget(db, ctx.user, kind, id, ctx.scope);
   const batchId = crypto.randomUUID();
   const actor = historyActor(ctx.request, ctx.user, "template_migration", batchId);
   const table = tableOf(kind);

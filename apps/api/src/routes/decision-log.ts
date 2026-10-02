@@ -3,14 +3,13 @@ import { listDecisionLogQuerySchema } from "@moonx/schemas";
 import { and, eq, gte, lt, lte } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { type AccessInput, accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import { loadDecisionSummaries } from "../lib/decision-log";
 import { loadDecisionEntry } from "../lib/decision-record";
 import { decodeCursor, toPage } from "../lib/page";
-import { resolveScope } from "../lib/scope";
 import { addDays, resolveTimeZone, startOfLocalDay } from "../lib/timezone";
-import { authPlugin } from "../plugins";
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -21,11 +20,10 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 export function decisionLogRoutes(ctx: AppContext) {
   const { db } = ctx;
   return new Elysia({ name: "moonx-decision-log" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/workspaces/:workspaceId/decision-log",
-      async ({ params, query, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+      async ({ query, user, scope }) => {
         // A date without a time means a whole day on the caller's calendar.
         const zone = resolveTimeZone(user.timezone);
         const from = query.from
@@ -58,19 +56,28 @@ export function decisionLogRoutes(ctx: AppContext) {
         );
         return toPage(items, offset, query.limit);
       },
-      { params: z.object({ workspaceId: z.uuid() }), query: listDecisionLogQuerySchema },
+      {
+        params: z.object({ workspaceId: z.uuid() }),
+        query: listDecisionLogQuerySchema,
+        scoped: { to: { workspaceId: "workspaceId" }, need: "member" },
+      },
     )
     .get(
       "/decision-log/:entryId",
-      async ({ params, user }) => {
-        const [entry] = await db
-          .select({ workspaceId: schema.decisionLogEntries.workspaceId })
-          .from(schema.decisionLogEntries)
-          .where(eq(schema.decisionLogEntries.id, params.entryId));
-        if (!entry) throw new ApiError("NOT_FOUND", "Decision not found");
-        const scope = await resolveScope(db, user, { workspaceId: entry.workspaceId });
-        return loadDecisionEntry(db, scope.workspaceId, params.entryId);
+      ({ params, scope }) => loadDecisionEntry(db, scope.workspaceId, params.entryId),
+      {
+        params: z.object({ entryId: z.uuid() }),
+        scoped: {
+          to: async ({ params }: AccessInput) => {
+            const [entry] = await db
+              .select({ workspaceId: schema.decisionLogEntries.workspaceId })
+              .from(schema.decisionLogEntries)
+              .where(eq(schema.decisionLogEntries.id, params.entryId));
+            if (!entry) throw new ApiError("NOT_FOUND", "Decision not found");
+            return { workspaceId: entry.workspaceId };
+          },
+          need: "member",
+        },
       },
-      { params: z.object({ entryId: z.uuid() }) },
     );
 }

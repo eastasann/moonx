@@ -71,6 +71,26 @@ describe("P12 deck", () => {
     expect(competition.table.rows.length).toBeLessThanOrEqual(5);
   });
 
+  test("the five-minute deck reads §8's text sub-items, §10, the §11 table and §20's text", async () => {
+    const res = await call(t.app, "GET", deckPath(planA, "variant=five"), { as: who.ana });
+    const texts = (key: string) =>
+      res.body.slides
+        .find((s: { key: string }) => s.key === key)
+        .bullets.map((b: { text: string }) => b.text) as string[];
+    const model = texts("business_model");
+    expect(model).toHaveLength(3);
+    expect(model[0]).toStartWith("Revenue: Gift box sales");
+    expect(model[1]).toStartWith("Secondary revenue: Monthly office subscriptions");
+    expect(model[2]).toStartWith("Why the startup cost is justified: The startup cost pays back");
+    const whyUs = texts("why_us");
+    expect(whyUs).toHaveLength(4);
+    expect(whyUs[1]).toStartWith("Missing capabilities: Food production experience");
+    expect(whyUs[2]).toStartWith("Filling the gaps: Contract a licensed bakery");
+    expect(whyUs[3]).toStartWith("Founders: Ana Villanueva — Lead; Kenji Mori — Operations");
+    const economics = texts("economics");
+    expect(economics.at(-1)).toStartWith("Funding trigger: If cash falls below");
+  });
+
   test("a saved version is the source of text, numbers and the footer", async () => {
     const versions = (await call(t.app, "GET", `/api/v1/plans/${planA}/versions`, { as: who.ana }))
       .body.items;

@@ -235,7 +235,8 @@ function SlideBody({ slide, currency }: { slide: PitchSlide; currency: string })
  * The Pitch Deck as a 16:9 PDF, always in the light colors (design-spec 6.14). One page per slide,
  * 960 × 540 pt, with Business Name, version label and date in the footer. Fonts are the ones of
  * the print tokens and only the glyphs used are embedded (ADR-012). react-pdf has no
- * `font-variant-numeric`, so the tokens' tabular figures cannot be applied in the PDF.
+ * `font-variant-numeric`; the tokens' tabular figures hold because the default digits of Noto
+ * Sans (the first print family, used for every cell and figure) are tabular.
  */
 export async function renderPitchDeckPdf(
   deck: PitchDeck,

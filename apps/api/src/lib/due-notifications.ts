@@ -19,17 +19,21 @@ export const EXECUTION_TAB: Record<ExecutionType, string> = {
 };
 
 /**
- * The one stage an item is in on `today`, or null while the due date is more than 3 days away.
- * Only this stage is ever created. After a missed run the notice of the current stage is still
- * made (ADR-014: "past 8am and not yet notified"), but earlier stages are skipped: an item whose
- * due date was set to yesterday gets "overdue", not also "in 3 days" and "today" in the same hour.
+ * Every stage an item has reached on `today`, oldest first: empty while the due date is more than
+ * 3 days away, then "three_days_before", plus "due_day" from the due date, plus "overdue" after it.
+ * All of them are returned, not just the latest, so a run after an outage still creates the stages
+ * that were missed (ADR-014: not missing any); the unique key keeps each stage to one notice.
  */
-export function dueStageOn(dueDate: string, today: string): DueStage | null {
-  if (today > dueDate) return "overdue";
-  if (today === dueDate) return "due_day";
-  if (today >= addDays(dueDate, -3)) return "three_days_before";
-  return null;
+export function dueStagesOn(dueDate: string, today: string): DueStage[] {
+  const stages: DueStage[] = [];
+  if (today >= addDays(dueDate, -3)) stages.push("three_days_before");
+  if (today >= dueDate) stages.push("due_day");
+  if (today > dueDate) stages.push("overdue");
+  return stages;
 }
+
+/** Rows per INSERT; see the loop in `processDueNotifications`. */
+const INSERT_CHUNK = 1000;
 
 /**
  * Z3: creates the due notices that are owed at this moment (SDD 5.14, ADR-014, design-spec 6.13).
@@ -98,8 +102,7 @@ export async function processDueNotifications(
     if (local.hour < NOTICE_HOUR) return [];
     // The query keeps only rows with a due date.
     const dueDate = item.dueDate as string;
-    const stage = dueStageOn(dueDate, local.date);
-    return stage ? [{ item, dueDate, stage }] : [];
+    return dueStagesOn(dueDate, local.date).map((stage) => ({ item, dueDate, stage }));
   });
   if (due.length === 0) return { checkedItems: items.length, created: 0 };
 
@@ -111,29 +114,34 @@ export async function processDueNotifications(
     tab: EXECUTION_TAB[item.type],
     rowId: item.id,
   });
-  const created = await db
-    .insert(schema.notifications)
-    .values(
-      due.map(({ item, dueDate, stage }) => ({
-        userId: item.assigneeId,
-        workspaceId: item.workspaceId,
-        kind: "due" as const,
-        executionItemId: item.id,
-        dueStage: stage,
-        dueDate,
-        link: link(item),
-        createdAt: now,
-      })),
-    )
-    .onConflictDoNothing({
-      target: [
-        schema.notifications.executionItemId,
-        schema.notifications.dueDate,
-        schema.notifications.dueStage,
-      ],
-      where: sql`${schema.notifications.kind} = 'due'`,
-    })
-    .returning({ id: schema.notifications.id });
-  logger.log("info", "due notifications", { checkedItems: items.length, created: created.length });
-  return { checkedItems: items.length, created: created.length };
+  let created = 0;
+  // A statement carries at most 65,534 bind parameters, and a long outage leaves many stages to make.
+  for (let from = 0; from < due.length; from += INSERT_CHUNK) {
+    const inserted = await db
+      .insert(schema.notifications)
+      .values(
+        due.slice(from, from + INSERT_CHUNK).map(({ item, dueDate, stage }) => ({
+          userId: item.assigneeId,
+          workspaceId: item.workspaceId,
+          kind: "due" as const,
+          executionItemId: item.id,
+          dueStage: stage,
+          dueDate,
+          link: link(item),
+          createdAt: now,
+        })),
+      )
+      .onConflictDoNothing({
+        target: [
+          schema.notifications.executionItemId,
+          schema.notifications.dueDate,
+          schema.notifications.dueStage,
+        ],
+        where: sql`${schema.notifications.kind} = 'due'`,
+      })
+      .returning({ id: schema.notifications.id });
+    created += inserted.length;
+  }
+  logger.log("info", "due notifications", { checkedItems: items.length, created });
+  return { checkedItems: items.length, created };
 }

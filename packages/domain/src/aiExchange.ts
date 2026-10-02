@@ -410,8 +410,9 @@ function jsonBlocks(doc: Record<string, unknown>): ReplyBlock[] {
 
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
 const IGNORED_H1 = /^(prompt|reference|how to reply)\b/i;
-const ID_HEADING = /^##[ \t]+\[([^\]\n]+)\][ \t]*(.*)$/;
-const H2_HEADING = /^##[ \t]+(\S.*)$/;
+const ID_HEADING = /^##[ \t]+\[([^\]\n]*)\][ \t]*(.*)$/;
+/** Any `## [` line ends a block, well-formed or not; other `##` headings are answer text. */
+const BLOCK_START = /^##[ \t]+\[/;
 const H1_HEADING = /^#[ \t]+(\S.*)$/;
 const AMOUNT_HEADING = /^###[ \t]+amount[ \t]*:?[ \t]*$/i;
 const REASON_HEADING = /^###[ \t]+(why this amount\??|reason)[ \t]*:?[ \t]*$/i;
@@ -535,7 +536,6 @@ function markdownBlocks(input: string): ReplyBlock[] {
     if (!l.fenced) {
       const idM = ID_HEADING.exec(l.line);
       const h1 = H1_HEADING.exec(l.line);
-      const h2 = idM ? null : H2_HEADING.exec(l.line);
       if (h1) {
         flush();
         const title = (h1[1] as string).trim();
@@ -545,13 +545,11 @@ function markdownBlocks(input: string): ReplyBlock[] {
         if (!skipping && !/^questions\b/i.test(title)) heading = title;
         continue;
       }
-      if (!skipping && (idM || h2)) {
+      if (!skipping && BLOCK_START.test(l.line)) {
         flush();
         if (idM) {
           id = (idM[1] as string).trim() || null;
           heading = cleanText(idM[2]);
-        } else {
-          heading = (h2 ? (h2[1] as string) : "").trim() || null;
         }
         continue;
       }
@@ -570,10 +568,11 @@ function markdownBlocks(input: string): ReplyBlock[] {
  * yields `amount` plus `reason`). Anything else is read as Markdown.
  *
  * Markdown rules:
- * - A block starts at `## [ID] heading` and ends at the next `##` or `#` heading. Lowercase IDs are
- *   kept as written; {@link matchBlocks} compares case-insensitively.
- * - Text before the first heading, `##` headings without an ID, and other `#` headings start
- *   unlabeled blocks (`id: null`); empty ones are dropped.
+ * - A block starts at `## [ID] heading` and ends at the next `## [` heading or the next `# `
+ *   heading (design-spec 6.6). A `##` heading without `[` inside an answer is part of its text.
+ *   Lowercase IDs are kept as written; {@link matchBlocks} compares case-insensitively.
+ * - Text before the first heading and `# ` headings start unlabeled blocks (`id: null`); empty
+ *   ones are dropped.
  * - The `<!-- moonx-export ... -->` header line is dropped.
  * - The `# Prompt`, `# Reference ...` and `# How to reply` sections of a pasted export are ignored.
  * - Headings inside fenced code blocks (``` or ~~~) are text, so an answer may show Markdown. An

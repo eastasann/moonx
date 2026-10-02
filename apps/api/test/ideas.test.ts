@@ -632,7 +632,7 @@ describe("I4 archive and restore", () => {
       as: grace,
       body: { name: "x", lockVersion: 0 },
     });
-    expect(viewerPatch.status).toBe(403);
+    expect(viewerPatch.status).toBe(409);
     expect((await call(t.app, "GET", path, { as: ana })).status).toBe(200);
     const copy = await call(t.app, "POST", `${path}/duplicate`, { as: ana, body: {} });
     expect(copy.status).toBe(201);

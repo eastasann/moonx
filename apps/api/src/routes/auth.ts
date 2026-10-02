@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { openPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 
@@ -10,6 +11,8 @@ import { ApiError } from "../errors";
  */
 export function authRoutes(ctx: AppContext) {
   return new Elysia({ name: "moonx-auth-routes" })
+    .use(openPlugin())
+    .guard({ open: true })
     .all("/api/auth/*", ({ request, body }) => {
       // The base plugin already read the stream, so the request Better Auth sees is rebuilt.
       const text = typeof body === "string" && body !== "" ? body : undefined;

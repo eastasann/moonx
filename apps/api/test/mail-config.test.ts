@@ -152,6 +152,8 @@ describe("configuration", () => {
 
   test("staging and production need the shared secret and the Resend transport", () => {
     const deployed = {
+      GOOGLE_CLIENT_ID: "id",
+      GOOGLE_CLIENT_SECRET: "secret",
       PROXY_SHARED_SECRET: "s",
       MAIL_TRANSPORT: "resend",
       RESEND_API_KEY: "k",
@@ -171,6 +173,7 @@ describe("configuration", () => {
       ).toThrow("MAIL_TRANSPORT");
     }
     for (const name of [
+      "GOOGLE_CLIENT_SECRET",
       "BETTER_AUTH_URL",
       "MAIL_FROM",
       "TRUSTED_ORIGINS",
@@ -214,6 +217,36 @@ describe("configuration", () => {
       GOOGLE_CLIENT_SECRET: "secret",
     });
     expect(google.auth.googleClientId).toBe("id");
+  });
+
+  test("staging and production refuse to start without Google's client; local may omit it", () => {
+    const deployed = {
+      PROXY_SHARED_SECRET: "s",
+      MAIL_TRANSPORT: "resend",
+      RESEND_API_KEY: "k",
+      BETTER_AUTH_URL: "https://moonx.app",
+      MAIL_FROM: "moonx <no-reply@moonx.app>",
+      TRUSTED_ORIGINS: "https://moonx.app",
+      CRON_OIDC_AUDIENCE: "https://moonx-api-123.asia-southeast1.run.app",
+      CRON_INVOKER_EMAIL: "scheduler@moonx.iam.gserviceaccount.com",
+      AVATAR_BUCKET: "moonx-avatars",
+    };
+    for (const APP_ENV of ["staging", "production"]) {
+      expect(() => loadConfig({ ...AUTH, APP_ENV, ...deployed })).toThrow("GOOGLE_CLIENT_ID");
+      expect(() => loadConfig({ ...AUTH, APP_ENV, ...deployed, GOOGLE_CLIENT_ID: "id" })).toThrow(
+        "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET",
+      );
+      const config = loadConfig({
+        ...AUTH,
+        APP_ENV,
+        ...deployed,
+        GOOGLE_CLIENT_ID: "id",
+        GOOGLE_CLIENT_SECRET: "secret",
+      });
+      expect(config.auth.googleClientId).toBe("id");
+    }
+    expect(loadConfig({ ...AUTH, APP_ENV: "local" }).auth.googleClientId).toBe("");
+    expect(testConfig().auth.googleClientId).toBe("");
   });
 
   test("the Resend transport needs its key", () => {

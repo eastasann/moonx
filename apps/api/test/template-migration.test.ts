@@ -726,7 +726,7 @@ describe("T2 POST /template-migrations, validation", () => {
       .where(eq(schema.ideas.id, ideaId("laundry")));
     const archived = await migrate("validation", laundry, v3);
     expect([archived.status, archived.body.error.code]).toEqual([409, "ARCHIVED"]);
-    expect((await migrate("validation", laundry, v3, as.grace)).status).toBe(403);
+    expect((await migrate("validation", laundry, v3, as.grace)).status).toBe(409);
     expect(await pinnedOf("validation", laundry)).not.toBe(v3);
   });
 
@@ -845,7 +845,7 @@ describe("T2 POST /template-migrations, business plan", () => {
       .where(eq(schema.businessPlans.id, plan));
     const archived = await migrate("business_plan", plan, v2);
     expect([archived.status, archived.body.error.code]).toEqual([409, "ARCHIVED"]);
-    expect((await migrate("business_plan", plan, v2, as.grace)).status).toBe(403);
+    expect((await migrate("business_plan", plan, v2, as.grace)).status).toBe(409);
     expect(
       (
         await t.db

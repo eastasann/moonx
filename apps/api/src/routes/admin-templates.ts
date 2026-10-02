@@ -22,9 +22,9 @@ import {
 import { eq, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { operatorPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError, validationFailed } from "../errors";
-import { adminPlugin } from "../lib/admin-guard";
 import {
   createDraftFrom,
   loadVersionDetail,
@@ -37,7 +37,6 @@ import { validateVersion } from "../lib/admin-template-validate";
 import type { Tx } from "../lib/db";
 import { iso, isoOrNull } from "../lib/dto";
 import { toUserRef } from "../lib/users";
-import { authPlugin } from "../plugins";
 
 const versionParams = z.object({ versionId: z.uuid() });
 const sectionParams = z.object({ sectionId: z.uuid() });
@@ -98,8 +97,8 @@ export function adminTemplateRoutes(ctx: AppContext) {
   }
 
   return new Elysia({ name: "moonx-admin-templates" })
-    .use(authPlugin(ctx))
-    .use(adminPlugin(ctx))
+    .use(operatorPlugin(ctx))
+    .guard({ operator: true })
     .get(
       "/admin/templates",
       async () => {

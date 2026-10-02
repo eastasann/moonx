@@ -39,7 +39,10 @@ const fullAnswers: PitchDeckInput["answers"] = {
   "P.06.8": answer("Bakeries only sell by the piece."),
   "P.08.1": answer("Gift box sales"),
   "P.08.2": answer("Corporate orders"),
+  "P.08.11": answer("Quotes confirm the oven price."),
   "P.10.1": answer("Ten years in the bakery trade."),
+  "P.10.2": answer("No delivery experience."),
+  "P.10.3": answer("Partner with a courier."),
   "P.20.2": answer("Three months of fixed cost."),
   "P.20.10": answer("Four months."),
   "P.20.11": answer("Cash below one month."),
@@ -256,15 +259,17 @@ describe("empty sources", () => {
     for (const s of empty.slides) expect(slideFitsAtMinimum(s)).toBe(true);
   });
 
-  test("Blue/Mixed answer is not required for a Red market", () => {
+  test("a Red market keeps the Blue/Mixed bullet, shown as 'Not written yet' when empty", () => {
     const red = buildPitchDeck(
       base({
         variant: "one",
         answers: { ...fullAnswers, "P.06.1": answer("Red"), "P.06.8": answer(null) },
       }),
     );
-    expect(slide(red, "why_now").emptySources).toEqual([]);
-    expect(slide(red, "why_now").bullets).toHaveLength(1);
+    expect(slide(red, "why_now").emptySources).toEqual([
+      "§6 If Blue/Mixed, why has nobody captured it?",
+    ]);
+    expect(slide(red, "why_now").bullets).toHaveLength(2);
     const unknown = buildPitchDeck(
       base({
         variant: "one",
@@ -273,6 +278,87 @@ describe("empty sources", () => {
     );
     expect(slide(unknown, "why_now").emptySources).toEqual([
       "§6 If Blue/Mixed, why has nobody captured it?",
+    ]);
+  });
+});
+
+describe("bullet counts (design-spec 6.14)", () => {
+  const countOf = (deck: ReturnType<typeof buildPitchDeck>, key: string) =>
+    slide(deck, key).bullets?.length ?? 0;
+
+  test("text slides have 2 to 4 bullets, also when every material is empty", () => {
+    const filled = [buildPitchDeck(base({ variant: "one" })), buildPitchDeck(base())];
+    const blank = [
+      buildPitchDeck(base({ variant: "one", answers: {}, execution: [] })),
+      buildPitchDeck(base({ answers: {}, execution: [] })),
+    ];
+    for (const deck of [...filled, ...blank]) {
+      for (const s of deck.slides.filter((x) => x.type === "text")) {
+        // The Ask slide has five by the pending decision.
+        if (s.key === "ask") continue;
+        expect(s.bullets?.length ?? 0).toBeGreaterThanOrEqual(2);
+        expect(s.bullets?.length ?? 0).toBeLessThanOrEqual(4);
+      }
+    }
+    expect(countOf(filled[1] as ReturnType<typeof buildPitchDeck>, "ask")).toBe(5);
+  });
+});
+
+describe("source materials (design-spec 6.14)", () => {
+  test("five-minute business model reads the text sub-items of §8", () => {
+    const s = slide(buildPitchDeck(base()), "business_model");
+    expect(s.bullets?.map((b) => b.text)).toEqual([
+      "Revenue: Gift box sales",
+      "Secondary revenue: Corporate orders",
+      "Why the startup cost is justified: Quotes confirm the oven price.",
+    ]);
+    expect(s.editSource?.itemNo).toBe(8);
+    const empty = slide(buildPitchDeck(base({ answers: {} })), "business_model");
+    expect(empty.emptySources).toEqual([
+      "§8 Primary revenue stream",
+      "§8 Secondary revenue streams",
+      "§8 Why is the startup cost justified?",
+    ]);
+  });
+
+  test("five-minute Why us reads §10 and the whole §11 table", () => {
+    const rows = Array.from({ length: 5 }, (_, i) => ({ name: `Founder ${i}`, role: `Role ${i}` }));
+    const s = slide(
+      buildPitchDeck(base({ answers: { ...fullAnswers, "P.11.1": { text: null, rows } } })),
+      "why_us",
+    );
+    expect(s.bullets).toHaveLength(4);
+    expect(s.bullets?.slice(0, 3).map((b) => b.text)).toEqual([
+      "Ten years in the bakery trade.",
+      "Missing capabilities: No delivery experience.",
+      "Filling the gaps: Partner with a courier.",
+    ]);
+    expect(s.bullets?.[3]?.text).toBe(
+      "Founders: Founder 0 — Role 0; Founder 1 — Role 1; Founder 2 — Role 2; Founder 3 — Role 3; Founder 4 — Role 4",
+    );
+    const none = slide(buildPitchDeck(base({ answers: {} })), "why_us");
+    expect(none.emptySources).toEqual([
+      "§10 Founder advantages",
+      "§10 Missing capabilities",
+      "§10 How will we fill the gaps?",
+      "§11 Founders",
+    ]);
+  });
+
+  test("economics reads the text sub-items of §20 under the scenario table", () => {
+    const s = slide(buildPitchDeck(base()), "economics");
+    expect(s.bullets?.map((b) => b.text.split(":")[0])).toEqual([
+      expect.stringContaining("Startup cost"),
+      "Opening cash reserve",
+      "Runway",
+      "Funding trigger",
+    ]);
+    expect(s.bullets?.[3]?.text).toBe("Funding trigger: Cash below one month.");
+    const empty = slide(buildPitchDeck(base({ answers: {} })), "economics");
+    expect(empty.emptySources).toEqual([
+      "§20 Opening cash reserve",
+      "§20 Runway if sales are below plan",
+      "§20 Trigger for additional funding",
     ]);
   });
 });

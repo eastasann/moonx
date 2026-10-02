@@ -1,8 +1,9 @@
 import { schema } from "@moonx/db";
 import { invitationLinkSchema, invitationWithLinkSchema } from "@moonx/schemas";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { type AccessInput, accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import type { Tx } from "../lib/db";
@@ -11,7 +12,6 @@ import { reissueInvitation } from "../lib/invitation-issue";
 import { INVITATION_TTL_DAYS } from "../lib/invitation-token";
 import { enforceRateLimit } from "../lib/rate-limit";
 import { invitationMail } from "../mail/mailer";
-import { authPlugin } from "../plugins";
 
 const params = z.object({ invitationId: z.uuid() });
 
@@ -19,37 +19,30 @@ const params = z.object({ invitationId: z.uuid() });
 export function invitationRoutes(ctx: AppContext) {
   const { db } = ctx;
 
-  /** Locks the row and checks who may act on it and what state it is in. */
-  async function lockInvitation(
-    tx: Tx,
-    invitationId: string,
-    user: { id: string; isAdmin: boolean },
-  ) {
+  /**
+   * The workspace of the invitation, which its Owner manages; `null` for an operator, who may
+   * manage any invitation (W5-W7), and 403 for anyone else on an operator invitation.
+   */
+  async function invitationScope({ params, user }: AccessInput) {
+    const [row] = await db
+      .select({ workspaceId: schema.invitations.workspaceId })
+      .from(schema.invitations)
+      .where(eq(schema.invitations.id, params.invitationId));
+    if (!row) throw new ApiError("NOT_FOUND", "Invitation not found");
+    if (user.isAdmin) return null;
+    if (!row.workspaceId) throw new ApiError("FORBIDDEN", "Only an Owner can manage invitations");
+    return { workspaceId: row.workspaceId };
+  }
+  const manage = { to: invitationScope, need: "owner" } as const;
+
+  /** Locks the row and checks the state it is in. */
+  async function lockInvitation(tx: Tx, invitationId: string) {
     const [row] = await tx
       .select()
       .from(schema.invitations)
       .where(eq(schema.invitations.id, invitationId))
       .for("update");
     if (!row) throw new ApiError("NOT_FOUND", "Invitation not found");
-    if (!user.isAdmin) {
-      const [membership] = row.workspaceId
-        ? await tx
-            .select({ role: schema.memberships.role })
-            .from(schema.memberships)
-            .where(
-              and(
-                eq(schema.memberships.workspaceId, row.workspaceId),
-                eq(schema.memberships.userId, user.id),
-              ),
-            )
-        : [];
-      if (row.workspaceId && !membership) {
-        throw new ApiError("NO_ACCESS", "Not a member of this workspace");
-      }
-      if (membership?.role !== "owner") {
-        throw new ApiError("FORBIDDEN", "Only an Owner can manage invitations");
-      }
-    }
     if (row.status === "accepted") {
       throw new ApiError("INVITATION_ALREADY_ACCEPTED", "The invitation was already accepted");
     }
@@ -59,12 +52,12 @@ export function invitationRoutes(ctx: AppContext) {
   }
 
   return new Elysia({ name: "moonx-invitations" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .post(
       "/invitations/:invitationId/resend",
       async ({ params: p, user }) =>
         db.transaction(async (tx) => {
-          const current = await lockInvitation(tx, p.invitationId, user);
+          const current = await lockInvitation(tx, p.invitationId);
           await enforceRateLimit(tx, "invitation", user.id, ctx.now().getTime());
           const now = ctx.now();
           const { row, link } = await reissueInvitation(tx, current.id, ctx.config.publicUrl, now);
@@ -86,23 +79,23 @@ export function invitationRoutes(ctx: AppContext) {
           const [invitation] = await toInvitations(tx, [row], now);
           return { invitation: invitation as NonNullable<typeof invitation>, link };
         }),
-      { params, response: { 200: invitationWithLinkSchema } },
+      { params, response: { 200: invitationWithLinkSchema }, located: manage },
     )
     .post(
       "/invitations/:invitationId/link",
-      async ({ params: p, user }) =>
+      async ({ params: p }) =>
         db.transaction(async (tx) => {
-          const current = await lockInvitation(tx, p.invitationId, user);
+          const current = await lockInvitation(tx, p.invitationId);
           const { link } = await reissueInvitation(tx, current.id, ctx.config.publicUrl, ctx.now());
           return { link };
         }),
-      { params, response: { 200: invitationLinkSchema } },
+      { params, response: { 200: invitationLinkSchema }, located: manage },
     )
     .delete(
       "/invitations/:invitationId",
-      async ({ params: p, user, set }) => {
+      async ({ params: p, set }) => {
         await db.transaction(async (tx) => {
-          const current = await lockInvitation(tx, p.invitationId, user);
+          const current = await lockInvitation(tx, p.invitationId);
           await tx
             .update(schema.invitations)
             .set({ status: "revoked" })
@@ -110,6 +103,6 @@ export function invitationRoutes(ctx: AppContext) {
         });
         set.status = 204;
       },
-      { params },
+      { params, located: manage },
     );
 }

@@ -3,17 +3,18 @@ import { listNotificationsQuerySchema } from "@moonx/schemas";
 import { and, count, eq, isNull } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import { listNotifications } from "../lib/notification-dto";
-import { authPlugin } from "../plugins";
 
 /** N1-N3 (SDD 5.11). A person only ever reaches their own notifications, in every workspace. */
 export function notificationRoutes(ctx: AppContext) {
   const { db } = ctx;
   const table = schema.notifications;
   return new Elysia({ name: "moonx-notifications" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
+    .guard({ signedIn: true })
     .get(
       "/notifications",
       ({ query, user }) =>

@@ -13,7 +13,7 @@ import type { Executor } from "./db";
 import { excerpt } from "./decision-log";
 import { EXECUTION_TAB } from "./due-notifications";
 import { i18n } from "./i18n";
-import { requireNotArchived, resolveScope, type Scope, type ScopeRef } from "./scope";
+import { requireNotArchived, type Scope, type ScopeRef } from "./scope";
 import type { AuthUser } from "./session";
 import { QUESTION_SCREEN } from "./validation-data";
 
@@ -330,27 +330,49 @@ async function activeShares(db: Executor, analysisId: string) {
 }
 
 /**
- * Decides what the caller may do with the comments of a target (SDD 7.1).
+ * What the route's `located` declaration resolves for the comments of a target (SDD 7.1), `null`
+ * for the one case with no workspace: the analysis' owner reading every share at once.
+ *
+ * - Ordinary targets: the target's workspace.
+ * - Self-analysis targets: the workspace the caller names (`workspaceId`), which a write always
+ *   has to name.
+ */
+export function targetScopeRef(
+  located: LocatedTarget,
+  user: Pick<AuthUser, "id">,
+  opts: { workspaceId?: string; write: boolean },
+): ScopeRef | null {
+  if (!located.selfAnalysis) return located.scopeRef as ScopeRef;
+  if (!opts.write && located.selfAnalysis.ownerId === user.id) return null;
+  if (!opts.workspaceId) {
+    throw validationFailed([
+      { path: "workspaceId", code: "invalid_type", message: "workspaceId is required" },
+    ]);
+  }
+  return { workspaceId: opts.workspaceId };
+}
+
+/**
+ * Decides what the caller may do with the comments of a target (SDD 7.1), given the scope the
+ * route resolved with `targetScopeRef`.
  *
  * - Ordinary targets: any member of the target's workspace reads and writes, Viewers included.
  * - Self-analysis targets: comments live in the workspace the analysis is shared with. A reader
  *   must be an Owner or Member there (a Viewer cannot read it) and name the workspace. Only the
  *   analysis' owner reads every share at once. A stopped share hides its comments from everyone.
  *
- * `write` also requires the workspace to be named by the caller (`workspaceId`).
  * `existing` is for operations on a comment that already exists: what the caller may not see is
  * then a 404 instead of the 403 / 422 a new comment would get.
  */
 export async function authorizeTarget(
   db: Executor,
-  user: Pick<AuthUser, "id">,
   located: LocatedTarget,
-  opts: { workspaceId?: string; write: boolean; existing?: boolean },
+  scope: Scope | null,
+  opts: { workspaceId?: string; existing?: boolean },
 ): Promise<TargetAccess> {
   if (located.selfAnalysis) {
     const analysisId = located.ref.id;
-    const isOwner = located.selfAnalysis.ownerId === user.id;
-    if (!opts.write && isOwner) {
+    if (!scope) {
       return {
         located,
         scope: null,
@@ -358,12 +380,6 @@ export async function authorizeTarget(
         workspace: null,
       };
     }
-    if (!opts.workspaceId) {
-      throw validationFailed([
-        { path: "workspaceId", code: "invalid_type", message: "workspaceId is required" },
-      ]);
-    }
-    const scope = await resolveScope(db, user, { workspaceId: opts.workspaceId });
     if (scope.role === "viewer")
       throw new ApiError("FORBIDDEN", "Viewers cannot read self analyses");
     const shares = await activeShares(db, analysisId);
@@ -379,7 +395,7 @@ export async function authorizeTarget(
     };
   }
 
-  const scope = await resolveScope(db, user, located.scopeRef as ScopeRef);
+  if (!scope) throw new ApiError("INTERNAL", "A workspace target needs a scope");
   if (opts.workspaceId && opts.workspaceId !== scope.workspaceId) {
     throw validationFailed([
       { path: "workspaceId", code: "invalid_value", message: "Not the workspace of the target" },

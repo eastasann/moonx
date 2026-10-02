@@ -6,8 +6,9 @@ import type { AppContext } from "./context";
 import { ApiError, type ValidationDetail } from "./errors";
 import { isAppTooOld, parseClient } from "./lib/client";
 import { reportable } from "./lib/error-report";
-import { requestInfo, setRequestInfo, setRequestUser } from "./lib/request-info";
-import { currentUser } from "./lib/session";
+import { createFailureWatch } from "./lib/failure-watch";
+import { AUTH_SECRET_PATHS, enforceRateLimit } from "./lib/rate-limit";
+import { clientIp, requestInfo, setRequestInfo } from "./lib/request-info";
 import { captureServerError } from "./observability";
 
 const STATE_CHANGING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -23,6 +24,9 @@ function secretMatches(given: string | null, accepted: string[]): boolean {
 
 /** Paths the Worker's shared secret does not guard (SDD 2 通信フロー 3). */
 const isOpenPath = (path: string) => path === "/api/health" || path.startsWith("/internal/");
+
+const isPhotoUpload = (method: string, path: string) =>
+  method === "PUT" && path === "/api/v1/me/avatar";
 
 /** The 4xx status of an Elysia error that has no code of its own here (bad file type, cookie signature). */
 function clientErrorStatus(error: unknown): number | null {
@@ -67,9 +71,10 @@ function detailsOf(error: unknown): ValidationDetail[] {
  */
 export function basePlugin(ctx: AppContext) {
   const { config, logger } = ctx;
+  const failures = createFailureWatch();
   return (
     new Elysia({ name: "moonx-base" })
-      .onRequest(({ request, set }) => {
+      .onRequest(async ({ request, set }) => {
         const url = new URL(request.url);
         const supplied = request.headers.get("x-request-id");
         const requestId =
@@ -96,6 +101,10 @@ export function basePlugin(ctx: AppContext) {
           if (url.pathname.startsWith("/api/auth/") && length > MAX_JSON_BYTES) {
             throw new ApiError("PAYLOAD_TOO_LARGE", "The request body is too large");
           }
+          // Better Auth only counts per path; SDD 7.2 wants one bucket per IP for these paths.
+          if (request.method === "POST" && AUTH_SECRET_PATHS.has(url.pathname)) {
+            await enforceRateLimit(ctx.db, "authSecret", clientIp(request), ctx.now().getTime());
+          }
           return;
         }
 
@@ -107,17 +116,20 @@ export function basePlugin(ctx: AppContext) {
           if (origin && !config.trustedOrigins.includes(origin)) {
             throw new ApiError("FORBIDDEN", "Origin is not trusted");
           }
+          // A cross-site form cannot send application/json without a preflight, so the type is
+          // required even when the body is empty. Only the photo upload is multipart.
           const length = Number(request.headers.get("content-length") ?? 0);
           const type = (request.headers.get("content-type") ?? "").toLowerCase();
-          const hasBody = length > 0 || type !== "" || request.headers.has("transfer-encoding");
-          if (hasBody) {
-            const multipart = type.startsWith("multipart/form-data");
-            if (!type.startsWith("application/json") && !multipart) {
-              throw new ApiError("BAD_REQUEST", "Content-Type must be application/json");
-            }
-            if (length > (multipart ? MAX_BODY_BYTES : MAX_JSON_BYTES)) {
-              throw new ApiError("PAYLOAD_TOO_LARGE", "The request body is too large");
-            }
+          const multipart = type.startsWith("multipart/form-data");
+          if (
+            multipart
+              ? !isPhotoUpload(request.method, url.pathname)
+              : !type.startsWith("application/json")
+          ) {
+            throw new ApiError("BAD_REQUEST", "Content-Type must be application/json");
+          }
+          if (length > (multipart ? MAX_BODY_BYTES : MAX_JSON_BYTES)) {
+            throw new ApiError("PAYLOAD_TOO_LARGE", "The request body is too large");
           }
         }
       })
@@ -191,10 +203,19 @@ export function basePlugin(ctx: AppContext) {
           error: { code: api.code, message: api.message, requestId: info.requestId, ...api.extra },
         };
       })
-      .onAfterResponse({ as: "global" }, ({ request, set, route }) => {
+      .onAfterResponse({ as: "global" }, ({ request, response, set, route }) => {
         const info = requestInfo(request);
-        const status = typeof set.status === "number" ? set.status : 200;
-        const level = status >= 500 ? "error" : "info";
+        // Better Auth answers with its own Response, which never goes through `set.status`.
+        const status =
+          response instanceof Response
+            ? response.status
+            : typeof set.status === "number"
+              ? set.status
+              : 200;
+        const burst =
+          (status === 401 || status === 403) &&
+          failures.record(clientIp(request), ctx.now().getTime());
+        const level = status >= 500 ? "error" : burst ? "warn" : "info";
         logger.log(level, "request", {
           requestId: info.requestId,
           userId: info.userId,
@@ -206,16 +227,4 @@ export function basePlugin(ctx: AppContext) {
         });
       })
   );
-}
-
-/**
- * Resolves the signed-in user for the routes `.use`d after it. 401 when there is none (SDD 5.1).
- * Routes read `user` from the context.
- */
-export function authPlugin(ctx: AppContext) {
-  return new Elysia({ name: "moonx-auth" }).derive({ as: "scoped" }, async ({ request }) => {
-    const user = await currentUser(ctx.db, ctx.auth, request);
-    setRequestUser(request, user.id);
-    return { user };
-  });
 }

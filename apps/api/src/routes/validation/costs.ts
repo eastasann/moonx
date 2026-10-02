@@ -12,6 +12,7 @@ import {
 import { and, eq, isNull, max } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../../access";
 import type { AppContext } from "../../context";
 import { ApiError } from "../../errors";
 import { HISTORY_SECTION } from "../../history/sections";
@@ -21,7 +22,7 @@ import { sortCostItems, toCostItem, toEconomicsInput, toEconomicsInputs } from "
 import { planCostUpdate, planEconomicsUpdate } from "../../lib/cost-rules";
 import type { Executor, Tx } from "../../lib/db";
 import { historyActor } from "../../lib/dto";
-import { requireWritable, resolveScope, type Scope } from "../../lib/scope";
+import type { Scope } from "../../lib/scope";
 import {
   computeValidationState,
   loadValidationData,
@@ -47,7 +48,6 @@ import {
   type WriteSpec,
 } from "../../lib/validation-table-write";
 import { lostInsertRace } from "../../lib/validation-write";
-import { authPlugin } from "../../plugins";
 
 const SCREEN_PARAMS = z.object({ validationId: z.uuid() });
 const WORTH_KEY = "V.08.WORTH";
@@ -146,11 +146,10 @@ export function costRoutes(ctx: AppContext) {
       .then((rows) => rows[0]);
 
   return new Elysia({ name: "moonx-validation-costs" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/validations/:validationId/costs",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
+      async ({ scope }) => {
         const c = await screenContext(db, scope);
         const state = computeValidationState(c.data, {
           workspaceId: scope.workspaceId,
@@ -162,13 +161,11 @@ export function costRoutes(ctx: AppContext) {
           economicsInputs: toEconomicsInputs(c),
         };
       },
-      { params: SCREEN_PARAMS },
+      { params: SCREEN_PARAMS, scoped: { to: { validationId: "validationId" }, need: "member" } },
     )
     .post(
       "/validations/:validationId/cost-items",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
-        requireWritable(scope);
+      async ({ body, user, request, set, scope }) => {
         const row = await createItem(
           envOf(scope, request, user),
           costSpec,
@@ -202,13 +199,15 @@ export function costRoutes(ctx: AppContext) {
         set.status = 201;
         return costItemDto(db, scope, row.id);
       },
-      { params: SCREEN_PARAMS, body: createCostItemBodySchema },
+      {
+        params: SCREEN_PARAMS,
+        body: createCostItemBodySchema,
+        scoped: { to: { validationId: "validationId" }, need: "writable" },
+      },
     )
     .patch(
       "/cost-items/:costItemId",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { costItemId: params.costItemId });
-        requireWritable(scope);
+      async ({ params, body, user, request, scope }) => {
         const { lockVersion, force, ...fields } = body;
         await updateItem(envOf(scope, request, user), costSpec, {
           lock: { lockVersion, force },
@@ -236,13 +235,15 @@ export function costRoutes(ctx: AppContext) {
         });
         return costItemDto(db, scope, params.costItemId);
       },
-      { params: z.object({ costItemId: z.uuid() }), body: updateCostItemBodySchema },
+      {
+        params: z.object({ costItemId: z.uuid() }),
+        body: updateCostItemBodySchema,
+        scoped: { to: { costItemId: "costItemId" }, need: "writable" },
+      },
     )
     .delete(
       "/cost-items/:costItemId",
-      async ({ params, user, request, set }) => {
-        const scope = await resolveScope(db, user, { costItemId: params.costItemId });
-        requireWritable(scope);
+      async ({ params, user, request, set, scope }) => {
         await deleteItem(envOf(scope, request, user), costSpec, {
           readRow: (tx) => readCostItem(tx, scope, params.costItemId),
           markDeleted: async (tx, row, stamp) => {
@@ -259,12 +260,14 @@ export function costRoutes(ctx: AppContext) {
         });
         set.status = 204;
       },
-      { params: z.object({ costItemId: z.uuid() }) },
+      {
+        params: z.object({ costItemId: z.uuid() }),
+        scoped: { to: { costItemId: "costItemId" }, need: "writable" },
+      },
     )
     .get(
       "/validations/:validationId/economics",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
+      async ({ scope }) => {
         const c = await screenContext(db, scope, true);
         const state = computeValidationState(c.data, {
           workspaceId: scope.workspaceId,
@@ -281,13 +284,11 @@ export function costRoutes(ctx: AppContext) {
           costItems: sortCostItems(c.data.costItems).map((row) => toCostItem(c, row)),
         };
       },
-      { params: SCREEN_PARAMS },
+      { params: SCREEN_PARAMS, scoped: { to: { validationId: "validationId" }, need: "member" } },
     )
     .put(
       "/validations/:validationId/economics/:fieldKey",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
-        requireWritable(scope);
+      async ({ params, body, user, request, scope }) => {
         const field = params.fieldKey;
         const vid = validationOf(scope);
         const now = ctx.now();
@@ -375,6 +376,10 @@ export function costRoutes(ctx: AppContext) {
         });
         return economicsDto(db, scope, field);
       },
-      { params: economicsFieldParamsSchema, body: putEconomicsInputBodySchema },
+      {
+        params: economicsFieldParamsSchema,
+        body: putEconomicsInputBodySchema,
+        scoped: { to: { validationId: "validationId" }, need: "writable" },
+      },
     );
 }

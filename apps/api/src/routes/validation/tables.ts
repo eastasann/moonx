@@ -15,6 +15,7 @@ import {
 import { and, eq, isNotNull, isNull, max } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../../access";
 import type { AppContext } from "../../context";
 import { ApiError, validationFailed } from "../../errors";
 import { HISTORY_SECTION } from "../../history/sections";
@@ -22,7 +23,7 @@ import { assumptionSnapshot, competitorSnapshot, riskSnapshot } from "../../hist
 import { reorderCostItems } from "../../lib/cost-order";
 import type { Executor, Tx } from "../../lib/db";
 import { historyActor } from "../../lib/dto";
-import { requireWritable, resolveScope, type Scope } from "../../lib/scope";
+import type { Scope } from "../../lib/scope";
 import { loadValidationData, type ValidationData } from "../../lib/validation-data";
 import {
   commentCountsById,
@@ -45,7 +46,6 @@ import {
   type WriteEnv,
   type WriteSpec,
 } from "../../lib/validation-table-write";
-import { authPlugin } from "../../plugins";
 
 const PATTERN_KEYS = ["V.04.SURVIVOR_PATTERNS", "V.04.FAILURE_PATTERNS"] as const;
 const SCREEN_PARAMS = z.object({ validationId: z.uuid() });
@@ -218,11 +218,10 @@ export function validationTableRoutes(ctx: AppContext) {
   });
 
   return new Elysia({ name: "moonx-validation-tables" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/validations/:validationId/competitors",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
+      async ({ scope }) => {
         const c = await competitorContext(db, scope, true);
         const answerOf = (key: string) =>
           toTableAnswer(
@@ -236,13 +235,11 @@ export function validationTableRoutes(ctx: AppContext) {
           guidance: { min: c.data.rules.competitors.min, max: c.data.rules.competitors.max },
         };
       },
-      { params: SCREEN_PARAMS },
+      { params: SCREEN_PARAMS, scoped: { to: { validationId: "validationId" }, need: "member" } },
     )
     .post(
       "/validations/:validationId/competitors",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
-        requireWritable(scope);
+      async ({ body, user, request, set, scope }) => {
         const row = await createItem(
           envOf(scope, request, user),
           competitorSpec,
@@ -264,13 +261,15 @@ export function validationTableRoutes(ctx: AppContext) {
         set.status = 201;
         return competitorDto(db, scope, row.id);
       },
-      { params: SCREEN_PARAMS, body: createCompetitorBodySchema },
+      {
+        params: SCREEN_PARAMS,
+        body: createCompetitorBodySchema,
+        scoped: { to: { validationId: "validationId" }, need: "writable" },
+      },
     )
     .patch(
       "/competitors/:competitorId",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { competitorId: params.competitorId });
-        requireWritable(scope);
+      async ({ params, body, user, request, scope }) => {
         const { lockVersion, force, ...fields } = body;
         await updateItem(envOf(scope, request, user), competitorSpec, {
           lock: { lockVersion, force },
@@ -287,13 +286,15 @@ export function validationTableRoutes(ctx: AppContext) {
         });
         return competitorDto(db, scope, params.competitorId);
       },
-      { params: z.object({ competitorId: z.uuid() }), body: updateCompetitorBodySchema },
+      {
+        params: z.object({ competitorId: z.uuid() }),
+        body: updateCompetitorBodySchema,
+        scoped: { to: { competitorId: "competitorId" }, need: "writable" },
+      },
     )
     .delete(
       "/competitors/:competitorId",
-      async ({ params, user, request, set }) => {
-        const scope = await resolveScope(db, user, { competitorId: params.competitorId });
-        requireWritable(scope);
+      async ({ params, user, request, set, scope }) => {
         await deleteItem(envOf(scope, request, user), competitorSpec, {
           readRow: (tx) => readCompetitor(tx, scope, params.competitorId),
           markDeleted: async (tx, row, stamp) => {
@@ -305,22 +306,22 @@ export function validationTableRoutes(ctx: AppContext) {
         });
         set.status = 204;
       },
-      { params: z.object({ competitorId: z.uuid() }) },
+      {
+        params: z.object({ competitorId: z.uuid() }),
+        scoped: { to: { competitorId: "competitorId" }, need: "writable" },
+      },
     )
     .get(
       "/validations/:validationId/assumptions",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
+      async ({ scope }) => {
         const c = await rowContext(db, scope, "assumption");
         return { items: c.data.assumptions.map((row) => toAssumption(c, row)) };
       },
-      { params: SCREEN_PARAMS },
+      { params: SCREEN_PARAMS, scoped: { to: { validationId: "validationId" }, need: "member" } },
     )
     .post(
       "/validations/:validationId/assumptions",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
-        requireWritable(scope);
+      async ({ body, user, request, set, scope }) => {
         const row = await createItem(
           envOf(scope, request, user),
           assumptionSpec,
@@ -342,13 +343,15 @@ export function validationTableRoutes(ctx: AppContext) {
         set.status = 201;
         return assumptionDto(db, scope, row.id);
       },
-      { params: SCREEN_PARAMS, body: createAssumptionBodySchema },
+      {
+        params: SCREEN_PARAMS,
+        body: createAssumptionBodySchema,
+        scoped: { to: { validationId: "validationId" }, need: "writable" },
+      },
     )
     .patch(
       "/assumptions/:assumptionId",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { assumptionId: params.assumptionId });
-        requireWritable(scope);
+      async ({ params, body, user, request, scope }) => {
         const { lockVersion, force, ...fields } = body;
         await updateItem(envOf(scope, request, user), assumptionSpec, {
           lock: { lockVersion, force },
@@ -365,13 +368,15 @@ export function validationTableRoutes(ctx: AppContext) {
         });
         return assumptionDto(db, scope, params.assumptionId);
       },
-      { params: z.object({ assumptionId: z.uuid() }), body: updateAssumptionBodySchema },
+      {
+        params: z.object({ assumptionId: z.uuid() }),
+        body: updateAssumptionBodySchema,
+        scoped: { to: { assumptionId: "assumptionId" }, need: "writable" },
+      },
     )
     .delete(
       "/assumptions/:assumptionId",
-      async ({ params, user, request, set }) => {
-        const scope = await resolveScope(db, user, { assumptionId: params.assumptionId });
-        requireWritable(scope);
+      async ({ params, user, request, set, scope }) => {
         await deleteItem(envOf(scope, request, user), assumptionSpec, {
           readRow: (tx) => readAssumption(tx, scope, params.assumptionId),
           markDeleted: async (tx, row, stamp) => {
@@ -383,22 +388,22 @@ export function validationTableRoutes(ctx: AppContext) {
         });
         set.status = 204;
       },
-      { params: z.object({ assumptionId: z.uuid() }) },
+      {
+        params: z.object({ assumptionId: z.uuid() }),
+        scoped: { to: { assumptionId: "assumptionId" }, need: "writable" },
+      },
     )
     .get(
       "/validations/:validationId/risks",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
+      async ({ scope }) => {
         const c = await rowContext(db, scope, "risk");
         return { items: orderRisks(c.data.risks).map((row) => toRisk(c, row)) };
       },
-      { params: SCREEN_PARAMS },
+      { params: SCREEN_PARAMS, scoped: { to: { validationId: "validationId" }, need: "member" } },
     )
     .post(
       "/validations/:validationId/risks",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
-        requireWritable(scope);
+      async ({ body, user, request, set, scope }) => {
         const row = await createItem(
           envOf(scope, request, user),
           riskSpec,
@@ -420,13 +425,15 @@ export function validationTableRoutes(ctx: AppContext) {
         set.status = 201;
         return riskDto(db, scope, row.id);
       },
-      { params: SCREEN_PARAMS, body: createRiskBodySchema },
+      {
+        params: SCREEN_PARAMS,
+        body: createRiskBodySchema,
+        scoped: { to: { validationId: "validationId" }, need: "writable" },
+      },
     )
     .patch(
       "/risks/:riskId",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { riskId: params.riskId });
-        requireWritable(scope);
+      async ({ params, body, user, request, scope }) => {
         const { lockVersion, force, ...fields } = body;
         await updateItem(envOf(scope, request, user), riskSpec, {
           lock: { lockVersion, force },
@@ -443,13 +450,15 @@ export function validationTableRoutes(ctx: AppContext) {
         });
         return riskDto(db, scope, params.riskId);
       },
-      { params: z.object({ riskId: z.uuid() }), body: updateRiskBodySchema },
+      {
+        params: z.object({ riskId: z.uuid() }),
+        body: updateRiskBodySchema,
+        scoped: { to: { riskId: "riskId" }, need: "writable" },
+      },
     )
     .delete(
       "/risks/:riskId",
-      async ({ params, user, request, set }) => {
-        const scope = await resolveScope(db, user, { riskId: params.riskId });
-        requireWritable(scope);
+      async ({ params, user, request, set, scope }) => {
         await deleteItem(envOf(scope, request, user), riskSpec, {
           readRow: (tx) => readRisk(tx, scope, params.riskId),
           markDeleted: async (tx, row, stamp) => {
@@ -461,13 +470,14 @@ export function validationTableRoutes(ctx: AppContext) {
         });
         set.status = 204;
       },
-      { params: z.object({ riskId: z.uuid() }) },
+      {
+        params: z.object({ riskId: z.uuid() }),
+        scoped: { to: { riskId: "riskId" }, need: "writable" },
+      },
     )
     .put(
       "/validations/:validationId/:list/order",
-      async ({ params, body, user, set }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
-        requireWritable(scope);
+      async ({ params, body, set, scope }) => {
         if (params.list === "cost-items" && !body.category) {
           throw validationFailed([
             { path: "category", code: "invalid_value", message: "Required for cost-items" },
@@ -492,6 +502,7 @@ export function validationTableRoutes(ctx: AppContext) {
       {
         params: z.object({ validationId: z.uuid(), list: orderListSchema }),
         body: reorderBodySchema,
+        scoped: { to: { validationId: "validationId" }, need: "writable" },
       },
     );
 }

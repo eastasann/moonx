@@ -8,10 +8,10 @@ import {
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { loadSelfAnalysisOverview } from "../lib/dashboard-data";
 import { historyActor } from "../lib/dto";
-import { requireEditor, resolveScope } from "../lib/scope";
 import {
   completeSelfAnalysis,
   ensureSelfAnalysis,
@@ -23,7 +23,6 @@ import {
   setSelfAnalysisCurrency,
   setSelfAnalysisShares,
 } from "../lib/self-analysis";
-import { authPlugin } from "../plugins";
 
 const workspaceParams = z.object({ workspaceId: z.uuid() });
 
@@ -35,8 +34,8 @@ export function selfAnalysisRoutes(ctx: AppContext) {
     return loadSelfAnalysisHome(db, userId, analysis);
   };
   return new Elysia({ name: "moonx-self-analysis" })
-    .use(authPlugin(ctx))
-    .get("/me/self-analysis", ({ user }) => home(user.id))
+    .use(accessPlugin(ctx))
+    .get("/me/self-analysis", ({ user }) => home(user.id), { signedIn: true })
     .patch(
       "/me/self-analysis",
       async ({ body, user }) => {
@@ -44,13 +43,13 @@ export function selfAnalysisRoutes(ctx: AppContext) {
         const updated = await setSelfAnalysisCurrency(db, analysis, body.currency);
         return loadSelfAnalysisHome(db, user.id, updated);
       },
-      { body: updateSelfAnalysisBodySchema },
+      { body: updateSelfAnalysisBodySchema, signedIn: true },
     )
     .get(
       "/me/self-analysis/sections/:sectionKey",
       async ({ params, user }) =>
         loadSelfAnalysisSection(db, await ensureSelfAnalysis(db, user.id), params.sectionKey),
-      { params: z.object({ sectionKey: z.string().max(20) }) },
+      { params: z.object({ sectionKey: z.string().max(20) }), signedIn: true },
     )
     .put(
       "/me/self-analysis/answers/:questionKey",
@@ -68,6 +67,7 @@ export function selfAnalysisRoutes(ctx: AppContext) {
       {
         params: z.object({ questionKey: z.string().max(100) }),
         body: putSelfAnalysisAnswerBodySchema,
+        signedIn: true,
       },
     )
     .post(
@@ -79,12 +79,16 @@ export function selfAnalysisRoutes(ctx: AppContext) {
         );
         return loadSelfAnalysisHome(db, user.id, done);
       },
-      { body: z.optional(completeSelfAnalysisBodySchema) },
+      { body: z.optional(completeSelfAnalysisBodySchema), signedIn: true },
     )
-    .post("/me/self-analysis/reopen", async ({ user }) => {
-      const analysis = await ensureSelfAnalysis(db, user.id);
-      return loadSelfAnalysisHome(db, user.id, await reopenSelfAnalysis(db, analysis));
-    })
+    .post(
+      "/me/self-analysis/reopen",
+      async ({ user }) => {
+        const analysis = await ensureSelfAnalysis(db, user.id);
+        return loadSelfAnalysisHome(db, user.id, await reopenSelfAnalysis(db, analysis));
+      },
+      { signedIn: true },
+    )
     .put(
       "/me/self-analysis/shares",
       async ({ body, user }) => {
@@ -96,24 +100,23 @@ export function selfAnalysisRoutes(ctx: AppContext) {
           .where(eq(schema.selfAnalyses.id, analysis.id));
         return loadSelfAnalysisHome(db, user.id, fresh as typeof analysis);
       },
-      { body: putSelfAnalysisSharesBodySchema },
+      { body: putSelfAnalysisSharesBodySchema, signedIn: true },
     )
     .get(
       "/workspaces/:workspaceId/self-analyses",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
-        requireEditor(scope);
+      async ({ scope }) => {
         return { items: await loadSelfAnalysisOverview(db, scope.workspaceId) };
       },
-      { params: workspaceParams },
+      { params: workspaceParams, scoped: { to: { workspaceId: "workspaceId" }, need: "editor" } },
     )
     .get(
       "/workspaces/:workspaceId/self-analyses/:userId",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
-        requireEditor(scope);
+      async ({ params, scope }) => {
         return loadSharedSelfAnalysis(db, scope.workspaceId, params.userId);
       },
-      { params: z.object({ workspaceId: z.uuid(), userId: z.uuid() }) },
+      {
+        params: z.object({ workspaceId: z.uuid(), userId: z.uuid() }),
+        scoped: { to: { workspaceId: "workspaceId" }, need: "editor" },
+      },
     );
 }

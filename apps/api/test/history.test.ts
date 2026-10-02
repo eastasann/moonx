@@ -672,7 +672,7 @@ describe("H2 POST /history/{entryId}/revert", () => {
     const archived = await revert(id);
     expect([archived.status, archived.body.error.code]).toEqual([409, "ARCHIVED"]);
     const archivedViewer = await revert(id, as.grace);
-    expect(archivedViewer.status).toBe(403);
+    expect(archivedViewer.status).toBe(409);
     expect((await getAnswer(bike, "V.01.WHY_THEM")).text).toBe("three");
   });
 
@@ -801,7 +801,7 @@ describe("H3 POST /history/batches/{batchId}/revert", () => {
       .where(eq(schema.ideas.id, validation?.ideaId as string));
     const archived = await revertBatch(batchId);
     expect([archived.status, archived.body.error.code]).toEqual([409, "ARCHIVED"]);
-    expect((await revertBatch(batchId, as.grace)).status).toBe(403);
+    expect((await revertBatch(batchId, as.grace)).status).toBe(409);
   });
 });
 

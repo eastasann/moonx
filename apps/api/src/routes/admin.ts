@@ -13,14 +13,13 @@ import {
 import { and, desc, eq, gt, lte, or } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { operatorPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import { listAdminUsers, listAdminWorkspaces, loadAdminUser } from "../lib/admin-directory";
-import { adminPlugin } from "../lib/admin-guard";
 import { toInvitations } from "../lib/invitation-dto";
 import { issueInvitation } from "../lib/invitation-issue";
 import { decodeCursor, toPage } from "../lib/page";
-import { authPlugin } from "../plugins";
 import { adminTemplateRoutes } from "./admin-templates";
 
 const userParams = z.object({ userId: z.uuid() });
@@ -59,8 +58,8 @@ export function adminRoutes(ctx: AppContext) {
 
   return new Elysia({ name: "moonx-admin" })
     .use(adminTemplateRoutes(ctx))
-    .use(authPlugin(ctx))
-    .use(adminPlugin(ctx))
+    .use(operatorPlugin(ctx))
+    .guard({ operator: true })
     .get("/admin/users", ({ query }) => listAdminUsers(db, query), {
       query: adminUsersQuerySchema,
       response: { 200: adminUsersPageSchema },

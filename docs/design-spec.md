@@ -1192,7 +1192,7 @@ Reply in Markdown. For each question you want to update, write one block:
 
 規則:
 
-- 設問のブロックは `## [ID] タイトル` の見出しで始まり、次の `##` か `#` の見出しまでが1つのブロック（ID のない `##` の見出しは、取り込みで未振り分けのブロックになる）。
+- 設問のブロックは `## [ID] タイトル` の見出しで始まり、次の `## [` の見出しか、次の `# ` の見出しまでが1つのブロック。
 - 取り込みは、書き出した Markdown をそのまま貼ったものも読める（`# Prompt`・`# Reference`・`# How to reply` は読み飛ばし、`**Current answer:**` の内容を回答とする。コードブロックの中の見出しは本文）。
 - 書き出しに入る設問は、取り込める型（長文・短文・選択・金額＋理由）で、隠れていないものだけ。「空の設問を含める」がオフで全部空のときは、設問0件で書き出し、「全部空」の注意を出す（範囲そのものに設問が無いときだけ 422 `EMPTY_SCOPE`）。
 - ヘッダーのコメントの `scope:` は `all`・`part:a`・`part:b`・セクションの一覧、`idea:` はプランなら「アイデア名 / 案の名前」で、自己分析では付けない。JSON の `scope` は、プランが `{ planName, items, part }`、自己分析が `{ sections }`。金額＋理由の設問は `Amount:` と `Reason:` の行、選択の設問は `**Choices:**` の行を付ける。ファイル名の元は `moonx-export-{種類}-{名前}-{日付}`。
@@ -1315,7 +1315,7 @@ Web（パターン G ステップ。差分確認だけ左右2列）
 
 - テキスト欄に貼り付けるか、`.md` / `.json` のファイルを選ぶ。上限は 200,000 文字（ファイルは 1MB）、文字コードは UTF-8。超えたら「This is too long. Import fewer questions at a time.」。
 - 形式は自動で見分ける: JSON として読めて `format` が `moonx-reply` か `moonx-export` なら JSON、それ以外は Markdown。`moonx-export` が貼られたときは、各設問の `answer.text`（金額の設問は `amount` と `text`）を返答として扱う。
-- Markdown は `## [ID]` の見出しでブロックに分ける。見出しの前の文章や、ID のない見出しのブロックは「未振り分け」にする。
+- Markdown は `## [ID]` の見出しでブロックに分ける。見出しの前の文章や、ID のない見出し（`## []`）のブロックは「未振り分け」にする。`[` で始まらない `##` の見出しは、回答の文章の一部として前のブロックに含める。
 - 何も読み取れなかったら「No question IDs found」と、期待する書式の例を出す。貼り付け全体を1つの未振り分けのブロックとして次へ進むこともできる。
 
 #### ② 振り分け
@@ -1648,7 +1648,7 @@ Web（パターン A）                                        スマホは縦�
 ### 6.14 23 Pitch Deck（パターン I）
 
 - プランから毎回生成する。スライドは直接編集しない。各スライドに「Edit source」（元の項目の 21 へ。Owner / Member）。数字の入るスライドには「Edit in validation」（17 / 18 へ。Owner / Member）も置く。
-- スライドの型は4つ: 表紙（大きな見出しと副題）/ 文章（見出しと箇条書き。1〜4つ、5分版の Ask / next step だけ3つの条件・Next Actions・資金の条件の5つ）/ 数字（見出しと大きな数字2〜4つ）/ 表（見出しと表）。各スライドの型は下の表のとおり。ロゴは置かず、Business Name を表紙とフッターに出す。
+- スライドの型は4つ: 表紙（大きな見出しと副題）/ 文章（見出しと箇条書き。2〜4つ、5分版の Ask / next step だけ3つの条件・Next Actions・資金の条件の5つ）/ 数字（見出しと大きな数字2〜4つ）/ 表（見出しと表）。各スライドの型は下の表のとおり。ロゴは置かず、Business Name を表紙とフッターに出す。
 - スライドへのコメントは「版の種類 + スライドのキー」で指す（例: `five.market`）。
 - 上部で **1分版（One-minute）/ 5分版（Five-minute）** を切り替える（原本 §30 の流れどおり）。
 - 上部で生成元を選ぶ: 「Latest」（今の内容）か、保存済みの版。
@@ -1666,7 +1666,7 @@ Web（パターン A）                                        スマホは縦�
 | 4 | Solution（solution・文章） | §5 Initial offer at launch・Core customer experience |
 | 5 | Why now（why_now・文章） | §1 Why can this work?・§6 If Blue/Mixed, why has nobody captured it? |
 | 6 | Business model（business_model・数字） | §8 Primary revenue stream、価格・粗利/件・損益分岐（件/日） |
-| 7 | Why us（why_us・文章） | §10 Founder advantages |
+| 7 | Why us（why_us・文章） | §10 Founder advantages・Missing capabilities・How will we fill the gaps |
 | 8 | Next step（next_step・文章） | §29 Next Actions（完了済みを除き、期限が近い順に最大3件。期限なしは最後）・§24 We proceed to launch if |
 
 5分版（12枚）:
@@ -1679,14 +1679,14 @@ Web（パターン A）                                        スマホは縦�
 | 4 | Solution（solution・文章） | §5 |
 | 5 | Market（market・文章） | §6 Market type・Why?・Reachable market・Required market share |
 | 6 | Competition（competition・表） | §6 Key competitors・What must we do differently or better?、検証の競合（最大5件: 名前・種類・価格・強み） |
-| 7 | Business model（business_model・数字） | §8 の Primary revenue stream・Secondary revenue streams、価格・変動費/件・粗利/件・粗利率 |
-| 8 | Economics（economics・表） | §20 の Opening cash reserve・Runway、シナリオ表（Conservative / Expected / Strong の件数/日・売上・営業利益）、初期費用、損益分岐、回収期間、ROI |
-| 9 | Why us（why_us・文章） | §10 Founder advantages、§11 の表（Name・Role。先頭の3行） |
+| 7 | Business model（business_model・数字） | §8 の文章の小項目、価格・変動費/件・粗利/件・粗利率 |
+| 8 | Economics（economics・表） | §20、シナリオ表（Conservative / Expected / Strong の件数/日・売上・営業利益）、初期費用、損益分岐、回収期間、ROI |
+| 9 | Why us（why_us・文章） | §10、§11 の表（Name・Role） |
 | 10 | Execution plan（execution・表） | §23 マイルストーン（期限順に最大6件）、§25 ローンチを時期の区分ごとにまとめた要約（区分の固定の名前で出す。Timing の文言を直しても変わらない） |
 | 11 | Risks（risks・表） | §22 の上位3件（Impact → Probability の順）と Mitigation |
 | 12 | Ask / next step（ask・文章） | §24 の3つの条件、§29 Next Actions（期限が近い順に最大3件）、§20 Trigger for additional funding |
 
-- 数字・表のスライドは、数字や表の下に注記の箇条書き（素材の文章の小項目）を持てる。文章スライドの箇条書きは1〜4つ（素材が空なら「Not written yet」の1つを残す。Why now は、市場の種類が Red だけで Blue/Mixed の小項目が空のとき、その箇条書きを出さない）。
+- 数字・表のスライドは、数字や表の下に注記の箇条書き（素材の文章の小項目）を持てる。文章スライドの箇条書きは2〜4つ（素材が空の項目は「Not written yet」で出し、箇条書きの数は減らさない）。
 - 各スライドの「Edit source」の移動先は、表紙 §1、Problem §4、Customer §3、Solution §5、Why now §1、Market・Competition §6、Business model §8（Edit in validation は 18）、Economics §20（Edit in validation は 17）、Why us §10、Execution plan §23、Risks §22、Next step §29、Ask §24。
 - 空の素材は、そのスライドに「Not written yet」とグレーで出す（PDF にも出す）。
 - 文章が長くて収まらないときは文字を小さくし（型ごとに最小の文字の大きさを決める。具体値は Phase 3 のデザイントークン）、それでも収まらなければ末尾を「…」で切り、アプリの表示だけに「Too long for this slide — shorten it in the plan」と出す。
@@ -1751,8 +1751,8 @@ Web（パターン A）                                        スマホは縦�
 |---|---|
 | メール・表示名・写真・パスワード・Google との連携・セッション | 消す。表示名は「Deleted user」に置き換える（メールは復元できない値に置き換える） |
 | 自己分析（回答・共有・その回答へのコメント・変更履歴） | すべて消す |
-| 本人しかいないワークスペース | 個人用もチーム用も、中身ごと消す（残しても誰も開けないため）。個人用にほかのメンバーがいれば、チームのワークスペースと同じ扱い |
-| ほかのメンバーがいるワークスペースの所属 | 外す（上の表の「外れたとき」と同じ。担当は名前の自由記述「Deleted user」に置き換える） |
+| 個人用ワークスペース | 本人しかいなければ、中身ごと消す。ほかにメンバーがいれば、チームのワークスペースと同じ扱い |
+| チームのワークスペースの所属 | 外す（上の表の「外れたとき」と同じ。担当は名前の自由記述「Deleted user」に置き換える。本人しかいなかったチームのワークスペースも消さず、メンバーのいない記録として残す） |
 | チームに書いたもの（アイデア・検証・プラン・実行管理・コメント・決定ログ・変更履歴） | チームの記録として残す。名前は「Deleted user」と出す |
 | 本人あての通知・送った招待のうち有効なもの | 通知は消す。有効な招待は取り消す |
 

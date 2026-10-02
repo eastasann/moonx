@@ -1217,7 +1217,7 @@ describe("U7 delete account", () => {
     expect(left).toHaveLength(0);
   });
 
-  test("a team workspace nobody else belongs to is deleted with the person", async () => {
+  test("a team workspace with no other member stays, without members", async () => {
     const [team] = await t.db
       .insert(schema.workspaces)
       .values({ name: "Solo team", createdById: userId("grace") })
@@ -1233,6 +1233,12 @@ describe("U7 delete account", () => {
     expect(res.status).toBe(204);
     expect(
       await t.db.select().from(schema.workspaces).where(eq(schema.workspaces.id, teamId)),
+    ).toHaveLength(1);
+    expect(
+      await t.db
+        .select()
+        .from(schema.memberships)
+        .where(eq(schema.memberships.workspaceId, teamId)),
     ).toHaveLength(0);
     expect(
       await t.db.select().from(schema.workspaces).where(eq(schema.workspaces.id, BCDX)),

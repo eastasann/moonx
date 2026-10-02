@@ -3,6 +3,7 @@ import { recordDecisionBodySchema } from "@moonx/schemas";
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../../access";
 import type { AppContext } from "../../context";
 import { ApiError } from "../../errors";
 import type { Executor } from "../../lib/db";
@@ -12,9 +13,8 @@ import {
   recordValidationDecision,
   validationDecisionSnapshot,
 } from "../../lib/decision-record";
-import { requireEditor, requireWritable, resolveScope, type Scope } from "../../lib/scope";
+import type { Scope } from "../../lib/scope";
 import { computeValidationState, hasText, loadValidationData } from "../../lib/validation-data";
-import { authPlugin } from "../../plugins";
 
 const params = z.object({ ideaId: z.uuid() });
 
@@ -50,12 +50,10 @@ async function loadIdeaState(db: Executor, scope: Scope) {
 export function decisionRoutes(ctx: AppContext) {
   const { db } = ctx;
   return new Elysia({ name: "moonx-validation-decisions" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/ideas/:ideaId/decision-context",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { ideaId: params.ideaId });
-        requireEditor(scope);
+      async ({ scope }) => {
         const { idea, data, state } = await loadIdeaState(db, scope);
         const answer = (key: string) => {
           const text = data.answers.find((a) => a.questionKey === key)?.text;
@@ -84,13 +82,11 @@ export function decisionRoutes(ctx: AppContext) {
           lastDecision: await latestValidationDecision(db, scope.workspaceId, idea.id),
         };
       },
-      { params },
+      { params, scoped: { to: { ideaId: "ideaId" }, need: "editor" } },
     )
     .post(
       "/ideas/:ideaId/decisions",
-      async ({ params, body, user, set }) => {
-        const scope = await resolveScope(db, user, { ideaId: params.ideaId });
-        requireWritable(scope);
+      async ({ body, user, set, scope }) => {
         const result = await db.transaction(async (tx) => {
           const { entryId } = await recordValidationDecision(tx, {
             workspaceId: scope.workspaceId,
@@ -113,6 +109,10 @@ export function decisionRoutes(ctx: AppContext) {
           canCreatePlan: body.value === "proceed",
         };
       },
-      { params, body: recordDecisionBodySchema },
+      {
+        params,
+        body: recordDecisionBodySchema,
+        scoped: { to: { ideaId: "ideaId" }, need: "writable" },
+      },
     );
 }

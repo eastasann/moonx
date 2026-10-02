@@ -9,6 +9,7 @@ import {
 import { and, eq, ne } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError, validationFailed } from "../errors";
 import {
@@ -22,7 +23,6 @@ import { AVATAR_MAX_BYTES, toAvatarWebp } from "../lib/avatar-image";
 import { historyActor } from "../lib/dto";
 import { reportable } from "../lib/error-report";
 import { enforceRateLimit } from "../lib/rate-limit";
-import { authPlugin } from "../plugins";
 
 /** U1-U3, U7 and U8 (SDD 5.4): the signed-in user's own account. */
 export function meRoutes(ctx: AppContext) {
@@ -46,7 +46,8 @@ export function meRoutes(ctx: AppContext) {
   }
 
   return new Elysia({ name: "moonx-me" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
+    .guard({ signedIn: true })
     .get("/me", ({ user }) => loadMe(db, user.id), { response: { 200: meSchema } })
     .patch(
       "/me",

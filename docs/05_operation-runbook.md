@@ -285,6 +285,7 @@ cd apps/web && bunx wrangler tail --env production --status=error --format=prett
 | Google の画面に `Error 400: redirect_uri_mismatch` | OAuth クライアントのリダイレクト URI が `BETTER_AUTH_URL` ＋ `/api/auth/callback/google` と違う | 03 6章の表に合わせる |
 | `Error 403: access_denied` | 同意画面が「テスト」のまま | 「本番環境」にする（03 6章） |
 | `Error 401: invalid_client` | `GOOGLE_CLIENT_ID` と SECRET の組が違う、Google 側で SECRET を消した | `moonx-{env}-google-client-secret` と Terraform の ID を確かめ、新しいリビジョンを作る（3.15） |
+| API が起動せず、ログに `GOOGLE_CLIENT_ID is required in production`（staging も同じ形） | staging と production は、`GOOGLE_CLIENT_ID` と `GOOGLE_CLIENT_SECRET` が無いと起動しない（SDD 2章「環境変数」） | `moonx-{env}-google-client-secret` と Terraform の ID を確かめ、新しいリビジョンを作る（3.15） |
 | ログインの後「招待が無い」 | 招待制（ADR-010）。そのメールあての有効な招待（pending・期限内）が無い | 運営の画面で招待を確かめる。招待の画面から Google ログインを始めてもらう |
 | スマホで Google の後にアプリへ戻らない | `TRUSTED_ORIGINS` にアプリの scheme（`moonx://`。staging は `moonx-staging://`）が無い、ビルドの scheme が違う | `TRUSTED_ORIGINS` と `app.config.ts` の scheme を比べる |
 

@@ -12,7 +12,7 @@ registerAiHooks();
 test("an unmatched block is sent to a chosen question and then imports like a matched one", async () => {
   api();
   renderBare(<ImportFromAi workspaceId={WORKSPACE} target="validation" id={VALIDATION} />);
-  await paste("## [V.01.WHO]\nBPO HR teams\n\n## Customer segments\nBPO firms in Bacolod");
+  await paste("## [V.01.WHO]\nBPO HR teams\n\n## [] Customer segments\nBPO firms in Bacolod");
   await pressNext();
   await screen.findByRole("list", { name: "Match" });
   expect(matchRows()[1]).toHaveTextContent("Not matched");

@@ -14,20 +14,19 @@ import {
 import { and, count, desc, eq, gt } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { type AccessInput, accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import type { Executor } from "../lib/db";
 import { historyActor } from "../lib/dto";
 import { toInvitations } from "../lib/invitation-dto";
 import { issueInvitation } from "../lib/invitation-issue";
-import { requireOwner, resolveScope } from "../lib/scope";
 import {
   loadMentionCandidates,
   loadWorkspaceMembers,
   releaseMemberDuties,
   resetLastWorkspace,
 } from "../lib/workspace-members";
-import { authPlugin } from "../plugins";
 
 async function loadWorkspace(
   db: Executor,
@@ -60,7 +59,7 @@ const memberParams = z.object({
 export function workspaceRoutes(ctx: AppContext) {
   const { db } = ctx;
   return new Elysia({ name: "moonx-workspaces" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .post(
       "/workspaces",
       async ({ body, user, set }) => {
@@ -88,21 +87,22 @@ export function workspaceRoutes(ctx: AppContext) {
         set.status = 201;
         return loadWorkspace(db, id, "owner");
       },
-      { body: createWorkspaceBodySchema, response: { 201: workspaceSchema } },
+      { body: createWorkspaceBodySchema, response: { 201: workspaceSchema }, signedIn: true },
     )
     .get(
       "/workspaces/:workspaceId",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+      async ({ scope }) => {
         return loadWorkspace(db, scope.workspaceId, scope.role);
       },
-      { params: z.object({ workspaceId: z.uuid() }), response: { 200: workspaceSchema } },
+      {
+        params: z.object({ workspaceId: z.uuid() }),
+        response: { 200: workspaceSchema },
+        scoped: { to: { workspaceId: "workspaceId" }, need: "member" },
+      },
     )
     .patch(
       "/workspaces/:workspaceId",
-      async ({ params, body, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
-        requireOwner(scope);
+      async ({ body, scope }) => {
         if (body.name !== undefined || body.currency !== undefined) {
           await db
             .update(schema.workspaces)
@@ -115,24 +115,23 @@ export function workspaceRoutes(ctx: AppContext) {
         params: z.object({ workspaceId: z.uuid() }),
         body: updateWorkspaceBodySchema,
         response: { 200: workspaceSchema },
+        scoped: { to: { workspaceId: "workspaceId" }, need: "owner" },
       },
     )
     .get(
       "/workspaces/:workspaceId/members",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+      async ({ scope }) => {
         return { items: await loadWorkspaceMembers(db, scope.workspaceId, scope.role) };
       },
       {
         params: workspaceParams,
         response: { 200: z.object({ items: z.array(memberSchema) }) },
+        scoped: { to: { workspaceId: "workspaceId" }, need: "member" },
       },
     )
     .patch(
       "/workspaces/:workspaceId/members/:userId",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
-        requireOwner(scope);
+      async ({ params, body, user, request, scope }) => {
         const targetId = params.userId === "me" ? user.id : params.userId;
         await db.transaction(async (tx) => {
           const members = await tx
@@ -172,14 +171,13 @@ export function workspaceRoutes(ctx: AppContext) {
         params: z.object({ workspaceId: z.uuid(), userId: z.uuid() }),
         body: updateMemberBodySchema,
         response: { 200: memberSchema },
+        scoped: { to: { workspaceId: "workspaceId" }, need: "owner" },
       },
     )
     .delete(
       "/workspaces/:workspaceId/members/:userId",
-      async ({ params, user, request, set }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+      async ({ params, user, request, set, scope }) => {
         const targetId = params.userId === "me" ? user.id : params.userId;
-        if (targetId !== user.id) requireOwner(scope);
         await db.transaction(async (tx) => {
           const [workspace] = await tx
             .select({ isPersonal: schema.workspaces.isPersonal })
@@ -216,13 +214,19 @@ export function workspaceRoutes(ctx: AppContext) {
         });
         set.status = 204;
       },
-      { params: memberParams },
+      {
+        params: memberParams,
+        // A member may leave on their own; removing someone else is for Owners.
+        scoped: {
+          to: { workspaceId: "workspaceId" },
+          need: ({ params, user }: AccessInput) =>
+            params.userId === "me" || params.userId === user.id ? "member" : "owner",
+        },
+      },
     )
     .get(
       "/workspaces/:workspaceId/invitations",
-      async ({ params, query, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
-        requireOwner(scope);
+      async ({ query, scope }) => {
         const now = ctx.now();
         const rows = await db
           .select()
@@ -241,13 +245,15 @@ export function workspaceRoutes(ctx: AppContext) {
           .orderBy(desc(schema.invitations.createdAt), desc(schema.invitations.id));
         return { items: await toInvitations(db, rows, now) };
       },
-      { params: workspaceParams, query: listInvitationsQuerySchema },
+      {
+        params: workspaceParams,
+        query: listInvitationsQuerySchema,
+        scoped: { to: { workspaceId: "workspaceId" }, need: "owner" },
+      },
     )
     .post(
       "/workspaces/:workspaceId/invitations",
-      async ({ params, body, user, set }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
-        requireOwner(scope);
+      async ({ body, user, set, scope }) => {
         const { invitation, link } = await issueInvitation(db, {
           publicUrl: ctx.config.publicUrl,
           now: ctx.now(),
@@ -264,18 +270,22 @@ export function workspaceRoutes(ctx: AppContext) {
         params: workspaceParams,
         body: createInvitationBodySchema,
         response: { 201: invitationWithLinkSchema },
+        scoped: { to: { workspaceId: "workspaceId" }, need: "owner" },
       },
     )
     .get(
       "/workspaces/:workspaceId/mention-candidates",
-      async ({ params, query, user }) => {
-        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+      async ({ query, scope }) => {
         const target =
           query.targetType && query.targetId
             ? { type: query.targetType, id: query.targetId }
             : null;
         return { items: await loadMentionCandidates(db, scope, target) };
       },
-      { params: workspaceParams, query: mentionCandidatesQuerySchema },
+      {
+        params: workspaceParams,
+        query: mentionCandidatesQuerySchema,
+        scoped: { to: { workspaceId: "workspaceId" }, need: "member" },
+      },
     );
 }

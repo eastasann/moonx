@@ -4,13 +4,31 @@ import { ApiError, fromEnvelope } from "./api-error";
 
 let client: ReturnType<typeof treaty<App>> | undefined;
 
+/**
+ * The API refuses a state-changing request without `Content-Type: application/json`, even one
+ * with no body (SDD 7.2 CSRF); Treaty leaves the header off when there is nothing to send. A
+ * `FormData` body keeps the type the browser derives from it.
+ */
+function withJsonType(init?: RequestInit): Headers {
+  const headers = new Headers(init?.headers);
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD" && !(init?.body instanceof FormData)) {
+    if (!headers.has("content-type")) headers.set("content-type", "application/json");
+  }
+  return headers;
+}
+
 /** The Eden Treaty client for `/api/v1` (ADR-006). Created on first use because it needs the page's origin. */
 export function api() {
   client ??= treaty<App>(window.location.origin, {
     headers: { "X-Moonx-Client": "web" },
     // A wrapper, not `fetch` itself, so a replaced `globalThis.fetch` (tests) is honoured.
     fetcher: ((input: RequestInfo | URL, init?: RequestInit) =>
-      globalThis.fetch(input, { ...init, credentials: "same-origin" })) as typeof fetch,
+      globalThis.fetch(input, {
+        ...init,
+        headers: withJsonType(init),
+        credentials: "same-origin",
+      })) as typeof fetch,
   });
   return client;
 }

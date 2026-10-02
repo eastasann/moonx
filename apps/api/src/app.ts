@@ -1,6 +1,7 @@
 import { openapi } from "@elysiajs/openapi";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { assertAllRoutesDeclared } from "./access";
 import { createAuth } from "./auth";
 import type { AppConfig } from "./config";
 import type { AppContext } from "./context";
@@ -50,6 +51,8 @@ export function createApp(config: AppConfig, deps: AppDeps) {
     .use(authRoutes(ctx))
     .use(internalRoutes(ctx, deps.oidcKeys))
     .use(apiV1(ctx));
+  // Before the OpenAPI plugin: its documentation routes come from the library and have no access declaration.
+  assertAllRoutesDeclared(app);
   if (config.openapi) {
     app.use(
       openapi({

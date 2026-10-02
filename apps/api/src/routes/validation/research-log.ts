@@ -7,11 +7,12 @@ import {
 import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { accessPlugin } from "../../access";
 import type { AppContext } from "../../context";
 import { ApiError } from "../../errors";
 import { historyActor } from "../../lib/dto";
 import { decodeCursor, toPage } from "../../lib/page";
-import { requireWritable, resolveScope } from "../../lib/scope";
+
 import { loadValidationData } from "../../lib/validation-data";
 import {
   deleteResearchLog,
@@ -21,7 +22,6 @@ import {
   updateResearchLog,
 } from "../../lib/validation-research-log";
 import { touchValidationActivity } from "../../lib/validation-write";
-import { authPlugin } from "../../plugins";
 
 const escapeLike = (text: string) => text.replace(/[\\%_]/g, "\\$&");
 
@@ -42,11 +42,10 @@ export function researchLogRoutes(ctx: AppContext) {
   });
 
   return new Elysia({ name: "moonx-validation-research-log" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/validations/:validationId/research-log",
-      async ({ params, query, user }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
+      async ({ params, query, scope }) => {
         const offset = decodeCursor(query.cursor);
         const pattern = query.q ? `%${escapeLike(query.q)}%` : null;
         const rows = await db
@@ -83,13 +82,15 @@ export function researchLogRoutes(ctx: AppContext) {
           nextCursor: page.nextCursor,
         };
       },
-      { params: z.object({ validationId: z.uuid() }), query: researchLogQuerySchema },
+      {
+        params: z.object({ validationId: z.uuid() }),
+        query: researchLogQuerySchema,
+        scoped: { to: { validationId: "validationId" }, need: "member" },
+      },
     )
     .post(
       "/validations/:validationId/research-log",
-      async ({ params, body, user, request, set }) => {
-        const scope = await resolveScope(db, user, { validationId: params.validationId });
-        requireWritable(scope);
+      async ({ body, user, request, set, scope }) => {
         const write = writeContext(scope, request, user);
         const row = await db.transaction(async (tx) => {
           const created = await insertResearchLog(tx, { ...write, input: body });
@@ -99,12 +100,15 @@ export function researchLogRoutes(ctx: AppContext) {
         set.status = 201;
         return (await toResearchLogEntries(db, scope.workspaceId, [row]))[0];
       },
-      { params: z.object({ validationId: z.uuid() }), body: researchLogInputSchema },
+      {
+        params: z.object({ validationId: z.uuid() }),
+        body: researchLogInputSchema,
+        scoped: { to: { validationId: "validationId" }, need: "writable" },
+      },
     )
     .get(
       "/research-log/:entryId",
-      async ({ params, user }) => {
-        const scope = await resolveScope(db, user, { researchLogId: params.entryId });
+      async ({ params, scope }) => {
         const validationId = scope.validationId as string;
         const [row] = await db
           .select()
@@ -127,29 +131,29 @@ export function researchLogRoutes(ctx: AppContext) {
         );
         return { ...entry, usages };
       },
-      { params: entryParams },
+      { params: entryParams, scoped: { to: { researchLogId: "entryId" }, need: "member" } },
     )
     .patch(
       "/research-log/:entryId",
-      async ({ params, body, user, request }) => {
-        const scope = await resolveScope(db, user, { researchLogId: params.entryId });
-        requireWritable(scope);
+      async ({ params, body, user, request, scope }) => {
         return db.transaction((tx) =>
           updateResearchLog(tx, writeContext(scope, request, user), params.entryId, body),
         );
       },
-      { params: entryParams, body: updateResearchLogBodySchema },
+      {
+        params: entryParams,
+        body: updateResearchLogBodySchema,
+        scoped: { to: { researchLogId: "entryId" }, need: "writable" },
+      },
     )
     .delete(
       "/research-log/:entryId",
-      async ({ params, user, request }) => {
-        const scope = await resolveScope(db, user, { researchLogId: params.entryId });
-        requireWritable(scope);
+      async ({ params, user, request, scope }) => {
         const affected = await db.transaction((tx) =>
           deleteResearchLog(tx, writeContext(scope, request, user), params.entryId),
         );
         return { affected };
       },
-      { params: entryParams },
+      { params: entryParams, scoped: { to: { researchLogId: "entryId" }, need: "writable" } },
     );
 }

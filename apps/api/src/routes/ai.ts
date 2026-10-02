@@ -5,6 +5,7 @@ import {
   type TemplateKind,
 } from "@moonx/schemas";
 import { Elysia } from "elysia";
+import { type AccessInput, accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { validationFailed } from "../errors";
 import { exportForAi } from "../lib/ai-export";
@@ -18,9 +19,8 @@ import {
 import type { Executor } from "../lib/db";
 import { historyActor } from "../lib/dto";
 import { enforceRateLimit } from "../lib/rate-limit";
-import { requireEditor, requireWritable, resolveScope } from "../lib/scope";
+import { authorize, type Scope, type ScopeRef } from "../lib/scope";
 import { ensureSelfAnalysis } from "../lib/self-analysis";
-import { authPlugin } from "../plugins";
 
 /** X1-X3 (SDD 5.10). */
 export function aiRoutes(ctx: AppContext) {
@@ -35,34 +35,34 @@ export function aiRoutes(ctx: AppContext) {
     return id;
   };
 
-  /** Resolves the scope and loads the target. `write` also refuses Viewers and archived items. */
+  /** The resource a request names, `null` for the caller's own self analysis (no workspace). */
+  const refOf = (type: TemplateKind, id: string | undefined): ScopeRef | null => {
+    if (type === "self_analysis") return null;
+    const targetId = requireId(type, id) as string;
+    return type === "validation" ? { validationId: targetId } : { planId: targetId };
+  };
+
+  /** Loads the target the route has authorized with `scope`. */
   async function loadTarget(
     executor: Executor,
     user: { id: string },
     type: TemplateKind,
     id: string | undefined,
-    write: boolean,
+    scope: Scope | null,
   ): Promise<AiTarget> {
-    if (type === "self_analysis") return loadSelfAnalysisTarget(executor, user.id);
+    if (type === "self_analysis" || !scope) return loadSelfAnalysisTarget(executor, user.id);
     const targetId = requireId(type, id) as string;
-    const scope = await resolveScope(
-      executor,
-      user,
-      type === "validation" ? { validationId: targetId } : { planId: targetId },
-    );
-    if (write) requireWritable(scope);
-    else requireEditor(scope);
     return type === "validation"
       ? loadValidationTarget(executor, targetId, scope.workspaceId)
       : loadPlanTarget(executor, targetId);
   }
 
   return new Elysia({ name: "moonx-ai" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/ai/export",
-      async ({ query, user }) => {
-        const target = await loadTarget(db, user, query.source, query.id, false);
+      async ({ query, user, scope }) => {
+        const target = await loadTarget(db, user, query.source, query.id, scope);
         await enforceRateLimit(db, "ai", user.id, ctx.now().getTime());
         const built = exportForAi(target, query, { now: ctx.now(), timeZone: user.timezone });
         return {
@@ -73,35 +73,34 @@ export function aiRoutes(ctx: AppContext) {
           allEmpty: built.allEmpty,
         };
       },
-      { query: aiExportQuerySchema },
+      {
+        query: aiExportQuerySchema,
+        located: { to: ({ query }: AccessInput) => refOf(query.source, query.id), need: "editor" },
+      },
     )
     .get(
       "/ai/import/context",
-      async ({ query, user }) =>
-        buildImportContext(await loadTarget(db, user, query.target, query.id, false)),
-      { query: aiImportContextQuerySchema },
+      async ({ query, user, scope }) =>
+        buildImportContext(await loadTarget(db, user, query.target, query.id, scope)),
+      {
+        query: aiImportContextQuerySchema,
+        located: { to: ({ query }: AccessInput) => refOf(query.target, query.id), need: "editor" },
+      },
     )
     .post(
       "/ai/import/apply",
       async ({ body, user, request }) => {
         const { type, id } = body.target;
-        if (type !== "self_analysis") {
-          // Role and archive checks come before the limit and the transaction.
-          await resolveScope(
-            db,
-            user,
-            type === "validation"
-              ? { validationId: requireId(type, id) as string }
-              : { planId: requireId(type, id) as string },
-          ).then(requireWritable);
-        }
         await enforceRateLimit(db, "ai", user.id, ctx.now().getTime());
         const keys = body.changes.map((c) => c.questionKey);
         return db.transaction(async (tx) => {
           const targetId =
             type === "self_analysis" ? (await ensureSelfAnalysis(tx, user.id)).id : (id as string);
           await lockImportRows(tx, { type, id: targetId }, keys);
-          const target = await loadTarget(tx, user, type, id, true);
+          // Checked again under the locks: the idea or plan may have been archived meanwhile.
+          const ref = refOf(type, id);
+          const scope = ref && (await authorize(tx, user, ref, "writable"));
+          const target = await loadTarget(tx, user, type, id, scope);
           return applyAiImport(
             tx,
             target,
@@ -110,6 +109,12 @@ export function aiRoutes(ctx: AppContext) {
           );
         });
       },
-      { body: aiImportApplyBodySchema },
+      {
+        body: aiImportApplyBodySchema,
+        located: {
+          to: ({ body }: AccessInput) => refOf(body.target.type, body.target.id),
+          need: "writable",
+        },
+      },
     );
 }

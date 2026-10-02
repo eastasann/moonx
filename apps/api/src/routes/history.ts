@@ -6,34 +6,42 @@ import {
 } from "@moonx/schemas";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { Elysia } from "elysia";
+import type { z } from "zod";
+import { type AccessInput, accessPlugin } from "../access";
 import type { AppContext } from "../context";
 import { toHistoryEntries } from "../lib/history-dto";
-import { revertBatch, revertEntry } from "../lib/history-revert";
-import { containerOfTarget, resolveContainer } from "../lib/history-target";
+import { batchScopeRef, entryScopeRef, revertBatch, revertEntry } from "../lib/history-revert";
+import { containerAccess, containerOfTarget, containerScopeRef } from "../lib/history-target";
 import { decodeCursor, toPage } from "../lib/page";
-import { authPlugin } from "../plugins";
+
+type HistoryQuery = z.infer<typeof historyQuerySchema>;
 
 /** H1-H3 (SDD 5.11): the change history of an item or a screen, and taking changes back. */
 export function historyRoutes(ctx: AppContext) {
   const { db } = ctx;
   const c = schema.changeHistory;
+
+  /** The container the query names, directly or through the item it asks about. */
+  const containerOf = (query: HistoryQuery) =>
+    query.targetType != null
+      ? containerOfTarget(db, {
+          type: query.targetType,
+          id: query.targetId as string,
+          key: query.targetKey,
+        })
+      : Promise.resolve({
+          type: query.containerType as NonNullable<typeof query.containerType>,
+          id: query.containerId as string,
+        });
+
   return new Elysia({ name: "moonx-history" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/history",
-      async ({ query, user }) => {
+      async ({ query, user, scope }) => {
         const item = query.targetType != null;
-        const container = item
-          ? await containerOfTarget(db, {
-              type: query.targetType as NonNullable<typeof query.targetType>,
-              id: query.targetId as string,
-              key: query.targetKey,
-            })
-          : {
-              type: query.containerType as NonNullable<typeof query.containerType>,
-              id: query.containerId as string,
-            };
-        const access = await resolveContainer(db, user, container.type, container.id);
+        const container = await containerOf(query as HistoryQuery);
+        const access = containerAccess(user, container.type, container.id, scope);
         const offset = decodeCursor(query.cursor);
         const rows = await db
           .select()
@@ -63,18 +71,39 @@ export function historyRoutes(ctx: AppContext) {
           nextCursor: page.nextCursor,
         };
       },
-      { query: historyQuerySchema },
+      {
+        query: historyQuerySchema,
+        located: {
+          to: async ({ query, user }: AccessInput) => {
+            const container = await containerOf(query as HistoryQuery);
+            return containerScopeRef(db, user, container.type, container.id);
+          },
+          need: "member",
+        },
+      },
     )
     .post(
       "/history/:entryId/revert",
-      ({ params, user, request }) =>
-        revertEntry(db, { user, request, now: ctx.now() }, params.entryId),
-      { params: historyEntryParamsSchema },
+      ({ params, user, scope, request }) =>
+        revertEntry(db, { user, scope, request, now: ctx.now() }, params.entryId),
+      {
+        params: historyEntryParamsSchema,
+        located: {
+          to: ({ params, user }: AccessInput) => entryScopeRef(db, user, params.entryId),
+          need: "writable",
+        },
+      },
     )
     .post(
       "/history/batches/:batchId/revert",
-      ({ params, user, request }) =>
-        revertBatch(db, { user, request, now: ctx.now() }, params.batchId),
-      { params: historyBatchParamsSchema },
+      ({ params, user, scope, request }) =>
+        revertBatch(db, { user, scope, request, now: ctx.now() }, params.batchId),
+      {
+        params: historyBatchParamsSchema,
+        located: {
+          to: ({ params, user }: AccessInput) => batchScopeRef(db, user, params.batchId),
+          need: "writable",
+        },
+      },
     );
 }

@@ -1,22 +1,39 @@
 import { templateMigrationBodySchema, templateMigrationQuerySchema } from "@moonx/schemas";
 import { Elysia } from "elysia";
+import { type AccessInput, accessPlugin } from "../access";
 import type { AppContext } from "../context";
+import { containerScopeRef } from "../lib/history-target";
 import { migrateTemplate, previewTemplateMigration } from "../lib/template-migration";
-import { authPlugin } from "../plugins";
 
 /** T1 and T2 (SDD 5.12): moving a self analysis, validation or plan to a newer template version. */
 export function templateMigrationRoutes(ctx: AppContext) {
   const { db } = ctx;
   return new Elysia({ name: "moonx-template-migrations" })
-    .use(authPlugin(ctx))
+    .use(accessPlugin(ctx))
     .get(
       "/template-migrations/preview",
-      ({ query, user }) => previewTemplateMigration(db, user, query.targetType, query.targetId),
-      { query: templateMigrationQuerySchema },
+      ({ query, user, scope }) =>
+        previewTemplateMigration(db, user, query.targetType, query.targetId, scope),
+      {
+        query: templateMigrationQuerySchema,
+        located: {
+          to: ({ query, user }: AccessInput) =>
+            containerScopeRef(db, user, query.targetType, query.targetId),
+          need: "editor",
+        },
+      },
     )
     .post(
       "/template-migrations",
-      ({ body, user, request }) => migrateTemplate(db, { user, request, now: ctx.now() }, body),
-      { body: templateMigrationBodySchema },
+      ({ body, user, scope, request }) =>
+        migrateTemplate(db, { user, scope, request, now: ctx.now() }, body),
+      {
+        body: templateMigrationBodySchema,
+        located: {
+          to: ({ body, user }: AccessInput) =>
+            containerScopeRef(db, user, body.targetType, body.targetId),
+          need: "writable",
+        },
+      },
     );
 }

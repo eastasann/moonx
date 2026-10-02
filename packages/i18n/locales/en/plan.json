@@ -92,7 +92,11 @@
       "delayIf": "Delay if",
       "stopIf": "Stop if",
       "nextActions": "Next actions",
-      "fundingTrigger": "Funding trigger"
+      "fundingTrigger": "Funding trigger",
+      "startupJustified": "Why the startup cost is justified",
+      "missingCapabilities": "Missing capabilities",
+      "fillGaps": "Filling the gaps",
+      "founders": "Founders"
     },
     "number": {
       "price": "Price",
@@ -156,7 +160,10 @@
       "s25LaunchPlan": "§25 Launch Plan",
       "s11Founders": "§11 Founders",
       "s6IfBlueMixedWhyHasNobodyCapturedIt": "§6 If Blue/Mixed, why has nobody captured it?",
-      "s22KeyRisks": "§22 Key risks"
+      "s22KeyRisks": "§22 Key risks",
+      "s8WhyIsTheStartupCostJustified": "§8 Why is the startup cost justified?",
+      "s10MissingCapabilities": "§10 Missing capabilities",
+      "s10HowWillWeFillTheGaps": "§10 How will we fill the gaps?"
     },
     "empty": "Not written yet",
     "noValue": "—",

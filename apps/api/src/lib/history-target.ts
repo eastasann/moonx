@@ -3,7 +3,7 @@ import type { Role, TargetType, TemplateKind } from "@moonx/schemas";
 import { eq } from "drizzle-orm";
 import { ApiError } from "../errors";
 import type { Executor, Tx } from "./db";
-import { resolveScope, type Scope } from "./scope";
+import type { Scope, ScopeRef } from "./scope";
 import type { AuthUser } from "./session";
 
 /** The screen-level owner of a history row: what `change_history.container_*` holds. */
@@ -24,44 +24,53 @@ export interface HistoryAccess {
 }
 
 /**
- * Resolves a history container to the workspace and the caller's role in it (SDD 7.1). A self
- * analysis is only for its owner: anyone else, shared members included, gets 403 FORBIDDEN.
+ * What the route's `located` declaration resolves for a history container (SDD 7.1). A self
+ * analysis belongs to no workspace and is only for its owner: anyone else, shared members
+ * included, gets 403 FORBIDDEN, and the answer is `null` (no scope).
  */
-export async function resolveContainer(
+export async function containerScopeRef(
   db: Executor,
   user: Pick<AuthUser, "id">,
   type: HistoryContainerType,
   id: string,
-): Promise<HistoryAccess> {
+): Promise<ScopeRef | null> {
   if (type === "self_analysis") {
     const [analysis] = await db
-      .select({ id: schema.selfAnalyses.id, userId: schema.selfAnalyses.userId })
+      .select({ userId: schema.selfAnalyses.userId })
       .from(schema.selfAnalyses)
       .where(eq(schema.selfAnalyses.id, id));
     if (!analysis) throw new ApiError("NOT_FOUND", "Resource not found");
     if (analysis.userId !== user.id) {
       throw new ApiError("FORBIDDEN", "Only the owner can see the history of a self analysis");
     }
+    return null;
+  }
+  return type === "validation"
+    ? { validationId: id }
+    : type === "business_plan"
+      ? { planId: id }
+      : { ideaId: id };
+}
+
+/** The workspace and role of the caller for a container, from the scope its route declared. */
+export function containerAccess(
+  user: Pick<AuthUser, "id">,
+  type: HistoryContainerType,
+  id: string,
+  scope: Scope | null,
+): HistoryAccess {
+  if (!scope) {
     return {
       container: { type, id },
       workspaceId: null,
       role: null,
-      ownerUserId: analysis.userId,
+      ownerUserId: user.id,
       ideaId: null,
       validationId: null,
       planId: null,
       archived: false,
     };
   }
-  const scope: Scope = await resolveScope(
-    db,
-    user,
-    type === "validation"
-      ? { validationId: id }
-      : type === "business_plan"
-        ? { planId: id }
-        : { ideaId: id },
-  );
   return {
     container: { type, id },
     workspaceId: scope.workspaceId,
@@ -77,12 +86,6 @@ export async function resolveContainer(
 /** Whether the caller may change the container: Owner or Member, and not archived. */
 export function canRevert(access: HistoryAccess): boolean {
   return access.role !== "viewer" && !access.archived;
-}
-
-/** Reverting changes content: Viewers get 403 first, then an archived idea or plan 409 (SDD 7.1). */
-export function requireRevertable(access: HistoryAccess): void {
-  if (access.role === "viewer") throw new ApiError("FORBIDDEN", "Viewers cannot make changes");
-  if (access.archived) throw new ApiError("ARCHIVED", "Archived items cannot be changed");
 }
 
 /** Row tables of the validation lists, to find the validation of a row that may be deleted. */

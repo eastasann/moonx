@@ -142,7 +142,7 @@ moonx/
 | `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32文字以上の乱数。短ければ起動しない） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
 | `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://staging.{DOMAIN}` / `https://{DOMAIN}` |
 | `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り） | `http://localhost:5173,moonx://,exp://` | `https://{DOMAIN},moonx://`（staging は `https://staging.{DOMAIN},moonx-staging://`） |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | api | Google ログイン（OAuth クライアント。環境ごとに作る。どちらも空なら Google ログインだけが使えず、片方だけ入れると起動しない） | 開発用のクライアント | ID は環境変数、SECRET は Secret Manager `moonx-{env}-google-client-secret` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | api | Google ログイン（OAuth クライアント。環境ごとに作る。片方だけ入れると起動しない。staging・production は空でも起動しない。local だけ空にでき、Google ログインだけが使えなくなる） | 開発用のクライアント | ID は環境変数、SECRET は Secret Manager `moonx-{env}-google-client-secret` |
 | `MAIL_TRANSPORT` | api | `console` / `resend`（それ以外の値では起動しない。staging・production は `resend` でなければ起動しない。`console` は招待のリンクを含むメールの全文をログに出すので、local とテストだけで使う） | `console` | `resend` |
 | `RESEND_API_KEY` | api | Resend の API キー | 不要 | Secret Manager `moonx-{env}-resend-api-key` |
 | `MAIL_FROM` | api | 送信元 | `moonx <no-reply@localhost>` | `moonx <no-reply@{DOMAIN}>` |
@@ -284,7 +284,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-005: API は ElysiaJS（Bun）（ユーザー指定）
 
-**決定:** `apps/api` は ElysiaJS を Bun で動かす。ルートはドメイン（ワークスペース・アイデア・検証・プランなど）ごとのプラグインに分け、認証はプラグインの `derive` で行い、ワークスペースとロールの確認は各ハンドラーが `resolveScope` と `requireOwner` / `requireEditor` / `requireWritable` で行う（7.1 の表は表駆動の結合テストで確かめる）。入出力のスキーマは Zod v4（Standard Schema として Elysia に渡す）。Better Auth はハンドラーを `/api/auth/*` にマウントする。
+**決定:** `apps/api` は ElysiaJS を Bun で動かす。ルートはドメイン（ワークスペース・アイデア・検証・プランなど）ごとのプラグインに分け、認証と権限の確認はプラグインの `derive` / `beforeHandle` でまとめて行う。各ルートは、誰が呼べるかをルートのオプション（`open` / `signedIn` / `operator` / `scoped` / `located`）で宣言し、宣言の無いルートがあれば API は起動しない（7.1 の表は表駆動の結合テストで確かめる）。入出力のスキーマは Zod v4（Standard Schema として Elysia に渡す）。Better Auth はハンドラーを `/api/auth/*` にマウントする。
 
 **理由:** ユーザーが ElysiaJS を指定し、「Elysia の仕組み」（Eden Treaty の型共有）を使いたいとした。Bun で速く起動するので、Cloud Run の0台からの立ち上がりが短い。
 
@@ -346,7 +346,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-012: Pitch Deck の PDF は API サーバーで作る
 
-**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web・スマホ）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{fraunces,noto-sans,noto-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる。react-pdf は `font-variant-numeric` を持たないので、PDF では 06 の等幅数字（tabular）を適用できない。
+**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web・スマホ）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{fraunces,noto-sans,noto-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる。react-pdf は `font-variant-numeric` を持たないが、Noto Sans の標準の数字は等幅なので、表・指標・金額の数字は等幅数字になる（`apps/api/test/pitch-deck-pdf-figures.test.ts` が PDF の字送りで確かめる）。
 
 **理由:** Web とスマホで同じ PDF を作るには、作る場所を1つにするのが確実。ブラウザ・スマホのどちらで作っても、日本語のフォントの埋め込みと16:9のページの再現がそろわない。react-pdf は Chromium を使わないので、コンテナが軽く、0台からの起動も遅くならない。
 
@@ -366,7 +366,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **理由:** Cloud Run は常駐しないので、定期実行は外から呼ぶ必要がある。Cloud Scheduler は同じ Google Cloud の中で完結し、OIDC で呼び出し元を確かめられる。
 
-**トレードオフ:** 毎時の実行なので、朝8時ちょうどではなく8時台に届く。ジョブが失敗しても、次の回がその時点の段階の通知を作る（条件は「朝8時を過ぎていて、その段階をまだ通知していない」）。飛ばした前の段階は作らない（期限が昨日になった項目には「期限切れ」だけを出し、「3日前」「当日」は出さない）。捨てた案: Cloudflare Worker の Cron Triggers（Cloud Run まで共有シークレットで呼ぶことになり、OIDC で確かめられない）、GitHub Actions の schedule（実行が数十分遅れることがある）、Cloud Run jobs（API と別のコンテナの起動が要り、処理が API のコードと分かれる）。
+**トレードオフ:** 毎時の実行なので、朝8時ちょうどではなく8時台に届く。ジョブが失敗すると、その回の通知は次の回でまとめて作る（取りこぼさないように、条件は「朝8時を過ぎていて、その段階をまだ通知していない」で選ぶ）。捨てた案: Cloudflare Worker の Cron Triggers（Cloud Run まで共有シークレットで呼ぶことになり、OIDC で確かめられない）、GitHub Actions の schedule（実行が数十分遅れることがある）、Cloud Run jobs（API と別のコンテナの起動が要り、処理が API のコードと分かれる）。
 
 ### ADR-015: IaC は Terraform（ユーザー指定）
 
@@ -503,7 +503,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-029: API の回数制限は3段にする
 
-**決定:** ① Better Auth の回数制限（本体の `rateLimit` 設定。IP ごと。保存先は DB の `rate_limits`）を認証のエンドポイントにかける。② アプリの API（`/api/v1`）は、Elysia の自前のミドルウェアで、ユーザーごと・IP ごとの上限（招待の送信、PDF の作成、AI 書き出し・取り込み、アカウントの削除のパスワード確認、U5 の新規登録。7.2）を同じ `rate_limits` テーブルにキーの接頭辞（`app:`）を分けて記録する。③ 外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` にかける（Terraform の `envs/shared`）。
+**決定:** ① Better Auth の回数制限（本体の `rateLimit` 設定。IP ごと。保存先は DB の `rate_limits`）は、秘密を受け取らない認証のパスにかける。秘密を受け取るパス（5.4）は、パスごとにしか数えられない Better Auth の代わりにベースプラグインが IP ごとの1つの枠で数える。② アプリの API（`/api/v1`）は、Elysia の自前のミドルウェアで、ユーザーごとの上限（招待の送信、PDF の作成、AI 書き出し・取り込み、アカウントの削除のパスワード確認。7.2）と、IP ごとの上限（U5 の新規登録と、①の秘密を受け取るパス。7.2）を同じ `rate_limits` テーブルにキーの接頭辞（`app:`）を分けて記録する。③ 外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` にかける（Terraform の `envs/shared`）。
 
 **理由:** Better Auth の回数制限は Better Auth のエンドポイントにしか効かない。アプリの API の上限は「誰が」で数える必要があり（Resend の1日100通や PDF の CPU を守る）、ログインの後にしか分からないので API の中で数える。DB に記録すれば、Cloud Run が複数台でも数がそろい、Redis が要らない（ADR-011）。
 
@@ -574,7 +574,7 @@ API のルートは5章、Worker が配る静的なファイル（`/.well-known/
 | 同時編集 | 項目を更新するリクエストは、読んだときの `lockVersion` を送る。違えば 409 `CONFLICT` と相手の内容を返す。「自分の内容で上書きする」は同じ内容に `force: true` を付けて送る（ADR-019）。まだ行が無い項目（未回答の設問など）の `lockVersion` は `0`。一覧に出る行（調査ログ・競合・費用行など）は作成時の `lockVersion` が 0、キーで決まる項目（回答・数字）は最初の保存で 1 になる。何も変えないリクエストは `lockVersion` を上げず、履歴も書かない。キーで決まる項目を同時に作られて負けたときは、`force: true` でも 409 `CONFLICT`（`current` を読んでからやり直す）。V4・V5 は根拠の付け外しのたびに、対象の項目の `lockVersion` を上げる |
 | 一覧 | `?cursor=&limit=`（既定50、上限200）。応答は `{ items, nextCursor }`。`cursor` は並べ替えた結果へのオフセット（上限 1,000,000）で、読めない値は 422 `VALIDATION_FAILED`（`details[0].path` は `cursor`）。件数の少ない一覧（競合・費用行など）はページに分けず `{ items }` |
 | 権限 | 下の表の記号。O = Owner、M = Member、V = Viewer（いずれもその資源が属するワークスペースのロール）、本人 = 自己分析の持ち主、Admin = 運営者、公開 = ログイン不要。足りなければ 403 `FORBIDDEN`、ワークスペースに所属していなければ 403 `NO_ACCESS`、無ければ 404 `NOT_FOUND`。権限の対応の全体は 7.1 |
-| アーカイブ | アーカイブしたアイデア・プランの中身を変えるリクエスト（コメントを書く・元に戻すを含む）は 409 `ARCHIVED`（design-spec 6.8） |
+| アーカイブ | アーカイブしたアイデア・プランの中身を変えるリクエスト（コメントを書く・元に戻すを含む）は、ロールにかかわらず 409 `ARCHIVED`（design-spec 6.8） |
 | エラー | 8章の形式（`{ "error": { "code", "message", "requestId", ... } }`） |
 | 計算 | 損益分岐・シナリオ・確認項目・F/A/U の内訳・工程は `packages/domain` の関数で計算して返す（保存しない）。クライアントは入力中は同じ関数で自分で計算し、保存の応答では計算結果を返さない（画面を開いたときと、保存の後に必要な画面だけ取り直す） |
 | 変更履歴 | 変更履歴の対象（design-spec 6.0.5）を変える API は、すべて `change_history` に書く（ADR-020）。下の「履歴」列に書いた `source` を付ける |
@@ -861,7 +861,7 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | 登録の後 | `databaseHooks.user.create.after`: 個人用ワークスペース（名前「{表示名}'s workspace」、通貨 PHP、本人が Owner）を作り、`last_workspace_id` に入れる。そのメールあてのワークスペースなしの招待があれば、その招待を受諾済みにし（3 の ① を飛ばすため、U6 は呼ばれない）、`grants_admin` が true のときだけ運営者にする |
 | ログインの制限 | `databaseHooks.session.create.before`: `users.status` が `active` 以外（停止・削除）なら `ACCOUNT_SUSPENDED` で拒否する |
 | セッション | 有効期限30日、毎日更新。Cookie は `__Secure-` 接頭辞・HttpOnly・Secure・SameSite=Lax（local は Secure なし）。`change-password` はクライアントの指定にかかわらず他のセッションを消す（`revokeOtherSessions`）。Better Auth の `update-user`・`delete-user`・`change-email` は閉じて 404 を返す（プロフィールと削除は U2・U3・U7 だけから行う） |
-| 回数制限 | 有効。保存先は DB（`rate_limits`）。秘密を受け取る5つのパス（`sign-in/email`・`sign-in/social`・`request-password-reset`・`reset-password`・`sign-up/email`）は、パスごとに IP あたり1分10回。それ以外のパスは Better Auth の既定（IP あたり1分100回）。U5 も IP あたり1分10回を同じテーブルで数える |
+| 回数制限 | 有効。保存先は DB（`rate_limits`）。秘密を受け取るパス（`sign-in/email`・`sign-in/social`・`sign-up/email`・`request-password-reset`・`reset-password`・`change-password`）と U5 は、パスをまたいで IP ごとに1つの枠で1分10回。ベースプラグインが数え、Better Auth 側ではこれらのパスの `customRules` を `false` にしてパスごとの数え方を止める。それ以外のパス（`get-session` など）は Better Auth の既定（IP あたり1分100回） |
 | 信頼するオリジン | `TRUSTED_ORIGINS`（2章） |
 | IP の取得 | `CF-Connecting-IP`（Worker が付ける。2章 通信フロー 3） |
 
@@ -914,7 +914,7 @@ interface InvitationPreview {
 **U7 `POST /api/v1/me/delete`**（アカウントの削除。design-spec 6.16）本体 `{ confirmEmail: string; password?: string }` → `204`（セッションの Cookie を消す）。
 - `confirmEmail` が自分のメールと違えば `422 CONFIRMATION_MISMATCH`。パスワードがある人は `password` が必須で、違えば `403 INVALID_PASSWORD`（ユーザーごとに10分5回まで。超えたら `429 RATE_LIMITED`）。パスワードが無い人（Google だけ）は、セッションが10分以内に作られたものでなければ `403 REAUTH_REQUIRED`。
 - ほかにメンバーのいるワークスペースで最後の Owner なら `409 LAST_OWNER`（`error.workspaces: { id; name }[]`）。
-- 1つのトランザクションで次を行う: `users` の行は残して個人の情報を消す（`email` を `deleted+{id}@deleted.invalid`、`display_name` を `Deleted user`、`avatar_url` を null、`status` を `deleted`）。`sessions`・`accounts`・自己分析（回答・共有・その回答へのコメントと履歴）・本人あての通知を消す。本人しかいないワークスペース（個人用もチーム用も）を中身ごと消す。ほかのワークスペースは所属を外す（W3 DELETE と同じ処理。担当は名前「Deleted user」）。本人が送った有効な招待を取り消す。パスワード再設定のトークン（`verifications`）を消す。トランザクションをコミットしてから、保存した写真を消す（Cloud Storage または local のディスク）。
+- 1つのトランザクションで次を行う: `users` の行は残して個人の情報を消す（`email` を `deleted+{id}@deleted.invalid`、`display_name` を `Deleted user`、`avatar_url` を null、`status` を `deleted`）。`sessions`・`accounts`・自己分析（回答・共有・その回答へのコメントと履歴）・本人あての通知を消す。本人しかいない個人用ワークスペースを中身ごと消す。所属を外す（W3 DELETE と同じ処理。担当は名前「Deleted user」）。本人しかいなかったチームのワークスペースは消さず、メンバーのいない記録として残す。本人が送った有効な招待を取り消す。パスワード再設定のトークン（`verifications`）を消す。トランザクションをコミットしてから、保存した写真を消す（Cloud Storage または local のディスク）。
 - Better Auth の `deleteUser`（行ごと消す）は使わない（チームの記録が `users` を参照しているため）。
 
 ### 5.5 ワークスペース・メンバー・招待
@@ -2089,10 +2089,10 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 追加の決まり:
 
-- **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は 409 `ARCHIVED`（コメントを書く・元に戻すを含む。design-spec 6.8）。ロールが足りない人には先に 403 を返す（Viewer の編集は、アーカイブ中でも 403）。確認は書き込みの最後（更新日時の更新）でもう一度行い、確認と書き込みのあいだにアーカイブされても書き込みは残らない。読む・複製・Restore・Pitch Deck はできる。
+- **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は、ロールにかかわらず 409 `ARCHIVED`（コメントを書く・元に戻すを含む。Viewer の編集も 403 ではなく 409。design-spec 6.8）。ただしワークスペースのメンバーではない人には、先に 403 `NO_ACCESS` を返す。確認は書き込みの最後（更新日時の更新）でもう一度行い、確認と書き込みのあいだにアーカイブされても書き込みは残らない。読む・複製・Restore・Pitch Deck はできる。
 - **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。`is_admin` を直接変える API は無い。付くのは `make admin-create` の招待（`grants_admin = true`）から登録・受諾したときとシードだけで、AD9 の招待では付かず、外す API も無い。
 - **停止・削除したユーザー**: セッションを消し、ログインを拒否する。残ったリクエストも、認証のミドルウェアが `users.status` を確かめて 401 にする。
-- **実装**: 認可は、リソースからワークスペースを引く共通の関数（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）を通して判定し、クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
+- **実装**: 認可は、ルートの宣言（`apps/api/src/access.ts`）でまとめて行う。`scoped: { to, need }` は、`to` でリソースの引き方（パスのパラメーターの名前、または Query・本文から引く関数）を宣言し、プラグインが共通の関数 `resolveScope`（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）でワークスペースとロールを求め、`need`（`member` / `editor` / `writable` / `owner`。プランのアーカイブ・復元だけは `plan-archive-toggle`: `writable` と同じだが、そのプラン自身のアーカイブ済みの印では止めず、アイデアのアーカイブ済みでは止める）を満たさなければ拒否してから、ハンドラーに `scope` を渡す。自己分析のようにワークスペースを持たないものがあるルートは `located`（`scope` が null になりうる）を使う。ワークスペースを持たない他のルートは `open`（セッション不要）・`signedIn`（自分のデータだけ）・`operator`（運営者）を宣言する。宣言の無いルートがあれば `createApp` が例外で止まる。クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
 
 ### 7.2 その他の設計判断
 
@@ -2100,9 +2100,9 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 |---|---|
 | 入力バリデーション | API は必須（`packages/schemas` の Zod。範囲・長さ・形式・列挙）。クライアントは同じスキーマで入力中に補助として検査する。最後の守りは DB の check 制約（6.3）。文字列の長さの上限は、短文200字・長文20,000字・理由とコメント5,000字 |
 | シークレット | 置き場所の方針は ADR-027、CI の置き場所の一覧は2章「CI のシークレットと変数」が正。local は `.env`（コミットしない。`.env.example` だけコミットする）。staging / production の API のシークレットは Secret Manager から Cloud Run の環境変数として渡す。ローテーションの手順は 05_operation-runbook.md |
-| CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる（合わなければ 403 `FORBIDDEN`）。Content-Type の決まりは本体のあるリクエストに適用し、本体の無い POST・DELETE は Content-Type が無くてよい。JSON の1MB は `Content-Length` と実際に読んだ長さの両方で確かめる。Cookie は SameSite=Lax。スマホは `Origin` を送らないが、Cookie を自動では送らない（SecureStore から付ける）ので対象外 |
+| CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる（合わなければ 403 `FORBIDDEN`）。本体の無い POST・DELETE にも同じ決まりを適用する（Web とスマホのクライアントは、本文が無くても `application/json` を付ける）。`multipart/form-data` は `PUT /api/v1/me/avatar`（U3）だけに許す。JSON の1MB は `Content-Length` と実際に読んだ長さの両方で確かめる。Cookie は SameSite=Lax。スマホは `Origin` を送らないが、Cookie を自動では送らない（SecureStore から付ける）ので対象外 |
 | CORS | 使わない（Web と API は同じオリジン。ADR-004）。CORS のヘッダーを返さないので、他のオリジンからのブラウザのリクエストは届かない。local は Vite の転送で同じオリジンにする |
-| レート制限 | 仕組みは ADR-029。認証（Better Auth）は、秘密を受け取るパスごとに IP あたり1分10回（DB に記録。5.4）。アプリの API は、次の上限を同じ仕組みで持つ。ユーザーごと: 招待の送信・再送 1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3。X2 は既存の内容を読むだけなので数えない）、アカウントの削除のパスワード確認（U7）10分5回。IP ごと: U5 の新規登録 1分10回（アカウントがまだ無いため）。超えたら 429 `RATE_LIMITED`。外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` に付ける |
+| レート制限 | 仕組みは ADR-029。秘密を受け取る認証のパス（Better Auth の6パスと U5。5.4）は、IP ごとに1つの枠で1分10回（DB に記録）。アプリの API は、次の上限を同じ仕組みで持つ。ユーザーごと: 招待の送信・再送 1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3。X2 は既存の内容を読むだけなので数えない）、アカウントの削除のパスワード確認（U7）10分5回。超えたら 429 `RATE_LIMITED`。外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` に付ける |
 | 直接のアクセス | Cloud Run の URL を直接呼ばれないように、Worker の共有シークレットを確かめる（2章 通信フロー 3）。`CF-Connecting-IP` は、共有シークレットのあるリクエストのときだけ信じる |
 | セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。スマホは SecureStore。ログアウトしたら送信待ちの列（ADR-021）も消す |
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、5MB まで。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
@@ -2194,7 +2194,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 ### 8.3 ログとの対応
 
 - **リクエスト ID**: Worker が `X-Request-Id`（無ければ UUID を作る）を付けて API へ渡す。API は全ログ行・エラーの応答・Sentry のタグに同じ値を入れ、応答のヘッダーにも返す。スマホも Worker を通るので同じ。Cloud Scheduler からの呼び出しは API が作る。
-- **レベル**: 4xx は `info`（401・403 の多発は、ログの `status` を集計して見つける）、5xx は `error`。5xx は、アクセスログの行（`message: "request"`）とは別に、`message: "request failed"` の行を `requestId`・`errorCode`・`errorName`・`errorMessage`・`stack` 付きで書く。DB のエラーは `pgCode` と `constraint` だけを出し、SQL とパラメーターは出さない（利用者の入力が入るため）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。
+- **レベル**: 4xx は `info`、5xx は `error`。ただし同じ IP への 401・403 が1分に10回を超えたら、その後の 401・403 のアクセスログの行は `warn` にする（Cloud Run のインスタンスごとに数える。ログの水準を決めるだけなので、インスタンス間で数は合わせない）。5xx は、アクセスログの行（`message: "request"`）とは別に、`message: "request failed"` の行を `requestId`・`errorCode`・`errorName`・`errorMessage`・`stack` 付きで書く。DB のエラーは `pgCode` と `constraint` だけを出し、SQL とパラメーターは出さない（利用者の入力が入るため）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。
 - **探し方**: 利用者の画面の `Ref` → Cloud Logging で `jsonPayload.requestId` を検索 → 同じ ID の Sentry のイベント。手順は 05_operation-runbook.md。
 
 ---

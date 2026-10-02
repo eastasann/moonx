@@ -87,3 +87,15 @@ test("an open tray has no axe violations", async () => {
   await screen.findByRole("dialog");
   await expectNoAxeViolations(document.body);
 });
+
+test("without a trigger it is driven by isOpen and raises no React Aria warning", () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  render(
+    <Tray isOpen aria-label="More">
+      Content
+    </Tray>,
+  );
+  expect(screen.getByRole("dialog", { name: "More" })).toBeInTheDocument();
+  expect(warn).not.toHaveBeenCalled();
+  warn.mockRestore();
+});

@@ -1,8 +1,11 @@
+import { style } from "@vanilla-extract/css";
 import { type RecipeVariants, recipe } from "@vanilla-extract/recipes";
 import { vars } from "../../theme";
 
 export const avatar = recipe({
   base: {
+    position: "relative",
+    overflow: "hidden",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -33,3 +36,12 @@ export const avatar = recipe({
 });
 
 export type AvatarVariants = NonNullable<RecipeVariants<typeof avatar>>;
+
+/** Covers the initials once the photo has loaded. */
+export const photo = style({
+  position: "absolute",
+  inset: 0,
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+});

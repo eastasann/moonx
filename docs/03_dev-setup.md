@@ -583,6 +583,8 @@ make format
 make typecheck
 ```
 
+`make test-e2e` は `e2e/playwright.config.ts` の `webServer` で、API（ポート 3100）と Web（ポート 5273）を専用に起動する。開発サーバー（3000・5173）は止めなくてよい。実行のたびに `DATABASE_URL_TEST` の DB を作り直してデモデータを入れる（`e2e/global-setup.ts`）。Better Auth はログインの回数をアドレスごとに数えるので、テストは `CF-Connecting-IP` をテストごとに変えて送る（`e2e/fixtures.ts`）。
+
 各ターゲットが何を動かすかは [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)、テスト用の DB（`DATABASE_URL_TEST`）は SDD 2章「環境変数」、ツールの選定は ADR-022、テストの方針は SDD 10章。PR では CI が同じターゲットを動かす（04 2章）。
 
 ---

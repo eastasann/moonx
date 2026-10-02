@@ -178,8 +178,7 @@ export async function migrateTemplate(
       .from(schema.templateVersions)
       .where(eq(schema.templateVersions.id, locked.versionId));
     if (
-      !to ||
-      to.status !== "published" ||
+      to?.status !== "published" ||
       to.templateId !== pinned?.templateId ||
       to.versionNumber <= current.versionNumber
     ) {

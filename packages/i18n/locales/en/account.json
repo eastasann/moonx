@@ -1,0 +1,69 @@
+{
+  "title": "Account",
+  "logout": "Log out",
+  "logInAgain": "Log in again",
+  "role": {
+    "owner": "Owner",
+    "member": "Member",
+    "viewer": "Viewer"
+  },
+  "profile": {
+    "title": "Profile",
+    "displayName": "Display name",
+    "email": "Email",
+    "choosePhoto": "Choose photo",
+    "removePhoto": "Remove photo",
+    "photoHint": "JPEG, PNG or WebP, up to 5 MB.",
+    "saved": "Profile saved"
+  },
+  "password": {
+    "title": "Change password",
+    "changeHint": "Changing your password logs you out of your other devices.",
+    "current": "Current password",
+    "change": "Change password",
+    "changed": "Password changed",
+    "setTitle": "Set password",
+    "setHint": "You signed up with Google. Set a password to also log in with your email.",
+    "setButton": "Set password",
+    "set": "Password set",
+    "reauth": "Log in again to set a password"
+  },
+  "preferences": {
+    "title": "Preferences",
+    "timezone": "Time zone",
+    "theme": "Display mode",
+    "themes": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    }
+  },
+  "workspaces": {
+    "title": "Workspaces",
+    "personal": "Personal",
+    "leave": "Leave",
+    "leaveTitle": "Leave {{name}}?",
+    "leaveBody": "You will lose access to its ideas and plans. An Owner can invite you again.",
+    "left": "You left the workspace",
+    "lastOwner": "Make someone else Owner first",
+    "leaveNamed": "Leave {{name}}"
+  },
+  "delete": {
+    "title": "Delete account",
+    "hint": "Deleting your account is permanent and can't be undone.",
+    "open": "Delete account",
+    "dialogTitle": "Delete your account",
+    "erasedTitle": "What is deleted",
+    "erased": "Your email, name, photo and password, your Self Analysis with its comments and history, your notifications, and workspaces where you are the only member.",
+    "keptTitle": "What stays",
+    "kept": "What you wrote in team workspaces stays as the team's record, shown as \"Deleted user\".",
+    "confirmEmail": "Your email address",
+    "confirmEmailHint": "Type {{email}} to confirm.",
+    "password": "Password",
+    "confirm": "Delete account",
+    "deleting": "Deleting",
+    "reauth": "Log in again to delete your account",
+    "lastOwnerHeading": "You are the last Owner of a workspace that has other members",
+    "lastOwner": "Make someone else Owner of {{name}} first"
+  }
+}

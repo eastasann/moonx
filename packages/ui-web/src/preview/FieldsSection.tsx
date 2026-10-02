@@ -3,10 +3,13 @@
 import { parseDate } from "@internationalized/date";
 import type { ComponentSize } from "@moonx/ui-tokens";
 import { type ReactNode, useState } from "react";
+import { Button } from "../components/Button";
 import { Checkbox } from "../components/Checkbox";
 import { CheckboxGroup } from "../components/CheckboxGroup";
 import { ComboBox, ComboBoxItem } from "../components/ComboBox";
 import { DatePicker } from "../components/DatePicker";
+import { FileTrigger } from "../components/FileTrigger";
+import { Form } from "../components/Form";
 import { NumberField } from "../components/NumberField";
 import { Picker, PickerItem } from "../components/Picker";
 import { Radio, RadioGroup } from "../components/RadioGroup";
@@ -16,6 +19,21 @@ import { Tag, TagGroup } from "../components/TagGroup";
 import { TextArea } from "../components/TextArea";
 import { TextField } from "../components/TextField";
 import { bySize, Case, Cases, Component, GallerySection } from "./parts";
+
+function FilePicker() {
+  const [name, setName] = useState("No file chosen");
+  return (
+    <Case label="Image files only">
+      <FileTrigger
+        acceptedFileTypes={["image/png", "image/jpeg", "image/webp"]}
+        onSelect={(files) => setName(files[0]?.name ?? "No file chosen")}
+      >
+        <Button variant="secondary">Choose photo</Button>
+      </FileTrigger>
+      <output>{name}</output>
+    </Case>
+  );
+}
 
 interface FieldCase {
   label: string;
@@ -373,6 +391,27 @@ export function FieldsSection() {
               </Tag>
             </TagGroup>
           </Case>
+        </Cases>
+      </Component>
+
+      <Component
+        name="Form"
+        note="Stacks fields and a submit button. Browser validation is off; each field shows the message it is given."
+      >
+        <Cases layout="column">
+          <Case label="Fields and a submit button">
+            <Form aria-label="Profile" onSubmit={(event) => event.preventDefault()}>
+              <TextField label="Display name" isRequired />
+              <TextField label="Email" isInvalid errorMessage="Enter a valid email address" />
+              <Button type="submit">Save</Button>
+            </Form>
+          </Case>
+        </Cases>
+      </Component>
+
+      <Component name="FileTrigger" note="Opens the file picker from the button it wraps.">
+        <Cases>
+          <FilePicker />
         </Cases>
       </Component>
     </GallerySection>

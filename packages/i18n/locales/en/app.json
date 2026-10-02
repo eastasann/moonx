@@ -1,0 +1,107 @@
+{
+  "close": "Close",
+  "back": "Back",
+  "cancel": "Cancel",
+  "saving": "Saving",
+  "sending": "Sending",
+  "signingIn": "Signing in",
+  "skipToContent": "Skip to main content",
+  "toasts": "Messages",
+  "offline": "Offline — changes will be saved when you reconnect",
+  "form": {
+    "required": "Required",
+    "tooShort_one": "Enter at least {{count}} character",
+    "tooShort_other": "Enter at least {{count}} characters",
+    "tooLong_one": "Use at most {{count}} character",
+    "tooLong_other": "Use at most {{count}} characters",
+    "email": "Enter a valid email address",
+    "invalid": "Enter a valid value",
+    "passwordMismatch": "The passwords don't match"
+  },
+  "nav": {
+    "label": "Main menu",
+    "tabsLabel": "Tab bar",
+    "dashboard": "Dashboard",
+    "ideas": "Ideas",
+    "self-analysis": "Self Analysis",
+    "notifications": "Notifications",
+    "decisions": "Decision Log",
+    "settings": "Workspace Settings",
+    "admin": "Admin",
+    "more": "More",
+    "account": "Account",
+    "logout": "Log out",
+    "switchWorkspace": "Switch workspace, current: {{name}}",
+    "switchWorkspaceNamed": "Switch workspace ({{name}})",
+    "userMenu": "{{name}}, account menu"
+  },
+  "header": {
+    "trail": "Breadcrumbs",
+    "comments": "Comments",
+    "history": "History"
+  },
+  "states": {
+    "dashboardLink": "Go to Dashboard",
+    "retry": "Retry",
+    "loading": "Loading",
+    "slow": "Taking longer than usual",
+    "noAccess": {
+      "heading": "You don't have access to this"
+    },
+    "notFound": {
+      "heading": "Not found. Check the link."
+    },
+    "loadError": {
+      "heading": "Couldn't load this page"
+    },
+    "unexpected": {
+      "heading": "Something went wrong",
+      "reference": "Ref: {{reference}}"
+    },
+    "rateLimited": {
+      "heading": "Too many attempts. Try again in a minute."
+    },
+    "updateRequired": {
+      "heading": "Update moonx to continue"
+    }
+  },
+  "workspace": {
+    "switchTitle": "Switch workspace",
+    "newTitle": "New workspace",
+    "new": "New workspace",
+    "create": "Create workspace",
+    "name": "Name",
+    "currency": "Currency",
+    "listLabel": "Workspaces",
+    "current": "Current"
+  },
+  "landing": {
+    "title": "Start a local business with confidence",
+    "lead": "moonx takes you from knowing yourself, to testing an idea, to a business plan you can show others. Work on your phone or on the web.",
+    "stagesHeading": "Three steps",
+    "stages": {
+      "selfAnalysis": {
+        "title": "Self Analysis",
+        "body": "Answer questions about your strengths, your values and what you want from a business."
+      },
+      "validation": {
+        "title": "Validation",
+        "body": "Test an idea with research, competitors and costs, then decide whether to go ahead, wait or drop it."
+      },
+      "plan": {
+        "title": "Business plan",
+        "body": "Turn a validated idea into a plan with milestones and a pitch deck."
+      }
+    },
+    "liveNumbers": "Profit and break-even are worked out as you type, and moonx shows what is still missing.",
+    "invitationOnly": "moonx is by invitation. Ask the person who invited you for your link.",
+    "login": "Log in"
+  },
+  "save": "Save",
+  "saveState": {
+    "saving": "Saving…",
+    "saved": "Saved",
+    "failed": "Couldn't save",
+    "retry": "Retry"
+  }
+}

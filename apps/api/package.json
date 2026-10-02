@@ -2,6 +2,12 @@
   "name": "@moonx/api",
   "private": true,
   "type": "module",
+  "types": "src/app.ts",
+  "exports": {
+    ".": {
+      "types": "./src/app.ts"
+    }
+  },
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",

@@ -1,9 +1,13 @@
 /** Gallery section: the app-specific parts (SideNav, TabBar, QuestionCard, Slide). */
 import { Bell, Ellipsis, LayoutDashboard, Lightbulb, Settings, UserSearch } from "lucide-react";
 import { useState } from "react";
+import { AppFrame } from "../components/AppFrame";
 import { Avatar } from "../components/Avatar";
 import { Badge } from "../components/Badge";
+import { Breadcrumb, Breadcrumbs } from "../components/Breadcrumbs";
 import { Button } from "../components/Button";
+import { InlineAlert } from "../components/InlineAlert";
+import { PageFrame } from "../components/PageFrame";
 import { QuestionCard } from "../components/QuestionCard";
 import { SideNav, type SideNavItem } from "../components/SideNav";
 import { Slide, type SlideProps } from "../components/Slide";
@@ -197,6 +201,68 @@ export function AppPartsSection() {
           </Case>
           <Case label="isCollapsed">
             <SideNavDemo collapsed />
+          </Case>
+        </Cases>
+      </Component>
+
+      <Component
+        name="AppFrame"
+        note="The frame of every signed-in screen: sidebar, header and main. The sidebar and the header follow the window width."
+      >
+        <Cases layout="column">
+          <Case label="With a trail, a save state and an offline notice">
+            <div className={navFrame}>
+              <AppFrame
+                isEmbedded
+                skipLabel="Skip to main content"
+                sideNav={
+                  <SideNav
+                    aria-label="Main, in the frame"
+                    items={NAV_ITEMS}
+                    workspaceSwitcher="My workspace"
+                    userMenu={<Avatar name="Maria Santos" size="S" />}
+                  />
+                }
+                tabBar={null}
+                banner={
+                  <InlineAlert
+                    variant="notice"
+                    heading="Offline — changes will be saved when you reconnect"
+                  />
+                }
+                breadcrumbs={
+                  <Breadcrumbs aria-label="Trail">
+                    <Breadcrumb href="#app">Ideas</Breadcrumb>
+                    <Breadcrumb>Piaya Gift Box</Breadcrumb>
+                  </Breadcrumbs>
+                }
+                backLink={
+                  <Button variant="secondary" size="S">
+                    Back
+                  </Button>
+                }
+                title="Piaya Gift Box"
+                status={<StatusLight variant="positive">Saved</StatusLight>}
+                actions={
+                  <Button variant="secondary" size="S">
+                    Comments
+                  </Button>
+                }
+              >
+                Main content
+              </AppFrame>
+            </div>
+          </Case>
+        </Cases>
+      </Component>
+
+      <Component
+        name="PageFrame"
+        note="The main landmark of a screen without the app frame (landing, log in, onboarding). It adds no layout."
+      >
+        <Cases>
+          <Case label="Around a layout pattern">
+            <PageFrame isEmbedded>Page content</PageFrame>
           </Case>
         </Cases>
       </Component>

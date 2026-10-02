@@ -35,7 +35,7 @@
 ```
                     ┌───────────────────────── Cloudflare（DNS・CDN・無料枠）──────────────────────────┐
  Web ブラウザ ─────▶ │ Worker「moonx-web-{env}」                                                        │
-                    │  ├ /*      → 静的アセット（apps/web の SPA。見つからないパスは index.html）       │
+                    │  ├ /*      → 静的アセット（apps/web の SPA。見つからないパスは _shell.html）       │
  スマホアプリ ─────▶ │  └ /api/*  → Cloud Run へ転送（Cookie・ヘッダーはそのまま。共有シークレットを付ける）│
  (Expo, iOS/Android) └──────────────────────────────────────────┬────────────────────────────────────┘
                                                                 │ HTTPS
@@ -274,7 +274,7 @@ moonx/
 
 ### ADR-004: Web は「静的ファイル＋/api の転送」で配り、Cloudflare に置く
 
-**決定:** Web の配信は「`/*` は静的ファイル（見つからないパスは `index.html`）、`/api/*` は API へ転送」という形に固定する。置き場所は Cloudflare の Worker（静的アセット機能）で、`/api/*` だけ Worker のコード（`apps/web/worker/index.ts`）が動いて Cloud Run へ転送する。静的アセットのセキュリティヘッダーと、`/.well-known/apple-app-site-association` の Content-Type は、静的アセットの `_headers` ファイル（`apps/web/public/_headers`）で付ける（Worker のコードを動かさない）。スマホも同じ `https://{DOMAIN}/api` を使う。独自ドメインの DNS も Cloudflare に置く。
+**決定:** Web の配信は「`/*` は静的ファイル（見つからないパスは `_shell.html`）、`/api/*` は API へ転送」という形に固定する。`index.html` はビルド時に作るランディング（ADR-002）で、SPA の殻は `_shell.html` に出力される。置き場所は Cloudflare の Worker（静的アセット機能）で、`/api/*` と、静的アセットに無い画面のパス（`_shell.html` を返す）だけ Worker のコード（`apps/web/worker/index.ts`）が動く。静的アセットのセキュリティヘッダーと、`/.well-known/apple-app-site-association` の Content-Type は、静的アセットの `_headers` ファイル（`apps/web/public/_headers`）で付ける（Worker のコードを動かさない）。スマホも同じ `https://{DOMAIN}/api` を使う。独自ドメインの DNS も Cloudflare に置く。
 
 Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし、代わりに Worker が付ける共有シークレット（`X-Moonx-Proxy-Secret`）を API が確かめて、直接のアクセスを拒否する（2章 通信フロー 3）。例外は `/api/health`（監視）と `/internal/*`（OIDC で確かめる）。
 
@@ -2184,7 +2184,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | アーカイブ（409 `ARCHIVED`） | design-spec 6.1「アーカイブ済み」の表示に切り替える |
 | アプリの更新が必要（426） | design-spec 6.0.6「アプリの更新が必要」 |
 | 回数制限（429） | design-spec 6.0.6「回数の上限」 |
-| 想定外のエラー（500 など） | design-spec 6.0.6「想定外のエラー」。`Ref` には `requestId` の先頭8文字を出す。画面のブロックごとにエラーの境界（Error Boundary）を置き、1つの失敗で全体を壊さない。Sentry に送る |
+| 想定外のエラー（500 など） | design-spec 6.0.6「想定外のエラー」。`Ref` には `requestId` の先頭8文字を出す。画面の描画が失敗したとき（API の応答が無いとき）は `requestId` が無いので、Sentry のイベント ID の先頭8文字を出す。画面のブロックごとにエラーの境界（Error Boundary）を置き、1つの失敗で全体を壊さない。Sentry に送る |
 
 ### 8.3 ログとの対応
 

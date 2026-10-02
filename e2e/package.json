@@ -1,0 +1,5 @@
+{
+  "name": "@moonx/e2e",
+  "private": true,
+  "type": "module"
+}

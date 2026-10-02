@@ -4,6 +4,7 @@ import { Inbox, SearchX } from "lucide-react";
 import { Avatar } from "../components/Avatar";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
+import { Heading } from "../components/Heading";
 import { IllustratedMessage } from "../components/IllustratedMessage";
 import { InlineAlert } from "../components/InlineAlert";
 import { Meter } from "../components/Meter";
@@ -11,6 +12,8 @@ import { ProgressBar } from "../components/ProgressBar";
 import { ProgressCircle } from "../components/ProgressCircle";
 import { Skeleton } from "../components/Skeleton";
 import { StatusLight } from "../components/StatusLight";
+import { Steps } from "../components/Steps";
+import { Text } from "../components/Text";
 import { Flex, Stack } from "../layout";
 import { bySize, Case, Cases, Component, GallerySection, SIZES } from "./parts";
 import { widthFull } from "./preview.css";
@@ -233,6 +236,61 @@ export function FeedbackSection() {
           <Case label="Japanese name">
             <Avatar name="山田 太郎" />
           </Case>
+          <Case label="Photo that cannot be loaded (initials stay)">
+            <Avatar name="Maria Santos" src="/dev/missing-photo.webp" />
+          </Case>
+        </Cases>
+      </Component>
+
+      <Component
+        name="Heading"
+        note="The display typeface. The level sets the outline, the variant the look."
+      >
+        <Cases label="Levels 1 to 4, and display" layout="column">
+          <Case label="display">
+            <Heading level={1} variant="display">
+              Start a local business
+            </Heading>
+          </Case>
+          {([1, 2, 3, 4] as const).map((level) => (
+            <Case key={level} label={`Level ${level}`}>
+              <Heading level={level}>Validate the idea</Heading>
+            </Case>
+          ))}
+        </Cases>
+      </Component>
+
+      <Component name="Text">
+        <Cases label="Variants and tones" layout="column">
+          {(["body", "body-long", "body-sm", "caption", "label"] as const).map((variant) => (
+            <Case key={variant} label={variant}>
+              <Text variant={variant}>Bread is sold out by 9 am.</Text>
+            </Case>
+          ))}
+          <Case label="secondary">
+            <Text tone="secondary">The nearest bakery is 3 km away.</Text>
+          </Case>
+          <Case label="negative">
+            <Text tone="negative">Enter a number greater than 0.</Text>
+          </Case>
+        </Cases>
+      </Component>
+
+      <Component name="Steps">
+        <Cases label="Current step 1, 2 and 3" layout="column">
+          {(["invite", "profile", "done"] as const).map((current) => (
+            <Case key={current} label={`current = ${current}`}>
+              <Steps
+                aria-label={`Progress, ${current}`}
+                current={current}
+                items={[
+                  { id: "invite", label: "Invitation" },
+                  { id: "profile", label: "Profile" },
+                  { id: "done", label: "Done" },
+                ]}
+              />
+            </Case>
+          ))}
         </Cases>
       </Component>
     </GallerySection>

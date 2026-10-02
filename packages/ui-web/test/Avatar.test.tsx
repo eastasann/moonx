@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { Avatar, initialsOf } from "../src/components/Avatar";
 import { expectNoAxeViolations } from "./axe";
 
@@ -26,4 +26,20 @@ test("initials use at most two words and survive non-latin names", () => {
 test("has no axe violations", async () => {
   const { container } = render(<Avatar name="Maria Santos" />);
   await expectNoAxeViolations(container);
+});
+
+test("shows the photo over the initials and falls back to them when it fails", () => {
+  const { container } = render(<Avatar name="Maria Santos" src="/api/avatars/a.webp" />);
+  const photo = container.querySelector("img");
+  expect(photo).toHaveAttribute("src", "/api/avatars/a.webp");
+  expect(screen.getByRole("img", { name: "Maria Santos" })).toHaveTextContent("MS");
+  fireEvent.error(photo as HTMLImageElement);
+  expect(container.querySelector("img")).toBeNull();
+});
+
+test("shows no photo for an empty or missing source", () => {
+  const { container, rerender } = render(<Avatar name="Maria Santos" src={null} />);
+  expect(container.querySelector("img")).toBeNull();
+  rerender(<Avatar name="Maria Santos" src="" />);
+  expect(container.querySelector("img")).toBeNull();
 });

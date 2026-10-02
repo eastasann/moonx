@@ -71,24 +71,33 @@ export function DialogSurface({
   isDismissable,
   isKeyboardDismissDisabled,
   children,
-  ...triggerProps
+  ...openState
 }: DialogSurfaceProps) {
   const narrow = useIsNarrow();
   const layout = narrow ? (size === "fullscreen" ? "sheet" : "tray") : size;
+  const overlayOf = (
+    state: Pick<DialogSurfaceProps, "isOpen" | "defaultOpen" | "onOpenChange">,
+  ) => (
+    <ModalOverlay
+      {...state}
+      isDismissable={isDismissable}
+      isKeyboardDismissDisabled={isKeyboardDismissDisabled}
+      className={overlay({ layout })}
+    >
+      <Modal className={modal({ layout })}>
+        <AriaDialog role={role} className={dialog}>
+          {children}
+        </AriaDialog>
+      </Modal>
+    </ModalOverlay>
+  );
+  // Without a trigger the dialog is driven by `isOpen`. A `DialogTrigger` with no pressable child
+  // makes React Aria warn, so the overlay stands alone then.
+  if (!trigger) return overlayOf(openState);
   return (
-    <DialogTrigger {...triggerProps}>
+    <DialogTrigger {...openState}>
       {trigger}
-      <ModalOverlay
-        isDismissable={isDismissable}
-        isKeyboardDismissDisabled={isKeyboardDismissDisabled}
-        className={overlay({ layout })}
-      >
-        <Modal className={modal({ layout })}>
-          <AriaDialog role={role} className={dialog}>
-            {children}
-          </AriaDialog>
-        </Modal>
-      </ModalOverlay>
+      {overlayOf({})}
     </DialogTrigger>
   );
 }

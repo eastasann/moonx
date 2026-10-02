@@ -237,7 +237,10 @@ function SlideBody({ slide, currency }: { slide: PitchSlide; currency: string })
  * the print tokens and only the glyphs used are embedded (ADR-012). react-pdf has no
  * `font-variant-numeric`, so the tokens' tabular figures cannot be applied in the PDF.
  */
-export async function renderPitchDeckPdf(deck: PitchDeck, currency: string): Promise<Uint8Array> {
+export async function renderPitchDeckPdf(
+  deck: PitchDeck,
+  currency: string,
+): Promise<Uint8Array<ArrayBuffer>> {
   registerPdfFonts();
   const document = (
     <Document

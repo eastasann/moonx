@@ -1,4 +1,7 @@
 import i18next, { type i18n as I18n } from "i18next";
+import account from "../locales/en/account.json";
+import app from "../locales/en/app.json";
+import auth from "../locales/en/auth.json";
 import common from "../locales/en/common.json";
 import errors from "../locales/en/errors.json";
 import mail from "../locales/en/mail.json";
@@ -7,11 +10,20 @@ import validation from "../locales/en/validation.json";
 
 /** Catalogs per language. The UI is English only for now (design-spec 1.2); add a language here. */
 export const resources = {
-  en: { common, errors, mail, plan, validation },
+  en: { account, app, auth, common, errors, mail, plan, validation },
 } as const;
 
 export const DEFAULT_LANGUAGE = "en";
-export const NAMESPACES = ["common", "errors", "mail", "plan", "validation"] as const;
+export const NAMESPACES = [
+  "account",
+  "app",
+  "auth",
+  "common",
+  "errors",
+  "mail",
+  "plan",
+  "validation",
+] as const;
 
 /**
  * Creates an i18next instance with the shared catalogs. Web, mobile and the API each create their

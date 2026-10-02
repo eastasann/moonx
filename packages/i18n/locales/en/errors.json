@@ -3,7 +3,7 @@
   "UNAUTHENTICATED": "Please sign in again.",
   "FORBIDDEN": "You don't have permission to do this.",
   "NO_ACCESS": "You don't have access to this",
-  "INVITATION_EMAIL_MISMATCH": "This invitation was sent to a different email address.",
+  "INVITATION_EMAIL_MISMATCH": "This invitation was sent to {{email}}. Log in with that email.",
   "INVALID_PASSWORD": "The password is incorrect.",
   "REAUTH_REQUIRED": "Please log in again to continue.",
   "NOT_SHARED": "This has not been shared with you.",
@@ -25,7 +25,7 @@
   "ALREADY_LATEST": "Already on the latest template version.",
   "DRAFT_EXISTS": "A draft already exists.",
   "PUBLISHED_READ_ONLY": "A published version can't be edited.",
-  "INVITATION_INVALID": "This invitation is invalid or has expired.",
+  "INVITATION_INVALID": "This invitation is invalid or expired. Ask the person who invited you for a new one.",
   "PAYLOAD_TOO_LARGE": "This is too large to send.",
   "VALIDATION_FAILED": "Some values are not valid. Check the highlighted fields.",
   "FACT_REQUIRES_EVIDENCE": "Add evidence before marking this as a Fact.",
@@ -51,6 +51,6 @@
   "RATE_LIMITED": "Too many attempts. Try again in a minute.",
   "INTERNAL": "Something went wrong. Try again.",
   "UPSTREAM_UNAVAILABLE": "The service is temporarily unavailable. Try again shortly.",
-  "INVITATION_REQUIRED": "Sign-up is by invitation only.",
-  "ACCOUNT_SUSPENDED": "This account is suspended."
+  "INVITATION_REQUIRED": "This invitation is invalid or expired. Ask the person who invited you for a new one.",
+  "ACCOUNT_SUSPENDED": "This account is suspended"
 }

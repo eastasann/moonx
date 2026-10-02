@@ -9,7 +9,16 @@ export default defineConfig({
   resolve: { dedupe: ["react", "react-dom"] },
   server: {
     port: 5173,
-    proxy: { "/api": "http://localhost:3000" },
+    proxy: { "/api": process.env.API_ORIGIN ?? "http://localhost:3000" },
   },
-  plugins: [vanillaExtractPlugin(), tanstackStart({ spa: { enabled: true } }), viteReact()],
+  plugins: [
+    vanillaExtractPlugin(),
+    tanstackStart({
+      spa: { enabled: true },
+      pages: [{ path: "/?prerender", prerender: { outputPath: "/index.html" } }],
+      // Only the landing page is built to HTML (ADR-002); every other path is the SPA shell.
+      prerender: { enabled: true, crawlLinks: false, autoStaticPathsDiscovery: false },
+    }),
+    viteReact(),
+  ],
 });

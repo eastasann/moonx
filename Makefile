@@ -85,6 +85,7 @@ format:
 typecheck:
 	bun run --workspaces --if-present typecheck
 	bunx tsc -p scripts/tsconfig.json
+	bunx tsc -p e2e/tsconfig.json
 
 db-up:
 	docker compose up -d --wait db

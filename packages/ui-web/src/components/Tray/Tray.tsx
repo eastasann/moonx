@@ -18,17 +18,23 @@ export interface TrayProps {
  * A bottom sheet at every width. Use `Popover` when the content should be a popover on wide
  * screens; use `Tray` when it is a tray everywhere (design-spec 4.5).
  */
-export function Tray({ trigger, children, "aria-label": ariaLabel, ...triggerProps }: TrayProps) {
+export function Tray({ trigger, children, "aria-label": ariaLabel, ...openState }: TrayProps) {
+  const overlay = (state: Pick<TrayProps, "isOpen" | "defaultOpen" | "onOpenChange">) => (
+    <ModalOverlay {...state} isDismissable className={trayOverlay}>
+      <Modal className={tray}>
+        <AriaDialog aria-label={ariaLabel} className={content}>
+          {children}
+        </AriaDialog>
+      </Modal>
+    </ModalOverlay>
+  );
+  // Without a trigger the tray is driven by `isOpen`. A `DialogTrigger` with no pressable child
+  // makes React Aria warn, so the overlay stands alone then.
+  if (!trigger) return overlay(openState);
   return (
-    <DialogTrigger {...triggerProps}>
+    <DialogTrigger {...openState}>
       {trigger}
-      <ModalOverlay isDismissable className={trayOverlay}>
-        <Modal className={tray}>
-          <AriaDialog aria-label={ariaLabel} className={content}>
-            {children}
-          </AriaDialog>
-        </Modal>
-      </ModalOverlay>
+      {overlay({})}
     </DialogTrigger>
   );
 }

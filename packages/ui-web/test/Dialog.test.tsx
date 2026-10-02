@@ -154,3 +154,20 @@ describe("Dialog", () => {
     await expectNoAxeViolations(document.body);
   });
 });
+
+describe("without a trigger", () => {
+  test("is driven by isOpen and raises no React Aria warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const onOpenChange = vi.fn();
+    render(
+      <Dialog isOpen onOpenChange={onOpenChange} title="Switch workspace" closeLabel="Close">
+        Body
+      </Dialog>,
+    );
+    expect(screen.getByRole("dialog", { name: "Switch workspace" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});

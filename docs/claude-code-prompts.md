@@ -355,7 +355,7 @@ make test-web・make lint・make typecheck が通る状態をゴールとする�
 
 ## Step 11: Web のアプリの枠と認証・アカウントの画面
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/02-01_system-design-doc.md の4章（ルーティング）・8.2（表示方針）・9章と、docs/design-spec.md の
@@ -748,7 +748,8 @@ docs/03_dev-setup.md 5.4 の手順でユーザーが行う。
    bootstrap の変数、Cloud Run の image の ignore_changes、CRON_OIDC_AUDIENCE の組み立て、
    Monitoring のアラート（SDD 11章の閾値）、予算アラート、Cloudflare のゾーンの設定
 4. apps/web/worker/index.ts（/api/* の転送、X-Moonx-Proxy-Secret・CF-Connecting-IP・X-Request-Id の付与、
-   届かないときは UPSTREAM_UNAVAILABLE の形）と wrangler.jsonc（env staging / production、observability）
+   届かないときは UPSTREAM_UNAVAILABLE の形。静的アセットに無い GET の画面のパスには `_shell.html` を返す。
+   `index.html` はプリレンダーしたランディングで、SPA の殻ではない）と wrangler.jsonc（env staging / production、observability）
 5. apps/web/public/: _headers（7.2 のセキュリティヘッダー、apple-app-site-association の Content-Type）、
    /.well-known/apple-app-site-association と assetlinks.json、robots.txt、/privacy と /support
    （文面はユーザーに用意してもらう。無ければ Status を blocked にして理由を書く）

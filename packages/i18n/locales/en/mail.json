@@ -1,0 +1,15 @@
+{
+  "invitation": {
+    "subject_workspace": "{{inviter}} invited you to {{workspace}} on moonx",
+    "subject_account": "{{inviter}} invited you to moonx",
+    "body_workspace": "{{inviter}} invited you to join {{workspace}} on moonx as {{role}}.",
+    "body_account": "{{inviter}} invited you to moonx.",
+    "action": "Open this link to accept (valid for {{days}} days):",
+    "ignore": "If you weren't expecting this, you can ignore this email."
+  },
+  "role": {
+    "owner": "an Owner",
+    "member": "a Member",
+    "viewer": "a Viewer"
+  }
+}

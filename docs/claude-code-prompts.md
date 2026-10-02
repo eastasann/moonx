@@ -193,7 +193,7 @@ make db-studio でデモデータが見え、make db-reset で作り直せ、mak
 
 ## Step 6: API の基盤とワークスペース・アイデア・検証の API
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/02-01_system-design-doc.md の 5.1〜5.3・5.5〜5.7・5.14（Z2）・7章・8.1・8.3 と
@@ -204,7 +204,7 @@ ADR-005・ADR-006・ADR-019・ADR-020・ADR-023・ADR-029 に従って、API の
 1. 基盤（apps/api）:
    - ドメインごとの Elysia のプラグイン、/api/v1 の下の REST、Zod v4（Standard Schema）での入出力の検査
    - エラーの形式（8.1）とコード（packages/schemas の errors.ts）。500 では詳細を返さない
-   - リクエスト ID（X-Request-Id。無ければ作る）、1行1つの JSON のログ（ADR-023 の項目）、Sentry（sendDefaultPii: false）
+   - リクエスト ID（X-Request-Id。無ければ作る）、1行1つの JSON のログ（ADR-023 の項目）、Sentry（dataCollection を全て無効）
    - 応答はすべて Cache-Control: no-store。CSRF の決まり（7.2）。Worker の共有シークレットの検査
      （2章 通信フロー 3。PROXY_SHARED_SECRET が空の local では検査しない）
    - X-Moonx-Client / X-Moonx-App-Version の記録と 426 APP_UPDATE_REQUIRED（最低の版はコードの定数）

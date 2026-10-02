@@ -404,6 +404,9 @@ describe("demo data", () => {
 
     const invitations = await db.select().from(schema.invitations);
     expect(invitations.map((i) => i.status).sort()).toEqual(["expired", "pending"]);
+    for (const i of invitations) {
+      expect(i.expiresAt.getTime() > Date.now()).toBe(i.status === "pending");
+    }
   });
 
   test("passwords are Better Auth scrypt hashes of the demo password", async () => {

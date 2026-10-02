@@ -1,0 +1,346 @@
+import { schema } from "@moonx/db";
+import {
+  createInvitationBodySchema,
+  createWorkspaceBodySchema,
+  type Invitation,
+  invitationWithLinkSchema,
+  listInvitationsQuerySchema,
+  memberSchema,
+  mentionCandidatesQuerySchema,
+  updateMemberBodySchema,
+  updateWorkspaceBodySchema,
+  type Workspace,
+  workspaceSchema,
+} from "@moonx/schemas";
+import { and, count, desc, eq, gt, sql } from "drizzle-orm";
+import { Elysia } from "elysia";
+import { z } from "zod";
+import type { AppContext } from "../context";
+import { ApiError } from "../errors";
+import type { Executor } from "../lib/db";
+import { historyActor } from "../lib/dto";
+import { toInvitations } from "../lib/invitation-dto";
+import {
+  hashInvitationToken,
+  INVITATION_TTL_DAYS,
+  invitationExpiry,
+  invitationLink,
+  newInvitationToken,
+} from "../lib/invitation-token";
+import { enforceRateLimit } from "../lib/rate-limit";
+import { requireOwner, resolveScope } from "../lib/scope";
+import {
+  loadMentionCandidates,
+  loadWorkspaceMembers,
+  releaseMemberDuties,
+  resetLastWorkspace,
+} from "../lib/workspace-members";
+import { invitationMail } from "../mail/mailer";
+import { authPlugin } from "../plugins";
+
+async function loadWorkspace(
+  db: Executor,
+  id: string,
+  role: Workspace["myRole"],
+): Promise<Workspace> {
+  const [row] = await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, id));
+  if (!row) throw new ApiError("NOT_FOUND", "Workspace not found");
+  const [members] = await db
+    .select({ n: count() })
+    .from(schema.memberships)
+    .where(eq(schema.memberships.workspaceId, id));
+  return {
+    id,
+    name: row.name,
+    currency: row.currency,
+    isPersonal: row.isPersonal,
+    myRole: role,
+    memberCount: members?.n ?? 0,
+  };
+}
+
+const workspaceParams = z.object({ workspaceId: z.uuid() });
+const memberParams = z.object({
+  workspaceId: z.uuid(),
+  userId: z.union([z.uuid(), z.literal("me")]),
+});
+
+/** W0-W4 and W8 (SDD 5.5). W5-W7 live in `invitations.ts`. */
+export function workspaceRoutes(ctx: AppContext) {
+  const { db } = ctx;
+  return new Elysia({ name: "moonx-workspaces" })
+    .use(authPlugin(ctx))
+    .post(
+      "/workspaces",
+      async ({ body, user, set }) => {
+        const id = await db.transaction(async (tx) => {
+          const [created] = await tx
+            .insert(schema.workspaces)
+            .values({
+              name: body.name,
+              currency: body.currency ?? "PHP",
+              isPersonal: false,
+              createdById: user.id,
+              lastActiveAt: ctx.now(),
+            })
+            .returning({ id: schema.workspaces.id });
+          const workspaceId = (created as { id: string }).id;
+          await tx
+            .insert(schema.memberships)
+            .values({ workspaceId, userId: user.id, role: "owner" });
+          await tx
+            .update(schema.users)
+            .set({ lastWorkspaceId: workspaceId })
+            .where(eq(schema.users.id, user.id));
+          return workspaceId;
+        });
+        set.status = 201;
+        return loadWorkspace(db, id, "owner");
+      },
+      { body: createWorkspaceBodySchema, response: { 201: workspaceSchema } },
+    )
+    .get(
+      "/workspaces/:workspaceId",
+      async ({ params, user }) => {
+        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+        return loadWorkspace(db, scope.workspaceId, scope.role);
+      },
+      { params: z.object({ workspaceId: z.uuid() }), response: { 200: workspaceSchema } },
+    )
+    .patch(
+      "/workspaces/:workspaceId",
+      async ({ params, body, user }) => {
+        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+        requireOwner(scope);
+        if (body.name !== undefined || body.currency !== undefined) {
+          await db
+            .update(schema.workspaces)
+            .set(body)
+            .where(eq(schema.workspaces.id, scope.workspaceId));
+        }
+        return loadWorkspace(db, scope.workspaceId, scope.role);
+      },
+      {
+        params: z.object({ workspaceId: z.uuid() }),
+        body: updateWorkspaceBodySchema,
+        response: { 200: workspaceSchema },
+      },
+    )
+    .get(
+      "/workspaces/:workspaceId/members",
+      async ({ params, user }) => {
+        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+        return { items: await loadWorkspaceMembers(db, scope.workspaceId, scope.role) };
+      },
+      {
+        params: workspaceParams,
+        response: { 200: z.object({ items: z.array(memberSchema) }) },
+      },
+    )
+    .patch(
+      "/workspaces/:workspaceId/members/:userId",
+      async ({ params, body, user, request }) => {
+        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+        requireOwner(scope);
+        const targetId = params.userId === "me" ? user.id : params.userId;
+        await db.transaction(async (tx) => {
+          const members = await tx
+            .select({ userId: schema.memberships.userId, role: schema.memberships.role })
+            .from(schema.memberships)
+            .where(eq(schema.memberships.workspaceId, scope.workspaceId))
+            .for("update");
+          const target = members.find((m) => m.userId === targetId);
+          if (!target) throw new ApiError("NOT_FOUND", "Member not found");
+          if (target.role === body.role) return;
+          const owners = members.filter((m) => m.role === "owner").length;
+          if (target.role === "owner" && owners <= 1) {
+            throw new ApiError("LAST_OWNER", "A workspace needs at least one Owner");
+          }
+          await tx
+            .update(schema.memberships)
+            .set({ role: body.role })
+            .where(
+              and(
+                eq(schema.memberships.workspaceId, scope.workspaceId),
+                eq(schema.memberships.userId, targetId),
+              ),
+            );
+          if (body.role === "viewer") {
+            const [person] = await tx
+              .select({ id: schema.users.id, displayName: schema.users.displayName })
+              .from(schema.users)
+              .where(eq(schema.users.id, targetId));
+            if (person)
+              await releaseMemberDuties(tx, scope.workspaceId, person, historyActor(request, user));
+          }
+        });
+        const [member] = await loadWorkspaceMembers(db, scope.workspaceId, scope.role, targetId);
+        return member as NonNullable<typeof member>;
+      },
+      {
+        params: z.object({ workspaceId: z.uuid(), userId: z.uuid() }),
+        body: updateMemberBodySchema,
+        response: { 200: memberSchema },
+      },
+    )
+    .delete(
+      "/workspaces/:workspaceId/members/:userId",
+      async ({ params, user, request, set }) => {
+        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+        const targetId = params.userId === "me" ? user.id : params.userId;
+        if (targetId !== user.id) requireOwner(scope);
+        await db.transaction(async (tx) => {
+          const [workspace] = await tx
+            .select({ isPersonal: schema.workspaces.isPersonal })
+            .from(schema.workspaces)
+            .where(eq(schema.workspaces.id, scope.workspaceId));
+          if (workspace?.isPersonal && targetId === user.id) {
+            throw new ApiError("CANNOT_LEAVE_PERSONAL", "A personal workspace cannot be left");
+          }
+          const members = await tx
+            .select({ userId: schema.memberships.userId, role: schema.memberships.role })
+            .from(schema.memberships)
+            .where(eq(schema.memberships.workspaceId, scope.workspaceId))
+            .for("update");
+          const target = members.find((m) => m.userId === targetId);
+          if (!target) throw new ApiError("NOT_FOUND", "Member not found");
+          if (target.role === "owner" && members.filter((m) => m.role === "owner").length <= 1) {
+            throw new ApiError("LAST_OWNER", "Make someone else Owner first");
+          }
+          const [person] = await tx
+            .select({ id: schema.users.id, displayName: schema.users.displayName })
+            .from(schema.users)
+            .where(eq(schema.users.id, targetId));
+          if (person)
+            await releaseMemberDuties(tx, scope.workspaceId, person, historyActor(request, user));
+          await tx
+            .delete(schema.memberships)
+            .where(
+              and(
+                eq(schema.memberships.workspaceId, scope.workspaceId),
+                eq(schema.memberships.userId, targetId),
+              ),
+            );
+          await resetLastWorkspace(tx, targetId, scope.workspaceId);
+        });
+        set.status = 204;
+      },
+      { params: memberParams },
+    )
+    .get(
+      "/workspaces/:workspaceId/invitations",
+      async ({ params, query, user }) => {
+        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+        requireOwner(scope);
+        const now = ctx.now();
+        const rows = await db
+          .select()
+          .from(schema.invitations)
+          .where(
+            and(
+              eq(schema.invitations.workspaceId, scope.workspaceId),
+              (query.status ?? "pending") === "pending"
+                ? and(
+                    eq(schema.invitations.status, "pending"),
+                    gt(schema.invitations.expiresAt, now),
+                  )
+                : undefined,
+            ),
+          )
+          .orderBy(desc(schema.invitations.createdAt), desc(schema.invitations.id));
+        return { items: await toInvitations(db, rows, now) };
+      },
+      { params: workspaceParams, query: listInvitationsQuerySchema },
+    )
+    .post(
+      "/workspaces/:workspaceId/invitations",
+      async ({ params, body, user, set }) => {
+        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+        requireOwner(scope);
+        const now = ctx.now();
+        const email = body.email.toLowerCase();
+        const token = newInvitationToken();
+        const link = invitationLink(ctx.config.publicUrl, token);
+        const invitation = await db.transaction(async (tx) => {
+          // Serializes the invitations of one workspace, so a double click cannot pass the checks
+          // below twice and create two pending invitations for the same address. An advisory
+          // lock rather than a row lock: this transaction waits for Resend, and a lock on the
+          // workspace row would hold up every content write of the workspace meanwhile.
+          await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${scope.workspaceId}))`);
+          const [existing] = await tx
+            .select({ id: schema.memberships.id })
+            .from(schema.memberships)
+            .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
+            .where(
+              and(
+                eq(schema.memberships.workspaceId, scope.workspaceId),
+                sql`lower(${schema.users.email}) = ${email}`,
+              ),
+            );
+          if (existing) throw new ApiError("ALREADY_MEMBER", "That person is already a member");
+          const [pending] = await tx
+            .select({ id: schema.invitations.id })
+            .from(schema.invitations)
+            .where(
+              and(
+                eq(schema.invitations.workspaceId, scope.workspaceId),
+                sql`lower(${schema.invitations.email}) = ${email}`,
+                eq(schema.invitations.status, "pending"),
+                gt(schema.invitations.expiresAt, now),
+              ),
+            );
+          if (pending) {
+            throw new ApiError("INVITATION_PENDING", "A valid invitation already exists", {
+              invitationId: pending.id,
+            });
+          }
+          await enforceRateLimit(tx, "invitation", user.id, now.getTime());
+          const [created] = await tx
+            .insert(schema.invitations)
+            .values({
+              workspaceId: scope.workspaceId,
+              email: body.email,
+              role: body.role,
+              tokenHash: hashInvitationToken(token),
+              invitedById: user.id,
+              expiresAt: invitationExpiry(now),
+            })
+            .returning();
+          const [workspace] = await tx
+            .select({ name: schema.workspaces.name })
+            .from(schema.workspaces)
+            .where(eq(schema.workspaces.id, scope.workspaceId));
+          await ctx.mailer.send(
+            invitationMail({
+              to: body.email,
+              inviter: user.displayName,
+              workspace: { name: workspace?.name ?? "", role: body.role },
+              link,
+              expiresInDays: INVITATION_TTL_DAYS,
+            }),
+          );
+          const [dto] = await toInvitations(tx, [created as NonNullable<typeof created>], now);
+          return dto as Invitation;
+        });
+        set.status = 201;
+        return { invitation, link };
+      },
+      {
+        params: workspaceParams,
+        body: createInvitationBodySchema,
+        response: { 201: invitationWithLinkSchema },
+      },
+    )
+    .get(
+      "/workspaces/:workspaceId/mention-candidates",
+      async ({ params, query, user }) => {
+        const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
+        const target =
+          query.targetType && query.targetId
+            ? { type: query.targetType, id: query.targetId }
+            : null;
+        return { items: await loadMentionCandidates(db, scope, target) };
+      },
+      { params: workspaceParams, query: mentionCandidatesQuerySchema },
+    );
+}

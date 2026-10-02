@@ -100,7 +100,8 @@ export async function addAccounts(world: World, clock: Clock) {
       tokenHash: sha256(DEMO_INVITE_TOKENS.pending),
       invitedById: userId("ana"),
       status: "pending",
-      expiresAt: clock.ago(-5),
+      // Not clock.ago(): that caps every instant at the run, which would make this invitation expired.
+      expiresAt: new Date(clock.now.getTime() + 5 * 24 * 60 * 60 * 1000),
       createdAt: clock.ago(2),
       updatedAt: clock.ago(2),
     },

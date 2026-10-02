@@ -11,5 +11,18 @@
     "expected": "Expected",
     "strong": "Strong",
     "capacity": "Capacity limit"
+  },
+  "deletedUser": "Deleted user",
+  "target": {
+    "economics": "Economics",
+    "researchLog": "Research log",
+    "competitor": "Competitors",
+    "assumption": "Assumptions",
+    "risk": "Risks",
+    "cost": "Costs",
+    "plan": "Plan",
+    "pitchDeck": "Pitch deck",
+    "execution": "Execution",
+    "templateVersion": "Template version"
   }
 }

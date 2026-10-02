@@ -50,7 +50,8 @@ export const ERROR_STATUS = {
   APP_UPDATE_REQUIRED: 426,
   RATE_LIMITED: 429,
   INTERNAL: 500,
-  // The Worker answers 502, 503 or 504 depending on the failure; the API never produces this code.
+  // The Worker answers 502, 503 or 504 when it cannot reach the API; the API itself answers 503
+  // when a dependency it needs is down (the database in Z2, Resend while sending an invitation).
   UPSTREAM_UNAVAILABLE: 503,
 } as const;
 

@@ -61,7 +61,7 @@
 
 1. **Web**: ブラウザは `https://{DOMAIN}/` から SPA を読み込む（Cloudflare の CDN。Worker は動かない）。データは同じオリジンの `/api/v1/*` を Eden Treaty で呼ぶ。ログインは Better Auth の HttpOnly Cookie（同じオリジンなので SameSite=Lax で足りる）。
 2. **スマホ**: アプリは `https://{DOMAIN}/api/*` を直接呼ぶ。セッションは Better Auth の Expo プラグインが SecureStore に保存し、`Cookie` ヘッダーとして付ける。Google ログインはシステムのブラウザで行い、`moonx://` のディープリンクで戻る。
-3. **Worker → Cloud Run**: Worker は `/api/*` を Cloud Run の URL へ転送し、`X-Moonx-Proxy-Secret`（共有シークレット）と `CF-Connecting-IP`（利用者の IP）を付ける。API は `/internal/*` と `/api/health` 以外で共有シークレットを確かめ、直接のアクセスを拒否する（IP の偽装を防ぐ）。
+3. **Worker → Cloud Run**: Worker は `/api/*` を Cloud Run の URL へ転送し、`X-Moonx-Proxy-Secret`（共有シークレット）と `CF-Connecting-IP`（利用者の IP）を付ける。API は `/internal/*` と `/api/health` 以外で共有シークレットを確かめ、無い・違うリクエストを 403 `FORBIDDEN` で拒否する（IP の偽装を防ぐ）。`/api/docs`（staging）と `/api/health/db` も対象で、Worker 経由でだけ届く。
 4. **定期実行**: Cloud Scheduler が1時間ごとに Cloud Run の `/internal/cron/due-notifications` を OIDC トークン付きで直接呼ぶ。API はトークンの発行者・audience・サービスアカウントを確かめる。
 5. **メール**: API が Resend の HTTP API で送る（送信元 `no-reply@{DOMAIN}`）。
 6. **計算**: 損益分岐・シナリオ・確認項目・F/A/U の内訳・工程は `packages/domain` の純粋関数で計算する。クライアントは入力のたびにその場で計算して表示し、API は一覧・ダッシュボード・決定ログのスナップショット・版の保存・PDF で同じ関数を使う。DB には保存しない（6章「保存しないもの」）。
@@ -133,7 +133,7 @@ moonx/
 
 | 変数 | 使う場所 | 内容 | local の値 | staging / production の置き場所 |
 |---|---|---|---|---|
-| `APP_ENV` | api | `local` / `staging` / `production` | `local` | Cloud Run の環境変数 |
+| `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `PROXY_SHARED_SECRET`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS` も必須 | `local` | Cloud Run の環境変数 |
 | `APP_VERSION` | api | `/api/health` の `version`（コミット SHA） | 未設定なら `dev` | API の Dockerfile が `build-api-image` の build-arg から環境変数に入れる |
 | `PORT` | api | 待ち受けるポート | `3000` | Cloud Run が `8080` を渡す |
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
@@ -143,11 +143,11 @@ moonx/
 | `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://staging.{DOMAIN}` / `https://{DOMAIN}` |
 | `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り） | `http://localhost:5173,moonx://,exp://` | `https://{DOMAIN},moonx://`（staging は `https://staging.{DOMAIN},moonx-staging://`） |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | api | Google ログイン（OAuth クライアント。環境ごとに作る） | 開発用のクライアント | ID は環境変数、SECRET は Secret Manager `moonx-{env}-google-client-secret` |
-| `MAIL_TRANSPORT` | api | `console` / `resend` | `console` | `resend` |
+| `MAIL_TRANSPORT` | api | `console` / `resend`（それ以外の値では起動しない。staging・production は `resend` でなければ起動しない。`console` は招待のリンクを含むメールの全文をログに出すので、local とテストだけで使う） | `console` | `resend` |
 | `RESEND_API_KEY` | api | Resend の API キー | 不要 | Secret Manager `moonx-{env}-resend-api-key` |
 | `MAIL_FROM` | api | 送信元 | `moonx <no-reply@localhost>` | `moonx <no-reply@{DOMAIN}>` |
 | `MAIL_ALLOWLIST` | api | staging でだけ使う送信先の許可リスト（カンマ区切り。空なら制限なし） | 空 | staging だけ設定 |
-| `PROXY_SHARED_SECRET` | api, Worker | Worker が付ける共有シークレット。API 側はカンマ区切りで2つまで受け付ける（ローテーションの間だけ新旧の両方を入れる。05_operation-runbook.md） | 空（local では検査しない） | Secret Manager `moonx-{env}-proxy-shared-secret` と Worker のシークレット |
+| `PROXY_SHARED_SECRET` | api, Worker | Worker が付ける共有シークレット。API 側はカンマ区切りで2つまで受け付ける（ローテーションの間だけ新旧の両方を入れる。05_operation-runbook.md） | 空（local では検査しない。staging・production では空だと起動しない） | Secret Manager `moonx-{env}-proxy-shared-secret` と Worker のシークレット |
 | `API_ORIGIN` | Worker | 転送先の Cloud Run の URL | 不要（Vite の転送を使う） | `wrangler.jsonc` の環境ごとの `vars` |
 | `CRON_OIDC_AUDIENCE` | api | cron の OIDC トークンの audience。Cloud Run の決まった形の URL `https://moonx-api-{env}-{プロジェクト番号}.asia-southeast1.run.app`（Terraform がプロジェクト番号から組み立てる。サービス自身の出力を参照すると循環するため） | 空（local では `make cron-due` が直接呼ぶ） | Cloud Run の環境変数 |
 | `CRON_INVOKER_EMAIL` | api | cron を呼ぶサービスアカウントのメール | 空 | Cloud Run の環境変数 |
@@ -284,7 +284,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-005: API は ElysiaJS（Bun）（ユーザー指定）
 
-**決定:** `apps/api` は ElysiaJS を Bun で動かす。ルートはドメイン（ワークスペース・アイデア・検証・プランなど）ごとのプラグインに分け、認証と権限の確認はプラグインの `derive` / `beforeHandle` でまとめて行う。入出力のスキーマは Zod v4（Standard Schema として Elysia に渡す）。Better Auth はハンドラーを `/api/auth/*` にマウントする。
+**決定:** `apps/api` は ElysiaJS を Bun で動かす。ルートはドメイン（ワークスペース・アイデア・検証・プランなど）ごとのプラグインに分け、認証はプラグインの `derive` で行い、ワークスペースとロールの確認は各ハンドラーが `resolveScope` と `requireOwner` / `requireEditor` / `requireWritable` で行う（7.1 の表は表駆動の結合テストで確かめる）。入出力のスキーマは Zod v4（Standard Schema として Elysia に渡す）。Better Auth はハンドラーを `/api/auth/*` にマウントする。
 
 **理由:** ユーザーが ElysiaJS を指定し、「Elysia の仕組み」（Eden Treaty の型共有）を使いたいとした。Bun で速く起動するので、Cloud Run の0台からの立ち上がりが短い。
 
@@ -423,7 +423,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-020: 変更履歴はアプリのコードで、同じトランザクションの中で書く
 
-**決定:** 変更履歴の対象（design-spec 6.0.5）を更新する API は、本体の更新と `change_history` への書き込みを1つのトランザクションで行う。共通の関数 `withHistory(tx, { targetType, targetId, targetKey, source }, mutate)` を通す。DB のトリガーは使わない。
+**決定:** 変更履歴の対象（design-spec 6.0.5）を更新する API は、本体の更新と `change_history` への書き込みを1つのトランザクションで行う。共通の関数 `withHistory(tx, { container, workspaceId, sectionKey, target: { type, id, key }, actor: { userId, client, source, batchId } }, mutate)` を通す。`mutate` は `{ result, before, after }` を返し、更新で `before` と `after` が等しければ履歴を書かない（値を変えない保存は版も上げない）。DB のトリガーは使わない。
 
 **理由:** 変更の種類（手入力・AI 取り込み・元に戻す・テンプレートの移行・複製・下書き作成）と、誰が変えたかはアプリしか知らない。トリガーにすると、乗り換えのときに DB 側のロジックを持ち出す必要が出る。
 
@@ -568,15 +568,15 @@ API のルートは5章、Worker が配る静的なファイル（`/.well-known/
 | 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601（表示はクライアントが利用者のタイムゾーンで行う） |
 | 金額・率 | 金額は number（ワークスペースの通貨。自己分析は自己分析の通貨）。率は 0〜1 の小数（35% は `0.35`）。DB は numeric、API で number に変換する |
 | 部分更新 | 1つの項目は `PATCH`（送った項目だけ変える）、キーで決まる項目（回答・数字）は `PUT .../{key}` で作るか更新する |
-| 同時編集 | 項目を更新するリクエストは、読んだときの `lockVersion` を送る。違えば 409 `CONFLICT` と相手の内容を返す。「自分の内容で上書きする」は同じ内容に `force: true` を付けて送る（ADR-019）。まだ行が無い項目（未回答の設問など）の `lockVersion` は `0` |
-| 一覧 | `?cursor=&limit=`（既定50、上限200）。応答は `{ items, nextCursor }`。件数の少ない一覧（競合・費用行など）はページに分けず `{ items }` |
+| 同時編集 | 項目を更新するリクエストは、読んだときの `lockVersion` を送る。違えば 409 `CONFLICT` と相手の内容を返す。「自分の内容で上書きする」は同じ内容に `force: true` を付けて送る（ADR-019）。まだ行が無い項目（未回答の設問など）の `lockVersion` は `0`。一覧に出る行（調査ログ・競合・費用行など）は作成時の `lockVersion` が 0、キーで決まる項目（回答・数字）は最初の保存で 1 になる。何も変えないリクエストは `lockVersion` を上げず、履歴も書かない。キーで決まる項目を同時に作られて負けたときは、`force: true` でも 409 `CONFLICT`（`current` を読んでからやり直す）。V4・V5 は根拠の付け外しのたびに、対象の項目の `lockVersion` を上げる |
+| 一覧 | `?cursor=&limit=`（既定50、上限200）。応答は `{ items, nextCursor }`。`cursor` は並べ替えた結果へのオフセット（上限 1,000,000）で、読めない値は 422 `VALIDATION_FAILED`（`details[0].path` は `cursor`）。件数の少ない一覧（競合・費用行など）はページに分けず `{ items }` |
 | 権限 | 下の表の記号。O = Owner、M = Member、V = Viewer（いずれもその資源が属するワークスペースのロール）、本人 = 自己分析の持ち主、Admin = 運営者、公開 = ログイン不要。足りなければ 403 `FORBIDDEN`、ワークスペースに所属していなければ 403 `NO_ACCESS`、無ければ 404 `NOT_FOUND`。権限の対応の全体は 7.1 |
 | アーカイブ | アーカイブしたアイデア・プランの中身を変えるリクエスト（コメントを書く・元に戻すを含む）は 409 `ARCHIVED`（design-spec 6.8） |
 | エラー | 8章の形式（`{ "error": { "code", "message", "requestId", ... } }`） |
 | 計算 | 損益分岐・シナリオ・確認項目・F/A/U の内訳・工程は `packages/domain` の関数で計算して返す（保存しない）。クライアントは入力中は同じ関数で自分で計算し、保存の応答では計算結果を返さない（画面を開いたときと、保存の後に必要な画面だけ取り直す） |
 | 変更履歴 | 変更履歴の対象（design-spec 6.0.5）を変える API は、すべて `change_history` に書く（ADR-020）。下の「履歴」列に書いた `source` を付ける |
 | キャッシュ | 応答はすべて `Cache-Control: no-store`（ADR-011） |
-| クライアントの種類 | Web とスマホは `X-Moonx-Client: web|ios|android` と `X-Moonx-App-Version`（スマホのアプリの版）を付ける。API は変更履歴の `client` に記録し（PRD の「スマホからの入力の割合」の集計に使う）、ログにも出す。古すぎるスマホの版は 426 `APP_UPDATE_REQUIRED` で更新を促す（最低の版は環境変数ではなくコードの定数で持つ） |
+| クライアントの種類 | Web とスマホは `X-Moonx-Client: web|ios|android` と `X-Moonx-App-Version`（スマホのアプリの版）を付ける。API は変更履歴の `client` に記録し（PRD の「スマホからの入力の割合」の集計に使う）、ログにも出す。古すぎるスマホの版は 426 `APP_UPDATE_REQUIRED` で更新を促す（最低の版は環境変数ではなくコードの定数で持つ）。`X-Moonx-Client` が `ios` / `android` で `X-Moonx-App-Version` が無い・読めないときも 426。それ以外の `X-Moonx-Client`（`web`、無い、不正な値）は 426 にならず、`web` 以外は `unknown` として記録する |
 
 **対象の指し方（TargetRef）**: コメント・変更履歴・根拠は、同じ形で項目を指す。
 
@@ -932,14 +932,14 @@ interface Invitation {
 | W1 GET | — | `200 Workspace` | |
 | W1 PATCH | `{ name?: string (1〜60); currency?: string (ISO 4217) }` | `200 Workspace` | 通貨を変えても金額は換算しない |
 | W2 GET | — | `200 { items: Member[] }` | |
-| W3 PATCH | `{ role: Role }` | `200 Member` | `409 LAST_OWNER`（最後の Owner を降格できない）。Viewer に降格したら design-spec 6.16 の表のとおり処理する（自己分析の共有を解除、担当を名前に置き換え） |
-| W3 DELETE | — | `204` | `409 LAST_OWNER`、`409 CANNOT_LEAVE_PERSONAL`。外れたときの処理は design-spec 6.16 の表 |
-| W4 GET | `?status=pending|all` | `200 { items: Invitation[] }` | |
-| W4 POST | `{ email: string; role: Role }` | `201 { invitation: Invitation; link: string }` | 招待のメールを送る。`409 ALREADY_MEMBER`、`409 INVITATION_PENDING`（同じメールの有効な招待がある。W5 で再送する） |
-| W5 | — | `200 { invitation: Invitation; link: string }` | トークンを作り直してメールを再送する（前のリンクは無効）。期限を7日に延ばす |
-| W6 | — | `200 { link: string }` | トークンを作り直す（メールは送らない） |
+| W3 PATCH | `{ role: Role }` | `200 Member` | `409 LAST_OWNER`（最後の Owner を降格できない）。Viewer に降格したら design-spec 6.16 の表のとおり処理する（自己分析の共有を解除、担当を名前に置き換え。担当の置き換えは実行管理の項目の変更履歴 `manual` に残す）。`userId` は UUID だけを受け付ける。対象がメンバーでなければ `404 NOT_FOUND`、ロールが同じなら何も変えず 200 |
+| W3 DELETE | — | `204` | `409 LAST_OWNER`、`409 CANNOT_LEAVE_PERSONAL`。外れたときの処理は design-spec 6.16 の表（担当の置き換えは W3 PATCH と同じ。`last_workspace_id` が外れたワークスペースなら個人用ワークスペースに戻す） |
+| W4 GET | `?status=pending|all` | `200 { items: Invitation[] }` | `status` の既定は `pending`: 受諾できるものだけ（期限切れは含まない）。`all` は受諾・取り消し・期限切れも返す。期限を過ぎた `pending` は `status: "expired"` として返す |
+| W4 POST | `{ email: string; role: Role }` | `201 { invitation: Invitation; link: string }` | 招待のメールを送る。`409 ALREADY_MEMBER`、`409 INVITATION_PENDING`（同じメールの有効な招待がある。`error.invitationId` に付ける id の招待を W5 で再送する）。メールの送信は招待を作るトランザクションの中で行い、Resend に届かなければ招待も作らず `503 UPSTREAM_UNAVAILABLE` を返す（利用者は再試行する）。同じワークスペースへの招待はワークスペースの行を `FOR UPDATE` で押さえて直列にする。W5 と合わせて1時間20回まで（7.2。超えたら `429 RATE_LIMITED`） |
+| W5 | — | `200 { invitation: Invitation; link: string }` | トークンを作り直してメールを再送する（前のリンクは無効）。期限を7日に延ばし、期限切れの招待は `pending` に戻す。受諾済みは `409 INVITATION_ALREADY_ACCEPTED`、取り消し済みは `410 INVITATION_INVALID`（W6・W7 も同じ）。招待のワークスペースに所属しない人は `403 NO_ACCESS`、所属していても Owner でなければ `403 FORBIDDEN`（Admin は除く） |
+| W6 | — | `200 { link: string }` | トークンを作り直し、期限を7日に延ばす（メールは送らず、回数の上限にも数えない） |
 | W7 | — | `204` | `revoked` にする |
-| W8 | `?targetType=&targetId=` | `200 { items: UserRef[] }` | 自己分析への対象なら、その自己分析を読める Owner / Member だけ（design-spec 6.0.4） |
+| W8 | `?targetType=&targetId=` | `200 { items: UserRef[] }` | 自己分析への対象なら、その自己分析を読める Owner / Member だけ（design-spec 6.0.4）。その自己分析がこのワークスペースに共有されていなければ `403 NOT_SHARED`、設問が無ければ `404 NOT_FOUND` |
 
 招待のリンクは `https://{DOMAIN}/invite/{token}`。トークンは32バイトの乱数で、DB には SHA-256 のハッシュだけを持つ。
 
@@ -965,23 +965,23 @@ interface DueItem {
 }
 interface Activity {
   kind: "change" | "comment" | "decision" | "go_no_go" | "version_saved";
-  actor: UserRef; at: DateTime; summary: string /* 例: "Paolo commented on WHO" の材料 */;
+  actor: UserRef; at: DateTime; summary: string /* 動きの対象のラベル。change・comment は項目のラベル（"01 WHO"・"Costs · Rent"）かアイデア名、decision・go_no_go は記録した値、version_saved は版の名前。文はクライアントが kind・actor・summary から組み立てる */;
   idea: { id: UUID; name: string } | null; plan: { id: UUID; name: string } | null; link: LinkTarget;
 }
 ```
 
 | API | 本体・クエリ | 応答 | 補足 |
 |---|---|---|---|
-| D1 | — | `200 { items: IdeaSummary[]; droppedCount: number }` | アーカイブ・Drop を除く。更新順 |
+| D1 | — | `200 { items: IdeaSummary[]; droppedCount: number }` | アーカイブ・Drop を除く。更新順。`droppedCount` はアーカイブしていない Drop の件数 |
 | D2 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | Owner / Member の一覧。共有していない人の `status` は null（進み具合を見せない） |
-| D3 | — | `200 { items: DueItem[] }` | 期限切れか7日以内、Done / Resolved でない、アーカイブを除く。自分の担当を先、次に期限順 |
-| D4 | — | `200 { items: Activity[] }` | 直近20件。自己分析に関わる動きは除く |
-| I1 GET | `?stage=&decision=not_dropped|all|undecided|proceed|hold|drop&proposerId=&includeArchived=true&sort=updated|created|name&q=&cursor=&limit=` | `200 Page<IdeaSummary> & { hiddenDroppedCount: number }` | `decision` の既定は `not_dropped` |
-| I1 POST | `{ name: string (1〜100); oneLineConcept: string (1〜200); proposedSolution?: string }` | `201 IdeaDetail` | 最新の検証のテンプレートの版で検証を作り、費用の初期行を Empty で作る（履歴なし: 作成の記録だけ） |
+| D3 | — | `200 { items: DueItem[] }` | 期限切れか7日以内、Done / Resolved でない、アーカイブを除く。自分の担当を先、次に期限順。「今日」は利用者の `users.timezone` の日付で、`overdue` と7日の範囲もそれで決める |
+| D4 | — | `200 { items: Activity[] }` | 直近20件。自己分析に関わる動きは除く。変更・コメント・決定ログを合わせて新しい順に並べ、`batch_id` のある変更は1回の操作を1件にまとめる（複製は新しいアイデアの行で示す）。削除した行へのコメントは除く |
+| I1 GET | `?stage=&decision=not_dropped|all|undecided|proceed|hold|drop&proposerId=&includeArchived=true&sort=updated|created|name&q=&cursor=&limit=` | `200 Page<IdeaSummary> & { hiddenDroppedCount: number }` | `decision` の既定は `not_dropped`。`q` は名前と一行コンセプトの部分一致（大文字小文字を区別しない）。`hiddenDroppedCount` は `decision=not_dropped` のときだけ数え、他は 0 |
+| I1 POST | `{ name: string (1〜100); oneLineConcept: string (1〜200); proposedSolution?: string }` | `201 IdeaDetail` | 最新の検証のテンプレートの版で検証を作り、費用の初期行を Empty で作る（履歴なし: 作成の記録だけ）。`proposedSolution` は20,000字まで、空白だけなら null |
 | I2 GET | — | `200 IdeaDetail` | |
 | I2 PATCH | `{ name?; oneLineConcept?; proposedSolution?; lockVersion: number; force?: boolean }` | `200 IdeaDetail` | 履歴 `manual`（対象 `idea`） |
-| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail` | design-spec 6.8 の複製。履歴 `duplicate`（1つの `batchId`） |
-| I4 | — | `200 IdeaDetail` | |
+| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail` | design-spec 6.8 の複製。履歴 `duplicate`: 新しいアイデアの作成と、コピーした記録対象の項目（回答・数字・調査ログ・競合・前提・リスク・費用行）それぞれの作成を、同じ `batchId` で1行ずつ残す（H3 でまとめて戻せるようにするため）。既定の名前は100字に収める |
+| I4 | — | `200 IdeaDetail` | すでにその状態なら何もせず 200。履歴は書かず、`updatedAt` と `updatedBy` も変えない（`lastActivityAt` だけ更新する） |
 
 ### 5.7 検証
 
@@ -1004,7 +1004,7 @@ interface ValidationHome {
   }[];
   decisions: DecisionLogSummary[];           // 新しい順に最大5件
   plans: PlanSummary[];                      // アーカイブした案を除く
-  canAddPlan: boolean;                       // 最新の判定が Proceed
+  canAddPlan: boolean;                       // 最新の判定が Proceed で、アーカイブしていない
 }
 interface ValidationAnswer extends Versioned {
   questionKey: string; text: string | null;
@@ -1056,32 +1056,32 @@ interface EconomicsInput extends Versioned {
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| V1 | — | `200 ValidationHome` | 確認項目・Next steps・F/A/U・主要指標は `packages/domain` で計算する |
-| V2 | — | `200 { section: TemplateSection; answers: ValidationAnswer[] }` | `sectionKey` は `01` / `02` / `10`（`04` のパターンと `08` は V8・V15 が返す）。設問ごとに必ず1件返す（未回答は `text: null`, `lockVersion: 0`） |
-| V3 | `{ text?: string | null; classification?: ClassificationInput; lockVersion: number; force?: boolean }` | `200 ValidationAnswer` | `422 FACT_REQUIRES_EVIDENCE`（有効な根拠が無いのに `fact`。Fact は V4 の `setFact` で付ける）、`422 CONFIDENCE_REQUIRED`、`422 INVALID_CHOICE`（選択の設問）、`422 QUESTION_NOT_FOUND`。`text` を null にすると F/A/U も外す（`unknown` を除く）。履歴 `manual` |
-| V4 | `{ target: TargetRef; researchLogEntryId?: UUID; newResearchLog?: ResearchLogInput; url?: string; note?: string; setFact?: boolean; lockVersion: number }` | `201 { evidence: Evidence; classification: Classification; lockVersion: number }` | `researchLogEntryId` / `newResearchLog` / `url` のどれか1つ。`setFact: true` なら対象を Fact にする（M2 で根拠を付けて閉じたとき）。対象は `validation_answer` / `economics_input` / `cost_item` / `competitor` / `assumption`。履歴 `manual` |
-| V5 | `?lockVersion=` | `200 { classification: Classification; lockVersion: number }` | Fact の最後の根拠を外すと未分類に戻す（クライアントは事前に確認を出す）。履歴 `manual` |
-| V6 GET | `?supports=&sourceType=&q=&cursor=&limit=` | `200 Page<ResearchLogEntry>` | 日付の新しい順 |
+| V1 | — | `200 ValidationHome` | 確認項目・Next steps・F/A/U・主要指標は `packages/domain` で計算する。`sections[].title` は番号を含む固定のラベル（カタログ `validation:sections.<key>`。テンプレートの節の題とは独立） |
+| V2 | — | `200 { section: TemplateSection; answers: ValidationAnswer[] }` | `sectionKey` は `01` / `02` / `10`（`04` のパターンと `08` は V8・V15 が返す。それ以外の値は `404 NOT_FOUND`）。設問ごとに必ず1件返す（未回答は `text: null`, `lockVersion: 0`。出し分けで隠れる設問も `hidden: true` で返す） |
+| V3 | `{ text?: string | null; classification?: ClassificationInput; lockVersion: number; force?: boolean }` | `200 ValidationAnswer` | `422 FACT_REQUIRES_EVIDENCE`（有効な根拠が無いのに `fact`。Fact は V4 の `setFact` で付ける）、`422 CONFIDENCE_REQUIRED`、`422 INVALID_CHOICE`（選択の設問）、`422 QUESTION_NOT_FOUND`（テンプレートの版に無い設問 ID。`V.04.SURVIVOR_PATTERNS`・`V.04.FAILURE_PATTERNS`・`V.08.WORTH` も V3 で答える）。`text` は `short_text` の設問で200字、それ以外は20,000字まで（超えたら `422 VALIDATION_FAILED`）。`text` を null か空白にすると F/A/U も外す（`unknown` を除く）。答えの行を作るときの `lockVersion` は 0 で、作られた行は 1 から始まる。履歴 `manual` |
+| V4 | `{ target: TargetRef; researchLogEntryId?: UUID; newResearchLog?: ResearchLogInput; url?: string; note?: string; setFact?: boolean; lockVersion: number }` | `201 { evidence: Evidence; classification: Classification; lockVersion: number }` | `researchLogEntryId` / `newResearchLog` / `url` のどれか1つ。`setFact: true` なら対象を Fact にする（M2 で根拠を付けて閉じたとき）。対象は `validation_answer` / `economics_input` / `cost_item` / `competitor` / `assumption`（`lockVersion` は対象の項目の版）。同じ調査ログを同じ対象に2回付けると `422 VALIDATION_FAILED`。値の無い対象や F/A/U を持たない対象（競合・前提）への `setFact` も `422 VALIDATION_FAILED`（`details[0].path` は `setFact`）。`url` と `note` は2,000字まで。履歴は対象の項目に1行（`newResearchLog` のときは調査ログの作成も1行）。`manual` |
+| V5 | `?lockVersion=` | `200 { classification: Classification; lockVersion: number }` | Fact の最後の根拠を外すと未分類に戻す（クライアントは事前に確認を出す）。`?force=true` で版の食い違いを上書きする。履歴は対象の項目に1行（`manual`） |
+| V6 GET | `?supports=&sourceType=&q=&cursor=&limit=` | `200 Page<ResearchLogEntry>` | `observedOn` の新しい順（日付なしは末尾）、同じなら作成の新しい順。`q` は topic と observation の部分一致 |
 | V6 POST | `ResearchLogInput` | `201 ResearchLogEntry` | 履歴 `manual` |
 | V7 GET | — | `200 ResearchLogEntry & { usages: EvidenceUsage[] }` | |
 | V7 PATCH | `Partial<ResearchLogInput> & { lockVersion; force? }` | `200 ResearchLogEntry` | 履歴 `manual` |
-| V7 DELETE | — | `200 { affected: EvidenceUsage[] }` | 論理削除。根拠の紐づけは残し、数えなくなる。その根拠しかなかった Fact は「Fact（根拠なし）」になる（design-spec 6.0.3）。クライアントは事前に V7 GET の `usages` で確認を出す。履歴 `manual`（`delete`） |
+| V7 DELETE | — | `200 { affected: EvidenceUsage[] }` | 論理削除。`affected` はその調査ログを根拠にしているすべての項目（`isOnlyEvidenceOfFact` でそれが唯一の根拠かを示す）。根拠の紐づけは残し、数えなくなる。その根拠しかなかった Fact は「Fact（根拠なし）」になる（design-spec 6.0.3）。クライアントは事前に V7 GET の `usages` で確認を出す。履歴 `manual`（`delete`） |
 | V8 GET | — | `200 { items: Competitor[]; patterns: ValidationAnswer[]; guidance: { min: number; max: number } }` | `patterns` は `V.04.SURVIVOR_PATTERNS` と `V.04.FAILURE_PATTERNS`（更新は V3） |
 | V8 POST | `{ name: string; type?; targetCustomer?; offering?; typicalPrice?: number (≥0); priceNote?; strength?; weakness?; whyChosen?; whySurvive? }` | `201 Competitor` | 履歴 `manual` |
 | V9 PATCH | 上の項目の一部 ＋ `{ lockVersion; force? }` | `200 Competitor` | 履歴 `manual` |
 | V9 DELETE | — | `204` | 論理削除（行へのコメントも隠れる）。履歴 `manual`（`delete`） |
-| V10 GET | — | `200 { items: Assumption[] }` / `200 { items: Risk[] }` | Risks は並び順を適用済み |
-| V10 POST | 前提: `{ statement; whyBelieve?; evidenceNote?; confidence?; disproveCondition?; nextCheck? }`。リスク: `{ statement; probability?; impact?; whyMatters?; mitigation?; howToValidate? }` | `201 Assumption` / `201 Risk` | 履歴 `manual` |
+| V10 GET | — | `200 { items: Assumption[] }` / `200 { items: Risk[] }` | Risks は並び順を適用済み: 手の並び（`sort_order`）のある行が先で、無い行は Impact → Probability の高い順（同順位は作成順）。手の並びのある一覧に足したリスクは末尾に付く |
+| V10 POST | 前提: `{ statement; whyBelieve?; evidenceNote?; confidence?; disproveCondition?; nextCheck? }`。リスク: `{ statement; probability?; impact?; whyMatters?; mitigation?; howToValidate? }` | `201 Assumption` / `201 Risk` | 新しい行は末尾に付く（リスクは手の並びのときだけ末尾に付き、そうでなければ `sortOrder` は null）。空白だけの文章の項目は null で保存する。履歴 `manual` |
 | V11 | PATCH: 上の項目の一部 ＋ `{ lockVersion; force? }`。DELETE: なし | `200` / `204` | 履歴 `manual` |
 | V12 | — | `200 { items: CostItem[]; result: EconomicsResult; economicsInputs: EconomicsInput[] }` | `result` は Totals と 18 の損益分岐の表示用。`economicsInputs` はクライアントがその場で計算し直すために返す |
 | V13 | `{ category: CostCategory; name: string }` | `201 CostItem` | 表の末尾に Empty の行を作る。履歴 `manual` |
-| V14 PATCH | `{ name?; inputMode?; amount?: number | null (≥0); percent?: number | null (0〜1); isLumpSum?; whyNeeded?; canReduce?; notes?; classification?; lockVersion; force? }` | `200 CostItem` | `422 PERCENT_ONLY_FOR_VARIABLE`、`422 OUT_OF_RANGE`、F/A/U の決まりは V3 と同じ。`unknown` にすると金額と % を null にする。履歴 `manual` |
+| V14 PATCH | `{ name?; inputMode?; amount?: number | null (≥0); percent?: number | null (0〜1); isLumpSum?; whyNeeded?; canReduce?; notes?; classification?; lockVersion; force? }` | `200 CostItem` | `422 PERCENT_ONLY_FOR_VARIABLE`、`422 OUT_OF_RANGE`、F/A/U の決まりは V3 と同じ。`unknown` にすると金額と % を null にする（Unknown の数字に値を入れると未分類になる）。使わない入力方式の値を送ると `422 VALIDATION_FAILED`、`inputMode` を切り替えると使わなくなった側の値を null にする。履歴 `manual` |
 | V14 DELETE | — | `204` | 論理削除。履歴 `manual`（`delete`） |
 | V15 | — | `200 { inputs: EconomicsInput[]; worth: ValidationAnswer; result: EconomicsResult; costItems: CostItem[] }` | `inputs` は7つすべて（未入力は `value: null`）。`worth` は `V.08.WORTH`（更新は V3） |
-| V16 | `{ value: number | null; classification?: ClassificationInput; lockVersion; force? }` | `200 EconomicsInput` | 範囲は design-spec 6.4（価格 > 0、営業日数は整数 1〜31、目標利益率 0〜0.99、販売数 ≥ 0）。外れたら `422 OUT_OF_RANGE`。履歴 `manual` |
-| V17 | `{ ids: UUID[]; category?: CostCategory }`（費用行は表ごと） | `204` | `sort_order` を振り直す（リスクは手の並びに切り替わる）。履歴は残さない（並べ替えは対象外） |
+| V16 | `{ value: number | null; classification?: ClassificationInput; lockVersion; force? }` | `200 EconomicsInput` | 範囲は design-spec 6.4（価格 > 0、営業日数は整数 1〜31、目標利益率 0〜0.99、販売数 ≥ 0）。外れたら `422 OUT_OF_RANGE`。値も F/A/U も変わらないリクエストは行を作らず、履歴も書かない。履歴 `manual` |
+| V17 | `{ ids: UUID[]; category?: CostCategory }`（費用行は表ごと） | `204` | `ids` はその一覧の（論理削除を除く）全件と一致すること（違えば `422 VALIDATION_FAILED`）。`sort_order` を振り直す（リスクは手の並びに切り替わる）。履歴は残さず、`lockVersion` と `updated_at` も変えない（並べ替えは対象外で、開いている編集と衝突させない） |
 | V18 | — | `200 DecisionContext` | |
-| V19 | `{ value: DecisionValue; reason: string (1〜5000); basedOnDecisionId: UUID | null; confirmNewer?: boolean }` | `201 { entry: DecisionLogEntry; latestDecision: DecisionValue; canCreatePlan: boolean }` | 画面を開いた後に別の判定が記録されていて `confirmNewer` が無ければ `409 DECISION_CHANGED`（`error.latest: DecisionLogSummary`）。決定ログに記録し、`ideas.latest_decision` を変え、ワークスペースの他のメンバーに通知（`decision`）を作る |
+| V19 | `{ value: DecisionValue; reason: string (1〜5000); basedOnDecisionId: UUID | null; confirmNewer?: boolean }` | `201 { entry: DecisionLogEntry; latestDecision: DecisionValue; canCreatePlan: boolean }` | 画面を開いた後に別の判定が記録されていて `confirmNewer` が無ければ `409 DECISION_CHANGED`（`error.latest: DecisionLogSummary`）。決定ログに記録し、`ideas.latest_decision` を変え、ワークスペースの他のメンバー（停止・削除したユーザーを除く Owner / Member / Viewer）に通知（`decision`）を作る。通知の開き先は 13（`{ screen: 13, workspaceId, ideaId }`。Go / No-Go は 20）。`recordedAt` は idea の行を押さえた後に決め、先に確定した記録より後になるようにする |
 
 ```ts
 interface DecisionContext {
@@ -1353,7 +1353,7 @@ interface AdminWorkspace { id: UUID; name: string; isPersonal: boolean; owners: 
 | API | 本体 | 応答 | 補足 |
 |---|---|---|---|
 | Z1 `GET /api/health` | — | `200 { status: "ok"; version: string /* コミット SHA */; env: string }` | **DB に触れない**（監視のたびに Neon を起こさないため。ADR-008） |
-| Z2 `GET /api/health/db` | — | `200 { status: "ok"; latencyMs: number }` / `503` | デプロイ後の確認に使う |
+| Z2 `GET /api/health/db` | — | `200 { status: "ok"; latencyMs: number }` / `503` | デプロイ後の確認に使う。`503` は 8.1 の形式で `UPSTREAM_UNAVAILABLE` |
 | Z3 `POST /internal/cron/due-notifications` | — | `200 { checkedItems: number; created: number }` | `Authorization: Bearer <OIDC トークン>` の発行者（`https://accounts.google.com`）・audience（`CRON_OIDC_AUDIENCE`）・メール（`CRON_INVOKER_EMAIL`）を確かめる。対象は ADR-014。停止されたユーザー・アーカイブしたアイデアとプランの項目・担当が名前だけの項目は除く |
 
 ## 6. データモデル
@@ -1431,7 +1431,7 @@ const versioned = () => ({
   lockVersion: integer().notNull().default(0),
   updatedById: uuid().references((): AnyPgColumn => users.id, { onDelete: "set null" }),
 });
-const money = () => numeric({ precision: 14, scale: 2, mode: "number" });    // 金額
+const money = () => numeric({ precision: 15, scale: 2, mode: "number" });    // 金額
 const ratio = () => numeric({ precision: 7, scale: 4, mode: "number" });     // 0.3500 = 35%
 
 // ---------- enum ----------
@@ -1820,7 +1820,7 @@ export const economicsInputs = pgTable("economics_inputs", {
   id: pk(),
   validationId: uuid().notNull().references(() => validations.id, { onDelete: "cascade" }),
   fieldKey: economicsField().notNull(),
-  value: numeric({ precision: 14, scale: 4, mode: "number" }),   // null = 未入力。target_margin は 0.15 = 15%
+  value: numeric({ precision: 17, scale: 4, mode: "number" }),   // null = 未入力。target_margin は 0.15 = 15%
   ...fauColumns(),
   ...versioned(),
   ...timestamps(),
@@ -1985,7 +1985,7 @@ export const changeHistory = pgTable("change_history", {
   ownerUserId: uuid().references(() => users.id, { onDelete: "cascade" }),          // 自己分析の履歴の持ち主
   containerType: historyContainer().notNull(),    // 画面全体の履歴を引くため
   containerId: uuid().notNull(),
-  sectionKey: text(),                             // 例: "01"、"costs"、"economics"、プランは項目番号
+  sectionKey: text(),                             // 検証: 回答は設問の節（"01"・"02"・"04"・"08"・"10"）、"research_log"・"competitors"・"assumptions_risks"・"costs"・"economics"。プラン: 項目番号。実行管理: "execution"
   targetType: text().notNull(),                   // 5.1 TargetRef の type
   targetId: uuid().notNull(),
   targetKey: text(),
@@ -2081,7 +2081,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 追加の決まり:
 
-- **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は、ロールにかかわらず 409 `ARCHIVED`（コメントを書く・元に戻すを含む。design-spec 6.8）。読む・複製・Restore・Pitch Deck はできる。
+- **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は 409 `ARCHIVED`（コメントを書く・元に戻すを含む。design-spec 6.8）。ロールが足りない人には先に 403 を返す（Viewer の編集は、アーカイブ中でも 403）。確認は書き込みの最後（更新日時の更新）でもう一度行い、確認と書き込みのあいだにアーカイブされても書き込みは残らない。読む・複製・Restore・Pitch Deck はできる。
 - **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。`is_admin` は API では変えられない（`make admin-create` とシードだけ）。
 - **停止・削除したユーザー**: セッションを消し、ログインを拒否する。残ったリクエストも、認証のミドルウェアが `users.status` を確かめて 401 にする。
 - **実装**: 認可は、リソースからワークスペースを引く共通の関数（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）を通して判定し、クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
@@ -2092,14 +2092,14 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 |---|---|
 | 入力バリデーション | API は必須（`packages/schemas` の Zod。範囲・長さ・形式・列挙）。クライアントは同じスキーマで入力中に補助として検査する。最後の守りは DB の check 制約（6.3）。文字列の長さの上限は、短文200字・長文20,000字・理由とコメント5,000字 |
 | シークレット | 置き場所の方針は ADR-027、CI の置き場所の一覧は2章「CI のシークレットと変数」が正。local は `.env`（コミットしない。`.env.example` だけコミットする）。staging / production の API のシークレットは Secret Manager から Cloud Run の環境変数として渡す。ローテーションの手順は 05_operation-runbook.md |
-| CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる。Cookie は SameSite=Lax。スマホは `Origin` を送らないが、Cookie を自動では送らない（SecureStore から付ける）ので対象外 |
+| CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる（合わなければ 403 `FORBIDDEN`）。Content-Type の決まりは本体のあるリクエストに適用し、本体の無い POST・DELETE は Content-Type が無くてよい。JSON の1MB は `Content-Length` と実際に読んだ長さの両方で確かめる。Cookie は SameSite=Lax。スマホは `Origin` を送らないが、Cookie を自動では送らない（SecureStore から付ける）ので対象外 |
 | CORS | 使わない（Web と API は同じオリジン。ADR-004）。CORS のヘッダーを返さないので、他のオリジンからのブラウザのリクエストは届かない。local は Vite の転送で同じオリジンにする |
 | レート制限 | 仕組みは ADR-029。認証（Better Auth）は IP ごとに1分10回（DB に記録）。アプリの API は、ユーザーごとに次の上限を同じ仕組みで持つ: 招待の送信・再送 1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回。超えたら 429 `RATE_LIMITED`。外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` に付ける |
 | 直接のアクセス | Cloud Run の URL を直接呼ばれないように、Worker の共有シークレットを確かめる（2章 通信フロー 3）。`CF-Connecting-IP` は、共有シークレットのあるリクエストのときだけ信じる |
 | セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。スマホは SecureStore。ログアウトしたら送信待ちの列（ADR-021）も消す |
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、5MB まで。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
 | セキュリティヘッダー | 静的アセットの `_headers` ファイル（`apps/web/public/_headers`。ADR-004）で付ける: `Content-Security-Policy`（`default-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy`。HSTS は Cloudflare で有効にする |
-| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者もアプリからは中身を見られない。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Cloudflare のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は `sendDefaultPii: false` で、リクエストの本文と Cookie を落とす）。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
+| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者もアプリからは中身を見られない。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Cloudflare のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は `dataCollection` で利用者の情報・Cookie・ヘッダー・本文・クエリ・DB の値・スタックの変数をすべて集めない設定にする（Sentry v11 では `sendDefaultPii` の代わり））。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
 | ストアの要件 | プライバシーポリシー（`/privacy`）とサポート（`/support`）の静的ページを Worker で配る（`apps/web/public/`。中身はストアへの提出までに用意する）。App Store のプライバシーの申告と Google Play のデータセーフティは、上の「個人情報」に合わせて書く。アプリ内のアカウント削除（U7）と、Google Play 向けの Web の削除の入口（`/account`）を用意する |
 | 依存の脆弱性 | GitHub の Dependabot のアラートを有効にする。Better Auth・Elysia・Drizzle のセキュリティ修正は速やかに取り込む（05_operation-runbook.md） |
 
@@ -2141,13 +2141,13 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 - `code`: 機械が読むコード（下の表）。クライアントはこのコードで画面の文言を決める（`message` を画面に出さない）。
 - `message`: 開発者向けの英語の説明（ログと同じ）。
 - `requestId`: 8.3。
-- エラーごとの追加の項目: `current`（`CONFLICT`）、`conflicts`（`CONFLICT_MULTI`）、`latest`（`DECISION_CHANGED`）、`invitedEmail`（`INVITATION_EMAIL_MISMATCH`）、`emptyCount`（`HAS_EMPTY_QUESTIONS`）、`workspaces`（アカウントの削除の `LAST_OWNER`）、`retryAfterSeconds`（`RATE_LIMITED`）。
+- エラーごとの追加の項目: `current`（`CONFLICT`）、`conflicts`（`CONFLICT_MULTI`）、`latest`（`DECISION_CHANGED`）、`invitedEmail`（`INVITATION_EMAIL_MISMATCH`）、`emptyCount`（`HAS_EMPTY_QUESTIONS`）、`workspaces`（アカウントの削除の `LAST_OWNER`）、`retryAfterSeconds`（`RATE_LIMITED`）、`invitationId`（`INVITATION_PENDING`）。`details` は `OUT_OF_RANGE` にも付く（`VALIDATION_FAILED` と同じ形）。
 
 | HTTP | コード | 使う場面 |
 |---|---|---|
 | 400 | `BAD_REQUEST` | JSON として読めない、`Content-Type` が違う |
 | 401 | `UNAUTHENTICATED` | 未ログイン、セッション切れ、停止・削除されたユーザー |
-| 403 | `FORBIDDEN` | ロールが足りない（例: Viewer の編集） |
+| 403 | `FORBIDDEN` | ロールが足りない（例: Viewer の編集）、共有シークレットが合わない、Origin が合わない |
 | 403 | `NO_ACCESS` | そのワークスペースに所属していない |
 | 403 | `INVITATION_EMAIL_MISMATCH`・`INVALID_PASSWORD`・`REAUTH_REQUIRED`・`NOT_SHARED` | 5章の各 API |
 | 404 | `NOT_FOUND` | 資源が無い |
@@ -2155,13 +2155,13 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 409 | `ARCHIVED` | アーカイブしたものを変えようとした |
 | 409 | `LAST_OWNER`・`CANNOT_LEAVE_PERSONAL`・`ALREADY_MEMBER`・`INVITATION_PENDING`・`INVITATION_ALREADY_ACCEPTED`・`EMAIL_TAKEN`・`DECISION_CHANGED`・`DECISION_NOT_PROCEED`・`NAME_TAKEN`・`HAS_EMPTY_QUESTIONS`・`ALREADY_LATEST`・`DRAFT_EXISTS`・`PUBLISHED_READ_ONLY` | 状態がその操作を許さない（5章） |
 | 410 | `INVITATION_INVALID` | 招待のトークンが無い・取り消し・期限切れ |
-| 413 | `PAYLOAD_TOO_LARGE` | 本体が大きすぎる（JSON は1MB、写真は5MB） |
-| 422 | `VALIDATION_FAILED` | 入力の検査に失敗（`details` に項目ごとの理由） |
+| 413 | `PAYLOAD_TOO_LARGE` | 本体が大きすぎる（JSON は1MB、写真は5MB。`Content-Length` が無い分割転送でも読んだ量で数える） |
+| 422 | `VALIDATION_FAILED` | 入力の検査に失敗（`details` に項目ごとの `path`・Zod の `code`・`message`。入力の値そのものは返さない） |
 | 422 | `FACT_REQUIRES_EVIDENCE`・`CONFIDENCE_REQUIRED`・`INVALID_CHOICE`・`QUESTION_NOT_FOUND`・`PERCENT_ONLY_FOR_VARIABLE`・`OUT_OF_RANGE`・`NOT_EDITABLE`・`INVALID_ASSIGNEE`・`INVALID_STATUS`・`MUST_BE_DONE_TO_SHARE`・`NOT_SHAREABLE`・`EMPTY_SCOPE`・`NOT_IMPORTABLE`・`REPLY_DEPTH`・`INVALID_MENTION`・`INVALID_QUESTION_KEY`・`TEMPLATE_INVALID`・`CANNOT_SUSPEND_SELF`・`CONFIRMATION_MISMATCH` | 業務の決まりに合わない（5章） |
 | 426 | `APP_UPDATE_REQUIRED` | スマホのアプリの版が古すぎる（5.1） |
 | 429 | `RATE_LIMITED` | 7.2 のレート制限 |
 | 500 | `INTERNAL` | 想定外のエラー（詳細は返さない） |
-| 502 / 503 / 504 | `UPSTREAM_UNAVAILABLE` | Worker が API に届かない・タイムアウト（Worker が同じ形で返す） |
+| 502 / 503 / 504 | `UPSTREAM_UNAVAILABLE` | Worker が API に届かない・タイムアウト（Worker が同じ形で返す）。API が必要な依存先に届かないとき（Z2 の DB、招待のメールの送信）は API が 503 を返す |
 
 コードの一覧は `packages/schemas/src/errors.ts` に型として置き、API とクライアントが共有する。Better Auth のフックで拒否するとき（`INVITATION_REQUIRED`・`ACCOUNT_SUSPENDED`）は、Better Auth のエラーの `code` に同じ名前を入れる。
 
@@ -2186,7 +2186,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 ### 8.3 ログとの対応
 
 - **リクエスト ID**: Worker が `X-Request-Id`（無ければ UUID を作る）を付けて API へ渡す。API は全ログ行・エラーの応答・Sentry のタグに同じ値を入れ、応答のヘッダーにも返す。スマホも Worker を通るので同じ。Cloud Scheduler からの呼び出しは API が作る。
-- **レベル**: 4xx は `info`（401・403 が多発したら `warn`）、5xx は `error`（スタックトレース付き）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。
+- **レベル**: 4xx は `info`（401・403 の多発は、ログの `status` を集計して見つける）、5xx は `error`。5xx は、アクセスログの行（`message: "request"`）とは別に、`message: "request failed"` の行を `requestId`・`errorCode`・`errorName`・`errorMessage`・`stack` 付きで書く。DB のエラーは `pgCode` と `constraint` だけを出し、SQL とパラメーターは出さない（利用者の入力が入るため）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。
 - **探し方**: 利用者の画面の `Ref` → Cloud Logging で `jsonPayload.requestId` を検索 → 同じ ID の Sentry のイベント。手順は 05_operation-runbook.md。
 
 ---
@@ -2198,7 +2198,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目 | 決定 |
 |---|---|
 | ライブラリ | i18next ＋ react-i18next（Web とスマホで同じ）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
-| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペース（`common`・`errors`・`validation`）で、キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
+| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペース（`common`・`errors`・`mail`・`validation`）で、キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
 | 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatPercent()`・`formatDate()`・`formatTime()`・`formatIsoDate()`）に集め、画面・PDF・AI 書き出しのすべてがこれを使う |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |

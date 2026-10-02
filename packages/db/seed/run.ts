@@ -14,7 +14,15 @@ import { addTemplates } from "./templates/load";
 
 export type { IdeaKey, IdeaRecord } from "./demo/ideas";
 export { ideaId } from "./demo/ideas";
-export { DEMO_INVITE_TOKENS, DEMO_PASSWORD, people } from "./demo/ids";
+export {
+  BCDX,
+  DEMO_INVITE_TOKENS,
+  DEMO_PASSWORD,
+  type PersonKey,
+  people,
+  personalWorkspaceId,
+  userId,
+} from "./demo/ids";
 export { planId } from "./demo/plans";
 export { seedTemplates } from "./templates";
 

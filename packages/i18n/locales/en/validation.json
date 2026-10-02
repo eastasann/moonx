@@ -32,6 +32,15 @@
     "09": "09 Assumptions & Risks",
     "10": "10 Final Assessment"
   },
+  "economicsFields": {
+    "selling_price": "Selling price",
+    "operating_days": "Operating days",
+    "target_margin": "Target margin",
+    "units_conservative": "Conservative units per day",
+    "units_expected": "Expected units per day",
+    "units_strong": "Strong units per day",
+    "units_capacity": "Capacity limit"
+  },
   "checks": {
     "state": {
       "not_started": "Not started",

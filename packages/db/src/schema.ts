@@ -32,7 +32,7 @@ const versioned = () => ({
   lockVersion: integer().notNull().default(0),
   updatedById: uuid().references((): AnyPgColumn => users.id, { onDelete: "set null" }),
 });
-const money = () => numeric({ precision: 14, scale: 2, mode: "number" }); // 金額
+const money = () => numeric({ precision: 15, scale: 2, mode: "number" }); // 金額
 const ratio = () => numeric({ precision: 7, scale: 4, mode: "number" }); // 0.3500 = 35%
 
 // ---------- enum ----------
@@ -676,7 +676,7 @@ export const economicsInputs = pgTable(
       .notNull()
       .references(() => validations.id, { onDelete: "cascade" }),
     fieldKey: economicsField().notNull(),
-    value: numeric({ precision: 14, scale: 4, mode: "number" }), // null = 未入力。target_margin は 0.15 = 15%
+    value: numeric({ precision: 17, scale: 4, mode: "number" }), // null = 未入力。target_margin は 0.15 = 15%
     ...fauColumns(),
     ...versioned(),
     ...timestamps(),

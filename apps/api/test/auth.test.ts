@@ -51,7 +51,11 @@ const ORIGIN = { origin: "http://localhost:5173" };
 /** Creates a pending invitation for `email` and returns its token (only the hash is stored). */
 async function invite(
   email: string,
-  options: { workspaceId?: string | null; role?: "owner" | "member" | "viewer" } = {},
+  options: {
+    workspaceId?: string | null;
+    role?: "owner" | "member" | "viewer";
+    grantsAdmin?: boolean;
+  } = {},
 ) {
   const token = `test-${crypto.randomUUID()}`;
   const workspaceId = options.workspaceId === undefined ? BCDX : options.workspaceId;
@@ -59,6 +63,7 @@ async function invite(
     workspaceId,
     email,
     role: workspaceId ? (options.role ?? "member") : null,
+    grantsAdmin: options.grantsAdmin ?? false,
     tokenHash: hashInvitationToken(token),
     invitedById: userId("ana"),
     expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
@@ -413,7 +418,7 @@ describe("operator invitations", () => {
   });
 
   test("an operator invitation for an existing account makes them an operator when they accept", async () => {
-    const token = await invite("kenji@bcdx.example", { workspaceId: null });
+    const token = await invite("kenji@bcdx.example", { workspaceId: null, grantsAdmin: true });
     const kenji = await login(app, "kenji");
     const res = await call(app, "POST", `/api/v1/invitations/by-token/${token}/accept`, {
       as: kenji,
@@ -438,6 +443,40 @@ describe("operator invitations", () => {
   test("a workspace invitation does not", async () => {
     const created = await signUp(DEMO_INVITE_TOKENS.pending);
     expect(created.body.me.isAdmin).toBe(false);
+  });
+
+  test("a workspace-less invitation without grants_admin does not, and sign-up still accepts it", async () => {
+    const token = await invite("plain.person@example.com", { workspaceId: null });
+    const created = await signUp(token);
+    expect(created.status).toBe(201);
+    expect(created.body.me.isAdmin).toBe(false);
+    const [row] = await t.db
+      .select()
+      .from(schema.invitations)
+      .where(eq(schema.invitations.tokenHash, hashInvitationToken(token)));
+    expect(row).toMatchObject({ status: "accepted", acceptedById: created.body.me.id });
+  });
+
+  test("accepting a workspace-less invitation without grants_admin leaves an existing account alone", async () => {
+    const token = await invite("kenji@bcdx.example", { workspaceId: null });
+    const kenji = await login(app, "kenji");
+    const res = await call(app, "POST", `/api/v1/invitations/by-token/${token}/accept`, {
+      as: kenji,
+    });
+    expect(res.body).toEqual({ workspaceId: null, alreadyMember: false });
+    expect((await call(app, "GET", "/api/v1/me", { as: kenji })).body.isAdmin).toBe(false);
+  });
+
+  test("admin-create upgrades a pending workspace-less invitation that AD9 issued", async () => {
+    const plain = await invite("upgrade@example.com", { workspaceId: null });
+    const { link } = await createOperatorInvitation(t.db, {
+      email: "upgrade@example.com",
+      publicUrl: "http://localhost:5173",
+      now: new Date(),
+    });
+    expect((await signUp(plain)).status).toBe(410);
+    const created = await signUp(link.split("/invite/")[1] as string);
+    expect(created.body.me.isAdmin).toBe(true);
   });
 });
 
@@ -560,6 +599,9 @@ describe("the invitation requirement holds for every way of creating an account"
   test("a pending invitation lets the account in, case aside, with its workspace", async () => {
     const user = await create("New.Member@BCDX.example");
     expect(user.email).toBe("new.member@bcdx.example");
+    expect(
+      (await t.db.select().from(schema.users).where(eq(schema.users.id, user.id)))[0]?.isAdmin,
+    ).toBe(false);
     const memberships = await t.db
       .select()
       .from(schema.memberships)
@@ -568,6 +610,23 @@ describe("the invitation requirement holds for every way of creating an account"
     expect(memberships[0]?.role).toBe("owner");
     const [row] = await t.db.select().from(schema.users).where(eq(schema.users.id, user.id));
     expect(row?.lastWorkspaceId).toBe(memberships[0]?.workspaceId);
+  });
+
+  const isAdmin = async (id: string) =>
+    (await t.db.select().from(schema.users).where(eq(schema.users.id, id)))[0]?.isAdmin;
+
+  test("a workspace-less invitation without grants_admin makes no operator", async () => {
+    await invite("g.plain@example.com", { workspaceId: null });
+    expect(await isAdmin((await create("g.plain@example.com")).id)).toBe(false);
+  });
+
+  test("an admin-create invitation makes an operator", async () => {
+    await createOperatorInvitation(t.db, {
+      email: "g.operator@example.com",
+      publicUrl: "http://localhost:5173",
+      now: new Date(),
+    });
+    expect(await isAdmin((await create("g.operator@example.com")).id)).toBe(true);
   });
 });
 

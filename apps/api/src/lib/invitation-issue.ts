@@ -22,8 +22,10 @@ export interface IssueInvitationInput {
   inviter: { id: string; displayName: string } | null;
   /** Kept as typed; compared in lower case. */
   email: string;
-  /** null = an operator invitation without a workspace (design-spec 6.16 screen 3). */
+  /** null = an invitation without a workspace (design-spec 6.16 screen 3). */
   target: { workspaceId: string; role: Role } | null;
+  /** Only `make admin-create` sets this; it needs `target: null`. */
+  grantsAdmin?: boolean;
   /** null when the caller hands the link over itself (`make admin-create`). */
   mailer: Mailer | null;
   /** Count the use against the inviter's hourly limit (SDD 7.2). */
@@ -43,7 +45,7 @@ export async function issueInvitation(
   const token = newInvitationToken();
   const link = invitationLink(input.publicUrl, token);
   const invitation = await db.transaction(async (tx) => {
-    // Serializes the invitations of one workspace (or of one address for operator invitations), so
+    // Serializes the invitations of one workspace (or of one address for invitations without a workspace), so
     // a double click cannot pass the checks below twice and create two pending invitations. An
     // advisory lock rather than a row lock: this transaction waits for Resend, and a lock on the
     // workspace row would hold up every content write of the workspace meanwhile.
@@ -91,6 +93,7 @@ export async function issueInvitation(
         workspaceId: target?.workspaceId ?? null,
         email: input.email,
         role: target?.role ?? null,
+        grantsAdmin: input.grantsAdmin ?? false,
         tokenHash: hashInvitationToken(token),
         invitedById: input.inviter?.id ?? null,
         expiresAt: invitationExpiry(now),
@@ -122,13 +125,15 @@ export async function issueInvitation(
 
 /**
  * Gives an invitation a new token and a fresh 7 days and makes it pending again; the previous
- * link stops working (design-spec 6.16). Used by W5, W6 and a repeated `admin-create`.
+ * link stops working (design-spec 6.16). Used by W5, W6 and a repeated `admin-create`, which
+ * passes `grantsAdmin` to upgrade a pending workspace-less invitation from AD9.
  */
 export async function reissueInvitation(
   tx: Executor,
   invitationId: string,
   publicUrl: string,
   now: Date,
+  options: { grantsAdmin?: true } = {},
 ) {
   const token = newInvitationToken();
   const [row] = await tx
@@ -137,6 +142,7 @@ export async function reissueInvitation(
       tokenHash: hashInvitationToken(token),
       status: "pending",
       expiresAt: invitationExpiry(now),
+      ...(options.grantsAdmin ? { grantsAdmin: true } : {}),
     })
     .where(eq(schema.invitations.id, invitationId))
     .returning();

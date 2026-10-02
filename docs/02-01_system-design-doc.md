@@ -198,7 +198,7 @@ moonx/
 | `openapi` | API の OpenAPI 仕様を `apps/api/openapi.json` に書き出す |
 | `doc-lint` | ドキュメントと実体の食い違いを検査する（`scripts/doc-lint.sh --docs`: ドキュメントが参照する make ターゲットの実在・`docs/README.md` のリンク切れ・`docs/features/` の命名）。コミットの前の検査（`--staged`）は `.githooks/pre-commit` が動かす |
 | `cron-due` | 期限の通知の処理を手で1回動かす（local だけ。staging では Cloud Scheduler のジョブを手で実行する。04・05） |
-| `admin-create EMAIL=...` | 最初の運営者を作るための招待（ワークスペースなし）を発行し、リンクを表示する。接続先は `DATABASE_URL`、リンクの基準は `BETTER_AUTH_URL`（staging / production では、この2つを上書きして手元から実行する。03_dev-setup.md） |
+| `admin-create EMAIL=...` | 最初の運営者を作るための招待（ワークスペースなし、`grants_admin = true`）を発行し、リンクを表示する。同じメールあての有効な招待があれば、新しいリンクで作り直す。接続先は `DATABASE_URL`、リンクの基準は `BETTER_AUTH_URL`（staging / production では、この2つを上書きして手元から実行する。03_dev-setup.md） |
 | `infra-plan ENV=...` / `infra-apply ENV=...` | Terraform の plan / apply（`ENV` は `shared` / `staging` / `production`） |
 | `deploy-api ENV=... SHA=...` | マイグレーションの後、Cloud Run に新しいリビジョンを出す（CI が使う） |
 | `deploy-web ENV=...` | `build-web` の結果を `wrangler deploy --env` で出す（CI が使う） |
@@ -329,7 +329,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 - メール＋パスワードの新規登録は Better Auth の公開エンドポイントを閉じ（`emailAndPassword.disableSignUp`）、moonx の `POST /api/v1/invitations/by-token/{token}/sign-up`（5章 U5）だけから作る。メールは招待のメールに固定する。
 - Google の新規登録は、招待の画面からだけ `requestSignUp` 付きで始める（`disableImplicitSignUp`）。さらにユーザーを作る直前のフック（`databaseHooks.user.create.before`）で、**そのメールあての有効な招待（pending・期限内）があること**を確かめ、無ければ拒否する。
 - ユーザーを作った直後のフックで、個人用ワークスペースを作る（design-spec 5章）。
-- 最初の運営者は `make admin-create EMAIL=...` でワークスペースなしの招待を発行し、登録したユーザーを運営者にする（`is_admin`。design-spec 9.2 の既定案）。ワークスペースなしの招待は AD9 でも発行でき、どちらから登録・受諾した人も運営者になる。
+- 運営者は `make admin-create EMAIL=...` が発行する招待（`invitations.grants_admin = true`。ワークスペースなし）から登録・受諾した人だけがなる（`is_admin`。design-spec 9.2 の既定案）。AD9 のワークスペースなしの招待は `grants_admin = false` で、登録した人は個人用ワークスペースだけを持つ一般の利用者になる。同じメールあての有効なワークスペースなしの招待が AD9 で出ている状態で `make admin-create` を再実行すると、その招待に `grants_admin = true` を付けて新しいリンクを出す（前のリンクは無効になる）。`grants_admin` を付ける API は無い。
 - 停止したユーザー（`status = suspended`）はセッションを消し、ログインのフックで拒否する。
 
 **理由:** ユーザーが Better Auth で最初から Google ログインを入れると指定した。ライブラリなので $0 で、ユーザー情報は自分の DB に残り、乗り換えの妨げにならない。招待制のような独自の決まりを、フックで確実に組み込める。
@@ -858,7 +858,7 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | メール＋パスワード | 有効。`disableSignUp: true`（新規登録は U5 だけ）。パスワードは8文字以上・128文字以下。パスワード再設定のリンクの期限は1時間（design-spec 6.16）。再設定すると他のセッションを消し、`hooks.after`（`/reset-password`）でそのユーザーの新しいセッションを作って Cookie を返す（ログインした状態で 5 へ。design-spec 6.16） |
 | Google | 有効。`disableImplicitSignUp: true`。新規登録は招待の画面（`/invite/$token`）からだけ `requestSignUp: true` で始め、`callbackURL` を `/welcome?step=invite&token=…`、`errorCallbackURL` を `/login?error=…` にする |
 | 新規登録の制限 | `databaseHooks.user.create.before`: そのメールあての有効な招待（`pending` かつ期限内。大文字小文字を区別しない）が無いか、メールが確認済みでなければ（Google が `email_verified` を返さない）`INVITATION_REQUIRED` で拒否する |
-| 登録の後 | `databaseHooks.user.create.after`: 個人用ワークスペース（名前「{表示名}'s workspace」、通貨 PHP、本人が Owner）を作り、`last_workspace_id` に入れる。そのメールあてのワークスペースなしの招待があれば、運営者にして、その招待を受諾済みにする（3 の ① を飛ばすため、U6 は呼ばれない） |
+| 登録の後 | `databaseHooks.user.create.after`: 個人用ワークスペース（名前「{表示名}'s workspace」、通貨 PHP、本人が Owner）を作り、`last_workspace_id` に入れる。そのメールあてのワークスペースなしの招待があれば、その招待を受諾済みにし（3 の ① を飛ばすため、U6 は呼ばれない）、`grants_admin` が true のときだけ運営者にする |
 | ログインの制限 | `databaseHooks.session.create.before`: `users.status` が `active` 以外（停止・削除）なら `ACCOUNT_SUSPENDED` で拒否する |
 | セッション | 有効期限30日、毎日更新。Cookie は `__Secure-` 接頭辞・HttpOnly・Secure・SameSite=Lax（local は Secure なし）。`change-password` はクライアントの指定にかかわらず他のセッションを消す（`revokeOtherSessions`）。Better Auth の `update-user`・`delete-user`・`change-email` は閉じて 404 を返す（プロフィールと削除は U2・U3・U7 だけから行う） |
 | 回数制限 | 有効。保存先は DB（`rate_limits`）。秘密を受け取る5つのパス（`sign-in/email`・`sign-in/social`・`request-password-reset`・`reset-password`・`sign-up/email`）は、パスごとに IP あたり1分10回。それ以外のパスは Better Auth の既定（IP あたり1分100回）。U5 も IP あたり1分10回を同じテーブルで数える |
@@ -897,7 +897,7 @@ interface Me {
 interface InvitationPreview {
   status: "pending" | "accepted";
   email: string;
-  workspace: { id: UUID; name: string } | null;   // 運営者のワークスペースなしの招待は null
+  workspace: { id: UUID; name: string } | null;   // ワークスペースなしの招待は null
   role: Role | null;
   invitedBy: { displayName: string } | null;       // `make admin-create` の招待は null
   expiresAt: DateTime;
@@ -905,9 +905,9 @@ interface InvitationPreview {
 }
 ```
 
-**U5 `POST /api/v1/invitations/by-token/{token}/sign-up`**（公開）本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie（スマホは Better Auth の Expo プラグインが受け取る）。メールは招待のメールに固定し、1つのトランザクションで `users`・`accounts`（credential）・個人用ワークスペースを作ってから Better Auth の `signInEmail` でセッションを作る。ワークスペースのある招待はまだ受諾しない（3 の ① で U6）。ワークスペースなしの招待は、登録の時点で運営者にして受諾済みにする（上の「登録の後」）。エラー: `410 INVITATION_INVALID`、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
+**U5 `POST /api/v1/invitations/by-token/{token}/sign-up`**（公開）本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie（スマホは Better Auth の Expo プラグインが受け取る）。メールは招待のメールに固定し、1つのトランザクションで `users`・`accounts`（credential）・個人用ワークスペースを作ってから Better Auth の `signInEmail` でセッションを作る。ワークスペースのある招待はまだ受諾しない（3 の ① で U6）。ワークスペースなしの招待は、登録の時点で受諾済みにする。`grants_admin` が true なら運営者にもする（上の「登録の後」）。エラー: `410 INVITATION_INVALID`、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
 
-**U6 `POST /api/v1/invitations/by-token/{token}/accept`** 本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。エラー: `410 INVITATION_INVALID`、`409 INVITATION_ALREADY_ACCEPTED`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）。
+**U6 `POST /api/v1/invitations/by-token/{token}/accept`** 本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。ワークスペースなしの招待は、`grants_admin` が true のときだけ受諾した人を運営者にする。エラー: `410 INVITATION_INVALID`、`409 INVITATION_ALREADY_ACCEPTED`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）。
 
 **U8 `POST /api/v1/me/password`**（Set password。design-spec 6.16）本体 `{ newPassword: string }` → `204`。Google だけで登録した人（`hasPassword: false`）がパスワードを足す。パスワードがある人は `409 PASSWORD_ALREADY_SET`（A8 で変える）。セッションが10分以内に作られたものでなければ `403 REAUTH_REQUIRED`。サーバーから Better Auth の `setPassword` を呼び、この要求のセッション以外を消す。
 
@@ -1352,7 +1352,7 @@ interface AdminWorkspace { id: UUID; name: string; isPersonal: boolean; owners: 
 | AD7 workspaces | `?q=&cursor=` | `200 Page<AdminWorkspace>` | |
 | AD7 invitations | `?status=&cursor=` | `200 Page<Invitation>` | |
 | AD8 | — | `200 AdminUser` | 停止: セッションを全部消す。通知を作らない。再開で元どおり。自分自身は停止できない（`422 CANNOT_SUSPEND_SELF`） |
-| AD9 | `{ email: string; workspaceId?: UUID; role?: Role }` | `201 { invitation: Invitation; link: string }` | `workspaceId` があれば `role` は必須 |
+| AD9 | `{ email: string; workspaceId?: UUID; role?: Role }` | `201 { invitation: Invitation; link: string }` | `workspaceId` があれば `role` は必須。`workspaceId` なしの招待は `grantsAdmin = false`（受諾した人は運営者にならない） |
 
 ### 5.14 内部・死活確認
 
@@ -1375,7 +1375,7 @@ users ─┬─ 1:N sessions / accounts（Better Auth）        verifications・
        │                        └─ N:M workspaces（中間: self_analysis_shares）
        └─ 1:N notifications
 
-workspaces ─┬─ 1:N invitations（運営者の招待は workspace_id = null）
+workspaces ─┬─ 1:N invitations（ワークスペースなしの招待は workspace_id = null）
             ├─ 1:N ideas ─┬─ 1:1 validations ─┬─ 1:N validation_answers
             │             │                   ├─ 1:N research_log_entries
             │             │                   ├─ 1:N competitors
@@ -1567,9 +1567,10 @@ export const memberships = pgTable("memberships", {
 
 export const invitations = pgTable("invitations", {
   id: pk(),
-  workspaceId: uuid().references(() => workspaces.id, { onDelete: "cascade" }),   // null = 運営者のワークスペースなしの招待
+  workspaceId: uuid().references(() => workspaces.id, { onDelete: "cascade" }),   // null = ワークスペースなしの招待
   email: text().notNull(),
   role: workspaceRole(),
+  grantsAdmin: boolean().notNull().default(false),   // true = 受諾した人を運営者にする。`make admin-create` だけが付ける（ワークスペースなしのときだけ）
   tokenHash: text().notNull().unique(),           // SHA-256。トークンそのものは持たない
   invitedById: uuid().references(() => users.id),   // null = `make admin-create` の招待（運営者がまだ居ない）
   status: invitationStatus().notNull().default("pending"),
@@ -1581,6 +1582,7 @@ export const invitations = pgTable("invitations", {
   index().on(t.workspaceId),
   index("invitations_email_lower_idx").on(sql`lower(${t.email})`),
   check("invitations_role_required", sql`${t.workspaceId} is null or ${t.role} is not null`),
+  check("invitations_admin_without_workspace", sql`not ${t.grantsAdmin} or ${t.workspaceId} is null`),
 ]);
 
 // ---------- テンプレート ----------
@@ -2088,7 +2090,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 追加の決まり:
 
 - **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は 409 `ARCHIVED`（コメントを書く・元に戻すを含む。design-spec 6.8）。ロールが足りない人には先に 403 を返す（Viewer の編集は、アーカイブ中でも 403）。確認は書き込みの最後（更新日時の更新）でもう一度行い、確認と書き込みのあいだにアーカイブされても書き込みは残らない。読む・複製・Restore・Pitch Deck はできる。
-- **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。`is_admin` を直接変える API は無い。付くのはワークスペースなしの招待（`make admin-create`・AD9）から登録・受諾したときとシードだけで、外す API も無い。
+- **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。`is_admin` を直接変える API は無い。付くのは `make admin-create` の招待（`grants_admin = true`）から登録・受諾したときとシードだけで、AD9 の招待では付かず、外す API も無い。
 - **停止・削除したユーザー**: セッションを消し、ログインを拒否する。残ったリクエストも、認証のミドルウェアが `users.status` を確かめて 401 にする。
 - **実装**: 認可は、リソースからワークスペースを引く共通の関数（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）を通して判定し、クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
 

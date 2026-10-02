@@ -1,0 +1,2 @@
+ALTER TABLE "invitations" ADD COLUMN "grants_admin" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "invitations" ADD CONSTRAINT "invitations_admin_without_workspace" CHECK (not "invitations"."grants_admin" or "invitations"."workspace_id" is null);

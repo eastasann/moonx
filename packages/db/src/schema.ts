@@ -291,9 +291,10 @@ export const invitations = pgTable(
   "invitations",
   {
     id: pk(),
-    workspaceId: uuid().references(() => workspaces.id, { onDelete: "cascade" }), // null = 運営者のワークスペースなしの招待
+    workspaceId: uuid().references(() => workspaces.id, { onDelete: "cascade" }), // null = ワークスペースなしの招待
     email: text().notNull(),
     role: workspaceRole(),
+    grantsAdmin: boolean().notNull().default(false), // 受諾した人を運営者にする。`make admin-create` だけが付ける
     tokenHash: text().notNull().unique(), // SHA-256。トークンそのものは持たない
     invitedById: uuid().references(() => users.id), // null = `make admin-create`（運営者がまだ居ない）
     status: invitationStatus().notNull().default("pending"),
@@ -306,6 +307,10 @@ export const invitations = pgTable(
     index().on(t.workspaceId),
     index("invitations_email_lower_idx").on(sql`lower(${t.email})`),
     check("invitations_role_required", sql`${t.workspaceId} is null or ${t.role} is not null`),
+    check(
+      "invitations_admin_without_workspace",
+      sql`not ${t.grantsAdmin} or ${t.workspaceId} is null`,
+    ),
   ],
 );
 

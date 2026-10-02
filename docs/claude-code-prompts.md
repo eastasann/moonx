@@ -451,7 +451,7 @@ make test-web が通る状態をゴールとする。
 
 ## Step 13a: 運営者の招待を make admin-create だけに戻す
 
-Status:
+Status: done 2026-10-02
 
 ```
 運営者（is_admin）になる経路を、ループの前の設計（SDD 7.1「is_admin は API では変えられない（make admin-create と

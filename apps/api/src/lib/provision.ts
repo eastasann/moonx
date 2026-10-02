@@ -5,9 +5,9 @@ import { findUsableInvitation } from "./invitation-gate";
 
 /**
  * What a new account gets right after it exists (SDD 5.4): a personal workspace named after
- * them (currency PHP, they are its Owner, and it is where they land), and operator rights when
- * the invitation they came with has no workspace (`make admin-create`, AD9: ADR-010); that
- * invitation counts as accepted from then on.
+ * them (currency PHP, they are its Owner, and it is where they land). An invitation without a
+ * workspace counts as accepted from then on, and makes them an operator only when it carries
+ * `grants_admin` (`make admin-create`, ADR-010).
  */
 export async function provisionNewUser(
   db: Executor,
@@ -29,14 +29,16 @@ export async function provisionNewUser(
     .update(schema.users)
     .set({ lastWorkspaceId: workspaceId })
     .where(eq(schema.users.id, user.id));
-  const operator = await findUsableInvitation(db, user.email, now, { withoutWorkspace: true });
-  if (operator) {
-    await db.update(schema.users).set({ isAdmin: true }).where(eq(schema.users.id, user.id));
+  const invitation = await findUsableInvitation(db, user.email, now, { withoutWorkspace: true });
+  if (invitation) {
+    if (invitation.grantsAdmin) {
+      await db.update(schema.users).set({ isAdmin: true }).where(eq(schema.users.id, user.id));
+    }
     // Onboarding skips the invitation step for these (design-spec 6.16 screen 3), so nothing
     // else would ever accept it.
     await db
       .update(schema.invitations)
       .set({ status: "accepted", acceptedById: user.id, acceptedAt: now })
-      .where(eq(schema.invitations.id, operator.id));
+      .where(eq(schema.invitations.id, invitation.id));
   }
 }

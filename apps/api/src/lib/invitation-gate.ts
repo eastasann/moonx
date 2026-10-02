@@ -5,8 +5,8 @@ import type { Executor } from "./db";
 /**
  * A pending, unexpired invitation addressed to `email` (compared without case). This is the
  * check behind "no account without an invitation" (SDD 5.4): the sign-up route and Better Auth's
- * `user.create.before` hook both use it. `withoutWorkspace` narrows it to the operator
- * invitations of `make admin-create`, which make their holder an operator.
+ * `user.create.before` hook both use it. `withoutWorkspace` narrows it to the invitations
+ * without a workspace, which sign-up accepts on the spot.
  */
 export async function findUsableInvitation(
   db: Executor,

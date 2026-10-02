@@ -8,10 +8,10 @@ import { issueInvitation, reissueInvitation } from "./invitation-issue";
 export class AdminCreateError extends Error {}
 
 /**
- * Issues the invitation that makes its holder an operator: an invitation without a workspace
- * (SDD ADR-010, design-spec 6.16 screen 3). Running it again for the same address while the
- * invitation is still valid gives it a new link, because the link is shown only once and the
- * first operator has no screen to get it from.
+ * Issues the invitation that makes its holder an operator: `grants_admin` on an invitation without
+ * a workspace (SDD ADR-010, design-spec 6.16 screen 3). Running it again for the same address while
+ * the invitation is still valid gives it a new link (and upgrades one issued by AD9), because the
+ * link is shown only once and the first operator has no screen to get it from.
  */
 export async function createOperatorInvitation(
   db: Db,
@@ -45,7 +45,9 @@ export async function createOperatorInvitation(
       ),
     );
   if (pending) {
-    const { row, link } = await reissueInvitation(db, pending.id, input.publicUrl, input.now);
+    const { row, link } = await reissueInvitation(db, pending.id, input.publicUrl, input.now, {
+      grantsAdmin: true,
+    });
     return { link, expiresAt: row.expiresAt.toISOString(), reissued: true };
   }
   const { invitation, link } = await issueInvitation(db, {
@@ -54,6 +56,7 @@ export async function createOperatorInvitation(
     inviter: inviter ?? null,
     email,
     target: null,
+    grantsAdmin: true,
     mailer: null,
     rateLimited: false,
   });

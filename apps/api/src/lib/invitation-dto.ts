@@ -22,7 +22,7 @@ export function effectiveInvitationStatus(
 
 /**
  * Turns rows into `Invitation`s. The inviter keeps a "former member" badge only when the
- * invitation belongs to a workspace they have left; operator invitations have no workspace.
+ * invitation belongs to a workspace they have left; invitations without a workspace have none.
  */
 export async function toInvitations(
   db: Executor,

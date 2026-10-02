@@ -85,7 +85,7 @@ function InviteStep({ token }: { token: string }) {
   });
 
   const content = (invitation: InvitationPreview) => {
-    // An operator's invitation is accepted when they register, so there is nothing to join.
+    // An invitation without a workspace is accepted when they register, so there is nothing to join.
     if (invitation.status === "accepted" && !invitation.workspace) {
       return <Redirect to="/welcome?step=profile" />;
     }

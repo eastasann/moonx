@@ -160,7 +160,7 @@ export function invitationAccessRoutes(ctx: AppContext) {
             .onConflictDoNothing()
             .returning({ id: schema.memberships.id });
           alreadyMember = inserted.length === 0;
-        } else {
+        } else if (row.grantsAdmin) {
           await tx.update(schema.users).set({ isAdmin: true }).where(eq(schema.users.id, user.id));
         }
         await tx

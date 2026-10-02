@@ -1246,7 +1246,7 @@ describe("AD9 POST /admin/invitations", () => {
   const post = (body: unknown, who = as.admin) =>
     call(t.app, "POST", `${api}/invitations`, { as: who, body });
 
-  test("without a workspace it is an operator invitation: no workspace, no role", async () => {
+  test("without a workspace it has no workspace and no role, and does not make an operator", async () => {
     const res = await post({ email: "New.Operator@Example.com" });
     expect(res.status).toBe(201);
     expect(res.body.invitation).toMatchObject({
@@ -1262,7 +1262,12 @@ describe("AD9 POST /admin/invitations", () => {
       .select()
       .from(schema.invitations)
       .where(eq(schema.invitations.id, res.body.invitation.id));
-    expect(row).toMatchObject({ workspaceId: null, role: null, invitedById: userId("admin") });
+    expect(row).toMatchObject({
+      workspaceId: null,
+      role: null,
+      grantsAdmin: false,
+      invitedById: userId("admin"),
+    });
     expect(row?.tokenHash).not.toContain(res.body.link.split("/invite/")[1]);
     expect(t.mailbox.sent).toHaveLength(1);
     expect(t.mailbox.sent[0]?.to).toBe("New.Operator@Example.com");

@@ -133,7 +133,7 @@ moonx/
 
 | 変数 | 使う場所 | 内容 | local の値 | staging / production の置き場所 |
 |---|---|---|---|---|
-| `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `PROXY_SHARED_SECRET`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS` も必須 | `local` | Cloud Run の環境変数 |
+| `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `PROXY_SHARED_SECRET`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS`・`CRON_OIDC_AUDIENCE`・`CRON_INVOKER_EMAIL` も必須 | `local` | Cloud Run の環境変数 |
 | `APP_VERSION` | api | `/api/health` の `version`（コミット SHA） | 未設定なら `dev` | API の Dockerfile が `build-api-image` の build-arg から環境変数に入れる |
 | `PORT` | api | 待ち受けるポート | `3000` | Cloud Run が `8080` を渡す |
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
@@ -366,7 +366,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **理由:** Cloud Run は常駐しないので、定期実行は外から呼ぶ必要がある。Cloud Scheduler は同じ Google Cloud の中で完結し、OIDC で呼び出し元を確かめられる。
 
-**トレードオフ:** 毎時の実行なので、朝8時ちょうどではなく8時台に届く。ジョブが失敗すると、その回の通知は次の回でまとめて作る（取りこぼさないように、条件は「朝8時を過ぎていて、その段階をまだ通知していない」で選ぶ）。捨てた案: Cloudflare Worker の Cron Triggers（Cloud Run まで共有シークレットで呼ぶことになり、OIDC で確かめられない）、GitHub Actions の schedule（実行が数十分遅れることがある）、Cloud Run jobs（API と別のコンテナの起動が要り、処理が API のコードと分かれる）。
+**トレードオフ:** 毎時の実行なので、朝8時ちょうどではなく8時台に届く。ジョブが失敗しても、次の回がその時点の段階の通知を作る（条件は「朝8時を過ぎていて、その段階をまだ通知していない」）。飛ばした前の段階は作らない（期限が昨日になった項目には「期限切れ」だけを出し、「3日前」「当日」は出さない）。捨てた案: Cloudflare Worker の Cron Triggers（Cloud Run まで共有シークレットで呼ぶことになり、OIDC で確かめられない）、GitHub Actions の schedule（実行が数十分遅れることがある）、Cloud Run jobs（API と別のコンテナの起動が要り、処理が API のコードと分かれる）。
 
 ### ADR-015: IaC は Terraform（ユーザー指定）
 
@@ -895,7 +895,7 @@ interface InvitationPreview {
   email: string;
   workspace: { id: UUID; name: string } | null;   // 運営者のワークスペースなしの招待は null
   role: Role | null;
-  invitedBy: { displayName: string };
+  invitedBy: { displayName: string } | null;       // `make admin-create` の招待は null
   expiresAt: DateTime;
   accountExists: boolean;                          // そのメールのアカウントがあればログインへ案内する
 }
@@ -922,7 +922,7 @@ interface Invitation {
   id: UUID; email: string; role: Role | null;
   workspace: { id: UUID; name: string } | null;
   status: "pending" | "accepted" | "revoked" | "expired";
-  invitedBy: UserRef; createdAt: DateTime; expiresAt: DateTime; acceptedAt: DateTime | null;
+  invitedBy: UserRef | null; createdAt: DateTime; expiresAt: DateTime; acceptedAt: DateTime | null;
 }
 ```
 
@@ -980,7 +980,7 @@ interface Activity {
 | I1 POST | `{ name: string (1〜100); oneLineConcept: string (1〜200); proposedSolution?: string }` | `201 IdeaDetail` | 最新の検証のテンプレートの版で検証を作り、費用の初期行を Empty で作る（履歴なし: 作成の記録だけ）。`proposedSolution` は20,000字まで、空白だけなら null |
 | I2 GET | — | `200 IdeaDetail` | |
 | I2 PATCH | `{ name?; oneLineConcept?; proposedSolution?; lockVersion: number; force?: boolean }` | `200 IdeaDetail` | 履歴 `manual`（対象 `idea`） |
-| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail` | design-spec 6.8 の複製。履歴 `duplicate`: 新しいアイデアの作成と、コピーした記録対象の項目（回答・数字・調査ログ・競合・前提・リスク・費用行）それぞれの作成を、同じ `batchId` で1行ずつ残す（H3 でまとめて戻せるようにするため）。既定の名前は100字に収める |
+| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail` | design-spec 6.8 の複製。履歴 `duplicate`: 新しいアイデアの作成と、コピーした記録対象の項目（回答・数字・調査ログ・競合・前提・リスク・費用行）それぞれの作成を、同じ `batchId` で1行ずつ残す（履歴で1回の操作としてまとめて見せるため。H3 では戻せない。複製したアイデアはアーカイブで片づける）。既定の名前は100字に収める |
 | I4 | — | `200 IdeaDetail` | すでにその状態なら何もせず 200。履歴は書かず、`updatedAt` と `updatedBy` も変えない（`lastActivityAt` だけ更新する） |
 
 ### 5.7 検証
@@ -1305,7 +1305,7 @@ interface Notification {
 | C3 | — | `200 Comment` | スレッドの最初のコメントだけ |
 | H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKey=&cursor=` | `200 Page<HistoryEntry>` | 新しい順 |
 | H2 | — | `200 { entry: HistoryEntry; target: unknown }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す。衝突の検査はしない（戻すのは意図した上書き） |
-| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・下書き作成・複製を、1回の操作の単位でまとめて戻す |
+| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 CONFLICT`。下書き作成と複製は作ったレコードごと消すことになるため戻せず、`422 VALIDATION_FAILED` |
 | N1 | `?filter=all|unread&cursor=&limit=` | `200 Page<Notification>` | ワークスペースをまたいで新しい順 |
 | N2 | — | `200 { total: number }` | クライアントは画面を開いたとき・前面に戻ったとき・60秒ごとに呼ぶ |
 | N3 | — | `204` | |
@@ -1338,10 +1338,10 @@ interface AdminWorkspace { id: UUID; name: string; isPersonal: boolean; owners: 
 | AD1 | — | `200 { items: { kind: TemplateKind; name: string; versions: { id: UUID; versionNumber: number; status: "draft" | "published"; publishedAt: DateTime | null; publishedBy: UserRef | null; usageCount: number }[] }[] }` | |
 | AD2 | — | `201 { id: UUID }` | その版をコピーした下書きを作る。下書きがすでにあれば `409 DRAFT_EXISTS` |
 | AD3 GET | — | `200 TemplateVersionDetail` | |
-| AD3 PATCH | `{ aiPrompt: string }` | `200 TemplateVersionDetail` | 公開済みの版は `409 PUBLISHED_READ_ONLY`（AD4〜AD6 も同じ） |
+| AD3 PATCH | `{ aiPrompt: string }` | `200 TemplateVersionDetail` | 公開済みの版は `409 PUBLISHED_READ_ONLY`（AD4・AD5・AD6 publish も同じ。AD6 validate は書き込まないので公開済みの版にも使える） |
 | AD4 | セクション: `{ key; title; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（PATCH は一部） | `201` / `200` / `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`） |
 | AD5 | order: `{ sections: { id: UUID; questionIds: UUID[] }[] }`。cost-defaults: `{ items: { category; key; name }[] }`。check-rules: `{ items: { checkKey; params }[] }`。execution-presets: `{ items: { type; title; area?; launchTiming? }[] }` | `200 TemplateVersionDetail` | 一覧ごと置き換える |
-| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 設問 ID の重複・形式、前の版から消えた ID |
+| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 公開をふさぐエラー: 設問が0件（`no_questions`）、セクションの `part` の過不足（`invalid_part`。プランは A / B が必須、他は無し）、設問 ID の形式（`invalid_question_key`）・セクションとの不一致（`question_key_section_mismatch`）・重複（`duplicate_question_key`）、`answerType` と `options` の食い違い（`options_mismatch`）、`displayCondition` が存在しない設問を指す（`unknown_condition_key`）。警告: 前の版から消えた ID |
 | AD6 publish | — | `200 { versionNumber: number; publishedAt: DateTime }` | 検査のエラーがあれば `422 TEMPLATE_INVALID`。既存の回答は変わらない |
 | AD7 users | `?q=&status=&cursor=` | `200 Page<AdminUser>` | 中身（アイデア・回答）は返さない |
 | AD7 workspaces | `?q=&cursor=` | `200 Page<AdminWorkspace>` | |
@@ -1355,7 +1355,7 @@ interface AdminWorkspace { id: UUID; name: string; isPersonal: boolean; owners: 
 |---|---|---|---|
 | Z1 `GET /api/health` | — | `200 { status: "ok"; version: string /* コミット SHA */; env: string }` | **DB に触れない**（監視のたびに Neon を起こさないため。ADR-008） |
 | Z2 `GET /api/health/db` | — | `200 { status: "ok"; latencyMs: number }` / `503` | デプロイ後の確認に使う。`503` は 8.1 の形式で `UPSTREAM_UNAVAILABLE` |
-| Z3 `POST /internal/cron/due-notifications` | — | `200 { checkedItems: number; created: number }` | `Authorization: Bearer <OIDC トークン>` の発行者（`https://accounts.google.com`）・audience（`CRON_OIDC_AUDIENCE`）・メール（`CRON_INVOKER_EMAIL`）を確かめる。対象は ADR-014。停止されたユーザー・アーカイブしたアイデアとプランの項目・担当が名前だけの項目は除く |
+| Z3 `POST /internal/cron/due-notifications` | — | `200 { checkedItems: number; created: number }` | `Authorization: Bearer <OIDC トークン>` の発行者（`https://accounts.google.com`）・audience（`CRON_OIDC_AUDIENCE`）・メール（`CRON_INVOKER_EMAIL`）を確かめる。発行者・audience・署名・期限が合わなければ `401 UNAUTHENTICATED`、署名は正しいが別のサービスアカウントなら `403 FORBIDDEN`（鍵は `https://www.googleapis.com/oauth2/v3/certs` から取り、`Cache-Control` の間だけ覚える）。対象は ADR-014。停止されたユーザー・アーカイブしたアイデアとプランの項目・担当が名前だけの項目は除く |
 
 ## 6. データモデル
 
@@ -1566,7 +1566,7 @@ export const invitations = pgTable("invitations", {
   email: text().notNull(),
   role: workspaceRole(),
   tokenHash: text().notNull().unique(),           // SHA-256。トークンそのものは持たない
-  invitedById: uuid().notNull().references(() => users.id),
+  invitedById: uuid().references(() => users.id),   // null = `make admin-create` の招待（運営者がまだ居ない）
   status: invitationStatus().notNull().default("pending"),
   expiresAt: ts().notNull(),                      // 発行（再送）から7日
   acceptedById: uuid().references(() => users.id),

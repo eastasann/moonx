@@ -295,9 +295,7 @@ export const invitations = pgTable(
     email: text().notNull(),
     role: workspaceRole(),
     tokenHash: text().notNull().unique(), // SHA-256。トークンそのものは持たない
-    invitedById: uuid()
-      .notNull()
-      .references(() => users.id),
+    invitedById: uuid().references(() => users.id), // null = `make admin-create`（運営者がまだ居ない）
     status: invitationStatus().notNull().default("pending"),
     expiresAt: ts().notNull(), // 発行（再送）から7日
     acceptedById: uuid().references(() => users.id),

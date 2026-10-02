@@ -2,7 +2,6 @@ import { schema } from "@moonx/db";
 import {
   createInvitationBodySchema,
   createWorkspaceBodySchema,
-  type Invitation,
   invitationWithLinkSchema,
   listInvitationsQuerySchema,
   memberSchema,
@@ -12,7 +11,7 @@ import {
   type Workspace,
   workspaceSchema,
 } from "@moonx/schemas";
-import { and, count, desc, eq, gt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import type { AppContext } from "../context";
@@ -20,14 +19,7 @@ import { ApiError } from "../errors";
 import type { Executor } from "../lib/db";
 import { historyActor } from "../lib/dto";
 import { toInvitations } from "../lib/invitation-dto";
-import {
-  hashInvitationToken,
-  INVITATION_TTL_DAYS,
-  invitationExpiry,
-  invitationLink,
-  newInvitationToken,
-} from "../lib/invitation-token";
-import { enforceRateLimit } from "../lib/rate-limit";
+import { issueInvitation } from "../lib/invitation-issue";
 import { requireOwner, resolveScope } from "../lib/scope";
 import {
   loadMentionCandidates,
@@ -35,7 +27,6 @@ import {
   releaseMemberDuties,
   resetLastWorkspace,
 } from "../lib/workspace-members";
-import { invitationMail } from "../mail/mailer";
 import { authPlugin } from "../plugins";
 
 async function loadWorkspace(
@@ -257,70 +248,14 @@ export function workspaceRoutes(ctx: AppContext) {
       async ({ params, body, user, set }) => {
         const scope = await resolveScope(db, user, { workspaceId: params.workspaceId });
         requireOwner(scope);
-        const now = ctx.now();
-        const email = body.email.toLowerCase();
-        const token = newInvitationToken();
-        const link = invitationLink(ctx.config.publicUrl, token);
-        const invitation = await db.transaction(async (tx) => {
-          // Serializes the invitations of one workspace, so a double click cannot pass the checks
-          // below twice and create two pending invitations for the same address. An advisory
-          // lock rather than a row lock: this transaction waits for Resend, and a lock on the
-          // workspace row would hold up every content write of the workspace meanwhile.
-          await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${scope.workspaceId}))`);
-          const [existing] = await tx
-            .select({ id: schema.memberships.id })
-            .from(schema.memberships)
-            .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
-            .where(
-              and(
-                eq(schema.memberships.workspaceId, scope.workspaceId),
-                sql`lower(${schema.users.email}) = ${email}`,
-              ),
-            );
-          if (existing) throw new ApiError("ALREADY_MEMBER", "That person is already a member");
-          const [pending] = await tx
-            .select({ id: schema.invitations.id })
-            .from(schema.invitations)
-            .where(
-              and(
-                eq(schema.invitations.workspaceId, scope.workspaceId),
-                sql`lower(${schema.invitations.email}) = ${email}`,
-                eq(schema.invitations.status, "pending"),
-                gt(schema.invitations.expiresAt, now),
-              ),
-            );
-          if (pending) {
-            throw new ApiError("INVITATION_PENDING", "A valid invitation already exists", {
-              invitationId: pending.id,
-            });
-          }
-          await enforceRateLimit(tx, "invitation", user.id, now.getTime());
-          const [created] = await tx
-            .insert(schema.invitations)
-            .values({
-              workspaceId: scope.workspaceId,
-              email: body.email,
-              role: body.role,
-              tokenHash: hashInvitationToken(token),
-              invitedById: user.id,
-              expiresAt: invitationExpiry(now),
-            })
-            .returning();
-          const [workspace] = await tx
-            .select({ name: schema.workspaces.name })
-            .from(schema.workspaces)
-            .where(eq(schema.workspaces.id, scope.workspaceId));
-          await ctx.mailer.send(
-            invitationMail({
-              to: body.email,
-              inviter: user.displayName,
-              workspace: { name: workspace?.name ?? "", role: body.role },
-              link,
-              expiresInDays: INVITATION_TTL_DAYS,
-            }),
-          );
-          const [dto] = await toInvitations(tx, [created as NonNullable<typeof created>], now);
-          return dto as Invitation;
+        const { invitation, link } = await issueInvitation(db, {
+          publicUrl: ctx.config.publicUrl,
+          now: ctx.now(),
+          inviter: user,
+          email: body.email,
+          target: { workspaceId: scope.workspaceId, role: body.role },
+          mailer: ctx.mailer,
+          rateLimited: true,
         });
         set.status = 201;
         return { invitation, link };

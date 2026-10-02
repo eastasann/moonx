@@ -98,7 +98,10 @@ const ALL_TYPE_FIELDS: TypeField[] = [
 ];
 
 /** 422 for a column the type does not have, so a milestone never carries a KPI target. */
-function assertFieldsFit(type: ExecutionType, body: Partial<Record<TypeField, unknown>>): void {
+export function assertFieldsFit(
+  type: ExecutionType,
+  body: Partial<Record<TypeField, unknown>>,
+): void {
   const refused = ALL_TYPE_FIELDS.filter(
     (field) => body[field] != null && !TYPE_FIELDS[type].includes(field),
   );
@@ -245,7 +248,7 @@ const historyMeta = (ctx: ExecutionContext, row: Pick<ExecutionRow, "id" | "type
 });
 
 /** `assigneeUserId` must be an Owner or Member of the plan's workspace (SDD 5.9 P9). */
-async function assertAssignable(tx: Tx, workspaceId: string, userId: string): Promise<void> {
+export async function assertAssignable(tx: Tx, workspaceId: string, userId: string): Promise<void> {
   const [member] = await tx
     .select({ role: schema.memberships.role })
     .from(schema.memberships)
@@ -266,14 +269,20 @@ async function assertAssignable(tx: Tx, workspaceId: string, userId: string): Pr
   }
 }
 
-function assertStatus(type: ExecutionType, status: ExecutionStatus | null | undefined): void {
+export function assertStatus(
+  type: ExecutionType,
+  status: ExecutionStatus | null | undefined,
+): void {
   if (status == null) return;
   if (!STATUSES[type].includes(status)) {
     throw new ApiError("INVALID_STATUS", `${status} is not a status of ${type} items`);
   }
 }
 
-function assertOneAssignee(body: { assigneeUserId?: string | null; assigneeName?: string | null }) {
+export function assertOneAssignee(body: {
+  assigneeUserId?: string | null;
+  assigneeName?: string | null;
+}) {
   if (body.assigneeUserId != null && body.assigneeName != null) {
     throw validationFailed([
       {

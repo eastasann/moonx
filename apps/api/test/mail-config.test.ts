@@ -156,6 +156,8 @@ describe("configuration", () => {
       BETTER_AUTH_URL: "https://staging.moonx.app",
       MAIL_FROM: "moonx <no-reply@moonx.app>",
       TRUSTED_ORIGINS: "https://staging.moonx.app,moonx-staging://",
+      CRON_OIDC_AUDIENCE: "https://moonx-api-staging-123.asia-southeast1.run.app",
+      CRON_INVOKER_EMAIL: "scheduler@moonx.iam.gserviceaccount.com",
     };
     for (const APP_ENV of ["staging", "production"]) {
       expect(() => loadConfig({ APP_ENV, ...deployed, PROXY_SHARED_SECRET: "" })).toThrow(
@@ -165,7 +167,13 @@ describe("configuration", () => {
         "MAIL_TRANSPORT",
       );
     }
-    for (const name of ["BETTER_AUTH_URL", "MAIL_FROM", "TRUSTED_ORIGINS"]) {
+    for (const name of [
+      "BETTER_AUTH_URL",
+      "MAIL_FROM",
+      "TRUSTED_ORIGINS",
+      "CRON_OIDC_AUDIENCE",
+      "CRON_INVOKER_EMAIL",
+    ]) {
       expect(() => loadConfig({ APP_ENV: "production", ...deployed, [name]: "" })).toThrow(name);
     }
     expect(loadConfig({ APP_ENV: "staging", ...deployed }).openapi).toBe(true);

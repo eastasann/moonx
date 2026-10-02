@@ -415,8 +415,7 @@ export function addCollaboration(
     kind: "comment",
     actor: "paolo",
     commentId: t5.id,
-    link: link(12, {
-      userId: userId("ana"),
+    link: link(11, {
       questionKey: "SA.WHY.1",
       panel: "comments",
       target: { type: "self_analysis_answer", id: saId, key: "SA.WHY.1" },
@@ -468,7 +467,7 @@ export function addCollaboration(
   const overdue = executionItemId("piaya-a", "next_action", 0);
   const soon = executionItemId("piaya-a", "next_action", 1);
   const execLink = (id: string) =>
-    link(22, { ideaId: piaya.id, planId: planA.id, tab: "next_actions", rowId: id });
+    link(22, { ideaId: piaya.id, planId: planA.id, tab: "actions", rowId: id });
   notify("due-ana-3d", {
     user: "ana",
     kind: "due",

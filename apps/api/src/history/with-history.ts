@@ -25,6 +25,8 @@ export interface HistoryMeta {
   /** Defaults to create (no `before`), delete (no `after`) or update. */
   action?: "create" | "update" | "delete" | "restore";
   revertedFromId?: string | null;
+  /** Fixes the id of the history row, for callers that return the row they wrote. */
+  entryId?: string;
 }
 
 /** What a `withHistory` callback returns: the handler result and the item before and after the change. */
@@ -49,6 +51,7 @@ export async function withHistory<T>(
   const action = meta.action ?? (before == null ? "create" : after == null ? "delete" : "update");
   if (action === "update" && isDeepStrictEqual(before, after)) return result;
   await tx.insert(schema.changeHistory).values({
+    id: meta.entryId,
     workspaceId: meta.workspaceId,
     ownerUserId: meta.ownerUserId ?? null,
     containerType: meta.container.type,

@@ -13,6 +13,9 @@
     "capacity": "Capacity limit"
   },
   "deletedUser": "Deleted user",
+  "history": {
+    "templateUpdated": "Template updated to v{{version}}"
+  },
   "target": {
     "economics": "Economics",
     "researchLog": "Research log",
@@ -24,5 +27,16 @@
     "pitchDeck": "Pitch deck",
     "execution": "Execution",
     "templateVersion": "Template version"
+  },
+  "notification": {
+    "mention": "{{actor}} mentioned you on {{target}}",
+    "comment": "{{actor}} commented on {{target}}",
+    "decision": "{{actor}} recorded a decision on {{idea}}",
+    "goNoGo": "{{actor}} recorded Go / No-Go on {{plan}}",
+    "versionSaved": "{{actor}} saved {{version}} of {{plan}}",
+    "due_three_days_before": "{{title}} is due in 3 days",
+    "due_due_day": "{{title}} is due today",
+    "due_overdue": "{{title}} is overdue",
+    "unknownTarget": "an item"
   }
 }

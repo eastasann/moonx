@@ -1,0 +1,1 @@
+ALTER TABLE "invitations" ALTER COLUMN "invited_by_id" DROP NOT NULL;

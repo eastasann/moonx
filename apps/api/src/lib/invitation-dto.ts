@@ -38,7 +38,9 @@ export async function toInvitations(
         .where(inArray(schema.workspaces.id, workspaceIds))
     : [];
   const names = new Map(workspaces.map((w) => [w.id, w.name]));
-  const inviterIds = [...new Set(rows.map((r) => r.invitedById))];
+  const inviterIds = [
+    ...new Set(rows.flatMap((r) => (r.invitedById === null ? [] : [r.invitedById]))),
+  ];
   const inviters = await db
     .select({
       id: schema.users.id,
@@ -57,8 +59,10 @@ export async function toInvitations(
   const member = new Set(memberships.map((m) => `${m.workspaceId}:${m.userId}`));
   const byId = new Map(inviters.map((u) => [u.id, u]));
   return rows.map((row) => {
-    const inviter = byId.get(row.invitedById);
-    if (!inviter) throw new Error(`invitation ${row.id} has no inviter`);
+    const inviter = row.invitedById === null ? null : byId.get(row.invitedById);
+    if (row.invitedById !== null && !inviter) {
+      throw new Error(`invitation ${row.id} has no inviter`);
+    }
     return {
       id: row.id,
       email: row.email,
@@ -67,10 +71,12 @@ export async function toInvitations(
         ? { id: row.workspaceId, name: names.get(row.workspaceId) ?? "" }
         : null,
       status: effectiveInvitationStatus(row, now),
-      invitedBy: toUserRef(
-        inviter,
-        row.workspaceId === null || member.has(`${row.workspaceId}:${row.invitedById}`),
-      ),
+      invitedBy: inviter
+        ? toUserRef(
+            inviter,
+            row.workspaceId === null || member.has(`${row.workspaceId}:${row.invitedById}`),
+          )
+        : null,
       createdAt: iso(row.createdAt),
       expiresAt: iso(row.expiresAt),
       acceptedAt: isoOrNull(row.acceptedAt),

@@ -7,13 +7,8 @@ import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import type { Tx } from "../lib/db";
 import { toInvitations } from "../lib/invitation-dto";
-import {
-  hashInvitationToken,
-  INVITATION_TTL_DAYS,
-  invitationExpiry,
-  invitationLink,
-  newInvitationToken,
-} from "../lib/invitation-token";
+import { reissueInvitation } from "../lib/invitation-issue";
+import { INVITATION_TTL_DAYS } from "../lib/invitation-token";
 import { enforceRateLimit } from "../lib/rate-limit";
 import { invitationMail } from "../mail/mailer";
 import { authPlugin } from "../plugins";
@@ -63,26 +58,6 @@ export function invitationRoutes(ctx: AppContext) {
     return row;
   }
 
-  /** A new token and a fresh 7 days; the previous link stops working. */
-  async function reissue(tx: Tx, id: string) {
-    const token = newInvitationToken();
-    const now = ctx.now();
-    const [row] = await tx
-      .update(schema.invitations)
-      .set({
-        tokenHash: hashInvitationToken(token),
-        status: "pending",
-        expiresAt: invitationExpiry(now),
-      })
-      .where(eq(schema.invitations.id, id))
-      .returning();
-    return {
-      row: row as NonNullable<typeof row>,
-      link: invitationLink(ctx.config.publicUrl, token),
-      now,
-    };
-  }
-
   return new Elysia({ name: "moonx-invitations" })
     .use(authPlugin(ctx))
     .post(
@@ -91,7 +66,8 @@ export function invitationRoutes(ctx: AppContext) {
         db.transaction(async (tx) => {
           const current = await lockInvitation(tx, p.invitationId, user);
           await enforceRateLimit(tx, "invitation", user.id, ctx.now().getTime());
-          const { row, link, now } = await reissue(tx, current.id);
+          const now = ctx.now();
+          const { row, link } = await reissueInvitation(tx, current.id, ctx.config.publicUrl, now);
           const [workspace] = row.workspaceId
             ? await tx
                 .select({ name: schema.workspaces.name })
@@ -117,7 +93,7 @@ export function invitationRoutes(ctx: AppContext) {
       async ({ params: p, user }) =>
         db.transaction(async (tx) => {
           const current = await lockInvitation(tx, p.invitationId, user);
-          const { link } = await reissue(tx, current.id);
+          const { link } = await reissueInvitation(tx, current.id, ctx.config.publicUrl, ctx.now());
           return { link };
         }),
       { params, response: { 200: invitationLinkSchema } },

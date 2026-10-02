@@ -265,7 +265,7 @@ make test-domain・make test-api が通る状態をゴールとする。
 
 ## Step 8: API: 決定ログ・コメント・履歴・通知・テンプレートの移行・運営者・定期実行
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/02-01_system-design-doc.md の 5.11〜5.14・ADR-014 と、docs/design-spec.md 6.0.4（コメント）・

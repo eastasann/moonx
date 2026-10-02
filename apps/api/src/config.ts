@@ -17,6 +17,12 @@ export interface AppConfig {
     /** Staging only: when non-empty, mail goes to these addresses and nowhere else. */
     allowlist: string[];
   };
+  /**
+   * Who may call `/internal/cron/*` (Cloud Scheduler's OIDC token, SDD 5.14 Z3). Empty values
+   * make every call a 403: the endpoint is never open. staging and production refuse to start
+   * without both, so a missing value cannot silently stop the due notices.
+   */
+  cron: { oidcAudience: string; invokerEmail: string };
   sentryDsn: string;
   /** Serve the OpenAPI document at /api/docs (staging only, ADR-006). */
   openapi: boolean;
@@ -54,7 +60,13 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (appEnv === "staging" || appEnv === "production") {
     if (proxySecrets.length === 0) throw new Error(`PROXY_SHARED_SECRET is required in ${appEnv}`);
     if (transport !== "resend") throw new Error(`MAIL_TRANSPORT must be resend in ${appEnv}`);
-    for (const name of ["BETTER_AUTH_URL", "MAIL_FROM", "TRUSTED_ORIGINS"]) {
+    for (const name of [
+      "BETTER_AUTH_URL",
+      "MAIL_FROM",
+      "TRUSTED_ORIGINS",
+      "CRON_OIDC_AUDIENCE",
+      "CRON_INVOKER_EMAIL",
+    ]) {
       if (!env[name]) throw new Error(`${name} is required in ${appEnv}`);
     }
   }
@@ -70,6 +82,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       from: env.MAIL_FROM || "moonx <no-reply@localhost>",
       resendApiKey: env.RESEND_API_KEY ?? "",
       allowlist: list(env.MAIL_ALLOWLIST).map((v) => v.toLowerCase()),
+    },
+    cron: {
+      oidcAudience: env.CRON_OIDC_AUDIENCE ?? "",
+      invokerEmail: (env.CRON_INVOKER_EMAIL ?? "").toLowerCase(),
     },
     sentryDsn: env.SENTRY_DSN ?? "",
     openapi: appEnv === "staging",
@@ -91,6 +107,7 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       resendApiKey: "",
       allowlist: [],
     },
+    cron: { oidcAudience: "", invokerEmail: "" },
     sentryDsn: "",
     openapi: false,
     ...overrides,

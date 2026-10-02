@@ -33,6 +33,7 @@ export async function loadDecisionSummaries(
   workspaceId: string,
   where: SQL | undefined,
   limit: number,
+  offset = 0,
 ): Promise<DecisionLogSummary[]> {
   const rows = await db
     .select({
@@ -57,7 +58,8 @@ export async function loadDecisionSummaries(
       desc(schema.decisionLogEntries.createdAt),
       desc(schema.decisionLogEntries.id),
     )
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
   const refs = await loadUserRefs(
     db,
     rows.map((r) => r.entry.recordedById),

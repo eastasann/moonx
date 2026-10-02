@@ -50,7 +50,7 @@ export const invitationSchema = z.object({
   role: roleSchema.nullable(),
   workspace: z.object({ id: z.uuid(), name: z.string() }).nullable(),
   status: invitationStatusSchema,
-  invitedBy: userRefSchema,
+  invitedBy: userRefSchema.nullable(),
   createdAt: dateTimeSchema,
   expiresAt: dateTimeSchema,
   acceptedAt: dateTimeSchema.nullable(),

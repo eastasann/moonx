@@ -11,13 +11,13 @@ import { QUESTION_SCREEN } from "./validation-data";
 /** How many entries Recent activity shows (design-spec 6.9). */
 const ACTIVITY_LIMIT = 20;
 
-interface Target {
+export interface Target {
   type: TargetType;
   id: string;
   key: string | null;
 }
 
-interface Resolved {
+export interface Resolved {
   idea: { id: string; name: string } | null;
   plan: { id: string; name: string } | null;
   /** Name of the touched row, for the label. */
@@ -35,7 +35,7 @@ const VALIDATION_ROWS = [
 const PLAN_LEVEL = ["plan_answer", "pitch_slide", "business_plan"] as const;
 
 /** The idea and plan a target sits under, and the name of a row target, in a fixed number of queries. */
-async function resolveTargets(
+export async function resolveTargets(
   db: Executor,
   workspaceId: string,
   targets: Target[],
@@ -249,7 +249,7 @@ const humanize = (key: string) => {
 };
 
 /** The text that names a touched item: "01 WHO", "Costs · Rent", an idea's name (HistoryEntry.label). */
-function labelOf(t: Target, resolved: Resolved): string {
+export function labelOf(t: Target, resolved: Resolved): string {
   const named = (prefix: string) => `${prefix} · ${excerpt(resolved.name) ?? ""}`.trimEnd();
   switch (t.type) {
     case "validation_answer": {

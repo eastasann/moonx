@@ -1,0 +1,147 @@
+{
+  "home": {
+    "ideaLink": "Back to {{name}}",
+    "ideaLinkFallback": "Back to the idea",
+    "switcher": {
+      "plans": "Plans",
+      "archived": "Archived",
+      "add": "Add plan",
+      "current": "{{name}} (current)"
+    },
+    "version": {
+      "none": "Version: No version saved",
+      "saved": "Version: {{name}}",
+      "withChanges": "Version: {{name}} + changes"
+    },
+    "actions": {
+      "saveVersion": "Save version",
+      "recordGoNoGo": "Record Go/No-Go",
+      "pitchDeck": "Pitch Deck",
+      "more": "More actions"
+    },
+    "menu": {
+      "rename": "Rename plan",
+      "aiExport": "AI export",
+      "aiImport": "AI import",
+      "archive": "Archive plan",
+      "restore": "Restore plan"
+    },
+    "fields": {
+      "businessName": "Business name",
+      "preparedBy": "Prepared by",
+      "autosave": "Changes save as you type."
+    },
+    "readOnlyFields": {
+      "businessName": "Business name: {{name}}",
+      "preparedBy": "Prepared by {{name}}"
+    },
+    "date": {
+      "updated": "Updated {{date}}",
+      "saved": "Saved {{date}}"
+    },
+    "latestDecision": "Latest decision is {{decision}}.",
+    "archivedBanner": {
+      "heading": "This plan is archived",
+      "body": "It is read only. Restore it to save versions, record Go / No-Go or edit it.",
+      "restore": "Restore"
+    },
+    "viewing": {
+      "heading": "Viewing {{name}} (read only)",
+      "body": "This is the plan as it was when the version was saved.",
+      "back": "Back to latest"
+    },
+    "actionFailed": "The change was not saved.",
+    "conflictItem": "plan header",
+    "blocks": {
+      "keyNumbers": "Key numbers (from validation)",
+      "goNoGo": "Go / No-Go",
+      "versions": "Versions",
+      "execution": "Execution",
+      "items": "Items"
+    },
+    "editInValidation": "Edit in validation",
+    "goNoGo": {
+      "none": "Not recorded yet",
+      "line": "{{date}} · {{who}}"
+    },
+    "versions": {
+      "none": "No version saved yet",
+      "line": "{{date}} · {{who}}",
+      "viewing": "Viewing"
+    },
+    "execution": {
+      "dueSoon_one": "{{count}} action due soon",
+      "dueSoon_other": "{{count}} actions due soon",
+      "overdue_one": "{{count}} overdue",
+      "overdue_other": "{{count}} overdue",
+      "none": "Nothing due soon",
+      "open": "Open the execution plan"
+    },
+    "parts": {
+      "a": "Part A: Business Case",
+      "b": "Part B: Execution Plan",
+      "progress": "{{done}} / {{total}}",
+      "legend": "V: uses your validation data. S: refers to your self analysis.",
+      "markV": "V",
+      "markS": "S",
+      "filled": "{{filled}}/{{total}}",
+      "comments_one": "{{count}} comment",
+      "comments_other": "{{count}} comments",
+      "itemLabel": "{{itemNo}} {{title}}"
+    },
+    "emptyHint": "Start with the items marked [V] — they already have your validation data."
+  },
+  "rename": {
+    "title": "Rename plan",
+    "name": "Plan name",
+    "save": "Rename",
+    "failed": "The plan was not renamed."
+  },
+  "create": {
+    "title": "Create plan draft",
+    "name": "Plan name",
+    "help": "Name this approach, for example Plan A or Plan B. Your validation answers are copied into the draft.",
+    "create": "Create draft",
+    "failed": "The plan was not created.",
+    "loadFailed": "The existing plans could not be read.",
+    "namePrefix": "Plan"
+  },
+  "saveVersion": {
+    "title": "Save version",
+    "name": "Version name",
+    "help": "For example: v1 For advisors. The plan as it is now is kept as a read-only snapshot.",
+    "save": "Save version",
+    "saved": "Version saved",
+    "failed": "The version was not saved.",
+    "loadFailed": "The plan could not be read.",
+    "defaultName": "v{{number}}"
+  },
+  "goNoGo": {
+    "title": "Record Go / No-Go",
+    "conditions": "Your conditions (§24)",
+    "launchIf": "We proceed to launch if",
+    "delayIf": "We delay if",
+    "stopIf": "We stop / abandon if",
+    "notWritten": "Not written yet",
+    "keyNumbers": "Key numbers",
+    "currentVersion": "Current version: {{name}}",
+    "noVersion": "No version saved yet",
+    "changes": "This plan has changed since {{name}}. Save a version first?",
+    "changesNoVersion": "This plan has changed since it was last saved. Save a version first?",
+    "saveFirst": "Save a version",
+    "question": "What do you decide?",
+    "reason": "Why?",
+    "record": "Record",
+    "recorded": "Go / No-Go recorded",
+    "failed": "The Go / No-Go was not recorded.",
+    "history": "History",
+    "historyEmpty": "No Go / No-Go recorded yet.",
+    "historyLine": "{{value}} · {{date}} · {{who}}",
+    "historyVersion": "On {{version}}",
+    "reasonLine": "Reason: {{reason}}",
+    "loadFailed": "The Go / No-Go details could not be read."
+  },
+  "sheet": {
+    "retry": "Retry"
+  }
+}

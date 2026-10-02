@@ -52,6 +52,8 @@ describe("P1 list and create", () => {
       archived: false,
       latestVersion: null,
       template: { versionNumber: 1 },
+      ideaArchived: false,
+      draftOnly: true,
     });
     const id = res.body.id as string;
     const answers = await t.db
@@ -86,6 +88,32 @@ describe("P1 list and create", () => {
       .from(schema.businessPlans)
       .where(eq(schema.businessPlans.id, id));
     expect(row?.createdFromDecisionId).not.toBeNull();
+
+    const edited = await call(t.app, "PUT", `${planPath(id)}/answers/P.01.1`, {
+      as: who.kenji,
+      body: { text: "Changed after the draft.", lockVersion: byKey.get("P.01.1")?.lockVersion },
+    });
+    expect(edited.status).toBe(200);
+    const after = await call(t.app, "GET", planPath(id), { as: who.kenji });
+    expect(after.body.draftOnly).toBe(false);
+  });
+
+  test("deleting a preset execution row ends draftOnly", async () => {
+    const res = await call(t.app, "POST", plansPath(piaya), {
+      as: who.kenji,
+      body: { name: "Plan D" },
+    });
+    const id = res.body.id as string;
+    const [preset] = await t.db
+      .select()
+      .from(schema.executionItems)
+      .where(eq(schema.executionItems.businessPlanId, id));
+    const del = await call(t.app, "DELETE", `/api/v1/execution-items/${preset?.id}`, {
+      as: who.kenji,
+    });
+    expect(del.status).toBe(204);
+    const after = await call(t.app, "GET", planPath(id), { as: who.kenji });
+    expect(after.body.draftOnly).toBe(false);
   });
 
   test("the name must be free, archived plans included, and the decision must be Proceed", async () => {
@@ -159,6 +187,8 @@ describe("P2 plan home", () => {
     expect(res.body.versions).toHaveLength(1);
     expect(res.body.latestDecision).toBe("proceed");
     expect(res.body.viewingVersion).toBeNull();
+    expect(res.body.ideaArchived).toBe(false);
+    expect(res.body.draftOnly).toBe(false);
   });
 
   test("a saved version is shown from its snapshot, read only", async () => {

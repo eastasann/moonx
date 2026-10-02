@@ -46,6 +46,14 @@ export interface PlanHome extends PlanSummary, Versioned {
   preparedBy: string;
   date: string;
   latestDecision: DecisionValue | null;
+  /** The idea is archived, which makes every plan screen of it read only (design-spec 6.12). */
+  ideaArchived: boolean;
+  /**
+   * Nothing but the draft's own content is there: every answer is still the copy made by M5 and
+   * no execution row was added, renamed or changed. Drives the "Start with the items marked [V]"
+   * hint of screen 20, which never looks at the saved version being viewed.
+   */
+  draftOnly: boolean;
   viewingVersion: { id: string; name: string; savedAt: string } | null;
   keyMetrics: Pick<KeyMetrics, (typeof LIST_METRIC_KEYS)[number]>;
   versions: PlanVersionSummary[];
@@ -294,6 +302,11 @@ export async function buildPlanHome(
     preparedBy: state.header.preparedBy,
     date: iso(viewing ? viewing.savedAt : bundle.plan.lastActivityAt),
     latestDecision: bundle.idea.latestDecision,
+    ideaArchived: bundle.idea.archivedAt != null,
+    draftOnly:
+      bundle.answers.every((a) => a.copiedFrom != null && a.lockVersion <= 1) &&
+      !bundle.presetRowDeleted &&
+      bundle.execution.every((e) => e.fromPreset && e.lockVersion === 0),
     viewingVersion: viewing
       ? { id: viewing.id, name: viewing.name, savedAt: iso(viewing.savedAt) }
       : null,

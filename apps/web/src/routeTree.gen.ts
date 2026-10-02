@@ -44,7 +44,12 @@ import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRouteImport } from './r
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdDecideRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.decide'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.economics'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.research'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.plans.$planId'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.questions.$sectionKey'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.plans.$planId.index'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.plans.$planId.execution'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.plans.$planId.pitch'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.plans.$planId.items.$itemNo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -241,11 +246,41 @@ const AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute =
     path: '/research',
     getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdRoute,
   } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteImport.update({
+    id: '/plans/$planId',
+    path: '/plans/$planId',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdRoute,
+  } as any)
 const AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute =
   AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport.update({
     id: '/questions/$sectionKey',
     path: '/questions/$sectionKey',
     getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRouteImport.update({
+    id: '/execution',
+    path: '/execution',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRouteImport.update({
+    id: '/pitch',
+    path: '/pitch',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRouteImport.update({
+    id: '/items/$itemNo',
+    path: '/items/$itemNo',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -282,7 +317,12 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceId/ideas/$ideaId/economics': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute
   '/w/$workspaceId/ideas/$ideaId/research': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId/': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteWithChildren
   '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -314,6 +354,10 @@ export interface FileRoutesByTo {
   '/w/$workspaceId/ideas/$ideaId/research': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -352,7 +396,12 @@ export interface FileRoutesById {
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/economics': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/research': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteWithChildren
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -390,7 +439,12 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/ideas/$ideaId/economics'
     | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId/'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId'
     | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -422,6 +476,10 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId'
     | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
   id:
     | '__root__'
     | '/'
@@ -459,7 +517,12 @@ export interface FileRouteTypes {
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/economics'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/research'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -719,12 +782,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRoute
     }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId'
+      path: '/plans/$planId'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRoute
+    }
     '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': {
       id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
       path: '/questions/$sectionKey'
       fullPath: '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRoute
+    }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/'
+      path: '/'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId/'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute
+    }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+      path: '/execution'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute
+    }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+      path: '/pitch'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute
+    }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
+      path: '/items/$itemNo'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute
     }
   }
 }
@@ -740,6 +838,30 @@ const AuthedFrameAdminRouteChildren: AuthedFrameAdminRouteChildren = {
 const AuthedFrameAdminRouteWithChildren =
   AuthedFrameAdminRoute._addFileChildren(AuthedFrameAdminRouteChildren)
 
+interface AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteChildren {
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
+}
+
+const AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteChildren: AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteChildren =
+  {
+    AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute,
+    AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute,
+    AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute,
+    AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute,
+  }
+
+const AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteWithChildren =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute._addFileChildren(
+    AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteChildren,
+  )
+
 interface AuthedFrameWWorkspaceIdIdeasIdeaIdRouteChildren {
   AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute
@@ -748,6 +870,7 @@ interface AuthedFrameWWorkspaceIdIdeasIdeaIdRouteChildren {
   AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute
   AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute
   AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
+  AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteWithChildren
   AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
 
@@ -767,6 +890,8 @@ const AuthedFrameWWorkspaceIdIdeasIdeaIdRouteChildren: AuthedFrameWWorkspaceIdId
       AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute,
     AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute:
       AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute,
+    AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdPlansPlanIdRouteWithChildren,
     AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute:
       AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute,
   }

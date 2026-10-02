@@ -1551,7 +1551,7 @@ Web（パターン A）                                        スマホは縦�
 - ⋯ メニュー: 案の名前を変える / AI 書き出し（24）/ AI 取り込み（25）/ アーカイブ / テンプレートの移行（M8）。
 - **案のアーカイブ**（Owner / Member）: 案の切替では「Archived」の下にまとめ、13 の Plans では隠す。読み取り専用で、版の保存・Go / No-Go・Add plan の対象にならない。工程の判定（プランの有無・Launch）、Due soon、期限の通知の対象から外す。Pitch Deck は表示できる。案の切替の「Archived」から開いて Restore する。M5 の既定名はアーカイブした案の名前も使用済みとして数える。閲覧・コメントの閲覧・変更履歴の閲覧はできるが、コメントを書く・元に戻すはできない（アイデアのアーカイブと同じ）。
 - 版を指定して開く（Versions から）と、その版のスナップショットを読み取り専用で表示する（上部に「Viewing v1 For advisors (read only)」）。
-- 空の状態: 下書き直後は、コピーした小項目だけが記入済み。「Start with the items marked [V] — they already have your validation data.」
+- 空の状態: 回答がすべて下書き作成時のコピーのままで、実行管理の初期行も変えていない間（API の `draftOnly`）は、「Start with the items marked [V]」で始まる案内文（続きは「they already have your validation data.」）を出す。版を開いているときは出さない。
 
 #### M3 版の保存（名前付きスナップショット）
 
@@ -1641,7 +1641,7 @@ Web（パターン A）                                        スマホは縦�
 | Next Action（§29） | Action / Owner / Deadline / Status | To do / Doing / Done（原本の Status） | なし |
 
 - 期限の列（Deadline / Target Date）は日付。ローンチの Timing は時期の名前で、日付は任意。
-- Next Actions は担当・状態・期限で絞り込み、期限順に並べる。期限切れは警告色とラベル「Overdue」。
+- Next Actions は担当・状態・期限（Overdue のみの切替。URL には入れない）で絞り込み、期限順に並べる。期限切れは警告色とラベル「Overdue」。
 - ローンチは時期の区分（T−30 / T−7 / Launch day / First 30 days / Days 31–90 / Other）ごとにまとめて出す。初期行はそれぞれの区分に入り、追加した行は区分を選ぶ（既定は Other）。Timing の文言は自由に直せ、区分とは別に持つ。KPI は Area ごとにまとめて出す。
 - 初期行は追加・削除・名前の変更ができる。
 - 期限の通知: 期限があり、Done / Resolved でない項目の担当者（メンバー）に、期限の3日前・当日・期限切れのそれぞれ1回、担当者のタイムゾーンの朝8時台に送る。期限を変えたら送り直す。アーカイブしたアイデア・プランの項目には送らない。
@@ -1651,7 +1651,7 @@ Web（パターン A）                                        スマホは縦�
 
 ### 6.14 23 Pitch Deck（パターン I）
 
-- プランから毎回生成する。スライドは直接編集しない。各スライドに「Edit source」（元の項目の 21 へ。Owner / Member）。数字の入るスライドには「Edit in validation」（17 / 18 へ。Owner / Member）も置く。
+- プランから毎回生成する。スライドは直接編集しない。各スライドに「Edit source」（元の項目の 21 へ。Owner / Member）。数字の入るスライドには「Edit in validation」（17 / 18 へ。Owner / Member）も置く。版を指定して開いているとき、プラン・アイデアがアーカイブ済みのときは、どちらのリンクも出さない（遷移先が読み取り専用のため）。
 - スライドの型は4つ: 表紙（大きな見出しと副題）/ 文章（見出しと箇条書き。2〜4つ、5分版の Ask / next step だけ3つの条件・Next Actions・資金の条件の5つ）/ 数字（見出しと大きな数字2〜4つ）/ 表（見出しと表）。各スライドの型は下の表のとおり。ロゴは置かず、Business Name を表紙とフッターに出す。
 - スライドへのコメントは「版の種類 + スライドのキー」で指す（例: `five.market`）。
 - 上部で **1分版（One-minute）/ 5分版（Five-minute）** を切り替える（原本 §30 の流れどおり）。

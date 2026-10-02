@@ -547,8 +547,8 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 | `/w/$workspaceId/ideas/$ideaId/economics` | 18 損益・シナリオ | `?field=` |
 | `/w/$workspaceId/ideas/$ideaId/decide` | 19 判定 | |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId` | 20 プランホーム | `?version=<plan_version の id>`（版の読み取り専用表示） |
-| `/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo` | 21 プラン項目の編集 | `$itemNo` は 1〜30。`?q=` |
-| `/w/$workspaceId/ideas/$ideaId/plans/$planId/execution` | 22 実行管理 | `?tab=milestones|launch|kpis|questions|actions&item=` |
+| `/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo` | 21 プラン項目の編集 | `$itemNo` は 1〜30。`?q=&version=<plan_version の id>`（P4 の `versionId`。版の読み取り専用表示から項目を開くとき） |
+| `/w/$workspaceId/ideas/$ideaId/plans/$planId/execution` | 22 実行管理 | `?tab=milestones|launch|kpis|questions|actions&item=&assignee=me|<user の id>&status=` |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch` | 23 Pitch Deck | `?variant=one|five&version=` |
 | `/w/$workspaceId/ai/export` | 24 AI 書き出し | `?source=self_analysis|validation|business_plan&id=&scope=` |
 | `/w/$workspaceId/ai/import` | 25 AI 取り込み | `?target=self_analysis|validation|business_plan&id=&scope=&returnTo=` |
@@ -1140,6 +1140,8 @@ interface PlanHome extends PlanSummary, Versioned {   // Versioned はヘッダ�
   ideaId: UUID; workspaceId: UUID; template: TemplateRef;
   businessName: string; preparedBy: string; date: DateTime;   // 最終更新日（版の表示中は保存日）
   latestDecision: DecisionValue | null;
+  ideaArchived: boolean;                       // アイデアがアーカイブ済み。20〜23 を読み取り専用にする
+  draftOnly: boolean;                          // 回答がすべて下書き作成時のコピーのままで、実行管理の初期行も未変更（20 の「Start with…」の表示に使う。版の表示中も今の内容で決める）
   viewingVersion: { id: UUID; name: string; savedAt: DateTime } | null;   // ?versionId= のとき
   keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months">;
   versions: PlanVersionSummary[];

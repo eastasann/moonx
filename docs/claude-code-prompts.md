@@ -630,7 +630,7 @@ Grace（Viewer）には自己分析のタブが出ず、make test-web が通る�
 
 ## Step 16: Web の残りの画面（3）: プラン・実行管理・Pitch Deck
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/design-spec.md 6.12（20 プランホーム・21 プラン項目の編集・M3・M4・M5）・6.13（22 実行管理）・

@@ -11,12 +11,16 @@ import decision from "../locales/en/decision.json";
 import decisionLog from "../locales/en/decisionLog.json";
 import economics from "../locales/en/economics.json";
 import errors from "../locales/en/errors.json";
+import execution from "../locales/en/execution.json";
 import form from "../locales/en/form.json";
 import ideas from "../locales/en/ideas.json";
 import mail from "../locales/en/mail.json";
 import notifications from "../locales/en/notifications.json";
 import panels from "../locales/en/panels.json";
+import pitch from "../locales/en/pitch.json";
 import plan from "../locales/en/plan.json";
+import planHome from "../locales/en/planHome.json";
+import planItem from "../locales/en/planItem.json";
 import research from "../locales/en/research.json";
 import selfAnalysis from "../locales/en/selfAnalysis.json";
 import validation from "../locales/en/validation.json";
@@ -37,12 +41,16 @@ export const resources = {
     decisionLog,
     economics,
     errors,
+    execution,
     form,
     ideas,
     mail,
     notifications,
     panels,
+    pitch,
     plan,
+    planHome,
+    planItem,
     research,
     selfAnalysis,
     validation,
@@ -64,12 +72,16 @@ export const NAMESPACES = [
   "decisionLog",
   "economics",
   "errors",
+  "execution",
   "form",
   "ideas",
   "mail",
   "notifications",
   "panels",
+  "pitch",
   "plan",
+  "planHome",
+  "planItem",
   "research",
   "selfAnalysis",
   "validation",

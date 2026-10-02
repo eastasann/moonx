@@ -1,0 +1,48 @@
+{
+  "crumb": "Item {{itemNo}}",
+  "itemTitle": "{{itemNo}}. {{title}}",
+  "planArchived": "This plan is archived",
+  "viewing": "Viewing {{name}} (read only)",
+  "complete": {
+    "home": "Back to the plan"
+  },
+  "copiedFrom": "Copied from validation on {{date}}",
+  "problems": {
+    "percent": "Enter a share from 0% to 100%",
+    "money": "Enter an amount of 0 or more"
+  },
+  "rowCount_one": "{{count}} row",
+  "rowCount_other": "{{count}} rows",
+  "itemCount_one": "{{count}} item",
+  "itemCount_other": "{{count}} items",
+  "noRows": "No rows",
+  "rowTitle": "Row {{position}}",
+  "removeRow": "Remove row {{position}}",
+  "addRow": "+ Add row",
+  "noValue": "—",
+  "totals": {
+    "ownership": "Ownership total: {{value}}",
+    "capital": "Capital total: {{value}}"
+  },
+  "metricsNote": "These numbers come from your validation and update when it changes.",
+  "editInValidation": "Edit in validation",
+  "ref": {
+    "heading": "References",
+    "note": "Always the latest from your validation, research and team. They do not change what you wrote here.",
+    "open": "Open the source",
+    "none": "Nothing to show yet",
+    "notWritten": "Not written yet",
+    "price": "Typical price",
+    "strength": "Strength",
+    "weakness": "Weakness",
+    "recorded": "{{name}}, {{date}}",
+    "confidence": "Confidence: {{level}}",
+    "whyBelieve": "Why we believe it",
+    "evidence": "Evidence",
+    "disprove": "What would disprove it",
+    "probability": "Probability",
+    "impact": "Impact",
+    "mitigation": "Mitigation",
+    "member": "Member"
+  }
+}

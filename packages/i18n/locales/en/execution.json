@@ -1,0 +1,132 @@
+{
+  "crumb": "Execution",
+  "title": "Execution",
+  "back": "← {{plan}}",
+  "planArchived": "This plan is archived",
+  "tabs": {
+    "label": "Kinds of execution items",
+    "withCount": "{{label}} ({{count}})",
+    "milestones": "Milestones",
+    "launch": "Launch",
+    "kpis": "KPIs",
+    "questions": "Open Questions",
+    "actions": "Next Actions"
+  },
+  "types": {
+    "milestone": "Milestone",
+    "launch": "Launch step",
+    "kpi": "KPI",
+    "open_question": "Open question",
+    "next_action": "Next action"
+  },
+  "status": {
+    "todo": "To do",
+    "doing": "Doing",
+    "done": "Done",
+    "open": "Open",
+    "resolved": "Resolved"
+  },
+  "timing": {
+    "t_minus_30": "T-30",
+    "t_minus_7": "T-7",
+    "launch_day": "Launch day",
+    "first_30": "First 30 days",
+    "days_31_90": "Days 31-90",
+    "other": "Other"
+  },
+  "fields": {
+    "milestone": "Milestone",
+    "goal": "Goal",
+    "assignee": "Assignee",
+    "assigneeName": "Assignee name",
+    "deadline": "Deadline",
+    "exitCondition": "Exit Condition",
+    "timing": "Timing",
+    "bucket": "Time bucket",
+    "actions": "Actions",
+    "completionCriteria": "Completion Criteria",
+    "dueDate": "Date",
+    "area": "Area",
+    "kpi": "KPI",
+    "target": "Target",
+    "reviewFrequency": "Review Frequency",
+    "actual": "Actual",
+    "openQuestion": "Open Question",
+    "whyItMatters": "Why It Matters",
+    "targetDate": "Target Date",
+    "answer": "Answer",
+    "action": "Action",
+    "status": "Status"
+  },
+  "unassigned": "Unassigned",
+  "someoneElse": "Someone else",
+  "assigneeNote": "Deadline notifications reach only members chosen from the list.",
+  "overdue": "Overdue",
+  "row": {
+    "assignee": "Assignee: {{name}}",
+    "due": "Due {{date}}",
+    "target": "Target: {{value}}",
+    "actual": "Actual: {{value}}"
+  },
+  "groupLabel": "{{name}}",
+  "kpi": {
+    "noArea": "No area",
+    "actualUpdated": "Actual updated {{date}}"
+  },
+  "add": "+ Add",
+  "noMatch": "Nothing matches these filters",
+  "pickRow": "Choose an item to see its details.",
+  "backToList": "Back to the list",
+  "rowMenu": "Actions for {{name}}",
+  "moveUp": "Move up",
+  "moveDown": "Move down",
+  "delete": "Delete",
+  "deleted": "Item deleted",
+  "deleteFailed": "Couldn't delete the item",
+  "moveFailed": "Couldn't move the item",
+  "itemName": "item",
+  "confirm": {
+    "title": "Delete \"{{name}}\"?",
+    "body": "The item leaves the list. You can bring it back from the change history."
+  },
+  "new": {
+    "form": "New {{type}}",
+    "title": "New {{type}}",
+    "submit": "Add"
+  },
+  "empty": {
+    "milestone": {
+      "heading": "No milestones yet",
+      "body": "Milestones are the steps to finish before launch, each with a goal and a deadline."
+    },
+    "launch": {
+      "heading": "No launch steps yet",
+      "body": "Launch steps say what to do and when, from 30 days before launch to the first 90 days."
+    },
+    "kpi": {
+      "heading": "No KPIs yet",
+      "body": "A KPI is a number you will watch, with a target and how often you will review it."
+    },
+    "open_question": {
+      "heading": "No open questions yet",
+      "body": "Write down what you still need to find out, and who will find it."
+    },
+    "next_action": {
+      "heading": "No next actions yet",
+      "body": "Next actions are the small tasks to do now, with a person and a deadline."
+    }
+  },
+  "filters": {
+    "assignee": "Assignee",
+    "anyone": "Anyone",
+    "me": "Me",
+    "status": "Status",
+    "anyStatus": "Any status",
+    "overdueOnly": "Overdue only"
+  },
+  "view": {
+    "open": "Open in Execution",
+    "add": "+ Add",
+    "empty": "Nothing yet"
+  }
+}

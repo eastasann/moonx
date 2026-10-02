@@ -1,0 +1,35 @@
+{
+  "crumb": "Pitch Deck",
+  "heading": "Pitch Deck",
+  "back": "Back to plan",
+  "variant": {
+    "label": "Deck length",
+    "one": "One-minute",
+    "five": "Five-minute"
+  },
+  "source": {
+    "label": "Generated from",
+    "latest": "Latest"
+  },
+  "versionNotice": "Showing the saved version “{{name}}”. Numbers are the values saved with it.",
+  "download": "Download PDF",
+  "preparing": "Preparing PDF…",
+  "pdfFailed": "Couldn't prepare the PDF",
+  "retry": "Retry",
+  "thumbnails": {
+    "label": "Slides",
+    "item": "{{n}}. {{title}}"
+  },
+  "slide": {
+    "label": "Slide {{n}} of {{total}}: {{title}}",
+    "editSource": "Edit source",
+    "editInValidation": "Edit in validation"
+  },
+  "empty": "Not written yet",
+  "overflow": "Too long for this slide — shorten it in the plan",
+  "notes": {
+    "heading": "What to say",
+    "help": "Shown in the app only. The PDF does not include it.",
+    "empty": "Not written yet"
+  }
+}

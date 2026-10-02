@@ -1,6 +1,9 @@
 import type { ComponentType } from "react";
 import { type ModalName, useOverlay } from "../lib/overlay";
+import { CreatePlanDialog } from "./CreatePlanDialog";
+import { GoNoGoDialog } from "./GoNoGoDialog";
 import { NewIdeaDialog } from "./NewIdeaDialog";
+import { SaveVersionDialog } from "./SaveVersionDialog";
 import { ShareDialog } from "./ShareDialog";
 import { SwitchWorkspaceDialog } from "./SwitchWorkspaceDialog";
 
@@ -10,6 +13,9 @@ import { SwitchWorkspaceDialog } from "./SwitchWorkspaceDialog";
  */
 const MODALS: Partial<Record<ModalName, ComponentType>> = {
   "new-idea": NewIdeaDialog,
+  "create-plan": CreatePlanDialog,
+  "save-version": SaveVersionDialog,
+  "go-no-go": GoNoGoDialog,
   share: ShareDialog,
   "switch-workspace": SwitchWorkspaceDialog,
 };

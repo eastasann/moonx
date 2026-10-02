@@ -175,5 +175,6 @@
       "payback": "Payback {{value}} months",
       "roi": "ROI {{value}}"
     }
-  }
+  },
+  "crumbFallback": "Plan"
 }

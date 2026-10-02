@@ -1,6 +1,6 @@
 import { schema } from "@moonx/db";
 import type { KeyMetrics, ScenarioColumn } from "@moonx/schemas";
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { ApiError } from "../errors";
 import { executionItemSnapshot } from "../history/snapshots";
 import type { Executor } from "./db";
@@ -65,6 +65,8 @@ export interface PlanBundle {
   questions: Map<string, TemplateQuestionRow>;
   answers: PlanAnswerRow[];
   execution: ExecutionRow[];
+  /** A preset execution row was deleted; `execution` holds only live rows, so this is not derivable from it. */
+  presetRowDeleted: boolean;
   versions: Omit<PlanVersionRow, "snapshot">[];
   validation: { data: ValidationData; state: ValidationState };
 }
@@ -89,35 +91,48 @@ export async function loadPlanBundle(db: Executor, planId: string): Promise<Plan
     .where(eq(schema.validations.ideaId, row.idea.id));
   if (!validation) throw new ApiError("NOT_FOUND", "Resource not found");
 
-  const [sections, answers, execution, versions, validationData] = await Promise.all([
-    loadTemplateSections(db, row.plan.templateVersionId),
-    db.select().from(schema.planAnswers).where(eq(schema.planAnswers.businessPlanId, planId)),
-    db
-      .select()
-      .from(schema.executionItems)
-      .where(
-        and(
-          eq(schema.executionItems.businessPlanId, planId),
-          isNull(schema.executionItems.deletedAt),
-        ),
-      )
-      .orderBy(asc(schema.executionItems.sortOrder), asc(schema.executionItems.createdAt)),
-    db
-      .select({
-        id: schema.planVersions.id,
-        businessPlanId: schema.planVersions.businessPlanId,
-        versionNumber: schema.planVersions.versionNumber,
-        name: schema.planVersions.name,
-        savedById: schema.planVersions.savedById,
-        savedAt: schema.planVersions.savedAt,
-        createdAt: schema.planVersions.createdAt,
-        updatedAt: schema.planVersions.updatedAt,
-      })
-      .from(schema.planVersions)
-      .where(eq(schema.planVersions.businessPlanId, planId))
-      .orderBy(desc(schema.planVersions.versionNumber)),
-    loadValidationData(db, [validation.id]),
-  ]);
+  const [sections, answers, execution, deletedPreset, versions, validationData] = await Promise.all(
+    [
+      loadTemplateSections(db, row.plan.templateVersionId),
+      db.select().from(schema.planAnswers).where(eq(schema.planAnswers.businessPlanId, planId)),
+      db
+        .select()
+        .from(schema.executionItems)
+        .where(
+          and(
+            eq(schema.executionItems.businessPlanId, planId),
+            isNull(schema.executionItems.deletedAt),
+          ),
+        )
+        .orderBy(asc(schema.executionItems.sortOrder), asc(schema.executionItems.createdAt)),
+      db
+        .select({ id: schema.executionItems.id })
+        .from(schema.executionItems)
+        .where(
+          and(
+            eq(schema.executionItems.businessPlanId, planId),
+            eq(schema.executionItems.fromPreset, true),
+            isNotNull(schema.executionItems.deletedAt),
+          ),
+        )
+        .limit(1),
+      db
+        .select({
+          id: schema.planVersions.id,
+          businessPlanId: schema.planVersions.businessPlanId,
+          versionNumber: schema.planVersions.versionNumber,
+          name: schema.planVersions.name,
+          savedById: schema.planVersions.savedById,
+          savedAt: schema.planVersions.savedAt,
+          createdAt: schema.planVersions.createdAt,
+          updatedAt: schema.planVersions.updatedAt,
+        })
+        .from(schema.planVersions)
+        .where(eq(schema.planVersions.businessPlanId, planId))
+        .orderBy(desc(schema.planVersions.versionNumber)),
+      loadValidationData(db, [validation.id]),
+    ],
+  );
   const data = validationData.get(validation.id) as ValidationData;
   const questions = new Map(sections.flatMap(({ rows }) => rows.map((q) => [q.key, q] as const)));
   return {
@@ -130,6 +145,7 @@ export async function loadPlanBundle(db: Executor, planId: string): Promise<Plan
     questions,
     answers,
     execution,
+    presetRowDeleted: deletedPreset.length > 0,
     versions,
     validation: {
       data,

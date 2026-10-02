@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: moonx
+      POSTGRES_PASSWORD: moonx
+      POSTGRES_DB: moonx
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - moonx-pgdata:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moonx -d moonx"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  moonx-pgdata:

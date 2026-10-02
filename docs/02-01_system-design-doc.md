@@ -102,6 +102,8 @@ moonx/
 ├─ infra/terraform/  modules/ と envs/{shared,staging,production}/
 ├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA
 ├─ e2e/           Playwright（Web）
+├─ docker/        ローカルの PostgreSQL の初期化 SQL（docker-compose.yml が使う）
+├─ scripts/       doc-lint と、画面の検査（`style` 属性・JSX の生の文字列。`make lint` が呼ぶ）
 └─ Makefile
 ```
 
@@ -132,6 +134,7 @@ moonx/
 | 変数 | 使う場所 | 内容 | local の値 | staging / production の置き場所 |
 |---|---|---|---|---|
 | `APP_ENV` | api | `local` / `staging` / `production` | `local` | Cloud Run の環境変数 |
+| `APP_VERSION` | api | `/api/health` の `version`（コミット SHA） | 未設定なら `dev` | API の Dockerfile が `build-api-image` の build-arg から環境変数に入れる |
 | `PORT` | api | 待ち受けるポート | `3000` | Cloud Run が `8080` を渡す |
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
 | `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
@@ -183,9 +186,9 @@ moonx/
 | `build-web ENV=...` | Web を環境ごとにビルドする（`VITE_*` を埋め込む） |
 | `build-api-image SHA=...` | API の Docker イメージを作って Artifact Registry に上げる |
 | `test` | `test-domain`・`test-api`・`test-web`・`test-mobile` をまとめて実行 |
-| `test-domain` / `test-api` / `test-web` / `test-mobile` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`、`test-api` は `apps/api`（`DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web`、`test-mobile` は `apps/mobile`・`packages/ui-native` |
+| `test-domain` / `test-api` / `test-web` / `test-mobile` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`scripts/`（画面の検査スクリプト）、`test-api` は `apps/api`（`DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web`、`test-mobile` は `apps/mobile`・`packages/ui-native` |
 | `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
-| `lint` / `format` / `typecheck` | Biome の検査・整形、TypeScript の型チェック |
+| `lint` / `format` / `typecheck` | Biome の検査・整形（`lint` は画面の検査スクリプト `scripts/check-screens.ts` も動かす）、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
 | `db-migrate` | マイグレーションを適用する（`DATABASE_URL_DIRECT` か `DATABASE_URL`） |
@@ -383,9 +386,9 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-017: モノレポは Bun workspaces ＋ Makefile
 
-**決定:** Bun workspaces で `apps/*` と `packages/*` をまとめる。パッケージ名は `@moonx/*`。タスクの実行は Makefile に集め（2章「make ターゲット」）、CI もデプロイを含めて Makefile のターゲットを呼ぶ（GitHub Actions のワークフローは `ci.yml`（PR）・`build.yml`（`main`）・`deploy.yml`（昇格）・`db-backup.yml`（定期のバックアップ））。
+**決定:** Bun workspaces で `apps/*` と `packages/*` をまとめる。パッケージ名は `@moonx/*`。タスクの実行は Makefile に集め（2章「make ターゲット」）、CI もデプロイを含めて Makefile のターゲットを呼ぶ（GitHub Actions のワークフローは `ci.yml`（PR）・`build.yml`（`main`）・`deploy.yml`（昇格）・`db-backup.yml`（定期のバックアップ））。`bunfig.toml` で `linker = "hoisted"` を指定する。
 
-**理由:** API が Bun で動くので、パッケージ管理も Bun にそろえる。Expo と Vite も Bun のワークスペースで動く。Makefile を正にすれば、ドキュメント・CI・CLAUDE.md がターゲット名だけを参照できる。
+**理由:** API が Bun で動くので、パッケージ管理も Bun にそろえる。Expo と Vite も Bun のワークスペースで動く。Makefile を正にすれば、ドキュメント・CI・CLAUDE.md がターゲット名だけを参照できる。hoisted にするのは、Expo の Metro と jest-expo が `node_modules` の標準の配置を前提にしており、Bun の隔離された配置では `@react-native/*` の変換が外れてテストが落ちるため。
 
 **トレードオフ:** Turborepo のような差分ビルドのキャッシュは無い。ビルドが遅くなったら導入を考える。
 
@@ -436,7 +439,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-022: テストとリントのツール
 
-**決定:** Biome（リントと整形）、TypeScript の型チェック、`packages/domain` と `apps/api` は Bun test（API は実際の PostgreSQL に対する結合テスト）、`apps/web` と `packages/ui-web` は Vitest ＋ Testing Library（部品は `@react-aria/test-utils` も）、`apps/mobile` と `packages/ui-native` は Jest（jest-expo）＋ React Native Testing Library、Web の E2E は Playwright、アクセシビリティの検査は axe（`@axe-core/playwright`）。画面にスタイルを書かない決まり（ADR-025）は Biome の `noRestrictedImports`、JSX の中の生の文字列（9章）は Biome の規則で足りない分を CI の小さな検査スクリプトで見つける。詳細は10章。
+**決定:** Biome（リントと整形）、TypeScript の型チェック、`packages/domain` と `apps/api` は Bun test（API は実際の PostgreSQL に対する結合テスト）、`apps/web` と `packages/ui-web` は Vitest ＋ Testing Library（部品は `@react-aria/test-utils` も）、`apps/mobile` と `packages/ui-native` は Jest（jest-expo）＋ React Native Testing Library（v13。v14 は React 19.3 が要り、Expo SDK 57 が固定する React 19.2 と二重になる）、Web の E2E は Playwright、アクセシビリティの検査は axe（`@axe-core/playwright`）。画面にスタイルを書かない決まり（ADR-025）は Biome の `noRestrictedImports`、JSX の中の生の文字列（9章）は Biome の規則で足りない分を CI の小さな検査スクリプトで見つける。詳細は10章。
 
 **理由:** 実行環境（Bun・Vite・React Native）ごとに標準のツールを使うのが、一番つまずきが少ない。Biome は1つのツールで速い。
 

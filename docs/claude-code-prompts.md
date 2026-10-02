@@ -22,7 +22,7 @@ Claude Code のチャットに **1つずつ** コピペして使う（`/draft:im
 
 ## Step 1: モノレポ骨格と開発環境
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/02-01_system-design-doc.md の2章（リポジトリ構成・環境と命名・環境変数・make ターゲット）と
@@ -775,7 +775,7 @@ docs/02-01_system-design-doc.md の10章（テスト戦略）・11章（KPI）�
 テストと品質を仕上げてください。
 
 やること:
-1. E2E（Playwright。e2e/。make test-e2e）: コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 →
+1. E2E（Playwright。e2e/。make test-e2e。e2e/playwright.config.ts の webServer で、DATABASE_URL_TEST の DB に対して API と Web を起動する）: コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 →
    プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）の Happy Path を1本。コアフローの E2E は
    **受入スイート**を兼ねる。「同じことができる」の判定基準になるため、実装の内部でなく仕様の振る舞いで書く。
    加えて、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除、

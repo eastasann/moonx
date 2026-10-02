@@ -1,0 +1,30 @@
+{
+  "name": "@moonx/mobile",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start --dev-client",
+    "test": "jest",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "expo": "^57.0.26",
+    "expo-constants": "^57.0.20",
+    "expo-linking": "^57.0.11",
+    "expo-router": "^57.0.24",
+    "expo-status-bar": "^57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.26.0"
+  },
+  "devDependencies": {
+    "@react-native/assets-registry": "0.86.3",
+    "@testing-library/react-native": "^13",
+    "@types/jest": "^30.0.0",
+    "@types/react": "19.2.3",
+    "jest": "^30.5.2",
+    "jest-expo": "^57.0.5",
+    "react-test-renderer": "19.2.3"
+  }
+}

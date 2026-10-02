@@ -1,0 +1,17 @@
+{
+  "name": "@moonx/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "elysia": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2"
+  }
+}

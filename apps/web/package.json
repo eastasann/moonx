@@ -1,0 +1,31 @@
+{
+  "name": "@moonx/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port 5173",
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@tanstack/react-form": "^1.33.5",
+    "@tanstack/react-query": "^5.104.0",
+    "@tanstack/react-router": "^1.170.41",
+    "@tanstack/react-start": "^1.168.60",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tanstack/router-plugin": "^1.168.42",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "19.2.3",
+    "@types/react-dom": "19.2.3",
+    "@vanilla-extract/css": "^1.21.2",
+    "@vanilla-extract/vite-plugin": "^5.2.6",
+    "@vitejs/plugin-react": "^6.1.1",
+    "jsdom": "^30.1.1",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  }
+}

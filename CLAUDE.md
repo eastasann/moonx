@@ -30,6 +30,7 @@
 - infra/terraform: `modules/` と `envs/{shared,staging,production}/`
 - deploy/{staging,production}/version: デプロイするコミット SHA
 - e2e/: Playwright（Web）
+- docker/・scripts/: ローカルの PostgreSQL の初期化 SQL / doc-lint と画面の検査スクリプト
 
 ## Key Design Decisions
 

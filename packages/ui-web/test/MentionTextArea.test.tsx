@@ -1,8 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { applyMention, findMentionQuery, MentionTextArea } from "../src/components/MentionTextArea";
 import { expectNoAxeViolations } from "./axe";
+import { mockNarrow } from "./matchMedia";
 
 const CANDIDATES = [
   { id: "ana", name: "Ana Reyes" },
@@ -65,7 +66,7 @@ test("Escape closes the list and a click on an option chooses it", async () => {
   await user.keyboard("{Escape}");
   expect(screen.queryByRole("listbox")).toBeNull();
   await user.type(input, "e");
-  fireEvent.click(screen.getByRole("option", { name: "Ben Cruz" }));
+  await user.click(screen.getByRole("option", { name: "Ben Cruz" }));
   expect(input).toHaveValue("@Ben Cruz ");
   expect(onMention).toHaveBeenCalledWith("ben");
 });
@@ -75,4 +76,38 @@ test("has no axe violations with the list open", async () => {
   const { container } = render(<Harness onMention={() => {}} />);
   await user.type(screen.getByRole("textbox", { name: "Comment" }), "@");
   await expectNoAxeViolations(container);
+});
+
+test("below tablet typing @ opens a tray to search and choose the member", async () => {
+  mockNarrow(true);
+  const user = userEvent.setup();
+  const onMention = vi.fn();
+  render(<Harness onMention={onMention} />);
+  const input = screen.getByRole("textbox", { name: "Comment" });
+  await user.type(input, "Hello @");
+  const tray = await screen.findByRole("dialog", { name: "Members" });
+  expect(input).not.toHaveAttribute("aria-controls");
+  expect(within(tray).getAllByRole("option")).toHaveLength(3);
+  await user.type(within(tray).getByRole("textbox", { name: "Members" }), "an");
+  expect(
+    within(tray)
+      .getAllByRole("option")
+      .map((o) => o.textContent),
+  ).toEqual(["Ana Reyes", "Anabel Lim"]);
+  await user.click(within(tray).getByRole("option", { name: "Anabel Lim" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(input).toHaveValue("Hello @Anabel Lim ");
+  expect(onMention).toHaveBeenCalledWith("anabel");
+});
+
+test("below tablet closing the tray keeps the typed text and does not reopen until the next keystroke", async () => {
+  mockNarrow(true);
+  const user = userEvent.setup();
+  render(<Harness onMention={() => {}} />);
+  const input = screen.getByRole("textbox", { name: "Comment" });
+  await user.type(input, "@");
+  await screen.findByRole("dialog", { name: "Members" });
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(input).toHaveValue("@");
 });

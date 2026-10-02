@@ -35,7 +35,7 @@ export interface IdeaSummary {
   stage: Stage;
   latestDecision: DecisionValue | null;
   archived: boolean;
-  checks: { key: CheckKey; state: CheckState }[];
+  checks: { key: CheckKey; state: CheckState; params: Record<string, number> }[];
   keyMetrics: Pick<KeyMetrics, (typeof LIST_METRIC_KEYS)[number]>;
   plans: {
     id: string;
@@ -120,7 +120,7 @@ export async function loadIdeas(
       ),
       latestDecision: row.latestDecision,
       archived: row.archivedAt != null,
-      checks: state.checks.map((c) => ({ key: c.key, state: c.state })),
+      checks: state.checks.map((c) => ({ key: c.key, state: c.state, params: c.params })),
       keyMetrics: pickMetrics(state.keyMetrics, LIST_METRIC_KEYS),
       plans: ideaPlans
         .filter((p) => !p.archived)

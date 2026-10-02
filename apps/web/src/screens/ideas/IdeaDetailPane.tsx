@@ -4,6 +4,7 @@ import { Badge, Divider, Flex, Heading, Link, Stack, StatusLight, Text } from "@
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import type { IdeaSummary } from "../../lib/ideas";
+import { checkLabel } from "../../lib/validation-home";
 import { checkVariant, proposerName } from "./ideaText";
 
 /** A key metric as text: the formatted number with its unit, or the reason it has none. */
@@ -71,9 +72,9 @@ export function IdeaDetailPane({
       <Divider />
       <Stack gap="space-100">
         <Heading level={3}>{t("ideas:detail.checks")}</Heading>
-        {idea.checks.map(({ key, state }) => (
+        {idea.checks.map(({ key, state, params }) => (
           <StatusLight key={key} variant={checkVariant(state)}>
-            {t(`ideas:check.${key}`)} · {t(`validation:checks.state.${state}`)}
+            {checkLabel(t, { key, params })} · {t(`validation:checks.state.${state}`)}
           </StatusLight>
         ))}
       </Stack>

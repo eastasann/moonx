@@ -1,7 +1,7 @@
 import { buildExport, type ExportQuestion } from "@moonx/domain";
 import type { Classification } from "@moonx/schemas";
 import { onlineManager } from "@tanstack/react-query";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, vi } from "vitest";
 import type { ContextQuestion, ImportContext } from "../src/lib/ai-exchange";
@@ -313,7 +313,8 @@ export function api(
 /** Puts `text` into the paste field of screen 25. */
 export async function paste(text: string) {
   const field = await screen.findByRole("textbox", { name: "AI reply" });
-  fireEvent.change(field, { target: { value: text } });
+  await userEvent.clear(field);
+  await userEvent.paste(text);
 }
 
 export const pressNext = () => userEvent.click(screen.getByRole("button", { name: "Next" }));

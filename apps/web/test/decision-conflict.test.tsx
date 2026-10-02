@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   changedAnswer,
@@ -22,7 +23,7 @@ test("a newer decision asks first, and confirming sends the same base with confi
       (body as { confirmNewer?: boolean }).confirmNewer ? recordedAnswer("drop") : changedAnswer(),
   });
   await fillDecision("Drop", "Too risky");
-  pressRecord();
+  await pressRecord();
   expect(
     await screen.findByText("Kenji recorded Hold 2 min. ago. Record yours as well?"),
   ).toBeInTheDocument();
@@ -30,7 +31,7 @@ test("a newer decision asks first, and confirming sends the same base with confi
   expect(router.state.location.pathname).not.toBe(HOME_URL);
   expect(screen.queryByText("Couldn't record")).toBeNull();
 
-  fireEvent.click(screen.getByRole("button", { name: "Record mine as well" }));
+  await userEvent.click(screen.getByRole("button", { name: "Record mine as well" }));
   await waitFor(() => expect(router.state.location.pathname).toBe(HOME_URL));
   expect(decisionPosts(api).map((c) => c.body)).toEqual([
     { value: "drop", reason: "Too risky", basedOnDecisionId: LAST_ID },

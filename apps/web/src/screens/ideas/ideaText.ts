@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { IdeaSummary } from "../../lib/ideas";
+import { checkLabel } from "../../lib/validation-home";
 
 type CheckState = IdeaSummary["checks"][number]["state"];
 
@@ -18,5 +19,5 @@ export function proposerName(t: TFunction, proposer: IdeaSummary["proposer"]): s
 
 /** The names of the checks that are not done yet, in the order of the six. */
 export function missingChecks(t: TFunction, idea: IdeaSummary): string[] {
-  return idea.checks.filter((c) => c.state !== "done").map(({ key }) => t(`ideas:check.${key}`));
+  return idea.checks.filter((c) => c.state !== "done").map((check) => checkLabel(t, check));
 }

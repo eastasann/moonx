@@ -1,43 +1,28 @@
-import { formatRelativeTime } from "@moonx/i18n";
-import { conflictCurrentSchema, createIdeaBodySchema } from "@moonx/schemas";
+import { createIdeaBodySchema } from "@moonx/schemas";
 import {
   Button,
   Dialog,
+  Flex,
   Form,
   InlineAlert,
   Stack,
   Text,
   TextArea,
   TextField,
-  Well,
 } from "@moonx/ui-web";
-import { useForm } from "@tanstack/react-form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { api, call } from "../../lib/api";
-import { isApiError } from "../../lib/api-error";
+import { ConflictDialog } from "../../components/ConflictDialog";
+import { autosave } from "../../lib/autosave";
 import { errorText } from "../../lib/error-text";
-import { fieldProps, validate } from "../../lib/form";
+import { validate } from "../../lib/form";
 import { IDEAS_KEY } from "../../lib/idea-actions";
-import { useMe } from "../../lib/session";
-import { toasts } from "../../lib/toast";
+import { ME_KEY } from "../../lib/session";
+import { useSavedItem } from "../../lib/use-saved-item";
 import type { ValidationHomeData } from "../../lib/validation-home";
-
-/**
- * The body of the 409. Eden parses ISO timestamps in a JSON body into `Date`s, so `updatedAt`
- * arrives as either form.
- */
-const conflictSchema = conflictCurrentSchema.extend({
-  value: z.object({
-    name: z.string(),
-    oneLineConcept: z.string(),
-    proposedSolution: z.string().nullable(),
-  }),
-  updatedAt: z.union([z.iso.datetime(), z.date()]),
-});
 
 interface Values {
   name: string;
@@ -45,33 +30,36 @@ interface Values {
   proposedSolution: string;
 }
 
-interface Save {
-  values: Values;
-  lockVersion: number;
-  force: boolean;
-}
+type Field = keyof Values;
+
+/** The summary as the 409 of I2 carries it in `current.value`. */
+const currentValueSchema = z.object({
+  name: z.string(),
+  oneLineConcept: z.string(),
+  proposedSolution: z.string().nullable(),
+});
 
 const toValues = (idea: {
   name: string;
   oneLineConcept: string;
   proposedSolution: string | null;
-}) => ({
+}): Values => ({
   name: idea.name,
   oneLineConcept: idea.oneLineConcept,
   proposedSolution: idea.proposedSolution ?? "",
 });
 
-/** The other person's saved summary carried by a 409 CONFLICT of I2, or null for any other error. */
-function readConflict(error: unknown) {
-  if (!isApiError(error) || error.code !== "CONFLICT") return null;
-  const current = conflictSchema.safeParse(error.extra.current);
-  return current.success ? { ...current.data, value: toValues(current.data.value) } : null;
-}
+/** The request body for one changed field; I2 stores a blank proposed solution as null. */
+const bodyOf = (field: Field, value: string) =>
+  field === "proposedSolution"
+    ? { proposedSolution: value.trim() === "" ? null : value }
+    : { [field]: value.trim() };
 
 /**
  * The sheet that edits the idea's name, one-line concept and proposed solution (design-spec 6.1).
- * When someone saved the summary after it was opened, I2 answers 409 and the sheet shows their
- * version beside the person's own, to load theirs or overwrite with mine (design-spec 6.0.2).
+ * It has no Save button: each field saves by the autosave rules, and a field that fails the
+ * check is not sent. When someone saved the summary first, the shared conflict choice opens
+ * (design-spec 6.0.2).
  */
 export function EditSummaryDialog({
   idea,
@@ -80,183 +68,172 @@ export function EditSummaryDialog({
   idea: ValidationHomeData["idea"];
   onClose: () => void;
 }) {
-  const { t } = useTranslation(["validation", "app"]);
+  const { t } = useTranslation(["validation", "form", "app"]);
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { timezone: timeZone } = useMe();
-  const formId = useId();
-  const [copyFailed, setCopyFailed] = useState(false);
-  const [lockVersion, setLockVersion] = useState(idea.lockVersion);
-  // The form re-applies `defaultValues` whenever they differ from its own, so loading their
-  // version must change what is passed here too, or the next render would put the old text back.
-  const [defaults, setDefaults] = useState(() => toValues(idea));
+  const [values, setValues] = useState<Values>(() => toValues(idea));
+  const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
 
-  const save = useMutation({
-    mutationFn: ({ values, lockVersion: version, force }: Save) =>
-      call(
-        api()
-          .api.v1.ideas({ ideaId: idea.id })
-          .patch({
-            name: values.name.trim(),
-            oneLineConcept: values.oneLineConcept.trim(),
-            proposedSolution:
-              values.proposedSolution.trim() === "" ? null : values.proposedSolution,
-            lockVersion: version,
-            ...(force ? { force: true } : {}),
-          }),
-      ),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: IDEAS_KEY });
-      // The breadcrumb reads the name from the route's loader.
-      await router.invalidate();
-      toasts.add({ title: t("app:saveState.saved"), variant: "positive" });
-      onClose();
-    },
-  });
-
-  const form = useForm({
-    defaultValues: defaults,
-    validators: { onSubmit: validate(createIdeaBodySchema, t) },
-    // The sheet shows the failure through `save.error` and keeps the input.
-    onSubmit: ({ value }) =>
-      save.mutateAsync({ values: value, lockVersion, force: false }).catch(() => {}),
-  });
-
-  const conflict = readConflict(save.error);
-  const otherError = save.error && !conflict ? save.error : null;
-
-  const loadTheirs = () => {
-    if (!conflict) return;
-    setDefaults(conflict.value);
-    form.reset(conflict.value);
-    setLockVersion(conflict.lockVersion);
-    save.reset();
-    void queryClient.invalidateQueries({ queryKey: IDEAS_KEY });
-  };
-  // Loading theirs drops the person's own input, so they can take it with them first.
-  const copyMine = () => {
-    const mine = form.state.values;
-    const text = fields.map((field) => `${field.label}: ${mine[field.name]}`).join("\n");
-    navigator.clipboard.writeText(text).then(
-      () => setCopyFailed(false),
-      () => setCopyFailed(true),
-    );
-  };
-  const overwrite = () => {
-    if (!conflict) return;
-    save.mutate({ values: form.state.values, lockVersion: conflict.lockVersion, force: true });
-  };
-
-  const fields: { name: keyof Values; label: string }[] = [
+  const fields: { name: Field; label: string }[] = [
     { name: "name", label: t("validation:home.edit.name") },
     { name: "oneLineConcept", label: t("validation:home.edit.oneLineConcept") },
     { name: "proposedSolution", label: t("validation:home.edit.proposedSolution") },
   ];
-  const shown = (text: string) => text || t("validation:home.edit.empty");
+  const summaryText = (summary: Values) =>
+    fields.map((field) => `${field.label}: ${summary[field.name]}`).join("\n");
+
+  const item = useSavedItem({
+    itemKey: `idea:${idea.id}`,
+    method: "PATCH",
+    url: `/api/v1/ideas/${idea.id}`,
+    lockVersion: idea.lockVersion,
+    onSaved: () => {
+      void queryClient.invalidateQueries({ queryKey: IDEAS_KEY });
+      // The breadcrumb reads the name from the route's loader.
+      void router.invalidate();
+    },
+    onSentElsewhere: () => {
+      void queryClient.invalidateQueries({ queryKey: IDEAS_KEY });
+    },
+    onAdopt: (current) => {
+      const theirs = currentValueSchema.safeParse(current.value);
+      if (theirs.success) setValues(toValues(theirs.data));
+      setErrors({});
+      void queryClient.invalidateQueries({ queryKey: IDEAS_KEY });
+    },
+    onRestore: (patch) => {
+      setValues((prev) => ({
+        name: typeof patch.name === "string" ? patch.name : prev.name,
+        oneLineConcept:
+          typeof patch.oneLineConcept === "string" ? patch.oneLineConcept : prev.oneLineConcept,
+        proposedSolution:
+          typeof patch.proposedSolution === "string"
+            ? patch.proposedSolution
+            : "proposedSolution" in patch
+              ? ""
+              : prev.proposedSolution,
+      }));
+    },
+  });
+
+  const change = (field: Field, value: string) => {
+    const next = { ...values, [field]: value };
+    setValues(next);
+    const result = validate(createIdeaBodySchema, t)({ value: next });
+    const message = result?.fields[field];
+    setErrors((prev) => ({ ...prev, [field]: message }));
+    // What waits from before this keystroke is the last value that passed; it goes out now so the
+    // timer cannot send it after the field has become invalid.
+    if (message) void item.flush();
+    else item.save(bodyOf(field, value));
+  };
+
+  // The hook stops listening when the sheet unmounts, so a save still on its way would not refresh
+  // the screens behind; they are refreshed once the queue has gone quiet.
+  const close = () => {
+    const queued = item.flush();
+    onClose();
+    void queued.then(async () => {
+      await autosave.idle();
+      void queryClient.invalidateQueries({ queryKey: IDEAS_KEY });
+      void router.invalidate();
+    });
+  };
+
+  const failure = item.failure;
+  // A refusal for lost rights is not queued; the screens behind read the idea and the person again (SDD 8.2).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reacts to a new failure only
+  useEffect(() => {
+    if (!failure || failure.willRetry) return;
+    if (["ARCHIVED", "FORBIDDEN", "NO_ACCESS"].includes(failure.error.code)) {
+      void queryClient.invalidateQueries({ queryKey: IDEAS_KEY });
+      void queryClient.invalidateQueries({ queryKey: ME_KEY });
+    }
+  }, [failure]);
+
+  const theirs = item.conflict ? currentValueSchema.safeParse(item.conflict.value) : null;
 
   return (
-    <Dialog
-      isOpen
-      size="medium"
-      title={t("validation:home.edit.title")}
-      closeLabel={t("app:close")}
-      isKeyboardDismissDisabled={save.isPending}
-      onOpenChange={(open) => !open && onClose()}
-      actions={
-        conflict ? (
-          <>
-            <Button variant="secondary" onPress={copyMine}>
-              {t("validation:home.edit.copyMine")}
-            </Button>
-            <Button variant="secondary" onPress={loadTheirs}>
-              {t("validation:home.edit.loadTheirs")}
-            </Button>
-            <Button isPending={save.isPending} pendingLabel={t("app:saving")} onPress={overwrite}>
-              {t("validation:home.edit.overwrite")}
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button variant="secondary" onPress={onClose}>
-              {t("app:cancel")}
-            </Button>
-            <Button
-              type="submit"
-              form={formId}
-              isPending={save.isPending}
-              pendingLabel={t("app:saving")}
+    <>
+      <Dialog
+        isOpen
+        size="medium"
+        title={t("validation:home.edit.title")}
+        closeLabel={t("app:close")}
+        isKeyboardDismissDisabled={item.conflict !== null}
+        onOpenChange={(open) => !open && close()}
+      >
+        <Stack gap="space-200">
+          {failure ? (
+            <InlineAlert
+              variant="negative"
+              heading={failure.willRetry ? t("form:saveFailed") : errorText(t, failure.error)}
             >
-              {t("validation:home.edit.save")}
-            </Button>
-          </>
-        )
-      }
-    >
-      <Stack gap="space-200">
-        {conflict ? (
-          <InlineAlert
-            variant="notice"
-            heading={t("validation:home.edit.conflictHeading", {
-              name: conflict.updatedBy?.displayName ?? t("validation:home.edit.someone"),
-              when: formatRelativeTime(conflict.updatedAt, new Date(), timeZone),
-            })}
+              <Flex gap="space-100" align="center" wrap>
+                <Button
+                  variant="secondary"
+                  size="S"
+                  onPress={() =>
+                    item.retry(
+                      Object.assign(
+                        {},
+                        ...fields
+                          .filter(({ name }) => !errors[name])
+                          .map(({ name }) => bodyOf(name, values[name])),
+                      ),
+                    )
+                  }
+                >
+                  {t("form:retry")}
+                </Button>
+              </Flex>
+            </InlineAlert>
+          ) : null}
+          <Form
+            aria-label={t("validation:home.edit.title")}
+            onSubmit={(event) => event.preventDefault()}
           >
-            <Stack gap="space-100">
-              <Text>{t("validation:home.edit.conflictBody")}</Text>
-              <Well aria-label={t("validation:home.edit.conflictTheirs")}>
-                <Stack gap="space-100">
-                  <Text variant="label">{t("validation:home.edit.conflictTheirs")}</Text>
-                  {fields.map((field) => (
-                    <Stack key={field.name} gap="space-25">
-                      <Text variant="caption" tone="secondary">
-                        {field.label}
-                      </Text>
-                      <Text>{shown(conflict.value[field.name])}</Text>
-                    </Stack>
-                  ))}
-                </Stack>
-              </Well>
-              {copyFailed ? (
-                <InlineAlert variant="notice" heading={t("validation:home.edit.copyFailed")} />
-              ) : null}
-            </Stack>
-          </InlineAlert>
-        ) : null}
-        {otherError ? <InlineAlert variant="negative" heading={errorText(t, otherError)} /> : null}
-        <Form
-          aria-label={t("validation:home.edit.title")}
-          id={formId}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void form.handleSubmit();
-          }}
-        >
-          <form.Field name="name">
-            {(field) => (
-              <TextField
-                label={t("validation:home.edit.name")}
-                isRequired
-                autoFocus
-                {...fieldProps(field)}
-              />
-            )}
-          </form.Field>
-          <form.Field name="oneLineConcept">
-            {(field) => (
-              <TextField
-                label={t("validation:home.edit.oneLineConcept")}
-                isRequired
-                {...fieldProps(field)}
-              />
-            )}
-          </form.Field>
-          <form.Field name="proposedSolution">
-            {(field) => (
-              <TextArea label={t("validation:home.edit.proposedSolution")} {...fieldProps(field)} />
-            )}
-          </form.Field>
-        </Form>
-      </Stack>
-    </Dialog>
+            <TextField
+              label={t("validation:home.edit.name")}
+              isRequired
+              autoFocus
+              value={values.name}
+              errorMessage={errors.name}
+              isInvalid={Boolean(errors.name)}
+              onChange={(value) => change("name", value)}
+              onBlur={() => void item.flush()}
+            />
+            <TextField
+              label={t("validation:home.edit.oneLineConcept")}
+              isRequired
+              value={values.oneLineConcept}
+              errorMessage={errors.oneLineConcept}
+              isInvalid={Boolean(errors.oneLineConcept)}
+              onChange={(value) => change("oneLineConcept", value)}
+              onBlur={() => void item.flush()}
+            />
+            <TextArea
+              label={t("validation:home.edit.proposedSolution")}
+              value={values.proposedSolution}
+              errorMessage={errors.proposedSolution}
+              isInvalid={Boolean(errors.proposedSolution)}
+              onChange={(value) => change("proposedSolution", value)}
+              onBlur={() => void item.flush()}
+            />
+          </Form>
+          <Text variant="caption" tone="secondary">
+            {t("validation:home.edit.autosave")}
+          </Text>
+        </Stack>
+      </Dialog>
+      <ConflictDialog
+        current={item.conflict}
+        itemName={t("validation:home.edit.conflictItem")}
+        theirText={theirs?.success ? summaryText(toValues(theirs.data)) : null}
+        mineText={summaryText(values)}
+        onLoadTheirs={item.loadTheirs}
+        onKeepMine={item.keepMine}
+      />
+    </>
   );
 }

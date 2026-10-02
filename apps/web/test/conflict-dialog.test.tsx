@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { I18nextProvider } from "react-i18next";
 import { expect, test, vi } from "vitest";
 import { ConflictDialog } from "../src/components/ConflictDialog";
@@ -50,26 +51,28 @@ test("without a name it says someone", () => {
   expect(screen.getByText(/Someone updated this answer/)).toBeInTheDocument();
 });
 
-test("each button reports the choice", () => {
+test("each button reports the choice", async () => {
+  const user = userEvent.setup();
   const { onLoadTheirs, onKeepMine } = renderDialog();
-  fireEvent.click(screen.getByRole("button", { name: "Load theirs" }));
+  await user.click(screen.getByRole("button", { name: "Load theirs" }));
   expect(onLoadTheirs).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole("button", { name: "Overwrite with mine" }));
+  await user.click(screen.getByRole("button", { name: "Overwrite with mine" }));
   expect(onKeepMine).toHaveBeenCalledTimes(1);
 });
 
-test("the input can be copied before it is dropped", () => {
-  const writeText = vi.fn().mockResolvedValue(undefined);
-  vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+test("the input can be copied before it is dropped", async () => {
+  const user = userEvent.setup();
+  const writeText = vi.spyOn(navigator.clipboard, "writeText");
   renderDialog();
-  fireEvent.click(screen.getByRole("button", { name: "Copy my input" }));
+  await user.click(screen.getByRole("button", { name: "Copy my input" }));
   expect(writeText).toHaveBeenCalledWith("My version");
-  vi.unstubAllGlobals();
 });
 
-test("Escape does not close it: closing is not a choice", () => {
+test("Escape does not close it: closing is not a choice", async () => {
+  const user = userEvent.setup();
   const { onLoadTheirs, onKeepMine } = renderDialog();
-  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  await user.click(screen.getByRole("dialog"));
+  await user.keyboard("{Escape}");
   expect(screen.getByRole("dialog")).toBeInTheDocument();
   expect(onLoadTheirs).not.toHaveBeenCalled();
   expect(onKeepMine).not.toHaveBeenCalled();

@@ -1,5 +1,5 @@
 import type { Classification } from "@moonx/schemas";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { I18nextProvider } from "react-i18next";
 import { expect, test, vi } from "vitest";
@@ -85,7 +85,7 @@ test("a read-only item shows the label and no buttons", () => {
   expect(screen.queryByRole("radio")).toBeNull();
 });
 
-test("the status label names Fact without evidence and the count of evidence", () => {
+test("the status label names Fact without evidence, and a Fact carries a chip for each piece of evidence", () => {
   const { rerender } = render(
     <I18nextProvider i18n={i18n}>
       <FauStatus classification={classified({ fau: "fact", state: "fact_no_evidence" })} />
@@ -105,5 +105,8 @@ test("the status label names Fact without evidence and the count of evidence", (
       />
     </I18nextProvider>,
   );
-  expect(screen.getByText("Fact · 1 evidence")).toBeInTheDocument();
+  expect(screen.getByText("Fact")).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("grid", { name: "Evidence" })).getByText("https://psa.gov.ph"),
+  ).toBeInTheDocument();
 });

@@ -4,12 +4,15 @@ import {
   Flex,
   Stack,
   StatusLight,
+  Tag,
+  TagGroup,
   Text,
   ToggleButtonGroup,
   ToggleButtonGroupItem,
 } from "@moonx/ui-web";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { evidenceTagText } from "../lib/evidence-tag";
 
 const CONFIDENCES: Confidence[] = ["low", "medium", "high"];
 
@@ -19,21 +22,38 @@ export interface FauChange {
   confidence?: Confidence;
 }
 
-/** The F/A/U label of an item, "Assumption · Medium", "Fact · No evidence" (design-spec 6.0.3). */
+/**
+ * The F/A/U label of an item, "Assumption · Medium", "Fact · No evidence" (design-spec 6.0.3). A
+ * Fact is followed by one chip per piece of evidence.
+ */
 export function FauStatus({ classification }: { classification: Classification }) {
-  const { t } = useTranslation("validation");
+  const { t } = useTranslation(["validation", "form"]);
   const { state, confidence, evidence } = classification;
   const label =
     state === "assumption" && confidence
       ? t("fau.assumptionWithConfidence", { confidence: t(`fau.confidence.${confidence}`) })
       : t(`fau.state.${state}`);
   const variant = state === "fact_no_evidence" ? "fact" : state;
-  return (
+  const light = (
     <StatusLight variant={variant} size="S">
-      {state === "fact" && evidence.length > 0
-        ? t("form:fau.factWithEvidence", { label, count: evidence.length })
-        : label}
+      {label}
     </StatusLight>
+  );
+  if (state !== "fact" || evidence.length === 0) return light;
+  return (
+    <Flex gap="space-100" align="center" wrap>
+      {light}
+      <TagGroup aria-label={t("form:fau.evidenceGroup")} size="S">
+        {evidence.map((item) => {
+          const text = evidenceTagText(item, t("form:evidence.deletedLog"));
+          return (
+            <Tag key={item.id} id={item.id} textValue={text}>
+              {text}
+            </Tag>
+          );
+        })}
+      </TagGroup>
+    </Flex>
   );
 }
 

@@ -37,14 +37,6 @@
     "created": "Created",
     "name": "Name"
   },
-  "check": {
-    "competitors": "Competitors",
-    "local_price": "Local price range",
-    "costs": "Startup & monthly costs",
-    "break_even": "Break-even volume",
-    "permits": "Permits",
-    "demand_signal": "Demand or problem signal"
-  },
   "row": {
     "listLabel": "Ideas",
     "updated": "Updated {{when}}",

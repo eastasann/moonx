@@ -17,7 +17,6 @@ const TARGET = `validation_answer:${VALIDATION}:V.01.WHO`;
 const OPEN = `/w/${WORKSPACE}?panel=history&target=${TARGET}`;
 
 beforeEach(() => {
-  toast.mockImplementation(() => "toast");
   vi.stubGlobal("matchMedia", (query: string) => ({
     matches: /min-width/.test(query),
     media: query,
@@ -25,7 +24,6 @@ beforeEach(() => {
     removeEventListener: () => {},
   }));
 });
-// A second real toast in one jsdom never lets the next press return, so the toast is spied on.
 const toast = vi.spyOn(toasts, "add");
 
 afterEach(() => {
@@ -140,6 +138,7 @@ test("Restore this version asks the server to restore that entry", async () => {
   await waitFor(() =>
     expect(toast).toHaveBeenCalledWith({ title: "Restored", variant: "positive" }),
   );
+  expect(await screen.findByText("Restored")).toBeInTheDocument();
 });
 
 test("a deleted row offers Undo delete", async () => {
@@ -171,6 +170,7 @@ test("an AI import offers one button for the whole operation, on its first row o
   await waitFor(() =>
     expect(toast).toHaveBeenCalledWith({ title: "Operation undone", variant: "positive" }),
   );
+  expect(await screen.findByText("Operation undone")).toBeInTheDocument();
   expect(api.calls.some((c) => c.method === "POST")).toBe(true);
 });
 

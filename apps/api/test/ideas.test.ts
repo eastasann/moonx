@@ -64,6 +64,7 @@ describe("I1 GET list", () => {
       "demand_signal",
     ]);
     expect(piaya.checks.every((c: { state: string }) => c.state === "done")).toBe(true);
+    expect(piaya.checks[0]).toMatchObject({ key: "competitors", params: { min: 3, max: 5 } });
     expect(piaya.keyMetrics.initial_cost_total.value).toBe(169500);
     expect(piaya.keyMetrics.break_even_units_day.value).toBeCloseTo(6.93, 2);
     expect(piaya.keyMetrics.expected_operating_profit.value).toBe(18490);

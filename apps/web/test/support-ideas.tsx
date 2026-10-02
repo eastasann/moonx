@@ -1,18 +1,5 @@
-import type { Me } from "@moonx/schemas";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  createMemoryHistory,
-  createRootRoute,
-  createRouter,
-  RouterProvider,
-} from "@tanstack/react-router";
-import { render } from "@testing-library/react";
-import { I18nextProvider } from "react-i18next";
-import { i18n } from "../src/lib/i18n";
-import type { IdeaSummary, IdeasSearch } from "../src/lib/ideas";
-import { ME_KEY } from "../src/lib/session";
-import { Ideas } from "../src/screens/Ideas";
-import { makeMe, WORKSPACE } from "./support";
+import type { IdeaSummary } from "../src/lib/ideas";
+import { WORKSPACE } from "./support";
 
 export const ANA = "44444444-4444-4444-8444-444444444444";
 export const KENJI = "66666666-6666-4666-8666-666666666666";
@@ -33,12 +20,12 @@ export function makeIdea(overrides: Partial<IdeaSummary> = {}): IdeaSummary {
     latestDecision: "proceed",
     archived: false,
     checks: [
-      { key: "competitors", state: "done" },
-      { key: "local_price", state: "done" },
-      { key: "costs", state: "done" },
-      { key: "break_even", state: "done" },
-      { key: "permits", state: "done" },
-      { key: "demand_signal", state: "done" },
+      { key: "competitors", state: "done", params: { min: 3, max: 5 } },
+      { key: "local_price", state: "done", params: { pricedCompetitors: 2, researchLogs: 1 } },
+      { key: "costs", state: "done", params: {} },
+      { key: "break_even", state: "done", params: {} },
+      { key: "permits", state: "done", params: { researchLogs: 1 } },
+      { key: "demand_signal", state: "done", params: { researchLogs: 1 } },
     ],
     keyMetrics: {
       initial_cost_total: { value: 450000, bound: "lower", reason: null },
@@ -68,12 +55,12 @@ export const BACOLOD = makeIdea({
   stage: "validation",
   latestDecision: "hold",
   checks: [
-    { key: "competitors", state: "done" },
-    { key: "local_price", state: "done" },
-    { key: "costs", state: "partial" },
-    { key: "break_even", state: "done" },
-    { key: "permits", state: "not_started" },
-    { key: "demand_signal", state: "done" },
+    { key: "competitors", state: "partial", params: { min: 3, max: 5 } },
+    { key: "local_price", state: "done", params: { pricedCompetitors: 2, researchLogs: 1 } },
+    { key: "costs", state: "partial", params: {} },
+    { key: "break_even", state: "done", params: {} },
+    { key: "permits", state: "not_started", params: { researchLogs: 1 } },
+    { key: "demand_signal", state: "done", params: { researchLogs: 1 } },
   ],
   plans: [],
   lastActivityAt: hoursAgo(26),
@@ -97,48 +84,3 @@ export const MEMBERS = {
     },
   ],
 };
-
-/**
- * Renders screen 6 without the app frame, with the account already cached. Popovers and menus
- * cannot be opened inside the full frame under jsdom (the test never returns), so the tests that
- * open one use this harness; `onSearchChange` records what the screen asks the URL to become.
- */
-export function renderIdeasScreen(
-  options: {
-    me?: Me;
-    search?: Partial<IdeasSearch>;
-    onSearchChange?: (patch: Partial<IdeasSearch>) => void;
-  } = {},
-) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  queryClient.setQueryData(ME_KEY, options.me ?? makeMe());
-  const search: IdeasSearch = {
-    decision: "not_dropped",
-    archived: false,
-    sort: "updated",
-    q: undefined,
-    ...options.search,
-  };
-  const root = createRootRoute({
-    component: () => (
-      <Ideas
-        workspaceId={WORKSPACE}
-        search={search}
-        onSearchChange={options.onSearchChange ?? (() => {})}
-      />
-    ),
-  });
-  const router = createRouter({
-    routeTree: root.addChildren([]),
-    defaultNotFoundComponent: () => null,
-    history: createMemoryHistory({ initialEntries: ["/"] }),
-  });
-  const view = render(
-    <I18nextProvider i18n={i18n}>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    </I18nextProvider>,
-  );
-  return { router, queryClient, ...view };
-}

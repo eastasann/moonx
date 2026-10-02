@@ -3,7 +3,6 @@ import { formatDate } from "@moonx/i18n";
 import {
   type Classification,
   type CreateEvidenceBody,
-  type Evidence,
   type ResearchLogInput,
   type SourceType,
   type SupportsCheck,
@@ -41,6 +40,7 @@ import { evidenceUrlSchema, newResearchLogSchema } from "../forms/evidence";
 import { api, call } from "../lib/api";
 import { isApiError } from "../lib/api-error";
 import { errorText } from "../lib/error-text";
+import { evidenceTagText } from "../lib/evidence-tag";
 import { fieldProps, validate } from "../lib/form";
 import { IDEAS_KEY } from "../lib/idea-actions";
 import { researchLogKey, validationKey } from "../lib/validation-keys";
@@ -68,13 +68,6 @@ export interface EvidenceSheetProps {
   onChanged: (result: EvidenceResult) => void;
   /** Someone saved the item first: the screen reads it again (text and version) before anything else is sent. */
   onConflict: () => void;
-}
-
-function evidenceTagText(evidence: Evidence, deletedLabel: string, timeZone = "UTC"): string {
-  const log = evidence.researchLog;
-  if (!log) return evidence.url ?? "";
-  const date = log.observedOn ? `${formatDate(log.observedOn, timeZone)} ` : "";
-  return `${date}${log.topic}${log.deleted ? ` (${deletedLabel})` : ""}`;
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { Classification } from "@moonx/schemas";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test } from "vitest";
 import { pendingQueue } from "../src/lib/pending-queue";
@@ -220,12 +220,202 @@ test("Ctrl+ArrowDown moves to the next question and Ctrl+ArrowUp back", async ()
   api();
   await renderApp(PATH("01", "?q=V.01.WHO"));
   const who = await screen.findByRole("textbox", { name: "Prompt of WHO" });
-  fireEvent.keyDown(who, { key: "ArrowDown", ctrlKey: true });
+  const user = userEvent.setup();
+  await user.click(who);
+  await user.keyboard("{Control>}{ArrowDown}{/Control}");
   expect(await screen.findByRole("textbox", { name: "Prompt of WHY THEM" })).toBeInTheDocument();
   expect(screen.queryByRole("textbox", { name: "Prompt of WHO" })).toBeNull();
-  fireEvent.keyDown(screen.getByRole("textbox", { name: "Prompt of WHY THEM" }), {
-    key: "ArrowUp",
-    ctrlKey: true,
-  });
+  await user.keyboard("{Control>}{ArrowUp}{/Control}");
   expect(await screen.findByRole("textbox", { name: "Prompt of WHO" })).toBeInTheDocument();
+});
+
+test("a 409 asks what to do; loading theirs replaces the field", async () => {
+  api({
+    [ANSWER("V.01.WHY_THEM")]: () => ({
+      status: 409,
+      body: {
+        error: {
+          code: "CONFLICT",
+          message: "x",
+          requestId: "abcdef12",
+          current: {
+            value: answer("V.01.WHY_THEM", { text: "Paolo's version", lockVersion: 4 }),
+            lockVersion: 4,
+            updatedAt: new Date().toISOString(),
+            updatedBy: { id: "u2", displayName: "Paolo", avatarUrl: null, badge: null },
+          },
+        },
+      },
+    }),
+  });
+  await renderApp(PATH("01", "?q=V.01.WHY_THEM"));
+  const field = await screen.findByRole("textbox", { name: "Prompt of WHY THEM" });
+  const user = userEvent.setup();
+  await user.clear(field);
+  await user.type(field, "My version");
+  await user.tab();
+  const dialog = await screen.findByRole("dialog", { name: "Someone updated this first" });
+  expect(within(dialog).getByText(/Paolo updated this answer/)).toBeInTheDocument();
+  expect(within(dialog).getByText("Paolo's version")).toBeInTheDocument();
+  expect(within(dialog).getByText("My version")).toBeInTheDocument();
+  await user.click(within(dialog).getByRole("button", { name: "Load theirs" }));
+  await waitFor(() =>
+    expect(screen.getByRole("textbox", { name: "Prompt of WHY THEM" })).toHaveValue(
+      "Paolo's version",
+    ),
+  );
+  expect(await pendingQueue.list(ME.id)).toEqual([]);
+});
+
+test("overwriting with mine sends the same input again with force", async () => {
+  let attempt = 0;
+  const { calls } = api({
+    [ANSWER("V.01.WHY_THEM")]: () => {
+      attempt += 1;
+      if (attempt === 1) {
+        return {
+          status: 409,
+          body: {
+            error: {
+              code: "CONFLICT",
+              message: "x",
+              requestId: "abcdef12",
+              current: {
+                value: answer("V.01.WHY_THEM", { text: "Paolo's version", lockVersion: 4 }),
+                lockVersion: 4,
+                updatedAt: new Date().toISOString(),
+                updatedBy: null,
+              },
+            },
+          },
+        };
+      }
+      return { body: answer("V.01.WHY_THEM", { text: "My version", lockVersion: 5 }) };
+    },
+  });
+  await renderApp(PATH("01", "?q=V.01.WHY_THEM"));
+  const field = await screen.findByRole("textbox", { name: "Prompt of WHY THEM" });
+  const user = userEvent.setup();
+  await user.clear(field);
+  await user.type(field, "My version");
+  await user.tab();
+  const dialog = await screen.findByRole("dialog", { name: "Someone updated this first" });
+  expect(within(dialog).getByText(/Someone updated this answer/)).toBeInTheDocument();
+  await user.click(within(dialog).getByRole("button", { name: "Overwrite with mine" }));
+  await waitFor(() => expect(calls.filter((c) => c.method === "PUT")).toHaveLength(2));
+  expect(calls.filter((c) => c.method === "PUT")[1]?.body).toEqual({
+    text: "My version",
+    lockVersion: 4,
+    force: true,
+  });
+});
+
+test("a queued input that conflicts comes back into the field with the choice", async () => {
+  await pendingQueue.put({
+    userId: ME.id,
+    itemKey: `answer:${VALIDATION_ID}:V.01.BEHAVIOR`,
+    request: {
+      method: "PUT",
+      url: `/api/v1/validations/${VALIDATION_ID}/answers/V.01.BEHAVIOR`,
+      body: { text: "Left unsent", lockVersion: 0 },
+    },
+    conflict: {
+      value: answer("V.01.BEHAVIOR", { text: "Paolo's version", lockVersion: 3 }),
+      lockVersion: 3,
+      updatedAt: new Date().toISOString(),
+      updatedBy: { id: "u2", displayName: "Paolo", avatarUrl: null, badge: null },
+    },
+    queuedAt: 1,
+  });
+  const { calls } = api();
+  await renderApp(PATH());
+  const dialog = await screen.findByRole("dialog", { name: "Someone updated this first" });
+  expect(within(dialog).getByText("Paolo's version")).toBeInTheDocument();
+  expect(within(dialog).getByText("Left unsent")).toBeInTheDocument();
+  expect(calls.filter((c) => c.method === "PUT")).toHaveLength(0);
+});
+
+test("closing the evidence sheet without evidence changes nothing", async () => {
+  const { calls } = api();
+  const user = userEvent.setup();
+  await renderApp(PATH("01", "?q=V.01.WHO"));
+  await screen.findByRole("textbox", { name: "Prompt of WHO" });
+  await user.click(screen.getByRole("radio", { name: "Fact" }));
+  const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+  await user.click(within(sheet).getByRole("button", { name: "Done" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull());
+  expect(calls.filter((c) => c.method !== "GET")).toHaveLength(0);
+  expect(screen.getByRole("radio", { name: "Assumption" })).toBeChecked();
+});
+
+test("Fact opens the evidence sheet, and attaching a research log makes the answer Fact", async () => {
+  const log = {
+    id: "77777777-7777-4777-8777-777777777777",
+    observedOn: "2026-09-12",
+    topic: "Store observation: SM Bacolod",
+  };
+  const { calls } = api({
+    [`GET /api/v1/validations/${VALIDATION_ID}/research-log`]: () => ({
+      body: {
+        items: [
+          {
+            ...log,
+            observation: null,
+            sourceType: null,
+            sourceUrl: null,
+            supportsChecks: [],
+            supportsNote: null,
+            lockVersion: 1,
+            updatedAt: null,
+            updatedBy: null,
+            createdBy: null,
+            usedAsEvidenceCount: 0,
+            commentCount: 0,
+          },
+        ],
+        nextCursor: null,
+      },
+    }),
+    [`POST /api/v1/validations/${VALIDATION_ID}/evidence`]: () => ({
+      status: 201,
+      body: {
+        evidence: { id: "e1" },
+        lockVersion: 3,
+        classification: {
+          fau: "fact",
+          confidence: null,
+          state: "fact",
+          evidence: [
+            {
+              id: "e1",
+              kind: "research_log",
+              researchLog: { ...log, sourceType: null, deleted: false },
+              url: null,
+              note: null,
+            },
+          ],
+        },
+      },
+    }),
+  });
+  const user = userEvent.setup();
+  await renderApp(PATH("01", "?q=V.01.WHO"));
+  await screen.findByRole("textbox", { name: "Prompt of WHO" });
+  await user.click(screen.getByRole("radio", { name: "Fact" }));
+  const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+  await user.click(await within(sheet).findByRole("checkbox", { name: /Store observation/ }));
+  await user.click(within(sheet).getByRole("button", { name: "Attach 1 entry" }));
+  await waitFor(() =>
+    expect(calls.find((c) => c.method === "POST")?.body).toEqual({
+      target: { type: "validation_answer", id: VALIDATION_ID, key: "V.01.WHO" },
+      researchLogEntryId: log.id,
+      setFact: true,
+      lockVersion: 2,
+    }),
+  );
+  expect(await within(sheet).findByText(/Store observation: SM Bacolod/)).toBeInTheDocument();
+  await user.click(within(sheet).getByRole("button", { name: "Done" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull());
+  const chips = await screen.findByRole("grid", { name: "Evidence" });
+  expect(within(chips).getByText(/Store observation: SM Bacolod/)).toBeInTheDocument();
 });

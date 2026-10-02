@@ -34,13 +34,13 @@
     "unknown": "Unknown",
     "confidence": "Confidence:",
     "confidenceGroup": "Confidence of {{label}}",
-    "factWithEvidence": "{{label}} · {{count}} evidence",
     "unknownConfirm": {
       "title": "Clear the value and mark it Unknown?",
       "body": "The value will be cleared. To keep the value, choose Assumption with Low confidence instead.",
       "confirm": "Clear and mark Unknown",
       "cancel": "Cancel"
-    }
+    },
+    "evidenceGroup": "Evidence"
   },
   "conflict": {
     "title": "Someone updated this first",

@@ -2,6 +2,7 @@ import { formatRelativeTime } from "@moonx/i18n";
 import { ActionMenu, Badge, CheckDots, Flex, MenuItem, Text } from "@moonx/ui-web";
 import { useTranslation } from "react-i18next";
 import type { IdeaSummary } from "../../lib/ideas";
+import { checkLabel } from "../../lib/validation-home";
 import { checkVariant, missingChecks, proposerName } from "./ideaText";
 
 /**
@@ -42,8 +43,8 @@ export function IdeaRowContent({
         <Flex gap="space-100" align="center" wrap>
           <CheckDots
             size="S"
-            items={idea.checks.map(({ key, state }) => ({
-              label: t(`ideas:check.${key}`),
+            items={idea.checks.map(({ key, state, params }) => ({
+              label: checkLabel(t, { key, params }),
               state: checkVariant(state),
               stateLabel: t(`validation:checks.state.${state}`),
             }))}

@@ -128,7 +128,7 @@ export function nextStepText(t: TFunction, step: NextStep, sections: Section[]):
 }
 
 /** The check's name; the competitors check carries the template's range. */
-export function checkLabel(t: TFunction, check: CheckResult): string {
+export function checkLabel(t: TFunction, check: Pick<CheckResult, "key" | "params">): string {
   return t(HOME_KEYS.checkLabel[check.key], {
     min: check.params.min ?? 0,
     max: check.params.max ?? 0,

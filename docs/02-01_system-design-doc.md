@@ -953,7 +953,7 @@ interface Invitation {
 interface IdeaSummary {
   id: UUID; name: string; oneLineConcept: string;
   proposer: UserRef; stage: Stage; latestDecision: DecisionValue | null; archived: boolean;
-  checks: { key: CheckKey; state: CheckState }[];          // 6つ。合計や点数は返さない
+  checks: { key: CheckKey; state: CheckState; params: Record<string, number> }[];   // 6つ。合計や点数は返さない。params は CheckResult（5.2）と同じ基準値（一覧が競合の範囲「Competitors (3–5)」を出すため）
   keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months">;
   plans: { id: UUID; name: string; latestVersionName: string | null; latestGoNoGo: GoNoGoValue | null }[];
   lastActivityAt: DateTime; createdAt: DateTime;

@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   DECISIONS_PATH,
@@ -28,13 +29,13 @@ test("a failed record keeps the input and Retry sends the same decision again", 
     },
   });
   await fillDecision("Hold", "Wait for the permit");
-  pressRecord();
+  await pressRecord();
   expect(await screen.findByText("Couldn't record")).toBeInTheDocument();
   expect(screen.getByRole("textbox", { name: /^Why\?/ })).toHaveValue("Wait for the permit");
   expect(screen.getByRole("radio", { name: "Hold" })).toBeChecked();
   expect(router.state.location.pathname).not.toBe(HOME_URL);
 
-  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  await userEvent.click(screen.getByRole("button", { name: "Retry" }));
   await waitFor(() => expect(router.state.location.pathname).toBe(HOME_URL));
   const bodies = decisionPosts(api).map((c) => c.body);
   expect(bodies).toHaveLength(2);

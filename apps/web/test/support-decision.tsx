@@ -1,4 +1,5 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import type { DecisionContext } from "../src/lib/decision";
 import { renderApp, stubApi, WORKSPACE } from "./support";
@@ -185,9 +186,10 @@ export async function fillDecision(
 ) {
   await waitForForm();
   await screen.findByRole("heading", { name: `Checks — ${missing} missing` });
-  fireEvent.click(screen.getByRole("radio", { name: value }));
-  fireEvent.change(screen.getByRole("textbox", { name: /^Why\?/ }), { target: { value: reason } });
+  await userEvent.click(screen.getByRole("radio", { name: value }));
+  await userEvent.click(screen.getByRole("textbox", { name: /^Why\?/ }));
+  await userEvent.paste(reason);
 }
 
 export const pressRecord = () =>
-  fireEvent.click(screen.getByRole("button", { name: "Record decision" }));
+  userEvent.click(screen.getByRole("button", { name: "Record decision" }));

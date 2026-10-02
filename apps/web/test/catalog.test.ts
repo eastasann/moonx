@@ -53,14 +53,6 @@ const DYNAMIC: Record<string, string[]> = {
     "drop",
   ].map((d) => `ideas:decisionFilter.${d}`),
   "ideas:sort.${sort}": ["updated", "created", "name"].map((x) => `ideas:sort.${x}`),
-  "ideas:check.${key}": [
-    "competitors",
-    "local_price",
-    "costs",
-    "break_even",
-    "permits",
-    "demand_signal",
-  ].map((k) => `ideas:check.${k}`),
   "ideas:goNoGo.${value}": ["launch", "delay", "stop"].map((v) => `ideas:goNoGo.${v}`),
   "landing.stages.${stage}.title": ["selfAnalysis", "validation", "plan"].map(
     (s) => `landing.stages.${s}.title`,

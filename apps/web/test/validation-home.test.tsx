@@ -352,3 +352,49 @@ test("a missing idea shows Not found", async () => {
   await renderApp(HOME_URL);
   expect(await screen.findByText("Not found. Check the link.")).toBeInTheDocument();
 });
+
+/** The viewport is below every `max-width` breakpoint, as on a phone. */
+const onPhone = () => {
+  const original = window.matchMedia;
+  window.matchMedia = ((query: string) => ({
+    ...original(query),
+    matches: query.includes("max-width"),
+  })) as typeof window.matchMedia;
+  return () => {
+    window.matchMedia = original;
+  };
+};
+
+test("on a phone the blocks stack as checks, F/A/U, sections, Summary, decisions, plans", async () => {
+  const restore = onPhone();
+  try {
+    await open();
+    const order = [
+      screen.getByRole("list", { name: "Checks" }),
+      screen.getByRole("group", { name: "Items by F/A/U" }),
+      screen.getByRole("list", { name: "Sections" }),
+      screen.getByRole("list", { name: "Summary" }),
+      screen.getByRole("list", { name: "Decisions" }),
+      screen.getByRole("list", { name: "Plans" }),
+    ];
+    for (let i = 0; i < order.length - 1; i++) {
+      expect(
+        Boolean(
+          (order[i] as Node).compareDocumentPosition(order[i + 1] as Node) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+      ).toBe(true);
+    }
+  } finally {
+    restore();
+  }
+});
+
+test("on a wide screen Summary stays in the left column, ahead of the sections column", async () => {
+  await open();
+  const summary = screen.getByRole("list", { name: "Summary" });
+  const sections = screen.getByRole("list", { name: "Sections" });
+  expect(
+    Boolean(sections.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_PRECEDING),
+  ).toBe(true);
+});

@@ -1,20 +1,7 @@
 import type { FauBreakdown, Me } from "@moonx/schemas";
-import { RouterProvider as UiRouterProvider } from "@moonx/ui-web";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  createMemoryHistory,
-  createRootRoute,
-  createRoute,
-  createRouter,
-  Outlet,
-  RouterProvider,
-} from "@tanstack/react-router";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { I18nextProvider } from "react-i18next";
-import { i18n } from "../src/lib/i18n";
-import { ME_KEY } from "../src/lib/session";
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ValidationHomeData } from "../src/lib/validation-home";
-import { ValidationHome } from "../src/screens/validation-home/ValidationHome";
 import { makeMe, renderApp, stubApi, WORKSPACE } from "./support";
 
 export const IDEA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -310,47 +297,6 @@ export function makeFullHome(overrides: Partial<ValidationHomeData> = {}): Valid
   });
 }
 
-/**
- * Renders the home without the app frame. Under jsdom a menu opened inside the frame never
- * finishes (the frame's side navigation keeps React Aria's hide-outside observer busy), so the
- * tests that open the header's menus mount the screen directly in a router of its own.
- */
-export async function renderHomeAlone(me: Me, path: string) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  queryClient.setQueryData(ME_KEY, me);
-  const root = createRootRoute({
-    component: () => (
-      <UiRouterProvider
-        navigate={(href) => router.history.push(href)}
-        useHref={(href) => router.history.createHref(href)}
-      >
-        <Outlet />
-      </UiRouterProvider>
-    ),
-  });
-  const home = createRoute({
-    getParentRoute: () => root,
-    path: "/w/$workspaceId/ideas/$ideaId",
-    component: function HomeRoute() {
-      const { workspaceId, ideaId } = home.useParams();
-      return <ValidationHome workspaceId={workspaceId} ideaId={ideaId} />;
-    },
-  });
-  const router = createRouter({
-    routeTree: root.addChildren([home]),
-    history: createMemoryHistory({ initialEntries: [path] }),
-  });
-  render(
-    <I18nextProvider i18n={i18n}>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    </I18nextProvider>,
-  );
-  await router.load();
-  return { router, queryClient };
-}
-
 export const HOME_URL = `/w/${WORKSPACE}/ideas/${IDEA}`;
 
 /** Stubs the API for the edit sheet: a signed-in owner, the full home and the given extra handlers. */
@@ -363,12 +309,14 @@ export function stubEditApi(extra: Parameters<typeof stubApi>[0]) {
   });
 }
 
-/** Opens the app on the home and the Edit summary sheet. Presses use fireEvent: user-event never returns inside a React Aria modal under jsdom. */
+/** Opens the app on the home and the Edit summary sheet. */
 export async function openEditSheet() {
   await renderApp(HOME_URL);
   await screen.findByRole("heading", { level: 1, name: "Piaya Gift Box Delivery" });
-  fireEvent.click(screen.getByRole("button", { name: "Edit summary" }));
-  return screen.findByRole("dialog", { name: "Edit summary" });
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Edit summary" }));
+  const dialog = await screen.findByRole("dialog", { name: "Edit summary" });
+  return { dialog, user };
 }
 
 export const patchesOf = (api: ReturnType<typeof stubApi>) =>
@@ -402,14 +350,19 @@ export const meOf = (role: Role): Me => {
   return { ...me, memberships: [{ ...first, role }, ...rest] };
 };
 
-/** The screen without the app frame, for the tests that open the header's menus. */
-export const openHomeAlone = async (
+/** Opens the app on the home of the full-home fixture, signed in with the given role. */
+export const openHome = async (
   home: ValidationHomeData,
   handlers: Parameters<typeof stubApi>[0] = {},
   role: Role = "owner",
 ) => {
-  const api = stubApi({ [`GET ${HOME_PATH}`]: () => ({ body: home }), ...handlers });
-  const view = await renderHomeAlone(meOf(role), HOME_URL);
+  const api = stubApi({
+    "GET /api/v1/me": () => ({ body: meOf(role) }),
+    "GET /api/v1/notifications/unread-count": () => ({ body: { total: 0 } }),
+    [`GET ${HOME_PATH}`]: () => ({ body: home }),
+    ...handlers,
+  });
+  const view = await renderApp(HOME_URL);
   await screen.findByRole("heading", { level: 1, name: home.idea.name });
-  return { api, ...view };
+  return { api, user: userEvent.setup(), ...view };
 };

@@ -1,6 +1,6 @@
 import type { Me } from "@moonx/schemas";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, waitFor } from "@testing-library/react";
+import { cleanup, render, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 import { getRouter } from "../src/router";
 
@@ -80,11 +80,21 @@ export const unauthenticated = (): { status: number; body: unknown } => ({
   body: { error: { code: "UNAUTHENTICATED", message: "no session", requestId: "abcdef12-0000" } },
 });
 
-/** Renders the whole app at `path`, with the API stubbed, and waits for the first load to settle. */
+/**
+ * Renders the whole app at `path`, with the API stubbed, and waits for the first load to settle.
+ * The root route renders `<html>` and `<body>`, which React binds to the document's own elements.
+ * Like the browser's entry, the tree is mounted on the document: in a `div`, an overlay portaled
+ * to `document.body` makes React's event dispatch walk from the portal to the root and back forever.
+ * `unmount` is `cleanup`, which also forgets the root: Testing Library refuses a second `render`
+ * into a container whose root was only unmounted.
+ */
 export async function renderApp(path: string) {
   const router = getRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
-  const view = render(<RouterProvider router={router} />);
+  const view = render(<RouterProvider router={router} />, {
+    container: document,
+    baseElement: document.body,
+  });
   await router.load();
   await waitFor(() => expect(router.state.isLoading).toBe(false));
-  return { router, ...view };
+  return { router, ...view, unmount: () => cleanup() };
 }

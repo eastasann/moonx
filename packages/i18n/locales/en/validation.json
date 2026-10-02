@@ -221,16 +221,8 @@
       "name": "Name",
       "oneLineConcept": "One-line concept",
       "proposedSolution": "Proposed solution",
-      "save": "Save",
-      "conflictHeading": "{{name}} updated this summary {{when}}",
-      "conflictBody": "Choose whose version to keep. Overwriting keeps their version in the history.",
-      "conflictTheirs": "Their version",
-      "loadTheirs": "Load theirs",
-      "overwrite": "Overwrite with mine",
-      "copyMine": "Copy my input",
-      "copyFailed": "Couldn't copy. Select your text in the form and copy it yourself.",
-      "empty": "(empty)",
-      "someone": "Someone"
+      "autosave": "Changes are saved as you type.",
+      "conflictItem": "summary"
     },
     "formerMember": "{{name}} (former member)",
     "conceptLine": "{{concept}} · {{proposer}}"

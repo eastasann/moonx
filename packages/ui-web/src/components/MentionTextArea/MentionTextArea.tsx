@@ -9,6 +9,14 @@ import {
   useState,
 } from "react";
 import {
+  Autocomplete,
+  Input,
+  ListBox,
+  ListBoxItem,
+  TextField,
+  useFilter,
+} from "react-aria-components";
+import {
   box,
   fieldRoot,
   label as labelClass,
@@ -16,6 +24,9 @@ import {
   listItem,
   textArea,
 } from "../_internal/field.css";
+import { trayDialog } from "../ComboBox/ComboBox.css";
+import { useIsNarrow } from "../ResponsivePopover";
+import { Tray } from "../Tray";
 
 export interface MentionCandidate {
   id: string;
@@ -52,9 +63,12 @@ export function applyMention(text: string, caret: number, name: string) {
 }
 
 /**
- * A multi-line field where typing `@` and some letters lists the candidates. The list is a
- * listbox the textarea points at with `aria-controls` and `aria-activedescendant`, so focus stays
- * in the text. The textarea keeps its textbox role because ARIA does not allow `combobox` on it. Up and Down move, Enter and Tab choose, Escape closes.
+ * A multi-line field where typing `@` and some letters lists the candidates. From tablet width
+ * the list is a listbox the textarea points at with `aria-controls` and `aria-activedescendant`,
+ * so focus stays in the text. The textarea keeps its textbox role because ARIA does not allow
+ * `combobox` on it. Up and Down move, Enter and Tab choose, Escape closes. Below
+ * `semantic.breakpoint.tablet` the candidates are chosen in a tray that holds its own search
+ * field, started with what was typed after the `@` (design-spec 4.5, as ComboBox does).
  */
 export function MentionTextArea({
   label,
@@ -73,6 +87,7 @@ export function MentionTextArea({
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const pendingCaret = useRef<number | null>(null);
+  const narrow = useIsNarrow();
 
   const query = dismissed ? null : findMentionQuery(value, caret);
   const matches =
@@ -141,13 +156,32 @@ export function MentionTextArea({
         className={`${box({ size })} ${textArea}`}
         aria-autocomplete="list"
         aria-haspopup="listbox"
-        aria-controls={open ? listId : undefined}
-        aria-activedescendant={open ? `${id}-option-${matches[activeIndex]?.id}` : undefined}
+        aria-controls={open && !narrow ? listId : undefined}
+        aria-activedescendant={
+          open && !narrow ? `${id}-option-${matches[activeIndex]?.id}` : undefined
+        }
         onChange={onTextChange}
         onKeyDown={onKeyDown}
         onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
       />
-      {open ? (
+      {narrow ? (
+        <Tray
+          aria-label={listLabel}
+          isOpen={open}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setDismissed(true);
+          }}
+        >
+          {/* Mounted only while open, so the search field starts from the text typed after the @. */}
+          <CandidateTray
+            initialQuery={query ?? ""}
+            candidates={candidates}
+            listLabel={listLabel}
+            size={size}
+            onChoose={choose}
+          />
+        </Tray>
+      ) : open ? (
         <div id={listId} role="listbox" aria-label={listLabel} className={listbox}>
           {matches.map((candidate, index) => (
             // The textarea keeps focus, so options are not tab stops; Enter and Tab choose.
@@ -168,6 +202,51 @@ export function MentionTextArea({
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function CandidateTray({
+  initialQuery,
+  candidates,
+  listLabel,
+  size,
+  onChoose,
+}: {
+  initialQuery: string;
+  candidates: readonly MentionCandidate[];
+  listLabel: string;
+  size: ComponentSize;
+  onChoose: (candidate: MentionCandidate) => void;
+}) {
+  const [query, setQuery] = useState(initialQuery);
+  const { contains } = useFilter({ sensitivity: "base" });
+  return (
+    <div className={trayDialog}>
+      <Autocomplete filter={contains} inputValue={query} onInputChange={setQuery}>
+        <TextField aria-label={listLabel}>
+          <Input autoFocus className={box({ size })} />
+        </TextField>
+        <ListBox
+          aria-label={listLabel}
+          className={listbox}
+          onAction={(key) => {
+            const chosen = candidates.find((candidate) => candidate.id === key);
+            if (chosen) onChoose(chosen);
+          }}
+        >
+          {candidates.map((candidate) => (
+            <ListBoxItem
+              key={candidate.id}
+              id={candidate.id}
+              textValue={candidate.name}
+              className={listItem({ size })}
+            >
+              {candidate.name}
+            </ListBoxItem>
+          ))}
+        </ListBox>
+      </Autocomplete>
     </div>
   );
 }

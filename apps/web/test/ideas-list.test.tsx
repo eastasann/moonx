@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { makeMe, renderApp, stubApi, WORKSPACE } from "./support";
@@ -50,12 +50,14 @@ test("each row shows the name, decision, stage, proposer, time and the checks", 
     within(bowl as HTMLElement).getByText(/Validation · Kenji Ito · Updated yesterday/),
   ).toBeInTheDocument();
   expect(
-    within(bowl as HTMLElement).getByText("Missing: Startup & monthly costs, Permits"),
+    within(bowl as HTMLElement).getByText(
+      "Missing: Competitors (3–5), Startup & monthly costs, Permits",
+    ),
   ).toBeInTheDocument();
   // The dots carry the state in their name, not in color alone.
   expect(
     within(bowl as HTMLElement).getByRole("img", {
-      name: /Startup & monthly costs: Partial, .*Permits: Not started/,
+      name: /Competitors \(3–5\): Partial, .*Startup & monthly costs: Partial, .*Permits: Not started/,
     }),
   ).toBeInTheDocument();
 });
@@ -120,12 +122,7 @@ test("choosing a row selects it in the URL and shows its summary", async () => {
   stubApi({ ...base(), [`GET ${IDEAS_PATH}`]: () => page() });
   const { router } = await renderApp(ideasUrl());
   expect(await screen.findByText("Select an idea to see its summary.")).toBeInTheDocument();
-  // A pointer press on a row never returns under user-event inside the full frame, so the row
-  // is chosen the way the keyboard does it.
-  const row = await screen.findByRole("row", { name: /Piaya Gift Box Delivery/ });
-  row.focus();
-  fireEvent.keyDown(row, { key: " ", code: "Space" });
-  fireEvent.keyUp(row, { key: " ", code: "Space" });
+  await userEvent.click(await screen.findByRole("row", { name: /Piaya Gift Box Delivery/ }));
   await waitFor(() => expect(router.state.location.search).toMatchObject({ selected: IDEA_A }));
   expect(
     await screen.findByRole("heading", { level: 2, name: "Piaya Gift Box Delivery" }),
@@ -223,14 +220,107 @@ test("the sidebar's Ideas entry points at this screen", async () => {
   expect(links.some((a) => a.getAttribute("href") === `/w/${WORKSPACE}/ideas`)).toBe(true);
 });
 
-// Last in the file: after a dialog opens in the full frame the next test never returns.
 test("a workspace with no ideas invites an Owner to write the first one", async () => {
   stubApi({ ...base(), [`GET ${IDEAS_PATH}`]: () => page([]) });
   const { router } = await renderApp(ideasUrl());
   expect(await screen.findByText("No ideas yet")).toBeInTheDocument();
   expect(screen.getByText("Write down the first one — you can have many.")).toBeInTheDocument();
   const buttons = screen.getAllByRole("button", { name: "New idea" });
-  // Opening a dialog inside the full frame only works with fireEvent (see workspace-switcher.test.tsx).
-  fireEvent.click(buttons[buttons.length - 1] as HTMLElement);
+  await userEvent.click(buttons[buttons.length - 1] as HTMLElement);
   await waitFor(() => expect(router.state.location.search).toMatchObject({ modal: "new-idea" }));
+});
+
+test("choosing a decision in the picker puts it in the URL", async () => {
+  stubApi({ ...base(), [`GET ${IDEAS_PATH}`]: () => page() });
+  const { router } = await renderApp(ideasUrl());
+  await screen.findAllByRole("row");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /Decision/ }));
+  await user.click(await screen.findByRole("option", { name: "Proceed" }));
+  await waitFor(() => expect(router.state.location.search).toMatchObject({ decision: "proceed" }));
+});
+
+test("the stage picker offers All and the three stages, and All clears the stage", async () => {
+  stubApi({ ...base(), [`GET ${IDEAS_PATH}`]: () => page() });
+  const { router } = await renderApp(ideasUrl("?stage=planning"));
+  await screen.findAllByRole("row");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /Stage/ }));
+  const options = await screen.findAllByRole("option");
+  expect(options.map((o) => o.textContent)).toEqual([
+    "All",
+    "Validation",
+    "Planning",
+    "Launch prep",
+  ]);
+  await user.click(options[0] as HTMLElement);
+  await waitFor(() => expect(router.state.location.search).not.toHaveProperty("stage"));
+});
+
+test("the sort picker has no decision sort", async () => {
+  stubApi({ ...base(), [`GET ${IDEAS_PATH}`]: () => page() });
+  await renderApp(ideasUrl());
+  await screen.findAllByRole("row");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /Sort/ }));
+  const options = await screen.findAllByRole("option");
+  expect(options.map((o) => o.textContent)).toEqual(["Updated", "Created", "Name"]);
+});
+
+test("an Owner duplicates from the row menu and lands on the copy", async () => {
+  const COPY = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const api = stubApi({
+    ...base(),
+    [`GET ${IDEAS_PATH}`]: () => page(),
+    [`POST /api/v1/ideas/${IDEA_A}/duplicate`]: () => ({
+      status: 201,
+      body: makeIdea({ id: COPY, name: "Piaya Gift Box Delivery (copy)" }),
+    }),
+  });
+  const { router } = await renderApp(ideasUrl());
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: "More actions for Piaya Gift Box Delivery" }),
+  );
+  await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
+  await waitFor(() => expect(router.state.location.pathname).toBe(`/w/${WORKSPACE}/ideas/${COPY}`));
+  expect(api.calls.some((c) => c.method === "POST" && c.url.pathname.endsWith("/duplicate"))).toBe(
+    true,
+  );
+});
+
+test("an Owner archives from the row menu and the list is read again", async () => {
+  const api = stubApi({
+    ...base(),
+    [`GET ${IDEAS_PATH}`]: () => page(),
+    [`POST /api/v1/ideas/${IDEA_B}/archive`]: () => ({ body: { ...BACOLOD, archived: true } }),
+  });
+  await renderApp(ideasUrl());
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: "More actions for Bacolod Health Bowl" }),
+  );
+  await user.click(await screen.findByRole("menuitem", { name: "Archive" }));
+  await waitFor(() => expect(listCalls(api).length).toBeGreaterThan(1));
+});
+
+test("an archived idea offers Restore instead of Archive", async () => {
+  const api = stubApi({
+    ...base(),
+    [`GET ${IDEAS_PATH}`]: () => page([{ ...BACOLOD, archived: true }]),
+    [`POST /api/v1/ideas/${IDEA_B}/restore`]: () => ({ body: BACOLOD }),
+  });
+  await renderApp(ideasUrl("?archived=true"));
+  expect(await screen.findByText("Archived")).toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: "More actions for Bacolod Health Bowl" }),
+  );
+  expect(screen.queryByRole("menuitem", { name: "Archive" })).not.toBeInTheDocument();
+  await user.click(await screen.findByRole("menuitem", { name: "Restore" }));
+  await waitFor(() =>
+    expect(api.calls.some((c) => c.method === "POST" && c.url.pathname.endsWith("/restore"))).toBe(
+      true,
+    ),
+  );
 });

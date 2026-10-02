@@ -86,6 +86,7 @@ export const hubRight = style([column, asChildren]);
 export const hubSummary = column;
 export const hubNext = column;
 export const hubStatus = column;
+export const hubSupplement = column;
 export const hubEntries = column;
 export const hubHistory = column;
 

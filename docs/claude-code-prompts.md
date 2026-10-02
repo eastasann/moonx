@@ -523,7 +523,7 @@ make test-domain・make test-api・make lint・make typecheck・make doc-lint �
 
 ## Step 13c: 仕様からの劣化を直す（2）: Web の画面
 
-Status:
+Status: done 2026-10-02
 
 ```
 Step 13b と同じ方針（元の仕様（コミット 5d85129 の docs）より劣化した点を戻す。ループが書き換えた docs も戻す。

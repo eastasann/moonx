@@ -15,6 +15,7 @@ import {
   hubRight,
   hubStatus,
   hubSummary,
+  hubSupplement,
   listDetail,
   listPane,
   pageFrame,
@@ -59,14 +60,21 @@ export interface HubPatternProps extends ActionSlot {
   status: ReactNode;
   /** Right column on desktop: the entries to other screens. Fourth on mobile. */
   entries: ReactNode;
+  /**
+   * Background the object carries, such as its summary. Bottom of the left column on desktop,
+   * after `entries` and before `history` on mobile.
+   */
+  supplement?: ReactNode;
   /** Change history and related items. Below `entries` on desktop, last on mobile. */
   history?: ReactNode;
 }
 
 /**
  * Pattern A, the hub. Desktop has two columns, the left holding `summary`, `nextSteps` and
- * `status` and the right holding `entries` and `history`. Below desktop the columns dissolve and
- * the slots stack in DOM order: summary, next steps, status, entries, history (design-spec 4.1).
+ * `status` and `supplement` and the right holding `entries` and `history`. Below desktop the
+ * columns dissolve and the slots stack in DOM order: summary, next steps, status, entries,
+ * supplement, history (design-spec 4.1). `supplement` is rendered once, where the width puts it,
+ * so the reading and focus order is the visual order.
  */
 export function HubPattern({
   header: head,
@@ -74,10 +82,13 @@ export function HubPattern({
   nextSteps,
   status,
   entries,
+  supplement,
   history,
   actions,
   hasTabBar,
 }: HubPatternProps) {
+  const compact = useBelowDesktop();
+  const supplementBlock = supplement ? <div className={hubSupplement}>{supplement}</div> : null;
   return (
     <div className={pageFrame}>
       {head ? <div className={header}>{head}</div> : null}
@@ -86,9 +97,11 @@ export function HubPattern({
           {summary ? <div className={hubSummary}>{summary}</div> : null}
           {nextSteps ? <div className={hubNext}>{nextSteps}</div> : null}
           <div className={hubStatus}>{status}</div>
+          {compact ? null : supplementBlock}
         </div>
         <div className={hubRight}>
           <div className={hubEntries}>{entries}</div>
+          {compact ? supplementBlock : null}
           {history ? <div className={hubHistory}>{history}</div> : null}
         </div>
       </div>

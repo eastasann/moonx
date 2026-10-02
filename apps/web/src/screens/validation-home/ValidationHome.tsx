@@ -40,15 +40,17 @@ function HomeContent({ data, workspaceId }: { data: ValidationHomeData; workspac
           <Stack gap="space-400">
             <Checks data={data} workspaceId={workspaceId} />
             <FauBreakdownBand fau={data.fau} />
-            <Summary
-              data={data}
-              workspaceId={workspaceId}
-              canChange={access.canChange}
-              onEdit={() => setEditing(true)}
-            />
           </Stack>
         }
         entries={<Sections data={data} workspaceId={workspaceId} />}
+        supplement={
+          <Summary
+            data={data}
+            workspaceId={workspaceId}
+            canChange={access.canChange}
+            onEdit={() => setEditing(true)}
+          />
+        }
         history={
           <Stack gap="space-400">
             <Decisions data={data} workspaceId={workspaceId} timeZone={access.timeZone} />

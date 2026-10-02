@@ -63,6 +63,24 @@ describe("A HubPattern", () => {
     expect(right).toContainElement(screen.getByText("history"));
   });
 
+  test("puts the supplement under the status on desktop", () => {
+    mockNarrow(false);
+    render(hub({ supplement: <p>supplement</p> }));
+    const left = screen.getByText("status").parentElement?.parentElement as HTMLElement;
+    expect(left).toContainElement(screen.getByText("supplement"));
+    expect(precedes(screen.getByText("status"), screen.getByText("supplement"))).toBe(true);
+  });
+
+  test("below desktop the supplement follows the entries and precedes the history", () => {
+    mockNarrow(true);
+    render(hub({ supplement: <p>supplement</p> }));
+    const order = ["status", "entries", "supplement", "history"].map((t) => screen.getByText(t));
+    for (let i = 0; i < order.length - 1; i++) {
+      expect(precedes(order[i] as Node, order[i + 1] as Node)).toBe(true);
+    }
+    expect(screen.getAllByText("supplement")).toHaveLength(1);
+  });
+
   test("omits optional slots", () => {
     render(<HubPattern status={<p>status</p>} entries={<p>entries</p>} />);
     expect(screen.queryByRole("button")).toBeNull();

@@ -3,6 +3,7 @@ import {
   Flex,
   Heading,
   ListDetailPattern,
+  Stack,
   Tab,
   TabList,
   TabPanel,
@@ -21,6 +22,7 @@ import {
   useAdminUsers,
   useAdminWorkspaces,
 } from "../lib/admin";
+import { AdminTabs } from "./admin/AdminTabs";
 import { InvitationDetail, InvitationsList } from "./admin/InvitationsPane";
 import { ListSearch } from "./admin/ListSearch";
 import { NewInvitationDialog } from "./admin/NewInvitationDialog";
@@ -146,14 +148,17 @@ export function AdminUsers({
     <>
       <ListDetailPattern
         header={
-          <Flex justify="between" align="center" gap="space-200">
-            <Heading level={1}>{t("title")}</Heading>
-            {tab === "invitations" && !compact ? (
-              <Button variant="accent" onPress={() => setInviting(true)}>
-                {t("invitations.new")}
-              </Button>
-            ) : null}
-          </Flex>
+          <Stack gap="space-200">
+            <Flex justify="between" align="center" gap="space-200">
+              <Heading level={1}>{t("title")}</Heading>
+              {tab === "invitations" && !compact ? (
+                <Button variant="accent" onPress={() => setInviting(true)}>
+                  {t("invitations.new")}
+                </Button>
+              ) : null}
+            </Flex>
+            <AdminTabs current="users" />
+          </Stack>
         }
         detailOpen={showDetail}
         list={

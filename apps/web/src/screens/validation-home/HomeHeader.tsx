@@ -19,6 +19,7 @@ import { useIdeaActions } from "../../lib/idea-actions";
 import { linkTargetPath } from "../../lib/link-target";
 import { useGoTo } from "../../lib/navigate";
 import { useOverlay } from "../../lib/overlay";
+import { formatMigrationTarget } from "../../lib/template-migration";
 import { HOME_KEYS, type ValidationHomeData } from "../../lib/validation-home";
 import type { HomeAccess } from "./access";
 import { decisionBadge, decisionText } from "./decision-text";
@@ -63,10 +64,13 @@ export function HomeHeader({
       onSuccess: (copy) => goTo(`/w/${workspaceId}/ideas/${copy.id}`),
     });
 
+  const openUpdateTemplate = () =>
+    openModal("update-template", formatMigrationTarget("validation", data.validationId));
+
   const onMenuAction = (key: string | number) => {
     if (key === "duplicate") duplicate();
     else if (key === "archive") actions.archive.mutate(idea.id);
-    else if (key === "update-template") openModal("update-template");
+    else if (key === "update-template") openUpdateTemplate();
   };
 
   return (
@@ -120,7 +124,7 @@ export function HomeHeader({
       ) : null}
       {hasNewerTemplate ? (
         <InlineAlert variant="informative" heading={t("home.templateNotice")}>
-          <Button variant="secondary" onPress={() => openModal("update-template")}>
+          <Button variant="secondary" onPress={openUpdateTemplate}>
             {t("home.updateTemplate")}
           </Button>
         </InlineAlert>

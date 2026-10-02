@@ -23,6 +23,7 @@ import planHome from "../locales/en/planHome.json";
 import planItem from "../locales/en/planItem.json";
 import research from "../locales/en/research.json";
 import selfAnalysis from "../locales/en/selfAnalysis.json";
+import templateMigration from "../locales/en/templateMigration.json";
 import validation from "../locales/en/validation.json";
 import workspaceSettings from "../locales/en/workspaceSettings.json";
 
@@ -53,6 +54,7 @@ export const resources = {
     planItem,
     research,
     selfAnalysis,
+    templateMigration,
     validation,
     workspaceSettings,
   },
@@ -84,6 +86,7 @@ export const NAMESPACES = [
   "planItem",
   "research",
   "selfAnalysis",
+  "templateMigration",
   "validation",
   "workspaceSettings",
 ] as const;

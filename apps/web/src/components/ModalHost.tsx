@@ -6,6 +6,7 @@ import { NewIdeaDialog } from "./NewIdeaDialog";
 import { SaveVersionDialog } from "./SaveVersionDialog";
 import { ShareDialog } from "./ShareDialog";
 import { SwitchWorkspaceDialog } from "./SwitchWorkspaceDialog";
+import { UpdateTemplateDialog } from "./UpdateTemplateDialog";
 
 /**
  * The modals that exist so far. A modal of design-spec 3.8 is added here by the step that builds
@@ -18,6 +19,7 @@ const MODALS: Partial<Record<ModalName, ComponentType>> = {
   "go-no-go": GoNoGoDialog,
   share: ShareDialog,
   "switch-workspace": SwitchWorkspaceDialog,
+  "update-template": UpdateTemplateDialog,
 };
 
 /** Shows the modal named by `?modal=` over the current screen. */

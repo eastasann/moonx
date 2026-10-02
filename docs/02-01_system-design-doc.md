@@ -518,6 +518,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 - モーダル（M1〜M8）とパネル（PNL-1・PNL-2）はルートを作らず、検索パラメータで開く: `?modal=new-idea|evidence|save-version|go-no-go|create-plan|share|switch-workspace|update-template`、`?panel=comments|history&target=<targetType>:<targetId>[:<targetKey>]`。
 - `target` の書式は2つ。項目は `<targetType>:<targetId>[:<targetKey>]`（`targetKey` に `:` を含んでもよい）で、コメント（C1）と項目の履歴（H1 の `targetType`・`targetId`・`targetKey`）に使う。画面全体の履歴は `container:<containerType>:<containerId>[:<sectionKey>]`（`containerType` は `self_analysis` / `validation` / `business_plan` / `idea`）で、H1 の `containerType`・`containerId`・`sectionKey` に渡す。画面全体にコメントの対象はなく、コメントを開けるのは項目と、`container:idea:<ideaId>`（アイデア `idea:<ideaId>` へのコメント）だけ。どちらにも当てはまらない値は、パネルを開かない。Web は `apps/web/src/lib/panel-target.tsx` の `parsePanelTarget` / `formatItemTarget` / `formatContainerTarget` で読み書きする。
 - モーダルが対象の項目を持つとき（M2 の根拠シート）は `?modal=evidence&about=<targetType>:<targetId>[:<targetKey>]` とする。`about` の書式は `target` の項目と同じで、パネルの `target` と同時に使える（パネルを開いたまま根拠シートを開ける）。
+- M8 は `?modal=update-template&about=<templateKind>:<targetId>`（`templateKind` は `self_analysis` / `validation` / `business_plan`、`targetId` は自己分析・検証・プランの id）で開く。`about` が無いとき、画面の対象と食い違うとき、操作できない人が開いたときは、何も出さない。
 - 認証が要るルートで未ログインなら `/login?next=<元のパス>` へ移る。
 - `/dev/components` は部品の確認用ページで、開発サーバー（`import.meta.env.DEV`）だけで開く。本番のビルドには入らず、開くと Not Found になる。スマホには作らない（パスを Web とスマホで同じにする決まりの例外）。
 
@@ -553,7 +554,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 | `/w/$workspaceId/ai/export` | 24 AI 書き出し | `?source=self_analysis|validation|business_plan&id=&scope=` |
 | `/w/$workspaceId/ai/import` | 25 AI 取り込み | `?target=self_analysis|validation|business_plan&id=&scope=&returnTo=` |
 | `/admin/templates` | 26 管理: テンプレート一覧 | `?kind=` |
-| `/admin/templates/versions/$versionId` | 27 管理: テンプレート編集 | `?node=<section か question の id>` |
+| `/admin/templates/versions/$versionId` | 27 管理: テンプレート編集 | `?node=<section か question の id>`、または設定のノード `ai-prompt` / `cost-defaults` / `check-rules` / `execution-presets` |
 | `/admin/users` | 28 管理: ユーザーとワークスペース | `?tab=users|workspaces|invitations` |
 
 API のルートは5章、Worker が配る静的なファイル（`/.well-known/apple-app-site-association`、`/.well-known/assetlinks.json`、`/robots.txt`）は `apps/web/public/` に置く。
@@ -1288,7 +1289,8 @@ interface HistoryEntry {
   action: "create" | "update" | "delete" | "restore";
   source: HistorySource;
   before: unknown | null; after: unknown | null;   // 本文・数字・F/A/U・確信度・根拠の id の一覧など（差分の強調はクライアント）
-  changedBy: UserRef; changedAt: DateTime; revertible: boolean;
+  changedBy: UserRef; changedAt: DateTime;
+  revertible: boolean;   // 呼んだ人がこの行を戻せる（Viewer・アーカイブ済みは false）。`template_version` の行は H2 では戻せないが、H3 で操作全体を戻せるときは true
 }
 interface Notification {
   id: UUID; kind: "mention" | "comment" | "decision" | "due";
@@ -1309,8 +1311,8 @@ interface Notification {
 | C2 PATCH | `{ body: string; mentionUserIds: UUID[] }` | `200 Comment` | 新しくメンションした人にだけ通知する |
 | C2 DELETE | — | `204` | 「deleted」として残す |
 | C3 | — | `200 Comment` | スレッドの最初のコメントだけ |
-| H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKey=&cursor=` | `200 Page<HistoryEntry>` | 新しい順 |
-| H2 | — | `200 { entry: HistoryEntry; target: unknown }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す。衝突の検査はしない（戻すのは意図した上書き） |
+| H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKey=&cursor=` | `200 Page<HistoryEntry>` | 新しい順。`containerType=idea`（13）は、アイデア自身の行に加え、そのアイデアの検証のテンプレートの版の行（テンプレートの移行。design-spec 6.0.7）も返す。項目の指定と `sectionKey` の指定では返さない |
+| H2 | — | `200 { entry: HistoryEntry; target: unknown }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す。衝突の検査はしない（戻すのは意図した上書き）。`template_version` の行は `422 VALIDATION_FAILED`（H3 で戻す） |
 | H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 CONFLICT`。下書き作成と複製は作ったレコードごと消すことになるため戻せず、`422 VALIDATION_FAILED` |
 | N1 | `?filter=all|unread&cursor=&limit=` | `200 Page<Notification>` | ワークスペースをまたいで新しい順 |
 | N2 | — | `200 { total: number }` | クライアントは画面を開いたとき・前面に戻ったとき・60秒ごとに呼ぶ |

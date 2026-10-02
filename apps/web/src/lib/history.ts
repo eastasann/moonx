@@ -1,7 +1,14 @@
 import type { HistoryEntry } from "@moonx/schemas";
-import { infiniteQueryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  infiniteQueryOptions,
+  type QueryClient,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { SELF_ANALYSIS_KEY } from "./ai-exchange";
 import { api, call } from "./api";
 import { COMMENTS_KEY } from "./comments";
+import { DASHBOARD_KEY } from "./dashboard";
 import { IDEAS_KEY } from "./idea-actions";
 import type { PanelTarget } from "./panel-target";
 
@@ -49,17 +56,32 @@ export function historyQuery(target: PanelTarget) {
 }
 
 /**
- * H2 and H3. Taking changes back rewrites item content, which the idea screens and the
- * validation's sections read, and hides or shows the comments of a deleted or restored row.
+ * Refreshes everything a change to answers, rows or the pinned template version can touch: the
+ * history and comments, the idea screens, the validation's sections, the self analysis, the
+ * plans and the dashboard's activity.
+ */
+export function refreshAfterContentChange(queryClient: QueryClient) {
+  return Promise.all(
+    [
+      HISTORY_KEY,
+      COMMENTS_KEY,
+      IDEAS_KEY,
+      ["validations"],
+      SELF_ANALYSIS_KEY,
+      ["plans"],
+      DASHBOARD_KEY,
+    ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+  );
+}
+
+/**
+ * H2 and H3. Taking changes back rewrites item content, which the idea screens, the validation's
+ * sections, the self analysis and the plans read, hides or shows the comments of a deleted or
+ * restored row, and (for a template migration) moves the pinned template version.
  */
 export function useRevertMutations() {
   const queryClient = useQueryClient();
-  const refresh = () =>
-    Promise.all(
-      [HISTORY_KEY, COMMENTS_KEY, IDEAS_KEY, ["validations"]].map((queryKey) =>
-        queryClient.invalidateQueries({ queryKey }),
-      ),
-    );
+  const refresh = () => refreshAfterContentChange(queryClient);
   return {
     entry: useMutation({
       mutationFn: (entryId: string) => call(api().api.v1.history({ entryId }).revert.post()),

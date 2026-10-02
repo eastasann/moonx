@@ -15,6 +15,13 @@ export type HistoryRow = typeof schema.changeHistory.$inferSelect;
  */
 const NOT_RESTORABLE = new Set<TargetType>(["pitch_slide", "template_version"]);
 
+/**
+ * Whether `revertible` is true for a target that H2 refuses. A template migration may consist of
+ * this one row alone (self analysis, plan), so the client has no other row in its batch to learn
+ * from whether the caller may use H3; for it `revertible` means "H3 can take the batch back".
+ */
+const BATCH_ONLY = new Set<TargetType>(["template_version"]);
+
 const versionNumberOf = (row: HistoryRow): number | null => {
   const state = (row.after ?? row.before) as { versionNumber?: number } | null;
   return state?.versionNumber ?? null;
@@ -74,7 +81,7 @@ export async function toHistoryEntries(
       after: row.after ?? null,
       changedBy: refs.get(row.changedById) as NonNullable<ReturnType<typeof refs.get>>,
       changedAt: iso(row.changedAt),
-      revertible: mayRevert && !NOT_RESTORABLE.has(target.type),
+      revertible: mayRevert && (!NOT_RESTORABLE.has(target.type) || BATCH_ONLY.has(target.type)),
     };
   });
 }

@@ -1,0 +1,24 @@
+{
+  "title": "Update template",
+  "version": "Template v{{from}} to v{{to}}",
+  "intro": "Answers to questions that are still in the new version carry over. Nothing is deleted.",
+  "loadFailed": "Couldn't load the changes",
+  "retry": "Retry",
+  "carried_one": "{{count}} answer carries over",
+  "carried_other": "{{count}} answers carry over",
+  "added_one": "{{count}} new question, empty until you answer it",
+  "added_other": "{{count}} new questions, empty until you answer them",
+  "addedCosts": "Cost rows added",
+  "hidden": {
+    "heading": "Not in the new version",
+    "body": "These answers are hidden, not deleted. They no longer count toward progress, F/A/U, AI export or copies, and come back if you undo the update.",
+    "withAnswer": "Has an answer",
+    "withoutAnswer": "No answer"
+  },
+  "nothingHidden": "Every question carries over.",
+  "confirm": "Update to v{{version}}",
+  "updating": "Updating",
+  "failed": "Couldn't update the template",
+  "alreadyLatest": "This is already on the latest template. Nothing to update.",
+  "done": "Template updated to v{{version}}"
+}

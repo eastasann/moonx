@@ -24,8 +24,11 @@
       "aiExport": "AI export",
       "aiImport": "AI import",
       "archive": "Archive plan",
-      "restore": "Restore plan"
+      "restore": "Restore plan",
+      "updateTemplate": "Update template"
     },
+    "templateNotice": "A newer template is available",
+    "updateTemplate": "Update template",
     "fields": {
       "businessName": "Business name",
       "preparedBy": "Prepared by",

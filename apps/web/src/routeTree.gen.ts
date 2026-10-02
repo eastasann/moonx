@@ -23,12 +23,14 @@ import { Route as AuthedFrameAdminRouteImport } from './routes/_authed/_frame/ad
 import { Route as AuthedFrameNotificationsRouteImport } from './routes/_authed/_frame/notifications'
 import { Route as AuthedFrameAdminUsersRouteImport } from './routes/_authed/_frame/admin.users'
 import { Route as AuthedFrameWWorkspaceIdRouteImport } from './routes/_authed/_frame/w.$workspaceId'
+import { Route as AuthedFrameAdminTemplatesIndexRouteImport } from './routes/_authed/_frame/admin.templates.index'
 import { Route as AuthedFrameWWorkspaceIdIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.index'
 import { Route as AuthedFrameWWorkspaceIdDecisionsRouteImport } from './routes/_authed/_frame/w.$workspaceId.decisions'
 import { Route as AuthedFrameWWorkspaceIdIdeasRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas'
 import { Route as AuthedFrameWWorkspaceIdSelfAnalysisRouteImport } from './routes/_authed/_frame/w.$workspaceId.self-analysis'
 import { Route as AuthedFrameWWorkspaceIdSettingsRouteImport } from './routes/_authed/_frame/w.$workspaceId.settings'
 import { Route as AuthedFrameWWorkspaceIdTeamRouteImport } from './routes/_authed/_frame/w.$workspaceId.team'
+import { Route as AuthedFrameAdminTemplatesVersionsVersionIdRouteImport } from './routes/_authed/_frame/admin.templates.versions.$versionId'
 import { Route as AuthedFrameWWorkspaceIdAiExportRouteImport } from './routes/_authed/_frame/w.$workspaceId.ai.export'
 import { Route as AuthedFrameWWorkspaceIdAiImportRouteImport } from './routes/_authed/_frame/w.$workspaceId.ai.import'
 import { Route as AuthedFrameWWorkspaceIdIdeasIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.index'
@@ -120,6 +122,12 @@ const AuthedFrameWWorkspaceIdRoute = AuthedFrameWWorkspaceIdRouteImport.update({
   path: '/w/$workspaceId',
   getParentRoute: () => AuthedFrameRoute,
 } as any)
+const AuthedFrameAdminTemplatesIndexRoute =
+  AuthedFrameAdminTemplatesIndexRouteImport.update({
+    id: '/templates/',
+    path: '/templates/',
+    getParentRoute: () => AuthedFrameAdminRoute,
+  } as any)
 const AuthedFrameWWorkspaceIdIndexRoute =
   AuthedFrameWWorkspaceIdIndexRouteImport.update({
     id: '/',
@@ -155,6 +163,12 @@ const AuthedFrameWWorkspaceIdTeamRoute =
     id: '/team',
     path: '/team',
     getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
+  } as any)
+const AuthedFrameAdminTemplatesVersionsVersionIdRoute =
+  AuthedFrameAdminTemplatesVersionsVersionIdRouteImport.update({
+    id: '/templates/versions/$versionId',
+    path: '/templates/versions/$versionId',
+    getParentRoute: () => AuthedFrameAdminRoute,
   } as any)
 const AuthedFrameWWorkspaceIdAiExportRoute =
   AuthedFrameWWorkspaceIdAiExportRouteImport.update({
@@ -301,7 +315,9 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceId/self-analysis': typeof AuthedFrameWWorkspaceIdSelfAnalysisRouteWithChildren
   '/w/$workspaceId/settings': typeof AuthedFrameWWorkspaceIdSettingsRoute
   '/w/$workspaceId/team': typeof AuthedFrameWWorkspaceIdTeamRouteWithChildren
+  '/admin/templates/': typeof AuthedFrameAdminTemplatesIndexRoute
   '/w/$workspaceId/': typeof AuthedFrameWWorkspaceIdIndexRoute
+  '/admin/templates/versions/$versionId': typeof AuthedFrameAdminTemplatesVersionsVersionIdRoute
   '/w/$workspaceId/ai/export': typeof AuthedFrameWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof AuthedFrameWWorkspaceIdAiImportRoute
   '/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren
@@ -338,7 +354,9 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthedFrameAdminUsersRoute
   '/w/$workspaceId/decisions': typeof AuthedFrameWWorkspaceIdDecisionsRoute
   '/w/$workspaceId/settings': typeof AuthedFrameWWorkspaceIdSettingsRoute
+  '/admin/templates': typeof AuthedFrameAdminTemplatesIndexRoute
   '/w/$workspaceId': typeof AuthedFrameWWorkspaceIdIndexRoute
+  '/admin/templates/versions/$versionId': typeof AuthedFrameAdminTemplatesVersionsVersionIdRoute
   '/w/$workspaceId/ai/export': typeof AuthedFrameWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof AuthedFrameWWorkspaceIdAiImportRoute
   '/w/$workspaceId/self-analysis/$sectionKey': typeof AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRoute
@@ -380,7 +398,9 @@ export interface FileRoutesById {
   '/_authed/_frame/w/$workspaceId/self-analysis': typeof AuthedFrameWWorkspaceIdSelfAnalysisRouteWithChildren
   '/_authed/_frame/w/$workspaceId/settings': typeof AuthedFrameWWorkspaceIdSettingsRoute
   '/_authed/_frame/w/$workspaceId/team': typeof AuthedFrameWWorkspaceIdTeamRouteWithChildren
+  '/_authed/_frame/admin/templates/': typeof AuthedFrameAdminTemplatesIndexRoute
   '/_authed/_frame/w/$workspaceId/': typeof AuthedFrameWWorkspaceIdIndexRoute
+  '/_authed/_frame/admin/templates/versions/$versionId': typeof AuthedFrameAdminTemplatesVersionsVersionIdRoute
   '/_authed/_frame/w/$workspaceId/ai/export': typeof AuthedFrameWWorkspaceIdAiExportRoute
   '/_authed/_frame/w/$workspaceId/ai/import': typeof AuthedFrameWWorkspaceIdAiImportRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren
@@ -423,7 +443,9 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/self-analysis'
     | '/w/$workspaceId/settings'
     | '/w/$workspaceId/team'
+    | '/admin/templates/'
     | '/w/$workspaceId/'
+    | '/admin/templates/versions/$versionId'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
     | '/w/$workspaceId/ideas/$ideaId'
@@ -460,7 +482,9 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/w/$workspaceId/decisions'
     | '/w/$workspaceId/settings'
+    | '/admin/templates'
     | '/w/$workspaceId'
+    | '/admin/templates/versions/$versionId'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
     | '/w/$workspaceId/self-analysis/$sectionKey'
@@ -501,7 +525,9 @@ export interface FileRouteTypes {
     | '/_authed/_frame/w/$workspaceId/self-analysis'
     | '/_authed/_frame/w/$workspaceId/settings'
     | '/_authed/_frame/w/$workspaceId/team'
+    | '/_authed/_frame/admin/templates/'
     | '/_authed/_frame/w/$workspaceId/'
+    | '/_authed/_frame/admin/templates/versions/$versionId'
     | '/_authed/_frame/w/$workspaceId/ai/export'
     | '/_authed/_frame/w/$workspaceId/ai/import'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId'
@@ -635,6 +661,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdRouteImport
       parentRoute: typeof AuthedFrameRoute
     }
+    '/_authed/_frame/admin/templates/': {
+      id: '/_authed/_frame/admin/templates/'
+      path: '/templates'
+      fullPath: '/admin/templates/'
+      preLoaderRoute: typeof AuthedFrameAdminTemplatesIndexRouteImport
+      parentRoute: typeof AuthedFrameAdminRoute
+    }
     '/_authed/_frame/w/$workspaceId/': {
       id: '/_authed/_frame/w/$workspaceId/'
       path: '/'
@@ -676,6 +709,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/w/$workspaceId/team'
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdTeamRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdRoute
+    }
+    '/_authed/_frame/admin/templates/versions/$versionId': {
+      id: '/_authed/_frame/admin/templates/versions/$versionId'
+      path: '/templates/versions/$versionId'
+      fullPath: '/admin/templates/versions/$versionId'
+      preLoaderRoute: typeof AuthedFrameAdminTemplatesVersionsVersionIdRouteImport
+      parentRoute: typeof AuthedFrameAdminRoute
     }
     '/_authed/_frame/w/$workspaceId/ai/export': {
       id: '/_authed/_frame/w/$workspaceId/ai/export'
@@ -829,10 +869,15 @@ declare module '@tanstack/react-router' {
 
 interface AuthedFrameAdminRouteChildren {
   AuthedFrameAdminUsersRoute: typeof AuthedFrameAdminUsersRoute
+  AuthedFrameAdminTemplatesIndexRoute: typeof AuthedFrameAdminTemplatesIndexRoute
+  AuthedFrameAdminTemplatesVersionsVersionIdRoute: typeof AuthedFrameAdminTemplatesVersionsVersionIdRoute
 }
 
 const AuthedFrameAdminRouteChildren: AuthedFrameAdminRouteChildren = {
   AuthedFrameAdminUsersRoute: AuthedFrameAdminUsersRoute,
+  AuthedFrameAdminTemplatesIndexRoute: AuthedFrameAdminTemplatesIndexRoute,
+  AuthedFrameAdminTemplatesVersionsVersionIdRoute:
+    AuthedFrameAdminTemplatesVersionsVersionIdRoute,
 }
 
 const AuthedFrameAdminRouteWithChildren =

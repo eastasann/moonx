@@ -26,6 +26,7 @@ import { linkTargetPath } from "../../lib/link-target";
 import { useGoTo } from "../../lib/navigate";
 import { useOverlay } from "../../lib/overlay";
 import { type PlanHome, planPaths } from "../../lib/plans";
+import { formatMigrationTarget } from "../../lib/template-migration";
 import { useSavedItem } from "../../lib/use-saved-item";
 import { validationHomeQuery } from "../../lib/validation-home";
 import { decisionText } from "../validation-home/decision-text";
@@ -161,10 +162,15 @@ export function PlanHeader({
     : paths.pitch;
   const showMenu = access.isEditor && viewing === null;
 
+  const hasNewerTemplate = access.canEditLatest && plan.template.newerVersion !== null;
+  const openUpdateTemplate = () =>
+    openModal("update-template", formatMigrationTarget("business_plan", plan.id));
+
   const onMenuAction = (key: string | number) => {
     if (key === "rename") setRenaming(true);
     else if (key === "archive") archive.mutate(true);
     else if (key === "restore") archive.mutate(false);
+    else if (key === "update-template") openUpdateTemplate();
   };
 
   return (
@@ -214,6 +220,13 @@ export function PlanHeader({
               </Flex>
             ) : null}
           </Stack>
+        </InlineAlert>
+      ) : null}
+      {hasNewerTemplate ? (
+        <InlineAlert variant="informative" heading={t("planHome:home.templateNotice")}>
+          <Button variant="secondary" onPress={openUpdateTemplate}>
+            {t("planHome:home.updateTemplate")}
+          </Button>
         </InlineAlert>
       ) : null}
       {viewing ? (
@@ -289,6 +302,9 @@ export function PlanHeader({
               >
                 {t("planHome:home.menu.aiImport")}
               </MenuItem>
+            ) : null}
+            {hasNewerTemplate ? (
+              <MenuItem id="update-template">{t("planHome:home.menu.updateTemplate")}</MenuItem>
             ) : null}
             {access.canToggleArchive && !plan.archived ? (
               <MenuItem id="archive">{t("planHome:home.menu.archive")}</MenuItem>

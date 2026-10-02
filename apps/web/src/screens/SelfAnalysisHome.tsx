@@ -7,6 +7,7 @@ import {
   Heading,
   HubPattern,
   IllustratedMessage,
+  InlineAlert,
   Link,
   Menu,
   MenuItem,
@@ -35,6 +36,7 @@ import {
   useSelfAnalysisActions,
 } from "../lib/self-analysis";
 import { useMe } from "../lib/session";
+import { formatMigrationTarget } from "../lib/template-migration";
 import { toasts } from "../lib/toast";
 import { CurrencyDialog } from "./self-analysis/CurrencyDialog";
 import { BlockHeading } from "./validation-home/BlockHeading";
@@ -91,6 +93,9 @@ function HomeView({ workspaceId, home }: { workspaceId: string; home: Home }) {
   };
   const markDone = (confirmed: boolean) => complete.mutate(confirmed, { onError: failed });
   const isDone = home.status === "done";
+  const hasNewerTemplate = canEditIdeas(role) && home.template.newerVersion !== null;
+  const openUpdateTemplate = () =>
+    openModal("update-template", formatMigrationTarget("self_analysis", home.id));
   const sharedNames = home.shares.map((entry) => entry.workspace.name);
 
   const actions = (
@@ -137,11 +142,17 @@ function HomeView({ workspaceId, home }: { workspaceId: string; home: Home }) {
       ) : null}
       <ActionMenu
         label={t("selfAnalysis:currencyMenu")}
-        onAction={(key) => key === "currency" && setCurrencyOpen(true)}
+        onAction={(key) => {
+          if (key === "currency") setCurrencyOpen(true);
+          else if (key === "update-template") openUpdateTemplate();
+        }}
       >
         <MenuItem id="currency">
           {t("selfAnalysis:changeCurrency", { currency: home.currency })}
         </MenuItem>
+        {hasNewerTemplate ? (
+          <MenuItem id="update-template">{t("selfAnalysis:updateTemplate")}</MenuItem>
+        ) : null}
       </ActionMenu>
     </Flex>
   );
@@ -162,6 +173,13 @@ function HomeView({ workspaceId, home }: { workspaceId: string; home: Home }) {
                 })}
               </Text>
             </Flex>
+            {hasNewerTemplate ? (
+              <InlineAlert variant="informative" heading={t("selfAnalysis:templateNotice")}>
+                <Button variant="secondary" onPress={openUpdateTemplate}>
+                  {t("selfAnalysis:updateTemplate")}
+                </Button>
+              </InlineAlert>
+            ) : null}
             {actions}
           </Stack>
         }

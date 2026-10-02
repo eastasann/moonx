@@ -15,6 +15,8 @@
   "reopen": "Reopen",
   "teamLink": "Team",
   "share": "Share",
+  "templateNotice": "A newer template is available",
+  "updateTemplate": "Update template",
   "currencyMenu": "More actions for the self analysis",
   "changeCurrency": "Currency: {{currency}}",
   "confirmDone": {

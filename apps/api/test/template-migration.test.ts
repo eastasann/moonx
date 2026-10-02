@@ -398,7 +398,7 @@ describe("T2 POST /template-migrations, self analysis", () => {
       source: "template_migration",
       batchId: res.body.batchId,
       target: { type: "template_version", id, key: "self_analysis" },
-      revertible: false,
+      revertible: true,
     });
     const single = await call(t.app, "POST", `/api/v1/history/${entry.id}/revert`, { as: as.ana });
     expect([single.status, single.body.error.code]).toEqual([422, "VALIDATION_FAILED"]);
@@ -624,6 +624,18 @@ describe("T2 POST /template-migrations, validation", () => {
       ["template_version", "restore", "revert"],
     ]);
     expect(recorded.every((r) => r.changedById === userId("paolo"))).toBe(true);
+  });
+
+  test("the idea's screen history (13) shows the validation's migration and nothing else of it", async () => {
+    const v3 = await publishNext("validation", V_EDIT);
+    const piaya = await validationOf("piaya");
+    const res = await migrate("validation", piaya, v3);
+    const list = await screenHistory("idea", ideaId("piaya"));
+    const migrated = list.body.items.filter((e: HistoryEntry) => e.source === "template_migration");
+    expect(migrated.map((e: HistoryEntry) => [e.label, e.target.type, e.batchId])).toEqual([
+      ["Template updated to v3", "template_version", res.body.batchId],
+    ]);
+    expect(migrated[0].revertible).toBe(true);
   });
 
   test("a cost row that was taken away does not come back with a later migration", async () => {

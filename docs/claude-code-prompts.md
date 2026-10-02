@@ -657,7 +657,7 @@ Piaya Gift Box Delivery の Plan A で 20〜23 がデモデータどおりに出
 
 ## Step 17: Web の残りの画面（4）: テンプレートの改訂と移行
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/design-spec.md 6.17（26 管理: テンプレート一覧・27 管理: テンプレート編集）と 6.0.7（M8 テンプレートの移行）に

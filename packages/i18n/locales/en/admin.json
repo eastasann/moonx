@@ -118,5 +118,232 @@
       "failed": "Couldn't send the invitation",
       "sentToast": "Invitation sent to {{email}}"
     }
+  },
+  "screens": {
+    "label": "Admin screens",
+    "templates": "Templates",
+    "users": "Users & Workspaces"
+  },
+  "templates": {
+    "crumb": "Templates",
+    "title": "Templates",
+    "listLabel": "Templates",
+    "latest": "Latest v{{number}}",
+    "versionsHeading": "{{name}} versions",
+    "versionsLabel": "Versions of {{name}}",
+    "versionLabel": "v{{number}}",
+    "status": {
+      "draft": "Draft",
+      "published": "Published"
+    },
+    "publishedLine": "Published {{date}} by {{name}}",
+    "unknownUser": "a former operator",
+    "notPublished": "Not published",
+    "inUse_one": "{{count}} in use",
+    "inUse_other": "{{count}} in use",
+    "newDraft": "New draft from this version",
+    "openDraft": "Open draft",
+    "view": "View",
+    "draftExists": "This template has a draft. Open it to keep editing; a template has one draft at a time."
+  },
+  "edit": {
+    "crumb": "Edit template",
+    "back": "← Templates",
+    "title": "{{name}} v{{number}}",
+    "kinds": {
+      "self_analysis": "Self Analysis",
+      "validation": "Business Idea & Validation",
+      "business_plan": "Business Plan"
+    },
+    "readOnly": {
+      "heading": "v{{number}} is published",
+      "body": "A published version can't be edited. To change it, start a new draft from this version.",
+      "toList": "Back to the versions"
+    },
+    "none": "Choose a section, a question or a setting to edit.",
+    "required": "This is required",
+    "treeLabel": "Template outline",
+    "tree": {
+      "section": "{{key}} {{title}}",
+      "planSection": "{{key}} {{title}}"
+    },
+    "nodes": {
+      "aiPrompt": "AI prompt",
+      "costDefaults": "Cost rows",
+      "checkRules": "Check thresholds",
+      "executionPresets": "Execution rows"
+    },
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "remove": "Remove {{name}}",
+    "moveSelectedUp": "Move up",
+    "moveSelectedDown": "Move down",
+    "deleteSelected": "Delete",
+    "add": {
+      "section": "Add section",
+      "question": "Add question",
+      "sectionTitle": "Add a section",
+      "questionTitle": "Add a question",
+      "create": "Add"
+    },
+    "delete": {
+      "sectionTitle": "Delete section {{key}}?",
+      "sectionBody_one": "The section and its {{count}} question are deleted from this draft.",
+      "sectionBody_other": "The section and its {{count}} questions are deleted from this draft.",
+      "questionTitle": "Delete question {{key}}?",
+      "questionBody": "The question is deleted from this draft. Answers already given in earlier versions are kept.",
+      "confirm": "Delete"
+    },
+    "section": {
+      "heading": "Section {{key}}",
+      "key": "Key",
+      "keyHelp": "Capital letters, digits and _ only. Question IDs in the section carry it.",
+      "keyInvalid": "Use capital letters, digits and _ (up to 40 characters)",
+      "title": "Title",
+      "guidance": "Guidance",
+      "summary": "One-line description",
+      "part": "Part",
+      "partA": "Part A",
+      "partB": "Part B"
+    },
+    "question": {
+      "heading": "Question {{key}}",
+      "preview": "Preview",
+      "key": "Question ID",
+      "keyHelp": "Looks like {{start}}. It can't change once the version is published.",
+      "keyInvalid": "Must look like {{start}}: capital letters, digits and _",
+      "title": "Title",
+      "prompt": "Question",
+      "example": "EXAMPLE",
+      "hint": "Hint",
+      "answerType": "Answer type",
+      "fau": "Classify as Fact / Assumption / Unknown",
+      "fauHelp": "The answer gets an F/A/U label and counts in the validation's breakdown.",
+      "copyFrom": "Copy from",
+      "copyFromHelp": "What a new plan draft copies into this item, one per line: a validation question ID, or IDEA.ONE_LINE_CONCEPT, IDEA.PROPOSED_SOLUTION, LIST.ASSUMPTIONS, LIST.RISKS.",
+      "switchTitle": "Change the answer type?",
+      "switchBody": "The choices, columns or numbers set for the current type are cleared. Answers already given are kept.",
+      "switchConfirm": "Change type",
+      "copyFromTooLong": "Up to 50 sources, each up to 100 characters"
+    },
+    "answerTypes": {
+      "long_text": "Long text",
+      "short_text": "Short text",
+      "choice": "Choice",
+      "amount_with_reason": "Amount with reason",
+      "table": "Table",
+      "linked_metric": "Key numbers",
+      "execution_view": "Execution list"
+    },
+    "options": {
+      "choices": "Choices",
+      "choicesHelp": "One choice per line.",
+      "metricKeys": "Numbers to show",
+      "metricKeysHelp": "One per line: a key number, scenario:<name>, or a cost row key.",
+      "atLeastOne": "Add at least one",
+      "columns": "Columns",
+      "columnKey": "Column key",
+      "columnLabel": "Column name",
+      "columnType": "Type",
+      "columnTypes": {
+        "text": "Text",
+        "number": "Number",
+        "percent": "Percent",
+        "money": "Money"
+      },
+      "addColumn": "Add column",
+      "removeColumn": "Remove column {{number}}",
+      "executionType": "Execution list",
+      "executionTypes": {
+        "milestone": "Milestones",
+        "launch": "Launch checklist",
+        "kpi": "KPIs",
+        "open_question": "Open questions",
+        "next_action": "Next actions"
+      },
+      "columnKeyDuplicate": "This key is used twice"
+    },
+    "condition": {
+      "heading": "Shown when",
+      "always": "Always shown.",
+      "question": "Question",
+      "option": "{{key}} {{title}}",
+      "values": "Is one of",
+      "valuesHelp": "Comma-separated values.",
+      "add": "Add condition",
+      "remove": "Remove condition {{number}}"
+    },
+    "cost": {
+      "heading": "Cost rows",
+      "help": "The rows a new validation starts with in each cost table. A key is unique in the version and is what checks and plan items refer to.",
+      "categories": {
+        "initial": "Startup costs",
+        "monthly_fixed": "Monthly fixed costs",
+        "variable": "Variable costs"
+      },
+      "name": "Row name",
+      "key": "Key",
+      "keyInvalid": "Use lower-case letters, digits and _, joined by dots (initial.permits)",
+      "keyDuplicate": "This key is used twice",
+      "add": "Add row"
+    },
+    "checks": {
+      "heading": "Check thresholds",
+      "help": "What each check needs before it shows Done. The costs and break-even checks have no threshold.",
+      "competitorsMin": "Competitors: at least",
+      "competitorsMax": "Competitors: aim for up to",
+      "rangeInvalid": "The minimum can't be above the maximum",
+      "localPricePriced": "Local price: competitors with a price",
+      "localPriceLogs": "Local price: research logs tagged to it",
+      "permitsLogs": "Permits: research logs tagged to it",
+      "demandLogs": "Demand signal: research logs tagged to it"
+    },
+    "execution": {
+      "heading": "Execution rows",
+      "help": "The milestones, launch items and KPIs a new plan draft starts with.",
+      "type": "Type",
+      "title": "Title",
+      "area": "Area",
+      "timing": "Timing",
+      "add": "Add row",
+      "types": {
+        "milestone": "Milestone",
+        "launch": "Launch",
+        "kpi": "KPI"
+      },
+      "timings": {
+        "t_minus_30": "30 days before launch",
+        "t_minus_7": "7 days before launch",
+        "launch_day": "Launch day",
+        "first_30": "First 30 days",
+        "days_31_90": "Days 31 to 90",
+        "other": "Other"
+      }
+    },
+    "prompt": {
+      "heading": "AI prompt",
+      "help": "The conversation prompt the export for AI puts under # Prompt. Leave it empty to leave that section out.",
+      "label": "Prompt"
+    },
+    "preview": {
+      "title": "Preview",
+      "reason": "Reason",
+      "metrics": "Shows these numbers",
+      "execution": "Shows the list of {{name}}",
+      "executionNone": "Shows an execution list. Choose which one in the options."
+    },
+    "publish": {
+      "button": "Publish as v{{number}}",
+      "title": "Publish as v{{number}}",
+      "confirm": "Publish v{{number}}",
+      "body": "Answers already given don't change. People on an earlier version can move to this one with Update template.",
+      "errors": "Fix these before publishing",
+      "goTo": "Go to it",
+      "removed_one": "{{count}} question ID is not in this version",
+      "removed_other": "{{count}} question IDs are not in this version",
+      "removedBody": "Answers to these questions can't be carried over when someone moves to this version. They are kept but hidden.",
+      "done": "v{{number}} is published"
+    },
+    "held": "Some rows have problems and are not saved yet. Fix the marked fields to save the list."
   }
 }

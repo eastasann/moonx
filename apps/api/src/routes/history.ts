@@ -4,7 +4,7 @@ import {
   historyEntryParamsSchema,
   historyQuerySchema,
 } from "@moonx/schemas";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { Elysia } from "elysia";
 import type { z } from "zod";
 import { type AccessInput, accessPlugin } from "../access";
@@ -34,6 +34,25 @@ export function historyRoutes(ctx: AppContext) {
           id: query.containerId as string,
         });
 
+  /**
+   * What 13 adds to the idea's own rows: the template version of the idea's validation. A
+   * migration is written to the validation's container, and 13 is the only screen that shows the
+   * validation as a whole (design-spec 6.0.7).
+   */
+  async function validationVersionRows(ideaId: string) {
+    const [validation] = await db
+      .select({ id: schema.validations.id })
+      .from(schema.validations)
+      .where(eq(schema.validations.ideaId, ideaId));
+    return validation
+      ? and(
+          eq(c.containerType, "validation"),
+          eq(c.containerId, validation.id),
+          eq(c.targetType, "template_version"),
+        )
+      : undefined;
+  }
+
   return new Elysia({ name: "moonx-history" })
     .use(accessPlugin(ctx))
     .get(
@@ -43,13 +62,16 @@ export function historyRoutes(ctx: AppContext) {
         const container = await containerOf(query as HistoryQuery);
         const access = containerAccess(user, container.type, container.id, scope);
         const offset = decodeCursor(query.cursor);
+        const ofIdea =
+          !item && !query.sectionKey && container.type === "idea"
+            ? await validationVersionRows(container.id)
+            : undefined;
         const rows = await db
           .select()
           .from(c)
           .where(
             and(
-              eq(c.containerType, container.type),
-              eq(c.containerId, container.id),
+              or(and(eq(c.containerType, container.type), eq(c.containerId, container.id)), ofIdea),
               item
                 ? eq(c.targetType, query.targetType as NonNullable<typeof query.targetType>)
                 : undefined,

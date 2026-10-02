@@ -183,6 +183,8 @@ function EntryView({
     i18n.exists(`history.fields.${change.field}`, { ns: "panels" }),
   );
   const busy = pendingId !== null;
+  // A template update moves only as a whole (H3): its row carries no restore of its own.
+  const restorable = entry.target.type !== "template_version";
   return (
     <Stack gap="space-100">
       <Flex gap="space-100" align="center" wrap>
@@ -216,16 +218,18 @@ function EntryView({
       ))}
       {entry.revertible ? (
         <Flex gap="space-100" wrap>
-          <Button
-            size="S"
-            variant="secondary"
-            isDisabled={busy}
-            isPending={pendingId === entry.id}
-            pendingLabel={t("history.restoring")}
-            onPress={() => onRestore(entry)}
-          >
-            {entry.action === "delete" ? t("history.undoDelete") : t("history.restore")}
-          </Button>
+          {restorable ? (
+            <Button
+              size="S"
+              variant="secondary"
+              isDisabled={busy}
+              isPending={pendingId === entry.id}
+              pendingLabel={t("history.restoring")}
+              onPress={() => onRestore(entry)}
+            >
+              {entry.action === "delete" ? t("history.undoDelete") : t("history.restore")}
+            </Button>
+          ) : null}
           {showUndoBatch && entry.batchId ? (
             <ActionButton
               size="S"

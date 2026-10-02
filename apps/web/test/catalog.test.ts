@@ -133,6 +133,36 @@ const DYNAMIC: Record<string, string[]> = {
   "import.steps.${stepId}": ["paste", "match", "review", "apply"].map(
     (s) => `ai:import.steps.${s}`,
   ),
+  "validation:stage.${idea.stage}": ["validation", "planning", "launch_prep"].map(
+    (s) => `validation:stage.${s}`,
+  ),
+  "dashboard:activity.${entry.kind}": [
+    "change",
+    "comment",
+    "decision",
+    "go_no_go",
+    "version_saved",
+  ].map((kind) => `dashboard:activity.${kind}`),
+  "dashboard:selfAnalyses.status.${status}": ["not_started", "in_progress", "done"].map(
+    (s) => `dashboard:selfAnalyses.status.${s}`,
+  ),
+  "selfAnalysis:status.${home.status}": ["not_started", "in_progress", "done"].map(
+    (s) => `selfAnalysis:status.${s}`,
+  ),
+  "selfAnalysis:status.${status}": ["not_started", "in_progress", "done"].map(
+    (s) => `selfAnalysis:status.${s}`,
+  ),
+  "selfAnalysis:status.${analysis.status}": ["not_started", "in_progress", "done"].map(
+    (s) => `selfAnalysis:status.${s}`,
+  ),
+  "decisionLog:kind.${entry.kind}": ["validation_decision", "go_no_go", "version_saved"].map(
+    (k) => `decisionLog:kind.${k}`,
+  ),
+  "kind.${kind}": ["validation_decision", "go_no_go", "version_saved"].map(
+    (k) => `decisionLog:kind.${k}`,
+  ),
+  "filters.${bound}": ["from", "to"].map((b) => `decisionLog:filters.${b}`),
+  "detail.${row.key}": ["launchIf", "delayIf", "stopIf"].map((k) => `decisionLog:detail.${k}`),
   "columns.${id}": ["name", "amount", "fau", "whyNeeded", "canReduce", "notes", "actions"].map(
     (c) => `costs:columns.${c}`,
   ),

@@ -340,6 +340,7 @@ describe("S6 / S7 members' analyses", () => {
       { as: who.paolo },
     );
     expect(res.status).toBe(200);
+    expect(res.body.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(res.body.user.displayName).toBe("Ana Villanueva");
     expect(res.body.status).toBe("done");
     expect(res.body.sections).toHaveLength(11);

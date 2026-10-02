@@ -98,3 +98,14 @@ export async function renderApp(path: string) {
   await waitFor(() => expect(router.state.isLoading).toBe(false));
   return { router, ...view, unmount: () => cleanup() };
 }
+
+/** The four requests of the dashboard (D1-D4), answering that there is nothing to show. */
+export function emptyDashboard(workspaceId: string = WORKSPACE): Record<string, Handler> {
+  const base = `/api/v1/workspaces/${workspaceId}/dashboard`;
+  return {
+    [`GET ${base}/ideas`]: () => ({ body: { items: [], droppedCount: 0 } }),
+    [`GET ${base}/self-analyses`]: () => ({ body: { items: [] } }),
+    [`GET ${base}/due-soon`]: () => ({ body: { items: [] } }),
+    [`GET ${base}/activity`]: () => ({ body: { items: [] } }),
+  };
+}

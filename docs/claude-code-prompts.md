@@ -604,7 +604,7 @@ Moonx Admin が 28 で招待の発行とユーザーの停止・再開ができ�
 
 ## Step 15: Web の残りの画面（2）: ダッシュボード・決定ログ・通知・自己分析
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/design-spec.md 6.9（5 ダッシュボード）・6.15（7 決定ログ・8 通知）・6.11（10 自己分析ホーム・
@@ -642,7 +642,7 @@ docs/design-spec.md 6.12（20 プランホーム・21 プラン項目の編集�
    版の一覧と読み取り専用の表示、Go / No-Go、Latest decision の表示）
 3. 21 プラン項目の編集（11 と同じ部品。検証のデータと共有された自己分析の参照、表の設問、linked_metric と
    execution_view の設問）
-4. M3 版の保存と M4 Go / No-Go の記録（決定ログに残す）
+4. M3 版の保存と M4 Go / No-Go の記録（決定ログに残す。記録したら `apps/web/src/lib/decision.ts` の `DECISION_LOG_KEY` の問い合わせを更新し、7 に出す）
 5. 22 実行管理（5つのタブ、担当・期限・状態、並べ替え、期限切れの表示）
 6. 23 Pitch Deck（パターン I。1分版 / 5分版、版の選択、PDF のダウンロード（P13）。スライドは直接編集しない）
 7. 20 の ⋯ メニューの AI 書き出し・AI 取り込み（24・25 はプランを対象に Step 13 で作ってある。入口のリンクは `apps/web/src/lib/link-target.ts`、戻り先は `apps/web/src/lib/ai-exchange.ts` の `sourcePath`、問い合わせのキーは `planKey`）

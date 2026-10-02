@@ -20,15 +20,23 @@ import { Route as DevComponentsRouteImport } from './routes/dev.components'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AuthedFrameAccountRouteImport } from './routes/_authed/_frame/account'
 import { Route as AuthedFrameAdminRouteImport } from './routes/_authed/_frame/admin'
+import { Route as AuthedFrameNotificationsRouteImport } from './routes/_authed/_frame/notifications'
 import { Route as AuthedFrameAdminUsersRouteImport } from './routes/_authed/_frame/admin.users'
 import { Route as AuthedFrameWWorkspaceIdRouteImport } from './routes/_authed/_frame/w.$workspaceId'
 import { Route as AuthedFrameWWorkspaceIdIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.index'
+import { Route as AuthedFrameWWorkspaceIdDecisionsRouteImport } from './routes/_authed/_frame/w.$workspaceId.decisions'
 import { Route as AuthedFrameWWorkspaceIdIdeasRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas'
+import { Route as AuthedFrameWWorkspaceIdSelfAnalysisRouteImport } from './routes/_authed/_frame/w.$workspaceId.self-analysis'
 import { Route as AuthedFrameWWorkspaceIdSettingsRouteImport } from './routes/_authed/_frame/w.$workspaceId.settings'
+import { Route as AuthedFrameWWorkspaceIdTeamRouteImport } from './routes/_authed/_frame/w.$workspaceId.team'
 import { Route as AuthedFrameWWorkspaceIdAiExportRouteImport } from './routes/_authed/_frame/w.$workspaceId.ai.export'
 import { Route as AuthedFrameWWorkspaceIdAiImportRouteImport } from './routes/_authed/_frame/w.$workspaceId.ai.import'
 import { Route as AuthedFrameWWorkspaceIdIdeasIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.index'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId'
+import { Route as AuthedFrameWWorkspaceIdSelfAnalysisIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.self-analysis.index'
+import { Route as AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRouteImport } from './routes/_authed/_frame/w.$workspaceId.self-analysis.$sectionKey'
+import { Route as AuthedFrameWWorkspaceIdTeamIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.team.index'
+import { Route as AuthedFrameWWorkspaceIdTeamUserIdRouteImport } from './routes/_authed/_frame/w.$workspaceId.team.$userId'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.index'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.assumptions'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.competitors'
@@ -91,6 +99,12 @@ const AuthedFrameAdminRoute = AuthedFrameAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthedFrameRoute,
 } as any)
+const AuthedFrameNotificationsRoute =
+  AuthedFrameNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AuthedFrameRoute,
+  } as any)
 const AuthedFrameAdminUsersRoute = AuthedFrameAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -107,16 +121,34 @@ const AuthedFrameWWorkspaceIdIndexRoute =
     path: '/',
     getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
   } as any)
+const AuthedFrameWWorkspaceIdDecisionsRoute =
+  AuthedFrameWWorkspaceIdDecisionsRouteImport.update({
+    id: '/decisions',
+    path: '/decisions',
+    getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
+  } as any)
 const AuthedFrameWWorkspaceIdIdeasRoute =
   AuthedFrameWWorkspaceIdIdeasRouteImport.update({
     id: '/ideas',
     path: '/ideas',
     getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
   } as any)
+const AuthedFrameWWorkspaceIdSelfAnalysisRoute =
+  AuthedFrameWWorkspaceIdSelfAnalysisRouteImport.update({
+    id: '/self-analysis',
+    path: '/self-analysis',
+    getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
+  } as any)
 const AuthedFrameWWorkspaceIdSettingsRoute =
   AuthedFrameWWorkspaceIdSettingsRouteImport.update({
     id: '/settings',
     path: '/settings',
+    getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdTeamRoute =
+  AuthedFrameWWorkspaceIdTeamRouteImport.update({
+    id: '/team',
+    path: '/team',
     getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
   } as any)
 const AuthedFrameWWorkspaceIdAiExportRoute =
@@ -142,6 +174,30 @@ const AuthedFrameWWorkspaceIdIdeasIdeaIdRoute =
     id: '/$ideaId',
     path: '/$ideaId',
     getParentRoute: () => AuthedFrameWWorkspaceIdIdeasRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdSelfAnalysisIndexRoute =
+  AuthedFrameWWorkspaceIdSelfAnalysisIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthedFrameWWorkspaceIdSelfAnalysisRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRoute =
+  AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRouteImport.update({
+    id: '/$sectionKey',
+    path: '/$sectionKey',
+    getParentRoute: () => AuthedFrameWWorkspaceIdSelfAnalysisRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdTeamIndexRoute =
+  AuthedFrameWWorkspaceIdTeamIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthedFrameWWorkspaceIdTeamRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdTeamUserIdRoute =
+  AuthedFrameWWorkspaceIdTeamUserIdRouteImport.update({
+    id: '/$userId',
+    path: '/$userId',
+    getParentRoute: () => AuthedFrameWWorkspaceIdTeamRoute,
   } as any)
 const AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute =
   AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRouteImport.update({
@@ -202,15 +258,23 @@ export interface FileRoutesByFullPath {
   '/invite/$token': typeof InviteTokenRoute
   '/account': typeof AuthedFrameAccountRoute
   '/admin': typeof AuthedFrameAdminRouteWithChildren
+  '/notifications': typeof AuthedFrameNotificationsRoute
   '/admin/users': typeof AuthedFrameAdminUsersRoute
   '/w/$workspaceId': typeof AuthedFrameWWorkspaceIdRouteWithChildren
+  '/w/$workspaceId/decisions': typeof AuthedFrameWWorkspaceIdDecisionsRoute
   '/w/$workspaceId/ideas': typeof AuthedFrameWWorkspaceIdIdeasRouteWithChildren
+  '/w/$workspaceId/self-analysis': typeof AuthedFrameWWorkspaceIdSelfAnalysisRouteWithChildren
   '/w/$workspaceId/settings': typeof AuthedFrameWWorkspaceIdSettingsRoute
+  '/w/$workspaceId/team': typeof AuthedFrameWWorkspaceIdTeamRouteWithChildren
   '/w/$workspaceId/': typeof AuthedFrameWWorkspaceIdIndexRoute
   '/w/$workspaceId/ai/export': typeof AuthedFrameWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof AuthedFrameWWorkspaceIdAiImportRoute
   '/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren
+  '/w/$workspaceId/self-analysis/$sectionKey': typeof AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRoute
+  '/w/$workspaceId/team/$userId': typeof AuthedFrameWWorkspaceIdTeamUserIdRoute
   '/w/$workspaceId/ideas/': typeof AuthedFrameWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/self-analysis/': typeof AuthedFrameWWorkspaceIdSelfAnalysisIndexRoute
+  '/w/$workspaceId/team/': typeof AuthedFrameWWorkspaceIdTeamIndexRoute
   '/w/$workspaceId/ideas/$ideaId/assumptions': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/w/$workspaceId/ideas/$ideaId/competitors': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   '/w/$workspaceId/ideas/$ideaId/costs': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute
@@ -230,12 +294,18 @@ export interface FileRoutesByTo {
   '/invite/$token': typeof InviteTokenRoute
   '/account': typeof AuthedFrameAccountRoute
   '/admin': typeof AuthedFrameAdminRouteWithChildren
+  '/notifications': typeof AuthedFrameNotificationsRoute
   '/admin/users': typeof AuthedFrameAdminUsersRoute
+  '/w/$workspaceId/decisions': typeof AuthedFrameWWorkspaceIdDecisionsRoute
   '/w/$workspaceId/settings': typeof AuthedFrameWWorkspaceIdSettingsRoute
   '/w/$workspaceId': typeof AuthedFrameWWorkspaceIdIndexRoute
   '/w/$workspaceId/ai/export': typeof AuthedFrameWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof AuthedFrameWWorkspaceIdAiImportRoute
+  '/w/$workspaceId/self-analysis/$sectionKey': typeof AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRoute
+  '/w/$workspaceId/team/$userId': typeof AuthedFrameWWorkspaceIdTeamUserIdRoute
   '/w/$workspaceId/ideas': typeof AuthedFrameWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/self-analysis': typeof AuthedFrameWWorkspaceIdSelfAnalysisIndexRoute
+  '/w/$workspaceId/team': typeof AuthedFrameWWorkspaceIdTeamIndexRoute
   '/w/$workspaceId/ideas/$ideaId/assumptions': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/w/$workspaceId/ideas/$ideaId/competitors': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   '/w/$workspaceId/ideas/$ideaId/costs': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute
@@ -258,15 +328,23 @@ export interface FileRoutesById {
   '/invite/$token': typeof InviteTokenRoute
   '/_authed/_frame/account': typeof AuthedFrameAccountRoute
   '/_authed/_frame/admin': typeof AuthedFrameAdminRouteWithChildren
+  '/_authed/_frame/notifications': typeof AuthedFrameNotificationsRoute
   '/_authed/_frame/admin/users': typeof AuthedFrameAdminUsersRoute
   '/_authed/_frame/w/$workspaceId': typeof AuthedFrameWWorkspaceIdRouteWithChildren
+  '/_authed/_frame/w/$workspaceId/decisions': typeof AuthedFrameWWorkspaceIdDecisionsRoute
   '/_authed/_frame/w/$workspaceId/ideas': typeof AuthedFrameWWorkspaceIdIdeasRouteWithChildren
+  '/_authed/_frame/w/$workspaceId/self-analysis': typeof AuthedFrameWWorkspaceIdSelfAnalysisRouteWithChildren
   '/_authed/_frame/w/$workspaceId/settings': typeof AuthedFrameWWorkspaceIdSettingsRoute
+  '/_authed/_frame/w/$workspaceId/team': typeof AuthedFrameWWorkspaceIdTeamRouteWithChildren
   '/_authed/_frame/w/$workspaceId/': typeof AuthedFrameWWorkspaceIdIndexRoute
   '/_authed/_frame/w/$workspaceId/ai/export': typeof AuthedFrameWWorkspaceIdAiExportRoute
   '/_authed/_frame/w/$workspaceId/ai/import': typeof AuthedFrameWWorkspaceIdAiImportRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren
+  '/_authed/_frame/w/$workspaceId/self-analysis/$sectionKey': typeof AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRoute
+  '/_authed/_frame/w/$workspaceId/team/$userId': typeof AuthedFrameWWorkspaceIdTeamUserIdRoute
   '/_authed/_frame/w/$workspaceId/ideas/': typeof AuthedFrameWWorkspaceIdIdeasIndexRoute
+  '/_authed/_frame/w/$workspaceId/self-analysis/': typeof AuthedFrameWWorkspaceIdSelfAnalysisIndexRoute
+  '/_authed/_frame/w/$workspaceId/team/': typeof AuthedFrameWWorkspaceIdTeamIndexRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/assumptions': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/competitors': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/costs': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute
@@ -288,15 +366,23 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/account'
     | '/admin'
+    | '/notifications'
     | '/admin/users'
     | '/w/$workspaceId'
+    | '/w/$workspaceId/decisions'
     | '/w/$workspaceId/ideas'
+    | '/w/$workspaceId/self-analysis'
     | '/w/$workspaceId/settings'
+    | '/w/$workspaceId/team'
     | '/w/$workspaceId/'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
     | '/w/$workspaceId/ideas/$ideaId'
+    | '/w/$workspaceId/self-analysis/$sectionKey'
+    | '/w/$workspaceId/team/$userId'
     | '/w/$workspaceId/ideas/'
+    | '/w/$workspaceId/self-analysis/'
+    | '/w/$workspaceId/team/'
     | '/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/w/$workspaceId/ideas/$ideaId/competitors'
     | '/w/$workspaceId/ideas/$ideaId/costs'
@@ -316,12 +402,18 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/account'
     | '/admin'
+    | '/notifications'
     | '/admin/users'
+    | '/w/$workspaceId/decisions'
     | '/w/$workspaceId/settings'
     | '/w/$workspaceId'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
+    | '/w/$workspaceId/self-analysis/$sectionKey'
+    | '/w/$workspaceId/team/$userId'
     | '/w/$workspaceId/ideas'
+    | '/w/$workspaceId/self-analysis'
+    | '/w/$workspaceId/team'
     | '/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/w/$workspaceId/ideas/$ideaId/competitors'
     | '/w/$workspaceId/ideas/$ideaId/costs'
@@ -343,15 +435,23 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/_authed/_frame/account'
     | '/_authed/_frame/admin'
+    | '/_authed/_frame/notifications'
     | '/_authed/_frame/admin/users'
     | '/_authed/_frame/w/$workspaceId'
+    | '/_authed/_frame/w/$workspaceId/decisions'
     | '/_authed/_frame/w/$workspaceId/ideas'
+    | '/_authed/_frame/w/$workspaceId/self-analysis'
     | '/_authed/_frame/w/$workspaceId/settings'
+    | '/_authed/_frame/w/$workspaceId/team'
     | '/_authed/_frame/w/$workspaceId/'
     | '/_authed/_frame/w/$workspaceId/ai/export'
     | '/_authed/_frame/w/$workspaceId/ai/import'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId'
+    | '/_authed/_frame/w/$workspaceId/self-analysis/$sectionKey'
+    | '/_authed/_frame/w/$workspaceId/team/$userId'
     | '/_authed/_frame/w/$workspaceId/ideas/'
+    | '/_authed/_frame/w/$workspaceId/self-analysis/'
+    | '/_authed/_frame/w/$workspaceId/team/'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/competitors'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/costs'
@@ -451,6 +551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFrameAdminRouteImport
       parentRoute: typeof AuthedFrameRoute
     }
+    '/_authed/_frame/notifications': {
+      id: '/_authed/_frame/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AuthedFrameNotificationsRouteImport
+      parentRoute: typeof AuthedFrameRoute
+    }
     '/_authed/_frame/admin/users': {
       id: '/_authed/_frame/admin/users'
       path: '/users'
@@ -472,6 +579,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdIndexRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdRoute
     }
+    '/_authed/_frame/w/$workspaceId/decisions': {
+      id: '/_authed/_frame/w/$workspaceId/decisions'
+      path: '/decisions'
+      fullPath: '/w/$workspaceId/decisions'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdDecisionsRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdRoute
+    }
     '/_authed/_frame/w/$workspaceId/ideas': {
       id: '/_authed/_frame/w/$workspaceId/ideas'
       path: '/ideas'
@@ -479,11 +593,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdRoute
     }
+    '/_authed/_frame/w/$workspaceId/self-analysis': {
+      id: '/_authed/_frame/w/$workspaceId/self-analysis'
+      path: '/self-analysis'
+      fullPath: '/w/$workspaceId/self-analysis'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdSelfAnalysisRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdRoute
+    }
     '/_authed/_frame/w/$workspaceId/settings': {
       id: '/_authed/_frame/w/$workspaceId/settings'
       path: '/settings'
       fullPath: '/w/$workspaceId/settings'
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdSettingsRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdRoute
+    }
+    '/_authed/_frame/w/$workspaceId/team': {
+      id: '/_authed/_frame/w/$workspaceId/team'
+      path: '/team'
+      fullPath: '/w/$workspaceId/team'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdTeamRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdRoute
     }
     '/_authed/_frame/w/$workspaceId/ai/export': {
@@ -513,6 +641,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/w/$workspaceId/ideas/$ideaId'
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdIdeasRoute
+    }
+    '/_authed/_frame/w/$workspaceId/self-analysis/': {
+      id: '/_authed/_frame/w/$workspaceId/self-analysis/'
+      path: '/'
+      fullPath: '/w/$workspaceId/self-analysis/'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdSelfAnalysisIndexRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdSelfAnalysisRoute
+    }
+    '/_authed/_frame/w/$workspaceId/self-analysis/$sectionKey': {
+      id: '/_authed/_frame/w/$workspaceId/self-analysis/$sectionKey'
+      path: '/$sectionKey'
+      fullPath: '/w/$workspaceId/self-analysis/$sectionKey'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdSelfAnalysisRoute
+    }
+    '/_authed/_frame/w/$workspaceId/team/': {
+      id: '/_authed/_frame/w/$workspaceId/team/'
+      path: '/'
+      fullPath: '/w/$workspaceId/team/'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdTeamIndexRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdTeamRoute
+    }
+    '/_authed/_frame/w/$workspaceId/team/$userId': {
+      id: '/_authed/_frame/w/$workspaceId/team/$userId'
+      path: '/$userId'
+      fullPath: '/w/$workspaceId/team/$userId'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdTeamUserIdRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdTeamRoute
     }
     '/_authed/_frame/w/$workspaceId/ideas/$ideaId/': {
       id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/'
@@ -638,9 +794,48 @@ const AuthedFrameWWorkspaceIdIdeasRouteWithChildren =
     AuthedFrameWWorkspaceIdIdeasRouteChildren,
   )
 
+interface AuthedFrameWWorkspaceIdSelfAnalysisRouteChildren {
+  AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRoute: typeof AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRoute
+  AuthedFrameWWorkspaceIdSelfAnalysisIndexRoute: typeof AuthedFrameWWorkspaceIdSelfAnalysisIndexRoute
+}
+
+const AuthedFrameWWorkspaceIdSelfAnalysisRouteChildren: AuthedFrameWWorkspaceIdSelfAnalysisRouteChildren =
+  {
+    AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRoute:
+      AuthedFrameWWorkspaceIdSelfAnalysisSectionKeyRoute,
+    AuthedFrameWWorkspaceIdSelfAnalysisIndexRoute:
+      AuthedFrameWWorkspaceIdSelfAnalysisIndexRoute,
+  }
+
+const AuthedFrameWWorkspaceIdSelfAnalysisRouteWithChildren =
+  AuthedFrameWWorkspaceIdSelfAnalysisRoute._addFileChildren(
+    AuthedFrameWWorkspaceIdSelfAnalysisRouteChildren,
+  )
+
+interface AuthedFrameWWorkspaceIdTeamRouteChildren {
+  AuthedFrameWWorkspaceIdTeamUserIdRoute: typeof AuthedFrameWWorkspaceIdTeamUserIdRoute
+  AuthedFrameWWorkspaceIdTeamIndexRoute: typeof AuthedFrameWWorkspaceIdTeamIndexRoute
+}
+
+const AuthedFrameWWorkspaceIdTeamRouteChildren: AuthedFrameWWorkspaceIdTeamRouteChildren =
+  {
+    AuthedFrameWWorkspaceIdTeamUserIdRoute:
+      AuthedFrameWWorkspaceIdTeamUserIdRoute,
+    AuthedFrameWWorkspaceIdTeamIndexRoute:
+      AuthedFrameWWorkspaceIdTeamIndexRoute,
+  }
+
+const AuthedFrameWWorkspaceIdTeamRouteWithChildren =
+  AuthedFrameWWorkspaceIdTeamRoute._addFileChildren(
+    AuthedFrameWWorkspaceIdTeamRouteChildren,
+  )
+
 interface AuthedFrameWWorkspaceIdRouteChildren {
+  AuthedFrameWWorkspaceIdDecisionsRoute: typeof AuthedFrameWWorkspaceIdDecisionsRoute
   AuthedFrameWWorkspaceIdIdeasRoute: typeof AuthedFrameWWorkspaceIdIdeasRouteWithChildren
+  AuthedFrameWWorkspaceIdSelfAnalysisRoute: typeof AuthedFrameWWorkspaceIdSelfAnalysisRouteWithChildren
   AuthedFrameWWorkspaceIdSettingsRoute: typeof AuthedFrameWWorkspaceIdSettingsRoute
+  AuthedFrameWWorkspaceIdTeamRoute: typeof AuthedFrameWWorkspaceIdTeamRouteWithChildren
   AuthedFrameWWorkspaceIdIndexRoute: typeof AuthedFrameWWorkspaceIdIndexRoute
   AuthedFrameWWorkspaceIdAiExportRoute: typeof AuthedFrameWWorkspaceIdAiExportRoute
   AuthedFrameWWorkspaceIdAiImportRoute: typeof AuthedFrameWWorkspaceIdAiImportRoute
@@ -648,9 +843,15 @@ interface AuthedFrameWWorkspaceIdRouteChildren {
 
 const AuthedFrameWWorkspaceIdRouteChildren: AuthedFrameWWorkspaceIdRouteChildren =
   {
+    AuthedFrameWWorkspaceIdDecisionsRoute:
+      AuthedFrameWWorkspaceIdDecisionsRoute,
     AuthedFrameWWorkspaceIdIdeasRoute:
       AuthedFrameWWorkspaceIdIdeasRouteWithChildren,
+    AuthedFrameWWorkspaceIdSelfAnalysisRoute:
+      AuthedFrameWWorkspaceIdSelfAnalysisRouteWithChildren,
     AuthedFrameWWorkspaceIdSettingsRoute: AuthedFrameWWorkspaceIdSettingsRoute,
+    AuthedFrameWWorkspaceIdTeamRoute:
+      AuthedFrameWWorkspaceIdTeamRouteWithChildren,
     AuthedFrameWWorkspaceIdIndexRoute: AuthedFrameWWorkspaceIdIndexRoute,
     AuthedFrameWWorkspaceIdAiExportRoute: AuthedFrameWWorkspaceIdAiExportRoute,
     AuthedFrameWWorkspaceIdAiImportRoute: AuthedFrameWWorkspaceIdAiImportRoute,
@@ -664,12 +865,14 @@ const AuthedFrameWWorkspaceIdRouteWithChildren =
 interface AuthedFrameRouteChildren {
   AuthedFrameAccountRoute: typeof AuthedFrameAccountRoute
   AuthedFrameAdminRoute: typeof AuthedFrameAdminRouteWithChildren
+  AuthedFrameNotificationsRoute: typeof AuthedFrameNotificationsRoute
   AuthedFrameWWorkspaceIdRoute: typeof AuthedFrameWWorkspaceIdRouteWithChildren
 }
 
 const AuthedFrameRouteChildren: AuthedFrameRouteChildren = {
   AuthedFrameAccountRoute: AuthedFrameAccountRoute,
   AuthedFrameAdminRoute: AuthedFrameAdminRouteWithChildren,
+  AuthedFrameNotificationsRoute: AuthedFrameNotificationsRoute,
   AuthedFrameWWorkspaceIdRoute: AuthedFrameWWorkspaceIdRouteWithChildren,
 }
 

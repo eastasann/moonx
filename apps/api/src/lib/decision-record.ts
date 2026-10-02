@@ -14,6 +14,10 @@ export interface DecisionLogEntry extends DecisionLogSummary {
     missingChecks: CheckResult[];
     keyMetrics: KeyMetrics;
     fau: FauBreakdown;
+    /** Go / No-Go only: the three conditions of plan item 24 as they were. */
+    conditions?: { launchIf: string | null; delayIf: string | null; stopIf: string | null };
+    /** Go / No-Go and version saves: the plan version the entry is about. */
+    planVersion?: { id: string; name: string } | null;
   };
 }
 

@@ -1,0 +1,16 @@
+{
+  "title": "Notifications",
+  "listLabel": "Notifications",
+  "filter": {
+    "label": "Show",
+    "all": "All",
+    "unread": "Unread"
+  },
+  "markAllRead": "Mark all as read",
+  "empty": "You're all caught up.",
+  "unreadMark": "Unread",
+  "noAccess": "You no longer have access",
+  "loadMore": "Load more",
+  "loadingMore": "Loading more notifications",
+  "loadMoreFailed": "Couldn't load more notifications"
+}

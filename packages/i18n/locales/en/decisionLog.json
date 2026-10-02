@@ -1,0 +1,56 @@
+{
+  "title": "Decision Log",
+  "listLabel": "Recorded decisions",
+  "empty": {
+    "heading": "Decisions you record will appear here, with who, when and why."
+  },
+  "filters": {
+    "kind": "Type",
+    "allKinds": "All types",
+    "idea": "Idea",
+    "allIdeas": "All ideas",
+    "recordedBy": "Recorded by",
+    "anyone": "Anyone",
+    "from": "From",
+    "to": "To",
+    "openCalendar": "Open the calendar",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "clear": "Clear filters"
+  },
+  "kind": {
+    "validation_decision": "Decision",
+    "go_no_go": "Go / No-Go",
+    "version_saved": "Version saved"
+  },
+  "row": {
+    "when": "{{date}}, {{time}}",
+    "place": "{{idea}} · {{plan}}",
+    "recordedBy": "by {{name}}"
+  },
+  "filteredEmpty": "Nothing matches these filters",
+  "loadMore": "Load more",
+  "loadingMore": "Loading more entries",
+  "loadMoreFailed": "Couldn't load more entries",
+  "choose": "Choose an entry to see what it rested on.",
+  "detail": {
+    "recorded": "Recorded by {{name}} on {{date}}, {{time}}",
+    "reason": "Reason",
+    "noReason": "No reason was recorded.",
+    "snapshot": "What it rested on",
+    "snapshotNote": "As the screen showed it when this was recorded.",
+    "checksMissing_one": "{{count}} check was missing",
+    "checksMissing_other": "{{count}} checks were missing",
+    "checksDone": "All checks were done.",
+    "keyNumbers": "Key numbers",
+    "conditions": "Conditions",
+    "launchIf": "Launch if",
+    "delayIf": "Delay if",
+    "stopIf": "Stop if",
+    "notSet": "Not set",
+    "planVersion": "Plan version: {{name}}",
+    "openValidation": "Open validation",
+    "openPlan": "Open plan",
+    "back": "Back to the log"
+  }
+}

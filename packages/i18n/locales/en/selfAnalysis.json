@@ -1,0 +1,84 @@
+{
+  "title": "My Self Analysis",
+  "status": {
+    "not_started": "Not started",
+    "in_progress": "In progress",
+    "done": "Done"
+  },
+  "summary": "{{status}} · {{answered}} / {{total}} answered",
+  "empty": {
+    "body": "Answer {{count}} questions at your own pace. Only you can see your answers until you share them.",
+    "start": "Start"
+  },
+  "continue": "Continue",
+  "markDone": "Mark as done",
+  "reopen": "Reopen",
+  "teamLink": "Team",
+  "share": "Share",
+  "currencyMenu": "More actions for the self analysis",
+  "changeCurrency": "Currency: {{currency}}",
+  "confirmDone": {
+    "title": "Mark as done?",
+    "body_one": "{{count}} question is empty. Mark as done anyway?",
+    "body_other": "{{count}} questions are empty. Mark as done anyway?",
+    "confirm": "Mark as done",
+    "cancel": "Cancel"
+  },
+  "blocks": {
+    "state": "Status",
+    "sections": "Sections"
+  },
+  "state": {
+    "answered": "{{answered}} / {{total}} answered",
+    "sharedWith": "Shared with: {{names}}",
+    "notShared": "Shared with: not shared",
+    "template": "Template v{{version}}",
+    "currency": "Currency: {{currency}}",
+    "completedOn": "Done on {{date}}"
+  },
+  "sections": {
+    "listLabel": "Sections of the self analysis",
+    "progress": "{{answered}}/{{total}}",
+    "complete": "Complete"
+  },
+  "currency": {
+    "title": "Currency of the amounts",
+    "label": "Currency",
+    "help": "Amounts are not converted when you change the currency.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saveFailed": "Couldn't save"
+  },
+  "shareModal": {
+    "title": "Share your self analysis",
+    "body": "Owners and Members of the workspaces you choose can read your answers. Viewers can't. You can stop sharing at any time.",
+    "listLabel": "Workspaces to share with",
+    "needsDone": "Mark your self analysis as done to share it with another workspace.",
+    "noTeam": "Join a team workspace to share your self analysis",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saveFailed": "Couldn't save"
+  },
+  "form": {
+    "home": "Back to Self Analysis",
+    "amount": "Amount",
+    "reason": "Why this amount?",
+    "amountRange": "Enter a number from 0 to 1,000,000,000,000",
+    "answerFailed": "Couldn't save — Retry",
+    "conflictItem": "answer",
+    "preview": "{{amount}} — {{reason}}"
+  },
+  "team": {
+    "title": "Team",
+    "listLabel": "Members",
+    "notShared": "Not shared",
+    "shared": "Shared · {{status}}",
+    "empty": "No one has shared their self analysis in this workspace yet.",
+    "choose": "Choose a member to read their self analysis.",
+    "back": "Back to the members",
+    "noAnswer": "Empty",
+    "amount": "Amount: {{value}}",
+    "noAccess": "This self analysis is not shared in this workspace.",
+    "readOnly": "{{name}}'s self analysis · {{status}}"
+  }
+}

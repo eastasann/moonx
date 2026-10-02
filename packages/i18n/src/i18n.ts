@@ -6,15 +6,19 @@ import app from "../locales/en/app.json";
 import auth from "../locales/en/auth.json";
 import common from "../locales/en/common.json";
 import costs from "../locales/en/costs.json";
+import dashboard from "../locales/en/dashboard.json";
 import decision from "../locales/en/decision.json";
+import decisionLog from "../locales/en/decisionLog.json";
 import economics from "../locales/en/economics.json";
 import errors from "../locales/en/errors.json";
 import form from "../locales/en/form.json";
 import ideas from "../locales/en/ideas.json";
 import mail from "../locales/en/mail.json";
+import notifications from "../locales/en/notifications.json";
 import panels from "../locales/en/panels.json";
 import plan from "../locales/en/plan.json";
 import research from "../locales/en/research.json";
+import selfAnalysis from "../locales/en/selfAnalysis.json";
 import validation from "../locales/en/validation.json";
 import workspaceSettings from "../locales/en/workspaceSettings.json";
 
@@ -28,15 +32,19 @@ export const resources = {
     auth,
     common,
     costs,
+    dashboard,
     decision,
+    decisionLog,
     economics,
     errors,
     form,
     ideas,
     mail,
+    notifications,
     panels,
     plan,
     research,
+    selfAnalysis,
     validation,
     workspaceSettings,
   },
@@ -51,15 +59,19 @@ export const NAMESPACES = [
   "auth",
   "common",
   "costs",
+  "dashboard",
   "decision",
+  "decisionLog",
   "economics",
   "errors",
   "form",
   "ideas",
   "mail",
+  "notifications",
   "panels",
   "plan",
   "research",
+  "selfAnalysis",
   "validation",
   "workspaceSettings",
 ] as const;

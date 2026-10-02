@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { type ModalName, useOverlay } from "../lib/overlay";
 import { NewIdeaDialog } from "./NewIdeaDialog";
+import { ShareDialog } from "./ShareDialog";
 import { SwitchWorkspaceDialog } from "./SwitchWorkspaceDialog";
 
 /**
@@ -9,6 +10,7 @@ import { SwitchWorkspaceDialog } from "./SwitchWorkspaceDialog";
  */
 const MODALS: Partial<Record<ModalName, ComponentType>> = {
   "new-idea": NewIdeaDialog,
+  share: ShareDialog,
   "switch-workspace": SwitchWorkspaceDialog,
 };
 

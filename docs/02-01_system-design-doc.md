@@ -1125,7 +1125,7 @@ interface SelfAnalysisAnswer extends Versioned {
 | S4 reopen | — | `200 SelfAnalysisHome` | 共有は続く |
 | S5 | `{ workspaceIds: UUID[] }`（共有先の全体） | `200 SelfAnalysisHome` | 新しく足すのは `done` のときだけ（`422 MUST_BE_DONE_TO_SHARE`）。外すのはいつでも。Owner / Member でないワークスペースは `422 NOT_SHAREABLE` |
 | S6 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | 今のワークスペースの Owner / Member |
-| S7 | — | `200 { user: UserRef; status; currency: string; sections: (TemplateSection & { answers: { questionKey: string; text: string | null; amount: number | null; commentCount: number }[] })[] }` | 今のワークスペースに共有済みでなければ `403 NOT_SHARED`。変更履歴は返さない |
+| S7 | — | `200 { id: UUID; user: UserRef; status; currency: string; sections: (TemplateSection & { answers: { questionKey: string; text: string | null; amount: number | null; commentCount: number }[] })[] }` | `id` は自己分析の ID で、回答へのコメント（C1）の `targetId` に使う。今のワークスペースに共有済みでなければ `403 NOT_SHARED`。変更履歴は返さない |
 
 ### 5.9 プラン
 
@@ -1272,7 +1272,7 @@ interface DecisionLogEntry extends DecisionLogSummary {
   snapshot: {
     missingChecks: CheckResult[]; keyMetrics: KeyMetrics; fau: FauBreakdown;
     conditions?: { launchIf: string | null; delayIf: string | null; stopIf: string | null };  // go_no_go
-    planVersion?: { id: UUID; name: string } | null;
+    planVersion?: { id: UUID; name: string } | null;  // go_no_go・version_saved
   };
 }
 interface Comment {

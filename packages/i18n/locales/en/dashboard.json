@@ -1,0 +1,60 @@
+{
+  "title": "Dashboard",
+  "blocks": {
+    "ideas": "Ideas",
+    "selfAnalyses": "Self analyses",
+    "dueSoon": "Due soon",
+    "activity": "Recent activity"
+  },
+  "ideas": {
+    "listLabel": "Ideas in this workspace",
+    "none": "No ideas to show.",
+    "noMissing": "—",
+    "missingCount": "{{count}} checks",
+    "missing": "Missing: {{names}}",
+    "droppedHidden_one": "{{count}} dropped idea hidden",
+    "droppedHidden_other": "{{count}} dropped ideas hidden",
+    "showDropped": "Show",
+    "meta": "{{stage}} · {{updated}}"
+  },
+  "gettingStarted": {
+    "title": "Getting started",
+    "body": "A new workspace begins with these steps.",
+    "listLabel": "Steps to get started",
+    "selfAnalysis": "Start your self analysis",
+    "invite": "Invite the people you work with",
+    "idea": "Write down your first idea",
+    "viewerBody": "No ideas have been written in this workspace yet."
+  },
+  "selfAnalyses": {
+    "listLabel": "Self analyses of the members",
+    "shared": "Shared · {{status}}",
+    "notShared": "Not shared",
+    "status": {
+      "not_started": "Not started",
+      "in_progress": "In progress",
+      "done": "Done"
+    }
+  },
+  "dueSoon": {
+    "listLabel": "Execution items due soon",
+    "empty": "Nothing is due in the next 7 days.",
+    "unassigned": "Unassigned",
+    "overdue": "overdue {{days}}d",
+    "today": "today",
+    "inDays": "{{days}}d",
+    "mine": "Yours",
+    "assignee": "{{who}} ·",
+    "assigneeWhen": "{{who}} · {{when}}"
+  },
+  "activity": {
+    "listLabel": "Recent activity",
+    "empty": "Changes, comments and decisions of this workspace will appear here.",
+    "change": "{{actor}} changed {{summary}}",
+    "comment": "{{actor}} commented on {{summary}}",
+    "decision": "{{actor}} recorded {{value}}",
+    "go_no_go": "{{actor}} recorded Go / No-Go: {{value}}",
+    "version_saved": "{{actor}} saved version {{summary}}",
+    "context": "{{place}} · {{when}}"
+  }
+}

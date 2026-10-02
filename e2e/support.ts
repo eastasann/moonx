@@ -92,3 +92,23 @@ export async function restoreDemoPassword(email: string) {
     [email],
   );
 }
+
+/**
+ * Puts Paolo back in BCDX as a Member with his self analysis shared there. The auth spec has him
+ * leave the workspace, which also ends the share, and the specs share one database.
+ */
+export async function restorePaoloInBcdx() {
+  await query(
+    `insert into memberships (workspace_id, user_id, role)
+     select w.id, u.id, 'member' from workspaces w, users u
+     where w.name = 'BCDX' and u.email = 'paolo@bcdx.example'
+     on conflict (workspace_id, user_id) do nothing`,
+  );
+  await query(
+    `insert into self_analysis_shares (self_analysis_id, workspace_id)
+     select sa.id, w.id from self_analyses sa
+     join users u on u.id = sa.user_id, workspaces w
+     where w.name = 'BCDX' and u.email = 'paolo@bcdx.example'
+     on conflict (self_analysis_id, workspace_id) do nothing`,
+  );
+}

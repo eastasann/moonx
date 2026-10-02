@@ -2,17 +2,13 @@ import { expect, test } from "vitest";
 import {
   isAnswered,
   isQuestionVisible,
-  neighbourSections,
   sectionPath,
   withChoice,
   withText,
 } from "../src/lib/questions";
 import { emptyClassification } from "./question-fixtures";
 
-test("sections follow the validation's order and open their own screens", () => {
-  expect(neighbourSections("01")).toEqual({ previous: null, next: "02" });
-  expect(neighbourSections("02")).toEqual({ previous: "01", next: "03" });
-  expect(neighbourSections("10")).toEqual({ previous: "09", next: null });
+test("sections open their own screens", () => {
   expect(sectionPath("01")).toBe("/questions/01");
   expect(["03", "04", "05", "06-08", "09"].map(sectionPath)).toEqual([
     "/research",

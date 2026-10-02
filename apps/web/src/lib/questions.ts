@@ -35,18 +35,6 @@ export function sectionPath(section: string): string {
   }
 }
 
-/** The neighbours of a section in the validation's order, or null at either end. */
-export function neighbourSections(section: string): {
-  previous: string | null;
-  next: string | null;
-} {
-  const index = VALIDATION_SECTION_ORDER.indexOf(section as ValidationSectionKey);
-  return {
-    previous: VALIDATION_SECTION_ORDER[index - 1] ?? null,
-    next: VALIDATION_SECTION_ORDER[index + 1] ?? null,
-  };
-}
-
 /** What the form knows about one question's answer while it is edited. */
 export interface AnswerDraft {
   text: string | null;

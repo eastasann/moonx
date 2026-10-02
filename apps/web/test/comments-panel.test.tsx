@@ -2,7 +2,7 @@ import type { Comment, CommentThread } from "@moonx/schemas";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { makeMe, renderApp, stubApi, WORKSPACE } from "./support";
+import { emptyDashboard, makeMe, renderApp, stubApi, WORKSPACE } from "./support";
 
 const VALIDATION = "66666666-6666-4666-8666-666666666666";
 const ME = makeMe();
@@ -65,6 +65,7 @@ function stubComments(
     "GET /api/v1/notifications/unread-count": () => ({ body: { total: 0 } }),
     [`GET /api/v1/workspaces/${WORKSPACE}/members`]: () => ({ body: members }),
     "GET /api/v1/comments": () => ({ body: { threads: state.threads } }),
+    ...emptyDashboard(),
     ...extra,
   });
 }

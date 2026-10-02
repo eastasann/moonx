@@ -1,26 +1,43 @@
-import { Heading, HubPattern, Text } from "@moonx/ui-web";
+import { Heading, HubPattern, Stack, Text } from "@moonx/ui-web";
 import { useTranslation } from "react-i18next";
+import { canEditIdeas, useWorkspaceRole } from "../lib/ideas";
 import { useMe } from "../lib/session";
+import { ActivityBlock } from "./dashboard/ActivityBlock";
+import { DueSoonBlock } from "./dashboard/DueSoonBlock";
+import { IdeasBlock } from "./dashboard/IdeasBlock";
+import { SelfAnalysesBlock } from "./dashboard/SelfAnalysesBlock";
 
 /**
- * Screen 5 as far as the app frame needs it: the route, the title and the workspace it is for.
- * The blocks of design-spec 6.9 come with the dashboard step.
+ * Screen 5 (design-spec 6.9, pattern A): the ideas and the members' self analyses on the left, what
+ * is due and what happened lately on the right. The blocks load separately. Self analyses are for
+ * Owners and Members only.
  */
 export function Dashboard({ workspaceId }: { workspaceId: string }) {
-  const { t } = useTranslation("app");
+  const { t } = useTranslation("dashboard");
   const me = useMe();
+  const role = useWorkspaceRole(workspaceId);
   const workspace = me.memberships.find((m) => m.workspace.id === workspaceId)?.workspace;
   return (
     <HubPattern
       hasTabBar
       header={
         <>
-          <Heading level={1}>{t("nav.dashboard")}</Heading>
+          <Heading level={1}>{t("title")}</Heading>
           <Text tone="secondary">{workspace?.name}</Text>
         </>
       }
-      status={null}
-      entries={null}
+      status={
+        <Stack gap="space-300">
+          <IdeasBlock workspaceId={workspaceId} />
+          {canEditIdeas(role) ? <SelfAnalysesBlock workspaceId={workspaceId} /> : null}
+        </Stack>
+      }
+      entries={
+        <Stack gap="space-300">
+          <DueSoonBlock workspaceId={workspaceId} />
+          <ActivityBlock workspaceId={workspaceId} />
+        </Stack>
+      }
     />
   );
 }

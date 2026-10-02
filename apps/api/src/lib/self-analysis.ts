@@ -541,6 +541,7 @@ export async function loadSharedSelfAnalysis(
   const rowOf = new Map(answers.map((a) => [a.questionKey, a]));
   const countOf = new Map(comments.flatMap((c) => (c.key ? [[c.key, c.n] as const] : [])));
   return {
+    id: row.id,
     user: refs.get(ownerUserId) as NonNullable<ReturnType<typeof refs.get>>,
     status: row.status,
     currency: row.currency,

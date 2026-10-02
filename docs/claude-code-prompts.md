@@ -163,7 +163,7 @@ make tokens が通り、2回続けて動かしても生成物に差分が出ず�
 
 ## Step 5: テンプレート v1 とデモデータのシード
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/design-spec.md 8章（デモデータ仕様）と docs/02-01_system-design-doc.md 6.5（シード）に従って、

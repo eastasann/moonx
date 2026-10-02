@@ -16,7 +16,11 @@
         "elysia": "^1.4.0",
       },
       "devDependencies": {
+        "@moonx/db": "workspace:*",
+        "@moonx/domain": "workspace:*",
+        "@moonx/schemas": "workspace:*",
         "@types/bun": "^1.4.2",
+        "drizzle-orm": "0.45.3",
       },
     },
     "apps/mobile": {
@@ -68,6 +72,8 @@
     "packages/db": {
       "name": "@moonx/db",
       "dependencies": {
+        "@moonx/domain": "workspace:*",
+        "@moonx/schemas": "workspace:*",
         "drizzle-orm": "0.45.3",
         "postgres": "3.4.9",
       },

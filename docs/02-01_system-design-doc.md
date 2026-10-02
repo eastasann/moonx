@@ -192,7 +192,7 @@ moonx/
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
 | `db-migrate` | マイグレーションを適用する（`DATABASE_URL_DIRECT` か `DATABASE_URL`） |
-| `db-seed` / `db-reset` | デモデータを入れる（design-spec 8章）/ DB を作り直してシードまで |
+| `db-seed` / `db-reset` | 全テーブルの中身を消してデモデータを入れる（design-spec 8章。`APP_ENV=local` のときだけ動く。何度動かしても行の id は変わらない）/ DB を作り直してシードまで |
 | `db-studio` | Drizzle Studio |
 | `tokens` | `docs/06_design-tokens.json` から `packages/ui-tokens` を生成する |
 | `openapi` | API の OpenAPI 仕様を `apps/api/openapi.json` に書き出す |
@@ -676,7 +676,7 @@ interface TemplateQuestion {
 }
 type QuestionOptions =
   | { kind: "choice"; choices: string[] }                                   // 例: ["Red", "Blue", "Mixed"]
-  | { kind: "table"; columns: { key: string; label: string; type: "text" | "number" | "percent" | "money" }[] }
+  | { kind: "table"; columns: { key: string; label: string; type: "text" | "number" | "percent" | "money" }[] }   // percent は 0〜1 の小数で持つ（5.1）。money はワークスペースの通貨の金額
   | { kind: "linked_metric"; metricKeys: string[] }                         // design-spec 6.4 の主要指標のキー
   | { kind: "execution_view"; executionType: ExecutionType };
 interface TemplateSection { key: string; part: "a" | "b" | null; title: string; guidance: string | null; questions: TemplateQuestion[]; }
@@ -1623,8 +1623,8 @@ export const templateQuestions = pgTable("template_questions", {
   options: jsonb(),                               // 5.2 QuestionOptions
   displayCondition: jsonb(),                      // 例: { "V.02.OCEAN": ["Red", "Mixed"] }
   hasFau: boolean().notNull().default(false),
-  copyFrom: jsonb(),                              // プラン: 下書きでコピーする元（設問 ID・IDEA.*・LIST.*）
-  reference: jsonb(),                             // プラン: 参照に出すもの
+  copyFrom: jsonb(),                              // プラン: 下書きでコピーする元（文字列の配列。形は 6.3 の末尾）
+  reference: jsonb(),                             // プラン: 参照に出すもの（形は 6.3 の末尾）
   sortOrder: integer().notNull(),
   ...timestamps(),
 }, (t) => [uniqueIndex().on(t.templateVersionId, t.questionKey), index().on(t.templateSectionId)]);
@@ -2006,6 +2006,23 @@ export const changeHistory = pgTable("change_history", {
 ]);
 ```
 
+`template_questions` の `copy_from` と `reference` の形（どちらもプランの小項目だけが持つ）:
+
+- `copy_from`: 文字列の配列。要素は設問 ID（`V.01.WHO`）か疑似キー（`IDEA.ONE_LINE_CONCEPT`・`IDEA.PROPOSED_SOLUTION`・`LIST.ASSUMPTIONS`・`LIST.RISKS`）。要素が複数なら、書かれた順に空行でつないで1つの文章にする。`LIST.*` は表の小項目の `rows` にする（`LIST.RISKS` の Trigger / Indicator は null）。空の回答は飛ばす
+- `reference`: 次の指定の配列。項目の参照は、その項目の小項目の `reference` の和集合で、各指定は最も関係の深い小項目に置く。`kind` は 5.9 の `PlanReference.kind` と同じ
+
+| 指定 | 内容 |
+|---|---|
+| `{ kind: "validation_answers", section?, keys? }` | 検証の回答。`section`（`"01"`）か `keys`（設問 ID の配列） |
+| `{ kind: "competitors", limit }` | 検証の競合の上位 `limit` 件 |
+| `{ kind: "cost_rows", keys }` | 費用行。`keys` はテンプレートの費用行のキー（`initial.permits`） |
+| `{ kind: "research_log", tag }` | 調査ログのうち `tag`（`local_price` / `permits` / `demand_signal`）が付いたもの |
+| `{ kind: "self_analysis", sections }` | 共有された自己分析のセクション（`WHY` など） |
+| `{ kind: "metrics", keys }` | 主要指標（design-spec 6.4 のキー） |
+| `{ kind: "decision_log" \| "go_no_go_history" \| "assumptions" \| "risks" \| "totals" }` | キーを持たない参照。`totals` は表の小項目の持分と出資の合計 |
+
+`plan_versions.snapshot` の形: `{ header: { name, businessName, preparedBy }, answers: { questionKey, text, rows }[], keyMetrics, scenarios, execution: { type, title, status, dueDate, assigneeUserId, assigneeName, ... }[], competitors: { name, type, typicalPrice, strength, weakness }[] }`。`answers` は版を保存した時点の文章で、`keyMetrics` は `buildKeyMetrics()`、`scenarios` は `EconomicsResult.scenarios`、`competitors` は検証の上位5件。「+ changes」（5.9 `hasChangesSinceVersion`）は、版の保存より後に更新された回答・表・ヘッダ・実行管理の項目があるか（`updated_at` と `saved_at` の比較）で決める。
+
 ### 6.4 保存しないもの（毎回計算・生成する）
 
 - 損益分岐・シナリオ表・投資回収・ROI（design-spec 6.4）
@@ -2026,7 +2043,7 @@ export const changeHistory = pgTable("change_history", {
 - **選択肢の値は原本を踏襲する。** 判定 Proceed / Hold / Drop、市場の種類 Red / Blue / Mixed、確信度 Low / Medium / High、Can Reduce? Yes / Partly / No、競合の種類 Direct / Indirect / Substitute、出典の種類（design-spec 6.10）。
 - **ワークスペースの通貨を変えても金額は換算しない。**
 - **アカウントの削除**: `users` の行は残して個人の情報を消す（5.4 U7）。外部キーは `users` を参照し続ける。
-- **シード**: `make db-seed` は design-spec 8章のデモデータを入れる。テンプレート v1 の中身は Drive の原本から転記したもの（design-spec 9.3）を `packages/db/seed/templates/` に置く。
+- **シード**: `make db-seed` は全テーブルを空にして design-spec 8章のデモデータを入れる（`APP_ENV=local` 以外では動かない）。行の id は名前から決まるので、何度動かしても同じ id の行になる（パスワードのハッシュは毎回変わり、日時はシードを動かした日からの相対になる）。テンプレート v1 の中身は Drive の原本から転記したもの（design-spec 9.3）を `packages/db/seed/templates/` に置く。検証とプランの AI 用プロンプトは原本に無いので空で入れ、運営者が 27 で書く。
 
 ---
 

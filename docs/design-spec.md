@@ -842,6 +842,7 @@ Web（パターン F ワークシート）
 
 - 原本の「Source」列は F/A/U の根拠（M2）に置き換える。
 - 行は追加・削除・名前の変更・並べ替えができる。行数の上限はない。テンプレートの初期行も削除できる（削除は履歴から戻せる）。
+- 初期行のキー（`template_cost_defaults.key`、`cost_items.template_key`）: 初期費用は `initial.equipment`・`initial.renovation`・`initial.lease_deposit`・`initial.permits`・`initial.inventory`・`initial.branding`・`initial.launch_marketing`・`initial.tech_setup`・`initial.working_capital`・`initial.other`、月額固定費は `monthly.rent`・`monthly.salaries`・`monthly.utilities`・`monthly.internet`・`monthly.accounting`・`monthly.marketing`・`monthly.insurance`・`monthly.other`、変動費は `variable.materials`・`variable.packaging`・`variable.payment_fee`・`variable.delivery`・`variable.labor`・`variable.other`。確認項目5・主要指標の `cost_row:*`・プランの参照がこのキーで行を指す。
 - 変動費の行は「金額」か「価格の%」を切り替えて入れる（例: Materials 35%）。% の行は 18 の価格から金額を計算して添える（「35% · ₱77.00」）。価格が未入力なら「Needs price」。
 - 「まとめ額」: 行のメニューから「Lump sum（内訳なし）」の印を付けられる。仮置きのまとめ額であることを示すラベルを出すだけで、計算は通常の行と同じ。
 
@@ -1566,7 +1567,7 @@ Web（パターン A）                                        スマホは縦�
 | 19 | Technology & Systems | Systems required at launch / What can remain manual initially? / What should be automated early? / Who owns setup and maintenance? | — | 費用行 Tech Setup・Internet-Software |
 | 20 | Financial Plan | Startup cost / Opening cash reserve / Monthly fixed cost / Unit economics / Break-even / Conservative scenario / Expected scenario / Strong scenario / Capacity-limit scenario / Runway if sales are below plan / Trigger for additional funding | 数字: Startup cost・Monthly fixed cost・Unit economics・Break-even・4つのシナリオ。文章: Opening cash reserve・Runway・Trigger for additional funding | 費用行 Working Capital Buffer、回収期間・ROI |
 | 21 | Key Assumptions | **表**: Assumption / Why We Believe It / Evidence / What Would Disprove It | コピー: `LIST.ASSUMPTIONS`（16 の前提。Evidence は根拠の一覧と自由記述を文章にする） | 16 の前提 |
-| 22 | Key Risks | **表**: Risk / Probability / Impact / Mitigation / Trigger / Indicator | コピー: `LIST.RISKS`（16 のリスク。Trigger / Indicator は空） | 16 のリスク |
+| 22 | Key Risks | **表**: Risk / Probability / Impact / Mitigation / Trigger / Indicator（原本の列名は「Trigger / Indicator」の1列） | コピー: `LIST.RISKS`（16 のリスク。Trigger / Indicator は空） | 16 のリスク |
 | 23 | Pre-launch Milestones | 実行管理（マイルストーン） | 初期行6つ（6.13） | — |
 | 24 | Go / No-Go Conditions | We proceed to launch if / We delay if / We stop / abandon if | — | Go / No-Go の記録の履歴（決定は M4 から記録） |
 | 25 | Launch Plan | 実行管理（ローンチ） | 初期行5つ（6.13） | — |
@@ -1576,6 +1577,7 @@ Web（パターン A）                                        スマホは縦�
 | 29 | Next Actions | 実行管理（Next Action） | — | — |
 | 30 | Pitch-ready Summary | One-minute explanation / Five-minute explanation | — | 23 の1分版・5分版の「話す内容」に使うことを表示 |
 
+- 表の小項目の名前は、§11 が「Founders」、§13 が「Ownership and capital」（原本の Founder 1〜3 の固定行と、持分・出資の2行を、人数自由の表1つに置き換えた）。§13 の持分の列は 0〜1 の小数で持ち、「40%」と表示する。
 - 「下書きでコピー」の文章は、下書きを作った時点でコピーし、その後はプラン側で自由に直せる。検証の側が変わっても自動では変わらない。参照で「最新の検証」と見比べられる。
 - §11・§13 の表はメンバーとは紐づけない（名前も手で書く）。人数は自由。
 - §21 / §22 の表は、下書きのときに 16 からコピーし、その後はプラン側で直す。
@@ -1768,7 +1770,9 @@ Web（パターン A）                                        スマホは縦�
 | Grace Tan | grace@advisor.example | 一般 | Viewer | 未着手 |
 
 - ワークスペース「BCDX」（通貨 PHP）と、5人それぞれの個人用ワークスペース。
-- 招待: 未使用の招待1件（new.member@bcdx.example、Member）、期限切れの招待1件。
+- 招待: 未使用の招待1件（new.member@bcdx.example、Member。トークン `demo-invite-pending`）、期限切れの招待1件（late.joiner@bcdx.example、Member。トークン `demo-invite-expired`）。
+- サインイン: 5人とも、メールとパスワード `moonx-demo-2026`。パスワードは Better Auth と同じ scrypt のハッシュで入れる。
+- 個人用ワークスペースの名前は「{表示名}'s workspace」。Grace の自己分析は、回答0件で未着手の行として入れる（Admin には自己分析の行を入れない）。
 
 ### 8.2 アイデア（BCDX）
 
@@ -1815,10 +1819,12 @@ Web（パターン A）                                        スマホは縦�
 - 調査ログ: Piaya に7件（裏付ける確認項目のタグ: 地元の価格帯・許認可・需要・課題シグナルを含む）、Health Bowl に5件（地元の価格帯1件・需要・課題シグナル2件。許認可のタグなし）、Bike Repair に0件。
 - 競合: Piaya に4件（価格入り3件）、Health Bowl に4件（価格入り2件）、Bike Repair に0件。
 - これで確認項目は、Piaya が6つとも達成、Health Bowl が 1・2・4・6 達成 / 3 途中 / 5 未着手、Bike Repair が6つとも未着手になる。
-- コメント: 6スレッド。うち2つで Kenji をメンションし、Kenji の未読通知にする。1スレッドは解決済み。Ana の自己分析に Paolo のコメント1件。
+- コメント: 6スレッド（返信を含めて7件）。うち2つで Kenji をメンションし、Kenji の未読通知にする。1スレッドは解決済み。6つのうち1つは Ana の自己分析に付けた Paolo のコメント。
 - 決定ログ: Piaya（Proceed、版「v1 For advisors」の保存、Go / No-Go: Delay）、Health Bowl（Hold。不足: 初期費用と月額費用・許認可）、Study Café（Proceed、版「v1 Launch review」の保存、Launch）、Laundry（Drop）。
 - 変更履歴: 主要な回答に2〜3件ずつ（手入力・AI 取り込み・元に戻す）。
 - テンプレート: 3つすべて v1 を公開。検証のテンプレートは v2（設問を1つ追加）も公開し、Mobile Bike Repair だけを v2 で作る（他の検証は v1 のままで、M8 の案内が出る）。さらに検証の v3 の下書きを置き、27 を確かめられるようにする。v1 の設問・EXAMPLE・ガイダンス・小項目と Example は Drive の原本の写しから転記する（9.3）。実行管理の初期行は 6.13 のとおり。
+- テンプレートの追加分: v2 で足す設問は `V.01.REACH`（「How will you reach this customer?」）で、01 の最後に置く。v3 の下書きは v2 に `V.10.NEXT_STEP`（「What is the next step to reduce the biggest unknown?」）を足したもの。2つとも原本に無い文面で、27 と M8 の確認のために置く。検証とプランの AI 用プロンプトは原本に無いので空で入れる。
+- 日付はシードを動かした日からの相対（期限切れ・2日後が変わらないようにする）。Health Bowl の未分類3件は `V.01.BEHAVIOR`・`V.01.SWITCHING`・`V.02.DRIVERS`。
 
 ---
 
@@ -1870,7 +1876,7 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 
 - 技術スタック、認証方式、PDF の生成方式、オフライン時の一時保存の方式 → Phase 3 で決定済み（`docs/02-01_system-design-doc.md` の ADR。認証はメールとパスワード＋Google ログイン）
 - デザイントークン（Hermes Teal 系の色・見出しの表示用書体・余白の具体値、意味色のライト / ダーク両方の値、Pitch Deck のスライドの型ごとの最小の文字の大きさ）→ Phase 3 の `docs/06_design-tokens.json`。参照元: Hermes Agent のサイト（https://hermes-agent.nousresearch.com/）と、その既定テーマ「Hermes Teal」
-- テンプレート v1 の中身（自己分析36問・検証の設問・プランの小項目の問いと Example・セクションのガイダンス・AI 用プロンプト）は、Drive の原本の写し（`docs/drive-templates/`。2026-10-02 に書き出した）から転記してシードにする。プランの小項目の名前と表の列・初期行は 6.12 / 6.13 に記録済み。問いの本文と Example はこの写しから転記する
+- テンプレート v1 の中身（自己分析36問・検証の設問・プランの小項目の問いと Example・セクションのガイダンス・AI 用プロンプト）は、Drive の原本の写し（`docs/drive-templates/`。2026-10-02 に書き出した）から転記してシードにする。プランの小項目の名前と表の列・初期行は 6.12 / 6.13 に記録済み。問いの本文と Example はこの写しから転記する。AI 用プロンプトの原本があるのは自己分析だけで、検証とプランは空で始める。自己分析のセクション見出しの横にある短い言い換え（「WHY | Why do I want this?」の後半）は取り込まず、見出しの下の1行のガイダンスだけを持つ
 - 日時の表示はユーザーのタイムゾーン（登録時に端末から取り、4 で変えられる）
 - 技術の希望（スマホはストアで配るネイティブアプリ、運用費、TypeScript）は Phase 3 で反映済み。正は `docs/02-01_system-design-doc.md`（1章 Goal の運用費、ADR-001・ADR-003）
 

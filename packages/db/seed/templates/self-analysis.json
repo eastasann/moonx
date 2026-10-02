@@ -1,0 +1,262 @@
+{
+  "aiPrompt": "I want to complete the attached Self Analysis template.\n\nPlease use the template as the source of truth for the questions, order, sections, and overall\nstructure.\n\nThe purpose of this exercise is not to decide what business I should start. It is to understand\nwhat kind of life I want, what I value, what I am willing to sacrifice, what “enough” means to\nme, and what role work or business should play in my life.\n\nGuide me through the template conversationally, one question at a time.\n\nThe discussion is more important than completing the template quickly.\n\nFor EVERY question, follow this process:\n\n1. Ask me the question from the template.\n2. Let me answer naturally.\n3. Do not immediately accept, rewrite, or finalize my first answer.\n4. Reflect back what you think I mean.\n5. Discuss the answer with me and help me think more deeply.\n6. Ask follow-up questions about anything important, vague, contradictory, or worth\nexploring.\n7. Use concrete examples, trade-offs, comparisons, or hypothetical situations when useful.\n8. Continue the discussion until the answer feels genuinely clear to me.\n9. Then summarize what we discovered in a concise answer suitable for that field in the\ntemplate.\n10. Ask whether the summary accurately represents what I mean.\n11. Once the answer is settled, move to the next question in the template.\n\nAlways have a discussion phase for every question, even when my first answer appears\nclear.\n\nDo not treat this as a questionnaire where the goal is simply to fill every blank.\n\n### How to guide the discussion\n\n- Help me discover what I actually think rather than suggesting what I should think.\n- There are no correct answers.\n- Do not try to make my answers sound more ambitious, impressive, socially responsible, or\nsophisticated.\n- Do not force entrepreneurship to be the goal.\n\n- Owning a business may be one option, but employment, leadership, investment,\ncommunity work, or other paths may achieve the same life goals.\n- Distinguish between what I genuinely want and what I feel I am expected to want.\n- It is completely acceptable for me to say “I don't know.”\n- If I am uncertain, explore the uncertainty with me instead of inventing an answer.\n- If my current answer conflicts with something I said earlier, point it out neutrally and help\nme explore the trade-off.\n- If I use an abstract word such as freedom, success, happiness, impact, or enough, help me\ndefine what that word means specifically to me.\n- Ask “why” when it can reveal something meaningful, but do not manufacture depth where\nnone exists.\n- When useful, ask me to choose between two realistic situations to clarify my priorities.\n- Use my previous answers as context when discussing later questions.\n\n### Language\n\nI may answer in English, Tagalog, another Philippine language, or a mixture of languages.\n\nContinue primarily in the language I am using.\n\nDo not translate my answers into another language unless I explicitly ask you to.\n\nWhen you summarize an answer for the template, preserve my meaning and use my primary\nlanguage.\n\n### Important boundaries\n\nDo not:\n\n- give me business ideas unless I explicitly ask;\n- rank or score my answers;\n- compare my ambitions with other people's;\n- tell me what a successful person should want;\n- silently add motivations or values that I did not express;\n- rush to the next question simply because my first answer sounds reasonable.\n\n### Income questions\n\nWhen the template asks about personal income:\n\n- use PHP as the default currency unless I specify otherwise;\n- discuss what lifestyle or freedom the amount is intended to enable, not only the number;\n- distinguish between minimum, target, and ideal income;\n- help me determine whether additional income would actually improve the life I want.\n\n### Final Reflection\n\nSpend extra time on the Final Reflection section.\n\nDo not simply combine earlier answers mechanically.\n\nHelp me examine whether the conclusions genuinely feel true to me and whether any\nimportant contradictions remain.\n\nIn particular, help me clarify:\n\n- the life I want to build;\n- the person I want to become;\n- what “enough” means to me;\n- what self-fulfillment means to me;\n- what role work or business should play in my life.\n\nAfter completing the entire template, provide a consolidated version of all finalized answers\nso I can review my Self Analysis as a whole.\n\nStart by reading the attached Self Analysis template and asking me its first question.\n\nDo not show me every question at once.",
+  "sections": [
+    {
+      "key": "WHY",
+      "title": "WHY",
+      "guidance": "Start with motivation. Do not assume business is the answer; clarify what you are actually trying to change or gain.",
+      "questions": [
+        {
+          "n": 1,
+          "prompt": "Why do I want to build a business?",
+          "example": "I want more control over what I build, who I work with, where I live, and how the value I create is rewarded. In my current career I can improve projects and organizations, but I ultimately do not own the outcome. I want to experience building something where the results, responsibility, and upside belong to us."
+        },
+        {
+          "n": 2,
+          "prompt": "Why does that matter to me?",
+          "example": "Ownership matters to me because I feel most motivated when my decisions directly affect the outcome. I do not necessarily want to avoid employment; I want to know whether I can build something of my own and take full responsibility for it while I still have the energy and flexibility to try."
+        }
+      ]
+    },
+    {
+      "key": "BE",
+      "title": "BE",
+      "guidance": "Describe the person you want to become—not only the job title, income, or company size.",
+      "questions": [
+        {
+          "n": 3,
+          "prompt": "In 5–10 years, what kind of person do I want to be?",
+          "example": "I want to become someone who can identify opportunities, organize people and resources, make difficult decisions, and turn an unclear idea into a sustainable business. I want to be capable of creating jobs and opportunities rather than depending only on my own salary or technical skills."
+        },
+        {
+          "n": 4,
+          "prompt": "Why do I want to become that person?",
+          "example": "I want the ability to choose my own direction and also create opportunities for people around me. I would rather develop that capability now than look back later and wonder whether I could have done it."
+        }
+      ]
+    },
+    {
+      "key": "DO",
+      "title": "DO",
+      "guidance": "Focus on how you want to spend your time and energy on an ordinary week—not only on exceptional moments.",
+      "questions": [
+        {
+          "n": 5,
+          "prompt": "What do I want to spend more of my time doing?",
+          "example": "Understanding real problems, designing solutions, building products or services, improving operations, making decisions, learning new things, and working closely with people who are affected by those decisions."
+        },
+        {
+          "n": 6,
+          "prompt": "What do I want to spend less of my time doing?",
+          "example": "Internal politics, repetitive reporting, unnecessary approval processes, or work where I have responsibility but little authority and cannot clearly see how the work creates value."
+        },
+        {
+          "n": 7,
+          "prompt": "Why?",
+          "example": "I get energy from creating and improving things. I lose motivation when most of my time is spent maintaining processes that exist mainly because the organization is large or because nobody wants to change them."
+        }
+      ]
+    },
+    {
+      "key": "GIVE",
+      "title": "GIVE",
+      "guidance": "Self-fulfillment is not only about what you gain. Clarify who should be better off because of your work.",
+      "questions": [
+        {
+          "n": 8,
+          "prompt": "Who do I want to create value for?",
+          "example": "People in Bacolod, local workers, small businesses, customers who currently have limited options, and eventually people outside the city if the business can expand responsibly."
+        },
+        {
+          "n": 9,
+          "prompt": "What kind of value do I want to create?",
+          "example": "Better services, meaningful employment, higher-quality products, healthier choices, stronger local businesses, or opportunities that currently do not exist locally."
+        },
+        {
+          "n": 10,
+          "prompt": "Why is creating this value important to me?",
+          "example": "I do not want the business to exist only to generate income for the founders. I want there to be a clear reason why customers, employees, or the local community are better off because the business exists."
+        }
+      ]
+    },
+    {
+      "key": "HAVE",
+      "title": "HAVE",
+      "guidance": "Make the desired life concrete: location, schedule, relationships, flexibility, and daily living.",
+      "questions": [
+        {
+          "n": 11,
+          "prompt": "Where do I want to live?",
+          "example": "I want Bacolod to become my primary base while keeping enough flexibility to spend time in Japan when necessary. I want to build a real life there rather than treat it only as a business location."
+        },
+        {
+          "n": 12,
+          "prompt": "Why do I want to live that way?",
+          "example": "I have personal connections there, I enjoy the pace of life, and I believe the cost structure and environment could give me more freedom to build something long term while still maintaining ties to Japan."
+        },
+        {
+          "n": 13,
+          "prompt": "What kind of schedule do I want long term?",
+          "example": "I am willing to work intensely during the early stages of a business, but long term I want control over my schedule and I do not want the company to require my physical presence every day. I want to be able to step away for several days without the business stopping."
+        },
+        {
+          "n": 14,
+          "prompt": "Why does that schedule matter to me?",
+          "example": "One reason I want to build a business is autonomy. If the company permanently requires 70 hours a week from me, I may have created a demanding job rather than the life I wanted."
+        }
+      ]
+    },
+    {
+      "key": "INCOME",
+      "title": "PERSONAL INCOME",
+      "guidance": "Choose amounts based on the life they enable. Money is a means, so always explain why the number matters.",
+      "questions": [
+        {
+          "n": 15,
+          "prompt": "What is my minimum monthly personal income?",
+          "example": "PHP 80,000/month. This would allow me to cover comfortable housing, food, transportation, insurance, basic leisure, and regular savings in Bacolod without feeling that I had significantly reduced my quality of life."
+        },
+        {
+          "n": 16,
+          "prompt": "What is my target monthly personal income?",
+          "example": "PHP 150,000/month after tax. At this level I expect to cover housing and daily expenses comfortably, travel to Japan several times a year, support family when necessary, save and invest consistently, and still have enough discretionary income to enjoy life without constantly worrying about money."
+        },
+        {
+          "n": 17,
+          "prompt": "What is my ideal monthly personal income?",
+          "example": "PHP 250,000+/month. This would give me enough flexibility to invest in new businesses, help family, absorb unexpected expenses, travel freely, and make career or business decisions based more on opportunity than immediate financial necessity."
+        }
+      ]
+    },
+    {
+      "key": "ENOUGH",
+      "title": "ENOUGH",
+      "guidance": "Define the point where more money, scale, or work would stop meaningfully improving your life.",
+      "questions": [
+        {
+          "n": 18,
+          "prompt": "At what point would additional income stop significantly improving my life?",
+          "example": "If my personal income consistently reaches PHP 250,000–300,000 per month and I also have sufficient savings and investments, maximizing income beyond that would become less important than time, freedom, relationships, and meaningful work."
+        },
+        {
+          "n": 19,
+          "prompt": "How large does a business need to become for me to feel successful?",
+          "example": "I do not need to build a 1,000-person company. A profitable company with 20–50 strong employees, healthy cash flow, and the ability to operate without the founders being involved in every daily decision could already represent success to me."
+        },
+        {
+          "n": 20,
+          "prompt": "Why is that enough?",
+          "example": "I am more interested in building a durable and well-run business than pursuing size only for status. If the business can create good jobs, generate enough profit for the founders, and operate sustainably, I would consider that meaningful success."
+        },
+        {
+          "n": 21,
+          "prompt": "How much of my time am I willing to give to the business?",
+          "example": "During the first year I could accept 50–60 hour weeks for limited periods, but I would not want that to become permanent. Long term I would want the business to function with roughly 30–40 hours of my weekly involvement or less."
+        }
+      ]
+    },
+    {
+      "key": "NOT",
+      "title": "NOT",
+      "guidance": "Boundaries are part of the goal. Clarify what success is not allowed to cost you.",
+      "questions": [
+        {
+          "n": 22,
+          "prompt": "What am I not willing to sacrifice for the business?",
+          "example": "My long-term health, important relationships, personal integrity, all of my financial safety, or all of my freedom for the sake of growth."
+        },
+        {
+          "n": 23,
+          "prompt": "What kind of success would actually feel like failure?",
+          "example": "Building a highly profitable company but having no time outside work, constantly fighting with my co-founders, becoming dependent on practices I am not proud of, or being financially successful but unable to leave the business even for a short period."
+        },
+        {
+          "n": 24,
+          "prompt": "What kind of business do I never want to run?",
+          "example": "A business that depends on misleading customers, exploiting employees, hiding serious quality problems, or creating revenue through something I would be uncomfortable explaining openly to people I respect."
+        },
+        {
+          "n": 25,
+          "prompt": "What would make me leave the business?",
+          "example": "I would consider leaving if I no longer believed in the business, if the founders fundamentally stopped trusting each other, if the work permanently damaged my health or relationships, or if continuing required values I do not accept."
+        }
+      ]
+    },
+    {
+      "key": "NOW",
+      "title": "NOW",
+      "guidance": "Bring the reflection back to reality. State what you can contribute now—not what you hope to contribute someday.",
+      "questions": [
+        {
+          "n": 26,
+          "prompt": "Time",
+          "example": "I can contribute 10–15 hours per week during the planning and validation stage. I could consider full-time involvement once the business reaches a defined level of revenue, funding, or operational readiness."
+        },
+        {
+          "n": 27,
+          "prompt": "Capital",
+          "example": "I am comfortable investing up to PHP ___ / JPY ___ initially as long as losing that amount would not threaten my emergency savings, living expenses, or other essential commitments."
+        },
+        {
+          "n": 28,
+          "prompt": "Skills",
+          "example": "Technology, product development, project planning, problem structuring, documentation, operations improvement, process design, and working across different cultures."
+        },
+        {
+          "n": 29,
+          "prompt": "Network / Resources",
+          "example": "Friends and local connections in Bacolod, technology professionals in Japan and the Philippines, access to people with product-development experience, and the ability to build simple digital systems ourselves if needed."
+        },
+        {
+          "n": 30,
+          "prompt": "Current constraints",
+          "example": "I currently have a full-time job, I do not yet live permanently in Bacolod, and I cannot personally operate a physical business every day during the initial stage. Any business that requires constant on-site founder involvement must account for this."
+        }
+      ]
+    },
+    {
+      "key": "FINAL",
+      "title": "FINAL REFLECTION",
+      "guidance": "Synthesize the earlier sections. If these answers contradict each other, note the tension rather than forcing consistency.",
+      "questions": [
+        {
+          "n": 31,
+          "prompt": "The life I want",
+          "example": "I live primarily in Bacolod, have enough financial independence that I can choose what to work on, spend most of my professional time creating and improving things, maintain close relationships with people important to me, and have enough flexibility to travel and explore new ideas."
+        },
+        {
+          "n": 32,
+          "prompt": "The person I want to become",
+          "example": "Someone capable of creating sustainable businesses, taking responsibility for difficult decisions, learning outside my original expertise, and creating opportunities for other people instead of only optimizing my own career."
+        },
+        {
+          "n": 33,
+          "prompt": "What “enough” means to me",
+          "example": "Enough income to live comfortably, support people I care about, and invest for the future; enough time to enjoy my life; and enough organizational independence that the business does not depend entirely on me."
+        },
+        {
+          "n": 34,
+          "prompt": "My definition of self-fulfillment",
+          "example": "Creating something I genuinely own, using my abilities to make things better, helping people around me grow, and having enough freedom to choose how I spend my time and where I direct my effort."
+        },
+        {
+          "n": 35,
+          "prompt": "The role business plays in that life",
+          "example": "Business is not the final objective itself. It is one possible vehicle for ownership, freedom, meaningful work, wealth creation, learning, and creating value for other people. If another path serves those goals better, I should be willing to recognize that."
+        }
+      ]
+    },
+    {
+      "key": "ONE",
+      "title": "ONE-SENTENCE SUMMARY",
+      "guidance": "Force the result into one sentence after completing everything else.",
+      "questions": [
+        {
+          "n": 36,
+          "prompt": "If I had to describe the life I am trying to build in one sentence:",
+          "example": "I want to build a life where I have enough ownership, financial independence, meaningful work, and time freedom to choose what I work on while creating opportunities for people around me."
+        }
+      ]
+    }
+  ]
+}

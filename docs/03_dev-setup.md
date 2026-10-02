@@ -149,7 +149,9 @@ make admin-create EMAIL=<自分のメール>
 
 ### 3.6 デモデータ
 
-デモデータ（design-spec 8章）を入れ直すときは `make db-seed`、DB を最初からやり直すときは `make db-reset`。
+デモデータ（design-spec 8章）を入れ直すときは `make db-seed`、DB を最初からやり直すときは `make db-reset`。`make db-seed` は全テーブルの中身を消してから入れるので、ローカルで作ったデータは残らない。`APP_ENV=local` 以外では動かない。
+
+デモのユーザーでのサインイン、招待の受諾に使うトークンは design-spec 8.1。
 
 ---
 
@@ -162,7 +164,7 @@ make admin-create EMAIL=<自分のメール>
 | DB を起動する / 止める | `make db-up` / `make db-down` |
 | `packages/db` のスキーマを変えた | `make db-generate` → できた SQL を読んで確かめる → `make db-migrate` |
 | 他の人のマイグレーションを取り込んだ | `make db-migrate` |
-| デモデータを入れ直したい | `make db-seed` |
+| デモデータを入れ直したい（ローカルのデータは消える） | `make db-seed` |
 | DB を作り直したい（ローカルのデータは消える） | `make db-reset` |
 | 中身を見たい | `make db-studio` |
 | テストを動かす | `make test-api`・`make test-e2e`（テスト用の DB `DATABASE_URL_TEST` を使う。開発用の DB `moonx` のデータは消えない。7章） |

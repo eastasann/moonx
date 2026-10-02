@@ -1,0 +1,725 @@
+[
+  {
+    "no": 1,
+    "heading": "Executive Summary",
+    "guidance": "A reader should understand the business in under two minutes.",
+    "items": [
+      {
+        "label": "What is the business?",
+        "example": "A healthy fast-casual food business in Bacolod that provides convenient meals with standardized calories and macronutrients."
+      },
+      {
+        "label": "Who is the primary customer?",
+        "example": "Working professionals aged 25–40 in Bacolod with enough disposable income to pay above mass-market meal prices for convenience, taste, and nutrition transparency."
+      },
+      {
+        "label": "What problem are we solving?",
+        "example": "Healthy eating is difficult to sustain because planning, cooking, portion control, and repeated decisions consume time and effort."
+      },
+      {
+        "label": "What is our solution?",
+        "example": "A focused menu with consistent portions and clearly communicated nutrition, available via dine-in, takeaway, and delivery."
+      },
+      {
+        "label": "How does the business make money?",
+        "example": "Primarily individual meal sales, with secondary revenue such as beverages, add-ons, or corporate orders only if they prove profitable."
+      },
+      {
+        "label": "Why can this work?",
+        "example": "Existing alternatives prove demand for convenient food, while the proposed differentiation may support repeat behavior and acceptable margins."
+      },
+      {
+        "label": "Key numbers",
+        "example": "Startup Cost: PHP ___ | Break-even: ___ orders/month | Expected Revenue: PHP ___/month | Expected Operating Profit: PHP ___/month | Payback: ___ months"
+      }
+    ]
+  },
+  {
+    "no": 2,
+    "heading": "Vision & Purpose",
+    "guidance": "Define what the business is trying to become—and what it is not trying to become.",
+    "items": [
+      {
+        "label": "Why should this business exist?",
+        "example": "Make the healthier everyday choice easier without asking customers to become nutrition experts."
+      },
+      {
+        "label": "3-year state",
+        "example": "A consistently profitable Bacolod business with reliable operations, repeat customers, and a management structure that does not require all founders in daily operations."
+      },
+      {
+        "label": "5-year state",
+        "example": "A proven model that can either expand or remain a strong cash-generating local business depending on which path creates the best outcome."
+      },
+      {
+        "label": "What are we explicitly NOT trying to become?",
+        "example": "We are not trying to maximize store count at any cost, compete as the cheapest provider, or create a business that permanently depends on founder labor."
+      }
+    ]
+  },
+  {
+    "no": 3,
+    "heading": "Customer",
+    "guidance": "Describe the actual buyer and the behavior that produces revenue.",
+    "items": [
+      {
+        "label": "Primary customer",
+        "example": "Define age, income, location, occupation, lifestyle, purchase frequency, and decision criteria."
+      },
+      {
+        "label": "Secondary customer",
+        "example": "Only include if the economics and acquisition path are meaningfully different."
+      },
+      {
+        "label": "Customer behavior",
+        "example": "Where do they buy today? How often? What alternatives do they use?"
+      },
+      {
+        "label": "Buying trigger",
+        "example": "They need the solution now, discover us through a relevant channel, trust the offer, and accept the price."
+      },
+      {
+        "label": "Reasons not to buy",
+        "example": "Price, habit, distance, trust, timing, preference, or another substitute."
+      }
+    ]
+  },
+  {
+    "no": 4,
+    "heading": "Problem",
+    "guidance": "Explain the problem in observable terms, not only as an opinion.",
+    "items": [
+      {
+        "label": "Primary problem",
+        "example": "What repeated job, pain, cost, inconvenience, or unmet need are we solving?"
+      },
+      {
+        "label": "Frequency",
+        "example": "How often does the problem occur?"
+      },
+      {
+        "label": "Severity",
+        "example": "How painful or costly is it?"
+      },
+      {
+        "label": "Current alternatives",
+        "example": "How is the customer solving this today?"
+      },
+      {
+        "label": "Why are alternatives insufficient?",
+        "example": "Explain the gap without assuming customers are unhappy just because you would build something different."
+      }
+    ]
+  },
+  {
+    "no": 5,
+    "heading": "Product / Service",
+    "guidance": "Define exactly what is sold at launch and deliberately limit the initial scope.",
+    "items": [
+      {
+        "label": "Initial offer at launch",
+        "example": "What can customers actually buy on Day 1?"
+      },
+      {
+        "label": "What will NOT be included at launch?",
+        "example": "Reduce complexity and avoid treating future ideas as launch requirements."
+      },
+      {
+        "label": "Core customer experience",
+        "example": "Describe discovery → purchase → delivery/use → repeat purchase."
+      },
+      {
+        "label": "Quality standard",
+        "example": "Define what must always remain consistent: quality, timing, safety, service, accuracy, etc."
+      },
+      {
+        "label": "Future products / services",
+        "example": "Only list credible extensions after the initial model works."
+      }
+    ]
+  },
+  {
+    "no": 6,
+    "heading": "Market & Competition",
+    "guidance": "Summarize the evidence from Business Idea & Validation rather than repeating all research.",
+    "items": [
+      {
+        "label": "Market type",
+        "example": "Red / Blue / Mixed"
+      },
+      {
+        "label": "Why?",
+        "example": "Explain the sources of competition and the specific underserved angle, if any."
+      },
+      {
+        "label": "Reachable market",
+        "example": "Use a practical launch market, not an inflated total population."
+      },
+      {
+        "label": "Required market share",
+        "example": "Translate break-even into active customers, purchase frequency, or contracts."
+      },
+      {
+        "label": "Key competitors / substitutes",
+        "example": "Summarize 3–5 businesses or behaviors customers already use."
+      },
+      {
+        "label": "Why do successful competitors survive?",
+        "example": "Strong location, repeat demand, cost control, brand, distribution, or another economic engine."
+      },
+      {
+        "label": "What must we do differently or better?",
+        "example": "Choose the dimensions where we intend to win."
+      },
+      {
+        "label": "If Blue/Mixed, why has nobody captured it?",
+        "example": "Distinguish opportunity from lack of demand."
+      }
+    ]
+  },
+  {
+    "no": 7,
+    "heading": "Positioning & Value Proposition",
+    "guidance": "Make the reason to choose you specific and believable.",
+    "items": [
+      {
+        "label": "Positioning statement",
+        "example": "For ___, who ___, our business is ___ that ___. Unlike ___, we ___."
+      },
+      {
+        "label": "Why should customers believe us?",
+        "example": "Proof, process, expertise, transparency, consistency, or another reason for trust."
+      },
+      {
+        "label": "What are we willing to compete on?",
+        "example": "Examples: reliability, quality, convenience, transparency, service."
+      },
+      {
+        "label": "What are we NOT willing to compete on?",
+        "example": "Example: being the absolute cheapest option."
+      }
+    ]
+  },
+  {
+    "no": 8,
+    "heading": "Business Model",
+    "guidance": "Explain how activity becomes revenue and profit.",
+    "items": [
+      {
+        "label": "Primary revenue stream",
+        "example": "What creates most of the revenue?"
+      },
+      {
+        "label": "Secondary revenue streams",
+        "example": "Only include realistic, operationally compatible streams."
+      },
+      {
+        "label": "Average selling price",
+        "example": "PHP ___"
+      },
+      {
+        "label": "Variable cost per sale",
+        "example": "PHP ___"
+      },
+      {
+        "label": "Contribution profit per sale",
+        "example": "PHP ___"
+      },
+      {
+        "label": "Contribution margin",
+        "example": "___ %"
+      },
+      {
+        "label": "Monthly fixed cost",
+        "example": "PHP ___"
+      },
+      {
+        "label": "Break-even volume",
+        "example": "___ / month and ___ / day"
+      },
+      {
+        "label": "Expected scenario",
+        "example": "Revenue / operating profit / margin"
+      },
+      {
+        "label": "Capacity-limit scenario",
+        "example": "Maximum realistic revenue / profit with the initial setup"
+      },
+      {
+        "label": "Why is the startup cost justified?",
+        "example": "The investment is acceptable only if expected returns remain attractive after replacing assumptions with real quotes."
+      }
+    ]
+  },
+  {
+    "no": 9,
+    "heading": "Sales & Marketing",
+    "guidance": "Explain how customers are acquired and why the selected channels fit their behavior.",
+    "items": [
+      {
+        "label": "How will the first 100 customers discover us?",
+        "example": "Describe specific launch paths."
+      },
+      {
+        "label": "Launch channels",
+        "example": "Facebook, TikTok, Google Maps, delivery platforms, partnerships, direct outreach, events—only where relevant."
+      },
+      {
+        "label": "Why should each channel work?",
+        "example": "Connect the channel to observed customer behavior."
+      },
+      {
+        "label": "Retention strategy",
+        "example": "What creates repeat behavior?"
+      },
+      {
+        "label": "Referral strategy",
+        "example": "If relevant, explain why customers would recommend the business."
+      },
+      {
+        "label": "Marketing budget",
+        "example": "PHP ___ / month"
+      },
+      {
+        "label": "Key acquisition metric",
+        "example": "Cost per first purchase, repeat rate, orders per active customer, etc."
+      }
+    ]
+  },
+  {
+    "no": 10,
+    "heading": "Why Us",
+    "guidance": "Be explicit about founder advantages and gaps.",
+    "items": [
+      {
+        "label": "Founder advantages",
+        "example": "Skills, local knowledge, relationships, technology, operations, capital, trust, industry expertise."
+      },
+      {
+        "label": "Missing capabilities",
+        "example": "What critical knowledge or operating ability is absent?"
+      },
+      {
+        "label": "How will we fill the gaps?",
+        "example": "Hire, partner, outsource, learn, or use advisors."
+      }
+    ]
+  },
+  {
+    "no": 11,
+    "heading": "Founder Roles",
+    "guidance": "Make ownership of work and authority explicit.",
+    "items": [
+      {
+        "label": "Founder 1 — Role / Responsibilities / Authority / Time",
+        "example": "Define what this person owns and what they can decide independently."
+      },
+      {
+        "label": "Founder 2 — Role / Responsibilities / Authority / Time",
+        "example": "Define what this person owns and what they can decide independently."
+      },
+      {
+        "label": "Founder 3 — Role / Responsibilities / Authority / Time",
+        "example": "Define what this person owns and what they can decide independently."
+      },
+      {
+        "label": "Shared responsibilities",
+        "example": "Keep this list small; shared ownership often means unclear ownership."
+      }
+    ]
+  },
+  {
+    "no": 12,
+    "heading": "Decision Making & Governance",
+    "guidance": "Decide how the three founders make decisions before pressure creates conflict.",
+    "items": [
+      {
+        "label": "What can one founder decide alone?",
+        "example": "Decisions inside their defined area and budget."
+      },
+      {
+        "label": "What requires majority agreement?",
+        "example": "Material but reversible decisions."
+      },
+      {
+        "label": "What requires unanimous agreement?",
+        "example": "Debt, major capital expenditure, ownership changes, founder compensation, sale, shutdown, or adding a co-founder."
+      },
+      {
+        "label": "What happens when we disagree?",
+        "example": "Define discussion, evidence, escalation, and tie-breaking rules."
+      },
+      {
+        "label": "How are important decisions recorded?",
+        "example": "Use a shared decision log with date, owner, decision, reasoning, and follow-up."
+      }
+    ]
+  },
+  {
+    "no": 13,
+    "heading": "Ownership & Money Between Founders",
+    "guidance": "Agree on ownership, capital, compensation, and what happens when contributions differ.",
+    "items": [
+      {
+        "label": "Initial ownership",
+        "example": "Founder 1 ___% | Founder 2 ___% | Founder 3 ___%"
+      },
+      {
+        "label": "Initial capital contribution",
+        "example": "Founder 1 PHP ___ | Founder 2 PHP ___ | Founder 3 PHP ___"
+      },
+      {
+        "label": "Founder compensation at launch",
+        "example": "Salary / no salary / reimbursement rules."
+      },
+      {
+        "label": "When can founder salaries increase?",
+        "example": "Tie changes to business conditions, not arbitrary dates."
+      },
+      {
+        "label": "What if more capital is required?",
+        "example": "Define whether it is debt, additional equity, or optional contribution."
+      },
+      {
+        "label": "What if one founder cannot contribute?",
+        "example": "Define dilution, loan treatment, or other agreed handling."
+      },
+      {
+        "label": "What if a founder wants to leave?",
+        "example": "Define with legal advice: notice, vesting, buyback, valuation, and transfer restrictions."
+      }
+    ]
+  },
+  {
+    "no": 14,
+    "heading": "Legal & Company Setup",
+    "guidance": "Translate legal and regulatory requirements into a launch checklist.",
+    "items": [
+      {
+        "label": "Company structure",
+        "example": "Selected structure or TBD."
+      },
+      {
+        "label": "Registrations",
+        "example": "List required registrations."
+      },
+      {
+        "label": "Permits / licenses",
+        "example": "List business- and industry-specific permits."
+      },
+      {
+        "label": "Tax / accounting setup",
+        "example": "Who handles books, filings, payroll, and controls?"
+      },
+      {
+        "label": "Employment requirements",
+        "example": "Contracts, statutory benefits, payroll obligations, workplace rules."
+      },
+      {
+        "label": "Industry-specific compliance",
+        "example": "Food safety, professional licenses, data rules, product standards, etc."
+      },
+      {
+        "label": "Professional advice required",
+        "example": "Lawyer / accountant / permits specialist / industry expert."
+      }
+    ]
+  },
+  {
+    "no": 15,
+    "heading": "Location / Facilities / Equipment",
+    "guidance": "Define what the initial physical setup must accomplish and what it must cost.",
+    "items": [
+      {
+        "label": "Location requirements",
+        "example": "Customer access, delivery radius, size, utilities, parking, visibility, etc."
+      },
+      {
+        "label": "Maximum acceptable rent",
+        "example": "PHP ___ / month, with a reason linked to unit economics."
+      },
+      {
+        "label": "Required equipment",
+        "example": "List only items needed for launch."
+      },
+      {
+        "label": "Capacity of initial setup",
+        "example": "___ sales / orders / customers per day."
+      },
+      {
+        "label": "Primary capacity constraint",
+        "example": "Kitchen, staff, seating, machine throughput, delivery, or another bottleneck."
+      },
+      {
+        "label": "Before signing a lease / contract",
+        "example": "Define non-negotiable go/no-go conditions."
+      }
+    ]
+  },
+  {
+    "no": 16,
+    "heading": "Suppliers & Inventory",
+    "guidance": "Reduce the chance that one supplier, material, or inventory decision can stop the business.",
+    "items": [
+      {
+        "label": "Critical suppliers",
+        "example": "List the suppliers or inputs the business cannot operate without."
+      },
+      {
+        "label": "Alternative suppliers",
+        "example": "Identify backup options."
+      },
+      {
+        "label": "Supplier selection criteria",
+        "example": "Price, quality, reliability, terms, distance, consistency."
+      },
+      {
+        "label": "Inventory policy",
+        "example": "Stock level, reorder point, shelf life, wastage target."
+      },
+      {
+        "label": "Single points of failure",
+        "example": "Inputs, people, equipment, or contracts that could stop operations."
+      }
+    ]
+  },
+  {
+    "no": 17,
+    "heading": "Operations",
+    "guidance": "Design the repeated operating system, not just the opening day.",
+    "items": [
+      {
+        "label": "Opening / operating hours",
+        "example": "Define schedule and why it matches demand."
+      },
+      {
+        "label": "Daily operating flow",
+        "example": "Opening, preparation, service, quality control, closing."
+      },
+      {
+        "label": "Weekly operating flow",
+        "example": "Purchasing, scheduling, inventory review, maintenance, marketing, finance."
+      },
+      {
+        "label": "Quality controls",
+        "example": "How is consistency checked and recorded?"
+      },
+      {
+        "label": "Cash controls",
+        "example": "Who receives money, reconciles sales, approves expenses, and reviews discrepancies?"
+      },
+      {
+        "label": "Customer complaint process",
+        "example": "How are issues received, resolved, recorded, and learned from?"
+      },
+      {
+        "label": "What must be documented before launch?",
+        "example": "SOPs, checklists, vendor list, recipes/specs, pricing rules, safety procedures."
+      }
+    ]
+  },
+  {
+    "no": 18,
+    "heading": "People & Hiring",
+    "guidance": "Connect staffing to actual operating capacity and service quality.",
+    "items": [
+      {
+        "label": "Roles required at launch",
+        "example": "List positions, not names."
+      },
+      {
+        "label": "Number of people required",
+        "example": "Headcount and shift assumptions."
+      },
+      {
+        "label": "Expected monthly payroll",
+        "example": "PHP ___"
+      },
+      {
+        "label": "Hiring criteria",
+        "example": "Skills, reliability, attitude, licenses, experience."
+      },
+      {
+        "label": "Training required",
+        "example": "What must be taught before independent work?"
+      },
+      {
+        "label": "Day-to-day manager",
+        "example": "Who runs the operation each day?"
+      },
+      {
+        "label": "Trigger for the next hire",
+        "example": "Define an operational trigger such as sustained capacity utilization or service delay."
+      }
+    ]
+  },
+  {
+    "no": 19,
+    "heading": "Technology & Systems",
+    "guidance": "Use technology where it improves control, visibility, or customer experience—not because it is interesting.",
+    "items": [
+      {
+        "label": "Systems required at launch",
+        "example": "POS, accounting, inventory, scheduling, website, CRM, analytics, etc."
+      },
+      {
+        "label": "What can remain manual initially?",
+        "example": "Avoid premature automation."
+      },
+      {
+        "label": "What should be automated early?",
+        "example": "High-risk repetitive processes, financial controls, or customer-critical workflows."
+      },
+      {
+        "label": "Who owns setup and maintenance?",
+        "example": "Assign one accountable owner."
+      }
+    ]
+  },
+  {
+    "no": 20,
+    "heading": "Financial Plan",
+    "guidance": "Turn the validation model into operating financial guardrails.",
+    "items": [
+      {
+        "label": "Startup cost",
+        "example": "PHP ___"
+      },
+      {
+        "label": "Opening cash reserve",
+        "example": "PHP ___"
+      },
+      {
+        "label": "Monthly fixed cost",
+        "example": "PHP ___"
+      },
+      {
+        "label": "Unit economics",
+        "example": "Price / variable cost / contribution profit / contribution margin"
+      },
+      {
+        "label": "Break-even",
+        "example": "Monthly and daily volume"
+      },
+      {
+        "label": "Conservative scenario",
+        "example": "Revenue / loss or profit / cash impact"
+      },
+      {
+        "label": "Expected scenario",
+        "example": "Revenue / operating profit / margin"
+      },
+      {
+        "label": "Strong scenario",
+        "example": "Revenue / operating profit / margin"
+      },
+      {
+        "label": "Capacity-limit scenario",
+        "example": "Revenue / operating profit / margin"
+      },
+      {
+        "label": "Runway if sales are below plan",
+        "example": "___ months"
+      },
+      {
+        "label": "Trigger for additional funding",
+        "example": "Define the condition and maximum acceptable amount."
+      }
+    ]
+  },
+  {
+    "no": 21,
+    "heading": "KEY ASSUMPTIONS",
+    "guidance": "List the assumptions that must be true for the plan to work.",
+    "items": []
+  },
+  {
+    "no": 22,
+    "heading": "KEY RISKS",
+    "guidance": "Focus on risks that can materially damage economics, launch, trust, or continuity.",
+    "items": []
+  },
+  {
+    "no": 23,
+    "heading": "PRE-LAUNCH MILESTONES",
+    "guidance": null,
+    "items": []
+  },
+  {
+    "no": 24,
+    "heading": "Go / No-Go Conditions",
+    "guidance": "Define decision thresholds before sunk cost and emotion make the decision harder.",
+    "items": [
+      {
+        "label": "We proceed to launch if",
+        "example": "Expected economics remain attractive after real supplier/rent/payroll quotes; required permits are feasible; founders can fund initial capital plus buffer."
+      },
+      {
+        "label": "We delay if",
+        "example": "Critical information is still missing but can realistically be resolved without irreversible spending."
+      },
+      {
+        "label": "We stop / abandon if",
+        "example": "Realistic pricing produces structurally negative unit economics, startup capital rises far beyond expected return, or a critical legal/operational constraint cannot be solved."
+      }
+    ]
+  },
+  {
+    "no": 25,
+    "heading": "LAUNCH PLAN",
+    "guidance": null,
+    "items": []
+  },
+  {
+    "no": 26,
+    "heading": "KPI SCORECARD",
+    "guidance": null,
+    "items": []
+  },
+  {
+    "no": 27,
+    "heading": "Review Cadence",
+    "guidance": "Define what the founders inspect regularly so problems become visible early.",
+    "items": [
+      {
+        "label": "Daily",
+        "example": "Cash/sales exceptions, customer complaints, safety/quality exceptions, critical operating issues."
+      },
+      {
+        "label": "Weekly",
+        "example": "Sales, margin, volume, inventory, staffing, marketing results, major actions."
+      },
+      {
+        "label": "Monthly",
+        "example": "P&L, cash position, assumptions, pricing, hiring, capital decisions, strategy changes."
+      }
+    ]
+  },
+  {
+    "no": 28,
+    "heading": "OPEN QUESTIONS",
+    "guidance": null,
+    "items": []
+  },
+  {
+    "no": 29,
+    "heading": "NEXT ACTIONS",
+    "guidance": null,
+    "items": []
+  },
+  {
+    "no": 30,
+    "heading": "Pitch-ready Summary",
+    "guidance": "Use the completed plan to create a concise narrative.",
+    "items": [
+      {
+        "label": "One-minute explanation",
+        "example": "Problem → Customer → Solution → Why now → Business model → Why us → Next step."
+      },
+      {
+        "label": "Five-minute explanation",
+        "example": "Problem → Customer → Solution → Market → Competition → Business model → Economics → Why us → Execution plan → Risks → Ask / next step."
+      }
+    ]
+  }
+]

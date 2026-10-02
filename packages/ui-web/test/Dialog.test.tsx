@@ -24,6 +24,22 @@ function Sample({ size, onOpenChange }: { size?: Size; onOpenChange?: (o: boolea
 }
 
 describe("Dialog", () => {
+  test("isCloseHidden leaves out the close button but keeps the actions", () => {
+    render(
+      <Dialog
+        isOpen
+        isCloseHidden
+        title="Someone updated this first"
+        closeLabel="Close dialog"
+        actions={<Button>Load theirs</Button>}
+      >
+        <p>Body</p>
+      </Dialog>,
+    );
+    expect(screen.queryByRole("button", { name: "Close dialog" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Load theirs" })).toBeInTheDocument();
+  });
+
   test.each(["small", "medium", "large", "fullscreen"] as const)(
     "renders a dialog named by its title at size %s",
     async (size) => {

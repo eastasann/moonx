@@ -10,6 +10,7 @@ import { ComboBox, ComboBoxItem } from "../components/ComboBox";
 import { DatePicker } from "../components/DatePicker";
 import { FileTrigger } from "../components/FileTrigger";
 import { Form } from "../components/Form";
+import { MentionTextArea } from "../components/MentionTextArea";
 import { NumberField } from "../components/NumberField";
 import { Picker, PickerItem } from "../components/Picker";
 import { Radio, RadioGroup } from "../components/RadioGroup";
@@ -110,6 +111,23 @@ function FieldMatrix({
   );
 }
 
+function MentionTextAreaDemo() {
+  const [value, setValue] = useState("");
+  return (
+    <MentionTextArea
+      label="Comment"
+      value={value}
+      onChange={setValue}
+      listLabel="Members"
+      candidates={[
+        { id: "ana", name: "Ana Reyes" },
+        { id: "ben", name: "Ben Cruz" },
+      ]}
+      onMention={() => {}}
+    />
+  );
+}
+
 const CURRENCIES = ["PHP", "USD", "JPY"];
 
 export function FieldsSection() {
@@ -130,6 +148,13 @@ export function FieldsSection() {
           />
         )}
       />
+      <Component name="MentionTextArea">
+        <Cases layout="fields">
+          <Case label="Type @ and letters">
+            <MentionTextAreaDemo />
+          </Case>
+        </Cases>
+      </Component>
       <FieldMatrix
         name="NumberField"
         note="Formats follow en-PH."

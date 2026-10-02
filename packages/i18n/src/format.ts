@@ -123,3 +123,26 @@ export function formatIsoDate(value: string | Date, timeZone = "UTC"): string {
     timeZone: dateOnly ? "UTC" : timeZone,
   }).format(date);
 }
+
+const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["day", 86_400],
+  ["hour", 3_600],
+  ["minute", 60],
+];
+const RELATIVE_LIMIT_DAYS = 7;
+
+/**
+ * How long ago a moment was, "2 hr. ago" or "yesterday". A week or more back it is the date
+ * (`formatDate`), because "23 days ago" is harder to place than "Sep 9, 2026". `now` is passed in
+ * so the same value renders the same text in tests and across one render pass.
+ */
+export function formatRelativeTime(value: string | Date, now: Date, timeZone = "UTC"): string {
+  const { date } = toDate(value);
+  const seconds = Math.max(0, Math.round((now.getTime() - date.getTime()) / 1000));
+  if (seconds >= RELATIVE_LIMIT_DAYS * 86_400) return formatDate(date, timeZone);
+  const format = new Intl.RelativeTimeFormat(LOCALE, { numeric: "auto", style: "short" });
+  for (const [unit, size] of RELATIVE_UNITS) {
+    if (seconds >= size) return format.format(-Math.floor(seconds / size), unit);
+  }
+  return format.format(0, "second");
+}

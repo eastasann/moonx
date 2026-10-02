@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { type ModalName, useOverlay } from "../lib/overlay";
+import { NewIdeaDialog } from "./NewIdeaDialog";
 import { SwitchWorkspaceDialog } from "./SwitchWorkspaceDialog";
 
 /**
@@ -7,6 +8,7 @@ import { SwitchWorkspaceDialog } from "./SwitchWorkspaceDialog";
  * it; until then its `?modal=` name opens nothing.
  */
 const MODALS: Partial<Record<ModalName, ComponentType>> = {
+  "new-idea": NewIdeaDialog,
   "switch-workspace": SwitchWorkspaceDialog,
 };
 

@@ -69,7 +69,9 @@
       "name": "@moonx/web",
       "dependencies": {
         "@elysiajs/eden": "^1.4.9",
+        "@internationalized/date": "^3.12.4",
         "@moonx/api": "workspace:*",
+        "@moonx/domain": "workspace:*",
         "@moonx/i18n": "workspace:*",
         "@moonx/schemas": "workspace:*",
         "@moonx/ui-web": "workspace:*",
@@ -96,6 +98,7 @@
         "@vanilla-extract/css": "^1.21.2",
         "@vanilla-extract/vite-plugin": "^5.2.6",
         "@vitejs/plugin-react": "^6.1.1",
+        "fake-indexeddb": "^6.2.5",
         "jsdom": "^30.1.1",
         "vite": "^8.3.2",
         "vitest": "^5.0.3",
@@ -1526,6 +1529,8 @@
     "exsolve": ["exsolve@1.1.1", "", {}, "sha512-9U/jZUgjnSGyntRr6y5Muu1MJcwFl6kPu7k8qLF0IMNfLqvw0NZ4nnVDq0RVoZ0RvCyumib4Ez3KYrVfilrw+g=="],
 
     "extend": ["extend@3.0.2", "", {}, "sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g=="],
+
+    "fake-indexeddb": ["fake-indexeddb@6.2.5", "", {}, "sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w=="],
 
     "fast-decode-uri-component": ["fast-decode-uri-component@1.0.1", "", {}, "sha512-WKgKWg5eUxvRZGwW8FvfbaH7AXSh2cL+3j5fMGzUMCxWBJ3dV3a7Wz8y2f/uQ0e3B6WmodD3oS54jTQ9HVTIIg=="],
 

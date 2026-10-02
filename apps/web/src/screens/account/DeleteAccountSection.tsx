@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { deleteAccountSchema } from "../../forms/schemas";
 import { postJson } from "../../lib/api";
 import { isApiError } from "../../lib/api-error";
+import { autosave } from "../../lib/autosave";
 import { errorText } from "../../lib/error-text";
 import { fieldProps, validate } from "../../lib/form";
 import { useLogout } from "../../lib/logout";
@@ -54,7 +55,9 @@ export function DeleteAccountSection() {
         confirmEmail: value.confirmEmail.trim(),
         ...(me.hasPassword ? { password: value.password } : {}),
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
+      // The deleted account's unsent input must not stay readable on this browser (ADR-021).
+      await autosave.endSession();
       queryClient.clear();
       applyTheme(undefined);
       goTo("/");

@@ -19,9 +19,12 @@ const surface = {
 export const side = style({
   ...surface,
   flexShrink: 0,
-  alignSelf: "stretch",
+  alignSelf: "flex-start",
+  // Stays in view while a long page scrolls beside it.
+  position: "sticky",
+  insetBlockStart: 0,
   width: vars.layout["side-panel-width"],
-  maxHeight: "100dvh",
+  height: "100dvh",
   borderInlineStart: hairline,
 });
 

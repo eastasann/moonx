@@ -25,6 +25,7 @@ export const overlaySearchSchema = z.object({
   modal: z.enum(MODALS).optional().catch(undefined),
   panel: z.enum(PANELS).optional().catch(undefined),
   target: z.string().optional().catch(undefined),
+  about: z.string().optional().catch(undefined),
 });
 
 type OverlaySearch = z.infer<typeof overlaySearchSchema>;
@@ -41,8 +42,11 @@ export function useOverlay() {
     modal: search.modal,
     panel: search.panel,
     target: search.target,
-    openModal: (modal: ModalName) => update({ modal }),
-    closeModal: () => update({ modal: undefined }),
+    /** The item a sheet is about (M2: `<targetType>:<targetId>[:<targetKey>]`). */
+    about: search.about,
+    /** `about` names what a sheet is about. It is separate from `target`, which belongs to the panel beside it. */
+    openModal: (modal: ModalName, about?: string) => update({ modal, ...(about ? { about } : {}) }),
+    closeModal: () => update({ modal: undefined, about: undefined }),
     openPanel: (panel: PanelName, target: string) => update({ panel, target }),
     closePanel: () => update({ panel: undefined, target: undefined }),
   };

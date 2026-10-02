@@ -109,6 +109,129 @@
         "costs_missing": "Add startup and monthly costs"
       }
     },
-    "marginNegative": "Contribution margin is negative"
+    "marginNegative": "Contribution margin is negative",
+    "crumbFallback": "Idea",
+    "stageLabel": "Stage: {{stage}}",
+    "proposedBy": "by {{name}}",
+    "duplicatedFrom": "Duplicated from",
+    "decision": {
+      "undecided": "Undecided",
+      "proceed": "Proceed",
+      "hold": "Hold",
+      "drop": "Drop",
+      "launch": "Launch",
+      "delay": "Delay",
+      "stop": "Stop"
+    },
+    "decisionBadge": "Latest decision: {{decision}}",
+    "templateNotice": "A newer template is available",
+    "updateTemplate": "Update template",
+    "archivedHeading": "This idea is archived",
+    "archivedBody": "You can read it, but not change it.",
+    "restore": "Restore",
+    "editSummary": "Edit summary",
+    "ai": "AI",
+    "aiExport": "Export for AI",
+    "aiImport": "Import from AI",
+    "recordDecision": "Record decision",
+    "addPlan": "Add plan",
+    "moreActions": "More actions",
+    "duplicate": "Duplicate",
+    "archive": "Archive",
+    "blocks": {
+      "keyNumbers": "Key numbers",
+      "nextSteps": "Next steps",
+      "checks": "Checks",
+      "fau": "F/A/U",
+      "summary": "Summary",
+      "sections": "Sections",
+      "decisions": "Decisions",
+      "plans": "Plans"
+    },
+    "metrics": {
+      "initial_cost_total": "Startup",
+      "break_even_units_day": "Break-even",
+      "expected_operating_profit": "Expected",
+      "payback_months": "Payback"
+    },
+    "metricEmpty": "Empty",
+    "metricLowerBound": "Lower bound: some rows are Empty or Unknown",
+    "fixMargin": "Open Unit Economics",
+    "checkRow": {
+      "withCount": "{{state}} ({{count}})",
+      "competitorsAim": "Aim for {{min}}–{{max}}"
+    },
+    "reason": {
+      "competitors": "{{count}} found, {{min}} needed",
+      "local_price_priced": "{{count}} of {{needed}} competitors have a price",
+      "local_price": "Add a price to {{needed}} competitors, or log a local price",
+      "costs_empty_one": "{{count}} row is Empty",
+      "costs_empty_other": "{{count}} rows are Empty",
+      "costs_initial_amount": "No startup cost amount yet",
+      "costs_monthly_amount": "No monthly cost amount yet",
+      "permits": "Fill the Permits cost row, or log what you found",
+      "demand_signal": "Log research that shows demand or the problem"
+    },
+    "fau": {
+      "label": "Items by F/A/U",
+      "total_one": "{{value}} item",
+      "total_other": "{{value}} items",
+      "assumptionBreakdown": "{{total}} (L{{low}} M{{medium}} H{{high}})"
+    },
+    "summary": {
+      "customer": "Customer",
+      "problem": "Problem",
+      "solution": "Solution",
+      "marketType": "Market type",
+      "empty": "Empty",
+      "fill": "Fill in"
+    },
+    "sections": {
+      "progress": "{{answered}}/{{total}}",
+      "progressRows": "{{answered}}/{{total}} rows",
+      "progressInputs": "{{answered}}/{{total}} inputs",
+      "entries_one": "{{count}} entry",
+      "entries_other": "{{count}} entries",
+      "competitors": "{{count}} ({{min}}–{{max}})",
+      "assumptionsCount_one": "{{count}} assumption",
+      "assumptionsCount_other": "{{count}} assumptions",
+      "risksCount_one": "{{count}} risk",
+      "risksCount_other": "{{count}} risks",
+      "assumptionsAndRisks": "{{assumptions}} · {{risks}}",
+      "fauLabel": "{{section}} by F/A/U"
+    },
+    "decisions": {
+      "empty": "No decisions yet",
+      "seeAll": "See all",
+      "goNoGo": "Go / No-Go: {{value}}",
+      "versionSaved": "Saved {{version}}",
+      "line": "{{date}} · {{who}}",
+      "reason": "“{{reason}}”"
+    },
+    "plans": {
+      "empty": "No plans yet",
+      "version": "Version: {{name}}",
+      "noVersion": "No version saved",
+      "changes": "+ changes",
+      "goNoGo": "Go / No-Go: {{value}}"
+    },
+    "edit": {
+      "title": "Edit summary",
+      "name": "Name",
+      "oneLineConcept": "One-line concept",
+      "proposedSolution": "Proposed solution",
+      "save": "Save",
+      "conflictHeading": "{{name}} updated this summary {{when}}",
+      "conflictBody": "Choose whose version to keep. Overwriting keeps their version in the history.",
+      "conflictTheirs": "Their version",
+      "loadTheirs": "Load theirs",
+      "overwrite": "Overwrite with mine",
+      "copyMine": "Copy my input",
+      "copyFailed": "Couldn't copy. Select your text in the form and copy it yourself.",
+      "empty": "(empty)",
+      "someone": "Someone"
+    },
+    "formerMember": "{{name}} (former member)",
+    "conceptLine": "{{concept}} · {{proposer}}"
   }
 }

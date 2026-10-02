@@ -6,6 +6,7 @@ import {
   formatMoney,
   formatMonths,
   formatPercent,
+  formatRelativeTime,
   formatTime,
   formatUnits,
 } from "../src";
@@ -93,5 +94,23 @@ describe("dates and times (en-PH, 12-hour)", () => {
     expect(formatIsoDate("2026-09-30T20:00:00.000Z", "Asia/Manila")).toBe("2026-10-01");
     expect(formatIsoDate("2026-10-01T02:00:00.000Z")).toBe("2026-10-01");
     expect(formatIsoDate(new Date("2026-10-01T02:00:00Z"))).toBe("2026-10-01");
+  });
+});
+
+describe("formatRelativeTime", () => {
+  const now = new Date("2026-10-02T12:00:00Z");
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+  test("minutes, hours and days", () => {
+    expect(formatRelativeTime(ago(30_000), now)).toBe("now");
+    expect(formatRelativeTime(ago(5 * 60_000), now)).toBe("5 min. ago");
+    expect(formatRelativeTime(ago(2 * 3_600_000), now)).toBe("2 hr. ago");
+    expect(formatRelativeTime(ago(26 * 3_600_000), now)).toBe("yesterday");
+    expect(formatRelativeTime(ago(3 * 86_400_000), now)).toBe("3 days ago");
+  });
+  test("a week or more back it is the date in the given time zone", () => {
+    expect(formatRelativeTime("2026-09-20T20:00:00.000Z", now, "Asia/Manila")).toBe("Sep 21, 2026");
+  });
+  test("a moment ahead of the clock reads as now", () => {
+    expect(formatRelativeTime(ago(-5_000), now)).toBe("now");
   });
 });

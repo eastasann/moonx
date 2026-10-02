@@ -36,23 +36,47 @@ export async function call<Data>(request: Promise<TreatyResult<Data>>): Promise<
   return result.data as Data;
 }
 
+/** How long `sendJson` waits for an answer. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Sends a JSON request with `fetch` and returns the parsed answer (null for an empty one), or
+ * throws an {@link ApiError}. For requests that are described as data, such as the saves of the
+ * pending queue (ADR-021), which a Treaty call cannot express.
+ */
+export async function sendJson<Data = unknown>(
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  body: unknown,
+): Promise<Data> {
+  let response: Response;
+  try {
+    response = await globalThis.fetch(path, {
+      method,
+      credentials: "same-origin",
+      headers: { "content-type": "application/json", "X-Moonx-Client": "web" },
+      body: JSON.stringify(body),
+      // A request that never answers must end: it holds the item's lock and the logout flush.
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new ApiError("NETWORK", 0, error instanceof Error ? error.message : "Network error");
+  }
+  const text = await response.text().catch(() => "");
+  let parsed: unknown = null;
+  try {
+    parsed = text ? (JSON.parse(text) as unknown) : null;
+  } catch {
+    // A gateway's HTML error page: `fromEnvelope` reads a body without an envelope as UNKNOWN or 5xx.
+  }
+  if (!response.ok) throw fromEnvelope(response.status, parsed);
+  return parsed as Data;
+}
+
 /**
  * POST for the one route Treaty cannot reach: `/me/delete`, whose last segment is also the name
  * of an HTTP method, which Treaty reads as a method call.
  */
 export async function postJson(path: string, body: unknown): Promise<void> {
-  let response: Response;
-  try {
-    response = await globalThis.fetch(path, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json", "X-Moonx-Client": "web" },
-      body: JSON.stringify(body),
-    });
-  } catch (error) {
-    throw new ApiError("NETWORK", 0, error instanceof Error ? error.message : "Network error");
-  }
-  if (!response.ok) {
-    throw fromEnvelope(response.status, await response.json().catch(() => null));
-  }
+  await sendJson("POST", path, body);
 }

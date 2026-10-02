@@ -517,6 +517,8 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 - `$workspaceId` などは URL のパラメータ。ワークスペースに属する画面は `/w/$workspaceId/` の下に置き、他のワークスペースの URL を開いたら design-spec 6.0.6 の「権限がない」を出す。
 - モーダル（M1〜M8）とパネル（PNL-1・PNL-2）はルートを作らず、検索パラメータで開く: `?modal=new-idea|evidence|save-version|go-no-go|create-plan|share|switch-workspace|update-template`、`?panel=comments|history&target=<targetType>:<targetId>[:<targetKey>]`。
+- `target` の書式は2つ。項目は `<targetType>:<targetId>[:<targetKey>]`（`targetKey` に `:` を含んでもよい）で、コメント（C1）と項目の履歴（H1 の `targetType`・`targetId`・`targetKey`）に使う。画面全体の履歴は `container:<containerType>:<containerId>[:<sectionKey>]`（`containerType` は `self_analysis` / `validation` / `business_plan` / `idea`）で、H1 の `containerType`・`containerId`・`sectionKey` に渡す。画面全体にコメントの対象はなく、コメントを開けるのは項目と、`container:idea:<ideaId>`（アイデア `idea:<ideaId>` へのコメント）だけ。どちらにも当てはまらない値は、パネルを開かない。Web は `apps/web/src/lib/panel-target.tsx` の `parsePanelTarget` / `formatItemTarget` / `formatContainerTarget` で読み書きする。
+- モーダルが対象の項目を持つとき（M2 の根拠シート）は `?modal=evidence&about=<targetType>:<targetId>[:<targetKey>]` とする。`about` の書式は `target` の項目と同じで、パネルの `target` と同時に使える（パネルを開いたまま根拠シートを開ける）。
 - 認証が要るルートで未ログインなら `/login?next=<元のパス>` へ移る。
 - `/dev/components` は部品の確認用ページで、開発サーバー（`import.meta.env.DEV`）だけで開く。本番のビルドには入らず、開くと Not Found になる。スマホには作らない（パスを Web とスマホで同じにする決まりの例外）。
 
@@ -539,10 +541,10 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 | `/w/$workspaceId/team` | 12 メンバーの自己分析 | `/w/$workspaceId/team/$userId` で選んだ人を開く |
 | `/w/$workspaceId/ideas/$ideaId` | 13 検証ホーム | |
 | `/w/$workspaceId/ideas/$ideaId/questions/$sectionKey` | 11 設問フォーム（検証の 01 / 02 / 10） | `?q=` |
-| `/w/$workspaceId/ideas/$ideaId/research` | 14 調査ログ | `?supports=&source=&entry=&new=1` |
-| `/w/$workspaceId/ideas/$ideaId/competitors` | 15 競合・代替 | `?view=cards|table&q=V.04.SURVIVOR_PATTERNS` |
-| `/w/$workspaceId/ideas/$ideaId/assumptions` | 16 前提・リスク | `?tab=assumptions|risks&row=` |
-| `/w/$workspaceId/ideas/$ideaId/costs` | 17 費用 | `?row=<cost_item の id か template_key>` |
+| `/w/$workspaceId/ideas/$ideaId/research` | 14 調査ログ | `?supports=&source=&entry=<research_log_entry の id>&new=1` |
+| `/w/$workspaceId/ideas/$ideaId/competitors` | 15 競合・代替 | `?view=cards|table&q=V.04.SURVIVOR_PATTERNS&row=<competitor の id>` |
+| `/w/$workspaceId/ideas/$ideaId/assumptions` | 16 前提・リスク | `?tab=assumptions|risks&row=<assumption か risk の id>` |
+| `/w/$workspaceId/ideas/$ideaId/costs` | 17 費用 | `?row=<cost_item の id か template_key>&tab=initial|monthly_fixed|variable` |
 | `/w/$workspaceId/ideas/$ideaId/economics` | 18 損益・シナリオ | `?field=` |
 | `/w/$workspaceId/ideas/$ideaId/decide` | 19 判定 | |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId` | 20 プランホーム | `?version=<plan_version の id>`（版の読み取り専用表示） |
@@ -2203,7 +2205,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | ライブラリ | i18next ＋ react-i18next（Web とスマホで同じ）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
 | カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペース（`common`・`errors`・`mail`・`validation`）で、キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
-| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatPercent()`・`formatDate()`・`formatTime()`・`formatIsoDate()`）に集め、画面・PDF・AI 書き出しのすべてがこれを使う |
+| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatPercent()`・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。`formatRelativeTime()` は1週間未満を「3 min. ago」のような相対表記にし、1週間以上前は日付にする |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（スマホの Hermes も対応）。金額の入力は桁区切りのカンマを受け付ける |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |

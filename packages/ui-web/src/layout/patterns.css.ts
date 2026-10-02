@@ -120,6 +120,15 @@ export const detailPane = style({
   "@media": { [desktop]: { selectors: { '&[data-hidden="true"]': { display: "flex" } } } },
 });
 
+/** Sits above the fixed `TabBar`; the `TabBar` and this slot both stop at desktop. */
+export const floatingActionSlot = style({
+  position: "fixed",
+  insetInlineEnd: vars.layout["page-gutter-mobile"],
+  insetBlockEnd: `calc(${vars.layout["tab-bar-height"]} + env(safe-area-inset-bottom) + ${vars.space["200"]})`,
+  zIndex: vars.layout["z-index"]["bottom-action"],
+  "@media": { [desktop]: { display: "none" } },
+});
+
 export const cardGrid = style({
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr)",

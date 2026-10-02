@@ -237,6 +237,44 @@ describe("QuestionCard", () => {
   });
 });
 
+describe("QuestionCard autoScroll", () => {
+  function Card({ isFocused, autoScroll }: { isFocused: boolean; autoScroll?: boolean }) {
+    return (
+      <div data-testid="scroller" style={{ overflowY: "auto" }}>
+        <QuestionCard
+          title="BEHAVIOR"
+          isFocused={isFocused}
+          autoScroll={autoScroll}
+          emptyLabel="Empty"
+        >
+          <textarea aria-label="Answer" />
+        </QuestionCard>
+      </div>
+    );
+  }
+
+  function scrolledBy(autoScroll: boolean | undefined) {
+    setReducedMotion(true);
+    const { container, rerender } = render(<Card isFocused={false} autoScroll={autoScroll} />);
+    const scroller = screen.getByTestId("scroller");
+    Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 400 });
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 2000 });
+    scroller.getBoundingClientRect = () => ({ top: 0, height: 400 }) as DOMRect;
+    const card = container.querySelector("[data-question-card]") as HTMLElement;
+    card.getBoundingClientRect = () => ({ top: 600, height: 100 }) as DOMRect;
+    rerender(<Card isFocused autoScroll={autoScroll} />);
+    return scroller.scrollTop;
+  }
+
+  test("a card scrolls to the anchor when it opens", () => {
+    expect(scrolledBy(undefined)).toBe(450);
+  });
+
+  test("a card with autoScroll off opens without scrolling", () => {
+    expect(scrolledBy(false)).toBe(0);
+  });
+});
+
 describe("useFocusAnchor", () => {
   function Scroller({ isFocused }: { isFocused: boolean }) {
     const ref = useFocusAnchor<HTMLDivElement>(isFocused);

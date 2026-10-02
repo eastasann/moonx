@@ -34,5 +34,16 @@ export function createQueryClient(onUnauthenticated: () => void): QueryClient {
       mutations: { retry: false },
     },
   });
+  unauthenticatedHandlers.set(queryClient, handle);
   return queryClient;
+}
+
+const unauthenticatedHandlers = new WeakMap<QueryClient, (error: unknown) => void>();
+
+/**
+ * Tells the client's 401 handling about a 401 that came from outside its caches (the autosave
+ * engine sends its own requests), so the person lands on the login screen like everywhere else.
+ */
+export function reportUnauthenticated(queryClient: QueryClient, error: unknown): void {
+  unauthenticatedHandlers.get(queryClient)?.(error);
 }

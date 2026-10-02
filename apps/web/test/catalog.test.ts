@@ -19,6 +19,49 @@ function* sources(dir: string): Generator<string> {
  * checked against the values its screen can give it, listed here.
  */
 const DYNAMIC: Record<string, string[]> = {
+  "validation:stage.${stage}": ["validation", "planning", "launch_prep"].map(
+    (s) => `validation:stage.${s}`,
+  ),
+  "validation:checks.state.${state}": ["not_started", "partial", "done"].map(
+    (s) => `validation:checks.state.${s}`,
+  ),
+  "validation:economics.reason.${reason}": [
+    "needs_price",
+    "needs_monthly_costs",
+    "needs_expected_sales",
+    "needs_startup_costs",
+    "margin_not_positive",
+    "target_margin_unreachable",
+    "not_recovered",
+    "empty",
+  ].map((r) => `validation:economics.reason.${r}`),
+  "plan:metric.${key}": [
+    "initial_cost_total",
+    "break_even_units_day",
+    "expected_operating_profit",
+    "payback_months",
+  ].map((k) => `plan:metric.${k}`),
+  "ideas:decision.${decision}": ["undecided", "proceed", "hold", "drop"].map(
+    (d) => `ideas:decision.${d}`,
+  ),
+  "ideas:decisionFilter.${decision}": [
+    "not_dropped",
+    "all",
+    "undecided",
+    "proceed",
+    "hold",
+    "drop",
+  ].map((d) => `ideas:decisionFilter.${d}`),
+  "ideas:sort.${sort}": ["updated", "created", "name"].map((x) => `ideas:sort.${x}`),
+  "ideas:check.${key}": [
+    "competitors",
+    "local_price",
+    "costs",
+    "break_even",
+    "permits",
+    "demand_signal",
+  ].map((k) => `ideas:check.${k}`),
+  "ideas:goNoGo.${value}": ["launch", "delay", "stop"].map((v) => `ideas:goNoGo.${v}`),
   "landing.stages.${stage}.title": ["selfAnalysis", "validation", "plan"].map(
     (s) => `landing.stages.${s}.title`,
   ),
@@ -34,6 +77,45 @@ const DYNAMIC: Record<string, string[]> = {
     "settings",
     "admin",
   ].map((id) => `nav.${id}`),
+  "fau.confidence.${confidence}": ["low", "medium", "high"].map(
+    (level) => `validation:fau.confidence.${level}`,
+  ),
+  "validation:fau.confidence.${level}": ["low", "medium", "high"].map(
+    (level) => `validation:fau.confidence.${level}`,
+  ),
+  "fau.state.${state}": [
+    "empty",
+    "unclassified",
+    "fact",
+    "fact_no_evidence",
+    "assumption",
+    "unknown",
+  ].map((state) => `validation:fau.state.${state}`),
+  "form:evidence.sourceTypes.${type}": [
+    "google_maps_reviews",
+    "website",
+    "social_media",
+    "public_data",
+    "news_report",
+    "store_observation",
+    "price_check",
+    "other",
+  ].map((type) => `form:evidence.sourceTypes.${type}`),
+  "validation:checks.${check}.label": ["local_price", "permits", "demand_signal"].map(
+    (check) => `validation:checks.${check}.label`,
+  ),
+  "validation:sections.${key}": ["01", "02", "03", "04", "05", "06-08", "09", "10"].map(
+    (key) => `validation:sections.${key}`,
+  ),
+  "validation:sections.${params.sectionKey}": ["01", "02", "10"].map(
+    (key) => `validation:sections.${key}`,
+  ),
+  "history.fields.${field}": Object.keys(i18n.getResource("en", "panels", "history.fields")).map(
+    (field) => `panels:history.fields.${field}`,
+  ),
+  "history.values.${value}": Object.keys(i18n.getResource("en", "panels", "history.values")).map(
+    (value) => `panels:history.values.${value}`,
+  ),
   "account:role.${role}": ["owner", "member", "viewer"].map((r) => `account:role.${r}`),
   "account:role.${invitation.role}": ["owner", "member", "viewer"].map((r) => `account:role.${r}`),
   "account:preferences.themes.${theme}": ["system", "light", "dark"].map(

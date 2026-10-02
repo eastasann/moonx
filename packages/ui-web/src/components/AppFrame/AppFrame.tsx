@@ -28,6 +28,11 @@ export interface AppFrameProps {
   status?: ReactNode;
   /** Header entries: the Comments and History panel buttons. */
   actions?: ReactNode;
+  /**
+   * The `Panel` (comments or history). On desktop it sits as a column at the right of the content;
+   * on tablet and phone it renders its own overlay, so the slot's position does not matter there.
+   */
+  panel?: ReactNode;
   /** A notice above the header, such as the offline message. */
   banner?: ReactNode;
   /**
@@ -52,6 +57,7 @@ export function AppFrame({
   status,
   actions,
   banner,
+  panel,
   isEmbedded = false,
   children,
 }: AppFrameProps) {
@@ -89,6 +95,7 @@ export function AppFrame({
           {children}
         </Content>
       </div>
+      {panel}
       {tabBar}
     </div>
   );

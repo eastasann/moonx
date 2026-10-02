@@ -43,6 +43,11 @@ export interface DialogProps {
   isDismissable?: boolean;
   /** Turns off closing with Esc, for example while a submit is in flight. */
   isKeyboardDismissDisabled?: boolean;
+  /**
+   * Leaves out the close button, for a dialog that can only end with one of its `actions`, such as
+   * the choice after a conflict (design-spec 6.0.2).
+   */
+  isCloseHidden?: boolean;
   isOpen?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (isOpen: boolean) => void;
@@ -138,6 +143,7 @@ export function Dialog({
   children,
   actions,
   isDismissable = false,
+  isCloseHidden = false,
   ...surfaceProps
 }: DialogProps) {
   return (
@@ -146,9 +152,11 @@ export function Dialog({
         <>
           <DialogHeader>
             <DialogTitle>{heading}</DialogTitle>
-            <AriaButton aria-label={closeLabel} onPress={close} className={closeButton}>
-              <X aria-hidden className={closeIcon} />
-            </AriaButton>
+            {isCloseHidden ? null : (
+              <AriaButton aria-label={closeLabel} onPress={close} className={closeButton}>
+                <X aria-hidden className={closeIcon} />
+              </AriaButton>
+            )}
           </DialogHeader>
           <DialogBody>{typeof children === "function" ? children({ close }) : children}</DialogBody>
           {actions ? (

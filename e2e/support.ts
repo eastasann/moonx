@@ -77,3 +77,18 @@ export async function expectNoAxeViolations(page: Page) {
   });
   expect(violations).toEqual([]);
 }
+
+/**
+ * Gives a demo user the demo password again. The specs share one database and some of them change
+ * a password (the auth spec does for Kenji and Grace); a spec that needs such a user restores it
+ * by copying the hash of Ana, whose password no spec changes.
+ */
+export async function restoreDemoPassword(email: string) {
+  await query(
+    `update accounts set password = (
+       select a.password from accounts a join users u on u.id = a.user_id
+       where u.email = 'ana@bcdx.example' and a.provider_id = 'credential')
+     where provider_id = 'credential' and user_id = (select id from users where email = $1)`,
+    [email],
+  );
+}

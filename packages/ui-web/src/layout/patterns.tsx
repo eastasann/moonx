@@ -6,6 +6,7 @@ import {
   cardGrid,
   detailPane,
   diffColumns,
+  floatingActionSlot,
   header,
   hubEntries,
   hubHistory,
@@ -160,6 +161,11 @@ export interface ListDetailPatternProps {
   list: ReactNode;
   detail: ReactNode;
   /**
+   * The main "create" action as an icon button floating at the bottom right, above the tab bar.
+   * Shown below desktop only; on desktop the screen puts the action in its header.
+   */
+  floatingAction?: ReactNode;
+  /**
    * Below desktop only one pane shows: the detail when true, the list otherwise. Desktop shows
    * both; the tablet layout follows mobile (a full-width detail) instead of an overlay.
    */
@@ -175,6 +181,7 @@ export function ListDetailPattern({
   header: head,
   list,
   detail,
+  floatingAction,
   detailOpen = false,
 }: ListDetailPatternProps) {
   return (
@@ -188,6 +195,7 @@ export function ListDetailPattern({
           {detail}
         </div>
       </div>
+      {floatingAction ? <div className={floatingActionSlot}>{floatingAction}</div> : null}
     </div>
   );
 }

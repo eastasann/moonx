@@ -21,6 +21,11 @@ import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AuthedFrameAccountRouteImport } from './routes/_authed/_frame/account'
 import { Route as AuthedFrameWWorkspaceIdRouteImport } from './routes/_authed/_frame/w.$workspaceId'
 import { Route as AuthedFrameWWorkspaceIdIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.index'
+import { Route as AuthedFrameWWorkspaceIdIdeasRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas'
+import { Route as AuthedFrameWWorkspaceIdIdeasIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.index'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.index'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.questions.$sectionKey'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -81,6 +86,36 @@ const AuthedFrameWWorkspaceIdIndexRoute =
     path: '/',
     getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
   } as any)
+const AuthedFrameWWorkspaceIdIdeasRoute =
+  AuthedFrameWWorkspaceIdIdeasRouteImport.update({
+    id: '/ideas',
+    path: '/ideas',
+    getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdIdeasIndexRoute =
+  AuthedFrameWWorkspaceIdIdeasIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdRouteImport.update({
+    id: '/$ideaId',
+    path: '/$ideaId',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport.update({
+    id: '/questions/$sectionKey',
+    path: '/questions/$sectionKey',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -92,7 +127,12 @@ export interface FileRoutesByFullPath {
   '/invite/$token': typeof InviteTokenRoute
   '/account': typeof AuthedFrameAccountRoute
   '/w/$workspaceId': typeof AuthedFrameWWorkspaceIdRouteWithChildren
+  '/w/$workspaceId/ideas': typeof AuthedFrameWWorkspaceIdIdeasRouteWithChildren
   '/w/$workspaceId/': typeof AuthedFrameWWorkspaceIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren
+  '/w/$workspaceId/ideas/': typeof AuthedFrameWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -104,6 +144,9 @@ export interface FileRoutesByTo {
   '/invite/$token': typeof InviteTokenRoute
   '/account': typeof AuthedFrameAccountRoute
   '/w/$workspaceId': typeof AuthedFrameWWorkspaceIdIndexRoute
+  '/w/$workspaceId/ideas': typeof AuthedFrameWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -118,7 +161,12 @@ export interface FileRoutesById {
   '/invite/$token': typeof InviteTokenRoute
   '/_authed/_frame/account': typeof AuthedFrameAccountRoute
   '/_authed/_frame/w/$workspaceId': typeof AuthedFrameWWorkspaceIdRouteWithChildren
+  '/_authed/_frame/w/$workspaceId/ideas': typeof AuthedFrameWWorkspaceIdIdeasRouteWithChildren
   '/_authed/_frame/w/$workspaceId/': typeof AuthedFrameWWorkspaceIdIndexRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren
+  '/_authed/_frame/w/$workspaceId/ideas/': typeof AuthedFrameWWorkspaceIdIdeasIndexRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId/': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -132,7 +180,12 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/account'
     | '/w/$workspaceId'
+    | '/w/$workspaceId/ideas'
     | '/w/$workspaceId/'
+    | '/w/$workspaceId/ideas/$ideaId'
+    | '/w/$workspaceId/ideas/'
+    | '/w/$workspaceId/ideas/$ideaId/'
+    | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +197,9 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/account'
     | '/w/$workspaceId'
+    | '/w/$workspaceId/ideas'
+    | '/w/$workspaceId/ideas/$ideaId'
+    | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
   id:
     | '__root__'
     | '/'
@@ -157,7 +213,12 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/_authed/_frame/account'
     | '/_authed/_frame/w/$workspaceId'
+    | '/_authed/_frame/w/$workspaceId/ideas'
     | '/_authed/_frame/w/$workspaceId/'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId'
+    | '/_authed/_frame/w/$workspaceId/ideas/'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -256,15 +317,89 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdIndexRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdRoute
     }
+    '/_authed/_frame/w/$workspaceId/ideas': {
+      id: '/_authed/_frame/w/$workspaceId/ideas'
+      path: '/ideas'
+      fullPath: '/w/$workspaceId/ideas'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdRoute
+    }
+    '/_authed/_frame/w/$workspaceId/ideas/': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/'
+      path: '/'
+      fullPath: '/w/$workspaceId/ideas/'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIndexRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasRoute
+    }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId'
+      path: '/$ideaId'
+      fullPath: '/w/$workspaceId/ideas/$ideaId'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasRoute
+    }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId/': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/'
+      path: '/'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRoute
+    }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+      path: '/questions/$sectionKey'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRoute
+    }
   }
 }
 
+interface AuthedFrameWWorkspaceIdIdeasIdeaIdRouteChildren {
+  AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
+  AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+}
+
+const AuthedFrameWWorkspaceIdIdeasIdeaIdRouteChildren: AuthedFrameWWorkspaceIdIdeasIdeaIdRouteChildren =
+  {
+    AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute,
+    AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute,
+  }
+
+const AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdRoute._addFileChildren(
+    AuthedFrameWWorkspaceIdIdeasIdeaIdRouteChildren,
+  )
+
+interface AuthedFrameWWorkspaceIdIdeasRouteChildren {
+  AuthedFrameWWorkspaceIdIdeasIdeaIdRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren
+  AuthedFrameWWorkspaceIdIdeasIndexRoute: typeof AuthedFrameWWorkspaceIdIdeasIndexRoute
+}
+
+const AuthedFrameWWorkspaceIdIdeasRouteChildren: AuthedFrameWWorkspaceIdIdeasRouteChildren =
+  {
+    AuthedFrameWWorkspaceIdIdeasIdeaIdRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren,
+    AuthedFrameWWorkspaceIdIdeasIndexRoute:
+      AuthedFrameWWorkspaceIdIdeasIndexRoute,
+  }
+
+const AuthedFrameWWorkspaceIdIdeasRouteWithChildren =
+  AuthedFrameWWorkspaceIdIdeasRoute._addFileChildren(
+    AuthedFrameWWorkspaceIdIdeasRouteChildren,
+  )
+
 interface AuthedFrameWWorkspaceIdRouteChildren {
+  AuthedFrameWWorkspaceIdIdeasRoute: typeof AuthedFrameWWorkspaceIdIdeasRouteWithChildren
   AuthedFrameWWorkspaceIdIndexRoute: typeof AuthedFrameWWorkspaceIdIndexRoute
 }
 
 const AuthedFrameWWorkspaceIdRouteChildren: AuthedFrameWWorkspaceIdRouteChildren =
   {
+    AuthedFrameWWorkspaceIdIdeasRoute:
+      AuthedFrameWWorkspaceIdIdeasRouteWithChildren,
     AuthedFrameWWorkspaceIdIndexRoute: AuthedFrameWWorkspaceIdIndexRoute,
   }
 

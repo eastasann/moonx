@@ -4,13 +4,16 @@ import app from "../locales/en/app.json";
 import auth from "../locales/en/auth.json";
 import common from "../locales/en/common.json";
 import errors from "../locales/en/errors.json";
+import form from "../locales/en/form.json";
+import ideas from "../locales/en/ideas.json";
 import mail from "../locales/en/mail.json";
+import panels from "../locales/en/panels.json";
 import plan from "../locales/en/plan.json";
 import validation from "../locales/en/validation.json";
 
 /** Catalogs per language. The UI is English only for now (design-spec 1.2); add a language here. */
 export const resources = {
-  en: { account, app, auth, common, errors, mail, plan, validation },
+  en: { account, app, auth, common, errors, form, ideas, mail, panels, plan, validation },
 } as const;
 
 export const DEFAULT_LANGUAGE = "en";
@@ -20,7 +23,10 @@ export const NAMESPACES = [
   "auth",
   "common",
   "errors",
+  "form",
+  "ideas",
   "mail",
+  "panels",
   "plan",
   "validation",
 ] as const;

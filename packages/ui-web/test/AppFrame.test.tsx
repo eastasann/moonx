@@ -20,6 +20,7 @@ function Frame() {
       status={<span>Saved</span>}
       actions={<button type="button">Comments</button>}
       banner={<div role="status">Offline</div>}
+      panel={<aside aria-label="Panel">panel</aside>}
     >
       <h1>Content</h1>
     </AppFrame>
@@ -47,6 +48,7 @@ test("places every slot", () => {
   expect(screen.getByRole("navigation", { name: "Main" })).toBeInTheDocument();
   expect(screen.getByRole("navigation", { name: "Tabs" })).toBeInTheDocument();
   expect(screen.getByRole("status")).toHaveTextContent("Offline");
+  expect(screen.getByRole("complementary", { name: "Panel" })).toBeInTheDocument();
 });
 
 test("has no axe violations", async () => {

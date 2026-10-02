@@ -4,10 +4,12 @@ import { Inbox, SearchX } from "lucide-react";
 import { Avatar } from "../components/Avatar";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
+import { CheckDots } from "../components/CheckDots";
 import { Heading } from "../components/Heading";
 import { IllustratedMessage } from "../components/IllustratedMessage";
 import { InlineAlert } from "../components/InlineAlert";
 import { Meter } from "../components/Meter";
+import { MetricTile } from "../components/MetricTile";
 import { ProgressBar } from "../components/ProgressBar";
 import { ProgressCircle } from "../components/ProgressCircle";
 import { Skeleton } from "../components/Skeleton";
@@ -41,6 +43,27 @@ export function FeedbackSection() {
               Saved
             </StatusLight>
           ))}
+        </Cases>
+      </Component>
+
+      <Component
+        name="CheckDots"
+        note="The shape carries the state; assistive technology reads every check and its state."
+      >
+        <Cases label="Six checks">
+          <Case label="done, partial, not started">
+            <CheckDots
+              items={[
+                { label: "Competitors", state: "done", stateLabel: "Done" },
+                { label: "Local price range", state: "partial", stateLabel: "Partial" },
+                {
+                  label: "Startup & monthly costs",
+                  state: "not-started",
+                  stateLabel: "Not started",
+                },
+              ]}
+            />
+          </Case>
         </Cases>
       </Component>
 
@@ -169,6 +192,20 @@ export function FeedbackSection() {
                 { label: "Unknown", value: 0, variant: "unknown" },
               ]}
             />
+          </Case>
+        </Cases>
+      </Component>
+
+      <Component name="MetricTile" note="One key number: label, figure and an optional note.">
+        <Cases label="States">
+          <Case label="Amount">
+            <MetricTile label="Startup" value="₱169,500" />
+          </Case>
+          <Case label="Lower bound with a note">
+            <MetricTile label="Startup" value="₱450,000+" note="Some rows are Empty or Unknown" />
+          </Case>
+          <Case label="Missing, with the reason">
+            <MetricTile label="Break-even" value="Empty" note="Needs price" />
           </Case>
         </Cases>
       </Component>

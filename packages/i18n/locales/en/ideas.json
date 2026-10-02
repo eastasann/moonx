@@ -1,0 +1,100 @@
+{
+  "title": "Ideas",
+  "newIdea": "New idea",
+  "filters": {
+    "stage": "Stage",
+    "decision": "Decision",
+    "proposer": "Proposer",
+    "sort": "Sort",
+    "search": "Search ideas",
+    "searchPlaceholder": "Search by name or concept",
+    "clearSearch": "Clear search",
+    "includeArchived": "Include archived",
+    "allStages": "All",
+    "allProposers": "All"
+  },
+  "decisionFilter": {
+    "not_dropped": "Not dropped",
+    "all": "All",
+    "undecided": "Undecided",
+    "proceed": "Proceed",
+    "hold": "Hold",
+    "drop": "Drop"
+  },
+  "decision": {
+    "undecided": "Undecided",
+    "proceed": "Proceed",
+    "hold": "Hold",
+    "drop": "Drop"
+  },
+  "goNoGo": {
+    "launch": "Launch",
+    "delay": "Delay",
+    "stop": "Stop"
+  },
+  "sort": {
+    "updated": "Updated",
+    "created": "Created",
+    "name": "Name"
+  },
+  "check": {
+    "competitors": "Competitors",
+    "local_price": "Local price range",
+    "costs": "Startup & monthly costs",
+    "break_even": "Break-even volume",
+    "permits": "Permits",
+    "demand_signal": "Demand or problem signal"
+  },
+  "row": {
+    "listLabel": "Ideas",
+    "updated": "Updated {{when}}",
+    "missing": "Missing: {{names}}",
+    "allChecksDone": "All checks done",
+    "archived": "Archived",
+    "formerMember": "{{name}} (former member)",
+    "actions": "More actions for {{name}}",
+    "duplicate": "Duplicate",
+    "archive": "Archive",
+    "restore": "Restore",
+    "archivedToast": "Idea archived",
+    "restoredToast": "Idea restored"
+  },
+  "hidden_one": "{{count}} dropped idea hidden",
+  "hidden_other": "{{count}} dropped ideas hidden",
+  "showDropped": "Show",
+  "loadMore": "Load more",
+  "loadingMore": "Loading more ideas",
+  "empty": {
+    "heading": "No ideas yet",
+    "body": "Write down the first one — you can have many.",
+    "viewerBody": "Ideas that Owners and Members add will show up here."
+  },
+  "filteredEmpty": {
+    "heading": "No ideas match these filters",
+    "clear": "Clear filters"
+  },
+  "detail": {
+    "none": "Select an idea to see its summary.",
+    "proposer": "Proposer",
+    "metrics": "Key numbers",
+    "checks": "Checks",
+    "plans": "Plans",
+    "noPlans": "No plans yet",
+    "planVersion": "Latest version: {{name}}",
+    "noVersion": "No version saved",
+    "goNoGo": "Go / No-Go: {{value}}",
+    "noGoNoGo": "No Go / No-Go yet",
+    "openValidation": "Open validation"
+  },
+  "new": {
+    "title": "New idea",
+    "name": "Name",
+    "concept": "One-line concept",
+    "conceptHelp": "What it is and who it is for, in one sentence.",
+    "solution": "Proposed solution",
+    "solutionHelp": "Optional. You can write this later.",
+    "create": "Create idea",
+    "saveFailed": "Couldn't save — Retry"
+  },
+  "loadMoreFailed": "Couldn't load more ideas"
+}

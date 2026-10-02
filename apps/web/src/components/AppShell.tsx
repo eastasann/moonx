@@ -39,10 +39,12 @@ import { unreadCountQuery } from "../lib/notifications";
 import { useOverlay } from "../lib/overlay";
 import { PanelTargetProvider } from "../lib/panel-target";
 import { homePath, useMe } from "../lib/session";
+import { AutosaveRuntime } from "./AutosaveRuntime";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { ModalHost } from "./ModalHost";
 import { OfflineNotice } from "./OfflineNotice";
 import { PanelEntries } from "./PanelEntries";
+import { PanelHost } from "./PanelHost";
 import { SaveStatus } from "./SaveStatus";
 
 const ICONS: Record<NavId, LucideIcon> = {
@@ -263,11 +265,13 @@ function Shell() {
       title={current?.label}
       status={<SaveStatus key={location.pathname} />}
       actions={<PanelEntries />}
+      panel={<PanelHost />}
     >
       <ErrorBoundary>
         <Outlet />
       </ErrorBoundary>
       <ModalHost />
+      <AutosaveRuntime />
     </AppFrame>
   );
 }

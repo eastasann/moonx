@@ -1,4 +1,5 @@
 import {
+  createIdeaBodySchema,
   currencySchema,
   displayNameSchema,
   PASSWORD_MAX_LENGTH,
@@ -55,3 +56,6 @@ export const deleteAccountSchema = z.object({
   confirmEmail: z.string().trim().min(1),
   password: z.string().max(PASSWORD_MAX_LENGTH),
 });
+
+/** M1, a new idea: the name and concept are required, the proposed solution is optional. */
+export const newIdeaSchema = createIdeaBodySchema;

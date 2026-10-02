@@ -196,6 +196,19 @@ describe("D ListDetailPattern", () => {
     expect(pane("detail")).toHaveAttribute("data-hidden", "false");
   });
 
+  test("renders the floating action when one is given", () => {
+    const { rerender } = render(<ListDetailPattern list={<p>list</p>} detail={<p>detail</p>} />);
+    expect(screen.queryByRole("button", { name: "New" })).not.toBeInTheDocument();
+    rerender(
+      <ListDetailPattern
+        list={<p>list</p>}
+        detail={<p>detail</p>}
+        floatingAction={<button type="button">New</button>}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "New" })).toBeInTheDocument();
+  });
+
   test("has no axe violations", async () => {
     const { container } = render(<ListDetailPattern list={<p>list</p>} detail={<p>detail</p>} />);
     await expectNoAxeViolations(container);

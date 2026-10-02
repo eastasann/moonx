@@ -7,16 +7,25 @@ import { Badge } from "../components/Badge";
 import { Breadcrumb, Breadcrumbs } from "../components/Breadcrumbs";
 import { Card } from "../components/Card";
 import { CardView } from "../components/CardView";
+import { DiffText } from "../components/DiffText";
 import { Accordion, Disclosure } from "../components/Disclosure";
 import { Divider } from "../components/Divider";
 import { IllustratedMessage } from "../components/IllustratedMessage";
 import { ListView, ListViewItem } from "../components/ListView";
+import { RowList, RowListItem } from "../components/RowList";
 import { TableView, type TableViewColumn, type TableViewRow } from "../components/TableView";
 import { Tab, TabList, TabPanel, Tabs } from "../components/Tabs";
 import { Tree, TreeItem } from "../components/Tree";
 import { Well } from "../components/Well";
 import { bySize, Case, Cases, Component, GallerySection } from "./parts";
 import { verticalBox, widthFull } from "./preview.css";
+
+const DIFF = [
+  { kind: "same", text: "Sell " },
+  { kind: "removed", text: "cakes" },
+  { kind: "added", text: "gift boxes" },
+  { kind: "same", text: " daily" },
+] as const;
 
 const COLUMNS: TableViewColumn[] = [
   { id: "name", label: "Cost", isRowHeader: true, allowsSorting: true },
@@ -268,6 +277,34 @@ export function CollectionsSection() {
           </Case>
           <Case label="Named (role group)">
             <Well aria-label="AI export preview">Preview of the export</Well>
+          </Case>
+        </Cases>
+      </Component>
+
+      <Component name="DiffText">
+        <Cases>
+          <Case label="Before">
+            <DiffText side="before" segments={DIFF} />
+          </Case>
+          <Case label="After">
+            <DiffText side="after" segments={DIFF} />
+          </Case>
+        </Cases>
+      </Component>
+
+      <Component name="RowList" note="A static list of rows separated by hairlines.">
+        <Cases label="Unordered and ordered" layout="column">
+          <Case label="Unordered">
+            <RowList aria-label="Checks">
+              <RowListItem>Competitors (3–5)</RowListItem>
+              <RowListItem>Local price range</RowListItem>
+            </RowList>
+          </Case>
+          <Case label="Ordered">
+            <RowList aria-label="Next steps" ordered>
+              <RowListItem>Classify answers (3)</RowListItem>
+              <RowListItem>Find 3 competitors</RowListItem>
+            </RowList>
           </Case>
         </Cases>
       </Component>

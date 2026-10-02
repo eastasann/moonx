@@ -20,6 +20,11 @@ export interface QuestionCardProps {
   prompt?: string;
   /** The card showing its full body. Becoming focused scrolls it to the focus anchor. */
   isFocused: boolean;
+  /**
+   * Whether becoming focused scrolls the card to the focus anchor. Off when every card is open
+   * at once (the Focus switch is off), where one scroll per card would fight the others.
+   */
+  autoScroll?: boolean;
   /** Start of the saved answer, shown in the compact form. Empty or missing shows `emptyLabel`. */
   answer?: string;
   /** Text for an unanswered question ("Empty"). */
@@ -63,6 +68,7 @@ export function QuestionCard({
   title,
   prompt,
   isFocused,
+  autoScroll = true,
   answer,
   emptyLabel,
   status,
@@ -72,7 +78,7 @@ export function QuestionCard({
   onFocusRequest,
   onNavigate,
 }: QuestionCardProps) {
-  const ref = useFocusAnchor<HTMLDivElement>(isFocused);
+  const ref = useFocusAnchor<HTMLDivElement>(isFocused && autoScroll);
   const titleId = useId();
   const groupRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);

@@ -37,7 +37,7 @@ export async function touchValidationActivity(
 export async function checkLockLazily(
   db: Executor,
   opts: {
-    workspaceId: string;
+    workspaceId: string | null;
     row: LockedRow | null;
     sent: LockInput;
     currentValue: () => Promise<unknown>;
@@ -56,7 +56,7 @@ export async function checkLockLazily(
 export async function lostInsertRace(
   db: Executor,
   opts: {
-    workspaceId: string;
+    workspaceId: string | null;
     row: LockedRow | null;
     currentValue: () => Promise<unknown>;
   },

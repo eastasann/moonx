@@ -25,7 +25,7 @@ export interface LockInput {
 export async function checkLock(
   db: Executor,
   opts: {
-    workspaceId: string;
+    workspaceId: string | null;
     row: LockedRow | null;
     sent: LockInput;
     /** The item's current content in the response shape of the endpoint. */

@@ -11,17 +11,24 @@
   },
   "dependencies": {
     "@elysiajs/openapi": "^1.4.16",
+    "@expo-google-fonts/fraunces": "^0.4.1",
+    "@expo-google-fonts/noto-sans": "^0.4.2",
+    "@expo-google-fonts/noto-sans-jp": "^0.4.3",
     "@moonx/db": "workspace:*",
     "@moonx/domain": "workspace:*",
     "@moonx/i18n": "workspace:*",
     "@moonx/schemas": "workspace:*",
+    "@react-pdf/renderer": "^4.9.0",
     "@sentry/bun": "^11.2.0",
     "drizzle-orm": "0.45.3",
     "elysia": "^1.4.0",
     "postgres": "3.4.9",
+    "react": "^19.3.0",
     "zod": "^4"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.2"
+    "@types/bun": "^1.4.2",
+    "@types/react": "^19.3.0",
+    "unpdf": "^1.8.1"
   }
 }

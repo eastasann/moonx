@@ -8,6 +8,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@moonx/schemas": "workspace:*"
+    "@moonx/i18n": "workspace:*",
+    "@moonx/schemas": "workspace:*",
+    "@moonx/ui-tokens": "workspace:*"
   }
 }

@@ -30,11 +30,14 @@ export function toUserRef(user: UserRow, isMember = true): UserRef {
   };
 }
 
-/** Resolves user ids to refs in one round trip. `workspaceId` decides the "former member" badge. */
+/**
+ * Resolves user ids to refs in one round trip. `workspaceId` decides the "former member" badge;
+ * `null` (self-analysis content, which belongs to no workspace) never shows it.
+ */
 export async function loadUserRefs(
   db: Executor,
   ids: (string | null | undefined)[],
-  workspaceId: string,
+  workspaceId: string | null,
 ): Promise<Map<string, UserRef>> {
   const unique = [...new Set(ids.filter((id): id is string => !!id))];
   const refs = new Map<string, UserRef>();
@@ -48,17 +51,22 @@ export async function loadUserRefs(
     })
     .from(schema.users)
     .where(inArray(schema.users.id, unique));
-  const members = await db
-    .select({ userId: schema.memberships.userId })
-    .from(schema.memberships)
-    .where(
-      and(
-        eq(schema.memberships.workspaceId, workspaceId),
-        inArray(schema.memberships.userId, unique),
-      ),
-    );
+  const members =
+    workspaceId === null
+      ? []
+      : await db
+          .select({ userId: schema.memberships.userId })
+          .from(schema.memberships)
+          .where(
+            and(
+              eq(schema.memberships.workspaceId, workspaceId),
+              inArray(schema.memberships.userId, unique),
+            ),
+          );
   const memberIds = new Set(members.map((m) => m.userId));
-  for (const user of users) refs.set(user.id, toUserRef(user, memberIds.has(user.id)));
+  for (const user of users) {
+    refs.set(user.id, toUserRef(user, workspaceId === null || memberIds.has(user.id)));
+  }
   return refs;
 }
 

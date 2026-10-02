@@ -221,3 +221,24 @@ export function executionItemSnapshot(
     answer: row.answer,
   };
 }
+
+/** Snapshot of a self-analysis answer. */
+export function selfAnalysisAnswerSnapshot(
+  row: Pick<Row<typeof schema.selfAnalysisAnswers>, "text" | "amount"> | null,
+) {
+  return { text: row?.text ?? null, amount: row?.amount ?? null };
+}
+
+/** Snapshot of a plan answer: its text and the rows of a table sub-item. */
+export function planAnswerSnapshot(
+  row: Pick<Row<typeof schema.planAnswers>, "text" | "rows"> | null,
+) {
+  return { text: row?.text ?? null, rows: (row?.rows as unknown[] | null) ?? null };
+}
+
+/** Snapshot of the plan header (name, Business Name, Prepared By). */
+export function planHeaderSnapshot(
+  row: Pick<Row<typeof schema.businessPlans>, "name" | "businessName" | "preparedBy">,
+) {
+  return { name: row.name, businessName: row.businessName, preparedBy: row.preparedBy };
+}

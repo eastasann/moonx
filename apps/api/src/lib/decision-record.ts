@@ -1,15 +1,10 @@
 import { schema } from "@moonx/db";
-import type {
-  CheckResult,
-  DecisionValue,
-  FauBreakdown,
-  KeyMetrics,
-  LinkTarget,
-} from "@moonx/schemas";
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import type { CheckResult, DecisionValue, FauBreakdown, KeyMetrics } from "@moonx/schemas";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { ApiError } from "../errors";
 import type { Executor, Tx } from "./db";
 import { type DecisionLogSummary, loadDecisionSummaries } from "./decision-log";
+import { notifyDecisionRecorded } from "./notify";
 import type { ValidationState } from "./validation-data";
 
 /** SDD 5.11 DecisionLogEntry. */
@@ -136,31 +131,12 @@ export async function recordValidationDecision(
     .set({ lastActiveAt: recordedAt, updatedAt: sql`${schema.workspaces.updatedAt}` })
     .where(eq(schema.workspaces.id, workspaceId));
 
-  const recipients = await tx
-    .select({ userId: schema.memberships.userId })
-    .from(schema.memberships)
-    .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
-    .where(
-      and(
-        eq(schema.memberships.workspaceId, workspaceId),
-        inArray(schema.memberships.role, ["owner", "member", "viewer"]),
-        ne(schema.memberships.userId, recorder.id),
-        eq(schema.users.status, "active"),
-      ),
-    );
-  if (recipients.length > 0) {
-    const link: LinkTarget = { screen: 13, workspaceId, ideaId };
-    await tx.insert(schema.notifications).values(
-      recipients.map((r) => ({
-        userId: r.userId,
-        workspaceId,
-        kind: "decision" as const,
-        actorId: recorder.id,
-        decisionLogEntryId: entryId,
-        link,
-      })),
-    );
-  }
+  await notifyDecisionRecorded(tx, {
+    workspaceId,
+    recorderId: recorder.id,
+    entryId,
+    link: { screen: 13, workspaceId, ideaId },
+  });
   return { entryId };
 }
 

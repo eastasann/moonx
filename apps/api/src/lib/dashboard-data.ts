@@ -14,7 +14,7 @@ const dateOnly = (date: Date) => date.toISOString().slice(0, 10);
  * UTC (design-spec 6.13). `users.timezone` holds IANA names; a value Intl cannot read falls back
  * to UTC instead of failing the dashboard.
  */
-function todayIn(timezone: string, now: Date): string {
+export function todayIn(timezone: string, now: Date): string {
   try {
     return new Intl.DateTimeFormat("en-CA", {
       timeZone: timezone,

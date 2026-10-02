@@ -340,6 +340,7 @@ export function versionSnapshot(world: World, plan: PlanRecord, idea: IdeaRecord
     execution: world.executionItems
       .filter((e) => e.businessPlanId === plan.id)
       .map((e) => ({
+        id: e.id,
         type: e.type,
         title: e.title,
         status: e.status ?? null,
@@ -353,7 +354,14 @@ export function versionSnapshot(world: World, plan: PlanRecord, idea: IdeaRecord
         completionCriteria: e.completionCriteria ?? null,
         kpiArea: e.kpiArea ?? null,
         kpiTarget: e.kpiTarget ?? null,
+        kpiReviewFrequency: e.kpiReviewFrequency ?? null,
         kpiActual: e.kpiActual ?? null,
+        kpiActualUpdatedAt: e.kpiActualUpdatedAt?.toISOString() ?? null,
+        whyItMatters: e.whyItMatters ?? null,
+        answer: e.answer ?? null,
+        fromPreset: e.fromPreset ?? false,
+        completedAt: e.completedAt?.toISOString() ?? null,
+        sortOrder: e.sortOrder,
       })),
     competitors: idea.validation.spec.competitors.slice(0, 5).map((c) => ({
       name: c.name,

@@ -236,7 +236,7 @@ make test-api が通り、make openapi で apps/api/openapi.json が書き出せ
 
 ## Step 7: API: 自己分析・プラン・Pitch Deck・AI 往復
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/02-01_system-design-doc.md の 5.8〜5.10・ADR-012 と、docs/design-spec.md 6.6（AI 書き出しの書式と設問 ID）・

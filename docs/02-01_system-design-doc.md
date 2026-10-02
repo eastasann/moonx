@@ -346,7 +346,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-012: Pitch Deck の PDF は API サーバーで作る
 
-**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web・スマホ）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。
+**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web・スマホ）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{fraunces,noto-sans,noto-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる。react-pdf は `font-variant-numeric` を持たないので、PDF では 06 の等幅数字（tabular）を適用できない。
 
 **理由:** Web とスマホで同じ PDF を作るには、作る場所を1つにするのが確実。ブラウザ・スマホのどちらで作っても、日本語のフォントの埋め込みと16:9のページの再現がそろわない。react-pdf は Chromium を使わないので、コンテナが軽く、0台からの起動も遅くならない。
 
@@ -1117,7 +1117,7 @@ interface SelfAnalysisAnswer extends Versioned {
 | S1 GET | — | `200 SelfAnalysisHome` | 初めて開いたときに自己分析を作る（最新の版、`not_started`） |
 | S1 PATCH | `{ currency: string }` | `200 SelfAnalysisHome` | 換算しない |
 | S2 | — | `200 { section: TemplateSection; answers: SelfAnalysisAnswer[] }` | |
-| S3 | `{ text?: string | null; amount?: number | null (≥0); lockVersion; force? }` | `200 SelfAnalysisAnswer` | 最初の回答で `in_progress` にする。履歴 `manual`（本人だけが見られる） |
+| S3 | `{ text?: string | null; amount?: number | null (≥0); lockVersion; force? }` | `200 SelfAnalysisAnswer` | 最初の回答で `in_progress` にする。金額を送れるのは金額＋理由の設問だけ（それ以外は `422 VALIDATION_FAILED`）。短文は200字まで。存在しない設問は `422 QUESTION_NOT_FOUND`。履歴 `manual`（本人だけが見られる） |
 | S4 complete | `{ confirmEmpty?: boolean }` | `200 SelfAnalysisHome` | 未回答があり `confirmEmpty` が無ければ `409 HAS_EMPTY_QUESTIONS`（`error.emptyCount`） |
 | S4 reopen | — | `200 SelfAnalysisHome` | 共有は続く |
 | S5 | `{ workspaceIds: UUID[] }`（共有先の全体） | `200 SelfAnalysisHome` | 新しく足すのは `done` のときだけ（`422 MUST_BE_DONE_TO_SHARE`）。外すのはいつでも。Owner / Member でないワークスペースは `422 NOT_SHAREABLE` |
@@ -1140,7 +1140,7 @@ interface PlanHome extends PlanSummary, Versioned {   // Versioned はヘッダ�
   viewingVersion: { id: UUID; name: string; savedAt: DateTime } | null;   // ?versionId= のとき
   keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months">;
   versions: PlanVersionSummary[];
-  execution: { dueSoon: number; overdue: number };
+  execution: { dueSoon: number; overdue: number };   // 版の表示中も今の実行管理から数える
   parts: { part: "a" | "b"; completeItems: number; totalItems: number;
            items: { itemNo: number; title: string; marks: ("V" | "S")[]; filled: number; total: number; commentCount: number }[] }[];
 }
@@ -1162,7 +1162,8 @@ interface PlanReference {
 interface PlanItem {
   itemNo: number; title: string; guidance: string | null; readOnly: boolean;   // 版の表示中・アーカイブ・Viewer
   prompts: TemplateQuestion[]; answers: PlanAnswer[];
-  metrics: KeyMetrics;                          // linked_metric の小項目が使う主要指標
+  metrics: KeyMetrics;                          // linked_metric の小項目が使う主要指標（版の表示中はスナップショットの値）
+  scenarios: ScenarioColumn[];                  // `scenario:*` の小項目が使うシナリオ表（metrics は1つの値だけを持つため。同上）
   execution: ExecutionItem[];                   // execution_view の小項目の種類の項目
   references: PlanReference[];                  // [S] の自己分析は Owner / Member にだけ返す
 }
@@ -1209,17 +1210,17 @@ interface PitchDeck {
 | P1 GET | `?includeArchived=true` | `200 { items: PlanSummary[] }` | |
 | P1 POST（M5） | `{ name: string }` | `201 PlanHome` | 最新の判定が Proceed でなければ `409 DECISION_NOT_PROCEED`。名前の重複は `409 NAME_TAKEN`（アーカイブした案の名前も数える）。テンプレートの `copy_from` で検証から文章をコピーし、実行管理の初期行を作る。`created_from_decision_id` に最新の Proceed を入れる。履歴 `plan_draft`（1つの `batchId`） |
 | P2 GET | `?versionId=` | `200 PlanHome` | 版を指定したら、`parts` などを版のスナップショットから作る |
-| P2 PATCH | `{ name?; businessName?; preparedBy?; lockVersion; force? }` | `200 PlanHome` | 履歴 `manual` |
+| P2 PATCH | `{ name?; businessName?; preparedBy?; lockVersion; force? }` | `200 PlanHome` | 名前の重複は `409 NAME_TAKEN`。履歴 `manual` |
 | P3 | — | `200 PlanSummary` | |
 | P4 | `?versionId=` | `200 PlanItem` | `itemNo` は 1〜30 |
-| P5 | `{ text?: string | null; rows?: Record<string, string | number | null>[] | null; lockVersion; force? }` | `200 PlanAnswer` | 数字・実行管理の小項目は `422 NOT_EDITABLE`。表の列にないキーは `422 VALIDATION_FAILED`。履歴 `manual` |
+| P5 | `{ text?: string | null; rows?: Record<string, string | number | null>[] | null; lockVersion; force? }` | `200 PlanAnswer` | 数字・実行管理の小項目は `422 NOT_EDITABLE`。存在しない設問は `422 QUESTION_NOT_FOUND`、選択肢にない値は `422 INVALID_CHOICE`。表の列にないキー・型の合わない値・表に `text`・表以外に `rows`・200字を超える短文は `422 VALIDATION_FAILED`。履歴 `manual` |
 | P6 GET | — | `200 { items: PlanVersionSummary[] }` | |
 | P6 POST（M3） | `{ name: string (1〜80) }` | `201 PlanVersionSummary` | スナップショット（30項目の回答・主要指標・シナリオ表・実行管理の項目・検証の競合の上位5件）を保存し、決定ログに `version_saved` を記録して通知する |
 | P7 | — | `200 { conditions: { launchIf: string | null; delayIf: string | null; stopIf: string | null }; keyMetrics: KeyMetrics; currentVersion: PlanVersionSummary | null; hasChangesSinceVersion: boolean; history: DecisionLogSummary[] }` | |
 | P8（M4） | `{ value: GoNoGoValue; reason: string (1〜5000) }` | `201 { entry: DecisionLogEntry; stage: Stage }` | 対象の版は最新の保存済みの版（無ければ null）。決定ログに `go_no_go` を記録して通知する |
 | P9 GET | `?type=&assignee=me|<userId>&status=` | `200 { items: ExecutionItem[] }` | Next Actions は期限順、ローンチは区分ごと、KPI は Area ごとに並べて返す |
 | P9 POST | `ExecutionItemInput & { type: ExecutionType; title: string }` | `201 ExecutionItem` | 担当のメンバーは Owner / Member だけ（`422 INVALID_ASSIGNEE`）。状態は種類ごとの値だけ（`422 INVALID_STATUS`。milestone / launch / next_action は todo・doing・done、open_question は open・resolved、kpi は null）。履歴 `manual` |
-| P10 | PATCH: `ExecutionItemInput & { lockVersion; force? }`。DELETE: なし | `200 ExecutionItem` / `204` | `done` / `resolved` にしたら `completed_at` を入れる。期限を変えたら期限の通知を送り直せるようにする。`kpiActual` を変えたら `kpi_actual_updated_at` を入れる。履歴 `manual` |
+| P10 | PATCH: `ExecutionItemInput & { lockVersion; force? }`。DELETE: なし（ロックを持たない論理削除） | `200 ExecutionItem` / `204` | 種類に無い列を送ると `422 VALIDATION_FAILED`（担当は `assigneeUserId` と `assigneeName` の一方だけ）。`done` / `resolved` にしたら `completed_at` を入れる。期限を変えたら期限の通知を送り直せるようにする。`kpiActual` を変えたら `kpi_actual_updated_at` を入れる。履歴 `manual` |
 | P11 | `{ type: ExecutionType; ids: UUID[] }` | `204` | |
 | P12 | `?variant=one|five&versionId=` | `200 PitchDeck` | `packages/domain` の `buildPitchDeck()` |
 | P13 | 同上 | `200 application/pdf`（`Content-Disposition: attachment; filename="{businessName}-{one|five}-{版の名前|draft}-{日付}.pdf"`） | ADR-012。常にライトの配色 |
@@ -1232,7 +1233,7 @@ interface PitchDeck {
 |---|---|---|---|
 | X1 | `?source=self_analysis|validation|business_plan&id=<検証かプランの id。自己分析は省く>&sections=01,02&items=1,3&part=a|b&includeEmpty=true&includeExamples=true&includeReference=true` | `200 { markdown: string; json: object; fileBaseName: string; questionCount: number; allEmpty: boolean }` | `json` は design-spec 6.6 の `moonx-export`。範囲が空なら `422 EMPTY_SCOPE`。記録しない |
 | X2 | `?target=self_analysis|validation|business_plan&id=` | `200 ImportContext` | |
-| X3 | `{ target: { type: TemplateKind; id?: UUID }; changes: ImportChange[] }` | `200 { applied: number; needsClassification: number; batchId: UUID }` | 1つのトランザクションで全部反映するか、何もしない。どれかの `baseLockVersion` が古ければ `409 CONFLICT_MULTI`（`error.conflicts: { questionKey; current: ConflictCurrent }[]`）。取り込めない設問・隠れた設問は `422 NOT_IMPORTABLE`、金額・選択の値が読めなければ `422 VALIDATION_FAILED`。検証の回答で本文が変わったものは F/A/U を外して未分類にする（`classification` を送ったらそれを使う。`fact` は根拠が残っているときだけ）。履歴 `ai_import`（1つの `batchId`） |
+| X3 | `{ target: { type: TemplateKind; id?: UUID }; changes: ImportChange[] }` | `200 { applied: number; needsClassification: number; batchId: UUID }` | 1つのトランザクションで全部反映するか、何もしない。どれかの `baseLockVersion` が古ければ `409 CONFLICT_MULTI`（`error.conflicts: { questionKey; current: ConflictCurrent }[]`）。取り込めない設問・隠れた設問は `422 NOT_IMPORTABLE`、存在しない設問は `422 QUESTION_NOT_FOUND`、金額・選択の値が読めない・同じ設問が2回あれば `422 VALIDATION_FAILED`。`applied` は内容が変わった回答の数（変わらないものは数えない）。`conflicts[].current.value` は `{ text, amount }`。検証の回答で本文が変わったものは F/A/U を外して未分類にする（`classification` を送ったらそれを使う。`fact` は根拠が残っているときだけ）。履歴 `ai_import`（1つの `batchId`） |
 
 ```ts
 interface ImportContext {
@@ -2094,7 +2095,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | シークレット | 置き場所の方針は ADR-027、CI の置き場所の一覧は2章「CI のシークレットと変数」が正。local は `.env`（コミットしない。`.env.example` だけコミットする）。staging / production の API のシークレットは Secret Manager から Cloud Run の環境変数として渡す。ローテーションの手順は 05_operation-runbook.md |
 | CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる（合わなければ 403 `FORBIDDEN`）。Content-Type の決まりは本体のあるリクエストに適用し、本体の無い POST・DELETE は Content-Type が無くてよい。JSON の1MB は `Content-Length` と実際に読んだ長さの両方で確かめる。Cookie は SameSite=Lax。スマホは `Origin` を送らないが、Cookie を自動では送らない（SecureStore から付ける）ので対象外 |
 | CORS | 使わない（Web と API は同じオリジン。ADR-004）。CORS のヘッダーを返さないので、他のオリジンからのブラウザのリクエストは届かない。local は Vite の転送で同じオリジンにする |
-| レート制限 | 仕組みは ADR-029。認証（Better Auth）は IP ごとに1分10回（DB に記録）。アプリの API は、ユーザーごとに次の上限を同じ仕組みで持つ: 招待の送信・再送 1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回。超えたら 429 `RATE_LIMITED`。外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` に付ける |
+| レート制限 | 仕組みは ADR-029。認証（Better Auth）は IP ごとに1分10回（DB に記録）。アプリの API は、ユーザーごとに次の上限を同じ仕組みで持つ: 招待の送信・再送 1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3。X2 は既存の内容を読むだけなので数えない）。超えたら 429 `RATE_LIMITED`。外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` に付ける |
 | 直接のアクセス | Cloud Run の URL を直接呼ばれないように、Worker の共有シークレットを確かめる（2章 通信フロー 3）。`CF-Connecting-IP` は、共有シークレットのあるリクエストのときだけ信じる |
 | セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。スマホは SecureStore。ログアウトしたら送信待ちの列（ADR-021）も消す |
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、5MB まで。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |

@@ -886,6 +886,12 @@ docs/03_dev-setup.md 5.4 の手順でユーザーが行う。
    Dependabot、deploy/staging/version と deploy/production/version
 8. Makefile のデプロイ系のターゲット（build-web・build-api-image・deploy-api・deploy-web・mobile-update・
    mobile-build・infra-plan・infra-apply・db-backup）を、ここで作った対象に合わせて確かめる
+9. Playwright の版（申し送り）: @playwright/test はルートの package.json で 1.56.1 に固定してある（コミット 7bea59d）。
+   理由は Phase 5 のクラウドの開発環境の都合で、cdn.playwright.dev に届かず、入っている Chromium（revision 1194）に
+   版を合わせた。CI（ci.yml の make test-e2e）と手元はブラウザを取得できるので、この固定は要らない。CI で最新の版の
+   make test-e2e が通ることを確かめて固定を外す。クラウドの開発環境で E2E を動かす手段（入っている Chromium を
+   使う設定など）が要るなら docs/03_dev-setup.md 11章に書く。外せない理由が見つかったら、理由と版を
+   docs/03_dev-setup.md 1章の Playwright の行に書く
 
 docker build した API のイメージがローカルで起動して /api/health と P13 の PDF が動き、
 3つの env で terraform validate が通り、両方の env で wrangler deploy --dry-run が通り、

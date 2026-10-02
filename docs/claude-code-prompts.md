@@ -326,7 +326,7 @@ docs/design-spec.md 6.16 に従って、Better Auth で認証を実装し、Step
 
 ## Step 10: Web の部品（packages/ui-web）
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/design-spec.md 4章（4.1 レイアウトパターン・4.3 レスポンシブ・4.4 ビジュアル・4.5 部品）と

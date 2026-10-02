@@ -42,6 +42,9 @@ export type AvatarSize = (typeof AVATAR_SIZES)[number];
 export const DIALOG_SIZES = ["small", "medium", "large", "fullscreen"] as const;
 export type DialogSize = (typeof DIALOG_SIZES)[number];
 
+export const TOAST_VARIANTS = ["informative", "positive", "negative", "neutral"] as const;
+export type ToastVariant = (typeof TOAST_VARIANTS)[number];
+
 export const SPACE_STEPS = [
   "25",
   "50",
@@ -67,3 +70,31 @@ export type SpaceName = `space-${SpaceStep}`;
 export function spaceStep(name: SpaceName): SpaceStep {
   return name.slice("space-".length) as SpaceStep;
 }
+
+/** F/A/U states of an answer (design-spec 6.0.3); the tokens are `semantic.color.fau.*`. */
+export const FAU_VARIANTS = ["fact", "assumption", "unknown", "unclassified", "empty"] as const;
+export type FauVariant = (typeof FAU_VARIANTS)[number];
+
+/** Check item states; the tokens are `semantic.color.check.*`. */
+export const CHECK_VARIANTS = ["not-started", "partial", "done"] as const;
+export type CheckVariant = (typeof CHECK_VARIANTS)[number];
+
+/** Decisions; the tokens are `semantic.color.decision.*`. Drop is not `negative` on purpose. */
+export const DECISION_VARIANTS = ["proceed", "hold", "drop", "undecided"] as const;
+export type DecisionVariant = (typeof DECISION_VARIANTS)[number];
+
+/** Colors StatusLight and the Meter segments take: status families, F/A/U and check items. */
+export const STATUS_LIGHT_VARIANTS = [
+  ...STATUS_VARIANTS,
+  ...FAU_VARIANTS,
+  ...CHECK_VARIANTS,
+] as const;
+export type StatusLightVariant = (typeof STATUS_LIGHT_VARIANTS)[number];
+
+/** Colors Badge takes: status families (neutral included) and decisions. */
+export const BADGE_VARIANTS = [...STATUS_VARIANTS, ...DECISION_VARIANTS] as const;
+export type BadgeVariant = (typeof BADGE_VARIANTS)[number];
+
+export const CARD_VIEW_COLUMNS = [1, 2, 3] as const;
+/** Number of columns of CardView. */
+export type CardViewColumns = (typeof CARD_VIEW_COLUMNS)[number];

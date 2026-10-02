@@ -86,10 +86,14 @@
         "900": { "$value": { "colorSpace": "srgb", "components": [0.259, 0.165, 0.098], "hex": "#422a19" } }
       },
       "red": {
-        "$description": "赤（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "$description": "赤（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地。400・500 はダークの strong の hover・pressed、750・800 はライトの strong の hover・pressed）",
         "100": { "$value": { "colorSpace": "srgb", "components": [1, 0.867, 0.859], "hex": "#ffdddb" } },
         "300": { "$value": { "colorSpace": "srgb", "components": [1, 0.584, 0.573], "hex": "#ff9592" } },
+        "400": { "$value": { "colorSpace": "srgb", "components": [0.949, 0.557, 0.545], "hex": "#f28e8b" } },
+        "500": { "$value": { "colorSpace": "srgb", "components": [0.902, 0.525, 0.514], "hex": "#e68683" } },
         "700": { "$value": { "colorSpace": "srgb", "components": [0.631, 0.145, 0.184], "hex": "#a1252f" } },
+        "750": { "$value": { "colorSpace": "srgb", "components": [0.6, 0.137, 0.176], "hex": "#99232d" } },
+        "800": { "$value": { "colorSpace": "srgb", "components": [0.569, 0.129, 0.165], "hex": "#91212a" } },
         "900": { "$value": { "colorSpace": "srgb", "components": [0.275, 0.149, 0.145], "hex": "#462625" } }
       },
       "sea": {
@@ -245,6 +249,7 @@
       "70": { "$value": { "value": 70, "unit": "px" } },
       "80": { "$value": { "value": 80, "unit": "px" } },
       "96": { "$value": { "value": 96, "unit": "px" } },
+      "160": { "$value": { "value": 160, "unit": "px" } },
       "192": { "$value": { "value": 192, "unit": "px" } },
       "208": { "$value": { "value": 208, "unit": "px" } },
       "224": { "$value": { "value": 224, "unit": "px" } },
@@ -252,7 +257,9 @@
       "256": { "$value": { "value": 256, "unit": "px" } },
       "272": { "$value": { "value": 272, "unit": "px" } },
       "288": { "$value": { "value": 288, "unit": "px" } },
+      "352": { "$value": { "value": 352, "unit": "px" } },
       "360": { "$value": { "value": 360, "unit": "px" } },
+      "384": { "$value": { "value": 384, "unit": "px" } },
       "400": { "$value": { "value": 400, "unit": "px" } },
       "480": { "$value": { "value": 480, "unit": "px" } },
       "540": { "$value": { "value": 540, "unit": "px" } },
@@ -281,7 +288,16 @@
     },
     "ratio": {
       "$type": "number",
-      "half": { "$value": 0.5 }
+      "half": { "$value": 0.5 },
+      "85": { "$value": 0.85 }
+    },
+    "z-index": {
+      "$type": "number",
+      "$description": "重なりの順序の生の値",
+      "10": { "$value": 10 },
+      "50": { "$value": 50 },
+      "100": { "$value": 100 },
+      "200": { "$value": 200 }
     },
     "stroke": {
       "$type": "number",
@@ -333,7 +349,10 @@
       "150": { "$value": { "value": 150, "unit": "ms" } },
       "200": { "$value": { "value": 200, "unit": "ms" } },
       "300": { "$value": { "value": 300, "unit": "ms" } },
-      "400": { "$value": { "value": 400, "unit": "ms" } }
+      "400": { "$value": { "value": 400, "unit": "ms" } },
+      "1000": { "$value": { "value": 1000, "unit": "ms" } },
+      "1200": { "$value": { "value": 1200, "unit": "ms" } },
+      "1600": { "$value": { "value": 1600, "unit": "ms" } }
     },
     "easing": {
       "$type": "cubicBezier",
@@ -420,6 +439,8 @@
           "fg": { "$value": "{primitive.color.red.700}" },
           "bg": { "$value": "{primitive.color.red.100}" },
           "strong": { "$value": "{primitive.color.red.700}" },
+          "strong-hover": { "$value": "{primitive.color.red.750}", "$description": "Button variant=negative と Toast の操作のホバー" },
+          "strong-pressed": { "$value": "{primitive.color.red.800}", "$description": "Button variant=negative と Toast の操作の押下" },
           "on-strong": { "$value": "{primitive.color.cream.50}" }
         },
         "neutral": {
@@ -618,6 +639,8 @@
           "fg": { "$value": "{primitive.color.red.300}" },
           "bg": { "$value": "{primitive.color.red.900}" },
           "strong": { "$value": "{primitive.color.red.300}" },
+          "strong-hover": { "$value": "{primitive.color.red.400}", "$description": "Button variant=negative と Toast の操作のホバー" },
+          "strong-pressed": { "$value": "{primitive.color.red.500}", "$description": "Button variant=negative と Toast の操作の押下" },
           "on-strong": { "$value": "{primitive.color.teal.950}" }
         },
         "neutral": {
@@ -1462,6 +1485,13 @@
           "$description": "入力中の設問を画面の縦の中央へスクロール（4.1 パターン C）"
         }
       },
+      "loop": {
+        "$type": "duration",
+        "$description": "読み込み中の繰り返しの1周期",
+        "spin": { "$value": "{primitive.duration.1000}", "$description": "ProgressCircle のくるくる" },
+        "indeterminate": { "$value": "{primitive.duration.1200}", "$description": "ProgressBar の不定の帯の往復" },
+        "pulse": { "$value": "{primitive.duration.1600}", "$description": "Skeleton の骨組みの揺れ" }
+      },
       "reduced": {
         "$type": "duration",
         "$description": "動きを減らす設定のとき。移動とスクロールは即時、色と不透明度だけ fade で残す",
@@ -1484,6 +1514,9 @@
       "content-max": { "$value": "{primitive.dimension.1280}", "$description": "本文エリアの最大幅" },
       "header-height": { "$value": "{primitive.dimension.56}" },
       "tab-bar-height": { "$value": "{primitive.dimension.56}", "$description": "スマホの TabBar（安全領域は別に足す）" },
+      "list-pane-width": { "$value": "{primitive.dimension.352}", "$description": "一覧と詳細の左ペイン（一覧側）の幅。結果ペインは side-panel-width を使う" },
+      "thumbnail-column-width": { "$value": "{primitive.dimension.160}", "$description": "サムネイル列の幅" },
+      "popover-max-height": { "$value": "{primitive.dimension.384}", "$description": "Popover の高さの上限（画面の可視領域のほうが低ければそちら）" },
       "bottom-action-height": { "$value": "{primitive.dimension.64}", "$description": "スマホで下部に固定する操作・結果の要約バー" },
       "page-gutter-mobile": { "$value": "{primitive.dimension.16}" },
       "page-gutter-tablet": { "$value": "{primitive.dimension.24}" },
@@ -1494,7 +1527,16 @@
         "M": { "$value": "{primitive.dimension.480}" },
         "L": { "$value": "{primitive.dimension.640}" }
       },
-      "focus-anchor": { "$type": "number", "$value": "{primitive.ratio.half}", "$description": "入力中の設問を置く縦位置（0.5 = 画面の縦の中央）" }
+      "focus-anchor": { "$type": "number", "$value": "{primitive.ratio.half}", "$description": "入力中の設問を置く縦位置（0.5 = 画面の縦の中央）" },
+      "sheet-max-height-ratio": { "$type": "number", "$value": "{primitive.ratio.85}", "$description": "Tray・Dialog・Panel の高さの上限（0.85 = 画面の高さの 85%。使う側が vh に掛ける）" },
+      "z-index": {
+        "$type": "number",
+        "$description": "重なりの順序。下から bottom-action < nav < overlay < toast",
+        "bottom-action": { "$value": "{primitive.z-index.10}", "$description": "スマホで下部に固定する操作・結果の要約バー" },
+        "nav": { "$value": "{primitive.z-index.50}", "$description": "TabBar・SideNav の固定" },
+        "overlay": { "$value": "{primitive.z-index.100}", "$description": "Dialog・Tray・Popover・Panel" },
+        "toast": { "$value": "{primitive.z-index.200}", "$description": "Toast（Dialog より上）" }
+      }
     },
     "icon": {
       "$description": "Lucide（lucide-react / lucide-react-native）。大きさは scale.*.component.icon.size",

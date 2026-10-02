@@ -66,6 +66,9 @@ const shared = {
     "content-max": 1280,
     "header-height": 56,
     "tab-bar-height": 56,
+    "list-pane-width": 352,
+    "thumbnail-column-width": 160,
+    "popover-max-height": 384,
     "bottom-action-height": 64,
     "page-gutter-mobile": 16,
     "page-gutter-tablet": 24,
@@ -75,7 +78,14 @@ const shared = {
       "M": 480,
       "L": 640
     },
-    "focus-anchor": 0.5
+    "focus-anchor": 0.5,
+    "sheet-max-height-ratio": 0.85,
+    "z-index": {
+      "bottom-action": 10,
+      "nav": 50,
+      "overlay": 100,
+      "toast": 200
+    }
   },
   "icon": {
     "stroke-width": 1.75
@@ -132,6 +142,11 @@ const shared = {
           1
         ]
       }
+    },
+    "loop": {
+      "spin": 1000,
+      "indeterminate": 1200,
+      "pulse": 1600
     },
     "reduced": {
       "movement": 0,
@@ -556,6 +571,8 @@ export const lightTheme = {
       "fg": "#a1252f",
       "bg": "#ffdddb",
       "strong": "#a1252f",
+      "strong-hover": "#99232d",
+      "strong-pressed": "#91212a",
       "on-strong": "#fcf9f2"
     },
     "neutral": {
@@ -744,6 +761,8 @@ export const darkTheme = {
       "fg": "#ff9592",
       "bg": "#462625",
       "strong": "#ff9592",
+      "strong-hover": "#f28e8b",
+      "strong-pressed": "#e68683",
       "on-strong": "#061817"
     },
     "neutral": {

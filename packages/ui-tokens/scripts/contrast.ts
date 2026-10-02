@@ -61,6 +61,8 @@ function pairsFor(): Pair[] {
     add(`${family}.fg`, `${family}.bg`, TEXT);
     add(`${family}.on-strong`, `${family}.strong`, TEXT);
   }
+  for (const state of ["hover", "pressed"])
+    add("negative.on-strong", `negative.strong-${state}`, TEXT);
   for (const family of FAU_FAMILIES) add(`${family}.fg`, `${family}.bg`, TEXT);
 
   for (const s of ["canvas", "raised", "sunken"]) add("border.strong", `surface.${s}`, NON_TEXT);

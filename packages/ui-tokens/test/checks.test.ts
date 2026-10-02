@@ -92,3 +92,62 @@ describe("scale redirect", () => {
     expect(height("large")).toBeGreaterThan(height("medium"));
   });
 });
+
+describe("layout, z-index and motion tokens", () => {
+  const tokens = collectTokens(load());
+
+  test("the ratio, dimension and loop tokens keep their types and values", () => {
+    const leaf = (path: string, kind: "number" | "dimension" | "duration") => {
+      const resolved = resolveToken(tokens, path, "medium");
+      if (resolved.kind !== kind) throw new Error(`${path} is not a ${kind}`);
+      return resolved;
+    };
+    const number = (path: string) => (leaf(path, "number") as { value: number }).value;
+    const px = (path: string) => (leaf(path, "dimension") as { px: number }).px;
+    const ms = (path: string) => (leaf(path, "duration") as { ms: number }).ms;
+    expect(number("semantic.layout.sheet-max-height-ratio")).toBe(0.85);
+    expect(px("semantic.layout.list-pane-width")).toBe(352);
+    expect(px("semantic.layout.thumbnail-column-width")).toBe(160);
+    expect(px("semantic.layout.popover-max-height")).toBe(384);
+    expect(ms("semantic.motion.loop.spin")).toBe(1000);
+    expect(ms("semantic.motion.loop.indeterminate")).toBe(1200);
+    expect(ms("semantic.motion.loop.pulse")).toBe(1600);
+  });
+
+  test("z-index stacks bottom-action < nav < overlay < toast", () => {
+    const order = ["bottom-action", "nav", "overlay", "toast"].map((name) => {
+      const resolved = resolveToken(tokens, `semantic.layout.z-index.${name}`, "medium");
+      if (resolved.kind !== "number") throw new Error(`${name} is not a number`);
+      return resolved.value;
+    });
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(new Set(order).size).toBe(order.length);
+  });
+
+  test("there is no separate result pane width", () => {
+    expect([...tokens.keys()].filter((path) => /^semantic\.layout\..*result/.test(path))).toEqual(
+      [],
+    );
+  });
+
+  test("negative strong-hover and strong-pressed differ from strong and from each other", () => {
+    for (const mode of ["light", "dark"] as const) {
+      const hex = (name: string) => {
+        const r = resolveToken(tokens, `semantic.color.${mode}.negative.${name}`, "medium");
+        if (r.kind !== "color") throw new Error(`${name} is not a color`);
+        return r.hex;
+      };
+      expect(hex("strong-hover")).not.toBe(hex("strong"));
+      expect(hex("strong-pressed")).not.toBe(hex("strong-hover"));
+    }
+  });
+
+  test("reports negative strong-hover below 4.5:1 against on-strong", () => {
+    const doc = load();
+    setValue(doc, "semantic.color.light.negative.strong-hover", "{primitive.color.red.100}");
+    const errors = checkContrast(collectTokens(doc));
+    expect(
+      errors.some((e) => e.startsWith("light: negative.on-strong on negative.strong-hover")),
+    ).toBe(true);
+  });
+});

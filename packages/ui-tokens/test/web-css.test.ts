@@ -38,3 +38,12 @@ test("large scale carries bigger body text than medium", async () => {
   expect(bodySize(":root")).toBe(1);
   expect(bodySize(':root[data-scale="large"]')).toBeGreaterThan(1);
 });
+
+test("web theme exposes the layout, z-index and loop variables", async () => {
+  const css = await compileCss();
+  expect(css).toContain("--moonx-layout-list-pane-width: 352px");
+  expect(css).toContain("--moonx-layout-sheet-max-height-ratio: 0.85");
+  expect(css).toContain("--moonx-layout-z-index-toast: 200");
+  expect(css).toContain("--moonx-motion-loop-pulse: 1600ms");
+  expect(css).toContain("--moonx-color-negative-strong-hover: #99232d");
+});

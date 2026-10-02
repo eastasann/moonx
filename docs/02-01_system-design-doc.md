@@ -399,7 +399,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 - **参考にするもの**: Adobe Spectrum（Spectrum 2）の仕組みを取り入れ、見た目は Hermes Teal にする（ユーザーと合意、2026-10-01）。取り入れる範囲は design-spec 4.4「デザインシステムの参考」、部品の一覧は design-spec 4.5 が正。この ADR は、それを実装する方法（トークンの階層・生成・ライト / ダーク）を決める。
 - **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.scale.{medium,large}.component`。実装が参照してよいのは `semantic` だけ。`semantic` の値はエイリアスだけで、たどると必ず `primitive` に着く（書体のスタイルや密度は `semantic.scale.medium` を参照し、生成のときに large へ差し替える）。
 - **生成**: `make tokens` が `packages/ui-tokens` に次を生成する（変換は自前の小さなスクリプト。Style Dictionary は使わない）。
-  - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク × medium / large の値。CSS 変数として出る）
+  - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク × medium / large の値。CSS 変数として出る）。画面のスライド表示（Slide）は `semantic.print`（ライト固定）を参照する
   - スマホ: Unistyles のテーマ（ライト / ダーク）とブレークポイント。large のスケールを既定にする
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
 - **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は `<html data-theme>` と `prefers-color-scheme`、スマホは Unistyles の適応テーマ（4 アカウント設定の System / Light / Dark に従う）。
@@ -518,6 +518,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 - `$workspaceId` などは URL のパラメータ。ワークスペースに属する画面は `/w/$workspaceId/` の下に置き、他のワークスペースの URL を開いたら design-spec 6.0.6 の「権限がない」を出す。
 - モーダル（M1〜M8）とパネル（PNL-1・PNL-2）はルートを作らず、検索パラメータで開く: `?modal=new-idea|evidence|save-version|go-no-go|create-plan|share|switch-workspace|update-template`、`?panel=comments|history&target=<targetType>:<targetId>[:<targetKey>]`。
 - 認証が要るルートで未ログインなら `/login?next=<元のパス>` へ移る。
+- `/dev/components` は部品の確認用ページで、開発サーバー（`import.meta.env.DEV`）だけで開く。本番のビルドには入らず、開くと Not Found になる。スマホには作らない（パスを Web とスマホで同じにする決まりの例外）。
 
 | ルート | 画面（design-spec 参照） | 補足 |
 |---|---|---|
@@ -2207,6 +2208,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（スマホの Hermes も対応）。金額の入力は桁区切りのカンマを受け付ける |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |
 | テンプレートの中身 | 設問・EXAMPLE・ガイダンスは1言語（英語）でテンプレートに持ち、UI の多言語化とは別に扱う（design-spec 1.2） |
+| 確認用ページ | `packages/ui-web/src/preview/`（`/dev/components`）は開発専用で、英語の文字列を直接持つ。この章の「UI の文言はカタログに置く」の対象外（`scripts/check-screens.ts` は `apps/web/src`・`apps/mobile/app` だけを見る） |
 | 言語を足すとき | `locales/<lang>/` を足し、`users.locale` 列と 4 アカウント設定の言語の選択を足す（今は作らない） |
 
 ---

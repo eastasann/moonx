@@ -345,7 +345,7 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 
 | 部品（Spectrum の名前） | moonx での使いどころ | 種類・大きさ | スマホでの振る舞い |
 |---|---|---|---|
-| Button / ButtonGroup | 主要な操作（Record decision・Apply n changes・Save version など） | accent（1画面に1つまで。金色）/ primary / secondary / negative（削除の確認だけ）。S / M / L / XL | 主要な操作は下部に固定（4.1） |
+| Button / ButtonGroup | 主要な操作（Record decision・Apply n changes・Save version など） | accent（1画面に1つまで。金色）/ primary / secondary / negative（削除の確認だけ）。S / M / L / XL。送信中（isPending）は ProgressCircle を出し、押せなくする | 主要な操作は下部に固定（4.1） |
 | ActionButton / ActionGroup | ツールバーの操作（💬・🕘・⋯） | quiet あり。S / M / L / XL | 同じ |
 | ActionMenu / Menu | 行の ⋯、アイデアの ⋯（複製・アーカイブ・移行）、AI ▼ | — | トレイで開く |
 | Link | 確認項目・Next steps・「Edit in validation」 | — | 同じ |
@@ -353,7 +353,7 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 | NumberField | 金額（通貨記号・桁区切り）、%、日数、販売数 | 書式は en-PH（1.2） | 数字のキーボード |
 | SearchField | 一覧の検索、M2 の調査ログの検索 | — | 同じ |
 | Picker | 通貨・出典の種類・ロール・確信度（Risks の Probability / Impact） | — | トレイで選ぶ |
-| ComboBox | 担当（メンバーか自由記述）、25 の「Choose question」、メンション | — | トレイで選ぶ |
+| ComboBox | 担当（メンバーか自由記述）、25 の「Choose question」、メンション | — | 入力欄を押すとトレイが開き、トレイの中の入力欄で絞り込んで選ぶ |
 | RadioGroup | 判定（Proceed / Hold / Drop）、Go / No-Go、02 OCEAN | — | 同じ |
 | Checkbox / CheckboxGroup | 24 の範囲、25 の「反映する」、M6 の共有先 | — | 同じ |
 | Switch | Focus の切替、テーマ（System / Light / Dark は Picker） | — | 同じ |
@@ -366,7 +366,7 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 | Tooltip / ContextualHelp | アイコンだけのボタンの説明 / 設問のヒント（▸ Hint） | — | ContextualHelp はトレイ |
 | Disclosure / Accordion | EXAMPLE・関連する調査ログの開閉、解決済みのスレッド | — | 同じ |
 | Tabs | 16 の Assumptions / Risks、22 の5つのタブ、28 の3つのタブ | — | 横にスクロールできるタブ |
-| Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | — | 出さない（← 戻る） |
+| Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | — | 出さない（部品が幅で隠す。画面は ← 戻る を出す） |
 | StatusLight | F/A/U（Fact / Assumption / Unknown / Unclassified / Empty）、確認項目の状態（Not started / Partial / Done）、保存状態 | 色の点＋ラベル（色だけで伝えない） | 同じ |
 | Badge | 判定（Proceed / Hold / Drop）、工程、未読数、「Overdue」「Lump sum」「(former member)」 | neutral と用途ごとの色。Drop を negative にしない | 同じ |
 | InlineAlert | 粗利のマイナス・Capacity 超過・費用の下限の注意・「Latest decision is Hold」・アーカイブ中 | informative / notice / negative / neutral | 同じ |
@@ -376,7 +376,7 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 | Skeleton | ローディングの骨組み（6.0.6） | — | 同じ |
 | IllustratedMessage | 空の状態・0件・権限がない・見つからない（6.0.6）。絵は使わず、Lucide のアイコンと見出しと説明 | — | 同じ |
 | Avatar | 提案者・記録者・コメントの書き手 | S / M | 同じ |
-| TableView | 17 費用・18 シナリオ表・7 決定ログ・28 の一覧 | 密度 compact / regular / spacious | 行ごとのカード（4.3） |
+| TableView | 17 費用・18 シナリオ表・7 決定ログ・28 の一覧 | 密度 compact / regular / spacious。layout は auto（幅で切り替え。既定）/ table / cards | 行ごとのカード（4.3） |
 | ListView | 6 アイデア一覧・14 調査ログ・8 通知・22 の各リスト | 同上 | 全画面のリスト |
 | Card / CardView | 15 競合・代替のカード、5 のブロック、23 のサムネイル | — | 1列 |
 | Well | 判断材料の要約（19）、AI 書き出しのプレビュー（24） | — | 同じ |
@@ -386,6 +386,17 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 | 独自: Panel | コメント・変更履歴のパネル（PNL-1・PNL-2） | — | トレイ |
 | 独自: QuestionCard | 設問フォームの1問（4.1 パターン C のフォーカスの表示と控えめな表示） | — | 1問ずつのカード |
 | 独自: Slide | Pitch Deck のスライドの4つの型（6.14） | — | 幅に合わせる |
+| 独自: Flex / Stack / Grid / Container と、パターン A〜J の枠（HubPattern・FocusPattern・QuestionFormPattern・ListDetailPattern・CardComparePattern・WorksheetPattern・StepsPattern・SettingsPattern・PresentationPattern・PublicPattern） | 画面の並び。間隔はトークンの名前だけを受け取る。パターンの枠は 4.1 の並び（デスクトップ・タブレット・モバイル）を持つ | — | 同じ |
+
+部品の補足:
+
+- 種類・大きさの列が空欄（—）の部品も、size（S / M / L / XL）を受ける。Avatar は S / M、Divider と ProgressCircle は S / M / L。
+- タップ領域は、どの大きさでも `semantic.scale.component.target-min` 以上にする（4.3）。見た目の高さが小さい部品は、最小の高さで広げる。
+- Link は、単独の行・リストに置く primary がタップ領域の下限を守る。文中に置く secondary は折り返すため、WCAG 2.5.8 のインラインの例外として下限を求めない。
+- Dialog・Menu・Picker・ComboBox・DatePicker・ContextualHelp・Panel は、幅が `semantic.breakpoint.tablet` より狭いときトレイで開く。Panel はタブレットの幅では右のドロワー（モーダル）、デスクトップでは右の固定パネル（モーダルにしない）。
+- ComboBox の狭い幅は、閉じているときは入力欄と同じ見た目で、押すとトレイが開き、トレイの中の入力欄で絞り込む。自由記述を許すときは、入力した文字列を確定する操作（Enter か customValueLabel のボタン）を出す。
+- パターン D（リスト＋詳細）は、デスクトップ未満では1ペインずつ全幅で出す（タブレットもスマホと同じ。4.3 の「オーバーレイ」はこの全幅の詳細で満たす）。パターン C はスマホの幅で、フォーカス中の設問のカードだけを出す。
+- 開発専用の確認用ページ（`/dev/components`）に全部品を並べる。
 
 ---
 

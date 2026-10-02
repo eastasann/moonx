@@ -69,6 +69,9 @@ export const base = {
     "content-max": "1280px",
     "header-height": "56px",
     "tab-bar-height": "56px",
+    "list-pane-width": "352px",
+    "thumbnail-column-width": "160px",
+    "popover-max-height": "384px",
     "bottom-action-height": "64px",
     "page-gutter-mobile": "16px",
     "page-gutter-tablet": "24px",
@@ -78,7 +81,14 @@ export const base = {
       "M": "480px",
       "L": "640px"
     },
-    "focus-anchor": "0.5"
+    "focus-anchor": "0.5",
+    "sheet-max-height-ratio": "0.85",
+    "z-index": {
+      "bottom-action": "10",
+      "nav": "50",
+      "overlay": "100",
+      "toast": "200"
+    }
   },
   "icon": {
     "stroke-width": "1.75"
@@ -90,6 +100,11 @@ export const base = {
       "enter": "300ms cubic-bezier(0, 0, 0, 1) 0ms",
       "exit": "200ms cubic-bezier(0.3, 0, 1, 1) 0ms",
       "focus-scroll": "400ms cubic-bezier(0.45, 0, 0.25, 1) 0ms"
+    },
+    "loop": {
+      "spin": "1000ms",
+      "indeterminate": "1200ms",
+      "pulse": "1600ms"
     },
     "reduced": {
       "movement": "0ms",
@@ -277,6 +292,8 @@ export const colorLight = {
       "fg": "#a1252f",
       "bg": "#ffdddb",
       "strong": "#a1252f",
+      "strong-hover": "#99232d",
+      "strong-pressed": "#91212a",
       "on-strong": "#fcf9f2"
     },
     "neutral": {
@@ -452,6 +469,8 @@ export const colorDark = {
       "fg": "#ff9592",
       "bg": "#462625",
       "strong": "#ff9592",
+      "strong-hover": "#f28e8b",
+      "strong-pressed": "#e68683",
       "on-strong": "#061817"
     },
     "neutral": {

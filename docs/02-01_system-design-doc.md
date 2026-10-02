@@ -186,7 +186,7 @@ moonx/
 | `build-web ENV=...` | Web を環境ごとにビルドする（`VITE_*` を埋め込む） |
 | `build-api-image SHA=...` | API の Docker イメージを作って Artifact Registry に上げる |
 | `test` | `test-domain`・`test-api`・`test-web`・`test-mobile` をまとめて実行 |
-| `test-domain` / `test-api` / `test-web` / `test-mobile` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`scripts/`（画面の検査スクリプト）、`test-api` は `apps/api`（`DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web`、`test-mobile` は `apps/mobile`・`packages/ui-native` |
+| `test-domain` / `test-api` / `test-web` / `test-mobile` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査スクリプト）、`test-api` は `apps/api`（`DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web`、`test-mobile` は `apps/mobile`・`packages/ui-native` |
 | `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
 | `lint` / `format` / `typecheck` | Biome の検査・整形（`lint` は画面の検査スクリプト `scripts/check-screens.ts` も動かす）、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
@@ -403,6 +403,8 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
   - スマホ: Unistyles のテーマ（ライト / ダーク）とブレークポイント。large のスケールを既定にする
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
 - **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は `<html data-theme>` と `prefers-color-scheme`、スマホは Unistyles の適応テーマ（4 アカウント設定の System / Light / Dark に従う）。
+- **スケール（Web）**: 既定は `medium`。タッチ操作が主の端末（`@media (pointer: coarse)`）は `large` にする。`<html data-scale="medium|large">` で固定でき、固定が優先される。タッチパネル付きのノート PC も `pointer: coarse` に当たるときは `large` になる。
+- **生成器が持つ値**: スマホの等幅書体（iOS は Menlo、Android は monospace。06 の `primitive.font.family.mono` の説明文にだけ書かれていて DTCG の型が無い）と、Unistyles が要求する先頭のブレークポイント `mobile: 0` は、06 ではなく生成のスクリプトが持つ。
 - **アイコン**: Lucide（`lucide-react` / `lucide-react-native`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。
 
 **理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は Phase 2 で決めた Hermes Teal を保つことを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、Web とスマホで同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは一段ゆったり」をそのまま表せる。Lucide は Web（`lucide-react`）とスマホ（`lucide-react-native`）に同じ絵柄の版があり、線の太さと大きさを props で変えられる（Spectrum の Workflow アイコンは使わないと合意した）。変換を自前のスクリプトにするのは、出力が3種類（vanilla-extract・Unistyles・react-pdf）に限られ、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため（Style Dictionary は設定と拡張の方が大きくなる）。
@@ -2203,7 +2205,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | スマホ（`apps/mobile`） | Jest（jest-expo）＋ React Native Testing Library | 主要な部品 50% 以上 | 1問ずつのカード、ボトムシートでの行の編集、自動保存と送信待ちの列、セッションの保存 |
 | E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査 |
 | E2E（スマホ） | Phase 5 で Maestro の導入を判断する（ADR-001）。それまでは、ストアへの提出前に TestFlight / Play の内部テストで手で確かめる（04_deployment-procedure.md のチェックリスト） | — | コアフロー |
-| デザイントークン | `make tokens` の生成と検査 | — | エイリアスの参照先が実在すること、意味色のコントラスト（WCAG AA） |
+| デザイントークン | Bun test（`make test-domain`）と `make tokens` の検査 | — | エイリアスの参照先が実在すること・循環しないこと・`semantic` がエイリアスだけであること、意味色のコントラスト（WCAG AA。検査の対象に無い色の組が増えたら失敗）、生成物が 06 と一致すること、Web のテーマが vanilla-extract でコンパイルできること、`packages/ui-tokens/src/types.ts` の値が 06 と合っていること |
 
 CI（GitHub Actions）が PR ごとに動かすターゲットは 04_deployment-procedure.md 2章（`ci.yml`）が正。`main` への取り込みは、すべて通ったときだけ。
 

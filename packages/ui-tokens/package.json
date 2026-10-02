@@ -4,7 +4,20 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./web": "./src/generated/web.css.ts",
+    "./native": "./src/generated/native.ts",
+    "./print": "./src/generated/print.ts"
+  },
   "scripts": {
+    "generate": "bun scripts/generate.ts",
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@vanilla-extract/css": "^1.21.2"
+  },
+  "devDependencies": {
+    "@vanilla-extract/compiler": "^0.7.2"
   }
 }

@@ -135,7 +135,7 @@ make typecheck・make lint が通る状態をゴールとする。
 
 ## Step 4: デザイントークンの生成（packages/ui-tokens）
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/02-01_system-design-doc.md の ADR-018 に従って、docs/06_design-tokens.json から

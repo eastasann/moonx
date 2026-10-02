@@ -59,6 +59,7 @@ test-domain:
 	bun test packages/domain packages/schemas packages/i18n scripts
 
 test-api: db-up
+	bun run --cwd packages/db reset-test
 	DATABASE_URL=$(DATABASE_URL_TEST) bun run --cwd apps/api test
 
 test-web:

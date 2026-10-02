@@ -73,7 +73,7 @@ make setup の通しの確認は Step 5 で行う（シードとトークンの�
 
 ## Step 2: DB スキーマとマイグレーション
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/02-01_system-design-doc.md の6章（データモデル）と ADR-008・ADR-009 に従って、

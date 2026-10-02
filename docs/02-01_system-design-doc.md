@@ -138,7 +138,7 @@ moonx/
 | `PORT` | api | 待ち受けるポート | `3000` | Cloud Run が `8080` を渡す |
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
 | `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
-| `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直す） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
+| `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直す。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
 | `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32バイト以上の乱数） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
 | `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://staging.{DOMAIN}` / `https://{DOMAIN}` |
 | `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り） | `http://localhost:5173,moonx://,exp://` | `https://{DOMAIN},moonx://`（staging は `https://staging.{DOMAIN},moonx-staging://`） |
@@ -1431,7 +1431,6 @@ const versioned = () => ({
 });
 const money = () => numeric({ precision: 14, scale: 2, mode: "number" });    // 金額
 const ratio = () => numeric({ precision: 7, scale: 4, mode: "number" });     // 0.3500 = 35%
-const quantity = () => numeric({ precision: 12, scale: 2, mode: "number" }); // 1日の販売数など
 
 // ---------- enum ----------
 export const userStatus = pgEnum("user_status", ["active", "suspended", "deleted"]);

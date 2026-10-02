@@ -68,6 +68,11 @@ export interface EvidenceSheetProps {
   onChanged: (result: EvidenceResult) => void;
   /** Someone saved the item first: the screen reads it again (text and version) before anything else is sent. */
   onConflict: () => void;
+  /**
+   * Whether the item has a F/A/U (an answer, a number). A competitor or an assumption has none:
+   * evidence is attached to it without making it Fact, which V4 would refuse (default true).
+   */
+  hasFau?: boolean;
 }
 
 /**
@@ -85,6 +90,7 @@ export function EvidenceSheet({
   getLockVersion,
   onChanged,
   onConflict,
+  hasFau = true,
 }: EvidenceSheetProps) {
   const { t } = useTranslation(["form", "app"]);
   const queryClient = useQueryClient();
@@ -101,7 +107,7 @@ export function EvidenceSheet({
           .evidence.post({
             target,
             ...source,
-            setFact: classification.fau !== "fact" || undefined,
+            setFact: (hasFau && classification.fau !== "fact") || undefined,
             lockVersion: getLockVersion(),
           }),
       ),

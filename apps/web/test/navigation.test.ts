@@ -38,6 +38,15 @@ test("an operator also gets Admin", () => {
   expect(nav.secondary.find((entry) => entry.id === "admin")?.isCurrent).toBe(true);
 });
 
+test("Admin stays current on every operator screen", () => {
+  const admin = (pathname: string) =>
+    navigation(makeMe({ isAdmin: true }), WORKSPACE, pathname).secondary.find(
+      (entry) => entry.id === "admin",
+    );
+  expect(admin("/admin/users")?.isCurrent).toBe(true);
+  expect(admin("/account")?.isCurrent).toBe(false);
+});
+
 test("the current destination follows the path, and Dashboard only matches exactly", () => {
   const base = `/w/${WORKSPACE}`;
   const current = (pathname: string) =>

@@ -14,12 +14,11 @@ import {
   Text,
   useIsNarrow,
 } from "@moonx/ui-web";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NoAccessState, QueryBoundary } from "../components/states";
-import { autosave } from "../lib/autosave";
 import { ideaDetailQuery, sectionQuery } from "../lib/idea-detail";
 import { canEditIdeas, useWorkspaceRole } from "../lib/ideas";
 import { useGoTo } from "../lib/navigate";
@@ -32,7 +31,8 @@ import {
   sectionPath,
   VALIDATION_SECTION_ORDER,
 } from "../lib/questions";
-import { sectionKey as sectionQueryKeyOf, validationKey } from "../lib/validation-keys";
+import { useValidationRefresh } from "../lib/use-validation-refresh";
+import { sectionKey as sectionQueryKeyOf } from "../lib/validation-keys";
 import { AnswerCard } from "./questions/AnswerCard";
 
 const FOCUS_STORAGE_KEY = "moonx.questions.focus";
@@ -112,17 +112,9 @@ function SectionLoader(props: LoaderProps) {
   const { validationId, sectionKey } = props;
   const queryKey = sectionQueryKeyOf(validationId, sectionKey);
   const section = useQuery(sectionQuery(validationId, sectionKey, queryKey));
-  const queryClient = useQueryClient();
 
-  // Saves still on their way when the screen closes must reach every screen that shows them.
-  useEffect(
-    () => () => {
-      void autosave
-        .idle()
-        .then(() => queryClient.invalidateQueries({ queryKey: validationKey(validationId) }));
-    },
-    [queryClient, validationId],
-  );
+  // Saves still on their way when the screen closes must reach every screen that shows them, the home included.
+  useValidationRefresh(validationId);
 
   return (
     <QueryBoundary query={section} skeleton={<QuestionsSkeleton />}>

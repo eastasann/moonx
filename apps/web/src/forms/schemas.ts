@@ -4,6 +4,7 @@ import {
   displayNameSchema,
   PASSWORD_MAX_LENGTH,
   passwordSchema,
+  roleSchema,
   workspaceNameSchema,
 } from "@moonx/schemas";
 import { z } from "zod";
@@ -59,3 +60,23 @@ export const deleteAccountSchema = z.object({
 
 /** M1, a new idea: the name and concept are required, the proposed solution is optional. */
 export const newIdeaSchema = createIdeaBodySchema;
+
+/**
+ * Screen 28, issue an invitation. A workspace and a role go together; without a workspace the
+ * person gets only a personal workspace. Empty strings stand for "not chosen" in the form.
+ */
+export const adminInvitationSchema = z
+  .object({
+    email,
+    workspaceId: z.string(),
+    role: z.string(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.workspaceId && !roleSchema.safeParse(value.role).success) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["role"],
+        message: catalogMessage("app:form.required"),
+      });
+    }
+  });

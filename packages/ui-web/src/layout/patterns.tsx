@@ -222,7 +222,8 @@ export interface CardComparePatternProps {
 
 /**
  * Pattern E, cards to compare side by side: 3 columns on desktop, 2 on tablet, 1 on mobile.
- * `children` are the cards.
+ * `children` are the cards. A single child, such as a `CardView` that sets its own columns or the
+ * comparison table, takes the whole row.
  */
 export function CardComparePattern({ header: head, toolbar, children }: CardComparePatternProps) {
   return (

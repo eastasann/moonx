@@ -27,7 +27,7 @@ import { ideaDetailQuery } from "../lib/idea-detail";
 import { canEditIdeas, useWorkspaceCurrency, useWorkspaceRole } from "../lib/ideas";
 import { formatContainerTarget, usePanelTarget } from "../lib/panel-target";
 import { toasts } from "../lib/toast";
-import { validationKey } from "../lib/validation-keys";
+import { useValidationRefresh } from "../lib/use-validation-refresh";
 import type { RowView } from "./costs/CostFields";
 import {
   CostRowController,
@@ -94,18 +94,10 @@ interface LoaderProps extends CostsProps {
 function CostsLoader(props: LoaderProps) {
   const { validationId } = props;
   const costs = useQuery(costsQuery(validationId));
-  const queryClient = useQueryClient();
   usePanelTarget(formatContainerTarget("validation", validationId, "costs"));
 
-  // Saves still on their way when the screen closes must reach 18 and the home, which read the rows.
-  useEffect(
-    () => () => {
-      void autosave
-        .idle()
-        .then(() => queryClient.invalidateQueries({ queryKey: validationKey(validationId) }));
-    },
-    [queryClient, validationId],
-  );
+  // Saves still on their way when the screen closes must reach every screen that shows them, the home included.
+  useValidationRefresh(validationId);
 
   return (
     <QueryBoundary query={costs} skeleton={<CostsSkeleton />}>

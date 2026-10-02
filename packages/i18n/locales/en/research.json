@@ -1,0 +1,186 @@
+{
+  "back": "← Validation",
+  "done": "Done",
+  "none": "—",
+  "notSet": "Not set",
+  "pickRow": "Choose a row to see its details.",
+  "filteredEmpty": "Nothing matches these filters",
+  "moveUp": "Move up",
+  "moveDown": "Move down",
+  "moveFailed": "Couldn't move the row",
+  "delete": "Delete",
+  "deleteFailed": "Couldn't delete the row",
+  "confirmBody": "You can restore it from the change history. Its comments are hidden with it.",
+  "rowMenu": "Actions for {{name}}",
+  "problems": {
+    "url": "Enter a link that starts with http:// or https://",
+    "range": "Enter an amount of 0 or more"
+  },
+  "evidence": {
+    "title": "Evidence",
+    "attached": "Attached evidence",
+    "none": "No evidence yet",
+    "add": "Add evidence",
+    "edit": "Edit evidence"
+  },
+  "tabs": {
+    "label": "Assumptions and risks",
+    "assumptions": "Assumptions ({{total}})",
+    "risks": "Risks ({{total}})"
+  },
+  "log": {
+    "add": "Add entry",
+    "newTitle": "New entry",
+    "submit": "Add to log",
+    "listLabel": "Research log entries",
+    "none": "Choose an entry to see its details.",
+    "noDate": "No date",
+    "usedCount_one": "Evidence for {{count}} item",
+    "usedCount_other": "Evidence for {{count}} items",
+    "usedAsEvidence": "Used as evidence",
+    "notUsed": "Not used as evidence yet",
+    "backToList": "Back to the list",
+    "itemName": "entry",
+    "menu": "Actions for {{name}}",
+    "delete": "Delete entry",
+    "deleted": "Research log entry deleted",
+    "deleteFailed": "Couldn't delete the entry",
+    "loadMore": "Load more",
+    "loadingMore": "Loading more",
+    "loadMoreFailed": "Couldn't load more entries",
+    "empty": {
+      "heading": "Record what you observe, with sources. Others can check it later."
+    },
+    "filters": {
+      "supports": "Supports check",
+      "allChecks": "All checks",
+      "source": "Source type",
+      "allSources": "All sources",
+      "clear": "Clear filters"
+    },
+    "confirm": {
+      "title": "Delete “{{name}}”?",
+      "used_one": "This entry is evidence for {{count}} item. Deleting it stops it counting as evidence there.",
+      "used_other": "This entry is evidence for {{count}} items. Deleting it stops it counting as evidence there.",
+      "unused": "No item uses this entry as evidence.",
+      "onlyEvidence": "Fact would have no evidence left",
+      "restore": "Restoring it from the change history brings the links back.",
+      "confirm": "Delete entry"
+    }
+  },
+  "competitors": {
+    "count_one": "{{count}} competitor · aim for {{min}}–{{max}}",
+    "count_other": "{{count}} competitors · aim for {{min}}–{{max}}",
+    "view": "View as",
+    "cards": "Cards",
+    "cardsLabel": "Competitors",
+    "tableLabel": "Competitor comparison",
+    "add": "Add competitor",
+    "newTitle": "New competitor",
+    "submit": "Create competitor",
+    "itemName": "competitor",
+    "menu": "Actions for {{name}}",
+    "moveEarlier": "Move earlier",
+    "moveLater": "Move later",
+    "moveFailed": "Couldn't move the competitor",
+    "delete": "Delete competitor",
+    "deleted": "{{name}} deleted",
+    "deleteFailed": "Couldn't delete the competitor",
+    "empty": {
+      "heading": "List {{min}}–{{max}} competitors or substitutes.",
+      "body": "Include what people do today instead."
+    },
+    "confirm": {
+      "title": "Delete {{name}}?",
+      "body": "You can restore it from the change history. Its comments are hidden with it.",
+      "confirm": "Delete competitor"
+    },
+    "table": {
+      "title": "Table",
+      "field": "Field",
+      "open": "Details",
+      "edit": "Edit {{name}}",
+      "view": "View {{name}}",
+      "editLabel": "Edit",
+      "viewLabel": "View"
+    },
+    "patterns": {
+      "survivor": "Survivor Patterns",
+      "failure": "Failure Patterns"
+    },
+    "types": {
+      "direct": "Direct Competitor",
+      "indirect": "Indirect Competitor",
+      "substitute": "Substitute"
+    },
+    "fields": {
+      "name": "Name",
+      "type": "Type",
+      "targetCustomer": "Target Customer",
+      "offering": "Offering",
+      "typicalPrice": "Typical Price",
+      "priceNote": "Price Note",
+      "strength": "Strength",
+      "weakness": "Weakness",
+      "whyChosen": "Why Customers Choose Them",
+      "whySurvive": "Why They Survive"
+    }
+  },
+  "assumptions": {
+    "add": "Add assumption",
+    "newTitle": "New assumption",
+    "submit": "Create assumption",
+    "listLabel": "Assumptions",
+    "backToList": "Back to assumptions",
+    "itemName": "assumption",
+    "deleted": "Assumption deleted",
+    "confidenceBadge": "Confidence: {{level}}",
+    "noConfidence": "No confidence set",
+    "evidenceBadge_one": "{{count}} evidence",
+    "evidenceBadge_other": "{{count}} evidence",
+    "empty": {
+      "heading": "No assumptions yet",
+      "body": "List what has to be true for this idea to work, how sure you are, and what would prove you wrong."
+    },
+    "confirm": {
+      "title": "Delete “{{name}}”?"
+    },
+    "fields": {
+      "statement": "Assumption",
+      "whyBelieve": "Why We Believe It",
+      "evidenceNote": "Evidence",
+      "confidence": "Confidence",
+      "disproveCondition": "What Would Disprove It",
+      "nextCheck": "Next Check"
+    }
+  },
+  "risks": {
+    "add": "Add risk",
+    "newTitle": "New risk",
+    "submit": "Create risk",
+    "listLabel": "Risks",
+    "backToList": "Back to risks",
+    "itemName": "risk",
+    "deleted": "Risk deleted",
+    "impactBadge": "Impact: {{level}}",
+    "noImpact": "No impact set",
+    "probabilityBadge": "Probability: {{level}}",
+    "noProbability": "No probability set",
+    "order": "Highest Impact first, then Probability. Move a risk to place it by hand.",
+    "empty": {
+      "heading": "No risks yet",
+      "body": "List what could go wrong, how likely it is and how much it would hurt."
+    },
+    "confirm": {
+      "title": "Delete “{{name}}”?"
+    },
+    "fields": {
+      "statement": "Risk",
+      "probability": "Probability",
+      "impact": "Impact",
+      "whyMatters": "Why it matters",
+      "mitigation": "Mitigation",
+      "howToValidate": "How to validate"
+    }
+  }
+}

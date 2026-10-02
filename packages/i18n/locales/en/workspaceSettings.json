@@ -1,0 +1,104 @@
+{
+  "title": "Workspace Settings",
+  "general": {
+    "title": "General",
+    "name": "Workspace name",
+    "currency": "Currency",
+    "currencyWarning": "Changing the currency does not convert existing amounts. Every amount keeps its number and is shown in the new currency.",
+    "save": "Save changes",
+    "saved": "Workspace settings saved"
+  },
+  "members": {
+    "title": "Members",
+    "tableLabel": "Members of this workspace",
+    "columns": {
+      "member": "Member",
+      "email": "Email",
+      "role": "Role",
+      "joined": "Joined",
+      "actions": "Actions"
+    },
+    "you": "{{name}} (you)",
+    "suspended": "{{name}} (suspended)",
+    "menuLabel": "Actions for {{name}}",
+    "changeRole": "Change to {{role}}",
+    "remove": "Remove from workspace",
+    "lastOwner": "Make someone else Owner first",
+    "roleChanged": "{{name}} is now {{role}}",
+    "removed": "{{name}} was removed from the workspace",
+    "removeTitle": "Remove {{name}}?",
+    "removeIntro": "{{name}} loses access to this workspace. An Owner can invite them again.",
+    "removeAction": "Remove",
+    "demoteTitle": "Change {{name}} to Viewer?",
+    "demoteIntro": "{{name}} can still read this workspace but can no longer edit it.",
+    "demoteAction": "Change to Viewer",
+    "keep": "Cancel",
+    "consequences": {
+      "label": "What happens to their records",
+      "shared": "Their Self Analysis stops being shared with this workspace. Its comments are hidden but kept. If they become an Owner or Member again, they have to share it again.",
+      "assigned": "Execution items assigned to them keep their name as plain text, and due-date notifications stop.",
+      "assignedViewer": "Execution items assigned to them keep their name as plain text, and due-date notifications stop, because a Viewer cannot be an assignee.",
+      "names": "Their name stays on the ideas, comments and history they wrote, marked (former member).",
+      "namesViewer": "Their name stays on what they wrote without a (former member) mark, because they are still a member.",
+      "notifications": "Notifications they received in this workspace are kept. Opening one shows \"You no longer have access\".",
+      "notificationsViewer": "Their notifications are kept. Only notifications about comments on their Self Analysis show \"You no longer have access\" when opened."
+    }
+  },
+  "invitations": {
+    "title": "Invitations",
+    "hint": "An invitation link is valid for 7 days. Copying or resending a link creates a new one, and the previous link stops working.",
+    "form": {
+      "label": "Invite someone",
+      "email": "Email",
+      "role": "Role",
+      "send": "Send invitation",
+      "retry": "Try again"
+    },
+    "sent": "Invitation sent to {{email}}",
+    "resendPending": "Resend the existing invitation",
+    "filter": {
+      "label": "Show invitations",
+      "pending": "Pending",
+      "all": "All"
+    },
+    "tableLabel": "Invitations to this workspace",
+    "columns": {
+      "email": "Email",
+      "role": "Role",
+      "status": "Status",
+      "date": "Date",
+      "actions": "Actions"
+    },
+    "status": {
+      "pending": "Sent",
+      "accepted": "Accepted",
+      "expired": "Expired",
+      "revoked": "Cancelled"
+    },
+    "date": {
+      "pending": "Expires {{date}}",
+      "expired": "Expired {{date}}",
+      "accepted": "Accepted {{date}}",
+      "revoked": "Sent {{date}}"
+    },
+    "empty": {
+      "pending": "No pending invitations",
+      "all": "No invitations yet"
+    },
+    "menuLabel": "Actions for the invitation to {{email}}",
+    "copyLink": "Copy link",
+    "resend": "Resend",
+    "cancel": "Cancel invitation",
+    "linkCopied": "Link copied. The previous link no longer works.",
+    "manualLink": {
+      "heading": "Copy this link yourself",
+      "body": "Your browser did not allow copying. Select the link below and copy it. The previous link no longer works.",
+      "label": "Invitation link"
+    },
+    "resent": "Invitation resent to {{email}}",
+    "cancelled": "Invitation to {{email}} cancelled",
+    "cancelTitle": "Cancel the invitation to {{email}}?",
+    "cancelBody": "The link stops working. You can send a new invitation later.",
+    "keep": "Keep invitation"
+  }
+}

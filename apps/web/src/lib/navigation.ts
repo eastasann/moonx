@@ -56,7 +56,13 @@ export function navigation(me: Me, workspaceId: string | null, pathname: string)
 
   const secondary: NavEntry[] = [];
   if (base && membership?.role === "owner") secondary.push(entry("settings", `${base}/settings`));
-  if (me.isAdmin) secondary.push(entry("admin", "/admin/templates"));
+  // The entry opens the template list (26); every operator screen under `/admin` keeps it current.
+  if (me.isAdmin) {
+    secondary.push({
+      ...entry("admin", "/admin/templates"),
+      isCurrent: isUnder(pathname, "/admin"),
+    });
+  }
 
   return {
     workspaceId: membership?.workspace.id ?? null,

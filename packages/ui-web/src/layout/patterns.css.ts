@@ -140,6 +140,9 @@ export const cardGrid = style({
   },
 });
 
+// A lone child lays out its own columns (a CardView) or needs the whole row (the comparison table).
+globalStyle(`${cardGrid} > :only-child`, { gridColumn: "1 / -1" });
+
 export const worksheet = style({
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr)",

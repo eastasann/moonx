@@ -19,17 +19,23 @@ import { Route as AuthedWelcomeRouteImport } from './routes/_authed/welcome'
 import { Route as DevComponentsRouteImport } from './routes/dev.components'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AuthedFrameAccountRouteImport } from './routes/_authed/_frame/account'
+import { Route as AuthedFrameAdminRouteImport } from './routes/_authed/_frame/admin'
+import { Route as AuthedFrameAdminUsersRouteImport } from './routes/_authed/_frame/admin.users'
 import { Route as AuthedFrameWWorkspaceIdRouteImport } from './routes/_authed/_frame/w.$workspaceId'
 import { Route as AuthedFrameWWorkspaceIdIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.index'
 import { Route as AuthedFrameWWorkspaceIdIdeasRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas'
+import { Route as AuthedFrameWWorkspaceIdSettingsRouteImport } from './routes/_authed/_frame/w.$workspaceId.settings'
 import { Route as AuthedFrameWWorkspaceIdAiExportRouteImport } from './routes/_authed/_frame/w.$workspaceId.ai.export'
 import { Route as AuthedFrameWWorkspaceIdAiImportRouteImport } from './routes/_authed/_frame/w.$workspaceId.ai.import'
 import { Route as AuthedFrameWWorkspaceIdIdeasIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.index'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.index'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.assumptions'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.competitors'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.costs'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdDecideRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.decide'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.economics'
+import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.research'
 import { Route as AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport } from './routes/_authed/_frame/w.$workspaceId.ideas.$ideaId.questions.$sectionKey'
 
 const IndexRoute = IndexRouteImport.update({
@@ -80,6 +86,16 @@ const AuthedFrameAccountRoute = AuthedFrameAccountRouteImport.update({
   path: '/account',
   getParentRoute: () => AuthedFrameRoute,
 } as any)
+const AuthedFrameAdminRoute = AuthedFrameAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthedFrameRoute,
+} as any)
+const AuthedFrameAdminUsersRoute = AuthedFrameAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthedFrameAdminRoute,
+} as any)
 const AuthedFrameWWorkspaceIdRoute = AuthedFrameWWorkspaceIdRouteImport.update({
   id: '/w/$workspaceId',
   path: '/w/$workspaceId',
@@ -95,6 +111,12 @@ const AuthedFrameWWorkspaceIdIdeasRoute =
   AuthedFrameWWorkspaceIdIdeasRouteImport.update({
     id: '/ideas',
     path: '/ideas',
+    getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdSettingsRoute =
+  AuthedFrameWWorkspaceIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
     getParentRoute: () => AuthedFrameWWorkspaceIdRoute,
   } as any)
 const AuthedFrameWWorkspaceIdAiExportRoute =
@@ -127,6 +149,18 @@ const AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute =
     path: '/',
     getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdRoute,
   } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRouteImport.update({
+    id: '/assumptions',
+    path: '/assumptions',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdRoute,
+  } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRouteImport.update({
+    id: '/competitors',
+    path: '/competitors',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdRoute,
+  } as any)
 const AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute =
   AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRouteImport.update({
     id: '/costs',
@@ -145,6 +179,12 @@ const AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute =
     path: '/economics',
     getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdRoute,
   } as any)
+const AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute =
+  AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRouteImport.update({
+    id: '/research',
+    path: '/research',
+    getParentRoute: () => AuthedFrameWWorkspaceIdIdeasIdeaIdRoute,
+  } as any)
 const AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute =
   AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport.update({
     id: '/questions/$sectionKey',
@@ -161,16 +201,22 @@ export interface FileRoutesByFullPath {
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/account': typeof AuthedFrameAccountRoute
+  '/admin': typeof AuthedFrameAdminRouteWithChildren
+  '/admin/users': typeof AuthedFrameAdminUsersRoute
   '/w/$workspaceId': typeof AuthedFrameWWorkspaceIdRouteWithChildren
   '/w/$workspaceId/ideas': typeof AuthedFrameWWorkspaceIdIdeasRouteWithChildren
+  '/w/$workspaceId/settings': typeof AuthedFrameWWorkspaceIdSettingsRoute
   '/w/$workspaceId/': typeof AuthedFrameWWorkspaceIdIndexRoute
   '/w/$workspaceId/ai/export': typeof AuthedFrameWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof AuthedFrameWWorkspaceIdAiImportRoute
   '/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren
   '/w/$workspaceId/ideas/': typeof AuthedFrameWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/assumptions': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute
+  '/w/$workspaceId/ideas/$ideaId/competitors': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   '/w/$workspaceId/ideas/$ideaId/costs': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute
   '/w/$workspaceId/ideas/$ideaId/decide': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdDecideRoute
   '/w/$workspaceId/ideas/$ideaId/economics': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute
+  '/w/$workspaceId/ideas/$ideaId/research': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId/': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
@@ -183,13 +229,19 @@ export interface FileRoutesByTo {
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/account': typeof AuthedFrameAccountRoute
+  '/admin': typeof AuthedFrameAdminRouteWithChildren
+  '/admin/users': typeof AuthedFrameAdminUsersRoute
+  '/w/$workspaceId/settings': typeof AuthedFrameWWorkspaceIdSettingsRoute
   '/w/$workspaceId': typeof AuthedFrameWWorkspaceIdIndexRoute
   '/w/$workspaceId/ai/export': typeof AuthedFrameWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof AuthedFrameWWorkspaceIdAiImportRoute
   '/w/$workspaceId/ideas': typeof AuthedFrameWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/assumptions': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute
+  '/w/$workspaceId/ideas/$ideaId/competitors': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   '/w/$workspaceId/ideas/$ideaId/costs': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute
   '/w/$workspaceId/ideas/$ideaId/decide': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdDecideRoute
   '/w/$workspaceId/ideas/$ideaId/economics': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute
+  '/w/$workspaceId/ideas/$ideaId/research': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
@@ -205,16 +257,22 @@ export interface FileRoutesById {
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/_authed/_frame/account': typeof AuthedFrameAccountRoute
+  '/_authed/_frame/admin': typeof AuthedFrameAdminRouteWithChildren
+  '/_authed/_frame/admin/users': typeof AuthedFrameAdminUsersRoute
   '/_authed/_frame/w/$workspaceId': typeof AuthedFrameWWorkspaceIdRouteWithChildren
   '/_authed/_frame/w/$workspaceId/ideas': typeof AuthedFrameWWorkspaceIdIdeasRouteWithChildren
+  '/_authed/_frame/w/$workspaceId/settings': typeof AuthedFrameWWorkspaceIdSettingsRoute
   '/_authed/_frame/w/$workspaceId/': typeof AuthedFrameWWorkspaceIdIndexRoute
   '/_authed/_frame/w/$workspaceId/ai/export': typeof AuthedFrameWWorkspaceIdAiExportRoute
   '/_authed/_frame/w/$workspaceId/ai/import': typeof AuthedFrameWWorkspaceIdAiImportRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRouteWithChildren
   '/_authed/_frame/w/$workspaceId/ideas/': typeof AuthedFrameWWorkspaceIdIdeasIndexRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId/assumptions': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId/competitors': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/costs': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/decide': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdDecideRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/economics': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute
+  '/_authed/_frame/w/$workspaceId/ideas/$ideaId/research': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
   '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
@@ -229,16 +287,22 @@ export interface FileRouteTypes {
     | '/dev/components'
     | '/invite/$token'
     | '/account'
+    | '/admin'
+    | '/admin/users'
     | '/w/$workspaceId'
     | '/w/$workspaceId/ideas'
+    | '/w/$workspaceId/settings'
     | '/w/$workspaceId/'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
     | '/w/$workspaceId/ideas/$ideaId'
     | '/w/$workspaceId/ideas/'
+    | '/w/$workspaceId/ideas/$ideaId/assumptions'
+    | '/w/$workspaceId/ideas/$ideaId/competitors'
     | '/w/$workspaceId/ideas/$ideaId/costs'
     | '/w/$workspaceId/ideas/$ideaId/decide'
     | '/w/$workspaceId/ideas/$ideaId/economics'
+    | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId/'
     | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
   fileRoutesByTo: FileRoutesByTo
@@ -251,13 +315,19 @@ export interface FileRouteTypes {
     | '/dev/components'
     | '/invite/$token'
     | '/account'
+    | '/admin'
+    | '/admin/users'
+    | '/w/$workspaceId/settings'
     | '/w/$workspaceId'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
     | '/w/$workspaceId/ideas'
+    | '/w/$workspaceId/ideas/$ideaId/assumptions'
+    | '/w/$workspaceId/ideas/$ideaId/competitors'
     | '/w/$workspaceId/ideas/$ideaId/costs'
     | '/w/$workspaceId/ideas/$ideaId/decide'
     | '/w/$workspaceId/ideas/$ideaId/economics'
+    | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId'
     | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
   id:
@@ -272,16 +342,22 @@ export interface FileRouteTypes {
     | '/dev/components'
     | '/invite/$token'
     | '/_authed/_frame/account'
+    | '/_authed/_frame/admin'
+    | '/_authed/_frame/admin/users'
     | '/_authed/_frame/w/$workspaceId'
     | '/_authed/_frame/w/$workspaceId/ideas'
+    | '/_authed/_frame/w/$workspaceId/settings'
     | '/_authed/_frame/w/$workspaceId/'
     | '/_authed/_frame/w/$workspaceId/ai/export'
     | '/_authed/_frame/w/$workspaceId/ai/import'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId'
     | '/_authed/_frame/w/$workspaceId/ideas/'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/assumptions'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/competitors'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/costs'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/decide'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/economics'
+    | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/research'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/'
     | '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
   fileRoutesById: FileRoutesById
@@ -368,6 +444,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFrameAccountRouteImport
       parentRoute: typeof AuthedFrameRoute
     }
+    '/_authed/_frame/admin': {
+      id: '/_authed/_frame/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthedFrameAdminRouteImport
+      parentRoute: typeof AuthedFrameRoute
+    }
+    '/_authed/_frame/admin/users': {
+      id: '/_authed/_frame/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthedFrameAdminUsersRouteImport
+      parentRoute: typeof AuthedFrameAdminRoute
+    }
     '/_authed/_frame/w/$workspaceId': {
       id: '/_authed/_frame/w/$workspaceId'
       path: '/w/$workspaceId'
@@ -387,6 +477,13 @@ declare module '@tanstack/react-router' {
       path: '/ideas'
       fullPath: '/w/$workspaceId/ideas'
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdRoute
+    }
+    '/_authed/_frame/w/$workspaceId/settings': {
+      id: '/_authed/_frame/w/$workspaceId/settings'
+      path: '/settings'
+      fullPath: '/w/$workspaceId/settings'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdSettingsRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdRoute
     }
     '/_authed/_frame/w/$workspaceId/ai/export': {
@@ -424,6 +521,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRoute
     }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId/assumptions': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/assumptions'
+      path: '/assumptions'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/assumptions'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRoute
+    }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId/competitors': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/competitors'
+      path: '/competitors'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/competitors'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRoute
+    }
     '/_authed/_frame/w/$workspaceId/ideas/$ideaId/costs': {
       id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/costs'
       path: '/costs'
@@ -445,6 +556,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRouteImport
       parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRoute
     }
+    '/_authed/_frame/w/$workspaceId/ideas/$ideaId/research': {
+      id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/research'
+      path: '/research'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/research'
+      preLoaderRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRouteImport
+      parentRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdRoute
+    }
     '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': {
       id: '/_authed/_frame/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
       path: '/questions/$sectionKey'
@@ -455,22 +573,42 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthedFrameAdminRouteChildren {
+  AuthedFrameAdminUsersRoute: typeof AuthedFrameAdminUsersRoute
+}
+
+const AuthedFrameAdminRouteChildren: AuthedFrameAdminRouteChildren = {
+  AuthedFrameAdminUsersRoute: AuthedFrameAdminUsersRoute,
+}
+
+const AuthedFrameAdminRouteWithChildren =
+  AuthedFrameAdminRoute._addFileChildren(AuthedFrameAdminRouteChildren)
+
 interface AuthedFrameWWorkspaceIdIdeasIdeaIdRouteChildren {
+  AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute
+  AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute
   AuthedFrameWWorkspaceIdIdeasIdeaIdDecideRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdDecideRoute
   AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute
+  AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute
   AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute
   AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute: typeof AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
 
 const AuthedFrameWWorkspaceIdIdeasIdeaIdRouteChildren: AuthedFrameWWorkspaceIdIdeasIdeaIdRouteChildren =
   {
+    AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdAssumptionsRoute,
+    AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdCompetitorsRoute,
     AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute:
       AuthedFrameWWorkspaceIdIdeasIdeaIdCostsRoute,
     AuthedFrameWWorkspaceIdIdeasIdeaIdDecideRoute:
       AuthedFrameWWorkspaceIdIdeasIdeaIdDecideRoute,
     AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute:
       AuthedFrameWWorkspaceIdIdeasIdeaIdEconomicsRoute,
+    AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute:
+      AuthedFrameWWorkspaceIdIdeasIdeaIdResearchRoute,
     AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute:
       AuthedFrameWWorkspaceIdIdeasIdeaIdIndexRoute,
     AuthedFrameWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute:
@@ -502,6 +640,7 @@ const AuthedFrameWWorkspaceIdIdeasRouteWithChildren =
 
 interface AuthedFrameWWorkspaceIdRouteChildren {
   AuthedFrameWWorkspaceIdIdeasRoute: typeof AuthedFrameWWorkspaceIdIdeasRouteWithChildren
+  AuthedFrameWWorkspaceIdSettingsRoute: typeof AuthedFrameWWorkspaceIdSettingsRoute
   AuthedFrameWWorkspaceIdIndexRoute: typeof AuthedFrameWWorkspaceIdIndexRoute
   AuthedFrameWWorkspaceIdAiExportRoute: typeof AuthedFrameWWorkspaceIdAiExportRoute
   AuthedFrameWWorkspaceIdAiImportRoute: typeof AuthedFrameWWorkspaceIdAiImportRoute
@@ -511,6 +650,7 @@ const AuthedFrameWWorkspaceIdRouteChildren: AuthedFrameWWorkspaceIdRouteChildren
   {
     AuthedFrameWWorkspaceIdIdeasRoute:
       AuthedFrameWWorkspaceIdIdeasRouteWithChildren,
+    AuthedFrameWWorkspaceIdSettingsRoute: AuthedFrameWWorkspaceIdSettingsRoute,
     AuthedFrameWWorkspaceIdIndexRoute: AuthedFrameWWorkspaceIdIndexRoute,
     AuthedFrameWWorkspaceIdAiExportRoute: AuthedFrameWWorkspaceIdAiExportRoute,
     AuthedFrameWWorkspaceIdAiImportRoute: AuthedFrameWWorkspaceIdAiImportRoute,
@@ -523,11 +663,13 @@ const AuthedFrameWWorkspaceIdRouteWithChildren =
 
 interface AuthedFrameRouteChildren {
   AuthedFrameAccountRoute: typeof AuthedFrameAccountRoute
+  AuthedFrameAdminRoute: typeof AuthedFrameAdminRouteWithChildren
   AuthedFrameWWorkspaceIdRoute: typeof AuthedFrameWWorkspaceIdRouteWithChildren
 }
 
 const AuthedFrameRouteChildren: AuthedFrameRouteChildren = {
   AuthedFrameAccountRoute: AuthedFrameAccountRoute,
+  AuthedFrameAdminRoute: AuthedFrameAdminRouteWithChildren,
   AuthedFrameWWorkspaceIdRoute: AuthedFrameWWorkspaceIdRouteWithChildren,
 }
 

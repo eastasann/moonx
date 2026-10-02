@@ -110,6 +110,22 @@ const DYNAMIC: Record<string, string[]> = {
   ),
   "account:role.${role}": ["owner", "member", "viewer"].map((r) => `account:role.${r}`),
   "account:role.${invitation.role}": ["owner", "member", "viewer"].map((r) => `account:role.${r}`),
+  "account:role.${member.role}": ["owner", "member", "viewer"].map((r) => `account:role.${r}`),
+  "workspaceSettings:invitations.empty.${filter}": ["pending", "all"].map(
+    (f) => `workspaceSettings:invitations.empty.${f}`,
+  ),
+  "workspaceSettings:invitations.status.${invitation.status}": [
+    "pending",
+    "accepted",
+    "expired",
+    "revoked",
+  ].map((s) => `workspaceSettings:invitations.status.${s}`),
+  "workspaceSettings:invitations.date.${invitation.status}": [
+    "pending",
+    "accepted",
+    "expired",
+    "revoked",
+  ].map((s) => `workspaceSettings:invitations.date.${s}`),
   "account:preferences.themes.${theme}": ["system", "light", "dark"].map(
     (x) => `account:preferences.themes.${x}`,
   ),

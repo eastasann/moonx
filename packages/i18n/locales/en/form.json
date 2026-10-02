@@ -86,22 +86,22 @@
     "log": {
       "date": "Date",
       "topic": "Topic",
-      "observation": "Findings",
+      "observation": "Observation",
       "sourceType": "Source type",
       "sourceUrl": "Source URL",
-      "supports": "Supports checks",
-      "supportsNote": "What it supports",
+      "supports": "Supports check",
+      "supportsNote": "What It Supports",
       "submit": "Record and attach",
       "openCalendar": "Open calendar",
       "previousMonth": "Previous month",
       "nextMonth": "Next month"
     },
     "sourceTypes": {
-      "google_maps_reviews": "Google Maps reviews",
+      "google_maps_reviews": "Google Maps / Reviews",
       "website": "Website",
       "social_media": "Social media",
       "public_data": "Public data",
-      "news_report": "News report",
+      "news_report": "News / Report",
       "store_observation": "Store observation",
       "price_check": "Price check",
       "other": "Other"

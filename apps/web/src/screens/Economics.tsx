@@ -1,19 +1,18 @@
 import { computeEconomics, DEFAULT_TARGET_MARGIN, type EconomicsInputValues } from "@moonx/domain";
 import type { EconomicsField } from "@moonx/schemas";
 import { Heading, Link, Skeleton, Stack, Text, WorksheetPattern } from "@moonx/ui-web";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NoAccessState, QueryBoundary } from "../components/states";
 import { ValidationSectionHeader } from "../components/ValidationSectionHeader";
-import { autosave } from "../lib/autosave";
 import { costRowInput, draftOfItem, economicsValues, totalView } from "../lib/costs";
 import { ECONOMICS_FIELDS, type EconomicsData, economicsQuery, VALUE_KEY } from "../lib/economics";
 import { focusKeyedField } from "../lib/focus";
 import { ideaDetailQuery } from "../lib/idea-detail";
 import { canEditIdeas, useWorkspaceCurrency, useWorkspaceRole } from "../lib/ideas";
 import { formatContainerTarget, usePanelTarget } from "../lib/panel-target";
-import { validationKey } from "../lib/validation-keys";
+import { useValidationRefresh } from "../lib/use-validation-refresh";
 import { EconomicsInputCard } from "./economics/EconomicsInputCard";
 import { EconomicsResults, summaryBarText } from "./economics/EconomicsResults";
 import { WorthCard } from "./economics/WorthCard";
@@ -69,18 +68,10 @@ interface LoaderProps extends EconomicsProps {
 function EconomicsLoader(props: LoaderProps) {
   const { validationId } = props;
   const economics = useQuery(economicsQuery(validationId));
-  const queryClient = useQueryClient();
   usePanelTarget(formatContainerTarget("validation", validationId, "economics"));
 
-  // Saves still on their way when the screen closes must reach 17 and the home, which read the inputs.
-  useEffect(
-    () => () => {
-      void autosave
-        .idle()
-        .then(() => queryClient.invalidateQueries({ queryKey: validationKey(validationId) }));
-    },
-    [queryClient, validationId],
-  );
+  // Saves still on their way when the screen closes must reach every screen that shows them, the home included.
+  useValidationRefresh(validationId);
 
   return (
     <QueryBoundary query={economics} skeleton={<EconomicsSkeleton />}>

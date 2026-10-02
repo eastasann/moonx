@@ -1,0 +1,122 @@
+{
+  "title": "Users & Workspaces",
+  "tabsLabel": "Admin sections",
+  "tabs": {
+    "users": "Users",
+    "workspaces": "Workspaces",
+    "invitations": "Invitations"
+  },
+  "list": {
+    "loadMore": "Load more",
+    "loadingMore": "Loading more",
+    "loadMoreFailed": "Couldn't load more",
+    "backToList": "Back to list"
+  },
+  "never": "Never",
+  "none": "None",
+  "users": {
+    "listLabel": "Users",
+    "search": "Search users",
+    "searchPlaceholder": "Search by name or email",
+    "clearSearch": "Clear search",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "signedUp": "Signed up",
+      "lastUsed": "Last used",
+      "workspaces": "Workspaces",
+      "status": "Status"
+    },
+    "status": {
+      "active": "Active",
+      "suspended": "Suspended",
+      "deleted": "Deleted"
+    },
+    "suspendedName": "{{name}} (suspended)",
+    "noMatch": "No users match your search",
+    "detail": {
+      "none": "Choose a user to see their usage and actions.",
+      "admin": "Admin",
+      "usageNote": "Usage only: counts and dates. The ideas and answers in a workspace are not shown here.",
+      "deleted": "This account was deleted. It has no actions."
+    },
+    "suspend": "Suspend",
+    "reactivate": "Reactivate",
+    "suspendTitle": "Suspend {{name}}?",
+    "suspendBody": "They are logged out now and can't log in until you reactivate them. Their workspaces, shares and assignments stay, and their name shows \"(suspended)\". They are not notified.",
+    "reactivateTitle": "Reactivate {{name}}?",
+    "reactivateBody": "They can log in again, and everything is as it was before the suspension.",
+    "suspendedToast": "{{name}} is suspended",
+    "reactivatedToast": "{{name}} is active again"
+  },
+  "workspaces": {
+    "listLabel": "Workspaces",
+    "search": "Search workspaces",
+    "searchPlaceholder": "Search by name",
+    "clearSearch": "Clear search",
+    "columns": {
+      "name": "Name",
+      "owners": "Owners",
+      "members": "Members",
+      "ideas": "Ideas",
+      "lastUsed": "Last used"
+    },
+    "personal": "Personal",
+    "noMatch": "No workspaces match your search",
+    "detail": {
+      "none": "Choose a workspace to see its usage.",
+      "usageNote": "Usage only: counts and dates. The ideas and answers in a workspace are not shown here."
+    }
+  },
+  "invitations": {
+    "listLabel": "Invitations",
+    "new": "New invitation",
+    "columns": {
+      "email": "Email",
+      "workspace": "Workspace",
+      "status": "Status",
+      "invitedBy": "Invited by",
+      "sent": "Sent",
+      "expires": "Expires"
+    },
+    "status": {
+      "pending": "Sent",
+      "accepted": "Accepted",
+      "revoked": "Cancelled",
+      "expired": "Expired"
+    },
+    "noWorkspace": "No workspace",
+    "workspaceRole": "{{workspace}} · {{role}}",
+    "invitedByOperator": "Operator setup",
+    "empty": {
+      "heading": "No invitations yet",
+      "body": "Invite someone by email. With a workspace and a role they join it; without one they get only their own workspace."
+    },
+    "detail": {
+      "none": "Choose an invitation to resend or cancel it.",
+      "acceptedAt": "Accepted"
+    },
+    "resend": "Resend",
+    "resendToast": "Invitation sent again to {{email}}",
+    "cancel": "Cancel invitation",
+    "cancelTitle": "Cancel the invitation to {{email}}?",
+    "cancelBody": "The link stops working. You can invite the same address again.",
+    "cancelConfirm": "Cancel invitation",
+    "keep": "Keep invitation",
+    "cancelledToast": "Invitation to {{email}} cancelled",
+    "dialog": {
+      "title": "New invitation",
+      "email": "Email",
+      "workspace": "Workspace",
+      "workspaceHelp": "Optional. Leave empty to give them only a personal workspace.",
+      "workspaceOpen": "Show workspaces",
+      "workspaceEmpty": "No workspace matches",
+      "workspaceLoadFailed": "Couldn't load all workspaces. Try again.",
+      "role": "Role",
+      "roleHelp": "The role they get in the workspace.",
+      "send": "Send invitation",
+      "failed": "Couldn't send the invitation",
+      "sentToast": "Invitation sent to {{email}}"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import i18next, { type i18n as I18n } from "i18next";
 import account from "../locales/en/account.json";
+import admin from "../locales/en/admin.json";
 import ai from "../locales/en/ai.json";
 import app from "../locales/en/app.json";
 import auth from "../locales/en/auth.json";
@@ -13,12 +14,15 @@ import ideas from "../locales/en/ideas.json";
 import mail from "../locales/en/mail.json";
 import panels from "../locales/en/panels.json";
 import plan from "../locales/en/plan.json";
+import research from "../locales/en/research.json";
 import validation from "../locales/en/validation.json";
+import workspaceSettings from "../locales/en/workspaceSettings.json";
 
 /** Catalogs per language. The UI is English only for now (design-spec 1.2); add a language here. */
 export const resources = {
   en: {
     account,
+    admin,
     ai,
     app,
     auth,
@@ -32,13 +36,16 @@ export const resources = {
     mail,
     panels,
     plan,
+    research,
     validation,
+    workspaceSettings,
   },
 } as const;
 
 export const DEFAULT_LANGUAGE = "en";
 export const NAMESPACES = [
   "account",
+  "admin",
   "ai",
   "app",
   "auth",
@@ -52,7 +59,9 @@ export const NAMESPACES = [
   "mail",
   "panels",
   "plan",
+  "research",
   "validation",
+  "workspaceSettings",
 ] as const;
 
 /**

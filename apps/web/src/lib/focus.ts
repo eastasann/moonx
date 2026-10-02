@@ -43,10 +43,10 @@ export function focusTableRowWhenReady(key: string, onFocused: () => void): () =
   };
 }
 
-/** Moves the focus into the input of an element that carries `data-focus-key="<key>"`. */
+/** Moves the focus into the input or text area of an element that carries `data-focus-key="<key>"`. */
 export function focusKeyedField(key: string): boolean {
   const root = document.querySelector<HTMLElement>(`[data-focus-key="${key}"]`);
-  const input = root?.querySelector<HTMLInputElement>("input");
+  const input = root?.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
   if (!input) return false;
   input.focus();
   input.select();

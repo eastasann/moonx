@@ -578,7 +578,7 @@ make tokens（2回続けて差分なし）・make test-domain・make test-api・
 
 ## Step 14: Web の残りの画面（1）: 調査ログ・競合・前提とリスク・ワークスペース設定・ユーザーの管理
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/design-spec.md 6.10（14 調査ログ・15 競合・代替・16 前提・リスク）・6.16（9 ワークスペース設定）・
@@ -669,7 +669,8 @@ docs/design-spec.md 6.17（26 管理: テンプレート一覧・27 管理: テ�
    費用行と実行管理の初期行・AI 用プロンプト、検証と公開、公開済みの版は読み取り専用）
 3. M8 テンプレートの移行（10 / 13 / 20 のヘッダーの A newer template is available、引き継げない回答の事前の一覧、
    履歴からまとめて戻す）
-4. テスト（make test-web）
+4. 26 と 28 の行き来（管理の画面のタブ。Step 14 で 28 は `/admin/users` に作ってあり、ナビの Admin は 26 を指す）
+5. テスト（make test-web）
 
 Moonx Admin が検証の v3 の下書きを 27 で直して公開すると、Piaya Gift Box Delivery の 13 に移行の案内が出て、
 M8 で移行でき、13 の履歴の「Template updated to v3」から元に戻せ、make test-web が通る状態をゴールとする。

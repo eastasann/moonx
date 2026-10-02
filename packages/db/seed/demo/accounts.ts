@@ -16,6 +16,13 @@ import {
 
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
+/** Hashed once: scrypt is slow on purpose and every seeding would repeat it for each person. */
+let demoPasswordHash: Promise<string> | undefined;
+const demoHash = () => {
+  demoPasswordHash ??= hashPassword(DEMO_PASSWORD);
+  return demoPasswordHash;
+};
+
 /** Users, sign-in accounts, workspaces, memberships and invitations (design-spec 8.1). */
 export async function addAccounts(world: World, clock: Clock) {
   const roles: Partial<Record<PersonKey, "owner" | "member" | "viewer">> = {
@@ -46,7 +53,7 @@ export async function addAccounts(world: World, clock: Clock) {
       userId: userId(key),
       accountId: userId(key),
       providerId: "credential",
-      password: await hashPassword(DEMO_PASSWORD),
+      password: await demoHash(),
       createdAt: created,
       updatedAt: created,
     });

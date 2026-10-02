@@ -7,7 +7,9 @@ import { dashboardRoutes } from "./dashboard";
 import { decisionLogRoutes } from "./decision-log";
 import { historyRoutes } from "./history";
 import { ideaRoutes } from "./ideas";
+import { invitationAccessRoutes } from "./invitation-access";
 import { invitationRoutes } from "./invitations";
+import { meRoutes } from "./me";
 import { notificationRoutes } from "./notifications";
 import { planRoutes } from "./plans";
 import { selfAnalysisRoutes } from "./self-analysis";
@@ -18,6 +20,8 @@ import { workspaceRoutes } from "./workspaces";
 /** Every `/api/v1` route group (SDD 5.3). */
 export function apiV1(ctx: AppContext) {
   return new Elysia({ prefix: "/api/v1" })
+    .use(meRoutes(ctx))
+    .use(invitationAccessRoutes(ctx))
     .use(workspaceRoutes(ctx))
     .use(invitationRoutes(ctx))
     .use(dashboardRoutes(ctx))

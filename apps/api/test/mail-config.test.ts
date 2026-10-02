@@ -124,9 +124,11 @@ describe("mailer", () => {
   });
 });
 
+const AUTH = { BETTER_AUTH_SECRET: "test-secret-0123456789abcdef-0123" };
+
 describe("configuration", () => {
   test("defaults for a local run", () => {
-    const config = loadConfig({ APP_ENV: "local" });
+    const config = loadConfig({ ...AUTH, APP_ENV: "local" });
     expect(config).toMatchObject({
       env: "local",
       version: "dev",
@@ -140,10 +142,10 @@ describe("configuration", () => {
 
   test("APP_ENV is required and must be a known environment", () => {
     expect(() => loadConfig({})).toThrow("APP_ENV");
-    expect(() => loadConfig({ APP_ENV: "prod" })).toThrow("APP_ENV");
+    expect(() => loadConfig({ ...AUTH, APP_ENV: "prod" })).toThrow("APP_ENV");
     // the integration tests build their configuration directly; a deployment must never be "test"
-    expect(() => loadConfig({ APP_ENV: "test" })).toThrow("APP_ENV");
-    expect(() => loadConfig({ APP_ENV: "local", MAIL_TRANSPORT: "Resend" })).toThrow(
+    expect(() => loadConfig({ ...AUTH, APP_ENV: "test" })).toThrow("APP_ENV");
+    expect(() => loadConfig({ ...AUTH, APP_ENV: "local", MAIL_TRANSPORT: "Resend" })).toThrow(
       "MAIL_TRANSPORT",
     );
   });
@@ -158,14 +160,15 @@ describe("configuration", () => {
       TRUSTED_ORIGINS: "https://staging.moonx.app,moonx-staging://",
       CRON_OIDC_AUDIENCE: "https://moonx-api-staging-123.asia-southeast1.run.app",
       CRON_INVOKER_EMAIL: "scheduler@moonx.iam.gserviceaccount.com",
+      AVATAR_BUCKET: "moonx-staging-avatars",
     };
     for (const APP_ENV of ["staging", "production"]) {
-      expect(() => loadConfig({ APP_ENV, ...deployed, PROXY_SHARED_SECRET: "" })).toThrow(
+      expect(() => loadConfig({ ...AUTH, APP_ENV, ...deployed, PROXY_SHARED_SECRET: "" })).toThrow(
         "PROXY_SHARED_SECRET",
       );
-      expect(() => loadConfig({ APP_ENV, ...deployed, MAIL_TRANSPORT: "console" })).toThrow(
-        "MAIL_TRANSPORT",
-      );
+      expect(() =>
+        loadConfig({ ...AUTH, APP_ENV, ...deployed, MAIL_TRANSPORT: "console" }),
+      ).toThrow("MAIL_TRANSPORT");
     }
     for (const name of [
       "BETTER_AUTH_URL",
@@ -173,26 +176,59 @@ describe("configuration", () => {
       "TRUSTED_ORIGINS",
       "CRON_OIDC_AUDIENCE",
       "CRON_INVOKER_EMAIL",
+      "AVATAR_BUCKET",
     ]) {
-      expect(() => loadConfig({ APP_ENV: "production", ...deployed, [name]: "" })).toThrow(name);
+      expect(() => loadConfig({ ...AUTH, APP_ENV: "production", ...deployed, [name]: "" })).toThrow(
+        name,
+      );
     }
-    expect(loadConfig({ APP_ENV: "staging", ...deployed }).openapi).toBe(true);
-    expect(loadConfig({ APP_ENV: "production", ...deployed }).openapi).toBe(false);
-    expect(loadConfig({ APP_ENV: "production", ...deployed }).logLevel).toBe("info");
+    expect(loadConfig({ ...AUTH, APP_ENV: "staging", ...deployed }).openapi).toBe(true);
+    expect(loadConfig({ ...AUTH, APP_ENV: "production", ...deployed }).openapi).toBe(false);
+    expect(loadConfig({ ...AUTH, APP_ENV: "production", ...deployed }).logLevel).toBe("info");
+  });
+
+  test("every environment needs a session secret, and Google's two values come together", () => {
+    for (const APP_ENV of ["local", "staging", "production"]) {
+      expect(() => loadConfig({ APP_ENV })).toThrow("BETTER_AUTH_SECRET");
+    }
+    expect(() => loadConfig({ APP_ENV: "local", BETTER_AUTH_SECRET: "too-short" })).toThrow(
+      "at least 32 characters",
+    );
+    expect(() => loadConfig({ ...AUTH, APP_ENV: "local", GOOGLE_CLIENT_ID: "id" })).toThrow(
+      "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET",
+    );
+    expect(() => loadConfig({ ...AUTH, APP_ENV: "local", GOOGLE_CLIENT_SECRET: "s" })).toThrow(
+      "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET",
+    );
+    const local = loadConfig({ ...AUTH, APP_ENV: "local" });
+    expect(local.auth).toEqual({
+      secret: AUTH.BETTER_AUTH_SECRET,
+      googleClientId: "",
+      googleClientSecret: "",
+    });
+    expect(local.avatarBucket).toBe("");
+    const google = loadConfig({
+      ...AUTH,
+      APP_ENV: "local",
+      GOOGLE_CLIENT_ID: "id",
+      GOOGLE_CLIENT_SECRET: "secret",
+    });
+    expect(google.auth.googleClientId).toBe("id");
   });
 
   test("the Resend transport needs its key", () => {
-    expect(() => loadConfig({ APP_ENV: "local", MAIL_TRANSPORT: "resend" })).toThrow(
+    expect(() => loadConfig({ ...AUTH, APP_ENV: "local", MAIL_TRANSPORT: "resend" })).toThrow(
       "RESEND_API_KEY",
     );
     expect(
-      loadConfig({ APP_ENV: "local", MAIL_TRANSPORT: "resend", RESEND_API_KEY: "k" }).mail
+      loadConfig({ ...AUTH, APP_ENV: "local", MAIL_TRANSPORT: "resend", RESEND_API_KEY: "k" }).mail
         .transport,
     ).toBe("resend");
   });
 
   test("lists are split and trimmed; at most two shared secrets are accepted", () => {
     const config = loadConfig({
+      ...AUTH,
       APP_ENV: "local",
       PROXY_SHARED_SECRET: "a, b ,c",
       TRUSTED_ORIGINS: "http://localhost:5173, moonx://",

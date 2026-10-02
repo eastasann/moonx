@@ -24,6 +24,7 @@ export {
   userId,
 } from "./demo/ids";
 export { planId } from "./demo/plans";
+export { hashPassword } from "./lib/password";
 export { seedTemplates } from "./templates";
 
 /** Everything the demo data is built from, so tests can recompute what the screens would show. */
@@ -56,12 +57,14 @@ async function insert(tx: Pick<Db, "insert">, table: PgTable, rows: object[]) {
 /**
  * Replaces every row of every table with the demo data of design-spec 8. Ids are derived from
  * names, so a second run gives the same rows and nothing is duplicated. Destructive: callers
- * decide where it may run.
+ * decide where it may run. Sign-in sessions of people the demo data still contains survive, so
+ * reseeding between tests, or while developing, does not log anybody out.
  */
 export async function seedDemo(db: Db, now: Date = new Date()) {
   const { world, ideas, plans } = await buildWorld(now);
 
   await db.transaction(async (tx) => {
+    const keptSessions = await tx.select().from(schema.sessions);
     const tables = await tx.execute<{ tablename: string }>(
       sql`select tablename from pg_tables where schemaname = 'public'`,
     );
@@ -74,6 +77,12 @@ export async function seedDemo(db: Db, now: Date = new Date()) {
     await insert(tx, schema.workspaces, world.workspaces);
     await insert(tx, schema.memberships, world.memberships);
     await insert(tx, schema.accounts, world.accounts);
+    const demoUserIds = new Set(world.users.map((u) => u.id));
+    await insert(
+      tx,
+      schema.sessions,
+      keptSessions.filter((session) => demoUserIds.has(session.userId)),
+    );
     await insert(tx, schema.invitations, world.invitations);
     await insert(tx, schema.templates, world.templates);
     await insert(tx, schema.templateVersions, world.templateVersions);

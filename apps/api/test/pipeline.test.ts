@@ -40,10 +40,16 @@ describe("request pipeline", () => {
     expect(res.body.error.requestId).toBe(res.headers.get("x-request-id"));
   });
 
-  test("the dev header is refused outside local and test", async () => {
+  test("the old dev header authenticates nobody, in any environment", async () => {
     const prod = await startTestApp({ env: "production" });
-    const res = await call(prod.app, "GET", path, { as: await login(prod.app, "ana") });
-    expect(res.status).toBe(401);
+    const header = { "x-moonx-dev-user-id": userId("ana") };
+    for (const app of [prod.app, t.app]) {
+      const res = await call(app, "GET", path, { headers: header });
+      expect(res.status).toBe(401);
+    }
+    expect((await call(prod.app, "GET", path, { as: await login(prod.app, "ana") })).status).toBe(
+      200,
+    );
     await prod.close();
     // the other app reseeded the shared database; bring the data of this file back
     t = await startTestApp();
@@ -156,7 +162,7 @@ describe("request pipeline", () => {
 
   test("the Worker's shared secret guards everything but health; two secrets rotate", async () => {
     const guarded = await startTestApp({ proxySecrets: ["old-secret", "new-secret"] });
-    const as = await login(guarded.app, "ana");
+    const as = await login(guarded.app, "ana", { "x-moonx-proxy-secret": "old-secret" });
     expect((await call(guarded.app, "GET", path, { as })).status).toBe(403);
     expect(
       (await call(guarded.app, "GET", path, { as, headers: { "x-moonx-proxy-secret": "wrong" } }))

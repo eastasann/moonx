@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { schema } from "@moonx/db";
 import { BCDX, ideaId, userId } from "@moonx/db/seed";
 import { and, asc, eq, isNull } from "drizzle-orm";
-import { call, login, startTestApp, type TestApp } from "./helpers";
+import { call, createLoginUser, login, loginWith, startTestApp, type TestApp } from "./helpers";
 
 /**
  * The authorization matrix of SDD 7.1, endpoint by endpoint, for every endpoint of Step 6. Each
@@ -46,12 +46,12 @@ const MISSING = "6f1f3f3a-1111-4111-8111-111111111111";
 beforeAll(async () => {
   t = await startTestApp();
   for (const p of ["ana", "kenji", "grace", "admin"] as const) who[p] = await login(t.app, p);
-  await t.db.insert(schema.users).values({
+  await createLoginUser(t.db, {
     id: STRANGER,
     email: "stranger@elsewhere.example",
     displayName: "Stranger",
   });
-  who.stranger = { "x-moonx-dev-user-id": STRANGER };
+  who.stranger = await loginWith(t.app, "stranger@elsewhere.example");
 
   const [validation] = await t.db
     .select({ id: schema.validations.id })

@@ -1,6 +1,6 @@
 import { schema } from "@moonx/db";
 import { eq } from "drizzle-orm";
-import type { AppConfig } from "../config";
+import type { Auth } from "../auth";
 import { ApiError } from "../errors";
 import type { Db } from "./db";
 
@@ -11,21 +11,20 @@ export interface AuthUser {
   displayName: string;
   isAdmin: boolean;
   timezone: string;
+  /** The session this request came in with. */
+  sessionId: string;
+  /** When the session was created: U7 and U8 ask for a sign-in from the last 10 minutes. */
+  sessionCreatedAt: Date;
 }
 
-/** Header the local and test environments accept instead of a session (replaced in Step 9). */
-export const DEV_USER_HEADER = "x-moonx-dev-user-id";
-
 /**
- * The one place that turns a request into the signed-in user. Until Better Auth is wired in
- * (Step 9) it reads {@link DEV_USER_HEADER}, and only when `APP_ENV` is local or test. A
- * suspended or deleted user is answered with 401 whatever the credential (SDD 7.1).
+ * The one place that turns a request into the signed-in user: Better Auth resolves the session
+ * from the cookie, then the user row is read again so a suspended or deleted user is answered
+ * with 401 even while a session row is still around (SDD 7.1).
  */
-export async function currentUser(db: Db, config: AppConfig, request: Request): Promise<AuthUser> {
-  const devAllowed = config.env === "local" || config.env === "test";
-  const id = devAllowed ? request.headers.get(DEV_USER_HEADER) : null;
-  if (!id) throw new ApiError("UNAUTHENTICATED", "Sign in required");
-  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new ApiError("UNAUTHENTICATED", "Sign in required");
+export async function currentUser(db: Db, auth: Auth, request: Request): Promise<AuthUser> {
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) throw new ApiError("UNAUTHENTICATED", "Sign in required");
   const [user] = await db
     .select({
       id: schema.users.id,
@@ -36,7 +35,7 @@ export async function currentUser(db: Db, config: AppConfig, request: Request): 
       status: schema.users.status,
     })
     .from(schema.users)
-    .where(eq(schema.users.id, id));
+    .where(eq(schema.users.id, session.user.id));
   if (user?.status !== "active") throw new ApiError("UNAUTHENTICATED", "Sign in required");
   return {
     id: user.id,
@@ -44,5 +43,7 @@ export async function currentUser(db: Db, config: AppConfig, request: Request): 
     displayName: user.displayName,
     isAdmin: user.isAdmin,
     timezone: user.timezone,
+    sessionId: session.session.id,
+    sessionCreatedAt: new Date(session.session.createdAt),
   };
 }

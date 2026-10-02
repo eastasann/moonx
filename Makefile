@@ -23,6 +23,7 @@ install:
 
 setup: install
 	@test -f .env || cp .env.example .env
+	@grep -q '^BETTER_AUTH_SECRET=.' .env || { sed -i.bak "s|^BETTER_AUTH_SECRET=.*|BETTER_AUTH_SECRET=$$(openssl rand -base64 32)|" .env && rm -f .env.bak; }
 	@test -f apps/mobile/.env || cp apps/mobile/.env.example apps/mobile/.env
 	$(MAKE) db-up
 	$(MAKE) db-migrate

@@ -1141,6 +1141,7 @@ describe("AD8 suspend and reactivate", () => {
   test("suspend ends every session, makes no notification and locks the user out", async () => {
     await addSessions("kenji", 3);
     await addSessions("ana", 1);
+    const anaSessions = await sessionsOf("ana");
     const notificationsBefore = await t.db.select().from(schema.notifications);
     const res = await call(t.app, "POST", `${api}/users/${userId("kenji")}/suspend`, {
       as: as.admin,
@@ -1148,7 +1149,7 @@ describe("AD8 suspend and reactivate", () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ id: userId("kenji"), status: "suspended", workspaceCount: 2 });
     expect(await sessionsOf("kenji")).toBe(0);
-    expect(await sessionsOf("ana")).toBe(1);
+    expect(await sessionsOf("ana")).toBe(anaSessions);
     expect(await t.db.select().from(schema.notifications)).toEqual(notificationsBefore);
     const asKenji = await call(t.app, "GET", `/api/v1/workspaces/${BCDX}`, { as: as.kenji });
     expect(asKenji.status).toBe(401);
@@ -1175,6 +1176,11 @@ describe("AD8 suspend and reactivate", () => {
     });
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("active");
+    // Suspending ended his sessions; reactivating lets him sign in again but does not bring them back.
+    expect((await call(t.app, "GET", `/api/v1/workspaces/${BCDX}`, { as: as.kenji })).status).toBe(
+      401,
+    );
+    as.kenji = await login(t.app, "kenji");
     expect((await call(t.app, "GET", `/api/v1/workspaces/${BCDX}`, { as: as.kenji })).status).toBe(
       200,
     );
@@ -1230,6 +1236,9 @@ describe("AD8 suspend and reactivate", () => {
     });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ isAdmin: true, status: "suspended" });
+    // Suspending ended her sessions; the tests after this one need her signed in.
+    await seedDemo(t.db);
+    as.ana = await login(t.app, "ana");
   });
 });
 

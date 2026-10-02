@@ -139,10 +139,10 @@ moonx/
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
 | `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
 | `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直す。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
-| `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32バイト以上の乱数） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
+| `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32文字以上の乱数。短ければ起動しない） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
 | `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://staging.{DOMAIN}` / `https://{DOMAIN}` |
 | `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り） | `http://localhost:5173,moonx://,exp://` | `https://{DOMAIN},moonx://`（staging は `https://staging.{DOMAIN},moonx-staging://`） |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | api | Google ログイン（OAuth クライアント。環境ごとに作る） | 開発用のクライアント | ID は環境変数、SECRET は Secret Manager `moonx-{env}-google-client-secret` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | api | Google ログイン（OAuth クライアント。環境ごとに作る。どちらも空なら Google ログインだけが使えず、片方だけ入れると起動しない） | 開発用のクライアント | ID は環境変数、SECRET は Secret Manager `moonx-{env}-google-client-secret` |
 | `MAIL_TRANSPORT` | api | `console` / `resend`（それ以外の値では起動しない。staging・production は `resend` でなければ起動しない。`console` は招待のリンクを含むメールの全文をログに出すので、local とテストだけで使う） | `console` | `resend` |
 | `RESEND_API_KEY` | api | Resend の API キー | 不要 | Secret Manager `moonx-{env}-resend-api-key` |
 | `MAIL_FROM` | api | 送信元 | `moonx <no-reply@localhost>` | `moonx <no-reply@{DOMAIN}>` |
@@ -151,7 +151,7 @@ moonx/
 | `API_ORIGIN` | Worker | 転送先の Cloud Run の URL | 不要（Vite の転送を使う） | `wrangler.jsonc` の環境ごとの `vars` |
 | `CRON_OIDC_AUDIENCE` | api | cron の OIDC トークンの audience。Cloud Run の決まった形の URL `https://moonx-api-{env}-{プロジェクト番号}.asia-southeast1.run.app`（Terraform がプロジェクト番号から組み立てる。サービス自身の出力を参照すると循環するため） | 空（local では `make cron-due` が直接呼ぶ） | Cloud Run の環境変数 |
 | `CRON_INVOKER_EMAIL` | api | cron を呼ぶサービスアカウントのメール | 空 | Cloud Run の環境変数 |
-| `AVATAR_BUCKET` | api | プロフィール写真のバケット | 空（local はディスク `./.data/avatars`） | `moonx-{env}-avatars` |
+| `AVATAR_BUCKET` | api | プロフィール写真のバケット（staging・production は空なら起動しない） | 空（local はディスク `./.data/avatars`。API が `/api/avatars/{name}` で返す） | `moonx-{env}-avatars` |
 | `SENTRY_DSN` | api | Sentry（API） | 空 | Cloud Run の環境変数 |
 | `LOG_LEVEL` | api | `debug` / `info` / `warn` / `error` | `debug` | `info` |
 | `VITE_APP_ENV` / `VITE_SENTRY_DSN` | web（ビルド時） | 環境名と Sentry（Web）。ビルドに埋め込むので、Web はデプロイのときに環境ごとにビルドする（ADR-016） | `local` / 空 | GitHub Actions の環境の変数 |
@@ -179,7 +179,7 @@ moonx/
 | ターゲット | 内容 |
 |---|---|
 | `install` | 依存の取得だけ（`bun install --frozen-lockfile`）。CI が使う |
-| `setup` | `install`、`.env` の雛形のコピー（直下と `apps/mobile`）、`db-up`、`db-migrate`、`db-seed`、`tokens`、Playwright のブラウザの取得、Git のフックの配線（`git config core.hooksPath .githooks`） |
+| `setup` | `install`、`.env` の雛形のコピー（直下と `apps/mobile`。直下の `BETTER_AUTH_SECRET` が空なら乱数を入れる）、`db-up`、`db-migrate`、`db-seed`、`tokens`、Playwright のブラウザの取得、Git のフックの配線（`git config core.hooksPath .githooks`） |
 | `dev` | API と Web を同時に起動（`dev-api` と `dev-web`） |
 | `dev-api` / `dev-web` / `dev-mobile` | それぞれを単独で起動（`dev-mobile` は Expo の開発サーバー） |
 | `build` | 全パッケージの型チェックとビルド（Web は local の設定） |
@@ -192,7 +192,7 @@ moonx/
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
 | `db-migrate` | マイグレーションを適用する（`DATABASE_URL_DIRECT` か `DATABASE_URL`） |
-| `db-seed` / `db-reset` | 全テーブルの中身を消してデモデータを入れる（design-spec 8章。`APP_ENV=local` のときだけ動く。何度動かしても行の id は変わらない）/ DB を作り直してシードまで |
+| `db-seed` / `db-reset` | 全テーブルの中身を消してデモデータを入れる（デモのユーザーのログイン中のセッションだけは残す。design-spec 8章。`APP_ENV=local` のときだけ動く。何度動かしても行の id は変わらない）/ DB を作り直してシードまで |
 | `db-studio` | Drizzle Studio |
 | `tokens` | `docs/06_design-tokens.json` から `packages/ui-tokens` を生成する |
 | `openapi` | API の OpenAPI 仕様を `apps/api/openapi.json` に書き出す |
@@ -329,7 +329,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 - メール＋パスワードの新規登録は Better Auth の公開エンドポイントを閉じ（`emailAndPassword.disableSignUp`）、moonx の `POST /api/v1/invitations/by-token/{token}/sign-up`（5章 U5）だけから作る。メールは招待のメールに固定する。
 - Google の新規登録は、招待の画面からだけ `requestSignUp` 付きで始める（`disableImplicitSignUp`）。さらにユーザーを作る直前のフック（`databaseHooks.user.create.before`）で、**そのメールあての有効な招待（pending・期限内）があること**を確かめ、無ければ拒否する。
 - ユーザーを作った直後のフックで、個人用ワークスペースを作る（design-spec 5章）。
-- 最初の運営者は `make admin-create EMAIL=...` でワークスペースなしの招待を発行し、登録したユーザーを運営者にする（`is_admin`。design-spec 9.2 の既定案）。
+- 最初の運営者は `make admin-create EMAIL=...` でワークスペースなしの招待を発行し、登録したユーザーを運営者にする（`is_admin`。design-spec 9.2 の既定案）。ワークスペースなしの招待は AD9 でも発行でき、どちらから登録・受諾した人も運営者になる。
 - 停止したユーザー（`status = suspended`）はセッションを消し、ログインのフックで拒否する。
 
 **理由:** ユーザーが Better Auth で最初から Google ログインを入れると指定した。ライブラリなので $0 で、ユーザー情報は自分の DB に残り、乗り換えの妨げにならない。招待制のような独自の決まりを、フックで確実に組み込める。
@@ -503,7 +503,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-029: API の回数制限は3段にする
 
-**決定:** ① Better Auth の回数制限（本体の `rateLimit` 設定。IP ごと。保存先は DB の `rate_limits`）を認証のエンドポイントにかける。② アプリの API（`/api/v1`）は、Elysia の自前のミドルウェアで、ユーザーごとの上限（招待の送信、PDF の作成、AI 書き出し・取り込み。7.2）を同じ `rate_limits` テーブルにキーの接頭辞（`app:`）を分けて記録する。③ 外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` にかける（Terraform の `envs/shared`）。
+**決定:** ① Better Auth の回数制限（本体の `rateLimit` 設定。IP ごと。保存先は DB の `rate_limits`）を認証のエンドポイントにかける。② アプリの API（`/api/v1`）は、Elysia の自前のミドルウェアで、ユーザーごと・IP ごとの上限（招待の送信、PDF の作成、AI 書き出し・取り込み、アカウントの削除のパスワード確認、U5 の新規登録。7.2）を同じ `rate_limits` テーブルにキーの接頭辞（`app:`）を分けて記録する。③ 外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` にかける（Terraform の `envs/shared`）。
 
 **理由:** Better Auth の回数制限は Better Auth のエンドポイントにしか効かない。アプリの API の上限は「誰が」で数える必要があり（Resend の1日100通や PDF の CPU を守る）、ログインの後にしか分からないので API の中で数える。DB に記録すれば、Cloud Run が複数台でも数がそろい、Redis が要らない（ADR-011）。
 
@@ -746,6 +746,7 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | U1 | GET | `/api/v1/me` | ログイン | 共通・4 |
 | U2 | PATCH | `/api/v1/me` | ログイン | 3・4 |
 | U3 | PUT / DELETE | `/api/v1/me/avatar` | ログイン | 3・4 |
+| U3 | GET | `/api/avatars/{name}` | 公開（local だけ。staging・production は Cloud Storage の URL を直接開く） | 3・4 |
 | U4 | GET | `/api/v1/invitations/by-token/{token}` | 公開 | 2・3 |
 | U5 | POST | `/api/v1/invitations/by-token/{token}/sign-up` | 公開 | 2 |
 | U6 | POST | `/api/v1/invitations/by-token/{token}/accept` | ログイン | 3 |
@@ -853,11 +854,11 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 |---|---|
 | メール＋パスワード | 有効。`disableSignUp: true`（新規登録は U5 だけ）。パスワードは8文字以上・128文字以下。パスワード再設定のリンクの期限は1時間（design-spec 6.16）。再設定すると他のセッションを消し、`hooks.after`（`/reset-password`）でそのユーザーの新しいセッションを作って Cookie を返す（ログインした状態で 5 へ。design-spec 6.16） |
 | Google | 有効。`disableImplicitSignUp: true`。新規登録は招待の画面（`/invite/$token`）からだけ `requestSignUp: true` で始め、`callbackURL` を `/welcome?step=invite&token=…`、`errorCallbackURL` を `/login?error=…` にする |
-| 新規登録の制限 | `databaseHooks.user.create.before`: そのメールあての有効な招待（`pending` かつ期限内。大文字小文字を区別しない）が無ければ `INVITATION_REQUIRED` で拒否する |
-| 登録の後 | `databaseHooks.user.create.after`: 個人用ワークスペース（名前「{表示名}'s workspace」、通貨 PHP、本人が Owner）を作り、`last_workspace_id` に入れる |
-| ログインの制限 | `databaseHooks.session.create.before`: `users.status = suspended` なら `ACCOUNT_SUSPENDED` で拒否する |
-| セッション | 有効期限30日、毎日更新。Cookie は `__Secure-` 接頭辞・HttpOnly・Secure・SameSite=Lax（local は Secure なし） |
-| 回数制限 | 有効。保存先は DB（`rate_limits`）。ログイン・パスワード再設定・新規登録は IP ごとに1分10回 |
+| 新規登録の制限 | `databaseHooks.user.create.before`: そのメールあての有効な招待（`pending` かつ期限内。大文字小文字を区別しない）が無いか、メールが確認済みでなければ（Google が `email_verified` を返さない）`INVITATION_REQUIRED` で拒否する |
+| 登録の後 | `databaseHooks.user.create.after`: 個人用ワークスペース（名前「{表示名}'s workspace」、通貨 PHP、本人が Owner）を作り、`last_workspace_id` に入れる。そのメールあてのワークスペースなしの招待があれば、運営者にして、その招待を受諾済みにする（3 の ① を飛ばすため、U6 は呼ばれない） |
+| ログインの制限 | `databaseHooks.session.create.before`: `users.status` が `active` 以外（停止・削除）なら `ACCOUNT_SUSPENDED` で拒否する |
+| セッション | 有効期限30日、毎日更新。Cookie は `__Secure-` 接頭辞・HttpOnly・Secure・SameSite=Lax（local は Secure なし）。`change-password` はクライアントの指定にかかわらず他のセッションを消す（`revokeOtherSessions`）。Better Auth の `update-user`・`delete-user`・`change-email` は閉じて 404 を返す（プロフィールと削除は U2・U3・U7 だけから行う） |
+| 回数制限 | 有効。保存先は DB（`rate_limits`）。秘密を受け取る5つのパス（`sign-in/email`・`sign-in/social`・`request-password-reset`・`reset-password`・`sign-up/email`）は、パスごとに IP あたり1分10回。それ以外のパスは Better Auth の既定（IP あたり1分100回）。U5 も IP あたり1分10回を同じテーブルで数える |
 | 信頼するオリジン | `TRUSTED_ORIGINS`（2章） |
 | IP の取得 | `CF-Connecting-IP`（Worker が付ける。2章 通信フロー 3） |
 
@@ -885,7 +886,7 @@ interface Me {
 
 **U2 `PATCH /api/v1/me`** 本体 `{ displayName?: string (1〜60文字); timezone?: string; theme?: "system" | "light" | "dark"; lastWorkspaceId?: UUID }` → `200 Me`。`lastWorkspaceId` は所属するワークスペースだけ（違えば 422 `VALIDATION_FAILED`）。
 
-**U3 `PUT /api/v1/me/avatar`** 本体は `multipart/form-data` の `file`（JPEG / PNG / WebP、5MB まで）→ `200 { avatarUrl: string }`。512×512 の WebP に縮めて保存する（ADR-024）。`DELETE` → `204`。
+**U3 `PUT /api/v1/me/avatar`** 本体は `multipart/form-data` の `file`（JPEG / PNG / WebP、5MB まで）→ `200 { avatarUrl: string }`。512×512 の WebP に縮めて保存する（ADR-024）。ファイルの中身が画像でなければ `422 VALIDATION_FAILED`（`details` の `path` は `file`）、5MB を超えれば `413 PAYLOAD_TOO_LARGE`。古い写真のファイルは新しい写真を保存してから消す。`DELETE` → `204`。local だけ、API が `GET /api/avatars/{name}`（公開。名前は32桁の16進＋`.webp`）で保存したファイルを返す。
 
 **U4 `GET /api/v1/invitations/by-token/{token}`**（公開）→ `200 InvitationPreview`。トークンが見つからない・取り消し・期限切れは `410 INVITATION_INVALID`。
 
@@ -901,16 +902,16 @@ interface InvitationPreview {
 }
 ```
 
-**U5 `POST /api/v1/invitations/by-token/{token}/sign-up`**（公開）本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie（スマホは Better Auth の Expo プラグインが受け取る）。メールは招待のメールに固定する。招待はまだ受諾しない（3 の ① で U6）。エラー: `410 INVITATION_INVALID`、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
+**U5 `POST /api/v1/invitations/by-token/{token}/sign-up`**（公開）本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie（スマホは Better Auth の Expo プラグインが受け取る）。メールは招待のメールに固定し、1つのトランザクションで `users`・`accounts`（credential）・個人用ワークスペースを作ってから Better Auth の `signInEmail` でセッションを作る。ワークスペースのある招待はまだ受諾しない（3 の ① で U6）。ワークスペースなしの招待は、登録の時点で運営者にして受諾済みにする（上の「登録の後」）。エラー: `410 INVITATION_INVALID`、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
 
 **U6 `POST /api/v1/invitations/by-token/{token}/accept`** 本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。エラー: `410 INVITATION_INVALID`、`409 INVITATION_ALREADY_ACCEPTED`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）。
 
-**U8 `POST /api/v1/me/password`**（Set password。design-spec 6.16）本体 `{ newPassword: string }` → `204`。Google だけで登録した人（`hasPassword: false`）がパスワードを足す。パスワードがある人は `409 PASSWORD_ALREADY_SET`（A8 で変える）。セッションが10分以内に作られたものでなければ `403 REAUTH_REQUIRED`。サーバーから Better Auth の `setPassword` を呼ぶ。
+**U8 `POST /api/v1/me/password`**（Set password。design-spec 6.16）本体 `{ newPassword: string }` → `204`。Google だけで登録した人（`hasPassword: false`）がパスワードを足す。パスワードがある人は `409 PASSWORD_ALREADY_SET`（A8 で変える）。セッションが10分以内に作られたものでなければ `403 REAUTH_REQUIRED`。サーバーから Better Auth の `setPassword` を呼び、この要求のセッション以外を消す。
 
 **U7 `POST /api/v1/me/delete`**（アカウントの削除。design-spec 6.16）本体 `{ confirmEmail: string; password?: string }` → `204`（セッションの Cookie を消す）。
-- `confirmEmail` が自分のメールと違えば `422 CONFIRMATION_MISMATCH`。パスワードがある人は `password` が必須で、違えば `403 INVALID_PASSWORD`。パスワードが無い人（Google だけ）は、セッションが10分以内に作られたものでなければ `403 REAUTH_REQUIRED`。
+- `confirmEmail` が自分のメールと違えば `422 CONFIRMATION_MISMATCH`。パスワードがある人は `password` が必須で、違えば `403 INVALID_PASSWORD`（ユーザーごとに10分5回まで。超えたら `429 RATE_LIMITED`）。パスワードが無い人（Google だけ）は、セッションが10分以内に作られたものでなければ `403 REAUTH_REQUIRED`。
 - ほかにメンバーのいるワークスペースで最後の Owner なら `409 LAST_OWNER`（`error.workspaces: { id; name }[]`）。
-- 1つのトランザクションで次を行う: `users` の行は残して個人の情報を消す（`email` を `deleted+{id}@deleted.invalid`、`display_name` を `Deleted user`、`avatar_url` を null、`status` を `deleted`）。`sessions`・`accounts`・自己分析（回答・共有・その回答へのコメントと履歴）・本人あての通知を消す。本人しかいない個人用ワークスペースを中身ごと消す。所属を外す（W3 DELETE と同じ処理。担当は名前「Deleted user」）。有効な招待を取り消す。写真を Cloud Storage から消す。
+- 1つのトランザクションで次を行う: `users` の行は残して個人の情報を消す（`email` を `deleted+{id}@deleted.invalid`、`display_name` を `Deleted user`、`avatar_url` を null、`status` を `deleted`）。`sessions`・`accounts`・自己分析（回答・共有・その回答へのコメントと履歴）・本人あての通知を消す。本人しかいないワークスペース（個人用もチーム用も）を中身ごと消す。ほかのワークスペースは所属を外す（W3 DELETE と同じ処理。担当は名前「Deleted user」）。本人が送った有効な招待を取り消す。パスワード再設定のトークン（`verifications`）を消す。トランザクションをコミットしてから、保存した写真を消す（Cloud Storage または local のディスク）。
 - Better Auth の `deleteUser`（行ごと消す）は使わない（チームの記録が `users` を参照しているため）。
 
 ### 5.5 ワークスペース・メンバー・招待
@@ -2044,7 +2045,7 @@ export const changeHistory = pgTable("change_history", {
 - **選択肢の値は原本を踏襲する。** 判定 Proceed / Hold / Drop、市場の種類 Red / Blue / Mixed、確信度 Low / Medium / High、Can Reduce? Yes / Partly / No、競合の種類 Direct / Indirect / Substitute、出典の種類（design-spec 6.10）。
 - **ワークスペースの通貨を変えても金額は換算しない。**
 - **アカウントの削除**: `users` の行は残して個人の情報を消す（5.4 U7）。外部キーは `users` を参照し続ける。
-- **シード**: `make db-seed` は全テーブルを空にして design-spec 8章のデモデータを入れる（`APP_ENV=local` 以外では動かない）。行の id は名前から決まるので、何度動かしても同じ id の行になる（パスワードのハッシュは毎回変わり、日時はシードを動かした日からの相対になる）。テンプレート v1 の中身は Drive の原本から転記したもの（design-spec 9.3）を `packages/db/seed/templates/` に置く。検証とプランの AI 用プロンプトは原本に無いので空で入れ、運営者が 27 で書く。
+- **シード**: `make db-seed` は全テーブルを空にして design-spec 8章のデモデータを入れる（`APP_ENV=local` 以外では動かない。デモのユーザーのログイン中のセッションだけは残す。テストが1件ごとに入れ直しても、ログインが外れないため）。行の id は名前から決まるので、何度動かしても同じ id の行になる（パスワードのハッシュは毎回変わり、日時はシードを動かした日からの相対になる）。テンプレート v1 の中身は Drive の原本から転記したもの（design-spec 9.3）を `packages/db/seed/templates/` に置く。検証とプランの AI 用プロンプトは原本に無いので空で入れ、運営者が 27 で書く。
 
 ---
 
@@ -2083,7 +2084,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 追加の決まり:
 
 - **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は 409 `ARCHIVED`（コメントを書く・元に戻すを含む。design-spec 6.8）。ロールが足りない人には先に 403 を返す（Viewer の編集は、アーカイブ中でも 403）。確認は書き込みの最後（更新日時の更新）でもう一度行い、確認と書き込みのあいだにアーカイブされても書き込みは残らない。読む・複製・Restore・Pitch Deck はできる。
-- **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。`is_admin` は API では変えられない（`make admin-create` とシードだけ）。
+- **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。`is_admin` を直接変える API は無い。付くのはワークスペースなしの招待（`make admin-create`・AD9）から登録・受諾したときとシードだけで、外す API も無い。
 - **停止・削除したユーザー**: セッションを消し、ログインを拒否する。残ったリクエストも、認証のミドルウェアが `users.status` を確かめて 401 にする。
 - **実装**: 認可は、リソースからワークスペースを引く共通の関数（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）を通して判定し、クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
 
@@ -2095,7 +2096,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | シークレット | 置き場所の方針は ADR-027、CI の置き場所の一覧は2章「CI のシークレットと変数」が正。local は `.env`（コミットしない。`.env.example` だけコミットする）。staging / production の API のシークレットは Secret Manager から Cloud Run の環境変数として渡す。ローテーションの手順は 05_operation-runbook.md |
 | CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる（合わなければ 403 `FORBIDDEN`）。Content-Type の決まりは本体のあるリクエストに適用し、本体の無い POST・DELETE は Content-Type が無くてよい。JSON の1MB は `Content-Length` と実際に読んだ長さの両方で確かめる。Cookie は SameSite=Lax。スマホは `Origin` を送らないが、Cookie を自動では送らない（SecureStore から付ける）ので対象外 |
 | CORS | 使わない（Web と API は同じオリジン。ADR-004）。CORS のヘッダーを返さないので、他のオリジンからのブラウザのリクエストは届かない。local は Vite の転送で同じオリジンにする |
-| レート制限 | 仕組みは ADR-029。認証（Better Auth）は IP ごとに1分10回（DB に記録）。アプリの API は、ユーザーごとに次の上限を同じ仕組みで持つ: 招待の送信・再送 1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3。X2 は既存の内容を読むだけなので数えない）。超えたら 429 `RATE_LIMITED`。外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` に付ける |
+| レート制限 | 仕組みは ADR-029。認証（Better Auth）は、秘密を受け取るパスごとに IP あたり1分10回（DB に記録。5.4）。アプリの API は、次の上限を同じ仕組みで持つ。ユーザーごと: 招待の送信・再送 1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3。X2 は既存の内容を読むだけなので数えない）、アカウントの削除のパスワード確認（U7）10分5回。IP ごと: U5 の新規登録 1分10回（アカウントがまだ無いため）。超えたら 429 `RATE_LIMITED`。外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` に付ける |
 | 直接のアクセス | Cloud Run の URL を直接呼ばれないように、Worker の共有シークレットを確かめる（2章 通信フロー 3）。`CF-Connecting-IP` は、共有シークレットのあるリクエストのときだけ信じる |
 | セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。スマホは SecureStore。ログアウトしたら送信待ちの列（ADR-021）も消す |
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、5MB まで。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
@@ -2154,7 +2155,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 404 | `NOT_FOUND` | 資源が無い |
 | 409 | `CONFLICT`・`CONFLICT_MULTI` | 同時編集の衝突（ADR-019） |
 | 409 | `ARCHIVED` | アーカイブしたものを変えようとした |
-| 409 | `LAST_OWNER`・`CANNOT_LEAVE_PERSONAL`・`ALREADY_MEMBER`・`INVITATION_PENDING`・`INVITATION_ALREADY_ACCEPTED`・`EMAIL_TAKEN`・`DECISION_CHANGED`・`DECISION_NOT_PROCEED`・`NAME_TAKEN`・`HAS_EMPTY_QUESTIONS`・`ALREADY_LATEST`・`DRAFT_EXISTS`・`PUBLISHED_READ_ONLY` | 状態がその操作を許さない（5章） |
+| 409 | `LAST_OWNER`・`CANNOT_LEAVE_PERSONAL`・`ALREADY_MEMBER`・`INVITATION_PENDING`・`INVITATION_ALREADY_ACCEPTED`・`EMAIL_TAKEN`・`PASSWORD_ALREADY_SET`・`DECISION_CHANGED`・`DECISION_NOT_PROCEED`・`NAME_TAKEN`・`HAS_EMPTY_QUESTIONS`・`ALREADY_LATEST`・`DRAFT_EXISTS`・`PUBLISHED_READ_ONLY` | 状態がその操作を許さない（5章） |
 | 410 | `INVITATION_INVALID` | 招待のトークンが無い・取り消し・期限切れ |
 | 413 | `PAYLOAD_TOO_LARGE` | 本体が大きすぎる（JSON は1MB、写真は5MB。`Content-Length` が無い分割転送でも読んだ量で数える） |
 | 422 | `VALIDATION_FAILED` | 入力の検査に失敗（`details` に項目ごとの `path`・Zod の `code`・`message`。入力の値そのものは返さない） |

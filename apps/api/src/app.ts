@@ -1,14 +1,17 @@
 import { openapi } from "@elysiajs/openapi";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { createAuth } from "./auth";
 import type { AppConfig } from "./config";
 import type { AppContext } from "./context";
+import { type AvatarStore, createAvatarStore } from "./lib/avatar-store";
 import type { Db } from "./lib/db";
 import { createLogger, type Logger } from "./lib/logger";
 import type { OidcKeySource } from "./lib/oidc";
 import { createMailer, type Mailer } from "./mail/mailer";
 import { basePlugin } from "./plugins";
 import { apiV1 } from "./routes";
+import { authRoutes } from "./routes/auth";
 import { healthRoutes } from "./routes/health";
 import { internalRoutes } from "./routes/internal";
 
@@ -18,6 +21,8 @@ export type { AppConfig } from "./config";
 export interface AppDeps {
   db: Db;
   mailer?: Mailer;
+  /** Where profile photos go; tests pass a temporary directory. */
+  avatars?: AvatarStore;
   logger?: Logger;
   now?: () => Date;
   /** Where Z3 finds the keys that sign Cloud Scheduler's tokens; tests pass their own. */
@@ -27,16 +32,22 @@ export interface AppDeps {
 /** Builds the app. The database and the mailer are passed in so tests use their own. */
 export function createApp(config: AppConfig, deps: AppDeps) {
   const logger = deps.logger ?? createLogger(config.logLevel);
-  const ctx: AppContext = {
+  const base = {
     db: deps.db,
     config,
     logger,
     mailer: deps.mailer ?? createMailer(config.mail, logger),
     now: deps.now ?? (() => new Date()),
   };
+  const ctx: AppContext = {
+    ...base,
+    auth: createAuth(base),
+    avatars: deps.avatars ?? createAvatarStore(config),
+  };
   const app = new Elysia()
     .use(basePlugin(ctx))
     .use(healthRoutes(ctx))
+    .use(authRoutes(ctx))
     .use(internalRoutes(ctx, deps.oidcKeys))
     .use(apiV1(ctx));
   if (config.openapi) {

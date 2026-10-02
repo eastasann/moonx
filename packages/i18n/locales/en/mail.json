@@ -11,5 +11,11 @@
     "owner": "an Owner",
     "member": "a Member",
     "viewer": "a Viewer"
+  },
+  "passwordReset": {
+    "subject": "Reset your moonx password",
+    "body": "We received a request to reset the password for your moonx account.",
+    "action": "Open this link to choose a new password (valid for {{minutes}} minutes):",
+    "ignore": "If you didn't ask for this, you can ignore this email. Your password stays the same."
   }
 }

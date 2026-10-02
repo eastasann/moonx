@@ -23,6 +23,15 @@ export interface AppConfig {
    * without both, so a missing value cannot silently stop the due notices.
    */
   cron: { oidcAudience: string; invokerEmail: string };
+  auth: {
+    /** Signs sessions and tokens (SDD 2 環境変数). Every environment but the tests must set it. */
+    secret: string;
+    /** Empty values leave Google sign-in switched off; everything else keeps working. */
+    googleClientId: string;
+    googleClientSecret: string;
+  };
+  /** Cloud Storage bucket for profile photos; empty keeps them on local disk (ADR-024). */
+  avatarBucket: string;
   sentryDsn: string;
   /** Serve the OpenAPI document at /api/docs (staging only, ADR-006). */
   openapi: boolean;
@@ -57,6 +66,14 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new Error("RESEND_API_KEY is required when MAIL_TRANSPORT=resend");
   }
   const proxySecrets = list(env.PROXY_SHARED_SECRET).slice(0, 2);
+  if (!env.BETTER_AUTH_SECRET || env.BETTER_AUTH_SECRET.length < 32) {
+    throw new Error(
+      "BETTER_AUTH_SECRET must be at least 32 characters (generate one: openssl rand -base64 32)",
+    );
+  }
+  if (Boolean(env.GOOGLE_CLIENT_ID) !== Boolean(env.GOOGLE_CLIENT_SECRET)) {
+    throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together");
+  }
   if (appEnv === "staging" || appEnv === "production") {
     if (proxySecrets.length === 0) throw new Error(`PROXY_SHARED_SECRET is required in ${appEnv}`);
     if (transport !== "resend") throw new Error(`MAIL_TRANSPORT must be resend in ${appEnv}`);
@@ -66,6 +83,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       "TRUSTED_ORIGINS",
       "CRON_OIDC_AUDIENCE",
       "CRON_INVOKER_EMAIL",
+      "AVATAR_BUCKET",
     ]) {
       if (!env[name]) throw new Error(`${name} is required in ${appEnv}`);
     }
@@ -87,6 +105,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       oidcAudience: env.CRON_OIDC_AUDIENCE ?? "",
       invokerEmail: (env.CRON_INVOKER_EMAIL ?? "").toLowerCase(),
     },
+    auth: {
+      secret: env.BETTER_AUTH_SECRET,
+      googleClientId: env.GOOGLE_CLIENT_ID ?? "",
+      googleClientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+    },
+    avatarBucket: env.AVATAR_BUCKET ?? "",
     sentryDsn: env.SENTRY_DSN ?? "",
     openapi: appEnv === "staging",
   };
@@ -108,6 +132,12 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       allowlist: [],
     },
     cron: { oidcAudience: "", invokerEmail: "" },
+    auth: {
+      secret: "test-secret-test-secret-test-secret-0123",
+      googleClientId: "",
+      googleClientSecret: "",
+    },
+    avatarBucket: "",
     sentryDsn: "",
     openapi: false,
     ...overrides,

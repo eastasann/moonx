@@ -296,7 +296,7 @@ make test-api が通る状態をゴールとする。
 
 ## Step 9: 認証（Better Auth・招待制）
 
-Status:
+Status: done 2026-10-02
 
 ```
 docs/02-01_system-design-doc.md の ADR-010・ADR-024・5.4・7.2（セッション・CSRF・レート制限・アップロード）と

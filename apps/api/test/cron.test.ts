@@ -206,7 +206,7 @@ describe("Z3 authentication", () => {
     const res = await call(guarded, "POST", PATH, { headers: bearer(await token()) });
     expect(res.status).toBe(200);
     const other = await call(guarded, "GET", "/api/v1/notifications", {
-      as: await login(guarded, "ana"),
+      as: await login(guarded, "ana", { "x-moonx-proxy-secret": "shared-secret" }),
     });
     expect(other.status).toBe(403);
   });
@@ -225,7 +225,7 @@ describe("Z3 authentication", () => {
     );
   });
 
-  test("the dev-user header is no credential here", async () => {
+  test("a session cookie is no credential here", async () => {
     await expectRejected(await login(app, "admin"), 401, "UNAUTHENTICATED");
   });
 
@@ -811,7 +811,13 @@ describe("local scripts", () => {
   ) {
     const proc = Bun.spawn(["bun", `scripts/${file}`, ...args], {
       cwd,
-      env: { ...process.env, APP_ENV: "local", DATABASE_URL: databaseUrl, ...env },
+      env: {
+        ...process.env,
+        APP_ENV: "local",
+        DATABASE_URL: databaseUrl,
+        BETTER_AUTH_SECRET: "test-secret-0123456789abcdef-0123",
+        ...env,
+      },
       stdout: "pipe",
       stderr: "pipe",
     });

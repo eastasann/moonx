@@ -1,10 +1,9 @@
-import { createDb, type Db } from "@moonx/db";
-import { type PersonKey, seedDemo, userId } from "@moonx/db/seed";
+import { createDb, type Db, schema } from "@moonx/db";
+import { DEMO_PASSWORD, hashPassword, type PersonKey, people, seedDemo } from "@moonx/db/seed";
 import type { Elysia } from "elysia";
 import { createApp } from "../src/app";
 import { type AppConfig, testConfig } from "../src/config";
 import { createLogger } from "../src/lib/logger";
-import { DEV_USER_HEADER } from "../src/lib/session";
 import type { Mailer, MailMessage } from "../src/mail/mailer";
 
 /** Opens the test database. Tests refuse to run anywhere but a database named `*_test`. */
@@ -52,11 +51,57 @@ export async function startTestApp(config: Partial<AppConfig> = {}): Promise<Tes
 }
 
 /**
- * How a test acts as a person. This is the one place that knows how requests are authenticated:
- * Step 9 swaps the body for a real sign-in and the tests stay as they are.
+ * Signs in through Better Auth the way a client does and returns the headers that carry the
+ * session; `headers` are sent with the sign-in (the Worker's shared secret, for guarded apps). Sends no `CF-Connecting-IP`, so Better Auth's per-IP limit does not count these.
  */
-export async function login(_app: Elysia, person: PersonKey): Promise<Record<string, string>> {
-  return { [DEV_USER_HEADER]: userId(person) };
+export async function loginWith(
+  app: Elysia,
+  email: string,
+  password: string = DEMO_PASSWORD,
+  headers: Record<string, string> = {},
+): Promise<Record<string, string>> {
+  const response = await app.handle(
+    new Request("http://localhost/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify({ email, password }),
+    }),
+  );
+  if (response.status !== 200) {
+    throw new Error(`sign-in as ${email} answered ${response.status}: ${await response.text()}`);
+  }
+  return { cookie: cookieHeader(response) };
+}
+
+/** The `Cookie` header that replays the cookies a response set. */
+export function cookieHeader(response: Response): string {
+  return response.headers
+    .getSetCookie()
+    .map((cookie) => cookie.split(";")[0])
+    .join("; ");
+}
+
+/** How a test acts as one of the demo people. */
+export function login(
+  app: Elysia,
+  person: PersonKey,
+  headers: Record<string, string> = {},
+): Promise<Record<string, string>> {
+  return loginWith(app, people[person].email, DEMO_PASSWORD, headers);
+}
+
+/** Adds a user who can sign in with `DEMO_PASSWORD` and belongs to no workspace. */
+export async function createLoginUser(
+  db: Db,
+  user: { id: string; email: string; displayName: string },
+): Promise<void> {
+  await db.insert(schema.users).values(user);
+  await db.insert(schema.accounts).values({
+    userId: user.id,
+    accountId: user.id,
+    providerId: "credential",
+    password: await hashPassword(DEMO_PASSWORD),
+  });
 }
 
 export interface CallOptions {

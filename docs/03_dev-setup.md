@@ -69,11 +69,11 @@ make setup
 
 ### 3.2 `.env` を埋める
 
-`.env` の置き場所（2つある）と値の正は [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数)（値は「local の値」の列）。雛形のままでよいものが多く、`make setup` のあとで次だけを埋める。
+`.env` の置き場所（2つある）と値の正は [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数)（値は「local の値」の列）。雛形のままでよいものが多く、`make setup` のあとで次だけを埋める（`BETTER_AUTH_SECRET` は `make setup` が入れるので確認だけ）。
 
 | ファイル | 変数 | やること |
 |---|---|---|
-| `.env` | `BETTER_AUTH_SECRET` | 乱数を入れる: `openssl rand -base64 32` |
+| `.env` | `BETTER_AUTH_SECRET` | `make setup` が乱数を入れる。空のままだと API が起動しないので、`.env` を手で作った場合は `openssl rand -base64 32` の値を入れる |
 | `.env` | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google ログインをローカルで試すときだけ。local 用の OAuth クライアントの値（6章） |
 | `.env` | 上の2つ以外 | 雛形のまま（local の値）。`DATABASE_URL_TEST` はテスト用の DB `moonx_test`（7章）。`RESEND_API_KEY`・`PROXY_SHARED_SECRET`・`CRON_OIDC_AUDIENCE` など local で使わないものは空のまま |
 | `apps/mobile/.env` | `EXPO_PUBLIC_API_BASE_URL` | スマホで動かすときだけ。開発 PC の IP にする（3.5） |
@@ -149,7 +149,7 @@ make admin-create EMAIL=<自分のメール>
 
 ### 3.6 デモデータ
 
-デモデータ（design-spec 8章）を入れ直すときは `make db-seed`、DB を最初からやり直すときは `make db-reset`。`make db-seed` は全テーブルの中身を消してから入れるので、ローカルで作ったデータは残らない。`APP_ENV=local` 以外では動かない。
+デモデータ（design-spec 8章）を入れ直すときは `make db-seed`、DB を最初からやり直すときは `make db-reset`。`make db-seed` は全テーブルの中身を消してから入れるので、ローカルで作ったデータは残らない（デモのユーザーのログイン中のセッションだけは残る）。`APP_ENV=local` 以外では動かない。
 
 デモのユーザーでのサインイン、招待の受諾に使うトークンは design-spec 8.1。
 

@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { Elysia } from "elysia";
 import type { ZodError } from "zod";
-import { MAX_JSON_BYTES } from "./config";
+import { MAX_BODY_BYTES, MAX_JSON_BYTES } from "./config";
 import type { AppContext } from "./context";
 import { ApiError, type ValidationDetail } from "./errors";
 import { isAppTooOld, parseClient } from "./lib/client";
@@ -91,7 +91,13 @@ export function basePlugin(ctx: AppContext) {
             throw new ApiError("FORBIDDEN", "Direct access is not allowed");
           }
         }
-        if (!url.pathname.startsWith("/api/v1")) return;
+        if (!url.pathname.startsWith("/api/v1")) {
+          const length = Number(request.headers.get("content-length") ?? 0);
+          if (url.pathname.startsWith("/api/auth/") && length > MAX_JSON_BYTES) {
+            throw new ApiError("PAYLOAD_TOO_LARGE", "The request body is too large");
+          }
+          return;
+        }
 
         if (isAppTooOld(client, appVersion)) {
           throw new ApiError("APP_UPDATE_REQUIRED", "This app version is no longer supported");
@@ -109,7 +115,7 @@ export function basePlugin(ctx: AppContext) {
             if (!type.startsWith("application/json") && !multipart) {
               throw new ApiError("BAD_REQUEST", "Content-Type must be application/json");
             }
-            if (!multipart && length > MAX_JSON_BYTES) {
+            if (length > (multipart ? MAX_BODY_BYTES : MAX_JSON_BYTES)) {
               throw new ApiError("PAYLOAD_TOO_LARGE", "The request body is too large");
             }
           }
@@ -117,6 +123,14 @@ export function basePlugin(ctx: AppContext) {
       })
       // Chunked bodies carry no Content-Length, so the JSON limit is also enforced on what was read.
       .onParse({ as: "global" }, async ({ request, contentType }) => {
+        // Better Auth parses its own bodies: hand it the raw text, `authRoutes` rebuilds the request.
+        if (new URL(request.url).pathname.startsWith("/api/auth/")) {
+          const text = await request.text();
+          if (Buffer.byteLength(text) > MAX_JSON_BYTES) {
+            throw new ApiError("PAYLOAD_TOO_LARGE", "The request body is too large");
+          }
+          return text;
+        }
         if (!contentType?.startsWith("application/json")) return;
         const text = await request.text();
         if (Buffer.byteLength(text) > MAX_JSON_BYTES) {
@@ -196,11 +210,11 @@ export function basePlugin(ctx: AppContext) {
 
 /**
  * Resolves the signed-in user for the routes `.use`d after it. 401 when there is none (SDD 5.1).
- * Routes read `user` from the context; Step 9 only changes {@link currentUser}.
+ * Routes read `user` from the context.
  */
 export function authPlugin(ctx: AppContext) {
   return new Elysia({ name: "moonx-auth" }).derive({ as: "scoped" }, async ({ request }) => {
-    const user = await currentUser(ctx.db, ctx.config, request);
+    const user = await currentUser(ctx.db, ctx.auth, request);
     setRequestUser(request, user.id);
     return { user };
   });

@@ -28,3 +28,12 @@ export function setRequestUser(request: Request, userId: string): void {
   const info = infos.get(request);
   if (info) info.userId = userId;
 }
+
+/**
+ * The caller's address from `CF-Connecting-IP`. The header is trustworthy only because the base
+ * plugin has already rejected requests without the Worker's shared secret when one is configured
+ * (SDD 7.2); without a secret (local, tests) a missing header reads as one shared bucket.
+ */
+export function clientIp(request: Request): string {
+  return request.headers.get("cf-connecting-ip")?.trim() || "unknown";
+}

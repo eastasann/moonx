@@ -100,3 +100,21 @@ export function invitationMail(input: InvitationMailInput): MailMessage {
   ].join("\n");
   return { to: input.to, subject, text };
 }
+
+/** The password reset mail (design-spec 6.16 screen 2). */
+export function passwordResetMail(input: {
+  to: string;
+  link: string;
+  expiresInMinutes: number;
+}): MailMessage {
+  const t = createI18n().t;
+  const text = [
+    t("mail:passwordReset.body"),
+    "",
+    t("mail:passwordReset.action", { minutes: input.expiresInMinutes }),
+    input.link,
+    "",
+    t("mail:passwordReset.ignore"),
+  ].join("\n");
+  return { to: input.to, subject: t("mail:passwordReset.subject"), text };
+}

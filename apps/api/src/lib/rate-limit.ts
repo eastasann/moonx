@@ -3,11 +3,15 @@ import { sql } from "drizzle-orm";
 import { ApiError } from "../errors";
 import type { Executor } from "./db";
 
-/** Per-user limits of SDD 7.2. The window is fixed: it starts at the first counted request. */
+/** Limits of SDD 7.2. The window is fixed: it starts at the first counted request. */
 export const RATE_LIMITS = {
   invitation: { limit: 20, windowSeconds: 3600 },
   pdf: { limit: 30, windowSeconds: 3600 },
   ai: { limit: 60, windowSeconds: 3600 },
+  /** Per IP address, not per user: the caller has no account yet (U5). */
+  signUp: { limit: 10, windowSeconds: 60 },
+  /** Password guesses at U7, per user: a stolen session must not be able to try passwords freely. */
+  passwordCheck: { limit: 5, windowSeconds: 600 },
 } as const;
 
 /** The operations that have a per-user limit. */

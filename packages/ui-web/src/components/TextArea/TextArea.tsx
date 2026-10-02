@@ -12,6 +12,7 @@ export function TextArea({
   description,
   errorMessage,
   isRequired,
+  isLabelHidden,
   size = "M",
   placeholder,
   ...props
@@ -47,7 +48,7 @@ export function TextArea({
       validationBehavior="aria"
       className={fieldRoot({ size })}
     >
-      <FieldLabel isRequired={isRequired} size={size}>
+      <FieldLabel isRequired={isRequired} isLabelHidden={isLabelHidden} size={size}>
         {label}
       </FieldLabel>
       <AriaTextArea

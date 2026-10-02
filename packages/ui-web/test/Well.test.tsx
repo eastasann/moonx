@@ -27,3 +27,17 @@ test("has no axe violations", async () => {
   const { container } = render(<Well aria-label="Summary">Text</Well>);
   await expectNoAxeViolations(container);
 });
+
+test("preformatted keeps the text as written in a focusable scrolling region", async () => {
+  const text = "## [V.01.WHO]\n\n> HR teams";
+  const { container } = render(
+    <Well preformatted aria-label="Export preview">
+      {text}
+    </Well>,
+  );
+  const group = screen.getByRole("group", { name: "Export preview" });
+  const pre = group.querySelector("pre");
+  expect(pre?.textContent).toBe(text);
+  expect(pre).toHaveAttribute("tabindex", "0");
+  await expectNoAxeViolations(container);
+});

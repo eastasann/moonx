@@ -21,6 +21,11 @@ export interface NumberFieldProps
    * currency: "PHP" }` or `{ style: "percent" }`. Parsing and grouping follow en-PH.
    */
   formatOptions?: Intl.NumberFormatOptions;
+  /**
+   * Called with the text as it is typed. `onChange` only fires when the field is committed (blur
+   * or Enter), so a screen that recalculates on every keystroke reads the text here.
+   */
+  onInputChange?: (text: string) => void;
 }
 
 export function NumberField({
@@ -28,8 +33,10 @@ export function NumberField({
   description,
   errorMessage,
   isRequired,
+  isLabelHidden,
   size = "M",
   placeholder,
+  onInputChange,
   ...props
 }: NumberFieldProps) {
   return (
@@ -42,7 +49,7 @@ export function NumberField({
       >
         {({ isInvalid, isDisabled }) => (
           <>
-            <FieldLabel isRequired={isRequired} size={size}>
+            <FieldLabel isRequired={isRequired} isLabelHidden={isLabelHidden} size={size}>
               {label}
             </FieldLabel>
             <Group
@@ -51,7 +58,11 @@ export function NumberField({
               isDisabled={isDisabled}
               className={box({ size, numeric: true })}
             >
-              <Input placeholder={placeholder} className={bareInput} />
+              <Input
+                placeholder={placeholder}
+                className={bareInput}
+                onChange={(event) => onInputChange?.(event.target.value)}
+              />
             </Group>
             <FieldHelp description={description} errorMessage={errorMessage} />
           </>

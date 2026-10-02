@@ -96,6 +96,14 @@ function needsPriceForPercentRows(rows: CostRowInput[], price: number | null): b
   );
 }
 
+/**
+ * What a percent-of-price row amounts to at a price (design-spec 6.3 "35% · ₱77.00"). Null while
+ * either is unknown.
+ */
+export function percentOfPriceAmount(percent: number | null, price: number | null): number | null {
+  return percent == null || price == null ? null : percent * price;
+}
+
 /** Variable cost per sale: amount rows plus percent rows times the price. */
 function variableTotal(rows: CostRowInput[], price: number | null): CostTotal {
   const { unknownRows, emptyRows, filled } = tally(rows);
@@ -107,7 +115,7 @@ function variableTotal(rows: CostRowInput[], price: number | null): CostTotal {
           (sum, r) =>
             sum +
             (r.inputMode === "percent_of_price"
-              ? (r.percent ?? 0) * (price ?? 0)
+              ? (percentOfPriceAmount(r.percent, price) ?? 0)
               : (r.amount ?? 0)),
           0,
         );

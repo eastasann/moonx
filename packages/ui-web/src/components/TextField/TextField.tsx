@@ -24,6 +24,7 @@ export function TextField({
   description,
   errorMessage,
   isRequired,
+  isLabelHidden,
   size = "M",
   placeholder,
   ...props
@@ -35,7 +36,7 @@ export function TextField({
       validationBehavior="aria"
       className={fieldRoot({ size })}
     >
-      <FieldLabel isRequired={isRequired} size={size}>
+      <FieldLabel isRequired={isRequired} isLabelHidden={isLabelHidden} size={size}>
         {label}
       </FieldLabel>
       <Input placeholder={placeholder} className={box({ size })} />

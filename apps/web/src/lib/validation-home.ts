@@ -12,8 +12,7 @@ const fetchHome = (ideaId: string) => call(api().api.v1.ideas({ ideaId }).valida
 export type ValidationHomeData = Awaited<ReturnType<typeof fetchHome>>;
 
 /** Under `["ideas", ...]`, so the idea actions and the edit sheet refresh the home with the list. */
-export const validationHomeKey = (ideaId: string) =>
-  [...IDEAS_KEY, "validation-home", ideaId] as const;
+const validationHomeKey = (ideaId: string) => [...IDEAS_KEY, "validation-home", ideaId] as const;
 
 export const validationHomeQuery = (ideaId: string) =>
   queryOptions({ queryKey: validationHomeKey(ideaId), queryFn: () => fetchHome(ideaId) });
@@ -66,6 +65,7 @@ export const HOME_KEYS = {
     break_even_units_day: "validation:home.metrics.break_even_units_day",
     expected_operating_profit: "validation:home.metrics.expected_operating_profit",
     payback_months: "validation:home.metrics.payback_months",
+    simple_roi: "validation:home.metrics.simple_roi",
   },
   metricReason: {
     needs_price: "validation:economics.reason.needs_price",
@@ -198,6 +198,7 @@ export function checkReasons(t: TFunction, check: CheckResult): string[] {
 }
 
 export type HomeMetricKey = keyof typeof HOME_KEYS.metric;
+/** The home shows four of the key numbers; the decision screen adds ROI (design-spec 6.5). */
 export const HOME_METRIC_KEYS: HomeMetricKey[] = [
   "initial_cost_total",
   "break_even_units_day",

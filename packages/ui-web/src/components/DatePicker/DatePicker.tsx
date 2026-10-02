@@ -64,6 +64,7 @@ export function DatePicker({
   description,
   errorMessage,
   isRequired,
+  isLabelHidden,
   size = "M",
   openLabel,
   previousMonthLabel,
@@ -81,7 +82,7 @@ export function DatePicker({
       >
         {({ isInvalid, isDisabled }) => (
           <>
-            <FieldLabel isRequired={isRequired} size={size}>
+            <FieldLabel isRequired={isRequired} isLabelHidden={isLabelHidden} size={size}>
               {label}
             </FieldLabel>
             <Group

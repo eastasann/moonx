@@ -1,0 +1,145 @@
+{
+  "export": {
+    "title": "Export for AI",
+    "steps": {
+      "label": "Export steps",
+      "scope": "Scope",
+      "review": "Review",
+      "export": "Export"
+    },
+    "source": {
+      "self_analysis": "Self analysis",
+      "validation": "Validation: {{name}}",
+      "business_plan": "Plan: {{name}}"
+    },
+    "scope": {
+      "sections": "Sections to export",
+      "selectAll": "All sections",
+      "wholePlan": "Whole plan",
+      "partA": "Part A",
+      "partB": "Part B",
+      "items": "Items",
+      "chooseOne": "Choose at least one section",
+      "options": "Options",
+      "includeEmpty": "Include empty questions",
+      "includeExamples": "Include examples",
+      "includeReference": "Include reference (key numbers, competitors, research)",
+      "includeReferencePlan": "Include reference (validation numbers and tables)",
+      "validationSection": {
+        "01": "01 Customer & Problem",
+        "02": "02 Market",
+        "04": "04 Patterns",
+        "08": "08 Worth",
+        "10": "10 Final Assessment"
+      }
+    },
+    "next": "Next",
+    "review": {
+      "questions_one": "{{count}} question",
+      "questions_other": "{{count}} questions",
+      "format": "Format",
+      "markdown": "Markdown",
+      "json": "JSON",
+      "preview": "Preview of the export",
+      "allEmpty": "All questions are empty",
+      "allEmptyBody": "You can still export it to start from scratch with your AI.",
+      "emptyScope": "Nothing to export",
+      "loadFailed": "Couldn't build the export"
+    },
+    "done": {
+      "copyMarkdown": "Copy Markdown",
+      "downloadMarkdown": "Download .md",
+      "copyJson": "Copy JSON",
+      "downloadJson": "Download .json",
+      "copied": "Copied",
+      "copyFailed": "Couldn't copy. Use Download instead.",
+      "next": "Next: paste it into your AI, then bring the reply back.",
+      "importLink": "Import from AI"
+    }
+  },
+  "import": {
+    "title": "Import from AI",
+    "titleFor": "Import from AI — {{name}}",
+    "steps": {
+      "label": "Import steps",
+      "paste": "Paste",
+      "match": "Match",
+      "review": "Review",
+      "apply": "Apply"
+    },
+    "paste": {
+      "label": "AI reply",
+      "placeholder": "Paste the reply from your AI (Markdown or JSON)",
+      "upload": "Upload .md / .json",
+      "tooLong": "This is too long. Import fewer questions at a time.",
+      "unreadableFile": "Couldn't read this file. Use a .md or .json file.",
+      "noIds": "No question IDs found",
+      "noIdsBody": "Start each answer with a heading that has its question ID in square brackets, like this:",
+      "example": "## [{{id}}]\nYour answer",
+      "exampleLabel": "Example of a reply",
+      "continueWhole": "Continue with the whole paste as one block"
+    },
+    "match": {
+      "summary_one": "{{count}} block to review",
+      "summary_other": "{{count}} blocks to review",
+      "matched": "Matched",
+      "unmatched": "Not matched",
+      "notImportable": "Tables and numbers can't be imported",
+      "hidden": "This question is hidden",
+      "duplicate": "More than one block uses this ID. Choose which to use.",
+      "discarded": "Discarded",
+      "unlabeled": "Block without a question ID",
+      "choose": "Choose question",
+      "chooseOpen": "Show questions",
+      "chooseEmpty": "No question matches",
+      "discard": "Discard",
+      "restore": "Restore",
+      "use": "Use this block",
+      "unmatchedHint": "Choose a question for it, or discard it. Blocks left unmatched are discarded.",
+      "emptyBlock": "(empty)",
+      "nothing": "Nothing to import",
+      "nothingBody": "No block matched a question. Go back and check the reply.",
+      "backToPaste": "Back to paste"
+    },
+    "review": {
+      "current": "Current",
+      "imported": "Imported (editable)",
+      "apply_one": "Apply {{count}} change",
+      "apply_other": "Apply {{count}} changes",
+      "unchanged_one": "{{count}} unchanged",
+      "unchanged_other": "{{count}} unchanged",
+      "unchangedItem": "Same as the current answer",
+      "include": "Apply {{title}}",
+      "amount": "Amount",
+      "reason": "Reason",
+      "amountError": "Couldn't read the amount",
+      "choiceError": "Use one of: {{choices}}",
+      "tooLong": "This is too long.",
+      "empty": "(empty)",
+      "changes": "Changes",
+      "updatedBy": "Updated by {{name}} {{when}}",
+      "updatedByUnknown": "Updated {{when}}",
+      "someone": "someone",
+      "justNow": "just now",
+      "fauReset": "F/A/U goes back to Unclassified. Set it again if you want.",
+      "fau": "F/A/U",
+      "factNeedsEvidence": "Fact needs evidence, and this answer has none. Apply first, then attach evidence in the question.",
+      "conflict": "Some answers changed while you were reviewing",
+      "conflictBody": "Current shows the latest answers. Check the changes and apply again.",
+      "noChanges": "No changes found",
+      "noChangesBody": "The reply matches your current answers.",
+      "cancel": "Cancel",
+      "close": "Close"
+    },
+    "apply": {
+      "applying": "Applying",
+      "failed": "Couldn't apply",
+      "retry": "Retry",
+      "backToReview": "Back to review",
+      "updated_one": "{{count}} answer updated",
+      "updated_other": "{{count}} answers updated",
+      "needsFau": "{{count}} needs F/A/U",
+      "summary": "{{updated}} · {{needs}}"
+    }
+  }
+}

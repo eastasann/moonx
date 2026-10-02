@@ -1,3 +1,4 @@
+import { DEFAULT_CURRENCY } from "@moonx/i18n";
 import { useMe } from "../../lib/session";
 import type { ValidationHomeData } from "../../lib/validation-home";
 
@@ -18,7 +19,7 @@ export function useHomeAccess(data: ValidationHomeData, workspaceId: string): Ho
   return {
     isEditor,
     canChange: isEditor && !data.idea.archived,
-    currency: membership?.workspace.currency ?? "PHP",
+    currency: membership?.workspace.currency ?? DEFAULT_CURRENCY,
     timeZone: me.timezone,
   };
 }

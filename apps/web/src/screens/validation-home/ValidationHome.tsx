@@ -35,7 +35,7 @@ function HomeContent({ data, workspaceId }: { data: ValidationHomeData; workspac
           />
         }
         summary={<KeyNumbers data={data} workspaceId={workspaceId} currency={access.currency} />}
-        nextSteps={<NextSteps data={data} workspaceId={workspaceId} />}
+        nextSteps={<NextSteps data={data} workspaceId={workspaceId} canDecide={access.canChange} />}
         status={
           <Stack gap="space-400">
             <Checks data={data} workspaceId={workspaceId} />

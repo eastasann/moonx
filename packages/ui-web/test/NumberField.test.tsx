@@ -25,6 +25,25 @@ describe("NumberField", () => {
     expect(onChange).toHaveBeenLastCalledWith(30000.5);
   });
 
+  test("reports the text on every keystroke while onChange waits for the commit", async () => {
+    const onChange = vi.fn();
+    const onInputChange = vi.fn();
+    render(<NumberField label="Price" onChange={onChange} onInputChange={onInputChange} />);
+    const input = screen.getByRole("textbox", { name: "Price" });
+    await userEvent.type(input, "1,2");
+    expect(onInputChange.mock.calls.map(([text]) => text)).toEqual(["1", "1,", "1,2"]);
+    expect(onChange).not.toHaveBeenCalled();
+    await userEvent.tab();
+    expect(onChange).toHaveBeenLastCalledWith(12);
+  });
+
+  test("hides the label visually but keeps it as the accessible name", () => {
+    render(<NumberField label="Price" isLabelHidden />);
+    const input = screen.getByRole("textbox", { name: "Price" });
+    expect(input).toBeInTheDocument();
+    expect(screen.getByText("Price").className).not.toMatch(/label/i);
+  });
+
   test("formats percent from a 0 to 1 value", () => {
     render(
       <NumberField

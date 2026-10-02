@@ -2,6 +2,7 @@ import type { ComponentSize } from "@moonx/ui-tokens";
 import { Asterisk } from "lucide-react";
 import type { ReactNode } from "react";
 import { FieldError, Label, Text } from "react-aria-components";
+import { visuallyHidden } from "../../styles.css";
 import {
   description as descriptionClass,
   errorMessage as errorClass,
@@ -20,22 +21,29 @@ export interface FieldProps {
   errorMessage?: ReactNode;
   isInvalid?: boolean;
   isRequired?: boolean;
+  /**
+   * Keeps the label for assistive technology and hides it visually, for a field whose meaning is
+   * clear from its surroundings, such as a cell under a column heading.
+   */
+  isLabelHidden?: boolean;
   size?: ComponentSize;
 }
 
 export function FieldLabel({
   children,
   isRequired,
+  isLabelHidden,
   size,
   id,
 }: {
   id?: string;
   children: ReactNode;
   isRequired?: boolean;
+  isLabelHidden?: boolean;
   size: ComponentSize;
 }) {
   return (
-    <Label id={id} className={label({ size })}>
+    <Label id={id} className={isLabelHidden ? visuallyHidden : label({ size })}>
       {children}
       {isRequired ? <Asterisk aria-hidden="true" className={icon({ size: "XS" })} /> : null}
     </Label>

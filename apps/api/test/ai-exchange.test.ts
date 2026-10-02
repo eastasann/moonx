@@ -149,6 +149,40 @@ describe("X2 context", () => {
     expect(byKey["P.08.3"].importable).toBe(false);
     expect(byKey["P.23.1"].importable).toBe(false);
     expect(byKey["P.01.1"].current.text).toEqual(expect.any(String));
+    expect(res.body.target).toMatchObject({
+      workspaceId: expect.any(String),
+      ideaId: expect.any(String),
+      currency: expect.any(String),
+      archived: false,
+    });
+    const sections = Object.fromEntries(res.body.sections.map((x: { key: string }) => [x.key, x]));
+    expect(sections["01"]).toMatchObject({ part: "a", importable: true });
+    const questions = res.body.questions as { questionKey: string; importable: boolean }[];
+    for (const [key, section] of Object.entries(sections) as [string, { importable: boolean }][]) {
+      const own = questions.filter((q) => q.questionKey.split(".")[1] === key);
+      expect(section.importable).toBe(own.some((q) => q.importable));
+    }
+    expect(Object.values(sections).some((s) => !(s as { importable: boolean }).importable)).toBe(
+      true,
+    );
+  });
+
+  test("a plan under an archived idea says so, and the context is still readable", async () => {
+    const url = `/api/v1/ai/import/context?target=business_plan&id=${planA}`;
+    await t.db
+      .update(schema.ideas)
+      .set({ archivedAt: new Date() })
+      .where(eq(schema.ideas.id, ideaId("piaya")));
+    try {
+      const res = await call(t.app, "GET", url, { as: who.ana });
+      expect(res.status).toBe(200);
+      expect(res.body.target.archived).toBe(true);
+    } finally {
+      await t.db
+        .update(schema.ideas)
+        .set({ archivedAt: null })
+        .where(eq(schema.ideas.id, ideaId("piaya")));
+    }
   });
 
   test("a validation context marks the OCEAN branch hidden and carries classification", async () => {

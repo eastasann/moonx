@@ -66,7 +66,10 @@ export function stubApi(handlers: Record<string, Handler>) {
         { status: 404 },
       );
     }
-    return Response.json(answer.body ?? null, { status: answer.status ?? 200 });
+    const status = answer.status ?? 200;
+    // A 204 cannot carry a body, not even `null`.
+    if (status === 204) return new Response(null, { status });
+    return Response.json(answer.body ?? null, { status });
   });
   vi.stubGlobal("fetch", fetchStub);
   return { calls, unhandled, fetchStub };

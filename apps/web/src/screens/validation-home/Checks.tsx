@@ -45,17 +45,39 @@ function CheckRow({
   );
 }
 
+/** Check rows with their state, what is missing and where to fill it (no totals or scores). */
+export function CheckRows({
+  checks,
+  workspaceId,
+  ideaId,
+  label,
+}: {
+  checks: readonly CheckResult[];
+  workspaceId: string;
+  ideaId: string;
+  label: string;
+}) {
+  return (
+    <RowList aria-label={label}>
+      {checks.map((check) => (
+        <CheckRow key={check.key} check={check} workspaceId={workspaceId} ideaId={ideaId} />
+      ))}
+    </RowList>
+  );
+}
+
 /** The six checks with their state, what is missing and where to fill it (no totals or scores). */
 export function Checks({ data, workspaceId }: { data: ValidationHomeData; workspaceId: string }) {
   const { t } = useTranslation("validation");
   return (
     <Stack gap="space-100">
       <BlockHeading>{t("home.blocks.checks")}</BlockHeading>
-      <RowList aria-label={t("home.blocks.checks")}>
-        {data.checks.map((check) => (
-          <CheckRow key={check.key} check={check} workspaceId={workspaceId} ideaId={data.idea.id} />
-        ))}
-      </RowList>
+      <CheckRows
+        checks={data.checks}
+        workspaceId={workspaceId}
+        ideaId={data.idea.id}
+        label={t("home.blocks.checks")}
+      />
     </Stack>
   );
 }

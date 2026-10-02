@@ -1236,12 +1236,13 @@ interface PitchDeck {
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
 | X1 | `?source=self_analysis|validation|business_plan&id=<検証かプランの id。自己分析は省く>&sections=01,02&items=1,3&part=a|b&includeEmpty=true&includeExamples=true&includeReference=true` | `200 { markdown: string; json: object; fileBaseName: string; questionCount: number; allEmpty: boolean }` | `json` は design-spec 6.6 の `moonx-export`。範囲が空なら `422 EMPTY_SCOPE`。記録しない |
-| X2 | `?target=self_analysis|validation|business_plan&id=` | `200 ImportContext` | |
+| X2 | `?target=self_analysis|validation|business_plan&id=` | `200 ImportContext` | アーカイブ中のアイデア・プランも読める（X1 も同じ）。`target.archived` で 24・25 が操作を止め、X3 は 409 `ARCHIVED` |
 | X3 | `{ target: { type: TemplateKind; id?: UUID }; changes: ImportChange[] }` | `200 { applied: number; needsClassification: number; batchId: UUID }` | 1つのトランザクションで全部反映するか、何もしない。どれかの `baseLockVersion` が古ければ `409 CONFLICT_MULTI`（`error.conflicts: { questionKey; current: ConflictCurrent }[]`）。取り込めない設問・隠れた設問は `422 NOT_IMPORTABLE`、存在しない設問は `422 QUESTION_NOT_FOUND`、金額・選択の値が読めない・同じ設問が2回あれば `422 VALIDATION_FAILED`。`applied` は内容が変わった回答の数（変わらないものは数えない）。`conflicts[].current.value` は `{ text, amount }`。検証の回答で本文が変わったものは F/A/U を外して未分類にする（`classification` を送ったらそれを使う。`fact` は根拠が残っているときだけ）。履歴 `ai_import`（1つの `batchId`） |
 
 ```ts
 interface ImportContext {
-  target: { type: TemplateKind; id: UUID; name: string };
+  target: { type: TemplateKind; id: UUID; name: string; workspaceId: UUID | null; ideaId: UUID | null; currency: string | null; archived: boolean };  // workspaceId は検証・プランのワークスペース（24・25 は URL のワークスペースと食い違えば「You don't have access」を出す。自己分析は null）。ideaId は検証・プランの親のアイデア（取り込み後に開く画面）。currency は金額の表示用。archived はアイデアかプランがアーカイブ中（24・25 は書き出し・取り込みの操作を出さない）
+  sections: { key: string; title: string; part: "a" | "b" | null; importable: boolean }[];  // テンプレートの全セクション（順）。importable は取り込める型の設問を1つ以上持つ。24 の範囲の選択肢と 25 の範囲の判定に使う
   questions: {
     questionKey: string; title: string; sectionKey: string;
     answerType: AnswerType; options: QuestionOptions | null;

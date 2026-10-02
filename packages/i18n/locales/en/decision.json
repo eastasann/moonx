@@ -1,0 +1,34 @@
+{
+  "crumb": "Record decision",
+  "title": "Record decision",
+  "titleWithName": "Record decision — {{name}}",
+  "back": "Validation",
+  "concept": "Concept",
+  "biggestOpportunity": "Biggest opportunity",
+  "biggestRisk": "Biggest risk",
+  "biggestUnknown": "Biggest unknown",
+  "checksMissing_one": "Checks — {{count}} missing",
+  "checksMissing_other": "Checks — {{count}} missing",
+  "checksDone": "All {{count}} checks done",
+  "fauFocus": "Review first: {{unclassified}} Unclassified · {{unknown}} Unknown",
+  "last": "Last: {{decision}} · {{date}} · {{who}}",
+  "question": "Should we develop this into a full Business Plan?",
+  "reason": "Why?",
+  "note": {
+    "proceed": "Proceed means it is worth planning — not approval to launch.",
+    "drop": "Dropped ideas are hidden from lists by default. You can decide again later."
+  },
+  "missing_one": "{{count}} check is missing. It will be recorded with this decision.",
+  "missing_other": "{{count}} checks are missing. They will be recorded with this decision.",
+  "failed": "Couldn't record",
+  "retry": "Retry",
+  "conflict": "{{who}} recorded {{decision}} {{when}}. Record yours as well?",
+  "recordMine": "Record mine as well",
+  "recorded": "Decision recorded",
+  "plan": {
+    "title": "Create a plan draft?",
+    "body": "Start the Business Plan for this idea now, or come back to it later.",
+    "create": "Create draft",
+    "later": "Later"
+  }
+}

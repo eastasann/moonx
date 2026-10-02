@@ -4,6 +4,7 @@ import {
   type CostRowInput,
   computeEconomics,
   EMPTY_ECONOMICS_INPUTS,
+  percentOfPriceAmount,
 } from "../src";
 import { percentRow, piayaInputs, piayaRows, row } from "./fixtures";
 
@@ -300,5 +301,14 @@ describe("key metrics", () => {
     expect(m.operating_days?.value).toBe(30);
     expect(m["cost_row:initial.permits"]?.reason).toBe("empty");
     expect(Object.keys(m).some((k) => k === "cost_row:null")).toBe(false);
+  });
+});
+
+describe("percentOfPriceAmount", () => {
+  test("is the percent times the price, and unknown while either is missing", () => {
+    expect(percentOfPriceAmount(0.35, 220)).toBeCloseTo(77, 10);
+    expect(percentOfPriceAmount(0, 450)).toBe(0);
+    expect(percentOfPriceAmount(0.35, null)).toBeNull();
+    expect(percentOfPriceAmount(null, 450)).toBeNull();
   });
 });

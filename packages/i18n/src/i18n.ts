@@ -1,8 +1,12 @@
 import i18next, { type i18n as I18n } from "i18next";
 import account from "../locales/en/account.json";
+import ai from "../locales/en/ai.json";
 import app from "../locales/en/app.json";
 import auth from "../locales/en/auth.json";
 import common from "../locales/en/common.json";
+import costs from "../locales/en/costs.json";
+import decision from "../locales/en/decision.json";
+import economics from "../locales/en/economics.json";
 import errors from "../locales/en/errors.json";
 import form from "../locales/en/form.json";
 import ideas from "../locales/en/ideas.json";
@@ -13,15 +17,35 @@ import validation from "../locales/en/validation.json";
 
 /** Catalogs per language. The UI is English only for now (design-spec 1.2); add a language here. */
 export const resources = {
-  en: { account, app, auth, common, errors, form, ideas, mail, panels, plan, validation },
+  en: {
+    account,
+    ai,
+    app,
+    auth,
+    common,
+    costs,
+    decision,
+    economics,
+    errors,
+    form,
+    ideas,
+    mail,
+    panels,
+    plan,
+    validation,
+  },
 } as const;
 
 export const DEFAULT_LANGUAGE = "en";
 export const NAMESPACES = [
   "account",
+  "ai",
   "app",
   "auth",
   "common",
+  "costs",
+  "decision",
+  "economics",
   "errors",
   "form",
   "ideas",

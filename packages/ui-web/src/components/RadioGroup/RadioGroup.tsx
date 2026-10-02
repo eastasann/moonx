@@ -24,6 +24,7 @@ export function RadioGroup({
   description,
   errorMessage,
   isRequired,
+  isLabelHidden,
   size = "M",
   orientation = "vertical",
   children,
@@ -38,7 +39,7 @@ export function RadioGroup({
         validationBehavior="aria"
         className={`${fieldRoot({ size })} ${fieldRootAuto}`}
       >
-        <FieldLabel isRequired={isRequired} size={size}>
+        <FieldLabel isRequired={isRequired} isLabelHidden={isLabelHidden} size={size}>
           {label}
         </FieldLabel>
         <div className={choiceGroupItems({ orientation })}>{children}</div>

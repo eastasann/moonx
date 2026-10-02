@@ -12,6 +12,7 @@ export function WideComboBox({
   description,
   errorMessage,
   isRequired,
+  isLabelHidden,
   size = "M",
   placeholder,
   value,
@@ -34,7 +35,7 @@ export function WideComboBox({
         onSelectionChange={(key) => onChange?.(key === null ? null : String(key))}
         className={fieldRoot({ size })}
       >
-        <FieldLabel isRequired={isRequired} size={size}>
+        <FieldLabel isRequired={isRequired} isLabelHidden={isLabelHidden} size={size}>
           {label}
         </FieldLabel>
         <Group role="presentation" className={box({ size })}>

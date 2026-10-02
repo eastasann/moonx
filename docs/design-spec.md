@@ -887,7 +887,7 @@ Web（パターン F ワークシート）
 |---|---|---|
 | 金額・%・文章を入れる | 自動保存。合計と 18 の計算がその場で変わる | Owner / Member |
 | F/A/U | 6.0.3（数字の Unknown は値を持たない） | Owner / Member |
-| + Add row | その表の末尾に空の行を追加し、項目名の入力にフォーカス | Owner / Member |
+| + Add row | その表の末尾に、名前が「New row」で金額が未入力の行を追加し、項目名の入力にフォーカスして全選択する（V13 は名前を必須にしているので、既定の名前を付けて作る） | Owner / Member |
 | 行の ⋯ | 名前の変更 / 並べ替え / Lump sum / 削除 / コメント / 履歴 | Owner / Member（コメント・履歴は全ロール） |
 | → Unit Economics | 18 へ | 全ロール |
 
@@ -1083,6 +1083,7 @@ Web / スマホ共通（パターン B 中央集中。スマホは縦に積む�
 | 判断材料が空 | 各欄「Empty」。不足は6件と表示。記録はできる |
 | 記録の失敗 | 入力を残して「Couldn't record — Retry」 |
 | Viewer | この画面に入れない（ボタンを出さない）。URL で開いたら「You don't have access」 |
+| アーカイブ済みのアイデア | 判断材料は出し、判定の入力欄は出さない。「This idea is archived」の注意を表示する |
 
 ---
 
@@ -1264,6 +1265,8 @@ Reply in Markdown. For each question you want to update, write one block:
 | 範囲が空 | Next を押せない。「Choose at least one section」 |
 | 回答が全部空 | 書き出せる（AI に最初から相談する使い方）。注意として「All questions are empty」 |
 | コピーの失敗（ブラウザの制限） | 「Couldn't copy. Use Download instead.」 |
+| アーカイブ済みのアイデア・プラン | 「This idea is archived」の注意を出し、範囲の選択は出さない。書き出した内容は取り込めないため |
+| URL のワークスペースに無い検証・プラン | 「You don't have access to this」（SDD 4） |
 | ローディング | プレビューの骨組み |
 
 ---
@@ -1330,7 +1333,7 @@ Web（パターン G ステップ。差分確認だけ左右2列）
 - 設問ごとに、今の回答と取り込む内容を並べ、変わった部分を強調する。
 - 取り込む内容はその場で直せる。
 - 設問ごとに「反映する」のチェック（初期値はオン）。内容が同じ設問は「unchanged」として折りたたみ、反映しない。
-- **検証の回答で内容が変わったものは、F/A/U を「未分類」に戻す。** 差分確認の画面でその場で付け直せる（Fact を選ぶと M2 が開く）。付け直さなければ未分類のまま反映する。根拠の紐づけは消さずに残し、Fact に付け直すときにそのまま使える。
+- **検証の回答で内容が変わったものは、F/A/U を「未分類」に戻す。** 差分確認の画面でその場で付け直せる。Fact を選べるのは、根拠の紐づけが残っている設問だけ（紐づけは消さずに残すので、そのまま使える）。根拠が無い設問で Fact を選ぶと「Apply first, then attach evidence in the question」と出し、反映の後に設問の画面の M2 で根拠を足して Fact にする。M2 は根拠を付けた時点で Fact にするため、反映の前の回答に付けると、反映で内容が変わって未分類に戻るから。付け直さなければ未分類のまま反映する。
 - 自己分析の金額の設問は、金額を数値として読む（通貨記号・桁区切りを取り除く）。読めなければ「Couldn't read the amount」と出し、直すまで反映できない。
 - 選択の設問（02 OCEAN）は Red / Blue / Mixed のいずれか（大文字小文字は問わない）。それ以外は直すまで反映できない。
 - 開いた後に他の人がその回答を変えていた場合は、「Current」に最新の内容を出し、「Updated by Kenji just now」と添える。
@@ -1348,6 +1351,9 @@ Web（パターン G ステップ。差分確認だけ左右2列）
 | 振り分け済みが0件 | ③ に進めない。「Nothing to import」と ① に戻るボタン |
 | 変更が0件 | 「No changes found」と閉じるボタン |
 | 反映の失敗 | 入力を残して「Couldn't apply — Retry」 |
+| 他の人が先に回答を変えていた（409 `CONFLICT_MULTI`） | ③ に戻り、Current を最新にして「Some answers changed while you were reviewing」を出す。直した内容は残る |
+| アーカイブ済みのアイデア・プラン | 「This idea is archived」の注意を出し、貼り付け欄は出さない |
+| URL のワークスペースに無い検証・プラン | 「You don't have access to this」（SDD 4） |
 | Viewer | この画面に入れない |
 
 ---

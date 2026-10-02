@@ -42,20 +42,25 @@ const REQUEST_TIMEOUT_MS = 30_000;
 /**
  * Sends a JSON request with `fetch` and returns the parsed answer (null for an empty one), or
  * throws an {@link ApiError}. For requests that are described as data, such as the saves of the
- * pending queue (ADR-021), which a Treaty call cannot express.
+ * pending queue (ADR-021), which a Treaty call cannot express, and for reads whose text must
+ * arrive untouched: Treaty turns any string that looks like a date into a `Date`, which would
+ * change an exported `exportedAt` or an answer that is a date.
  */
 export async function sendJson<Data = unknown>(
-  method: "POST" | "PUT" | "PATCH" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
-  body: unknown,
+  body?: unknown,
 ): Promise<Data> {
   let response: Response;
   try {
     response = await globalThis.fetch(path, {
       method,
       credentials: "same-origin",
-      headers: { "content-type": "application/json", "X-Moonx-Client": "web" },
-      body: JSON.stringify(body),
+      headers:
+        method === "GET"
+          ? { "X-Moonx-Client": "web" }
+          : { "content-type": "application/json", "X-Moonx-Client": "web" },
+      body: method === "GET" ? undefined : JSON.stringify(body),
       // A request that never answers must end: it holds the item's lock and the logout flush.
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });

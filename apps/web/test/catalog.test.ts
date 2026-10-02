@@ -121,6 +121,13 @@ const DYNAMIC: Record<string, string[]> = {
   "account:preferences.themes.${theme}": ["system", "light", "dark"].map(
     (x) => `account:preferences.themes.${x}`,
   ),
+  "export.steps.${stepId}": ["scope", "review", "export"].map((s) => `ai:export.steps.${s}`),
+  "import.steps.${stepId}": ["paste", "match", "review", "apply"].map(
+    (s) => `ai:import.steps.${s}`,
+  ),
+  "columns.${id}": ["name", "amount", "fau", "whyNeeded", "canReduce", "notes", "actions"].map(
+    (c) => `costs:columns.${c}`,
+  ),
 };
 
 test("every translation key used in the app exists", () => {

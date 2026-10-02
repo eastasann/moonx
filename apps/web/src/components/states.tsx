@@ -1,7 +1,7 @@
 import type { Me } from "@moonx/schemas";
 import { Button, IllustratedMessage, Link, Stack, Text } from "@moonx/ui-web";
 import { type UseQueryResult, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, Clock, Lock, SearchX, ShieldAlert, WifiOff } from "lucide-react";
+import { Archive, CircleAlert, Clock, Lock, SearchX, ShieldAlert, WifiOff } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { isApiError } from "../lib/api-error";
@@ -26,6 +26,20 @@ export function NoAccessState() {
   );
 }
 
+/** The idea is archived, so a screen that changes it has nothing to offer (design-spec 6.8). */
+export function ArchivedState() {
+  const { t } = useTranslation(["validation", "app"]);
+  return (
+    <IllustratedMessage
+      icon={Archive}
+      heading={t("validation:home.archivedHeading")}
+      actions={<Link href={useHomeHref()}>{t("app:states.dashboardLink")}</Link>}
+    >
+      {t("validation:home.archivedBody")}
+    </IllustratedMessage>
+  );
+}
+
 /** "Not found. Check the link." (design-spec 6.0.6). */
 export function NotFoundState() {
   const { t } = useTranslation("app");
@@ -39,7 +53,7 @@ export function NotFoundState() {
 }
 
 /** "Couldn't load this page" with a retry (design-spec 6.0.6). The navigation stays usable. */
-export function LoadErrorState({ onRetry }: { onRetry: () => void }) {
+function LoadErrorState({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation("app");
   return (
     <IllustratedMessage
@@ -115,7 +129,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry: () => 
 }
 
 /** How long a skeleton may show before the screen admits it is slow (design-spec 6.0.6). */
-export const SLOW_LOADING_MS = 10_000;
+const SLOW_LOADING_MS = 10_000;
 
 /** The skeleton of a screen, and after ten seconds "Taking longer than usual" with a retry. */
 export function LoadingState({ skeleton, onRetry }: { skeleton: ReactNode; onRetry: () => void }) {
@@ -142,7 +156,10 @@ export function LoadingState({ skeleton, onRetry }: { skeleton: ReactNode; onRet
   );
 }
 
-/** Shows the skeleton while a query loads, the matching state if it fails, else the data. */
+/**
+ * Shows the skeleton while a query loads, the matching state if it fails, else the data. A failed
+ * refetch keeps the data already on screen: replacing it would throw away what is being typed.
+ */
 export function QueryBoundary<Data>({
   query,
   skeleton,
@@ -155,6 +172,8 @@ export function QueryBoundary<Data>({
   if (query.isPending) {
     return <LoadingState skeleton={skeleton} onRetry={() => void query.refetch()} />;
   }
-  if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
-  return children(query.data);
+  if (query.isError && query.data === undefined) {
+    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
+  }
+  return children(query.data as Data);
 }

@@ -1,0 +1,95 @@
+{
+  "back": "← Validation",
+  "created": "Fill in what you know. Mark the rest Unknown, or delete rows you don't need.",
+  "tables": {
+    "initial": "Startup costs",
+    "monthly_fixed": "Monthly fixed costs",
+    "variable": "Variable costs (per sale)"
+  },
+  "columns": {
+    "name": "Item",
+    "amount": "Amount",
+    "fau": "F/A/U",
+    "whyNeeded": "Why needed",
+    "canReduce": "Can reduce?",
+    "notes": "Notes",
+    "actions": "Actions"
+  },
+  "canReduce": {
+    "placeholder": "Select",
+    "yes": "Yes",
+    "partly": "Partly",
+    "no": "No"
+  },
+  "fields": {
+    "name": "Name of {{name}}",
+    "amount": "Amount of {{name}}",
+    "percent": "Percent of price for {{name}}",
+    "mode": "How {{name}} is entered",
+    "whyNeeded": "Why {{name}} is needed",
+    "canReduce": "Can {{name}} be reduced?",
+    "notes": "Notes on {{name}}",
+    "lumpSum": "Lump sum (no breakdown)"
+  },
+  "mode": {
+    "amount": "Amount",
+    "percent": "% of price"
+  },
+  "badge": {
+    "lumpSum": "Lump sum"
+  },
+  "unnamed": "this row",
+  "none": "—",
+  "empty": "Empty",
+  "newRowName": "New row",
+  "addRow": "Add row",
+  "addRowTo": "Add row to {{table}}",
+  "noRows": "No rows",
+  "percentOfPrice": "{{percent}} · {{amount}}",
+  "percentPrefix": "{{percent}} ·",
+  "needsPrice": "Needs price",
+  "perSale": "{{value}} / sale",
+  "perDayShort": "{{value}}/day",
+  "subtotal": "Subtotal {{value}}",
+  "errors": {
+    "required": "Enter a name",
+    "amountRange": "Enter an amount from 0 to 1,000,000,000,000",
+    "percentRange": "Enter a percent from 0 to 100"
+  },
+  "menu": {
+    "label": "Actions for {{name}}",
+    "rename": "Rename",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "lumpSum": "Mark as lump sum",
+    "unmarkLumpSum": "Remove lump sum mark",
+    "delete": "Delete",
+    "comments": "Comments",
+    "history": "History"
+  },
+  "sheet": {
+    "done": "Done",
+    "close": "Close"
+  },
+  "totals": {
+    "title": "Totals",
+    "startup": "Startup",
+    "monthly": "Monthly",
+    "variable": "Variable",
+    "breakEven": "Break-even",
+    "empty": "Empty",
+    "toEconomics": "Unit Economics →",
+    "breakdown": {
+      "both": "{{unknown}} Unknown, {{empty}} Empty",
+      "unknown": "{{unknown}} Unknown",
+      "empty": "{{empty}} Empty"
+    }
+  },
+  "summaryBar": "Startup {{startup}} · Monthly {{monthly}} · BE {{breakEven}}",
+  "deleted": "Deleted {{name}}. You can undo it in History.",
+  "deleteFailed": "Couldn't delete the row",
+  "addFailed": "Couldn't add the row",
+  "moveFailed": "Couldn't change the order",
+  "failure": "Couldn't save {{name}}",
+  "conflict": "row"
+}

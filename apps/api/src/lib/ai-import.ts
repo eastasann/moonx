@@ -22,7 +22,19 @@ import { hasText } from "./validation-data";
 
 /** SDD 5.10 ImportContext. */
 export interface ImportContext {
-  target: { type: TemplateKind; id: string; name: string };
+  target: {
+    type: TemplateKind;
+    id: string;
+    name: string;
+    /** The workspace of a validation or plan; the screens check it against the one in their URL. */
+    workspaceId: string | null;
+    /** The idea of a validation or plan, which the screens that open after an import are under. */
+    ideaId: string | null;
+    currency: string | null;
+    archived: boolean;
+  };
+  /** Every section of the pinned template, in order; `importable` when it holds a question the exchange can carry. */
+  sections: { key: string; title: string; part: "a" | "b" | null; importable: boolean }[];
   questions: {
     questionKey: string;
     title: string;
@@ -42,7 +54,21 @@ export interface ImportContext {
 /** X2: every question of the target with what it holds now, so the import can match and diff. */
 export function buildImportContext(target: AiTarget): ImportContext {
   return {
-    target: { type: target.kind, id: target.id, name: target.name },
+    target: {
+      type: target.kind,
+      id: target.id,
+      name: target.name,
+      workspaceId: target.workspaceId,
+      ideaId: target.ideaId,
+      currency: target.currency,
+      archived: target.archived,
+    },
+    sections: target.sections.map(({ section, rows }) => ({
+      key: section.key,
+      title: section.title,
+      part: section.part,
+      importable: rows.some((q) => IMPORTABLE_TYPES.has(q.answerType)),
+    })),
     questions: target.sections.flatMap(({ rows }) =>
       rows.map((q) => {
         const answer = target.answers.get(q.key) as TargetAnswer;

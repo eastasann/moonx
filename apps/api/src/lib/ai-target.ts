@@ -41,6 +41,8 @@ export interface AiTarget {
   workspaceId: string | null;
   /** The idea of a validation or plan target. */
   ideaId: string | null;
+  /** The idea or plan is archived: the exchange can be read but not applied (design-spec 6.8). */
+  archived: boolean;
   templateVersionId: string;
   templateVersionNumber: number;
   aiPrompt: string;
@@ -73,6 +75,7 @@ export async function loadSelfAnalysisTarget(db: Executor, userId: string): Prom
     name: "Self analysis",
     workspaceId: null,
     ideaId: null,
+    archived: false,
     templateVersionId: analysis.templateVersionId,
     templateVersionNumber: version.versionNumber,
     aiPrompt: version.aiPrompt,
@@ -109,6 +112,7 @@ export async function loadValidationTarget(
     .select({
       ideaId: schema.ideas.id,
       name: schema.ideas.name,
+      archivedAt: schema.ideas.archivedAt,
       currency: schema.workspaces.currency,
     })
     .from(schema.validations)
@@ -124,6 +128,7 @@ export async function loadValidationTarget(
     name: idea?.name ?? "Validation",
     workspaceId,
     ideaId: idea?.ideaId ?? null,
+    archived: idea?.archivedAt != null,
     templateVersionId: data.templateVersionId,
     templateVersionNumber: version.versionNumber,
     aiPrompt: version.aiPrompt,
@@ -163,6 +168,7 @@ export async function loadPlanTarget(db: Executor, planId: string): Promise<AiTa
     name: bundle.plan.name,
     workspaceId: bundle.workspaceId,
     ideaId: bundle.idea.id,
+    archived: bundle.idea.archivedAt != null || bundle.plan.archivedAt != null,
     templateVersionId: bundle.plan.templateVersionId,
     templateVersionNumber: version.versionNumber,
     aiPrompt: version.aiPrompt,

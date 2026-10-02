@@ -146,3 +146,21 @@ export function formatRelativeTime(value: string | Date, now: Date, timeZone = "
   }
   return format.format(0, "second");
 }
+
+/** Options for a number field that takes money: the symbol shows, whole or two-decimal amounts. */
+export function moneyInputFormat(currency: string): Intl.NumberFormatOptions {
+  return {
+    style: "currency",
+    currency,
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  };
+}
+
+/** Options for a number field that takes a rate: the field shows 35% and holds 0.35. */
+export const PERCENT_INPUT_FORMAT: Intl.NumberFormatOptions = {
+  style: "percent",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+};

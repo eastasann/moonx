@@ -41,6 +41,7 @@ export function Picker({
   description,
   errorMessage,
   isRequired,
+  isLabelHidden,
   size = "M",
   value,
   defaultValue,
@@ -59,7 +60,7 @@ export function Picker({
         onChange={(key) => onChange?.(key === null ? null : String(key))}
         className={fieldRoot({ size })}
       >
-        <FieldLabel isRequired={isRequired} size={size}>
+        <FieldLabel isRequired={isRequired} isLabelHidden={isLabelHidden} size={size}>
           {label}
         </FieldLabel>
         <Button className={box({ size })}>

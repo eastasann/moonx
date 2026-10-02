@@ -152,7 +152,8 @@
       "initial_cost_total": "Startup",
       "break_even_units_day": "Break-even",
       "expected_operating_profit": "Expected",
-      "payback_months": "Payback"
+      "payback_months": "Payback",
+      "simple_roi": "ROI"
     },
     "metricEmpty": "Empty",
     "metricLowerBound": "Lower bound: some rows are Empty or Unknown",

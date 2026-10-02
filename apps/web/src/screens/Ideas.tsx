@@ -25,6 +25,7 @@ import {
   type IdeasSearch,
   useIdeaList,
   useIdeaSummary,
+  useWorkspaceCurrency,
   useWorkspaceRole,
 } from "../lib/ideas";
 import { useGoTo } from "../lib/navigate";
@@ -74,8 +75,7 @@ export function Ideas({
   const me = useMe();
   const role = useWorkspaceRole(workspaceId);
   const editable = canEditIdeas(role);
-  const currency =
-    me.memberships.find((m) => m.workspace.id === workspaceId)?.workspace.currency ?? "PHP";
+  const currency = useWorkspaceCurrency(workspaceId);
   const compact = useBelowDesktop();
   const goTo = useGoTo();
   const { openModal } = useOverlay();

@@ -1,0 +1,54 @@
+{
+  "back": "← Validation",
+  "inputs": "Inputs",
+  "dailySales": "Daily sales (units/day)",
+  "empty": "Empty",
+  "conflict": "number",
+  "range": {
+    "selling_price": "Enter a number greater than 0",
+    "operating_days": "Enter a whole number from 1 to 31",
+    "target_margin": "Enter a percent from 0 to 99",
+    "units": "Enter a number from 0 to 1,000,000,000"
+  },
+  "costsSummary": "Costs from 05: Startup {{startup}} · Monthly {{monthly}}",
+  "costsLink": "Costs →",
+  "worth": {
+    "question": "Is the return worth the capital and effort?"
+  },
+  "results": {
+    "title": "Results",
+    "unitEconomics": "Unit economics",
+    "variable": "Variable cost / sale",
+    "contribution": "Contribution / sale",
+    "breakEven": "Break-even",
+    "breakEvenNote": "{{month}} · {{revenue}}",
+    "targetMargin": "Units for {{rate}} margin",
+    "scenarios": "Scenarios",
+    "investment": "Investment return",
+    "payback": "Payback",
+    "roi": "ROI"
+  },
+  "roiPerYear": "{{value}} / year",
+  "scenario": {
+    "break_even": "BE",
+    "conservative": "Cons",
+    "expected": "Exp",
+    "strong": "Strong",
+    "capacity": "Cap"
+  },
+  "scenarios": {
+    "label": "Scenarios",
+    "metric": "Per scenario",
+    "unitsPerDay": "Units / day",
+    "unitsPerMonth": "Units / month",
+    "revenue": "Revenue",
+    "variableCostTotal": "Variable cost",
+    "operatingProfit": "Operating profit",
+    "operatingMargin": "Margin"
+  },
+  "short": {
+    "perDay": "{{value}}/day",
+    "perMonth": "{{value}}/mo"
+  },
+  "summaryBar": "BE {{breakEven}} · Exp {{expected}}"
+}

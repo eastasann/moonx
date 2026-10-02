@@ -1,3 +1,4 @@
+import { DEFAULT_CURRENCY } from "@moonx/i18n";
 import { ideaDecisionFilterSchema, type Role, stageSchema } from "@moonx/schemas";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
@@ -97,6 +98,15 @@ export function useWorkspaceMembers(workspaceId: string) {
 export function useWorkspaceRole(workspaceId: string): Role | null {
   const me = useMe();
   return me.memberships.find((m) => m.workspace.id === workspaceId)?.role ?? null;
+}
+
+/** The currency of a workspace the signed-in person belongs to. */
+export function useWorkspaceCurrency(workspaceId: string): string {
+  const me = useMe();
+  return (
+    me.memberships.find((m) => m.workspace.id === workspaceId)?.workspace.currency ??
+    DEFAULT_CURRENCY
+  );
 }
 
 /** Owners and Members create, duplicate and archive; a Viewer sees no such button (design-spec 2.2). */

@@ -45,6 +45,7 @@ export function NarrowComboBox({
   errorMessage,
   isInvalid,
   isRequired,
+  isLabelHidden,
   isDisabled,
   isReadOnly,
   size = "M",
@@ -102,7 +103,7 @@ export function NarrowComboBox({
         data-invalid={isInvalid || undefined}
         data-disabled={isDisabled || undefined}
       >
-        <FieldLabel id={labelId} isRequired={isRequired} size={size}>
+        <FieldLabel id={labelId} isRequired={isRequired} isLabelHidden={isLabelHidden} size={size}>
           {label}
         </FieldLabel>
         <DialogTrigger isOpen={isOpen} onOpenChange={open}>

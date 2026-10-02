@@ -102,6 +102,13 @@ describe("buildExport markdown", () => {
     }
   });
 
+  test("a version without a prompt leaves out `# Prompt` and json.prompt", () => {
+    const r = buildExport({ ...base, kind: "validation", prompt: " \n", questions: [who] });
+    expect(r.markdown).not.toContain("# Prompt");
+    expect(r.markdown).toContain("# Questions");
+    expect(r.json).not.toHaveProperty("prompt");
+  });
+
   test("amount questions print amount and reason and mention the amount headings", () => {
     const r = buildExport({ ...base, kind: "self_analysis", questions: [income] });
     expect(r.markdown).toContain("> Amount: 30,000 PHP\n>\n> Reason: Enough to live");

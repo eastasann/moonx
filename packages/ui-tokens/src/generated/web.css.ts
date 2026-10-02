@@ -58,6 +58,7 @@ export const base = {
     }
   },
   "breakpoint": {
+    "mobile": "0px",
     "tablet": "768px",
     "desktop": "1024px"
   },
@@ -1304,6 +1305,7 @@ export const vars = { ...baseVars, ...colorVars, ...scaleVars };
 
 /** Minimum widths in px, for media queries (CSS variables cannot be used there). */
 export const breakpoints = {
+  "mobile": 0,
   "tablet": 768,
   "desktop": 1024
 } as const;

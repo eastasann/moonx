@@ -4,6 +4,7 @@
     {
       "key": "WHY",
       "title": "WHY",
+      "subtitle": "Why do I want this?",
       "guidance": "Start with motivation. Do not assume business is the answer; clarify what you are actually trying to change or gain.",
       "questions": [
         {
@@ -21,6 +22,7 @@
     {
       "key": "BE",
       "title": "BE",
+      "subtitle": "Who do I want to become?",
       "guidance": "Describe the person you want to become—not only the job title, income, or company size.",
       "questions": [
         {
@@ -38,6 +40,7 @@
     {
       "key": "DO",
       "title": "DO",
+      "subtitle": "What do I want to spend my life doing?",
       "guidance": "Focus on how you want to spend your time and energy on an ordinary week—not only on exceptional moments.",
       "questions": [
         {
@@ -60,6 +63,7 @@
     {
       "key": "GIVE",
       "title": "GIVE",
+      "subtitle": "What do I want to create for others?",
       "guidance": "Self-fulfillment is not only about what you gain. Clarify who should be better off because of your work.",
       "questions": [
         {
@@ -82,6 +86,7 @@
     {
       "key": "HAVE",
       "title": "HAVE",
+      "subtitle": "What kind of life do I want?",
       "guidance": "Make the desired life concrete: location, schedule, relationships, flexibility, and daily living.",
       "questions": [
         {
@@ -109,6 +114,7 @@
     {
       "key": "INCOME",
       "title": "PERSONAL INCOME",
+      "subtitle": "What do I need money to enable?",
       "guidance": "Choose amounts based on the life they enable. Money is a means, so always explain why the number matters.",
       "questions": [
         {
@@ -131,6 +137,7 @@
     {
       "key": "ENOUGH",
       "title": "ENOUGH",
+      "subtitle": "What is enough for me?",
       "guidance": "Define the point where more money, scale, or work would stop meaningfully improving your life.",
       "questions": [
         {
@@ -158,6 +165,7 @@
     {
       "key": "NOT",
       "title": "NOT",
+      "subtitle": "What am I unwilling to sacrifice?",
       "guidance": "Boundaries are part of the goal. Clarify what success is not allowed to cost you.",
       "questions": [
         {
@@ -185,6 +193,7 @@
     {
       "key": "NOW",
       "title": "NOW",
+      "subtitle": "What can I realistically contribute?",
       "guidance": "Bring the reflection back to reality. State what you can contribute now—not what you hope to contribute someday.",
       "questions": [
         {
@@ -217,6 +226,7 @@
     {
       "key": "FINAL",
       "title": "FINAL REFLECTION",
+      "subtitle": "What does self-fulfillment mean to me?",
       "guidance": "Synthesize the earlier sections. If these answers contradict each other, note the tension rather than forcing consistency.",
       "questions": [
         {
@@ -249,6 +259,7 @@
     {
       "key": "ONE",
       "title": "ONE-SENTENCE SUMMARY",
+      "subtitle": "Describe the life you are trying to build",
       "guidance": "Force the result into one sentence after completing everything else.",
       "questions": [
         {

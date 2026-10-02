@@ -50,6 +50,8 @@ describe("X1 export", () => {
     expect(md).toContain("# Reference (read-only)");
     expect(md).toContain("Startup cost: ₱169,500");
     expect(md).toContain("# How to reply");
+    expect(md).not.toContain("# Prompt");
+    expect(res.body.json).not.toHaveProperty("prompt");
     expect(res.body.json).toMatchObject({
       format: "moonx-export",
       kind: "validation",
@@ -69,6 +71,9 @@ describe("X1 export", () => {
     expect(res.body.questionCount).toBe(5);
     expect(res.body.markdown).not.toContain("**F/A/U:**");
     expect(res.body.markdown).toContain("80,000");
+    expect(res.body.markdown).toContain(
+      "# Prompt\n\nI want to complete the attached Self Analysis",
+    );
     expect(
       res.body.json.questions.find((q: { id: string }) => q.id === "SA.INCOME.1").answer.amount,
     ).toBe(80000);

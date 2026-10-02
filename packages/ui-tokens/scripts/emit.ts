@@ -196,7 +196,7 @@ export const vars = { ...baseVars, ...colorVars, ...scaleVars };
 // ---- Native (Unistyles) ----------------------------------------------------
 
 // RN takes the OS default sans-serif when no family is given, and has no single monospace name
-// (06: primitive.font.family.sans / mono descriptions).
+// (06: primitive.font.family.sans / mono descriptions; semantic.native.font names the per-OS mono).
 const NATIVE_FONT_ROLE: Record<string, "display" | "body" | "mono"> = {
   "primitive.font.family.display": "display",
   "primitive.font.family.sans": "body",
@@ -285,7 +285,17 @@ export function emitNative(tokens: TokenMap): string {
   if (!display || !isResolved(display) || display.kind !== "fontFamily") {
     throw new Error("semantic.font.family.display must resolve to a font family");
   }
-  const fontFamily = { display: display.names[0], mono: { ios: "Menlo", android: "monospace" } };
+  const nativeMono = (name: "mono-ios" | "mono-android") => {
+    const leaf = resolveSubtree(tokens, "semantic.native.font", "large")[name];
+    if (!leaf || !isResolved(leaf) || leaf.kind !== "fontFamily") {
+      throw new Error(`semantic.native.font.${name} must resolve to a font family`);
+    }
+    return leaf.names[0];
+  };
+  const fontFamily = {
+    display: display.names[0],
+    mono: { ios: nativeMono("mono-ios"), android: nativeMono("mono-android") },
+  };
 
   const shared = {
     space: section("semantic.space"),
@@ -316,8 +326,7 @@ export function emitNative(tokens: TokenMap): string {
  */
 `,
     render("fontFamily", fontFamily),
-    // Unistyles requires the first breakpoint to start at 0 (semantic.breakpoint only names tablet and desktop)
-    render("breakpoints", { mobile: 0, ...breakpointTree }, { asConst: true }),
+    render("breakpoints", breakpointTree, { asConst: true }),
     `const shared = ${JSON.stringify(shared, null, 2)};\n`,
     render("lightTheme", colors("light"), { spread: "shared" }),
     render("darkTheme", colors("dark"), { spread: "shared" }),

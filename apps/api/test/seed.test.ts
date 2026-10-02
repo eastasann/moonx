@@ -283,11 +283,33 @@ describe("transcription of the drive copies", () => {
       expect(flat).toContain(squash(q.prompt));
       expect(flat).toContain(squash(q.example as string));
     }
-    for (const s of must(template("self_analysis").versions[0], "v1").sections) {
-      expect(flat).toContain(squash(s.guidance as string));
-    }
+    const lines = text.split("\n");
+    const headings = lines.flatMap((line, i) => {
+      const m = /^\s*([A-Z][A-Z &/-]*?) \| (.+?)\s*$/.exec(line);
+      if (!m) return [];
+      const after = lines
+        .slice(i + 1)
+        .join("\n")
+        .replace(/^\s*\n/, "");
+      const guidance = after.split(/\n\s*\n/)[0] ?? "";
+      return [{ title: m[1] ?? "", subtitle: m[2] ?? "", guidance: squash(guidance) }];
+    });
+    const sections = must(template("self_analysis").versions[0], "v1").sections;
+    expect(headings).toHaveLength(sections.length);
+    sections.forEach((s, i) => {
+      const h = must(headings[i], `heading ${i}`);
+      expect(s.title).toBe(h.title);
+      const lead = h.subtitle.endsWith("?") ? h.subtitle : `${h.subtitle}.`;
+      expect(s.guidance).toBe(`${lead} ${h.guidance}`);
+    });
     const prompt = squash(raw("initialize-prompt.txt"));
     expect(prompt).toContain(squash(must(template("self_analysis").versions[0], "v1").aiPrompt));
+  });
+
+  test("validation and business plan have no AI prompt (design-spec 8.4)", () => {
+    for (const kind of ["validation", "business_plan"]) {
+      for (const v of template(kind).versions) expect(v.aiPrompt).toBe("");
+    }
   });
 
   test("business plan: the parsed copy has every prompt and example, and the seed uses it", () => {

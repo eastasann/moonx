@@ -140,8 +140,10 @@
         },
         "mono": {
           "$value": ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", "Noto Sans Mono", "monospace"],
-          "$description": "システムの等幅。RN では iOS は Menlo、Android は monospace"
+          "$description": "システムの等幅。RN は単一の名前を持たないので mono-ios / mono-android を使う"
         },
+        "mono-ios": { "$value": ["Menlo"], "$description": "RN（iOS）の等幅" },
+        "mono-android": { "$value": ["monospace"], "$description": "RN（Android）の等幅" },
         "print-display": { "$value": ["Fraunces", "Noto Sans JP"], "$description": "PDF 用。react-pdf に登録し、使った文字だけ埋め込む（ADR-012）" },
         "print-sans": { "$value": ["Noto Sans", "Noto Sans JP"], "$description": "PDF 用。Noto Sans / Noto Sans JP（ともに SIL OFL 1.1）を埋め込む（ADR-012）" }
       },
@@ -283,6 +285,7 @@
     },
     "breakpoint": {
       "$type": "dimension",
+      "base": { "$value": { "value": 0, "unit": "px" } },
       "md": { "$value": { "value": 768, "unit": "px" } },
       "lg": { "$value": { "value": 1024, "unit": "px" } }
     },
@@ -1249,6 +1252,14 @@
         "tabular": { "$value": "{primitive.font.feature.tabular-nums}" }
       }
     },
+    "native": {
+      "$description": "スマホだけが読む値（Web の CSS 変数には出ない）",
+      "font": {
+        "$type": "fontFamily",
+        "mono-ios": { "$value": "{primitive.font.family.mono-ios}" },
+        "mono-android": { "$value": "{primitive.font.family.mono-android}" }
+      }
+    },
     "typography": {
       "$type": "typography",
       "$description": "見出し（display・heading-*）だけ Fraunces、ほかはシステムのサンセリフ。fontSize は scale.medium の値で、large では生成時に scale.large の同じ段に差し替える。等幅数字は $extensions の fontVariantNumeric",
@@ -1501,7 +1512,8 @@
     },
     "breakpoint": {
       "$type": "dimension",
-      "$description": "最小幅。<768 モバイル / 768〜1023 タブレット / ≥1024 デスクトップ。768 未満で Popover を Tray にする",
+      "$description": "最小幅。<768 モバイル / 768〜1023 タブレット / ≥1024 デスクトップ。768 未満で Popover を Tray にする。Unistyles は先頭のブレークポイントが 0 であることを要求する",
+      "mobile": { "$value": "{primitive.breakpoint.base}" },
       "tablet": { "$value": "{primitive.breakpoint.md}" },
       "desktop": { "$value": "{primitive.breakpoint.lg}" }
     },

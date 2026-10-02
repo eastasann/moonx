@@ -52,6 +52,7 @@ export interface BuildExportInput {
   exportedAt: string;
   templateVersion: number;
   currency: string | null;
+  /** Blank when the template version has no conversation prompt; `# Prompt` and `json.prompt` are then left out. */
   prompt: string;
   /** Already filtered by the API (scope, includeEmpty) and in display order. */
   questions: ExportQuestion[];
@@ -241,7 +242,7 @@ export function buildExport(input: BuildExportInput): BuiltExport {
 
   const sections = [
     `<!-- ${header} -->`,
-    `# Prompt\n\n${input.prompt}`,
+    ...(input.prompt.trim() ? [`# Prompt\n\n${input.prompt}`] : []),
     `# Questions\n\n${questions
       .map((q) => questionMarkdown(q, kind, input.includeExamples, currency))
       .join("\n\n")}`,
@@ -266,7 +267,7 @@ export function buildExport(input: BuildExportInput): BuiltExport {
     scope: input.scope,
     templateVersion: input.templateVersion,
     currency: input.currency,
-    prompt: input.prompt,
+    ...(input.prompt.trim() ? { prompt: input.prompt } : {}),
     questions: questions.map((q) => questionJson(q, kind, input.includeExamples)),
   };
   if (input.reference) json.reference = input.reference.json;

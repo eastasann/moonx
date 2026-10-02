@@ -1151,7 +1151,7 @@ Web / スマホ共通（パターン G ステップ）
 
 # Prompt
 
-（テンプレートの版に入っている AI 用の対話プロンプト。運営者が編集する）
+（テンプレートの版に入っている AI 用の対話プロンプト。運営者が編集する。版にプロンプトが無いときは `# Prompt` の節ごと出さない）
 
 # Questions
 
@@ -1196,6 +1196,7 @@ Reply in Markdown. For each question you want to update, write one block:
 - 取り込みは、書き出した Markdown をそのまま貼ったものも読める（`# Prompt`・`# Reference`・`# How to reply` は読み飛ばし、`**Current answer:**` の内容を回答とする。コードブロックの中の見出しは本文）。
 - 書き出しに入る設問は、取り込める型（長文・短文・選択・金額＋理由）で、隠れていないものだけ。「空の設問を含める」がオフで全部空のときは、設問0件で書き出し、「全部空」の注意を出す（範囲そのものに設問が無いときだけ 422 `EMPTY_SCOPE`）。
 - ヘッダーのコメントの `scope:` は `all`・`part:a`・`part:b`・セクションの一覧、`idea:` はプランなら「アイデア名 / 案の名前」で、自己分析では付けない。JSON の `scope` は、プランが `{ planName, items, part }`、自己分析が `{ sections }`。金額＋理由の設問は `Amount:` と `Reason:` の行、選択の設問は `**Choices:**` の行を付ける。ファイル名の元は `moonx-export-{種類}-{名前}-{日付}`。
+- テンプレートの版のプロンプトが空（空白だけを含む）のときは、Markdown の `# Prompt` の節も JSON の `prompt` も出さない。
 - 最後の「How to reply」はアプリが自動で作る（運営者は編集しない）。取り込みで読める形を AI に指示するため。
 
 #### JSON の書式
@@ -1861,7 +1862,7 @@ Web（パターン A）                                        スマホは縦�
 - 決定ログ: Piaya（Proceed、版「v1 For advisors」の保存、Go / No-Go: Delay）、Health Bowl（Hold。不足: 初期費用と月額費用・許認可）、Study Café（Proceed、版「v1 Launch review」の保存、Launch）、Laundry（Drop）。
 - 変更履歴: 主要な回答に2〜3件ずつ（手入力・AI 取り込み・元に戻す）。
 - テンプレート: 3つすべて v1 を公開。検証のテンプレートは v2（設問を1つ追加）も公開し、Mobile Bike Repair だけを v2 で作る（他の検証は v1 のままで、M8 の案内が出る）。さらに検証の v3 の下書きを置き、27 を確かめられるようにする。v1 の設問・EXAMPLE・ガイダンス・小項目と Example は Drive の原本の写しから転記する（9.3）。実行管理の初期行は 6.13 のとおり。
-- テンプレートの追加分: v2 で足す設問は `V.01.REACH`（「How will you reach this customer?」）で、01 の最後に置く。v3 の下書きは v2 に `V.10.NEXT_STEP`（「What is the next step to reduce the biggest unknown?」）を足したもの。2つとも原本に無い文面で、27 と M8 の確認のために置く。検証とプランの AI 用プロンプトは原本に無いので空で入れる。
+- テンプレートの追加分: v2 で足す設問は `V.01.REACH`（「How will you reach this customer?」）で、01 の最後に置く。v3 の下書きは v2 に `V.10.NEXT_STEP`（「What is the next step to reduce the biggest unknown?」）を足したもの。2つとも原本に無い文面で、27 と M8 の確認のために置く。検証とプランの AI 用プロンプトは用意しない（検証の内容は書き出して外部の AI と壁打ちできるが、対話用のプロンプトは置かない）ので空で入れ、書き出しに `# Prompt` の節を出さない。
 - 日付はシードを動かした日からの相対（期限切れ・2日後が変わらないようにする）。Health Bowl の未分類3件は `V.01.BEHAVIOR`・`V.01.SWITCHING`・`V.02.DRIVERS`。
 
 ---
@@ -1914,7 +1915,7 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 
 - 技術スタック、認証方式、PDF の生成方式、オフライン時の一時保存の方式 → Phase 3 で決定済み（`docs/02-01_system-design-doc.md` の ADR。認証はメールとパスワード＋Google ログイン）
 - デザイントークン（Hermes Teal 系の色・見出しの表示用書体・余白の具体値、意味色のライト / ダーク両方の値、Pitch Deck のスライドの型ごとの最小の文字の大きさ）→ Phase 3 の `docs/06_design-tokens.json`。参照元: Hermes Agent のサイト（https://hermes-agent.nousresearch.com/）と、その既定テーマ「Hermes Teal」
-- テンプレート v1 の中身（自己分析36問・検証の設問・プランの小項目の問いと Example・セクションのガイダンス・AI 用プロンプト）は、Drive の原本の写し（`docs/drive-templates/`。2026-10-02 に書き出した）から転記してシードにする。プランの小項目の名前と表の列・初期行は 6.12 / 6.13 に記録済み。問いの本文と Example はこの写しから転記する。AI 用プロンプトの原本があるのは自己分析だけで、検証とプランは空で始める。自己分析のセクション見出しの横にある短い言い換え（「WHY | Why do I want this?」の後半）は取り込まず、見出しの下の1行のガイダンスだけを持つ
+- テンプレート v1 の中身（自己分析36問・検証の設問・プランの小項目の問いと Example・セクションのガイダンス・AI 用プロンプト）は、Drive の原本の写し（`docs/drive-templates/`。2026-10-02 に書き出した）から転記してシードにする。プランの小項目の名前と表の列・初期行は 6.12 / 6.13 に記録済み。問いの本文と Example はこの写しから転記する。AI 用プロンプトは自己分析だけが持ち、検証とプランは用意しない（8.4）。自己分析のセクション見出しの横にある短い言い換え（「WHY | Why do I want this?」の後半）は、セクションに専用の列が無いので、見出しの下の1行のガイダンスの先頭に置く（「Why do I want this? Start with motivation. …」。言い換えが疑問文でないときは文末に `.` を足す）
 - 日時の表示はユーザーのタイムゾーン（登録時に端末から取り、4 で変えられる）
 - 技術の希望（スマホはストアで配るネイティブアプリ、運用費、TypeScript）は Phase 3 で反映済み。正は `docs/02-01_system-design-doc.md`（1章 Goal の運用費、ADR-001・ADR-003）
 

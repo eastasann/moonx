@@ -404,7 +404,6 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
 - **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は `<html data-theme>` と `prefers-color-scheme`、スマホは Unistyles の適応テーマ（4 アカウント設定の System / Light / Dark に従う）。
 - **スケール（Web）**: 既定は `medium`。タッチ操作が主の端末（`@media (pointer: coarse)`）は `large` にする。`<html data-scale="medium|large">` で固定でき、固定が優先される。タッチパネル付きのノート PC も `pointer: coarse` に当たるときは `large` になる。
-- **生成器が持つ値**: スマホの等幅書体（iOS は Menlo、Android は monospace。06 の `primitive.font.family.mono` の説明文にだけ書かれていて DTCG の型が無い）と、Unistyles が要求する先頭のブレークポイント `mobile: 0` は、06 ではなく生成のスクリプトが持つ。
 - **アイコン**: Lucide（`lucide-react` / `lucide-react-native`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。
 
 **理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は Phase 2 で決めた Hermes Teal を保つことを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、Web とスマホで同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは一段ゆったり」をそのまま表せる。Lucide は Web（`lucide-react`）とスマホ（`lucide-react-native`）に同じ絵柄の版があり、線の太さと大きさを props で変えられる（Spectrum の Workflow アイコンは使わないと合意した）。変換を自前のスクリプトにするのは、出力が3種類（vanilla-extract・Unistyles・react-pdf）に限られ、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため（Style Dictionary は設定と拡張の方が大きくなる）。
@@ -2051,7 +2050,7 @@ export const changeHistory = pgTable("change_history", {
 - **選択肢の値は原本を踏襲する。** 判定 Proceed / Hold / Drop、市場の種類 Red / Blue / Mixed、確信度 Low / Medium / High、Can Reduce? Yes / Partly / No、競合の種類 Direct / Indirect / Substitute、出典の種類（design-spec 6.10）。
 - **ワークスペースの通貨を変えても金額は換算しない。**
 - **アカウントの削除**: `users` の行は残して個人の情報を消す（5.4 U7）。外部キーは `users` を参照し続ける。
-- **シード**: `make db-seed` は全テーブルを空にして design-spec 8章のデモデータを入れる（`APP_ENV=local` 以外では動かない。デモのユーザーのログイン中のセッションだけは残す。テストが1件ごとに入れ直しても、ログインが外れないため）。行の id は名前から決まるので、何度動かしても同じ id の行になる（パスワードのハッシュは毎回変わり、日時はシードを動かした日からの相対になる）。テンプレート v1 の中身は Drive の原本から転記したもの（design-spec 9.3）を `packages/db/seed/templates/` に置く。検証とプランの AI 用プロンプトは原本に無いので空で入れ、運営者が 27 で書く。
+- **シード**: `make db-seed` は全テーブルを空にして design-spec 8章のデモデータを入れる（`APP_ENV=local` 以外では動かない。デモのユーザーのログイン中のセッションだけは残す。テストが1件ごとに入れ直しても、ログインが外れないため）。行の id は名前から決まるので、何度動かしても同じ id の行になる（パスワードのハッシュは毎回変わり、日時はシードを動かした日からの相対になる）。テンプレート v1 の中身は Drive の原本から転記したもの（design-spec 9.3）を `packages/db/seed/templates/` に置く。検証とプランの AI 用プロンプトは用意せず空で入れる（design-spec 8.4）。空のときは AI 書き出しに `# Prompt` の節と `json.prompt` を出さない。
 
 ---
 

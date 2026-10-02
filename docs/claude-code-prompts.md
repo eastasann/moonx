@@ -550,7 +550,7 @@ make test-web・make test-e2e・make lint・make typecheck・make doc-lint が�
 
 ## Step 13d: 仕様からの劣化を直す（3）: トークン・テンプレートの転記
 
-Status:
+Status: done 2026-10-02
 
 ```
 Step 13b と同じ方針で、トークンとテンプレートの転記を直してください。

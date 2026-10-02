@@ -563,7 +563,12 @@ Step 13b と同じ方針で、トークンとテンプレートの転記を直�
    want this?」の "Why do I want this?"）を docs/drive-templates/self-analysis.txt から転記する。
    ほかにも転記から漏れた文面が無いか、3つのテンプレートを docs/drive-templates/ と突き合わせて確かめ、
    漏れていれば転記する（写しに無い文面は作らない）
-3. テスト（make test-domain・make test-api）: シードのテンプレートが写しの文面と一致すること
+3. 検証とプランの AI 用プロンプト: 用意しない（2026-10-02 のユーザーの決定。検証の内容を書き出して外部の AI と
+   壁打ちすることはあるが、対話用のプロンプトは置かない）。design-spec 9.3・8.4 の「原本に無いので空」をこの
+   決定に書き換え、6.6 の書き出しの書式に「テンプレートの版にプロンプトが無いときは `# Prompt` の節を出さない」を
+   書き足す。packages/domain の書き出しを合わせる（今は中身の無い `# Prompt` を出している）
+4. テスト（make test-domain・make test-api）: シードのテンプレートが写しの文面と一致すること、プロンプトの無い
+   テンプレートの書き出しに `# Prompt` が出ないこと
 
 make tokens（2回続けて差分なし）・make test-domain・make test-api・make lint・make typecheck・make doc-lint が
 通る状態をゴールとする。

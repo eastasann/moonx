@@ -18,6 +18,7 @@
 |---|---|
 | [concept.md](concept.md) | Phase 0 のコンセプトメモ（アーカイブ） |
 | [brainstorm-notes.md](brainstorm-notes.md) | Phase 1 の壁打ちメモと、現行の Drive のテンプレートの構成（アーカイブ） |
+| [drive-templates/README.md](drive-templates/README.md) | Drive のテンプレートの原本の写し（アーカイブ。テンプレート v1 のシードの転記元） |
 | [design-spec.md](design-spec.md) | 設計仕様書。画面一覧・画面ごとの仕様・ロールと権限・デザインの方針と部品の一覧・デモデータ |
 | [screen_flow.mermaid](screen_flow.mermaid) | 画面遷移図 |
 | [01_prd.md](01_prd.md) | PRD。目的・対象ユーザー・ユーザーストーリーと優先度・KPI・スコープ外 |
@@ -37,7 +38,7 @@
 |---|---|---|
 | ソース（正） | `design-spec.md`・`screen_flow.mermaid`・`01_prd.md`・`02-01_system-design-doc.md`・`03_dev-setup.md`・`04_deployment-procedure.md`・`05_operation-runbook.md`・`06_design-tokens.json` | 事実ごとに正は1つ（下の所有権マップ）。変更のたびに更新する生きた文書 |
 | 派生 | ソースから生成・要約するもの（06 から `make tokens` で作るテーマ `packages/ui-tokens`（vanilla-extract・Unistyles・react-pdf 用）、`make openapi` の書き出し、Phase 4 の実装準備で作る `CLAUDE.md`（リポジトリの直下）と `claude-code-prompts.md`） | 直接直さない。ソースを直してから作り直す |
-| アーカイブ | `concept.md`・`brainstorm-notes.md` | 決めた経緯の記録。更新しない。今の正はソースを読む |
+| アーカイブ | `concept.md`・`brainstorm-notes.md`・`drive-templates/` | 決めた経緯の記録と、Drive の原本の写し。更新しない。今の正はソースを読む |
 
 ### 事実の所有権マップ
 

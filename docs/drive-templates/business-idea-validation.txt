@@ -1,0 +1,399 @@
+=== Sheet: 00 Summary (range A1:K60)
+A1: Business Idea & Validation
+A3: Purpose: decide whether an idea is worth developing into a full Business Plan. Fill yellow cells; blue cells calculate automatically.
+A5: IDEA OVERVIEW
+D5: KEY METRICS
+A6: Idea Name
+D6: Startup Cost
+E6: ='05 Costs'!B15
+F6: PHP
+A7: Created By
+D7: Break-even / Month
+E7: ='06 Economics'!B11
+F7: orders
+A8: Date
+D8: Expected Revenue / Month
+E8: ='07 Scenarios'!D8
+F8: PHP
+A9: One-line Concept
+D9: Expected Operating Profit
+E9: ='07 Scenarios'!D11
+F9: PHP
+A10: Primary Customer
+D10: Maximum Realistic Profit
+E10: ='07 Scenarios'!F11
+F10: PHP
+A11: Core Problem
+D11: Payback Period
+E11: ='08 Return'!B10
+F11: months
+A12: Proposed Solution
+D12: Expected Simple ROI
+E12: ='08 Return'!B11
+F12: % / year
+A13: Market Type
+A15: DECISION
+A16: Biggest Opportunity
+D16: Yellow
+E16: Manual input
+A17: Biggest Risk
+D17: Blue
+E17: Calculated
+A18: Biggest Unknown
+D18: Gray
+E18: Label / guidance
+A19: Decision
+A20: Why?
+merged: D5:F5 A1:F2 A5:B5 A3:F3 A15:F15
+validation B19: type=list formula1="Proceed,Hold,Drop"
+
+=== Sheet: 01 Customer & Problem (range A1:K60)
+A1: Customer & Problem
+A2: Define exactly who pays, what problem recurs, and why they would change behavior. Use evidence where possible.
+A4: Focus
+B4: Question
+C4: Your Answer
+D4: Evidence / Source
+E4: Confidence
+A5: WHO
+B5: Who is the primary paying customer?
+A6: WHY THEM
+B6: Why is this customer attractive?
+A7: BEHAVIOR
+B7: What do they do today instead?
+A8: PROBLEM
+B8: What problem are we solving?
+A9: FREQUENCY
+B9: How often does the problem occur?
+A10: SEVERITY
+B10: How painful or costly is it?
+A11: PAYMENT
+B11: Why would the customer pay?
+A12: SWITCHING
+B12: What would make them switch from current alternatives?
+A13: NON-CUSTOMER
+B13: Who is probably NOT the customer?
+A14: PROOF
+B14: What evidence suggests this customer and problem exist?
+merged: A2:E2 A1:E1
+validation E5:E14: type=list formula1="Low,Medium,High"
+
+=== Sheet: 02 Market (range A1:K60)
+A1: Market
+A2: Judge whether this is Red, Blue, or Mixed—and explain why. Competition is evidence to study, not automatically a negative.
+A4: Focus
+B4: Question
+C4: Your Answer
+D4: Evidence / Source
+E4: Confidence
+A5: CATEGORY
+B5: How would you classify the market?
+A6: OCEAN
+B6: Red, Blue, or Mixed?
+A7: WHY
+B7: Why did you choose that classification?
+A8: DRIVERS
+B8: What trends could increase demand?
+A9: BARRIERS
+B9: What could limit growth or entry?
+A10: RED: SURVIVORS
+B10: Which competitors appear to be surviving?
+A11: RED: WHY
+B11: Why are they still alive?
+A12: RED: ECONOMICS
+B12: What appears to be their economic engine?
+A13: RED: FAILURE
+B13: Why do competitors fail?
+A14: BLUE: GAP
+B14: If Blue/Mixed, what is underserved?
+A15: BLUE: WHY EMPTY
+B15: Why has nobody already captured this?
+A16: BLUE: PROOF
+B16: Why is this an opportunity rather than no demand?
+A17: MARKET SIZE
+B17: How many potential customers might exist?
+A18: REACHABLE
+B18: How many can we realistically reach at launch?
+A19: SHARE
+B19: What share / active-customer count is required for break-even?
+merged: A2:E2 A1:E1
+validation C6: type=list formula1="Red,Blue,Mixed"
+validation E5:E19: type=list formula1="Low,Medium,High"
+
+=== Sheet: 03 Research Log (range A1:K60)
+A1: Research Log
+A2: Capture the public evidence behind the validation so another founder can verify it later.
+A4: Date
+B4: Topic
+C4: Observation / Finding
+D4: Source Type
+E4: Source URL / Reference
+F4: What It Supports
+G4: Confidence
+merged: A2:G2 A1:G1
+validation D5:D24: type=list formula1="Google Maps / Reviews,Website,Social Media,Public Data,News / Report,Store Observation,Price Check,Other"
+validation G5:G24: type=list formula1="Low,Medium,High"
+
+=== Sheet: 04 Competitors (range A1:K60)
+A1: Competitors & Substitutes
+A2: Study not only direct competitors, but also substitutes customers already use. Focus on why surviving businesses continue to work.
+A4: Name
+B4: Type
+C4: Target Customer
+D4: Offering
+E4: Typical Price
+F4: Strength
+G4: Weakness
+H4: Why Customers Choose Them
+I4: Why They Survive
+J4: Source
+A14: Survivor Patterns
+A16: Failure Patterns
+merged: A1:J1 A16:B16 C16:J16 C14:J14 A14:B14 A2:J2
+validation B5:B12: type=list formula1="Direct Competitor,Indirect Competitor,Substitute"
+
+=== Sheet: 05 Costs (range A1:K60)
+A1: Cost Model
+A2: Replace guesses with quotes, listings, observed prices, or explicit assumptions. Separate startup, fixed, and variable costs.
+A4: STARTUP COSTS
+B4: Cost (PHP)
+C4: Why Needed?
+D4: Source / Evidence
+E4: Can Reduce?
+A5: Equipment
+A6: Renovation / Fit-out
+A7: Lease Deposit / Advance
+A8: Permits / Registration
+A9: Initial Inventory
+A10: Branding / Signage
+A11: Launch Marketing
+A12: Technology / Systems Setup
+A13: Working Capital Buffer
+A14: Other Startup Cost
+A15: TOTAL STARTUP COST
+B15: =SUM(B5:B14)
+A18: MONTHLY FIXED COSTS
+B18: Monthly Cost (PHP)
+C18: Source / Evidence
+D18: Notes
+A19: Rent
+A20: Salaries
+A21: Utilities - Base
+A22: Internet / Software
+A23: Accounting / Admin
+A24: Base Marketing
+A25: Insurance / Compliance
+A26: Other Fixed Cost
+A27: TOTAL MONTHLY FIXED COST
+B27: =SUM(B19:B26)
+A30: VARIABLE COST PER SALE
+B30: Cost / Sale (PHP)
+C30: Source / Evidence
+D30: Notes
+A31: Core Product / Materials
+A32: Packaging
+A33: Payment / Platform Fee
+A34: Delivery / Fulfilment
+A35: Variable Labor / Commission
+A36: Other Variable Cost
+A37: TOTAL VARIABLE COST / SALE
+B37: =SUM(B31:B36)
+merged: A2:E2 A1:E1
+validation E5:E14: type=list formula1="Yes,Partly,No"
+
+=== Sheet: 06 Economics (range A1:K60)
+A1: Unit Economics & Break-even
+A2: Only yellow cells are assumptions. All other metrics calculate automatically from the Cost Model.
+A4: Metric
+B4: Value
+C4: Unit
+D4: Meaning
+A5: Selling Price
+C5: PHP / sale
+D5: Average amount paid per transaction.
+A6: Variable Cost / Sale
+B6: ='05 Costs'!B37
+C6: PHP / sale
+D6: Costs that increase directly with each sale.
+A7: Contribution Profit / Sale
+B7: =B5-B6
+C7: PHP / sale
+D7: Amount left from each sale to cover fixed costs and profit.
+A8: Contribution Margin
+B8: =IFERROR(B7/B5,0)
+C8: %
+D8: Contribution Profit ÷ Selling Price.
+A9: Monthly Fixed Cost
+B9: ='05 Costs'!B27
+C9: PHP / month
+D9: Costs incurred even if sales are zero.
+A10: Operating Days / Month
+B10: 30.0
+C10: days
+D10: Days the business operates.
+A11: Break-even Orders / Month
+B11: =IFERROR(B9/B7,0)
+C11: orders
+D11: Fixed Cost ÷ Contribution Profit / Sale.
+A12: Break-even Orders / Day
+B12: =IFERROR(B11/B10,0)
+C12: orders / day
+D12: Required average daily volume to cover fixed cost.
+A13: Break-even Revenue / Month
+B13: =B11*B5
+C13: PHP / month
+D13: Monthly revenue at break-even volume.
+A14: Target Operating Margin
+B14: 0.15
+C14: %
+D14: Desired operating profit as a % of revenue.
+A15: Orders / Month for Target Margin
+B15: =IFERROR(B9/(B7-(B5*B14)),0)
+C15: orders
+D15: Volume required to reach the target operating margin.
+merged: A1:D1 A2:D2
+
+=== Sheet: 07 Scenarios (range A1:K60)
+A1: Scenario Model
+A2: Enter only daily volume assumptions for Conservative, Expected, Strong, and Capacity Limit. The rest calculates automatically.
+A4: Metric
+B4: Break-even
+C4: Conservative
+D4: Expected
+E4: Strong
+F4: Capacity Limit
+A5: Orders / Day
+B5: ='06 Economics'!B12
+A6: Operating Days / Month
+B6: ='06 Economics'!B10
+C6: ='06 Economics'!B10
+D6: ='06 Economics'!B10
+E6: ='06 Economics'!B10
+F6: ='06 Economics'!B10
+A7: Orders / Month
+B7: =B5*B6
+C7: =C5*C6
+D7: =D5*D6
+E7: =E5*E6
+F7: =F5*F6
+A8: Revenue
+B8: =B7*'06 Economics'!B5
+C8: =C7*'06 Economics'!B5
+D8: =D7*'06 Economics'!B5
+E8: =E7*'06 Economics'!B5
+F8: =F7*'06 Economics'!B5
+A9: Total Variable Cost
+B9: =B7*'06 Economics'!B6
+C9: =C7*'06 Economics'!B6
+D9: =D7*'06 Economics'!B6
+E9: =E7*'06 Economics'!B6
+F9: =F7*'06 Economics'!B6
+A10: Fixed Cost
+B10: ='06 Economics'!B9
+C10: ='06 Economics'!B9
+D10: ='06 Economics'!B9
+E10: ='06 Economics'!B9
+F10: ='06 Economics'!B9
+A11: Operating Profit
+B11: =B8-B9-B10
+C11: =C8-C9-C10
+D11: =D8-D9-D10
+E11: =E8-E9-E10
+F11: =F8-F9-F10
+A12: Operating Margin
+B12: =IFERROR(B11/B8,0)
+C12: =IFERROR(C11/C8,0)
+D12: =IFERROR(D11/D8,0)
+E12: =IFERROR(E11/E8,0)
+F12: =IFERROR(F11/F8,0)
+merged: A2:F2 A1:F1
+
+=== Sheet: 08 Return (range A1:K60)
+A1: Investment Return
+A2: Return is only attractive if the assumptions behind Expected volume and profit are credible. Treat this as simple screening, not formal valuation.
+A4: Metric
+B4: Value
+C4: Unit
+D4: Meaning
+A5: Initial Investment
+B5: ='05 Costs'!B15
+C5: PHP
+D5: Total startup capital.
+A6: Expected Monthly Operating Profit
+B6: ='07 Scenarios'!D11
+C6: PHP / month
+D6: From Expected scenario.
+A7: Expected Annual Operating Profit
+B7: =B6*12
+C7: PHP / year
+D7: Monthly expected profit × 12.
+A8: Maximum Realistic Monthly Profit
+B8: ='07 Scenarios'!F11
+C8: PHP / month
+D8: Capacity-limit profit, not unlimited theoretical profit.
+A9: Maximum Realistic Annual Profit
+B9: =B8*12
+C9: PHP / year
+D9: Capacity-limit monthly profit × 12.
+A10: Expected Payback Period
+B10: =IF(B6>0,B5/B6,"")
+C10: months
+D10: Initial investment ÷ expected monthly operating profit.
+A11: Expected Simple ROI
+B11: =IF(B5>0,B7/B5,"")
+C11: % / year
+D11: Expected annual operating profit ÷ initial investment.
+A14: Is the return worth the capital and effort?
+merged: A1:D1 A14:B14 A15:D18 A2:D2
+
+=== Sheet: 09 Risks & Assumptions (range A1:K60)
+A1: Risks & Assumptions
+A2: Assumptions are statements that must be true. Risks are events or conditions that could damage the business. Keep them separate.
+A4: KEY ASSUMPTIONS
+B4: Why We Believe It
+C4: Evidence
+D4: Confidence
+E4: What Would Disprove It?
+F4: Next Check
+A12: KEY RISKS
+B12: Probability
+C12: Impact
+D12: Why It Matters
+E12: Mitigation
+F12: How to Validate / Monitor
+merged: A2:F2 A1:F1
+validation B13:C18 D5:D9: type=list formula1="Low,Medium,High"
+
+=== Sheet: 10 Final Assessment (range A1:K60)
+A1: Final Assessment
+A2: Answer these after the rest of the workbook. Proceed means 'worth deeper planning', not approval to launch.
+A4: Question
+B4: Your Answer
+C4: Linked Metric
+D4: Result
+A5: Why might this work?
+A6: Why might this fail?
+A7: What must be true?
+A8: Biggest unknown
+A9: Biggest risk
+A10: Biggest opportunity
+A11: Estimated Startup Cost
+B11: ='05 Costs'!B15
+C11: 05 Costs
+A12: Break-even Orders / Month
+B12: ='06 Economics'!B11
+C12: 06 Economics
+A13: Expected Monthly Profit
+B13: ='07 Scenarios'!D11
+C13: 07 Scenarios
+A14: Maximum Realistic Monthly Profit
+B14: ='07 Scenarios'!F11
+C14: 07 Scenarios
+A15: Expected Payback Period
+B15: ='08 Return'!B10
+C15: 08 Return
+A16: Should we develop this into a full Business Plan?
+A17: Why?
+merged: A1:D1 A2:D2
+validation B16: type=list formula1="Proceed,Hold,Drop"
+

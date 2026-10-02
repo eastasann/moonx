@@ -1,0 +1,115 @@
+README: Attach        _TEMPLATE - Self Analysisto any AI like ChatGPT or Claude,
+paste the following prompt, and answer the AI’s questions one at a time to complete
+your Self Analysis.​
+​
+```​
+I want to complete the attached Self Analysis template.
+
+Please use the template as the source of truth for the questions, order, sections, and overall
+structure.
+
+The purpose of this exercise is not to decide what business I should start. It is to understand
+what kind of life I want, what I value, what I am willing to sacrifice, what “enough” means to
+me, and what role work or business should play in my life.
+
+Guide me through the template conversationally, one question at a time.
+
+The discussion is more important than completing the template quickly.
+
+For EVERY question, follow this process:
+
+1. Ask me the question from the template.
+2. Let me answer naturally.
+3. Do not immediately accept, rewrite, or finalize my first answer.
+4. Reflect back what you think I mean.
+5. Discuss the answer with me and help me think more deeply.
+6. Ask follow-up questions about anything important, vague, contradictory, or worth
+exploring.
+7. Use concrete examples, trade-offs, comparisons, or hypothetical situations when useful.
+8. Continue the discussion until the answer feels genuinely clear to me.
+9. Then summarize what we discovered in a concise answer suitable for that field in the
+template.
+10. Ask whether the summary accurately represents what I mean.
+11. Once the answer is settled, move to the next question in the template.
+
+Always have a discussion phase for every question, even when my first answer appears
+clear.
+
+Do not treat this as a questionnaire where the goal is simply to fill every blank.
+
+### How to guide the discussion
+
+- Help me discover what I actually think rather than suggesting what I should think.
+- There are no correct answers.
+- Do not try to make my answers sound more ambitious, impressive, socially responsible, or
+sophisticated.
+- Do not force entrepreneurship to be the goal.
+- Owning a business may be one option, but employment, leadership, investment,
+community work, or other paths may achieve the same life goals.
+- Distinguish between what I genuinely want and what I feel I am expected to want.
+- It is completely acceptable for me to say “I don't know.”
+- If I am uncertain, explore the uncertainty with me instead of inventing an answer.
+- If my current answer conflicts with something I said earlier, point it out neutrally and help
+me explore the trade-off.
+- If I use an abstract word such as freedom, success, happiness, impact, or enough, help me
+define what that word means specifically to me.
+- Ask “why” when it can reveal something meaningful, but do not manufacture depth where
+none exists.
+- When useful, ask me to choose between two realistic situations to clarify my priorities.
+- Use my previous answers as context when discussing later questions.
+
+### Language
+
+I may answer in English, Tagalog, another Philippine language, or a mixture of languages.
+
+Continue primarily in the language I am using.
+
+Do not translate my answers into another language unless I explicitly ask you to.
+
+When you summarize an answer for the template, preserve my meaning and use my primary
+language.
+
+### Important boundaries
+
+Do not:
+
+- give me business ideas unless I explicitly ask;
+- rank or score my answers;
+- compare my ambitions with other people's;
+- tell me what a successful person should want;
+- silently add motivations or values that I did not express;
+- rush to the next question simply because my first answer sounds reasonable.
+
+### Income questions
+
+When the template asks about personal income:
+
+- use PHP as the default currency unless I specify otherwise;
+- discuss what lifestyle or freedom the amount is intended to enable, not only the number;
+- distinguish between minimum, target, and ideal income;
+- help me determine whether additional income would actually improve the life I want.
+
+### Final Reflection
+
+Spend extra time on the Final Reflection section.
+Do not simply combine earlier answers mechanically.
+
+Help me examine whether the conclusions genuinely feel true to me and whether any
+important contradictions remain.
+
+In particular, help me clarify:
+
+- the life I want to build;
+- the person I want to become;
+- what “enough” means to me;
+- what self-fulfillment means to me;
+- what role work or business should play in my life.
+
+After completing the entire template, provide a consolidated version of all finalized answers
+so I can review my Self Analysis as a whole.
+
+Start by reading the attached Self Analysis template and asking me its first question.
+
+Do not show me every question at once.
+```
+

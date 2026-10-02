@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { schema } from "@moonx/db";
 import { BCDX, ideaId, personalWorkspaceId, userId } from "@moonx/db/seed";
 import { eq } from "drizzle-orm";
+import { addDays, todayIn } from "../src/lib/dashboard-data";
 import { call, login, startTestApp, type TestApp } from "./helpers";
 
 let t: TestApp;
@@ -190,8 +191,9 @@ describe("D3 due soon", () => {
       plan: { name: "Plan A" },
     });
     expect(items.slice(1).every((i) => !i.isMine && !i.overdue)).toBe(true);
-    const today = new Date().toISOString().slice(0, 10);
-    const limit = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10);
+    // The API takes "today" in the caller's time zone (ana: Asia/Manila), which is ahead of UTC.
+    const today = todayIn("Asia/Manila", new Date());
+    const limit = addDays(today, 7);
     for (const item of items) {
       expect(item.dueDate <= limit).toBe(true);
       expect(item.overdue).toBe(item.dueDate < today);
@@ -219,8 +221,7 @@ describe("D3 due soon", () => {
       .select()
       .from(schema.executionItems)
       .where(eq(schema.executionItems.id, baseline[0]?.id as string));
-    const day = (offset: number) =>
-      new Date(Date.now() + offset * 86400_000).toISOString().slice(0, 10);
+    const day = (offset: number) => addDays(todayIn("Asia/Manila", new Date()), offset);
     const make = async (
       title: string,
       over: Partial<typeof schema.executionItems.$inferInsert>,

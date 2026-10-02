@@ -56,7 +56,7 @@ build-api-image: require-SHA require-GCP_PROJECT_ID
 test: test-domain test-api test-web test-mobile
 
 test-domain:
-	bun test packages/domain packages/schemas packages/i18n scripts
+	bun test --coverage packages/domain packages/schemas packages/i18n scripts
 
 test-api: db-up
 	bun run --cwd packages/db reset-test

@@ -1,0 +1,15 @@
+{
+  "format": {
+    "months_one": "{{value}} month",
+    "months_other": "{{value}} months",
+    "perDay": "{{value}} / day",
+    "perMonth": "{{value}} / month"
+  },
+  "scenario": {
+    "break_even": "Break-even",
+    "conservative": "Conservative",
+    "expected": "Expected",
+    "strong": "Strong",
+    "capacity": "Capacity limit"
+  }
+}

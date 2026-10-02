@@ -686,7 +686,7 @@ type MetricReason = "needs_price" | "needs_monthly_costs" | "needs_expected_sale
 interface MetricValue {
   value: number | null;                       // 丸める前の値。計算できなければ null
   bound: "exact" | "lower" | "upper";         // lower = 「+」、upper = 「≤」（費用に未入力・Unknown の行があるとき）
-  reason: MetricReason | null;                // value が null の理由
+  reason: MetricReason | null;                // value が null の理由。value も reason も null は、売上 0 の営業利益率で、ダッシュ記号で表示する
 }
 interface CostTotal { amount: number | null; isLowerBound: boolean; unknownRows: number; emptyRows: number; }
 interface ScenarioColumn {
@@ -706,19 +706,19 @@ interface EconomicsResult {
   warnings: ("margin_not_positive" | "target_margin_unreachable" | "break_even_above_capacity"
     | "conservative_exceeds_capacity" | "expected_exceeds_capacity" | "strong_exceeds_capacity" | "costs_incomplete")[];
 }
-type KeyMetrics = Record<string, MetricValue>;   // キーは design-spec 6.4「主要指標」（initial_cost_total など）
+type KeyMetrics = Record<string, MetricValue>;   // キーは design-spec 6.4「主要指標」の1つの値のもの（initial_cost_total など）。scenario_table と scenario:* は表の形なので EconomicsResult.scenarios から読む
 
 // ---- 確認項目と Next steps（design-spec 6.1） ----
 interface CheckResult {
   key: CheckKey; state: CheckState;
   count: number | null;                        // 競合の件数・シグナルの件数など
-  params: Record<string, number>;              // テンプレートの基準値（例: { min: 3, max: 5 }）
+  params: Record<string, number>;              // テンプレートの基準値。competitors は { min, max }、local_price は { pricedCompetitors, researchLogs }、permits と demand_signal は { researchLogs }、costs と break_even は {}（例: 競合 { min: 3, max: 5 }）
   detail: { emptyRows?: number; missing?: ("price" | "monthly_costs" | "initial_amount" | "monthly_amount")[] } | null;
   link: LinkTarget;
 }
 interface NextStep {
   kind: "add_evidence" | "classify" | "start_customer_problem" | "check" | "start_section" | "check_unknowns" | "ready_to_decide";
-  count: number | null; checkKey: CheckKey | null; sectionKey: string | null;
+  count: number | null; checkKey: CheckKey | null; sectionKey: string | null;   // count は、add_evidence・classify・check_unknowns では該当の件数、check では costs の未入力の行数（0 のときは null）と competitors の基準値 min、それ以外は null
   link: LinkTarget;
 }
 
@@ -2179,8 +2179,8 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目 | 決定 |
 |---|---|
 | ライブラリ | i18next ＋ react-i18next（Web とスマホで同じ）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
-| カタログ | `packages/i18n/locales/en/*.json`。キーは画面と部品ごと（例: `validation.home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
-| エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors.<CODE>` を引く |
+| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペース（`common`・`errors`・`validation`）で、キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
+| エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
 | 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatPercent()`・`formatDate()`・`formatTime()`・`formatIsoDate()`）に集め、画面・PDF・AI 書き出しのすべてがこれを使う |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（スマホの Hermes も対応）。金額の入力は桁区切りのカンマを受け付ける |

@@ -1,0 +1,105 @@
+{
+  "stage": {
+    "validation": "Validation",
+    "planning": "Planning",
+    "launch_prep": "Launch prep"
+  },
+  "fau": {
+    "state": {
+      "empty": "Empty",
+      "unclassified": "Unclassified",
+      "fact": "Fact",
+      "fact_no_evidence": "Fact · No evidence",
+      "assumption": "Assumption",
+      "unknown": "Unknown"
+    },
+    "assumptionWithConfidence": "Assumption · {{confidence}}",
+    "confidence": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "factNoEvidenceCount_one": "{{count}} without evidence",
+    "factNoEvidenceCount_other": "{{count}} without evidence"
+  },
+  "sections": {
+    "01": "01 Customer & Problem",
+    "02": "02 Market",
+    "03": "03 Research Log",
+    "04": "04 Competitors",
+    "05": "05 Costs",
+    "06-08": "06–08 Unit Economics & Scenarios",
+    "09": "09 Assumptions & Risks",
+    "10": "10 Final Assessment"
+  },
+  "checks": {
+    "state": {
+      "not_started": "Not started",
+      "partial": "Partial",
+      "done": "Done"
+    },
+    "competitors": {
+      "label": "Competitors ({{min}}–{{max}})"
+    },
+    "local_price": {
+      "label": "Local price range"
+    },
+    "costs": {
+      "label": "Startup & monthly costs"
+    },
+    "break_even": {
+      "label": "Break-even volume"
+    },
+    "permits": {
+      "label": "Permits"
+    },
+    "demand_signal": {
+      "label": "Demand or problem signal"
+    }
+  },
+  "economics": {
+    "reason": {
+      "needs_price": "Needs price",
+      "needs_monthly_costs": "Needs monthly costs",
+      "needs_expected_sales": "Needs Expected sales",
+      "needs_startup_costs": "Needs startup costs",
+      "margin_not_positive": "Contribution margin is zero or negative. Review price or variable costs.",
+      "target_margin_unreachable": "This margin is not reachable: contribution margin is at or below the target",
+      "not_recovered": "Not recovered: Expected profit is zero or negative",
+      "empty": "Empty"
+    },
+    "warning": {
+      "margin_not_positive": "Contribution margin is zero or negative. Review price or variable costs.",
+      "target_margin_unreachable": "This margin is not reachable: contribution margin is at or below the target",
+      "break_even_above_capacity": "Break-even is above capacity",
+      "conservative_exceeds_capacity": "Conservative exceeds capacity limit",
+      "expected_exceeds_capacity": "Expected exceeds capacity limit",
+      "strong_exceeds_capacity": "Strong exceeds capacity limit",
+      "costs_incomplete": "Some cost rows are Empty or Unknown — results may look better than reality"
+    },
+    "defaultOperatingDays": "using default {{count}} days",
+    "defaultTargetMargin": "using default {{value}}",
+    "dash": "—"
+  },
+  "home": {
+    "nextSteps": {
+      "addEvidence": "Add evidence ({{count}})",
+      "classify": "Classify answers ({{count}})",
+      "startCustomerProblem": "Start with 01 Customer & Problem",
+      "startSection": "Start {{section}}",
+      "checkUnknowns": "Check unknowns ({{count}})",
+      "readyToDecide": "Ready to record a decision",
+      "check": {
+        "competitors": "Find {{count}} competitors",
+        "local_price": "Add local prices",
+        "costs_one": "Fill or mark {{count}} empty cost row",
+        "costs_other": "Fill or mark {{count}} empty cost rows",
+        "break_even": "Add price and monthly costs",
+        "permits": "Check permits",
+        "demand_signal": "Find a demand or problem signal",
+        "costs_missing": "Add startup and monthly costs"
+      }
+    },
+    "marginNegative": "Contribution margin is negative"
+  }
+}

@@ -100,7 +100,7 @@ make db-generate → make db-migrate が通り、make db-studio で 6.3 の全�
 
 ## Step 3: 計算と判定・共通の型・書式（packages/domain・schemas・i18n）
 
-Status:
+Status: done 2026-10-02
 
 ```
 Web・スマホ・API が同じコードを使う共有パッケージを作ってください（ADR-001）。

@@ -660,7 +660,7 @@ Web（パターン A ハブ: 左に状態、右にセクション）
 | 1 | Fact（根拠なし）がある | 「Add evidence (n)」 | 該当する最初の項目がある画面を開き、その項目にフォーカスする |
 | 2 | 未分類がある | 「Classify answers (n)」 | 同上（セクションの順: 01 → 02 → 04 → 05 → 06〜08 → 10） |
 | 3 | どのセクションにも入力がない | 「Start with 01 Customer & Problem」 | 11（01） |
-| 4 | 達成していない（未着手か途中の）確認項目 | 確認項目の番号順に「Find 3 competitors」「Add local prices」「Fill or mark 2 empty cost rows」「Add price and monthly costs」「Check permits」「Find a demand or problem signal」 | 1 → 15、2 → 15、3 → 17、4 → 18（価格がない）か 17（月額がない）、5 → 17 の Permits 行、6 → 14（新しい調査ログの入力） |
+| 4 | 達成していない（未着手か途中の）確認項目 | 確認項目の番号順に「Find 3 competitors」「Add local prices」「Fill or mark 2 empty cost rows」（未入力の行がなく、金額の行がない表があるときは「Add startup and monthly costs」）「Add price and monthly costs」「Check permits」「Find a demand or problem signal」 | 1 → 15、2 → 15、3 → 17、4 → 18（価格がない）か 17（月額がない）、5 → 17 の Permits 行、6 → 14（新しい調査ログの入力） |
 | 5 | 未着手のセクション | 01 から順に「Start 02 Market」 | そのセクション |
 | 6 | Unknown がある | 「Check unknowns (n)」 | 優先1と同じ開き方 |
 | 7 | 上のどれもない | 「Ready to record a decision」 | 19 |
@@ -920,6 +920,7 @@ Web（パターン F ワークシート）
 | 「Is the return worth the capital and effort?」 | 長文（設問 `V.08.WORTH`） | — | 付ける |
 
 - 営業日数と目標利益率は、入力欄に既定値を薄く表示し、値が空（未入力、または Unknown）のあいだは既定値で計算する。結果には「using default 30 days」と添える。「既定値のまま」とは値が空のことで、自分で 30 や 15% を入れたら入力済みとして扱う。
+- 入力の上限は、金額と価格が 1兆（1,000,000,000,000）、1日の販売数が 10億。桁あふれを防ぐための値で、実際の事業の規模には影響しない。
 - 費用（17 の合計）はこの画面では直さず、要約と 17 へのリンクを出す。
 
 #### 計算仕様
@@ -945,6 +946,7 @@ Web（パターン F ワークシート）
 | 回収期間（月） | IC ÷ Expected の営業利益 | Expected の営業利益 ≤ 0 → 「Not recovered: Expected profit is zero or negative」（原本の「空欄にする」に代えて理由を出す）。Expected がない → 「Needs Expected sales」 |
 | 単純 ROI（年） | Expected の営業利益 × 12 ÷ IC | IC がない・0 → 「Needs startup costs」 |
 
+- 計算できない理由の優先順は、価格がない（Needs price）、粗利が 0 以下（警告）、月額固定費がない（Needs monthly costs）の順。粗利が 0 以下のあいだは、目標利益率の件数も同じ理由（警告）にし、「This margin is not reachable」は粗利がプラスのときだけ出す。
 - 価格と費用は全シナリオ共通で、変わるのは販売数だけ。立ち上がり期間・税・割引は考えない（原本どおり）。
 - **Capacity 警告**: Conservative / Expected / Strong のいずれかが Capacity Limit を超えたら「{Scenario} exceeds capacity limit」（例: 「Strong exceeds capacity limit」）。損益分岐の件数/日が Capacity Limit を超えたら「Break-even is above capacity」。
 - **下限の伝播**: 費用の表に未入力・Unknown の行があると、その合計は下限（実際はもっと大きいかもしれない）になる。そのとき結果を次のように示し、結果の上に「Some cost rows are Empty or Unknown — results may look better than reality」と添える。
@@ -968,8 +970,8 @@ Web（パターン F ワークシート）
 | `contribution_margin` / `contribution_margin_rate` | Contribution / sale, rate | CP、粗利率 |
 | `break_even_units_month` / `break_even_units_day` / `break_even_revenue` | Break-even | BE_m、BE_m ÷ D、BE_m × P |
 | `target_margin_units_month` | Units for target margin | FC ÷（CP − P × m） |
-| `scenario_table` | Scenarios | 5列のシナリオ表 |
-| `scenario:{conservative/expected/strong/capacity}` | 各シナリオ | 1列分（件数・売上・営業利益・営業利益率） |
+| `scenario_table` | Scenarios | 5列のシナリオ表（表の形なので、1つの値としては持たず `EconomicsResult.scenarios` から読む） |
+| `scenario:{conservative/expected/strong/capacity}` | 各シナリオ | 1列分（件数・売上・営業利益・営業利益率。同上） |
 | `expected_revenue` / `expected_operating_profit` | Expected revenue / profit per month | Expected の売上・営業利益 |
 | `payback_months` / `simple_roi` | Payback, ROI | 回収期間、単純 ROI |
 | `capacity_units_day` | Capacity limit | Capacity Limit の1日の販売数 |

@@ -1065,6 +1065,11 @@ docs/03_dev-setup.md 5.4 の手順でユーザーが行う。
    make test-e2e が通ることを確かめて固定を外す。クラウドの開発環境で E2E を動かす手段（入っている Chromium を
    使う設定など）が要るなら docs/03_dev-setup.md 11章に書く。外せない理由が見つかったら、理由と版を
    docs/03_dev-setup.md 1章の Playwright の行に書く
+10. pg_dump の版（申し送り）: apps/api/test/db-backup.test.ts は手元の pg_dump で DATABASE_URL_TEST に dump を取る。
+   pg_dump はサーバーより古い版では動かないので、PostgreSQL 17 に対して 16 の pg_dump だと落ちる（2026-10-03 に
+   クラウドの開発環境で確認。17 の pg_dump では通る）。pg_dump が無いと test.skipIf で黙って飛ばす経路もある。
+   make test-api を動かす人と CI（ci.yml）が 17 の pg_dump を持つか、テストが DB と同じイメージの pg_dump を使うかを
+   決めて直し、飛ばす経路をなくす。決めた内容は docs/03_dev-setup.md 1章の PostgreSQL のクライアントの行に書く
 
 docker build した API のイメージがローカルで起動して /api/health と P13 の PDF が動き、
 3つの env で terraform validate が通り、両方の env で wrangler deploy --dry-run が通り、

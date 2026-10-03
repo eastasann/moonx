@@ -795,9 +795,15 @@ Step 17a・17b の「判断待ち」のうち、ここに挙げたものはこ�
    リリースでは作らない」との関係も書く（作成の取り消しであって、一般の削除ではない）
 5. スマホの E2E は Maestro を入れる: ADR-001 と SDD 10章に決定を書き、Step 27 の 3 を「Maestro を入れて、
    コアフローを1本書く」に書き換える（書くのはスマホの画面を作った後）
-6. テスト（make test-api・make test-web・make test-e2e）: 上の 1・3・4
+6. 1分版の Pitch Deck の Why us（design-spec 6.14）: 素材を元の仕様どおり §10 の Founder advantages だけにし、
+   このスライドは箇条書きが1つでもよい例外にする（「足りない能力」と「その埋め方」は載せない）
+7. 配布の方針（ADR-003 を書き換える。2026-10-03 のユーザーの決定）: 身内で使ううちはストアに公開しない。
+   Android は EAS の内部配布のリンクから入れる。iOS は Apple Developer Program（ユーザーが個人で登録する）の
+   TestFlight の社内テストか、端末を登録した内部配布で入れる。ストアに公開するかは、身内の外に広げるときに
+   改めて決める。04 のストアへの公開の節と、Step 26 の eas.json の項目をこの方針に合わせる
+8. テスト（make test-api・make test-web・make test-e2e）: 上の 1・3・4・6
 
-判断待ち（このステップでは触らない）: 期限の通知を取り戻すときの文、1分版の Why us のスライドの素材。
+判断待ち（このステップでは触らない）: 期限の通知（ユーザーに意味を確かめている）。
 
 make test-api・make test-web・make test-e2e・make lint・make typecheck・make doc-lint が通り、上の各点を
 テストが確かめている状態をゴールとする。

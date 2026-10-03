@@ -821,6 +821,76 @@ make test-api・make test-web・make test-e2e・make lint・make typecheck・mak
 
 ---
 
+## Step 17d: Web を Cloud Run から配る（Cloudflare をやめる）
+
+Status:
+
+```
+2026-10-03 にユーザーが、Web の置き場所を Google Cloud にまとめると決めた（管理するサービスを増やすほどの
+利点が無いため）。ドメインも決まった。先に設計ドキュメントを直してから、API と Web のコードを直してください。
+Terraform・CI・Dockerfile は Step 26 で作るので、ここでは docs とアプリのコードだけを扱う。
+
+決まったこと:
+- ドメイン: 既存の dwnfrc.app（Vercel で登録し、DNS も Vercel。ns1/ns2.vercel-dns.com で確認済み）の
+  サブドメインを使う。{DOMAIN} は bcgx.dwnfrc.app。staging の住所は stg.{DOMAIN} にする（staging.{DOMAIN} から
+  変える）。GitHub の環境・Neon のブランチ・EAS のチャンネル・アプリの ID の末尾など、名前の staging はそのまま
+- Web の配信: API と同じ Cloud Run のサービス（moonx-api-{env}）が、`/*` の静的ファイルと `/api/*` の両方を返す。
+  Cloudflare（Worker・ゾーンの設定・Registrar）は使わない
+- 独自ドメイン: Cloud Run のドメインマッピング（asia-southeast1 で使える）。Preview の機能で、Google は遅延の
+  問題から本番向けではないとしている。ユーザーはこれを承知で選んだ。DNS は Vercel に CNAME
+  （ghs.googlehosted.com）を置く。ドメインマッピングを作るアカウントは、Search Console で dwnfrc.app の所有を
+  確認しておく
+- 捨てた案（ADR-004 に書く）: Cloudflare Workers（DNS が Vercel のままでは独自ドメインを付けられない）、
+  Cloudflare Pages（付けられるが、管理するサービスが1つ増える）、Firebase Hosting（`__session` 以外の Cookie を
+  落とす。2026-10-01）、ロードバランサ＋Cloud CDN（月 $18 程度で予算を超える）。ドメインマッピングで問題が
+  出たときの乗り換え先はロードバランサ（同じ形のまま移れる）
+- 回数制限は ADR-029 の③（Cloudflare のレート制限ルール）が無くなり、①②の2段になる（ユーザー承知）
+
+やること:
+1. docs を直す。Cloudflare・Worker・wrangler・PROXY_SHARED_SECRET・X-Moonx-Proxy-Secret・CF-Connecting-IP・
+   staging.{DOMAIN} の記述を、すべて新しい形にする:
+   - SDD: ADR-004 を書き直す（決定・理由・トレードオフ。最初の表示が API の起動を待つことがある点を書く。
+     min_instance_count の扱いは ADR-007 のまま）。ADR-013（ドメインは既存の dwnfrc.app のサブドメインで、
+     新しく取らない。メールのレコードは Vercel の DNS に置く）。ADR-015（Terraform は Google Cloud の資源と
+     ドメインマッピングを持つ。Vercel の DNS のレコードは 03 の手順で手で入れる。Vercel のトークンはチームの
+     全プロジェクトを触れるので、Terraform にも手元にも持たせない）。ADR-029（2段にする）。2章（構成図・通信フロー・
+     インフラ管理・環境と命名・環境変数・プレースホルダの表に決まった {DOMAIN} を書く・CI のシークレットと変数・
+     make のターゲット）。4章（Universal Links と App Links のファイルは API が返す）。7.2（CORS の行、
+     セキュリティヘッダーは API が付ける、HSTS も API が付ける、回数制限の行）
+   - docs/03_dev-setup.md: 1章のアカウントの表、5章の初回セットアップ（Search Console での所有の確認、
+     Vercel の DNS に入れるレコードの一覧（Web の CNAME 2つ、Resend の MX と TXT、DMARC）と dig での確かめ方、
+     Worker の節をやめる）、6章の OAuth の URL を stg にする
+   - docs/04_deployment-procedure.md（デプロイとロールバックは Cloud Run のイメージ1つ。deploy-web をやめる）・
+     docs/05_operation-runbook.md（共有シークレットの入れ替えと Cloudflare の監視・障害対応をやめ、
+     ドメインマッピングの証明書と DNS の障害対応を足す）・CLAUDE.md（Tech Stack・Structure・
+     Key Design Decisions・Commands）・docs/README.md の所有権マップ（Cloudflare を挙げていれば）
+   - 環境ごとに違う値をビルドに焼き込まない: ADR-016 で staging と同じイメージを production に出すので、
+     Web の APP_ENV と Sentry の DSN は、API が HTML を返すときに meta 要素で渡す（CSP の script-src 'self' を
+     崩さない）。VITE_APP_ENV・VITE_SENTRY_DSN をやめ、API の環境変数（名前は SDD 2章で決める）に移す。
+     SDD 2章の環境変数と CI の変数を直す
+2. API: 共有シークレットの検査（X-Moonx-Proxy-Secret・PROXY_SHARED_SECRET）をやめる
+3. API: 呼び出し元の IP を、CF-Connecting-IP から X-Forwarded-For の右端の値（Cloud Run が付ける値）に変える。
+   クライアントが送った左側の値は使わない。リクエストの入口で1回だけ求め、request-info と Better Auth の
+   回数制限が同じ値を使う。Cloud Run が X-Forwarded-For をどう付けるかを公式の説明で確かめてから書き、
+   確かめた内容を SDD 7.2 に書く。テストと e2e の fixtures のヘッダーも直す
+4. API: Web の静的ファイルを返す。`index.html`（プリレンダーしたランディング）、アセット（ハッシュ付きの
+   ファイルは長くキャッシュさせる）、`/.well-known/apple-app-site-association`（Content-Type は
+   application/json）と assetlinks.json、ファイルに無い GET の画面のパスには `_shell.html` を返す。
+   `/api/*` は今のまま。静的ファイルの置き場所は設定で渡し、渡さない local（Vite の転送を使う）では返さない。
+   7.2 のセキュリティヘッダー（CSP・HSTS など）を付け、1 の meta で APP_ENV と Sentry の DSN を渡す
+5. Web: Sentry の初期化と環境の判定を、meta から読む形にする
+6. テスト（make test-api・make test-web・make test-e2e）: 2〜5。X-Forwarded-For の左側を偽っても回数制限を
+   逃れられないこと、画面のパスに _shell.html が返ること、.well-known の Content-Type、セキュリティヘッダー、
+   meta の値
+
+make test-api・make test-web・make test-e2e・make lint・make typecheck・make doc-lint が通り、
+docs とコードに Cloudflare・Worker・wrangler・PROXY_SHARED_SECRET・X-Moonx-Proxy-Secret・CF-Connecting-IP・
+staging.{DOMAIN} が残っていない状態をゴールとする（ADR-004 に捨てた案として書く Cloudflare と、
+アーカイブの docs は除く）。
+```
+
+---
+
 ## Step 18: スマホの部品（packages/ui-native）と開発ビルド
 
 Status: done 2026-10-03
@@ -1041,24 +1111,23 @@ docs/03_dev-setup.md 5章に従って、インフラと CI/CD を作ってくだ
 docs/03_dev-setup.md 5.4 の手順でユーザーが行う。
 
 やること:
-1. 未確定の名前（{DOMAIN}・{GCP_PROJECT_ID}）をユーザーに決めてもらい、SDD 2章の表と使っている箇所を置き換える
-2. apps/api/Dockerfile（oven/bun。sharp と PDF のフォントが動くこと）
+1. 未確定の名前（{GCP_PROJECT_ID}）をユーザーに決めてもらい、SDD 2章の表と使っている箇所を置き換える
+   （{DOMAIN} は Step 17d で決まった）
+2. apps/api/Dockerfile（oven/bun。sharp と PDF のフォントが動くこと）。Web もビルドしてイメージに入れ、API が返す
+   （Step 17d。環境ごとに違う値は焼き込まない）
 3. infra/terraform の modules/ と envs/{shared,staging,production}/: 2章「インフラ管理」の資源、tfstate のバケット、
    bootstrap の変数、Cloud Run の image の ignore_changes、
-   Monitoring のアラート（SDD 11章の閾値）、予算アラート、Cloudflare のゾーンの設定
-4. apps/web/worker/index.ts（/api/* の転送、X-Moonx-Proxy-Secret・CF-Connecting-IP・X-Request-Id の付与、
-   届かないときは UPSTREAM_UNAVAILABLE の形。静的アセットに無い GET の画面のパスには `_shell.html` を返す。
-   `index.html` はプリレンダーしたランディングで、SPA の殻ではない）と wrangler.jsonc（env staging / production、observability）
-5. apps/web/public/: _headers（7.2 のセキュリティヘッダー、apple-app-site-association の Content-Type）、
-   /.well-known/apple-app-site-association と assetlinks.json、robots.txt（/privacy と /support は
-   ストアに公開すると決めたときに足す。SDD 2章。ここでは作らない）
+   Monitoring のアラート（SDD 11章の閾値）、予算アラート、Cloud Run のドメインマッピング（{DOMAIN}・stg.{DOMAIN}）
+4. （Step 17d で Worker をやめたので、この項目は無い。静的ファイルの配信とセキュリティヘッダーは API が持つ）
+5. apps/web/public/: /.well-known/apple-app-site-association と assetlinks.json、robots.txt（/privacy と
+   /support はストアに公開すると決めたときに足す。SDD 2章。ここでは作らない）
 6. apps/mobile/eas.json（profile development / staging / production、チャンネル、runtimeVersion は fingerprint）と
    app.config.ts の環境ごとの設定。staging と production は Android が distribution: internal（APK）、
    iOS が TestFlight（submit の profile は iOS だけ。Android の submit は置かない。ADR-003）
 7. .github/workflows/ の ci.yml・build.yml・deploy.yml・db-backup.yml（04 2章のとおり make のターゲットを呼ぶ）、
    Dependabot、deploy/staging/version と deploy/production/version
-8. Makefile のデプロイ系のターゲット（build-web・build-api-image・deploy-api・deploy-web・mobile-update・
-   mobile-build・infra-plan・infra-apply・db-backup）を、ここで作った対象に合わせて確かめる
+8. Makefile のデプロイ系のターゲット（build-web・build-api-image・deploy-api・mobile-update・mobile-build・
+   infra-plan・infra-apply・db-backup。deploy-web は Step 17d でやめた）を、ここで作った対象に合わせて確かめる
 9. Playwright の版（申し送り）: @playwright/test はルートの package.json で 1.56.1 に固定してある（コミット 7bea59d）。
    理由は Phase 5 のクラウドの開発環境の都合で、cdn.playwright.dev に届かず、入っている Chromium（revision 1194）に
    版を合わせた。CI（ci.yml の make test-e2e）と手元はブラウザを取得できるので、この固定は要らない。CI で最新の版の
@@ -1071,9 +1140,9 @@ docs/03_dev-setup.md 5.4 の手順でユーザーが行う。
    make test-api を動かす人と CI（ci.yml）が 17 の pg_dump を持つか、テストが DB と同じイメージの pg_dump を使うかを
    決めて直し、飛ばす経路をなくす。決めた内容は docs/03_dev-setup.md 1章の PostgreSQL のクライアントの行に書く
 
-docker build した API のイメージがローカルで起動して /api/health と P13 の PDF が動き、
-3つの env で terraform validate が通り、両方の env で wrangler deploy --dry-run が通り、
-ワークフローの構文の検査（actionlint）が通り、make build-web ENV=staging が通る状態をゴールとする。
+docker build した API のイメージがローカルで起動して /api/health と P13 の PDF が動き、同じイメージが
+画面（ランディング・_shell.html・.well-known）を返し、3つの env で terraform validate が通り、
+ワークフローの構文の検査（actionlint）が通り、make build-web が通る状態をゴールとする。
 ```
 
 ---

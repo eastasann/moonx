@@ -215,24 +215,34 @@ function ThreadView({
 
 /**
  * PNL-1 (design-spec 6.0.4): the threads of one item, the input, and the thread actions. Anyone
- * who can see the item can comment, Viewers included. Whether an idea or plan is archived is not
- * known from the target, so the first write the API refuses as `ARCHIVED` turns the panel
- * read-only and says why.
+ * who can see the item can comment, Viewers included. An archived idea or plan is read-only: the
+ * screen behind the panel says so (`isArchived`), and when it cannot (the panel was opened from
+ * another screen) the first write the API refuses as `ARCHIVED` turns the panel read-only.
  */
-export function CommentsPanel({ target, onClose }: { target: ItemTarget; onClose: () => void }) {
+export function CommentsPanel({
+  target,
+  isArchived = false,
+  onClose,
+}: {
+  target: ItemTarget;
+  /** The screen behind the panel knows the idea or plan is archived. */
+  isArchived?: boolean;
+  onClose: () => void;
+}) {
   const { t } = useTranslation("panels");
   const me = useMe();
   const workspaceId = useCommentWorkspaceId();
   const threads = useQuery(commentsQuery(target, workspaceId));
   const members = useQuery(membersQuery(workspaceId));
   const mutations = useCommentMutations(target);
-  const [archived, setArchived] = useState(false);
+  const [refused, setRefused] = useState(false);
+  const archived = isArchived || refused;
   const [actionError, setActionError] = useState<unknown>(null);
   const isSelfAnalysis = isSelfAnalysisTarget(target);
   const candidates = mentionCandidates(members.data?.items ?? [], target, me.id);
 
   const noteError = (error: unknown) => {
-    if (isApiError(error) && error.code === "ARCHIVED") setArchived(true);
+    if (isApiError(error) && error.code === "ARCHIVED") setRefused(true);
   };
   /** Runs a form's write: an `ARCHIVED` answer is noted, and every error still reaches the form. */
   const attempt = async <T,>(run: () => Promise<T>): Promise<T> => {
@@ -312,9 +322,11 @@ export function CommentsPanel({ target, onClose }: { target: ItemTarget; onClose
   } else {
     body = (
       <Stack gap="space-300">
-        {archived || actionError ? (
+        {isArchived ? (
+          <InlineAlert variant="notice" heading={t("errors:ARCHIVED")} />
+        ) : refused || actionError ? (
           <InlineAlert variant="negative" heading={t("comments.saveFailed")}>
-            {archived ? t("errors:ARCHIVED") : errorText(t, actionError)}
+            {refused ? t("errors:ARCHIVED") : errorText(t, actionError)}
           </InlineAlert>
         ) : null}
         {all.length === 0 ? (

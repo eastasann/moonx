@@ -1,6 +1,8 @@
 import { style } from "@vanilla-extract/css";
+import { recipe } from "@vanilla-extract/recipes";
 import { focusRing, reducedMotion } from "../../styles.css";
 import { vars } from "../../theme";
+import { sizeVariants } from "../_internal/sizes";
 
 export const trigger = style({
   display: "inline-flex",
@@ -23,10 +25,15 @@ export const trigger = style({
   "@media": { [reducedMotion]: { transition: "none" } },
 });
 
-export const icon = style({
-  width: vars.scale.component.icon.size.M,
-  height: vars.scale.component.icon.size.M,
-  strokeWidth: vars.icon["stroke-width"],
+export const icon = recipe({
+  base: { strokeWidth: vars.icon["stroke-width"] },
+  variants: {
+    size: sizeVariants((s) => ({
+      width: vars.scale.component.icon.size[s],
+      height: vars.scale.component.icon.size[s],
+    })),
+  },
+  defaultVariants: { size: "M" },
 });
 
 export const title = style({

@@ -1,6 +1,7 @@
 import { useOverlay } from "../lib/overlay";
-import { commentTargetOf, parsePanelTarget } from "../lib/panel-target";
+import { commentTargetOf, parsePanelTarget, useHeaderPanelTarget } from "../lib/panel-target";
 import { CommentsPanel } from "./CommentsPanel";
+import { OverlayErrorBoundary } from "./ErrorBoundary";
 import { HistoryPanel } from "./HistoryPanel";
 
 /**
@@ -9,6 +10,16 @@ import { HistoryPanel } from "./HistoryPanel";
  */
 export function PanelHost() {
   const { panel, target, closePanel } = useOverlay();
+  return (
+    <OverlayErrorBoundary key={`${panel}:${target}`} onClose={closePanel}>
+      <Panel />
+    </OverlayErrorBoundary>
+  );
+}
+
+function Panel() {
+  const { panel, target, closePanel } = useOverlay();
+  const { archived } = useHeaderPanelTarget();
   const parsed = parsePanelTarget(target);
   if (!panel || !parsed) return null;
   if (panel === "history") {
@@ -16,5 +27,5 @@ export function PanelHost() {
   }
   const comment = parsePanelTarget(commentTargetOf(parsed));
   if (comment?.kind !== "item") return null;
-  return <CommentsPanel key={target} target={comment} onClose={closePanel} />;
+  return <CommentsPanel key={target} target={comment} isArchived={archived} onClose={closePanel} />;
 }

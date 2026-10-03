@@ -304,10 +304,20 @@ test("an empty Solution offers the edit sheet to editors only", async () => {
   expect(within(summary).getAllByRole("link", { name: "Fill in" })).toHaveLength(3);
 });
 
-test("a Viewer's empty Solution has no button", async () => {
+test("a Viewer's empty Summary has no Fill in", async () => {
   await open(makeNewHome(), "viewer");
   const summary = screen.getByRole("list", { name: "Summary" });
+  expect(within(summary).getAllByText("Empty")).toHaveLength(4);
   expect(within(summary).queryByRole("button")).toBeNull();
+  expect(within(summary).queryByRole("link", { name: "Fill in" })).toBeNull();
+});
+
+test("an archived idea's empty Summary has no Fill in, even for an editor", async () => {
+  await open(makeNewHome({ idea: makeDetail({ archived: true }) }));
+  const summary = screen.getByRole("list", { name: "Summary" });
+  expect(within(summary).getAllByText("Empty")).toHaveLength(4);
+  expect(within(summary).queryByRole("button")).toBeNull();
+  expect(within(summary).queryByRole("link", { name: "Fill in" })).toBeNull();
 });
 
 test("an idea of another workspace is a no-access page under this workspace's URL", async () => {

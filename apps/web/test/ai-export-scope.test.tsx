@@ -113,3 +113,13 @@ test("a validation without its id is not found", async () => {
   await renderApp(exportPath("source=validation"));
   expect(await screen.findByRole("heading", { name: /not found/i })).toBeInTheDocument();
 });
+
+test("the step indicator marks the finished step for assistive technology", async () => {
+  api();
+  await renderApp(exportPath(`source=validation&id=${VALIDATION}&scope=01`));
+  await userEvent.click(await screen.findByRole("button", { name: "Next" }));
+  const done = screen
+    .getAllByRole("listitem")
+    .find((item) => item.getAttribute("data-status") === "done");
+  expect(done).toHaveTextContent(/Scope, completed/);
+});

@@ -15,6 +15,7 @@ import {
 } from "@moonx/ui-web";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { type EvidenceResult, EvidenceSheet } from "../../components/EvidenceSheet";
 import { FauControl, FauStatus } from "../../components/FauControl";
 import {
   choicesOf,
@@ -32,7 +33,13 @@ export interface ReviewEntryCardProps {
   currency: string | null;
   /** Someone saved this answer after the import was opened. */
   updatedAfterLoad: boolean;
+  /** The validation the answer belongs to; M2 attaches evidence to it. */
+  validationId: string;
   onDraft: (patch: Partial<ReviewDraft>) => void;
+  /** M2 attached or removed evidence: the screen takes the new classification and version of the answer. */
+  onEvidenceChanged: (result: EvidenceResult) => void;
+  /** Someone saved the answer while M2 was open: the screen reads it again. */
+  onEvidenceConflict: () => void;
 }
 
 /** "just now" for the first minute, then how long ago. */
@@ -56,11 +63,15 @@ export function ReviewEntryCard({
   entry,
   currency,
   updatedAfterLoad,
+  validationId,
   onDraft,
+  onEvidenceChanged,
+  onEvidenceConflict,
 }: ReviewEntryCardProps) {
   const { t } = useTranslation(["ai", "form"]);
   const when = useWhen();
   const [factBlocked, setFactBlocked] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const { question, draft, evaluation } = entry;
   const amountQuestion = isAmountQuestion(question);
   const currentText = question.current.text ?? "";
@@ -175,8 +186,11 @@ export function ReviewEntryCard({
               if (keptEvidence(question) > 0) {
                 setFactBlocked(false);
                 onDraft({ fau: { fau: "fact" } });
-              } else {
+              } else if (currentText.trim() === "") {
                 setFactBlocked(true);
+              } else {
+                setFactBlocked(false);
+                setEvidenceOpen(true);
               }
             }}
           />
@@ -203,6 +217,25 @@ export function ReviewEntryCard({
         {question.title}
       </Checkbox>
       <DiffColumns before={before} after={after} />
+      {question.current.classification ? (
+        <EvidenceSheet
+          isOpen={evidenceOpen}
+          onClose={() => setEvidenceOpen(false)}
+          validationId={validationId}
+          target={{ type: "validation_answer", id: validationId, key: question.questionKey }}
+          label={`${question.questionKey} ${question.title}`}
+          classification={question.current.classification}
+          getLockVersion={() => question.current.lockVersion}
+          onConflict={onEvidenceConflict}
+          onChanged={(result) => {
+            onEvidenceChanged(result);
+            // M2 makes the stored answer Fact; the import keeps that only if asked, so the choice follows.
+            if (result.classification.evidence.some((e) => !e.researchLog?.deleted)) {
+              onDraft({ fau: { fau: "fact" } });
+            }
+          }}
+        />
+      ) : null}
     </Stack>
   );
 }

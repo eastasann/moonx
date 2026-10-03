@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { type ModalName, useOverlay } from "../lib/overlay";
 import { CreatePlanDialog } from "./CreatePlanDialog";
+import { OverlayErrorBoundary } from "./ErrorBoundary";
 import { GoNoGoDialog } from "./GoNoGoDialog";
 import { NewIdeaDialog } from "./NewIdeaDialog";
 import { SaveVersionDialog } from "./SaveVersionDialog";
@@ -24,7 +25,11 @@ const MODALS: Partial<Record<ModalName, ComponentType>> = {
 
 /** Shows the modal named by `?modal=` over the current screen. */
 export function ModalHost() {
-  const { modal } = useOverlay();
+  const { modal, closeModal } = useOverlay();
   const Modal = modal ? MODALS[modal] : undefined;
-  return Modal ? <Modal /> : null;
+  return Modal ? (
+    <OverlayErrorBoundary key={modal} onClose={closeModal}>
+      <Modal />
+    </OverlayErrorBoundary>
+  ) : null;
 }

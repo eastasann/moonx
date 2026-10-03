@@ -214,6 +214,85 @@ test("a save the server refuses is dropped and reported as final", async () => {
   expect(await pendingQueue.list(USER)).toEqual([]);
 });
 
+const REFUSALS: [string, number, string][] = [
+  ["409 ARCHIVED", 409, "ARCHIVED"],
+  ["403", 403, "FORBIDDEN"],
+  ["404", 404, "NOT_FOUND"],
+];
+
+for (const [name, status, code] of REFUSALS) {
+  test(`the header's Retry of a save refused with ${name} sends it again and never shows Saved`, async () => {
+    answers.push(() => failure(status, { code }));
+    await autosave.submit({
+      userId: USER,
+      itemKey: KEY,
+      request: request({ text: "refused" }),
+      lockVersion: 4,
+    });
+    await autosave.idle();
+    const first = saveStatus.getSnapshot();
+    expect(first.status).toBe("error");
+
+    answers.push(() => failure(status, { code }));
+    if (first.status === "error") first.retry();
+    await autosave.idle();
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]?.body).toMatchObject({ text: "refused", lockVersion: 4 });
+    expect(saveStatus.getSnapshot().status).toBe("error");
+    expect(events.filter((event) => event.type === "failed")).toHaveLength(2);
+    expect(events.some((event) => event.type === "saved")).toBe(false);
+
+    answers.push(() => ok({ lockVersion: 5 }));
+    const second = saveStatus.getSnapshot();
+    if (second.status === "error") second.retry();
+    await vi.waitFor(() => expect(saveStatus.getSnapshot().status).toBe("saved"));
+    expect(events.at(-1)).toMatchObject({ type: "saved" });
+  });
+}
+
+test("input submitted after a refusal does not carry the refused values", async () => {
+  answers.push(() => failure(422, { code: "VALIDATION_FAILED" }));
+  await autosave.submit({
+    userId: USER,
+    itemKey: KEY,
+    request: request({ text: "invalid", note: "n" }),
+    lockVersion: 1,
+  });
+  await autosave.idle();
+  answers.push(() => ok({ lockVersion: 2 }));
+  await autosave.submit({
+    userId: USER,
+    itemKey: KEY,
+    request: request({ text: "valid" }),
+    lockVersion: 1,
+  });
+  await autosave.idle();
+  expect(sent[1]?.body).toEqual({ text: "valid", lockVersion: 1 });
+  expect(saveStatus.getSnapshot().status).toBe("saved");
+});
+
+test("a refused 'Overwrite with mine' does not make later saves skip the lock check", async () => {
+  answers.push(() => failure(403, { code: "FORBIDDEN" }));
+  await autosave.submit({
+    userId: USER,
+    itemKey: KEY,
+    request: request({ text: "mine" }),
+    lockVersion: 3,
+    force: true,
+  });
+  await autosave.idle();
+  expect(sent[0]?.body).toMatchObject({ force: true });
+  answers.push(() => ok({ lockVersion: 4 }));
+  await autosave.submit({
+    userId: USER,
+    itemKey: KEY,
+    request: request({ text: "later" }),
+    lockVersion: 3,
+  });
+  await autosave.idle();
+  expect(sent[1]?.body).toEqual({ text: "later", lockVersion: 3 });
+});
+
 test("another person's input is dropped, and logging out empties the queue", async () => {
   await pendingQueue.put({
     userId: "someone-else",

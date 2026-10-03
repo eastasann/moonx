@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  formatCount,
   formatDate,
   formatInputNumber,
   formatInputPercent,
@@ -118,5 +119,14 @@ describe("formatRelativeTime", () => {
   });
   test("a moment ahead of the clock reads as now", () => {
     expect(formatRelativeTime(ago(-5_000), now)).toBe("now");
+  });
+});
+
+describe("formatCount", () => {
+  test("shows the count as is up to the cap and 99+ above it", () => {
+    expect(formatCount(1)).toBe("1");
+    expect(formatCount(99)).toBe("99");
+    expect(formatCount(100)).toBe("99+");
+    expect(formatCount(12345)).toBe("99+");
   });
 });

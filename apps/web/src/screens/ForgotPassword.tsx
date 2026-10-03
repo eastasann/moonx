@@ -12,6 +12,7 @@ import {
 } from "@moonx/ui-web";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { forgotPasswordSchema } from "../forms/schemas";
 import { authCall, authClient } from "../lib/auth-client";
@@ -27,6 +28,7 @@ export function ForgotPassword() {
         authClient().requestPasswordReset({ email: email.trim(), redirectTo: "/reset-password" }),
       ),
   });
+  const formId = useId();
   const form = useForm({
     defaultValues: { email: "" },
     validators: { onSubmit: validate(forgotPasswordSchema, t) },
@@ -38,6 +40,19 @@ export function ForgotPassword() {
       <FocusPattern
         hasTabBar={false}
         header={<Heading level={1}>{t("auth:forgot.title")}</Heading>}
+        actions={
+          send.isSuccess ? undefined : (
+            <Button
+              type="submit"
+              form={formId}
+              variant="accent"
+              isPending={send.isPending}
+              pendingLabel={t("app:sending")}
+            >
+              {t("auth:forgot.submit")}
+            </Button>
+          )
+        }
       >
         <Stack gap="space-300">
           {send.isSuccess ? (
@@ -49,6 +64,7 @@ export function ForgotPassword() {
                 <InlineAlert variant="negative" heading={errorText(t, send.error)} />
               ) : null}
               <Form
+                id={formId}
                 aria-label={t("auth:forgot.title")}
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -68,14 +84,6 @@ export function ForgotPassword() {
                     />
                   )}
                 </form.Field>
-                <Button
-                  type="submit"
-                  variant="accent"
-                  isPending={send.isPending}
-                  pendingLabel={t("app:sending")}
-                >
-                  {t("auth:forgot.submit")}
-                </Button>
               </Form>
             </>
           )}

@@ -65,7 +65,7 @@ test("Piaya's costs and economics show the design-spec 8.3 numbers and follow an
 
   await page.getByRole("link", { name: "Unit Economics →" }).click();
   await page.waitForURL(/\/economics$/);
-  await expect(page.getByText("Unit economics")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Unit economics", exact: true })).toBeVisible();
   await expect(page.getByText("₱231.50", { exact: true })).toBeVisible();
   await expect(page.getByText("51.4%", { exact: true })).toBeVisible();
   await expect(page.getByText("6.9 / day", { exact: true })).toBeVisible();

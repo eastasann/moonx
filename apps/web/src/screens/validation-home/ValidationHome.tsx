@@ -21,6 +21,7 @@ function HomeContent({ data, workspaceId }: { data: ValidationHomeData; workspac
   const access = useHomeAccess(data, workspaceId);
   const narrow = useIsNarrow();
   const [editing, setEditing] = useState(false);
+  usePanelTarget(formatContainerTarget("idea", data.idea.id), { archived: data.idea.archived });
   // Another workspace's URL must not show the idea (SDD 4).
   if (data.idea.workspaceId !== workspaceId) return <NoAccessState />;
   return (
@@ -71,7 +72,6 @@ function HomeContent({ data, workspaceId }: { data: ValidationHomeData; workspac
 /** Screen 13, the validation home: what the idea has and what it still needs (design-spec 6.1). */
 export function ValidationHome({ workspaceId, ideaId }: { workspaceId: string; ideaId: string }) {
   const query = useQuery(validationHomeQuery(ideaId));
-  usePanelTarget(formatContainerTarget("idea", ideaId));
   return (
     <QueryBoundary query={query} skeleton={<HomeSkeleton />}>
       {(data) => <HomeContent data={data} workspaceId={workspaceId} />}

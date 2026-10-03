@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { QuestionFormFrame } from "../components/QuestionFormFrame";
 import { NoAccessState, QueryBoundary } from "../components/states";
+import { exchangeHref } from "../lib/ai-exchange";
 import { ideaDetailQuery, sectionQuery } from "../lib/idea-detail";
 import { canEditIdeas, useWorkspaceRole } from "../lib/ideas";
 import { formatContainerTarget, usePanelTarget } from "../lib/panel-target";
@@ -112,7 +113,9 @@ function QuestionForm({
   const { t } = useTranslation(["form", "validation", "app"]);
   const role = useWorkspaceRole(workspaceId);
   const canEdit = canEditIdeas(role) && !isArchived;
-  usePanelTarget(formatContainerTarget("validation", validationId, sectionKey));
+  usePanelTarget(formatContainerTarget("validation", validationId, sectionKey), {
+    archived: isArchived,
+  });
 
   const answerOf = useMemo(
     () => new Map(answers.map((answer) => [answer.questionKey, answer])),
@@ -132,6 +135,7 @@ function QuestionForm({
   };
 
   const ideaBase = `/w/${workspaceId}/ideas/${ideaId}`;
+  const sectionHref = `${ideaBase}${sectionPath(sectionKey)}`;
   const sectionTitle = (key: string) => t(`validation:sections.${key}`);
   const sections = VALIDATION_SECTION_ORDER.map((key) => ({
     key,
@@ -148,7 +152,7 @@ function QuestionForm({
       section={{
         key: sectionKey,
         title: sectionTitle(sectionKey),
-        href: `${ideaBase}${sectionPath(sectionKey)}`,
+        href: sectionHref,
       }}
       sections={sections}
       guidance={section.guidance}
@@ -163,13 +167,25 @@ function QuestionForm({
           <Menu trigger={<Button variant="secondary">{t("form:ai")}</Button>}>
             <MenuItem
               id="export"
-              href={`/w/${workspaceId}/ai/export?source=validation&id=${validationId}&scope=${sectionKey}`}
+              href={exchangeHref("export", {
+                workspaceId,
+                kind: "validation",
+                id: validationId,
+                scope: sectionKey,
+                returnTo: sectionHref,
+              })}
             >
               {t("form:aiExport")}
             </MenuItem>
             <MenuItem
               id="import"
-              href={`/w/${workspaceId}/ai/import?target=validation&id=${validationId}&scope=${sectionKey}`}
+              href={exchangeHref("import", {
+                workspaceId,
+                kind: "validation",
+                id: validationId,
+                scope: sectionKey,
+                returnTo: sectionHref,
+              })}
             >
               {t("form:aiImport")}
             </MenuItem>

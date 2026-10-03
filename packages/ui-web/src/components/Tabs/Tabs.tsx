@@ -38,6 +38,11 @@ export function Tab(props: TabProps) {
 
 export interface TabPanelProps extends Omit<AriaTabPanelProps, "className" | "style"> {}
 
+/**
+ * Keyed by `id` because a panel that stays mounted while its `id` changes (one `<TabPanel id={tab}>`
+ * for the selected tab) keeps the DOM id it first rendered with, so the selected tab's
+ * `aria-controls` then points at nothing.
+ */
 export function TabPanel(props: TabPanelProps) {
-  return <AriaTabPanel {...props} className={tabPanel} />;
+  return <AriaTabPanel key={props.id} {...props} className={tabPanel} />;
 }

@@ -96,13 +96,13 @@ export function Summary({
           key: row.key,
           label: row.label,
           value: row.value,
-          fill: row.href ? (
+          fill: !canChange ? null : row.href ? (
             <Link href={row.href}>{t("home.summary.fill")}</Link>
-          ) : canChange ? (
+          ) : (
             <Button variant="secondary" size="S" onPress={onEdit}>
               {t("home.summary.fill")}
             </Button>
-          ) : null,
+          ),
         }))}
       />
     </Stack>

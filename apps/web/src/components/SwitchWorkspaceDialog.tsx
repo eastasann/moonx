@@ -28,7 +28,7 @@ import { ME_KEY, useMe } from "../lib/session";
 
 /** M7: switch to another workspace, or create one (design-spec 3.8, 5). */
 export function SwitchWorkspaceDialog() {
-  const { t } = useTranslation(["app", "account"]);
+  const { t } = useTranslation(["app", "account", "form"]);
   const me = useMe();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -70,14 +70,19 @@ export function SwitchWorkspaceDialog() {
             <Button variant="secondary" onPress={() => setCreating(false)}>
               {t("app:back")}
             </Button>
-            <Button
-              type="submit"
-              form={formId}
-              isPending={create.isPending}
-              pendingLabel={t("app:saving")}
-            >
-              {t("app:workspace.create")}
-            </Button>
+            <form.Subscribe selector={(state) => state.values.name}>
+              {(name) => (
+                <Button
+                  type="submit"
+                  form={formId}
+                  isDisabled={!name.trim()}
+                  isPending={create.isPending}
+                  pendingLabel={t("app:saving")}
+                >
+                  {t("app:workspace.create")}
+                </Button>
+              )}
+            </form.Subscribe>
           </>
         ) : (
           <Button variant="secondary" onPress={() => setCreating(true)}>
@@ -96,7 +101,9 @@ export function SwitchWorkspaceDialog() {
           id={formId}
         >
           {create.error ? (
-            <InlineAlert variant="negative" heading={errorText(t, create.error)} />
+            <InlineAlert variant="negative" heading={t("form:saveFailed")}>
+              {errorText(t, create.error)}
+            </InlineAlert>
           ) : null}
           <form.Field name="name">
             {(field) => (

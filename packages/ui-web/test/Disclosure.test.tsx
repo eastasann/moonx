@@ -1,3 +1,4 @@
+import { COMPONENT_SIZES } from "@moonx/ui-tokens";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Accordion, Disclosure } from "../src/components/Disclosure";
@@ -130,4 +131,29 @@ describe("Accordion", () => {
     expect(screen.getByRole("button", { name: "Second" })).toHaveFocus();
     await expectNoAxeViolations(container);
   });
+});
+
+test.each(COMPONENT_SIZES)("accepts size %s", (size) => {
+  render(
+    <Disclosure title="Example" size={size}>
+      Body
+    </Disclosure>,
+  );
+  expect(screen.getByRole("button", { name: "Example" })).toBeInTheDocument();
+});
+
+test("an Accordion hands its size to the items", () => {
+  render(
+    <>
+      <Accordion size="XL">
+        <Disclosure id="a" title="In accordion">
+          Body
+        </Disclosure>
+      </Accordion>
+      <Disclosure title="Alone">Body</Disclosure>
+    </>,
+  );
+  expect(screen.getByRole("button", { name: "In accordion" }).className).not.toBe(
+    screen.getByRole("button", { name: "Alone" }).className,
+  );
 });

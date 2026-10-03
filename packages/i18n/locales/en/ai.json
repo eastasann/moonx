@@ -123,7 +123,7 @@
       "justNow": "just now",
       "fauReset": "F/A/U goes back to Unclassified. Set it again if you want.",
       "fau": "F/A/U",
-      "factNeedsEvidence": "Fact needs evidence, and this answer has none. Apply first, then attach evidence in the question.",
+      "factNeedsEvidence": "This answer is empty now, so evidence can't be attached yet. Apply first, then attach evidence in the question.",
       "conflict": "Some answers changed while you were reviewing",
       "conflictBody": "Current shows the latest answers. Check the changes and apply again.",
       "noChanges": "No changes found",

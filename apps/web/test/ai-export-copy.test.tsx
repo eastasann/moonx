@@ -82,6 +82,19 @@ test("the link to Import from AI carries the exported scope", async () => {
   );
 });
 
+test("the export keeps the form screen it came from for Back and for the import", async () => {
+  const returnTo = `/w/${WORKSPACE}/ideas/x/questions/01`;
+  await openExport(
+    `source=validation&id=${VALIDATION}&scope=01&returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  expect(screen.getByRole("link", { name: "Import from AI" })).toHaveAttribute(
+    "href",
+    `/w/${WORKSPACE}/ai/import?target=validation&id=${VALIDATION}&scope=01&returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  const back = screen.getAllByRole("link", { name: /Back/ }).find((l) => l.closest("main"));
+  expect(back).toHaveAttribute("href", returnTo);
+});
+
 test("exporting writes nothing", async () => {
   const { calls } = await openExport();
   expect(calls.filter((c) => c.method !== "GET")).toEqual([]);

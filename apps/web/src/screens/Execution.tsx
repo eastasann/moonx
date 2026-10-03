@@ -169,7 +169,7 @@ function ExecutionScreen({
   const members = useWorkspaceMembers(workspaceId);
   const compact = useBelowDesktop();
   const { changed } = usePlanChangeRefresh(planId);
-  usePanelTarget(formatContainerTarget("business_plan", planId));
+  usePanelTarget(formatContainerTarget("business_plan", planId), { archived: isArchived });
   const type = EXECUTION_TYPE_OF_TAB[tab];
   const { remove, reorder } = useExecutionActions(planId, type, changed);
   const [creating, setCreating] = useState(false);

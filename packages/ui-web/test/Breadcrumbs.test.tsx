@@ -1,3 +1,4 @@
+import { COMPONENT_SIZES } from "@moonx/ui-tokens";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Breadcrumb, Breadcrumbs } from "../src/components/Breadcrumbs";
@@ -55,4 +56,17 @@ test("hover and focus-visible set data attributes", async () => {
 test("has no axe violations", async () => {
   const { container } = render(<Example />);
   await expectNoAxeViolations(container);
+});
+
+test.each(COMPONENT_SIZES)("accepts size %s", (size) => {
+  render(
+    <Breadcrumbs aria-label="Breadcrumbs" size={size}>
+      <Breadcrumb id="ideas" href="/ideas">
+        Ideas
+      </Breadcrumb>
+      <Breadcrumb id="validation">Validation</Breadcrumb>
+    </Breadcrumbs>,
+  );
+  expect(screen.getByRole("list", { name: "Breadcrumbs" }).className).toContain("size");
+  expect(screen.getAllByRole("listitem")).toHaveLength(2);
 });

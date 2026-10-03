@@ -7,7 +7,9 @@ export const Route = createFileRoute("/")({
   // prerender runs on the server with no session, so the check is for the browser only.
   beforeLoad: async ({ context }) => {
     if (typeof window === "undefined") return;
-    const me = await loadMe(context.queryClient);
+    // The landing page needs no session, so an API that is down (or any other failure of this
+    // check) leaves it open instead of replacing the page with an error (design-spec 5).
+    const me = await loadMe(context.queryClient).catch(() => null);
     if (me) throw redirect({ href: homePath(me) });
   },
   component: Landing,

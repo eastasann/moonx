@@ -1,6 +1,7 @@
 import { recipe } from "@vanilla-extract/recipes";
 import { focusRing, reducedMotion } from "../../styles.css";
 import { vars } from "../../theme";
+import { sizeVariants } from "../_internal/sizes";
 import { targetMin } from "../_internal/target";
 
 export const link = recipe({
@@ -39,6 +40,7 @@ export const link = recipe({
         selectors: { "&[data-hovered]": { color: vars.color.text.primary } },
       },
     },
+    size: sizeVariants((s) => ({ fontSize: vars.scale.component.field["font-size"][s] })),
   },
   defaultVariants: { variant: "primary" },
 });

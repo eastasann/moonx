@@ -19,6 +19,7 @@ function* sources(dir: string): Generator<string> {
  * checked against the values its screen can give it, listed here.
  */
 const DYNAMIC: Record<string, string[]> = {
+  "welcome.steps.${id}": ["invite", "profile", "done"].map((s) => `auth:welcome.steps.${s}`),
   "validation:stage.${stage}": ["validation", "planning", "launch_prep"].map(
     (s) => `validation:stage.${s}`,
   ),

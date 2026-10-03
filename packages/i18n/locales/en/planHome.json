@@ -98,14 +98,14 @@
     "title": "Rename plan",
     "name": "Plan name",
     "save": "Rename",
-    "failed": "The plan was not renamed."
+    "failed": "Couldn't save — Retry"
   },
   "create": {
     "title": "Create plan draft",
     "name": "Plan name",
     "help": "Name this approach, for example Plan A or Plan B. Your validation answers are copied into the draft.",
     "create": "Create draft",
-    "failed": "The plan was not created.",
+    "failed": "Couldn't save — Retry",
     "loadFailed": "The existing plans could not be read.",
     "namePrefix": "Plan"
   },
@@ -115,7 +115,7 @@
     "help": "For example: v1 For advisors. The plan as it is now is kept as a read-only snapshot.",
     "save": "Save version",
     "saved": "Version saved",
-    "failed": "The version was not saved.",
+    "failed": "Couldn't save — Retry",
     "loadFailed": "The plan could not be read.",
     "defaultName": "v{{number}}"
   },
@@ -136,7 +136,7 @@
     "reason": "Why?",
     "record": "Record",
     "recorded": "Go / No-Go recorded",
-    "failed": "The Go / No-Go was not recorded.",
+    "failed": "Couldn't save — Retry",
     "history": "History",
     "historyEmpty": "No Go / No-Go recorded yet.",
     "historyLine": "{{value}} · {{date}} · {{who}}",

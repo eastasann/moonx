@@ -1,10 +1,10 @@
 import type { Classification } from "@moonx/schemas";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { pendingQueue } from "../src/lib/pending-queue";
-import { answer, VALIDATION_ID } from "./question-fixtures";
-import { renderApp } from "./support";
+import { answer, answers01, section01, VALIDATION_ID } from "./question-fixtures";
+import { renderApp, WORKSPACE } from "./support";
 import {
   ANSWER,
   api,
@@ -418,4 +418,66 @@ test("Fact opens the evidence sheet, and attaching a research log makes the answ
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull());
   const chips = await screen.findByRole("grid", { name: "Evidence" });
   expect(within(chips).getByText(/Store observation: SM Bacolod/)).toBeInTheDocument();
+});
+
+const withCommentCounts = () =>
+  answers01().map((a) => (a.questionKey === "V.01.WHO" ? { ...a, commentCount: 3 } : a));
+
+test("a question that is not focused still shows its comment count, and the open one shows it once", async () => {
+  api({
+    [`GET /api/v1/validations/${VALIDATION_ID}/questions/01`]: () => ({
+      body: { section: section01, answers: withCommentCounts() },
+    }),
+  });
+  await renderApp(PATH());
+  const compact = await screen.findByRole("button", { name: /WHO/ });
+  expect(within(compact).getByText("3")).toBeInTheDocument();
+
+  await userEvent.click(compact);
+  const open = await screen.findByRole("group", { name: "WHO" });
+  expect(within(open).getAllByText("3")).toHaveLength(1);
+});
+
+test("a read-only answer shows its F/A/U label once", async () => {
+  api({}, { me: viewerMe() });
+  await renderApp(PATH());
+  const group = await screen.findByRole("group", { name: "WHO" });
+  expect(within(group).getAllByText("Assumption · Medium")).toHaveLength(1);
+});
+
+test("the comments panel of an archived idea has no input and says why", async () => {
+  api(
+    {
+      "GET /api/v1/comments": () => ({ body: { threads: [] } }),
+      [`GET /api/v1/workspaces/${WORKSPACE}/members`]: () => ({ body: { items: [] } }),
+    },
+    { archived: true },
+  );
+  // The panel is a column beside the page on a desktop-wide window.
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: /min-width/.test(query),
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+  await renderApp(PATH("01", `?panel=comments&target=validation_answer:${VALIDATION_ID}:V.01.WHO`));
+  const panel = within(await screen.findByRole("complementary", { name: "Comments" }));
+  expect(await panel.findByText("No comments yet")).toBeInTheDocument();
+  expect(panel.getByText("This is archived. Restore it to make changes.")).toBeInTheDocument();
+  expect(panel.queryByRole("textbox", { name: "Add a comment" })).toBeNull();
+});
+
+test("the AI menu sends the section to export and the whole validation to import, both returning here", async () => {
+  api();
+  await renderApp(PATH("01"));
+  await userEvent.click(await screen.findByRole("button", { name: "AI" }));
+  const returnTo = encodeURIComponent(PATH("01"));
+  expect(await screen.findByRole("menuitem", { name: "Export for AI" })).toHaveAttribute(
+    "href",
+    `/w/${WORKSPACE}/ai/export?source=validation&id=${VALIDATION_ID}&scope=01&returnTo=${returnTo}`,
+  );
+  expect(screen.getByRole("menuitem", { name: "Import from AI" })).toHaveAttribute(
+    "href",
+    `/w/${WORKSPACE}/ai/import?target=validation&id=${VALIDATION_ID}&returnTo=${returnTo}`,
+  );
 });

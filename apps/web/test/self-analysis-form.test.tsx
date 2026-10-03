@@ -225,13 +225,15 @@ test("the AI menu exports and imports this section of the self analysis", async 
   await renderApp(PATH("WHY"));
   await screen.findByRole("heading", { level: 1, name: "WHY" });
   await user.click(screen.getByRole("button", { name: "AI" }));
+  const returnTo = encodeURIComponent(PATH("WHY"));
   expect(await screen.findByRole("menuitem", { name: "Export for AI" })).toHaveAttribute(
     "href",
-    `/w/${WORKSPACE}/ai/export?source=self_analysis&scope=WHY`,
+    `/w/${WORKSPACE}/ai/export?source=self_analysis&scope=WHY&returnTo=${returnTo}`,
   );
+  // An import covers the whole self analysis, so it carries no scope (design-spec 6.7).
   expect(screen.getByRole("menuitem", { name: "Import from AI" })).toHaveAttribute(
     "href",
-    `/w/${WORKSPACE}/ai/import?target=self_analysis&scope=WHY`,
+    `/w/${WORKSPACE}/ai/import?target=self_analysis&returnTo=${returnTo}`,
   );
 });
 

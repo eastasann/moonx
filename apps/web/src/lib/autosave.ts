@@ -62,6 +62,12 @@ class Autosave {
   private readonly flushers = new Set<() => Promise<void>>();
   /** The version of each item's last successful save, which any later input must follow. */
   private readonly versions = new Map<string, number>();
+  /**
+   * Saves the server refused for good (409 ARCHIVED, 403, 404, 422). They leave the queue, but the
+   * header's Retry sends them again: without this the Retry would find nothing to run and the
+   * header would show "Saved" for input the server never took.
+   */
+  private readonly refused = new Map<string, PendingEntry>();
   private closed = false;
   /** Counts clears, so a save that was waiting on the queue when the person logged out is dropped. */
   private epoch = 0;
@@ -119,7 +125,12 @@ class Autosave {
     // What an earlier visit left in the queue is not merged here; the screen restored it into the
     // field before the person typed, so the new input already contains it.
     const slot = this.slots.get(id);
+    // A refused save is never merged into new input: its values were rejected as a whole, so
+    // resending them would block every later edit of the item, and a refused "Overwrite with mine"
+    // would carry its `force` past the lock check. The header's Retry is the only way it is sent
+    // again; new input is a fresh attempt, and the screen resends its whole input on a refusal.
     const stored = slot?.entry;
+    this.refused.delete(id);
     const entry: PendingEntry = {
       userId: input.userId,
       itemKey: input.itemKey,
@@ -186,6 +197,7 @@ class Autosave {
   /** Forgets the unsent save of an item: the person chose the other copy of a conflict. */
   async discard(userId: string, itemKey: string): Promise<void> {
     this.slots.delete(this.slotId(userId, itemKey));
+    this.refused.delete(this.slotId(userId, itemKey));
     this.versions.delete(this.slotId(userId, itemKey));
     await pendingQueue.remove(userId, itemKey);
     await this.clearFailure(userId, itemKey);
@@ -216,6 +228,7 @@ class Autosave {
   async clear(): Promise<void> {
     this.epoch += 1;
     this.slots.clear();
+    this.refused.clear();
     this.versions.clear();
     await pendingQueue.clear();
   }
@@ -239,7 +252,14 @@ class Autosave {
     let run = this.runs.get(id);
     if (!run) {
       run = async () => {
-        const slot = this.slots.get(id);
+        let slot = this.slots.get(id);
+        const refusedEntry = this.refused.get(id);
+        if (!slot && refusedEntry) {
+          this.refused.delete(id);
+          slot = { entry: refusedEntry, sending: false, fromQueue: false };
+          this.slots.set(id, slot);
+          await pendingQueue.put(refusedEntry);
+        }
         // A request already on its way ends with the loop that sent it.
         if (!slot || slot.sending) return;
         const error = await this.drain(id);
@@ -375,6 +395,7 @@ class Autosave {
     // A refusal of the request itself. Input merged in meanwhile is a fresh attempt, so it stays.
     if (slot.entry === sent) {
       this.slots.delete(id);
+      this.refused.set(id, sent);
       await pendingQueue.remove(sent.userId, sent.itemKey);
     }
     this.emit(id, { type: "failed", error, willRetry: false });

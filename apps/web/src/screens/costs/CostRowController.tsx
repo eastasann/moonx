@@ -1,6 +1,5 @@
 import { formatInputNumber, formatInputPercent } from "@moonx/i18n";
 import type { CostItem } from "@moonx/schemas";
-import { Button, InlineAlert, Stack, Text } from "@moonx/ui-web";
 import { useQueryClient } from "@tanstack/react-query";
 import { type MutableRefObject, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,12 +18,11 @@ import {
   percentProblem,
   withNumber,
 } from "../../lib/costs";
-import { errorText } from "../../lib/error-text";
 import { readNumberText, readPercentText } from "../../lib/number-input";
 import { useOverlay } from "../../lib/overlay";
 import { formatItemTarget } from "../../lib/panel-target";
 import { withChoice } from "../../lib/questions";
-import { useSavedItem } from "../../lib/use-saved-item";
+import { type SavedItem, useSavedItem } from "../../lib/use-saved-item";
 
 /** What the cells of one row can do. Every method changes what the row shows and queues the save. */
 export interface RowApi {
@@ -75,6 +73,14 @@ export interface CostRowControllerProps {
   /** Changes the screen's copy of a row; `item` is the base for a row that has none yet. */
   setDraft: (item: CostItem, update: (prev: CostDraft) => CostDraft) => void;
   registry: RowRegistry;
+  /** Hands the row's failed save to the screen, which draws it beside the row; `null` clears it. */
+  onFailure: (id: string, failure: RowFailure | null) => void;
+}
+
+/** A failed save of a row with what its Retry does. */
+export interface RowFailure {
+  failure: NonNullable<SavedItem["failure"]>;
+  retry: () => void;
 }
 
 const url = (id: string) => `/api/v1/cost-items/${id}`;
@@ -132,6 +138,7 @@ export function CostRowController({
   isReadOnly,
   setDraft,
   registry,
+  onFailure,
 }: CostRowControllerProps) {
   const { t } = useTranslation(["costs", "form", "app"]);
   const queryClient = useQueryClient();
@@ -228,6 +235,13 @@ export function CostRowController({
       void queryClient.invalidateQueries({ queryKey: ["me"] });
     }
   }, [failure]);
+
+  const retryRef = useRef(() => {});
+  retryRef.current = () => saved.retry(bodyOf(draftRef.current));
+  useEffect(() => {
+    onFailure(item.id, failure ? { failure, retry: () => retryRef.current() } : null);
+  }, [failure, item.id, onFailure]);
+  useEffect(() => () => onFailure(item.id, null), [item.id, onFailure]);
 
   const edit = (
     update: (prev: CostDraft) => CostDraft,
@@ -401,20 +415,6 @@ export function CostRowController({
 
   return (
     <>
-      {failure ? (
-        <InlineAlert variant="negative" heading={t("costs:failure", { name })}>
-          <Stack gap="space-100" align="start">
-            <Text>{failure.willRetry ? t("form:saveFailed") : errorText(t, failure.error)}</Text>
-            <Button
-              variant="secondary"
-              size="S"
-              onPress={() => saved.retry(bodyOf(draftRef.current))}
-            >
-              {t("form:retry")}
-            </Button>
-          </Stack>
-        </InlineAlert>
-      ) : null}
       {evidenceOpen && !isReadOnly ? (
         <EvidenceSheet
           isOpen

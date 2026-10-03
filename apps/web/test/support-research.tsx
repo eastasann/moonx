@@ -6,7 +6,7 @@ import type {
   ValidationAnswer,
 } from "@moonx/schemas";
 import { configure } from "@testing-library/react";
-import { IDEA_ID, idea, VALIDATION_ID } from "./question-fixtures";
+import { IDEA_ID, idea, question, VALIDATION_ID } from "./question-fixtures";
 import {
   ASSUMPTIONS,
   COMPETITORS,
@@ -42,6 +42,8 @@ export interface ResearchApiOptions {
   entries?: ResearchLogEntry[];
   competitors?: Competitor[];
   patterns?: ValidationAnswer[];
+  /** The titles the template gives the survivor and failure pattern questions. */
+  patternTitles?: [survivor: string, failure: string];
   assumptions?: Assumption[];
   risks?: Risk[];
 }
@@ -55,6 +57,12 @@ export const viewerMe = () =>
       },
     ],
   });
+
+const patternQuestion = (key: string, title: string) => ({
+  ...question("", title),
+  key,
+  sectionKey: "04",
+});
 
 /** The stub of every request screens 14, 15 and 16 make, with the fixtures' rows by default. */
 export function researchApi(extra: Record<string, Handler> = {}, options: ResearchApiOptions = {}) {
@@ -103,6 +111,27 @@ export function researchApi(extra: Record<string, Handler> = {}, options: Resear
         items: options.competitors ?? COMPETITORS,
         patterns: options.patterns ?? patternAnswers(),
         guidance: { min: 3, max: 5 },
+      },
+    }),
+    [`GET ${V}/questions/04`]: () => ({
+      body: {
+        section: {
+          key: "04",
+          part: null,
+          title: "Competitors & Substitutes",
+          guidance: null,
+          questions: [
+            patternQuestion(
+              "V.04.SURVIVOR_PATTERNS",
+              options.patternTitles?.[0] ?? "Survivor Patterns",
+            ),
+            patternQuestion(
+              "V.04.FAILURE_PATTERNS",
+              options.patternTitles?.[1] ?? "Failure Patterns",
+            ),
+          ],
+        },
+        answers: options.patterns ?? patternAnswers(),
       },
     }),
     [`GET ${V}/assumptions`]: () => ({ body: { items: options.assumptions ?? ASSUMPTIONS } }),

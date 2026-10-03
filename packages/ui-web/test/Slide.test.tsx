@@ -177,3 +177,8 @@ describe("Slide", () => {
     },
   );
 });
+
+test("headingLevel puts the title at the level the page outline needs", () => {
+  render(<Slide {...cases.text} headingLevel={2} />);
+  expect(screen.getByRole("heading", { level: 2, name: cases.text.title })).toBeInTheDocument();
+});

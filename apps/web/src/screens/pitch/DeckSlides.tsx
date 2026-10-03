@@ -59,7 +59,7 @@ export function DeckSlides({
               />
             </Flex>
           </Flex>
-          <Slide {...slideProps(t, deck, slide, currency, me.timezone)} />
+          <Slide {...slideProps(t, deck, slide, currency, me.timezone)} headingLevel={2} />
         </Stack>
       ))}
       <Stack gap="space-100">

@@ -5,6 +5,15 @@ import { isUnauthenticated } from "./api-error";
 
 export const ME_KEY = ["me"] as const;
 
+/**
+ * Drops every cached query. Everything cached besides the public pages belongs to one person
+ * (the account, unread counts, lists), so a lost session or a sign-in as someone else must not
+ * leave any of it readable. Mutations are left alone: the sign-in that calls this is one.
+ */
+export function dropUserQueries(queryClient: QueryClient): void {
+  queryClient.removeQueries();
+}
+
 /** U1. Every signed-in screen reads the account from this one cached query. */
 export const meQuery = queryOptions({
   queryKey: ME_KEY,
@@ -20,7 +29,7 @@ export async function loadMe(queryClient: QueryClient): Promise<Me | null> {
     return await queryClient.fetchQuery(meQuery);
   } catch (error) {
     if (isUnauthenticated(error)) {
-      queryClient.removeQueries({ queryKey: ME_KEY });
+      dropUserQueries(queryClient);
       return null;
     }
     throw error;

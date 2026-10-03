@@ -89,6 +89,5 @@
   "deleteFailed": "Couldn't delete the row",
   "addFailed": "Couldn't add the row",
   "moveFailed": "Couldn't change the order",
-  "failure": "Couldn't save {{name}}",
   "conflict": "row"
 }

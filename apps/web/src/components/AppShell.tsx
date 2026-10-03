@@ -1,3 +1,4 @@
+import { formatCount } from "@moonx/i18n";
 import {
   ActionButton,
   AppFrame,
@@ -62,7 +63,7 @@ function UnreadBadge() {
   if (!data || data.total <= 0) return null;
   return (
     <Badge variant="informative" size="S">
-      {data.total > 99 ? "99+" : data.total}
+      {formatCount(data.total)}
     </Badge>
   );
 }
@@ -267,7 +268,7 @@ function Shell() {
       actions={<PanelEntries />}
       panel={<PanelHost />}
     >
-      <ErrorBoundary>
+      <ErrorBoundary resetKey={location.pathname}>
         <Outlet />
       </ErrorBoundary>
       <ModalHost />

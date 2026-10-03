@@ -43,9 +43,11 @@ test("creating a workspace posts the form and opens it", async () => {
   const dialog = await screen.findByRole("dialog", { name: "Switch workspace" });
   await userEvent.click(within(dialog).getByRole("button", { name: "New workspace" }));
   const form = await screen.findByRole("dialog", { name: "New workspace" });
-  await userEvent.click(within(form).getByRole("button", { name: "Create workspace" }));
-  expect(await within(form).findByText("Required")).toBeInTheDocument();
+  expect(within(form).getByRole("button", { name: "Create workspace" })).toBeDisabled();
+  await userEvent.type(within(form).getByRole("textbox", { name: /^Name/ }), "   ");
+  expect(within(form).getByRole("button", { name: "Create workspace" })).toBeDisabled();
   await userEvent.type(within(form).getByRole("textbox", { name: /^Name/ }), "Cebu Bakery");
+  expect(within(form).getByRole("button", { name: "Create workspace" })).toBeEnabled();
   await userEvent.click(within(form).getByRole("button", { name: "Create workspace" }));
   await waitFor(() => expect(router.state.location.pathname).toBe(`/w/${created}`));
   expect(
@@ -54,4 +56,42 @@ test("creating a workspace posts the form and opens it", async () => {
     name: "Cebu Bakery",
     currency: "PHP",
   });
+});
+
+test("a failed create keeps the name and says Couldn't save — Retry, and Create sends it again", async () => {
+  let attempts = 0;
+  const api = stubApi({
+    ...signedIn(),
+    "POST /api/v1/workspaces": () => {
+      attempts += 1;
+      return attempts === 1
+        ? {
+            status: 503,
+            body: { error: { code: "UPSTREAM_UNAVAILABLE", message: "x", requestId: "abcdef12" } },
+          }
+        : {
+            status: 201,
+            body: {
+              id: "55555555-5555-4555-8555-555555555555",
+              name: "Cebu Bakery",
+              currency: "PHP",
+              isPersonal: false,
+              myRole: "owner",
+              memberCount: 1,
+            },
+          };
+    },
+  });
+  const { router } = await renderApp(`/w/${WORKSPACE}?modal=switch-workspace`);
+  const dialog = await screen.findByRole("dialog", { name: "Switch workspace" });
+  await userEvent.click(within(dialog).getByRole("button", { name: "New workspace" }));
+  const form = await screen.findByRole("dialog", { name: "New workspace" });
+  const name = within(form).getByRole("textbox", { name: /^Name/ });
+  await userEvent.type(name, "Cebu Bakery");
+  await userEvent.click(within(form).getByRole("button", { name: "Create workspace" }));
+  expect(await within(form).findByText("Couldn't save — Retry")).toBeInTheDocument();
+  expect(name).toHaveValue("Cebu Bakery");
+  await userEvent.click(within(form).getByRole("button", { name: "Create workspace" }));
+  await waitFor(() => expect(router.state.location.pathname).toContain("/w/5555"));
+  expect(api.calls.filter((c) => c.method === "POST")).toHaveLength(2);
 });

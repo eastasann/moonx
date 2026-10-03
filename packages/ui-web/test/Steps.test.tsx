@@ -27,3 +27,11 @@ test("has no axe violations", async () => {
   const { container } = render(<Steps aria-label="Progress" items={items} current="done" />);
   await expectNoAxeViolations(container);
 });
+
+test("says a finished step is completed to screen readers, and only a finished one", () => {
+  render(<Steps aria-label="Progress" items={items} current="profile" doneLabel="completed" />);
+  const [invite, profile, done] = screen.getAllByRole("listitem");
+  expect(invite).toHaveTextContent("Invitation, completed");
+  expect(profile).not.toHaveTextContent("completed");
+  expect(done).not.toHaveTextContent("completed");
+});

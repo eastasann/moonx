@@ -301,7 +301,9 @@ test("a Viewer reads the cards and the dialog as text, with no Add and no editin
   await renderApp(COMPETITORS_PATH());
   const cards = await screen.findByRole("grid", { name: "Competitors" });
   expect(screen.queryByRole("button", { name: "Add competitor" })).toBeNull();
-  expect(screen.getByRole("textbox", { name: "Survivor Patterns" })).toHaveAttribute("readonly");
+  expect(await screen.findByRole("textbox", { name: "Survivor Patterns" })).toHaveAttribute(
+    "readonly",
+  );
   await user.click(within(cards).getByText("Bacolod Piaya House"));
   const dialog = await screen.findByRole("dialog", { name: "Bacolod Piaya House" });
   expect(within(dialog).queryByRole("textbox")).toBeNull();
@@ -316,4 +318,12 @@ test("a row that is not in the list opens nothing", async () => {
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(WORKSPACE).toBeTruthy();
   expect(VALIDATION_ID).toBeTruthy();
+});
+
+test("the headings of the two pattern questions are the template's titles", async () => {
+  researchApi({}, { patternTitles: ["What survivors share", "Why others failed"] });
+  await renderApp(COMPETITORS_PATH());
+  expect(await screen.findByRole("textbox", { name: "What survivors share" })).toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "Why others failed" })).toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: "Survivor Patterns" })).toBeNull();
 });

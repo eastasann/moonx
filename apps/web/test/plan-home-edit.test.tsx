@@ -203,7 +203,7 @@ test("a failed rename shows the reason in the sheet", async () => {
   const dialog = await openRename(user);
   await user.type(within(dialog).getByRole("textbox", { name: /^Plan name/ }), "2");
   await user.click(within(dialog).getByRole("button", { name: "Rename" }));
-  expect(await within(dialog).findByText("The plan was not renamed.")).toBeInTheDocument();
+  expect(await within(dialog).findByText("Couldn't save — Retry")).toBeInTheDocument();
   expect(
     within(dialog).getByText("This is archived. Restore it to make changes."),
   ).toBeInTheDocument();

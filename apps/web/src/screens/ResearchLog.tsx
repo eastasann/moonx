@@ -96,7 +96,9 @@ function ResearchScreen({
   const currency = useWorkspaceCurrency(workspaceId);
   const compact = useBelowDesktop();
   const { changed } = useValidationRefresh(validationId);
-  usePanelTarget(formatContainerTarget("validation", validationId, "research_log"));
+  usePanelTarget(formatContainerTarget("validation", validationId, "research_log"), {
+    archived: isArchived,
+  });
 
   const filters: ResearchFilters = { supports: search.supports, source: search.source };
   const isFiltered = Boolean(filters.supports || filters.source);

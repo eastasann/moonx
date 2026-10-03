@@ -4,7 +4,7 @@ import {
   MAX_LONG_TEXT,
   type ValidationAnswer,
 } from "@moonx/schemas";
-import { Button, Flex, Stack, Text, TextArea, Well } from "@moonx/ui-web";
+import { Stack, Text, TextArea, Well } from "@moonx/ui-web";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,9 +12,9 @@ import { ConflictDialog } from "../../components/ConflictDialog";
 import { EvidenceSheet } from "../../components/EvidenceSheet";
 import { type FauChange, FauControl, FauStatus } from "../../components/FauControl";
 import { ItemPanelButtons } from "../../components/ItemPanelButtons";
+import { SaveFailureNotice } from "../../components/SaveFailureNotice";
 import { autosave } from "../../lib/autosave";
 import { type EconomicsData, economicsKey } from "../../lib/economics";
-import { errorText } from "../../lib/error-text";
 import { useOverlay } from "../../lib/overlay";
 import { formatItemTarget } from "../../lib/panel-target";
 import { hasText, withChoice, withText } from "../../lib/questions";
@@ -175,30 +175,22 @@ export function WorthCard({
           onBlur={() => void saved.flush()}
         />
         {failure ? (
-          <Flex gap="space-100" align="center" wrap>
-            <Text tone="negative" as="span">
-              {failure.willRetry ? t("form:saveFailed") : errorText(t, failure.error)}
-            </Text>
-            <Button
-              variant="secondary"
-              size="S"
-              onPress={() =>
-                saved.retry({
-                  text,
-                  ...(classification.fau && classification.fau !== "fact"
-                    ? {
-                        classification:
-                          classification.fau === "assumption"
-                            ? { fau: "assumption", confidence: classification.confidence }
-                            : { fau: classification.fau },
-                      }
-                    : {}),
-                })
-              }
-            >
-              {t("form:retry")}
-            </Button>
-          </Flex>
+          <SaveFailureNotice
+            failure={failure}
+            onRetry={() =>
+              saved.retry({
+                text,
+                ...(classification.fau && classification.fau !== "fact"
+                  ? {
+                      classification:
+                        classification.fau === "assumption"
+                          ? { fau: "assumption", confidence: classification.confidence }
+                          : { fau: classification.fau },
+                    }
+                  : {}),
+              })
+            }
+          />
         ) : null}
         <FauStatus classification={classification} />
         <FauControl

@@ -66,9 +66,11 @@ interface LoaderProps extends EconomicsProps {
 }
 
 function EconomicsLoader(props: LoaderProps) {
-  const { validationId } = props;
+  const { validationId, isArchived } = props;
   const economics = useQuery(economicsQuery(validationId));
-  usePanelTarget(formatContainerTarget("validation", validationId, "economics"));
+  usePanelTarget(formatContainerTarget("validation", validationId, "economics"), {
+    archived: isArchived,
+  });
 
   // Saves still on their way when the screen closes must reach every screen that shows them, the home included.
   useValidationRefresh(validationId);

@@ -42,13 +42,15 @@ test("the AI menu exports and imports this item of the plan", async () => {
   const user = userEvent.setup();
   await renderApp(ITEM_PATH(1));
   await user.click(await screen.findByRole("button", { name: "AI" }));
+  const returnTo = encodeURIComponent(ITEM_PATH(1));
   expect(await screen.findByRole("menuitem", { name: "Export for AI" })).toHaveAttribute(
     "href",
-    `/w/11111111-1111-4111-8111-111111111111/ai/export?source=business_plan&id=${PLAN_ID}&scope=1`,
+    `/w/11111111-1111-4111-8111-111111111111/ai/export?source=business_plan&id=${PLAN_ID}&scope=1&returnTo=${returnTo}`,
   );
+  // An import covers the whole plan, so it carries no scope (design-spec 6.7).
   expect(screen.getByRole("menuitem", { name: "Import from AI" })).toHaveAttribute(
     "href",
-    `/w/11111111-1111-4111-8111-111111111111/ai/import?target=business_plan&id=${PLAN_ID}&scope=1`,
+    `/w/11111111-1111-4111-8111-111111111111/ai/import?target=business_plan&id=${PLAN_ID}&returnTo=${returnTo}`,
   );
 });
 

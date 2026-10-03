@@ -47,7 +47,7 @@ function AlreadyAccepted({ workspaceId }: { workspaceId: string }) {
 }
 
 /** Step 1: the invitation's content and the Join button (design-spec 6.16, screen 3). */
-function InviteStep({ token }: { token: string }) {
+function InviteStep({ token, isNewAccount }: { token: string; isNewAccount: boolean }) {
   const { t } = useTranslation(["auth", "app", "account"]);
   const queryClient = useQueryClient();
   const goTo = useGoTo();
@@ -78,8 +78,11 @@ function InviteStep({ token }: { token: string }) {
       if (result.alreadyMember && result.workspaceId) {
         toasts.add({ title: t("auth:welcome.alreadyMember"), variant: "informative" });
         goTo(`/w/${result.workspaceId}`);
+      } else if (isNewAccount || !result.workspaceId) {
+        goTo("/welcome?step=profile&new=1");
       } else {
-        goTo("/welcome?step=profile");
+        // Someone who already had an account has nothing left to set up (design-spec 6.16).
+        goTo(`/w/${result.workspaceId}`);
       }
     },
   });
@@ -127,7 +130,7 @@ function InviteStep({ token }: { token: string }) {
 }
 
 /** Step 2: name, optional photo, and the time zone taken from the device. */
-function ProfileStep() {
+function ProfileStep({ withInvite }: { withInvite: boolean }) {
   const { t } = useTranslation(["auth", "app", "account"]);
   const me = useMe();
   const queryClient = useQueryClient();
@@ -142,7 +145,7 @@ function ProfileStep() {
       ),
     onSuccess: (updated) => {
       queryClient.setQueryData(ME_KEY, updated);
-      goTo("/welcome?step=done");
+      goTo(withInvite ? "/welcome?step=done&new=1" : "/welcome?step=done");
     },
   });
   const form = useForm({
@@ -233,12 +236,28 @@ function DoneStep() {
 }
 
 /**
- * Screen 3, onboarding: the invitation, then the profile, then done (design-spec 6.16). The
- * step comes from `?step=`; a link with a token and no step starts at the invitation.
+ * Screen 3, onboarding (design-spec 6.16). A new account goes through the invitation, the profile
+ * and done; an invitation without a workspace starts at the profile; a person who already had an
+ * account sees the invitation only. The step comes from `?step=`; a link with a token and no step
+ * starts at the invitation. The step indicator lists only the steps of that flow.
  */
-export function Welcome({ step, token }: { step?: WelcomeStep; token?: string }) {
-  const { t } = useTranslation("auth");
-  const current: WelcomeStep = step ?? (token ? "invite" : "profile");
+export function Welcome({
+  step,
+  token,
+  isNewAccount = false,
+}: {
+  step?: WelcomeStep;
+  token?: string;
+  isNewAccount?: boolean;
+}) {
+  const { t } = useTranslation(["auth", "app"]);
+  const showsInvite = Boolean(token) && (step === undefined || step === "invite");
+  const current: WelcomeStep = step ?? (showsInvite ? "invite" : "profile");
+  const ids: WelcomeStep[] = isNewAccount
+    ? ["invite", "profile", "done"]
+    : showsInvite
+      ? ["invite"]
+      : ["profile", "done"];
   return (
     <PageFrame>
       <StepsPattern
@@ -247,18 +266,17 @@ export function Welcome({ step, token }: { step?: WelcomeStep; token?: string })
         steps={
           <Steps
             aria-label={t("welcome.stepsLabel")}
-            current={current}
-            items={[
-              { id: "invite", label: t("welcome.steps.invite") },
-              { id: "profile", label: t("welcome.steps.profile") },
-              { id: "done", label: t("welcome.steps.done") },
-            ]}
+            current={current === "invite" && !showsInvite ? "profile" : current}
+            doneLabel={t("app:stepDone")}
+            items={ids.map((id) => ({ id, label: t(`welcome.steps.${id}`) }))}
           />
         }
       >
-        {current === "invite" && token ? <InviteStep token={token} /> : null}
-        {current === "invite" && !token ? <ProfileStep /> : null}
-        {current === "profile" ? <ProfileStep /> : null}
+        {current === "invite" && token ? (
+          <InviteStep token={token} isNewAccount={isNewAccount} />
+        ) : null}
+        {current === "invite" && !token ? <ProfileStep withInvite={isNewAccount} /> : null}
+        {current === "profile" ? <ProfileStep withInvite={isNewAccount} /> : null}
         {current === "done" ? <DoneStep /> : null}
       </StepsPattern>
     </PageFrame>

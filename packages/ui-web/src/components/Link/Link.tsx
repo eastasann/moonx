@@ -1,3 +1,4 @@
+import type { ComponentSize } from "@moonx/ui-tokens";
 import { Link as AriaLink, type LinkProps as AriaLinkProps } from "react-aria-components";
 import { link } from "./Link.css";
 
@@ -8,9 +9,11 @@ export interface LinkProps extends Omit<AriaLinkProps, "className" | "style"> {
    * text and is exempt from the target size.
    */
   variant?: "primary" | "secondary";
+  /** Sets the text size. Without it the link takes the size of the text around it. */
+  size?: ComponentSize;
 }
 
 /** Renders an `<a>` when `href` is given and a focusable `role="link"` span otherwise. */
-export function Link({ variant = "primary", ...props }: LinkProps) {
-  return <AriaLink {...props} className={link({ variant })} />;
+export function Link({ variant = "primary", size, ...props }: LinkProps) {
+  return <AriaLink {...props} className={link({ variant, size })} />;
 }

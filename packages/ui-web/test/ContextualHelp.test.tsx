@@ -1,3 +1,4 @@
+import { COMPONENT_SIZES } from "@moonx/ui-tokens";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ContextualHelp } from "../src/components/ContextualHelp";
@@ -71,4 +72,13 @@ describe("ContextualHelp", () => {
     await screen.findByRole("dialog");
     await expectNoAxeViolations(document.body);
   });
+});
+
+test.each(COMPONENT_SIZES)("accepts size %s on the icon button", (size) => {
+  render(
+    <ContextualHelp label="Hint" title="About this question" size={size}>
+      Body
+    </ContextualHelp>,
+  );
+  expect(screen.getByRole("button", { name: "Hint" })).toBeInTheDocument();
 });

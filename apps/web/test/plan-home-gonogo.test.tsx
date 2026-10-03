@@ -129,7 +129,7 @@ test("a refused record shows the reason and keeps the input", async () => {
   await user.click(within(dialog).getByRole("textbox", { name: /^Why\?/ }));
   await user.paste("Wait");
   await user.click(within(dialog).getByRole("button", { name: "Record" }));
-  expect(await within(dialog).findByText("The Go / No-Go was not recorded.")).toBeInTheDocument();
+  expect(await within(dialog).findByText("Couldn't save — Retry")).toBeInTheDocument();
   expect(
     within(dialog).getByText("This is archived. Restore it to make changes."),
   ).toBeInTheDocument();

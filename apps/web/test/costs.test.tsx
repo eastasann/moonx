@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test } from "vitest";
 import { costItem, costItems, PIAYA_ROWS } from "./cost-fixtures";
@@ -150,3 +150,87 @@ test("Delete in the row menu removes the row from the table and the totals", asy
   expect(screen.queryByRole("textbox", { name: "Name of Rent" })).not.toBeInTheDocument();
   expect(calls.filter((c) => c.method === "DELETE")).toHaveLength(1);
 });
+
+test("a save the server refuses shows Couldn't save beside the row and in the header, and Retry never turns it into Saved", async () => {
+  const items = costItems(PIAYA_ROWS);
+  const rent = rowNamed(items, "Rent");
+  let patches = 0;
+  const { calls } = costsApi(
+    {
+      [COST_ITEM(rent.id)]: () => {
+        patches += 1;
+        return {
+          status: 409,
+          body: { error: { code: "ARCHIVED", message: "archived", requestId: "abcdef12" } },
+        };
+      },
+    },
+    { items },
+  );
+  await renderApp(COSTS_PATH());
+  await screen.findByRole("heading", { name: "Totals" });
+  const field = screen.getByRole("textbox", { name: "Amount of Rent" });
+  await userEvent.click(field);
+  await userEvent.keyboard("{Control>}a{/Control}13,500");
+  await userEvent.tab();
+
+  const row = (await screen.findByRole("textbox", { name: /^Name of Rent/ })).closest(
+    '[role="row"]',
+  ) as HTMLElement;
+  expect(await within(row).findByText("Couldn't save")).toBeInTheDocument();
+  expect(
+    within(row).getByText("This is archived. Restore it to make changes."),
+  ).toBeInTheDocument();
+  expect(screen.getAllByText("Couldn't save").length).toBeGreaterThan(1);
+
+  const header = screen.getByRole("banner");
+  await userEvent.click(within(header).getByRole("button", { name: "Retry" }));
+  await waitFor(() => expect(patches).toBe(2));
+  expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(2);
+  expect(within(header).queryByText("Saved")).toBeNull();
+  expect(within(header).getByText("Couldn't save")).toBeInTheDocument();
+
+  await userEvent.click(within(row).getByRole("button", { name: "Retry" }));
+  await waitFor(() => expect(patches).toBe(3));
+  expect(within(header).queryByText("Saved")).toBeNull();
+}, 15_000);
+
+test("a failed save shows its notice once while the row's sheet is open over the table", async () => {
+  const original = window.matchMedia;
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("max-width"),
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia;
+  try {
+    const items = costItems(PIAYA_ROWS);
+    const rent = rowNamed(items, "Rent");
+    costsApi(
+      {
+        [COST_ITEM(rent.id)]: () => ({
+          status: 409,
+          body: { error: { code: "ARCHIVED", message: "archived", requestId: "abcdef12" } },
+        }),
+      },
+      { items },
+    );
+    await renderApp(COSTS_PATH());
+    const cell = (await screen.findAllByText("Rent"))[0] as HTMLElement;
+    await userEvent.click(cell);
+    const dialog = await screen.findByRole("dialog");
+    const field = within(dialog).getByRole("textbox", { name: "Amount of Rent" });
+    await userEvent.click(field);
+    await userEvent.keyboard("{Control>}a{/Control}13,500");
+    await userEvent.tab();
+    await within(dialog).findByText("Couldn't save");
+    // The header's status and the sheet's notice; the table behind the sheet adds none.
+    expect(screen.getAllByText("Couldn't save", { exact: true })).toHaveLength(2);
+  } finally {
+    window.matchMedia = original;
+  }
+}, 15_000);

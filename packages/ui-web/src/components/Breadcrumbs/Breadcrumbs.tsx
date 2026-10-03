@@ -1,5 +1,6 @@
+import type { ComponentSize } from "@moonx/ui-tokens";
 import { ChevronRight } from "lucide-react";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import {
   Breadcrumb as AriaBreadcrumb,
   Breadcrumbs as AriaBreadcrumbs,
@@ -12,11 +13,19 @@ export interface BreadcrumbsProps<T extends object>
   extends Omit<AriaBreadcrumbsProps<T>, "className" | "style" | "aria-label" | "aria-labelledby"> {
   /** Required: the name of the trail, e.g. "Breadcrumbs". */
   "aria-label": string;
+  /** Text size of the trail. */
+  size?: ComponentSize;
 }
 
+const SizeContext = createContext<ComponentSize>("M");
+
 /** The path to the current screen in the Web header. Mobile shows a back link instead (design-spec 6.0.1). */
-export function Breadcrumbs<T extends object>(props: BreadcrumbsProps<T>) {
-  return <AriaBreadcrumbs {...props} className={breadcrumbs} />;
+export function Breadcrumbs<T extends object>({ size = "M", ...props }: BreadcrumbsProps<T>) {
+  return (
+    <SizeContext.Provider value={size}>
+      <AriaBreadcrumbs {...props} className={breadcrumbs({ size })} />
+    </SizeContext.Provider>
+  );
 }
 
 export interface BreadcrumbProps {
@@ -28,6 +37,7 @@ export interface BreadcrumbProps {
 }
 
 export function Breadcrumb({ href, children, ...props }: BreadcrumbProps) {
+  const size = useContext(SizeContext);
   return (
     <AriaBreadcrumb {...props} className={breadcrumb}>
       {({ isCurrent }) => (
@@ -35,7 +45,7 @@ export function Breadcrumb({ href, children, ...props }: BreadcrumbProps) {
           <Link href={href} className={link}>
             {children}
           </Link>
-          {isCurrent ? null : <ChevronRight aria-hidden="true" className={separator} />}
+          {isCurrent ? null : <ChevronRight aria-hidden="true" className={separator({ size })} />}
         </>
       )}
     </AriaBreadcrumb>

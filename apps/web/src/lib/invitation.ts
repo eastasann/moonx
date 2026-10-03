@@ -13,6 +13,11 @@ export const invitationQuery = (token: string) =>
     staleTime: 0,
   });
 
-/** Where the invitation continues once the person is signed in: step 1 of the welcome flow. */
-export const welcomeInvitePath = (token: string) =>
-  `/welcome?step=invite&token=${encodeURIComponent(token)}`;
+/**
+ * Where the invitation continues once the person is signed in: step 1 of the welcome flow.
+ * `isNewAccount` marks someone who just registered from the invitation, who goes on to the
+ * profile and the done step (the `new` flag stays on those URLs so the indicator keeps step 1); a person who logged in with an account they already had sees step 1
+ * only (design-spec 6.16).
+ */
+export const welcomeInvitePath = (token: string, isNewAccount = false) =>
+  `/welcome?step=invite&token=${encodeURIComponent(token)}${isNewAccount ? "&new=1" : ""}`;

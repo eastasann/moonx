@@ -13,8 +13,7 @@
     "email": "Email",
     "choosePhoto": "Choose photo",
     "removePhoto": "Remove photo",
-    "photoHint": "JPEG, PNG or WebP, up to 5 MB.",
-    "saved": "Profile saved"
+    "photoHint": "JPEG, PNG or WebP, up to 5 MB."
   },
   "password": {
     "title": "Change password",
@@ -54,9 +53,9 @@
     "open": "Delete account",
     "dialogTitle": "Delete your account",
     "erasedTitle": "What is deleted",
-    "erased": "Your email, name, photo and password, your Self Analysis with its comments and history, your notifications, and workspaces where you are the only member.",
+    "erased": "Your email, name, photo and password, your Self Analysis with its comments and history, your personal workspace if you are its only member, and your notifications.",
     "keptTitle": "What stays",
-    "kept": "What you wrote in team workspaces stays as the team's record, shown as \"Deleted user\".",
+    "kept": "Team workspaces stay, including any where you are the only member. What you wrote in them stays as the team's record, shown as \"Deleted user\".",
     "confirmEmail": "Your email address",
     "confirmEmailHint": "Type {{email}} to confirm.",
     "password": "Password",

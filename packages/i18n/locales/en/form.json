@@ -20,6 +20,7 @@
   "archived": "This idea is archived",
   "oceanHint": "Answer OCEAN to see the next questions",
   "saveFailed": "Couldn't save — Retry",
+  "saveRefused": "Couldn't save",
   "retry": "Retry",
   "complete": {
     "title": "Section complete",

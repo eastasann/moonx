@@ -14,6 +14,8 @@ export interface StepsProps {
   items: readonly StepItem[];
   /** `id` of the step being shown. Steps before it count as done. */
   current: string;
+  /** Spoken after the label of a finished step ("completed"), which the check mark alone does not say. */
+  doneLabel?: string;
   testID?: string;
 }
 
@@ -26,7 +28,7 @@ type Status = "done" | "current" | "upcoming";
  * exposed as `selected`, the nearest of React Native's states to the Web part's `aria-current`.
  * Steps wrap to a second line when the labels do not fit one.
  */
-export function Steps({ items, current, "aria-label": ariaLabel, testID }: StepsProps) {
+export function Steps({ items, current, doneLabel, "aria-label": ariaLabel, testID }: StepsProps) {
   const currentIndex = items.findIndex((item) => item.id === current);
   return (
     <View role="list" aria-label={ariaLabel} testID={testID} style={styles.list}>
@@ -37,6 +39,7 @@ export function Steps({ items, current, "aria-label": ariaLabel, testID }: Steps
           <Step
             key={item.id}
             label={item.label}
+            doneLabel={doneLabel}
             number={index + 1}
             status={status}
             isLast={index === items.length - 1}
@@ -49,11 +52,13 @@ export function Steps({ items, current, "aria-label": ariaLabel, testID }: Steps
 
 function Step({
   label,
+  doneLabel,
   number,
   status,
   isLast,
 }: {
   label: string;
+  doneLabel?: string;
   number: number;
   status: Status;
   isLast: boolean;
@@ -64,6 +69,7 @@ function Step({
     <View
       accessible
       role="listitem"
+      aria-label={status === "done" && doneLabel ? `${label}, ${doneLabel}` : undefined}
       accessibilityState={{ selected: status === "current" }}
       testID={`step-${status}`}
       style={styles.step}

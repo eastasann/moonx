@@ -51,6 +51,8 @@ export interface ExportForAiProps {
   id?: string;
   /** `?scope=`: what the screen that sent the person here was showing. */
   scope?: string;
+  /** `?returnTo=`: the form screen the exchange started from; Back and the import return there. */
+  returnTo?: string;
 }
 
 function ExportSkeleton() {
@@ -95,6 +97,7 @@ function ExportFlow({
   source,
   id,
   scope,
+  returnTo,
   context,
 }: ExportForAiProps & { context: ImportContext }) {
   const { t } = useTranslation(["ai", "errors", "app"]);
@@ -120,6 +123,7 @@ function ExportFlow({
     target: source,
     ...(id ? { id } : {}),
     scope: scopeOfSections(selected, exportable),
+    ...(returnTo ? { returnTo } : {}),
   })}`;
 
   const stepItems = STEP_IDS.map((stepId) => ({ id: stepId, label: t(`export.steps.${stepId}`) }));
@@ -127,7 +131,7 @@ function ExportFlow({
 
   const header = (
     <Stack gap="space-100">
-      <SourceBackLink href={sourcePath(workspaceId, context.target)} />
+      <SourceBackLink href={returnTo ?? sourcePath(workspaceId, context.target)} />
       <Heading level={1}>{t("export.title")}</Heading>
       <Text tone="secondary">{t(SOURCE_KEYS[source], { name: context.target.name })}</Text>
     </Stack>
@@ -295,7 +299,14 @@ function ExportFlow({
   return (
     <StepsPattern
       header={header}
-      steps={<Steps aria-label={t("export.steps.label")} items={stepItems} current={step} />}
+      steps={
+        <Steps
+          aria-label={t("export.steps.label")}
+          doneLabel={t("app:stepDone")}
+          items={stepItems}
+          current={step}
+        />
+      }
       actions={actions}
     >
       {body}

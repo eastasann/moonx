@@ -22,8 +22,9 @@ import {
 } from "@moonx/ui-web";
 import { useTranslation } from "react-i18next";
 import { FauControl, FauStatus } from "../../components/FauControl";
+import { SaveFailureNotice } from "../../components/SaveFailureNotice";
 import { CAN_REDUCE_KEYS, type CostDraft, draftValue } from "../../lib/costs";
-import type { RowApi } from "./CostRowController";
+import type { RowApi, RowFailure } from "./CostRowController";
 
 /** What one row's fields need from the screen. */
 export interface RowView {
@@ -37,6 +38,8 @@ export interface RowView {
   price: number | null;
   /** Where "Needs price" leads. */
   economicsPath: string;
+  /** The row's failed save, drawn under its name so it sits beside the row it belongs to. */
+  failure: RowFailure | null;
 }
 
 export interface FieldOptions {
@@ -79,12 +82,18 @@ export function NameField({ view, isLabelHidden, autoFocus }: { view: RowView } 
       ) : null}
     </>
   );
+  const failureNotice = view.failure ? (
+    <SaveFailureNotice failure={view.failure.failure} onRetry={view.failure.retry} />
+  ) : null;
   if (isReadOnly) {
     return (
-      <Flex gap="space-100" align="center" wrap>
-        <Text as="span">{draft.name}</Text>
-        {marks}
-      </Flex>
+      <Stack gap="space-50" align="start">
+        <Flex gap="space-100" align="center" wrap>
+          <Text as="span">{draft.name}</Text>
+          {marks}
+        </Flex>
+        {failureNotice}
+      </Stack>
     );
   }
   return (
@@ -103,6 +112,7 @@ export function NameField({ view, isLabelHidden, autoFocus }: { view: RowView } 
       <Flex gap="space-100" align="center" wrap>
         {marks}
       </Flex>
+      {failureNotice}
     </Stack>
   );
 }

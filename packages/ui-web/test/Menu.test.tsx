@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { COMPONENT_SIZES } from "@moonx/ui-tokens";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Button } from "../src";
 import { Menu, MenuItem, MenuSection, MenuSeparator } from "../src/components/Menu";
@@ -138,3 +139,21 @@ describe("Menu", () => {
     await expectNoAxeViolations(document.body);
   });
 });
+
+test.each(COMPONENT_SIZES.filter((size) => size !== "M"))(
+  "hands size %s to its items, which differ from the default",
+  async (size) => {
+    const open = async (menuSize?: (typeof COMPONENT_SIZES)[number]) => {
+      render(
+        <Menu trigger={<Button>Actions</Button>} size={menuSize}>
+          <MenuItem id="duplicate">Duplicate</MenuItem>
+        </Menu>,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Actions" }));
+      const className = (await screen.findByRole("menuitem", { name: "Duplicate" })).className;
+      cleanup();
+      return className;
+    };
+    expect(await open(size)).not.toBe(await open());
+  },
+);

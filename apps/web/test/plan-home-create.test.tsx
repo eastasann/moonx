@@ -115,7 +115,7 @@ test("a decision that is not Proceed is refused with its reason", async () => {
   );
   await nameBox(dialog);
   await user.click(within(dialog).getByRole("button", { name: "Create draft" }));
-  expect(await within(dialog).findByText("The plan was not created.")).toBeInTheDocument();
+  expect(await within(dialog).findByText("Couldn't save — Retry")).toBeInTheDocument();
   expect(
     within(dialog).getByText("A plan can only be created after a Proceed decision."),
   ).toBeInTheDocument();
@@ -180,4 +180,28 @@ test("Add plan on screen 20 opens the same sheet", async () => {
   await renderApp(`${PLAN_URL}?modal=create-plan`);
   const dialog = await screen.findByRole("dialog", { name: "Create plan draft" });
   expect(await nameBox(dialog)).toHaveValue("Plan C");
+});
+
+test("a failed save keeps the name, says Couldn't save, and Create draft sends it again", async () => {
+  const created = makePlanHome({ id: PLAN_B, name: "Plan B" });
+  let attempts = 0;
+  const { api, user, dialog, router } = await openSheet(
+    {},
+    {
+      [`POST ${PLANS_PATH}`]: () => {
+        attempts += 1;
+        return attempts === 1 ? refusal("INTERNAL", 500) : { status: 201, body: created };
+      },
+      [`GET /api/v1/plans/${PLAN_B}`]: () => ({ body: created }),
+    },
+  );
+  const name = await nameBox(dialog);
+  await user.clear(name);
+  await user.type(name, "Plan B");
+  await user.click(within(dialog).getByRole("button", { name: "Create draft" }));
+  expect(await within(dialog).findByText("Couldn't save — Retry")).toBeInTheDocument();
+  expect(name).toHaveValue("Plan B");
+  await user.click(within(dialog).getByRole("button", { name: "Create draft" }));
+  await waitFor(() => expect(router.state.location.pathname).toContain(PLAN_B));
+  expect(callsTo(api, "POST", PLANS_PATH)).toHaveLength(2);
 });

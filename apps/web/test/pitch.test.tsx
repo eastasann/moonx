@@ -27,7 +27,7 @@ test("a one-minute deck renders each slide with its type", async () => {
   await openPitch();
   await waitFor(() => expect(frames()).toHaveLength(3));
   expect(frames().map((f) => f.dataset.slideType)).toEqual(["title", "text", "number"]);
-  expect(screen.getByRole("heading", { level: 3, name: "Piaya Box" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 2, name: "Piaya Box" })).toBeInTheDocument();
   expect(screen.getByText("Corporate gift boxes of Bacolod piaya")).toBeInTheDocument();
   expect(screen.getByText("₱450")).toBeInTheDocument();
   expect(screen.getByText("6.9")).toBeInTheDocument();

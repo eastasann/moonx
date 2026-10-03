@@ -1,3 +1,4 @@
+import { COMPONENT_SIZES } from "@moonx/ui-tokens";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
@@ -48,4 +49,17 @@ test("an open tooltip has no axe violations", async () => {
     rules: { "color-contrast": { enabled: false }, region: { enabled: false } },
   });
   expect(result.violations).toEqual([]);
+});
+
+test.each(COMPONENT_SIZES)("accepts size %s", async (size) => {
+  render(
+    <Tooltip content="Comments" size={size} delay={0} closeDelay={0}>
+      <Button aria-label="Open comments">C</Button>
+    </Tooltip>,
+  );
+  await userEvent.pointer({ keys: "[MouseLeft]", target: document.body });
+  await userEvent.hover(screen.getByRole("button", { name: "Open comments" }));
+  const tip = await screen.findByRole("tooltip");
+  expect(tip).toHaveTextContent("Comments");
+  expect(tip.className).not.toBe("");
 });

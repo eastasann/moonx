@@ -14,6 +14,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { EvidenceResult } from "../../components/EvidenceSheet";
 import {
   ArchivedState,
   NoAccessState,
@@ -125,7 +126,7 @@ function ImportFlow({
   const [conflict, setConflict] = useState(false);
   const [applyError, setApplyError] = useState<unknown>(null);
   // The versions the answers had when the screen opened: a different one later means someone saved it.
-  const [baseline] = useState(
+  const [baseline, setBaseline] = useState(
     () => new Map(context.questions.map((q) => [q.questionKey, q.current.lockVersion])),
   );
 
@@ -177,6 +178,34 @@ function ImportFlow({
       return { ...previous, [key]: { ...previous[key], ...patch } };
     });
 
+  /**
+   * M2 saved the stored answer (Fact, with its evidence) under a new version. The context takes
+   * both so Apply sends the version M2 produced, and the person's own save is not shown as
+   * someone else's.
+   */
+  const adoptEvidence = (questionKey: string, result: EvidenceResult) => {
+    queryClient.setQueryData<ImportContext>(contextKey, (previous) =>
+      previous
+        ? {
+            ...previous,
+            questions: previous.questions.map((q) =>
+              q.questionKey === questionKey
+                ? {
+                    ...q,
+                    current: {
+                      ...q.current,
+                      classification: result.classification,
+                      lockVersion: result.lockVersion,
+                    },
+                  }
+                : q,
+            ),
+          }
+        : previous,
+    );
+    setBaseline((previous) => new Map(previous).set(questionKey, result.lockVersion));
+  };
+
   const isTooLong = fileTooBig || text.length > MAX_REPLY_CHARS;
   const changes = applicable(entries);
   const backPath = returnTo ?? sourcePath(workspaceId, context.target);
@@ -191,6 +220,7 @@ function ImportFlow({
     setNoIds(false);
     setBlocks(parsed.blocks);
     setChoices(NO_CHOICES);
+    setEdits({});
     setStep("match");
   };
   const continueWhole = () => {
@@ -199,6 +229,7 @@ function ImportFlow({
       { index: 0, id: null, heading: null, text: text.trim(), amount: null, reason: null },
     ]);
     setChoices(NO_CHOICES);
+    setEdits({});
     setStep("match");
   };
   const openReview = () => {
@@ -300,7 +331,12 @@ function ImportFlow({
         currency={context.target.currency}
         updatedAfterLoad={updatedAfterLoad}
         conflict={conflict}
+        validationId={context.target.id}
         onDraft={editDraft}
+        onEvidenceChanged={adoptEvidence}
+        onEvidenceConflict={() =>
+          void queryClient.invalidateQueries({ queryKey: contextKey, exact: true })
+        }
         onClose={leave}
       />
     );
@@ -348,7 +384,14 @@ function ImportFlow({
   return (
     <StepsPattern
       header={header}
-      steps={<Steps aria-label={t("import.steps.label")} items={stepItems} current={step} />}
+      steps={
+        <Steps
+          aria-label={t("import.steps.label")}
+          doneLabel={t("app:stepDone")}
+          items={stepItems}
+          current={step}
+        />
+      }
       actions={actions}
     >
       {body}

@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { QuestionFormFrame } from "../components/QuestionFormFrame";
 import { NoAccessState, QueryBoundary } from "../components/states";
+import { exchangeHref } from "../lib/ai-exchange";
 import { canEditIdeas, useWorkspaceCurrency, useWorkspaceRole } from "../lib/ideas";
 import { formatContainerTarget, usePanelTarget } from "../lib/panel-target";
 import {
@@ -119,7 +120,9 @@ function ItemForm({
   const currency = useWorkspaceCurrency(workspaceId);
   const canEdit = canEditIdeas(role) && !item.readOnly;
   const isSaved = versionId !== undefined;
-  usePanelTarget(formatContainerTarget("business_plan", planId, String(itemNo).padStart(2, "0")));
+  usePanelTarget(formatContainerTarget("business_plan", planId, String(itemNo).padStart(2, "0")), {
+    archived: plan.archived || plan.ideaArchived,
+  });
 
   const answerOf = useMemo(
     () => new Map(item.answers.map((answer) => [answer.questionKey, answer])),
@@ -171,7 +174,6 @@ function ItemForm({
       href: withVersion(paths.item(entry.itemNo)),
     }));
   const hasTotals = referenceOf(item.references, "totals") !== undefined;
-  const scope = `scope=${itemNo}`;
 
   const notices = [
     plan.ideaArchived ? (
@@ -211,13 +213,25 @@ function ItemForm({
           <Menu trigger={<Button variant="secondary">{t("form:ai")}</Button>}>
             <MenuItem
               id="export"
-              href={`/w/${workspaceId}/ai/export?source=business_plan&id=${planId}&${scope}`}
+              href={exchangeHref("export", {
+                workspaceId,
+                kind: "business_plan",
+                id: planId,
+                scope: String(itemNo),
+                returnTo: paths.item(itemNo),
+              })}
             >
               {t("form:aiExport")}
             </MenuItem>
             <MenuItem
               id="import"
-              href={`/w/${workspaceId}/ai/import?target=business_plan&id=${planId}&${scope}`}
+              href={exchangeHref("import", {
+                workspaceId,
+                kind: "business_plan",
+                id: planId,
+                scope: String(itemNo),
+                returnTo: paths.item(itemNo),
+              })}
             >
               {t("form:aiImport")}
             </MenuItem>

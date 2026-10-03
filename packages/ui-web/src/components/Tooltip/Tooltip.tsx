@@ -1,3 +1,4 @@
+import type { ComponentSize } from "@moonx/ui-tokens";
 import type { ReactNode } from "react";
 import {
   Tooltip as AriaTooltip,
@@ -12,6 +13,8 @@ export interface TooltipProps {
   /** The text shown. Keep it to a short phrase; anything longer belongs in ContextualHelp. */
   content: ReactNode;
   placement?: AriaTooltipProps["placement"];
+  /** Text size. Without it the tooltip uses the caption size. */
+  size?: ComponentSize;
   /** Milliseconds before it opens on hover. */
   delay?: number;
   closeDelay?: number;
@@ -22,11 +25,17 @@ export interface TooltipProps {
 }
 
 /** Describes an icon-only button on hover and keyboard focus. */
-export function Tooltip({ children, content, placement = "top", ...triggerProps }: TooltipProps) {
+export function Tooltip({
+  children,
+  content,
+  placement = "top",
+  size,
+  ...triggerProps
+}: TooltipProps) {
   return (
     <TooltipTrigger {...triggerProps}>
       {children}
-      <AriaTooltip placement={placement} className={tooltip}>
+      <AriaTooltip placement={placement} className={tooltip({ size })}>
         {content}
       </AriaTooltip>
     </TooltipTrigger>

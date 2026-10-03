@@ -8,10 +8,8 @@ import {
   type ValidationAnswer,
 } from "@moonx/schemas";
 import {
-  Button,
   ContextualHelp,
   Disclosure,
-  Flex,
   QuestionCard,
   Radio,
   RadioGroup,
@@ -26,9 +24,9 @@ import { useTranslation } from "react-i18next";
 import { ConflictDialog } from "../../components/ConflictDialog";
 import { EvidenceSheet } from "../../components/EvidenceSheet";
 import { type FauChange, FauControl, FauStatus } from "../../components/FauControl";
-import { ItemPanelButtons } from "../../components/ItemPanelButtons";
+import { CommentCountBadge, ItemPanelButtons } from "../../components/ItemPanelButtons";
+import { SaveFailureNotice } from "../../components/SaveFailureNotice";
 import { autosave } from "../../lib/autosave";
-import { errorText } from "../../lib/error-text";
 import { IDEAS_KEY } from "../../lib/idea-actions";
 import { useOverlay } from "../../lib/overlay";
 import { formatItemTarget } from "../../lib/panel-target";
@@ -254,6 +252,10 @@ export function AnswerCard({
         answer={text}
         emptyLabel={t("form:empty")}
         status={question.hasFau ? <FauStatus classification={classification} /> : undefined}
+        // The open card carries the count beside its Comments button; a compact one shows it alone.
+        meta={
+          isFocused || isOpenAll ? undefined : <CommentCountBadge count={answer.commentCount} />
+        }
         actions={<ItemPanelButtons target={target} commentCount={answer.commentCount} />}
         onFocusRequest={onFocusRequest}
         onNavigate={onNavigate}
@@ -261,37 +263,28 @@ export function AnswerCard({
         <Stack gap="space-200">
           {field}
           {failure ? (
-            <Flex gap="space-100" align="center" wrap>
-              <Text tone="negative" as="span">
-                {failure.willRetry ? t("form:saveFailed") : errorText(t, failure.error)}
-              </Text>
-              <Button
-                variant="secondary"
-                size="S"
-                onPress={() =>
-                  item.retry({
-                    text,
-                    ...(classification.fau
-                      ? {
-                          classification:
-                            classification.fau === "assumption"
-                              ? { fau: "assumption", confidence: classification.confidence }
-                              : { fau: classification.fau },
-                        }
-                      : {}),
-                  })
-                }
-              >
-                {t("form:retry")}
-              </Button>
-            </Flex>
+            <SaveFailureNotice
+              failure={failure}
+              onRetry={() =>
+                item.retry({
+                  text,
+                  ...(classification.fau
+                    ? {
+                        classification:
+                          classification.fau === "assumption"
+                            ? { fau: "assumption", confidence: classification.confidence }
+                            : { fau: classification.fau },
+                      }
+                    : {}),
+                })
+              }
+            />
           ) : null}
-          {question.hasFau ? (
+          {question.hasFau && !isReadOnly ? (
             <FauControl
               label={question.title}
               classification={classification}
               hasValue={hasValue}
-              isReadOnly={isReadOnly}
               onChange={choose}
               onOpenEvidence={() => void openEvidence()}
             />

@@ -104,10 +104,6 @@
       "editLabel": "Edit",
       "viewLabel": "View"
     },
-    "patterns": {
-      "survivor": "Survivor Patterns",
-      "failure": "Failure Patterns"
-    },
     "types": {
       "direct": "Direct Competitor",
       "indirect": "Indirect Competitor",

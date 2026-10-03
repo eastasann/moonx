@@ -114,8 +114,7 @@ test.describe("the app frame", () => {
     await page.getByRole("button", { name: /Switch workspace, current/ }).click();
     await page.getByRole("button", { name: "New workspace" }).click();
     const dialog = page.getByRole("dialog", { name: "New workspace" });
-    await dialog.getByRole("button", { name: "Create workspace" }).click();
-    await expect(dialog.getByText("Required")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Create workspace" })).toBeDisabled();
     await dialog.getByRole("textbox", { name: "Name" }).fill("Cebu Bakery Team");
     await dialog.getByRole("button", { name: "Create workspace" }).click();
     await expect(page.getByRole("button", { name: /current: Cebu Bakery Team/ })).toBeVisible();
@@ -159,8 +158,8 @@ test.describe("account settings", () => {
     await expectNoAxeViolations(page);
 
     await page.getByLabel("Display name").fill("Paolo G.");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(page.getByText("Profile saved")).toBeVisible();
+    await page.getByLabel("Display name").blur();
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: /Display mode/ }).click();
     await page.getByRole("option", { name: "Dark" }).click();
@@ -234,13 +233,13 @@ test.describe("invitations", () => {
     await page.getByLabel("Password").fill("nina-password-1");
     await page.getByRole("button", { name: "Create account" }).click();
 
-    await expect(page).toHaveURL(/\/welcome\?step=invite&token=demo-invite-pending$/);
+    await expect(page).toHaveURL(/\/welcome\?step=invite&token=demo-invite-pending&new=1$/);
     await expect(page.getByRole("heading", { name: "BCDX" })).toBeVisible();
     await page.getByRole("button", { name: "Join" }).click();
-    await expect(page).toHaveURL(/\/welcome\?step=profile$/);
+    await expect(page).toHaveURL(/\/welcome\?step=profile&new=1$/);
     await expect(page.getByLabel("Display name")).toHaveValue("Nina Member");
     await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page).toHaveURL(/\/welcome\?step=done$/);
+    await expect(page).toHaveURL(/\/welcome\?step=done&new=1$/);
     await page.getByRole("button", { name: "Go to Dashboard" }).click();
     await expect(page.getByRole("button", { name: /current: BCDX/ })).toBeVisible();
 
@@ -315,7 +314,8 @@ test.describe("invitations", () => {
     await guestPage.getByRole("button", { name: "Log in" }).click();
     await expect(guestPage).toHaveURL(/\/welcome\?step=invite&token=/);
     await guestPage.getByRole("button", { name: "Join" }).click();
-    await expect(guestPage).toHaveURL(/\/welcome\?step=profile$/);
+    await expect(guestPage).toHaveURL(/\/w\/[^/]+$/);
+    await expect(guestPage.getByRole("button", { name: /current: BCDX/ })).toBeVisible();
   });
 
   test("a different account gets the invited address in the message", async ({ page, guest }) => {

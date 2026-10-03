@@ -66,7 +66,6 @@
     "amount": "Amount",
     "reason": "Why this amount?",
     "amountRange": "Enter a number from 0 to 1,000,000,000,000",
-    "answerFailed": "Couldn't save — Retry",
     "conflictItem": "answer",
     "preview": "{{amount}} — {{reason}}"
   },

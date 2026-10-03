@@ -131,7 +131,9 @@ function ListsScreen({
   const currency = useWorkspaceCurrency(workspaceId);
   const compact = useBelowDesktop();
   const { changed } = useValidationRefresh(validationId);
-  usePanelTarget(formatContainerTarget("validation", validationId, "assumptions_risks"));
+  usePanelTarget(formatContainerTarget("validation", validationId, "assumptions_risks"), {
+    archived: isArchived,
+  });
   const assumptionFields = useMemo(() => assumptionSpecs(t), [t]);
   const riskFields = useMemo(() => riskSpecs(t), [t]);
   const [creating, setCreating] = useState(false);

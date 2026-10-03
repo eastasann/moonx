@@ -9,6 +9,7 @@ import {
   Text,
 } from "@moonx/ui-web";
 import { useTranslation } from "react-i18next";
+import type { EvidenceResult } from "../../components/EvidenceSheet";
 import type { ReviewDraft, ReviewEntry } from "../../lib/ai-review";
 import { ReviewEntryCard } from "./ReviewEntryCard";
 
@@ -19,7 +20,11 @@ export interface ReviewStepProps {
   updatedAfterLoad: ReadonlySet<string>;
   /** An apply came back as a conflict: Current was refreshed and the person is asked again. */
   conflict: boolean;
+  /** The validation the questions belong to (M2 attaches evidence to its answers). */
+  validationId: string;
   onDraft: (questionKey: string, patch: Partial<ReviewDraft>) => void;
+  onEvidenceChanged: (questionKey: string, result: EvidenceResult) => void;
+  onEvidenceConflict: () => void;
   onClose: () => void;
 }
 
@@ -32,7 +37,10 @@ export function ReviewStep({
   currency,
   updatedAfterLoad,
   conflict,
+  validationId,
   onDraft,
+  onEvidenceChanged,
+  onEvidenceConflict,
   onClose,
 }: ReviewStepProps) {
   const { t } = useTranslation("ai");
@@ -64,7 +72,10 @@ export function ReviewStep({
             entry={entry}
             currency={currency}
             updatedAfterLoad={updatedAfterLoad.has(entry.question.questionKey)}
+            validationId={validationId}
             onDraft={(patch) => onDraft(entry.question.questionKey, patch)}
+            onEvidenceChanged={(result) => onEvidenceChanged(entry.question.questionKey, result)}
+            onEvidenceConflict={onEvidenceConflict}
           />
         ))
       )}

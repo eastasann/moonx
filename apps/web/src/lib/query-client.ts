@@ -1,6 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { isApiError, isUnauthenticated } from "./api-error";
-import { ME_KEY } from "./session";
+import { dropUserQueries, ME_KEY } from "./session";
 
 /** Queries that failed for a reason a retry can fix: no answer, or the server's own failure. */
 function shouldRetry(failureCount: number, error: unknown): boolean {
@@ -13,11 +13,11 @@ function shouldRetry(failureCount: number, error: unknown): boolean {
  * query or mutation gets a 401, whichever screen made it (SDD 8.2).
  */
 export function createQueryClient(onUnauthenticated: () => void): QueryClient {
-  // The cached account is dropped first: the login screen asks for it and would send a person
-  // whose session just ended straight back to the workspace.
+  // The cache goes first: the login screen asks for the account and would send a person whose
+  // session just ended straight back to the workspace, and the next sign-in may be someone else.
   const handle = (error: unknown) => {
     if (!isUnauthenticated(error)) return;
-    queryClient.removeQueries({ queryKey: ME_KEY });
+    dropUserQueries(queryClient);
     onUnauthenticated();
   };
   const queryClient = new QueryClient({

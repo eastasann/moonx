@@ -12,7 +12,7 @@ import {
 } from "@moonx/ui-web";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { loginSchema } from "../forms/schemas";
 import { ApiError } from "../lib/api-error";
@@ -21,7 +21,7 @@ import { errorText } from "../lib/error-text";
 import { fieldProps, validate } from "../lib/form";
 import { useGoTo } from "../lib/navigate";
 import { oauthErrorCode } from "../lib/oauth-error";
-import { homePath, loadMe, ME_KEY, safeNext } from "../lib/session";
+import { dropUserQueries, homePath, loadMe, safeNext } from "../lib/session";
 
 /** Screen 2, log in: email and password, or Google (design-spec 6.16). */
 export function Login({ next, error }: { next?: string; error?: string }) {
@@ -35,7 +35,7 @@ export function Login({ next, error }: { next?: string; error?: string }) {
       await authCall(
         authClient().signIn.email({ email: value.email.trim(), password: value.password }),
       );
-      queryClient.removeQueries({ queryKey: ME_KEY });
+      dropUserQueries(queryClient);
       const me = await loadMe(queryClient);
       if (!me) throw new ApiError("UNAUTHENTICATED", 401, "No session after sign-in");
       return me;
@@ -55,6 +55,7 @@ export function Login({ next, error }: { next?: string; error?: string }) {
     onError: setGoogleError,
   });
 
+  const formId = useId();
   const form = useForm({
     defaultValues: { email: "", password: "" },
     validators: { onSubmit: validate(loginSchema, t) },
@@ -70,10 +71,25 @@ export function Login({ next, error }: { next?: string; error?: string }) {
 
   return (
     <PageFrame>
-      <FocusPattern hasTabBar={false} header={<Heading level={1}>{t("auth:login.title")}</Heading>}>
+      <FocusPattern
+        hasTabBar={false}
+        header={<Heading level={1}>{t("auth:login.title")}</Heading>}
+        actions={
+          <Button
+            type="submit"
+            form={formId}
+            variant="accent"
+            isPending={login.isPending}
+            pendingLabel={t("app:signingIn")}
+          >
+            {t("auth:login.submit")}
+          </Button>
+        }
+      >
         <Stack gap="space-300">
           {alert ? <InlineAlert variant="negative" heading={alert} /> : null}
           <Form
+            id={formId}
             aria-label={t("auth:login.title")}
             onSubmit={(event) => {
               event.preventDefault();
@@ -104,14 +120,6 @@ export function Login({ next, error }: { next?: string; error?: string }) {
                 />
               )}
             </form.Field>
-            <Button
-              type="submit"
-              variant="accent"
-              isPending={login.isPending}
-              pendingLabel={t("app:signingIn")}
-            >
-              {t("auth:login.submit")}
-            </Button>
           </Form>
           <Link href="/forgot-password">{t("auth:login.forgot")}</Link>
           <Divider />

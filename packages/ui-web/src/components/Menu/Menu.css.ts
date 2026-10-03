@@ -2,6 +2,7 @@ import { style } from "@vanilla-extract/css";
 import { recipe } from "@vanilla-extract/recipes";
 import { focusRing } from "../../styles.css";
 import { vars } from "../../theme";
+import { sizeVariants } from "../_internal/sizes";
 import { atLeastTarget } from "../_internal/target";
 
 const insetFocusRing = {
@@ -26,8 +27,6 @@ export const item = recipe({
     display: "flex",
     alignItems: "center",
     gap: vars.space["100"],
-    minHeight: atLeastTarget(vars.scale.component.field.height.M),
-    paddingInline: vars.scale.component.field["padding-x"].M,
     borderRadius: vars.radius.control,
     cursor: "pointer",
     outline: "none",
@@ -43,8 +42,13 @@ export const item = recipe({
       default: { color: vars.color.text.primary },
       negative: { color: vars.color.negative.fg },
     },
+    size: sizeVariants((s) => ({
+      minHeight: atLeastTarget(vars.scale.component.field.height[s]),
+      paddingInline: vars.scale.component.field["padding-x"][s],
+      fontSize: vars.scale.component.field["font-size"][s],
+    })),
   },
-  defaultVariants: { variant: "default" },
+  defaultVariants: { variant: "default", size: "M" },
 });
 
 export const itemLabel = style({ flex: 1 });

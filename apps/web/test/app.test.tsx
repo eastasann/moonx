@@ -305,3 +305,12 @@ test("a signed-in person opening an invitation link goes to step 1 of the welcom
   expect(await screen.findByRole("heading", { name: "Cebu Team" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
 });
+
+test("the unread badge in the navigation goes through the count format", async () => {
+  stubApi({
+    ...signedIn(),
+    "GET /api/v1/notifications/unread-count": () => ({ body: { total: 1234 } }),
+  });
+  await renderApp("/account");
+  expect(await screen.findByRole("link", { name: /^Notifications\s*99\+$/ })).toBeInTheDocument();
+});

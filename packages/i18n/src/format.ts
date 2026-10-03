@@ -60,6 +60,15 @@ export function formatUnits(value: number, options: Formatted = {}): string {
   return withBound(typographicMinus(text), options.bound);
 }
 
+/** Largest count a badge shows as is; above it the badge reads "99+". */
+export const BADGE_COUNT_MAX = 99;
+
+/** A count in a badge (unread notifications, comments): grouped digits, "99+" above the cap. */
+export function formatCount(count: number): string {
+  const text = numberFormat({ maximumFractionDigits: 0 }).format(Math.min(count, BADGE_COUNT_MAX));
+  return count > BADGE_COUNT_MAX ? `${text}+` : text;
+}
+
 /** A number as typed by a person (daily sales inputs): no rounding to one decimal. */
 export function formatInputNumber(value: number): string {
   return typographicMinus(numberFormat({ maximumFractionDigits: 6 }).format(value));

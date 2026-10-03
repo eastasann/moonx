@@ -127,6 +127,31 @@ export function safeReturnTo(value: string | undefined): string | undefined {
   return value;
 }
 
+/**
+ * The link from a form screen (10 / 11 / 21) into an AI exchange. Export starts from the section
+ * on screen; import takes the whole of the kind (design-spec 6.7), so it carries no scope. Both
+ * carry the screen as `returnTo`, so Back and a finished import land where the person came from.
+ */
+export function exchangeHref(
+  direction: "export" | "import",
+  params: {
+    workspaceId: string;
+    kind: TemplateKind;
+    id?: string;
+    /** The export's starting scope: a section key, or `scope=` text such as a plan item. */
+    scope: string;
+    returnTo: string;
+  },
+): string {
+  const query = new URLSearchParams({
+    [direction === "export" ? "source" : "target"]: params.kind,
+    ...(params.id ? { id: params.id } : {}),
+    ...(direction === "export" ? { scope: params.scope } : {}),
+    returnTo: params.returnTo,
+  });
+  return `/w/${params.workspaceId}/ai/${direction}?${query}`;
+}
+
 /** The screen an exchange works on (10 / 11 / 13 / 20 / 21): where Back and a finished import go. */
 export function sourcePath(workspaceId: string, target: ImportContext["target"]): string {
   const { type, ideaId, id } = target;

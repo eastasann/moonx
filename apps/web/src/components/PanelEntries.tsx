@@ -1,3 +1,4 @@
+import { formatCount } from "@moonx/i18n";
 import { ActionButton, Badge, Flex } from "@moonx/ui-web";
 import { History, MessageSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -23,7 +24,7 @@ export function PanelEntries() {
           />
           {count > 0 ? (
             <Badge variant="informative" size="S">
-              {count > 99 ? "99+" : count}
+              {formatCount(count)}
             </Badge>
           ) : null}
         </Flex>

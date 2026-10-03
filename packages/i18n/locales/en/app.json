@@ -1,6 +1,7 @@
 {
   "close": "Close",
   "back": "Back",
+  "stepDone": "completed",
   "cancel": "Cancel",
   "saving": "Saving",
   "sending": "Sending",

@@ -1,3 +1,4 @@
+import { COMPONENT_SIZES } from "@moonx/ui-tokens";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Link } from "../src/components/Link";
@@ -59,4 +60,18 @@ describe("Link", () => {
     const { container } = render(<Link href="/a">Next</Link>);
     await expectNoAxeViolations(container);
   });
+});
+
+test.each(COMPONENT_SIZES)("renders at size %s with its own class", (size) => {
+  render(
+    <>
+      <Link href="/a">Plain</Link>
+      <Link href="/b" size={size}>
+        Sized
+      </Link>
+    </>,
+  );
+  const plain = screen.getByRole("link", { name: "Plain" });
+  const sized = screen.getByRole("link", { name: "Sized" });
+  expect(sized.className).not.toBe(plain.className);
 });

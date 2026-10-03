@@ -226,3 +226,12 @@ test("an unmatched block is sent to a chosen question and then imports like a ma
     "BPO firms in Bacolod",
   );
 });
+
+test("the step indicator marks the finished step for assistive technology", async () => {
+  api();
+  await toMatch("## [V.01.WHO] WHO\nBPO HR teams");
+  const done = screen
+    .getAllByRole("listitem")
+    .find((item) => item.getAttribute("data-status") === "done");
+  expect(done).toHaveTextContent(/Paste, completed/);
+});

@@ -728,7 +728,7 @@ make test-api・make test-domain・make lint・make typecheck・make doc-lint �
 
 ## Step 17b: 突き合わせで見つかった食い違いを直す（2）: Web
 
-Status:
+Status: done 2026-10-03
 
 ```
 Step 17a と同じ突き合わせで見つかった Web の食い違いを、同じ方針で直してください。

@@ -1,7 +1,17 @@
+import { formatCount } from "@moonx/i18n";
 import { ActionButton, Badge, Flex } from "@moonx/ui-web";
 import { History, MessageSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useOverlay } from "../lib/overlay";
+
+/** The number of comments on an item as a small badge; nothing when there are none. */
+export function CommentCountBadge({ count }: { count: number }) {
+  return count > 0 ? (
+    <Badge variant="informative" size="S">
+      {formatCount(count)}
+    </Badge>
+  ) : null;
+}
 
 /**
  * The quiet Comments and History buttons next to one item (design-spec 6.0.4, 6.0.5). `target` is
@@ -27,11 +37,7 @@ export function ItemPanelButtons({
         aria-label={t("item.comments")}
         onPress={() => openPanel("comments", target)}
       />
-      {commentCount > 0 ? (
-        <Badge variant="informative" size="S">
-          {commentCount > 99 ? "99+" : commentCount}
-        </Badge>
-      ) : null}
+      <CommentCountBadge count={commentCount} />
       {showHistory ? (
         <ActionButton
           isQuiet

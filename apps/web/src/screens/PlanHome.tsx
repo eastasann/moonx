@@ -19,6 +19,9 @@ function PlanHomeContent({
   ideaId: string;
 }) {
   const access = usePlanAccess(plan, workspaceId);
+  usePanelTarget(formatContainerTarget("business_plan", plan.id), {
+    archived: plan.archived || plan.ideaArchived,
+  });
   // Another workspace's or idea's URL must not show the plan (SDD 4).
   if (plan.workspaceId !== workspaceId || plan.ideaId !== ideaId) return <NoAccessState />;
   const block = { plan, workspaceId, ideaId, access };
@@ -54,7 +57,6 @@ export function PlanHome({
   versionId?: string;
 }) {
   const query = useQuery(planHomeQuery(planId, versionId));
-  usePanelTarget(formatContainerTarget("business_plan", planId));
   return (
     <QueryBoundary query={query} skeleton={<PlanHomeSkeleton />}>
       {(plan) => (

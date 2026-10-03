@@ -103,7 +103,7 @@ test("a refused save shows the reason, keeps the input and the sheet", async () 
   });
   const name = await nameBox(dialog);
   await user.click(within(dialog).getByRole("button", { name: "Save version" }));
-  expect(await within(dialog).findByText("The version was not saved.")).toBeInTheDocument();
+  expect(await within(dialog).findByText("Couldn't save — Retry")).toBeInTheDocument();
   expect(
     within(dialog).getByText("This is archived. Restore it to make changes."),
   ).toBeInTheDocument();

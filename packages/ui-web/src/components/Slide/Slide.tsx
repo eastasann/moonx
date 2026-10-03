@@ -51,6 +51,8 @@ interface SlideBase {
   emptyLabel: string;
   /** Shown under the slide, outside it, when the text was cut ("Too long for this slide"). */
   overflowNotice?: ReactNode;
+  /** The slide title's level in the page outline. A page whose slides follow its h1 directly uses 2. */
+  headingLevel?: 2 | 3;
 }
 
 /** Cover: large title and subtitle. */
@@ -179,14 +181,15 @@ export function Slide(props: SlideProps) {
   const titleId = useId();
   const { frameRef, canvasRef, scale } = useSlideScale<HTMLDivElement, HTMLDivElement>();
   const isCover = props.type === "title";
+  const Title = props.headingLevel === 2 ? "h2" : "h3";
   return (
     <section className={wrapper} aria-labelledby={titleId}>
       <div ref={frameRef} className={frame} data-slide-type={props.type}>
         <div ref={canvasRef} className={canvasClass} style={{ transform: `scale(${scale})` }}>
           <div className={isCover ? `${content} ${contentTitle}` : content}>
-            <h3 id={titleId} className={isCover ? `${heading} ${coverTitle}` : heading}>
+            <Title id={titleId} className={isCover ? `${heading} ${coverTitle}` : heading}>
               {props.title}
-            </h3>
+            </Title>
             <Body {...props} />
           </div>
           <div className={footerClass}>

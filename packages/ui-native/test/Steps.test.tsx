@@ -59,3 +59,10 @@ test("an unknown current id leaves every step upcoming", () => {
   render(<Steps aria-label="Progress" items={items} current="missing" />);
   expect(screen.getAllByTestId("step-upcoming")).toHaveLength(3);
 });
+
+test("a done step is named with the done label, the others by their label", () => {
+  render(<Steps aria-label="Progress" items={items} current="two" doneLabel="completed" />);
+  expect(screen.getByRole("listitem", { name: "Profile, completed" })).toBeTruthy();
+  expect(screen.getByRole("listitem", { name: "Idea" })).toBeTruthy();
+  expect(screen.getByRole("listitem", { name: "Plan" })).toBeTruthy();
+});

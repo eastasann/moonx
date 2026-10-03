@@ -117,7 +117,9 @@ function CompetitorsScreen({
   const narrow = useIsNarrow();
   const belowDesktop = useBelowDesktop();
   const { changed } = useValidationRefresh(validationId);
-  usePanelTarget(formatContainerTarget("validation", validationId, "competitors"));
+  usePanelTarget(formatContainerTarget("validation", validationId, "competitors"), {
+    archived: isArchived,
+  });
   const specs = useMemo(() => competitorSpecs(t), [t]);
   const key = competitorsKey(validationId);
   const { items, answers, guidance } = data;

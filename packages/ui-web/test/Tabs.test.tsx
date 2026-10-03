@@ -2,6 +2,7 @@ import { COMPONENT_SIZES } from "@moonx/ui-tokens";
 import { User } from "@react-aria/test-utils";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { Tab, TabList, TabPanel, Tabs } from "../src/components/Tabs";
 import { expectNoAxeViolations } from "./axe";
 
@@ -88,4 +89,23 @@ test("supports a controlled selection", async () => {
 test("has no axe violations", async () => {
   const { container } = render(<Example />);
   await expectNoAxeViolations(container);
+});
+
+test("a single panel whose id follows the selected tab stays the target of aria-controls", async () => {
+  function Follower() {
+    const [tab, setTab] = useState("assumptions");
+    return (
+      <Tabs selectedKey={tab} onSelectionChange={(key) => setTab(String(key))}>
+        <TabList aria-label="Sections">
+          <Tab id="assumptions">Assumptions</Tab>
+          <Tab id="risks">Risks</Tab>
+        </TabList>
+        <TabPanel id={tab}>{tab} list</TabPanel>
+      </Tabs>
+    );
+  }
+  render(<Follower />);
+  await userEvent.click(screen.getByRole("tab", { name: "Risks" }));
+  const controlled = screen.getByRole("tab", { name: "Risks" }).getAttribute("aria-controls");
+  expect(controlled).toBe(screen.getByRole("tabpanel").id);
 });

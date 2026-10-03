@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { QuestionFormFrame } from "../components/QuestionFormFrame";
 import { QueryBoundary } from "../components/states";
+import { exchangeHref } from "../lib/ai-exchange";
 import { formatContainerTarget, usePanelTarget } from "../lib/panel-target";
 import {
   isAnswered,
@@ -102,13 +103,23 @@ function Form({
         <Menu trigger={<Button variant="secondary">{t("form:ai")}</Button>}>
           <MenuItem
             id="export"
-            href={`/w/${workspaceId}/ai/export?source=self_analysis&scope=${sectionKey}`}
+            href={exchangeHref("export", {
+              workspaceId,
+              kind: "self_analysis",
+              scope: sectionKey,
+              returnTo: sectionPath(workspaceId, sectionKey),
+            })}
           >
             {t("form:aiExport")}
           </MenuItem>
           <MenuItem
             id="import"
-            href={`/w/${workspaceId}/ai/import?target=self_analysis&scope=${sectionKey}`}
+            href={exchangeHref("import", {
+              workspaceId,
+              kind: "self_analysis",
+              scope: sectionKey,
+              returnTo: sectionPath(workspaceId, sectionKey),
+            })}
           >
             {t("form:aiImport")}
           </MenuItem>

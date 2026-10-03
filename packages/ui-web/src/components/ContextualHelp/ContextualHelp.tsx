@@ -1,3 +1,4 @@
+import type { ComponentSize } from "@moonx/ui-tokens";
 import { CircleQuestionMark, Info } from "lucide-react";
 import type { ReactNode } from "react";
 import {
@@ -18,6 +19,8 @@ export interface ContextualHelpProps {
   title: string;
   children: ReactNode;
   placement?: ResponsivePopoverProps["placement"];
+  /** Size of the icon button. */
+  size?: ComponentSize;
   isOpen?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (isOpen: boolean) => void;
@@ -30,13 +33,14 @@ export function ContextualHelp({
   title,
   children,
   placement = "bottom start",
+  size = "M",
   ...triggerProps
 }: ContextualHelpProps) {
   const Icon = variant === "help" ? CircleQuestionMark : Info;
   return (
     <DialogTrigger {...triggerProps}>
       <AriaButton aria-label={label} className={trigger}>
-        <Icon aria-hidden className={icon} />
+        <Icon aria-hidden className={icon({ size })} />
       </AriaButton>
       <ResponsivePopover placement={placement}>
         <AriaDialog className={content}>

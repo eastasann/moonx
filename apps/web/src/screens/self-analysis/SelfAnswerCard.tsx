@@ -6,10 +6,8 @@ import {
   type TemplateQuestion,
 } from "@moonx/schemas";
 import {
-  Button,
   ContextualHelp,
   Disclosure,
-  Flex,
   NumberField,
   QuestionCard,
   Radio,
@@ -25,7 +23,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConflictDialog } from "../../components/ConflictDialog";
 import { ItemPanelButtons } from "../../components/ItemPanelButtons";
-import { errorText } from "../../lib/error-text";
+import { SaveFailureNotice } from "../../components/SaveFailureNotice";
 import { readNumberText } from "../../lib/number-input";
 import { formatItemTarget } from "../../lib/panel-target";
 import { hasText } from "../../lib/questions";
@@ -251,20 +249,10 @@ export function SelfAnswerCard({
         <Stack gap="space-200">
           {field}
           {failure ? (
-            <Flex gap="space-100" align="center" wrap>
-              <Text tone="negative" as="span">
-                {failure.willRetry
-                  ? t("selfAnalysis:form.answerFailed")
-                  : errorText(t, failure.error)}
-              </Text>
-              <Button
-                variant="secondary"
-                size="S"
-                onPress={() => item.retry({ text, ...(withAmount ? { amount } : {}) })}
-              >
-                {t("form:retry")}
-              </Button>
-            </Flex>
+            <SaveFailureNotice
+              failure={failure}
+              onRetry={() => item.retry({ text, ...(withAmount ? { amount } : {}) })}
+            />
           ) : null}
           {question.example ? (
             <Disclosure title={t("form:example")} defaultExpanded headingLevel={2}>

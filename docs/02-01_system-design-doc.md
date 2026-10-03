@@ -338,7 +338,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-011: サーバー側のキャッシュは置かない
 
-**決定:** Redis などのサーバー側のキャッシュは置かない。クライアントは TanStack Query でデータを持ち（画面の移動ではキャッシュを先に出し、裏で取り直す。保存したら関係するキーを無効にする）、API の応答は `Cache-Control: no-store`（個人のデータのため）。静的アセットは Cloudflare の CDN が持つ（ファイル名にハッシュを付けて長期キャッシュ）。Better Auth の回数制限は DB に記録する。
+**決定:** Redis などのサーバー側のキャッシュは置かない。クライアントは TanStack Query でデータを持ち（画面の移動ではキャッシュを先に出し、裏で取り直す。保存したら関係するキーを無効にする。セッションが切れたとき（401）と、ログイン・新規登録・パスワードの再設定で別のセッションに入ったときは、キャッシュをすべて捨てる。キャッシュは1人の利用者のデータなので、次の人に見せない）、API の応答は `Cache-Control: no-store`（個人のデータのため）。静的アセットは Cloudflare の CDN が持つ（ファイル名にハッシュを付けて長期キャッシュ）。Better Auth の回数制限は DB に記録する。
 
 **理由:** 利用者は BCDX の数人で、データ量も小さい。複数人が同じアイデアを編集するので、サーバー側のキャッシュは古い内容を見せる危険の方が大きい。重く見える計算（損益分岐・確認項目）は純粋関数で一瞬で終わる。マネージドの Redis（Memorystore）は月 $30 を超えて予算に合わない。
 
@@ -433,6 +433,8 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 **決定:** 自動保存（design-spec 6.0.2）が失敗したら、項目ごとに最新の入力だけを送信待ちの列に残し、再接続したとき・定期的に再送する。Web は IndexedDB、スマホは expo-sqlite に置く。送信待ちの列の項目は `lockVersion` を持ち、再送で衝突したら ADR-019 の選択を出す。
 
 **理由:** design-spec で「保存できなかった入力は端末に残し、再接続したら送る」と決めた。スマホで電波が途切れても、書いた回答を失わない。
+
+保存がサーバーに恒久的に断られた（アーカイブ済み・権限がない・対象が無い）ときは、再送しても結果が同じなので自動では再送しない。画面は「Couldn't save」と理由を項目の横とヘッダーに出し、Retry を押したときだけ送り直す（通信やサーバーの一時的な失敗は`Couldn't save — Retry`で、自動でも再送する。design-spec 6.0.2）。
 
 セッションが切れた（401）ときは列を残し、同じユーザーでログインし直したときだけ再送する（違うユーザーなら消す）。
 
@@ -529,7 +531,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 | `/forgot-password` | 2（パスワード再設定のメールを送る） | |
 | `/reset-password` | 2（新しいパスワードを決める） | `?token=`（メールのリンク） |
 | `/invite/$token` | 2（新規登録）、または 3 の ①（ログイン済み） | 出し分けは design-spec 6.16 |
-| `/welcome` | 3 オンボーディング | `?step=invite|profile|done&token=` |
+| `/welcome` | 3 オンボーディング | `?step=invite|profile|done&token=&new=1`（`new=1` は招待から登録した直後の人。① を済みにして ② ③ を出す。付かなければ ① だけ（既存のアカウント）か、② ③（ワークスペースなしの招待）。6.16） |
 | `/account` | 4 アカウント設定 | |
 | `/notifications` | 8 通知 | `?filter=unread` |
 | `/w/$workspaceId` | 5 ダッシュボード | |
@@ -551,7 +553,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo` | 21 プラン項目の編集 | `$itemNo` は 1〜30。`?q=&version=<plan_version の id>`（P4 の `versionId`。版の読み取り専用表示から項目を開くとき） |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/execution` | 22 実行管理 | `?tab=milestones|launch|kpis|questions|actions&item=&assignee=me|<user の id>&status=` |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch` | 23 Pitch Deck | `?variant=one|five&version=` |
-| `/w/$workspaceId/ai/export` | 24 AI 書き出し | `?source=self_analysis|validation|business_plan&id=&scope=` |
+| `/w/$workspaceId/ai/export` | 24 AI 書き出し | `?source=self_analysis|validation|business_plan&id=&scope=&returnTo=` |
 | `/w/$workspaceId/ai/import` | 25 AI 取り込み | `?target=self_analysis|validation|business_plan&id=&scope=&returnTo=` |
 | `/admin/templates` | 26 管理: テンプレート一覧 | `?kind=` |
 | `/admin/templates/versions/$versionId` | 27 管理: テンプレート編集 | `?node=<section か question の id>`、または設定のノード `ai-prompt`（検証とプランでは空） / `cost-defaults` / `check-rules` / `execution-presets` |
@@ -856,7 +858,7 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | 項目 | 設定 |
 |---|---|
 | メール＋パスワード | 有効。`disableSignUp: true`（新規登録は U5 だけ）。パスワードは8文字以上・128文字以下。パスワード再設定のリンクの期限は1時間（design-spec 6.16）。再設定すると他のセッションを消し、`hooks.after`（`/reset-password`）でそのユーザーの新しいセッションを作って Cookie を返す（ログインした状態で 5 へ。design-spec 6.16） |
-| Google | 有効。`disableImplicitSignUp: true`。新規登録は招待の画面（`/invite/$token`）からだけ `requestSignUp: true` で始め、`callbackURL` を `/welcome?step=invite&token=…`、`errorCallbackURL` を `/login?error=…` にする |
+| Google | 有効。`disableImplicitSignUp: true`。新規登録は招待の画面（`/invite/$token`）からだけ `requestSignUp: true` で始め、`callbackURL` を `/welcome?step=invite&token=…&new=1`、`errorCallbackURL` を `/login?error=…` にする |
 | 新規登録の制限 | `databaseHooks.user.create.before`: そのメールあての有効な招待（`pending` かつ期限内。大文字小文字を区別しない）が無いか、メールが確認済みでなければ（Google が `email_verified` を返さない）`INVITATION_REQUIRED` で拒否する |
 | 登録の後 | `databaseHooks.user.create.after`: 個人用ワークスペース（名前「{表示名}'s workspace」、通貨 PHP、本人が Owner）を作り、`last_workspace_id` に入れる。そのメールあてのワークスペースなしの招待があれば、その招待を受諾済みにし（3 の ① を飛ばすため、U6 は呼ばれない）、`grants_admin` が true のときだけ運営者にする |
 | ログインの制限 | `databaseHooks.session.create.before`: `users.status` が `active` 以外（停止・削除）なら `ACCOUNT_SUSPENDED` で拒否する |
@@ -2112,7 +2114,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。スマホは SecureStore。ログアウトしたら送信待ちの列（ADR-021）も消す |
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、5MB まで。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
 | セキュリティヘッダー | 静的アセットの `_headers` ファイル（`apps/web/public/_headers`。ADR-004）で付ける: `Content-Security-Policy`（`default-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy`。HSTS は Cloudflare で有効にする |
-| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者もアプリからは中身を見られない。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Cloudflare のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は `dataCollection` で利用者の情報・Cookie・ヘッダー・本文・クエリ・DB の値・スタックの変数をすべて集めない設定にする（Sentry v11 では `sendDefaultPii` の代わり））。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
+| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者もアプリからは中身を見られない。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Cloudflare のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は `dataCollection` で利用者の情報・Cookie・ヘッダー・本文・クエリ・DB の値・スタックの変数をすべて集めない設定にする（Sentry v11 では `sendDefaultPii` の代わり）。さらにブレッドクラム（画面遷移の URL を記録する）はすべて捨て、イベントのリクエストのヘッダー・Cookie・クエリ文字列は消す。イベントに載る URL は、クエリ・フラグメント・招待のトークン（`/invite/<token>` のパス）を持たない）。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
 | ストアの要件 | プライバシーポリシー（`/privacy`）とサポート（`/support`）の静的ページを Worker で配る（`apps/web/public/`。中身はストアへの提出までに用意する）。App Store のプライバシーの申告と Google Play のデータセーフティは、上の「個人情報」に合わせて書く。アプリ内のアカウント削除（U7）と、Google Play 向けの Web の削除の入口（`/account`）を用意する |
 | 依存の脆弱性 | GitHub の Dependabot のアラートを有効にする。Better Auth・Elysia・Drizzle のセキュリティ修正は速やかに取り込む（05_operation-runbook.md） |
 
@@ -2188,12 +2190,13 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 業務の決まり（409・422 の個別のコード） | コードごとに design-spec の各画面の「状態」の文言を出す。対応はカタログのキー `errors:<CODE>`（9章） |
 | 同時編集の衝突（409 `CONFLICT` / `CONFLICT_MULTI`） | design-spec 6.0.2 の確認 |
 | 通信・サーバーエラー（ネットワーク断・5xx・`UPSTREAM_UNAVAILABLE`） | 保存: design-spec 6.0.2 の保存エラー（入力は送信待ちの列に残して自動で再送する。ADR-021）。読み込み: design-spec 6.0.6「読み込みエラー」（ブロックごと） |
-| 認証エラー（401） | `/login?next=<今のパス>` へ移る（design-spec 5章「認証」）。送信待ちの列の扱いは ADR-021 |
+| 認証エラー（401） | クライアントのクエリのキャッシュをすべて捨ててから、`/login?next=<今のパス>` へ移る（design-spec 5章「認証」。ログイン・新規登録・パスワードの再設定でも同じく捨てる。次に入るのが別の人でも、前の人のデータが残らない）。送信待ちの列の扱いは ADR-021 |
 | 認可エラー（403 `FORBIDDEN` / `NO_ACCESS`） | design-spec 6.0.6「権限がない」。編集の途中で権限が変わったときは、読み取りの表示に切り替える |
 | 見つからない（404） | design-spec 6.0.6「見つからない」 |
 | アーカイブ（409 `ARCHIVED`） | design-spec 6.1「アーカイブ済み」の表示に切り替える |
 | アプリの更新が必要（426） | design-spec 6.0.6「アプリの更新が必要」 |
 | 回数制限（429） | design-spec 6.0.6「回数の上限」 |
+| モーダル・パネルの中の失敗（描画エラー、想定外のエラー） | 枠・ナビ・背後の画面は残し、モーダルやパネルの代わりに小さなダイアログ「Something went wrong」を出す。`Ref`（下の行と同じ番号）、Retry（描画をやり直す）、Close（閉じる）を持つ（design-spec 6.0.6）。モーダルとパネルのそれぞれにエラーの境界を置き、開くものが変わったら境界も作り直す |
 | 想定外のエラー（500 など） | design-spec 6.0.6「想定外のエラー」。`Ref` には `requestId` の先頭8文字を出す。画面の描画が失敗したとき（API の応答が無いとき）は `requestId` が無いので、Sentry のイベント ID の先頭8文字を出す。画面のブロックごとにエラーの境界（Error Boundary）を置き、1つの失敗で全体を壊さない。Sentry に送る |
 
 ### 8.3 ログとの対応
@@ -2213,7 +2216,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | ライブラリ | i18next ＋ react-i18next（Web とスマホで同じ）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
 | カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペース（`account`・`admin`・`ai`・`app`・`auth`・`common`・`costs`・`dashboard`・`decision`・`decisionLog`・`economics`・`errors`・`execution`・`form`・`ideas`・`mail`・`notifications`・`panels`・`pitch`・`plan`・`planHome`・`planItem`・`research`・`selfAnalysis`・`templateMigration`・`validation`・`workspaceSettings`。一覧は `packages/i18n/src/i18n.ts` の `NAMESPACES`）で、キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
-| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。`formatRelativeTime()` は1週間未満を「3 min. ago」のような相対表記にし、1週間以上前は日付にする |
+| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。`formatRelativeTime()` は1週間未満を「3 min. ago」のような相対表記にし、1週間以上前は日付にする |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（スマホの Hermes も対応）。金額の入力は桁区切りのカンマを受け付ける |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |

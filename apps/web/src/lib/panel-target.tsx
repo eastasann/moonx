@@ -73,6 +73,8 @@ export interface HeaderPanelTarget {
   target: string | null;
   /** The target the Comments button opens, or null when nothing there takes comments. */
   commentTarget: string | null;
+  /** The idea or plan is archived, so the Comments panel is read-only (design-spec 1.3, 6.8). */
+  archived?: boolean;
 }
 
 interface PanelTargetValue extends HeaderPanelTarget {
@@ -97,21 +99,25 @@ export function PanelTargetProvider({ children }: { children: ReactNode }) {
  * `options.comments` names the comment target of a screen whose own target takes none (the
  * default is the item itself, or the idea of an idea screen). `options.history: false` leaves out
  * the History button, for a screen whose viewer may not read the history (a shared self analysis).
+ * `options.archived` tells the Comments panel the idea or plan is archived, so it shows no input
+ * instead of waiting for the API to refuse the first post.
  */
 export function usePanelTarget(
   target: string | null,
-  options?: { comments?: string | null; history?: boolean },
+  options?: { comments?: string | null; history?: boolean; archived?: boolean },
 ): void {
   const setTargets = useContext(PanelTargetContext)?.setTargets;
   const comments = options?.comments;
   const history = options?.history ?? true;
+  const archived = options?.archived ?? false;
   useEffect(() => {
     setTargets?.({
       target: history ? target : null,
       commentTarget: comments !== undefined ? comments : commentTargetOf(parsePanelTarget(target)),
+      archived,
     });
     return () => setTargets?.(NO_TARGETS);
-  }, [setTargets, target, comments, history]);
+  }, [setTargets, target, comments, history, archived]);
 }
 
 /** The items the header's panel entries open. */

@@ -2,7 +2,7 @@ import { computeEconomics } from "@moonx/domain";
 import type { CostCategory, CostItem } from "@moonx/schemas";
 import { InlineAlert, Skeleton, Stack, useIsNarrow, WorksheetPattern } from "@moonx/ui-web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NoAccessState, QueryBoundary } from "../components/states";
 import { ValidationSectionHeader } from "../components/ValidationSectionHeader";
@@ -32,6 +32,7 @@ import type { RowView } from "./costs/CostFields";
 import {
   CostRowController,
   type RowApi,
+  type RowFailure,
   type RowRegistry,
   rowApiOf,
 } from "./costs/CostRowController";
@@ -92,9 +93,11 @@ interface LoaderProps extends CostsProps {
 }
 
 function CostsLoader(props: LoaderProps) {
-  const { validationId } = props;
+  const { validationId, isArchived } = props;
   const costs = useQuery(costsQuery(validationId));
-  usePanelTarget(formatContainerTarget("validation", validationId, "costs"));
+  usePanelTarget(formatContainerTarget("validation", validationId, "costs"), {
+    archived: isArchived,
+  });
 
   // Saves still on their way when the screen closes must reach every screen that shows them, the home included.
   useValidationRefresh(validationId);
@@ -131,6 +134,18 @@ function CostsWorksheet({
   const setDraft = (item: CostItem, update: (prev: CostDraft) => CostDraft) =>
     setDrafts((prev) => ({ ...prev, [item.id]: update(prev[item.id] ?? draftOfItem(item)) }));
 
+  const [failures, setFailures] = useState<Record<string, RowFailure>>({});
+  const setFailure = useCallback((id: string, next: RowFailure | null) => {
+    setFailures((prev) => {
+      if (!next) {
+        if (!(id in prev)) return prev;
+        const { [id]: _gone, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [id]: next };
+    });
+  }, []);
+
   const registry: RowRegistry = useRef(new Map<string, RowApi>());
   const apis = useRef(new Map<string, RowApi>());
   const apiOf = (id: string): RowApi => {
@@ -162,6 +177,7 @@ function CostsWorksheet({
     currency,
     price,
     economicsPath,
+    failure: failures[item.id] ?? null,
   });
 
   const [sheetId, setSheetId] = useState<string | null>(() => {
@@ -297,6 +313,7 @@ function CostsWorksheet({
                 isReadOnly={!canEdit}
                 setDraft={setDraft}
                 registry={registry}
+                onFailure={setFailure}
               />
             ))}
             {COST_CATEGORIES.map((category) => (
@@ -304,7 +321,10 @@ function CostsWorksheet({
                 key={category}
                 category={category}
                 items={rowsOf(items, category)}
-                viewOf={viewOf}
+                // The open sheet draws the row's failure; the row behind it would repeat it.
+                viewOf={(item) =>
+                  item.id === sheetId ? { ...viewOf(item), failure: null } : viewOf(item)
+                }
                 actions={actions}
                 isNarrow={isNarrow}
                 isReadOnly={!canEdit}

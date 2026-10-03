@@ -1,5 +1,6 @@
+import type { ComponentSize } from "@moonx/ui-tokens";
 import { Check } from "lucide-react";
-import type { ReactElement, ReactNode } from "react";
+import { type ReactElement, type ReactNode, useContext } from "react";
 import {
   Menu as AriaMenu,
   MenuItem as AriaMenuItem,
@@ -11,6 +12,7 @@ import {
   Separator,
   Text,
 } from "react-aria-components";
+import { SizeContext } from "../_internal/SizeContext";
 import { ResponsivePopover, type ResponsivePopoverProps } from "../ResponsivePopover";
 import { check, item, itemLabel, menu, sectionHeader, separator } from "./Menu.css";
 
@@ -22,6 +24,8 @@ export interface MenuProps<T extends object>
    */
   trigger: ReactElement;
   placement?: ResponsivePopoverProps["placement"];
+  /** Height, padding and text size of the items. */
+  size?: ComponentSize;
   isOpen?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (isOpen: boolean) => void;
@@ -34,6 +38,7 @@ export interface MenuProps<T extends object>
 export function Menu<T extends object>({
   trigger,
   placement,
+  size = "M",
   isOpen,
   defaultOpen,
   onOpenChange,
@@ -43,7 +48,9 @@ export function Menu<T extends object>({
     <MenuTrigger isOpen={isOpen} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
       {trigger}
       <ResponsivePopover placement={placement}>
-        <AriaMenu {...props} className={menu} />
+        <SizeContext.Provider value={size}>
+          <AriaMenu {...props} className={menu} />
+        </SizeContext.Provider>
       </ResponsivePopover>
     </MenuTrigger>
   );
@@ -56,8 +63,9 @@ export interface MenuItemProps extends Omit<AriaMenuItemProps, "className" | "st
 }
 
 export function MenuItem({ variant = "default", children, ...props }: MenuItemProps) {
+  const size = useContext(SizeContext) ?? "M";
   return (
-    <AriaMenuItem {...props} className={item({ variant })}>
+    <AriaMenuItem {...props} className={item({ variant, size })}>
       {({ isSelected }) => (
         <>
           <Text slot="label" className={itemLabel}>

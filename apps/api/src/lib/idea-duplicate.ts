@@ -33,7 +33,8 @@ type EvidenceTarget = (typeof schema.evidenceLinks.$inferSelect)["targetType"];
  * log rows. Evidence that points at a deleted research log or a deleted row is left out.
  *
  * Every tracked item that was copied gets a `duplicate` history row (action create) with the one
- * `batchId` of the operation, so that H3 can undo the copy as a unit; the idea's own row comes first.
+ * `batchId` of the operation, so that the history shows the copy as one operation; H3 does not take it
+ * back (SDD 5.6 I3). The idea's own row comes first.
  */
 export async function duplicateIdea(
   db: Db,

@@ -104,6 +104,57 @@ describe("X1 export", () => {
     ).toBe(true);
   });
 
+  test("the whole plan, validation or self analysis says scope: all; a part or a pick does not", async () => {
+    const header = (md: string) => (md.split("\n")[0] as string).split(" | ")[2];
+    const whole = await call(
+      t.app,
+      "GET",
+      exportUrl(`source=business_plan&id=${planA}&includeEmpty=true`),
+      { as: who.kenji },
+    );
+    expect(header(whole.body.markdown)).toBe("scope: all");
+    const part = await call(
+      t.app,
+      "GET",
+      exportUrl(`source=business_plan&id=${planA}&part=a&includeEmpty=true`),
+      { as: who.kenji },
+    );
+    expect(header(part.body.markdown)).toBe("scope: part:a");
+    const id = await validationId();
+    const everySection = await call(
+      t.app,
+      "GET",
+      exportUrl(`source=validation&id=${id}&sections=01,02,04,08,10&includeEmpty=true`),
+      { as: who.ana },
+    );
+    expect(header(everySection.body.markdown)).toBe("scope: all");
+    const one = await call(
+      t.app,
+      "GET",
+      exportUrl(`source=validation&id=${id}&sections=01&includeEmpty=true`),
+      { as: who.ana },
+    );
+    expect(header(one.body.markdown)).toBe("scope: 01");
+    const self = await call(t.app, "GET", exportUrl("source=self_analysis&includeEmpty=true"), {
+      as: who.ana,
+    });
+    expect(header(self.body.markdown)).toBe("scope: all");
+  });
+
+  test("file names carry the kind once", async () => {
+    const self = await call(t.app, "GET", exportUrl("source=self_analysis&sections=WHY"), {
+      as: who.ana,
+    });
+    expect(self.body.fileBaseName).toMatch(/^moonx-export-self-analysis-\d{4}-\d{2}-\d{2}$/);
+    const plan = await call(
+      t.app,
+      "GET",
+      exportUrl(`source=business_plan&id=${planA}&includeEmpty=true`),
+      { as: who.kenji },
+    );
+    expect(plan.body.fileBaseName).toMatch(/^moonx-export-business-plan-piaya-/);
+  });
+
   test("empty answers can be left out, an empty scope and bad queries are refused", async () => {
     const some = await call(t.app, "GET", exportUrl("source=self_analysis&sections=WHY"), {
       as: who.grace,

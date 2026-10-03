@@ -337,10 +337,15 @@ export function exportForAi(
       : target.kind === "validation"
         ? { ideaName: target.name, sections: sectionKeys }
         : { sections: sectionKeys };
+  // "all" means every section that can hold an exportable question, not every section of the
+  // template: sections of tables or numbers only never appear in an export.
+  const wholeKeys = new Set(
+    questionsInScope(target, { source: query.source }).map((q) => q.sectionKey),
+  );
   const scopeLabel =
     target.kind === "business_plan" && query.part && !query.items
       ? `part:${query.part}`
-      : sectionKeys.length === target.sections.length
+      : sectionKeys.length === wholeKeys.size
         ? "all"
         : sectionKeys.join(",");
   const reference =
@@ -366,6 +371,6 @@ export function exportForAi(
   return {
     ...built,
     allEmpty: scoped.every(({ question }) => !answered(target.answers.get(question.key))),
-    fileBaseName: exportFileBaseName(target.kind, subjectName ?? target.name, exportedAt),
+    fileBaseName: exportFileBaseName(target.kind, subjectName, exportedAt),
   };
 }

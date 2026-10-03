@@ -969,7 +969,16 @@ describe("rate limits on the auth endpoints", () => {
         body: { email: "ana@bcdx.example", password: "wrong password!" },
       });
     for (let i = 0; i < 10; i++) expect((await attempt("198.51.100.1")).status).toBe(401);
-    expect((await attempt("198.51.100.1")).status).toBe(429);
+    const limited = await app.handle(
+      new Request("http://localhost/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "content-type": "application/json", "cf-connecting-ip": "198.51.100.1" },
+        body: JSON.stringify({ email: "ana@bcdx.example", password: "wrong password!" }),
+      }),
+    );
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toEqual({ code: "RATE_LIMITED", message: expect.any(String) });
+    expect(Number(limited.headers.get("x-retry-after"))).toBeGreaterThan(0);
     expect((await attempt("198.51.100.2")).status).toBe(401);
     const rows = await t.db.select().from(schema.rateLimits);
     expect(rows.some((r) => r.key.includes("198.51.100.1"))).toBe(true);
@@ -1345,6 +1354,10 @@ describe("body size limits", () => {
       }),
     );
     expect(declared.status).toBe(413);
+    expect(await declared.json()).toEqual({
+      code: "PAYLOAD_TOO_LARGE",
+      message: expect.any(String),
+    });
     const stream = new ReadableStream({
       start(controller) {
         controller.enqueue(new TextEncoder().encode(big));
@@ -1360,6 +1373,10 @@ describe("body size limits", () => {
       }),
     );
     expect(chunked.status).toBe(413);
+    expect(await chunked.json()).toEqual({
+      code: "PAYLOAD_TOO_LARGE",
+      message: expect.any(String),
+    });
   });
 
   test("a photo upload that declares more than the body limit is refused before it is read", async () => {

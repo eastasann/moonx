@@ -5,7 +5,7 @@ import type {
   TemplateMigrationPreview,
   TemplateRef,
 } from "@moonx/schemas";
-import { eq, max } from "drizzle-orm";
+import { and, asc, eq, inArray, max } from "drizzle-orm";
 import { ApiError, validationFailed } from "../errors";
 import { costItemSnapshot } from "../history/snapshots";
 import { withHistory } from "../history/with-history";
@@ -84,21 +84,59 @@ async function questionsOf(db: Executor, versionId: string) {
   );
 }
 
+/**
+ * The template keys of the validation's cost rows that count as existing: live rows, and rows the
+ * user deleted (a deleted row stays gone even when a new version carries its key). A row whose
+ * latest history entry is a revert was removed by taking a migration back, so it does not count
+ * and the next migration adds it again.
+ */
+async function existingCostKeys(db: Executor, validationId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({
+      id: schema.costItems.id,
+      key: schema.costItems.templateKey,
+      deletedAt: schema.costItems.deletedAt,
+    })
+    .from(schema.costItems)
+    .where(eq(schema.costItems.validationId, validationId));
+  const deleted = rows.filter((r) => r.deletedAt != null);
+  const latest = new Map<string, string>();
+  if (deleted.length > 0) {
+    const entries = await db
+      .select({
+        targetId: schema.changeHistory.targetId,
+        source: schema.changeHistory.source,
+      })
+      .from(schema.changeHistory)
+      .where(
+        and(
+          eq(schema.changeHistory.targetType, "cost_item"),
+          inArray(
+            schema.changeHistory.targetId,
+            deleted.map((r) => r.id),
+          ),
+        ),
+      )
+      .orderBy(asc(schema.changeHistory.changedAt), asc(schema.changeHistory.id));
+    for (const e of entries) latest.set(e.targetId, e.source);
+  }
+  const keys = new Set<string>();
+  for (const r of rows) {
+    if (r.key != null && (r.deletedAt == null || latest.get(r.id) !== "revert")) keys.add(r.key);
+  }
+  return keys;
+}
+
 /** Template cost rows of the target version that the validation does not have yet, in order. */
 async function missingCostDefaults(db: Executor, validationId: string, toVersionId: string) {
-  const [defaults, existing] = await Promise.all([
+  const [defaults, have] = await Promise.all([
     db
       .select()
       .from(schema.templateCostDefaults)
       .where(eq(schema.templateCostDefaults.templateVersionId, toVersionId))
       .orderBy(schema.templateCostDefaults.sortOrder),
-    // Deleted rows count: a row someone removed does not come back with a migration.
-    db
-      .select({ key: schema.costItems.templateKey })
-      .from(schema.costItems)
-      .where(eq(schema.costItems.validationId, validationId)),
+    existingCostKeys(db, validationId),
   ]);
-  const have = new Set(existing.map((r) => r.key));
   return defaults.filter((d) => !have.has(d.key));
 }
 

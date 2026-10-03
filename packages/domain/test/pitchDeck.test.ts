@@ -345,6 +345,20 @@ describe("source materials (design-spec 6.14)", () => {
     ]);
   });
 
+  test("economics shows a typed sales volume as entered, not rounded to one decimal", () => {
+    const inputs = { ...piayaInputs, unitsConservative: 6.25, unitsCapacity: 12.5 };
+    const typed = computeEconomics(piayaRows, inputs);
+    const deck = buildPitchDeck(
+      base({
+        keyMetrics: buildKeyMetrics(typed, inputs, piayaRows),
+        scenarios: typed.scenarios,
+      }),
+    );
+    const row = slide(deck, "economics").table?.rows[0];
+    expect(row?.[0]).toBe("Units per day");
+    expect(row?.[1]).toBe("6.25");
+  });
+
   test("economics reads the text sub-items of §20 under the scenario table", () => {
     const s = slide(buildPitchDeck(base()), "economics");
     expect(s.bullets?.map((b) => b.text.split(":")[0])).toEqual([
@@ -468,6 +482,23 @@ describe("next actions, milestones and risks", () => {
     );
     const texts = slide(deck, "next_step").bullets?.map((b) => b.text);
     expect(texts?.slice(0, 2)).toEqual([`A · due ${formatDate("2026-10-05")}`, "B"]);
+  });
+
+  test("the five-minute Ask skips done next actions too", () => {
+    const deck = buildPitchDeck(
+      base({
+        variant: "five",
+        execution: [
+          item({ title: "Done", dueDate: "2026-10-01", status: "done" }),
+          item({ title: "Open", dueDate: "2026-10-05", status: "doing" }),
+        ],
+      }),
+    );
+    const text = (slide(deck, "ask").bullets ?? [])
+      .map((b) => `${b.label ?? ""} ${b.text}`)
+      .join("\n");
+    expect(text).toContain("Open");
+    expect(text).not.toContain("Done");
   });
 
   test("risks: top 3 by impact then probability", () => {

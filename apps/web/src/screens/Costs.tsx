@@ -188,11 +188,7 @@ function CostsWorksheet({
 
   const add = useMutation({
     mutationFn: (category: CostCategory) =>
-      call(
-        api()
-          .api.v1.validations({ validationId })
-          ["cost-items"].post({ category, name: t("costs:newRowName") }),
-      ),
+      call(api().api.v1.validations({ validationId })["cost-items"].post({ category, name: "" })),
     onSuccess: (created) => {
       queryClient.setQueryData<CostsData>(queryKey, (old) =>
         old ? { ...old, items: [...old.items, created] } : old,
@@ -221,7 +217,7 @@ function CostsWorksheet({
       );
       setDrafts(({ [item.id]: _gone, ...rest }) => rest);
       toasts.add({
-        title: t("costs:deleted", { name: item.name }),
+        title: t("costs:deleted", { name: item.name.trim() || t("costs:unnamed") }),
         variant: "informative",
       });
     },

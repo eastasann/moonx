@@ -65,20 +65,40 @@ export function formatInputNumber(value: number): string {
   return typographicMinus(numberFormat({ maximumFractionDigits: 6 }).format(value));
 }
 
-/** Months to one decimal place. The unit word comes from the catalog (`format.months`). */
+/**
+ * Months to one decimal place, always shown (9.0). Only counts drop the trailing ".0"
+ * (design-spec 6.4). The unit word comes from the catalog (`format.months`).
+ */
 export function formatMonths(value: number, options: Formatted = {}): string {
-  return formatUnits(value, options);
+  const text = numberFormat({
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    signDisplay: "negative",
+  }).format(value);
+  return withBound(typographicMinus(text), options.bound);
 }
 
-/** A 0-1 rate as a percentage with one decimal place. */
+/** A calculated 0-1 rate (margin, ROI) as a percentage with one decimal place, always shown (50.0%). */
 export function formatPercent(rate: number, options: Formatted = {}): string {
   const text = numberFormat({
     style: "percent",
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 1,
     maximumFractionDigits: 1,
     signDisplay: "negative",
   }).format(rate);
   return withBound(typographicMinus(text), options.bound);
+}
+
+/** A 0-1 rate as a person entered it (15%, 12.5%): the number field's precision, no forced decimal. */
+export function formatInputPercent(rate: number): string {
+  return typographicMinus(
+    numberFormat({
+      style: "percent",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      signDisplay: "negative",
+    }).format(rate),
+  );
 }
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;

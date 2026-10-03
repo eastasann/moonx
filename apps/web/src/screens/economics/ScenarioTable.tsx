@@ -28,15 +28,20 @@ const ROW_LABEL_KEYS = {
 /** The rows of the scenario table: what each column shows, and how. */
 const ROWS: {
   id: keyof typeof ROW_LABEL_KEYS;
-  kind: MetricKind;
+  kind: (column: ScenarioColumn) => MetricKind;
   of: (column: ScenarioColumn) => MetricValue;
 }[] = [
-  { id: "unitsPerDay", kind: "units", of: (c) => c.unitsPerDay },
-  { id: "unitsPerMonth", kind: "units", of: (c) => c.unitsPerMonth },
-  { id: "revenue", kind: "money", of: (c) => c.revenue },
-  { id: "variableCostTotal", kind: "money", of: (c) => c.variableCostTotal },
-  { id: "operatingProfit", kind: "money", of: (c) => c.operatingProfit },
-  { id: "operatingMargin", kind: "percent", of: (c) => c.operatingMargin },
+  // The typed volumes show as typed; only the break-even column is calculated.
+  {
+    id: "unitsPerDay",
+    kind: (c) => (c.key === "break_even" ? "units" : "input"),
+    of: (c) => c.unitsPerDay,
+  },
+  { id: "unitsPerMonth", kind: () => "units", of: (c) => c.unitsPerMonth },
+  { id: "revenue", kind: () => "money", of: (c) => c.revenue },
+  { id: "variableCostTotal", kind: () => "money", of: (c) => c.variableCostTotal },
+  { id: "operatingProfit", kind: () => "money", of: (c) => c.operatingProfit },
+  { id: "operatingMargin", kind: () => "percent", of: (c) => c.operatingMargin },
 ];
 
 /** A scenario that has no value reads "Empty" when its units are empty, and a dash for any other gap. */
@@ -80,7 +85,7 @@ export function ScenarioTable({ result, currency }: { result: EconomicsResult; c
                     <Text as="span" tone="secondary">
                       {t(ROW_LABEL_KEYS[row.id])}
                     </Text>
-                    <Text as="span">{cellText(t, row.of(column), row.kind, currency)}</Text>
+                    <Text as="span">{cellText(t, row.of(column), row.kind(column), currency)}</Text>
                   </Flex>
                 </RowListItem>
               ))}
@@ -105,7 +110,10 @@ export function ScenarioTable({ result, currency }: { result: EconomicsResult; c
     cells: {
       metric: t(ROW_LABEL_KEYS[row.id]),
       ...Object.fromEntries(
-        scenarios.map((column) => [column.key, cellText(t, row.of(column), row.kind, currency)]),
+        scenarios.map((column) => [
+          column.key,
+          cellText(t, row.of(column), row.kind(column), currency),
+        ]),
       ),
     },
   }));

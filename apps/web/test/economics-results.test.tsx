@@ -46,3 +46,26 @@ test("the empty target margin says the default 15% is used", async () => {
   expect(screen.getAllByText("using default 15%").length).toBeGreaterThan(0);
   expect(screen.getByText("9.8 / day")).toBeInTheDocument();
 });
+
+test("typed daily volumes show as typed, Capacity included; only break-even is rounded", async () => {
+  costsApi(
+    {},
+    {
+      inputs: {
+        selling_price: 450,
+        operating_days: 26,
+        units_conservative: 6.25,
+        units_expected: 10,
+        units_strong: 12.125,
+        units_capacity: 25.5,
+      },
+    },
+  );
+  await renderApp(ECONOMICS_PATH());
+  await screen.findByText("Unit economics");
+  const perDay = within(row("Units / day"));
+  expect(perDay.getByText("6.25")).toBeInTheDocument();
+  expect(perDay.getByText("12.125")).toBeInTheDocument();
+  expect(perDay.getByText("25.5")).toBeInTheDocument();
+  expect(perDay.getByText("6.9")).toBeInTheDocument();
+});

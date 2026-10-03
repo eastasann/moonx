@@ -1,8 +1,8 @@
 import { DEFAULT_OPERATING_DAYS, DEFAULT_TARGET_MARGIN } from "@moonx/domain";
 import {
   formatInputNumber,
+  formatInputPercent,
   formatMoney,
-  formatPercent,
   formatUnits,
   moneyInputFormat,
   PERCENT_INPUT_FORMAT,
@@ -71,7 +71,7 @@ function displayValue(kind: FieldKind, value: number, currency: string): string 
     case "money":
       return formatMoney(value, currency);
     case "percent":
-      return formatPercent(value);
+      return formatInputPercent(value);
     case "days":
       return formatUnits(value);
     case "units":
@@ -251,14 +251,14 @@ export function EconomicsInputCard({
       ? t("validation:economics.defaultOperatingDays", { count: DEFAULT_OPERATING_DAYS })
       : field === "target_margin"
         ? t("validation:economics.defaultTargetMargin", {
-            value: formatPercent(DEFAULT_TARGET_MARGIN),
+            value: formatInputPercent(DEFAULT_TARGET_MARGIN),
           })
         : null;
   const placeholder =
     field === "operating_days"
       ? formatUnits(DEFAULT_OPERATING_DAYS)
       : field === "target_margin"
-        ? formatPercent(DEFAULT_TARGET_MARGIN)
+        ? formatInputPercent(DEFAULT_TARGET_MARGIN)
         : classification.state === "unknown"
           ? t("validation:fau.state.unknown")
           : t("economics:empty");

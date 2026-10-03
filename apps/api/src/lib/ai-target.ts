@@ -7,6 +7,7 @@ import { loadPlanBundle, type PlanBundle } from "./plan-context";
 import { buildPlanAnswers } from "./plan-write";
 import { buildSelfAnalysisAnswers, ensureSelfAnalysis } from "./self-analysis";
 import {
+  loadQuestionsFromOtherVersions,
   loadTemplateSections,
   loadTemplateVersionInfo,
   type TemplateQuestionRow,
@@ -49,6 +50,12 @@ export interface AiTarget {
   currency: string | null;
   sections: { section: TemplateSection; rows: TemplateQuestionRow[] }[];
   answers: Map<string, TargetAnswer>;
+  /**
+   * Answers the pinned version no longer asks for (a template migration hid them): the question
+   * as the version that had it defined it, and what is stored. X2 lists them as hidden and X3
+   * refuses them; exports skip them.
+   */
+  migrationHidden: { question: TemplateQuestionRow; answer: TargetAnswer }[];
   /** The validation behind a validation or plan target: what the reference and the F/A/U rules read. */
   validation: { data: ValidationData; state: ValidationState } | null;
   plan: PlanBundle | null;
@@ -62,6 +69,31 @@ export const IMPORTABLE_TYPES = new Set([
   "amount_with_reason",
 ]);
 
+/** The importable questions that have a stored answer but are not in the pinned version. */
+async function loadMigrationHidden(
+  db: Executor,
+  versionId: string,
+  currentKeys: Set<string>,
+  storedKeys: string[],
+  build: (questions: TemplateQuestionRow[]) => Promise<TargetAnswer[]>,
+): Promise<AiTarget["migrationHidden"]> {
+  const gone = [...new Set(storedKeys)].filter((key) => !currentKeys.has(key));
+  const questions = (await loadQuestionsFromOtherVersions(db, versionId, gone)).filter((q) =>
+    IMPORTABLE_TYPES.has(q.answerType),
+  );
+  if (questions.length === 0) return [];
+  const answers = await build(questions);
+  // `build` answers in the order of the questions it is given; a mismatch would pair answers with
+  // the wrong questions.
+  if (answers.length !== questions.length) {
+    throw new Error("Answer builder returned a different number of answers than questions");
+  }
+  return questions.map((question, i) => ({
+    question,
+    answer: { ...(answers[i] as TargetAnswer), hidden: true },
+  }));
+}
+
 /** Loads the target of the caller's own self analysis. */
 export async function loadSelfAnalysisTarget(db: Executor, userId: string): Promise<AiTarget> {
   const analysis = await ensureSelfAnalysis(db, userId);
@@ -69,6 +101,33 @@ export async function loadSelfAnalysisTarget(db: Executor, userId: string): Prom
   const keys = sections.flatMap(({ rows }) => rows.map((q) => q.key));
   const answers = await buildSelfAnalysisAnswers(db, analysis, keys);
   const version = await loadTemplateVersionInfo(db, analysis.templateVersionId);
+  const toTarget = (a: Awaited<ReturnType<typeof buildSelfAnalysisAnswers>>[number]) => ({
+    lockVersion: a.lockVersion,
+    updatedAt: a.updatedAt,
+    updatedBy: a.updatedBy,
+    text: a.text,
+    amount: a.amount,
+    classification: null,
+    hidden: false,
+  });
+  const stored = await db
+    .select({ key: schema.selfAnalysisAnswers.questionKey })
+    .from(schema.selfAnalysisAnswers)
+    .where(eq(schema.selfAnalysisAnswers.selfAnalysisId, analysis.id));
+  const migrationHidden = await loadMigrationHidden(
+    db,
+    analysis.templateVersionId,
+    new Set(keys),
+    stored.map((r) => r.key),
+    async (questions) =>
+      (
+        await buildSelfAnalysisAnswers(
+          db,
+          analysis,
+          questions.map((q) => q.key),
+        )
+      ).map(toTarget),
+  );
   return {
     kind: "self_analysis",
     id: analysis.id,
@@ -81,20 +140,8 @@ export async function loadSelfAnalysisTarget(db: Executor, userId: string): Prom
     aiPrompt: version.aiPrompt,
     currency: analysis.currency,
     sections,
-    answers: new Map(
-      answers.map((a) => [
-        a.questionKey,
-        {
-          lockVersion: a.lockVersion,
-          updatedAt: a.updatedAt,
-          updatedBy: a.updatedBy,
-          text: a.text,
-          amount: a.amount,
-          classification: null,
-          hidden: false,
-        },
-      ]),
-    ),
+    answers: new Map(answers.map((a) => [a.questionKey, toTarget(a)])),
+    migrationHidden,
     validation: null,
     plan: null,
   };
@@ -122,6 +169,23 @@ export async function loadValidationTarget(
   const sections = await loadTemplateSections(db, data.templateVersionId);
   const answers = await buildValidationAnswers(db, workspaceId, data, data.questions);
   const version = await loadTemplateVersionInfo(db, data.templateVersionId);
+  const toTarget = (a: Awaited<ReturnType<typeof buildValidationAnswers>>[number]) => ({
+    lockVersion: a.lockVersion,
+    updatedAt: a.updatedAt,
+    updatedBy: a.updatedBy,
+    text: a.text,
+    amount: null,
+    classification: a.classification,
+    hidden: a.hidden,
+  });
+  const migrationHidden = await loadMigrationHidden(
+    db,
+    data.templateVersionId,
+    new Set(data.questions.map((q) => q.key)),
+    data.answers.map((a) => a.questionKey),
+    async (questions) =>
+      (await buildValidationAnswers(db, workspaceId, data, questions)).map(toTarget),
+  );
   return {
     kind: "validation",
     id: validationId,
@@ -134,20 +198,8 @@ export async function loadValidationTarget(
     aiPrompt: version.aiPrompt,
     currency: idea?.currency ?? null,
     sections,
-    answers: new Map(
-      answers.map((a) => [
-        a.questionKey,
-        {
-          lockVersion: a.lockVersion,
-          updatedAt: a.updatedAt,
-          updatedBy: a.updatedBy,
-          text: a.text,
-          amount: null,
-          classification: a.classification,
-          hidden: a.hidden,
-        },
-      ]),
-    ),
+    answers: new Map(answers.map((a) => [a.questionKey, toTarget(a)])),
+    migrationHidden,
     validation: {
       data,
       state: computeValidationState(data, { workspaceId, ideaId: idea?.ideaId as string }),
@@ -162,6 +214,31 @@ export async function loadPlanTarget(db: Executor, planId: string): Promise<AiTa
   const keys = bundle.sections.flatMap(({ rows }) => rows.map((q) => q.key));
   const answers = await buildPlanAnswers(db, bundle.workspaceId, planId, bundle.answers, keys);
   const version = await loadTemplateVersionInfo(db, bundle.plan.templateVersionId);
+  const toTarget = (a: Awaited<ReturnType<typeof buildPlanAnswers>>[number]) => ({
+    lockVersion: a.lockVersion,
+    updatedAt: a.updatedAt,
+    updatedBy: a.updatedBy,
+    text: a.text,
+    amount: null,
+    classification: null,
+    hidden: false,
+  });
+  const migrationHidden = await loadMigrationHidden(
+    db,
+    bundle.plan.templateVersionId,
+    new Set(keys),
+    bundle.answers.map((a) => a.questionKey),
+    async (questions) =>
+      (
+        await buildPlanAnswers(
+          db,
+          bundle.workspaceId,
+          planId,
+          bundle.answers,
+          questions.map((q) => q.key),
+        )
+      ).map(toTarget),
+  );
   return {
     kind: "business_plan",
     id: planId,
@@ -174,20 +251,8 @@ export async function loadPlanTarget(db: Executor, planId: string): Promise<AiTa
     aiPrompt: version.aiPrompt,
     currency: bundle.workspace.currency,
     sections: bundle.sections,
-    answers: new Map(
-      answers.map((a) => [
-        a.questionKey,
-        {
-          lockVersion: a.lockVersion,
-          updatedAt: a.updatedAt,
-          updatedBy: a.updatedBy,
-          text: a.text,
-          amount: null,
-          classification: null,
-          hidden: false,
-        },
-      ]),
-    ),
+    answers: new Map(answers.map((a) => [a.questionKey, toTarget(a)])),
+    migrationHidden,
     validation: bundle.validation,
     plan: bundle,
   };

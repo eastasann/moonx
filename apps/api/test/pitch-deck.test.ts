@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { schema } from "@moonx/db";
 import { planId, userId } from "@moonx/db/seed";
+import { formatDate } from "@moonx/i18n";
 import { eq } from "drizzle-orm";
 import { extractText, getDocumentProxy } from "unpdf";
 import { call, login, startTestApp, type TestApp } from "./helpers";
@@ -175,6 +176,9 @@ describe("P13 PDF", () => {
     const { pages, text } = await readPdf(bytes);
     expect(pages).toBe(12);
     expect(text.join("\n")).toContain("v1 For advisors");
+    const footerDate = versions[0].savedAt.slice(0, 10) as string;
+    expect(text[0]).toContain(formatDate(footerDate));
+    expect(text[0]).not.toContain(footerDate);
   });
 
   test("a Japanese answer is embedded with the fallback font", async () => {

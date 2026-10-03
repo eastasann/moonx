@@ -185,3 +185,36 @@ describe("V1 validation home", () => {
     ).toBe(422);
   });
 });
+
+describe("06-08 progress counts Unknown of the defaulted inputs as unanswered", () => {
+  test("operating days and target margin count only with a value; the others count with Unknown", async () => {
+    const { id } = await computed("piaya");
+    await t.db.delete(schema.economicsInputs).where(eq(schema.economicsInputs.validationId, id));
+    const put = (field: string, body: Record<string, unknown>, lockVersion = 0) =>
+      call(t.app, "PUT", `/api/v1/validations/${id}/economics/${field}`, {
+        as: ana,
+        body: { ...body, lockVersion },
+      });
+    const progress = async () => {
+      const res = await call(t.app, "GET", path("piaya"), { as: ana });
+      return res.body.sections.find((s: { key: string }) => s.key === "06-08");
+    };
+    expect(await progress()).toMatchObject({ answered: 0, total: 7 });
+
+    for (const field of ["operating_days", "target_margin", "units_expected"]) {
+      expect((await put(field, { value: null, classification: { fau: "unknown" } })).status).toBe(
+        200,
+      );
+    }
+    // Only units_expected counts; the other two stay on their defaults.
+    const unknown = await progress();
+    expect(unknown).toMatchObject({ answered: 1, total: 7 });
+    expect(unknown.fau.unknown).toBe(3);
+
+    const days = await put("operating_days", { value: 26 }, 1);
+    expect(days.status).toBe(200);
+    expect(await progress()).toMatchObject({ answered: 2, total: 7 });
+    expect((await put("selling_price", { value: 100 })).status).toBe(200);
+    expect(await progress()).toMatchObject({ answered: 3, total: 7 });
+  });
+});

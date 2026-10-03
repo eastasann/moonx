@@ -1,5 +1,5 @@
 import { DEFAULT_OPERATING_DAYS, DEFAULT_TARGET_MARGIN } from "@moonx/domain";
-import { formatPercent } from "@moonx/i18n";
+import { formatInputPercent } from "@moonx/i18n";
 import type { EconomicsResult, EconomicsWarning, MetricValue } from "@moonx/schemas";
 import { Grid, Heading, InlineAlert, MetricTile, Stack, Text } from "@moonx/ui-web";
 import type { TFunction } from "i18next";
@@ -89,7 +89,7 @@ export function EconomicsResults({
       : null,
     result.defaultsUsed.targetMargin
       ? t("validation:economics.defaultTargetMargin", {
-          value: formatPercent(DEFAULT_TARGET_MARGIN),
+          value: formatInputPercent(DEFAULT_TARGET_MARGIN),
         })
       : null,
   ].filter((note): note is string => note !== null);
@@ -133,7 +133,7 @@ export function EconomicsResults({
           }
         />
         <MetricTile
-          label={t("economics:results.targetMargin", { rate: formatPercent(targetMargin) })}
+          label={t("economics:results.targetMargin", { rate: formatInputPercent(targetMargin) })}
           value={target.value}
           note={target.note ?? (targetMonth === null ? null : perMonth(targetMonth))}
         />

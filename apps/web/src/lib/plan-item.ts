@@ -1,5 +1,5 @@
 import { formatKeyMetric } from "@moonx/domain";
-import { formatInputNumber, formatMoney, formatPercent } from "@moonx/i18n";
+import { formatInputNumber, formatInputPercent, formatMoney } from "@moonx/i18n";
 import type {
   DecisionValue,
   GoNoGoValue,
@@ -163,7 +163,7 @@ export function cellText(
   if (typeof value === "string") return value;
   switch (column.type) {
     case "percent":
-      return formatPercent(value);
+      return formatInputPercent(value);
     case "money":
       return formatMoney(value, currency);
     default:
@@ -175,16 +175,22 @@ export function cellText(
 export const blankRow = (columns: readonly TableColumn[]): PlanRow =>
   Object.fromEntries(columns.map((column) => [column.key, null]));
 
-/** The rows as P5 takes them: a blank text cell is null, and only the table's columns remain. */
+/**
+ * The rows as P5 takes them: a blank text cell is null, the table's columns come first, and a key
+ * the stored row holds beyond them stays. That is a column a template migration removed, whose
+ * value is kept hidden (design-spec 6.0.7) and must survive the next save.
+ */
 export function rowsBody(columns: readonly TableColumn[], rows: readonly PlanRow[]): PlanRow[] {
-  return rows.map((row) =>
-    Object.fromEntries(
-      columns.map((column) => {
-        const value = row[column.key] ?? null;
-        return [column.key, typeof value === "string" && value.trim() === "" ? null : value];
+  return rows.map((row) => {
+    const keys = new Set(columns.map((column) => column.key));
+    for (const key of Object.keys(row)) keys.add(key);
+    return Object.fromEntries(
+      [...keys].map((key) => {
+        const value = row[key] ?? null;
+        return [key, typeof value === "string" && value.trim() === "" ? null : value];
       }),
-    ),
-  );
+    );
+  });
 }
 
 /** Whether two sets of rows say the same thing once blanks are dropped. */

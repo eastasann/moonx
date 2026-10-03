@@ -78,6 +78,8 @@ function copySource(
     }));
     return rows.length > 0 ? { rows } : null;
   }
+  // An answer to a question the validation's pinned version dropped stays stored but is hidden.
+  if (!data.questions.some((q) => q.key === source)) return null;
   const text = data.answers.find((a) => a.questionKey === source)?.text;
   return hasText(text) ? { text: text as string } : null;
 }

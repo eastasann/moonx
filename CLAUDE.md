@@ -53,7 +53,8 @@
 - `make db-up` / `make db-down`: ローカルの PostgreSQL の起動・停止
 - `make db-generate`: スキーマからマイグレーションを作る
 - `make db-migrate`: マイグレーションを当てる
-- `make db-seed` / `make db-reset`: デモデータを入れる / DB を作り直す
+- `make db-seed`: デモデータを入れる（全テーブルを空にするので手元のデータが消える。`APP_ENV=local` だけ）
+- `make db-reset`: DB を作り直す
 - `make db-studio`: Drizzle Studio
 - `make tokens`: `docs/06_design-tokens.json` から `packages/ui-tokens` を生成する
 - `make openapi`: OpenAPI を `apps/api/openapi.json` に書き出す

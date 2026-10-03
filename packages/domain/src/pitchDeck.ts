@@ -2,6 +2,7 @@ import {
   type Bound,
   createI18n,
   formatDate,
+  formatInputNumber,
   formatMoney,
   formatMonths,
   formatPercent,
@@ -819,7 +820,7 @@ export function buildPitchDeck(input: PitchDeckInput): PitchDeck {
             t("plan:pitch.row.unitsPerDay"),
             ...cells(
               (s) => s.unitsPerDay,
-              (v, b) => formatUnits(v, { bound: b }),
+              (v) => formatInputNumber(v),
             ),
           ],
           [

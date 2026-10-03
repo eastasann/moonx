@@ -283,6 +283,26 @@ describe("V13 POST cost-items", () => {
     expect(rows[0]?.after).toMatchObject({ category: "variable", name: "Sticker", amount: null });
   });
 
+  test("Add row creates a row with an empty name, and the name can stay empty or be set later", async () => {
+    for (const name of ["", "   "]) {
+      const res = await call(t.app, "POST", `${base(piaya)}/cost-items`, {
+        as: kenji,
+        body: { category: "monthly_fixed", name },
+      });
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({
+        name: "",
+        amount: null,
+        classification: { state: "empty" },
+      });
+      const named = await patchItem(res.body.id, { lockVersion: 0, name: "Parking" }, kenji);
+      expect(named.body.name).toBe("Parking");
+      const cleared = await patchItem(res.body.id, { lockVersion: 1, name: "" }, kenji);
+      expect(cleared.status).toBe(200);
+      expect(cleared.body.name).toBe("");
+    }
+  });
+
   test("validation, roles and archive", async () => {
     const send = (body: unknown, as = ana) =>
       call(t.app, "POST", `${base(piaya)}/cost-items`, { as, body });
@@ -291,7 +311,6 @@ describe("V13 POST cost-items", () => {
       { category: "initial" },
       { name: "A" },
       { category: "other", name: "A" },
-      { category: "initial", name: "" },
       { category: "initial", name: "x".repeat(201) },
     ]) {
       expect(code(await send(body))).toEqual([422, "VALIDATION_FAILED"]);
@@ -523,7 +542,7 @@ describe("V14 PATCH cost-items", () => {
   test("validation, roles, archive, missing row", async () => {
     const row = await addItem("initial", "Perm");
     expect(code(await patchItem(row.id, { amount: 1 }))).toEqual([422, "VALIDATION_FAILED"]);
-    expect(code(await patchItem(row.id, { lockVersion: 0, name: "" }))).toEqual([
+    expect(code(await patchItem(row.id, { lockVersion: 0, name: "x".repeat(201) }))).toEqual([
       422,
       "VALIDATION_FAILED",
     ]);

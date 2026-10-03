@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   formatDate,
   formatInputNumber,
+  formatInputPercent,
   formatIsoDate,
   formatMoney,
   formatMonths,
@@ -64,12 +65,17 @@ describe("formatPercent and formatMonths", () => {
   test("percent to one decimal", () => {
     expect(formatPercent(0.514)).toBe("51.4%");
     expect(formatPercent(1.3091)).toBe("130.9%");
-    expect(formatPercent(0.15)).toBe("15%");
+    expect(formatPercent(0.15)).toBe("15.0%");
+    expect(formatPercent(0.5)).toBe("50.0%");
+    expect(formatInputPercent(0.15)).toBe("15%");
+    expect(formatInputPercent(0.125)).toBe("12.5%");
     expect(formatPercent(1.3091, { bound: "upper" })).toBe("≤ 130.9%");
     expect(formatPercent(-0.025)).toBe("−2.5%");
   });
   test("months to one decimal with bounds", () => {
     expect(formatMonths(9.167)).toBe("9.2");
+    expect(formatMonths(9)).toBe("9.0");
+    expect(formatMonths(9, { bound: "lower" })).toBe("9.0+");
     expect(formatMonths(9.167, { bound: "lower" })).toBe("9.2+");
   });
 });

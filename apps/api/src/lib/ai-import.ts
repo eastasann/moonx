@@ -53,6 +53,23 @@ export interface ImportContext {
 
 /** X2: every question of the target with what it holds now, so the import can match and diff. */
 export function buildImportContext(target: AiTarget): ImportContext {
+  const entry = (question: TemplateQuestionRow, answer: TargetAnswer) => ({
+    questionKey: question.key,
+    title: question.title,
+    sectionKey: question.sectionKey,
+    answerType: question.answerType,
+    options: question.options,
+    importable: IMPORTABLE_TYPES.has(question.answerType),
+    hidden: answer.hidden,
+    current: {
+      text: answer.text,
+      amount: answer.amount,
+      classification: answer.classification,
+      lockVersion: answer.lockVersion,
+      updatedAt: answer.updatedAt,
+      updatedBy: answer.updatedBy,
+    },
+  });
   return {
     target: {
       type: target.kind,
@@ -69,28 +86,12 @@ export function buildImportContext(target: AiTarget): ImportContext {
       part: section.part,
       importable: rows.some((q) => IMPORTABLE_TYPES.has(q.answerType)),
     })),
-    questions: target.sections.flatMap(({ rows }) =>
-      rows.map((q) => {
-        const answer = target.answers.get(q.key) as TargetAnswer;
-        return {
-          questionKey: q.key,
-          title: q.title,
-          sectionKey: q.sectionKey,
-          answerType: q.answerType,
-          options: q.options,
-          importable: IMPORTABLE_TYPES.has(q.answerType),
-          hidden: answer.hidden,
-          current: {
-            text: answer.text,
-            amount: answer.amount,
-            classification: answer.classification,
-            lockVersion: answer.lockVersion,
-            updatedAt: answer.updatedAt,
-            updatedBy: answer.updatedBy,
-          },
-        };
-      }),
-    ),
+    questions: [
+      ...target.sections.flatMap(({ rows }) =>
+        rows.map((q) => entry(q, target.answers.get(q.key) as TargetAnswer)),
+      ),
+      ...target.migrationHidden.map(({ question, answer }) => entry(question, answer)),
+    ],
   };
 }
 
@@ -187,6 +188,9 @@ function prepare(target: AiTarget, changes: AiImportApplyBody["changes"]): Prepa
       ]);
     }
     seen.add(change.questionKey);
+    if (target.migrationHidden.some((h) => h.question.key === change.questionKey)) {
+      throw new ApiError("NOT_IMPORTABLE", `${change.questionKey} cannot be imported`);
+    }
     const question = questions.get(change.questionKey);
     if (!question) throw new ApiError("QUESTION_NOT_FOUND", "No such question in this template");
     const answer = target.answers.get(question.key) as TargetAnswer;

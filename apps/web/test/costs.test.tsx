@@ -39,7 +39,7 @@ test("an amount typed with a thousands separator changes the totals at once and 
 
 test("Add row creates the row at the end of its table and focuses its name", async () => {
   const created = costItem(
-    { category: "monthly_fixed", key: "", name: "New row", amount: null, state: "empty" },
+    { category: "monthly_fixed", key: "", name: "", amount: null, state: "empty" },
     99,
   );
   const { calls } = costsApi({
@@ -51,11 +51,11 @@ test("Add row creates the row at the end of its table and focuses its name", asy
   await renderApp(COSTS_PATH());
   await screen.findByRole("heading", { name: "Totals" });
   await userEvent.click(screen.getByRole("button", { name: "Add row to Monthly fixed costs" }));
-  const name = await screen.findByRole("textbox", { name: "Name of New row" });
+  const name = await screen.findByRole("textbox", { name: "Name of this row" });
   await waitFor(() => expect(name).toHaveFocus());
   expect(calls.find((c) => c.method === "POST")?.body).toEqual({
     category: "monthly_fixed",
-    name: "New row",
+    name: "",
   });
 });
 

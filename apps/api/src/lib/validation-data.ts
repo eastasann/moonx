@@ -389,6 +389,9 @@ const ECON_VALUE_KEY: Record<EconomicsField, keyof EconomicsInputValues> = {
   units_capacity: "unitsCapacity",
 };
 
+/** Economics inputs that have a default to calculate with when left empty (design-spec 6.4). */
+const DEFAULTED_FIELDS = new Set<EconomicsField>(["operating_days", "target_margin"]);
+
 /** Screen the question of a section opens (design-spec 6.1 "操作"). */
 export const QUESTION_SCREEN: Record<string, number> = { "04": 15, "08": 18 };
 
@@ -542,7 +545,12 @@ export function computeValidationState(
       case "06-08":
         return {
           key,
-          answered: econFau.filter((i) => i.state !== "empty").length,
+          // The two fields with a default are answered by a value only: Unknown leaves them on the default.
+          answered: ECONOMICS_FIELDS.filter((field, i) =>
+            DEFAULTED_FIELDS.has(field)
+              ? economicsValues[ECON_VALUE_KEY[field]] != null
+              : (econFau[i] as FauItem).state !== "empty",
+          ).length,
           total: econFau.length,
           count: null,
           fau: summarizeFau([...econFau, ...q08]),

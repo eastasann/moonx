@@ -71,9 +71,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new Error("RESEND_API_KEY is required when MAIL_TRANSPORT=resend");
   }
   const proxySecrets = list(env.PROXY_SHARED_SECRET).slice(0, 2);
-  if (!env.BETTER_AUTH_SECRET || env.BETTER_AUTH_SECRET.length < 32) {
+  if (!env.BETTER_AUTH_SECRET || Buffer.byteLength(env.BETTER_AUTH_SECRET) < 32) {
     throw new Error(
-      "BETTER_AUTH_SECRET must be at least 32 characters (generate one: openssl rand -base64 32)",
+      "BETTER_AUTH_SECRET must be at least 32 bytes (generate one: openssl rand -base64 32)",
     );
   }
   if (Boolean(env.GOOGLE_CLIENT_ID) !== Boolean(env.GOOGLE_CLIENT_SECRET)) {

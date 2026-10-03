@@ -1,5 +1,10 @@
 import { percentOfPriceAmount } from "@moonx/domain";
-import { formatMoney, formatPercent, moneyInputFormat, PERCENT_INPUT_FORMAT } from "@moonx/i18n";
+import {
+  formatInputPercent,
+  formatMoney,
+  moneyInputFormat,
+  PERCENT_INPUT_FORMAT,
+} from "@moonx/i18n";
 import type { CostItem } from "@moonx/schemas";
 import {
   Badge,
@@ -108,7 +113,7 @@ function PercentNote({ view }: { view: RowView }) {
   const { draft, price, currency, economicsPath } = view;
   if (draft.percent === null) return null;
   const amount = percentOfPriceAmount(draft.percent, price);
-  const percent = formatPercent(draft.percent);
+  const percent = formatInputPercent(draft.percent);
   if (amount === null) {
     return (
       <Flex gap="space-50" align="center" wrap>

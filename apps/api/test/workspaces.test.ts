@@ -532,6 +532,47 @@ describe("W4 invitations", () => {
     expect(t.mailbox.sent).toHaveLength(0);
   });
 
+  test("simultaneous invitations to one address create one invitation", async () => {
+    const [a, b] = await Promise.all([invite("race@example.com"), invite("RACE@example.com")]);
+    expect([a.status, b.status].sort()).toEqual([201, 409]);
+    const rows = await t.db
+      .select({ id: schema.invitations.id })
+      .from(schema.invitations)
+      .where(eq(schema.invitations.email, "race@example.com"));
+    expect(rows).toHaveLength(1);
+  });
+
+  test("workspace writes are not held up while the invitation mail is on its way", async () => {
+    const send = t.mailbox.send;
+    let release = () => {};
+    let reached = () => {};
+    const inFlight = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    t.mailbox.send = async (message) => {
+      reached();
+      await gate;
+      return send(message);
+    };
+    try {
+      const pending = invite("slow.mail@example.com");
+      await inFlight;
+      const rename = await Promise.race([
+        call(t.app, "PATCH", ws, { as: as.ana, body: { name: "Renamed meanwhile" } }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]);
+      expect(rename?.status).toBe(200);
+      release();
+      expect((await pending).status).toBe(201);
+    } finally {
+      release();
+      t.mailbox.send = send;
+    }
+  });
+
   test("an expired invitation to the same address does not block a new one", async () => {
     const res = await invite("late.joiner@bcdx.example");
     expect(res.status).toBe(201);

@@ -157,7 +157,7 @@ describe("one bucket per IP for the paths that take a secret (SDD 7.2)", () => {
       email: "ana@bcdx.example",
       password: "wrong password!",
     });
-    expect([over.status, over.body.error.code]).toEqual([429, "RATE_LIMITED"]);
+    expect([over.status, over.body.code]).toEqual([429, "RATE_LIMITED"]);
     const other = await post("/api/auth/sign-in/email", "198.51.100.78", {
       email: "ana@bcdx.example",
       password: "wrong password!",

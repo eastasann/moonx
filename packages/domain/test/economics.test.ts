@@ -4,6 +4,7 @@ import {
   type CostRowInput,
   computeEconomics,
   EMPTY_ECONOMICS_INPUTS,
+  formatKeyMetric,
   percentOfPriceAmount,
 } from "../src";
 import { percentRow, piayaInputs, piayaRows, row } from "./fixtures";
@@ -288,6 +289,38 @@ describe("key metrics", () => {
     expect(m.operating_days?.value).toBe(26);
     expect(m["cost_row:monthly.rent"]?.value).toBe(12000);
     expect(m.payback_months?.value).toBeCloseTo(9.167, 3);
+  });
+
+  test("a percent-of-price row is the amount per sale, never the bare rate", () => {
+    const rows = [percentRow("variable.card_fees", 0.03), ...piayaRows];
+    const m = buildKeyMetrics(computeEconomics(rows, piayaInputs), piayaInputs, rows);
+    expect(m["cost_row:variable.card_fees"]?.value).toBeCloseTo(13.5, 10);
+    const noPrice = { ...piayaInputs, sellingPrice: null };
+    const n = buildKeyMetrics(computeEconomics(rows, noPrice), noPrice, rows);
+    expect(n["cost_row:variable.card_fees"]?.reason).toBe("needs_price");
+    const blank = [percentRow("variable.card_fees", null)];
+    const b = buildKeyMetrics(computeEconomics(blank, piayaInputs), piayaInputs, blank);
+    expect(b["cost_row:variable.card_fees"]?.reason).toBe("empty");
+  });
+
+  test("formatted headline metrics: rates and payback keep .0, typed volumes stay as typed", () => {
+    const inputs = { ...piayaInputs, unitsCapacity: 6.25 };
+    const m = buildKeyMetrics(computeEconomics(piayaRows, inputs), inputs, piayaRows);
+    expect(formatKeyMetric("capacity_units_day", m.capacity_units_day, "PHP")).toBe("6.25");
+    expect(
+      formatKeyMetric("payback_months", { value: 9, bound: "exact", reason: null }, "PHP"),
+    ).toBe("9.0");
+    expect(formatKeyMetric("simple_roi", { value: 0.5, bound: "exact", reason: null }, "PHP")).toBe(
+      "50.0%",
+    );
+    expect(
+      formatKeyMetric("break_even_units_day", { value: 13, bound: "exact", reason: null }, "PHP"),
+    ).toBe("13");
+    const rate = percentRow("variable.card_fees", 0.03);
+    const priced = buildKeyMetrics(computeEconomics([rate], piayaInputs), piayaInputs, [rate]);
+    expect(
+      formatKeyMetric("cost_row:variable.card_fees", priced["cost_row:variable.card_fees"], "PHP"),
+    ).toBe("₱14");
   });
 
   test("missing values carry a reason, rows without a key are skipped", () => {

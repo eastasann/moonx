@@ -1,4 +1,4 @@
-import { formatInputNumber, formatPercent } from "@moonx/i18n";
+import { formatInputNumber, formatInputPercent } from "@moonx/i18n";
 import type { CostItem } from "@moonx/schemas";
 import { Button, InlineAlert, Stack, Text } from "@moonx/ui-web";
 import { useQueryClient } from "@tanstack/react-query";
@@ -103,7 +103,7 @@ function describeRow(fields: Record<string, unknown> | undefined): string | null
   const parts = [
     typeof fields.name === "string" ? fields.name : null,
     typeof fields.amount === "number" ? formatInputNumber(fields.amount) : null,
-    typeof fields.percent === "number" ? formatPercent(fields.percent) : null,
+    typeof fields.percent === "number" ? formatInputPercent(fields.percent) : null,
     typeof fields.whyNeeded === "string" ? fields.whyNeeded : null,
     typeof fields.notes === "string" ? fields.notes : null,
   ].filter((part): part is string => part !== null && part !== "");

@@ -74,7 +74,7 @@ async function check<R extends ScopeRef | null>(
 export function accessPlugin(ctx: AppContext) {
   return new Elysia({ name: "moonx-access" })
     .derive({ as: "scoped" }, async ({ request }) => {
-      const user = await currentUser(ctx.db, ctx.auth, request);
+      const user = await currentUser(ctx.db, ctx.auth, request, ctx.now());
       setRequestUser(request, user.id);
       return { user };
     })
@@ -97,7 +97,7 @@ export function accessPlugin(ctx: AppContext) {
 export function operatorPlugin(ctx: AppContext) {
   return new Elysia({ name: "moonx-operator" })
     .derive({ as: "scoped" }, async ({ request }) => {
-      const user = await currentUser(ctx.db, ctx.auth, request);
+      const user = await currentUser(ctx.db, ctx.auth, request, ctx.now());
       setRequestUser(request, user.id);
       if (!user.isAdmin) throw new ApiError("FORBIDDEN", "Operators only");
       return { user };

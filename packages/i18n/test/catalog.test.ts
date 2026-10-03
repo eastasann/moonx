@@ -1,10 +1,25 @@
 import { describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
 import { AUTH_HOOK_ERROR_CODES, ERROR_CODES } from "@moonx/schemas";
-import { createI18n, errorMessageKey, resources } from "../src";
+import { createI18n, errorMessageKey, NAMESPACES, resources } from "../src";
 
 const t = createI18n().t;
 
 describe("catalog", () => {
+  test("the namespaces are the files in locales/en, and SDD chapter 9 lists them all", () => {
+    const files = readdirSync(new URL("../locales/en", import.meta.url))
+      .map((name) => name.replace(/\.json$/, ""))
+      .sort();
+    expect([...NAMESPACES].sort()).toEqual(files);
+    expect(Object.keys(resources.en).sort()).toEqual(files);
+    const doc = readFileSync(
+      new URL("../../../docs/02-01_system-design-doc.md", import.meta.url),
+      "utf8",
+    );
+    const row = doc.split("\n").find((line) => line.startsWith("| カタログ |")) ?? "";
+    for (const name of files) expect(row).toContain(`\`${name}\``);
+  });
+
   test("every API error code and auth hook code has a message", () => {
     const i18n = createI18n();
     for (const code of [...ERROR_CODES, ...AUTH_HOOK_ERROR_CODES]) {

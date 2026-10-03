@@ -1,6 +1,6 @@
 import { schema } from "@moonx/db";
 import type { QuestionOptions, TemplateKind, TemplateRef, TemplateSection } from "@moonx/schemas";
-import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { ApiError } from "../errors";
 import type { Executor } from "./db";
 
@@ -153,4 +153,40 @@ export async function loadTemplateVersionInfo(
     .where(eq(schema.templateVersions.id, versionId));
   if (!row) throw new ApiError("NOT_FOUND", "Resource not found");
   return row;
+}
+
+/**
+ * The questions of the other versions of a template that carry one of `keys`, newest version
+ * first. A question the pinned version no longer has is only known from the versions before it.
+ */
+export async function loadQuestionsFromOtherVersions(
+  db: Executor,
+  versionId: string,
+  keys: string[],
+): Promise<TemplateQuestionRow[]> {
+  if (keys.length === 0) return [];
+  const [pinned] = await db
+    .select({ templateId: schema.templateVersions.templateId })
+    .from(schema.templateVersions)
+    .where(eq(schema.templateVersions.id, versionId));
+  if (!pinned) throw new ApiError("NOT_FOUND", "Resource not found");
+  const others = await db
+    .select({ id: schema.templateVersions.id })
+    .from(schema.templateVersions)
+    .where(
+      and(
+        eq(schema.templateVersions.templateId, pinned.templateId),
+        ne(schema.templateVersions.id, versionId),
+        eq(schema.templateVersions.status, "published"),
+      ),
+    )
+    .orderBy(desc(schema.templateVersions.versionNumber));
+  const wanted = new Set(keys);
+  const found = new Map<string, TemplateQuestionRow>();
+  for (const { id } of others) {
+    for (const { rows } of await loadTemplateSections(db, id)) {
+      for (const q of rows) if (wanted.has(q.key) && !found.has(q.key)) found.set(q.key, q);
+    }
+  }
+  return [...found.values()];
 }

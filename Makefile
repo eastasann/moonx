@@ -151,6 +151,6 @@ mobile-build: require-ENV
 	cd apps/mobile && bunx eas-cli build --profile $(ENV) --platform all --non-interactive --auto-submit
 
 db-backup: require-ENV require-GCP_PROJECT_ID require-DATABASE_URL_DIRECT
-	@PGDATABASE="$(DATABASE_URL_DIRECT)" pg_dump -Fc -f $(BACKUP_DATE).dump
+	@pg_dump -Fc -d "$(DATABASE_URL_DIRECT)" -f $(BACKUP_DATE).dump
 	gcloud storage cp $(BACKUP_DATE).dump gs://$(GCP_PROJECT_ID)-moonx-backups/$(ENV)/$(BACKUP_DATE).dump
 	rm -f $(BACKUP_DATE).dump

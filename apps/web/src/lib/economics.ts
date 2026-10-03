@@ -1,5 +1,11 @@
 import type { EconomicsInputValues } from "@moonx/domain";
-import { formatMoney, formatMonths, formatPercent, formatUnits } from "@moonx/i18n";
+import {
+  formatInputNumber,
+  formatMoney,
+  formatMonths,
+  formatPercent,
+  formatUnits,
+} from "@moonx/i18n";
 import {
   type EconomicsField,
   type EconomicsWarning,
@@ -111,7 +117,7 @@ export const inputProblem = (field: EconomicsField, value: number): FieldProblem
   economicsValueSchemas[field].safeParse(value).success ? null : "range";
 
 /** The number formats of the result pane. */
-export type MetricKind = "money" | "money2" | "units" | "percent" | "months";
+export type MetricKind = "money" | "money2" | "units" | "input" | "percent" | "months";
 
 /** A metric as text with its bound mark, or null when it has no value (the reason is shown instead). */
 export function formatMetric(
@@ -128,6 +134,8 @@ export function formatMetric(
       return formatMoney(metric.value, currency, { ...options, decimals: 2 });
     case "units":
       return formatUnits(metric.value, options);
+    case "input":
+      return formatInputNumber(metric.value);
     case "percent":
       return formatPercent(metric.value, options);
     case "months":

@@ -1,4 +1,4 @@
-import { formatDate, formatMoney, formatPercent } from "@moonx/i18n";
+import { formatDate, formatInputPercent, formatMoney } from "@moonx/i18n";
 import type { DecisionValue, GoNoGoValue, MetricValue, UserRef } from "@moonx/schemas";
 import {
   Badge,
@@ -181,7 +181,7 @@ function ReferenceBody({ reference, currency }: { reference: PlanReference; curr
               </Text>
               <Text variant="body-sm" as="span">
                 {row.inputMode === "percent_of_price" && row.percent !== null
-                  ? formatPercent(row.percent)
+                  ? formatInputPercent(row.percent)
                   : row.amount !== null
                     ? formatMoney(row.amount, currency)
                     : t("planItem:noValue")}

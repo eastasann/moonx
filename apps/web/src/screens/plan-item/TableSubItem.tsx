@@ -1,4 +1,9 @@
-import { formatMoney, formatPercent, moneyInputFormat, PERCENT_INPUT_FORMAT } from "@moonx/i18n";
+import {
+  formatInputPercent,
+  formatMoney,
+  moneyInputFormat,
+  PERCENT_INPUT_FORMAT,
+} from "@moonx/i18n";
 import { MAX_LONG_TEXT } from "@moonx/schemas";
 import {
   ActionButton,
@@ -227,7 +232,7 @@ export function TableSubItem({
           {totals ? (
             <Stack gap="space-50">
               <Text variant="label" as="span">
-                {t("planItem:totals.ownership", { value: formatPercent(totals.ownership) })}
+                {t("planItem:totals.ownership", { value: formatInputPercent(totals.ownership) })}
               </Text>
               <Text variant="label" as="span">
                 {t("planItem:totals.capital", { value: formatMoney(totals.capital, currency) })}

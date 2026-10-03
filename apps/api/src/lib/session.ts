@@ -1,5 +1,5 @@
 import { schema } from "@moonx/db";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, lt, or } from "drizzle-orm";
 import type { Auth } from "../auth";
 import { ApiError } from "../errors";
 import type { Db } from "./db";
@@ -17,12 +17,20 @@ export interface AuthUser {
   sessionCreatedAt: Date;
 }
 
+/** How stale `users.last_active_at` may get before an authenticated request writes it again (SDD 5.13). */
+export const LAST_ACTIVE_WRITE_INTERVAL_MS = 5 * 60 * 1000;
+
 /**
  * The one place that turns a request into the signed-in user: Better Auth resolves the session
  * from the cookie, then the user row is read again so a suspended or deleted user is answered
  * with 401 even while a session row is still around (SDD 7.1).
  */
-export async function currentUser(db: Db, auth: Auth, request: Request): Promise<AuthUser> {
+export async function currentUser(
+  db: Db,
+  auth: Auth,
+  request: Request,
+  now: Date,
+): Promise<AuthUser> {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) throw new ApiError("UNAUTHENTICATED", "Sign in required");
   const [user] = await db
@@ -33,10 +41,24 @@ export async function currentUser(db: Db, auth: Auth, request: Request): Promise
       isAdmin: schema.users.isAdmin,
       timezone: schema.users.timezone,
       status: schema.users.status,
+      lastActiveAt: schema.users.lastActiveAt,
     })
     .from(schema.users)
     .where(eq(schema.users.id, session.user.id));
   if (user?.status !== "active") throw new ApiError("UNAUTHENTICATED", "Sign in required");
+  const staleBefore = new Date(now.getTime() - LAST_ACTIVE_WRITE_INTERVAL_MS);
+  if (!user.lastActiveAt || user.lastActiveAt < staleBefore) {
+    // Re-checked in the WHERE so concurrent requests write once per interval.
+    await db
+      .update(schema.users)
+      .set({ lastActiveAt: now })
+      .where(
+        and(
+          eq(schema.users.id, user.id),
+          or(isNull(schema.users.lastActiveAt), lt(schema.users.lastActiveAt, staleBefore)),
+        ),
+      );
+  }
   return {
     id: user.id,
     email: user.email,

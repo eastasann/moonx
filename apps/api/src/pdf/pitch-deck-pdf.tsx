@@ -1,4 +1,5 @@
 import { formatKeyMetric, slideFontSizes } from "@moonx/domain";
+import { formatDate } from "@moonx/i18n";
 import type { PitchDeck, PitchSlide } from "@moonx/schemas";
 import { print } from "@moonx/ui-tokens/print";
 import { Document, Page, renderToBuffer, StyleSheet, Text, View } from "@react-pdf/renderer";
@@ -257,7 +258,7 @@ export async function renderPitchDeckPdf(
           <View style={styles.footer} fixed>
             <Text>{deck.footer.businessName}</Text>
             <Text>{deck.footer.versionLabel}</Text>
-            <Text>{deck.footer.date}</Text>
+            <Text>{formatDate(deck.footer.date)}</Text>
           </View>
         </Page>
       ))}

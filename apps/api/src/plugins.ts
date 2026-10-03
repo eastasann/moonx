@@ -199,6 +199,15 @@ export function basePlugin(ctx: AppContext) {
         }
         set.status = api.status;
         set.headers["content-type"] = "application/json";
+        // SDD 8.1: `/api/auth/*` keeps Better Auth's flat body and its retry header, so one client
+        // adapter (SDD 5.4) reads both what Better Auth and this pipeline refuse.
+        if (new URL(request.url).pathname.startsWith("/api/auth/")) {
+          const retryAfter = api.extra?.retryAfterSeconds;
+          if (api.status === 429 && typeof retryAfter === "number") {
+            set.headers["x-retry-after"] = String(retryAfter);
+          }
+          return { code: api.code, message: api.message };
+        }
         return {
           error: { code: api.code, message: api.message, requestId: info.requestId, ...api.extra },
         };

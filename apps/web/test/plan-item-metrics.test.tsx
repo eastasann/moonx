@@ -59,7 +59,7 @@ test("a scenario sub-item shows that column of the scenario table", async () => 
   expect(await screen.findByRole("heading", { level: 3, name: "Expected" })).toBeInTheDocument();
   expect(within(tile("Units / day")).getByText("14")).toBeInTheDocument();
   expect(within(tile("Operating profit")).getByText("₱18,490")).toBeInTheDocument();
-  expect(within(tile("Margin")).getByText("31%")).toBeInTheDocument();
+  expect(within(tile("Margin")).getByText("31.0%")).toBeInTheDocument();
 });
 
 test("a number with no name of its own takes the sub-item's title", async () => {

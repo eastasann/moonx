@@ -3,6 +3,7 @@ import { schema } from "@moonx/db";
 import { BCDX, seedDemo, userId } from "@moonx/db/seed";
 import { and, count, eq, isNull } from "drizzle-orm";
 import { RATE_LIMITS } from "../src/lib/rate-limit";
+import { LAST_ACTIVE_WRITE_INTERVAL_MS } from "../src/lib/session";
 import { call, login, startTestApp, type TestApp } from "./helpers";
 
 let t: TestApp;
@@ -1372,5 +1373,57 @@ describe("AD9 POST /admin/invitations", () => {
     expect(
       (await call(t.app, "DELETE", `/api/v1/invitations/${opId}`, { as: as.admin })).status,
     ).toBe(204);
+  });
+});
+
+describe("users.last_active_at (SDD 5.13)", () => {
+  const lastActive = async () =>
+    (
+      await t.db
+        .select({ at: schema.users.lastActiveAt })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId("kenji")))
+    )[0]?.at ?? null;
+  const setLastActive = (at: Date | null) =>
+    t.db
+      .update(schema.users)
+      .set({ lastActiveAt: at })
+      .where(eq(schema.users.id, userId("kenji")));
+  // A fresh sign-in each time: earlier tests suspend users and reseed, which ends sessions.
+  const use = async () => call(t.app, "GET", "/api/v1/me", { as: await login(t.app, "kenji") });
+
+  test("an authenticated request sets it when it is empty", async () => {
+    await setLastActive(null);
+    const before = Date.now();
+    expect((await use()).status).toBe(200);
+    const at = await lastActive();
+    expect(at).not.toBeNull();
+    expect((at as Date).getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  test("it is written at most once per interval and again after it", async () => {
+    const recent = new Date(Date.now() - 60_000);
+    await setLastActive(recent);
+    await use();
+    expect((await lastActive())?.getTime()).toBe(recent.getTime());
+
+    await setLastActive(new Date(Date.now() - LAST_ACTIVE_WRITE_INTERVAL_MS - 1000));
+    const before = Date.now();
+    await use();
+    expect(((await lastActive()) as Date).getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  test("an unauthenticated request writes nothing", async () => {
+    await setLastActive(null);
+    expect((await call(t.app, "GET", "/api/v1/me")).status).toBe(401);
+    expect(await lastActive()).toBeNull();
+  });
+
+  test("AD7 shows the written value", async () => {
+    await setLastActive(null);
+    await use();
+    const res = await call(t.app, "GET", `${api}/users?q=kenji`, { as: as.admin });
+    const row = res.body.items.find((u: { id: string }) => u.id === userId("kenji"));
+    expect(row.lastActiveAt).not.toBeNull();
   });
 });

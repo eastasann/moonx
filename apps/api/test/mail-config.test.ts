@@ -195,8 +195,18 @@ describe("configuration", () => {
       expect(() => loadConfig({ APP_ENV })).toThrow("BETTER_AUTH_SECRET");
     }
     expect(() => loadConfig({ APP_ENV: "local", BETTER_AUTH_SECRET: "too-short" })).toThrow(
-      "at least 32 characters",
+      "at least 32 bytes",
     );
+    // 11 characters but 33 bytes: the check counts bytes, not characters.
+    expect(() =>
+      loadConfig({ APP_ENV: "local", BETTER_AUTH_SECRET: "あ".repeat(11) }),
+    ).not.toThrow();
+    expect(() => loadConfig({ APP_ENV: "local", BETTER_AUTH_SECRET: "x".repeat(31) })).toThrow(
+      "at least 32 bytes",
+    );
+    expect(() =>
+      loadConfig({ APP_ENV: "local", BETTER_AUTH_SECRET: "x".repeat(32) }),
+    ).not.toThrow();
     expect(() => loadConfig({ ...AUTH, APP_ENV: "local", GOOGLE_CLIENT_ID: "id" })).toThrow(
       "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET",
     );

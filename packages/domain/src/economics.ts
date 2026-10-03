@@ -378,7 +378,11 @@ export function buildKeyMetrics(
   for (const row of rows) {
     if (row.templateKey == null) continue;
     const value = rowValue(row);
-    metrics[`cost_row:${row.templateKey}`] = value == null ? missing("empty") : exact(value);
+    // A percent-of-price row holds a rate; the headline metric is the amount per sale it comes to.
+    const perSale = row.category === "variable" && row.inputMode === "percent_of_price";
+    const amount = perSale ? percentOfPriceAmount(row.percent, inputs.sellingPrice) : value;
+    metrics[`cost_row:${row.templateKey}`] =
+      amount != null ? exact(amount) : missing(value == null ? "empty" : "needs_price");
   }
   return metrics;
 }

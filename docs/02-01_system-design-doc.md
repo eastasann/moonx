@@ -139,7 +139,7 @@ moonx/
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
 | `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
 | `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直す。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
-| `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32文字以上の乱数。短ければ起動しない） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
+| `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32バイト以上の乱数。`openssl rand -base64 32` の出力。値が UTF-8 で32バイトに満たなければ起動しない） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
 | `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://staging.{DOMAIN}` / `https://{DOMAIN}` |
 | `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り） | `http://localhost:5173,moonx://,exp://` | `https://{DOMAIN},moonx://`（staging は `https://staging.{DOMAIN},moonx-staging://`） |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | api | Google ログイン（OAuth クライアント。環境ごとに作る。片方だけ入れると起動しない。staging・production は空でも起動しない。local だけ空にでき、Google ログインだけが使えなくなる） | 開発用のクライアント | ID は環境変数、SECRET は Secret Manager `moonx-{env}-google-client-secret` |
@@ -554,7 +554,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 | `/w/$workspaceId/ai/export` | 24 AI 書き出し | `?source=self_analysis|validation|business_plan&id=&scope=` |
 | `/w/$workspaceId/ai/import` | 25 AI 取り込み | `?target=self_analysis|validation|business_plan&id=&scope=&returnTo=` |
 | `/admin/templates` | 26 管理: テンプレート一覧 | `?kind=` |
-| `/admin/templates/versions/$versionId` | 27 管理: テンプレート編集 | `?node=<section か question の id>`、または設定のノード `ai-prompt` / `cost-defaults` / `check-rules` / `execution-presets` |
+| `/admin/templates/versions/$versionId` | 27 管理: テンプレート編集 | `?node=<section か question の id>`、または設定のノード `ai-prompt`（検証とプランでは空） / `cost-defaults` / `check-rules` / `execution-presets` |
 | `/admin/users` | 28 管理: ユーザーとワークスペース | `?tab=users|workspaces|invitations` |
 
 API のルートは5章、Worker が配る静的なファイル（`/.well-known/apple-app-site-association`、`/.well-known/assetlinks.json`、`/robots.txt`）は `apps/web/public/` に置く。
@@ -939,7 +939,7 @@ interface Invitation {
 | W3 PATCH | `{ role: Role }` | `200 Member` | `409 LAST_OWNER`（最後の Owner を降格できない）。Viewer に降格したら design-spec 6.16 の表のとおり処理する（自己分析の共有を解除、担当を名前に置き換え。担当の置き換えは実行管理の項目の変更履歴 `manual` に残す）。`userId` は UUID だけを受け付ける。対象がメンバーでなければ `404 NOT_FOUND`、ロールが同じなら何も変えず 200 |
 | W3 DELETE | — | `204` | `409 LAST_OWNER`、`409 CANNOT_LEAVE_PERSONAL`。外れたときの処理は design-spec 6.16 の表（担当の置き換えは W3 PATCH と同じ。`last_workspace_id` が外れたワークスペースなら個人用ワークスペースに戻す） |
 | W4 GET | `?status=pending|all` | `200 { items: Invitation[] }` | `status` の既定は `pending`: 受諾できるものだけ（期限切れは含まない）。`all` は受諾・取り消し・期限切れも返す。期限を過ぎた `pending` は `status: "expired"` として返す |
-| W4 POST | `{ email: string; role: Role }` | `201 { invitation: Invitation; link: string }` | 招待のメールを送る。`409 ALREADY_MEMBER`、`409 INVITATION_PENDING`（同じメールの有効な招待がある。`error.invitationId` に付ける id の招待を W5 で再送する）。メールの送信は招待を作るトランザクションの中で行い、Resend に届かなければ招待も作らず `503 UPSTREAM_UNAVAILABLE` を返す（利用者は再試行する）。同じワークスペースへの招待はワークスペースの行を `FOR UPDATE` で押さえて直列にする。W5 と合わせて1時間20回まで（7.2。超えたら `429 RATE_LIMITED`） |
+| W4 POST | `{ email: string; role: Role }` | `201 { invitation: Invitation; link: string }` | 招待のメールを送る。`409 ALREADY_MEMBER`、`409 INVITATION_PENDING`（同じメールの有効な招待がある。`error.invitationId` に付ける id の招待を W5 で再送する）。メールの送信は招待を作るトランザクションの中で行い、Resend に届かなければ招待も作らず `503 UPSTREAM_UNAVAILABLE` を返す（利用者は再試行する）。同じワークスペースへの招待は、ワークスペースの id で取る advisory lock（`pg_advisory_xact_lock`。トランザクションの終わりで外れる）で直列にする。トランザクションが Resend の応答を待つので、ワークスペースの行を `FOR UPDATE` で押さえると、そのあいだ中身の書き込みがすべて止まる。W5 と合わせて1時間20回まで（7.2。超えたら `429 RATE_LIMITED`） |
 | W5 | — | `200 { invitation: Invitation; link: string }` | トークンを作り直してメールを再送する（前のリンクは無効）。期限を7日に延ばし、期限切れの招待は `pending` に戻す。受諾済みは `409 INVITATION_ALREADY_ACCEPTED`、取り消し済みは `410 INVITATION_INVALID`（W6・W7 も同じ）。招待のワークスペースに所属しない人は `403 NO_ACCESS`、所属していても Owner でなければ `403 FORBIDDEN`（Admin は除く） |
 | W6 | — | `200 { link: string }` | トークンを作り直し、期限を7日に延ばす（メールは送らず、回数の上限にも数えない） |
 | W7 | — | `204` | `revoked` にする |
@@ -1078,8 +1078,8 @@ interface EconomicsInput extends Versioned {
 | V10 POST | 前提: `{ statement; whyBelieve?; evidenceNote?; confidence?; disproveCondition?; nextCheck? }`。リスク: `{ statement; probability?; impact?; whyMatters?; mitigation?; howToValidate? }` | `201 Assumption` / `201 Risk` | 新しい行は末尾に付く（リスクは手の並びのときだけ末尾に付き、そうでなければ `sortOrder` は null）。空白だけの文章の項目は null で保存する。履歴 `manual` |
 | V11 | PATCH: 上の項目の一部 ＋ `{ lockVersion; force? }`。DELETE: なし | `200` / `204` | 履歴 `manual` |
 | V12 | — | `200 { items: CostItem[]; result: EconomicsResult; economicsInputs: EconomicsInput[] }` | `result` は Totals と 18 の損益分岐の表示用。`economicsInputs` はクライアントがその場で計算し直すために返す |
-| V13 | `{ category: CostCategory; name: string }` | `201 CostItem` | 表の末尾に Empty の行を作る。履歴 `manual` |
-| V14 PATCH | `{ name?; inputMode?; amount?: number | null (≥0); percent?: number | null (0〜1); isLumpSum?; whyNeeded?; canReduce?; notes?; classification?; lockVersion; force? }` | `200 CostItem` | `422 PERCENT_ONLY_FOR_VARIABLE`、`422 OUT_OF_RANGE`、F/A/U の決まりは V3 と同じ。`unknown` にすると金額と % を null にする（Unknown の数字に値を入れると未分類になる）。使わない入力方式の値を送ると `422 VALIDATION_FAILED`、`inputMode` を切り替えると使わなくなった側の値を null にする。履歴 `manual` |
+| V13 | `{ category: CostCategory; name: string (0〜200文字。空も可) }` | `201 CostItem` | 表の末尾に Empty の行を作る（名前は空でよい。「+ Add row」は空の名前で呼ぶ）。履歴 `manual` |
+| V14 PATCH | `{ name? (0〜200文字。空も可); inputMode?; amount?: number | null (≥0); percent?: number | null (0〜1); isLumpSum?; whyNeeded?; canReduce?; notes?; classification?; lockVersion; force? }` | `200 CostItem` | `422 PERCENT_ONLY_FOR_VARIABLE`、`422 OUT_OF_RANGE`、F/A/U の決まりは V3 と同じ。`unknown` にすると金額と % を null にする（Unknown の数字に値を入れると未分類になる）。使わない入力方式の値を送ると `422 VALIDATION_FAILED`、`inputMode` を切り替えると使わなくなった側の値を null にする。履歴 `manual` |
 | V14 DELETE | — | `204` | 論理削除。履歴 `manual`（`delete`） |
 | V15 | — | `200 { inputs: EconomicsInput[]; worth: ValidationAnswer; result: EconomicsResult; costItems: CostItem[] }` | `inputs` は7つすべて（未入力は `value: null`）。`worth` は `V.08.WORTH`（更新は V3） |
 | V16 | `{ value: number | null; classification?: ClassificationInput; lockVersion; force? }` | `200 EconomicsInput` | 範囲は design-spec 6.4（価格 > 0、営業日数は整数 1〜31、目標利益率 0〜0.99、販売数 ≥ 0）。外れたら `422 OUT_OF_RANGE`。値も F/A/U も変わらないリクエストは行を作らず、履歴も書かない。履歴 `manual` |
@@ -1154,7 +1154,7 @@ interface PlanVersionSummary { id: UUID; versionNumber: number; name: string; sa
 interface PlanAnswer extends Versioned {
   questionKey: string;
   text: string | null;
-  rows: Record<string, string | number | null>[] | null;   // 表の小項目（§11・§13・§21・§22）。列のキーはテンプレートの options.columns
+  rows: Record<string, string | number | null>[] | null;   // 表の小項目（§11・§13・§21・§22）。列のキーはテンプレートの options.columns（移行で消えた列の値も残る）
   copiedFrom: { source: string; copiedAt: DateTime } | null;
   commentCount: number;
 }
@@ -1219,7 +1219,7 @@ interface PitchDeck {
 | P2 PATCH | `{ name?; businessName?; preparedBy?; lockVersion; force? }` | `200 PlanHome` | 名前の重複は `409 NAME_TAKEN`。履歴 `manual` |
 | P3 | — | `200 PlanSummary` | |
 | P4 | `?versionId=` | `200 PlanItem` | `itemNo` は 1〜30 |
-| P5 | `{ text?: string | null; rows?: Record<string, string | number | null>[] | null; lockVersion; force? }` | `200 PlanAnswer` | 数字・実行管理の小項目は `422 NOT_EDITABLE`。存在しない設問は `422 QUESTION_NOT_FOUND`、選択肢にない値は `422 INVALID_CHOICE`。表の列にないキー・型の合わない値・表に `text`・表以外に `rows`・200字を超える短文は `422 VALIDATION_FAILED`。履歴 `manual` |
+| P5 | `{ text?: string | null; rows?: Record<string, string | number | null>[] | null; lockVersion; force? }` | `200 PlanAnswer` | 数字・実行管理の小項目は `422 NOT_EDITABLE`。存在しない設問は `422 QUESTION_NOT_FOUND`、選択肢にない値は `422 INVALID_CHOICE`。表の列にないキー（ただし、テンプレートの移行で消えた列のキーは、保存済みの行にあるときだけ、保存済みの値か null で受け付ける。P4 は消えた列の値も行に含めて返し、クライアントは表示せずにそのまま送り返す）・型の合わない値・表に `text`・表以外に `rows`・200字を超える短文は `422 VALIDATION_FAILED`。履歴 `manual` |
 | P6 GET | — | `200 { items: PlanVersionSummary[] }` | |
 | P6 POST（M3） | `{ name: string (1〜80) }` | `201 PlanVersionSummary` | スナップショット（30項目の回答・主要指標・シナリオ表・実行管理の項目・検証の競合の上位5件）を保存し、決定ログに `version_saved` を記録して通知する |
 | P7 | — | `200 { conditions: { launchIf: string | null; delayIf: string | null; stopIf: string | null }; keyMetrics: KeyMetrics; currentVersion: PlanVersionSummary | null; hasChangesSinceVersion: boolean; history: DecisionLogSummary[] }` | |
@@ -1249,7 +1249,7 @@ interface ImportContext {
     questionKey: string; title: string; sectionKey: string;
     answerType: AnswerType; options: QuestionOptions | null;
     importable: boolean;                   // 表・数字・実行管理は false
-    hidden: boolean;                       // OCEAN の出し分け・移行で隠れている
+    hidden: boolean;                       // OCEAN の出し分け・移行で隠れている。移行で隠れた設問は、保存済みの回答がある取り込める型のものだけを、その設問を持っていた版の定義（sectionKey も）で載せる
     current: { text: string | null; amount: number | null; classification: Classification | null } & Versioned;
   }[];
 }
@@ -1340,6 +1340,8 @@ interface AdminUser { id: UUID; displayName: string; email: string; createdAt: D
   workspaceCount: number; status: "active" | "suspended" | "deleted"; isAdmin: boolean; }   // deleted は一覧の末尾に「Deleted user」として出し、操作を出さない
 interface AdminWorkspace { id: UUID; name: string; isPersonal: boolean; owners: UserRef[]; memberCount: number; ideaCount: number; lastActiveAt: DateTime | null; }
 ```
+
+`AdminUser.lastActiveAt` は `users.last_active_at` で、ログイン中のユーザーの API 呼び出しが書く。書き込みは、前回の値から5分以上たっているときだけにする（呼び出しのたびに users を更新しないため）。表示は最大5分遅れる。
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
@@ -2068,7 +2070,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 |---|---|---|---|---|---|
 | ログイン・パスワード再設定・招待の内容・招待からの新規登録（A1〜A3・A6・A7・U4・U5） | ○ | ○ | ○ | ○ | ○ |
 | 死活確認（Z1） | ○ | ○ | ○ | ○ | ○ |
-| 自分のアカウント（U1〜U3・U7・A4・A5・A8）・招待の受諾（U6。招待のメールと同じ人だけ） | — | 本人 | 本人 | 本人 | 本人 |
+| 自分のアカウント（U1〜U3・U7・U8・A4・A5・A8）・招待の受諾（U6。招待のメールと同じ人だけ） | — | 本人 | 本人 | 本人 | 本人 |
 | ワークスペースの作成（W0） | — | ○ | ○ | ○ | ○ |
 | ワークスペースの閲覧・メンバー一覧・メンションの候補（W1 GET・W2・W8） | — | ○ | ○ | ○ | 所属していれば、そのロールのとおり |
 | ワークスペースの設定・ロール変更・メンバーの削除・招待（W1 PATCH・W3・W4〜W7） | — | 自分の Leave だけ | 自分の Leave だけ | ○ | W5〜W7 だけ（運営者が出した招待を含むすべての招待） |
@@ -2136,7 +2138,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 ### 8.1 APIエラーレスポンス
 
-すべてのエラーを同じ形で返す（Better Auth の `/api/auth/*` は Better Auth の形のまま。クライアントが 5.4 の表で対応させる）。
+すべてのエラーを同じ形で返す。Better Auth の `/api/auth/*` は Better Auth の形（`{ code, message }`）のまま返し、クライアントが 5.4 の表で対応させる。このパスでベースプラグインが拒否する 429 `RATE_LIMITED` と 413 `PAYLOAD_TOO_LARGE` も `{ code, message }` で返し、429 には Better Auth と同じ `X-Retry-After`（秒）を付ける。
 
 ```json
 {
@@ -2183,7 +2185,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | エラー種別 | 表示方法（文言は design-spec の該当の状態） |
 |---|---|
 | バリデーションエラー（422 `VALIDATION_FAILED` など） | 入力欄の下に理由を出し、保存しない（design-spec 6.0.6「入力値が範囲外」）。クライアントの Zod の検査で送る前に止めるのが基本で、API の 422 は最後の守り |
-| 業務の決まり（409・422 の個別のコード） | コードごとに design-spec の各画面の「状態」の文言を出す。対応はカタログのキー `errors.<CODE>`（9章） |
+| 業務の決まり（409・422 の個別のコード） | コードごとに design-spec の各画面の「状態」の文言を出す。対応はカタログのキー `errors:<CODE>`（9章） |
 | 同時編集の衝突（409 `CONFLICT` / `CONFLICT_MULTI`） | design-spec 6.0.2 の確認 |
 | 通信・サーバーエラー（ネットワーク断・5xx・`UPSTREAM_UNAVAILABLE`） | 保存: design-spec 6.0.2 の保存エラー（入力は送信待ちの列に残して自動で再送する。ADR-021）。読み込み: design-spec 6.0.6「読み込みエラー」（ブロックごと） |
 | 認証エラー（401） | `/login?next=<今のパス>` へ移る（design-spec 5章「認証」）。送信待ちの列の扱いは ADR-021 |
@@ -2209,9 +2211,9 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目 | 決定 |
 |---|---|
 | ライブラリ | i18next ＋ react-i18next（Web とスマホで同じ）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
-| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペース（`common`・`errors`・`mail`・`validation`）で、キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
+| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペース（`account`・`admin`・`ai`・`app`・`auth`・`common`・`costs`・`dashboard`・`decision`・`decisionLog`・`economics`・`errors`・`execution`・`form`・`ideas`・`mail`・`notifications`・`panels`・`pitch`・`plan`・`planHome`・`planItem`・`research`・`selfAnalysis`・`templateMigration`・`validation`・`workspaceSettings`。一覧は `packages/i18n/src/i18n.ts` の `NAMESPACES`）で、キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
-| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatPercent()`・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。`formatRelativeTime()` は1週間未満を「3 min. ago」のような相対表記にし、1週間以上前は日付にする |
+| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。`formatRelativeTime()` は1週間未満を「3 min. ago」のような相対表記にし、1週間以上前は日付にする |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（スマホの Hermes も対応）。金額の入力は桁区切りのカンマを受け付ける |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |

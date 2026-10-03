@@ -11,6 +11,8 @@ const longText = z
   .max(20_000)
   .transform((value) => (value.trim() === "" ? null : value));
 const rowName = z.string().trim().min(1).max(200);
+/** A cost row may have no name: "+ Add row" creates it empty and the name is typed afterwards. */
+const costRowName = z.string().trim().max(200);
 /** Same shape as `classificationInputSchema` but a missing confidence answers 422 CONFIDENCE_REQUIRED. */
 const classificationBodySchema = z.object({
   fau: fauSchema.nullable(),
@@ -70,7 +72,10 @@ export const updateRiskBodySchema = z.object(riskFields).partial().extend(lockFi
 
 // ---- V13 / V14 cost items ----
 
-export const createCostItemBodySchema = z.object({ category: costCategorySchema, name: rowName });
+export const createCostItemBodySchema = z.object({
+  category: costCategorySchema,
+  name: costRowName,
+});
 
 /**
  * `amount` and `percent` are only checked for being numbers here: their ranges answer
@@ -78,7 +83,7 @@ export const createCostItemBodySchema = z.object({ category: costCategorySchema,
  */
 export const updateCostItemBodySchema = z
   .object({
-    name: rowName,
+    name: costRowName,
     inputMode: costInputModeSchema,
     amount: z.number().nullable(),
     percent: z.number().nullable(),

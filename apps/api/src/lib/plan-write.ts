@@ -120,17 +120,35 @@ async function loadPlanAnswersFor(tx: Executor, ctx: PlanWriteContext, keys: str
 
 type Cell = string | number | null;
 
+const unknownColumn = (path: string) => ({
+  path,
+  code: "unrecognized_keys",
+  message: "Not a column of this table",
+});
+
 /**
  * Checks the rows of a table sub-item against the question's columns (SDD 5.9 P5): only known
  * column keys, text columns hold text, number columns numbers, percent columns a 0-1 fraction
  * and money columns an amount of at least 0. Empty text cells are stored as null.
+ *
+ * A template migration can drop a column. Its values stay in the stored rows and the client sends
+ * them back with the rest of the row, so a key that is no longer a column is accepted when the
+ * stored rows hold that key, and only with a value they hold (or null). Anything else is refused.
  */
 function normalizeTableRows(
   options: QuestionOptions | null,
   rows: Record<string, Cell>[],
+  stored: Record<string, Cell>[] | null,
 ): Record<string, Cell>[] {
   if (options?.kind !== "table") return [];
   const columns = new Map(options.columns.map((c) => [c.key, c]));
+  const retained = new Map<string, Set<Cell>>();
+  for (const row of stored ?? []) {
+    for (const [key, value] of Object.entries(row)) {
+      if (columns.has(key)) continue;
+      retained.set(key, (retained.get(key) ?? new Set<Cell>()).add(value));
+    }
+  }
   const details: { path: string; code: string; message: string }[] = [];
   const normalized = rows.map((row, index) => {
     const out: Record<string, Cell> = {};
@@ -138,7 +156,9 @@ function normalizeTableRows(
       const column = columns.get(key);
       const path = `rows.${index}.${key}`;
       if (!column) {
-        details.push({ path, code: "unrecognized_keys", message: "Not a column of this table" });
+        const kept = retained.get(key);
+        if (kept && (value == null || kept.has(value))) out[key] = value;
+        else details.push(unknownColumn(path));
         continue;
       }
       if (value == null) {
@@ -233,7 +253,11 @@ export async function savePlanAnswer(
       ? ((row?.rows as Record<string, Cell>[] | null) ?? null)
       : body.rows === null
         ? null
-        : normalizeTableRows(question.options, body.rows);
+        : normalizeTableRows(
+            question.options,
+            body.rows,
+            row?.rows as Record<string, Cell>[] | null,
+          );
   const before = planAnswerSnapshot(row ?? null);
   const after = planAnswerSnapshot({ text, rows });
   if (row && JSON.stringify(before) === JSON.stringify(after)) return view();

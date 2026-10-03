@@ -638,28 +638,6 @@ describe("T2 POST /template-migrations, validation", () => {
     expect(migrated[0].revertible).toBe(true);
   });
 
-  test("a cost row that was taken away does not come back with a later migration", async () => {
-    const v3 = await publishNext("validation", V_EDIT);
-    const piaya = await validationOf("piaya");
-    const first = await migrate("validation", piaya, v3);
-    await revertBatch(first.body.batchId);
-    const view = await preview("validation", piaya);
-    expect(view.body.addedCostRows).toEqual([]);
-    const again = await migrate("validation", piaya, v3);
-    expect(again.status).toBe(200);
-    const signage = await t.db
-      .select()
-      .from(schema.costItems)
-      .where(
-        and(
-          eq(schema.costItems.validationId, piaya),
-          eq(schema.costItems.templateKey, "initial.signage"),
-        ),
-      );
-    expect(signage).toHaveLength(1);
-    expect(signage[0]?.deletedAt).not.toBeNull();
-  });
-
   test("after a migration the checks use the new version's thresholds", async () => {
     const v3 = await publishNext("validation", { competitorsMin: 9 });
     const piaya = await validationOf("piaya");
@@ -957,5 +935,275 @@ describe("T2 wrong targets and bad input", () => {
       .from(schema.costItems)
       .where(and(eq(schema.costItems.validationId, piaya), isNull(schema.costItems.deletedAt)));
     expect(open.length).toBeGreaterThan(0);
+  });
+});
+
+describe("questions hidden by a migration in the AI exchange (X2, X3) and the plan draft (P1)", () => {
+  const importContext = (kind: Kind, id: string) =>
+    call(t.app, "GET", `/api/v1/ai/import/context?target=${kind}&id=${id}`, { as: as.ana });
+
+  test("X2 lists a hidden answered question as hidden with the section of the version that had it", async () => {
+    const piaya = await validationOf("piaya");
+    const before = await importContext("validation", piaya);
+    expect(
+      before.body.questions
+        .filter((q: { hidden: boolean }) => q.hidden)
+        .map((q: { questionKey: string }) => q.questionKey),
+    ).not.toContain("V.01.WHY_THEM");
+
+    await migrate("validation", piaya, await publishNext("validation", V_EDIT));
+    const after = await importContext("validation", piaya);
+    const hidden = after.body.questions.find(
+      (q: { questionKey: string }) => q.questionKey === "V.01.WHY_THEM",
+    );
+    expect(hidden).toMatchObject({
+      hidden: true,
+      importable: true,
+      sectionKey: "01",
+      answerType: "long_text",
+    });
+    expect(hidden.current.text).toBeTruthy();
+    expect(typeof hidden.current.lockVersion).toBe("number");
+  });
+
+  test("X2 does the same for a self analysis", async () => {
+    await migrate(
+      "self_analysis",
+      await selfAnalysisOf("ana"),
+      await publishNext("self_analysis", SA_EDIT),
+    );
+    const res = await importContext("self_analysis", await selfAnalysisOf("ana"));
+    const hidden = res.body.questions.filter((q: { hidden: boolean }) => q.hidden);
+    expect(hidden.map((q: { questionKey: string }) => q.questionKey)).toContain("SA.WHY.1");
+  });
+
+  test("X3 refuses a hidden question with NOT_IMPORTABLE, not QUESTION_NOT_FOUND, and writes nothing", async () => {
+    const piaya = await validationOf("piaya");
+    await migrate("validation", piaya, await publishNext("validation", V_EDIT));
+    const hidden = (await importContext("validation", piaya)).body.questions.find(
+      (q: { questionKey: string }) => q.questionKey === "V.01.WHY_THEM",
+    );
+    const rows = await historyRowCount();
+    const res = await call(t.app, "POST", "/api/v1/ai/import/apply", {
+      as: as.ana,
+      body: {
+        target: { type: "validation", id: piaya },
+        changes: [
+          {
+            questionKey: "V.01.WHY_THEM",
+            text: "Overwritten",
+            baseLockVersion: hidden.current.lockVersion,
+          },
+        ],
+      },
+    });
+    expect([res.status, res.body.error.code]).toEqual([422, "NOT_IMPORTABLE"]);
+    expect(await historyRowCount()).toBe(rows);
+    const gone = await call(t.app, "POST", "/api/v1/ai/import/apply", {
+      as: as.ana,
+      body: {
+        target: { type: "validation", id: piaya },
+        changes: [{ questionKey: "V.01.NO_SUCH", text: "x", baseLockVersion: 0 }],
+      },
+    });
+    expect(gone.body.error.code).toBe("QUESTION_NOT_FOUND");
+  });
+
+  test("a plan draft does not copy the answer of a question the validation no longer has", async () => {
+    const piaya = await validationOf("piaya");
+    const copy = async (name: string) => {
+      const res = await call(t.app, "POST", `/api/v1/ideas/${ideaId("piaya")}/plans`, {
+        as: as.kenji,
+        body: { name },
+      });
+      expect(res.status).toBe(201);
+      const [row] = await t.db
+        .select()
+        .from(schema.planAnswers)
+        .where(
+          and(
+            eq(schema.planAnswers.businessPlanId, res.body.id),
+            eq(schema.planAnswers.questionKey, "P.03.1"),
+          ),
+        );
+      return row?.text as string;
+    };
+    const full = await copy("Before migration");
+    const [why] = await t.db
+      .select({ text: schema.validationAnswers.text })
+      .from(schema.validationAnswers)
+      .where(
+        and(
+          eq(schema.validationAnswers.validationId, piaya),
+          eq(schema.validationAnswers.questionKey, "V.01.WHY_THEM"),
+        ),
+      );
+    expect(why?.text).toBeTruthy();
+    expect(full).toContain(why?.text as string);
+
+    await migrate("validation", piaya, await publishNext("validation", V_EDIT));
+    const partial = await copy("After migration");
+    expect(partial).toBeTruthy();
+    expect(partial).not.toContain(why?.text as string);
+  });
+});
+
+describe("migrating again after taking a migration back", () => {
+  test("a cost row the user deleted stays gone with a migration that carries the same key", async () => {
+    const piaya = await validationOf("piaya");
+    const v3 = await publishNext("validation", V_EDIT);
+    const [row] = await t.db
+      .select()
+      .from(schema.costItems)
+      .where(and(eq(schema.costItems.validationId, piaya), isNull(schema.costItems.deletedAt)));
+    const key = row?.templateKey as string;
+    const carried = await t.db
+      .select()
+      .from(schema.templateCostDefaults)
+      .where(
+        and(
+          eq(schema.templateCostDefaults.templateVersionId, v3),
+          eq(schema.templateCostDefaults.key, key),
+        ),
+      );
+    expect(carried).toHaveLength(1);
+    const del = await call(t.app, "DELETE", `/api/v1/cost-items/${row?.id}`, { as: as.ana });
+    expect(del.status).toBe(204);
+
+    const view = await preview("validation", piaya);
+    expect(view.body.addedCostRows).not.toContain(carried[0]?.name);
+    expect((await migrate("validation", piaya, v3)).status).toBe(200);
+    const rows = await t.db
+      .select()
+      .from(schema.costItems)
+      .where(and(eq(schema.costItems.validationId, piaya), eq(schema.costItems.templateKey, key)));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.deletedAt).not.toBeNull();
+  });
+
+  test("rows removed by taking the migration back are added again by the next migration", async () => {
+    const piaya = await validationOf("piaya");
+    const v1 = await versionId("validation", 1);
+    const v3 = await publishNext("validation", V_EDIT);
+    const signage = () =>
+      t.db
+        .select()
+        .from(schema.costItems)
+        .where(
+          and(
+            eq(schema.costItems.validationId, piaya),
+            eq(schema.costItems.templateKey, "initial.signage"),
+          ),
+        );
+    const first = await migrate("validation", piaya, v3);
+    expect(first.status).toBe(200);
+    expect((await revertBatch(first.body.batchId, as.paolo)).status).toBe(200);
+    expect(await pinnedOf("validation", piaya)).toBe(v1);
+    expect((await signage()).every((r) => r.deletedAt != null)).toBe(true);
+
+    const again = await preview("validation", piaya);
+    expect(again.body.addedCostRows).toEqual(["Signage"]);
+    expect((await migrate("validation", piaya, v3)).status).toBe(200);
+    const live = (await signage()).filter((r) => r.deletedAt == null);
+    expect(live).toHaveLength(1);
+    const costs = await call(t.app, "GET", `/api/v1/validations/${piaya}/costs`, { as: as.ana });
+    expect(JSON.stringify(costs.body)).toContain("Signage");
+  });
+});
+
+describe("a table column the new version dropped (P4, P5)", () => {
+  async function publishWithoutColumn(): Promise<string> {
+    const draft = await call(
+      t.app,
+      "POST",
+      `${admin}/template-versions/${await versionId("business_plan", 1)}/draft`,
+      { as: as.admin },
+    );
+    const id = draft.body.id as string;
+    const detail = await call(t.app, "GET", `${admin}/template-versions/${id}`, { as: as.admin });
+    const question = detail.body.sections
+      .flatMap(
+        (s: {
+          questions: { id: string; key: string; options: { columns: { key: string }[] } }[];
+        }) => s.questions,
+      )
+      .find((q: { key: string }) => q.key === "P.22.1");
+    const columns = question.options.columns.filter((c: { key: string }) => c.key !== "mitigation");
+    const patch = await call(t.app, "PATCH", `${admin}/template-questions/${question.id}`, {
+      as: as.admin,
+      body: { options: { kind: "table", columns } },
+    });
+    expect(patch.status).toBe(200);
+    const published = await call(t.app, "POST", `${admin}/template-versions/${id}/publish`, {
+      as: as.admin,
+    });
+    expect(published.status).toBe(200);
+    return id;
+  }
+
+  test("the value stays; the table saves with it retained, and a made-up column or value is refused", async () => {
+    const plan = planId("piaya-a");
+    const put = (rows: unknown, lockVersion: number) =>
+      call(t.app, "PUT", `/api/v1/plans/${plan}/answers/P.22.1`, {
+        as: as.ana,
+        body: { rows, lockVersion },
+      });
+    const [stored] = await t.db
+      .select()
+      .from(schema.planAnswers)
+      .where(
+        and(
+          eq(schema.planAnswers.businessPlanId, plan),
+          eq(schema.planAnswers.questionKey, "P.22.1"),
+        ),
+      );
+    const storedRows = (stored?.rows ?? []) as Record<string, string | number | null>[];
+    expect(storedRows.length).toBeGreaterThan(0);
+    const mitigation = storedRows.find((r) => r.mitigation != null)?.mitigation;
+    expect(mitigation).toBeTruthy();
+
+    // Before the migration the column exists; a made-up one is refused as always.
+    const unknown = await put([{ ...storedRows[0], invented: "x" }], stored?.lockVersion ?? 0);
+    expect([unknown.status, unknown.body.error.code]).toEqual([422, "VALIDATION_FAILED"]);
+
+    await migrate("business_plan", plan, await publishWithoutColumn());
+    const item = await call(t.app, "GET", `/api/v1/plans/${plan}/items/22`, { as: as.ana });
+    const answer = item.body.answers.find(
+      (a: { questionKey: string }) => a.questionKey === "P.22.1",
+    );
+    expect(answer.rows[0].mitigation).toBe(storedRows[0]?.mitigation);
+    const lockVersion = answer.lockVersion as number;
+
+    // Edit another cell and send the retained values back with the rows.
+    const edited = answer.rows.map((r: Record<string, unknown>, i: number) =>
+      i === 0 ? { ...r, risk: "Edited risk" } : r,
+    );
+    const saved = await put(edited, lockVersion);
+    expect(saved.status).toBe(200);
+    expect(saved.body.rows[0]).toMatchObject({
+      risk: "Edited risk",
+      mitigation: storedRows[0]?.mitigation,
+    });
+    const [after] = await t.db
+      .select()
+      .from(schema.planAnswers)
+      .where(
+        and(
+          eq(schema.planAnswers.businessPlanId, plan),
+          eq(schema.planAnswers.questionKey, "P.22.1"),
+        ),
+      );
+    expect(((after?.rows ?? []) as Record<string, unknown>[]).map((r) => r.mitigation)).toEqual(
+      storedRows.map((r) => r.mitigation),
+    );
+
+    // A value the rows never held, and a column that was never there, are refused.
+    const forged = await put(
+      [{ ...edited[0], mitigation: "Something else" }],
+      saved.body.lockVersion,
+    );
+    expect([forged.status, forged.body.error.code]).toEqual([422, "VALIDATION_FAILED"]);
+    const invented = await put([{ ...edited[0], invented: "x" }], saved.body.lockVersion);
+    expect(invented.status).toBe(422);
   });
 });

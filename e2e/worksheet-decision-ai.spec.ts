@@ -81,7 +81,7 @@ test("a new idea gets a cost row, a decision, and the exchange with AI end to en
 
   await page.goto(`/w/${workspace}/ideas/${idea}/costs`);
   await page.getByRole("button", { name: "Add row to Startup costs" }).click();
-  const name = page.getByRole("textbox", { name: "Name of New row" });
+  const name = page.getByRole("textbox", { name: "Name of this row" });
   await expect(name).toBeFocused();
   await name.fill("Wrench set");
   const named = saved(page);

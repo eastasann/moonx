@@ -801,9 +801,15 @@ Step 17a・17b の「判断待ち」のうち、ここに挙げたものはこ�
    Android は EAS の内部配布のリンクから入れる。iOS は Apple Developer Program（ユーザーが個人で登録する）の
    TestFlight の社内テストか、端末を登録した内部配布で入れる。ストアに公開するかは、身内の外に広げるときに
    改めて決める。04 のストアへの公開の節と、Step 26 の eas.json の項目をこの方針に合わせる
-8. テスト（make test-api・make test-web・make test-e2e）: 上の 1・3・4・6
-
-判断待ち（このステップでは触らない）: 期限の通知（ユーザーに意味を確かめている）。
+8. 期限の通知を無くす（2026-10-03 のユーザーの決定。プランは北極星として使い、進捗の管理には使わないため）:
+   実行管理の期限の「3日前・当日・期限切れ」の通知と、それを作る定期実行（Z3 `POST /internal/cron/due-notifications`、
+   `make cron-due`、CRON_OIDC_AUDIENCE・CRON_INVOKER_EMAIL、Cloud Scheduler のジョブとその監視とアラート）を外す。
+   docs は PRD（C-05 の「期限」）、design-spec（6.13・6.15 ほか通知の種類を挙げている所）、SDD（2章の環境変数・
+   make ターゲット・インフラ管理、5.14、7.1、11章）、03・04・05、CLAUDE.md の Commands、Step 26 の指示から外し、
+   ADR-014 は廃止として理由を残す。API・シード・テストの該当部分を消す。実行管理の担当・期限・状態、画面の
+   Overdue の表示、ダッシュボードの期限の近いアクションの一覧は残す。DB の通知の種類と一意制約は、04 4.1 の
+   決まり（使わなくなってから消す）に沿って消す
+9. テスト（make test-api・make test-web・make test-e2e）: 上の 1・3・4・6・8
 
 make test-api・make test-web・make test-e2e・make lint・make typecheck・make doc-lint が通り、上の各点を
 テストが確かめている状態をゴールとする。

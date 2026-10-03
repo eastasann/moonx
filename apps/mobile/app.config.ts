@@ -11,7 +11,7 @@ const config: ExpoConfig = {
   version: "0.1.0",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
-  plugins: ["expo-router"],
+  plugins: ["expo-router", "expo-dev-client"],
   experiments: { typedRoutes: true },
 };
 

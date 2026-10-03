@@ -92,6 +92,7 @@ make dev
 | API が動いている | `curl http://localhost:3000/api/health` |
 | Web が開く | ブラウザで `http://localhost:5173`（`127.0.0.1` ではなく `localhost` で開く。Cookie のため） |
 | 部品を確かめる | ブラウザで `http://localhost:5173/dev/components`（開発サーバーだけ。本番のビルドには入らず、開くと Not Found）。全部品の種類・大きさ・状態を並べ、ページ上部でテーマ（System / Light / Dark）とスケール（Auto / Medium / Large）を切り替えられる。Popover と Tray はウィンドウの幅を `semantic.breakpoint.tablet` の前後に動かして確かめる |
+| スマホの部品を確かめる | 開発ビルドを入れた端末かエミュレーターで `moonx://dev/components` を開く（`__DEV__` が真の版だけ。それ以外のビルド（staging・production など）は `/` へ戻す）。Web と同じ並びで全部品を出し、ページ上部でテーマ（System / Light / Dark）を切り替えられる |
 | デモのユーザーでログインできる | ユーザーとデータは design-spec 8章 |
 | メールの中身 | local ではメールを送らない。招待やパスワード再設定のリンクは `make dev` の出力（API のログ）に出る |
 
@@ -119,6 +120,9 @@ make admin-create EMAIL=<自分のメール>
    # iOS 実機（最初に端末を登録する。Apple Developer Program が要る）
    eas device:create
    eas build --profile development --platform ios
+
+   # iOS シミュレーター（端末の登録は要らない）
+   eas build --profile development-simulator --platform ios
    ```
 
    ビルドが終わったら、EAS の画面の QR コードかリンクから端末に入れる。Xcode / Android Studio があれば手元でビルドしてもよい。

@@ -263,7 +263,7 @@ moonx/
 
 **決定:** `apps/mobile` は Expo（React Native、New Architecture。開発ビルドを使い、Expo Go は使わない）＋ Expo Router。画面の部品は `packages/ui-native`（ADR-025）だけを使う。ビルドとストアへの提出は EAS Build / EAS Submit、JS だけの修正は EAS Update（チャンネル `staging` / `production`）。iOS（App Store・TestFlight）と Android（Google Play）を最初から両方配る。セッションは Better Auth の Expo プラグインで SecureStore に保存する。保存できなかった入力は expo-sqlite に残す（ADR-021）。PDF は API から受け取り、expo-sharing で共有する。
 
-**理由:** ユーザーが「ネイティブアプリ」「最初から iOS と Android の両方」を選んだ。Expo は TypeScript・React で書けて Web と知識を共有でき、ネイティブのビルド環境（Mac など）を持たずにクラウドでビルド・提出できる。EAS の無料枠で試運転の規模は足りる。開発ビルドにするのは、Unistyles v3 と @gorhom/bottom-sheet がネイティブのモジュールを使い、Expo Go では動かないため（ADR-025）。フォームは Web と同じ TanStack Form と Zod のスキーマを使う。メールのリンク（招待・パスワード再設定）と通知のリンクを Web と同じパスで開けるように、iOS の Universal Links・Android の App Links（`https://{DOMAIN}/...`）と独自スキーム（`moonx://`、staging は `moonx-staging://`）でアプリを開く（4章）。
+**理由:** ユーザーが「ネイティブアプリ」「最初から iOS と Android の両方」を選んだ。Expo は TypeScript・React で書けて Web と知識を共有でき、ネイティブのビルド環境（Mac など）を持たずにクラウドでビルド・提出できる。EAS の無料枠で試運転の規模は足りる。開発ビルドにするのは、Unistyles v3 と @gorhom/bottom-sheet（react-native-reanimated・react-native-gesture-handler も要る）がネイティブのモジュールを使い、Expo Go では動かないため（ADR-025）。フォームは Web と同じ TanStack Form と Zod のスキーマを使う。メールのリンク（招待・パスワード再設定）と通知のリンクを Web と同じパスで開けるように、iOS の Universal Links・Android の App Links（`https://{DOMAIN}/...`）と独自スキーム（`moonx://`、staging は `moonx-staging://`）でアプリを開く（4章）。
 
 **トレードオフ:** ストアの審査があるので、修正の公開に1〜数日かかることがある（JS だけの修正は EAS Update で即時に出せる）。Apple の登録費（年 $99）と Google の登録費（$25 の1回だけ）がかかる（運用費の予算には含めない。ユーザーと合意済み）。招待制のアプリなので、審査用のデモアカウント（staging ではなく production の、審査専用のワークスペース）を用意する（04_deployment-procedure.md）。
 
@@ -467,8 +467,8 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 **決定:**
 
 - **Web（`packages/ui-web`）**: 振る舞いとアクセシビリティは **React Aria Components**（キーボード操作・フォーカスの管理・ARIA・国際化された数値と日付の入力）。見た目は **vanilla-extract**（`*.css.ts` に型付きで書き、ビルド時に静的な CSS になる。実行時の処理なし）。大きさや種類の出し分けは `@vanilla-extract/recipes` の `recipe()`（例: `size: S | M | L | XL`、`variant: accent | primary | secondary | negative`）。React Aria の状態は `data-*` 属性（`[data-hovered]`・`[data-pressed]`・`[data-focus-visible]`・`[data-disabled]` など）で書く。Popover と Tray の切り替えは、幅がトークンの `semantic.breakpoint.tablet` より狭いときに Tray（下からのシート）にする共通の部品で行う。
-- **スマホ（`packages/ui-native`）**: 振る舞いは **@rn-primitives**（Dialog・Popover・Select・Tabs・Checkbox・RadioGroup・Switch・Tooltip・Accordion など、見た目の無い部品）と、React Native 標準のアクセシビリティの属性（`accessibilityRole`・`accessibilityState` など）。トレイ（ボトムシート）は **@gorhom/bottom-sheet**。見た目は **react-native-unistyles**（v3。`StyleSheet.create` と同じ書き方でテーマとブレークポイントを使え、`variants` で大きさと種類を出し分ける）。
-- **部品の名前と API**: design-spec 4.5 の Spectrum の名前にそろえ、Web とスマホで同じ props（例: `<Button variant="accent" size="M">`、`<StatusLight variant="positive">`）にする。props の型は `packages/ui-web` と `packages/ui-native` のそれぞれで定義し、共通の部分（`size`・`variant` などの値の型）は `packages/ui-tokens` に手で書いて置く（`packages/ui-tokens/src/generated/` が `make tokens` の生成物、`src/types.ts` などそれ以外は手で書くファイル）。
+- **スマホ（`packages/ui-native`）**: 振る舞いは **@rn-primitives**（Avatar・Checkbox・Collapsible・RadioGroup・Switch・ToggleGroup と Portal。見た目の無い部品）と、React Native 標準のアクセシビリティの属性（`accessibilityRole`・`accessibilityState` など）。@rn-primitives に無い部品（Tabs・Tooltip・NumberField・DatePicker・ComboBox など）は自作する。トレイ（ボトムシート）は **@gorhom/bottom-sheet**（`Tray`）で、Dialog・Popover・Menu・Picker・ComboBox・DatePicker・ContextualHelp・Panel・MentionTextArea の候補はこの上に作る。見た目は **react-native-unistyles**（v3。`StyleSheet.create` と同じ書き方でテーマとブレークポイントを使え、`variants` で大きさと種類を出し分ける）。
+- **部品の名前と API**: design-spec 4.5 の Spectrum の名前にそろえ、Web とスマホで同じ props（例: `<Button variant="accent" size="M">`、`<StatusLight variant="positive">`）にする。ブラウザにしか意味の無い props（`href`・`as`・`className` など）はスマホの部品が受けず、差は design-spec 4.5 の補足と各部品の TSDoc に書く。props の型は `packages/ui-web` と `packages/ui-native` のそれぞれで定義し、共通の部分（`size`・`variant` などの値の型）は `packages/ui-tokens` に手で書いて置く（`packages/ui-tokens/src/generated/` が `make tokens` の生成物、`src/types.ts` などそれ以外は手で書くファイル）。
 - **画面にスタイルを書かない**: `apps/web` と `apps/mobile` の画面は、部品と、レイアウトの部品（`Flex`・`Grid`・`View` 相当。間隔はトークンの名前だけを受け取る。例: `gap="space-300"`）の組み合わせで作る。画面で `@vanilla-extract/css`・`StyleSheet`・Unistyles を直接使うこと、`style` 属性に値を書くことは、Biome の `noRestrictedImports` と CI の検査で禁止する。必要な見た目が無ければ、design-spec 4.5 に部品を足してから `packages/ui-*` に作る。
 - **Tailwind・NativeWind・CSS-in-JS の実行時ライブラリは使わない。**
 
@@ -520,7 +520,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 - モーダルが対象の項目を持つとき（M2 の根拠シート）は `?modal=evidence&about=<targetType>:<targetId>[:<targetKey>]` とする。`about` の書式は `target` の項目と同じで、パネルの `target` と同時に使える（パネルを開いたまま根拠シートを開ける）。
 - M8 は `?modal=update-template&about=<templateKind>:<targetId>`（`templateKind` は `self_analysis` / `validation` / `business_plan`、`targetId` は自己分析・検証・プランの id）で開く。`about` が無いとき、画面の対象と食い違うとき、操作できない人が開いたときは、何も出さない。
 - 認証が要るルートで未ログインなら `/login?next=<元のパス>` へ移る。
-- `/dev/components` は部品の確認用ページで、開発サーバー（`import.meta.env.DEV`）だけで開く。本番のビルドには入らず、開くと Not Found になる。スマホには作らない（パスを Web とスマホで同じにする決まりの例外）。
+- `/dev/components` は部品の確認用ページで、Web とスマホの両方に同じパスで作る。Web は開発サーバー（`import.meta.env.DEV`）だけで開き、本番のビルドには入らず、開くと Not Found になる。スマホは `app/dev/components.tsx` で、`__DEV__` が真の開発ビルドだけで開き、それ以外のビルドは `/` へ戻す。
 
 | ルート | 画面（design-spec 参照） | 補足 |
 |---|---|---|
@@ -2216,7 +2216,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（スマホの Hermes も対応）。金額の入力は桁区切りのカンマを受け付ける |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |
 | テンプレートの中身 | 設問・EXAMPLE・ガイダンスは1言語（英語）でテンプレートに持ち、UI の多言語化とは別に扱う（design-spec 1.2） |
-| 確認用ページ | `packages/ui-web/src/preview/`（`/dev/components`）は開発専用で、英語の文字列を直接持つ。この章の「UI の文言はカタログに置く」の対象外（`scripts/check-screens.ts` は `apps/web/src`・`apps/mobile/app` だけを見る） |
+| 確認用ページ | `packages/ui-web/src/preview/` と `packages/ui-native/src/preview/`（どちらも `/dev/components`）は開発専用で、英語の文字列を直接持つ。この章の「UI の文言はカタログに置く」の対象外（`scripts/check-screens.ts` は `apps/web/src`・`apps/mobile/app` だけを見る） |
 | 言語を足すとき | `locales/<lang>/` を足し、`users.locale` 列と 4 アカウント設定の言語の選択を足す（今は作らない） |
 
 ---

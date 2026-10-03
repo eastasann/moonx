@@ -774,16 +774,15 @@ make test-web・make test-e2e・make lint・make typecheck・make doc-lint が�
 
 ## Step 18: スマホの部品（packages/ui-native）と開発ビルド
 
-Status:
+Status: done 2026-10-03
 
 ```
 docs/design-spec.md 4章（4.1・4.3・4.4・4.5 の「スマホでの振る舞い」）と docs/02-01_system-design-doc.md の
 ADR-003・ADR-018・ADR-025 に従って、packages/ui-native にスマホの部品を作り、開発ビルドを用意してください。
 
 やること:
-1. 開発ビルド（EAS の profile development）の設定。{APP_ID} が SDD 2章で未確定なら、ユーザーに決めてもらい
-   （ストアに出した後は変えられない）、SDD 2章の表と使っている箇所を置き換えてから設定する。
-   EAS のアカウントでのビルドはユーザーと一緒に行う（docs/03_dev-setup.md 3.5）
+1. 開発ビルド（EAS の profile development）の設定のうち、アカウントと {APP_ID} が要らない部分: `eas.json`・
+   `expo-dev-client`・Babel の Unistyles プラグイン・アプリの入口。残りは Step 18a
 2. Unistyles v3 のテーマ（packages/ui-tokens の生成物。ライト / ダーク・ブレークポイント・large のスケール）。
    テーマは 4 アカウント設定の System / Light / Dark に従う
 3. design-spec 4.5 の全部品を、Web と同じ名前と props で作る（@rn-primitives・@gorhom/bottom-sheet・
@@ -791,13 +790,39 @@ ADR-003・ADR-018・ADR-025 に従って、packages/ui-native にスマホの部
    @rn-primitives に無い NumberField・DatePicker・ComboBox などは自作する（ADR-025）
 4. レイアウトの部品（トークンの名前だけを受け取る）と、4.1 のパターンのスマホの並び（主要な操作の下部固定、
    キーボードで入力欄と保存状態が隠れないこと（4.3））
-5. 確認用の画面（開発ビルドのときだけ開けるルート）
+5. 確認用の画面（開発ビルドのときだけ開けるルート `/dev/components`）
 6. テスト（Jest（jest-expo）＋ React Native Testing Library。make test-mobile）: 種類・大きさ・
    アクセシビリティの属性、トレイの開閉
 
-make test-mobile・make lint・make typecheck が通り、
-開発ビルドを入れた端末かエミュレーターで、確認用の画面に全部品が出て、ライト / ダークを切り替えても崩れない
-（端末での確認はユーザーと一緒に行う）状態をゴールとする。
+make test-mobile・make lint・make typecheck が通り、確認用の画面に全部品が出て（テストで確認）、
+`expo export` で iOS の JS が Metro と Babel のプラグインを通ってバンドルできる状態をゴールとする。
+端末での確認は Step 18a。
+```
+
+---
+
+## Step 18a: 開発ビルドの設定と端末での確認
+
+Status: blocked 2026-10-03
+{APP_ID} の決定（ストアに出した後は変えられない）、EAS のアカウントでのビルド、端末での目視確認にユーザーの操作が要る。
+
+```
+Step 18 で作った packages/ui-native と確認用の画面（/dev/components）を、開発ビルドを入れた端末かエミュレーターで確かめてください。
+
+やること:
+1. {APP_ID} が SDD 2章で未確定なら、ユーザーに決めてもらい（ストアに出した後は変えられない）、SDD 2章の表と
+   使っている箇所を置き換える。app.config.ts に ios.bundleIdentifier・android.package を設定する
+   （staging の版は {APP_ID}.staging）
+2. `eas init` で出た projectId を app.config.ts に設定し、`eas build --profile development` で
+   iOS と Android の開発ビルドを作って端末に入れる（docs/03_dev-setup.md 3.5。ユーザーと一緒に行う）
+3. 端末で `moonx://dev/components` を開き、全部品が出ること、System / Light / Dark の切り替えで崩れないことを確かめる
+4. 端末でしか確かめられない次の挙動を確かめる。Android の `Keyboard` の高さが見える高さと合うか（edge-to-edge）、
+   MentionTextArea の変更と選択のイベントの順、Tooltip の長押しと子の押す操作、Tray の中のスクロールと
+   キーボード、フォントの Fraunces が見出しに出ること、Unistyles の `variants` と動的な関数がバンドルされた
+   アプリで効いていること
+5. 端末で見つかった欠陥は、その場で直す（設計に関わる欠陥は設計ドキュメントを先に直す）
+
+端末で確認用の画面に全部品が出て、ライト / ダークを切り替えても崩れず、4 の挙動が仕様どおりである状態をゴールとする。
 ```
 
 ---

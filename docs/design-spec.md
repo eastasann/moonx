@@ -323,7 +323,9 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 
 - タップ領域は、タッチの端末（スマホ・タブレット。large のスケール）で 44px 以上。デスクトップのマウス操作では 24px 以上（WCAG 2.2。具体値は `docs/06_design-tokens.json`）。
 - スマホでは結合セルのような大きな表を出さない。行はカードにし、1行の編集はシートで行う（原本の「スマホで埋めにくい」を解消する）。
-- スマホのキーボード表示中も、入力欄と保存状態が隠れないようにする。
+- スマホのキーボード表示中も、入力欄と保存状態が隠れないようにする。キーボードが画面に重なる高さを測り、下部に固定した操作と保存状態をその分だけ持ち上げ、フォーカス中の入力欄をキーボードの上までスクロールする。
+- スマホの TabBar は本文の下に並んで高さを取る（本文に重ねない）。下部に固定した操作は本文の領域の下端に付き、タブの下端の安全領域は TabBar が持つ。TabBar の無い画面（ログイン・公開ページ）は固定した操作が安全領域を自分で空ける。
+- スマホの入力欄のフォーカスは、枠の外周線（`border-width.focus-ring`・`color.border.focus`）で示す。
 
 ### 4.4 ビジュアルデザイン方針
 
@@ -410,7 +412,15 @@ Admin:     26 テンプレート一覧 → 27 テンプレート編集 → 新�
 - Dialog・Menu・Picker・ComboBox・DatePicker・ContextualHelp・Panel は、幅が `semantic.breakpoint.tablet` より狭いときトレイで開く。Panel はタブレットの幅では右のドロワー（モーダル）、デスクトップでは右の固定パネル（モーダルにしない）。
 - ComboBox の狭い幅は、閉じているときは入力欄と同じ見た目で、押すとトレイが開き、トレイの中の入力欄で絞り込む。自由記述を許すときは、入力した文字列を確定する操作（Enter か customValueLabel のボタン）を出す。
 - パターン D（リスト＋詳細）は、デスクトップ未満では1ペインずつ全幅で出す（タブレットもスマホと同じ。4.3 の「オーバーレイ」はこの全幅の詳細で満たす）。パターン C はスマホの幅で、フォーカス中の設問のカードだけを出す。
-- 開発専用の確認用ページ（`/dev/components`）に全部品を並べる。
+- スマホの TableView は常に行ごとのカードで出す（`layout` は受けるが全部カード）。React Aria が出す英語の文言（全選択・並べ替えの向き）はスマホに無いので、`selectAllLabel`（全選択のチェックボックスの名前。渡したときだけ描く）と `sortLabels`（並べ替え中の列の向きの読み上げ）を画面が渡す。
+- スマホの Tooltip は長押しで開き、指を離してしばらくしたら閉じる（ホバーが無いため）。子の押す操作は邪魔しない。
+- React Native に無い role と属性（`tabpanel`・`aria-labelledby`・`aria-current`・`aria-sort`）は、スマホでは次の対応にする: TabPanel は role も名前も持たない、Steps の今のステップは `selected`、並べ替え中の列の向きは `sortLabels`（上の TableView）。
+- スマホの押せる Card は VoiceOver / TalkBack で1つの要素として読まれ、中のボタンに届かない。押せる Card の中にボタンを置かず、操作は Card の外に並べる。
+- スマホの Tray は中身がスクロールでき、`isDismissable` を false にすると下へのスワイプ・背景のタップ・戻るボタンで閉じなくなる。AlertDialog は閉じられない Tray で開く（答えるまで残す）。
+- スマホの DatePicker は日付の欄が無いので、空のときの表示のために `placeholder` を受ける（Web は欄に書式が出る）。ComboBox・Picker・MentionTextArea の候補の一覧は、React Native に listbox の role が無いので `role="list"` と各行の `role="option"` で表す。
+- 開発専用の確認用ページ（`/dev/components`。Web とスマホの両方）に全部品を並べる。
+- スマホに作らない部品は RouterProvider と SideNav（デスクトップのサイドバー。スマホは TabBar が担う）の2つ。Breadcrumbs は `aria-label` と子の Breadcrumb だけを受けて何も描かない（画面は ← 戻る を出す）。
+- Web だけにある export はスマホに作らない: `usePanelMode`・`PanelMode`（Panel はスマホで常にトレイ）、`useBelowDesktop`（スマホは常にデスクトップ未満）、`useFocusAnchor`（QuestionCard の中央へのスクロールはスマホに無い）、`TabBarLinkItem`・`TabBarActionItem`（スマホの TabBar は `href` を持たず、全項目が `onPress` を受ける1つの `TabBarItem`）。
 
 ---
 

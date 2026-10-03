@@ -8,7 +8,7 @@ import { type AuthUser, currentUser } from "./lib/session";
 /**
  * Every route declares who may call it, as a route option (SDD 7.1, ADR-005):
  *
- * - `open`: no session (sign-in pages, health, the invitation link, Cloud Scheduler)
+ * - `open`: no session (sign-in pages, health, the invitation link)
  * - `signedIn`: any signed-in user; the route only touches the caller's own data
  * - `operator`: `is_admin` only
  * - `scoped`: the workspace of a resource and the caller's role in it; the handler receives `scope`

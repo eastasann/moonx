@@ -2,6 +2,7 @@ import { formatDate, formatInputNumber, formatRelativeTime } from "@moonx/i18n";
 import type { HistoryEntry } from "@moonx/schemas";
 import {
   ActionButton,
+  AlertDialog,
   Avatar,
   Badge,
   Button,
@@ -15,13 +16,20 @@ import {
   Text,
 } from "@moonx/ui-web";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { useParams } from "@tanstack/react-router";
 import { History, WifiOff } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { isApiError } from "../lib/api-error";
 import { errorText } from "../lib/error-text";
-import { BATCH_UNDOABLE_SOURCES, historyQuery, useRevertMutations } from "../lib/history";
+import {
+  BATCH_UNDOABLE_SOURCES,
+  CREATION_SOURCES,
+  historyQuery,
+  useRevertMutations,
+} from "../lib/history";
 import { changedFields } from "../lib/history-fields";
+import { useGoTo } from "../lib/navigate";
 import type { PanelTarget } from "../lib/panel-target";
 import { useMe } from "../lib/session";
 import { diffText } from "../lib/text-diff";
@@ -174,7 +182,7 @@ function EntryView({
   showUndoBatch: boolean;
   pendingId: string | null;
   onRestore: (entry: HistoryEntry) => void;
-  onUndoBatch: (batchId: string) => void;
+  onUndoBatch: (entry: HistoryEntry) => void;
 }) {
   const { t, i18n } = useTranslation("panels");
   const me = useMe();
@@ -231,11 +239,7 @@ function EntryView({
             </Button>
           ) : null}
           {showUndoBatch && entry.batchId ? (
-            <ActionButton
-              size="S"
-              isDisabled={busy}
-              onPress={() => onUndoBatch(entry.batchId as string)}
-            >
+            <ActionButton size="S" isDisabled={busy} onPress={() => onUndoBatch(entry)}>
               {t("history.undoBatch")}
             </ActionButton>
           ) : null}
@@ -255,12 +259,22 @@ export function HistoryPanel({ target, onClose }: { target: PanelTarget; onClose
   const { t } = useTranslation("panels");
   const query = useInfiniteQuery(historyQuery(target));
   const revert = useRevertMutations();
+  const goTo = useGoTo();
+  const { workspaceId, ideaId } = useParams({ strict: false }) as {
+    workspaceId?: string;
+    ideaId?: string;
+  };
   const [error, setError] = useState<unknown>(null);
+  // The creation being asked about, and whether the last failure came from undoing one.
+  const [confirming, setConfirming] = useState<HistoryEntry | null>(null);
+  const [creationFailed, setCreationFailed] = useState(false);
   const pendingId = revert.entry.isPending
     ? (revert.entry.variables ?? null)
     : revert.batch.isPending
       ? (revert.batch.variables ?? null)
-      : null;
+      : revert.creation.isPending
+        ? (revert.creation.variables ?? null)
+        : null;
 
   const entries = query.data?.pages.flatMap((page) => page.items) ?? [];
   const now = new Date();
@@ -272,11 +286,29 @@ export function HistoryPanel({ target, onClose }: { target: PanelTarget; onClose
       onError: setError,
     });
   };
-  const undoBatch = (batchId: string) => {
+  const undoBatch = (entry: HistoryEntry) => {
     setError(null);
-    revert.batch.mutate(batchId, {
+    setCreationFailed(false);
+    if (CREATION_SOURCES.includes(entry.source)) return setConfirming(entry);
+    revert.batch.mutate(entry.batchId as string, {
       onSuccess: () => toasts.add({ title: t("history.undone"), variant: "positive" }),
       onError: setError,
+    });
+  };
+  // What was made is gone, and so is the screen showing it: the copy goes back to the list of
+  // ideas, a plan draft back to its idea.
+  const undoCreation = (entry: HistoryEntry) => {
+    setConfirming(null);
+    revert.creation.mutate(entry.batchId as string, {
+      onSuccess: () => {
+        toasts.add({ title: t("history.undone"), variant: "positive" });
+        const ideas = `/w/${workspaceId}/ideas`;
+        goTo(entry.source === "plan_draft" && ideaId ? `${ideas}/${ideaId}` : ideas);
+      },
+      onError: (failure) => {
+        setCreationFailed(true);
+        setError(failure);
+      },
     });
   };
 
@@ -307,7 +339,7 @@ export function HistoryPanel({ target, onClose }: { target: PanelTarget; onClose
         {error ? (
           <InlineAlert variant="negative" heading={t("history.revertFailed")}>
             {isApiError(error) && error.code === "CONFLICT"
-              ? t("history.alreadyUndone")
+              ? t(creationFailed ? "history.creation.blocked" : "history.alreadyUndone")
               : errorText(t, error)}
           </InlineAlert>
         ) : null}
@@ -350,6 +382,23 @@ export function HistoryPanel({ target, onClose }: { target: PanelTarget; onClose
       closeLabel={t("app:close")}
     >
       <div aria-busy={query.isPending}>{body}</div>
+      <AlertDialog
+        variant="negative"
+        isOpen={confirming !== null}
+        onOpenChange={(open) => !open && setConfirming(null)}
+        title={
+          confirming?.source === "plan_draft"
+            ? t("history.creation.plan_draft.title")
+            : t("history.creation.duplicate.title")
+        }
+        primaryActionLabel={t("history.creation.confirm")}
+        cancelLabel={t("history.creation.keep")}
+        onPrimaryAction={() => confirming && undoCreation(confirming)}
+      >
+        {confirming?.source === "plan_draft"
+          ? t("history.creation.plan_draft.body")
+          : t("history.creation.duplicate.body")}
+      </AlertDialog>
     </Panel>
   );
 }

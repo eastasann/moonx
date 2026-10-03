@@ -13,6 +13,7 @@
   "ARCHIVED": "This is archived. Restore it to make changes.",
   "LAST_OWNER": "A workspace needs at least one Owner.",
   "CANNOT_LEAVE_PERSONAL": "You can't leave your personal workspace.",
+  "PERSONAL_OWNER": "You can't change the owner of a personal workspace.",
   "ALREADY_MEMBER": "This person is already a member.",
   "INVITATION_PENDING": "An invitation has already been sent to this email address.",
   "INVITATION_ALREADY_ACCEPTED": "This invitation has already been accepted.",

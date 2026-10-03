@@ -19,7 +19,7 @@
 | Bun | 1.2 以上（CI と同じ版にそろえる） | パッケージ管理・API・テスト | 全員 |
 | Docker（Docker Desktop・OrbStack など。Compose v2） | 最近の版 | ローカルの PostgreSQL 17（`make db-up`。開発用の DB `moonx` とテスト用の DB `moonx_test`） | 全員 |
 | Node.js | LTS（22 以上） | Expo CLI・Metro・EAS CLI が使う。Web と API は Bun だけで動く | スマホを触る人 |
-| EAS CLI（`bun add -g eas-cli`） | `apps/mobile/eas.json` の `cli.version` を満たす版 | 開発ビルド・EAS の環境変数・ストアの鍵（`eas credentials`）。ストア用のビルドと EAS Update は `make mobile-build` / `make mobile-update` から使う | スマホを触る人 |
+| EAS CLI（`bun add -g eas-cli`） | `apps/mobile/eas.json` の `cli.version` を満たす版 | 開発ビルド・EAS の環境変数・TestFlight への提出の鍵（`eas credentials`）。配布用のビルドと EAS Update は `make mobile-build` / `make mobile-update` から使う | スマホを触る人 |
 | Expo の開発ビルド（端末に入れるアプリ） | 開発中のコードと同じ runtime | 実機・エミュレーターで動かす（3.5）。Expo Go は使わない（ADR-003） | スマホを触る人 |
 | Xcode | 最新の安定版（macOS のみ） | iOS シミュレーター。任意（EAS の開発ビルドで代わりがきく） | 任意 |
 | Android Studio | 最新の安定版 | Android エミュレーター。任意 | 任意 |
@@ -35,15 +35,14 @@
 | サービス | 用途 | 備考 |
 |---|---|---|
 | GitHub | リポジトリ・GitHub Actions | ローカル開発にも要る（リポジトリへの書き込み権限） |
-| Google Cloud | Cloud Run・Artifact Registry・Secret Manager・Cloud Scheduler・Cloud Storage・Cloud Logging / Monitoring | プロジェクト `{GCP_PROJECT_ID}` を staging と production で共有する。請求先アカウントが要る |
+| Google Cloud | Cloud Run・Artifact Registry・Secret Manager・Cloud Storage・Cloud Logging / Monitoring | プロジェクト `{GCP_PROJECT_ID}` を staging と production で共有する。請求先アカウントが要る |
 | Google OAuth クライアント | Google ログイン | `{GCP_PROJECT_ID}` の中で環境ごとに、コンソールで作る（6章） |
 | Cloudflare | `{DOMAIN}` の取得（Registrar）・DNS・Worker `moonx-web-staging` / `moonx-web-production` | |
 | Neon | PostgreSQL（プロジェクト `moonx`、DB 名 `moonx`、ブランチ `production` / `staging`） | 無料プラン（枠の扱いは ADR-008） |
 | Resend | 招待とパスワード再設定のメール | 無料プラン。`{DOMAIN}` の確認が要る |
 | Sentry | エラーの追跡（プロジェクト web / mobile / api） | 無料プラン |
-| Expo | EAS Build / Submit / Update・開発ビルド | 無料プラン。スマホを触る人はローカル開発でも要る（開発ビルドを EAS で作るため） |
-| Apple Developer Program | App Store・TestFlight | 年会費がかかる（ADR-003）。登録の区分（個人 / 組織）は、登録の前にユーザーが決める（ADR-003。5.4 A） |
-| Google Play Console | Google Play | 登録費がかかる（ADR-003）。**個人の開発者アカウント**で登録する（ADR-003）。製品版の最初の公開の前にクローズドテストが要る（条件と手順は 04 4.3） |
+| Expo | EAS Build / Submit（TestFlight だけ）/ Update・開発ビルド | 無料プラン。スマホを触る人はローカル開発でも要る（開発ビルドを EAS で作るため） |
+| Apple Developer Program | TestFlight・端末を登録した内部配布 | 年会費がかかる（ADR-003）。個人で登録する（5.4 A）。Google Play Console は、ストアに公開しない間は要らない（ADR-003） |
 
 ---
 
@@ -75,7 +74,7 @@ make setup
 |---|---|---|
 | `.env` | `BETTER_AUTH_SECRET` | `make setup` が乱数を入れる。空のままだと API が起動しないので、`.env` を手で作った場合は `openssl rand -base64 32` の値を入れる |
 | `.env` | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google ログインをローカルで試すときだけ。local 用の OAuth クライアントの値（6章） |
-| `.env` | 上の2つ以外 | 雛形のまま（local の値）。`DATABASE_URL_TEST` はテスト用の DB `moonx_test`（7章）。`RESEND_API_KEY`・`PROXY_SHARED_SECRET`・`CRON_OIDC_AUDIENCE` など local で使わないものは空のまま |
+| `.env` | 上の2つ以外 | 雛形のまま（local の値）。`DATABASE_URL_TEST` はテスト用の DB `moonx_test`（7章）。`RESEND_API_KEY`・`PROXY_SHARED_SECRET` など local で使わないものは空のまま |
 | `apps/mobile/.env` | `EXPO_PUBLIC_API_BASE_URL` | スマホで動かすときだけ。開発 PC の IP にする（3.5） |
 | `apps/mobile/.env` | `EXPO_PUBLIC_APP_ENV`・`EXPO_PUBLIC_SENTRY_DSN` | 雛形のまま（`local` / 空） |
 
@@ -221,14 +220,8 @@ make infra-apply ENV=staging    # 適用
 
 #### A. アカウントとドメイン
 
-- [ ] 1章のアカウントを作る（本人確認と審査に数日かかるので早めに）。Google Play は個人の開発者アカウントで登録する（ADR-003）
-- [ ] Apple Developer Program は、登録の区分（個人 / 組織）をユーザーに決めてもらってから登録する（ADR-003。ストアにアプリを登録する（K）より前に決める）。区分ごとに要るもの:
-
-  | 区分 | 要るもの |
-  |---|---|
-  | 個人 | 本人の Apple Account（2ファクタ認証を ON）と本人確認。ストアの販売元に個人名が出る |
-  | 組織 | 組織の D-U-N-S 番号（取得に日数がかかる）、組織を代表して契約できる権限、組織のウェブサイト |
-
+- [ ] 1章のアカウントを作る（本人確認と審査に数日かかるので早めに）
+- [ ] Apple Developer Program に個人で登録する（ADR-003）。本人の Apple Account（2ファクタ認証を ON）と本人確認が要る。TestFlight と、端末を登録した内部配布に使う。K の前に済ませる
 - [ ] Cloudflare Registrar で `{DOMAIN}` を取る（ゾーンが自動で作られる）。自動更新を ON にする
 - [ ] Cloudflare で API トークンを2つ作る（どちらも対象のゾーンは `{DOMAIN}` だけにする）
   - Terraform 用: `envs/shared` が管理する Cloudflare のゾーンの設定（[SDD 2章「インフラ管理」](02-01_system-design-doc.md#インフラ管理) の Cloudflare の行。メールの DNS レコード・HSTS・`/api/auth/*` のレート制限ルール）をすべて変えられる権限にする。`ENV=shared` を動かす人だけが持ち、GitHub には置かない（5.1）
@@ -252,7 +245,6 @@ make infra-apply ENV=staging    # 適用
     run.googleapis.com \
     artifactregistry.googleapis.com \
     secretmanager.googleapis.com \
-    cloudscheduler.googleapis.com \
     storage.googleapis.com \
     iam.googleapis.com \
     iamcredentials.googleapis.com \
@@ -415,7 +407,7 @@ make infra-apply ENV=staging    # 適用
 
 #### I. Terraform（`staging` / `production`。初回は2回に分けて apply する）
 
-初回は API のイメージとシークレットの値がまだ無いので、2回に分ける（ADR-015）。1回目でシークレットの入れ物などを作り、値とイメージを入れてから、2回目で Cloud Run と Cloud Scheduler を作る。
+初回は API のイメージとシークレットの値がまだ無いので、2回に分ける（ADR-015）。1回目でシークレットの入れ物などを作り、値とイメージを入れてから、2回目で Cloud Run を作る。
 
 1. - [ ] `infra/terraform/envs/staging/` の変数に、秘密でない値を入れる（`{GCP_PROJECT_ID}`・`{DOMAIN}`・`GOOGLE_CLIENT_ID`・`SENTRY_DSN`・staging の `MAIL_ALLOWLIST` など）と、`bootstrap = true`
 2. - [ ] 1回目: `make infra-plan ENV=staging` で差分を読み、`make infra-apply ENV=staging`（できるものは ADR-015 の②）
@@ -427,18 +419,8 @@ make infra-apply ENV=staging    # 適用
      asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api --include-tags
    ```
 
-5. - [ ] 2回目: `bootstrap = false` と、変数 `api_image` に 4 のイメージを入れて `make infra-apply ENV=staging`。Cloud Run `moonx-api-staging` と Cloud Scheduler のジョブ `moonx-staging-due-notifications` ができる。以後のイメージは CI が出す（ADR-015）
-6. - [ ] cron の設定を確かめる。Cloud Run の環境変数 `CRON_OIDC_AUDIENCE` と、ジョブの `oidcToken.audience` が1文字も違わないこと（値の決まりは [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数)）。ジョブの `oidcToken.serviceAccountEmail` が `CRON_INVOKER_EMAIL` と同じこと。ジョブを手で1回動かし、成功を確かめる
-
-   ```bash
-   gcloud run services describe moonx-api-staging --region=asia-southeast1 \
-     --format="yaml(spec.template.spec.containers[0].env)" | grep -A1 -E 'CRON_OIDC_AUDIENCE|CRON_INVOKER_EMAIL'
-   gcloud scheduler jobs describe moonx-staging-due-notifications --location=asia-southeast1 \
-     --format="yaml(httpTarget.uri,httpTarget.oidcToken)"
-   gcloud scheduler jobs run moonx-staging-due-notifications --location=asia-southeast1
-   ```
-
-7. - [ ] production だけ: Terraform が作った稼働時間チェックとアラートが、G の通知のチャンネル（メール）に向いていることを Cloud Monitoring の画面で確かめる（05 2章）
+5. - [ ] 2回目: `bootstrap = false` と、変数 `api_image` に 4 のイメージを入れて `make infra-apply ENV=staging`。Cloud Run `moonx-api-staging` ができる。以後のイメージは CI が出す（ADR-015）
+6. - [ ] production だけ: Terraform が作った稼働時間チェックとアラートが、G の通知のチャンネル（メール）に向いていることを Cloud Monitoring の画面で確かめる（05 2章）
 
 **シークレットの値（Secret Manager）**
 
@@ -452,7 +434,7 @@ read -rs VALUE; printf '%s' "$VALUE" | gcloud secrets versions add moonx-$TARGET
 read -rs VALUE; printf '%s' "$VALUE" | gcloud secrets versions add moonx-$TARGET-google-client-secret --data-file=-; unset VALUE
 read -rs VALUE; printf '%s' "$VALUE" | gcloud secrets versions add moonx-$TARGET-resend-api-key --data-file=-; unset VALUE
 
-# セッションの署名鍵（入れ替えると全員がログアウトする。05 3.15）
+# セッションの署名鍵（入れ替えると全員がログアウトする。05 3.14）
 openssl rand -base64 32 | tr -d '\n' | gcloud secrets versions add moonx-$TARGET-better-auth-secret --data-file=-
 
 # Worker と API の共有シークレット（同じ値を Worker にも入れる。J）。初回は1つの値だけ
@@ -479,7 +461,7 @@ printf '%s' "$proxy_secret" | gcloud secrets versions add moonx-$TARGET-proxy-sh
 
 - [ ] `wrangler.jsonc` の env `staging` に、カスタムドメイン `staging.{DOMAIN}`（production は `{DOMAIN}`）を書く。DNS レコードは、最初の `make deploy-web` のときに Worker のカスタムドメインが作る。同じホスト名のレコードを Terraform では作らない（二重に作らない）
 
-#### K. Expo / EAS とストア（1回だけ）
+#### K. Expo / EAS と配布（1回だけ）
 
 - [ ] EAS のプロジェクトを作り、チャンネルを用意する
 
@@ -512,12 +494,11 @@ printf '%s' "$proxy_secret" | gcloud secrets versions add moonx-$TARGET-proxy-sh
   ```
 
 - [ ] expo.dev の Access tokens で CI 用のトークンを作り、リポジトリのシークレットに入れる: `gh secret set EXPO_TOKEN`
-- [ ] App Store Connect でアプリを2つ作る（A で決めた区分で Apple Developer Program に登録してから）: `{APP_ID}`（production）と `{APP_ID}.staging`（staging。TestFlight だけで使う）
+- [ ] App Store Connect でアプリを2つ作る（A で Apple Developer Program に登録してから）: `{APP_ID}`（production）と `{APP_ID}.staging`（staging）。どちらも TestFlight だけで使う
 - [ ] App Store Connect の API キー（App Manager）を作り、EAS に登録する: `eas credentials --platform ios`
-- [ ] Google Play Console（個人の開発者アカウント）でアプリを2つ作る: `{APP_ID}` と `{APP_ID}.staging`（staging は内部テストだけで使う）
-- [ ] Google Play に提出するためのサービスアカウントと JSON 鍵を作り、Play Console の「ユーザーと権限」で招待し、EAS に登録する: `eas credentials --platform android`（鍵は EAS にだけ置き、手元のファイルは消す）
-- [ ] Android の最初の1回は、それぞれのアプリで Play Console に手で上げる（EAS Submit は2回目から使える。04 4.3）
-- [ ] `{APP_ID}` のクローズドテストのテスターを集め始める（条件と段取りは 04 4.3）
+- [ ] 作ったアプリの Apple ID（`ascAppId`）を、`eas.json` の `submit.staging.ios`・`submit.production.ios` に書く（`make mobile-build` が非対話で TestFlight に提出するのに要る）
+- [ ] 使う人を App Store Connect の「ユーザーとアクセス」に招待し、TestFlight の内部テスターのグループに入れる（上限100人。04 4.3）
+- [ ] Android は何も登録しない。最初の `make mobile-build ENV=staging` が出すインストール用のリンクで、端末に入れて確かめる（04 4.3）
 
 #### L. 最初のデプロイと運営者
 
@@ -531,7 +512,7 @@ printf '%s' "$proxy_secret" | gcloud secrets versions add moonx-$TARGET-proxy-sh
   make admin-create EMAIL=<運営者のメール>
   ```
 
-- [ ] 運営者でログインし、デプロイ後の確認（04 6章）だけに使うワークスペースを1つ作る（M7）。以後の確認は毎回このワークスペースで行う。審査用のワークスペース（04 4.3）とは別にする
+- [ ] 運営者でログインし、デプロイ後の確認（04 6章）だけに使うワークスペースを1つ作る（M7）。以後の確認は毎回このワークスペースで行う
 - [ ] staging の `MAIL_ALLOWLIST` に、確かめに使うメールを入れる（Terraform の変数。`make infra-apply ENV=staging`）
 - [ ] デプロイ後の確認をする（04 6章）
 - [ ] production でも、昇格（GitHub の環境 `production` の承認が要る）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・確認用のワークスペースの作成・デプロイ後の確認をする
@@ -634,7 +615,7 @@ fix/xxx     ──squash──▶   │
 3. staging で確かめたら、同じ SHA を `deploy/production/version` に書いた昇格の PR をマージ → GitHub の環境 `production` の承認のあと、production にデプロイする
 4. 戻すときは昇格の PR を revert する
 
-スマホも同じ昇格で出す（EAS Update か、EAS Build と Submit かは、`deploy.yml` が Expo の fingerprint で選ぶ。04 2章）。版の呼び方は、Web と API がコミット SHA。スマホのストアの版は `app.config.ts` の version（SemVer）。手順の詳細は [04_deployment-procedure.md](04_deployment-procedure.md)。
+スマホも同じ昇格で出す（EAS Update か、EAS Build と Submit かは、`deploy.yml` が Expo の fingerprint で選ぶ。04 2章）。版の呼び方は、Web と API がコミット SHA。スマホの配る版は `app.config.ts` の version（SemVer）。手順の詳細は [04_deployment-procedure.md](04_deployment-procedure.md)。
 
 ### PR のルール
 
@@ -686,11 +667,10 @@ fix/xxx     ──squash──▶   │
 | スマホから API に繋がらない | IP が違う、別の Wi-Fi、PC のファイアウォール | `apps/mobile/.env` の `EXPO_PUBLIC_API_BASE_URL` を見直し、`make dev-mobile` を起動し直す。端末のブラウザで `http://<開発 PC の IP>:3000/api/health` が開くか確かめる |
 | iPhone から API に繋がらない（IP は正しい） | ローカルネットワークの許可が無い | iPhone の設定 → プライバシーとセキュリティ → ローカルネットワークで開発ビルドを許可する |
 | Expo Go で開くと動かない（Unistyles などのエラー） | Expo Go は使わない作り（ADR-003） | 開発ビルドで開く（3.5） |
-| スマホで `http://` に繋がらない | ストア用（release）のビルドで動かしている | 開発ビルド（`--profile development`）を使う |
+| スマホで `http://` に繋がらない | 配布用（release）のビルドで動かしている | 開発ビルド（`--profile development`）を使う |
 | 開発ビルドで「ネイティブのモジュールが無い」 | ネイティブの依存が変わった | 開発ビルドを作り直す（3.5 の `eas build --profile development`） |
 | `.env` を変えてもスマホに反映されない | `EXPO_PUBLIC_*` を直下の `.env` に書いた、Metro を起動し直していない | `apps/mobile/.env` に書き、`make dev-mobile` を起動し直す |
 | 招待やパスワード再設定のメールが来ない | local はメールを送らない（`MAIL_TRANSPORT=console`） | `make dev` の出力（API のログ）に出るリンクを使う |
-| 期限の通知を試したい | 定期実行は local に無い | `make cron-due`（local だけ。staging ではジョブを手で実行する。04 4.1） |
 | 色や余白が古いまま | トークンの生成物が古い | `make tokens` |
 | CI が「トークンの差分」で落ちる | `make tokens` の実行を忘れた | `make tokens` を動かしてコミットする |
 | `make lint` が画面のスタイルで落ちる | 画面で `StyleSheet`・`@vanilla-extract/css`・Unistyles・`style` 属性を使った（ADR-025） | 部品（`packages/ui-web` / `packages/ui-native`）を使う。要る見た目が無ければ、design-spec 4.5 に部品を足してから作る |

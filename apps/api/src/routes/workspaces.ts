@@ -2,7 +2,7 @@ import { schema } from "@moonx/db";
 import {
   createInvitationBodySchema,
   createWorkspaceBodySchema,
-  invitationWithLinkSchema,
+  invitationResultSchema,
   listInvitationsQuerySchema,
   memberSchema,
   mentionCandidatesQuerySchema,
@@ -55,7 +55,30 @@ const memberParams = z.object({
   userId: z.union([z.uuid(), z.literal("me")]),
 });
 
-/** W0-W4 and W8 (SDD 5.5). W5-W7 live in `invitations.ts`. */
+/**
+ * 409 PERSONAL_OWNER: the person a personal workspace was made for stays its Owner against
+ * everyone else (SDD 5.5 W3). Their own choices (demoting themself, leaving) have their own checks.
+ */
+async function assertNotPersonalOwner(
+  tx: Executor,
+  workspaceId: string,
+  targetId: string,
+  actorId: string,
+): Promise<void> {
+  if (targetId === actorId) return;
+  const [workspace] = await tx
+    .select({
+      isPersonal: schema.workspaces.isPersonal,
+      createdById: schema.workspaces.createdById,
+    })
+    .from(schema.workspaces)
+    .where(eq(schema.workspaces.id, workspaceId));
+  if (workspace?.isPersonal && workspace.createdById === targetId) {
+    throw new ApiError("PERSONAL_OWNER", "The owner of a personal workspace cannot be changed");
+  }
+}
+
+/** W0-W4 and W8 (SDD 5.5). W5 and W7 live in `invitations.ts`. */
 export function workspaceRoutes(ctx: AppContext) {
   const { db } = ctx;
   return new Elysia({ name: "moonx-workspaces" })
@@ -142,6 +165,7 @@ export function workspaceRoutes(ctx: AppContext) {
           const target = members.find((m) => m.userId === targetId);
           if (!target) throw new ApiError("NOT_FOUND", "Member not found");
           if (target.role === body.role) return;
+          await assertNotPersonalOwner(tx, scope.workspaceId, targetId, user.id);
           const owners = members.filter((m) => m.role === "owner").length;
           if (target.role === "owner" && owners <= 1) {
             throw new ApiError("LAST_OWNER", "A workspace needs at least one Owner");
@@ -193,6 +217,7 @@ export function workspaceRoutes(ctx: AppContext) {
             .for("update");
           const target = members.find((m) => m.userId === targetId);
           if (!target) throw new ApiError("NOT_FOUND", "Member not found");
+          await assertNotPersonalOwner(tx, scope.workspaceId, targetId, user.id);
           if (target.role === "owner" && members.filter((m) => m.role === "owner").length <= 1) {
             throw new ApiError("LAST_OWNER", "Make someone else Owner first");
           }
@@ -254,7 +279,7 @@ export function workspaceRoutes(ctx: AppContext) {
     .post(
       "/workspaces/:workspaceId/invitations",
       async ({ body, user, set, scope }) => {
-        const { invitation, link } = await issueInvitation(db, {
+        const { invitation } = await issueInvitation(db, {
           publicUrl: ctx.config.publicUrl,
           now: ctx.now(),
           inviter: user,
@@ -264,12 +289,12 @@ export function workspaceRoutes(ctx: AppContext) {
           rateLimited: true,
         });
         set.status = 201;
-        return { invitation, link };
+        return { invitation };
       },
       {
         params: workspaceParams,
         body: createInvitationBodySchema,
-        response: { 201: invitationWithLinkSchema },
+        response: { 201: invitationResultSchema },
         scoped: { to: { workspaceId: "workspaceId" }, need: "owner" },
       },
     )

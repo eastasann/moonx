@@ -125,7 +125,7 @@ export async function issueInvitation(
 
 /**
  * Gives an invitation a new token and a fresh 7 days and makes it pending again; the previous
- * link stops working (design-spec 6.16). Used by W5, W6 and a repeated `admin-create`, which
+ * link stops working (design-spec 6.16). Used by W5 and a repeated `admin-create`, which
  * passes `grantsAdmin` to upgrade a pending workspace-less invitation from AD9.
  */
 export async function reissueInvitation(

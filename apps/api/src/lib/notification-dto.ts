@@ -96,10 +96,6 @@ async function accessibleIds(db: Executor, userId: string, rows: Row[]): Promise
   return ok;
 }
 
-function dueTitle(stage: string | null, title: string): string {
-  return i18n.t(`common:notification.due_${stage}`, { title });
-}
-
 function decisionTitle(actor: string, summary: DecisionLogSummary | undefined): string {
   if (!summary) return i18n.t("common:notification.decision", { actor, idea: "" }).trimEnd();
   if (summary.kind === "go_no_go") {
@@ -169,8 +165,7 @@ export async function listNotifications(
     }
   }
   const commentIds = rows.flatMap((r) => (r.commentId ? [r.commentId] : []));
-  const itemIds = rows.flatMap((r) => (r.executionItemId ? [r.executionItemId] : []));
-  const [comments, items, accessible] = await Promise.all([
+  const [comments, accessible] = await Promise.all([
     commentIds.length === 0
       ? []
       : db
@@ -181,16 +176,9 @@ export async function listNotifications(
           })
           .from(schema.comments)
           .where(inArray(schema.comments.id, commentIds)),
-    itemIds.length === 0
-      ? []
-      : db
-          .select({ id: schema.executionItems.id, title: schema.executionItems.title })
-          .from(schema.executionItems)
-          .where(inArray(schema.executionItems.id, itemIds)),
     accessibleIds(db, userId, rows),
   ]);
   const commentOf = new Map(comments.map((c) => [c.id, c]));
-  const itemOf = new Map(items.map((i) => [i.id, i.title]));
   const labels = new Map<string, string>();
   for (const row of rows) {
     if (row.kind !== "mention" && row.kind !== "comment") continue;
@@ -228,12 +216,10 @@ export async function listNotifications(
       ) as string;
       title = i18n.t(`common:notification.${row.kind}`, { actor: actorName, target });
       text = comment && !comment.deletedAt ? excerpt(comment.body) : null;
-    } else if (row.kind === "decision") {
+    } else {
       const summary = row.decisionLogEntryId ? decisions.get(row.decisionLogEntryId) : undefined;
       title = decisionTitle(actorName, summary);
       text = summary?.reasonExcerpt ?? null;
-    } else {
-      title = dueTitle(row.dueStage, itemOf.get(row.executionItemId ?? "") ?? "");
     }
     return {
       id: row.id,

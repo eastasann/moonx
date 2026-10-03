@@ -613,19 +613,7 @@ export function buildPitchDeck(input: PitchDeckInput): PitchDeck {
     base("why_us", {
       type: "text",
       editSource: 10,
-      bullets: [
-        bullet("P.10.1", t("plan:pitch.source.s10FounderAdvantages")),
-        bullet(
-          "P.10.2",
-          t("plan:pitch.source.s10MissingCapabilities"),
-          t("plan:pitch.label.missingCapabilities"),
-        ),
-        bullet(
-          "P.10.3",
-          t("plan:pitch.source.s10HowWillWeFillTheGaps"),
-          t("plan:pitch.label.fillGaps"),
-        ),
-      ],
+      bullets: [bullet("P.10.1", t("plan:pitch.source.s10FounderAdvantages"))],
     });
 
   const nextStep = () =>

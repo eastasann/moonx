@@ -57,40 +57,6 @@
         "operationId": "getApiAvatarsByName"
       }
     },
-    "/internal/cron/due-notifications": {
-      "post": {
-        "responses": {
-          "200": {
-            "description": "Response for status 200",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$schema": "https://json-schema.org/draft/2020-12/schema",
-                  "type": "object",
-                  "properties": {
-                    "checkedItems": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "created": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    }
-                  },
-                  "required": [
-                    "checkedItems",
-                    "created"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "postInternalCronDue-notifications"
-      }
-    },
     "/api/v1/me": {
       "get": {
         "responses": {
@@ -831,13 +797,17 @@
                             "type": "string",
                             "format": "date-time",
                             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "isPersonalOwner": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
                           "user",
                           "email",
                           "role",
-                          "joinedAt"
+                          "joinedAt",
+                          "isPersonalOwner"
                         ]
                       }
                     }
@@ -944,13 +914,17 @@
                       "type": "string",
                       "format": "date-time",
                       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "isPersonalOwner": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
                     "user",
                     "email",
                     "role",
-                    "joinedAt"
+                    "joinedAt",
+                    "isPersonalOwner"
                   ]
                 }
               }
@@ -1167,14 +1141,10 @@
                         "expiresAt",
                         "acceptedAt"
                       ]
-                    },
-                    "link": {
-                      "type": "string"
                     }
                   },
                   "required": [
-                    "invitation",
-                    "link"
+                    "invitation"
                   ]
                 }
               }
@@ -1378,14 +1348,10 @@
                         "expiresAt",
                         "acceptedAt"
                       ]
-                    },
-                    "link": {
-                      "type": "string"
                     }
                   },
                   "required": [
-                    "invitation",
-                    "link"
+                    "invitation"
                   ]
                 }
               }
@@ -1393,44 +1359,6 @@
           }
         },
         "operationId": "postApiV1InvitationsByInvitationIdResend"
-      }
-    },
-    "/api/v1/invitations/{invitationId}/link": {
-      "post": {
-        "parameters": [
-          {
-            "name": "invitationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Response for status 200",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$schema": "https://json-schema.org/draft/2020-12/schema",
-                  "type": "object",
-                  "properties": {
-                    "link": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "link"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "postApiV1InvitationsByInvitationIdLink"
       }
     },
     "/api/v1/invitations/{invitationId}": {

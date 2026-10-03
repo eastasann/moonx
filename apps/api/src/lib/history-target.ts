@@ -192,7 +192,9 @@ export async function assertOpen(
       .from(schema.businessPlans)
       .where(eq(schema.businessPlans.id, ids.planId))
       .for("share");
-    if (plan?.archivedAt) throw new ApiError("ARCHIVED", "Archived items cannot be changed");
+    // No row: the plan was deleted while this request waited for its lock (H3 undoes a draft).
+    if (!plan) throw new ApiError("NOT_FOUND", "Resource not found");
+    if (plan.archivedAt) throw new ApiError("ARCHIVED", "Archived items cannot be changed");
   }
   if (ids.ideaId) {
     const [idea] = await tx
@@ -200,6 +202,7 @@ export async function assertOpen(
       .from(schema.ideas)
       .where(eq(schema.ideas.id, ids.ideaId))
       .for("share");
-    if (idea?.archivedAt) throw new ApiError("ARCHIVED", "Archived items cannot be changed");
+    if (!idea) throw new ApiError("NOT_FOUND", "Resource not found");
+    if (idea.archivedAt) throw new ApiError("ARCHIVED", "Archived items cannot be changed");
   }
 }

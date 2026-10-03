@@ -309,7 +309,7 @@ describe("invitations", () => {
     const anasView = await call(
       t.app,
       "POST",
-      `/api/v1/invitations/${invite.body.invitation.id}/link`,
+      `/api/v1/invitations/${invite.body.invitation.id}/resend`,
       { as: ana },
     );
     expect(anasView.status).toBe(403);
@@ -318,7 +318,7 @@ describe("invitations", () => {
       .select()
       .from(schema.invitations)
       .where(eq(schema.invitations.email, "new.member@bcdx.example"));
-    const asMember = await call(t.app, "POST", `/api/v1/invitations/${pending?.id}/link`, {
+    const asMember = await call(t.app, "POST", `/api/v1/invitations/${pending?.id}/resend`, {
       as: kenji,
     });
     expect(asMember.status).toBe(403);

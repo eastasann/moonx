@@ -24,6 +24,7 @@
     "changeRole": "Change to {{role}}",
     "remove": "Remove from workspace",
     "lastOwner": "Make someone else Owner first",
+    "personalOwner": "Owner of this personal workspace",
     "roleChanged": "{{name}} is now {{role}}",
     "removed": "{{name}} was removed from the workspace",
     "removeTitle": "Remove {{name}}?",
@@ -86,15 +87,8 @@
       "all": "No invitations yet"
     },
     "menuLabel": "Actions for the invitation to {{email}}",
-    "copyLink": "Copy link",
     "resend": "Resend",
     "cancel": "Cancel invitation",
-    "linkCopied": "Link copied. The previous link no longer works.",
-    "manualLink": {
-      "heading": "Copy this link yourself",
-      "body": "Your browser did not allow copying. Select the link below and copy it. The previous link no longer works.",
-      "label": "Invitation link"
-    },
     "resent": "Invitation resent to {{email}}",
     "cancelled": "Invitation to {{email}} cancelled",
     "cancelTitle": "Cancel the invitation to {{email}}?",

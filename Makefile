@@ -13,7 +13,7 @@ BACKUP_DATE = $(shell date -u +%Y-%m-%d)
 .PHONY: install setup dev dev-api dev-web dev-mobile build build-web build-api-image \
 	test test-domain test-api test-web test-mobile test-e2e lint format typecheck \
 	db-up db-down db-generate db-migrate db-seed db-reset db-studio tokens openapi doc-lint \
-	cron-due admin-create infra-plan infra-apply deploy-api deploy-web mobile-update mobile-build db-backup
+	admin-create infra-plan infra-apply deploy-api deploy-web mobile-update mobile-build db-backup
 
 require-%:
 	@test -n "$($*)" || { echo "$* is required (example: make $(MAKECMDGOALS) $*=...)" >&2; exit 2; }
@@ -125,9 +125,6 @@ openapi:
 doc-lint:
 	scripts/doc-lint.sh --docs
 
-cron-due:
-	bun run --cwd apps/api cron-due
-
 admin-create: require-EMAIL
 	bun run --cwd apps/api admin-create $(EMAIL)
 
@@ -148,7 +145,8 @@ mobile-update: require-ENV
 	cd apps/mobile && bunx eas-cli update --channel $(ENV) --environment $(EAS_ENV_$(ENV)) --non-interactive --auto
 
 mobile-build: require-ENV
-	cd apps/mobile && bunx eas-cli build --profile $(ENV) --platform all --non-interactive --auto-submit
+	cd apps/mobile && bunx eas-cli build --profile $(ENV) --platform android --non-interactive
+	cd apps/mobile && bunx eas-cli build --profile $(ENV) --platform ios --non-interactive --auto-submit
 
 db-backup: require-ENV require-GCP_PROJECT_ID require-DATABASE_URL_DIRECT
 	@pg_dump -Fc -d "$(DATABASE_URL_DIRECT)" -f $(BACKUP_DATE).dump

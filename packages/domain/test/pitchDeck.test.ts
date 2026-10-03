@@ -292,15 +292,32 @@ describe("bullet counts (design-spec 6.14)", () => {
       buildPitchDeck(base({ variant: "one", answers: {}, execution: [] })),
       buildPitchDeck(base({ answers: {}, execution: [] })),
     ];
-    for (const deck of [...filled, ...blank]) {
+    const decks = [
+      { variant: "one", deck: filled[0] },
+      { variant: "five", deck: filled[1] },
+      { variant: "one", deck: blank[0] },
+      { variant: "five", deck: blank[1] },
+    ] as const;
+    for (const { variant, deck } of decks) {
       for (const s of deck.slides.filter((x) => x.type === "text")) {
-        // The Ask slide has five by the pending decision.
+        // Ask has five, and the one-minute Why us has the single Founder advantages bullet.
         if (s.key === "ask") continue;
+        if (s.key === "why_us" && variant === "one") continue;
         expect(s.bullets?.length ?? 0).toBeGreaterThanOrEqual(2);
         expect(s.bullets?.length ?? 0).toBeLessThanOrEqual(4);
       }
     }
     expect(countOf(filled[1] as ReturnType<typeof buildPitchDeck>, "ask")).toBe(5);
+  });
+
+  test("one-minute Why us shows only §10 Founder advantages", () => {
+    const one = buildPitchDeck(base({ variant: "one" }));
+    expect(slide(one, "why_us").bullets?.map((b) => b.text)).toEqual([
+      "Ten years in the bakery trade.",
+    ]);
+    const none = slide(buildPitchDeck(base({ variant: "one", answers: {} })), "why_us");
+    expect(none.bullets).toHaveLength(1);
+    expect(none.emptySources).toEqual(["§10 Founder advantages"]);
   });
 });
 

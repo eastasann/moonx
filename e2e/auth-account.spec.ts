@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import {
   attemptLogIn,
@@ -216,7 +217,35 @@ test.describe("account settings", () => {
   });
 });
 
+/**
+ * Issues a BCDX invitation as the operator and returns its link. The link is in the response of
+ * AD9 only: a workspace Owner's W4 sends it to the invited address and never shows it.
+ */
+async function operatorIssuedLink(page: Page, email: string): Promise<string> {
+  await logIn(page, "admin@moonx.example");
+  const [workspace] = await query<{ id: string }>("select id from workspaces where name = 'BCDX'");
+  const created = await page.request.post("/api/v1/admin/invitations", {
+    data: { email, workspaceId: workspace?.id, role: "member" },
+  });
+  expect(created.status()).toBe(201);
+  return ((await created.json()) as { link: string }).link;
+}
+
 test.describe("invitations", () => {
+  test("an Owner's invitation response carries no link", async ({ page }) => {
+    await logIn(page, ANA);
+    const [workspace] = await query<{ id: string }>(
+      "select id from workspaces where name = 'BCDX'",
+    );
+    const created = await page.request.post(`/api/v1/workspaces/${workspace?.id}/invitations`, {
+      data: { email: "no.link@example.com", role: "member" },
+    });
+    expect(created.status()).toBe(201);
+    const body = (await created.json()) as Record<string, unknown>;
+    expect(Object.keys(body)).toEqual(["invitation"]);
+    expect(JSON.stringify(body)).not.toContain("/invite/");
+  });
+
   test("sign up from a team invitation, join, fill in the profile, and delete the account", async ({
     page,
   }) => {
@@ -294,16 +323,7 @@ test.describe("invitations", () => {
     page,
     guest,
   }) => {
-    await logIn(page, ANA);
-    await expect(page).toHaveURL(/\/w\//);
-    const [workspace] = await query<{ id: string }>(
-      "select id from workspaces where name = 'BCDX'",
-    );
-    const created = await page.request.post(`/api/v1/workspaces/${workspace?.id}/invitations`, {
-      data: { email: "admin@moonx.example", role: "member" },
-    });
-    expect(created.status()).toBe(201);
-    const { link } = (await created.json()) as { link: string };
+    const link = await operatorIssuedLink(page, "admin@moonx.example");
 
     const guestContext = await guest();
     const guestPage = await guestContext.newPage();
@@ -319,14 +339,7 @@ test.describe("invitations", () => {
   });
 
   test("a different account gets the invited address in the message", async ({ page, guest }) => {
-    await logIn(page, ANA);
-    const [workspace] = await query<{ id: string }>(
-      "select id from workspaces where name = 'BCDX'",
-    );
-    const created = await page.request.post(`/api/v1/workspaces/${workspace?.id}/invitations`, {
-      data: { email: "someone.new@example.com", role: "member" },
-    });
-    const { link } = (await created.json()) as { link: string };
+    const link = await operatorIssuedLink(page, "someone.new@example.com");
     const token = link.split("/invite/")[1];
 
     const guestContext = await guest();

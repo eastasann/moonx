@@ -15,7 +15,7 @@
 - 3工程（自己分析 → アイデア検証 → ビジネスプラン）の入力・その場の計算・確認項目6つの自動判定・プランへの引き継ぎ・実行管理・Pitch Deck（PDF）・AI 往復・決定ログ・コメント・変更履歴・運営者の管理画面をすべて動かす（design-spec 1.2 のスコープ）。
 - 計算（損益分岐・シナリオ・投資回収・ROI）と確認項目の判定は、**Web・スマホ・API で同じコード**を使い、入力した瞬間に結果を出す。
 - 複数人が同じアイデアを編集しても、上書きで内容が消えない（項目単位の楽観ロックと変更履歴）。
-- サーバーと外部サービスの運用費は **月 $0〜10**（ストアの登録費は含めない）。初期は BCDX だけの招待制で、一般公開に向けて構成を変えずに広げられる。
+- サーバーと外部サービスの運用費は **月 $0〜10**（Apple Developer Program の年会費は含めない）。初期は BCDX だけの招待制で、一般公開に向けて構成を変えずに広げられる。
 - 依存先を乗り換えやすくする。DB は標準の PostgreSQL として使い（ADR-008）、Web は「静的ファイル＋`/api` の転送」だけで配る（ADR-004）。
 
 ### Non-Goal
@@ -43,9 +43,8 @@
                     │ Cloud Run「moonx-api-{env}」 ElysiaJS on Bun（0〜3台）                            │
                     │  ├ /api/auth/*  Better Auth（メール＋パスワード、Google）                           │
                     │  ├ /api/v1/*    アプリの REST API（Eden Treaty の型を Web・スマホへ公開）             │
-                    │  ├ /api/health  死活確認                                                           │
-                    │  └ /internal/cron/*  Cloud Scheduler からだけ呼ばれる（OIDC で検証）                │
-                    │ Cloud Scheduler（期限の通知: 1時間ごと）  Secret Manager  Artifact Registry         │
+                    │  └ /api/health  死活確認                                                           │
+                    │ Secret Manager  Artifact Registry                                                   │
                     │ Cloud Storage（プロフィール写真）  Cloud Logging / Monitoring                        │
                     └───────┬──────────────────────────────┬───────────────────────────────────────────┘
                             │ PostgreSQL プロトコル（TLS）     │ HTTPS
@@ -54,24 +53,23 @@
                     │ ap-southeast-1      │        │ 招待・パスワード再設定 │   │ エラー追跡     │
                     │ branch: production / staging │ └───────────────────┘   │ (web/mobile/api)│
                     └────────────────────┘                                  └──────────────┘
- ストア配布: Expo EAS Build / Submit → App Store（TestFlight）・Google Play。JS だけの更新は EAS Update
+ 配布: Expo EAS Build → Android は内部配布のリンク、iOS は TestFlight（EAS Submit）。ストアには公開しない（ADR-003）。JS だけの更新は EAS Update
 ```
 
 ### 通信フロー
 
 1. **Web**: ブラウザは `https://{DOMAIN}/` から SPA を読み込む（Cloudflare の CDN。Worker は動かない）。データは同じオリジンの `/api/v1/*` を Eden Treaty で呼ぶ。ログインは Better Auth の HttpOnly Cookie（同じオリジンなので SameSite=Lax で足りる）。
 2. **スマホ**: アプリは `https://{DOMAIN}/api/*` を直接呼ぶ。セッションは Better Auth の Expo プラグインが SecureStore に保存し、`Cookie` ヘッダーとして付ける。Google ログインはシステムのブラウザで行い、`moonx://` のディープリンクで戻る。
-3. **Worker → Cloud Run**: Worker は `/api/*` を Cloud Run の URL へ転送し、`X-Moonx-Proxy-Secret`（共有シークレット）と `CF-Connecting-IP`（利用者の IP）を付ける。API は `/internal/*` と `/api/health` 以外で共有シークレットを確かめ、無い・違うリクエストを 403 `FORBIDDEN` で拒否する（IP の偽装を防ぐ）。`/api/docs`（staging）と `/api/health/db` も対象で、Worker 経由でだけ届く。
-4. **定期実行**: Cloud Scheduler が1時間ごとに Cloud Run の `/internal/cron/due-notifications` を OIDC トークン付きで直接呼ぶ。API はトークンの発行者・audience・サービスアカウントを確かめる。
-5. **メール**: API が Resend の HTTP API で送る（送信元 `no-reply@{DOMAIN}`）。
-6. **計算**: 損益分岐・シナリオ・確認項目・F/A/U の内訳・工程は `packages/domain` の純粋関数で計算する。クライアントは入力のたびにその場で計算して表示し、API は一覧・ダッシュボード・決定ログのスナップショット・版の保存・PDF で同じ関数を使う。DB には保存しない（6章「保存しないもの」）。
-7. **通知の受け取り**: 常時接続は使わない。クライアントは画面を開いたとき・アプリが前面に戻ったとき・60秒ごと（画面が見えている間だけ）に未読数を取りに行く。
+3. **Worker → Cloud Run**: Worker は `/api/*` を Cloud Run の URL へ転送し、`X-Moonx-Proxy-Secret`（共有シークレット）と `CF-Connecting-IP`（利用者の IP）を付ける。API は `/api/health` 以外で共有シークレットを確かめ、無い・違うリクエストを 403 `FORBIDDEN` で拒否する（IP の偽装を防ぐ）。`/api/docs`（staging）と `/api/health/db` も対象で、Worker 経由でだけ届く。
+4. **メール**: API が Resend の HTTP API で送る（送信元 `no-reply@{DOMAIN}`）。
+5. **計算**: 損益分岐・シナリオ・確認項目・F/A/U の内訳・工程は `packages/domain` の純粋関数で計算する。クライアントは入力のたびにその場で計算して表示し、API は一覧・ダッシュボード・決定ログのスナップショット・版の保存・PDF で同じ関数を使う。DB には保存しない（6章「保存しないもの」）。
+6. **通知の受け取り**: 常時接続は使わない。クライアントは画面を開いたとき・アプリが前面に戻ったとき・60秒ごと（画面が見えている間だけ）に未読数を取りに行く。
 
 ### インフラ管理
 
 | 対象 | 管理方法 |
 |---|---|
-| Google Cloud の環境ごとの資源（Cloud Run・Secret Manager・Cloud Scheduler・写真のバケット・サービスアカウント・Monitoring のアラート） | **Terraform**（`infra/terraform/envs/{staging,production}/`） |
+| Google Cloud の環境ごとの資源（Cloud Run・Secret Manager・写真のバケット・サービスアカウント・Monitoring のアラート） | **Terraform**（`infra/terraform/envs/{staging,production}/`） |
 | Google Cloud の共有の資源（Artifact Registry のリポジトリ `moonx`・Workload Identity Federation・バックアップのバケット `{GCP_PROJECT_ID}-moonx-backups`・予算アラートと通知のチャンネル） | **Terraform**（`infra/terraform/envs/shared/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`） |
 | Cloudflare のゾーンの設定（メールの SPF・DKIM・DMARC と Resend の確認のレコード、HSTS、`/api/auth/*` のレート制限ルール） | **Terraform**（Cloudflare provider。`envs/shared/`） |
 | Cloudflare Worker・静的アセット・Web のドメイン（`{DOMAIN}` と `staging.{DOMAIN}` の DNS レコードは Worker のカスタムドメインが作る） | `apps/web/wrangler.jsonc`（デプロイは `make deploy-web`） |
@@ -90,7 +88,7 @@ moonx/
 ├─ apps/
 │  ├─ web/        TanStack Start（SPA モード）。worker/ に Cloudflare Worker（/api の転送）、wrangler.jsonc
 │  ├─ mobile/     Expo（Expo Router）。eas.json・app.config.ts
-│  └─ api/        ElysiaJS（Bun）。Better Auth・REST API・cron・PDF。Dockerfile
+│  └─ api/        ElysiaJS（Bun）。Better Auth・REST API・PDF。Dockerfile
 ├─ packages/
 │  ├─ domain/     計算・確認項目・F/A/U・工程・Pitch Deck の組み立て・AI 書き出し / 取り込みの書式（純粋関数）
 │  ├─ schemas/    Zod のスキーマ（API の入出力とフォームの入力チェック）
@@ -116,7 +114,7 @@ moonx/
 | Cloudflare Worker | `vite dev` | `moonx-web-staging`（`wrangler.jsonc` の env `staging`） | `moonx-web-production`（env `production`） |
 | DB | Docker の PostgreSQL 17（`localhost:5432`、DB 名 `moonx`） | Neon プロジェクト `moonx` のブランチ `staging` | 同じプロジェクトのブランチ `production` |
 | メール | コンソールに出す | Resend（送信先は許可リストのメールだけ） | Resend |
-| スマホ | Expo の開発ビルド（EAS の profile `development`） | EAS の profile `staging`・チャンネル `staging`・EAS の環境 `preview`。アプリ `{APP_ID}.staging`（TestFlight / Play の内部テスト） | profile `production`・チャンネル `production`・EAS の環境 `production`。アプリ `{APP_ID}`（App Store / Google Play） |
+| スマホ | Expo の開発ビルド（EAS の profile `development`） | EAS の profile `staging`・チャンネル `staging`・EAS の環境 `preview`。アプリ `{APP_ID}.staging`（Android は内部配布のリンク、iOS は TestFlight の社内テスト） | profile `production`・チャンネル `production`・EAS の環境 `production`。アプリ `{APP_ID}`（staging と同じ配り方） |
 | API のイメージ | — | `asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:<コミット SHA>`（両方の環境で同じイメージ） | 同左 |
 | GitHub の環境 | — | `staging` | `production`（デプロイに承認を要する）と `production-backup`（承認なし。`db-backup.yml` だけが使う） |
 | Sentry の environment | なし | `staging` | `production` |
@@ -127,13 +125,13 @@ moonx/
 |---|---|---|
 | `{DOMAIN}` | 独自ドメイン（例: moonx.app）。Cloudflare Registrar で取得し、DNS も Cloudflare | Phase 5 で最初にデプロイする前 |
 | `{GCP_PROJECT_ID}` | Google Cloud のプロジェクト ID（staging と production で1つのプロジェクトを共有する） | 同上 |
-| `{APP_ID}` | iOS の Bundle ID と Android の applicationId（例: com.bcdx.moonx）。staging の版は `{APP_ID}.staging` | ストアにアプリを登録する前（公開後は変えられない） |
+| `{APP_ID}` | iOS の Bundle ID と Android の applicationId（例: com.bcdx.moonx）。staging の版は `{APP_ID}.staging` | 最初の EAS Build と、App Store Connect への登録（TestFlight）の前（配った後は変えられない。変えると入れ直しになる） |
 
 ### 環境変数
 
 | 変数 | 使う場所 | 内容 | local の値 | staging / production の置き場所 |
 |---|---|---|---|---|
-| `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `PROXY_SHARED_SECRET`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS`・`CRON_OIDC_AUDIENCE`・`CRON_INVOKER_EMAIL` も必須 | `local` | Cloud Run の環境変数 |
+| `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `PROXY_SHARED_SECRET`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS` も必須 | `local` | Cloud Run の環境変数 |
 | `APP_VERSION` | api | `/api/health` の `version`（コミット SHA） | 未設定なら `dev` | API の Dockerfile が `build-api-image` の build-arg から環境変数に入れる |
 | `PORT` | api | 待ち受けるポート | `3000` | Cloud Run が `8080` を渡す |
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
@@ -149,8 +147,6 @@ moonx/
 | `MAIL_ALLOWLIST` | api | staging でだけ使う送信先の許可リスト（カンマ区切り。空なら制限なし） | 空 | staging だけ設定 |
 | `PROXY_SHARED_SECRET` | api, Worker | Worker が付ける共有シークレット。API 側はカンマ区切りで2つまで受け付ける（ローテーションの間だけ新旧の両方を入れる。05_operation-runbook.md） | 空（local では検査しない。staging・production では空だと起動しない） | Secret Manager `moonx-{env}-proxy-shared-secret` と Worker のシークレット |
 | `API_ORIGIN` | Worker | 転送先の Cloud Run の URL | 不要（Vite の転送を使う） | `wrangler.jsonc` の環境ごとの `vars` |
-| `CRON_OIDC_AUDIENCE` | api | cron の OIDC トークンの audience。Cloud Run の決まった形の URL `https://moonx-api-{env}-{プロジェクト番号}.asia-southeast1.run.app`（Terraform がプロジェクト番号から組み立てる。サービス自身の出力を参照すると循環するため） | 空（local では `make cron-due` が直接呼ぶ） | Cloud Run の環境変数 |
-| `CRON_INVOKER_EMAIL` | api | cron を呼ぶサービスアカウントのメール | 空 | Cloud Run の環境変数 |
 | `AVATAR_BUCKET` | api | プロフィール写真のバケット（staging・production は空なら起動しない） | 空（local はディスク `./.data/avatars`。API が `/api/avatars/{name}` で返す） | `moonx-{env}-avatars` |
 | `SENTRY_DSN` | api | Sentry（API） | 空 | Cloud Run の環境変数 |
 | `LOG_LEVEL` | api | `debug` / `info` / `warn` / `error` | `debug` | `info` |
@@ -172,7 +168,7 @@ moonx/
 | `CLOUDFLARE_API_TOKEN`（シークレット） | `staging` / `production` | `wrangler deploy`。権限は Workers のスクリプトの編集と、`{DOMAIN}` のゾーンの Workers のルート・カスタムドメイン・DNS の編集（カスタムドメインが DNS レコードを作るため）。Cloudflare のゾーンの設定（2章「インフラ管理」）用の Terraform のトークンは別（`envs/shared` の実行者だけが持つ） |
 | `VITE_APP_ENV` / `VITE_SENTRY_DSN`（変数） | `staging` / `production` | Web のビルド |
 
-ストアへの提出の鍵（App Store Connect の API キー、Google Play の提出用のサービスアカウントの JSON）は EAS に置く（`eas credentials`）。
+TestFlight への提出の鍵（App Store Connect の API キー）は EAS に置く（`eas credentials`）。ストアに公開しないので、Google Play の提出用の鍵は要らない（ADR-003）。
 
 ### make ターゲット
 
@@ -197,12 +193,11 @@ moonx/
 | `tokens` | `docs/06_design-tokens.json` から `packages/ui-tokens` を生成する |
 | `openapi` | API の OpenAPI 仕様を `apps/api/openapi.json` に書き出す |
 | `doc-lint` | ドキュメントと実体の食い違いを検査する（`scripts/doc-lint.sh --docs`: ドキュメントが参照する make ターゲットの実在・`docs/README.md` のリンク切れ・`docs/features/` の命名）。コミットの前の検査（`--staged`）は `.githooks/pre-commit` が動かす |
-| `cron-due` | 期限の通知の処理を手で1回動かす（local だけ。staging では Cloud Scheduler のジョブを手で実行する。04・05） |
 | `admin-create EMAIL=...` | 最初の運営者を作るための招待（ワークスペースなし、`grants_admin = true`）を発行し、リンクを表示する。同じメールあての有効な招待があれば、新しいリンクで作り直す。接続先は `DATABASE_URL`、リンクの基準は `BETTER_AUTH_URL`（staging / production では、この2つを上書きして手元から実行する。03_dev-setup.md） |
 | `infra-plan ENV=...` / `infra-apply ENV=...` | Terraform の plan / apply（`ENV` は `shared` / `staging` / `production`） |
 | `deploy-api ENV=... SHA=...` | マイグレーションの後、Cloud Run に新しいリビジョンを出す（CI が使う） |
 | `deploy-web ENV=...` | `build-web` の結果を `wrangler deploy --env` で出す（CI が使う） |
-| `mobile-update ENV=...` / `mobile-build ENV=...` | EAS Update（JS だけ）/ EAS Build と Submit（ネイティブの変更があるとき）（CI か手元） |
+| `mobile-update ENV=...` / `mobile-build ENV=...` | EAS Update（JS だけ）/ EAS Build と、iOS の TestFlight への Submit（ネイティブの変更があるとき）（CI か手元） |
 | `db-backup ENV=...` | `pg_dump -Fc` を取り、`gs://{GCP_PROJECT_ID}-moonx-backups/{env}/<日付>.dump` に上げる（バケットは30日で自動削除。定期実行の GitHub Actions が使う。05_operation-runbook.md） |
 
 ---
@@ -215,7 +210,7 @@ moonx/
 |---|---|---|
 | ADR-001 | クライアントの構成（ユーザー指定） | Web とスマホのネイティブアプリを**別々のコード**で作り、計算・入力チェック・型・文言・トークンを共有パッケージで共有する |
 | ADR-002 | Web（ユーザー指定） | **TanStack Start**（SPA モード）＋ TanStack Form |
-| ADR-003 | スマホ（ユーザー指定） | **Expo**（React Native）＋ Expo Router。**iOS と Android を最初からストアで配る** |
+| ADR-003 | スマホ（ユーザー指定） | **Expo**（React Native）＋ Expo Router。身内の間はストアに公開せず、Android は **EAS の内部配布**、iOS は **TestFlight** で配る |
 | ADR-004 | Web の配信 | **静的ファイル＋`/api` の転送**の形に固定し、Cloudflare（Worker の静的アセット）で配る。Cloud Run は共有シークレットで守る |
 | ADR-005 | API（ユーザー指定） | **ElysiaJS**（Bun） |
 | ADR-006 | 通信方式（ユーザー指定） | **REST**。クライアントは **Eden Treaty**、仕様書は OpenAPI。常時接続は使わない |
@@ -226,7 +221,7 @@ moonx/
 | ADR-011 | キャッシュ | サーバー側のキャッシュは置かない。クライアントは **TanStack Query** |
 | ADR-012 | Pitch Deck の PDF | API サーバーで **react-pdf** を使って作る |
 | ADR-013 | メール・ドメイン | **Resend** ＋ 独自ドメイン（Cloudflare Registrar） |
-| ADR-014 | 定期実行 | **Cloud Scheduler** → API の内部エンドポイント |
+| ADR-014 | 定期実行（廃止） | 期限の通知をやめたため、定期実行を持たない |
 | ADR-015 | IaC（ユーザー指定） | **Terraform**（GCP と Cloudflare のゾーンの設定）＋ wrangler / EAS の設定ファイル。コンソールで管理するものを明記 |
 | ADR-016 | 環境とリリース（ユーザー指定） | **staging ＋ production**。`deploy/{env}/version` による昇格 |
 | ADR-017 | モノレポ | **Bun workspaces** ＋ Makefile |
@@ -249,7 +244,7 @@ moonx/
 
 **理由:** ユーザーが「Web とスマホを別々に作る」を選んだ。design-spec は書く画面をスマホ基準、数字と表の画面を Web 基準で設計している（design-spec 1.2）。どちらにも最適な部品を使える（Web は DOM の表・キーボード操作、スマホはネイティブのキーボードとシート）。画面が違っても計算と判定の結果が食い違わないように、ロジックは1か所に置く。
 
-**トレードオフ:** 28画面を2回作るので、開発と保守の手間は一体型（Expo で Web も出す）のほぼ2倍。Web とスマホで画面の挙動がずれる危険があるため、画面の仕様は design-spec だけを正とし、E2E は Web（Playwright）と、スマホのコアフロー（Maestro。Phase 5 で導入を判断）で確かめる。捨てた案: Expo で Web も出す（Web の表やワークシートが作りにくい）、Web を Capacitor で包む（Apple の審査で「Web を包んだだけ」と判断される危険）。
+**トレードオフ:** 28画面を2回作るので、開発と保守の手間は一体型（Expo で Web も出す）のほぼ2倍。Web とスマホで画面の挙動がずれる危険があるため、画面の仕様は design-spec だけを正とし、E2E は Web（Playwright）と、スマホのコアフロー（Maestro。2026-10-03 にユーザーが導入を決めた）で確かめる。捨てた案: Expo で Web も出す（Web の表やワークシートが作りにくい）、Web を Capacitor で包む（Apple の審査で「Web を包んだだけ」と判断される危険）。
 
 ### ADR-002: Web は TanStack Start の SPA モード（ユーザー指定）
 
@@ -259,24 +254,25 @@ moonx/
 
 **トレードオフ:** TanStack Start は比較的新しく、情報が Next.js より少ない。サーバー描画を使わないので最初の表示は JS の読み込み待ちになる（ランディングはプリレンダーで補う）。将来サーバー描画が要るようになったら、TanStack Start のまま SSR モードに切り替えられる（そのときは Worker で動かす。ADR-004 の形は変わらない）。フォームの捨てた案: React Hook Form（利用者が多いが、型の推論と Standard Schema の扱いで TanStack Form の方がそろえやすい）。
 
-### ADR-003: スマホは Expo、iOS と Android を最初からストアで配る（ユーザー指定）
+### ADR-003: スマホは Expo、身内の間はストアに公開せず内部配布で配る（ユーザー指定）
 
-**決定:** `apps/mobile` は Expo（React Native、New Architecture。開発ビルドを使い、Expo Go は使わない）＋ Expo Router。画面の部品は `packages/ui-native`（ADR-025）だけを使う。ビルドとストアへの提出は EAS Build / EAS Submit、JS だけの修正は EAS Update（チャンネル `staging` / `production`）。iOS（App Store・TestFlight）と Android（Google Play）を最初から両方配る。セッションは Better Auth の Expo プラグインで SecureStore に保存する。保存できなかった入力は expo-sqlite に残す（ADR-021）。PDF は API から受け取り、expo-sharing で共有する。
+**決定:** `apps/mobile` は Expo（React Native、New Architecture。開発ビルドを使い、Expo Go は使わない）＋ Expo Router。画面の部品は `packages/ui-native`（ADR-025）だけを使う。ビルドは EAS Build、JS だけの修正は EAS Update（チャンネル `staging` / `production`）。身内だけが使う間は、App Store にも Google Play にも公開しない。Android は EAS の内部配布（`distribution: internal`、APK）のインストール用のリンクで入れる。iOS は Apple Developer Program（ユーザーが個人で登録する）の TestFlight の社内テスト（EAS Submit で提出する）で入れる。端末を登録した内部配布（ad hoc）でも入れられる。セッションは Better Auth の Expo プラグインで SecureStore に保存する。保存できなかった入力は expo-sqlite に残す（ADR-021）。PDF は API から受け取り、expo-sharing で共有する。
 
-**理由:** ユーザーが「ネイティブアプリ」「最初から iOS と Android の両方」を選んだ。Expo は TypeScript・React で書けて Web と知識を共有でき、ネイティブのビルド環境（Mac など）を持たずにクラウドでビルド・提出できる。EAS の無料枠で試運転の規模は足りる。開発ビルドにするのは、Unistyles v3 と @gorhom/bottom-sheet（react-native-reanimated・react-native-gesture-handler も要る）がネイティブのモジュールを使い、Expo Go では動かないため（ADR-025）。フォームは Web と同じ TanStack Form と Zod のスキーマを使う。メールのリンク（招待・パスワード再設定）と通知のリンクを Web と同じパスで開けるように、iOS の Universal Links・Android の App Links（`https://{DOMAIN}/...`）と独自スキーム（`moonx://`、staging は `moonx-staging://`）でアプリを開く（4章）。
+**理由:** ユーザーが「ネイティブアプリ」「iOS と Android の両方」を選び、使うのは身近な人だけなので、ストアの審査と公開の条件を負わずに配る方を選んだ。Expo は TypeScript・React で書けて Web と知識を共有でき、ネイティブのビルド環境（Mac など）を持たずにクラウドでビルドできる。EAS の無料枠で試運転の規模は足りる。開発ビルドにするのは、Unistyles v3 と @gorhom/bottom-sheet（react-native-reanimated・react-native-gesture-handler も要る）がネイティブのモジュールを使い、Expo Go では動かないため（ADR-025）。フォームは Web と同じ TanStack Form と Zod のスキーマを使う。メールのリンク（招待・パスワード再設定）を Web と同じパスで開けるように、iOS の Universal Links・Android の App Links（`https://{DOMAIN}/...`）と独自スキーム（`moonx://`、staging は `moonx-staging://`）でアプリを開く（4章）。
 
-**トレードオフ:** ストアの審査があるので、修正の公開に1〜数日かかることがある（JS だけの修正は EAS Update で即時に出せる）。Apple の登録費（年 $99）と Google の登録費（$25 の1回だけ）がかかる（運用費の予算には含めない。ユーザーと合意済み）。招待制のアプリなので、審査用のデモアカウント（staging ではなく production の、審査専用のワークスペース）を用意する（04_deployment-procedure.md）。
+**トレードオフ:** Android のアプリは、ストアの自動更新が無い。JS だけの修正は EAS Update で届くが、ネイティブの変更は新しいビルドのリンクを配り直し、入れ直してもらう。iOS の TestFlight のビルドは90日で期限が切れるので、使い続けるには期限の前に新しいビルドを提出する。TestFlight の社内テストは App Store Connect のユーザーとして追加した人（最大100人）だけが使える。端末を登録した内部配布は、登録した端末の数だけ UDID の登録の手間がかかる。Apple の登録費（年 $99）がかかる（運用費の予算には含めない。ユーザーと合意済み）。
 
-**審査の判断（ユーザーと合意、2026-10-01）:**
-- Apple の審査基準 4.8（他社のログインを出すアプリは、条件を満たす別のログインも並べる）に対して、Sign in with Apple は足さずに提出する（メール＋パスワードがあるため）。審査で求められたら、そのときに足すか、iOS はストアで配らず Web で使う（ユーザーはストアで配れなくても構わないとした）。
-- Google Play は**個人の開発者アカウント**で登録する（ユーザーの選択。組織のアカウントに要る D-U-N-S 番号の取得を待たずに始められる。後で組織へ移すときは、アプリの移管の手続きが要る）。個人アカウントは、製品版の公開の前にクローズドテストが必須（条件と手順は 04_deployment-procedure.md 4.3）。
-- Apple Developer Program の登録の区分（個人 / 組織）は、ストアにアプリを登録する前にユーザーが決める（個人はストアに個人名が出る。組織は D-U-N-S 番号が要る）。
+**配布の判断（ユーザーと合意、2026-10-03）:**
+- 身内だけが使う間は、ストアに公開しない。ストアに公開するかは、身内の外に広げるときに、ユーザーが改めて決める。決めたら、この ADR を公開する前提に書き換え、04_deployment-procedure.md 4.3 に公開の手順を足す。
+- Apple Developer Program は個人で登録する（TestFlight と、端末を登録した内部配布に要る）。Google Play Console は今は要らず、登録費も払わない。
+- 次はストアに公開すると決めたときだけ要る: Apple の審査基準 4.8（他社のログインを出すアプリは、条件を満たす別のログインも並べる）への対応、審査用のデモアカウント、Google Play の個人の開発者アカウントのクローズドテスト、ストアの掲載情報、プライバシーポリシーとサポートの静的ページ（`/privacy`・`/support`）。4.8 は、Sign in with Apple を足さずに提出し、差し戻されたらそのときに足すか iOS はストアで配らないかを決める（2026-10-01 の合意）。
+- アプリ内のアカウント削除（C-11）は、ストアに公開するかどうかにかかわらず作る。公開するときに App Store と Google Play が求める要件でもある。
 
 ### ADR-004: Web は「静的ファイル＋/api の転送」で配り、Cloudflare に置く
 
 **決定:** Web の配信は「`/*` は静的ファイル（見つからないパスは `_shell.html`）、`/api/*` は API へ転送」という形に固定する。`index.html` はビルド時に作るランディング（ADR-002）で、SPA の殻は `_shell.html` に出力される。置き場所は Cloudflare の Worker（静的アセット機能）で、`/api/*` と、静的アセットに無い画面のパス（`_shell.html` を返す）だけ Worker のコード（`apps/web/worker/index.ts`）が動く。静的アセットのセキュリティヘッダーと、`/.well-known/apple-app-site-association` の Content-Type は、静的アセットの `_headers` ファイル（`apps/web/public/_headers`）で付ける（Worker のコードを動かさない）。スマホも同じ `https://{DOMAIN}/api` を使う。独自ドメインの DNS も Cloudflare に置く。
 
-Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし、代わりに Worker が付ける共有シークレット（`X-Moonx-Proxy-Secret`）を API が確かめて、直接のアクセスを拒否する（2章 通信フロー 3）。例外は `/api/health`（監視）と `/internal/*`（OIDC で確かめる）。
+Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし、代わりに Worker が付ける共有シークレット（`X-Moonx-Proxy-Secret`）を API が確かめて、直接のアクセスを拒否する（2章 通信フロー 3）。例外は `/api/health`（監視）。
 
 **理由:** ユーザーの希望は「後から簡単に変えられること」。配信の役割をこの2つに限れば、どの配信先（Cloudflare、Netlify、nginx など）にも同じ形で移れて、アプリのコードは変わらない。Web と API が同じオリジンになるので、ログインの Cookie が第三者 Cookie にならず、Safari でも動き、CORS も要らない。Cloudflare の無料枠で静的アセットの配信は回数無制限、Worker は1日10万回まで（API の呼び出しだけが数える）で足りる。
 
@@ -334,7 +330,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **理由:** ユーザーが Better Auth で最初から Google ログインを入れると指定した。ライブラリなので $0 で、ユーザー情報は自分の DB に残り、乗り換えの妨げにならない。招待制のような独自の決まりを、フックで確実に組み込める。
 
-**トレードオフ:** 認証の画面（ログイン・新規登録・パスワード再設定）は自分で作る（design-spec 2 の仕様どおり）。Google の OAuth クライアントを環境ごとに作り、同意画面の設定と、スマホから戻るディープリンクの設定が要る。local の `BETTER_AUTH_URL`（localhost）では実機やエミュレータから Google ログインが戻れないので、スマホの Google ログインは staging で確かめる。Apple の審査基準 4.8 への対応は ADR-003 のとおり（Sign in with Apple は足さない）。Better Auth の更新でセキュリティ修正が出たら速やかに上げる。
+**トレードオフ:** 認証の画面（ログイン・新規登録・パスワード再設定）は自分で作る（design-spec 2 の仕様どおり）。Google の OAuth クライアントを環境ごとに作り、同意画面の設定と、スマホから戻るディープリンクの設定が要る。local の `BETTER_AUTH_URL`（localhost）では実機やエミュレータから Google ログインが戻れないので、スマホの Google ログインは staging で確かめる。Sign in with Apple は足さない。ストアに公開すると決めたときの Apple の審査基準 4.8 への対応は ADR-003 のとおり。Better Auth の更新でセキュリティ修正が出たら速やかに上げる。
 
 ### ADR-011: サーバー側のキャッシュは置かない
 
@@ -356,21 +352,19 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **決定:** 招待とパスワード再設定のメールは Resend の HTTP API で送る（無料枠: 月3,000通）。送信元のドメインとして独自ドメイン `{DOMAIN}` を Cloudflare Registrar で取り、SPF・DKIM・DMARC を設定する。staging は `MAIL_ALLOWLIST` に入っているメールにだけ送る。
 
-**理由:** 招待制のアプリなので、任意のメールアドレスに確実に届く必要がある。Resend は独自ドメインを確認しないと任意の宛先に送れない。ドメインは年 $10〜15 で予算に収まる（ストアの登録費を予算から外したため）。
+**理由:** 招待制のアプリなので、任意のメールアドレスに確実に届く必要がある。Resend は独自ドメインを確認しないと任意の宛先に送れない。ドメインは年 $10〜15 で予算に収まる（Apple Developer Program の年会費を予算から外したため）。
 
 **トレードオフ:** ドメインの更新を忘れるとメールもアプリも止まる（自動更新を有効にする）。Resend の無料枠は1日100通までなので、一般公開で招待が増えたら有料プランを検討する。捨てた案: Amazon SES（安いが AWS のアカウントと送信制限の解除の申請が増える）、SendGrid・Postmark（無料枠が小さいか無い）。
 
-### ADR-014: 期限の通知は Cloud Scheduler から API を呼ぶ
+### ADR-014: 定期実行（廃止）
 
-**決定:** Cloud Scheduler（無料枠: 3ジョブ）のジョブ `moonx-{env}-due-notifications` が、1時間ごと（毎時0分）に `POST /internal/cron/due-notifications` を OIDC トークン付きで呼ぶ。API は、担当者のタイムゾーン（`users.timezone`）で**朝8時以降**になっている担当者について、「期限の3日前・当日・期限切れ」になった実行管理の項目の通知を作る（design-spec 6.13）。同じ段階の通知は `(execution_item_id, due_date, due_stage)` の一意制約で二重に作らない。
+**決定:** 期限の通知を持たず、それを動かす定期実行（Cloud Scheduler と `/internal/cron`）も持たない。
 
-**理由:** Cloud Run は常駐しないので、定期実行は外から呼ぶ必要がある。Cloud Scheduler は同じ Google Cloud の中で完結し、OIDC で呼び出し元を確かめられる。
-
-**トレードオフ:** 毎時の実行なので、朝8時ちょうどではなく8時台に届く。ジョブが失敗すると、その回の通知は次の回でまとめて作る（取りこぼさないように、条件は「朝8時を過ぎていて、その段階をまだ通知していない」で選ぶ）。捨てた案: Cloudflare Worker の Cron Triggers（Cloud Run まで共有シークレットで呼ぶことになり、OIDC で確かめられない）、GitHub Actions の schedule（実行が数十分遅れることがある）、Cloud Run jobs（API と別のコンテナの起動が要り、処理が API のコードと分かれる）。
+**理由:** プランは北極星として使うもので、進捗の管理には使わない。担当・期限・状態は項目に残し、期限切れは画面の「Overdue」とダッシュボードの Due soon で見せる。通知で期限を追わせない。
 
 ### ADR-015: IaC は Terraform（ユーザー指定）
 
-**決定:** Google Cloud の資源と Cloudflare の DNS（メールのレコード）を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート・メールの DNS・Cloudflare のゾーンの設定（HSTS・`/api/auth/*` のレート制限ルール））、`staging` / `production` は環境ごとの資源（2章「インフラ管理」）。Cloud Run のイメージは CI が出すので、Terraform は `image` の変更を無視する（`lifecycle.ignore_changes`）。初回は、イメージとシークレットの値が無いので次の順に apply する: ① `ENV=shared`（Artifact Registry など）、② 環境ごとに変数 `bootstrap = true` で apply（シークレットの入れ物・サービスアカウント・写真のバケットだけを作り、Cloud Run と Scheduler は作らない）、③ シークレットの値を入れ、`make build-api-image` で最初のイメージを上げる、④ `bootstrap = false` と変数 `api_image`（最初のイメージ。以後は `ignore_changes` で無視される）で apply し、Cloud Run と Scheduler を作る。`CRON_OIDC_AUDIENCE` はプロジェクト番号から組み立てる（2章「環境変数」）。Cloudflare の Worker と Web のドメインは `wrangler.jsonc`、スマホのビルドは `eas.json` で管理する。コンソールで管理するもの（Terraform の外）: Neon、Google の OAuth の同意画面とクライアント、Sentry のプロジェクト、Resend のドメインと API キー、GitHub の環境と承認の設定、EAS の環境変数とストアの鍵、App Store Connect と Google Play Console。手順は 03_dev-setup.md。
+**決定:** Google Cloud の資源と Cloudflare の DNS（メールのレコード）を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート・メールの DNS・Cloudflare のゾーンの設定（HSTS・`/api/auth/*` のレート制限ルール））、`staging` / `production` は環境ごとの資源（2章「インフラ管理」）。Cloud Run のイメージは CI が出すので、Terraform は `image` の変更を無視する（`lifecycle.ignore_changes`）。初回は、イメージとシークレットの値が無いので次の順に apply する: ① `ENV=shared`（Artifact Registry など）、② 環境ごとに変数 `bootstrap = true` で apply（シークレットの入れ物・サービスアカウント・写真のバケットだけを作り、Cloud Run は作らない）、③ シークレットの値を入れ、`make build-api-image` で最初のイメージを上げる、④ `bootstrap = false` と変数 `api_image`（最初のイメージ。以後は `ignore_changes` で無視される）で apply し、Cloud Run を作る。Cloudflare の Worker と Web のドメインは `wrangler.jsonc`、スマホのビルドは `eas.json` で管理する。コンソールで管理するもの（Terraform の外）: Neon、Google の OAuth の同意画面とクライアント、Sentry のプロジェクト、Resend のドメインと API キー、GitHub の環境と承認の設定、EAS の環境変数と App Store Connect の鍵、App Store Connect のアプリ（TestFlight）。手順は 03_dev-setup.md。
 
 **理由:** ユーザーが Terraform を選んだ。環境を作り直せて、設定の変更をレビューできる。
 
@@ -378,11 +372,11 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-016: staging と production の2環境。バージョン宣言ファイルで昇格する（ユーザー指定）
 
-**決定:** 環境は staging と production（2章「環境と命名」）。ブランチは GitHub Flow（`main` ＋作業ブランチ、マージは常に squash）。`main` に入ると CI がテストし、API のイメージ（タグはコミット SHA。両方の環境で同じイメージを使う）を作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR。ブランチ名 `promote/{env}-<SHA の先頭7文字>`）をマージしたときに GitHub Actions が行う（DB のマイグレーション → API → Web の順）。Web はビルドに環境の値（`VITE_*`）を埋め込むので、デプロイのときにその SHA から環境ごとにビルドする（`make build-web ENV=...`）。戻すときは昇格の PR を revert する。スマホは同じ昇格で出す。アプリの `runtimeVersion` は Expo の fingerprint の方針にし、`deploy.yml` はその SHA の fingerprint が、その環境で最後にビルドしたアプリと同じなら `make mobile-update`（JS だけ）、違えば `make mobile-build`（EAS Build と Submit。ストアの審査を待つ）を選ぶ。
+**決定:** 環境は staging と production（2章「環境と命名」）。ブランチは GitHub Flow（`main` ＋作業ブランチ、マージは常に squash）。`main` に入ると CI がテストし、API のイメージ（タグはコミット SHA。両方の環境で同じイメージを使う）を作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR。ブランチ名 `promote/{env}-<SHA の先頭7文字>`）をマージしたときに GitHub Actions が行う（DB のマイグレーション → API → Web の順）。Web はビルドに環境の値（`VITE_*`）を埋め込むので、デプロイのときにその SHA から環境ごとにビルドする（`make build-web ENV=...`）。戻すときは昇格の PR を revert する。スマホは同じ昇格で出す。アプリの `runtimeVersion` は Expo の fingerprint の方針にし、`deploy.yml` はその SHA の fingerprint が、その環境で最後にビルドしたアプリと同じなら `make mobile-update`（JS だけ）、違えば `make mobile-build`（EAS Build と、iOS の TestFlight への Submit。新しいビルドを配り直す）を選ぶ。
 
 **理由:** ユーザーが staging ＋ production を選んだ。BCDX の実データに触れずに確かめられる。どの環境にどの版が出ているかが、リポジトリのファイルで分かる。マージを常に squash にするのは、`main` の1コミットが1つの PR になり、昇格と revert をコミット1つの単位で扱えるため。
 
-**トレードオフ:** 昇格の PR の分だけ手順が増える。DB のマイグレーションは戻せないので、「追加してから使い、使わなくなってから消す」の2段階で書く（04_deployment-procedure.md）。スマホは、戻し先の fingerprint が今のアプリと違うと EAS Update では戻せず、ストアの審査を待つ（ストアに出たアプリそのものは戻せないので、直した版を出す）。
+**トレードオフ:** 昇格の PR の分だけ手順が増える。DB のマイグレーションは戻せないので、「追加してから使い、使わなくなってから消す」の2段階で書く（04_deployment-procedure.md）。スマホは、戻し先の fingerprint が今のアプリと違うと EAS Update では戻せず、新しいビルドを配り直す（配ったアプリそのものは戻せないので、直した版を出す）。
 
 ### ADR-017: モノレポは Bun workspaces ＋ Makefile
 
@@ -442,7 +436,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-022: テストとリントのツール
 
-**決定:** Biome（リントと整形）、TypeScript の型チェック、`packages/domain` と `apps/api` は Bun test（API は実際の PostgreSQL に対する結合テスト）、`apps/web` と `packages/ui-web` は Vitest ＋ Testing Library（部品は `@react-aria/test-utils` も）、`apps/mobile` と `packages/ui-native` は Jest（jest-expo）＋ React Native Testing Library（v13。v14 は React 19.3 が要り、Expo SDK 57 が固定する React 19.2 と二重になる）、Web の E2E は Playwright、アクセシビリティの検査は axe（`@axe-core/playwright`）。画面にスタイルを書かない決まり（ADR-025）は Biome の `noRestrictedImports`、JSX の中の生の文字列（9章）は Biome の規則で足りない分を CI の小さな検査スクリプトで見つける。詳細は10章。
+**決定:** Biome（リントと整形）、TypeScript の型チェック、`packages/domain` と `apps/api` は Bun test（API は実際の PostgreSQL に対する結合テスト）、`apps/web` と `packages/ui-web` は Vitest ＋ Testing Library（部品は `@react-aria/test-utils` も）、`apps/mobile` と `packages/ui-native` は Jest（jest-expo）＋ React Native Testing Library（v13。v14 は React 19.3 が要り、Expo SDK 57 が固定する React 19.2 と二重になる）、Web の E2E は Playwright、スマホの E2E は Maestro（開発ビルドを入れた端末かシミュレーターを YAML のフローで操作する。2026-10-03 にユーザーが導入を決めた）、アクセシビリティの検査は axe（`@axe-core/playwright`）。画面にスタイルを書かない決まり（ADR-025）は Biome の `noRestrictedImports`、JSX の中の生の文字列（9章）は Biome の規則で足りない分を CI の小さな検査スクリプトで見つける。詳細は10章。
 
 **理由:** 実行環境（Bun・Vite・React Native）ごとに標準のツールを使うのが、一番つまずきが少ない。Biome は1つのツールで速い。
 
@@ -488,7 +482,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-027: CI/CD は GitHub Actions、Google Cloud へは Workload Identity Federation
 
-**決定:** CI/CD は GitHub Actions（ワークフローは ADR-017）。Google Cloud へは Workload Identity Federation で入り、サービスアカウントの鍵を作らない。GitHub の環境は `staging`・`production`（デプロイに承認を要する）・`production-backup`（バックアップ専用。承認なし）。依存の脆弱性は Dependabot のアラートで知る。シークレットの置き場所は次の4つに分ける: Cloud Run が使うものは Secret Manager、Worker が使うものは `wrangler secret`、CI が使うものは GitHub の環境かリポジトリ（2章「CI のシークレットと変数」）、スマホのビルドとストアの提出に使うものは EAS（環境変数とストアの鍵）。
+**決定:** CI/CD は GitHub Actions（ワークフローは ADR-017）。Google Cloud へは Workload Identity Federation で入り、サービスアカウントの鍵を作らない。GitHub の環境は `staging`・`production`（デプロイに承認を要する）・`production-backup`（バックアップ専用。承認なし）。依存の脆弱性は Dependabot のアラートで知る。シークレットの置き場所は次の4つに分ける: Cloud Run が使うものは Secret Manager、Worker が使うものは `wrangler secret`、CI が使うものは GitHub の環境かリポジトリ（2章「CI のシークレットと変数」）、スマホのビルドと TestFlight への提出に使うものは EAS（環境変数と App Store Connect の鍵）。
 
 **理由:** コードが GitHub にあり、PR・レビュー・昇格の PR とそのまま組み合わせられる。Workload Identity Federation なら、漏れると困る長期の鍵をどこにも置かない。シークレットは、それを使う実行環境のそばに置くのが一番漏れにくい。
 
@@ -567,7 +561,7 @@ API のルートは5章、Worker が配る静的なファイル（`/.well-known/
 
 | 項目 | 決まり |
 |---|---|
-| 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、API の仕様書は `/api/docs`（staging だけ。ADR-006）、Cloud Scheduler 用は `/internal/cron`（Worker を通らない） |
+| 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、API の仕様書は `/api/docs`（staging だけ。ADR-006） |
 | 値の正 | API が検査する期限・文字数・件数などの値（招待の期限7日、パスワード再設定のリンク1時間など）の正は design-spec。ここの値は design-spec に合わせ、変えるときは design-spec を先に直す |
 | 認証 | Better Auth のセッション。Web は HttpOnly Cookie、スマホは Expo プラグインが付ける `Cookie` ヘッダー。公開と書いたもの以外はログインが要る（未ログインは 401 `UNAUTHENTICATED`） |
 | 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601（表示はクライアントが利用者のタイムゾーンで行う） |
@@ -763,7 +757,6 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | W3 | PATCH / DELETE | `/api/v1/workspaces/{workspaceId}/members/{userId}` | O（DELETE は本人も。`userId` に `me`） | 4・9 |
 | W4 | GET / POST | `/api/v1/workspaces/{workspaceId}/invitations` | O | 9 |
 | W5 | POST | `/api/v1/invitations/{invitationId}/resend` | O・Admin | 9・28 |
-| W6 | POST | `/api/v1/invitations/{invitationId}/link` | O・Admin | 9・28 |
 | W7 | DELETE | `/api/v1/invitations/{invitationId}` | O・Admin | 9・28 |
 | W8 | GET | `/api/v1/workspaces/{workspaceId}/mention-candidates` | O,M,V | PNL-1 |
 | **ダッシュボードとアイデア（5.6）** | | | | |
@@ -849,7 +842,6 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | **内部** | | | | |
 | Z1 | GET | `/api/health` | 公開（DB に触れない） | 監視 |
 | Z2 | GET | `/api/health/db` | 公開（Worker の共有シークレットが要る） | デプロイ後の確認 |
-| Z3 | POST | `/internal/cron/due-notifications` | Cloud Scheduler（OIDC） | — |
 
 ### 5.4 認証・アカウント・招待
 
@@ -923,7 +915,7 @@ interface InvitationPreview {
 
 ```ts
 interface Workspace { id: UUID; name: string; currency: string; isPersonal: boolean; myRole: Role; memberCount: number; }
-interface Member { user: UserRef; email: string | null /* Owner にだけ返す */; role: Role; joinedAt: DateTime; }
+interface Member { user: UserRef; email: string | null /* Owner にだけ返す */; role: Role; joinedAt: DateTime; isPersonalOwner: boolean /* 個人用ワークスペースの持ち主。ほかの Owner は降格も削除もできない（W3） */ }
 interface Invitation {
   id: UUID; email: string; role: Role | null;
   workspace: { id: UUID; name: string } | null;
@@ -938,16 +930,15 @@ interface Invitation {
 | W1 GET | — | `200 Workspace` | |
 | W1 PATCH | `{ name?: string (1〜60); currency?: string (ISO 4217) }` | `200 Workspace` | 通貨を変えても金額は換算しない |
 | W2 GET | — | `200 { items: Member[] }` | |
-| W3 PATCH | `{ role: Role }` | `200 Member` | `409 LAST_OWNER`（最後の Owner を降格できない）。Viewer に降格したら design-spec 6.16 の表のとおり処理する（自己分析の共有を解除、担当を名前に置き換え。担当の置き換えは実行管理の項目の変更履歴 `manual` に残す）。`userId` は UUID だけを受け付ける。対象がメンバーでなければ `404 NOT_FOUND`、ロールが同じなら何も変えず 200 |
-| W3 DELETE | — | `204` | `409 LAST_OWNER`、`409 CANNOT_LEAVE_PERSONAL`。外れたときの処理は design-spec 6.16 の表（担当の置き換えは W3 PATCH と同じ。`last_workspace_id` が外れたワークスペースなら個人用ワークスペースに戻す） |
+| W3 PATCH | `{ role: Role }` | `200 Member` | `409 LAST_OWNER`（最後の Owner を降格できない）、`409 PERSONAL_OWNER`（個人用ワークスペースの持ち主は、ほかの Owner も降格できない。持ち主は `is_personal` のワークスペースの `created_by_id`）。Viewer に降格したら design-spec 6.16 の表のとおり処理する（自己分析の共有を解除、担当を名前に置き換え。担当の置き換えは実行管理の項目の変更履歴 `manual` に残す）。`userId` は UUID だけを受け付ける。対象がメンバーでなければ `404 NOT_FOUND`、ロールが同じなら何も変えず 200 |
+| W3 DELETE | — | `204` | `409 LAST_OWNER`、`409 CANNOT_LEAVE_PERSONAL`（本人が個人用ワークスペースから Leave する）、`409 PERSONAL_OWNER`（ほかの Owner が個人用ワークスペースの持ち主を外す）。外れたときの処理は design-spec 6.16 の表（担当の置き換えは W3 PATCH と同じ。`last_workspace_id` が外れたワークスペースなら個人用ワークスペースに戻す） |
 | W4 GET | `?status=pending|all` | `200 { items: Invitation[] }` | `status` の既定は `pending`: 受諾できるものだけ（期限切れは含まない）。`all` は受諾・取り消し・期限切れも返す。期限を過ぎた `pending` は `status: "expired"` として返す |
-| W4 POST | `{ email: string; role: Role }` | `201 { invitation: Invitation; link: string }` | 招待のメールを送る。`409 ALREADY_MEMBER`、`409 INVITATION_PENDING`（同じメールの有効な招待がある。`error.invitationId` に付ける id の招待を W5 で再送する）。メールの送信は招待を作るトランザクションの中で行い、Resend に届かなければ招待も作らず `503 UPSTREAM_UNAVAILABLE` を返す（利用者は再試行する）。同じワークスペースへの招待は、ワークスペースの id で取る advisory lock（`pg_advisory_xact_lock`。トランザクションの終わりで外れる）で直列にする。トランザクションが Resend の応答を待つので、ワークスペースの行を `FOR UPDATE` で押さえると、そのあいだ中身の書き込みがすべて止まる。W5 と合わせて1時間20回まで（7.2。超えたら `429 RATE_LIMITED`） |
-| W5 | — | `200 { invitation: Invitation; link: string }` | トークンを作り直してメールを再送する（前のリンクは無効）。期限を7日に延ばし、期限切れの招待は `pending` に戻す。受諾済みは `409 INVITATION_ALREADY_ACCEPTED`、取り消し済みは `410 INVITATION_INVALID`（W6・W7 も同じ）。招待のワークスペースに所属しない人は `403 NO_ACCESS`、所属していても Owner でなければ `403 FORBIDDEN`（Admin は除く） |
-| W6 | — | `200 { link: string }` | トークンを作り直し、期限を7日に延ばす（メールは送らず、回数の上限にも数えない） |
+| W4 POST | `{ email: string; role: Role }` | `201 { invitation: Invitation }` | 招待のメールを送る。招待のリンクは応答に含めない（招待した人が相手のメールで先にアカウントを作れてしまうため。リンクは招待されたメールにだけ届く。local は API のログ）。`409 ALREADY_MEMBER`、`409 INVITATION_PENDING`（同じメールの有効な招待がある。`error.invitationId` に付ける id の招待を W5 で再送する）。メールの送信は招待を作るトランザクションの中で行い、Resend に届かなければ招待も作らず `503 UPSTREAM_UNAVAILABLE` を返す（利用者は再試行する）。同じワークスペースへの招待は、ワークスペースの id で取る advisory lock（`pg_advisory_xact_lock`。トランザクションの終わりで外れる）で直列にする。トランザクションが Resend の応答を待つので、ワークスペースの行を `FOR UPDATE` で押さえると、そのあいだ中身の書き込みがすべて止まる。W5 と合わせて1時間20回まで（7.2。超えたら `429 RATE_LIMITED`） |
+| W5 | — | `200 { invitation: Invitation }` | トークンを作り直してメールを再送する（前のリンクは無効。リンクは応答に含めない）。期限を7日に延ばし、期限切れの招待は `pending` に戻す。受諾済みは `409 INVITATION_ALREADY_ACCEPTED`、取り消し済みは `410 INVITATION_INVALID`（W7 も同じ）。招待のワークスペースに所属しない人は `403 NO_ACCESS`、所属していても Owner でなければ `403 FORBIDDEN`（Admin は除く） |
 | W7 | — | `204` | `revoked` にする |
 | W8 | `?targetType=&targetId=` | `200 { items: UserRef[] }` | 自己分析への対象なら、その自己分析を読める Owner / Member だけ（design-spec 6.0.4）。その自己分析がこのワークスペースに共有されていなければ `403 NOT_SHARED`、設問が無ければ `404 NOT_FOUND` |
 
-招待のリンクは `https://{DOMAIN}/invite/{token}`。トークンは32バイトの乱数で、DB には SHA-256 のハッシュだけを持つ。
+招待のリンクは `https://{DOMAIN}/invite/{token}`。トークンは32バイトの乱数で、DB には SHA-256 のハッシュだけを持つ。リンクを API の応答で返すのは、運営者の AD9 と `make admin-create` だけ（運営者はサービスの管理者で、信頼する前提。7.1）。W4・W5・招待の一覧（W4 GET・AD8）はリンクもトークンも返さない。リンクのコピー用の API（旧 W6）は無い。
 
 ### 5.6 ダッシュボードとアイデア
 
@@ -986,7 +977,7 @@ interface Activity {
 | I1 POST | `{ name: string (1〜100); oneLineConcept: string (1〜200); proposedSolution?: string }` | `201 IdeaDetail` | 最新の検証のテンプレートの版で検証を作り、費用の初期行を Empty で作る（履歴なし: 作成の記録だけ）。`proposedSolution` は20,000字まで、空白だけなら null |
 | I2 GET | — | `200 IdeaDetail` | |
 | I2 PATCH | `{ name?; oneLineConcept?; proposedSolution?; lockVersion: number; force?: boolean }` | `200 IdeaDetail` | 履歴 `manual`（対象 `idea`） |
-| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail` | design-spec 6.8 の複製。履歴 `duplicate`: 新しいアイデアの作成と、コピーした記録対象の項目（回答・数字・調査ログ・競合・前提・リスク・費用行）それぞれの作成を、同じ `batchId` で1行ずつ残す（履歴で1回の操作としてまとめて見せるため。H3 では戻せない。複製したアイデアはアーカイブで片づける）。既定の名前は100字に収める |
+| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail` | design-spec 6.8 の複製。履歴 `duplicate`: 新しいアイデアの作成と、コピーした記録対象の項目（回答・数字・調査ログ・競合・前提・リスク・費用行）それぞれの作成を、同じ `batchId` で1行ずつ残す（履歴で1回の操作としてまとめて見せるため。H3 で作成ごと取り消せる。条件と消し方は H3）。既定の名前は100字に収める |
 | I4 | — | `200 IdeaDetail` | すでにその状態なら何もせず 200。履歴は書かず、`updatedAt` と `updatedBy` も変えない（`lastActivityAt` だけ更新する） |
 
 ### 5.7 検証
@@ -1216,7 +1207,7 @@ interface PitchDeck {
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
 | P1 GET | `?includeArchived=true` | `200 { items: PlanSummary[] }` | |
-| P1 POST（M5） | `{ name: string }` | `201 PlanHome` | 最新の判定が Proceed でなければ `409 DECISION_NOT_PROCEED`。名前の重複は `409 NAME_TAKEN`（アーカイブした案の名前も数える）。テンプレートの `copy_from` で検証から文章をコピーし、実行管理の初期行を作る。`created_from_decision_id` に最新の Proceed を入れる。履歴 `plan_draft`（1つの `batchId`） |
+| P1 POST（M5） | `{ name: string }` | `201 PlanHome` | 最新の判定が Proceed でなければ `409 DECISION_NOT_PROCEED`。名前の重複は `409 NAME_TAKEN`（アーカイブした案の名前も数える）。テンプレートの `copy_from` で検証から文章をコピーし、実行管理の初期行を作る。`created_from_decision_id` に最新の Proceed を入れる。履歴 `plan_draft`（1つの `batchId`。H3 で作成ごと取り消せる。条件と消し方は H3） |
 | P2 GET | `?versionId=` | `200 PlanHome` | 版を指定したら、`parts` などを版のスナップショットから作る |
 | P2 PATCH | `{ name?; businessName?; preparedBy?; lockVersion; force? }` | `200 PlanHome` | 名前の重複は `409 NAME_TAKEN`。履歴 `manual` |
 | P3 | — | `200 PlanSummary` | |
@@ -1228,7 +1219,7 @@ interface PitchDeck {
 | P8（M4） | `{ value: GoNoGoValue; reason: string (1〜5000) }` | `201 { entry: DecisionLogEntry; stage: Stage }` | 対象の版は最新の保存済みの版（無ければ null）。決定ログに `go_no_go` を記録して通知する |
 | P9 GET | `?type=&assignee=me|<userId>&status=` | `200 { items: ExecutionItem[] }` | Next Actions は期限順、ローンチは区分ごと、KPI は Area ごとに並べて返す |
 | P9 POST | `ExecutionItemInput & { type: ExecutionType; title: string }` | `201 ExecutionItem` | 担当のメンバーは Owner / Member だけ（`422 INVALID_ASSIGNEE`）。状態は種類ごとの値だけ（`422 INVALID_STATUS`。milestone / launch / next_action は todo・doing・done、open_question は open・resolved、kpi は null）。履歴 `manual` |
-| P10 | PATCH: `ExecutionItemInput & { lockVersion; force? }`。DELETE: なし（ロックを持たない論理削除） | `200 ExecutionItem` / `204` | 種類に無い列を送ると `422 VALIDATION_FAILED`（担当は `assigneeUserId` と `assigneeName` の一方だけ）。`done` / `resolved` にしたら `completed_at` を入れる。期限を変えたら期限の通知を送り直せるようにする。`kpiActual` を変えたら `kpi_actual_updated_at` を入れる。履歴 `manual` |
+| P10 | PATCH: `ExecutionItemInput & { lockVersion; force? }`。DELETE: なし（ロックを持たない論理削除） | `200 ExecutionItem` / `204` | 種類に無い列を送ると `422 VALIDATION_FAILED`（担当は `assigneeUserId` と `assigneeName` の一方だけ）。`done` / `resolved` にしたら `completed_at` を入れる。`kpiActual` を変えたら `kpi_actual_updated_at` を入れる。履歴 `manual` |
 | P11 | `{ type: ExecutionType; ids: UUID[] }` | `204` | |
 | P12 | `?variant=one|five&versionId=` | `200 PitchDeck` | `packages/domain` の `buildPitchDeck()` |
 | P13 | 同上 | `200 application/pdf`（`Content-Disposition: attachment; filename="{businessName}-{one|five}-{版の名前|draft}-{日付}.pdf"`） | ADR-012。常にライトの配色 |
@@ -1292,10 +1283,10 @@ interface HistoryEntry {
   source: HistorySource;
   before: unknown | null; after: unknown | null;   // 本文・数字・F/A/U・確信度・根拠の id の一覧など（差分の強調はクライアント）
   changedBy: UserRef; changedAt: DateTime;
-  revertible: boolean;   // 呼んだ人がこの行を戻せる（Viewer・アーカイブ済みは false）。`template_version` の行は H2 では戻せないが、H3 で操作全体を戻せるときは true
+  revertible: boolean;   // 呼んだ人がこの行を戻せる（Viewer・アーカイブ済みは false）。`template_version` の行は H2 では戻せないが、H3 で操作全体を戻せるときは true。`duplicate`・`plan_draft` の行は作成の取り消し（H3）の対象で、条件を満たすかは確かめずに true（呼んだ人の権限だけで決める）
 }
 interface Notification {
-  id: UUID; kind: "mention" | "comment" | "decision" | "due";
+  id: UUID; kind: "mention" | "comment" | "decision";
   workspace: { id: UUID; name: string }; actor: UserRef | null;
   title: string;          // 表示用の短い文（英語。例: "Paolo mentioned you on WHO"）
   excerpt: string | null; link: LinkTarget;
@@ -1315,10 +1306,18 @@ interface Notification {
 | C3 | — | `200 Comment` | スレッドの最初のコメントだけ |
 | H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKey=&cursor=` | `200 Page<HistoryEntry>` | 新しい順。`containerType=idea`（13）は、アイデア自身の行に加え、そのアイデアの検証のテンプレートの版の行（テンプレートの移行。design-spec 6.0.7）も返す。項目の指定と `sectionKey` の指定では返さない |
 | H2 | — | `200 { entry: HistoryEntry; target: unknown }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す。衝突の検査はしない（戻すのは意図した上書き）。`template_version` の行は `422 VALIDATION_FAILED`（H3 で戻す） |
-| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 CONFLICT`。下書き作成と複製は作ったレコードごと消すことになるため戻せず、`422 VALIDATION_FAILED` |
+| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 CONFLICT`。複製（`duplicate`）と下書き作成（`plan_draft`）は、戻すのではなく作ったものを消す「作成の取り消し」になる（下の「作成の取り消し」） |
 | N1 | `?filter=all|unread&cursor=&limit=` | `200 Page<Notification>` | ワークスペースをまたいで新しい順 |
 | N2 | — | `200 { total: number }` | クライアントは画面を開いたとき・前面に戻ったとき・60秒ごとに呼ぶ |
 | N3 | — | `204` | |
+
+**作成の取り消し（H3 の `duplicate` と `plan_draft`）:** 複製したアイデアとその検証、または下書きのプランを、作った操作の単位で消す。一般の削除ではない（design-spec 6.8 の「アイデア・プランの削除は初期リリースでは作らない」は変えない）。
+- 条件: 作ったあとに何も足されていないこと。次のどれかがあれば、何も消さずに `409 CONFLICT`（メッセージ「Something was added after this was created, so it cannot be undone」）を返す。(1) その操作の行以外の変更履歴（作ったアイデアなら `idea`・`validation` の画面、プランなら `business_plan` の画面。AI 取り込み・移行・元に戻すを含む）。(2) 作ったものの項目（アイデア・検証・各行、プラン・実行管理の項目）へのコメント（消したコメントを含む）。(3) 決定ログの行（アイデアの判定、プランの Go / No-Go と版の保存）。(4) 作ったアイデアに付いたプラン、作ったプランに保存した版。(5) 作ったアイデアを複製元にしたアイデア。作ったあとの仕事を巻き込んで消さないための条件で、足されたものを個別に片づける処理は持たない。
+- 消すもの: 作ったアイデア（検証・回答・調査ログ・競合・前提・リスク・費用行・数字・根拠の紐づけは外部キーのカスケードで消える）、または作ったプラン（回答・実行管理の項目はカスケード）。そして、その操作の `batchId` の変更履歴の行すべて。消したあとはコメント・通知・決定ログの行が残らない（条件でそれらが無いことを確かめてあるため）。
+- 履歴の扱い: 消す対象も、その履歴の行も無くなるので、取り消したこと自体の履歴の行は残さない。`withHistory` を通さない（ADR-020 の例外。履歴を書く先の画面が無くなる）。消したあとは元に戻せない（`revert` の行が無いので、戻したことの取り消しも無い）。同じ `batchId` をもう一度呼ぶと、行が無いので `404 NOT_FOUND`。
+- 応答: `reverted` は消した操作の履歴の行の数、`batchId` は取り消した操作の `batchId`。
+- 実行: 1つのトランザクションで、`batchId` の advisory lock、アイデアの行（プランの取り消しはそのプランの行も）の `FOR UPDATE`、条件の確認、削除の順に行う。項目の行・プランまたは検証・アイデアの行は `FOR UPDATE NOWAIT` で取る。ロックを持ったまま別のロックを待たないので、進行中の書き込みがデッドロックの犠牲になることはない。ほかの書き込みがその行を持っていれば、取り消しはすぐに `409 CONFLICT`（メッセージ「Something is being changed right now. Try again.」）を返す。削除の文だけは、子の行を足した書き込みの外部キーのロックを待つので、`lock_timeout` 500ms（デッドロックの検出の1秒より短い）を付け、取れなければ同じ `409 CONFLICT` にする。取り消しの完了を待っていた書き込みは、親の行が無くなっているので、コメントは対象の行が無く `404 NOT_FOUND`、項目の追加は親への外部キーの違反（SQLSTATE 23503）になる。エラーの処理がこれを `404 NOT_FOUND` に変える（外部キーが `business_plan_id`・`validation_id`・`idea_id` のときだけ）。更新は更新日時の更新が行を見つけられず `409 ARCHIVED` になる。どの場合も、足されたものは残らない。ワークスペースの最終更新を更新する。
+- 権限: 戻す操作の `need` と同じ（Owner / Member。アーカイブ済みのアイデアの中身は `409 ARCHIVED`）。作ったアイデア自身がアーカイブ済みなら取り消せない。
 
 ### 5.12 テンプレートの移行（M8）
 
@@ -1361,13 +1360,12 @@ interface AdminWorkspace { id: UUID; name: string; isPersonal: boolean; owners: 
 | AD8 | — | `200 AdminUser` | 停止: セッションを全部消す。通知を作らない。再開で元どおり。自分自身は停止できない（`422 CANNOT_SUSPEND_SELF`） |
 | AD9 | `{ email: string; workspaceId?: UUID; role?: Role }` | `201 { invitation: Invitation; link: string }` | `workspaceId` があれば `role` は必須。`workspaceId` なしの招待は `grantsAdmin = false`（受諾した人は運営者にならない） |
 
-### 5.14 内部・死活確認
+### 5.14 死活確認
 
 | API | 本体 | 応答 | 補足 |
 |---|---|---|---|
 | Z1 `GET /api/health` | — | `200 { status: "ok"; version: string /* コミット SHA */; env: string }` | **DB に触れない**（監視のたびに Neon を起こさないため。ADR-008） |
 | Z2 `GET /api/health/db` | — | `200 { status: "ok"; latencyMs: number }` / `503` | デプロイ後の確認に使う。`503` は 8.1 の形式で `UPSTREAM_UNAVAILABLE` |
-| Z3 `POST /internal/cron/due-notifications` | — | `200 { checkedItems: number; created: number }` | `Authorization: Bearer <OIDC トークン>` の発行者（`https://accounts.google.com`）・audience（`CRON_OIDC_AUDIENCE`）・メール（`CRON_INVOKER_EMAIL`）を確かめる。発行者・audience・署名・期限が合わなければ `401 UNAUTHENTICATED`、署名は正しいが別のサービスアカウントなら `403 FORBIDDEN`（鍵は `https://www.googleapis.com/oauth2/v3/certs` から取り、`Cache-Control` の間だけ覚える）。対象は ADR-014。停止されたユーザー・アーカイブしたアイデアとプランの項目・担当が名前だけの項目は除く |
 
 ## 6. データモデル
 
@@ -1488,8 +1486,7 @@ export const commentTargetType = pgEnum("comment_target_type", [
   "self_analysis_answer", "validation_answer", "research_log_entry", "competitor", "assumption", "risk",
   "cost_item", "economics_input", "plan_answer", "execution_item", "pitch_slide", "idea",
 ]);
-export const notificationKind = pgEnum("notification_kind", ["mention", "comment", "decision", "due"]);
-export const dueStage = pgEnum("due_stage", ["three_days_before", "due_day", "overdue"]);
+export const notificationKind = pgEnum("notification_kind", ["mention", "comment", "decision"]);
 export const historyAction = pgEnum("history_action", ["create", "update", "delete", "restore"]);
 export const historySource = pgEnum("history_source", [
   "manual", "ai_import", "revert", "template_migration", "duplicate", "plan_draft",
@@ -1982,16 +1979,12 @@ export const notifications = pgTable("notifications", {
   actorId: uuid().references(() => users.id),
   commentId: uuid().references(() => comments.id, { onDelete: "cascade" }),
   decisionLogEntryId: uuid().references(() => decisionLogEntries.id, { onDelete: "cascade" }),
-  executionItemId: uuid().references(() => executionItems.id, { onDelete: "cascade" }),
-  dueStage: dueStage(),                           // kind = due のとき
-  dueDate: date({ mode: "string" }),              // kind = due のとき（期限を変えたら新しい日付で送り直す）
   link: jsonb().notNull(),                        // 開く先（5.2 LinkTarget）
   readAt: ts(),
   createdAt: ts().notNull().defaultNow(),
 }, (t) => [
   index().on(t.userId, t.createdAt),
   index("notifications_unread_idx").on(t.userId).where(sql`${t.readAt} is null`),
-  uniqueIndex("notifications_due_once_uq").on(t.executionItemId, t.dueDate, t.dueStage).where(sql`${t.kind} = 'due'`),
 ]);
 
 export const changeHistory = pgTable("change_history", {
@@ -2075,7 +2068,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 自分のアカウント（U1〜U3・U7・U8・A4・A5・A8）・招待の受諾（U6。招待のメールと同じ人だけ） | — | 本人 | 本人 | 本人 | 本人 |
 | ワークスペースの作成（W0） | — | ○ | ○ | ○ | ○ |
 | ワークスペースの閲覧・メンバー一覧・メンションの候補（W1 GET・W2・W8） | — | ○ | ○ | ○ | 所属していれば、そのロールのとおり |
-| ワークスペースの設定・ロール変更・メンバーの削除・招待（W1 PATCH・W3・W4〜W7） | — | 自分の Leave だけ | 自分の Leave だけ | ○ | W5〜W7 だけ（運営者が出した招待を含むすべての招待） |
+| ワークスペースの設定・ロール変更・メンバーの削除・招待（W1 PATCH・W3・W4・W5・W7） | — | 自分の Leave だけ | 自分の Leave だけ | ○ | W5・W7 だけ（運営者が出した招待を含むすべての招待） |
 | ダッシュボード（D1・D3・D4） | — | ○ | ○ | ○ | 所属していれば |
 | ダッシュボードの自己分析（D2）・メンバーの自己分析（S6・S7。S7 は共有済みのみ） | — | — | ○ | ○ | 所属していれば |
 | アイデア・検証・プラン・実行管理・Pitch Deck・決定ログの閲覧（I1 GET・I2 GET・V1・V2・V6 GET・V7 GET・V8 GET・V10 GET・V12・V15・P1 GET・P2 GET・P4・P6 GET・P9 GET・P12・P13・L1・L2） | — | ○ | ○ | ○ | 所属していれば |
@@ -2092,12 +2085,11 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 通知（N1〜N3） | — | 本人 | 本人 | 本人 | 本人 |
 | テンプレート・ユーザー・ワークスペース・招待の管理（AD1〜AD9） | — | — | — | — | ○ |
 | DB の死活確認（Z2） | Worker の共有シークレットがあるときだけ | | | | |
-| 期限の通知の処理（Z3） | Cloud Scheduler の OIDC トークンだけ | | | | |
 
 追加の決まり:
 
 - **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は、ロールにかかわらず 409 `ARCHIVED`（コメントを書く・元に戻すを含む。Viewer の編集も 403 ではなく 409。design-spec 6.8）。ただしワークスペースのメンバーではない人には、先に 403 `NO_ACCESS` を返す。確認は書き込みの最後（更新日時の更新）でもう一度行い、確認と書き込みのあいだにアーカイブされても書き込みは残らない。読む・複製・Restore・Pitch Deck はできる。
-- **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。`is_admin` を直接変える API は無い。付くのは `make admin-create` の招待（`grants_admin = true`）から登録・受諾したときとシードだけで、AD9 の招待では付かず、外す API も無い。
+- **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD9）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。運営者はサービスの管理者で、信頼する前提にする: 運営者は AD9 で自分あてに、ワークスペースを指定した招待を出し、そのリンクから受諾すれば、そのワークスペースの Member 以上に入れる（AD9 は運営者にリンクを返す。5.5）。これを塞ぐ仕組みは作らない。見られるのは、入ったあとの所属のロールの範囲になる。`is_admin` を直接変える API は無い。付くのは `make admin-create` の招待（`grants_admin = true`）から登録・受諾したときとシードだけで、AD9 の招待では付かず、外す API も無い。
 - **停止・削除したユーザー**: セッションを消し、ログインを拒否する。残ったリクエストも、認証のミドルウェアが `users.status` を確かめて 401 にする。
 - **実装**: 認可は、ルートの宣言（`apps/api/src/access.ts`）でまとめて行う。`scoped: { to, need }` は、`to` でリソースの引き方（パスのパラメーターの名前、または Query・本文から引く関数）を宣言し、プラグインが共通の関数 `resolveScope`（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）でワークスペースとロールを求め、`need`（`member` / `editor` / `writable` / `owner`。プランのアーカイブ・復元だけは `plan-archive-toggle`: `writable` と同じだが、そのプラン自身のアーカイブ済みの印では止めず、アイデアのアーカイブ済みでは止める）を満たさなければ拒否してから、ハンドラーに `scope` を渡す。自己分析のようにワークスペースを持たないものがあるルートは `located`（`scope` が null になりうる）を使う。ワークスペースを持たない他のルートは `open`（セッション不要）・`signedIn`（自分のデータだけ）・`operator`（運営者）を宣言する。宣言の無いルートがあれば `createApp` が例外で止まる。クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
 
@@ -2115,7 +2107,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、5MB まで。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
 | セキュリティヘッダー | 静的アセットの `_headers` ファイル（`apps/web/public/_headers`。ADR-004）で付ける: `Content-Security-Policy`（`default-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy`。HSTS は Cloudflare で有効にする |
 | 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者もアプリからは中身を見られない。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Cloudflare のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は `dataCollection` で利用者の情報・Cookie・ヘッダー・本文・クエリ・DB の値・スタックの変数をすべて集めない設定にする（Sentry v11 では `sendDefaultPii` の代わり）。さらにブレッドクラム（画面遷移の URL を記録する）はすべて捨て、イベントのリクエストのヘッダー・Cookie・クエリ文字列は消す。イベントに載る URL は、クエリ・フラグメント・招待のトークン（`/invite/<token>` のパス）を持たない）。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
-| ストアの要件 | プライバシーポリシー（`/privacy`）とサポート（`/support`）の静的ページを Worker で配る（`apps/web/public/`。中身はストアへの提出までに用意する）。App Store のプライバシーの申告と Google Play のデータセーフティは、上の「個人情報」に合わせて書く。アプリ内のアカウント削除（U7）と、Google Play 向けの Web の削除の入口（`/account`）を用意する |
+| ストアに公開するときの要件 | ストアに公開すると決めたときに要る（ADR-003）。プライバシーポリシー（`/privacy`）とサポート（`/support`）の静的ページを Worker で配る（`apps/web/public/`）。App Store のプライバシーの申告と Google Play のデータセーフティは、上の「個人情報」に合わせて書く。アプリ内のアカウント削除（U7）は公開するかどうかにかかわらず用意する。Google Play 向けの Web の削除の入口（`/account`）は、公開すると決めたときに足す |
 | 依存の脆弱性 | GitHub の Dependabot のアラートを有効にする。Better Auth・Elysia・Drizzle のセキュリティ修正は速やかに取り込む（05_operation-runbook.md） |
 
 ### 7.3 パフォーマンス
@@ -2168,7 +2160,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 404 | `NOT_FOUND` | 資源が無い |
 | 409 | `CONFLICT`・`CONFLICT_MULTI` | 同時編集の衝突（ADR-019） |
 | 409 | `ARCHIVED` | アーカイブしたものを変えようとした |
-| 409 | `LAST_OWNER`・`CANNOT_LEAVE_PERSONAL`・`ALREADY_MEMBER`・`INVITATION_PENDING`・`INVITATION_ALREADY_ACCEPTED`・`EMAIL_TAKEN`・`PASSWORD_ALREADY_SET`・`DECISION_CHANGED`・`DECISION_NOT_PROCEED`・`NAME_TAKEN`・`HAS_EMPTY_QUESTIONS`・`ALREADY_LATEST`・`DRAFT_EXISTS`・`PUBLISHED_READ_ONLY` | 状態がその操作を許さない（5章） |
+| 409 | `LAST_OWNER`・`CANNOT_LEAVE_PERSONAL`・`PERSONAL_OWNER`・`ALREADY_MEMBER`・`INVITATION_PENDING`・`INVITATION_ALREADY_ACCEPTED`・`EMAIL_TAKEN`・`PASSWORD_ALREADY_SET`・`DECISION_CHANGED`・`DECISION_NOT_PROCEED`・`NAME_TAKEN`・`HAS_EMPTY_QUESTIONS`・`ALREADY_LATEST`・`DRAFT_EXISTS`・`PUBLISHED_READ_ONLY` | 状態がその操作を許さない（5章） |
 | 410 | `INVITATION_INVALID` | 招待のトークンが無い・取り消し・期限切れ |
 | 413 | `PAYLOAD_TOO_LARGE` | 本体が大きすぎる（JSON は1MB、写真は5MB。`Content-Length` が無い分割転送でも読んだ量で数える） |
 | 422 | `VALIDATION_FAILED` | 入力の検査に失敗（`details` に項目ごとの `path`・Zod の `code`・`message`。入力の値そのものは返さない） |
@@ -2201,7 +2193,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 ### 8.3 ログとの対応
 
-- **リクエスト ID**: Worker が `X-Request-Id`（無ければ UUID を作る）を付けて API へ渡す。API は全ログ行・エラーの応答・Sentry のタグに同じ値を入れ、応答のヘッダーにも返す。スマホも Worker を通るので同じ。Cloud Scheduler からの呼び出しは API が作る。
+- **リクエスト ID**: Worker が `X-Request-Id`（無ければ UUID を作る）を付けて API へ渡す。API は全ログ行・エラーの応答・Sentry のタグに同じ値を入れ、応答のヘッダーにも返す。スマホも Worker を通るので同じ。
 - **レベル**: 4xx は `info`、5xx は `error`。ただし同じ IP への 401・403 が1分に10回を超えたら、その後の 401・403 のアクセスログの行は `warn` にする（Cloud Run のインスタンスごとに数える。ログの水準を決めるだけなので、インスタンス間で数は合わせない）。5xx は、アクセスログの行（`message: "request"`）とは別に、`message: "request failed"` の行を `requestId`・`errorCode`・`errorName`・`errorMessage`・`stack` 付きで書く。DB のエラーは `pgCode` と `constraint` だけを出し、SQL とパラメーターは出さない（利用者の入力が入るため）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。
 - **探し方**: 利用者の画面の `Ref` → Cloud Logging で `jsonPayload.requestId` を検索 → 同じ ID の Sentry のイベント。手順は 05_operation-runbook.md。
 
@@ -2232,13 +2224,13 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 |---|---|---|---|
 | 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
-| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 分岐 80% 以上 | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、cron の重複防止、テンプレートの移行と戻し、PDF が作れること（ページ数と文字の抽出） |
+| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 分岐 80% 以上 | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの移行と戻し、PDF が作れること（ページ数と文字の抽出） |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作、axe の検査 |
 | スマホの部品（`packages/ui-native`） | Jest（jest-expo）＋ React Native Testing Library | 部品ごとに主要な状態 | 同じ名前の部品の種類・大きさ・アクセシビリティの属性、トレイの開閉 |
 | Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と送信待ちの列、衝突の確認、権限による表示の出し分け |
 | スマホ（`apps/mobile`） | Jest（jest-expo）＋ React Native Testing Library | 主要な部品 50% 以上 | 1問ずつのカード、ボトムシートでの行の編集、自動保存と送信待ちの列、セッションの保存 |
 | E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査 |
-| E2E（スマホ） | Phase 5 で Maestro の導入を判断する（ADR-001）。それまでは、ストアへの提出前に TestFlight / Play の内部テストで手で確かめる（04_deployment-procedure.md のチェックリスト） | — | コアフロー |
+| E2E（スマホ） | Maestro（フローは `apps/mobile/.maestro/` に置く。開発ビルドを入れたシミュレーター / エミュレーターに、local の API とシード済みの DB をつないで動かす。CI には載せない: macOS のランナーとエミュレーターの起動が要り、無料枠の運用費の方針に合わない。スマホのリリースの前に手元で通す。04 のチェックリスト） | — | コアフロー（ログイン → アイデアの作成 → 設問への回答の保存）を1本。画面を作り終えたあとに書く（Step 27） |
 | デザイントークン | Bun test（`make test-domain`）と `make tokens` の検査 | — | エイリアスの参照先が実在すること・循環しないこと・`semantic` がエイリアスだけであること、意味色のコントラスト（WCAG AA。検査の対象に無い色の組が増えたら失敗）、生成物が 06 と一致すること、Web のテーマが vanilla-extract でコンパイルできること、`packages/ui-tokens/src/types.ts` の値が 06 と合っていること |
 
 CI（GitHub Actions）が PR ごとに動かすターゲットは 04_deployment-procedure.md 2章（`ci.yml`）が正。`main` への取り込みは、すべて通ったときだけ。
@@ -2256,11 +2248,10 @@ CI（GitHub Actions）が PR ごとに動かすターゲットは 04_deployment-
 | 死活 | Cloud Monitoring の稼働時間チェック | `https://{DOMAIN}/api/health`（Z1。DB に触れない）を5分ごと、3つの地域から。2つ以上の地域で失敗が5分続いたらメール |
 | エラー率 | Cloud Monitoring（ログベースの指標） | 5xx が10分間で全体の1%を超える、または5分で5件を超えたらメール |
 | レイテンシ | Cloud Run の指標 | リクエストの p95 が15分続けて3秒を超えたらメール（0台からの起動を含むため、目標の 7.3 より緩くする） |
-| 定期実行 | Cloud Scheduler のジョブの結果（ログベースの指標） | production の `moonx-production-due-notifications` が2回続けて失敗したらメール（staging にはアラートを付けない） |
 | メモリ | Cloud Run の指標 | メモリの使用率が5分続けて90%を超えたらメール（PDF の作成で足りなくなる兆し） |
 | 台数 | Cloud Run の指標 | 台数が上限の3台に10分続けて張り付いたらメール |
 | DB の容量 | Neon のコンソール | 無料プランの 0.5GB に対して 400MB を超えたら対応する（確かめ方は 05_operation-runbook.md） |
 | メール | Resend のダッシュボード | 送信の失敗と戻り（バウンス）。API のログにも送信の失敗を出す |
 | 無料枠の使用量（週1回、手で見る。アラートは付けない） | 各サービスのダッシュボード | 次の目安を超えたら、05_operation-runbook.md の手順で原因を探し、有料プランか構成の見直しを検討する: Sentry 月4,000件（無料枠の80%）、Neon の計算時間 80%、Resend 1日80通・月2,400通、Worker 1日7万回、Cloud Run の無料枠 80% |
-| 費用 | Google Cloud の予算アラート（Terraform） | 月 $5 と $10 でメール（予算にストアの登録費は含めない） |
+| 費用 | Google Cloud の予算アラート（Terraform） | 月 $5 と $10 でメール（予算に Apple Developer Program の年会費は含めない） |
 | KPI（01_prd.md） | `packages/db/queries/kpi.sql` | 件数だけを数える SQL（回答の中身は読まない）。DB に入れる開発者（7.2）が月に1回、production に読み取り専用の接続で実行し、件数だけを運営者に渡す |

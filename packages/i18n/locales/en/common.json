@@ -34,9 +34,6 @@
     "decision": "{{actor}} recorded a decision on {{idea}}",
     "goNoGo": "{{actor}} recorded Go / No-Go on {{plan}}",
     "versionSaved": "{{actor}} saved {{version}} of {{plan}}",
-    "due_three_days_before": "{{title}} is due in 3 days",
-    "due_due_day": "{{title}} is due today",
-    "due_overdue": "{{title}} is overdue",
     "unknownTarget": "an item"
   }
 }

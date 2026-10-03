@@ -15,12 +15,17 @@ import type { PanelTarget } from "./panel-target";
 /** Every history query lives under this prefix. */
 export const HISTORY_KEY = ["history"] as const;
 
-/** Sources whose whole operation H3 can take back; the others touch records, not answers. */
+/** Sources whose whole operation H3 can take back; the others are single edits. */
 export const BATCH_UNDOABLE_SOURCES: readonly HistoryEntry["source"][] = [
   "ai_import",
   "template_migration",
   "revert",
+  "duplicate",
+  "plan_draft",
 ];
+
+/** The sources H3 takes back by deleting what they made, which asks first and leaves the screen. */
+export const CREATION_SOURCES: readonly HistoryEntry["source"][] = ["duplicate", "plan_draft"];
 
 /** H1, newest first, a page at a time. */
 export function historyQuery(target: PanelTarget) {
@@ -60,7 +65,10 @@ export function historyQuery(target: PanelTarget) {
  * history and comments, the idea screens, the validation's sections, the self analysis, the
  * plans and the dashboard's activity.
  */
-export function refreshAfterContentChange(queryClient: QueryClient) {
+export function refreshAfterContentChange(
+  queryClient: QueryClient,
+  { refetch = true }: { refetch?: boolean } = {},
+) {
   return Promise.all(
     [
       HISTORY_KEY,
@@ -70,14 +78,18 @@ export function refreshAfterContentChange(queryClient: QueryClient) {
       SELF_ANALYSIS_KEY,
       ["plans"],
       DASHBOARD_KEY,
-    ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    ].map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey, refetchType: refetch ? "active" : "none" }),
+    ),
   );
 }
 
 /**
  * H2 and H3. Taking changes back rewrites item content, which the idea screens, the validation's
  * sections, the self analysis and the plans read, hides or shows the comments of a deleted or
- * restored row, and (for a template migration) moves the pinned template version.
+ * restored row, and (for a template migration) moves the pinned template version. Undoing a
+ * creation deletes the screen the person is on, so it only marks the queries stale: refetching
+ * them would ask for something that no longer exists, and the caller leaves the screen.
  */
 export function useRevertMutations() {
   const queryClient = useQueryClient();
@@ -91,6 +103,11 @@ export function useRevertMutations() {
       mutationFn: (batchId: string) =>
         call(api().api.v1.history.batches({ batchId }).revert.post()),
       onSuccess: refresh,
+    }),
+    creation: useMutation({
+      mutationFn: (batchId: string) =>
+        call(api().api.v1.history.batches({ batchId }).revert.post()),
+      onSuccess: () => refreshAfterContentChange(queryClient, { refetch: false }),
     }),
   };
 }

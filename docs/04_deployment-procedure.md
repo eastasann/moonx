@@ -1,6 +1,6 @@
 # Deployment Procedure — moonx
 
-- この文書が持つもの: デプロイの流れ（GitHub Actions）、リリース前の確認、昇格の PR、ストアへの公開、ロールバック、デプロイ後の確認、緊急時の連絡先
+- この文書が持つもの: デプロイの流れ（GitHub Actions）、リリース前の確認、昇格の PR、スマホの配布、ロールバック、デプロイ後の確認、緊急時の連絡先
 - 環境の名前・環境変数（CI のシークレットを含む）・make ターゲット・ADR の正は [SDD 2章](02-01_system-design-doc.md#2-アーキテクチャ概要) と [SDD 3章](02-01_system-design-doc.md#3-技術選定と判断理由adr)。ここには書き写さない
 - 初回のクラウドのセットアップとブランチ戦略は [03_dev-setup.md](03_dev-setup.md)（5.4・9章）
 - 表記: `{DOMAIN}`・`{GCP_PROJECT_ID}`・`{APP_ID}` は SDD 2章のプレースホルダ。`<...>` はその場で調べて入れる値。`$TARGET` は `staging` か `production`
@@ -99,7 +99,7 @@ curl -fsS "$BASE_URL/api/health"       # 新しい Worker を通して届くこ�
   | fingerprint | `deploy.yml` が動かすもの | 届き方 |
   |---|---|---|
   | その環境で最後にビルドしたアプリと同じ | `make mobile-update ENV=$TARGET`（EAS Update。チャンネル `$TARGET`） | 同じ fingerprint のアプリに、次の起動から届く |
-  | 違う | `make mobile-build ENV=$TARGET`（EAS Build ＋ Submit） | staging は TestFlight と Play の内部テストに届く。production は審査を経て公開する（4.3） |
+  | 違う | `make mobile-build ENV=$TARGET`（EAS Build ＋ iOS だけ Submit） | Android は新しいビルドのリンク、iOS は TestFlight に届く。利用者へ配り直す（4.3） |
 
 - スマホの環境変数（`EXPO_PUBLIC_*`・`SENTRY_AUTH_TOKEN`）は EAS の環境変数にある（置き場所の正は SDD 2章「環境変数」「CI のシークレットと変数」）。値を変えるときは EAS の環境変数を直してから出す（03 5.4 K）
 
@@ -118,7 +118,7 @@ curl -fsS "$BASE_URL/api/health"       # 新しい Worker を通して届くこ�
 - 環境 `production-backup` は `db-backup.yml` だけが使う。デプロイのワークフローから参照しない
 - `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` の値は、Terraform の `envs/shared` が作ったもの（03 5.4 G）
 - CI 用の Cloudflare のトークンの権限は SDD の表の `CLOUDFLARE_API_TOKEN` の行のとおり。`envs/shared` の Terraform 用のトークン（Cloudflare のゾーンの設定を扱う。SDD 2章「インフラ管理」）は GitHub に置かない（03 5.1・5.4 A）
-- スマホの環境変数とストアへの提出の鍵は EAS に置く（SDD 2章）
+- スマホの環境変数と TestFlight への提出の鍵は EAS に置く（SDD 2章）
 
 ---
 
@@ -132,14 +132,9 @@ curl -fsS "$BASE_URL/api/health"       # 新しい Worker を通して届くこ�
 - [ ] API の変更が、出回っているスマホの版を壊さない（項目の追加だけ。壊すなら `/api/v2`。ADR-006）
 - [ ] 新しい環境変数・シークレットがある場合: SDD 2章の表に足し、Terraform・Secret Manager・`wrangler.jsonc`・EAS の環境変数（`preview` / `production`）・GitHub（SDD の表の置き場所。リポジトリか環境か）に、staging と production の両方で入れた
 - [ ] `infra/terraform/` の変更がある場合: 先に `make infra-apply ENV=$TARGET`（`shared` の変更なら `ENV=shared`）を済ませた
-- [ ] スマホの fingerprint が変わるか（ネイティブの変更があるか）を確かめた。変わるなら `deploy.yml` が `make mobile-build` を選ぶので、ストアの段取りを決めた（4.3）
+- [ ] スマホの fingerprint が変わるか（ネイティブの変更があるか）を確かめた。変わるなら `deploy.yml` が `make mobile-build` を選ぶので、利用者への配り直しの段取りを決めた（4.3）
+- [ ] スマホのネイティブの変更を含む場合: `apps/mobile/.maestro/` のコアフローを、開発ビルドを入れたシミュレーター / エミュレーターで通した（SDD 10章）
 - [ ] Better Auth の更新を含む場合: staging でログイン（メール・Google）・招待・パスワード再設定を確かめた
-- [ ] 期限の通知に関わる変更の場合: staging で Cloud Scheduler のジョブを手で動かして確かめた（`make cron-due` は local だけ）
-
-  ```bash
-  gcloud scheduler jobs run moonx-staging-due-notifications --location=asia-southeast1
-  ```
-
 - [ ] staging でデプロイ後の確認（6章）が済んだ
 - [ ] 昇格の PR に、対象の SHA・出す変更の一覧・staging での確認の結果・マイグレーションとネイティブの変更の有無・戻し方を書いた（`.github/PULL_REQUEST_TEMPLATE.md`）
 - [ ] production の昇格は、承認する人が `deploy.yml` を承認できる時間に出す
@@ -154,6 +149,8 @@ DB は戻せない（ADR-016）。1回のリリースのマイグレーション
 | 列の名前・型を変える | 新しい列を足し、両方に書く。古い行を埋める | 読む先を新しい列に変える → さらに次で古い列を消す |
 | 列・テーブルを消す | コードから使うのをやめる | 次のリリースで消す |
 | 制約を足す（一意・外部キー） | 先にデータを直す | 制約を足す |
+
+デプロイした版がまだ無い間（`deploy/{staging,production}/version` が無く、前の版の API が動いている環境が無い間）は、前の版に戻す先が無いので、使わなくなったものを、使うのをやめる変更と同じ変更で消してよい。最初のリリースのあとは、上の表のとおり2回に分ける。
 
 ### 4.2 昇格の PR の手順
 
@@ -206,75 +203,49 @@ gh run watch <RUN_ID>
 
 production の `deploy.yml` は、GitHub の環境 `production` の承認を待って止まる。GitHub の Actions のその実行の画面で「Review deployments」から承認する。`deploy.yml` が終わったら 6章の確認をする。
 
-### 4.3 スマホのストアへの公開
+### 4.3 スマホの配布
 
-昇格で `deploy.yml` が `make mobile-build` を選んだとき（fingerprint が変わったとき。2章）、またはストアの版（`app.config.ts` の version）を上げるときに行う。手元から出すときも `make mobile-build ENV=...`。fingerprint が同じなら EAS Update で届くので、ここの手順は要らない（2章）。
+昇格で `deploy.yml` が `make mobile-build` を選んだとき（fingerprint が変わったとき。2章）、または `app.config.ts` の version を上げるときに行う。手元から出すときも `make mobile-build ENV=...`。fingerprint が同じなら EAS Update で届くので、ここの手順は要らない（2章）。
 
-#### 最初の公開までの段取り
+身内だけが使う間は、App Store にも Google Play にも公開しない（ADR-003）。
 
-Google Play は個人の開発者アカウントなので、`{APP_ID}` を製品版で初めて公開する前に、**12人以上のテスターが14日間続けて参加するクローズドテスト**が要る（ADR-003）。テスターがそろってから Android の公開まで、少なくとも3週間ほどかかる。BCDX のメンバーとアドバイザーで12人に足りなければ、テスターを集めてから始める。
-
-| 時期 | iOS | Android |
+| | Android | iOS |
 |---|---|---|
-| 準備 | App Store Connect の版の情報と、審査用のデモアカウント（下）を用意する | テスターを12人以上集め、参加に使う Google アカウントのメールを控える。`{APP_ID}` の最初の版を Play Console に手で上げる（下） |
-| 1日目 | production の昇格で TestFlight に届いた版を、内部テスターで確かめる | `{APP_ID}` のクローズドテストのトラックに版を出し、テスターに参加してもらう（14日の数え始め） |
-| 1〜14日目 | 審査に出す（1〜数日）。公開を Android とそろえるなら、審査が通っても「手動でリリース」で待たせる | 12人以上が参加したまま14日間続ける（途中で12人を下回らないようにする）。テスターに実際に使ってもらい、反応を記録する |
-| 15日目〜 | — | Play Console のダッシュボードから製品版へのアクセスを申請する（テストの内容を聞かれる。Google の確認に数日かかる） |
-| 公開 | 手動でリリース（段階的リリース） | 製品版へ段階的に公開する |
-
-クローズドテストが要るのは最初の1回だけ。製品版へのアクセスが認められた後は、下の手順で内部テストから製品版へ昇格する。
-
-#### iOS
-
-1. staging の昇格で TestFlight（`{APP_ID}.staging`）に届いた版を確かめる
-2. production の昇格で `deploy.yml` が `make mobile-build ENV=production` を選ぶ（または手元から動かす）と、`{APP_ID}` がビルドされて TestFlight に提出される
-3. TestFlight の内部テスターで、6章のスマホの確認をする
-4. App Store Connect で新しい版を作る: リリースノート・スクリーンショット・App Review に関する情報（デモのアカウント。下）
-5. 審査に出す。公開は「手動でリリース」＋「段階的リリース」にする
-
-#### Apple の審査基準 4.8 で差し戻されたとき
-
-Sign in with Apple は足さずに出す（ADR-003）。審査基準 4.8 で差し戻されたら、ユーザーと次のどちらかを決める（ADR-003）。
-
-| 選ぶもの | やること |
-|---|---|
-| Sign in with Apple を足す | 認証の変更なので、SDD（ADR-003・ADR-010）を直してから実装する。ネイティブの変更になるので、版を上げて `make mobile-build ENV=production` で出し直し、もう一度審査に出す |
-| iOS はストアで配らない | App Store Connect で審査の申請を取り下げる。iOS の利用者には Web（`https://{DOMAIN}`）を案内する。Android の配布は続ける |
+| 配り方 | EAS の内部配布（`eas.json` の profile `staging`・`production` の `distribution: internal`、APK）。ビルドのインストール用のリンクを渡す | TestFlight の社内テスト（`make mobile-build` が EAS Submit で提出する）。端末を登録した内部配布も使える（下） |
+| 新しい人の追加 | 最新のビルドのインストール用のリンクを渡す（下） | App Store Connect でその人の Apple ID をユーザーに招待し、TestFlight の内部テスターのグループに入れる（上限100人） |
+| 更新の届き方 | 新しいビルドのリンクを渡し直し、入れ直してもらう。JS だけの変更は EAS Update | TestFlight の通知。JS だけの変更は EAS Update |
 
 #### Android
 
-1. staging の昇格で Play の内部テスト（`{APP_ID}.staging`）に届いた版を確かめる
-2. production の昇格で `deploy.yml` が `make mobile-build ENV=production` を選ぶ（または手元から動かす）と、`{APP_ID}` がビルドされて内部テストのトラックに提出される
-3. 内部テストで、6章のスマホの確認をする
-4. 最初の製品版の前だけ: クローズドテストを通し、製品版へのアクセスを申請する（上の「最初の公開までの段取り」）
-5. Play Console でリリースを製品版に昇格する。「アプリのアクセス権」にデモのアカウントを入れる
-6. 審査のあと、段階的な公開（例: 20% → 100%）で出す
+1. staging の昇格で `deploy.yml` が `make mobile-build ENV=staging` を選ぶと、`{APP_ID}.staging` の APK がビルドされる。EAS のビルドのページ（expo.dev のプロジェクトの Builds）の Install のリンクから端末に入れて確かめる
+2. production の昇格（または手元の `make mobile-build ENV=production`）で `{APP_ID}` の APK をビルドする。6章のスマホの確認をする
+3. 利用者にリンクを渡す。最新のビルドのページの URL は `eas build:list --platform android --build-profile production --status finished --limit 1` で出せる。リンクが無効になっているときは、同じ SHA で `make mobile-build ENV=production` をやり直す
+4. 受け取った人は、端末でリンクを開いて APK をダウンロードし、提供元不明のアプリのインストールを許可して入れる。前の版が入っていれば上書きされる（署名の鍵は EAS が持つ）
 
-最初の1回だけは、Google Play の API で提出できない。`{APP_ID}` と `{APP_ID}.staging` のそれぞれで、EAS のビルドの画面から AAB を取って Play Console に手で上げる（EAS Submit は2回目から使える）。
+版は `app.config.ts` の version（SemVer）を上げる。versionCode は `eas.json` の `appVersionSource: remote` で EAS が増やす。古いビルドを使えなくするときは、API の最低の版を上げる（426。SDD 5.1）。
 
-#### 審査用のデモアカウント
+#### iOS（TestFlight）
 
-招待制のため、審査をする人は自分で登録できない。production に審査専用のアカウントを用意する（ADR-003）。
+1. staging の昇格で `deploy.yml` が `make mobile-build ENV=staging` を選ぶと、`{APP_ID}.staging` がビルドされて TestFlight に提出される。TestFlight の内部テスターで確かめる
+2. production の昇格（または手元の `make mobile-build ENV=production`）で、`{APP_ID}` がビルドされて TestFlight に提出される。6章のスマホの確認をする
+3. 新しい人は、App Store Connect の「ユーザーとアクセス」で Apple ID を招待する（TestFlight だけに使うので、権限の弱いロールにする）。招待を受けた人が、TestFlight の内部テスターのグループに入ったあと、TestFlight アプリから入れる
+4. TestFlight のビルドは90日で期限が切れる。使い続けるときは、期限の前に `make mobile-build ENV=production` で新しいビルドを提出する
 
-- [ ] production に審査専用のワークスペースを作り、審査用のメールを招待して登録する（メール＋パスワード。Google ログインは使わない）
-- [ ] そのワークスペースに、3工程（自己分析 → アイデア検証 → ビジネスプラン）を一通り見られるサンプルのデータを手で入れる（BCDX の実データは使わない。`make db-seed` は production に使わない）
-- [ ] コメントなど複数人の機能を見せるため、同じワークスペースにもう1人のメンバーを入れておく
-- [ ] ID とパスワードをパスワード管理に入れ、App Store Connect（App Review に関する情報）と Play Console（アプリのアクセス権）に書く
-- [ ] 審査のメモに書く: BCDX 向けの招待制のアプリであること、デモのアカウントで全機能を見られること、Pitch Deck の PDF の出し方
-- [ ] 審査のあとも消さない（版を出すたびに審査がある）。パスワードを変えたら両ストアも直す
+#### iOS（端末を登録した内部配布）
 
-#### 審査で求められるもの（出す前に確かめる）
+TestFlight を使えない人がいるときの代わりの配り方。Apple Developer Program の登録（個人）で使える。
 
-| 項目 | iOS | Android |
-|---|---|---|
-| プライバシーポリシーの URL | 必須 | 必須 |
-| 集めるデータの申告 | App のプライバシー | データ セーフティ |
-| ログインが要るアプリのデモアカウント | App Review に関する情報 | アプリのアクセス権 |
-| アカウントを作れるアプリの、アカウント削除の手段 | 必須。アプリ内で削除できること（ガイドライン 5.1.1(v)） | 必須。アプリ内の手段と、Web で申し込める URL |
-| 第三者のログイン（Google）があるときの同等のログイン手段 | ガイドライン 4.8。Sign in with Apple は足さずに出す。差し戻されたら上の「4.8 で差し戻されたとき」 | — |
-| 製品版の前のクローズドテスト | — | 最初の1回だけ必須（上の「最初の公開までの段取り」） |
-| 暗号化の申告 | HTTPS だけなら輸出規制の対象外と答える | — |
-| コンテンツのレーティング | 年齢の区分 | レーティングの質問票 |
+1. `eas device:create` を動かし、表示された登録用のリンクをその人に送る。端末の UDID が登録される
+2. `eas.json` の profile の `ios.distribution` を `internal` にして `make mobile-build` で作り直す。内部配布のビルドは TestFlight に提出できないので、`Makefile` の iOS の `--auto-submit` も外す。同じ環境で TestFlight と併用しない
+3. ビルドのインストール用のリンクを、Android と同じように渡す。端末を足すたびに、1 に戻って作り直す
+
+#### JS だけの変更
+
+fingerprint が同じなら `deploy.yml` が `make mobile-update ENV=$TARGET` を選び、EAS Update で届く。入れてある人には、アプリを開いたあとの次の起動で届く。
+
+#### ストアに公開するとき
+
+今はストアに公開しない。公開すると決めたときは、ユーザーが決めた時点で ADR-003 を書き換え、この節に公開の手順を足す。
 
 ---
 
@@ -289,7 +260,7 @@ Sign in with Apple は足さずに出す（ADR-003）。審査基準 4.8 で差�
 3. 6章の確認をする
 
 - マイグレーションは前の版に戻らない（新しい列などは残る）。expand / contract を守っていれば、前の版の API はそのまま動く
-- スマホは、戻し先の SHA の fingerprint がその環境で最後にビルドしたアプリと同じなら、`deploy.yml` が `make mobile-update` で前の版の JS を出す。違えば `make mobile-build` を選び、ストアの審査を待つことになる（ADR-016）。ストアに出たバイナリは戻らない（5.5）
+- スマホは、戻し先の SHA の fingerprint がその環境で最後にビルドしたアプリと同じなら、`deploy.yml` が `make mobile-update` で前の版の JS を出す。違えば `make mobile-build` を選び、新しいビルドを配り直すことになる（ADR-016）。配ったバイナリは戻らない（5.5）
 
 以下は、PR を待てない緊急時（承認する人がすぐにいないときを含む）に CLI で直接戻す手順。戻したあとで、必ず 5.1 の revert もしてリポジトリと合わせる。
 
@@ -338,13 +309,13 @@ eas update:republish --group <前の GROUP_ID> --message "rollback to <短い SH
 
 端末に届くのは、アプリを開いたあとの次の起動のとき。
 
-### 5.5 ストアのバイナリ
+### 5.5 配ったバイナリ
 
-ストアに出たバイナリは戻せない。
+配ったバイナリは戻せない。
 
-1. 広がるのを止める: App Store は「段階的リリースを一時停止」、Google Play は「公開を停止」
+1. 広がるのを止める: 問題の版のリンクを新しく渡さない。TestFlight は App Store Connect で問題のビルドを期限切れにする。入れてしまった人には直接連絡する。使えなくするときは API の最低の版を上げる（426。SDD 5.1）
 2. JS だけで直せるなら、その runtime 向けに EAS Update を出す（5.4・2章）
-3. ネイティブの修正が要るなら、版を上げて `make mobile-build ENV=production` で作り直して出す（4.3）。iOS は急ぎの審査（Expedited Review）を申し込める
+3. ネイティブの修正が要るなら、版を上げて `make mobile-build ENV=production` で作り直して配る（4.3）
 4. API 側で古い版に合わせられるなら、先に API を直す（ADR-006）
 
 ### 5.6 DB
@@ -402,7 +373,6 @@ gcloud logging read \
 - [ ] 招待のメールが届く（staging は `MAIL_ALLOWLIST` のメールで）
 - [ ] スマホ（そのチャンネルのビルド）: ログイン → アイデアを開く → PDF を共有できる。EAS Update が届いている（アプリを2回起動し直す）
 - [ ] staging だけ: `/api/docs` が開く。production: `/api/docs` が開かない（ADR-006）
-- [ ] 期限の通知のジョブが次の回で成功している（05 4章）
 
 ---
 
@@ -415,9 +385,7 @@ gcloud logging read \
 | BCDX の窓口（利用者への連絡） | `<氏名>` | `<連絡手段>` | 運営者（アプリの管理画面） |
 | Google Cloud の請求先の管理者 | `<氏名>` | `<連絡手段>` | 請求先アカウント |
 | Cloudflare のアカウントの持ち主（`{DOMAIN}`） | `<氏名>` | `<連絡手段>` | Registrar・DNS |
-| Apple Developer の Account Holder | `<氏名>` | `<連絡手段>` | App Store Connect・会員の更新 |
-| Google Play Console のアカウントの持ち主（個人の開発者アカウント） | `<氏名>` | `<連絡手段>` | Play Console |
-| クローズドテストのテスターの取りまとめ（Android の最初の公開の前） | `<氏名>` | `<連絡手段>` | Play Console のテスターの一覧 |
+| Apple Developer の Account Holder | `<氏名>` | `<連絡手段>` | App Store Connect（TestFlight）・会員の更新 |
 
 - アラートは一次対応の担当にメールで届く（05 2章）。1人で運用するときは、予備の担当に少なくとも Google Cloud と Cloudflare の権限を渡しておく
 - 外部サービスの障害の確かめ方は 05 5章

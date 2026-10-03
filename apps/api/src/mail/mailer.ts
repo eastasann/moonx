@@ -18,7 +18,7 @@ export interface Mailer {
 
 /**
  * `console` prints the message to the API log (local, tests); `resend` posts it to Resend's HTTP
- * API (SDD 2 通信フロー 5). With an allowlist (staging) any other address is dropped and logged,
+ * API (SDD 2 通信フロー 4). With an allowlist (staging) any other address is dropped and logged,
  * so test data can never reach a real inbox.
  */
 export function createMailer(

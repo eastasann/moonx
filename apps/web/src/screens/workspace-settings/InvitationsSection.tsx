@@ -32,7 +32,6 @@ import { inviteMemberSchema } from "../../forms/workspace-settings";
 import { api, call } from "../../lib/api";
 import { isApiError } from "../../lib/api-error";
 import { errorText } from "../../lib/error-text";
-import { copyText } from "../../lib/file-save";
 import { fieldProps, validate } from "../../lib/form";
 import { useMe } from "../../lib/session";
 import { toasts } from "../../lib/toast";
@@ -52,8 +51,9 @@ const STATUS_VARIANT = {
 } as const;
 
 /**
- * Screen 9, invitations (W4 to W7). Copying and resending both make a new token, so the previous
- * link stops working. A send that fails keeps the form as typed for another try.
+ * Screen 9, invitations (W4, W5, W7). The link goes to the invited address only, so there is no
+ * way to copy it here; resending makes a new token and the previous link stops working. A send
+ * that fails keeps the form as typed for another try.
  */
 export function InvitationsSection({ workspaceId }: { workspaceId: string }) {
   const { t } = useTranslation(["workspaceSettings", "account", "app"]);
@@ -61,7 +61,6 @@ export function InvitationsSection({ workspaceId }: { workspaceId: string }) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<InvitationFilter>("pending");
   const [cancelling, setCancelling] = useState<Invitation | null>(null);
-  const [manualLink, setManualLink] = useState<string | null>(null);
   const invitations = useQuery(invitationsQuery(workspaceId, filter));
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: invitationsKey(workspaceId) });
@@ -89,21 +88,6 @@ export function InvitationsSection({ workspaceId }: { workspaceId: string }) {
       await refresh();
     },
   });
-  const copyLink = useMutation({
-    mutationFn: async (invitationId: string) => {
-      const { link } = await call(api().api.v1.invitations({ invitationId }).link.post());
-      return { link, copied: await copyText(link) };
-    },
-    onSuccess: async ({ link, copied }) => {
-      if (copied) {
-        setManualLink(null);
-        toasts.add({ title: t("workspaceSettings:invitations.linkCopied"), variant: "positive" });
-      } else {
-        setManualLink(link);
-      }
-      await refresh();
-    },
-  });
   const cancel = useMutation({
     mutationFn: (invitation: Invitation) =>
       call(api().api.v1.invitations({ invitationId: invitation.id }).delete()),
@@ -125,7 +109,7 @@ export function InvitationsSection({ workspaceId }: { workspaceId: string }) {
     },
   });
 
-  const actionError = resend.error ?? copyLink.error ?? cancel.error;
+  const actionError = resend.error ?? cancel.error;
   const pendingInvitationId =
     isApiError(send.error) && send.error.code === "INVITATION_PENDING"
       ? send.error.extra.invitationId
@@ -206,21 +190,6 @@ export function InvitationsSection({ workspaceId }: { workspaceId: string }) {
         </SegmentedControl>
       </Flex>
       {actionError ? <InlineAlert variant="negative" heading={errorText(t, actionError)} /> : null}
-      {manualLink ? (
-        <InlineAlert
-          variant="notice"
-          heading={t("workspaceSettings:invitations.manualLink.heading")}
-        >
-          <Stack gap="space-100">
-            <Text>{t("workspaceSettings:invitations.manualLink.body")}</Text>
-            <TextField
-              label={t("workspaceSettings:invitations.manualLink.label")}
-              value={manualLink}
-              isReadOnly
-            />
-          </Stack>
-        </InlineAlert>
-      ) : null}
       <QueryBoundary
         query={invitations}
         skeleton={
@@ -279,14 +248,11 @@ export function InvitationsSection({ workspaceId }: { workspaceId: string }) {
                     size="S"
                     onAction={(key) => {
                       resend.reset();
-                      copyLink.reset();
                       cancel.reset();
-                      if (key === "copy") return copyLink.mutate(invitation.id);
                       if (key === "resend") return resend.mutate(invitation.id);
                       setCancelling(invitation);
                     }}
                   >
-                    <MenuItem id="copy">{t("workspaceSettings:invitations.copyLink")}</MenuItem>
                     <MenuItem id="resend">{t("workspaceSettings:invitations.resend")}</MenuItem>
                     <MenuSeparator />
                     <MenuItem id="cancel" variant="negative">

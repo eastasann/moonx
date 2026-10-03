@@ -31,6 +31,9 @@ const ws = `/api/v1/workspaces/${BCDX}`;
 const OTHER = "00000000-0000-4000-8000-000000000001";
 
 const tokenOf = (link: string) => link.split("/invite/")[1] as string;
+/** The invitation link as the invited person gets it: the API never returns it to the inviter. */
+const linkIn = (mail: { text: string } | undefined) =>
+  mail?.text.match(/https?:\/\/\S+\/invite\/[\w-]+/)?.[0] as string;
 
 async function invite(email = "new.person@example.com", role = "member", who = as.ana) {
   return call(t.app, "POST", `${ws}/invitations`, { as: who, body: { email, role } });
@@ -165,6 +168,7 @@ describe("W2 GET members", () => {
       email: "ana@bcdx.example",
       role: "owner",
       joinedAt: expect.any(String),
+      isPersonalOwner: false,
     });
     for (const who of ["kenji", "grace"] as const) {
       const res = await call(t.app, "GET", `${ws}/members`, { as: as[who] });
@@ -201,6 +205,7 @@ describe("W3 PATCH member role", () => {
       email: "grace@advisor.example",
       role: "member",
       joinedAt: expect.any(String),
+      isPersonalOwner: false,
     });
     const [row] = await t.db
       .select()
@@ -434,13 +439,79 @@ describe("W3 DELETE member", () => {
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe("CANNOT_LEAVE_PERSONAL");
   });
+
+  describe("the owner of a personal workspace against other Owners", () => {
+    const personal = () => personalWorkspaceId("kenji");
+    const members = () => `/api/v1/workspaces/${personal()}/members`;
+    beforeEach(async () => {
+      await t.db
+        .insert(schema.memberships)
+        .values({ workspaceId: personal(), userId: userId("ana"), role: "owner" });
+    });
+
+    test("another Owner cannot demote or remove them", async () => {
+      const demote = await call(t.app, "PATCH", `${members()}/${userId("kenji")}`, {
+        as: as.ana,
+        body: { role: "viewer" },
+      });
+      expect(demote.status).toBe(409);
+      expect(demote.body.error.code).toBe("PERSONAL_OWNER");
+      const remove = await call(t.app, "DELETE", `${members()}/${userId("kenji")}`, {
+        as: as.ana,
+      });
+      expect(remove.status).toBe(409);
+      expect(remove.body.error.code).toBe("PERSONAL_OWNER");
+      const rows = await t.db
+        .select({ role: schema.memberships.role })
+        .from(schema.memberships)
+        .where(
+          and(
+            eq(schema.memberships.workspaceId, personal()),
+            eq(schema.memberships.userId, userId("kenji")),
+          ),
+        );
+      expect(rows).toEqual([{ role: "owner" }]);
+    });
+
+    test("the list marks them, and they can still demote themself while another Owner exists", async () => {
+      const list = await call(t.app, "GET", members(), { as: as.kenji });
+      expect(
+        Object.fromEntries(
+          list.body.items.map((m: { user: { id: string }; isPersonalOwner: boolean }) => [
+            m.user.id,
+            m.isPersonalOwner,
+          ]),
+        ),
+      ).toEqual({ [userId("kenji")]: true, [userId("ana")]: false });
+      const own = await call(t.app, "PATCH", `${members()}/${userId("kenji")}`, {
+        as: as.kenji,
+        body: { role: "member" },
+      });
+      expect(own.status).toBe(200);
+    });
+
+    test("they can remove and demote the other Owner", async () => {
+      const demote = await call(t.app, "PATCH", `${members()}/${userId("ana")}`, {
+        as: as.kenji,
+        body: { role: "member" },
+      });
+      expect(demote.status).toBe(200);
+      const remove = await call(t.app, "DELETE", `${members()}/${userId("ana")}`, {
+        as: as.kenji,
+      });
+      expect(remove.status).toBe(204);
+    });
+  });
 });
 
 describe("W4 invitations", () => {
-  test("POST stores only the hash, mails the link and returns the token once", async () => {
+  test("POST stores only the hash and mails the link to the invited address, not to the inviter", async () => {
     const res = await invite("New.Person@Example.com", "viewer");
     expect(res.status).toBe(201);
-    const { invitation, link } = res.body;
+    const { invitation } = res.body;
+    expect(Object.keys(res.body)).toEqual(["invitation"]);
+    expect(t.mailbox.sent).toHaveLength(1);
+    const link = linkIn(t.mailbox.sent[0]);
     expect(link).toMatch(/^http:\/\/localhost:5173\/invite\/[A-Za-z0-9_-]{43}$/);
     expect(invitation).toEqual({
       id: expect.any(String),
@@ -465,7 +536,6 @@ describe("W4 invitations", () => {
     expect(row?.tokenHash).not.toContain(tokenOf(link));
     expect(row?.workspaceId).toBe(BCDX);
 
-    expect(t.mailbox.sent).toHaveLength(1);
     const mail = t.mailbox.sent[0];
     expect(mail?.to).toBe("New.Person@Example.com");
     expect(mail?.subject).toContain("Ana Villanueva");
@@ -474,12 +544,13 @@ describe("W4 invitations", () => {
 
     const list = await call(t.app, "GET", `${ws}/invitations`, { as: as.ana });
     expect(JSON.stringify(list.body)).not.toContain(tokenOf(link));
+    expect(JSON.stringify(res.body)).not.toContain(tokenOf(link));
   });
 
   test("tokens differ between invitations", async () => {
-    const a = await invite("a@example.com");
-    const b = await invite("b@example.com");
-    expect(tokenOf(a.body.link)).not.toBe(tokenOf(b.body.link));
+    await invite("a@example.com");
+    await invite("b@example.com");
+    expect(tokenOf(linkIn(t.mailbox.sent[0]))).not.toBe(tokenOf(linkIn(t.mailbox.sent[1])));
   });
 
   test("GET lists valid pending ones by default and everything with status=all", async () => {
@@ -640,10 +711,6 @@ describe("W4 invitations", () => {
       as: as.ana,
     });
     expect(resend.status).toBe(429);
-    const link = await call(t.app, "POST", `/api/v1/invitations/${pending?.id}/link`, {
-      as: as.ana,
-    });
-    expect(link.status).toBe(200);
     const rows = await t.db
       .select()
       .from(schema.invitations)
@@ -659,7 +726,7 @@ describe("W4 invitations", () => {
   });
 });
 
-describe("W5 / W6 / W7 invitation actions", () => {
+describe("W5 / W7 invitation actions", () => {
   const pendingId = async () => {
     const [row] = await t.db
       .select()
@@ -667,14 +734,14 @@ describe("W5 / W6 / W7 invitation actions", () => {
       .where(eq(schema.invitations.email, "new.member@bcdx.example"));
     return row as NonNullable<typeof row>;
   };
-  const act = (verb: "resend" | "link" | "revoke", id: string, who = as.ana) =>
+  const act = (verb: "resend" | "revoke", id: string, who = as.ana) =>
     verb === "revoke"
       ? call(t.app, "DELETE", `/api/v1/invitations/${id}`, { as: who })
       : call(t.app, "POST", `/api/v1/invitations/${id}/${verb}`, { as: who });
 
   test("W5 reissues the token, extends expiry, mails again and kills the old link", async () => {
     const created = await invite("again@example.com");
-    const oldToken = tokenOf(created.body.link);
+    const oldToken = tokenOf(linkIn(t.mailbox.sent[0]));
     await t.db
       .update(schema.invitations)
       .set({ expiresAt: new Date(Date.now() + 3600_000) })
@@ -686,7 +753,8 @@ describe("W5 / W6 / W7 invitation actions", () => {
     expect(Date.parse(res.body.invitation.expiresAt) - Date.now()).toBeGreaterThan(
       6.9 * 86_400_000,
     );
-    const newToken = tokenOf(res.body.link);
+    expect(Object.keys(res.body)).toEqual(["invitation"]);
+    const newToken = tokenOf(linkIn(t.mailbox.sent[0]));
     expect(newToken).not.toBe(oldToken);
     const [row] = await t.db
       .select()
@@ -700,7 +768,7 @@ describe("W5 / W6 / W7 invitation actions", () => {
     expect(stale).toHaveLength(0);
     expect(t.mailbox.sent).toHaveLength(1);
     expect(t.mailbox.sent[0]?.to).toBe("again@example.com");
-    expect(t.mailbox.sent[0]?.text).toContain(res.body.link);
+    expect(t.mailbox.sent[0]?.text).toContain(newToken);
     expect(t.mailbox.sent[0]?.text).not.toContain(oldToken);
   });
 
@@ -716,20 +784,15 @@ describe("W5 / W6 / W7 invitation actions", () => {
     expect(list.body.items).toHaveLength(2);
   });
 
-  test("W6 returns a fresh link without mail or rate use and invalidates the old one", async () => {
+  test("the link-copy endpoint no longer exists", async () => {
     const row = await pendingId();
-    const res = await act("link", row.id);
-    expect(res.status).toBe(200);
-    expect(Object.keys(res.body)).toEqual(["link"]);
-    expect(t.mailbox.sent).toHaveLength(0);
+    const res = await call(t.app, "POST", `/api/v1/invitations/${row.id}/link`, { as: as.ana });
+    expect(res.status).toBe(404);
     const [after] = await t.db
       .select()
       .from(schema.invitations)
       .where(eq(schema.invitations.id, row.id));
-    expect(after?.tokenHash).toBe(hashInvitationToken(tokenOf(res.body.link)));
-    expect(after?.tokenHash).not.toBe(row.tokenHash);
-    const [limit] = await t.db.select().from(schema.rateLimits);
-    expect(limit).toBeUndefined();
+    expect(after?.tokenHash).toBe(row.tokenHash);
   });
 
   test("W7 revokes; afterwards every action is 410", async () => {
@@ -741,7 +804,7 @@ describe("W5 / W6 / W7 invitation actions", () => {
       .from(schema.invitations)
       .where(eq(schema.invitations.id, row.id));
     expect(after?.status).toBe("revoked");
-    for (const verb of ["resend", "link", "revoke"] as const) {
+    for (const verb of ["resend", "revoke"] as const) {
       const again = await act(verb, row.id);
       expect(again.status).toBe(410);
       expect(again.body.error.code).toBe("INVITATION_INVALID");
@@ -759,13 +822,13 @@ describe("W5 / W6 / W7 invitation actions", () => {
     expect((await act("revoke", expired?.id as string)).status).toBe(204);
   });
 
-  test("an accepted invitation is 409 for all three", async () => {
+  test("an accepted invitation is 409 for both", async () => {
     const row = await pendingId();
     await t.db
       .update(schema.invitations)
       .set({ status: "accepted", acceptedAt: new Date(), acceptedById: userId("kenji") })
       .where(eq(schema.invitations.id, row.id));
-    for (const verb of ["resend", "link", "revoke"] as const) {
+    for (const verb of ["resend", "revoke"] as const) {
       const res = await act(verb, row.id);
       expect(res.status).toBe(409);
       expect(res.body.error.code).toBe("INVITATION_ALREADY_ACCEPTED");
@@ -775,7 +838,7 @@ describe("W5 / W6 / W7 invitation actions", () => {
   test("Member, Viewer and a non-Owner outsider are 403; anonymous 401; unknown 404; bad id 422", async () => {
     const row = await pendingId();
     for (const who of ["kenji", "grace"] as const) {
-      for (const verb of ["resend", "link", "revoke"] as const) {
+      for (const verb of ["resend", "revoke"] as const) {
         const res = await act(verb, row.id, as[who]);
         expect(res.status).toBe(403);
         expect(res.body.error.code).toBe("FORBIDDEN");
@@ -786,9 +849,9 @@ describe("W5 / W6 / W7 invitation actions", () => {
     ).body;
     expect(otherWs).toBeDefined();
     expect((await act("resend", row.id, as.paolo)).status).toBe(403);
-    expect((await call(t.app, "POST", `/api/v1/invitations/${row.id}/link`)).status).toBe(401);
-    expect((await act("link", OTHER)).status).toBe(404);
-    expect((await act("link", "nope")).status).toBe(422);
+    expect((await call(t.app, "POST", `/api/v1/invitations/${row.id}/resend`)).status).toBe(401);
+    expect((await act("resend", OTHER)).status).toBe(404);
+    expect((await act("resend", "nope")).status).toBe(422);
     const [after] = await t.db
       .select()
       .from(schema.invitations)
@@ -799,8 +862,6 @@ describe("W5 / W6 / W7 invitation actions", () => {
 
   test("the Admin who is not a member manages any invitation, but still has no workspace access", async () => {
     const row = await pendingId();
-    const link = await act("link", row.id, as.admin);
-    expect(link.status).toBe(200);
     const resend = await act("resend", row.id, as.admin);
     expect(resend.status).toBe(200);
     expect(resend.body.invitation.invitedBy.id).toBe(userId("ana"));
@@ -825,7 +886,7 @@ describe("W5 / W6 / W7 invitation actions", () => {
         expiresAt: new Date(Date.now() + 86_400_000),
       })
       .returning();
-    expect((await act("link", op?.id as string, as.ana)).status).toBe(403);
+    expect((await act("resend", op?.id as string, as.ana)).status).toBe(403);
     const resend = await act("resend", op?.id as string, as.admin);
     expect(resend.status).toBe(200);
     expect(resend.body.invitation).toMatchObject({

@@ -260,13 +260,6 @@ const endpoints: Endpoint[] = [
     min: "invitation",
     ok: 200,
   },
-  {
-    name: "W6",
-    method: "POST",
-    path: (x) => `/api/v1/invitations/${x.invitationId}/link`,
-    min: "invitation",
-    ok: 200,
-  },
 
   {
     name: "I1 POST",
@@ -608,7 +601,7 @@ describe("SDD 7.1 authorization matrix", () => {
     expect(invite.status).toBe(201);
     const id = invite.body.invitation.id;
     expect(
-      (await call(t.app, "POST", `/api/v1/invitations/${id}/link`, { as: who.ana })).status,
+      (await call(t.app, "POST", `/api/v1/invitations/${id}/resend`, { as: who.ana })).status,
     ).toBe(200);
     expect(
       (await call(t.app, "GET", `/api/v1/workspaces/${BCDX}/members`, { as: who.admin })).status,

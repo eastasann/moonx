@@ -29,6 +29,13 @@
       "when": 1790957584054,
       "tag": "0003_invitation_grants_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791007301640,
+      "tag": "0004_drop_due_notifications",
+      "breakpoints": true
     }
   ]
 }

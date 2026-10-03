@@ -1,5 +1,5 @@
 import { schema } from "@moonx/db";
-import { invitationLinkSchema, invitationWithLinkSchema } from "@moonx/schemas";
+import { invitationResultSchema } from "@moonx/schemas";
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
@@ -15,13 +15,13 @@ import { invitationMail } from "../mail/mailer";
 
 const params = z.object({ invitationId: z.uuid() });
 
-/** W5-W7 (SDD 5.5): the Owner of the invitation's workspace, or an Admin for any invitation. */
+/** W5 and W7 (SDD 5.5): the Owner of the invitation's workspace, or an Admin for any invitation. */
 export function invitationRoutes(ctx: AppContext) {
   const { db } = ctx;
 
   /**
    * The workspace of the invitation, which its Owner manages; `null` for an operator, who may
-   * manage any invitation (W5-W7), and 403 for anyone else on an operator invitation.
+   * manage any invitation (W5, W7), and 403 for anyone else on an operator invitation.
    */
   async function invitationScope({ params, user }: AccessInput) {
     const [row] = await db
@@ -77,19 +77,9 @@ export function invitationRoutes(ctx: AppContext) {
             }),
           );
           const [invitation] = await toInvitations(tx, [row], now);
-          return { invitation: invitation as NonNullable<typeof invitation>, link };
+          return { invitation: invitation as NonNullable<typeof invitation> };
         }),
-      { params, response: { 200: invitationWithLinkSchema }, located: manage },
-    )
-    .post(
-      "/invitations/:invitationId/link",
-      async ({ params: p }) =>
-        db.transaction(async (tx) => {
-          const current = await lockInvitation(tx, p.invitationId);
-          const { link } = await reissueInvitation(tx, current.id, ctx.config.publicUrl, ctx.now());
-          return { link };
-        }),
-      { params, response: { 200: invitationLinkSchema }, located: manage },
+      { params, response: { 200: invitationResultSchema }, located: manage },
     )
     .delete(
       "/invitations/:invitationId",

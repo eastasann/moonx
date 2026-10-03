@@ -158,13 +158,7 @@ export const commentTargetType = pgEnum("comment_target_type", [
   "pitch_slide",
   "idea",
 ]);
-export const notificationKind = pgEnum("notification_kind", [
-  "mention",
-  "comment",
-  "decision",
-  "due",
-]);
-export const dueStage = pgEnum("due_stage", ["three_days_before", "due_day", "overdue"]);
+export const notificationKind = pgEnum("notification_kind", ["mention", "comment", "decision"]);
 export const historyAction = pgEnum("history_action", ["create", "update", "delete", "restore"]);
 export const historySource = pgEnum("history_source", [
   "manual",
@@ -918,9 +912,6 @@ export const notifications = pgTable(
     actorId: uuid().references(() => users.id),
     commentId: uuid().references(() => comments.id, { onDelete: "cascade" }),
     decisionLogEntryId: uuid().references(() => decisionLogEntries.id, { onDelete: "cascade" }),
-    executionItemId: uuid().references(() => executionItems.id, { onDelete: "cascade" }),
-    dueStage: dueStage(), // kind = due のとき
-    dueDate: date({ mode: "string" }), // kind = due のとき（期限を変えたら新しい日付で送り直す）
     link: jsonb().notNull(), // 開く先（5.2 LinkTarget）
     readAt: ts(),
     createdAt: ts().notNull().defaultNow(),
@@ -928,9 +919,6 @@ export const notifications = pgTable(
   (t) => [
     index().on(t.userId, t.createdAt),
     index("notifications_unread_idx").on(t.userId).where(sql`${t.readAt} is null`),
-    uniqueIndex("notifications_due_once_uq")
-      .on(t.executionItemId, t.dueDate, t.dueStage)
-      .where(sql`${t.kind} = 'due'`),
   ],
 );
 

@@ -38,6 +38,8 @@ export const memberSchema = z.object({
   email: z.string().nullable(),
   role: roleSchema,
   joinedAt: dateTimeSchema,
+  /** The person a personal workspace was made for; other Owners cannot demote or remove them. */
+  isPersonalOwner: z.boolean(),
 });
 
 export type Member = z.infer<typeof memberSchema>;
@@ -69,8 +71,10 @@ export const listInvitationsQuerySchema = z.object({
   status: z.enum(["pending", "all"]).optional(),
 });
 
-/** W5 / W6 answer with the link, which is the only time the token is shown. */
-export const invitationLinkSchema = z.object({ link: z.string() });
+/** W4 POST and W5: the inviter never sees the link; it goes to the invited address only. */
+export const invitationResultSchema = z.object({ invitation: invitationSchema });
+
+/** AD9 answers with the link as well: operators are trusted and hand it over themselves (SDD 5.5). */
 export const invitationWithLinkSchema = z.object({
   invitation: invitationSchema,
   link: z.string(),

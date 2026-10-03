@@ -25,6 +25,7 @@ const member = (id: string, name: string, role: string, email: string) => ({
   email,
   role,
   joinedAt: "2026-09-01T00:00:00.000Z",
+  isPersonalOwner: false,
 });
 const MEMBERS = [
   member(ANA, "Ana Villanueva", "owner", "ana@bcdx.example"),
@@ -129,6 +130,21 @@ test("the members table lists emails and roles, and the last Owner has no menu",
   expect(within(ana).getByRole("button", { name: /Actions for Ana Villanueva/ })).toBeDisabled();
   const kenji = screen.getByRole("row", { name: /Kenji Mori/ });
   expect(within(kenji).getByRole("button", { name: /Actions for Kenji Mori/ })).toBeEnabled();
+});
+
+test("the owner of a personal workspace has no menu for another Owner, whose own row keeps one", async () => {
+  stubApi(
+    base([
+      member(ANA, "Ana Villanueva", "owner", "a@x"),
+      { ...member(KENJI, "Kenji Mori", "owner", "k@x"), isPersonalOwner: true },
+    ]),
+  );
+  await renderApp(SETTINGS);
+  const kenji = await screen.findByRole("row", { name: /Kenji Mori/ });
+  expect(within(kenji).getByText("Owner of this personal workspace")).toBeInTheDocument();
+  expect(within(kenji).getByRole("button", { name: /Actions for Kenji Mori/ })).toBeDisabled();
+  const ana = screen.getByRole("row", { name: /Ana Villanueva/ });
+  expect(within(ana).getByRole("button", { name: /Actions for Ana Villanueva/ })).toBeEnabled();
 });
 
 test("a second Owner makes the first one's menu available", async () => {
@@ -345,43 +361,13 @@ test("an address with an open invitation offers to resend that invitation", asyn
   );
 });
 
-test("Copy link asks for a new link and puts it on the clipboard", async () => {
-  const writeText = vi.fn(async () => {});
-  vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
-  stubApi({
-    ...base(),
-    [`POST /api/v1/invitations/${PENDING}/link`]: () => ({
-      body: { link: "http://localhost:5173/invite/fresh-token" },
-    }),
-  });
+test("an invitation row offers Resend and Cancel but no way to copy the link", async () => {
+  stubApi(base());
   await renderApp(SETTINGS);
   await openMenu(/new.member@bcdx.example/, /Actions for the invitation/);
-  await userEvent.click(await screen.findByRole("menuitem", { name: "Copy link" }));
-  await waitFor(() =>
-    expect(writeText).toHaveBeenCalledWith("http://localhost:5173/invite/fresh-token"),
-  );
-  expect(
-    await screen.findByText(/Link copied\. The previous link no longer works\./),
-  ).toBeInTheDocument();
-});
-
-test("when the browser refuses to copy, the link is shown to copy by hand", async () => {
-  vi.stubGlobal("navigator", {
-    ...navigator,
-    clipboard: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) },
-  });
-  stubApi({
-    ...base(),
-    [`POST /api/v1/invitations/${PENDING}/link`]: () => ({
-      body: { link: "http://localhost:5173/invite/fresh-token" },
-    }),
-  });
-  await renderApp(SETTINGS);
-  await openMenu(/new.member@bcdx.example/, /Actions for the invitation/);
-  await userEvent.click(await screen.findByRole("menuitem", { name: "Copy link" }));
-  expect(await screen.findByRole("textbox", { name: "Invitation link" })).toHaveValue(
-    "http://localhost:5173/invite/fresh-token",
-  );
+  expect(await screen.findByRole("menuitem", { name: "Resend" })).toBeInTheDocument();
+  expect(screen.getByRole("menuitem", { name: "Cancel invitation" })).toBeInTheDocument();
+  expect(screen.queryByRole("menuitem", { name: "Copy link" })).not.toBeInTheDocument();
 });
 
 test("Resend posts to the invitation", async () => {
@@ -390,7 +376,6 @@ test("Resend posts to the invitation", async () => {
     [`POST /api/v1/invitations/${PENDING}/resend`]: () => ({
       body: {
         invitation: invitation(PENDING, "new.member@bcdx.example", "pending"),
-        link: "http://localhost:5173/invite/t",
       },
     }),
   });
@@ -421,28 +406,7 @@ test("cancelling asks first, then deletes the invitation", async () => {
   ).toBeInTheDocument();
 });
 
-test("the link the API returns opens the invitation screen", async () => {
-  let link = "";
-  stubApi({
-    ...base(),
-    [`POST /api/v1/invitations/${PENDING}/link`]: () => ({
-      body: { link: "http://localhost:5173/invite/fresh-token" },
-    }),
-  });
-  vi.stubGlobal("navigator", {
-    ...navigator,
-    clipboard: {
-      writeText: vi.fn(async (text: string) => {
-        link = text;
-      }),
-    },
-  });
-  const first = await renderApp(SETTINGS);
-  await openMenu(/new.member@bcdx.example/, /Actions for the invitation/);
-  await userEvent.click(await screen.findByRole("menuitem", { name: "Copy link" }));
-  await waitFor(() => expect(link).not.toBe(""));
-  first.unmount();
-
+test("the link in the invitation mail opens the invitation screen", async () => {
   stubApi({
     "GET /api/v1/me": () => ({
       status: 401,
@@ -462,7 +426,7 @@ test("the link the API returns opens the invitation screen", async () => {
       },
     }),
   });
-  await renderApp(new URL(link).pathname);
+  await renderApp("/invite/fresh-token");
   expect(await screen.findByText("You're invited to join BCDX")).toBeInTheDocument();
 });
 

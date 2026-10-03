@@ -35,8 +35,7 @@ export const invitationsQuery = (workspaceId: string, filter: InvitationFilter) 
   });
 
 /**
- * Whether the invitation can still be copied, resent or cancelled (W5-W7): pending and expired
- * ones. An accepted one is done and a cancelled one cannot be brought back.
+ * Whether the invitation can still be resent or cancelled (W5, W7): pending and expired ones. An accepted one is done and a cancelled one cannot be brought back.
  */
 export const isOpenInvitation = (invitation: Invitation) =>
   invitation.status === "pending" || invitation.status === "expired";

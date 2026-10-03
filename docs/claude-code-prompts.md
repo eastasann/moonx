@@ -267,6 +267,8 @@ make test-domain・make test-api が通る状態をゴールとする。
 
 Status: done 2026-10-02
 
+注: 項目 7 の定期実行（Z3・make cron-due）と通知の `due` は、Step 17c で外した。
+
 ```
 docs/02-01_system-design-doc.md の 5.11〜5.14・ADR-014 と、docs/design-spec.md 6.0.4（コメント）・
 6.0.5（変更履歴）・6.0.7（テンプレートの移行）・6.13（期限の通知）・6.15（決定ログ・通知）・6.17（運営者）に
@@ -377,7 +379,7 @@ Web のアプリの枠と、認証・アカウントの画面を作ってくだ�
    アカウントの削除）、M7 ワークスペース切替と新しいワークスペース
 7. テスト（make test-web）: ガードとリダイレクト、エラーの表示の対応、フォームの検査
 
-まだ作らないもの: 5 ダッシュボードの中身（Step 15。このステップではルートと枠だけ）、/privacy・/support（Step 26）。
+まだ作らないもの: 5 ダッシュボードの中身（Step 15。このステップではルートと枠だけ）、/privacy・/support（ストアに公開すると決めたときに足す。SDD 2章）。
 
 デモのユーザーでログインすると最後に開いたワークスペースの /w/$workspaceId に移り、
 make admin-create の招待のリンクから新規登録とオンボーディングが通り、M7 でワークスペースを作って切り替えられ、
@@ -580,6 +582,8 @@ make tokens（2回続けて差分なし）・make test-domain・make test-api・
 
 Status: done 2026-10-02
 
+注: 項目 5 の招待の「リンクのコピー」は、Step 17c で外した。
+
 ```
 docs/design-spec.md 6.10（14 調査ログ・15 競合・代替・16 前提・リスク）・6.16（9 ワークスペース設定）・
 6.17（28 管理: ユーザーとワークスペース）に従って、PRD 4章の Must のうち残っている画面を Web で作ってください。
@@ -774,7 +778,7 @@ make test-web・make test-e2e・make lint・make typecheck・make doc-lint が�
 
 ## Step 17c: ユーザーが決めた仕様の変更を入れる
 
-Status:
+Status: done 2026-10-03
 
 ```
 2026-10-03 にユーザーが決めた次の点を、先に設計ドキュメントに書いてから実装してください。
@@ -803,7 +807,7 @@ Step 17a・17b の「判断待ち」のうち、ここに挙げたものはこ�
    改めて決める。04 のストアへの公開の節と、Step 26 の eas.json の項目をこの方針に合わせる
 8. 期限の通知を無くす（2026-10-03 のユーザーの決定。プランは北極星として使い、進捗の管理には使わないため）:
    実行管理の期限の「3日前・当日・期限切れ」の通知と、それを作る定期実行（Z3 `POST /internal/cron/due-notifications`、
-   `make cron-due`、CRON_OIDC_AUDIENCE・CRON_INVOKER_EMAIL、Cloud Scheduler のジョブとその監視とアラート）を外す。
+   make cron-due、CRON_OIDC_AUDIENCE・CRON_INVOKER_EMAIL、Cloud Scheduler のジョブとその監視とアラート）を外す。
    docs は PRD（C-05 の「期限」）、design-spec（6.13・6.15 ほか通知の種類を挙げている所）、SDD（2章の環境変数・
    make ターゲット・インフラ管理、5.14、7.1、11章）、03・04・05、CLAUDE.md の Commands、Step 26 の指示から外し、
    ADR-014 は廃止として理由を残す。API・シード・テストの該当部分を消す。実行管理の担当・期限・状態、画面の
@@ -849,13 +853,13 @@ make test-mobile・make lint・make typecheck が通り、確認用の画面に�
 ## Step 18a: 開発ビルドの設定と端末での確認
 
 Status: blocked 2026-10-03
-{APP_ID} の決定（ストアに出した後は変えられない）、EAS のアカウントでのビルド、端末での目視確認にユーザーの操作が要る。
+{APP_ID} の決定（配った後は変えると入れ直しになる）、EAS のアカウントでのビルド、端末での目視確認にユーザーの操作が要る。
 
 ```
 Step 18 で作った packages/ui-native と確認用の画面（/dev/components）を、開発ビルドを入れた端末かエミュレーターで確かめてください。
 
 やること:
-1. {APP_ID} が SDD 2章で未確定なら、ユーザーに決めてもらい（ストアに出した後は変えられない）、SDD 2章の表と
+1. {APP_ID} が SDD 2章で未確定なら、ユーザーに決めてもらい（配った後は変えると入れ直しになる）、SDD 2章の表と
    使っている箇所を置き換える。app.config.ts に ios.bundleIdentifier・android.package を設定する
    （staging の版は {APP_ID}.staging）
 2. `eas init` で出た projectId を app.config.ts に設定し、`eas build --profile development` で
@@ -1040,16 +1044,17 @@ docs/03_dev-setup.md 5.4 の手順でユーザーが行う。
 1. 未確定の名前（{DOMAIN}・{GCP_PROJECT_ID}）をユーザーに決めてもらい、SDD 2章の表と使っている箇所を置き換える
 2. apps/api/Dockerfile（oven/bun。sharp と PDF のフォントが動くこと）
 3. infra/terraform の modules/ と envs/{shared,staging,production}/: 2章「インフラ管理」の資源、tfstate のバケット、
-   bootstrap の変数、Cloud Run の image の ignore_changes、CRON_OIDC_AUDIENCE の組み立て、
+   bootstrap の変数、Cloud Run の image の ignore_changes、
    Monitoring のアラート（SDD 11章の閾値）、予算アラート、Cloudflare のゾーンの設定
 4. apps/web/worker/index.ts（/api/* の転送、X-Moonx-Proxy-Secret・CF-Connecting-IP・X-Request-Id の付与、
    届かないときは UPSTREAM_UNAVAILABLE の形。静的アセットに無い GET の画面のパスには `_shell.html` を返す。
    `index.html` はプリレンダーしたランディングで、SPA の殻ではない）と wrangler.jsonc（env staging / production、observability）
 5. apps/web/public/: _headers（7.2 のセキュリティヘッダー、apple-app-site-association の Content-Type）、
-   /.well-known/apple-app-site-association と assetlinks.json、robots.txt、/privacy と /support
-   （文面はユーザーに用意してもらう。無ければ Status を blocked にして理由を書く）
+   /.well-known/apple-app-site-association と assetlinks.json、robots.txt（/privacy と /support は
+   ストアに公開すると決めたときに足す。SDD 2章。ここでは作らない）
 6. apps/mobile/eas.json（profile development / staging / production、チャンネル、runtimeVersion は fingerprint）と
-   app.config.ts の環境ごとの設定
+   app.config.ts の環境ごとの設定。staging と production は Android が distribution: internal（APK）、
+   iOS が TestFlight（submit の profile は iOS だけ。Android の submit は置かない。ADR-003）
 7. .github/workflows/ の ci.yml・build.yml・deploy.yml・db-backup.yml（04 2章のとおり make のターゲットを呼ぶ）、
    Dependabot、deploy/staging/version と deploy/production/version
 8. Makefile のデプロイ系のターゲット（build-web・build-api-image・deploy-api・deploy-web・mobile-update・
@@ -1084,8 +1089,8 @@ docs/02-01_system-design-doc.md の10章（テスト戦略）・11章（KPI）�
    異常系の最低ライン（不正入力のエラー形式・未認証アクセスの拒否・空の状態の表示）。主要な画面で axe の検査
 2. カバレッジを SDD 10章の目標（domain 行 95%・api 分岐 80%・web 60%・mobile 50%）と比べ、足りない所にテストを足す。
    7.1 の権限マトリクスの全エンドポイント × ロールが表駆動テストにあることを確かめる
-3. スマホの E2E: Maestro を入れるかをユーザーと決め（ADR-001・SDD 10章）、決めた内容を SDD 10章に書く。
-   入れるならコアフローを1本書く
+3. スマホの E2E: Maestro を入れて、コアフローを1本書く（ADR-001・SDD 10章に決定済み。フローは
+   apps/mobile/.maestro/。スマホの画面を作り終えたあとにやる）
 4. KPI の計測: packages/db/queries/kpi.sql（SDD 11章）。docs/01_prd.md 5章の指標のうちアプリのデータから数えられるものを、
    件数と割合だけで数える（回答の中身は読まない）
 5. README.md（リポジトリの直下）: docs/ への入口と make setup からの始め方。中身は docs への参照にし、書き写さない

@@ -27,9 +27,12 @@ export async function loadWorkspaceMembers(
       email: schema.users.email,
       role: schema.memberships.role,
       joinedAt: schema.memberships.createdAt,
+      isPersonal: schema.workspaces.isPersonal,
+      workspaceCreatedById: schema.workspaces.createdById,
     })
     .from(schema.memberships)
     .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
+    .innerJoin(schema.workspaces, eq(schema.workspaces.id, schema.memberships.workspaceId))
     .where(
       and(
         eq(schema.memberships.workspaceId, workspaceId),
@@ -42,6 +45,7 @@ export async function loadWorkspaceMembers(
     email: viewerRole === "owner" && row.status !== "deleted" ? row.email : null,
     role: row.role,
     joinedAt: iso(row.joinedAt),
+    isPersonalOwner: row.isPersonal && row.workspaceCreatedById === row.id,
   }));
 }
 
@@ -102,9 +106,8 @@ export async function loadMentionCandidates(
 /**
  * What stops being true when a person leaves a workspace or becomes a Viewer (design-spec 6.16):
  * their self-analysis stops being shared here (comments stay, hidden) and the execution items
- * they were assigned in this workspace keep their name as free text, which also stops the due
- * notices that follow `assignee_user_id`. The reassignment is a change of the execution item, so
- * it is recorded in the history like any other (design-spec 6.0.5).
+ * they were assigned in this workspace keep their name as free text. The reassignment is a change
+ * of the execution item, so it is recorded in the history like any other (design-spec 6.0.5).
  */
 export async function releaseMemberDuties(
   tx: Tx,

@@ -6,7 +6,6 @@ import type { IdeaKey, IdeaRecord } from "./ideas";
 import { BCDX, type PersonKey, personKeys, userId } from "./ids";
 import {
   answerAtRecord,
-  executionItemId,
   type PlanKey,
   type PlanRecord,
   planId,
@@ -245,13 +244,10 @@ export function addCollaboration(
     key: string,
     n: {
       user: PersonKey;
-      kind: "mention" | "comment" | "decision" | "due";
+      kind: "mention" | "comment" | "decision";
       actor?: PersonKey;
       commentId?: string;
       decisionId?: string;
-      executionItemId?: string;
-      dueStage?: "three_days_before" | "due_day" | "overdue";
-      dueDate?: string;
       link: LinkTarget;
       at: Date;
       read: boolean;
@@ -265,9 +261,6 @@ export function addCollaboration(
       actorId: n.actor ? userId(n.actor) : null,
       commentId: n.commentId ?? null,
       decisionLogEntryId: n.decisionId ?? null,
-      executionItemId: n.executionItemId ?? null,
-      dueStage: n.dueStage ?? null,
-      dueDate: n.dueDate ?? null,
       link: n.link,
       readAt: n.read ? new Date(n.at.getTime() + 3600_000) : null,
       createdAt: n.at,
@@ -462,52 +455,6 @@ export function addCollaboration(
       });
     }
   }
-
-  // Due dates: Ana's overdue action (three notices) and Kenji's action due in two days.
-  const overdue = executionItemId("piaya-a", "next_action", 0);
-  const soon = executionItemId("piaya-a", "next_action", 1);
-  const execLink = (id: string) =>
-    link(22, { ideaId: piaya.id, planId: planA.id, tab: "actions", rowId: id });
-  notify("due-ana-3d", {
-    user: "ana",
-    kind: "due",
-    executionItemId: overdue,
-    dueStage: "three_days_before",
-    dueDate: clock.date(-3),
-    link: execLink(overdue),
-    at: clock.ago(6, 8),
-    read: true,
-  });
-  notify("due-ana-day", {
-    user: "ana",
-    kind: "due",
-    executionItemId: overdue,
-    dueStage: "due_day",
-    dueDate: clock.date(-3),
-    link: execLink(overdue),
-    at: clock.ago(3, 8),
-    read: true,
-  });
-  notify("due-ana-overdue", {
-    user: "ana",
-    kind: "due",
-    executionItemId: overdue,
-    dueStage: "overdue",
-    dueDate: clock.date(-3),
-    link: execLink(overdue),
-    at: clock.ago(2, 8),
-    read: false,
-  });
-  notify("due-kenji-3d", {
-    user: "kenji",
-    kind: "due",
-    executionItemId: soon,
-    dueStage: "three_days_before",
-    dueDate: clock.date(2),
-    link: execLink(soon),
-    at: clock.ago(0, 8),
-    read: false,
-  });
 }
 
 /** Change history (design-spec 8.4): manual edits, AI imports, a revert, and the batches behind drafts and duplicates. */

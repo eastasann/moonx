@@ -174,6 +174,112 @@ test("an AI import offers one button for the whole operation, on its first row o
   expect(api.calls.some((c) => c.method === "POST")).toBe(true);
 });
 
+test("undoing a duplicate asks first, deletes the copy and goes back to the list of ideas", async () => {
+  const batchId = "b0000000-0000-4000-8000-000000000005";
+  const IDEA = "55555555-5555-4555-8555-555555555555";
+  const created = entry({
+    batchId,
+    source: "duplicate",
+    action: "create",
+    target: { type: "idea", id: IDEA, key: null },
+    label: "Piaya (copy)",
+    before: null,
+    after: { name: "Piaya (copy)" },
+  });
+  const api = stubHistory(
+    { first: { items: [created], nextCursor: null } },
+    {
+      [`POST /api/v1/history/batches/${batchId}/revert`]: () => ({
+        body: { reverted: 12, batchId },
+      }),
+    },
+  );
+  const { router } = await renderApp(
+    `/w/${WORKSPACE}/ideas/${IDEA}?panel=history&target=container:idea:${IDEA}`,
+  );
+  const view = within(await panel());
+  await userEvent.click(await view.findByRole("button", { name: "Undo the whole operation" }));
+  const dialog = await screen.findByRole("alertdialog", { name: "Delete the copied idea?" });
+  expect(api.calls.some((c) => c.method === "POST")).toBe(false);
+  await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+  await waitFor(() => expect(router.state.location.pathname).toBe(`/w/${WORKSPACE}/ideas`));
+  expect(api.calls.filter((c) => c.method === "POST")).toHaveLength(1);
+});
+
+test("keeping the copy sends nothing, and a plan draft goes back to its idea", async () => {
+  const batchId = "b0000000-0000-4000-8000-000000000006";
+  const IDEA = "55555555-5555-4555-8555-555555555555";
+  const PLAN = "44444444-4444-4444-8444-444444444444";
+  const draft = entry({
+    batchId,
+    source: "plan_draft",
+    action: "create",
+    target: { type: "business_plan", id: PLAN, key: null },
+    label: "Plan C",
+    before: null,
+    after: { name: "Plan C" },
+  });
+  const api = stubHistory(
+    { first: { items: [draft], nextCursor: null } },
+    {
+      [`POST /api/v1/history/batches/${batchId}/revert`]: () => ({
+        body: { reverted: 30, batchId },
+      }),
+    },
+  );
+  const { router } = await renderApp(
+    `/w/${WORKSPACE}/ideas/${IDEA}/plans/${PLAN}?panel=history&target=container:business_plan:${PLAN}`,
+  );
+  const view = within(await panel());
+  await userEvent.click(await view.findByRole("button", { name: "Undo the whole operation" }));
+  const dialog = await screen.findByRole("alertdialog", { name: "Delete this plan draft?" });
+  await userEvent.click(within(dialog).getByRole("button", { name: "Keep" }));
+  expect(api.calls.some((c) => c.method === "POST")).toBe(false);
+  await userEvent.click(await view.findByRole("button", { name: "Undo the whole operation" }));
+  await userEvent.click(
+    within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }),
+  );
+  await waitFor(() => expect(router.state.location.pathname).toBe(`/w/${WORKSPACE}/ideas/${IDEA}`));
+});
+
+test("a creation that had something added to it cannot be undone and stays", async () => {
+  const batchId = "b0000000-0000-4000-8000-000000000007";
+  const IDEA = "55555555-5555-4555-8555-555555555555";
+  stubHistory(
+    {
+      first: {
+        items: [
+          entry({
+            batchId,
+            source: "duplicate",
+            action: "create",
+            target: { type: "idea", id: IDEA, key: null },
+          }),
+        ],
+        nextCursor: null,
+      },
+    },
+    {
+      [`POST /api/v1/history/batches/${batchId}/revert`]: () => ({
+        status: 409,
+        body: { error: { code: "CONFLICT", message: "added", requestId: "abcdef12" } },
+      }),
+    },
+  );
+  const { router } = await renderApp(
+    `/w/${WORKSPACE}/ideas/${IDEA}?panel=history&target=container:idea:${IDEA}`,
+  );
+  const view = within(await panel());
+  await userEvent.click(await view.findByRole("button", { name: "Undo the whole operation" }));
+  await userEvent.click(
+    within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }),
+  );
+  expect(
+    await view.findByText("Something was added after this was created, so it cannot be undone."),
+  ).toBeInTheDocument();
+  expect(router.state.location.pathname).toBe(`/w/${WORKSPACE}/ideas/${IDEA}`);
+});
+
 test("a manual change is not offered as a whole-operation undo", async () => {
   const batchId = "b0000000-0000-4000-8000-000000000003";
   stubHistory({ first: { items: [entry({ batchId })], nextCursor: null } });

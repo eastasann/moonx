@@ -60,6 +60,19 @@
     "restored": "Restored",
     "undone": "Operation undone",
     "alreadyUndone": "This operation was already undone.",
+    "creation": {
+      "duplicate": {
+        "title": "Delete the copied idea?",
+        "body": "The copy and everything copied into it are deleted. This can't be undone."
+      },
+      "plan_draft": {
+        "title": "Delete this plan draft?",
+        "body": "The plan and its execution items are deleted. This can't be undone."
+      },
+      "confirm": "Delete",
+      "keep": "Keep",
+      "blocked": "Something was added after this was created, so it cannot be undone."
+    },
     "action": {
       "create": "Added",
       "update": "Changed",

@@ -17,12 +17,6 @@ export interface AppConfig {
     /** Staging only: when non-empty, mail goes to these addresses and nowhere else. */
     allowlist: string[];
   };
-  /**
-   * Who may call `/internal/cron/*` (Cloud Scheduler's OIDC token, SDD 5.14 Z3). Empty values
-   * make every call a 403: the endpoint is never open. staging and production refuse to start
-   * without both, so a missing value cannot silently stop the due notices.
-   */
-  cron: { oidcAudience: string; invokerEmail: string };
   auth: {
     /** Signs sessions and tokens (SDD 2 環境変数). Every environment but the tests must set it. */
     secret: string;
@@ -88,8 +82,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       "BETTER_AUTH_URL",
       "MAIL_FROM",
       "TRUSTED_ORIGINS",
-      "CRON_OIDC_AUDIENCE",
-      "CRON_INVOKER_EMAIL",
       "AVATAR_BUCKET",
     ]) {
       if (!env[name]) throw new Error(`${name} is required in ${appEnv}`);
@@ -107,10 +99,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       from: env.MAIL_FROM || "moonx <no-reply@localhost>",
       resendApiKey: env.RESEND_API_KEY ?? "",
       allowlist: list(env.MAIL_ALLOWLIST).map((v) => v.toLowerCase()),
-    },
-    cron: {
-      oidcAudience: env.CRON_OIDC_AUDIENCE ?? "",
-      invokerEmail: (env.CRON_INVOKER_EMAIL ?? "").toLowerCase(),
     },
     auth: {
       secret: env.BETTER_AUTH_SECRET,
@@ -138,7 +126,6 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       resendApiKey: "",
       allowlist: [],
     },
-    cron: { oidcAudience: "", invokerEmail: "" },
     auth: {
       secret: "test-secret-test-secret-test-secret-0123",
       googleClientId: "",
@@ -153,8 +140,8 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 
 /**
  * Oldest app build per mobile platform that this API still serves (SDD 5.1). Raising a value
- * answers older builds with 426 APP_UPDATE_REQUIRED, so it changes only together with a store
- * release that makes the old build unusable.
+ * answers older builds with 426 APP_UPDATE_REQUIRED, so it changes only together with a distributed
+ * build that replaces the old one.
  */
 export const MIN_APP_VERSION = { ios: "1.0.0", android: "1.0.0" } as const;
 

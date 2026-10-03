@@ -25,7 +25,7 @@
 | [02-01_system-design-doc.md](02-01_system-design-doc.md) | System Design Doc。アーキテクチャ・ADR・ルーティング・API・データモデル（Drizzle）・権限マトリクス・エラー・i18n・テスト・監視 |
 | [02-02_feature-design-doc.md](02-02_feature-design-doc.md) | Feature Design Doc の雛形（変更のたびにコピーして使う。中身は空のまま） |
 | [03_dev-setup.md](03_dev-setup.md) | 開発環境の作り方・コマンド・ブランチ戦略・クラウドの初期設定 |
-| [04_deployment-procedure.md](04_deployment-procedure.md) | デプロイとリリース（ストアを含む）・ロールバック |
+| [04_deployment-procedure.md](04_deployment-procedure.md) | デプロイとリリース（スマホの配布を含む）・ロールバック |
 | [05_operation-runbook.md](05_operation-runbook.md) | 監視・障害の対処・ログの見方・定期メンテナンス |
 | [06_design-tokens.json](06_design-tokens.json) | デザイントークン（色・書体・余白などの具体値。DTCG 形式、ライトとダーク） |
 | [claude-code-prompts.md](claude-code-prompts.md) | 実装のステップ別プロンプト（Phase 4 の派生。ステップごとの進み具合の記録先） |
@@ -51,7 +51,7 @@
 | 目的・対象ユーザー・ユーザーストーリーと優先度・KPI・スコープ外 | `01_prd.md` |
 | アーキテクチャ・技術選定（ADR）・環境と命名・環境変数・CI のシークレット・make ターゲット・ルーティング・API・**データモデル**・権限マトリクス（API の単位）・エラーの形式・i18n・テスト戦略・監視の項目と閾値 | `02-01_system-design-doc.md` |
 | 開発環境・ツール・ブランチ戦略・クラウドの初期設定の手順 | `03_dev-setup.md` |
-| デプロイ・リリース（ストアを含む）・ロールバックの手順、CI のワークフローの中身、緊急時の連絡先 | `04_deployment-procedure.md` |
+| デプロイ・リリース（スマホの配布を含む）・ロールバックの手順、CI のワークフローの中身、緊急時の連絡先 | `04_deployment-procedure.md` |
 | 障害の対処・ログの見方・アラートを受けたときの確かめ方・定期メンテナンス（バックアップを戻す練習の頻度を含む）の手順 | `05_operation-runbook.md` |
 | 色・書体・余白・角丸・影・動き・スライドの寸法などの具体値 | `06_design-tokens.json` |
 | 実際のコマンド | `Makefile`（ドキュメントはターゲット名だけを書く） |

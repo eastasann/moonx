@@ -160,8 +160,6 @@ describe("configuration", () => {
       BETTER_AUTH_URL: "https://staging.moonx.app",
       MAIL_FROM: "moonx <no-reply@moonx.app>",
       TRUSTED_ORIGINS: "https://staging.moonx.app,moonx-staging://",
-      CRON_OIDC_AUDIENCE: "https://moonx-api-staging-123.asia-southeast1.run.app",
-      CRON_INVOKER_EMAIL: "scheduler@moonx.iam.gserviceaccount.com",
       AVATAR_BUCKET: "moonx-staging-avatars",
     };
     for (const APP_ENV of ["staging", "production"]) {
@@ -177,8 +175,6 @@ describe("configuration", () => {
       "BETTER_AUTH_URL",
       "MAIL_FROM",
       "TRUSTED_ORIGINS",
-      "CRON_OIDC_AUDIENCE",
-      "CRON_INVOKER_EMAIL",
       "AVATAR_BUCKET",
     ]) {
       expect(() => loadConfig({ ...AUTH, APP_ENV: "production", ...deployed, [name]: "" })).toThrow(
@@ -237,8 +233,6 @@ describe("configuration", () => {
       BETTER_AUTH_URL: "https://moonx.app",
       MAIL_FROM: "moonx <no-reply@moonx.app>",
       TRUSTED_ORIGINS: "https://moonx.app",
-      CRON_OIDC_AUDIENCE: "https://moonx-api-123.asia-southeast1.run.app",
-      CRON_INVOKER_EMAIL: "scheduler@moonx.iam.gserviceaccount.com",
       AVATAR_BUCKET: "moonx-avatars",
     };
     for (const APP_ENV of ["staging", "production"]) {

@@ -11,13 +11,21 @@ import { and, eq } from "drizzle-orm";
 import { ApiError, validationFailed } from "../errors";
 import type { Executor } from "./db";
 import { excerpt } from "./decision-log";
-import { EXECUTION_TAB } from "./due-notifications";
 import { i18n } from "./i18n";
 import { requireNotArchived, type Scope, type ScopeRef } from "./scope";
 import type { AuthUser } from "./session";
 import { QUESTION_SCREEN } from "./validation-data";
 
 type CommentableType = CommentTargetRef["type"];
+
+/** The `tab` of the execution route (SDD 4) that shows each item type. */
+const EXECUTION_TAB: Record<ExecutionType, string> = {
+  milestone: "milestones",
+  launch: "launch",
+  kpi: "kpis",
+  open_question: "questions",
+  next_action: "actions",
+};
 
 /** Targets whose `key` names a question, a field or a slide; the others are whole rows. */
 const KEYED = new Set<CommentableType>([

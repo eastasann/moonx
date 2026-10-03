@@ -10,7 +10,7 @@
 - DB: PostgreSQL 17（local は Docker、staging / production は Neon。Neon 独自の機能は使わない）
 - Auth: Better Auth（メール＋パスワード、Google。Expo プラグイン。招待制をサーバーで強制）
 - i18n: i18next（UI は英語のみで開始。書式は en-PH）
-- Infra: Cloud Run（asia-southeast1）、Cloudflare Worker（静的ファイル＋`/api` の転送）、Cloud Scheduler、Secret Manager、Cloud Storage、Resend、Sentry、EAS（Build / Submit / Update）
+- Infra: Cloud Run（asia-southeast1）、Cloudflare Worker（静的ファイル＋`/api` の転送）、Secret Manager、Cloud Storage、Resend、Sentry、EAS（Build / Update、iOS の TestFlight への Submit）
 - IaC: Terraform（Google Cloud と Cloudflare のゾーンの設定）＋ `apps/web/wrangler.jsonc`・`apps/mobile/eas.json`
 - CI/CD: GitHub Actions（Workload Identity Federation）。デプロイは `deploy/{staging,production}/version` を変える昇格の PR
 - Monorepo: Bun workspaces ＋ Makefile（パッケージ名は `@moonx/*`）
@@ -20,7 +20,7 @@
 
 - apps/web: Web（TanStack Start）。`worker/` に Cloudflare Worker、`public/` に静的なファイル
 - apps/mobile: スマホ（Expo Router）。`eas.json`・`app.config.ts`
-- apps/api: API（Elysia）。Better Auth・REST API・cron・PDF。Dockerfile
+- apps/api: API（Elysia）。Better Auth・REST API・PDF。Dockerfile
 - packages/domain: 計算・確認項目・F/A/U・工程・Pitch Deck の組み立て・AI 書き出し / 取り込みの書式（純粋関数）
 - packages/schemas: Zod のスキーマ（API の入出力とフォームの入力チェック）とエラーコード
 - packages/db: Drizzle のスキーマ・マイグレーション・シード
@@ -58,7 +58,6 @@
 - `make db-studio`: Drizzle Studio
 - `make tokens`: `docs/06_design-tokens.json` から `packages/ui-tokens` を生成する
 - `make openapi`: OpenAPI を `apps/api/openapi.json` に書き出す
-- `make cron-due`: 期限の通知の処理を1回動かす（local）
 - `make admin-create EMAIL=...`: 最初の運営者の招待を出す
 - `make doc-lint`: Check docs↔reality drift (staged checks run via pre-commit hook)
 - デプロイ系（`build-web`・`build-api-image`・`deploy-api`・`deploy-web`・`mobile-update`・`mobile-build`・`infra-plan`・`infra-apply`・`db-backup`）: CI と `docs/04_deployment-procedure.md` の手順が使う
@@ -74,7 +73,7 @@ Detailed specifications are in `docs/`. This file and `docs/claude-code-prompts.
 - docs/02-01_system-design-doc.md: Architecture, ADRs, 環境変数, make ターゲット, ルーティング, API design, DB schema（Drizzle）, 権限マトリクス, エラー, i18n, テスト戦略, 監視
 - docs/02-02_feature-design-doc.md: Template for change-cycle FDDs
 - docs/03_dev-setup.md: 開発環境・クラウドの初期設定・テストの回し方・ブランチ戦略・トラブルシューティング
-- docs/04_deployment-procedure.md: Deploy, CI/CD, ストアへの公開, rollback
+- docs/04_deployment-procedure.md: Deploy, CI/CD, スマホの配布（内部配布・TestFlight）, rollback
 - docs/05_operation-runbook.md: Monitoring, incident response, 定期メンテナンス
 - docs/06_design-tokens.json: Design tokens（DTCG形式。色・タイポグラフィ・余白などスタイリング値の正。実装のテーマは `make tokens` でここから派生させ、セマンティック層のみ参照する）
 - docs/concept.md・docs/brainstorm-notes.md: アーカイブ（決めた経緯。今の正ではない。brainstorm-notes の付録に Drive のテンプレートの構成がある）

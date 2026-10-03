@@ -406,10 +406,6 @@ export const notificationsRelations = relations(t.notifications, ({ one }) => ({
     fields: [t.notifications.decisionLogEntryId],
     references: [t.decisionLogEntries.id],
   }),
-  executionItem: one(t.executionItems, {
-    fields: [t.notifications.executionItemId],
-    references: [t.executionItems.id],
-  }),
 }));
 
 export const changeHistoryRelations = relations(t.changeHistory, ({ one }) => ({

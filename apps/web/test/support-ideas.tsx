@@ -75,12 +75,14 @@ export const MEMBERS = {
       email: null,
       role: "owner",
       joinedAt: "2026-01-01T00:00:00.000Z",
+      isPersonalOwner: false,
     },
     {
       user: { id: KENJI, displayName: "Kenji Ito", avatarUrl: null, badge: null },
       email: null,
       role: "member",
       joinedAt: "2026-01-02T00:00:00.000Z",
+      isPersonalOwner: false,
     },
   ],
 };

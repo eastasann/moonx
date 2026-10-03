@@ -8,13 +8,11 @@ import type { AppContext } from "./context";
 import { type AvatarStore, createAvatarStore } from "./lib/avatar-store";
 import type { Db } from "./lib/db";
 import { createLogger, type Logger } from "./lib/logger";
-import type { OidcKeySource } from "./lib/oidc";
 import { createMailer, type Mailer } from "./mail/mailer";
 import { basePlugin } from "./plugins";
 import { apiV1 } from "./routes";
 import { authRoutes } from "./routes/auth";
 import { healthRoutes } from "./routes/health";
-import { internalRoutes } from "./routes/internal";
 
 export type { AppConfig } from "./config";
 
@@ -26,8 +24,6 @@ export interface AppDeps {
   avatars?: AvatarStore;
   logger?: Logger;
   now?: () => Date;
-  /** Where Z3 finds the keys that sign Cloud Scheduler's tokens; tests pass their own. */
-  oidcKeys?: OidcKeySource;
 }
 
 /** Builds the app. The database and the mailer are passed in so tests use their own. */
@@ -49,7 +45,6 @@ export function createApp(config: AppConfig, deps: AppDeps) {
     .use(basePlugin(ctx))
     .use(healthRoutes(ctx))
     .use(authRoutes(ctx))
-    .use(internalRoutes(ctx, deps.oidcKeys))
     .use(apiV1(ctx));
   // Before the OpenAPI plugin: its documentation routes come from the library and have no access declaration.
   assertAllRoutesDeclared(app);

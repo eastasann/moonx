@@ -14,7 +14,6 @@
     "test": "bun test",
     "typecheck": "tsc -p tsconfig.json",
     "openapi": "bun scripts/openapi.ts",
-    "cron-due": "bun scripts/cron-due.ts",
     "admin-create": "bun scripts/admin-create.ts"
   },
   "dependencies": {

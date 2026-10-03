@@ -1345,16 +1345,13 @@ describe("AD9 POST /admin/invitations", () => {
     ).toHaveLength(limit);
   });
 
-  test("an operator manages these invitations through W5-W7 without being a member", async () => {
+  test("an operator manages these invitations through W5 and W7 without being a member", async () => {
     const created = await post({ email: "managed@example.com", workspaceId: BCDX, role: "member" });
     const id = created.body.invitation.id;
     const resend = await call(t.app, "POST", `/api/v1/invitations/${id}/resend`, { as: as.admin });
     expect(resend.status).toBe(200);
-    expect(resend.body.link).not.toBe(created.body.link);
+    expect(Object.keys(resend.body)).toEqual(["invitation"]);
     expect(t.mailbox.sent).toHaveLength(2);
-    const link = await call(t.app, "POST", `/api/v1/invitations/${id}/link`, { as: as.admin });
-    expect(link.status).toBe(200);
-    expect(link.body.link).not.toBe(resend.body.link);
     expect(
       (await call(t.app, "DELETE", `/api/v1/invitations/${id}`, { as: as.admin })).status,
     ).toBe(204);
@@ -1367,7 +1364,7 @@ describe("AD9 POST /admin/invitations", () => {
       (await call(t.app, "POST", `/api/v1/invitations/${opId}/resend`, { as: as.admin })).status,
     ).toBe(200);
     expect(
-      (await call(t.app, "POST", `/api/v1/invitations/${opId}/link`, { as: as.ana })).body.error
+      (await call(t.app, "POST", `/api/v1/invitations/${opId}/resend`, { as: as.ana })).body.error
         .code,
     ).toBe("FORBIDDEN");
     expect(

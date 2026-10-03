@@ -34,17 +34,6 @@ function wallClock(at: Date, timeZone: string) {
   };
 }
 
-const pad = (n: number, width = 2) => String(n).padStart(width, "0");
-
-/**
- * The calendar date (`"2026-10-01"`) and the hour (0-23) an instant has in an IANA time zone.
- * Throws a RangeError for a name the runtime does not know.
- */
-export function localTime(at: Date, timeZone: string): { date: string; hour: number } {
-  const w = wallClock(at, timeZone);
-  return { date: `${pad(w.year, 4)}-${pad(w.month)}-${pad(w.day)}`, hour: w.hour };
-}
-
 /** `date` moved by `days` calendar days (no time zone involved). */
 export function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);

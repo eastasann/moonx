@@ -18,6 +18,7 @@ import {
 } from "../history/snapshots";
 import { type HistoryMeta, withHistory } from "../history/with-history";
 import { toCostItem, toEconomicsInput } from "./cost-dto";
+import { CREATION_SOURCES, undoCreation } from "./creation-undo";
 import { todayIn } from "./dashboard-data";
 import type { Db, Executor, Tx } from "./db";
 import { historyActor } from "./dto";
@@ -101,7 +102,7 @@ type Handler = (
 /** Targets that are not restored entry by entry; a template version moves with its whole batch. */
 const NOT_RESTORABLE = new Set<TargetType>(["pitch_slide", "template_version"]);
 
-/** Sources whose batch H3 takes back. Drafts and duplicates would have to delete whole records. */
+/** Sources whose batch H3 takes back by restoring rows; creations are deleted instead (`undoCreation`). */
 const UNDOABLE_SOURCES = new Set(["ai_import", "template_migration", "revert"]);
 
 const notFound = () => new ApiError("NOT_FOUND", "Resource not found");
@@ -1119,8 +1120,7 @@ async function restoreTemplateVersion(
  * transaction: each row of the batch, newest first, goes back to its state before the operation,
  * and is recorded as a revert of its own under a new `batchId`. Rows whose item no longer exists
  * (a question the template no longer has, a row deleted since) are skipped and not counted.
- * A plan draft or a duplicate would have to delete the records it made, which no design document
- * allows, so those batches are refused.
+ * A plan draft or a duplicate is taken back by deleting what it made (`undoCreation`).
  */
 export async function revertBatch(
   db: Db,
@@ -1136,6 +1136,7 @@ export async function revertBatch(
   const first = (await batchRows(db))[0];
   if (!first) throw notFound();
   const access = accessOf(ctx.user, first, ctx.scope);
+  if (CREATION_SOURCES.has(first.source)) return undoCreation(db, { batchId, now: ctx.now });
 
   const newBatchId = crypto.randomUUID();
   const env: Env = { access, userId: ctx.user.id, now: ctx.now };

@@ -5,7 +5,7 @@ import { MAX_BODY_BYTES, MAX_JSON_BYTES } from "./config";
 import type { AppContext } from "./context";
 import { ApiError, type ValidationDetail } from "./errors";
 import { isAppTooOld, parseClient } from "./lib/client";
-import { reportable } from "./lib/error-report";
+import { parentRowGone, reportable } from "./lib/error-report";
 import { createFailureWatch } from "./lib/failure-watch";
 import { AUTH_SECRET_PATHS, enforceRateLimit } from "./lib/rate-limit";
 import { clientIp, requestInfo, setRequestInfo } from "./lib/request-info";
@@ -23,7 +23,7 @@ function secretMatches(given: string | null, accepted: string[]): boolean {
 }
 
 /** Paths the Worker's shared secret does not guard (SDD 2 通信フロー 3). */
-const isOpenPath = (path: string) => path === "/api/health" || path.startsWith("/internal/");
+const isOpenPath = (path: string) => path === "/api/health";
 
 const isPhotoUpload = (method: string, path: string) =>
   method === "PUT" && path === "/api/v1/me/avatar";
@@ -174,6 +174,8 @@ export function basePlugin(ctx: AppContext) {
         else if (code === "VALIDATION") {
           // Only a response can reach this branch: it does not match its schema, a bug of ours.
           api = new ApiError("INTERNAL", "Internal error");
+        } else if (parentRowGone(error)) {
+          api = new ApiError("NOT_FOUND", "Resource not found");
         } else if (clientErrorStatus(error) === 413) {
           api = new ApiError("PAYLOAD_TOO_LARGE", "The request body is too large");
         } else if (clientErrorStatus(error) === 422) {

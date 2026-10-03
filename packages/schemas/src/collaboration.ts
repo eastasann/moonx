@@ -97,7 +97,7 @@ export const commentThreadSchema = z.object({
 
 export const notificationSchema = z.object({
   id: z.uuid(),
-  kind: z.enum(["mention", "comment", "decision", "due"]),
+  kind: z.enum(["mention", "comment", "decision"]),
   workspace: z.object({ id: z.uuid(), name: z.string() }),
   actor: userRefSchema.nullable(),
   title: z.string(),
@@ -108,14 +108,7 @@ export const notificationSchema = z.object({
   createdAt: dateTimeSchema,
 });
 
-/** Z3 answer. */
-export const dueNotificationsResultSchema = z.object({
-  checkedItems: z.number().int().min(0),
-  created: z.number().int().min(0),
-});
-
 export type CommentTargetRef = z.infer<typeof commentTargetRefSchema>;
 export type Comment = z.infer<typeof commentSchema>;
 export type CommentThread = z.infer<typeof commentThreadSchema>;
 export type Notification = z.infer<typeof notificationSchema>;
-export type DueNotificationsResult = z.infer<typeof dueNotificationsResultSchema>;

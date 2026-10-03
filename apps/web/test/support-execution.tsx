@@ -39,9 +39,27 @@ export const VIEWER: UserRef = {
 
 export const MEMBERS = {
   items: [
-    { user: ANA, email: null, role: "owner", joinedAt: "2026-01-01T00:00:00Z" },
-    { user: PAOLO, email: null, role: "member", joinedAt: "2026-01-01T00:00:00Z" },
-    { user: VIEWER, email: null, role: "viewer", joinedAt: "2026-01-01T00:00:00Z" },
+    {
+      user: ANA,
+      email: null,
+      role: "owner",
+      joinedAt: "2026-01-01T00:00:00Z",
+      isPersonalOwner: false,
+    },
+    {
+      user: PAOLO,
+      email: null,
+      role: "member",
+      joinedAt: "2026-01-01T00:00:00Z",
+      isPersonalOwner: false,
+    },
+    {
+      user: VIEWER,
+      email: null,
+      role: "viewer",
+      joinedAt: "2026-01-01T00:00:00Z",
+      isPersonalOwner: false,
+    },
   ],
 };
 

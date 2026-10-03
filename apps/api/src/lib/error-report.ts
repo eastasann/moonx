@@ -50,6 +50,19 @@ export function reportable(error: unknown): ErrorReport {
   };
 }
 
+/**
+ * A write whose parent row (idea, validation, plan) was deleted while it waited for the lock: the
+ * foreign key then refuses the insert. Only H3's undo of a creation deletes such a parent, and
+ * for the writer it means the thing it was editing is gone.
+ */
+export function parentRowGone(error: unknown): boolean {
+  const { code, constraint } = reportable(error);
+  return (
+    code === "23503" &&
+    /_(business_plan_id|validation_id|idea_id)_[a-z_]+_fk$/.test(constraint ?? "")
+  );
+}
+
 /** An error that is safe to hand to Sentry: the original, or a query-free stand-in for a database error. */
 export function sentrySafe(error: unknown): unknown {
   if (!(error instanceof Error) || !(isDatabaseError(error) || isValidationError(error))) {

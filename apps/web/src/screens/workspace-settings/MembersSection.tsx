@@ -55,10 +55,11 @@ function Consequences({ kind }: { kind: Pending["kind"] }) {
 }
 
 /**
- * Screen 9, members (W2, W3): change a role or remove someone. The last Owner's row has no menu
- * (the API refuses with `LAST_OWNER` too). Removal and demotion to Viewer ask first and state what
- * becomes of the person's records. When the person acts on their own row, the cached account is
- * reloaded: they may no longer be an Owner, so this screen is not theirs any more.
+ * Screen 9, members (W2, W3): change a role or remove someone. The last Owner's menu is disabled
+ * (the API refuses with `LAST_OWNER` too), and so is the one of a personal workspace's owner when
+ * someone else looks at it (`PERSONAL_OWNER`). Removal and demotion to Viewer ask first and state
+ * what becomes of the person's records. When the person acts on their own row, the cached
+ * account is reloaded: they may no longer be an Owner, so this screen is not theirs any more.
  */
 export function MembersSection({ workspaceId }: { workspaceId: string }) {
   const { t } = useTranslation(["workspaceSettings", "account", "app"]);
@@ -151,6 +152,8 @@ export function MembersSection({ workspaceId }: { workspaceId: string }) {
               ]}
               rows={items.map((member) => {
                 const lastOwner = member.role === "owner" && owners <= 1;
+                // The API refuses it with PERSONAL_OWNER; the person themself keeps their own menu.
+                const protectedOwner = member.isPersonalOwner && member.user.id !== me.id;
                 const name = member.user.displayName;
                 return {
                   id: member.user.id,
@@ -168,9 +171,13 @@ export function MembersSection({ workspaceId }: { workspaceId: string }) {
                     role: (
                       <Stack gap="space-50" align="start">
                         <Badge size="S">{t(`account:role.${member.role}`)}</Badge>
-                        {lastOwner ? (
+                        {lastOwner || protectedOwner ? (
                           <Text variant="caption" tone="secondary" as="span">
-                            {t("workspaceSettings:members.lastOwner")}
+                            {t(
+                              lastOwner
+                                ? "workspaceSettings:members.lastOwner"
+                                : "workspaceSettings:members.personalOwner",
+                            )}
                           </Text>
                         ) : null}
                       </Stack>
@@ -180,7 +187,7 @@ export function MembersSection({ workspaceId }: { workspaceId: string }) {
                       <ActionMenu
                         label={t("workspaceSettings:members.menuLabel", { name })}
                         size="S"
-                        isDisabled={lastOwner}
+                        isDisabled={lastOwner || protectedOwner}
                         onAction={(key) => {
                           resetErrors();
                           if (key === "remove") return setPending({ kind: "remove", member });

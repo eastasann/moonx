@@ -16,7 +16,6 @@
 |---|---|---|---|
 | API（Cloud Run の標準出力） | Cloud Logging | SDD 11章（`_Default` バケット） | 1行1つの JSON（項目は ADR-023） |
 | Cloud Run のリクエストのログ | Cloud Logging | API と同じ `_Default` バケット | URL・ステータス・時間。アプリのログが出ない失敗（起動の失敗・タイムアウト・メモリ不足）もここと system のログに出る |
-| Cloud Scheduler | Cloud Logging | API と同じ `_Default` バケット | ジョブ `moonx-{env}-due-notifications` の実行の結果 |
 | 稼働時間チェック | Cloud Monitoring | Cloud Monitoring の保持期間 | `https://{DOMAIN}/api/health` の結果 |
 | Worker（`moonx-web-production`。staging は `moonx-web-staging`） | Cloudflare Workers Logs（ダッシュボード）と `wrangler tail`（その場で追う） | SDD 11章 | 転送の失敗・例外 |
 | エラー（web / mobile / api） | Sentry の3つのプロジェクト | Sentry の無料プランの保持期間 | 例外・リクエスト ID・リリース（版）・environment |
@@ -50,7 +49,6 @@
 | 死活（稼働時間チェック） | 3.9 の切り分け（Worker を通す・Cloud Run を直接・Worker のログ）。外部のサービスの障害（5章） | 3.9。API 側なら 3.5・3.7 |
 | エラー率（5xx） | 4章の「5xx」のコマンド。直前にデプロイしていないか | 3.5。デプロイが原因なら戻す（04 5章） |
 | レイテンシ | 4章の「遅いリクエスト」のコマンドで、遅いルートを探す | 0台からの起動なら 3.4、DB が休んでいた後なら 3.1、PDF なら 3.6 |
-| 定期実行（期限の通知のジョブ） | 3.14 の確認のコマンド | 3.14 |
 | メモリ | Cloud Monitoring の Cloud Run のメモリの使用率（`container/memory/utilizations`）。PDF の作成と重なっているか | 3.6 |
 | 台数 | Cloud Monitoring の Cloud Run の台数（`container/instance_count`）と、同じ時間のリクエスト数。`wrangler tail`（4章）で、同じ呼び出しの繰り返しや攻撃が無いか | 遅いルートがあれば直す（3.5）。繰り返しや攻撃なら 3.10 と同じく原因を止める。利用が本当に増えたなら、上限の台数（ADR-007）を見直すかをユーザーと決める |
 | API のエラー（Sentry の新しい issue） | Sentry の issue のリクエスト ID で Cloud Logging を追う（4章） | 3章の該当の項目 |
@@ -104,7 +102,7 @@ select application_name, state, count(*) from pg_stat_activity group by 1, 2 ord
 ```
 
 **対処:**
-- API はプール接続を使う（ADR-008）。直接の接続になっていたら、プール接続の値を新しい版で入れ、新しいリビジョンを作る（3.15 の手順 1・2）
+- API はプール接続を使う（ADR-008）。直接の接続になっていたら、プール接続の値を新しい版で入れ、新しいリビジョンを作る（3.14 の手順 1・2）
 - プール接続で `prepared statement "..." does not exist` が出るなら、postgres.js の `prepare: false` が効いているか確かめる（ADR-008）
 - 手元から直接の接続をつないだままにしない（`make db-studio` などを production に向けない）
 
@@ -264,7 +262,7 @@ cd apps/web && bunx wrangler tail --env production --status=error --format=prett
 | 1（Worker） | 2（直接） | ほかの `/api` | 原因 | 対処 |
 |---|---|---|---|---|
 | 失敗 | 成功 | — | 転送先（`API_ORIGIN`）が違う、Worker の例外 | `wrangler.jsonc` の env `production` の `API_ORIGIN` を 2 の URL と比べ、直して PR → 昇格（`make deploy-web` で出る）。急ぐなら前の Worker に戻す（04 5.3） |
-| 成功 | 成功 | 拒否される | 共有シークレットの不一致（`X-Moonx-Proxy-Secret`）。`/api/health` は検査しないので通る | Worker と Secret Manager の `PROXY_SHARED_SECRET` をそろえる。Worker のシークレットは読み出せないので、3.15 の手順で新しい値を入れる |
+| 成功 | 成功 | 拒否される | 共有シークレットの不一致（`X-Moonx-Proxy-Secret`）。`/api/health` は検査しないので通る | Worker と Secret Manager の `PROXY_SHARED_SECRET` をそろえる。Worker のシークレットは読み出せないので、3.14 の手順で新しい値を入れる |
 | 失敗 | 失敗（403） | — | Cloud Run が認証なしの呼び出しを受けない設定 | `gcloud run services get-iam-policy moonx-api-production --region=asia-southeast1` に `allUsers` の `roles/run.invoker` があるか。Terraform で直す |
 | 失敗 | 失敗 | — | API 側の問題 | 3.5・3.7 |
 
@@ -284,8 +282,8 @@ cd apps/web && bunx wrangler tail --env production --status=error --format=prett
 |---|---|---|
 | Google の画面に `Error 400: redirect_uri_mismatch` | OAuth クライアントのリダイレクト URI が `BETTER_AUTH_URL` ＋ `/api/auth/callback/google` と違う | 03 6章の表に合わせる |
 | `Error 403: access_denied` | 同意画面が「テスト」のまま | 「本番環境」にする（03 6章） |
-| `Error 401: invalid_client` | `GOOGLE_CLIENT_ID` と SECRET の組が違う、Google 側で SECRET を消した | `moonx-{env}-google-client-secret` と Terraform の ID を確かめ、新しいリビジョンを作る（3.15） |
-| API が起動せず、ログに `GOOGLE_CLIENT_ID is required in production`（staging も同じ形） | staging と production は、`GOOGLE_CLIENT_ID` と `GOOGLE_CLIENT_SECRET` が無いと起動しない（SDD 2章「環境変数」） | `moonx-{env}-google-client-secret` と Terraform の ID を確かめ、新しいリビジョンを作る（3.15） |
+| `Error 401: invalid_client` | `GOOGLE_CLIENT_ID` と SECRET の組が違う、Google 側で SECRET を消した | `moonx-{env}-google-client-secret` と Terraform の ID を確かめ、新しいリビジョンを作る（3.14） |
+| API が起動せず、ログに `GOOGLE_CLIENT_ID is required in production`（staging も同じ形） | staging と production は、`GOOGLE_CLIENT_ID` と `GOOGLE_CLIENT_SECRET` が無いと起動しない（SDD 2章「環境変数」） | `moonx-{env}-google-client-secret` と Terraform の ID を確かめ、新しいリビジョンを作る（3.14） |
 | ログインの後「招待が無い」 | 招待制（ADR-010）。そのメールあての有効な招待（pending・期限内）が無い | 運営の画面で招待を確かめる。招待の画面から Google ログインを始めてもらう |
 | スマホで Google の後にアプリへ戻らない | `TRUSTED_ORIGINS` にアプリの scheme（`moonx://`。staging は `moonx-staging://`）が無い、ビルドの scheme が違う | `TRUSTED_ORIGINS` と `app.config.ts` の scheme を比べる |
 
@@ -296,7 +294,7 @@ cd apps/web && bunx wrangler tail --env production --status=error --format=prett
 | ログインやフォームが 403 `Invalid origin` | `TRUSTED_ORIGINS` にそのオリジンが無い | SDD 2章の値と比べ、Terraform で直して新しいリビジョン |
 | ログインできたのに、すぐログイン画面に戻る | Cookie が保存されない（`BETTER_AUTH_URL` がそのドメインと違う、Worker が `Set-Cookie` を落としている・まとめている） | 下の `curl` で `set-cookie` が複数そのまま返るか確かめる |
 | staging のログインが production に行く（その逆） | `BETTER_AUTH_URL` の取り違え | 下のコマンドで Cloud Run の環境変数を確かめる |
-| 全員が急にログアウトされた | `BETTER_AUTH_SECRET` が変わった | 意図した入れ替えなら仕様（3.15）。意図しない新しい版なら、その版を無効にして新しいリビジョンを作る |
+| 全員が急にログアウトされた | `BETTER_AUTH_SECRET` が変わった | 意図した入れ替えなら仕様（3.14）。意図しない新しい版なら、その版を無効にして新しいリビジョンを作る |
 
 ```bash
 # Cookie が返るか（確認用のアカウントで）
@@ -328,39 +326,7 @@ gcloud run services describe moonx-api-production --region=asia-southeast1 \
 
 原因を直してから、招待を出し直す。
 
-### 3.14 期限の通知が作られない
-
-**確認:**
-
-```bash
-gcloud scheduler jobs describe moonx-production-due-notifications --location=asia-southeast1 \
-  --format="yaml(state,schedule,lastAttemptTime,status,httpTarget.uri,httpTarget.oidcToken)"
-
-gcloud logging read \
-  'resource.type="cloud_scheduler_job" AND resource.labels.job_id="moonx-production-due-notifications"' \
-  --freshness=1d --limit=10
-
-gcloud run services describe moonx-api-production --region=asia-southeast1 \
-  --format="yaml(spec.template.spec.containers[0].env)" | grep -A1 -E 'CRON_OIDC_AUDIENCE|CRON_INVOKER_EMAIL'
-```
-
-**対処:**
-
-| 見え方 | 原因 | 対処 |
-|---|---|---|
-| ジョブの `state` が `PAUSED` | 止めたまま | `gcloud scheduler jobs resume moonx-production-due-notifications --location=asia-southeast1` |
-| 401 / 403 | ジョブの `oidcToken.audience` と Cloud Run の環境変数 `CRON_OIDC_AUDIENCE` が違う、ジョブの `oidcToken.serviceAccountEmail` と `CRON_INVOKER_EMAIL` が違う | 上のコマンドで2組を並べ、それぞれ1文字も違わないかを見る（値の決まりは SDD 2章「環境変数」）。違えば Terraform で直す |
-| 404 | ジョブの URL が違う | `httpTarget.uri` が Cloud Run の URL ＋ `/internal/cron/due-notifications` か |
-| 200 なのに通知が無い | 条件に合う項目が無い。担当者のタイムゾーン（`users.timezone`）でまだ朝8時より前（ADR-014） | 期限・担当者・`users.timezone` を確かめる。staging で再現する |
-| 5xx・タイムアウト | API か DB の問題 | 3.1〜3.7 |
-
-直したら手で1回動かす。取りこぼした分は次の回でまとめて作られる（ADR-014）。
-
-```bash
-gcloud scheduler jobs run moonx-production-due-notifications --location=asia-southeast1
-```
-
-### 3.15 シークレットの入れ替え（漏れたときも）
+### 3.14 シークレットの入れ替え（漏れたときも）
 
 Cloud Run はシークレットを起動のときに読む。値を変えたら新しいリビジョンを作る（Terraform がシークレットを `latest` の版で参照している前提）。
 
@@ -444,7 +410,7 @@ unset old new
 
 漏れたときも同じ手順で替える。手順 1 から 3 までの間は古い値も通るので、続けて行う。
 
-### 3.16 停止した利用者がログインしたまま
+### 3.15 停止した利用者がログインしたまま
 
 **症状:** 運営者が停止した利用者が、まだ画面を使えている。
 
@@ -457,13 +423,13 @@ unset old new
 - セッションの行が残っていれば消す（停止の処理でセッションを消すのが仕様。ADR-010）。停止をやり直す
 - Better Auth のセッションのキャッシュ（Cookie）を使っている場合、その有効期間は DB を見ずに通る。直らなければ不具合として直す
 
-### 3.17 スマホから API に繋がらない・古い版のアプリが動かない
+### 3.16 スマホから API に繋がらない・古い版のアプリが動かない
 
 | 見え方 | 原因 | 対処 |
 |---|---|---|
 | スマホだけ、すべての通信が失敗（Web は動く） | アプリに埋め込まれた `EXPO_PUBLIC_API_BASE_URL` が違う（EAS の環境変数の値の誤り。04 2章） | Sentry（mobile）で呼んでいる URL を確かめ、`eas env:list --environment production` で値を見る。前の更新に戻し（04 5.4）、EAS の環境変数を直してから `make mobile-update ENV=production` で出し直す |
 | staging のアプリが production を呼ぶ（その逆） | profile・チャンネル・EAS の環境の取り違え（staging は profile とチャンネルが `staging`、EAS の環境が `preview`） | `eas channel:view staging`・`eas update:list --branch staging`・`eas env:list --environment preview` で確かめる |
-| 特定の古い版だけ失敗する | API が古い版との互換を壊した（ADR-006） | Sentry（mobile）のリリース（版）で範囲を確かめる。API を直して互換を戻す（項目を戻す、`/api/v2` に分ける）。古い版の利用者にストアでの更新をお願いする |
+| 特定の古い版だけ失敗する | API が古い版との互換を壊した（ADR-006） | Sentry（mobile）のリリース（版）で範囲を確かめる。API を直して互換を戻す（項目を戻す、`/api/v2` に分ける）。古い版の利用者に、新しいビルドのリンク（Android）か TestFlight（iOS）での更新をお願いする |
 | 新しい EAS Update が届かない | runtime（fingerprint）が違う（ネイティブの変更の後の更新は、新しいバイナリにしか届かない） | `eas update:list --branch production` で runtime を確かめる |
 | ログインだけ失敗 | — | 3.11・3.12 |
 
@@ -510,15 +476,6 @@ gcloud run revisions list --service=moonx-api-production --region=asia-southeast
 gcloud run services describe moonx-api-production --region=asia-southeast1 --format="yaml(status.traffic)"
 ```
 
-### Cloud Scheduler
-
-```bash
-gcloud scheduler jobs describe moonx-production-due-notifications --location=asia-southeast1
-gcloud logging read \
-  'resource.type="cloud_scheduler_job" AND resource.labels.job_id="moonx-production-due-notifications"' \
-  --freshness=1d --limit=20
-```
-
 ### Worker（Cloudflare）
 
 ```bash
@@ -556,7 +513,7 @@ bunx wrangler deployments list --env production
 | 重さ | 例 | 動き出す目安 |
 |---|---|---|
 | S1 | 全員が使えない、データが消えた・漏れた | すぐ |
-| S2 | 一部が使えない（メール・期限の通知・PDF・スマホだけ・Google ログインだけ） | 当日中 |
+| S2 | 一部が使えない（メール・PDF・スマホだけ・Google ログインだけ） | 当日中 |
 | S3 | staging だけ、見た目、回避できる | 次の作業日 |
 
 ### 流れ
@@ -599,8 +556,8 @@ bunx wrangler deployments list --env production
 |---|---|---|
 | 依存パッケージの更新 | 月1回 | 更新 → `make lint`・`make typecheck`・`make test` → PR → staging → production（04 4.2） |
 | Better Auth のセキュリティ修正 | 公開されたら数日以内 | GitHub で better-auth の Releases と Security advisories を Watch し、Dependabot alerts を ON にしておく。上げたら staging でログイン・招待・パスワード再設定を確かめる（ADR-010） |
-| Expo SDK の更新 | 新しい SDK が出たら検討。遅くとも年1回 | fingerprint が変わるので、昇格で `make mobile-build` が選ばれ、ストアへの提出になる（04 2章・4.3） |
-| ストアの要件への追従 | 年1回 | Google Play の target API level の期限（毎年8月末）と、Apple の新しい SDK でのビルドの要件を、Expo SDK の更新で満たす |
+| Expo SDK の更新 | 新しい SDK が出たら検討。遅くとも年1回 | fingerprint が変わるので、昇格で `make mobile-build` が選ばれ、新しいビルドの配り直しになる（04 2章・4.3） |
+| ストアの要件への追従 | 年1回 | Apple の新しい SDK でのビルドの要件（TestFlight への提出に効く）を、Expo SDK の更新で満たす。Google Play の target API level の期限（毎年8月末）は、Google Play に公開したときだけ見る |
 | DB のバックアップの確認 | 週1回 | `db-backup.yml` が毎回成功し、バケットにファイルが増えているか（6.2） |
 | バックアップを戻す練習 | 四半期に1回 | 6.2 の「戻す練習」 |
 | 使用量・無料枠・ダッシュボードの遅さの確認 | 週1回（Cloud Run の無料枠は月1回の費用の確認で見る） | 2章「定期に見るもの」 |
@@ -611,10 +568,11 @@ bunx wrangler deployments list --env production
 | 費用の確認 | 月1回 | 予算（SDD 1章 Goal。予算アラートの金額は SDD 11章）と比べる（下） |
 | アラートの通知の確認 | 四半期に1回 | Cloud Monitoring・Sentry から試しの通知を出し、メールが届くか |
 | 古いスマホの版の確認 | 月1回 | Sentry（mobile）のリリースごとの利用を見て、API の互換を外してよいかを決める（ADR-006） |
-| シークレットの入れ替え | `GOOGLE_CLIENT_SECRET`・`RESEND_API_KEY`・`PROXY_SHARED_SECRET` と CI のトークン（`CLOUDFLARE_API_TOKEN`・`EXPO_TOKEN`・`SENTRY_AUTH_TOKEN`）と Terraform 用の Cloudflare のトークンは年1回、漏れたらすぐ。`BETTER_AUTH_SECRET` は漏れたときだけ | 3.15 |
+| シークレットの入れ替え | `GOOGLE_CLIENT_SECRET`・`RESEND_API_KEY`・`PROXY_SHARED_SECRET` と CI のトークン（`CLOUDFLARE_API_TOKEN`・`EXPO_TOKEN`・`SENTRY_AUTH_TOKEN`）と Terraform 用の Cloudflare のトークンは年1回、漏れたらすぐ。`BETTER_AUTH_SECRET` は漏れたときだけ | 3.14 |
 | OAuth クライアントの確認 | 年1回 | 使っていないクライアントは Google 側で消されることがある（local 用に注意）。同意画面の情報が古くないか |
 | ドメインの更新 | 年1回（期限の1か月前） | Cloudflare Registrar で自動更新が ON か、支払い方法が有効か。切れるとメールもアプリも止まる（ADR-013） |
-| Apple Developer Program の更新 | 年1回 | 自動更新が ON か。切れるとアプリがストアから消える |
+| Apple Developer Program の更新 | 年1回 | 自動更新が ON か。切れると TestFlight で配った iOS のアプリが使えなくなる |
+| TestFlight のビルドの期限 | 90日ごと（期限の前） | 最後に提出したビルドの期限が切れる前に、`make mobile-build ENV=production` で新しいビルドを提出する（04 4.3） |
 | Apple の配布証明書 | 年1回 | EAS が管理する（`eas credentials --platform ios`）。期限切れはビルドのときに分かる。公開済みのアプリには影響しない |
 
 **Artifact Registry の確認:**
@@ -646,7 +604,7 @@ gh run list --workflow=db-backup.yml --limit=7                                  
 gcloud storage ls "gs://{GCP_PROJECT_ID}-moonx-backups/production/" | tail -n 3  # 新しいファイルがあるか
 ```
 
-失敗していたら `gh run view <RUN_ID> --log-failed` で原因を見る。接続で失敗しているなら、GitHub の環境 `production-backup` の `DATABASE_URL_DIRECT`（production の読み取り専用のロール。03 5.4 E・H）を確かめる（入れ替えは 3.15）。
+失敗していたら `gh run view <RUN_ID> --log-failed` で原因を見る。接続で失敗しているなら、GitHub の環境 `production-backup` の `DATABASE_URL_DIRECT`（production の読み取り専用のロール。03 5.4 E・H）を確かめる（入れ替えは 3.14）。
 
 **バケットの設定を確かめる**（Terraform の `envs/shared`。03 5.4 G で最初に確かめ、変えたときにも見る）: 公開されていないこと（個人情報を含む）、書けるのはバックアップのワークフローが使うサービスアカウントだけで、読めるのは運用の担当だけであること、古いファイルを消す期間が ADR-028 のとおりであること。
 
@@ -675,6 +633,6 @@ rm ./restore.dump
 **本番に戻すとき（最後の手段）:** バックアップより後に書かれたデータは消える。
 
 1. Neon で新しいブランチを作って `pg_restore` し、中身を確かめる
-2. そのブランチのプール接続を `moonx-production-database-url` に入れ（3.15 の手順 1）、直接の接続（所有者のロール）を GitHub の環境 `production` の `DATABASE_URL_DIRECT` に入れる（`gh secret set DATABASE_URL_DIRECT --env production`）
+2. そのブランチのプール接続を `moonx-production-database-url` に入れ（3.14 の手順 1）、直接の接続（所有者のロール）を GitHub の環境 `production` の `DATABASE_URL_DIRECT` に入れる（`gh secret set DATABASE_URL_DIRECT --env production`）
 3. そのブランチに読み取り専用のロールが無ければ 03 5.4 E の SQL で作る。`pg_restore --no-privileges` では権限が戻らないので、すでにあるものへの権限を付ける SQL（03 5.4 E）も実行する。そのロールの直接の接続を GitHub の環境 `production-backup` の `DATABASE_URL_DIRECT` に入れる（`gh secret set DATABASE_URL_DIRECT --env production-backup`）。入れないと、次のバックアップは古いブランチを取る
-4. 新しいリビジョンを作る（3.15 の手順 2）。`gh workflow run db-backup.yml` で、新しいブランチからバックアップが取れることを確かめる
+4. 新しいリビジョンを作る（3.14 の手順 2）。`gh workflow run db-backup.yml` で、新しいブランチからバックアップが取れることを確かめる

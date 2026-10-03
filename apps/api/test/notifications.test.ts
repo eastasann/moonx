@@ -49,7 +49,7 @@ const unreadOf = async (person: PersonKey) =>
   (await rowsOf(person)).filter((r) => r.readAt === null).length;
 
 /** The people who got a notification of `kind` since the table was emptied, by key. */
-async function recipients(kind: "mention" | "comment" | "decision" | "due") {
+async function recipients(kind: "mention" | "comment" | "decision") {
   const rows = await t.db.select().from(table).where(eq(table.kind, kind));
   return rows.map((r) => r.userId).sort();
 }
@@ -152,12 +152,6 @@ describe("N1 list", () => {
 
     const hold = items.find((i) => i.title.includes("recorded a decision on"));
     expect(hold?.excerpt).toEqual(expect.any(String));
-
-    const overdue = items.find((i) => i.kind === "due" && i.title.endsWith("is overdue"));
-    expect(overdue?.excerpt).toBeNull();
-    expect(overdue?.actor).toBeNull();
-    const dueIds = items.filter((i) => i.kind === "due").map((i) => i.title);
-    expect(dueIds).toHaveLength(3);
   });
 
   test("the title says Go / No-Go and the saved version for those entries", async () => {

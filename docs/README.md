@@ -29,6 +29,7 @@
 | [05_operation-runbook.md](05_operation-runbook.md) | 監視・障害の対処・ログの見方・定期メンテナンス |
 | [06_design-tokens.json](06_design-tokens.json) | デザイントークン（色・書体・余白などの具体値。DTCG 形式、ライトとダーク） |
 | [claude-code-prompts.md](claude-code-prompts.md) | 実装のステップ別プロンプト（Phase 4 の派生。ステップごとの進み具合の記録先） |
+| [prototype-handoff.md](prototype-handoff.md) | プロトタイプからの引き継ぎ（2026-10-11）。実装のやり直しで設計の docs に移す決定と、プロトタイプで分かったこと。移し終えたら消す |
 
 ## ドキュメント体系
 

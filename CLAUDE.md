@@ -76,6 +76,7 @@ Detailed specifications are in `docs/`. This file and `docs/claude-code-prompts.
 - docs/04_deployment-procedure.md: Deploy, CI/CD, スマホの配布（内部配布・TestFlight）, rollback
 - docs/05_operation-runbook.md: Monitoring, incident response, 定期メンテナンス
 - docs/06_design-tokens.json: Design tokens（DTCG形式。色・タイポグラフィ・余白などスタイリング値の正。実装のテーマは `make tokens` でここから派生させ、セマンティック層のみ参照する）
+- docs/prototype-handoff.md: プロトタイプからの引き継ぎ（2026-10-11 に今の実装をプロトタイプとし、実装をやり直すと決めた）。設計の docs に移す決定を持つ。移し終えたら消す
 - docs/concept.md・docs/brainstorm-notes.md: アーカイブ（決めた経緯。今の正ではない。brainstorm-notes の付録に Drive のテンプレートの構成がある）
 
 ## Implementation Rules

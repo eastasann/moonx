@@ -26,8 +26,6 @@
 - [ ] make lint・make typecheck・make test が通った
 
 <!--
-昇格の PR（deploy/{staging,production}/version を更新するリリース）のときは、上の代わりに次を書く:
-- 対象のバージョン（コミット SHA と、前の版からの変更の一覧）
-- staging での確認の結果（production への昇格のとき）
-- ロールバックの手順（この PR を revert する。スマホは EAS Update を前の版に戻す。詳しくは docs/04_deployment-procedure.md）
+昇格の PR（deploy/{staging,production}/version を変えるリリースとロールバック）は make promote が作り、本文も make promote が書く（上のテンプレートは使わない）。
+本文の中身は docs/02-01_system-design-doc.md 2章「make ターゲット」の promote、人が足すものは docs/04_deployment-procedure.md 4.2・5.1。
 -->

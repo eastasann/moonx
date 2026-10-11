@@ -99,7 +99,7 @@ moonx/
 │  └─ ui-web/     Web の部品（React Aria Components ＋ vanilla-extract。design-spec 4.5 の部品）
 ├─ data/templates/bcdx/  BCDX のテンプレートのファイル（AD10 で取り込む。シードも使う。5.13）
 ├─ infra/terraform/  modules/ と envs/{shared,staging,production}/
-├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA
+├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA（環境ごとに、最初の `make promote` が作る）
 ├─ e2e/           Playwright（Web）
 ├─ docker/        ローカルの PostgreSQL の初期化 SQL（docker-compose.yml が使う）
 ├─ scripts/       doc-lint と、画面の検査（`style` 属性・JSX の生の文字列。`make lint` が呼ぶ）
@@ -121,6 +121,8 @@ moonx/
 | Sentry の environment | なし | `staging` | `production` |
 
 名前に使う「staging」は、URL のホスト名（`stg.{DOMAIN}`）を除いてそのまま使う（GitHub の環境・Neon のブランチ・Sentry の environment・Cloud Run のサービス名）。
+
+GitHub の環境は3つとも `main` からだけ使える。Google Cloud への入口（Workload Identity Federation）も `main` で動くワークフローに限る（ADR-016・ADR-027）。
 
 名前のプレースホルダ（ドキュメントの中ではプレースホルダのまま書く）:
 
@@ -163,7 +165,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 
 | 名前 | 置き場所 | 用途 |
 |---|---|---|
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT`（変数） | リポジトリ | Workload Identity Federation で Google Cloud に入る（鍵を置かない）。`build.yml` のイメージの作成、各環境のデプロイ、`db-backup.yml` のバックアップのバケットへの書き込みが使う |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT`（変数） | リポジトリ | Workload Identity Federation で Google Cloud に入る（鍵を置かない。`main` で動くワークフローだけが入れる。ADR-027）。`build.yml` のイメージの作成、各環境のデプロイ、`db-backup.yml` のバックアップのバケットへの書き込みが使う |
 | `SENTRY_AUTH_TOKEN`（シークレット） | リポジトリ | ソースマップのアップロード（Web と API。`make build-api-image` が上げる。04_deployment-procedure.md 2章） |
 | `DATABASE_URL_DIRECT`（シークレット） | `staging` / `production`（マイグレーション）、`production-backup`（バックアップと KPI の集計。production の読み取り専用のロール `moonx_backup_ro` の接続文字列） | マイグレーション、バックアップ、KPI の集計（11章） |
 
@@ -193,7 +195,9 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `doc-lint` | ドキュメントと実体の食い違いを検査する（`scripts/doc-lint.sh --docs`: ドキュメントが参照する make ターゲットの実在・`docs/README.md` のリンク切れ・`docs/features/` の命名）。コミットの前の検査（`--staged`）は `.githooks/pre-commit` が動かす |
 | `admin-create EMAIL=...` | 最初の運営者を作るための招待（ワークスペースなし、`grants_admin = true`）を発行し、リンクを表示する。同じメールあての有効な招待があれば、新しいリンクで作り直す。接続先は `DATABASE_URL`、リンクの基準は `BETTER_AUTH_URL`（staging / production では、この2つを上書きして手元から実行する。03_dev-setup.md） |
 | `infra-plan ENV=...` / `infra-apply ENV=...` | Terraform の plan / apply（`ENV` は `shared` / `staging` / `production`） |
-| `deploy-api ENV=... SHA=...` | マイグレーションの後、Cloud Run に新しいリビジョンを出す（イメージに Web も入っているので、Web もこれで出る。CI が使う） |
+| `deploy-api ENV=... SHA=...` | マイグレーションの後、Cloud Run に新しいリビジョンを出す（イメージに Web も入っているので、Web もこれで出る。CI が使う）。戻すときは戻し先の古い版のこのターゲットが動くので、引数と、読む環境変数・シークレットの名前を変えるときは、戻せる版でも動くように段階を分ける（04_deployment-procedure.md 4.1） |
+| `promote ENV=... [SHA=...]` | 昇格の PR（戻すときも同じ。ADR-016）を手元から作る。まず `git fetch origin` し、作業ツリーに変更が無く、`main` が `origin/main` と同じことを確かめる。`SHA` は短い形でもよく、完全な SHA に直して使う。省くと、staging は `deploy/` 以外を変えた `main` の最新のコミット、production は今の `deploy/staging/version`。省いた SHA が、今の版より古い（戻すことになる）か、その環境で前に戻した版（その環境の履歴にあって、今の版より新しい）なら、止めて `SHA` の指定を求める。確かめること: SHA が今の版と違う。その `build.yml` が成功し（gh）、イメージが Artifact Registry にある（gcloud）。production なら、その SHA を `deploy/staging/version` に書いたコミットの `deploy.yml` が成功している（gh）。そのあとブランチ `promote/{env}-<SHA の先頭7文字>` を作り（同じ名前のブランチが手元か origin に残っていれば、それを使う PR が開いているときは止め、そうでなければ消してから作る）、`deploy/{env}/version` を書いて（無ければ作る）コミットし、`promote-check BASE=origin/main` が通ったら push して PR を開く（gh）。件名は 03_dev-setup.md 9章「コミットメッセージ」の形（進めるときは promote、戻すときは roll back）。本文には、今の版と出す版の SHA・コミットの一覧・マイグレーションの一覧・戻し方（今の版の SHA で `promote` を動かす）を入れる。一覧の範囲は、いちばん先まで出した版（04_deployment-procedure.md 4.1）で決める。出す版がそれより新しいときは、コミットは今の版から出す版まで、マイグレーションはいちばん先まで出した版より後のもの（この昇格で新しく当たるもの）。古いときは、どちらも出す版から、いちばん先まで出した版まで（DB に当たっていて出す版に無いもの）とし、出す版が直前の版（同 4.1）かどうかも書く。その環境の前回の `deploy.yml`（今の版を書いたコミットのもの）が成功していなければ、本文の先頭にそう書き、Cloud Run で動いている版の SHA も出す（gcloud）。最初の昇格（今の版が無い）では、今の版は「なし」とし、コミットの一覧は省き、マイグレーションはすべて出す（04_deployment-procedure.md 4.2・5.1） |
+| `promote-check BASE=...` | `BASE` から `HEAD` までの差分のうち `deploy/` を検査する。`deploy/` を変えていなければ何もしない。変えていれば、次をすべて満たさないと失敗する: 変えたファイルは `deploy/staging/version` か `deploy/production/version` のどちらか1つだけで、ほかのファイルを一緒に変えていない（消してもいない）。中身は完全な SHA が1行で、`BASE` の時点の `main` にあるコミット。その SHA が `BASE` の時点のその環境の版より古い（戻す）なら、その環境の `deploy/{env}/version` に `BASE` までに書かれたことがある（`BASE` にその環境のファイルが無ければ、この条件は無い）。production なら、`deploy/staging/version` に `BASE` までに書かれたことがある。`ci.yml`（`BASE` は、PR を検査するマージのコミットの1つ目の親）・`deploy.yml`（`BASE` は push の前のコミット）・`promote` が使う（04_deployment-procedure.md 2章） |
 | `db-backup ENV=...` | `pg_dump -Fc` を取り、`gs://{GCP_PROJECT_ID}-moonx-backups/{env}/<日付>.dump` に上げる（バケットは30日で自動削除。定期実行の GitHub Actions が使う。05_operation-runbook.md） |
 
 ---
@@ -221,7 +225,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | ADR-013 | メール・ドメイン | **Resend** ＋ 既存の `dwnfrc.app` のサブドメイン（DNS は Vercel） |
 | ADR-014 | 期限の通知 | 期限の通知と、それを作る定期実行（Cloud Scheduler・`/internal/cron`）を持たない（2026-10-03 のユーザーの決定） |
 | ADR-015 | IaC（ユーザー指定） | **Terraform**（Google Cloud の資源とドメインマッピング）。DNS のレコードは Vercel で手で入れる。コンソールで管理するものは2章「インフラ管理」 |
-| ADR-016 | 環境とリリース（ユーザー指定） | **staging ＋ production**。`deploy/{env}/version` による昇格。Web と API を1つのイメージにし、同じイメージを両方の環境に出す |
+| ADR-016 | 環境とリリース（ユーザー指定） | **staging ＋ production**。`deploy/{env}/version` による昇格（戻すときも戻し先の SHA を書く）。Web と API を1つのイメージにし、同じイメージを両方の環境に出す |
 | ADR-017 | モノレポ | **Bun workspaces** ＋ Makefile |
 | ADR-018 | デザインシステムとトークン（ユーザー指定） | **Adobe Spectrum の仕組み**を取り入れ、見た目は月相（design-spec 4.4）。06_design-tokens.json から Web（vanilla-extract）・PDF のテーマと PWA のアイコンを生成する。アイコンは Lucide |
 | ADR-019 | 同時編集 | 項目単位の楽観ロック（`lock_version`）。衝突は 409 で返し、利用者に選ばせる |
@@ -232,7 +236,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | ADR-024 | 画像の保存 | プロフィール写真は Cloud Storage |
 | ADR-025 | 部品の作り方（ユーザー指定） | **Tailwind を使わない**。Web は振る舞いを **React Aria Components**、見た目を **vanilla-extract** で部品の中にだけ書き、画面にはスタイルを書かない。スマホの部品は**保留**（ネイティブは PRD 6章のとおり、Web のデザインが固まったあとの feature） |
 | ADR-026 | i18n | **i18next**（英語だけで始め、多言語にできる作り）。書式は en-PH |
-| ADR-027 | CI/CD とシークレット | **GitHub Actions** ＋ Workload Identity Federation。シークレットは Secret Manager と GitHub（環境・リポジトリ）に置く |
+| ADR-027 | CI/CD とシークレット | **GitHub Actions** ＋ Workload Identity Federation（`main` で動くワークフローだけ）。シークレットは Secret Manager と GitHub（環境・リポジトリ）に置く |
 | ADR-028 | DB のバックアップ | 毎日 **`pg_dump`** を Cloud Storage に30日残す |
 | ADR-029 | API の回数制限 | Better Auth の設定 ＋ API の入口のプラグイン（同じ `rate_limits` テーブル）の2段 |
 | ADR-030 | 言語（ユーザー指定） | **TypeScript**（アプリ・パッケージ・スクリプトのすべて） |
@@ -338,7 +342,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 
 **捨てた案:** 比較の記録なし（ユーザー指定）。
 
-**トレードオフ:** 0台から起動するときに数秒待つ（コールドスタート）。最初の利用者が遅く感じたら、Terraform の `min_instance_count` を1にする（常に1台。月数ドルかかるので、予算と相談して決める。時間帯での自動の切り替えは作らない）。Secret Manager は無料枠（有効な版6つ）を超えるため、月 $1 程度かかる。昇格の PR の revert で戻せるのは、イメージが残っている範囲（最新の30個か90日以内）まで。
+**トレードオフ:** 0台から起動するときに数秒待つ（コールドスタート）。最初の利用者が遅く感じたら、Terraform の `min_instance_count` を1にする（常に1台。月数ドルかかるので、予算と相談して決める。時間帯での自動の切り替えは作らない）。Secret Manager は無料枠（有効な版6つ）を超えるため、月 $1 程度かかる。ロールバック（戻し先の SHA の昇格の PR。ADR-016）で戻せるのは、イメージが残っている範囲（最新の30個か90日以内）まで。
 
 ### ADR-008: DB は Neon。ただし標準の PostgreSQL として使う（ユーザー指定）
 
@@ -434,7 +438,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 
 **状態・日付:** 採用（2026-10-01。2026-10-03 に Cloudflare の設定を外し、Cloud Run のドメインマッピングを足した。ユーザーの決定）
 
-**決定:** Google Cloud の資源を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート）、`staging` / `production` は環境ごとの資源で、Cloud Run のドメインマッピング（production は `{DOMAIN}`、staging は `stg.{DOMAIN}`）もここに含む（2章「インフラ管理」）。Cloud Run のイメージは CI が出すので、Terraform は `image` の変更を無視する（`lifecycle.ignore_changes`）。初回は、イメージとシークレットの値がまだ無いので、環境ごとに変数 `bootstrap` で apply を2回に分ける。1回目（`bootstrap = true`）はシークレットの入れ物・サービスアカウント・写真のバケットだけを作り、Cloud Run とドメインマッピングは作らない。2回目（`bootstrap = false` と、最初のイメージを入れた変数 `api_image`）で Cloud Run とドメインマッピングを作る。最初のイメージも `build.yml` が作る（手元では作らない。05_operation-runbook.md）。手順は 03_dev-setup.md 5.4 の G〜I。DNS のレコードは Terraform で持たず、Vercel の画面で手で入れる（Vercel のトークンはチームの全プロジェクトを触れるので、Terraform にも手元にも持たせない）。ドメインマッピングを作るには、`make infra-apply` を動かすアカウントが Search Console で `dwnfrc.app` の所有を確認している必要がある。コンソールで管理するもの（Terraform の外）は2章「インフラ管理」の表が正。
+**決定:** Google Cloud の資源を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート）、`staging` / `production` は環境ごとの資源で、Cloud Run のドメインマッピング（production は `{DOMAIN}`、staging は `stg.{DOMAIN}`）もここに含む（2章「インフラ管理」）。Cloud Run のイメージは CI が出し、緊急時はトラフィックを人が CLI で前のリビジョンに向ける（04_deployment-procedure.md 5.2）ので、Terraform は `image` と `traffic` の変更を無視する（`lifecycle.ignore_changes`。無視しないと、緊急で戻したあとの apply がトラフィックを悪い版に戻す）。初回は、イメージとシークレットの値がまだ無いので、環境ごとに変数 `bootstrap` で apply を2回に分ける。1回目（`bootstrap = true`）はシークレットの入れ物・サービスアカウント・写真のバケットだけを作り、Cloud Run とドメインマッピングは作らない。2回目（`bootstrap = false` と、最初のイメージを入れた変数 `api_image`）で Cloud Run とドメインマッピングを作る。最初のイメージも `build.yml` が作る（手元では作らない。05_operation-runbook.md）。手順は 03_dev-setup.md 5.4 の G〜I。DNS のレコードは Terraform で持たず、Vercel の画面で手で入れる（Vercel のトークンはチームの全プロジェクトを触れるので、Terraform にも手元にも持たせない）。ドメインマッピングを作るには、`make infra-apply` を動かすアカウントが Search Console で `dwnfrc.app` の所有を確認している必要がある。コンソールで管理するもの（Terraform の外）は2章「インフラ管理」の表が正。
 
 **理由:** ユーザーが Terraform を選んだ。環境を作り直せて、設定の変更をレビューできる。
 
@@ -444,15 +448,30 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 
 ### ADR-016: staging と production の2環境。バージョン宣言ファイルで昇格する（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01。2026-10-03 に Web を API と同じイメージに入れた。ユーザーの決定。2026-10-11 にスマホの昇格を外した）
+**状態・日付:** 採用（2026-10-01。2026-10-03 に Web を API と同じイメージに入れた。ユーザーの決定。2026-10-11 にスマホの昇格を外した。2026-10-12 に、戻し方を revert から戻し先の SHA の昇格の PR に変え、production に書ける SHA を絞り、GitHub の環境と Google Cloud への入口を `main` に限り、昇格の PR を `make promote` で作るようにした。ユーザーの決定）
 
-**決定:** 環境は staging と production（2章「環境と命名」）。ブランチは GitHub Flow で、マージは常に squash（ブランチの運用は 03_dev-setup.md 9章）。`main` に入ると CI がテストし、Web と API を入れたイメージ（タグはコミット SHA。両方の環境で同じイメージを使う）を作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR）をマージしたときに GitHub Actions が行う（順番とワークフローの中身は 04_deployment-procedure.md 2章）。Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素で渡す（ADR-004）ので、staging で確かめたイメージをそのまま production に出せる。戻すときは昇格の PR を revert する。
+**決定:** 環境は staging と production（2章「環境と命名」）。環境ごとのブランチは作らない。ブランチは GitHub Flow で、マージは常に squash（ブランチの運用は 03_dev-setup.md 9章）。`main` に入ると CI がテストし、Web と API を入れたイメージ（タグはコミット SHA。両方の環境で同じイメージを使う）を作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR。`make promote` で作る）をマージしたときに GitHub Actions が行う（順番とワークフローの中身は 04_deployment-procedure.md 2章）。
 
-**理由:** ユーザーが staging ＋ production を選んだ。BCDX の実データに触れずに確かめられる。どの環境にどの版が出ているかが、リポジトリのファイルで分かる。マージを常に squash にするのは、`main` の1コミットが1つの PR になり、昇格と revert をコミット1つの単位で扱えるため。
+- production に書けるのは、`main` の `deploy/staging/version` に書かれたことのある SHA（staging に出したもの）だけ。昇格の PR の CI が `make promote-check` で確かめ、通らなければマージできない。`make promote` は、その SHA の staging へのデプロイが成功したことも確かめる。
+- GitHub の環境は3つとも `main` からだけ使え、Google Cloud への入口（Workload Identity Federation）も `main` で動くワークフローに限る（ADR-027）。CI がデプロイする経路は、昇格の PR のマージだけにする（緊急時に人が CLI で戻す手順は 04_deployment-procedure.md 5.2）。
+- 戻すときも、戻し先の SHA を書いた昇格の PR を出す（revert はしない）。戻せるのは、その環境に書かれたことのある版（CI が確かめる）。直前の版（04_deployment-procedure.md 4.1）でない古い版を出すときは、出す版に無いマイグレーションに contract が無いことを人が確かめる（同 5.1）。
 
-**捨てた案:** 比較の記録なし（ユーザー指定）。
+Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素で渡す（ADR-004）ので、staging で確かめたイメージをそのまま production に出せる。
 
-**トレードオフ:** 昇格の PR の分だけ手順が増える。DB のマイグレーションは戻せないので、「追加してから使い、使わなくなってから消す」の2段階で書く（04_deployment-procedure.md）。
+**理由:** ユーザーが staging ＋ production を選び、環境をブランチではなく昇格の PR のマージで切り替えると決めた。BCDX の実データに触れずに確かめられる。どの環境にどの版が出ているかが、リポジトリのファイルで分かる。戻し先の SHA を書くと、戻し先が PR にそのまま見え、2つ以上前の版にも1回で戻れる。production の SHA を CI で確かめるのは、staging を通っていない版を書き間違いで出さないため。staging に出したことがあればよいので、production を戻すときに staging を先に戻さなくてよい。Google Cloud への入口も `main` に限るのは、GitHub の環境が守るのは環境のシークレットだけで、入口がリポジトリ全体に開いていると、作業ブランチのワークフローからでもデプロイできるため。マージを常に squash にするのは、`main` の1コミットが1つの PR になり、昇格の履歴（`deploy/{env}/version` の変更）をコミット1つの単位で読めるため。
+
+**捨てた案:**
+
+- 環境ごとのブランチ: ユーザーが選ばなかった。
+- 昇格の PR の revert で戻す（2026-10-12 まで）: 戻れるのはその PR の直前の版だけで、戻し先が PR に見えない。
+- production の SHA を今の staging の SHA に限る: production を戻すたびに、先に staging を戻す PR が要る。
+- 昇格の PR をワークフローで作る: ワークフローの `GITHUB_TOKEN` で作った PR は、PR ごとに「Approve workflows to run」を押すまで `ci.yml` が動かない。押さずに済ませるには、GitHub App かアクセストークンをシークレットに置いて管理することになる。手元の `make promote` なら、どちらも要らない（ユーザーの決定）。
+
+**トレードオフ:**
+
+- 昇格の PR の分だけ手順が増え、`make promote` を動かす人の手元に gh と gcloud のログインが要る（障害のときも手元から戻す）。
+- DB のマイグレーションは戻せないので、「追加してから使い、使わなくなってから消す」を別々の昇格で出す（04_deployment-procedure.md 4.1）。
+- 直前の版でない古い版を出せるか（出す版に無いマイグレーションに contract があるか）は、CI では確かめられず人が読む。
 
 ### ADR-017: モノレポは Bun workspaces ＋ Makefile
 
@@ -604,9 +623,9 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 
 ### ADR-027: CI/CD は GitHub Actions、Google Cloud へは Workload Identity Federation
 
-**状態・日付:** 採用（2026-10-01。2026-10-03 に Worker のシークレットを外し、2026-10-11 に EAS を外した）
+**状態・日付:** 採用（2026-10-01。2026-10-03 に Worker のシークレットを外し、2026-10-11 に EAS を外した。2026-10-12 に Workload Identity Federation と GitHub の環境を `main` に限った。ユーザーの決定）
 
-**決定:** CI/CD は GitHub Actions（ワークフローは 04_deployment-procedure.md 2章）。Google Cloud へは Workload Identity Federation で入り、サービスアカウントの鍵を作らない。GitHub の環境は `staging`・`production`（デプロイに承認を要する）・`production-backup`（バックアップと KPI の集計に使う読み取り専用の接続だけを持つ。承認なし）。依存の脆弱性は Dependabot のアラートで知る。シークレットの置き場所は次の2つに分ける: Cloud Run が使うものは Secret Manager、CI が使うものは GitHub の環境かリポジトリ（2章「CI のシークレットと変数」）。
+**決定:** CI/CD は GitHub Actions（ワークフローは 04_deployment-procedure.md 2章）。Google Cloud へは Workload Identity Federation で入り、サービスアカウントの鍵を作らない。WIF のプロバイダの条件は、このリポジトリの `main` で動くワークフロー（OIDC トークンの `repository` が `<org>/moonx` で、`ref` が `refs/heads/main`）に限る。Google Cloud を使うワークフロー（`build.yml`・`deploy.yml`・`db-backup.yml`）はどれも `main` で動き、PR の `ci.yml` は Google Cloud を使わない。`pull_request_target` と `workflow_run` で動くワークフローは作らない（PR から始まっても `ref` が `main` になり、この条件を通ってしまうため）。GitHub の環境は `staging`・`production`（デプロイに承認を要する）・`production-backup`（バックアップと KPI の集計に使う読み取り専用の接続だけを持つ。承認なし）で、3つとも `main` からだけ使える（ADR-016）。依存の脆弱性は Dependabot のアラートで知る。シークレットの置き場所は次の2つに分ける: Cloud Run が使うものは Secret Manager、CI が使うものは GitHub の環境かリポジトリ（2章「CI のシークレットと変数」）。
 
 **理由:** コードが GitHub にあり、PR・レビュー・昇格の PR とそのまま組み合わせられる。Workload Identity Federation なら、漏れると困る長期の鍵をどこにも置かない。シークレットは、それを使う実行環境のそばに置くのが一番漏れにくい。
 

@@ -535,7 +535,7 @@ gcloud run services describe moonx-api-production --region=asia-southeast1 --for
 | KPI の集計の確認 | 月1回 | `kpi.yml` の月1回の実行が成功しているかを見て（`gh run list --workflow=kpi.yml --limit=1`）、実行の要約の件数を運営者に渡す（04 2章・SDD 11章）。失敗していたら `gh run view <RUN_ID> --log-failed` で原因を見る（接続の失敗なら 6.2 と同じ確かめ方） |
 | `change_history` の増え方 | 月1回 | 3.3 の SQL で大きさを見る。前の月からの増え方で、無料プランの容量（ADR-008）に届く時期を見積もる。近ければ Neon の有料プランか移行を決める（ADR-008） |
 | Sentry の issue の棚卸し | 週1回 | 新しい issue・増えている issue を見て、直すか無視するかを決める |
-| Artifact Registry の整理 | 月1回 | 古いイメージが自動で消えているか確かめる（下）。`deploy/staging/version`・`deploy/production/version` の SHA と、戻し先の直前の版が消えていないこと |
+| Artifact Registry の整理 | 月1回 | 古いイメージが自動で消えているか確かめる（下）。`deploy/staging/version`・`deploy/production/version` の SHA と、それぞれの直前の版（いちばん使う戻し先。04 4.1）が消えていないこと |
 | IaC のずれの確認 | 月1回 | `make infra-plan ENV=shared`・`ENV=staging`・`ENV=production` に差分が無いこと（あれば CLI で変えたものを Terraform に入れる） |
 | 費用の確認 | 月1回 | 予算（SDD 1章 Goal。予算アラートの金額は SDD 11章）と比べる（下） |
 | アラートの通知の確認 | 四半期に1回 | Cloud Monitoring・Sentry から試しの通知を出し、メールが届くか |

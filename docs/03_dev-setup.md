@@ -19,9 +19,9 @@
 | Bun | 1.2 以上（CI と同じ版にそろえる） | パッケージ管理・API・テスト | 全員 |
 | Docker（Docker Desktop・OrbStack など。Compose v2） | 最近の版 | ローカルの PostgreSQL 17（`make db-up`。開発用の DB `moonx` とテスト用の DB `moonx_test`） | 全員 |
 | Playwright のブラウザ | リポジトリの Playwright に合う版 | `make test-e2e`（取得するターゲットは SDD 2章「make ターゲット」） | E2E を回す人 |
-| Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
+| Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・`make promote`（イメージの確認）・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
 | Terraform | 1.x の最新 | `make infra-plan` / `make infra-apply` | インフラを触る人 |
-| GitHub CLI（gh） | 最新 | PR・昇格・GitHub の環境の設定・ワークフローの確認 | 任意（あると速い） |
+| GitHub CLI（gh） | 最新 | PR・`make promote`（昇格の PR の作成）・GitHub の環境の設定・ワークフローの確認 | デプロイ・運用をする人（ほかの人は任意） |
 | PostgreSQL のクライアント（psql・pg_dump・pg_restore） | 17（サーバーと同じ版。古い版の pg_dump は 17 のサーバーに使えない） | `make test-api` のバックアップのテスト、バックアップの復元の確認（05 6.2） | 全員 |
 
 ### アカウント（デプロイ時に必要。ローカル開発は GitHub だけでよい）
@@ -186,7 +186,7 @@ make infra-apply ENV=staging    # 適用
 | 対象 | 誰が変えるか |
 |---|---|
 | `infra/terraform/`（`shared`・`staging`・`production`） | 人が PR に `make infra-plan` の結果を貼り、マージ後に `make infra-apply` を手で動かす。CI は Terraform を動かさない |
-| Cloud Run のイメージ（リビジョン） | CI（`deploy.yml` の `make deploy-api`）。Terraform はイメージの変更を無視する（`lifecycle.ignore_changes`。ADR-015） |
+| Cloud Run のイメージ（リビジョン）とトラフィック | イメージは CI（`deploy.yml` の `make deploy-api`）。トラフィックは、緊急時だけ人が `gcloud` で変える（04 5.2）。Terraform はどちらの変更も無視する（`lifecycle.ignore_changes`。ADR-015） |
 | Cloud Run のそれ以外の設定（環境変数・シークレットの参照・台数・メモリ） | Terraform。緊急で `gcloud` から変えたら、あとで Terraform にも同じ変更を入れる（入れないと次の apply で戻る） |
 | Web の静的ファイル | CI（`build.yml` の `make build-api-image` が Web もビルドして API のイメージに入れる。ADR-004） |
 | Cloud Run のドメインマッピング（`{DOMAIN}`・`stg.{DOMAIN}`） | Terraform（環境ごと。正は [SDD 2章「インフラ管理」](02-01_system-design-doc.md#インフラ管理)） |
@@ -330,7 +330,7 @@ make infra-apply ENV=staging    # 適用
 
   - バックアップのバケットが公開されない設定になっていること（05 6.2）
   - 予算アラートの金額が SDD 11章のとおりであること
-  - WIF の `attributeCondition` がこのリポジトリ（`<org>/moonx`）に限っていること。プロバイダの `name` とデプロイ用のサービスアカウントのメールは、リポジトリの変数 `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` に入れる（H。鍵は作らない。ADR-027）
+  - WIF の `attributeCondition` が、このリポジトリ（`<org>/moonx`）の `main` で動くワークフローに限っていること（`assertion.repository == '<org>/moonx' && assertion.ref == 'refs/heads/main'`。ADR-027）。プロバイダの `name` とデプロイ用のサービスアカウントのメールは、リポジトリの変数 `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` に入れる（H。鍵は作らない。ADR-027）
 
 - [ ] Resend の画面でドメインの確認（Verify）が通ったことを確かめる
 
@@ -351,18 +351,23 @@ make infra-apply ENV=staging    # 適用
   ```
 
 - [ ] Settings → Rules で `main` を守る（PR 必須・`ci.yml` の成功が必須・直接 push しない）
-- [ ] GitHub の環境を3つ作る（名前と役割は [SDD 2章「環境と命名」](02-01_system-design-doc.md#環境と命名) の「GitHub の環境」の行）。`production` はデプロイに承認を要する（1人で運用するときは自分を承認者にする）。`production-backup` は承認を付けず、`main` からだけ使えるようにする（`db-backup.yml` と `kpi.yml` は `main` で動く）
+- [ ] GitHub の環境を3つ作る（名前と役割は [SDD 2章「環境と命名」](02-01_system-design-doc.md#環境と命名) の「GitHub の環境」の行）。3つとも `main` からだけ使えるようにする。`production` はデプロイに承認を要する（1人で運用するときは自分を承認者にする）。`production-backup` は承認を付けない。環境・環境のシークレット・承認・ブランチの制限は、公開のリポジトリなら無料のプランで使える。非公開にすると、環境とそのシークレットとブランチの制限は Pro か Team 以上、承認は Enterprise のプランが要る（GitHub の「Deployments and environments」）
 
   ```bash
-  gh api -X PUT repos/<org>/moonx/environments/staging
+  BRANCH_POLICY='"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}'
+  gh api -X PUT repos/<org>/moonx/environments/staging --input - <<EOF
+  {$BRANCH_POLICY}
+  EOF
   gh api -X PUT repos/<org>/moonx/environments/production --input - <<EOF
-  {"reviewers":[{"type":"User","id":$(gh api user --jq .id)}]}
+  {"reviewers":[{"type":"User","id":$(gh api user --jq .id)}],$BRANCH_POLICY}
   EOF
   gh api -X PUT repos/<org>/moonx/environments/production-backup --input - <<EOF
-  {"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
+  {$BRANCH_POLICY}
   EOF
-  gh api -X POST repos/<org>/moonx/environments/production-backup/deployment-branch-policies \
-    -f name=main -f type=branch
+  for ENV_NAME in staging production production-backup; do
+    gh api -X POST repos/<org>/moonx/environments/$ENV_NAME/deployment-branch-policies \
+      -f name=main -f type=branch
+  done
   ```
 
 - [ ] CI のシークレットと変数を入れる。名前・置き場所（リポジトリか、どの環境か）・用途の正は [SDD 2章「CI のシークレットと変数」](02-01_system-design-doc.md#環境変数) の表。下のコマンドはその置き場所に合わせている。`build.yml` は GitHub の環境を使わずに動くので、リポジトリに置いたものだけを読む
@@ -524,13 +529,14 @@ make typecheck
 
 ## 9. ブランチ戦略・リリースフロー
 
-GitHub Flow ＋ バージョン宣言ファイルによる環境の昇格（ADR-016）。長く残るブランチは `main` だけ。リリースはブランチではなく、`deploy/{staging,production}/version`（デプロイするコミット SHA）で管理する。
+GitHub Flow ＋ バージョン宣言ファイルによる環境の昇格（ADR-016）。長く残るブランチは `main` だけ。リリースもロールバックもブランチではなく、`deploy/{staging,production}/version`（デプロイするコミット SHA）を変える昇格の PR のマージで行う。
 
 ```
 feature/xxx ──squash──▶ main ──build.yml──▶ API のイメージ（タグ = コミット SHA）
 fix/xxx     ──squash──▶   │
                           ├─ 昇格の PR（deploy/staging/version = SHA）────────▶ staging
                           └─ 昇格の PR（deploy/production/version = 同じ SHA）─▶ production（承認のあと）
+                             戻すときも昇格の PR（deploy/{env}/version = 戻し先の SHA）
 ```
 
 | ブランチ | 用途 |
@@ -538,7 +544,7 @@ fix/xxx     ──squash──▶   │
 | `main` | 唯一の長く残るブランチ。直接 push しない |
 | `feature/xxx` | 新しい機能。例: `feature/pitch-deck-pdf` |
 | `fix/xxx` | バグの修正。例: `fix/invite-expiry` |
-| `promote/{env}-<SHA の先頭7文字>` | 昇格の PR。`deploy/{env}/version` だけを変える |
+| `promote/{env}-<SHA の先頭7文字>` | 昇格の PR（進めるときも戻すときも）。`make promote` が作り、`deploy/{env}/version` だけを変える |
 
 ### マージの方式
 
@@ -548,9 +554,9 @@ fix/xxx     ──squash──▶   │
 ### リリースフロー（環境の昇格）
 
 1. `main` に squash マージ → `build.yml` がテストし、API のイメージ（タグ = コミット SHA）を Artifact Registry に置く（`make build-api-image`）
-2. その SHA を `deploy/staging/version` に書いた昇格の PR をマージ → `deploy.yml` が staging にデプロイする（マイグレーション → API。Web は同じイメージに入っている。ADR-004）
-3. staging で確かめたら、同じ SHA を `deploy/production/version` に書いた昇格の PR をマージ → GitHub の環境 `production` の承認のあと、production にデプロイする
-4. 戻すときは昇格の PR を revert する
+2. `make promote ENV=staging` で、その SHA を `deploy/staging/version` に書いた昇格の PR を作ってマージ → `deploy.yml` が staging にデプロイする（マイグレーション → API。Web は同じイメージに入っている。ADR-004）
+3. staging で確かめたら、`make promote ENV=production` で同じ SHA を `deploy/production/version` に書いた昇格の PR を作ってマージ → GitHub の環境 `production` の承認のあと、production にデプロイする。staging に出していない SHA（`deploy/staging/version` に書かれたことの無いもの）は、CI（`make promote-check`）が通さない
+4. 戻すときは、`make promote ENV=<環境> SHA=<戻し先の SHA>` で戻し先の SHA を書いた昇格の PR を作ってマージする（revert はしない。戻せる範囲は 04 5.1）
 
 版の呼び方はコミット SHA（Web と API は同じイメージ）。手順の詳細は [04_deployment-procedure.md](04_deployment-procedure.md)。
 
@@ -558,12 +564,12 @@ fix/xxx     ──squash──▶   │
 
 - `main` へのマージは PR 必須（squash）。CI（`ci.yml`）が通ること
 - 1人のときはセルフレビューでよい
-- PR は `.github/PULL_REQUEST_TEMPLATE.md` に従って書く。昇格の PR には、対象の SHA・staging での確認の結果・マイグレーションの有無・戻し方を書く（04 4.2）
+- PR は `.github/PULL_REQUEST_TEMPLATE.md` に従って書く。昇格の PR の本文は `make promote` が作る。人が足すものは 04 4.2・5.1
 - squash したコミットの件名は PR のタイトルになる。PR のタイトルもコミットの規約に合わせる
 
 ### コミットメッセージ
 
-- Conventional Commits（`feat:`・`fix:`・`refactor:`・`docs:`・`test:`・`chore:`）。範囲が分かるときは付ける（例: `feat(api):`・`fix(web):`）。昇格は `chore(deploy): promote production to <短い SHA>`
+- Conventional Commits（`feat:`・`fix:`・`refactor:`・`docs:`・`test:`・`chore:`）。範囲が分かるときは付ける（例: `feat(api):`・`fix(web):`）。昇格は `chore(deploy): promote {env} to <短い SHA>`、戻すときは `chore(deploy): roll back {env} to <短い SHA>`（`{env}` は `staging` か `production`。どちらも `make promote` が付ける）
 - 言語は既存のコミットに合わせる（履歴が無ければ英語）
 - トレーラー（`Co-Authored-By`、セッションの URL など）は付けない。ツールが既定で付けようとしても、この規約を優先する
 - 件名は50字を目安に、72字を超えない。本文は件名との間に空行を置き、表示幅72カラムで折り返す（全角は2カラム）

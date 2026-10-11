@@ -1,0 +1,1211 @@
+                                   BUSINESS PLAN
+        A pitch-ready explanation of the business and an execution-ready plan for how to build it.
+
+
+
+ Business Name                                                  [Name]
+
+
+ Version                                                        [Version]
+
+
+ Prepared By                                                    [Names]
+
+
+ Date                                                           [YYYY-MM-DD]
+
+
+
+
+PURPOSE
+
+• Part A — Business Case: explain why this business should exist and why it can succeed.
+
+• Part B — Execution Plan: define how the founders will actually build, launch, operate, and improve it.
+
+• The completed document should be detailed enough to become the source for a pitch deck, while remaining practical
+enough to guide execution.
+PART A
+
+
+BUSINESS CASE
+Why this business should exist, who it serves, why it can work, and what the economics look like.
+
+
+
+
+1. Executive Summary
+A reader should understand the business in under two minutes.
+
+ Prompt                                Response
+
+
+ What is the business?                 [Write here]
+
+                                       Example: A healthy fast-casual food business in Bacolod that provides convenient meals with
+                                       standardized calories and macronutrients.
+
+
+
+ Who is the primary customer?          [Write here]
+
+                                       Example: Working professionals aged 25–40 in Bacolod with enough disposable income to pay
+                                       above mass-market meal prices for convenience, taste, and nutrition transparency.
+
+
+
+ What problem are we solving?          [Write here]
+
+                                       Example: Healthy eating is difficult to sustain because planning, cooking, portion control, and
+                                       repeated decisions consume time and effort.
+
+
+
+ What is our solution?                 [Write here]
+
+                                       Example: A focused menu with consistent portions and clearly communicated nutrition, available
+                                       via dine-in, takeaway, and delivery.
+
+
+
+ How does the business make            [Write here]
+ money?
+                                       Example: Primarily individual meal sales, with secondary revenue such as beverages, add-ons, or
+                                       corporate orders only if they prove profitable.
+
+
+
+ Why can this work?                    [Write here]
+
+                                       Example: Existing alternatives prove demand for convenient food, while the proposed
+                                       differentiation may support repeat behavior and acceptable margins.
+
+
+
+ Key numbers                           [Write here]
+
+                                       Example: Startup Cost: PHP ___ | Break-even: ___ orders/month | Expected Revenue: PHP
+                                       ___/month | Expected Operating Profit: PHP ___/month | Payback: ___ months
+
+
+
+
+2. Vision & Purpose
+Define what the business is trying to become—and what it is not trying to become.
+ Prompt                                Response
+
+
+ Why should this business exist?       [Write here]
+
+                                       Example: Make the healthier everyday choice easier without asking customers to become nutrition
+                                       experts.
+
+
+
+ 3-year state                          [Write here]
+
+                                       Example: A consistently profitable Bacolod business with reliable operations, repeat customers,
+                                       and a management structure that does not require all founders in daily operations.
+
+
+
+ 5-year state                          [Write here]
+
+                                       Example: A proven model that can either expand or remain a strong cash-generating local
+                                       business depending on which path creates the best outcome.
+
+
+
+ What are we explicitly NOT            [Write here]
+ trying to become?
+                                       Example: We are not trying to maximize store count at any cost, compete as the cheapest
+                                       provider, or create a business that permanently depends on founder labor.
+
+
+
+
+3. Customer
+Describe the actual buyer and the behavior that produces revenue.
+
+ Prompt                                Response
+
+
+ Primary customer                      [Write here]
+
+                                       Example: Define age, income, location, occupation, lifestyle, purchase frequency, and decision
+                                       criteria.
+
+
+
+ Secondary customer                    [Write here]
+
+                                       Example: Only include if the economics and acquisition path are meaningfully different.
+
+
+
+ Customer behavior                     [Write here]
+
+                                       Example: Where do they buy today? How often? What alternatives do they use?
+
+
+
+ Buying trigger                        [Write here]
+
+                                       Example: They need the solution now, discover us through a relevant channel, trust the offer, and
+                                       accept the price.
+
+
+
+ Reasons not to buy                    [Write here]
+
+                                       Example: Price, habit, distance, trust, timing, preference, or another substitute.
+
+
+
+
+4. Problem
+Explain the problem in observable terms, not only as an opinion.
+
+ Prompt                                   Response
+
+
+ Primary problem                          [Write here]
+
+                                          Example: What repeated job, pain, cost, inconvenience, or unmet need are we solving?
+
+
+
+ Frequency                                [Write here]
+
+                                          Example: How often does the problem occur?
+
+
+
+ Severity                                 [Write here]
+
+                                          Example: How painful or costly is it?
+
+
+
+ Current alternatives                     [Write here]
+
+                                          Example: How is the customer solving this today?
+
+
+
+ Why are alternatives                     [Write here]
+ insufficient?
+                                          Example: Explain the gap without assuming customers are unhappy just because you would build
+                                          something different.
+
+
+
+
+5. Product / Service
+Define exactly what is sold at launch and deliberately limit the initial scope.
+
+ Prompt                                   Response
+
+
+ Initial offer at launch                  [Write here]
+
+                                          Example: What can customers actually buy on Day 1?
+
+
+
+ What will NOT be included at             [Write here]
+ launch?
+                                          Example: Reduce complexity and avoid treating future ideas as launch requirements.
+
+
+
+ Core customer experience                 [Write here]
+
+                                          Example: Describe discovery → purchase → delivery/use → repeat purchase.
+
+
+
+ Quality standard                         [Write here]
+
+                                          Example: Define what must always remain consistent: quality, timing, safety, service, accuracy, etc.
+
+
+
+ Future products / services               [Write here]
+
+                                          Example: Only list credible extensions after the initial model works.
+6. Market & Competition
+Summarize the evidence from Business Idea & Validation rather than repeating all research.
+
+ Prompt                                Response
+
+
+ Market type                           [Write here]
+
+                                       Example: Red / Blue / Mixed
+
+
+
+ Why?                                  [Write here]
+
+                                       Example: Explain the sources of competition and the specific underserved angle, if any.
+
+
+
+ Reachable market                      [Write here]
+
+                                       Example: Use a practical launch market, not an inflated total population.
+
+
+
+ Required market share                 [Write here]
+
+                                       Example: Translate break-even into active customers, purchase frequency, or contracts.
+
+
+
+ Key competitors / substitutes         [Write here]
+
+                                       Example: Summarize 3–5 businesses or behaviors customers already use.
+
+
+
+ Why do successful competitors         [Write here]
+ survive?
+                                       Example: Strong location, repeat demand, cost control, brand, distribution, or another economic
+                                       engine.
+
+
+
+ What must we do differently or        [Write here]
+ better?
+                                       Example: Choose the dimensions where we intend to win.
+
+
+
+ If Blue/Mixed, why has nobody         [Write here]
+ captured it?
+                                       Example: Distinguish opportunity from lack of demand.
+
+
+
+
+7. Positioning & Value Proposition
+Make the reason to choose you specific and believable.
+
+ Prompt                                Response
+
+
+ Positioning statement                 [Write here]
+
+                                       Example: For ___, who ___, our business is ___ that ___. Unlike ___, we ___.
+
+
+
+ Why should customers believe          [Write here]
+ us?
+                                       Example: Proof, process, expertise, transparency, consistency, or another reason for trust.
+ Prompt                                Response
+
+
+ What are we willing to compete        [Write here]
+ on?
+                                       Example: Examples: reliability, quality, convenience, transparency, service.
+
+
+
+ What are we NOT willing to            [Write here]
+ compete on?
+                                       Example: Example: being the absolute cheapest option.
+
+
+
+
+8. Business Model
+Explain how activity becomes revenue and profit.
+
+ Prompt                                Response
+
+
+ Primary revenue stream                [Write here]
+
+                                       Example: What creates most of the revenue?
+
+
+
+ Secondary revenue streams             [Write here]
+
+                                       Example: Only include realistic, operationally compatible streams.
+
+
+
+ Average selling price                 [Write here]
+
+                                       Example: PHP ___
+
+
+
+ Variable cost per sale                [Write here]
+
+                                       Example: PHP ___
+
+
+
+ Contribution profit per sale          [Write here]
+
+                                       Example: PHP ___
+
+
+
+ Contribution margin                   [Write here]
+
+                                       Example: ___ %
+
+
+
+ Monthly fixed cost                    [Write here]
+
+                                       Example: PHP ___
+
+
+
+ Break-even volume                     [Write here]
+
+                                       Example: ___ / month and ___ / day
+
+
+
+ Expected scenario                     [Write here]
+
+                                       Example: Revenue / operating profit / margin
+ Prompt                                Response
+
+
+ Capacity-limit scenario               [Write here]
+
+                                       Example: Maximum realistic revenue / profit with the initial setup
+
+
+
+ Why is the startup cost justified?    [Write here]
+
+                                       Example: The investment is acceptable only if expected returns remain attractive after replacing
+                                       assumptions with real quotes.
+
+
+
+
+9. Sales & Marketing
+Explain how customers are acquired and why the selected channels fit their behavior.
+
+ Prompt                                Response
+
+
+ How will the first 100 customers      [Write here]
+ discover us?
+                                       Example: Describe specific launch paths.
+
+
+
+ Launch channels                       [Write here]
+
+                                       Example: Facebook, TikTok, Google Maps, delivery platforms, partnerships, direct outreach,
+                                       events—only where relevant.
+
+
+
+ Why should each channel work?         [Write here]
+
+                                       Example: Connect the channel to observed customer behavior.
+
+
+
+ Retention strategy                    [Write here]
+
+                                       Example: What creates repeat behavior?
+
+
+
+ Referral strategy                     [Write here]
+
+                                       Example: If relevant, explain why customers would recommend the business.
+
+
+
+ Marketing budget                      [Write here]
+
+                                       Example: PHP ___ / month
+
+
+
+ Key acquisition metric                [Write here]
+
+                                       Example: Cost per first purchase, repeat rate, orders per active customer, etc.
+
+
+
+
+10. Why Us
+Be explicit about founder advantages and gaps.
+ Prompt                                Response
+
+
+ Founder advantages                    [Write here]
+
+                                       Example: Skills, local knowledge, relationships, technology, operations, capital, trust, industry
+                                       expertise.
+
+
+
+ Missing capabilities                  [Write here]
+
+                                       Example: What critical knowledge or operating ability is absent?
+
+
+
+ How will we fill the gaps?            [Write here]
+
+                                       Example: Hire, partner, outsource, learn, or use advisors.
+
+
+
+
+PART B
+
+
+EXECUTION PLAN
+How we will set up the company, divide responsibility, launch, operate, measure, and decide when to continue or
+stop.
+
+
+
+
+11. Founder Roles
+Make ownership of work and authority explicit.
+
+ Prompt                                Response
+
+
+ Founder 1 — Role /                    [Write here]
+ Responsibilities / Authority /
+ Time                                  Example: Define what this person owns and what they can decide independently.
+
+
+
+ Founder 2 — Role /                    [Write here]
+ Responsibilities / Authority /
+ Time                                  Example: Define what this person owns and what they can decide independently.
+
+
+
+ Founder 3 — Role /                    [Write here]
+ Responsibilities / Authority /
+ Time                                  Example: Define what this person owns and what they can decide independently.
+
+
+
+ Shared responsibilities               [Write here]
+
+                                       Example: Keep this list small; shared ownership often means unclear ownership.
+
+
+
+
+12. Decision Making & Governance
+Decide how the three founders make decisions before pressure creates conflict.
+ Prompt                               Response
+
+
+ What can one founder decide          [Write here]
+ alone?
+                                      Example: Decisions inside their defined area and budget.
+
+
+
+ What requires majority               [Write here]
+ agreement?
+                                      Example: Material but reversible decisions.
+
+
+
+ What requires unanimous              [Write here]
+ agreement?
+                                      Example: Debt, major capital expenditure, ownership changes, founder compensation, sale,
+                                      shutdown, or adding a co-founder.
+
+
+
+ What happens when we                 [Write here]
+ disagree?
+                                      Example: Define discussion, evidence, escalation, and tie-breaking rules.
+
+
+
+ How are important decisions          [Write here]
+ recorded?
+                                      Example: Use a shared decision log with date, owner, decision, reasoning, and follow-up.
+
+
+
+
+13. Ownership & Money Between Founders
+Agree on ownership, capital, compensation, and what happens when contributions differ.
+
+ Prompt                               Response
+
+
+ Initial ownership                    [Write here]
+
+                                      Example: Founder 1 ___% | Founder 2 ___% | Founder 3 ___%
+
+
+
+ Initial capital contribution         [Write here]
+
+                                      Example: Founder 1 PHP ___ | Founder 2 PHP ___ | Founder 3 PHP ___
+
+
+
+ Founder compensation at launch       [Write here]
+
+                                      Example: Salary / no salary / reimbursement rules.
+
+
+
+ When can founder salaries            [Write here]
+ increase?
+                                      Example: Tie changes to business conditions, not arbitrary dates.
+
+
+
+ What if more capital is required?    [Write here]
+
+                                      Example: Define whether it is debt, additional equity, or optional contribution.
+
+
+
+ What if one founder cannot           [Write here]
+ contribute?
+ Prompt                                 Response
+
+
+                                        Example: Define dilution, loan treatment, or other agreed handling.
+
+
+
+ What if a founder wants to             [Write here]
+ leave?
+                                        Example: Define with legal advice: notice, vesting, buyback, valuation, and transfer restrictions.
+
+
+
+
+14. Legal & Company Setup
+Translate legal and regulatory requirements into a launch checklist.
+
+ Prompt                                 Response
+
+
+ Company structure                      [Write here]
+
+                                        Example: Selected structure or TBD.
+
+
+
+ Registrations                          [Write here]
+
+                                        Example: List required registrations.
+
+
+
+ Permits / licenses                     [Write here]
+
+                                        Example: List business- and industry-specific permits.
+
+
+
+ Tax / accounting setup                 [Write here]
+
+                                        Example: Who handles books, filings, payroll, and controls?
+
+
+
+ Employment requirements                [Write here]
+
+                                        Example: Contracts, statutory benefits, payroll obligations, workplace rules.
+
+
+
+ Industry-specific compliance           [Write here]
+
+                                        Example: Food safety, professional licenses, data rules, product standards, etc.
+
+
+
+ Professional advice required           [Write here]
+
+                                        Example: Lawyer / accountant / permits specialist / industry expert.
+
+
+
+
+15. Location / Facilities / Equipment
+Define what the initial physical setup must accomplish and what it must cost.
+
+ Prompt                                 Response
+
+
+ Location requirements                  [Write here]
+ Prompt                                 Response
+
+
+                                        Example: Customer access, delivery radius, size, utilities, parking, visibility, etc.
+
+
+
+ Maximum acceptable rent                [Write here]
+
+                                        Example: PHP ___ / month, with a reason linked to unit economics.
+
+
+
+ Required equipment                     [Write here]
+
+                                        Example: List only items needed for launch.
+
+
+
+ Capacity of initial setup              [Write here]
+
+                                        Example: ___ sales / orders / customers per day.
+
+
+
+ Primary capacity constraint            [Write here]
+
+                                        Example: Kitchen, staff, seating, machine throughput, delivery, or another bottleneck.
+
+
+
+ Before signing a lease / contract      [Write here]
+
+                                        Example: Define non-negotiable go/no-go conditions.
+
+
+
+
+16. Suppliers & Inventory
+Reduce the chance that one supplier, material, or inventory decision can stop the business.
+
+ Prompt                                 Response
+
+
+ Critical suppliers                     [Write here]
+
+                                        Example: List the suppliers or inputs the business cannot operate without.
+
+
+
+ Alternative suppliers                  [Write here]
+
+                                        Example: Identify backup options.
+
+
+
+ Supplier selection criteria            [Write here]
+
+                                        Example: Price, quality, reliability, terms, distance, consistency.
+
+
+
+ Inventory policy                       [Write here]
+
+                                        Example: Stock level, reorder point, shelf life, wastage target.
+
+
+
+ Single points of failure               [Write here]
+
+                                        Example: Inputs, people, equipment, or contracts that could stop operations.
+17. Operations
+Design the repeated operating system, not just the opening day.
+
+ Prompt                                  Response
+
+
+ Opening / operating hours               [Write here]
+
+                                         Example: Define schedule and why it matches demand.
+
+
+
+ Daily operating flow                    [Write here]
+
+                                         Example: Opening, preparation, service, quality control, closing.
+
+
+
+ Weekly operating flow                   [Write here]
+
+                                         Example: Purchasing, scheduling, inventory review, maintenance, marketing, finance.
+
+
+
+ Quality controls                        [Write here]
+
+                                         Example: How is consistency checked and recorded?
+
+
+
+ Cash controls                           [Write here]
+
+                                         Example: Who receives money, reconciles sales, approves expenses, and reviews discrepancies?
+
+
+
+ Customer complaint process              [Write here]
+
+                                         Example: How are issues received, resolved, recorded, and learned from?
+
+
+
+ What must be documented                 [Write here]
+ before launch?
+                                         Example: SOPs, checklists, vendor list, recipes/specs, pricing rules, safety procedures.
+
+
+
+
+18. People & Hiring
+Connect staffing to actual operating capacity and service quality.
+
+ Prompt                                  Response
+
+
+ Roles required at launch                [Write here]
+
+                                         Example: List positions, not names.
+
+
+
+ Number of people required               [Write here]
+
+                                         Example: Headcount and shift assumptions.
+
+
+
+ Expected monthly payroll                [Write here]
+
+                                         Example: PHP ___
+ Prompt                                  Response
+
+
+ Hiring criteria                         [Write here]
+
+                                         Example: Skills, reliability, attitude, licenses, experience.
+
+
+
+ Training required                       [Write here]
+
+                                         Example: What must be taught before independent work?
+
+
+
+ Day-to-day manager                      [Write here]
+
+                                         Example: Who runs the operation each day?
+
+
+
+ Trigger for the next hire               [Write here]
+
+                                         Example: Define an operational trigger such as sustained capacity utilization or service delay.
+
+
+
+
+19. Technology & Systems
+Use technology where it improves control, visibility, or customer experience—not because it is interesting.
+
+ Prompt                                  Response
+
+
+ Systems required at launch              [Write here]
+
+                                         Example: POS, accounting, inventory, scheduling, website, CRM, analytics, etc.
+
+
+
+ What can remain manual                  [Write here]
+ initially?
+                                         Example: Avoid premature automation.
+
+
+
+ What should be automated                [Write here]
+ early?
+                                         Example: High-risk repetitive processes, financial controls, or customer-critical workflows.
+
+
+
+ Who owns setup and                      [Write here]
+ maintenance?
+                                         Example: Assign one accountable owner.
+
+
+
+
+20. Financial Plan
+Turn the validation model into operating financial guardrails.
+
+ Prompt                                  Response
+
+
+ Startup cost                            [Write here]
+
+                                         Example: PHP ___
+ Prompt                                  Response
+
+
+ Opening cash reserve                    [Write here]
+
+                                         Example: PHP ___
+
+
+
+ Monthly fixed cost                      [Write here]
+
+                                         Example: PHP ___
+
+
+
+ Unit economics                          [Write here]
+
+                                         Example: Price / variable cost / contribution profit / contribution margin
+
+
+
+ Break-even                              [Write here]
+
+                                         Example: Monthly and daily volume
+
+
+
+ Conservative scenario                   [Write here]
+
+                                         Example: Revenue / loss or profit / cash impact
+
+
+
+ Expected scenario                       [Write here]
+
+                                         Example: Revenue / operating profit / margin
+
+
+
+ Strong scenario                         [Write here]
+
+                                         Example: Revenue / operating profit / margin
+
+
+
+ Capacity-limit scenario                 [Write here]
+
+                                         Example: Revenue / operating profit / margin
+
+
+
+ Runway if sales are below plan          [Write here]
+
+                                         Example: ___ months
+
+
+
+ Trigger for additional funding          [Write here]
+
+                                         Example: Define the condition and maximum acceptable amount.
+
+
+
+
+21. KEY ASSUMPTIONS
+List the assumptions that must be true for the plan to work.
+
+ Assumption                       Why We Believe It                     Evidence                          What Would Disprove It
+
+
+ [Write here]                     [Write here]                          [Write here]                      [Write here]
+ Assumption                        Why We Believe It                Evidence                        What Would Disprove It
+
+
+ [Write here]                      [Write here]                     [Write here]                    [Write here]
+
+
+ [Write here]                      [Write here]                     [Write here]                    [Write here]
+
+
+ [Write here]                      [Write here]                     [Write here]                    [Write here]
+
+
+ [Write here]                      [Write here]                     [Write here]                    [Write here]
+
+
+
+
+22. KEY RISKS
+Focus on risks that can materially damage economics, launch, trust, or continuity.
+
+ Risk                           Probability       Impact         Mitigation                              Trigger / Indicator
+
+
+ [Write here]                   [Write here]      [Write here]   [Write here]                            [Write here]
+
+
+ [Write here]                   [Write here]      [Write here]   [Write here]                            [Write here]
+
+
+ [Write here]                   [Write here]      [Write here]   [Write here]                            [Write here]
+
+
+ [Write here]                   [Write here]      [Write here]   [Write here]                            [Write here]
+
+
+ [Write here]                   [Write here]      [Write here]   [Write here]                            [Write here]
+
+
+ [Write here]                   [Write here]      [Write here]   [Write here]                            [Write here]
+
+
+
+
+23. PRE-LAUNCH MILESTONES
+ Milestone                  Goal                                 Owner               Deadline          Exit Condition
+
+
+ Business decision          [Write here]                         [Write here]        [Write here]      [Write here]
+
+
+ Legal / company setup      [Write here]                         [Write here]        [Write here]      [Write here]
+
+
+ Location / supplier        [Write here]                         [Write here]        [Write here]      [Write here]
+ readiness
+
+
+ Product / service          [Write here]                         [Write here]        [Write here]      [Write here]
+ readiness
+
+
+ Team readiness             [Write here]                         [Write here]        [Write here]      [Write here]
+
+
+ Launch readiness           [Write here]                         [Write here]        [Write here]      [Write here]
+24. Go / No-Go Conditions
+Define decision thresholds before sunk cost and emotion make the decision harder.
+
+ Prompt                                     Response
+
+
+ We proceed to launch if                    [Write here]
+
+                                            Example: Expected economics remain attractive after real supplier/rent/payroll quotes; required
+                                            permits are feasible; founders can fund initial capital plus buffer.
+
+
+
+ We delay if                                [Write here]
+
+                                            Example: Critical information is still missing but can realistically be resolved without irreversible
+                                            spending.
+
+
+
+ We stop / abandon if                       [Write here]
+
+                                            Example: Realistic pricing produces structurally negative unit economics, startup capital rises far
+                                            beyond expected return, or a critical legal/operational constraint cannot be solved.
+
+
+
+
+25. LAUNCH PLAN
+ Timing                    Actions                                                             Owner                 Completion Criteria
+
+
+ 30 days before launch     [Write here]                                                        [Write here]          [Write here]
+
+
+ 7 days before launch      [Write here]                                                        [Write here]          [Write here]
+
+
+ Launch day                [Write here]                                                        [Write here]          [Write here]
+
+
+ First 30 days             [Write here]                                                        [Write here]          [Write here]
+
+
+ Days 31–90                [Write here]                                                        [Write here]          [Write here]
+
+
+
+
+26. KPI SCORECARD
+ Area                    KPI                                           Target                   Review Frequency              Owner
+
+
+ Financial               Revenue                                       [Write here]             [Write here]                  [Write here]
+
+
+ Financial               Operating Profit                              [Write here]             [Write here]                  [Write here]
+
+
+ Financial               Contribution Margin                           [Write here]             [Write here]                  [Write here]
+
+
+ Financial               Cash Balance                                  [Write here]             [Write here]                  [Write here]
+
+
+ Customer                Orders / Customers per Day                    [Write here]             [Write here]                  [Write here]
+ Area                  KPI                                         Target                 Review Frequency             Owner
+
+
+ Customer              Repeat Rate                                 [Write here]           [Write here]                 [Write here]
+
+
+ Customer              Average Order Value                         [Write here]           [Write here]                 [Write here]
+
+
+ Customer              Complaints                                  [Write here]           [Write here]                 [Write here]
+
+
+ Operations            Capacity Utilization                        [Write here]           [Write here]                 [Write here]
+
+
+ Operations            Waste / Defect Rate                         [Write here]           [Write here]                 [Write here]
+
+
+ Operations            Service Time                                [Write here]           [Write here]                 [Write here]
+
+
+ Operations            Staffing Cost                               [Write here]           [Write here]                 [Write here]
+
+
+
+
+27. Review Cadence
+Define what the founders inspect regularly so problems become visible early.
+
+ Prompt                                  Response
+
+
+ Daily                                   [Write here]
+
+                                         Example: Cash/sales exceptions, customer complaints, safety/quality exceptions, critical operating
+                                         issues.
+
+
+
+ Weekly                                  [Write here]
+
+                                         Example: Sales, margin, volume, inventory, staffing, marketing results, major actions.
+
+
+
+ Monthly                                 [Write here]
+
+                                         Example: P&L, cash position, assumptions, pricing, hiring, capital decisions, strategy changes.
+
+
+
+
+28. OPEN QUESTIONS
+ Open Question                                  Why It Matters                                      Owner               Target Date
+
+
+ [Write here]                                   [Write here]                                        [Write here]        [Write here]
+
+
+ [Write here]                                   [Write here]                                        [Write here]        [Write here]
+
+
+ [Write here]                                   [Write here]                                        [Write here]        [Write here]
+
+
+ [Write here]                                   [Write here]                                        [Write here]        [Write here]
+ Open Question                                Why It Matters                        Owner             Target Date
+
+
+ [Write here]                                 [Write here]                          [Write here]      [Write here]
+
+
+ [Write here]                                 [Write here]                          [Write here]      [Write here]
+
+
+ [Write here]                                 [Write here]                          [Write here]      [Write here]
+
+
+ [Write here]                                 [Write here]                          [Write here]      [Write here]
+
+
+
+
+29. NEXT ACTIONS
+ Action                                                        Owner          Deadline             Status
+
+
+ [Write here]                                                  [Write here]   [Write here]         [Write here]
+
+
+ [Write here]                                                  [Write here]   [Write here]         [Write here]
+
+
+ [Write here]                                                  [Write here]   [Write here]         [Write here]
+
+
+ [Write here]                                                  [Write here]   [Write here]         [Write here]
+
+
+ [Write here]                                                  [Write here]   [Write here]         [Write here]
+
+
+ [Write here]                                                  [Write here]   [Write here]         [Write here]
+
+
+ [Write here]                                                  [Write here]   [Write here]         [Write here]
+
+
+ [Write here]                                                  [Write here]   [Write here]         [Write here]
+
+
+
+
+FINAL OUTPUT
+
+
+PITCH-READY SUMMARY
+After completing the plan, you should be able to explain the business without opening the full document.
+
+
+
+
+30. Pitch-ready Summary
+Use the completed plan to create a concise narrative.
+
+ Prompt                                Response
+
+
+ One-minute explanation                [Write here]
+Prompt                    Response
+
+
+                          Example: Problem → Customer → Solution → Why now → Business model → Why us → Next
+                          step.
+
+
+
+Five-minute explanation   [Write here]
+
+                          Example: Problem → Customer → Solution → Market → Competition → Business model →
+                          Economics → Why us → Execution plan → Risks → Ask / next step.
+

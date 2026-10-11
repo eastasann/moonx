@@ -11,12 +11,12 @@
 
 ### Goal
 
-- design-spec 3章の全画面・モーダル・パネルを、**Web（ブラウザ）とスマホのネイティブアプリ（iOS / Android）の両方**で提供する。どちらも同じ API を使う。
+- design-spec 3章の全画面・モーダル・パネルを **Web（ブラウザ）** で提供する。スマホでは同じ Web を PWA としてホーム画面に追加して使う（ADR-031）。スマホのネイティブアプリ（iOS / Android）は最初の範囲に入れず、PRD 6章のとおり Web のデザインが固まったあとの feature で、同じ API を使って作る（ADR-001・ADR-003。2026-10-11 のユーザーの決定）。
 - 3工程（自己分析 → アイデア検証 → ビジネスプラン）の入力・その場の計算・確認項目6つの自動判定・プランへの引き継ぎ・実行管理・Pitch Deck（PDF）・AI 往復・決定ログ・コメント・変更履歴・運営者の管理画面をすべて動かす（design-spec 1.2 のスコープ）。
-- 計算（損益分岐・シナリオ・投資回収・ROI）と確認項目の判定は、**Web・スマホ・API で同じコード**を使い、入力した瞬間に結果を出す。
+- 計算（損益分岐・シナリオ・投資回収・ROI）と確認項目の判定は、**Web と API で同じコード**を使い、入力した瞬間に結果を出す（のちのネイティブアプリも同じコードを使う）。
 - 複数人が同じアイデアを編集しても、上書きで内容が消えない（項目単位の楽観ロックと変更履歴）。
-- サーバーと外部サービスの運用費は **月 $0〜10**（Apple Developer Program の年会費は含めない）。初期は BCDX だけの招待制で、一般公開に向けて構成を変えずに広げられる。
-- 依存先を乗り換えやすくする。DB は標準の PostgreSQL として使い（ADR-008）、Web は「静的ファイル＋`/api` の転送」だけで配る（ADR-004）。
+- サーバーと外部サービスの運用費は **月 $0〜10**。初期は BCDX だけの招待制で、一般公開に向けて構成を変えずに広げられる。
+- 依存先を乗り換えやすくする。DB は標準の PostgreSQL として使い（ADR-008）、Web は「`/*` は静的ファイル、`/api/*` は API」という形だけで配る（ADR-004。今は API と同じ Cloud Run のサービスが両方を返す）。
 
 ### Non-Goal
 
@@ -24,8 +24,8 @@
 
 - AI の API の呼び出し（サーバーにもクライアントにも置かない）
 - リアルタイムの共同編集の仕組み（WebSocket・CRDT。同じ欄を同時に打つと、後から保存した人に衝突を知らせるだけ。ADR-019）
-- プッシュ通知の仕組み（APNs・FCM。通知はアプリ内の一覧と未読数の取得だけ）
-- オフラインでの閲覧のための同期（保存できなかった入力の再送だけ。ADR-021）
+- プッシュ通知の仕組み（Web Push・APNs・FCM。通知はアプリ内の一覧と未読数の取得だけ）
+- オフラインでの入力と閲覧（入力には接続が要る。保存できなかった入力は、ページ（タブ）を開いている間だけ再送する。ADR-021。PWA がキャッシュするのは画面の外側だけ。ADR-031）
 - 2つ目以降の言語のカタログ（作りは残す。ADR-026）
 
 ---
@@ -33,49 +33,51 @@
 ## 2. アーキテクチャ概要
 
 ```
-                    ┌───────────────────────── Cloudflare（DNS・CDN・無料枠）──────────────────────────┐
- Web ブラウザ ─────▶ │ Worker「moonx-web-{env}」                                                        │
-                    │  ├ /*      → 静的アセット（apps/web の SPA。見つからないパスは _shell.html）       │
- スマホアプリ ─────▶ │  └ /api/*  → Cloud Run へ転送（Cookie・ヘッダーはそのまま。共有シークレットを付ける）│
- (Expo, iOS/Android) └──────────────────────────────────────────┬────────────────────────────────────┘
-                                                                │ HTTPS
-                    ┌───────────────────── Google Cloud（asia-southeast1）──────────────────────────┐
-                    │ Cloud Run「moonx-api-{env}」 ElysiaJS on Bun（0〜3台）                            │
-                    │  ├ /api/auth/*  Better Auth（メール＋パスワード、Google）                           │
-                    │  ├ /api/v1/*    アプリの REST API（Eden Treaty の型を Web・スマホへ公開）             │
-                    │  └ /api/health  死活確認                                                           │
-                    │ Secret Manager  Artifact Registry                                                   │
-                    │ Cloud Storage（プロフィール写真）  Cloud Logging / Monitoring                        │
-                    └───────┬──────────────────────────────┬───────────────────────────────────────────┘
-                            │ PostgreSQL プロトコル（TLS）     │ HTTPS
-                    ┌───────▼────────────┐        ┌────────▼──────────┐   ┌──────────────┐
-                    │ Neon PostgreSQL     │        │ Resend（メール）    │   │ Sentry        │
-                    │ ap-southeast-1      │        │ 招待・パスワード再設定 │   │ エラー追跡     │
-                    │ branch: production / staging │ └───────────────────┘   │ (web/mobile/api)│
-                    └────────────────────┘                                  └──────────────┘
- 配布: Expo EAS Build → Android は内部配布のリンク、iOS は TestFlight（EAS Submit）。ストアには公開しない（ADR-003）。JS だけの更新は EAS Update
+ Web ブラウザ（PWA を含む）
+   │ HTTPS  https://{DOMAIN}/（staging は https://stg.{DOMAIN}/）
+   │ DNS: Vercel の CNAME → ghs.googlehosted.com（Cloud Run のドメインマッピング）
+   ▼
+ ┌──────────────────── Google Cloud（asia-southeast1） ────────────────────┐
+ │ Cloud Run「moonx-api-{env}」 ElysiaJS on Bun（0〜3台）                     │
+ │  ├ /*           Web の静的ファイル（見つからない画面のパスは _shell.html）    │
+ │  ├ /api/auth/*  Better Auth（メール＋パスワード、Google）                   │
+ │  ├ /api/v1/*    アプリの REST API（Eden Treaty の型を Web へ公開）           │
+ │  └ /api/health  死活確認                                                  │
+ │ Secret Manager  Artifact Registry                                         │
+ │ Cloud Storage（プロフィール写真）  Cloud Logging / Monitoring               │
+ └───────┬──────────────────────────────┬────────────────────────────────────┘
+         │ PostgreSQL プロトコル（TLS）     │ HTTPS
+ ┌───────▼─────────────────────┐  ┌────────▼───────────────┐  ┌───────────────┐
+ │ Neon PostgreSQL              │  │ Resend（メール）         │  │ Sentry         │
+ │ ap-southeast-1               │  │ 招待・パスワード再設定    │  │ エラー追跡      │
+ │ branch: production / staging │  └────────────────────────┘  │ （web / api）   │
+ └──────────────────────────────┘                               └───────────────┘
 ```
 
 ### 通信フロー
 
-1. **Web**: ブラウザは `https://{DOMAIN}/` から SPA を読み込む（Cloudflare の CDN。Worker は動かない）。データは同じオリジンの `/api/v1/*` を Eden Treaty で呼ぶ。ログインは Better Auth の HttpOnly Cookie（同じオリジンなので SameSite=Lax で足りる）。
-2. **スマホ**: アプリは `https://{DOMAIN}/api/*` を直接呼ぶ。セッションは Better Auth の Expo プラグインが SecureStore に保存し、`Cookie` ヘッダーとして付ける。Google ログインはシステムのブラウザで行い、`moonx://` のディープリンクで戻る。
-3. **Worker → Cloud Run**: Worker は `/api/*` を Cloud Run の URL へ転送し、`X-Moonx-Proxy-Secret`（共有シークレット）と `CF-Connecting-IP`（利用者の IP）を付ける。API は `/api/health` 以外で共有シークレットを確かめ、無い・違うリクエストを 403 `FORBIDDEN` で拒否する（IP の偽装を防ぐ）。`/api/docs`（staging）と `/api/health/db` も対象で、Worker 経由でだけ届く。
+1. **Web**: ブラウザは `https://{DOMAIN}/` から Web を読み込む。静的ファイルと API は同じ Cloud Run のサービスが返す（ADR-004）。データは同じオリジンの `/api/v1/*` を Eden Treaty で呼ぶ。ログインは Better Auth の HttpOnly Cookie（同じオリジンなので SameSite=Lax で足りる）。
+2. **スマホ**: Web を PWA としてホーム画面に追加して使う（ADR-031）。通信は 1 と同じ。ネイティブアプリはPRD 6章のとおり Web のデザインが固まったあとの featureで作る（ADR-001・ADR-003）。
+3. **Cloud Run の入口**: Google のフロントが TLS を終え、`X-Forwarded-For` に接続元の IP を付けて API に渡す。API は入口のプラグイン（ADR-029）で、呼び出し元の IP をリクエストごとに1回だけ決める（7.2「呼び出し元の IP」）。共有シークレットのような、前段のプロキシを確かめる仕組みは無い（前段が無いため）。
 4. **メール**: API が Resend の HTTP API で送る（送信元 `no-reply@{DOMAIN}`）。
 5. **計算**: 損益分岐・シナリオ・確認項目・F/A/U の内訳・工程は `packages/domain` の純粋関数で計算する。クライアントは入力のたびにその場で計算して表示し、API は一覧・ダッシュボード・決定ログのスナップショット・版の保存・PDF で同じ関数を使う。DB には保存しない（6章「保存しないもの」）。
-6. **通知の受け取り**: 常時接続は使わない。クライアントは画面を開いたとき・アプリが前面に戻ったとき・60秒ごと（画面が見えている間だけ）に未読数を取りに行く。
+6. **通知の受け取り**: 常時接続は使わない。クライアントは画面を開いたとき・タブが前面に戻ったとき・60秒ごと（画面が見えている間だけ）に未読数を取りに行く。
 
 ### インフラ管理
 
+この表が、何をどこで管理するかの正。ADR-015 と 03_dev-setup.md はこの表を参照する。
+
 | 対象 | 管理方法 |
 |---|---|
-| Google Cloud の環境ごとの資源（Cloud Run・Secret Manager・写真のバケット・サービスアカウント。Monitoring のアラートは production だけ。11章） | **Terraform**（`infra/terraform/envs/{staging,production}/`） |
+| Google Cloud の環境ごとの資源（Cloud Run・Cloud Run のドメインマッピング（`{DOMAIN}`・`stg.{DOMAIN}`）・Secret Manager・写真のバケット・サービスアカウント。Monitoring のアラートは production だけ。11章） | **Terraform**（`infra/terraform/envs/{staging,production}/`） |
 | Google Cloud の共有の資源（Artifact Registry のリポジトリ `moonx`・Workload Identity Federation・バックアップのバケット `{GCP_PROJECT_ID}-moonx-backups`・予算アラートと通知のチャンネル） | **Terraform**（`infra/terraform/envs/shared/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`） |
-| Cloudflare のゾーンの設定（メールの SPF・DKIM・DMARC と Resend の確認のレコード、HSTS、`/api/auth/*` のレート制限ルール） | **Terraform**（Cloudflare provider。`envs/shared/`） |
-| Cloudflare Worker・静的アセット・Web のドメイン（`{DOMAIN}` と `staging.{DOMAIN}` の DNS レコードは Worker のカスタムドメインが作る） | `apps/web/wrangler.jsonc`（デプロイは `make deploy-web`） |
+| `dwnfrc.app` の DNS のレコード（Web の CNAME 2つ（`{DOMAIN}`・`stg.{DOMAIN}` → `ghs.googlehosted.com`）、Resend の MX と TXT、DMARC の TXT、Search Console の所有の確認の TXT） | **Vercel の画面で手で入れる**（`dwnfrc.app` は Vercel で登録し、DNS も Vercel。Vercel のトークンはチームの全プロジェクトを触れるので、Terraform にも手元にも持たせない。手順は 03_dev-setup.md） |
+| Search Console での `dwnfrc.app` の所有の確認 | ドメインマッピングを作る Google のアカウント（`make infra-apply` を動かすアカウント）で確認する（03_dev-setup.md） |
 | Google の OAuth の同意画面とクライアント | Google Cloud のコンソール（Terraform では作れないため。手順は 03_dev-setup.md） |
 | Neon（プロジェクトとブランチ。DB 名 `moonx`） | Neon のコンソールで作り、接続文字列を Secret Manager に入れる（無料プランは Terraform の対象にしない。手順は 03_dev-setup.md） |
-| スマホのビルドと配布 | `apps/mobile/eas.json`・`app.config.ts` |
+| Sentry のプロジェクト（`moonx-web`・`moonx-api`） | Sentry の画面（03_dev-setup.md） |
+| Resend のドメインと API キー | Resend の画面。API キーは Secret Manager に入れる（03_dev-setup.md） |
+| GitHub の環境（`staging`・`production`・`production-backup`）と承認の設定 | GitHub のリポジトリの設定（03_dev-setup.md） |
 | DB のスキーマ | Drizzle のマイグレーション（`packages/db/migrations/`。CI がデプロイ前に適用する） |
 | デプロイのきっかけ | `deploy/{staging,production}/version` の更新（GitHub Actions。04_deployment-procedure.md） |
 
@@ -86,17 +88,15 @@ Bun workspaces のモノレポ。実コマンドは `Makefile` が唯一の正�
 ```
 moonx/
 ├─ apps/
-│  ├─ web/        TanStack Start（SPA モード）。worker/ に Cloudflare Worker（/api の転送）、wrangler.jsonc
-│  ├─ mobile/     Expo（Expo Router）。eas.json・app.config.ts
-│  └─ api/        ElysiaJS（Bun）。Better Auth・REST API・PDF。Dockerfile
+│  ├─ web/        TanStack Start（SPA モード）。public/ に静的なファイル（robots.txt など）。Service Worker（ADR-031）
+│  └─ api/        ElysiaJS（Bun）。Better Auth・REST API・PDF・Web の静的ファイルの配信。Dockerfile（Web のビルドも入れる）
 ├─ packages/
 │  ├─ domain/     計算・確認項目・F/A/U・工程・Pitch Deck の組み立て・AI 書き出し / 取り込みの書式（純粋関数）
 │  ├─ schemas/    Zod のスキーマ（API の入出力とフォームの入力チェック）
 │  ├─ db/         Drizzle のスキーマ・マイグレーション・シード
 │  ├─ i18n/       英語のメッセージカタログと書式（en-PH）
-│  ├─ ui-tokens/  06_design-tokens.json から生成するテーマ（vanilla-extract・Unistyles・react-pdf 用。生成物）
-│  ├─ ui-web/     Web の部品（React Aria Components ＋ vanilla-extract。design-spec 4.5 の部品）
-│  └─ ui-native/  スマホの部品（@rn-primitives ＋ Unistyles ＋ @gorhom/bottom-sheet。同じ部品名）
+│  ├─ ui-tokens/  06_design-tokens.json から生成するテーマ（vanilla-extract・react-pdf 用）と PWA のアイコン・マニフェスト（生成物）
+│  └─ ui-web/     Web の部品（React Aria Components ＋ vanilla-extract。design-spec 4.5 の部品）
 ├─ data/templates/bcdx/  BCDX のテンプレートのファイル（AD10 で取り込む。シードも使う。5.13）
 ├─ infra/terraform/  modules/ と envs/{shared,staging,production}/
 ├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA
@@ -106,102 +106,94 @@ moonx/
 └─ Makefile
 ```
 
+ネイティブアプリ（`apps/mobile`・`packages/ui-native`）はPRD 6章のとおり Web のデザインが固まったあとの featureで足す（ADR-001）。
+
 ### 環境と命名
 
 | 項目 | local | staging | production |
 |---|---|---|---|
-| Web・API の URL | Web `http://localhost:5173`（Vite が `/api` を API へ転送）・API `http://localhost:3000` | `https://staging.{DOMAIN}` | `https://{DOMAIN}` |
-| API（Cloud Run） | `bun --watch` | `moonx-api-staging` | `moonx-api-production` |
-| Cloudflare Worker | `vite dev` | `moonx-web-staging`（`wrangler.jsonc` の env `staging`） | `moonx-web-production`（env `production`） |
+| Web・API の URL | Web `http://localhost:5173`（Vite が `/api` を API へ転送）・API `http://localhost:3000` | `https://stg.{DOMAIN}` | `https://{DOMAIN}` |
+| Web と API（Cloud Run） | Web は `vite dev`、API は `bun --watch`（API は静的ファイルを返さない） | `moonx-api-staging`（Web も返す） | `moonx-api-production`（Web も返す） |
 | DB | Docker の PostgreSQL 17（`localhost:5432`、DB 名 `moonx`） | Neon プロジェクト `moonx` のブランチ `staging` | 同じプロジェクトのブランチ `production` |
 | メール | コンソールに出す | Resend（送信先は許可リストのメールだけ） | Resend |
-| スマホ | Expo の開発ビルド（EAS の profile `development`） | EAS の profile `staging`・チャンネル `staging`・EAS の環境 `preview`。アプリ `{APP_ID}.staging`（Android は内部配布のリンク、iOS は TestFlight の社内テスト） | profile `production`・チャンネル `production`・EAS の環境 `production`。アプリ `{APP_ID}`（staging と同じ配り方） |
-| API のイメージ | — | `asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:<コミット SHA>`（両方の環境で同じイメージ） | 同左 |
+| イメージ | — | `asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:<コミット SHA>`（Web と API を1つに入れ、両方の環境で同じイメージを使う） | 同左 |
 | GitHub の環境 | — | `staging` | `production`（デプロイに承認を要する）と `production-backup`（承認なし。読み取り専用の接続だけを持ち、`db-backup.yml` と `kpi.yml` だけが使う） |
 | Sentry の environment | なし | `staging` | `production` |
 
-未確定の名前（決まったらこの表と、使っている箇所を一緒に置き換える）:
+名前に使う「staging」は、URL のホスト名（`stg.{DOMAIN}`）を除いてそのまま使う（GitHub の環境・Neon のブランチ・Sentry の environment・Cloud Run のサービス名）。
 
-| プレースホルダ | 意味 | 決める時期 |
+名前のプレースホルダ（ドキュメントの中ではプレースホルダのまま書く）:
+
+| プレースホルダ | 値 | 決めた日・決める時期 |
 |---|---|---|
-| `{DOMAIN}` | 独自ドメイン（例: moonx.app）。Cloudflare Registrar で取得し、DNS も Cloudflare | 最初にデプロイする前 |
-| `{GCP_PROJECT_ID}` | Google Cloud のプロジェクト ID（staging と production で1つのプロジェクトを共有する） | 同上 |
-| `{APP_ID}` | iOS の Bundle ID と Android の applicationId（例: com.bcdx.moonx）。staging の版は `{APP_ID}.staging` | 最初の EAS Build と、App Store Connect への登録（TestFlight）の前（配った後は変えられない。変えると入れ直しになる） |
+| `{DOMAIN}` | `bcdx.dwnfrc.app`（既存の `dwnfrc.app` のサブドメイン。staging は `stg.{DOMAIN}`） | 2026-10-03 に決めた（ユーザーの決定。ADR-013） |
+| `{GCP_PROJECT_ID}` | 未定（staging と production で1つのプロジェクトを共有する。世界で重複できず、あとから変えられない） | インフラを作るステップの前にユーザーが決める |
+
+ネイティブアプリの ID（`{APP_ID}`）は、ネイティブの feature で決める（案は 01_prd.md 6章）。
 
 ### 環境変数
 
 | 変数 | 使う場所 | 内容 | local の値 | staging / production の置き場所 |
 |---|---|---|---|---|
-| `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `PROXY_SHARED_SECRET`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS` も必須 | `local` | Cloud Run の環境変数 |
+| `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `WEB_DIST_DIR`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS` も必須。Web へは、API が返す HTML の meta 要素で渡す（ADR-004） | `local` | Cloud Run の環境変数 |
 | `APP_VERSION` | api | `/api/health` の `version`（コミット SHA） | 未設定なら `dev` | API の Dockerfile が `build-api-image` の build-arg から環境変数に入れる |
 | `PORT` | api | 待ち受けるポート | `3000` | Cloud Run が `8080` を渡す |
+| `WEB_DIST_DIR` | api | Web のビルドの出力の置き場所。ここにあるファイルを API が `/*` で返す（ADR-004） | 未設定（静的ファイルを返さない。Web は Vite の開発サーバーが返す） | API の Dockerfile が入れる（イメージの中のパス） |
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
 | `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
 | `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直す。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
 | `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32バイト以上の乱数。`openssl rand -base64 32` の出力。値が UTF-8 で32バイトに満たなければ起動しない） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
-| `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://staging.{DOMAIN}` / `https://{DOMAIN}` |
-| `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り） | `http://localhost:5173,moonx://,exp://` | `https://{DOMAIN},moonx://`（staging は `https://staging.{DOMAIN},moonx-staging://`） |
+| `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://stg.{DOMAIN}` / `https://{DOMAIN}` |
+| `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り） | `http://localhost:5173` | `https://stg.{DOMAIN}` / `https://{DOMAIN}` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | api | Google ログイン（OAuth クライアント。環境ごとに作る。片方だけ入れると起動しない。staging・production は空でも起動しない。local だけ空にでき、Google ログインだけが使えなくなる） | 開発用のクライアント | ID は環境変数、SECRET は Secret Manager `moonx-{env}-google-client-secret` |
 | `MAIL_TRANSPORT` | api | `console` / `resend`（それ以外の値では起動しない。staging・production は `resend` でなければ起動しない。`console` は招待のリンクを含むメールの全文をログに出すので、local とテストだけで使う） | `console` | `resend` |
 | `RESEND_API_KEY` | api | Resend の API キー | 不要 | Secret Manager `moonx-{env}-resend-api-key` |
 | `MAIL_FROM` | api | 送信元 | `moonx <no-reply@localhost>` | `moonx <no-reply@{DOMAIN}>` |
 | `MAIL_ALLOWLIST` | api | staging でだけ使う送信先の許可リスト（カンマ区切り。大文字小文字を区別しない）。staging では、ここに無い宛先にメールを送らない。空なら誰にも送らない（扱いは ADR-013）。local と production では読まない | 空 | staging だけ設定 |
-| `PROXY_SHARED_SECRET` | api, Worker | Worker が付ける共有シークレット。API 側はカンマ区切りで2つまで受け付ける（ローテーションの間だけ新旧の両方を入れる。05_operation-runbook.md） | 空（local では検査しない。staging・production では空だと起動しない） | Secret Manager `moonx-{env}-proxy-shared-secret` と Worker のシークレット |
-| `API_ORIGIN` | Worker | 転送先の Cloud Run の URL | 不要（Vite の転送を使う） | `wrangler.jsonc` の環境ごとの `vars` |
 | `AVATAR_BUCKET` | api | プロフィール写真のバケット（staging・production は空なら起動しない） | 空（local はディスク `./.data/avatars`。API が `/api/avatars/{name}` で返す。U9） | `{GCP_PROJECT_ID}-moonx-{env}-avatars` |
-| `SENTRY_DSN` | api | Sentry（API） | 空 | Cloud Run の環境変数 |
+| `SENTRY_DSN` | api | Sentry（API。プロジェクト `moonx-api`） | 空 | Cloud Run の環境変数（Terraform の環境ごとの変数で入れる。DSN は秘密ではないので Secret Manager に置かない） |
+| `WEB_SENTRY_DSN` | api | Sentry（Web。プロジェクト `moonx-web`）。API が Web の HTML の meta 要素 `moonx-sentry-dsn` で渡す（ADR-004） | 空（local の Web は Sentry に送らない） | Cloud Run の環境変数（`SENTRY_DSN` と同じく Terraform の環境ごとの変数で入れる） |
 | `LOG_LEVEL` | api | `debug` / `info` / `warn` / `error` | `debug` | `info` |
-| `VITE_APP_ENV` / `VITE_SENTRY_DSN` | web（ビルド時） | 環境名と Sentry（Web）。ビルドに埋め込むので、Web はデプロイのときに環境ごとにビルドする（ADR-016） | `local` / 空 | GitHub Actions の環境の変数 |
-| `EXPO_PUBLIC_API_BASE_URL` | mobile | API の基準 URL | `http://<開発 PC の IP>:3000/api`（`apps/mobile/.env`） | `https://staging.{DOMAIN}/api` / `https://{DOMAIN}/api`（EAS の環境変数。`preview` / `production`。`eas build` と `eas update --environment` の両方が読む） |
-| `EXPO_PUBLIC_APP_ENV` / `EXPO_PUBLIC_SENTRY_DSN` | mobile | 環境名と Sentry（スマホ） | `local` / 空（`apps/mobile/.env`） | 同上（EAS の環境変数） |
 
-`.env` の置き場所: `apps/mobile` 以外の変数はリポジトリの直下の `.env`、`EXPO_PUBLIC_*` は `apps/mobile/.env`（Expo が読む場所）。`make setup` が、それぞれの `.env.example` をコピーする。直下の `.env` は Makefile が読み込んで各コマンドに渡し、Vite は `envDir` をリポジトリの直下にする。
+`.env` はリポジトリの直下に1つ置く。`make setup` が `.env.example` をコピーする。直下の `.env` は Makefile が読み込んで各コマンドに渡し、Vite は `envDir` をリポジトリの直下にする。Web はビルドに環境ごとの値を持たない（環境名と Sentry の DSN は、API が返す HTML から読む。local の Vite の開発サーバーでは meta 要素が無いので、環境名は `local`、Sentry は使わない）。
 
-e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100）と Web（ポート 5273）を起動し、次の値を上書きする: `PORT=3100`、`BETTER_AUTH_URL=http://localhost:5273`、`TRUSTED_ORIGINS=http://localhost:5273`、`DATABASE_URL` は `DATABASE_URL_TEST` の値（`e2e/playwright.config.ts` の `webServer`）。
+e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100）と Web（ポート 5273）を起動し、次の値を上書きする: `PORT=3100`、`BETTER_AUTH_URL=http://localhost:5273`、`TRUSTED_ORIGINS=http://localhost:5273`、`DATABASE_URL` は `DATABASE_URL_TEST` の値（`e2e/playwright.config.ts` の `webServer`）。PWA の検査（10章）は、`make build-web` の結果を `WEB_DIST_DIR` で渡した API（ポート 3200。`BETTER_AUTH_URL`・`TRUSTED_ORIGINS` は `http://localhost:3200`）に対して行う。
 
 **CI（GitHub Actions）のシークレットと変数**: 環境ごとに値が違うものは GitHub の環境（`staging` / `production` / `production-backup`）に、環境をまたいで同じものはリポジトリに置く。
 
 | 名前 | 置き場所 | 用途 |
 |---|---|---|
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT`（変数） | リポジトリ | Workload Identity Federation で Google Cloud に入る（鍵を置かない）。`build.yml` のイメージの作成、各環境のデプロイ、`db-backup.yml` のバックアップのバケットへの書き込みが使う |
-| `SENTRY_AUTH_TOKEN`（シークレット） | リポジトリ（スマホのビルドは EAS で動くので、EAS の環境変数にも secret として置く） | ソースマップのアップロード（Web・スマホ・API。どのワークフローで上げるかは 04_deployment-procedure.md 2章） |
-| `CLOUDFLARE_ACCOUNT_ID`（変数） | リポジトリ | `wrangler deploy` |
-| `EXPO_TOKEN`（シークレット） | リポジトリ | EAS Build / Submit / Update |
+| `SENTRY_AUTH_TOKEN`（シークレット） | リポジトリ | ソースマップのアップロード（Web と API。`make build-api-image` が上げる。04_deployment-procedure.md 2章） |
 | `DATABASE_URL_DIRECT`（シークレット） | `staging` / `production`（マイグレーション）、`production-backup`（バックアップと KPI の集計。production の読み取り専用のロール `moonx_backup_ro` の接続文字列） | マイグレーション、バックアップ、KPI の集計（11章） |
-| `CLOUDFLARE_API_TOKEN`（シークレット） | `staging` / `production` | `wrangler deploy`。権限は Workers のスクリプトの編集と、`{DOMAIN}` のゾーンの Workers のルート・カスタムドメイン・DNS の編集（カスタムドメインが DNS レコードを作るため）。Cloudflare のゾーンの設定（2章「インフラ管理」）用の Terraform のトークンは別（`envs/shared` の実行者だけが持つ） |
-| `VITE_APP_ENV` / `VITE_SENTRY_DSN`（変数） | `staging` / `production` | Web のビルド |
-
-TestFlight への提出の鍵（App Store Connect の API キー）は EAS に置く（`eas credentials`）。ストアに公開しないので、Google Play の提出用の鍵は要らない（ADR-003）。
 
 ### make ターゲット
 
 | ターゲット | 内容 |
 |---|---|
 | `install` | 依存の取得だけ（`bun install --frozen-lockfile`）。CI が使う |
-| `setup` | `install`、`.env` の雛形のコピー（直下と `apps/mobile`。直下の `BETTER_AUTH_SECRET` が空なら乱数を入れる）、`db-up`、`db-migrate`、`db-seed`、`tokens`、Playwright のブラウザの取得、Git のフックの配線（`git config core.hooksPath .githooks`） |
+| `setup` | `install`、`.env` の雛形のコピー（`BETTER_AUTH_SECRET` が空なら乱数を入れる）、`db-up`、`db-migrate`、`db-seed`、`tokens`、Playwright のブラウザの取得、Git のフックの配線（`git config core.hooksPath .githooks`） |
 | `dev` | API と Web を同時に起動（`dev-api` と `dev-web`） |
-| `dev-api` / `dev-web` / `dev-mobile` | それぞれを単独で起動（`dev-mobile` は Expo の開発サーバー） |
-| `build` | 全パッケージの型チェックとビルド（Web は local の設定） |
-| `build-web ENV=...` | Web を環境ごとにビルドする（`VITE_*` を埋め込む） |
-| `build-api-image SHA=...` | API の Docker イメージを作って Artifact Registry に上げ、API のソースマップを Sentry の `moonx-api` に上げる（`release` = SHA）。`build.yml` が `make test` の後に使う（04_deployment-procedure.md 2章） |
-| `test` | `test-domain`・`test-api`・`test-web`・`test-mobile` をまとめて実行 |
-| `test-domain` / `test-api` / `test-web` / `test-mobile` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査スクリプト）、`test-api` は `apps/api`（`DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web`、`test-mobile` は `apps/mobile`・`packages/ui-native` |
-| `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
+| `dev-api` / `dev-web` | それぞれを単独で起動 |
+| `build` | 全パッケージの型チェックとビルド |
+| `build-web SHA=...` | Web をビルドする。環境ごとの値は入れないので、1回のビルドを両方の環境で使う。入れるのは Sentry の `release` に使う版（SHA。省くと `dev`）だけ。`build-api-image` が使う |
+| `build-api-image SHA=...` | `build-web` の結果と API を1つの Docker イメージにまとめて Artifact Registry に上げ、Web と API のソースマップを Sentry の `moonx-web`・`moonx-api` に上げる（`release` = SHA）。`build.yml` が `make test` の後に使う（04_deployment-procedure.md 2章） |
+| `test` | `test-domain`・`test-api`・`test-web` をまとめて実行 |
+| `test-domain` / `test-api` / `test-web` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査スクリプト）、`test-api` は `apps/api`（`DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web` |
+| `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して。PWA の検査は、先に `build-web SHA=dev` でビルドした Web を API から返す形で起動する）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
 | `lint` / `format` / `typecheck` | Biome の検査・整形（`lint` は画面の検査スクリプト `scripts/check-screens.ts` も動かす）、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
 | `db-migrate` | マイグレーションを適用する（`DATABASE_URL_DIRECT` か `DATABASE_URL`） |
 | `db-seed` / `db-reset` | 全テーブルの中身を消してデモデータを入れる（design-spec 8章。テンプレートは `data/templates/bcdx/` のファイルを AD10 と同じ取り込みの処理で入れて公開する。`APP_ENV=local` のときだけ動く。何度動かしても行の id は変わらない。6.5）/ DB を作り直してシードまで |
 | `db-studio` | Drizzle Studio |
-| `tokens` | `docs/06_design-tokens.json` から `packages/ui-tokens` を生成する |
+| `tokens` | `docs/06_design-tokens.json` から `packages/ui-tokens` を生成する（テーマと、PWA のアイコン・マニフェスト。ADR-018・ADR-031） |
 | `openapi` | API の OpenAPI 仕様を `apps/api/openapi.json` に書き出す。API を変えたら作り直してコミットする。CI（`ci.yml`）が作り直して差分が無いことを確かめる（`tokens` と同じ扱い。04_deployment-procedure.md 2章） |
 | `kpi ENV=...` | `packages/db/queries/kpi.sql`（件数だけを数え、回答の中身は読まない）を `DATABASE_URL_DIRECT` の DB に流し、件数の表を出す（CI では実行の要約に書く）。書き込まないので、読み取り専用の接続で足りる。`kpi.yml` が production の読み取り専用のロールの接続で使う（11章） |
 | `doc-lint` | ドキュメントと実体の食い違いを検査する（`scripts/doc-lint.sh --docs`: ドキュメントが参照する make ターゲットの実在・`docs/README.md` のリンク切れ・`docs/features/` の命名）。コミットの前の検査（`--staged`）は `.githooks/pre-commit` が動かす |
 | `admin-create EMAIL=...` | 最初の運営者を作るための招待（ワークスペースなし、`grants_admin = true`）を発行し、リンクを表示する。同じメールあての有効な招待があれば、新しいリンクで作り直す。接続先は `DATABASE_URL`、リンクの基準は `BETTER_AUTH_URL`（staging / production では、この2つを上書きして手元から実行する。03_dev-setup.md） |
 | `infra-plan ENV=...` / `infra-apply ENV=...` | Terraform の plan / apply（`ENV` は `shared` / `staging` / `production`） |
-| `deploy-api ENV=... SHA=...` | マイグレーションの後、Cloud Run に新しいリビジョンを出す（CI が使う） |
-| `deploy-web ENV=...` | `build-web` の結果を `wrangler deploy --env` で出す（CI が使う） |
-| `mobile-update ENV=...` / `mobile-build ENV=...` | EAS Update（JS だけ）/ EAS Build と、iOS の TestFlight への Submit（ネイティブの変更があるとき）（CI か手元） |
+| `deploy-api ENV=... SHA=...` | マイグレーションの後、Cloud Run に新しいリビジョンを出す（イメージに Web も入っているので、Web もこれで出る。CI が使う） |
 | `db-backup ENV=...` | `pg_dump -Fc` を取り、`gs://{GCP_PROJECT_ID}-moonx-backups/{env}/<日付>.dump` に上げる（バケットは30日で自動削除。定期実行の GitHub Actions が使う。05_operation-runbook.md） |
 
 ---
@@ -210,14 +202,14 @@ TestFlight への提出の鍵（App Store Connect の API キー）は EAS に�
 
 技術スタックは Phase 3 でユーザーと決めた（2026-10-01）。ユーザーが指定・選択したものは、見出しと下の表に「（ユーザー指定）」と書く。
 
-各 ADR は「状態・日付 / 決定 / 理由 / 捨てた案 / トレードオフ」の欄で書く。状態は「採用」か「廃止」。決定を変えたときは、状態・日付に変えた日と前の決定を書く。比べた候補の記録が無いものは「比較の記録なし」と書き、後から理由を作らない。
+各 ADR は「状態・日付 / 決定 / 理由 / 捨てた案 / トレードオフ」の欄で書く。状態は「採用」「廃止」「保留」。保留は、決めた内容を今の範囲では使わず、のちの feature で使うもの。保留の ADR は、保つ前提（のちの feature でもそのまま使う決定）と、feature で設計し直すものを分けて書く。決定を変えたときは、状態・日付に変えた日と前の決定を書く。比べた候補の記録が無いものは「比較の記録なし」と書き、後から理由を作らない。
 
 | # | 領域 | 決定 |
 |---|---|---|
-| ADR-001 | クライアントの構成（ユーザー指定） | Web とスマホのネイティブアプリを**別々のコード**で作り、計算・入力チェック・型・文言・トークンを共有パッケージで共有する |
+| ADR-001 | クライアントの構成（ユーザー指定） | Web と共有パッケージは採用、ネイティブの部分は**保留**（PRD 6章）。今の範囲は Web だけ。計算・入力チェック・型・文言・トークンは共有パッケージに置き、Web と API が使う。のちのネイティブアプリは Web と別のコードで作り、同じパッケージを使う |
 | ADR-002 | Web（ユーザー指定） | **TanStack Start**（SPA モード）＋ TanStack Form |
-| ADR-003 | スマホ（ユーザー指定） | **Expo**（React Native）＋ Expo Router。身内の間はストアに公開せず、Android は **EAS の内部配布**、iOS は **TestFlight** で配る |
-| ADR-004 | Web の配信 | **静的ファイル＋`/api` の転送**の形に固定し、Cloudflare（Worker の静的アセット）で配る。Cloud Run は共有シークレットで守る |
+| ADR-003 | スマホ（ユーザー指定） | **保留**（PRD 6章）。Expo（React Native）＋ Expo Router で作ることは保つ。配り方などの詳細は feature で設計する |
+| ADR-004 | Web の配信 | **`/*` は静的ファイル、`/api/*` は API** の形に固定し、API と同じ Cloud Run のサービスから配る。独自ドメインは Cloud Run のドメインマッピング |
 | ADR-005 | API（ユーザー指定） | **ElysiaJS**（Bun） |
 | ADR-006 | 通信方式（ユーザー指定） | **REST**。クライアントは **Eden Treaty**、仕様書は OpenAPI。常時接続は使わない |
 | ADR-007 | API の実行環境（ユーザー指定） | **Cloud Run**（asia-southeast1、0〜3台） |
@@ -226,36 +218,37 @@ TestFlight への提出の鍵（App Store Connect の API キー）は EAS に�
 | ADR-010 | 認証（ユーザー指定） | **Better Auth**（メール＋パスワード、**Google ログイン**）。招待制はサーバーで強制する |
 | ADR-011 | キャッシュ | サーバー側のキャッシュは置かない。クライアントは **TanStack Query** |
 | ADR-012 | Pitch Deck の PDF | API サーバーで **react-pdf** を使って作る |
-| ADR-013 | メール・ドメイン | **Resend** ＋ 独自ドメイン（Cloudflare Registrar） |
+| ADR-013 | メール・ドメイン | **Resend** ＋ 既存の `dwnfrc.app` のサブドメイン（DNS は Vercel） |
 | ADR-014 | 期限の通知 | 期限の通知と、それを作る定期実行（Cloud Scheduler・`/internal/cron`）を持たない（2026-10-03 のユーザーの決定） |
-| ADR-015 | IaC（ユーザー指定） | **Terraform**（GCP と Cloudflare のゾーンの設定）＋ wrangler / EAS の設定ファイル。コンソールで管理するものを明記 |
-| ADR-016 | 環境とリリース（ユーザー指定） | **staging ＋ production**。`deploy/{env}/version` による昇格 |
+| ADR-015 | IaC（ユーザー指定） | **Terraform**（Google Cloud の資源とドメインマッピング）。DNS のレコードは Vercel で手で入れる。コンソールで管理するものは2章「インフラ管理」 |
+| ADR-016 | 環境とリリース（ユーザー指定） | **staging ＋ production**。`deploy/{env}/version` による昇格。Web と API を1つのイメージにし、同じイメージを両方の環境に出す |
 | ADR-017 | モノレポ | **Bun workspaces** ＋ Makefile |
-| ADR-018 | デザインシステムとトークン（ユーザー指定） | **Adobe Spectrum の仕組み**を取り入れ、見た目は Hermes Teal。06_design-tokens.json から Web（vanilla-extract）・スマホ（Unistyles）・PDF のテーマを生成する。アイコンは Lucide |
+| ADR-018 | デザインシステムとトークン（ユーザー指定） | **Adobe Spectrum の仕組み**を取り入れ、見た目は Hermes Teal。06_design-tokens.json から Web（vanilla-extract）・PDF のテーマと PWA のアイコンを生成する。アイコンは Lucide |
 | ADR-019 | 同時編集 | 項目単位の楽観ロック（`lock_version`）。衝突は 409 で返し、利用者に選ばせる |
 | ADR-020 | 変更履歴の記録 | アプリのコードで、本体の更新と同じトランザクションの中で `change_history` に書く |
-| ADR-021 | 保存できなかった入力の再送 | クライアントの送信待ちの列（Web: IndexedDB、スマホ: SQLite）に残して再送する |
-| ADR-022 | テスト・リント | Bun test・Vitest・Jest（jest-expo）・Playwright・axe・Biome |
-| ADR-023 | 監視・ログ | Sentry ＋ Cloud Logging（構造化 JSON・リクエスト ID）＋ Cloud Monitoring の稼働時間チェック ＋ Workers Logs |
+| ADR-021 | 保存できなかった入力の再送 | ページを開いている間だけ、メモリに持った最新の値を再送する。端末には残さない。オフラインのときは入力を止める |
+| ADR-022 | テスト・リント | Bun test・Vitest・Playwright・axe・Biome |
+| ADR-023 | 監視・ログ | Sentry ＋ Cloud Logging（構造化 JSON・リクエスト ID）＋ Cloud Monitoring の稼働時間チェック |
 | ADR-024 | 画像の保存 | プロフィール写真は Cloud Storage |
-| ADR-025 | 部品の作り方（ユーザー指定） | **Tailwind を使わない**。振る舞いは headless の部品（Web は **React Aria Components**、スマホは **@rn-primitives** と **@gorhom/bottom-sheet**）、見た目は **vanilla-extract**（Web）と **Unistyles**（スマホ）で部品の中にだけ書き、画面にはスタイルを書かない |
+| ADR-025 | 部品の作り方（ユーザー指定） | **Tailwind を使わない**。Web は振る舞いを **React Aria Components**、見た目を **vanilla-extract** で部品の中にだけ書き、画面にはスタイルを書かない。スマホの部品は**保留**（ネイティブは PRD 6章のとおり、Web のデザインが固まったあとの feature） |
 | ADR-026 | i18n | **i18next**（英語だけで始め、多言語にできる作り）。書式は en-PH |
-| ADR-027 | CI/CD とシークレット | **GitHub Actions** ＋ Workload Identity Federation。シークレットは Secret Manager・GitHub の環境・Worker・EAS に置く |
+| ADR-027 | CI/CD とシークレット | **GitHub Actions** ＋ Workload Identity Federation。シークレットは Secret Manager と GitHub（環境・リポジトリ）に置く |
 | ADR-028 | DB のバックアップ | 毎日 **`pg_dump`** を Cloud Storage に30日残す |
-| ADR-029 | API の回数制限 | Better Auth の設定＋アプリの API の自前のミドルウェア（同じ `rate_limits` テーブル）＋ Cloudflare のルール |
+| ADR-029 | API の回数制限 | Better Auth の設定 ＋ API の入口のプラグイン（同じ `rate_limits` テーブル）の2段 |
 | ADR-030 | 言語（ユーザー指定） | **TypeScript**（アプリ・パッケージ・スクリプトのすべて） |
+| ADR-031 | PWA | Web を **PWA** にする。Service Worker がキャッシュするのは画面の外側だけで、`/api/*` はキャッシュしない |
 
 ### ADR-001: Web とスマホを別々に作り、ロジックを共有する（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01。2026-10-03 にスマホの E2E を Maestro にする決定を足した）
+**状態・日付:** 採用（Web と共有パッケージの部分）。ネイティブの部分は保留（2026-10-11。ネイティブは PRD 6章のとおり、Web のデザインが固まったあとの feature で作る。ユーザーの決定）。前の決定（2026-10-01。2026-10-03 にスマホの E2E を Maestro にする決定を足した）は、最初の範囲で Web とスマホのネイティブアプリを別々のコードで作る、だった。
 
-**決定:** Web（`apps/web`、TanStack Start）とスマホ（`apps/mobile`、Expo）を別々のコードで作る。画面は別々に作り、次のものは `packages/` で共有する: 計算と判定（`domain`）、API の入出力とフォームの入力チェック（`schemas`）、API の型（Eden Treaty が `apps/api` の型を読む）、文言と書式（`i18n`）、デザイントークン（`ui-tokens`）。
+**決定:** 今の範囲は Web（`apps/web`）だけ。計算と判定（`domain`）、API の入出力とフォームの入力チェック（`schemas`）、API の型（Eden Treaty が `apps/api` の型を読む）、文言と書式（`i18n`）、デザイントークン（`ui-tokens`）は `packages/` に置き、Web と API が使う。スマホからは Web を PWA として使う（ADR-031）。のちのネイティブアプリのために、次の前提を保つ: Web と別のコードで作る、同じパッケージと同じ API（`/api/v1`）を使う、画面のパスを Web と同じにする（4章）、部品は Web と同じ名前と props にする（ADR-025）。ネイティブの詳細（前の決定）は、タグ `prototype-2026-10-11` の `docs/02-01_system-design-doc.md` の ADR-001・ADR-003・ADR-025 にある。
 
-**理由:** ユーザーが「Web とスマホを別々に作る」を選んだ。design-spec は書く画面をスマホ基準、数字と表の画面を Web 基準で設計している（design-spec 1.2）。どちらにも最適な部品を使える（Web は DOM の表・キーボード操作、スマホはネイティブのキーボードとシート）。画面が違っても計算と判定の結果が食い違わないように、ロジックは1か所に置く。
+**理由:** ユーザーが「Web とスマホを別々に作る」を選んだ（2026-10-01）。その後、Web のデザインを固めてからネイティブを作ると決めた（2026-10-11）。ロジックを1か所に置けば、あとからネイティブを足しても計算と判定の結果が食い違わない。
 
 **捨てた案:** Expo で Web も出す（Web の表やワークシートが作りにくい）、Web を Capacitor で包む（Apple の審査で「Web を包んだだけ」と判断される危険）。
 
-**トレードオフ:** 画面を2回作るので、開発と保守の手間は一体型（Expo で Web も出す）のほぼ2倍。Web とスマホで画面の挙動がずれる危険があるため、画面の仕様は design-spec だけを正とし、E2E は Web（Playwright）と、スマホのコアフロー（Maestro。2026-10-03 にユーザーが導入を決めた）で確かめる。
+**トレードオフ:** ネイティブを足すときに、画面をもう一度作る。それまでのスマホでの使い勝手は PWA の範囲に限られる（ADR-031）。
 
 ### ADR-002: Web は TanStack Start の SPA モード（ユーザー指定）
 
@@ -263,43 +256,53 @@ TestFlight への提出の鍵（App Store Connect の API キー）は EAS に�
 
 **決定:** `apps/web` は TanStack Start（React・TanStack Router・Vite）を **SPA モード**で使い、静的ファイルとして出力する。ランディング（1）と、プライバシーポリシー・サポート（29・30）だけはビルド時に HTML を作る（プリレンダー）。データはすべて API（Eden Treaty ＋ TanStack Query）から取る。TanStack Start のサーバー関数・サーバー描画は使わない。フォームは TanStack Form（Zod のスキーマをそのまま使う）。画面の部品は `packages/ui-web`（ADR-025）だけを使う。
 
-**理由:** ユーザーが Next.js 以外として TanStack Start を選んだ。ログイン後の画面がほぼすべてで、検索エンジン向けのサーバー描画は要らない。データの取得口を Elysia の API 1つにまとめれば、スマホと同じ API を使える。ルートの型安全（パスと検索パラメータ）が、画面数の多いアプリで効く。TanStack Form は Zod のスキーマ（Standard Schema）をそのまま検査に使え、React Native でも同じ書き方で動くので、Web とスマホでフォームの作り方をそろえられる。TanStack Query はキャッシュと再取得・楽観的更新・オフラインからの復帰をまとめて扱え、Web とスマホの両方で使える（ADR-011）。
+**理由:** ユーザーが Next.js 以外として TanStack Start を選んだ。ログイン後の画面がほぼすべてで、検索エンジン向けのサーバー描画は要らない。データの取得口を Elysia の API 1つにまとめれば、のちのネイティブアプリも同じ API を使える。ルートの型安全（パスと検索パラメータ）が、画面数の多いアプリで効く。TanStack Form は Zod のスキーマ（Standard Schema）をそのまま検査に使え、React Native でも同じ書き方で動く。TanStack Query はキャッシュと再取得・楽観的更新をまとめて扱える（ADR-011。保存の再送は ADR-021 の仕組みで行い、TanStack Query の一時停止した変更の再開には頼らない）。
 
 **捨てた案:** Next.js（ユーザーが候補から外した。比べた理由の記録なし）、フォームの React Hook Form（利用者が多いが、型の推論と Standard Schema の扱いで TanStack Form の方がそろえやすい）。
 
-**トレードオフ:** TanStack Start は比較的新しく、情報が Next.js より少ない。サーバー描画を使わないので最初の表示は JS の読み込み待ちになる（ランディングはプリレンダーで補う）。将来サーバー描画が要るようになったら、TanStack Start のまま SSR モードに切り替えられる（そのときは Worker で動かす。ADR-004 の形は変わらない）。
+**トレードオフ:** TanStack Start は比較的新しく、情報が Next.js より少ない。サーバー描画を使わないので最初の表示は JS の読み込み待ちになる（ランディングはプリレンダーで補う）。将来サーバー描画が要るようになったら、TanStack Start のまま SSR モードに切り替えられる（そのときは同じ Cloud Run のサービスで描く。ADR-004 の「`/api/*` は API」の形は変わらない）。
 
-### ADR-003: スマホは Expo、身内の間はストアに公開せず内部配布で配る（ユーザー指定）
+### ADR-003: スマホのネイティブアプリは Expo（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01。2026-10-03 に配布の方針を変えた。下の「配布の判断」）
+**状態・日付:** 保留（2026-10-11。ネイティブは PRD 6章のとおり Web のデザインが固まったあとの feature で作る。Expo で作ることと配り方は保つ。ユーザーの決定）。前の決定（2026-10-01。2026-10-03 に配り方を変えた）は、最初の範囲で Expo（React Native）＋ Expo Router のアプリを作り、身内の間はストアに公開せず、Android は EAS の内部配布、iOS は TestFlight で配る、だった。
 
-**決定:** `apps/mobile` は Expo（React Native、New Architecture。開発ビルドを使い、Expo Go は使わない）＋ Expo Router。画面の部品は `packages/ui-native`（ADR-025）だけを使う。ビルドは EAS Build、JS だけの修正は EAS Update（チャンネル `staging` / `production`）。身内だけが使う間は、App Store にも Google Play にも公開しない。Android は EAS の内部配布（`distribution: internal`、APK）のインストール用のリンクで入れる。iOS は Apple Developer Program（ユーザーが個人で登録する）の TestFlight の社内テスト（EAS Submit で提出する）で入れる。端末を登録した内部配布（ad hoc）でも入れられる。セッションは Better Auth の Expo プラグインで SecureStore に保存する。保存できなかった入力は expo-sqlite に残す（ADR-021）。PDF は API から受け取り、expo-sharing で共有する。
+**決定:** ネイティブアプリは PRD 6章のとおり、Web のデザインが固まったあとの feature で作る。保つ前提: Expo（React Native）＋ Expo Router で作る（ユーザー指定）。配り方・開発中の確かめ方・Apple Developer Program の登録の時期・アプリの ID の案は PRD 6章にある。feature で設計し直すもの: 開発ビルド・EAS の設定・Universal Links・Apple の審査基準 4.8 の扱いなどの詳細。前の設計は、タグ `prototype-2026-10-11` の `docs/02-01_system-design-doc.md` の ADR-003 にあり、feature の設計で読み直して決める。
 
-**理由:** ユーザーが「ネイティブアプリ」「iOS と Android の両方」を選び、使うのは身近な人だけなので、ストアの審査と公開の条件を負わずに配る方を選んだ。Expo は TypeScript・React で書けて Web と知識を共有でき、ネイティブのビルド環境（Mac など）を持たずにクラウドでビルドできる。EAS の無料枠で試運転の規模は足りる。開発ビルドにするのは、Unistyles v3 と @gorhom/bottom-sheet（react-native-reanimated・react-native-gesture-handler も要る）がネイティブのモジュールを使い、Expo Go では動かないため（ADR-025）。フォームは Web と同じ TanStack Form と Zod のスキーマを使う。メールのリンク（招待・パスワード再設定）を Web と同じパスで開けるように、iOS の Universal Links・Android の App Links（`https://{DOMAIN}/...`）と独自スキーム（`moonx://`、staging は `moonx-staging://`）でアプリを開く（4章）。
+**理由:** ユーザーが「ネイティブアプリ」「iOS と Android の両方」を選び、Expo を指定した（2026-10-01）。Web のデザインの改修が固まってから、その内容でネイティブを作ると決めた（2026-10-11）。
 
 **捨てた案:** 比較の記録なし（ユーザー指定。Web を包む案は ADR-001）。
 
-**トレードオフ:** Android のアプリは、ストアの自動更新が無い。JS だけの修正は EAS Update で届くが、ネイティブの変更は新しいビルドのリンクを配り直し、入れ直してもらう。iOS の TestFlight のビルドは90日で期限が切れるので、使い続けるには期限の前に新しいビルドを提出する。TestFlight の社内テストは App Store Connect のユーザーとして追加した人（最大100人）だけが使える。端末を登録した内部配布は、登録した端末の数だけ UDID の登録の手間がかかる。Apple の登録費（年 $99）がかかる（運用費の予算には含めない。ユーザーと合意済み）。
+**トレードオフ:** ネイティブができるまで、スマホでは PWA で使う。iPhone ではホーム画面に追加した Web と Safari でログインが別になる（ADR-031）。
 
-**配布の判断（ユーザーと合意、2026-10-03）:**
-- 身内だけが使う間は、ストアに公開しない。ストアに公開するかは、身内の外に広げるときに、ユーザーが改めて決める。決めたら、この ADR を公開する前提に書き換え、04_deployment-procedure.md 4.3 に公開の手順を足す。
-- Apple Developer Program は個人で登録する（TestFlight と、端末を登録した内部配布に要る）。Google Play Console は今は要らず、登録費も払わない。
-- 次はストアに公開すると決めたときだけ要る: Apple の審査基準 4.8（他社のログインを出すアプリは、条件を満たす別のログインも並べる）への対応、審査用のデモアカウント、Google Play の個人の開発者アカウントのクローズドテスト、ストアの掲載情報（プライバシーポリシーとサポートのページ `/privacy`・`/support` は、ストアと関係なく Web の公開で作る。4章）。4.8 は、Sign in with Apple を足さずに提出し、差し戻されたらそのときに足すか iOS はストアで配らないかを決める（2026-10-01 の合意）。
-- アプリ内のアカウント削除（C-11）は、ストアに公開するかどうかにかかわらず作る。公開するときに App Store と Google Play が求める要件でもある。
+### ADR-004: Web は「静的ファイル＋/api」の形で、API と同じ Cloud Run のサービスから配る
 
-### ADR-004: Web は「静的ファイル＋/api の転送」で配り、Cloudflare に置く
+**状態・日付:** 採用（2026-10-03 に置き換えた。ユーザーの決定。ドキュメントへの反映は 2026-10-11）。前の決定（2026-10-01）は、Cloudflare の Worker の静的アセットで Web を配り、`/api/*` を Cloud Run へ転送し、Cloud Run を共有シークレットで守る、だった。
 
-**状態・日付:** 採用（2026-10-01）
+**決定:**
 
-**決定:** Web の配信は「`/*` は静的ファイル（見つからないパスは `_shell.html`）、`/api/*` は API へ転送」という形に固定する。`index.html` はビルド時に作るランディング（ADR-002）で、SPA の殻は `_shell.html` に出力される。置き場所は Cloudflare の Worker（静的アセット機能）で、`/api/*` と、静的アセットに無い画面のパス（`_shell.html` を返す）だけ Worker のコード（`apps/web/worker/index.ts`）が動く。静的アセットのセキュリティヘッダーと、`/.well-known/apple-app-site-association` の Content-Type は、静的アセットの `_headers` ファイル（`apps/web/public/_headers`）で付ける（Worker のコードを動かさない）。スマホも同じ `https://{DOMAIN}/api` を使う。独自ドメインの DNS も Cloudflare に置く。
+- 配信の形は「`/*` は静的ファイル、`/api/*` は API」に固定する（前と同じ）。
+- 置き場所は API と同じ Cloud Run のサービス `moonx-api-{env}`。イメージに Web のビルドの出力を入れ（ADR-016）、API が `WEB_DIST_DIR` のファイルを返す。返し方: `/` はビルド時に作るランディング（`index.html`。ADR-002）、`/privacy`・`/support` はビルド時に作る HTML、ビルドの出力にあるファイルはそのまま、それ以外の GET の画面のパス（`/api/` で始まらず、`/assets/` の下でも拡張子の付いたパスでもないもの）は SPA の殻の `_shell.html`（200）。見つからないファイル（`/assets/` の下か拡張子の付いたパス）は 404。`WEB_DIST_DIR` の無い local では静的ファイルを返さない（Web は Vite の開発サーバーが返し、`/api` を API へ転送する）。
+- キャッシュの見出し: ファイル名にハッシュの付いたアセットは `Cache-Control: public, max-age=31536000, immutable`。HTML・マニフェスト・Service Worker のファイルは `no-cache`（ADR-031）。アイコンなどハッシュの無いファイルは `public, max-age=86400`。API の応答は `no-store`（ADR-011）。
+- 環境ごとに違う値はイメージに焼き込まない（staging で確かめたイメージをそのまま production に出すため。ADR-016）。API は起動のときに HTML のファイルを読み、`<head>` に `<meta name="moonx-app-env" content="{APP_ENV}">` と `<meta name="moonx-sentry-dsn" content="{WEB_SENTRY_DSN}">` を入れて返す。Web はこの2つを読んで環境名と Sentry を決める。インラインのスクリプトを使わないので、CSP の `script-src 'self'` を保てる（7.2）。
+- セキュリティヘッダー（CSP・HSTS など）は API が付ける（7.2）。
+- 独自ドメインは Cloud Run のドメインマッピングで付ける（production は `{DOMAIN}`、staging は `stg.{DOMAIN}`）。DNS は Vercel にあり、CNAME（`ghs.googlehosted.com`）を手で入れる（2章「インフラ管理」）。ドメインマッピングを作る Google のアカウントは、Search Console で `dwnfrc.app` の所有を確認しておく。
+- Cloud Run は IAM の認証をかけない（誰でも呼べる設定）。前段のプロキシが無いので、共有シークレットは持たない。
 
-Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし、代わりに Worker が付ける共有シークレット（`X-Moonx-Proxy-Secret`）を API が確かめて、直接のアクセスを拒否する（2章 通信フロー 3）。例外は `/api/health`（監視）。
+**理由:** ユーザーが、管理するサービスを増やすほどの利点が無いとして、クラウドを Google Cloud にまとめると決めた（2026-10-03）。Web と API が同じオリジンになるので、ログインの Cookie が第三者 Cookie にならず、Safari でも動き、CORS も要らない（前と同じ）。配信の形を「静的ファイル＋`/api`」に限っているので、あとでロードバランサや別の配信先に移っても、アプリのコードは変わらない。
 
-**理由:** ユーザーの希望は「後から簡単に変えられること」。配信の役割をこの2つに限れば、どの配信先（Cloudflare、Netlify、nginx など）にも同じ形で移れて、アプリのコードは変わらない。Web と API が同じオリジンになるので、ログインの Cookie が第三者 Cookie にならず、Safari でも動き、CORS も要らない。Cloudflare の無料枠で静的アセットの配信は回数無制限、Worker は1日10万回まで（API の呼び出しだけが数える）で足りる。
+**捨てた案:**
 
-**捨てた案:** Firebase Hosting（最初の案。Cloud Run へ転送するときに `__session` という名前以外の Cookie を落とすため、Better Auth のセッションと Google ログインの状態の Cookie が届かず使えないと分かった。2026-10-01）、Google Cloud のロードバランサ＋Cloud CDN（月 $18 程度かかり予算を超える）、Cloud Run から Web も配る（API が休んでいると画面の表示まで数秒待たせる）、Cloud Run を IAM で守り Worker が ID トークンを付けて呼ぶ（Worker に Google Cloud のサービスアカウントの鍵を置くことになる）。
+- Cloudflare Workers（前の決定）: `dwnfrc.app` の DNS が Vercel にあるままでは、Worker に独自ドメインを付けられない。
+- Cloudflare Pages: Vercel の DNS に CNAME を足せば付けられるが、管理するサービスが1つ増える。
+- Firebase Hosting: Cloud Run へ転送するときに `__session` という名前以外の Cookie を落とすため、Better Auth のセッションと Google ログインの状態の Cookie が届かず使えない（2026-10-01 に分かった）。
+- Google Cloud のロードバランサ＋Cloud CDN: 月 $18 程度かかり、予算（月 $5・$10 のアラート。11章）を超える。
 
-**トレードオフ:** Google Cloud と Cloudflare の2つのアカウントを使う。共有シークレットを Secret Manager と Worker の2か所でそろえてローテーションする手間がかかる（05_operation-runbook.md）。
+**トレードオフ:**
+
+- Cloud Run のドメインマッピングは Preview の機能で、Google は遅延の問題から本番向けではないとしている。ユーザーはこれを承知で選んだ。問題が出たら、外部アプリケーション ロードバランサ（サーバーレス NEG）に乗り換える。配信の形は同じなので、アプリのコードは変わらない。
+- Cloud Run が0台のときは、最初の画面の表示も API の起動を待つ（数秒。7.3）。最小の台数は ADR-007 のまま（0台）で、遅く感じたら ADR-007 の手順で1台にする。
+- CDN を通さないので、静的ファイルも asia-southeast1 から返る（利用者はフィリピンにいるので遅れは小さい）。静的ファイルのリクエストも Cloud Run の無料枠に数えられる。2回目からはブラウザと Service Worker のキャッシュから出る（ADR-031）。
+- Cloud Run の URL（`*.run.app`）も公開のまま残る。ドメインの外から呼ばれても、認証・認可・回数制限は同じにかかり、ログインの Cookie は `{DOMAIN}` にしか送られない。
 
 ### ADR-005: API は ElysiaJS（Bun）（ユーザー指定）
 
@@ -317,13 +320,13 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **状態・日付:** 採用（2026-10-01）
 
-**決定:** API は `/api/v1` の下の REST（JSON、項目名は camelCase）。Web とスマホは Eden Treaty（`treaty<App>()`）で型付きで呼ぶ。仕様書は `@elysiajs/openapi` で出す（staging は `/api/docs` で読める。production は出さない）。常時接続（WebSocket・SSE）は使わず、通知の未読数は取りに行く（2章 通信フロー 6）。
+**決定:** API は `/api/v1` の下の REST（JSON、項目名は camelCase）。Web は Eden Treaty（`treaty<App>()`）で型付きで呼ぶ（のちのネイティブアプリも同じ）。仕様書は `@elysiajs/openapi` で出す（staging は `/api/docs` で読める。production は出さない）。常時接続（WebSocket・SSE）は使わず、通知の未読数は取りに行く（2章 通信フロー 6）。
 
-**理由:** Web とスマホの2つのクライアントが同じ API を使うので、言語に依存しない REST にし、型は Eden で共有する。ユーザーが Elysia の仕組み（Eden）を使いたいとした。
+**理由:** Web と、のちのネイティブアプリが同じ API を使うので、言語に依存しない REST にし、型は Eden で共有する。ユーザーが Elysia の仕組み（Eden）を使いたいとした。
 
 **捨てた案:** 常時接続（WebSocket・SSE。共同編集の即時反映は Non-Goal なので、運用コストに見合わない）。REST 以外の方式は比較の記録なし（ユーザー指定）。
 
-**トレードオフ:** Eden の型は `apps/api` の `App` 型に依存するため、API の変更でクライアントの型エラーがすぐ出る（利点でもある）。スマホの古い版が残る間は、API の互換性を壊せない。壊す変更は `/api/v2` を作るか、項目の追加だけにする（受け取る側は知らない項目を無視する）。
+**トレードオフ:** Eden の型は `apps/api` の `App` 型に依存するため、API の変更でクライアントの型エラーがすぐ出る（利点でもある）。Web は最新の版を読み込むが、Service Worker の更新を待っている間（ADR-031）と、のちのネイティブアプリの古い版が残る間は、API の互換性を壊せない。壊す変更は `/api/v2` を作るか、項目の追加だけにする（受け取る側は知らない項目を無視する）。
 
 ### ADR-007: API は Cloud Run（asia-southeast1）（ユーザー指定）
 
@@ -353,9 +356,9 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **状態・日付:** 採用（2026-10-01）
 
-**決定:** `packages/db` に Drizzle のスキーマ（6章のコード）を置き、drizzle-kit でマイグレーションの SQL を作る。ドライバは postgres.js。入力チェックは Zod v4 で `packages/schemas` に置き、API（Elysia）とフォーム（Web もスマホも TanStack Form）が同じスキーマを使う。DB の中身を手で見るときは Drizzle Studio（`make db-studio`）を使う。
+**決定:** `packages/db` に Drizzle のスキーマ（6章のコード）を置き、drizzle-kit でマイグレーションの SQL を作る。ドライバは postgres.js。入力チェックは Zod v4 で `packages/schemas` に置き、API（Elysia）と Web のフォーム（TanStack Form）が同じスキーマを使う。DB の中身を手で見るときは Drizzle Studio（`make db-studio`）を使う。
 
-**理由:** Drizzle は TypeScript でスキーマを書け、生成する SQL が素直で読める（乗り換えのときも普通の SQL として持ち出せる）。Better Auth に Drizzle 用のアダプターがある。Zod は Web・スマホ・API の全部で同じ入力チェックを使える。
+**理由:** Drizzle は TypeScript でスキーマを書け、生成する SQL が素直で読める（乗り換えのときも普通の SQL として持ち出せる）。Better Auth に Drizzle 用のアダプターがある。Zod は Web と API（のちのネイティブも）で同じ入力チェックを使える。
 
 **捨てた案:** 比較の記録なし（Prisma は下のトレードオフで抽象度を比べただけ。Zod と postgres.js の代わりの候補も記録なし）。
 
@@ -363,9 +366,9 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-010: 認証は Better Auth。Google ログインを最初から入れ、招待制をサーバーで強制する（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのセッションの Expo プラグインを外した。ネイティブの feature で足す）
 
-**決定:** Better Auth を API に組み込む（Drizzle アダプター、テーブルは6章）。ログインはメール＋パスワードと Google。プラグインは Expo（スマホのセッション）。回数制限は本体の設定（`rateLimit`）で有効にする（保存先は DB。ADR-029）。招待制は次のとおりサーバーで強制する:
+**決定:** Better Auth を API に組み込む（Drizzle アダプター、テーブルは6章）。ログインはメール＋パスワードと Google。プラグインは使わない。回数制限は本体の設定（`rateLimit`）で有効にする（保存先は DB。ADR-029）。呼び出し元の IP は、入口のプラグインが決めた値だけを読ませる（7.2「呼び出し元の IP」）。招待制は次のとおりサーバーで強制する:
 
 - メール＋パスワードの新規登録は Better Auth の公開エンドポイントを閉じ（`emailAndPassword.disableSignUp`）、moonx の `POST /api/v1/invitations/by-token/{token}/sign-up`（5章 U5）だけから作る。メールは招待のメールに固定する。U5 は Better Auth のアダプターを通さず、招待の確認・ユーザーと個人用ワークスペースの作成を自前のトランザクションで行う（下の2つのフックは U5 では動かない）。
 - Google の新規登録は、招待の画面からだけ `requestSignUp` 付きで始める（`disableImplicitSignUp`）。さらにユーザーを作る直前のフック（`databaseHooks.user.create.before`）で、**そのメールあての有効な招待があること**を確かめ、無ければ拒否する（有効 = pending・期限内）。
@@ -377,13 +380,13 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **捨てた案:** 比較の記録なし（ユーザー指定）。
 
-**トレードオフ:** 認証の画面（ログイン・新規登録・パスワード再設定）は自分で作る（design-spec 2 の仕様どおり）。Google の OAuth クライアントを環境ごとに作り、同意画面の設定と、スマホから戻るディープリンクの設定が要る。local の `BETTER_AUTH_URL`（localhost）では実機やエミュレータから Google ログインが戻れないので、スマホの Google ログインは staging で確かめる。Sign in with Apple は足さない。ストアに公開すると決めたときの Apple の審査基準 4.8 への対応は ADR-003 のとおり。Better Auth の更新でセキュリティ修正が出たら速やかに上げる。
+**トレードオフ:** 認証の画面（ログイン・新規登録・パスワード再設定）は自分で作る（design-spec 2 の仕様どおり）。Google の OAuth クライアントを環境ごとに作り、同意画面を設定する（03_dev-setup.md）。Better Auth の更新でセキュリティ修正が出たら速やかに上げる。
 
 ### ADR-011: サーバー側のキャッシュは置かない
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-11 に、M9 でログインし直したときはキャッシュを残すと変えた）
 
-**決定:** Redis などのサーバー側のキャッシュは置かない。クライアントは TanStack Query でデータを持ち（画面の移動ではキャッシュを先に出し、裏で取り直す。保存したら関係するキーを無効にする。セッションが切れたとき（401）と、ログイン・新規登録・パスワードの再設定で別のセッションに入ったときは、キャッシュをすべて捨てる。キャッシュは1人の利用者のデータなので、次の人に見せない）、API の応答は `Cache-Control: no-store`（個人のデータのため）。静的アセットは Cloudflare の CDN が持つ（ファイル名にハッシュを付けて長期キャッシュ）。Better Auth の回数制限は DB に記録する。
+**決定:** Redis などのサーバー側のキャッシュは置かない。クライアントは TanStack Query でデータを持ち（画面の移動ではキャッシュを先に出し、裏で取り直す。保存したら関係するキーを無効にする。ログインの画面へ移るとき（401 で M9 を開かないときと、M9 から移るとき）、ログアウト、ログイン・新規登録・パスワードの再設定で別のセッションに入ったときは、キャッシュをすべて捨てる。キャッシュは1人の利用者のデータなので、次の人に見せない。M9 で同じアカウントにログインし直したときは残す（8.2。2026-10-11 に変えた））、API の応答は `Cache-Control: no-store`（個人のデータのため）。静的アセットは、ファイル名にハッシュを付けて長期キャッシュの見出しで返し（ADR-004）、ブラウザと Service Worker（ADR-031）が持つ。Better Auth の回数制限は DB に記録する。
 
 **理由:** 利用者は BCDX の数人で、データ量も小さい。複数人が同じアイデアを編集するので、サーバー側のキャッシュは古い内容を見せる危険の方が大きい。重く見える計算（損益分岐・確認項目）は純粋関数で一瞬で終わる。
 
@@ -395,25 +398,25 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **状態・日付:** 採用（2026-10-01）
 
-**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web・スマホ）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{fraunces,noto-sans,noto-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる。react-pdf は `font-variant-numeric` を持たないが、Noto Sans の標準の数字は等幅なので、表・指標・金額の数字は等幅数字になる（API の結合テストが PDF の字送りで確かめる。10章）。
+**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{fraunces,noto-sans,noto-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる。react-pdf は `font-variant-numeric` を持たないが、Noto Sans の標準の数字は等幅なので、表・指標・金額の数字は等幅数字になる（API の結合テストが PDF の字送りで確かめる。10章）。
 
-**理由:** Web とスマホで同じ PDF を作るには、作る場所を1つにするのが確実。react-pdf は Chromium を使わないので、コンテナが軽く、0台からの起動も遅くならない。
+**理由:** どのクライアント（のちのネイティブを含む）からも同じ PDF を作るには、作る場所を1つにするのが確実。react-pdf は Chromium を使わないので、コンテナが軽く、0台からの起動も遅くならない。
 
-**捨てた案:** Web とスマホのそれぞれで PDF を作る（日本語のフォントの埋め込みとスライドの寸法（`semantic.print.slide`）の再現がそろわない）、Chromium で HTML から PDF を作る（コンテナが重くなり、0台からの起動が遅くなる）。
+**捨てた案:** クライアントで PDF を作る（クライアントごとに作り直すことになり、日本語のフォントの埋め込みとスライドの寸法（`semantic.print.slide`）の再現がそろわない）、Chromium で HTML から PDF を作る（コンテナが重くなり、0台からの起動が遅くなる）。
 
-**トレードオフ:** 画面のスライド（React / React Native）と PDF（react-pdf）で描画のコードが2つになる。見た目のずれは、素材とレイアウトの数値をトークンにまとめて減らす。PDF の作成は API の CPU を使うので、同時に大量に作られると遅くなる（利用者が少ないうちは問題にならない）。
+**トレードオフ:** 画面のスライド（React）と PDF（react-pdf）で描画のコードが2つになる。見た目のずれは、素材とレイアウトの数値をトークンにまとめて減らす。PDF の作成は API の CPU を使うので、同時に大量に作られると遅くなる（利用者が少ないうちは問題にならない）。
 
-### ADR-013: メールは Resend、独自ドメインを持つ
+### ADR-013: メールは Resend、ドメインは既存の dwnfrc.app のサブドメイン
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-03 にドメインの決定を変えた。ユーザーの決定。前は「独自ドメイン `{DOMAIN}` を Cloudflare Registrar で新しく取り、DNS も Cloudflare に置く」）
 
-**決定:** 招待とパスワード再設定のメールは Resend の HTTP API で送る（無料枠: 月3,000通）。送信元のドメインとして独自ドメイン `{DOMAIN}` を Cloudflare Registrar で取り、SPF・DKIM・DMARC を設定する。staging は `MAIL_ALLOWLIST` に入っているメールにだけ送る（空なら誰にも送らない）。許可リストに無い宛先は、送らずに送ったものとして扱う: 招待は作って成功を返し、API のログに「許可リストに無いので送らなかった」とだけ書く（宛先は書かない。7.2「個人情報」）。staging で確かめるときは、受け取る人のメールを先に許可リストに入れる（05_operation-runbook.md）。
+**決定:** 招待とパスワード再設定のメールは Resend の HTTP API で送る（無料枠: 月3,000通）。ドメインは新しく取らず、既存の `dwnfrc.app`（Vercel で登録し、DNS も Vercel）のサブドメインを使う: production は `{DOMAIN}` = `bcdx.dwnfrc.app`、staging は `stg.{DOMAIN}`。送信元は `no-reply@{DOMAIN}`。Resend のドメインの確認の MX と TXT（SPF・DKIM）と、DMARC の TXT は、Vercel の DNS に手で入れる（2章「インフラ管理」。03_dev-setup.md）。staging は `MAIL_ALLOWLIST` に入っているメールにだけ送る（空なら誰にも送らない）。許可リストに無い宛先は、送らずに送ったものとして扱う: 招待は作って成功を返し、API のログに「許可リストに無いので送らなかった」とだけ書く（宛先は書かない。7.2「個人情報」）。staging で確かめるときは、受け取る人のメールを先に許可リストに入れる（05_operation-runbook.md）。
 
-**理由:** 招待制のアプリなので、任意のメールアドレスに確実に届く必要がある。Resend は独自ドメインを確認しないと任意の宛先に送れない。ドメインは年 $10〜15 で予算に収まる（Apple Developer Program の年会費を予算から外したため）。
+**理由:** 招待制のアプリなので、任意のメールアドレスに確実に届く必要がある。Resend は独自ドメインを確認しないと任意の宛先に送れない。ユーザーがすでに持っている `dwnfrc.app` のサブドメインなら、新しいドメインの費用も、別の DNS の管理も要らない。
 
-**捨てた案:** Amazon SES（安いが AWS のアカウントと送信制限の解除の申請が増える）、SendGrid・Postmark（無料枠が小さいか無い）。
+**捨てた案:** Amazon SES（安いが AWS のアカウントと送信制限の解除の申請が増える）、SendGrid・Postmark（無料枠が小さいか無い）。新しいドメインを取る（前の決定。既存のドメインのサブドメインで足りる）。
 
-**トレードオフ:** ドメインの更新を忘れるとメールもアプリも止まる（自動更新を有効にする）。Resend の無料枠は1日100通までなので、一般公開で招待が増えたら有料プランを検討する。
+**トレードオフ:** `dwnfrc.app` の更新を忘れるとメールもアプリも止まる（Vercel で自動更新を有効にする）。DNS のレコードを手で入れるので、入れ間違いは 03_dev-setup.md の `dig` での確かめ方で見つける。Resend の無料枠は1日100通までなので、一般公開で招待が増えたら有料プランを検討する。
 
 ### ADR-014: 期限の通知と、そのための定期実行を持たない
 
@@ -429,35 +432,35 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-015: IaC は Terraform（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-03 に Cloudflare の設定を外し、Cloud Run のドメインマッピングを足した。ユーザーの決定）
 
-**決定:** Google Cloud の資源と Cloudflare の DNS（メールのレコード）を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート・メールの DNS・Cloudflare のゾーンの設定（HSTS・`/api/auth/*` のレート制限ルール））、`staging` / `production` は環境ごとの資源（2章「インフラ管理」）。Cloud Run のイメージは CI が出すので、Terraform は `image` の変更を無視する（`lifecycle.ignore_changes`）。初回は、API のイメージとシークレットの値がまだ無いので、環境ごとに変数 `bootstrap` で apply を2回に分ける。1回目（`bootstrap = true`）はシークレットの入れ物・サービスアカウント・写真のバケットだけを作り、Cloud Run は作らない。2回目（`bootstrap = false` と、最初のイメージを入れた変数 `api_image`）で Cloud Run を作る。最初のイメージも `build.yml` が作る（手元では作らない。05_operation-runbook.md）。手順は 03_dev-setup.md 5.4 の G〜I。Cloudflare の Worker と Web のドメインは `wrangler.jsonc`、スマホのビルドは `eas.json` で管理する。コンソールで管理するもの（Terraform の外）: Neon、Google の OAuth の同意画面とクライアント、Sentry のプロジェクト、Resend のドメインと API キー、GitHub の環境と承認の設定、EAS の環境変数と App Store Connect の鍵、App Store Connect のアプリ（TestFlight）。手順は 03_dev-setup.md。
+**決定:** Google Cloud の資源を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート）、`staging` / `production` は環境ごとの資源で、Cloud Run のドメインマッピング（production は `{DOMAIN}`、staging は `stg.{DOMAIN}`）もここに含む（2章「インフラ管理」）。Cloud Run のイメージは CI が出すので、Terraform は `image` の変更を無視する（`lifecycle.ignore_changes`）。初回は、イメージとシークレットの値がまだ無いので、環境ごとに変数 `bootstrap` で apply を2回に分ける。1回目（`bootstrap = true`）はシークレットの入れ物・サービスアカウント・写真のバケットだけを作り、Cloud Run とドメインマッピングは作らない。2回目（`bootstrap = false` と、最初のイメージを入れた変数 `api_image`）で Cloud Run とドメインマッピングを作る。最初のイメージも `build.yml` が作る（手元では作らない。05_operation-runbook.md）。手順は 03_dev-setup.md 5.4 の G〜I。DNS のレコードは Terraform で持たず、Vercel の画面で手で入れる（Vercel のトークンはチームの全プロジェクトを触れるので、Terraform にも手元にも持たせない）。ドメインマッピングを作るには、`make infra-apply` を動かすアカウントが Search Console で `dwnfrc.app` の所有を確認している必要がある。コンソールで管理するもの（Terraform の外）は2章「インフラ管理」の表が正。
 
 **理由:** ユーザーが Terraform を選んだ。環境を作り直せて、設定の変更をレビューできる。
 
-**捨てた案:** 比較の記録なし（ユーザー指定）。
+**捨てた案:** 比較の記録なし（ユーザー指定）。Vercel の DNS を Terraform で持つ案は、上のトークンの理由で採らない。
 
-**トレードオフ:** Terraform の学習コストがある。上のコンソールで管理するものは Terraform の外に残るので、手順を 03_dev-setup.md に書いて補う。
+**トレードオフ:** Terraform の学習コストがある。コンソールと Vercel の画面で管理するものは Terraform の外に残るので、手順を 03_dev-setup.md に書いて補う。ドメインマッピングの証明書は、DNS のレコードを入れてから作られるまで時間がかかる。最初のデプロイでドメインに届くのを確かめるのは、証明書ができてからにする（03_dev-setup.md 5.4）。
 
 ### ADR-016: staging と production の2環境。バージョン宣言ファイルで昇格する（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-03 に Web を API と同じイメージに入れた。ユーザーの決定。2026-10-11 にスマホの昇格を外した）
 
-**決定:** 環境は staging と production（2章「環境と命名」）。ブランチは GitHub Flow で、マージは常に squash（ブランチの運用は 03_dev-setup.md 9章）。`main` に入ると CI がテストし、API のイメージ（タグはコミット SHA。両方の環境で同じイメージを使う）を作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR）をマージしたときに GitHub Actions が行う（順番とワークフローの中身は 04_deployment-procedure.md 2章）。Web はビルドに環境の値（`VITE_*`）を埋め込むので、デプロイのときにその SHA から環境ごとにビルドする（`make build-web ENV=...`）。戻すときは昇格の PR を revert する。スマホも同じ昇格で出す（JS だけの更新か新しいビルドかの選び方は 04_deployment-procedure.md 2章）。
+**決定:** 環境は staging と production（2章「環境と命名」）。ブランチは GitHub Flow で、マージは常に squash（ブランチの運用は 03_dev-setup.md 9章）。`main` に入ると CI がテストし、Web と API を入れたイメージ（タグはコミット SHA。両方の環境で同じイメージを使う）を作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR）をマージしたときに GitHub Actions が行う（順番とワークフローの中身は 04_deployment-procedure.md 2章）。Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素で渡す（ADR-004）ので、staging で確かめたイメージをそのまま production に出せる。戻すときは昇格の PR を revert する。
 
 **理由:** ユーザーが staging ＋ production を選んだ。BCDX の実データに触れずに確かめられる。どの環境にどの版が出ているかが、リポジトリのファイルで分かる。マージを常に squash にするのは、`main` の1コミットが1つの PR になり、昇格と revert をコミット1つの単位で扱えるため。
 
 **捨てた案:** 比較の記録なし（ユーザー指定）。
 
-**トレードオフ:** 昇格の PR の分だけ手順が増える。DB のマイグレーションは戻せないので、「追加してから使い、使わなくなってから消す」の2段階で書く（04_deployment-procedure.md）。スマホは、戻し先の fingerprint が今のアプリと違うと EAS Update では戻せず、新しいビルドを配り直す（配ったアプリそのものは戻せないので、直した版を出す）。
+**トレードオフ:** 昇格の PR の分だけ手順が増える。DB のマイグレーションは戻せないので、「追加してから使い、使わなくなってから消す」の2段階で書く（04_deployment-procedure.md）。
 
 ### ADR-017: モノレポは Bun workspaces ＋ Makefile
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-11 に `bunfig.toml` の `linker = "hoisted"` を外した。Expo の Metro と jest-expo のための指定で、ネイティブを範囲から外したため。ネイティブの feature で要るか確かめ直す）
 
-**決定:** Bun workspaces で `apps/*` と `packages/*` をまとめる。パッケージ名は `@moonx/*`。タスクの実行は Makefile に集め（2章「make ターゲット」）、CI もデプロイを含めて Makefile のターゲットを呼ぶ（GitHub Actions のワークフローの一覧と中身は 04_deployment-procedure.md 2章）。`bunfig.toml` で `linker = "hoisted"` を指定する。
+**決定:** Bun workspaces で `apps/*` と `packages/*` をまとめる。パッケージ名は `@moonx/*`。タスクの実行は Makefile に集め（2章「make ターゲット」）、CI もデプロイを含めて Makefile のターゲットを呼ぶ（GitHub Actions のワークフローの一覧と中身は 04_deployment-procedure.md 2章）。
 
-**理由:** API が Bun で動くので、パッケージ管理も Bun にそろえる。Expo と Vite も Bun のワークスペースで動く。Makefile を正にすれば、ドキュメント・CI・CLAUDE.md がターゲット名だけを参照できる。hoisted にするのは、Expo の Metro と jest-expo が `node_modules` の標準の配置を前提にしており、Bun の隔離された配置では `@react-native/*` の変換が外れてテストが落ちるため。
+**理由:** API が Bun で動くので、パッケージ管理も Bun にそろえる。Vite も Bun のワークスペースで動く。Makefile を正にすれば、ドキュメント・CI・CLAUDE.md がターゲット名だけを参照できる。
 
 **捨てた案:** 比較の記録なし（パッケージ管理の pnpm・npm など）。Turborepo は捨てずに保留している（下のトレードオフ）。
 
@@ -465,7 +468,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 ### ADR-018: デザインシステムは Adobe Spectrum の仕組み、見た目は Hermes Teal（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテーマの生成を外し、PWA のアイコンとマニフェストの生成を足した）
 
 **決定:**
 
@@ -473,13 +476,14 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 - **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.scale.{medium,large}.component`。実装が参照してよいのは `semantic` だけ。`semantic` の値はエイリアスだけで、たどると必ず `primitive` に着く（書体のスタイルや密度は `semantic.scale.medium` を参照し、生成のときに large へ差し替える）。
 - **生成**: `make tokens` が `packages/ui-tokens` に次を生成する（変換は自前の小さなスクリプト。Style Dictionary は使わない）。
   - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク × medium / large の値。CSS 変数として出る）。画面のスライド表示（Slide）は `semantic.print`（ライト固定）を参照する
-  - スマホ: Unistyles のテーマ（ライト / ダーク）とブレークポイント。large のスケールを既定にする
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
-- **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は `<html data-theme>` と `prefers-color-scheme`、スマホは Unistyles の適応テーマ（4 アカウント設定の System / Light / Dark に従う）。
+  - PWA: アイコン（SVG と PNG）とマニフェスト（ADR-031）
+  - `semantic.native` と、06 のネイティブ向けの説明は今は生成に使わない（ネイティブの feature で使うか決め直す。06 の見直しはデザインの決め直しで行う）
+- **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は `<html data-theme>` と `prefers-color-scheme`（4 アカウント設定の System / Light / Dark に従う）。
 - **スケール（Web）**: 既定は `medium`。タッチ操作が主の端末（`@media (pointer: coarse)`）は `large` にする。`<html data-scale="medium|large">` で固定でき、固定が優先される。タッチパネル付きのノート PC も `pointer: coarse` に当たるときは `large` になる。
-- **アイコン**: Lucide（`lucide-react` / `lucide-react-native`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。
+- **アイコン**: Lucide（`lucide-react`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。
 
-**理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は Phase 2 で決めた Hermes Teal を保つことを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、Web とスマホで同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは一段ゆったり」をそのまま表せる。Lucide は Web（`lucide-react`）とスマホ（`lucide-react-native`）に同じ絵柄の版があり、線の太さと大きさを props で変えられる。変換を自前のスクリプトにするのは、出力が3種類（vanilla-extract・Unistyles・react-pdf）に限られ、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため。
+**理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は Phase 2 で決めた Hermes Teal を保つことを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、のちのネイティブでも同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは一段ゆったり」をそのまま表せる。Lucide はネイティブ（`lucide-react-native`）にも同じ絵柄の版があり、線の太さと大きさを props で変えられる。変換を自前のスクリプトにするのは、出力が限られ（vanilla-extract・react-pdf・PWA のアイコン）、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため。
 
 **捨てた案:** Spectrum の部品をそのまま使う（React Spectrum S2。配色と書体をほぼ変えられず、Hermes Teal を保てない）、Spectrum の Workflow アイコン（使わないとユーザーと合意した）、Style Dictionary（設定と拡張の方が大きくなる）。
 
@@ -513,43 +517,46 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **トレードオフ:** 履歴を書き忘れる API を作る危険がある。対象のテーブルを更新するリポジトリ関数を `withHistory` 経由に限り、結合テストで「更新したら履歴が1件増える」を確かめる。
 
-### ADR-021: 保存できなかった入力はクライアントの送信待ちの列で再送する
+### ADR-021: 保存できなかった入力は、ページを開いている間だけ再送する
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-11 に置き換えた。ユーザーの決定）。前の決定（2026-10-01）は、保存できなかった入力を端末の送信待ちの列（Web は IndexedDB、スマホは expo-sqlite）に残し、再接続したら送る、だった。PWA にすると決めたときに「入力には接続が要る（オフラインで入力して後で送る仕組みは作らない）」と決めたので（ADR-031）、それに合わせた。
 
-**決定:** 自動保存（design-spec 6.0.2）が失敗したら、項目ごとに最新の入力だけを送信待ちの列に残し、再接続したとき・定期的に再送する。Web は IndexedDB、スマホは expo-sqlite に置く。送信待ちの列の項目は `lockVersion` を持ち、再送で衝突したら ADR-019 の選択を出す。
+**決定:**
 
-保存がサーバーに恒久的に断られた（アーカイブ済み・権限がない・対象が無い）ときは、再送しても結果が同じなので自動では再送しない。画面は「Couldn't save」と理由を項目の横とヘッダーに出し、Retry を押したときだけ送り直す（通信やサーバーの一時的な失敗は「Couldn't save」と Retry で出し、自動でも再送する。design-spec 6.0.2）。
+- 自動保存（design-spec 6.0.2）は、項目ごとに、まだ保存できていない最新の値を1つだけメモリに持つ。端末の保存先（IndexedDB・localStorage など）には書かない。持つのはページ（タブ）を開いている間で、アプリの中で画面を移っても消えない。
+- 一時的な失敗（通信の断・5xx・`UPSTREAM_UNAVAILABLE`）は、間隔を伸ばしながら自動で再送する。再送は持っている `lockVersion` で送り、衝突したら ADR-019 の選択を出す。
+- オフラインになったら（ブラウザが `offline` を知らせたとき、または通信の失敗が続いたとき）、入力欄を読み取り専用にして入力を止める。戻ったら、持っている値を送ってから入力を戻す。表示と文言は design-spec 6.0.2・6.0.6 に従う。
+- 恒久的な失敗（アーカイブ済み・権限がない・対象が無い）は、再送しても結果が同じなので自動では再送しない。Retry を押したときだけ送り直す。表示は design-spec 6.0.2 に従う。
+- まだ保存できていない値があるまま、ページを閉じる・再読み込みする・アプリの外へ移るときは、ブラウザの離脱の確認（`beforeunload`）を出す。
+- セッションが切れた（401）ときは、持っている値を捨てずに画面に残し、design-spec M9 でその場でログインし直させる。同じアカウントでログインし直したら送る。ログインの画面へ移る（401 で M9 を開かないとき、M9 から 2 へ移るとき。Google でのログイン・「Sign in on the login page」・アカウントの停止）・ログアウトしたときは捨てる（ログアウトの前の確認は design-spec 5章「共通ナビ」）（8.2。2026-10-11 のユーザーの決定。プロトタイプは端末に残して、同じ人がログインし直したら送っていた）。
 
-セッションが切れた（401）ときは列を残し、同じユーザーでログインし直したときだけ再送する（違うユーザーなら消す）。
+**理由:** 入力には接続が要るという PWA の決定に合わせる。回答の内容を端末に残さずに済み、再接続したときに古い値を送って衝突させる扱いも要らない。通信の一瞬の途切れで入力が消えないことは、メモリの再送で足りる。
 
-**理由:** design-spec で「保存できなかった入力は端末に残し、再接続したら送る」と決めた。スマホで電波が途切れても、書いた回答を失わない。
+**捨てた案:** 前の決定（IndexedDB の送信待ちの列。ページを閉じても残るが、端末に回答が残り、再接続のときの衝突の扱いが増える）、TanStack Query の一時停止した変更の再開（保存先を足さない限りページを閉じると消え、項目ごとに最新の値だけを送る決まりを表しにくい）。
 
-**捨てた案:** localStorage・AsyncStorage（容量が小さく、書き込みが同期で、項目ごとの更新に向かない）、MMKV（速いが、項目の一覧と並べ替えに SQL が使える expo-sqlite の方が扱いやすい）。
-
-**トレードオフ:** 端末に回答の内容が残る（ログアウトしたら消す）。オフラインでの閲覧（読み込み済みでない画面）は対象外。
+**トレードオフ:** 電波の弱い場所では入力が止まる。保存できていない値は、離脱の確認を無視してタブを閉じると消える。
 
 ### ADR-022: テストとリントのツール
 
-**状態・日付:** 採用（2026-10-01。2026-10-03 にスマホの E2E を Maestro にする決定を足した）
+**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテスト（Jest（jest-expo）＋ React Native Testing Library、E2E の Maestro。Maestro は 2026-10-03 のユーザーの決定）を外した。ネイティブの feature で足す）
 
-**決定:** Biome（リントと整形）、TypeScript の型チェック、`packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`・`scripts/`・`apps/api` は Bun test（API は実際の PostgreSQL に対する結合テスト）、`apps/web` と `packages/ui-web` は Vitest ＋ Testing Library（部品は `@react-aria/test-utils` も）、`apps/mobile` と `packages/ui-native` は Jest（jest-expo）＋ React Native Testing Library（v13。v14 は React 19.3 が要り、Expo SDK 57 が固定する React 19.2 と二重になる）、Web の E2E は Playwright、スマホの E2E は Maestro（開発ビルドを入れた端末かシミュレーターを YAML のフローで操作する。2026-10-03 にユーザーが導入を決めた）、アクセシビリティの検査は axe（`@axe-core/playwright`。Playwright の E2E の中だけで使い、部品のテストでは使わない）。画面にスタイルを書かない決まり（ADR-025）は Biome の `noRestrictedImports`、JSX の中の生の文字列（9章）は Biome の規則で足りない分を CI の小さな検査スクリプトで見つける。詳細は10章。
+**決定:** Biome（リントと整形）、TypeScript の型チェック、`packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`・`scripts/`・`apps/api` は Bun test（API は実際の PostgreSQL に対する結合テスト）、`apps/web` と `packages/ui-web` は Vitest ＋ Testing Library（部品は `@react-aria/test-utils` も）、E2E は Playwright、アクセシビリティの検査は axe（`@axe-core/playwright`。Playwright の E2E の中だけで使い、部品のテストでは使わない）。画面にスタイルを書かない決まり（ADR-025）は Biome の `noRestrictedImports`、JSX の中の生の文字列（9章）は Biome の規則で足りない分を CI の小さな検査スクリプトで見つける。詳細は10章。
 
-**理由:** 実行環境（Bun・Vite・React Native）ごとに標準のツールを使うのが、一番つまずきが少ない。Biome は1つのツールで速い。
+**理由:** 実行環境（Bun・Vite）ごとに標準のツールを使うのが、一番つまずきが少ない。Biome は1つのツールで速い。
 
 **捨てた案:** 比較の記録なし。
 
-**トレードオフ:** テストのツールが3つになる。テストの書き方の違いは各パッケージの README で補う。
+**トレードオフ:** テストのツールが Bun test と Vitest の2つになる。テストの書き方の違いは各パッケージの README で補う。
 
 ### ADR-023: 監視とログは Sentry と Cloud Logging
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-03 に Cloudflare の Workers Logs を外した。2026-10-11 にスマホの Sentry のプロジェクトを外した）
 
-**決定:** エラーは Sentry（無料枠。プロジェクトは `moonx-web` / `moonx-mobile` / `moonx-api` の3つ）に送る。API のログは1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`appVersion`）で標準出力に書き、Cloud Logging が集める。リクエスト ID は Worker で付け（`X-Request-Id`）、エラーの応答と Sentry にも入れる。死活確認は Cloud Monitoring の稼働時間チェック（`/api/health`）。Worker の転送の失敗は Cloudflare の Workers Logs で見る。詳細は11章。
+**決定:** エラーは Sentry（無料枠。プロジェクトは `moonx-web` と `moonx-api`）に送る。API のログは1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`clientIp`）で標準出力に書き、Cloud Logging が集める。リクエスト ID は API が入口で作り（8.3）、エラーの応答と Sentry にも入れる。死活確認は Cloud Monitoring の稼働時間チェック（`/api/health`）。詳細は11章。
 
 **理由:** どれも無料枠で足りる。リクエスト ID で、利用者が見たエラーとログ・Sentry をつなげられる。
 
-**捨てた案:** Google Cloud の Error Reporting（無料だが、Web とスマホのエラーとソースマップを扱えず、API だけになる）。
+**捨てた案:** Google Cloud の Error Reporting（無料だが、Web のエラーとソースマップを扱えず、API だけになる）。
 
 **トレードオフ:** Sentry の無料枠（月5,000件）を超えると届かなくなる。同じエラーが大量に出たら Sentry の側で間引く。
 
@@ -561,49 +568,50 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **理由:** 写真は任意で小さいので、費用は月 $0.1 未満（Cloud Storage の無料枠は米国の3リージョンだけなので、asia-southeast1 のバケットには少しかかる）。バケット名は全体で一意なので、ほかのバケットと同じくプロジェクト ID を前に付ける。
 
-**捨てた案:** Cloudflare R2（無料枠はあるが、API から書き込む鍵を Cloud Run に置き、もう1つの保存先を管理することになる）、クライアントだけで縮める（Web とスマホで2回作ることになる）。
+**捨てた案:** Cloudflare R2（無料枠はあるが、API から書き込む鍵を Cloud Run に置き、もう1つの保存先を管理することになる）、クライアントだけで縮める（のちのネイティブでもう一度作ることになる）。
 
 **トレードオフ:** 公開読み取りなので、URL を知っていれば誰でも見られる（プロフィール写真なので許容する。乱数のファイル名で推測を防ぐ）。sharp はネイティブのライブラリで、Bun で動くことはプロトタイプのテストで確かめた。`oven/bun` のコンテナの中で動くことは、最初のイメージを作るときに確かめる。
 
 ### ADR-025: 部品は headless の部品＋自前のスタイル。Tailwind は使わない（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。Web の部分）。スマホの部分は保留（2026-10-11。ネイティブはPRD 6章のとおり Web のデザインが固まったあとの featureで作る。前の決定は @rn-primitives・@gorhom/bottom-sheet・react-native-unistyles。詳細はタグ `prototype-2026-10-11` の `docs/02-01_system-design-doc.md` の ADR-025）。
 
 **決定:**
 
 - **Web（`packages/ui-web`）**: 振る舞いとアクセシビリティは **React Aria Components**（キーボード操作・フォーカスの管理・ARIA・国際化された数値と日付の入力）。見た目は **vanilla-extract**（`*.css.ts` に型付きで書き、ビルド時に静的な CSS になる。実行時の処理なし）。大きさや種類の出し分けは `@vanilla-extract/recipes` の `recipe()`（例: `size: S | M | L | XL`、`variant: accent | primary | secondary | negative`）。React Aria の状態は `data-*` 属性（`[data-hovered]`・`[data-pressed]`・`[data-focus-visible]`・`[data-disabled]` など）で書く。Popover と Tray の切り替えは、幅がトークンの `semantic.breakpoint.tablet` より狭いときに Tray（下からのシート）にする共通の部品で行う。
-- **スマホ（`packages/ui-native`）**: 振る舞いは **@rn-primitives**（Avatar・Checkbox・Collapsible・RadioGroup・Switch・ToggleGroup と Portal。見た目の無い部品）と、React Native 標準のアクセシビリティの属性（`accessibilityRole`・`accessibilityState` など）。@rn-primitives に無い部品（Tabs・Tooltip・NumberField・DatePicker・ComboBox など）は自作する。トレイ（ボトムシート）は **@gorhom/bottom-sheet**（`Tray`）で、Dialog・Popover・Menu・Picker・ComboBox・DatePicker・ContextualHelp・Panel・MentionTextArea の候補はこの上に作る。見た目は **react-native-unistyles**（v3。`StyleSheet.create` と同じ書き方でテーマとブレークポイントを使え、`variants` で大きさと種類を出し分ける）。
-- **部品の名前と API**: design-spec 4.5 の Spectrum の名前にそろえ、Web とスマホで同じ props（例: `<Button variant="accent" size="M">`、`<StatusLight variant="positive">`）にする。ブラウザにしか意味の無い props（`href`・`as`・`className` など）はスマホの部品が受けず、差は design-spec 4.5 の補足と各部品の TSDoc に書く。props の型は `packages/ui-web` と `packages/ui-native` のそれぞれで定義し、共通の部分（`size`・`variant` などの値の型）は `packages/ui-tokens` に手で書いて置く（`packages/ui-tokens/src/generated/` が `make tokens` の生成物、`src/types.ts` などそれ以外は手で書くファイル）。
-- **画面にスタイルを書かない**: `apps/web` と `apps/mobile` の画面は、部品と、レイアウトの部品（`Flex`・`Grid`・`View` 相当。間隔はトークンの名前だけを受け取る。例: `gap="space-300"`）の組み合わせで作る。画面で `@vanilla-extract/css`・`StyleSheet`・Unistyles を直接使うこと、`style` 属性に値を書くことは、Biome の `noRestrictedImports` と CI の検査で禁止する。必要な見た目が無ければ、design-spec 4.5 に部品を足してから `packages/ui-*` に作る。
+- **部品の名前と API**: design-spec 4.5 の Spectrum の名前にそろえる（例: `<Button variant="accent" size="M">`、`<StatusLight variant="positive">`）。のちのネイティブの部品も同じ名前と props にする。props の型は `packages/ui-web` で定義し、共通の部分（`size`・`variant` などの値の型）は `packages/ui-tokens` に手で書いて置く（`packages/ui-tokens/src/generated/` が `make tokens` の生成物、`src/types.ts` などそれ以外は手で書くファイル）。
+- **画面にスタイルを書かない**: `apps/web` の画面は、部品と、レイアウトの部品（`Flex`・`Grid`。間隔はトークンの名前だけを受け取る。例: `gap="space-300"`）の組み合わせで作る。画面で `@vanilla-extract/css` を直接使うこと、`style` 属性に値を書くことは、Biome の `noRestrictedImports` と CI の検査で禁止する。必要な見た目が無ければ、design-spec 4.5 に部品を足してから `packages/ui-web` に作る。
+- **スマホ（保留）**: ネイティブの feature で決める。部品の名前と props を Web にそろえる決まりは保つ。
+
 **理由:** ユーザーが「Tailwind のクラスを画面に直接書かない」「React Aria などの headless の部品を使う」と指定した。振る舞いを実績のある部品に任せると、ダイアログのフォーカスの閉じ込め・キーボード操作・スクリーンリーダー対応を自分で作らずに済む（design-spec 4.1 の設問フォームのキーボード操作、6.0.6 のモーダルの決まり）。見た目を部品の中に閉じ込めると、画面ごとのばらつきが出ず、Spectrum を参考にしたデザインシステム（ADR-018）を守りやすい。vanilla-extract はトークンを型として扱えるので、`semantic` 以外の値を使うと型エラーになる。
 
 **捨てた案:** Tailwind・NativeWind（ユーザーが、画面にクラスを直接書く形を使わないと指定した）、CSS-in-JS の実行時ライブラリ（比較の記録なし。vanilla-extract はビルド時に静的な CSS になり、実行時の処理が無い）。
 
-**トレードオフ:** React Aria はスマホ（React Native）では動かないので、Web とスマホで振る舞いの部品が別になる（@rn-primitives は React Aria より機能が少なく、NumberField・DatePicker・ComboBox はスマホ側で自作する部分がある）。部品のライブラリを最初に作る手間がかかり、画面を作る前に主要な部品（Button・TextField・TextArea・NumberField・Dialog / Tray・StatusLight・TableView など）をそろえる必要がある。vanilla-extract の Vite プラグインを TanStack Start のビルドに組み込む（動かない場合は、部品の CSS を `packages/ui-web` で事前にビルドして読み込む）。Unistyles v3 は New Architecture と開発ビルドが前提。
+**トレードオフ:** 部品のライブラリを最初に作る手間がかかり、画面を作る前に主要な部品（Button・TextField・TextArea・NumberField・Dialog / Tray・StatusLight・TableView など）をそろえる必要がある。vanilla-extract の Vite プラグインを TanStack Start のビルドに組み込む（動かない場合は、部品の CSS を `packages/ui-web` で事前にビルドして読み込む）。React Aria はネイティブでは動かないので、ネイティブを足すときは振る舞いの部品を別に選ぶ。
 
 ### ADR-026: i18n は i18next。英語だけで始め、多言語にできる作りにする
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホ（Hermes の `Intl` の確かめ）を外した。ネイティブの feature で確かめる）
 
-**決定:** i18next ＋ react-i18next を Web とスマホで使い、API も同じカタログ（`packages/i18n`）を使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール）。UI は英語だけで始め、文言はすべてカタログに置く。日付・数値・金額の書式は `Intl` を使う `packages/i18n` の関数に集め、初期は en-PH に固定する。詳細は9章。
+**決定:** i18next ＋ react-i18next を Web で使い、API も同じカタログ（`packages/i18n`）を使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール）。UI は英語だけで始め、文言はすべてカタログに置く。日付・数値・金額の書式は `Intl` を使う `packages/i18n` の関数に集め、初期は en-PH に固定する。詳細は9章。
 
-**理由:** design-spec 1.2 で「UI は英語のみ。ただし多言語化できる作りは残す」と決めた。後から文言をカタログへ移すのは手間が大きいので、最初から分けておく。i18next は Web・React Native・サーバーのすべてで同じライブラリとカタログを使え、複数形の規則も持つ。
+**理由:** design-spec 1.2 で「UI は英語のみ。ただし多言語化できる作りは残す」と決めた。後から文言をカタログへ移すのは手間が大きいので、最初から分けておく。i18next は Web とサーバー（のちの React Native も）で同じライブラリとカタログを使え、複数形の規則も持つ。
 
 **捨てた案:** FormatJS（react-intl。ICU の書式は強いが、サーバーとスマホでの使い方がそろえにくい）、Lingui（コンパイルの手順が増える）。
 
-**トレードオフ:** 英語だけのうちは、カタログのキーを引く手間が増えるだけに見える。スマホの JavaScript エンジン（Hermes）の `Intl` の対応は、en-PH の書式で最初に確かめる。
+**トレードオフ:** 英語だけのうちは、カタログのキーを引く手間が増えるだけに見える。
 
 ### ADR-027: CI/CD は GitHub Actions、Google Cloud へは Workload Identity Federation
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-03 に Worker のシークレットを外し、2026-10-11 に EAS を外した）
 
-**決定:** CI/CD は GitHub Actions（ワークフローは 04_deployment-procedure.md 2章）。Google Cloud へは Workload Identity Federation で入り、サービスアカウントの鍵を作らない。GitHub の環境は `staging`・`production`（デプロイに承認を要する）・`production-backup`（バックアップと KPI の集計に使う読み取り専用の接続だけを持つ。承認なし）。依存の脆弱性は Dependabot のアラートで知る。シークレットの置き場所は次の4つに分ける: Cloud Run が使うものは Secret Manager、Worker が使うものは `wrangler secret`、CI が使うものは GitHub の環境かリポジトリ（2章「CI のシークレットと変数」）、スマホのビルドと TestFlight への提出に使うものは EAS（環境変数と App Store Connect の鍵）。
+**決定:** CI/CD は GitHub Actions（ワークフローは 04_deployment-procedure.md 2章）。Google Cloud へは Workload Identity Federation で入り、サービスアカウントの鍵を作らない。GitHub の環境は `staging`・`production`（デプロイに承認を要する）・`production-backup`（バックアップと KPI の集計に使う読み取り専用の接続だけを持つ。承認なし）。依存の脆弱性は Dependabot のアラートで知る。シークレットの置き場所は次の2つに分ける: Cloud Run が使うものは Secret Manager、CI が使うものは GitHub の環境かリポジトリ（2章「CI のシークレットと変数」）。
 
 **理由:** コードが GitHub にあり、PR・レビュー・昇格の PR とそのまま組み合わせられる。Workload Identity Federation なら、漏れると困る長期の鍵をどこにも置かない。シークレットは、それを使う実行環境のそばに置くのが一番漏れにくい。
 
-**捨てた案:** Cloud Build（Google Cloud の中で完結するが、Cloudflare と EAS への デプロイと PR の連携が GitHub Actions より手間）。
+**捨てた案:** Cloud Build（Google Cloud の中で完結するが、PR との連携が GitHub Actions より手間）。
 
-**トレードオフ:** 非公開のリポジトリでは GitHub Actions の無料の実行時間に上限がある（スマホのビルドは EAS で動くので数えない）。シークレットの置き場所が4つに分かれるので、ローテーションの手順を 05_operation-runbook.md にまとめる。
+**トレードオフ:** 非公開のリポジトリでは GitHub Actions の無料の実行時間に上限がある。シークレットの置き場所が2つに分かれるので、ローテーションの手順を 05_operation-runbook.md にまとめる。
 
 ### ADR-028: DB のバックアップは毎日の pg_dump
 
@@ -617,17 +625,24 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **トレードオフ:** 失うかもしれないのは最大で約1日分。GitHub Actions の定期実行は遅れることがある。バックアップの取得で Neon の計算時間を使う。削除したアカウントの情報は、バックアップから消えるまで最大30日残る（7.2）。
 
-### ADR-029: API の回数制限は3段にする
+### ADR-029: API の回数制限は2段にする
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-03 に3段から2段にした。ドキュメントへの反映は 2026-10-11）。前の決定（2026-10-01）の③（外側の守りとして Cloudflare の無料のレート制限ルール1つを `/api/auth/*` にかける）は、Cloudflare をやめたので無くなった（ADR-004。ユーザー承知）。
 
-**決定:** ① Better Auth の回数制限（本体の `rateLimit` 設定。IP ごと。保存先は DB の `rate_limits`）は、秘密を受け取らない認証のパスにかける。秘密を受け取るパス（5.4）は、パスごとにしか数えられない Better Auth の代わりにベースプラグインが IP ごとの1つの枠で数える。② アプリの API（`/api/v1`）は、Elysia の自前のミドルウェアで、ユーザーごとの上限（招待の送信、PDF の作成、AI 書き出し・取り込み、アカウントの削除のパスワード確認。7.2）と、IP ごとの上限（U5 の新規登録と、①の秘密を受け取るパス。7.2）を同じ `rate_limits` テーブルにキーの接頭辞（`app:`）を分けて記録する。③ 外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` にかける（Terraform の `envs/shared`）。
+**決定:** 回数は、API の入口のプラグイン（以下「入口のプラグイン」）と Better Auth の2つが、同じ DB のテーブル `rate_limits` に記録して数える。
+
+- ① **Better Auth の回数制限**（本体の `rateLimit` 設定。IP ごと）: 秘密を受け取らない認証のパス（`get-session` など）にかける。キーは Better Auth が決める（接頭辞 `app:` を使わない）。
+- ② **入口のプラグイン**（Elysia のプラグイン）: すべてのリクエスト（`/api/*` と静的ファイル）の前に入り、呼び出し元の IP（7.2）とリクエスト ID（8.3）を決め、アクセスログを書く。`/api/auth/*` の本体の大きさ（1MB。超えたら 413 `PAYLOAD_TOO_LARGE`）も確かめる。回数を数えるのは、下に挙げるパスだけ。キーは接頭辞 `app:` で始め、Better Auth のキーとぶつからない。
+  - IP ごと: 秘密を受け取る認証のパス（Better Auth の6つのパス。5.4）と U5（招待からの新規登録）を、パスをまたいで1つの枠で数える（キー `app:ip:auth:<IP>`）。Better Auth はパスごとにしか数えられないので、これらのパスでは Better Auth の数え方を止める（5.4）。DB の死活確認（Z2）も IP ごとに数える（キー `app:ip:health-db:<IP>`）。
+  - ユーザーごと: 招待の送信・再送（W4・W5・AD9）、PDF の作成、AI 書き出し・取り込み、アカウントの削除のパスワード確認（キー `app:user:<上限の名前>:<userId>`）。
+  - 上限の回数と時間の幅は 7.2「レート制限」に書く。
+- IP は、入口のプラグインがリクエストごとに1回だけ決めた値（7.2「呼び出し元の IP」）を、① と ② の両方が使う。
 
 **理由:** Better Auth の回数制限は Better Auth のエンドポイントにしか効かない。アプリの API の上限は「誰が」で数える必要があり（Resend の1日100通や PDF の CPU を守る）、ログインの後にしか分からないので API の中で数える。DB に記録すれば、Cloud Run が複数台でも数がそろい、Redis が要らない（ADR-011）。
 
-**捨てた案:** 比較の記録なし。
+**捨てた案:** 比較の記録なし（前の決定の③は、上の「状態・日付」のとおり Cloudflare をやめたので外した）。
 
-**トレードオフ:** 回数の記録のたびに DB への書き込みが増える（上限をかけるのは重い操作だけにして抑える）。Cloudflare の無料のルールは1つだけで、細かい条件は付けられない。
+**トレードオフ:** 回数の記録のたびに DB への書き込みが増える（上限をかけるのは重い操作と秘密を受け取るパスだけにして抑える）。前段で数える守りが無いので、大量のリクエストは Cloud Run まで届く（台数の上限は3台。ADR-007）。
 
 ### ADR-030: 言語は TypeScript（ユーザー指定）
 
@@ -641,28 +656,61 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 
 **トレードオフ:** 型チェックの時間が CI にかかる。
 
+### ADR-031: Web を PWA にする
+
+**状態・日付:** 採用（2026-10-11。ユーザーの決定）
+
+**決定:**
+
+- **マニフェスト**（`/manifest.webmanifest`）: `name` と `short_name` は下の「名前」、`display` は `standalone`、`start_url` と `scope` は `/`、`theme_color` と `background_color` はトークン（`semantic` の地の色）から作る。`make tokens` が生成する（ADR-018）。
+- **アイコン**: 形と色は design-spec 4.4「アプリのアイコン」に従う。ここは作り方だけを持つ: `make tokens` がトークンから SVG を作り、PNG（favicon 32、`apple-touch-icon` 180、192、512、maskable 512）は SVG から sharp で作る。生成物（`packages/ui-tokens/src/generated/pwa/`）は手で直さず、Web のビルドが `/icons/` に出す。
+- **Service Worker**（`/sw.js`。`apps/web` の Service Worker のソースに、ビルドしたアセットの一覧を vite-plugin-pwa の `injectManifest` で埋め込む）:
+  - キャッシュするのは画面の外側だけ: `_shell.html`、ビルドしたアセット、フォント、アイコン。ランディング（`index.html`）と 29・30 の HTML はキャッシュしない。
+  - `/api/*` はキャッシュせず、必ずネットワークに出す（オフラインでも代わりの応答を返さない）。
+  - 画面のパスへのナビゲーションはネットワークを先に使い、オフラインのときだけキャッシュした `_shell.html` を返す（API が meta を入れた最新の HTML を使うため）。
+  - 入力をオフラインで受けて後で送る仕組みは作らない（入力には接続が要る。ADR-021）。
+  - 新しい版の Service Worker が待っているときは、design-spec の表示で再読み込みを促し、利用者が選んだときだけ切り替える（`skipWaiting` を自動では呼ばない）。
+  - 登録は本番のビルドだけで行い、Vite の開発サーバーでは登録しない。
+- **パスと見出し**（API が返す。ADR-004）:
+
+  | パス | Content-Type | Cache-Control |
+  |---|---|---|
+  | `/manifest.webmanifest` | `application/manifest+json` | `no-cache` |
+  | `/sw.js` | `text/javascript; charset=utf-8` | `no-cache`（新しい版をすぐ見つけるため） |
+  | `/icons/icon-192.png`・`/icons/icon-512.png`・`/icons/icon-maskable-512.png`・`/icons/apple-touch-icon.png`・`/icons/favicon.png`・`/icons/icon.svg` | `image/png`・`image/svg+xml` | `public, max-age=86400` |
+
+- **iPhone の案内**: iPhone の Safari で開いたときだけ、「ホーム画面に追加」の手順を案内する（閉じられる。場所と文面は design-spec）。iPhone はインストールを勧める表示を自動では出さないため。
+- **名前**: マニフェストの `name` と `short_name` はサービス名（design-spec 1.2「配り方と名前」）。
+
+**理由:** 最初に公開するのは Web だけで、スマホではホーム画面に追加して使う（2026-10-11 のユーザーの決定）。画面の外側だけをキャッシュすれば、起動が速くなり、オフラインでも「オフライン」と出せる。データをキャッシュしないので、古い内容や他の人のデータを見せる危険が無い（ADR-011）。
+
+**捨てた案:** データもキャッシュしてオフラインで読めるようにする（古い内容を見せる危険と、キャッシュを人ごとに分ける手間が大きい）、Service Worker を置かずマニフェストだけにする（ホーム画面に追加はできるが、オフラインのときに何も出せない）。Service Worker の作り方の vite-plugin-pwa の `generateSW` は、比較の記録なし（`/api/*` を必ずネットワークに出す決まりを自前のコードで書くため、`injectManifest` にした）。
+
+**トレードオフ:** iPhone では、メールの招待のリンクはホーム画面のアプリではなく Safari で開く。ホーム画面のアプリと Safari ではログインが別になる（ユーザー承知）。Service Worker の更新を利用者が選ぶまで、古い版の画面が残る。
+
 ---
 
 ## 4. ルーティング
 
-画面の存在・目的・レイアウト・認証要否は design-spec 3章が正。ここはルートと画面の対応だけを持つ。Web は TanStack Router のファイルルート、スマホは Expo Router のファイルルートで、**パスは Web とスマホで同じ**にする（招待やパスワード再設定のメールのリンク、通知のリンクを同じパスで開けるように）。スマホは `https://{DOMAIN}/...` のリンク（iOS の Universal Links・Android の App Links。必要なファイルは Worker が静的アセットとして配る）と `moonx://...`（staging は `moonx-staging://`）で開く。
+画面の存在・目的・レイアウト・認証要否は design-spec 3章が正。ここはルートと画面の対応だけを持つ。Web は TanStack Router のファイルルート。のちのネイティブアプリも**同じパス**にする（招待やパスワード再設定のメールのリンク、通知のリンクを同じパスで開けるように。ADR-001）。
 
 - `$workspaceId` などは URL のパラメータ。ワークスペースに属する画面は `/w/$workspaceId/` の下に置き、他のワークスペースの URL を開いたら design-spec 6.0.6 の「権限がない」を出す。
 - 自己分析（10・11）は本人のもので、どのワークスペースのパスから開いても中身は同じ。Viewer として開いているワークスペースの `/w/$workspaceId/self-analysis...` を開いたら、自分の個人用ワークスペースの同じパスへ移す（design-spec 6.11）。
 - 作成の取り消し（5.11）で論理削除したアイデア・プランのパスは、無いものとして design-spec 6.0.6「見つからない」を出す。
 - モーダル（M1〜M8）とパネル（PNL-1・PNL-2）はルートを作らず、検索パラメータで開く: `?modal=new-idea|evidence|save-version|go-no-go|create-plan|share|switch-workspace|update-template`、`?panel=comments|history&target=<targetType>:<targetId>[:<targetKey>]`。
+- M9（ログインし直し）は 401 のときにだけ開くので、ルートも検索パラメータも持たない（8.2）。
 - `target` の書式は2つ。項目は `<targetType>:<targetId>[:<targetKey>]`（`targetKey` に `:` を含んでもよい）で、その項目のコメントのスレッド（C1）と項目の履歴（H1 の `targetType`・`targetId`・`targetKey`）に使う。画面全体は `container:<containerType>:<containerId>[:<sectionKey>,...]`（`containerType` は `self_analysis` / `validation` / `business_plan` / `idea`。`sectionKey` は画面が持つ節のキーで、複数ならカンマでつなぐ。画面と節の対応は 6.3 の末尾）で、画面全体の履歴（H1）と、画面のコメントの一覧（C1）に使う。画面のコメントの一覧は、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea:<ideaId>`）をまとめて出す（ヘッダーの 💬。design-spec 6.0.1・6.0.4）。どちらにも当てはまらない値は、パネルを開かない。
 - モーダルが対象の項目を持つとき（M2 の根拠シート）は `?modal=evidence&about=<targetType>:<targetId>[:<targetKey>]` とする。`about` の書式は `target` の項目と同じで、パネルの `target` と同時に使える（パネルを開いたまま根拠シートを開ける）。
 - M8 は `?modal=update-template&about=<templateKind>:<targetId>`（`templateKind` は `self_analysis` / `validation` / `business_plan`、`targetId` は自己分析・検証・プランの id）で開く。`about` が無いとき、画面の対象と食い違うとき、操作できない人が開いたときは、何も出さない。
 - 認証が要るルートで未ログインなら `/login?next=<元のパス>` へ移る。
-- `/dev/components` は部品の確認用ページで、Web とスマホの両方に同じパスで作る。Web は開発サーバー（`import.meta.env.DEV`）だけで開き、本番のビルドには入らず、開くと Not Found になる。スマホは `app/dev/components.tsx` で、`__DEV__` が真の開発ビルドだけで開き、それ以外のビルドは `/` へ戻す。
+- `/dev/components` は部品の確認用ページ。開発サーバー（`import.meta.env.DEV`）だけで開き、本番のビルドには入らず、開くと Not Found になる。
 
 | ルート | 画面（design-spec 参照） | 補足 |
 |---|---|---|
 | `/` | 1 ランディング | ビルド時に HTML を作る |
 | `/privacy` | 29 プライバシーポリシー | 公開。ビルド時に HTML を作る。本文は BCDX が用意する文章（9章「規約のページの本文」） |
 | `/support` | 30 サポート | 同上 |
-| `/login` | 2 ログイン / 新規登録（ログイン） | `?next=` |
+| `/login` | 2 ログイン / 新規登録（ログイン） | `?next=<戻る先のパス>&error=<エラーコード>`（`error` は 2 に出す状態。例: `ACCOUNT_SUSPENDED`、Google のログインの失敗） |
 | `/forgot-password` | 2（パスワード再設定のメールを送る） | |
 | `/reset-password` | 2（新しいパスワードを決める） | `?token=`（メールのリンク） |
 | `/invite/$token` | 2（新規登録）、または 3 の ①（ログイン済み） | 出し分けは design-spec 6.16 |
@@ -694,7 +742,7 @@ Cloud Run は IAM の認証をかけない（誰でも呼べる設定）にし�
 | `/admin/templates/versions/$versionId` | 27 管理: テンプレート編集 | `?node=<section か question の id>`、または設定のノード `ai-prompt`（自己分析のテンプレートだけ。ほかの版で指定されたら何も選ばない） / `cost-defaults` / `check-rules` / `execution-presets` |
 | `/admin/users` | 28 管理: ユーザーとワークスペース | `?tab=users|workspaces|invitations` |
 
-API のルートは5章、Worker が配る静的なファイル（`/.well-known/apple-app-site-association`、`/.well-known/assetlinks.json`、`/robots.txt`）は `apps/web/public/` に置く。
+API のルートは5章。API が返す Web の静的なファイルのうち、画面でないもの: `/robots.txt`（`apps/web/public/`。`/`・`/privacy`・`/support` だけを許し、ほかはクロールさせない）、`/manifest.webmanifest`・`/sw.js`・`/icons/*`（ADR-031）。返し方とキャッシュの見出しは ADR-004。
 
 ## 5. API設計
 
@@ -704,7 +752,7 @@ API のルートは5章、Worker が配る静的なファイル（`/.well-known/
 |---|---|
 | 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、API の仕様書は `/api/docs`（staging だけ。ADR-006） |
 | 値の正 | API が検査する入力の値（必須・文字数・範囲・形式・ファイルの種類と大きさ）の正は design-spec 6.0.8「入力の規則」。この章の API の表と 6.3 の check 制約は値を書かずに 6.0.8 を参照する（check 制約が値を持つときは 6.0.8 と同じ値にする）。期限（招待・パスワード再設定のリンク・再認証）と、画面に出す件数の正も design-spec（6.16・各画面）。変えるときは design-spec を先に直す |
-| 認証 | Better Auth のセッション。Web は HttpOnly Cookie、スマホは Expo プラグインが付ける `Cookie` ヘッダー。公開と書いたもの以外はログインが要る（未ログインは 401 `UNAUTHENTICATED`） |
+| 認証 | Better Auth のセッション（HttpOnly Cookie）。公開と書いたもの以外はログインが要る（未ログインは 401 `UNAUTHENTICATED`） |
 | 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601（表示はクライアントが利用者のタイムゾーンで行う） |
 | 金額・率 | 金額は number（ワークスペースの通貨。自己分析は自己分析の通貨）。率は 0〜1 の小数（35% は `0.35`）。DB は numeric、API で number に変換する |
 | 部分更新 | 1つの項目は `PATCH`（送った項目だけ変える）、キーで決まる項目（回答・数字）は `PUT .../{key}` で作るか更新する |
@@ -717,7 +765,7 @@ API のルートは5章、Worker が配る静的なファイル（`/.well-known/
 | 計算 | 損益分岐・シナリオ・確認項目・F/A/U の内訳・工程は `packages/domain` の関数で計算して返す（保存しない）。クライアントは入力中は同じ関数で自分で計算し、保存の応答では計算結果を返さない（画面を開いたときと、保存の後に必要な画面だけ取り直す） |
 | 変更履歴 | 変更履歴の対象（design-spec 6.0.5）を変える API は、すべて `change_history` に書く（ADR-020）。下の「履歴」列に書いた `source` を付ける |
 | キャッシュ | 応答はすべて `Cache-Control: no-store`（ADR-011） |
-| クライアントの種類 | Web とスマホは `X-Moonx-Client: web|ios|android` と `X-Moonx-App-Version`（スマホのアプリの版）を付ける。API は変更履歴の `client` に記録し（PRD の「スマホからの入力の割合」の集計に使う）、ログにも出す。古すぎるスマホの版は 426 `APP_UPDATE_REQUIRED` で更新を促す（最低の版は環境変数ではなくコードの定数で持つ）。`X-Moonx-Client` が `ios` / `android` で `X-Moonx-App-Version` が無い・読めないときも 426。それ以外の `X-Moonx-Client`（`web`、無い、不正な値）は 426 にならず、`web` 以外は `unknown` として記録する |
+| クライアントの種類 | Web は、保存のたびに `X-Moonx-Client` を付ける。そのときの画面の幅がトークンの `semantic.breakpoint.tablet` より狭ければ `web_mobile`、それ以外は `web`。API は変更履歴の `client` とログに記録する（PRD の K-08・K-16「スマホの幅の画面からの入力の割合」の集計に使う）。値が無い・知らない値なら `unknown` と記録し、拒否はしない。ネイティブの値（`ios`・`android`）は、ネイティブの feature で足す |
 
 **対象の指し方（TargetRef）**: コメント・変更履歴・根拠は、同じ形で項目を指す。
 
@@ -989,7 +1037,7 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | AD10 | POST | `/api/v1/admin/templates/import` | Admin | 26 |
 | 内部 | | | | |
 | Z1 | GET | `/api/health` | 公開（DB に触れない） | 監視 |
-| Z2 | GET | `/api/health/db` | 公開（Worker の共有シークレットが要る） | デプロイ後の確認 |
+| Z2 | GET | `/api/health/db` | 公開（IP ごとの回数制限。7.2） | デプロイ後の確認 |
 | Z3 | GET | `/api/docs` | 公開（staging だけ。production は出さない。ADR-006） | 開発 |
 
 ### 5.4 認証・アカウント・招待
@@ -999,21 +1047,22 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | 項目 | 設定 |
 |---|---|
 | メール＋パスワード | 有効。`disableSignUp: true`（新規登録は U5 だけ）。パスワードの規則は design-spec 6.0.8（Better Auth の `minPasswordLength`・`maxPasswordLength` もその値にする）。パスワード再設定のリンクの期限は design-spec 6.16。再設定すると他のセッションを消し、`hooks.after`（`/reset-password`）でそのユーザーの新しいセッションを作って Cookie を返す（ログインした状態で 5 へ。design-spec 6.16） |
-| Google | 有効。`disableImplicitSignUp: true`。新規登録は招待の画面（`/invite/$token`）からだけ `requestSignUp: true` で始め、`callbackURL` を `/welcome?step=invite&token=…&new=1`、`errorCallbackURL` を `/login?error=…` にする |
+| Google | 有効。`disableImplicitSignUp: true`。新規登録は招待の画面（`/invite/$token`）からだけ `requestSignUp: true` で始め、`callbackURL` を `/welcome?step=invite&token=…&new=1`、`errorCallbackURL` を `/login?error=…` にする。2 からのログインは、`callbackURL` を `next` の値（無ければ最後に開いたワークスペースの 5）にする |
 | 新規登録の制限 | Google の新規登録だけで動く（U5 はアダプターを通さず、自分で招待を確かめる。ADR-010）。`databaseHooks.user.create.before`: そのメールあての有効な招待（`pending` かつ期限内。大文字小文字を区別しない）が無いか、メールが確認済みでなければ（Google が `email_verified` を返さない）`INVITATION_REQUIRED` で拒否する |
 | 登録の後 | Google の新規登録だけで動く（U5 は同じ処理を自前のトランザクションで行う）。`databaseHooks.user.create.after`: 個人用ワークスペース（名前と通貨は design-spec 5章「登録時」。本人が Owner）を作り、`last_workspace_id` に入れる。そのメールあてのワークスペースなしの招待があれば、その招待を受諾済みにし（3 の ① を飛ばすため、U6 は呼ばれない）、`grants_admin` が true のときだけ運営者にする |
 | ログインの制限 | `databaseHooks.session.create.before`: `users.status` が `active` 以外（停止・削除）なら `ACCOUNT_SUSPENDED` で拒否する |
 | セッション | 有効期限30日、毎日更新。Cookie は `__Secure-` 接頭辞・HttpOnly・Secure・SameSite=Lax（local は Secure なし）。`change-password` はクライアントの指定にかかわらず他のセッションを消す（`revokeOtherSessions`）。Better Auth の `update-user`・`delete-user`・`change-email` は閉じて 404 を返す（プロフィールと削除は U2・U3・U7 だけから行う） |
-| 回数制限 | 有効。保存先は DB（`rate_limits`）。秘密を受け取るパス（`sign-in/email`・`sign-in/social`・`sign-up/email`・`request-password-reset`・`reset-password`・`change-password`）と U5 は、パスをまたいで IP ごとに1つの枠で1分10回。ベースプラグインが数え、Better Auth 側ではこれらのパスの `customRules` を `false` にしてパスごとの数え方を止める。それ以外のパス（`get-session` など）は Better Auth の既定（IP あたり1分100回） |
+| 回数制限 | 有効。保存先は DB（`rate_limits`）。秘密を受け取るパス（`sign-in/email`・`sign-in/social`・`sign-up/email`・`request-password-reset`・`reset-password`・`change-password`）と U5 は、パスをまたいで IP ごとに1つの枠で1分10回。入口のプラグイン（ADR-029）が数え、Better Auth 側ではこれらのパスの `customRules` を `false` にしてパスごとの数え方を止める。それ以外のパス（`get-session` など）は Better Auth の既定（IP あたり1分100回） |
 | 信頼するオリジン | `TRUSTED_ORIGINS`（2章） |
-| IP の取得 | `CF-Connecting-IP`（Worker が付ける。2章 通信フロー 3） |
+| IP の取得 | 入口のプラグインが決めた値だけを読ませる（7.2「呼び出し元の IP」。Better Auth の IP のヘッダーの設定は、入口のプラグインが付け直す `X-Moonx-Client-Ip` だけにする） |
 
 エラーの対応（文言は design-spec 6.16「状態とエラー」）:
 
 | Better Auth の応答 | design-spec 6.16 の状態 |
 |---|---|
-| メールかパスワードが違う | 2 の認証の失敗 |
-| `ACCOUNT_SUSPENDED` | 2 の停止されたユーザー |
+| メールかパスワードが違う | 2 の認証の失敗。M9 では M9 の「Password is incorrect」 |
+| 回数の上限（429） | 2 と M9 の回数の上限（design-spec 6.0.6。M9 は開いたまま、値を持ち続ける） |
+| `ACCOUNT_SUSPENDED` | 2 の停止されたユーザー。M9 で返ったときも、保存できていない値とキャッシュを捨てて 2 へ移り、同じ文言を出す |
 | `INVITATION_REQUIRED`（Google の新規登録） | 2 の招待リンクが無効・期限切れ |
 
 **U1 `GET /api/v1/me`** → `200 Me`
@@ -1050,9 +1099,9 @@ interface InvitationPreview {
 }
 ```
 
-**U5 `POST /api/v1/invitations/by-token/{token}/sign-up`**（公開）本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie（スマホは Better Auth の Expo プラグインが受け取る）。メールは招待のメールに固定し、1つのトランザクションで `users`・`accounts`（credential）・個人用ワークスペースを作ってから Better Auth の `signInEmail` でセッションを作る。ワークスペースのある招待はまだ受諾しない（3 の ① で U6）。ワークスペースなしの招待は、登録の時点で受諾済みにする。`grants_admin` が true なら運営者にもする（上の「登録の後」）。エラー: `410 INVITATION_INVALID`、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
+**U5**（公開）`POST /api/v1/invitations/by-token/{token}/sign-up`。本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie。メールは招待のメールに固定し、1つのトランザクションで `users`・`accounts`（credential）・個人用ワークスペースを作ってから Better Auth の `signInEmail` でセッションを作る。ワークスペースのある招待はまだ受諾しない（3 の ① で U6）。ワークスペースなしの招待は、登録の時点で受諾済みにする。`grants_admin` が true なら運営者にもする（上の「登録の後」）。エラー: `410 INVITATION_INVALID`、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
 
-**U6 `POST /api/v1/invitations/by-token/{token}/accept`** 本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。ワークスペースなしの招待は、`grants_admin` が true のときだけ受諾した人を運営者にする。エラー: `410 INVITATION_INVALID`、`409 INVITATION_ALREADY_ACCEPTED`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）。
+**U6** `POST /api/v1/invitations/by-token/{token}/accept`。本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。ワークスペースなしの招待は、`grants_admin` が true のときだけ受諾した人を運営者にする。エラー: `410 INVITATION_INVALID`、`409 INVITATION_ALREADY_ACCEPTED`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）。
 
 **U8 `POST /api/v1/me/password`**（Set password。design-spec 6.16）本体 `{ newPassword: string }` → `204`。Google だけで登録した人（`hasPassword: false`）がパスワードを足す。パスワードがある人は `409 PASSWORD_ALREADY_SET`（A8 で変える）。新しいパスワードの規則は design-spec 6.0.8。セッションが design-spec 6.16 の再認証の時間の中で作られたものでなければ `403 REAUTH_REQUIRED`。サーバーから Better Auth の `setPassword` を呼び、この要求のセッション以外を消す。
 
@@ -1550,7 +1599,7 @@ interface TemplateFile {
 ### 6.1 ER図
 
 ```
-users ─┬─ 1:N sessions / accounts（Better Auth）        verifications・rate_limits（Better Auth。単独）
+users ─┬─ 1:N sessions / accounts（Better Auth）        verifications（Better Auth。単独）・rate_limits（Better Auth と入口のプラグインが共有。ADR-029。単独）
        ├─ N:M workspaces（中間: memberships。role = owner / member / viewer）
        ├─ 1:0..1 self_analyses ─┬─ 1:N self_analysis_answers
        │                        └─ N:M workspaces（中間: self_analysis_shares）
@@ -1589,11 +1638,11 @@ self_analyses / validations / business_plans ─ N:1 template_versions（作成�
 | 対象 | 変更 | 理由 |
 |---|---|---|
 | `users` | `password_hash` をやめ、パスワードは `accounts.password` に置く。`email_verified` を足す。`display_name` / `avatar_url` は Better Auth の `name` / `image` に対応させる。`status` に `deleted` を足す | Better Auth（ADR-010）。アカウントの削除（design-spec 6.16） |
-| `sessions`・`accounts`・`verifications`・`rate_limits` | 追加 | Better Auth のテーブル |
+| `sessions`・`accounts`・`verifications`・`rate_limits` | 追加 | Better Auth のテーブル（`rate_limits` は入口のプラグインも、キーの接頭辞 `app:` を分けて使う。ADR-029） |
 | 版を持つ項目のテーブル | `updated_by_id` を足す | 衝突のときに「Paolo updated this answer…」を出す（design-spec 6.0.2） |
 | `template_questions` | `template_version_id` を足す | 版の中で設問 ID を一意にする制約のため |
 | `evidence_links` | `validation_id`・`target_key`・`deleted_at` を足す | 回答・数字を「検証の id ＋ キー」で指す（5.1 TargetRef）。根拠の付け外しを履歴から戻せるようにする |
-| `change_history` | `container_type`・`container_id`・`section_key`・`batch_id`・`client` を足す | 画面全体の履歴（design-spec 6.0.5）、1回の操作の単位で戻す（AI 取り込み・移行）、スマホからの入力の割合（PRD の KPI） |
+| `change_history` | `container_type`・`container_id`・`section_key`・`batch_id`・`client` を足す | 画面全体の履歴（design-spec 6.0.5）、1回の操作の単位で戻す（AI 取り込み・移行）、スマホの幅の画面からの入力の割合（PRD の K-08・K-16。5.1「クライアントの種類」） |
 | `risks.sort_order` | null を許す | null は自動の並び（Impact → Probability） |
 | `workspaces` | ユーザーが作るチームのワークスペースは `is_personal = false` | M7 の「New workspace」（Phase 3 で追加） |
 | `ideas`・`business_plans` | `deleted_at` を足す | 作成の取り消し（5.11）で論理削除する。戻さない |
@@ -1680,7 +1729,7 @@ export const historySource = pgEnum("history_source", [
   "manual", "ai_import", "revert", "template_migration", "duplicate", "plan_draft",
 ]);
 export const historyContainer = pgEnum("history_container", ["self_analysis", "validation", "business_plan", "idea"]);   // 画面の単位。change_history と comments が使う
-export const clientKind = pgEnum("client_kind", ["web", "ios", "android", "unknown"]);
+export const clientKind = pgEnum("client_kind", ["web", "web_mobile", "unknown"]);   // 5.1「クライアントの種類」。ネイティブの feature で ios・android を足す
 
 // ---------- 認証（Better Auth。auth の設定で列名を対応させる） ----------
 export const users = pgTable("users", {
@@ -1731,7 +1780,7 @@ export const verifications = pgTable("verifications", {
   ...timestamps(),
 }, (t) => [index().on(t.identifier)]);
 
-export const rateLimits = pgTable("rate_limits", {
+export const rateLimits = pgTable("rate_limits", {   // Better Auth と入口のプラグインが共有する。入口のプラグインのキーは `app:` で始まる（ADR-029）
   id: pk(),
   key: text().notNull().unique(),
   count: integer().notNull(),
@@ -2203,7 +2252,7 @@ export const changeHistory = pgTable("change_history", {
   after: jsonb(),
   source: historySource().notNull(),
   batchId: uuid(),                                // 1回の操作（AI 取り込み・移行・下書き作成・複製・それらを戻す操作）のまとまり
-  client: clientKind().notNull().default("unknown"),
+  client: clientKind().notNull().default("unknown"),   // 保存したときの画面の幅（5.1「クライアントの種類」。K-08・K-16）
   revertedFromId: uuid().references((): AnyPgColumn => changeHistory.id),
   changedById: uuid().notNull().references(() => users.id),
   changedAt: ts().notNull().defaultNow(),
@@ -2308,7 +2357,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 変更履歴から戻す（H2・H3） | × | × | ○ | ○ | 所属していれば |
 | 通知（N1〜N3） | × | 本人 | 本人 | 本人 | 本人 |
 | テンプレート・ユーザー・ワークスペース・招待の管理（AD1〜AD10） | × | × | × | × | ○ |
-| DB の死活確認（Z2） | Worker の共有シークレットがあるときだけ | | | | |
+| DB の死活確認（Z2。IP ごとの回数制限。7.2） | ○ | ○ | ○ | ○ | ○ |
 
 追加の決まり:
 
@@ -2323,15 +2372,14 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 |---|---|
 | 入力バリデーション | API は必須（`packages/schemas` の Zod。範囲・長さ・形式・列挙）。クライアントは同じスキーマで入力中に補助として検査する。最後の守りは DB の check 制約（6.3）。値（必須・文字数・範囲・形式）の正は design-spec 6.0.8 で、`packages/schemas` はそこから写す |
 | シークレット | 置き場所の方針は ADR-027、CI の置き場所の一覧は2章「CI のシークレットと変数」が正。local は `.env`（コミットしない。`.env.example` だけコミットする）。staging / production の API のシークレットは Secret Manager から Cloud Run の環境変数として渡す。ローテーションの手順は 05_operation-runbook.md |
-| CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる（合わなければ 403 `FORBIDDEN`）。本体の無い POST・DELETE にも同じ決まりを適用する（Web とスマホのクライアントは、本文が無くても `application/json` を付ける）。`multipart/form-data` は `PUT /api/v1/me/avatar`（U3）だけに許す。JSON の1MB は `Content-Length` と実際に読んだ長さの両方で確かめる。Cookie は SameSite=Lax。スマホは `Origin` を送らないが、Cookie を自動では送らない（SecureStore から付ける）ので対象外 |
-| CORS | 使わない（Web と API は同じオリジン。ADR-004）。CORS のヘッダーを返さないので、他のオリジンからのブラウザのリクエストは届かない。local は Vite の転送で同じオリジンにする |
-| レート制限 | 仕組みは ADR-029。秘密を受け取る認証のパス（Better Auth の6パスと U5。5.4）は、IP ごとに1つの枠で1分10回（DB に記録）。アプリの API は、次の上限を同じ仕組みで持つ。ユーザーごと: 招待の送信・再送（W4・W5・AD9）1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3。X2 は既存の内容を読むだけなので数えない）、アカウントの削除のパスワード確認（U7）10分5回。超えたら 429 `RATE_LIMITED`。外側の守りとして、Cloudflare の無料のレート制限ルール1つを `/api/auth/*` に付ける |
-| 直接のアクセス | Cloud Run の URL を直接呼ばれないように、Worker の共有シークレットを確かめる（2章 通信フロー 3）。`CF-Connecting-IP` は、共有シークレットのあるリクエストのときだけ信じる |
-| セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。スマホは SecureStore。ログアウトしたら送信待ちの列（ADR-021）も消す |
+| CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる（合わなければ 403 `FORBIDDEN`）。本体の無い POST・DELETE にも同じ決まりを適用する（Web のクライアントは、本文が無くても `application/json` を付ける）。`multipart/form-data` は `PUT /api/v1/me/avatar`（U3）だけに許す。JSON の1MB は `Content-Length` と実際に読んだ長さの両方で確かめる（`/api/auth/*` は入口のプラグインが確かめる。ADR-029）。Cookie は SameSite=Lax |
+| CORS | 使わない（Web と API は同じオリジン。ADR-004）。CORS のヘッダーを返さないので、他のオリジン（Cloud Run の `*.run.app` の URL を含む）からのブラウザのリクエストは届かない。local は Vite の転送で同じオリジンにする |
+| レート制限 | 仕組みは ADR-029（Better Auth と入口のプラグインの2段）。秘密を受け取る認証のパス（Better Auth の6パスと U5。5.4）は、IP ごとに1つの枠で1分10回（DB に記録）。DB の死活確認（Z2）は IP ごとに1分10回。アプリの API は、次の上限を同じ仕組みで持つ。ユーザーごと: 招待の送信・再送（W4・W5・AD9）1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3。X2 は既存の内容を読むだけなので数えない）、アカウントの削除のパスワード確認（U7）10分5回。超えたら 429 `RATE_LIMITED` |
+| 呼び出し元の IP | 入口のプラグインが、リクエストごとに1回だけ決める: `X-Forwarded-For` の右端の値。無ければ接続元のアドレス。決めた値は、回数制限（ADR-029）・Better Auth（`X-Moonx-Client-Ip` に付け直して読ませる。クライアントが同じ名前のヘッダーを送っても上書きする）・アクセスログの `clientIp`（8.3）・セッションの IP のすべてが使う。左側の値はクライアントが自由に書けるので使わない。Google は公式の説明（Cloud Run functions のリクエストのヘッダー）で「`X-Forwarded-For` は経路の IP の一覧で、最初の値はふつうクライアント」とだけ書き、クライアントが送った値に Cloud Run が足すのかは書いていない。右端の値は、Cloud Run が足す場合も置き換える場合も、Cloud Run が見た接続元になる。インフラを作るステップで、staging に偽の `X-Forwarded-For` を付けたリクエストを送り、ログの `clientIp` が偽の値でないことを確かめてから使う（04_deployment-procedure.md）。local と e2e は前段が無く、Vite の転送も値を足さない（`xfwd` を付けない）ので、送った `X-Forwarded-For` の右端の値がそのまま使われる。e2e はテストごとに値を変えて送り、別の IP として数えさせる（03_dev-setup.md） |
+| セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。ログアウトしたら、まだ保存できていない値（ADR-021）も捨てる |
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、形式と大きさは design-spec 6.0.8。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
-| セキュリティヘッダー | 静的アセットの `_headers` ファイル（`apps/web/public/_headers`。ADR-004）で付ける: `Content-Security-Policy`（`default-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy`。HSTS は Cloudflare で有効にする |
-| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者も、ワークスペースに所属していなければアプリから中身を見られない。自分あての招待で所属できることは 7.1「運営者」。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Cloudflare のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は、利用者の情報・Cookie・ヘッダー・本文・クエリ・DB の値・スタックの変数をすべて集めない設定にする（設定の名前は使う版のドキュメントに合わせる）。さらにブレッドクラム（画面遷移の URL を記録する）はすべて捨て、イベントのリクエストのヘッダー・Cookie・クエリ文字列は消す。イベントに載る URL は、クエリ・フラグメント・招待のトークン（`/invite/<token>` のパス）を持たない）。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
-| ストアに公開するときの要件 | ストアに公開すると決めたときに要る（ADR-003）。プライバシーポリシー（`/privacy`）とサポート（`/support`）のページは、ストアと関係なく Web の公開で作る（4章。29・30）。App Store のプライバシーの申告と Google Play のデータセーフティは、上の「個人情報」に合わせて書く。アプリ内のアカウント削除（U7）は公開するかどうかにかかわらず用意する。Google Play 向けの Web の削除の入口（`/account`）は、公開すると決めたときに足す |
+| セキュリティヘッダー | API が、静的ファイルを含むすべての応答に付ける（ADR-004）: `Content-Security-Policy`（`default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy`、`Strict-Transport-Security: max-age=31536000; includeSubDomains`（staging・production だけ。local は HTTP なので付けない）。環境ごとの値は meta 要素で渡し、インラインのスクリプトを使わない（ADR-004） |
+| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・アクセスログの呼び出し元の IP（Cloud Logging。保持は30日。11章）・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者も、ワークスペースに所属していなければアプリから中身を見られない。自分あての招待で所属できることは 7.1「運営者」。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Vercel（DNS）のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は、利用者の情報・Cookie・ヘッダー・本文・クエリ・DB の値・スタックの変数をすべて集めない設定にする（設定の名前は使う版のドキュメントに合わせる）。さらにブレッドクラム（画面遷移の URL を記録する）はすべて捨て、イベントのリクエストのヘッダー・Cookie・クエリ文字列は消す。イベントに載る URL は、クエリ・フラグメント・招待のトークン（`/invite/<token>` のパス）を持たない）。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
 | 依存の脆弱性 | GitHub の Dependabot のアラートを有効にする。Better Auth・Elysia・Drizzle のセキュリティ修正は速やかに取り込む（05_operation-runbook.md） |
 
 ### 7.3 パフォーマンス
@@ -2343,7 +2391,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目の保存（V3・V14・V16 など） | p95 300ms 以内（コールドスタートを除く） | 1項目＋変更履歴の1トランザクション。クライアントは表示を先に変え（楽観的更新）、design-spec 6.0.2 の保存のタイミングで送る |
 | ハブの画面（V1・P2・D1） | p95 800ms 以内 | 検証1件分のデータを決まった数のクエリでまとめて読み（N+1 をしない）、`packages/domain` でメモリ上で計算する。アイデアの一覧は検証ごとのデータを `IN (...)` でまとめて読む。一覧はページに分ける（I1 は50件） |
 | 0台からの最初の応答 | 5秒以内（Cloud Run の起動＋Neon の起動） | Bun で起動を速くし、Cloud Run の起動時の CPU ブーストを有効にする。死活確認（Z1）は DB に触れない |
-| Web の最初の表示 | 4G のミドルクラスのスマホで LCP 2.5秒以内 | ランディングはプリレンダー。アプリはルートごとにコードを分割し、静的アセットは CDN で長期キャッシュ |
+| Web の最初の表示 | 4G のミドルクラスのスマホで LCP 2.5秒以内（Cloud Run が0台のときは、上の「0台からの最初の応答」の分を足す） | ランディングはプリレンダー。アプリはルートごとにコードを分割し、静的アセットはハッシュ付きのファイル名で長期キャッシュ（ADR-004）。2回目からは Service Worker のキャッシュから画面の外側を出す（ADR-031） |
 | PDF の作成（P13） | 5秒以内（12枚） | react-pdf をサーバーで実行。フォントは起動時に読み込んでおく |
 | DB の接続 | Neon のプールの上限を超えない | postgres.js のプールはインスタンスごとに最大5。Cloud Run は最大3台なので最大15接続 |
 | クライアントのデータ | 画面の移動を速くする | TanStack Query。一覧は `staleTime` 30秒、編集中の画面は保存の応答で該当のキャッシュだけを更新する。通知の未読数は60秒ごと |
@@ -2356,7 +2404,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 ### 8.1 APIエラーレスポンス
 
-すべてのエラーを同じ形で返す。Better Auth の `/api/auth/*` は Better Auth の形（`{ code, message }`）のまま返し、クライアントが 5.4 の表で対応させる。このパスでベースプラグインが拒否する 429 `RATE_LIMITED` と 413 `PAYLOAD_TOO_LARGE` も `{ code, message }` で返し、429 には Better Auth と同じ `X-Retry-After`（秒）を付ける。
+すべてのエラーを同じ形で返す。Better Auth の `/api/auth/*` は Better Auth の形（`{ code, message }`）のまま返し、クライアントが 5.4 の表で対応させる。このパスで入口のプラグイン（ADR-029）が拒否する 429 `RATE_LIMITED` と 413 `PAYLOAD_TOO_LARGE` も `{ code, message }` で返し、429 には Better Auth と同じ `X-Retry-After`（秒）を付ける。
 
 ```json
 {
@@ -2378,7 +2426,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 |---|---|---|
 | 400 | `BAD_REQUEST` | JSON として読めない、`Content-Type` が違う |
 | 401 | `UNAUTHENTICATED` | 未ログイン、セッション切れ、停止・削除されたユーザー |
-| 403 | `FORBIDDEN` | ロールが足りない（例: Viewer の編集）、共有シークレットが合わない、Origin が合わない |
+| 403 | `FORBIDDEN` | ロールが足りない（例: Viewer の編集）、Origin が合わない |
 | 403 | `NO_ACCESS` | そのワークスペースに所属していない |
 | 403 | `INVITATION_EMAIL_MISMATCH`・`INVALID_PASSWORD`・`REAUTH_REQUIRED`・`NOT_SHARED` | 5章の各 API |
 | 403 | `INVITATION_REQUIRED`・`ACCOUNT_SUSPENDED` | Better Auth のフックで拒否したとき（Google の招待の無い新規登録、停止・削除したユーザーのログイン。Better Auth の形 `{ code, message }` で返る。5.4） |
@@ -2392,10 +2440,9 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 413 | `PAYLOAD_TOO_LARGE` | 本体が大きすぎる（JSON は1MB、写真は design-spec 6.0.8 の上限。`Content-Length` が無い分割転送でも読んだ量で数える） |
 | 422 | `VALIDATION_FAILED` | 入力の検査に失敗（`details` に項目ごとの `path`・Zod の `code`・`message`。入力の値そのものは返さない） |
 | 422 | `FACT_REQUIRES_EVIDENCE`・`CONFIDENCE_REQUIRED`・`INVALID_CHOICE`・`QUESTION_NOT_FOUND`・`PERCENT_ONLY_FOR_VARIABLE`・`OUT_OF_RANGE`・`NOT_EDITABLE`・`INVALID_ASSIGNEE`・`INVALID_STATUS`・`MUST_BE_DONE_TO_SHARE`・`NOT_SHAREABLE`・`EMPTY_SCOPE`・`NOT_IMPORTABLE`・`REPLY_DEPTH`・`INVALID_MENTION`・`INVALID_QUESTION_KEY`・`TEMPLATE_INVALID`・`CANNOT_SUSPEND_SELF`・`CONFIRMATION_MISMATCH` | 業務の決まりに合わない（5章） |
-| 426 | `APP_UPDATE_REQUIRED` | スマホのアプリの版が古すぎる（5.1） |
 | 429 | `RATE_LIMITED` | 7.2 のレート制限 |
 | 500 | `INTERNAL` | 想定外のエラー（詳細は返さない） |
-| 502 / 503 / 504 | `UPSTREAM_UNAVAILABLE` | Worker が API に届かない・タイムアウト（Worker が同じ形で返す）。API が必要な依存先に届かないとき（Z2 の DB、招待のメールの送信）は API が 503 を返す |
+| 502 / 503 / 504 | `UPSTREAM_UNAVAILABLE` | API が必要な依存先に届かないとき（Z2 の DB、招待のメールの送信）に API が 503 で返す。Cloud Run の前段が返す 502・503・504（本体がこの形でないもの。起動の失敗・タイムアウトなど）は、クライアントが `UPSTREAM_UNAVAILABLE` として扱う |
 
 コードの一覧は `packages/schemas/src/errors.ts` に型として置き、API とクライアントが共有する。Better Auth のフックで拒否するとき（`INVITATION_REQUIRED`・`ACCOUNT_SUSPENDED`）は、Better Auth のエラーの `code` に同じ名前を入れる。
 
@@ -2408,19 +2455,19 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | バリデーションエラー（422 `VALIDATION_FAILED` など） | 入力欄の下に理由を出し、保存しない（design-spec 6.0.6「入力値が範囲外」）。クライアントの Zod の検査で送る前に止めるのが基本で、API の 422 は最後の守り |
 | 業務の決まり（409・422 の個別のコード） | コードごとに design-spec の各画面の「状態」の文言を出す。対応はカタログのキー `errors:<CODE>`（9章）。`TEMPLATE_NOT_PUBLISHED` は design-spec 6.0.6 の文言を出す。画面が送る前に防いでいて、ふつうは返らないコードが返ったら、想定外のエラー（下）として出す |
 | 同時編集の衝突（409 `CONFLICT` / `CONFLICT_MULTI`） | design-spec 6.0.2 の確認 |
-| 通信・サーバーエラー（ネットワーク断・5xx・`UPSTREAM_UNAVAILABLE`） | 保存: design-spec 6.0.2 の保存エラー（入力は送信待ちの列に残して自動で再送する。ADR-021）。読み込み: design-spec 6.0.6「読み込みエラー」（ブロックごと） |
-| 認証エラー（401） | クライアントのクエリのキャッシュをすべて捨ててから、`/login?next=<今のパス>` へ移る（design-spec 5章「認証」。ログイン・新規登録・パスワードの再設定でも同じく捨てる。次に入るのが別の人でも、前の人のデータが残らない）。送信待ちの列の扱いは ADR-021 |
+| 通信・サーバーエラー（ネットワーク断・5xx・`UPSTREAM_UNAVAILABLE`） | 保存: design-spec 6.0.2 の保存エラー（ページを開いている間、まだ保存できていない値を自動で再送する。オフラインなら入力を止める。ADR-021）。読み込み: design-spec 6.0.6「読み込みエラー」（ブロックごと） |
+| 認証エラー（401） | まだ保存できていない値があれば、design-spec M9 を開く。M9 は今のアカウントのメールで Better Auth のメールのログインを呼び、成功したらキャッシュを残したまま保存できていない値を送る（ADR-021）。値が無いとき、M9 から 2 へ移るとき、Google でログインするときは、クライアントのクエリのキャッシュと保存できていない値をすべて捨ててから `/login?next=<今のパス>` へ移る（アカウントの停止で移るときは `&error=ACCOUNT_SUSPENDED` を付ける）（design-spec 5章「認証」。ログイン・新規登録・パスワードの再設定でも同じく捨てる。次に入るのが別の人でも、前の人のデータが残らない） |
 | 認可エラー（403 `FORBIDDEN` / `NO_ACCESS`） | design-spec 6.0.6「権限がない」。編集の途中で権限が変わったときは、読み取りの表示に切り替える |
 | 見つからない（404） | design-spec 6.0.6「見つからない」 |
 | アーカイブ（409 `ARCHIVED`） | design-spec 6.1「アーカイブ済み」の表示に切り替える |
-| アプリの更新が必要（426） | design-spec 6.0.6「アプリの更新が必要」 |
 | 回数制限（429） | design-spec 6.0.6「回数の上限」。待ち時間は応答の `retryAfterSeconds`（Better Auth のパスは `X-Retry-After`）から `packages/i18n` の書式で出す（上限の時間の幅は 7.2 で操作ごとに違うため）。どちらも無い 429 は、待ち時間の無い文言を出す |
 | モーダル・パネルの中の失敗（描画エラー、想定外のエラー） | 枠・ナビ・背後の画面は残し、モーダルやパネルの代わりに小さなダイアログ「Something went wrong」を出す。`Ref`（下の行と同じ番号）、Retry（描画をやり直す）、Close（閉じる）を持つ（design-spec 6.0.6）。モーダルとパネルのそれぞれにエラーの境界を置き、開くものが変わったら境界も作り直す |
 | 想定外のエラー（500 など） | design-spec 6.0.6「想定外のエラー」。`Ref` には `requestId` の先頭8文字を出す。画面の描画が失敗したとき（API の応答が無いとき）は `requestId` が無いので、Sentry のイベント ID の先頭8文字を出す。画面のブロックごとにエラーの境界（Error Boundary）を置き、1つの失敗で全体を壊さない。Sentry に送る |
 
 ### 8.3 ログとの対応
 
-- **リクエスト ID**: Worker が `X-Request-Id`（無ければ UUID を作る）を付けて API へ渡す。API は全ログ行・エラーの応答・Sentry のタグに同じ値を入れ、応答のヘッダーにも返す。スマホも Worker を通るので同じ。
+- **リクエスト ID**: API の入口のプラグインがリクエストごとに UUID を作る（クライアントが送った `X-Request-Id` は使わない。ログに偽の値を入れさせないため）。全ログ行・エラーの応答・Sentry のタグに同じ値を入れ、応答のヘッダー `X-Request-Id` にも返す。
+- **アクセスログ**: 1リクエストに1行（`message: "request"`）。項目は ADR-023 のとおりで、`clientIp` は入口のプラグインが決めた呼び出し元の IP（7.2「呼び出し元の IP」）、`client` は 5.1「クライアントの種類」の値。
 - **レベル**: 4xx は `info`、5xx は `error`。ただし同じ IP からの 401・403 が1分に10回を超えたら、その後の 401・403 のアクセスログの行は `warn` にする（Cloud Run のインスタンスごとに数える。ログの水準を決めるだけなので、インスタンス間で数は合わせない）。5xx は、アクセスログの行（`message: "request"`）とは別に、`message: "request failed"` の行を `requestId`・`errorCode`・`errorName`・`errorMessage`・`stack` 付きで書く。DB のエラーは `pgCode` と `constraint` だけを出し、SQL とパラメーターは出さない（利用者の入力が入るため）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。
 - **探し方**: 利用者の画面の `Ref` → Cloud Logging で `jsonPayload.requestId` を検索 → 同じ ID の Sentry のイベント。手順は 05_operation-runbook.md。
 
@@ -2432,16 +2479,16 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 | 項目 | 決定 |
 |---|---|
-| ライブラリ | i18next ＋ react-i18next（Web とスマホで同じ）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
+| ライブラリ | i18next ＋ react-i18next（Web）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
 | カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
 | 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`・`formatWaitTime()`（回数制限の待ち時間）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
-| 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（スマホの Hermes も対応） |
+| 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（ブラウザと Bun） |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |
 | テンプレートの中身 | 設問・EXAMPLE・ガイダンスは1言語（英語）でテンプレートに持ち、UI の多言語化とは別に扱う（design-spec 1.2） |
 | 規約のページの本文 | 29 プライバシーポリシーと 30 サポートの本文は、BCDX が用意する英語の文章をそのまま Markdown のファイルで持つ（`apps/web/src/content/`。ビルド時に HTML にする）。法的な文章を1つのまとまりで扱うため、カタログに分けて入れない。見出し・ナビ・リンクの文言はカタログに置く |
-| 確認用ページ | `packages/ui-web/src/preview/` と `packages/ui-native/src/preview/`（どちらも `/dev/components`）は開発専用で、英語の文字列を直接持つ。この章の「UI の文言はカタログに置く」の対象外（`scripts/check-screens.ts` は `apps/web/src`・`apps/mobile/app` だけを見る） |
+| 確認用ページ | `packages/ui-web/src/preview/`（`/dev/components`）は開発専用で、英語の文字列を直接持つ。この章の「UI の文言はカタログに置く」の対象外（`scripts/check-screens.ts` は `apps/web/src` だけを見る） |
 | 言語を足すとき | `locales/<lang>/` を足し、`users.locale` 列と 4 アカウント設定の言語の選択を足す（今は作らない） |
 
 ---
@@ -2452,13 +2499,11 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 |---|---|---|---|
 | 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
-| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 分岐 80% 以上 | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012） |
+| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 分岐 80% 以上 | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012） |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作（axe の検査は E2E で行う。ADR-022） |
-| スマホの部品（`packages/ui-native`） | Jest（jest-expo）＋ React Native Testing Library | 部品ごとに主要な状態 | 同じ名前の部品の種類・大きさ・アクセシビリティの属性、トレイの開閉 |
-| Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と送信待ちの列、衝突の確認、権限による表示の出し分け |
-| スマホ（`apps/mobile`） | Jest（jest-expo）＋ React Native Testing Library | 主要な部品 50% 以上 | 1問ずつのカード、ボトムシートでの行の編集、自動保存と送信待ちの列、セッションの保存 |
+| Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |
 | E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査 |
-| E2E（スマホ） | Maestro（フローは `apps/mobile/.maestro/` に置く。開発ビルドを入れたシミュレーター / エミュレーターに、local の API とシード済みの DB をつないで動かす。CI には載せない: macOS のランナーとエミュレーターの起動が要り、無料枠の運用費の方針に合わない。スマホのリリースの前に手元で通す。04 のチェックリスト） | — | コアフロー（ログイン → アイデアの作成 → 設問への回答の保存）を1本。スマホの画面を作り終えたあとに書く |
+| PWA と配信（`apps/web`・`apps/api`） | Playwright（Chromium。`make build-web` の結果を `WEB_DIST_DIR` で渡した API に対して。2章「環境変数」）と Bun test（API の静的ファイルの配信） | — | マニフェストの中身（ADR-031）、Service Worker が `/api/*` をキャッシュしないこと、新しい版の再読み込みの表示、iPhone の追加の案内が iPhone の Safari のときだけ出ること（User-Agent を変えて確かめる）、CDP の `Page.getInstallabilityErrors` が空であること。API が返すもの: 画面のパスに `_shell.html`、見つからないファイルに 404、ADR-004 と ADR-031 の Content-Type とキャッシュの見出し、7.2 のセキュリティヘッダー、HTML の meta 要素の値、`X-Forwarded-For` の左側を偽っても回数制限を逃れられないこと |
 | デザイントークン | Bun test（`make test-domain`）と `make tokens` の検査 | — | エイリアスの参照先が実在すること・循環しないこと・`semantic` がエイリアスだけであること、意味色のコントラスト（WCAG AA。検査の対象に無い色の組が増えたら失敗）、生成物が 06 と一致すること、Web のテーマが vanilla-extract でコンパイルできること、`packages/ui-tokens/src/types.ts` の値が 06 と合っていること |
 
 CI（GitHub Actions）が PR ごとに動かすターゲットは 04_deployment-procedure.md 2章（`ci.yml`）が正。`main` への取り込みは、すべて通ったときだけ。
@@ -2472,16 +2517,15 @@ Cloud Monitoring のアラート（死活・エラー率・レイテンシ・メ
 | 項目 | ツール | 設定 |
 |---|---|---|
 | API のエラー | Sentry（プロジェクト `moonx-api`） | `environment` = staging / production、`release` = コミット SHA、タグに `requestId`・`route`。ユーザーは `userId` だけ。新しい issue でメール通知。ソースマップは `make build-api-image` が上げる（2章「make ターゲット」） |
-| Web・スマホのエラー | Sentry（`moonx-web` / `moonx-mobile`） | CI でソースマップを上げる（ワークフローは 04_deployment-procedure.md 2章）。スマホの `release` はアプリの版、`dist` は EAS Update の ID |
-| API のログ | Cloud Logging | 標準出力に1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`appVersion`）。保持は既定の30日 |
-| Worker のログ | Cloudflare Workers Logs（`wrangler.jsonc` の `observability` を有効にする。無料プランの保持は3日） | `/api/*` の転送の失敗（`UPSTREAM_UNAVAILABLE`）を見る。その場で追うときは `wrangler tail` |
-| 死活 | Cloud Monitoring の稼働時間チェック | `https://{DOMAIN}/api/health`（Z1。DB に触れない）を5分ごと、3つの地域から。2つ以上の地域で失敗が5分続いたらメール |
+| Web のエラー | Sentry（プロジェクト `moonx-web`） | `environment` と DSN は API が HTML の meta 要素で渡す（ADR-004）。`release` = コミット SHA（`build-web` が入れる）。ソースマップは `make build-api-image` が上げる（2章「make ターゲット」） |
+| API のログ | Cloud Logging | 標準出力に1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`clientIp`。8.3）。保持は既定の30日 |
+| 死活 | Cloud Monitoring の稼働時間チェック | `https://{DOMAIN}/api/health`（Z1。DB に触れない）を5分ごと、3つの地域から。2つ以上の地域で失敗が5分続いたらメール。最初の構築では、証明書ができるまで作らない（03 5.4 I・J） |
 | エラー率 | Cloud Monitoring（ログベースの指標） | 5xx が10分間で全体の1%を超える、または5分で5件を超えたらメール |
 | レイテンシ | Cloud Run の指標 | リクエストの p95 が15分続けて3秒を超えたらメール（0台からの起動を含むため、目標の 7.3 より緩くする） |
 | メモリ | Cloud Run の指標 | メモリの使用率が5分続けて90%を超えたらメール（PDF の作成で足りなくなる兆し） |
 | 台数 | Cloud Run の指標 | 台数が上限の3台に10分続けて張り付いたらメール |
 | DB の容量 | Neon のコンソール | 無料プランの 0.5GB に対して 400MB を超えたら対応する（確かめ方は 05_operation-runbook.md） |
 | メール | Resend のダッシュボード | 送信の失敗と戻り（バウンス）。API のログにも送信の失敗を出す |
-| 無料枠の使用量（手で見る。頻度は 05_operation-runbook.md 6.1。アラートは付けない） | 各サービスのダッシュボード | 次の目安を超えたら、05_operation-runbook.md の手順で原因を探し、有料プランか構成の見直しを検討する: Sentry 月4,000件（無料枠の80%）、Neon の計算時間 80%、Resend 1日80通・月2,400通、Worker 1日7万回、Cloud Run の無料枠 80% |
-| 費用 | Google Cloud の予算アラート（Terraform） | 月 $5 と $10 でメール（予算に Apple Developer Program の年会費は含めない） |
-| KPI（01_prd.md） | `packages/db/queries/kpi.sql` と GitHub Actions の `kpi.yml` | 件数だけを数える SQL（回答の中身は読まない）。`kpi.yml` が毎月1回と手で動かしたときに、GitHub の環境 `production-backup` の読み取り専用の接続で `make kpi ENV=production` を動かし、件数を実行の要約に出す（ワークフローは 04_deployment-procedure.md 2章）。本番の接続を手元に持たない。結果を見て運営者に渡す手順は 05_operation-runbook.md 6.1 |
+| 無料枠の使用量（手で見る。頻度は 05_operation-runbook.md 6.1。アラートは付けない） | 各サービスのダッシュボード | 次の目安を超えたら、05_operation-runbook.md の手順で原因を探し、有料プランか構成の見直しを検討する: Sentry 月4,000件（無料枠の80%）、Neon の計算時間 80%、Resend 1日80通・月2,400通、Cloud Run の無料枠 80%（静的ファイルのリクエストも数える。ADR-004） |
+| 費用 | Google Cloud の予算アラート（Terraform） | 月 $5 と $10 でメール |
+| KPI（01_prd.md） | `packages/db/queries/kpi.sql` と GitHub Actions の `kpi.yml` | 件数だけを数える SQL（回答の中身は読まない）。K-08・K-16（スマホの幅の画面からの入力の割合）は、回答の手入力の変更履歴（`change_history` の `target_type` が `self_analysis_answer`・`validation_answer`・`plan_answer` で `source = manual` の行）のうち、`client = web_mobile` の行の割合（5.1「クライアントの種類」）。`kpi.yml` が毎月1回と手で動かしたときに、GitHub の環境 `production-backup` の読み取り専用の接続で `make kpi ENV=production` を動かし、件数を実行の要約に出す（ワークフローは 04_deployment-procedure.md 2章）。本番の接続を手元に持たない。結果を見て運営者に渡す手順は 05_operation-runbook.md 6.1 |

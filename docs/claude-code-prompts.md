@@ -832,7 +832,7 @@ Terraform・CI・Dockerfile は Step 26 で作るので、ここでは docs と�
 
 決まったこと:
 - ドメイン: 既存の dwnfrc.app（Vercel で登録し、DNS も Vercel。ns1/ns2.vercel-dns.com で確認済み）の
-  サブドメインを使う。{DOMAIN} は bcgx.dwnfrc.app。staging の住所は stg.{DOMAIN} にする（staging.{DOMAIN} から
+  サブドメインを使う。{DOMAIN} は bcdx.dwnfrc.app。staging の住所は stg.{DOMAIN} にする（staging.{DOMAIN} から
   変える）。GitHub の環境・Neon のブランチ・EAS のチャンネル・アプリの ID の末尾など、名前の staging はそのまま
 - Web の配信: API と同じ Cloud Run のサービス（moonx-api-{env}）が、`/*` の静的ファイルと `/api/*` の両方を返す。
   Cloudflare（Worker・ゾーンの設定・Registrar）は使わない
@@ -891,6 +891,54 @@ staging.{DOMAIN} が残っていない状態をゴールとする（ADR-004 に�
 
 ---
 
+## Step 17e: Web を PWA にする
+
+Status:
+
+```
+2026-10-11 にユーザーが、最初に公開するのは Web だけにすると決めた。ネイティブは最初のスコープで作るが配らず、
+Web のデザインの改修が固まってから、その内容で作る。スマホではホーム画面に追加して使えるように、Web を PWA にする。
+先に設計ドキュメントを直してから実装してください。
+
+決まったこと:
+- オフライン: 画面の外側（_shell.html、ビルドしたアセット・フォント・アイコン）だけをキャッシュし、`/api/*` は
+  キャッシュしない。入力には接続が要る（オフラインで入力して後で送る仕組みは作らない）
+- アイコン: 三日月と小さな丸（ユーザーが選んだ案 B）。512 の正方形に、中心 (246, 266) 半径 150 の円から
+  中心 (300, 215) 半径 132 の円を抜いた三日月と、中心 (378, 150) 半径 28 の丸を置く。地は surface.canvas、
+  三日月は text.primary、丸は accent.default。色はトークンから作り、生成物は手で直さない（ADR-018）。
+  maskable の安全域（中心から半径 40%）に収まっている
+- 名前: moonx（サービス名は変えない）
+- 公開: 最初は Web だけ。ネイティブの配布（EAS の内部配布・TestFlight）は最初のスコープに入れない。
+  Apple Developer Program の登録は、ネイティブを配ると決めたときにする
+
+やること:
+1. docs を直す:
+   - PRD のスコープ（初期リリースで公開するのは Web（PWA）。ネイティブは作るが配らない）
+   - SDD: ADR-003（配るのはユーザーが決めたとき。それまでは Android は開発ビルドを実機に入れ、iOS は Mac の
+     シミュレーターで確かめる）、PWA の決定（ADR-002 に足すか新しい ADR。マニフェスト、Service Worker の
+     キャッシュの決まり、新しい版への更新の流れ）、2章（アイコンの生成物）、7.2（CSP に manifest-src と worker-src）、
+     10章（PWA のテスト）
+   - design-spec: iPhone の Safari で開いたときに「ホーム画面に追加」の手順を案内する場所と文面（閉じられる）、
+     オフラインのときの表示、新しい版があるときの表示（再読み込み）。要る部品が 4.5 に無ければ足す
+   - docs/03_dev-setup.md と 04（Apple Developer Program を最初の準備から外す）
+2. アイコン: トークンから SVG と PNG（favicon、apple-touch-icon 180、192、512、maskable 512）を作る生成を、
+   make tokens か専用の make ターゲットに入れる
+3. Web: マニフェスト（name と short_name は moonx、display は standalone、start_url は /、theme_color と
+   background_color はトークン）と Service Worker（`/api/*` は必ずネットワークに出す）。ランディング（index.html）と
+   _shell.html の両方から読み込む
+4. Web: 新しい版の Service Worker が待っているときの表示と再読み込み、オフラインの表示、iPhone の追加の案内
+   （design-spec のとおり）
+5. API（Step 17d で静的ファイルを返す）: マニフェストと Service Worker の Content-Type とキャッシュの見出し
+   （Service Worker のファイルはキャッシュさせない）
+6. テスト（make test-web・make test-api・make test-e2e）: マニフェストの中身、Service Worker が `/api/*` を
+   キャッシュしないこと、更新の表示、追加の案内が iPhone の Safari のときだけ出ること
+
+make tokens を2回続けて差分が出ず、make test-web・make test-api・make test-e2e・make lint・make typecheck・
+make doc-lint が通り、Playwright の Chromium で CDP の Page.getInstallabilityErrors が空になる状態をゴールとする。
+```
+
+---
+
 ## Step 18: スマホの部品（packages/ui-native）と開発ビルド
 
 Status: done 2026-10-03
@@ -922,8 +970,10 @@ make test-mobile・make lint・make typecheck が通り、確認用の画面に�
 
 ## Step 18a: 開発ビルドの設定と端末での確認
 
-Status: blocked 2026-10-03
-{APP_ID} の決定（配った後は変えると入れ直しになる）、EAS のアカウントでのビルド、端末での目視確認にユーザーの操作が要る。
+Status: blocked 2026-10-11
+ネイティブは、Web のデザインの改修が固まってから、その内容で作る（2026-10-11 のユーザーの決定）。改修の内容はユーザーと決めてから
+ステップに足し、終わったらこのステップから再開する。{APP_ID}（案は app.dwnfrc.bcdx）の決定、Expo のアカウントでのビルド、
+端末での目視確認にもユーザーの操作が要る。
 
 ```
 Step 18 で作った packages/ui-native と確認用の画面（/dev/components）を、開発ビルドを入れた端末かエミュレーターで確かめてください。
@@ -932,8 +982,9 @@ Step 18 で作った packages/ui-native と確認用の画面（/dev/components�
 1. {APP_ID} が SDD 2章で未確定なら、ユーザーに決めてもらい（配った後は変えると入れ直しになる）、SDD 2章の表と
    使っている箇所を置き換える。app.config.ts に ios.bundleIdentifier・android.package を設定する
    （staging の版は {APP_ID}.staging）
-2. `eas init` で出た projectId を app.config.ts に設定し、`eas build --profile development` で
-   iOS と Android の開発ビルドを作って端末に入れる（docs/03_dev-setup.md 3.5。ユーザーと一緒に行う）
+2. `eas init` で出た projectId を app.config.ts に設定し、`eas build --profile development` で開発ビルドを作る。
+   Android は実機に入れ、iOS はシミュレーター用のビルドを Mac のシミュレーターに入れる（Apple Developer Program の
+   登録はネイティブを配ると決めたときにする。ADR-003。docs/03_dev-setup.md 3.5。ユーザーと一緒に行う）
 3. 端末で `moonx://dev/components` を開き、全部品が出ること、System / Light / Dark の切り替えで崩れないことを確かめる
 4. 端末でしか確かめられない次の挙動を確かめる。Android の `Keyboard` の高さが見える高さと合うか（edge-to-edge）、
    MentionTextArea の変更と選択のイベントの順、Tooltip の長押しと子の押す操作、Tray の中のスクロールと
@@ -948,7 +999,8 @@ Step 18 で作った packages/ui-native と確認用の画面（/dev/components�
 
 ## Step 19: スマホのアプリの枠と認証・アカウントの画面
 
-Status:
+Status: blocked 2026-10-11
+Web のデザインの改修が固まってから、その内容で作る（2026-10-11 のユーザーの決定）。Step 18a の後に進める。
 
 ```
 Step 11 と同じ範囲を、docs/02-01_system-design-doc.md の ADR-003・ADR-010・4章（ディープリンク）に従って
@@ -978,7 +1030,8 @@ make test-mobile が通る状態をゴールとする。
 
 ## Step 20: スマホのコア画面（1）: 共通の入力の仕組み・アイデア一覧・検証ホーム・設問フォーム
 
-Status:
+Status: blocked 2026-10-11
+Web のデザインの改修が固まってから、その内容で作る（2026-10-11 のユーザーの決定）。Step 18a の後に進める。
 
 ```
 Step 12 と同じ範囲（design-spec 6.0.2〜6.0.5・6 と M1・13・11 の検証の形）を、スマホで作ってください。
@@ -1002,7 +1055,8 @@ Step 12 と同じ範囲（design-spec 6.0.2〜6.0.5・6 と M1・13・11 の検�
 
 ## Step 21: スマホのコア画面（2）: 費用・損益・判定・AI 往復
 
-Status:
+Status: blocked 2026-10-11
+Web のデザインの改修が固まってから、その内容で作る（2026-10-11 のユーザーの決定）。Step 18a の後に進める。
 
 ```
 Step 13 と同じ範囲（design-spec 6.3〜6.7: 17・18・19・24・25）を、スマホで作ってください。
@@ -1024,7 +1078,8 @@ Step 13 と同じ範囲（design-spec 6.3〜6.7: 17・18・19・24・25）を、
 
 ## Step 22: スマホの残りの画面（1）: 調査ログ・競合・前提とリスク・ワークスペース設定・ユーザーの管理
 
-Status:
+Status: blocked 2026-10-11
+Web のデザインの改修が固まってから、その内容で作る（2026-10-11 のユーザーの決定）。Step 18a の後に進める。
 
 ```
 Step 14 と同じ画面（14・15・16・9・28）を、スマホで作ってください。画面の仕様は design-spec が正で、
@@ -1044,7 +1099,8 @@ Step 14 と同じ画面（14・15・16・9・28）を、スマホで作ってく
 
 ## Step 23: スマホの残りの画面（2）: ダッシュボード・決定ログ・通知・自己分析
 
-Status:
+Status: blocked 2026-10-11
+Web のデザインの改修が固まってから、その内容で作る（2026-10-11 のユーザーの決定）。Step 18a の後に進める。
 
 ```
 Step 15 と同じ画面（5・7・8・10・11 の自己分析の形・12・M6）を、スマホで作ってください。
@@ -1065,7 +1121,8 @@ make test-mobile が通る状態をゴールとする。
 
 ## Step 24: スマホの残りの画面（3）: プラン・実行管理・Pitch Deck
 
-Status:
+Status: blocked 2026-10-11
+Web のデザインの改修が固まってから、その内容で作る（2026-10-11 のユーザーの決定）。Step 18a の後に進める。
 
 ```
 Step 16 と同じ画面（M5・20・21・M3・M4・22・23）を、スマホで作ってください。画面の仕様は design-spec が正で、
@@ -1086,7 +1143,8 @@ make test-mobile が通る状態をゴールとする。
 
 ## Step 25: スマホの残りの画面（4）: テンプレートの改訂と移行
 
-Status:
+Status: blocked 2026-10-11
+Web のデザインの改修が固まってから、その内容で作る（2026-10-11 のユーザーの決定）。Step 18a の後に進める。
 
 ```
 Step 17 と同じ画面（26・27・M8）を、スマホで作ってください。画面の仕様は design-spec が正で、
@@ -1099,7 +1157,31 @@ Step 17 と同じ画面（26・27・M8）を、スマホで作ってください
 
 ---
 
-## Step 26: インフラ + CI/CD
+## Step 25a: スマホの配布の準備とテスト
+
+Status: blocked 2026-10-11
+Step 18a〜25 の後に進める（ネイティブは Web のデザインの改修が固まってから作る。2026-10-11 のユーザーの決定）。
+
+```
+ネイティブのアプリを配れる状態に準備し、スマホのテストを仕上げてください。配ること自体は、ユーザーが決めたときに
+docs/04_deployment-procedure.md の手順で行う（ADR-003）。
+
+やること:
+1. Step 17d で API が返す静的ファイルに、/.well-known/apple-app-site-association と assetlinks.json を足す
+2. apps/mobile/eas.json（profile development / staging / production、チャンネル、runtimeVersion は fingerprint）と
+   app.config.ts の環境ごとの設定。staging と production は Android が distribution: internal（APK）、
+   iOS が TestFlight（submit の profile は iOS だけ。Android の submit は置かない。ADR-003）
+3. Makefile の mobile-update・mobile-build と、04 2章のスマホの配布に関わるワークフロー
+4. スマホの E2E: Maestro を入れて、コアフローを1本書く（ADR-001・SDD 10章に決定済み。フローは apps/mobile/.maestro/）
+5. mobile のカバレッジを SDD 10章の目標（50%）と比べ、足りない所にテストを足す
+
+eas.json の各 profile で `eas config --profile <profile>` が通り、Maestro のコアフローがエミュレーターか
+シミュレーターで通り、make test-mobile が通る状態をゴールとする。
+```
+
+---
+
+## Step 26: インフラ + CI/CD（Web と API）
 
 Status:
 
@@ -1119,15 +1201,13 @@ docs/03_dev-setup.md 5.4 の手順でユーザーが行う。
    bootstrap の変数、Cloud Run の image の ignore_changes、
    Monitoring のアラート（SDD 11章の閾値）、予算アラート、Cloud Run のドメインマッピング（{DOMAIN}・stg.{DOMAIN}）
 4. （Step 17d で Worker をやめたので、この項目は無い。静的ファイルの配信とセキュリティヘッダーは API が持つ）
-5. apps/web/public/: /.well-known/apple-app-site-association と assetlinks.json、robots.txt（/privacy と
-   /support はストアに公開すると決めたときに足す。SDD 2章。ここでは作らない）
-6. apps/mobile/eas.json（profile development / staging / production、チャンネル、runtimeVersion は fingerprint）と
-   app.config.ts の環境ごとの設定。staging と production は Android が distribution: internal（APK）、
-   iOS が TestFlight（submit の profile は iOS だけ。Android の submit は置かない。ADR-003）
+5. apps/web/public/: robots.txt（/privacy と /support はストアに公開すると決めたときに足す。SDD 2章。
+   ここでは作らない）。/.well-known のファイルは Step 25a で作る
+6. （スマホの eas.json と app.config.ts の環境ごとの設定は Step 25a で作る）
 7. .github/workflows/ の ci.yml・build.yml・deploy.yml・db-backup.yml（04 2章のとおり make のターゲットを呼ぶ）、
-   Dependabot、deploy/staging/version と deploy/production/version
-8. Makefile のデプロイ系のターゲット（build-web・build-api-image・deploy-api・mobile-update・mobile-build・
-   infra-plan・infra-apply・db-backup。deploy-web は Step 17d でやめた）を、ここで作った対象に合わせて確かめる
+   Dependabot、deploy/staging/version と deploy/production/version。スマホの配布に関わる部分は Step 25a で作る
+8. Makefile のデプロイ系のターゲット（build-web・build-api-image・deploy-api・infra-plan・infra-apply・db-backup。
+   deploy-web は Step 17d でやめた。mobile-update・mobile-build は Step 25a）を、ここで作った対象に合わせて確かめる
 9. Playwright の版（申し送り）: @playwright/test はルートの package.json で 1.56.1 に固定してある（コミット 7bea59d）。
    理由は Phase 5 のクラウドの開発環境の都合で、cdn.playwright.dev に届かず、入っている Chromium（revision 1194）に
    版を合わせた。CI（ci.yml の make test-e2e）と手元はブラウザを取得できるので、この固定は要らない。CI で最新の版の
@@ -1141,13 +1221,13 @@ docs/03_dev-setup.md 5.4 の手順でユーザーが行う。
    決めて直し、飛ばす経路をなくす。決めた内容は docs/03_dev-setup.md 1章の PostgreSQL のクライアントの行に書く
 
 docker build した API のイメージがローカルで起動して /api/health と P13 の PDF が動き、同じイメージが
-画面（ランディング・_shell.html・.well-known）を返し、3つの env で terraform validate が通り、
+画面（ランディング・_shell.html・マニフェスト・Service Worker）を返し、3つの env で terraform validate が通り、
 ワークフローの構文の検査（actionlint）が通り、make build-web が通る状態をゴールとする。
 ```
 
 ---
 
-## Step 27: テスト + 仕上げ
+## Step 27: テスト + 仕上げ（Web と API）
 
 Status:
 
@@ -1161,10 +1241,9 @@ docs/02-01_system-design-doc.md の10章（テスト戦略）・11章（KPI）�
    **受入スイート**を兼ねる。「同じことができる」の判定基準になるため、実装の内部でなく仕様の振る舞いで書く。
    加えて、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除、
    異常系の最低ライン（不正入力のエラー形式・未認証アクセスの拒否・空の状態の表示）。主要な画面で axe の検査
-2. カバレッジを SDD 10章の目標（domain 行 95%・api 分岐 80%・web 60%・mobile 50%）と比べ、足りない所にテストを足す。
+2. カバレッジを SDD 10章の目標（domain 行 95%・api 分岐 80%・web 60%。mobile は Step 25a）と比べ、足りない所にテストを足す。
    7.1 の権限マトリクスの全エンドポイント × ロールが表駆動テストにあることを確かめる
-3. スマホの E2E: Maestro を入れて、コアフローを1本書く（ADR-001・SDD 10章に決定済み。フローは
-   apps/mobile/.maestro/。スマホの画面を作り終えたあとにやる）
+3. （スマホの E2E（Maestro）は Step 25a で書く）
 4. KPI の計測: packages/db/queries/kpi.sql（SDD 11章）。docs/01_prd.md 5章の指標のうちアプリのデータから数えられるものを、
    件数と割合だけで数える（回答の中身は読まない）
 5. README.md（リポジトリの直下）: docs/ への入口と make setup からの始め方。中身は docs への参照にし、書き写さない

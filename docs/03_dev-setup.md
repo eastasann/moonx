@@ -37,6 +37,44 @@
 | Resend | 招待とパスワード再設定のメール | 無料プラン。`{DOMAIN}` の確認が要る |
 | Sentry | エラーの追跡（プロジェクト `moonx-web` / `moonx-api`） | 無料プラン |
 
+### Claude Code のプラグインとスキル
+
+リポジトリの `.claude/settings.json` が次のプラグインを有効にする。リポジトリを信頼すると、手元のセッションに入る。
+
+| プラグイン | マーケットプレイス（リポジトリ） | 用途 |
+|---|---|---|
+| draft | `draft-marketplace`（`dwnfrc/DWNFRC-DRAFT`） | 進め方（DRAFT のフェーズと補助のスキル） |
+| frontend-design | `claude-plugins-official`（`anthropics/claude-plugins-official`） | 画面のデザインの方針を立て、作ったものを見直す手順 |
+| taste-skill | `taste-skill`（`Leonxlnx/taste-skill`。MIT。13のスキル） | 既存の画面の点検と、見た目の方向の比較 |
+
+クラウドのセッション（Claude Code on the web）は、リポジトリの設定で有効にしたプラグインを入れない（2026-10 時点の Claude Code の仕様）。クラウドでデザインのスキルを使う人は、claude.ai に自分のスキルとして入れる（claude.ai のスキルは手元とクラウドの両方に届く）。スキルのファイルはリポジトリに置かない（2026-10-11 の決定）。入れ方:
+
+1. 下の使い分けの表で「今は使う場面が無い」以外のスキルのフォルダーを取ってくる。frontend-design は `anthropics/claude-plugins-official` の `plugins/frontend-design/skills/frontend-design/`、taste-skill は `Leonxlnx/taste-skill` の `skills/<フォルダー>/`（例: redesign-existing-projects は `skills/redesign-skill/`）
+2. フォルダーごとに ZIP にする
+3. claude.ai の Customize > Skills で「+」>「Create skill」>「Upload a skill」から入れる
+
+claude.ai にも入れた人の手元では、プラグインのスキルと claude.ai のスキルが両方読み込まれる。手元ではプラグインのもの（`frontend-design:`・`taste-skill:` の付く名前）を使う。
+
+デザインのスキルは次のように使い分ける（2026-10-11 の決定）。
+
+| 場面 | 使うスキル |
+|---|---|
+| デザインの方針を立てる・見直す | frontend-design |
+| 既存の画面を点検する（デザインの作り直しでプロトタイプの画面を見るときなど） | redesign-existing-projects（taste-skill） |
+| 1 ランディングと 29・30 | 上の2つに加えて design-taste-frontend（taste-skill）。スキルの説明に「Not dashboards, not data tables, not multi-step product UI」とあり、業務の画面・表・ダッシュボードには使えない |
+| 見た目の方向を比べる | minimalist-ui・high-end-visual-design・industrial-brutalist-ui・gpt-taste（taste-skill）。比べる材料にだけ使い、決めた方向に合わないものは使わない |
+| 今は使う場面が無い | imagegen-frontend-web・imagegen-frontend-mobile・brandkit・image-to-code（画像を作る道具が要る）、stitch-design-taste（Google Stitch を前提にし、自分の `DESIGN.md` を正にする。moonx の正は design-spec 4.4 と 06）、design-taste-frontend-v1（新しい版がある）、full-output-enforcement（出力の省略を禁じるだけで、デザインに関わらない） |
+
+表は目安で、禁止ではない（設定でも止めていない。2026-10-11 の決定）。表に無い場面でも、合うスキルがあれば使ってよい。使ったときは、どのスキルを何に使ったかをユーザーに伝える。
+
+どのスキルの案も、design-spec 9.2「見た目の作り直し」の手順で決めてから実装する。実装では、design-spec と 06 と、画面にスタイルを書かない決まり（SDD ADR-018・ADR-025）を優先する。スキルが前提にしている技術のうち、Tailwind と、Tailwind を前提にする shadcn は ADR-025 で使わないと決めている。GSAP・motion など SDD に無い技術は、ADR を足すまで入れない。
+
+画面を見る手段:
+
+- 手元のセッション: Claude in Chrome（Chrome の拡張機能）で開発サーバーの画面を開いて確かめる。セッションは `claude --chrome` で始めるか、`/chrome` で既定にしておく
+- クラウドのセッション: ブラウザを動かす道具は用意されていない（クラウドのセッションにブラウザの道具を求める要望 anthropics/claude-code#75632 は、2026-09 に入れられないまま閉じた）。プロジェクトの Playwright で開発サーバーのスクリーンショットを撮って確かめる（ブラウザの版は 11章の「Playwright のブラウザを取ってこられない」）
+- 手元のセッションを別の端末から動かすときは Remote Control を使う。手元のプラグインと道具はそのまま使えるが、Chrome は `claude remote-control --chrome` で始めたときだけ使える（付けないと Chrome が切れた状態で始まる）
+
 ---
 
 ## 2. リポジトリ構成

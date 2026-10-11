@@ -60,14 +60,14 @@ claude.ai にも入れた人の手元では、プラグインのスキルと cla
 | 場面 | 使うスキル |
 |---|---|
 | デザインの方針を立てる・見直す | frontend-design |
-| 既存の画面を点検する（デザインの作り直しでプロトタイプの画面を見るときなど） | redesign-existing-projects（taste-skill） |
+| 既存の画面を点検する（できあがった画面やプロトタイプを見直すときなど） | redesign-existing-projects（taste-skill） |
 | 1 ランディングと 29・30 | 上の2つに加えて design-taste-frontend（taste-skill）。スキルの説明に「Not dashboards, not data tables, not multi-step product UI」とあり、業務の画面・表・ダッシュボードには使えない |
 | 見た目の方向を比べる | minimalist-ui・high-end-visual-design・industrial-brutalist-ui・gpt-taste（taste-skill）。比べる材料にだけ使い、決めた方向に合わないものは使わない |
 | 今は使う場面が無い | imagegen-frontend-web・imagegen-frontend-mobile・brandkit・image-to-code（画像を作る道具が要る）、stitch-design-taste（Google Stitch を前提にし、自分の `DESIGN.md` を正にする。moonx の正は design-spec 4.4 と 06）、design-taste-frontend-v1（新しい版がある）、full-output-enforcement（出力の省略を禁じるだけで、デザインに関わらない） |
 
 表は目安で、禁止ではない（設定でも止めていない。2026-10-11 の決定）。表に無い場面でも、合うスキルがあれば使ってよい。使ったときは、どのスキルを何に使ったかをユーザーに伝える。
 
-どのスキルの案も、design-spec 9.2「見た目の作り直し」の手順で決めてから実装する。実装では、design-spec と 06 と、画面にスタイルを書かない決まり（SDD ADR-018・ADR-025）を優先する。スキルが前提にしている技術のうち、Tailwind と、Tailwind を前提にする shadcn は ADR-025 で使わないと決めている。GSAP・motion など SDD に無い技術は、ADR を足すまで入れない。
+どのスキルの案も、design-spec の方針（4.4・4.5）と 06 に合うものだけを使う。方針を変える案は、先にユーザーと決めて design-spec と 06 を直してから実装する（見た目は 2026-10-12 に月相に作り直した）。実装では、design-spec と 06 と、画面にスタイルを書かない決まり（SDD ADR-018・ADR-025）を優先する。スキルが前提にしている技術のうち、Tailwind と、Tailwind を前提にする shadcn は ADR-025 で使わないと決めている。GSAP・motion など SDD に無い技術は、ADR を足すまで入れない。
 
 画面を見る手段:
 

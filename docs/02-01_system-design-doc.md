@@ -223,7 +223,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | ADR-015 | IaC（ユーザー指定） | **Terraform**（Google Cloud の資源とドメインマッピング）。DNS のレコードは Vercel で手で入れる。コンソールで管理するものは2章「インフラ管理」 |
 | ADR-016 | 環境とリリース（ユーザー指定） | **staging ＋ production**。`deploy/{env}/version` による昇格。Web と API を1つのイメージにし、同じイメージを両方の環境に出す |
 | ADR-017 | モノレポ | **Bun workspaces** ＋ Makefile |
-| ADR-018 | デザインシステムとトークン（ユーザー指定） | **Adobe Spectrum の仕組み**を取り入れ、見た目は Hermes Teal。06_design-tokens.json から Web（vanilla-extract）・PDF のテーマと PWA のアイコンを生成する。アイコンは Lucide |
+| ADR-018 | デザインシステムとトークン（ユーザー指定） | **Adobe Spectrum の仕組み**を取り入れ、見た目は月相（design-spec 4.4）。06_design-tokens.json から Web（vanilla-extract）・PDF のテーマと PWA のアイコンを生成する。アイコンは Lucide |
 | ADR-019 | 同時編集 | 項目単位の楽観ロック（`lock_version`）。衝突は 409 で返し、利用者に選ばせる |
 | ADR-020 | 変更履歴の記録 | アプリのコードで、本体の更新と同じトランザクションの中で `change_history` に書く |
 | ADR-021 | 保存できなかった入力の再送 | ページを開いている間だけ、メモリに持った最新の値を再送する。端末には残さない。オフラインのときは入力を止める |
@@ -373,7 +373,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 - メール＋パスワードの新規登録は Better Auth の公開エンドポイントを閉じ（`emailAndPassword.disableSignUp`）、moonx の `POST /api/v1/invitations/by-token/{token}/sign-up`（5章 U5）だけから作る。メールは招待のメールに固定する。U5 は Better Auth のアダプターを通さず、招待の確認・ユーザーと個人用ワークスペースの作成を自前のトランザクションで行う（下の2つのフックは U5 では動かない）。
 - Google の新規登録は、招待の画面からだけ `requestSignUp` 付きで始める（`disableImplicitSignUp`）。さらにユーザーを作る直前のフック（`databaseHooks.user.create.before`）で、**そのメールあての有効な招待があること**を確かめ、無ければ拒否する（有効 = pending・期限内）。
 - Google の新規登録では、ユーザーを作った直後のフック（`databaseHooks.user.create.after`）で個人用ワークスペースを作る（design-spec 5章。U5 と同じ処理）。
-- 運営者は `make admin-create EMAIL=...` が発行する招待（`invitations.grants_admin = true`。ワークスペースなし）から登録・受諾した人と、local のシードのデモの運営者だけがなる（`is_admin`。design-spec 9.2 の既定案）。AD9 のワークスペースなしの招待は `grants_admin = false` で、登録した人は個人用ワークスペースだけを持つ一般の利用者になる。同じメールあての有効なワークスペースなしの招待が AD9 で出ている状態で `make admin-create` を再実行すると、その招待に `grants_admin = true` を付けて新しいリンクを出す（前のリンクは無効になる）。`grants_admin` を付ける API は無い。
+- 運営者は `make admin-create EMAIL=...` が発行する招待（`invitations.grants_admin = true`。ワークスペースなし）から登録・受諾した人と、local のシードのデモの運営者だけがなる（`is_admin`）。AD9 のワークスペースなしの招待は `grants_admin = false` で、登録した人は個人用ワークスペースだけを持つ一般の利用者になる。同じメールあての有効なワークスペースなしの招待が AD9 で出ている状態で `make admin-create` を再実行すると、その招待に `grants_admin = true` を付けて新しいリンクを出す（前のリンクは無効になる）。`grants_admin` を付ける API は無い。
 - 停止したユーザー（`status = suspended`）はセッションを消し、ログインのフックで拒否する。
 
 **理由:** ユーザーが Better Auth で最初から Google ログインを入れると指定した。ライブラリなので $0 で、ユーザー情報は自分の DB に残り、乗り換えの妨げにならない。招待制のような独自の決まりを、フックで確実に組み込める。
@@ -398,7 +398,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 
 **状態・日付:** 採用（2026-10-01）
 
-**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{fraunces,noto-sans,noto-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる。react-pdf は `font-variant-numeric` を持たないが、Noto Sans の標準の数字は等幅なので、表・指標・金額の数字は等幅数字になる（API の結合テストが PDF の字送りで確かめる。10章）。
+**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{ibm-plex-sans,ibm-plex-mono,ibm-plex-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる（PDF には書体と太さごとに1つのファイルが要る。Web 用の `@fontsource` の日本語の書体は字の範囲ごとに分かれているので、PDF には使わない。ADR-018）。表・指標・金額の数字は、画面と同じく等幅の書体（`semantic.print.font.mono`）で書く（design-spec 4.4）（API の結合テストが PDF の字送りで確かめる。10章）。
 
 **理由:** どのクライアント（のちのネイティブを含む）からも同じ PDF を作るには、作る場所を1つにするのが確実。react-pdf は Chromium を使わないので、コンテナが軽く、0台からの起動も遅くならない。
 
@@ -466,26 +466,27 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 
 **トレードオフ:** Turborepo のような差分ビルドのキャッシュは無い。ビルドが遅くなったら導入を考える。
 
-### ADR-018: デザインシステムは Adobe Spectrum の仕組み、見た目は Hermes Teal（ユーザー指定）
+### ADR-018: デザインシステムは Adobe Spectrum の仕組み、見た目は月相（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテーマの生成を外し、PWA のアイコンとマニフェストの生成を足した）
+**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテーマの生成を外し、PWA のアイコンとマニフェストの生成を足した。2026-10-12 に見た目を Hermes Teal から月相に替え、06 からネイティブ向けの値を外し、書体の読み込みを決めた）
 
 **決定:**
 
-- **参考にするもの**: Adobe Spectrum（Spectrum 2）の仕組みを取り入れ、見た目は Hermes Teal にする（ユーザーと合意、2026-10-01）。取り入れる範囲は design-spec 4.4「デザインシステムの参考」、部品の一覧は design-spec 4.5 が正。この ADR は、それを実装する方法（トークンの階層・生成・ライト / ダーク）を決める。
+- **参考にするもの**: Adobe Spectrum（Spectrum 2）の仕組みを取り入れ（ユーザーと合意、2026-10-01）、見た目は design-spec 4.4 の月相にする（2026-10-12 にユーザーと決めた）。取り入れる範囲は design-spec 4.4「デザインシステムの参考」、部品の一覧は design-spec 4.5 が正。この ADR は、それを実装する方法（トークンの階層・生成・ライト / ダーク）を決める。
 - **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.scale.{medium,large}.component`。実装が参照してよいのは `semantic` だけ。`semantic` の値はエイリアスだけで、たどると必ず `primitive` に着く（書体のスタイルや密度は `semantic.scale.medium` を参照し、生成のときに large へ差し替える）。
 - **生成**: `make tokens` が `packages/ui-tokens` に次を生成する（変換は自前の小さなスクリプト。Style Dictionary は使わない）。
   - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク × medium / large の値。CSS 変数として出る）。画面のスライド表示（Slide）は `semantic.print`（ライト固定）を参照する
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
   - PWA: アイコン（SVG と PNG）とマニフェスト（ADR-031）
-  - `semantic.native` と、06 のネイティブ向けの説明は今は生成に使わない（ネイティブの feature で使うか決め直す。06 の見直しはデザインの決め直しで行う）
+  - 06 はネイティブ向けの値を持たない（2026-10-12 に外した。ネイティブの feature で要るものを足す）
 - **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は `<html data-theme>` と `prefers-color-scheme`（4 アカウント設定の System / Light / Dark に従う）。
 - **スケール（Web）**: 既定は `medium`。タッチ操作が主の端末（`@media (pointer: coarse)`）は `large` にする。`<html data-scale="medium|large">` で固定でき、固定が優先される。タッチパネル付きのノート PC も `pointer: coarse` に当たるときは `large` になる。
+- **書体**: 書体の名前の正は 06 の `primitive.font.family`（self-host する書体はどれも SIL OFL 1.1。並びの残りは配らない OS の書体）。Web は npm の `@fontsource/ibm-plex-sans`・`@fontsource/ibm-plex-mono`・`@fontsource/ibm-plex-sans-jp` を依存に入れて self-host する（外部の CDN からは読まない）。読み込むのは 06 の `primitive.font.weight` の太さだけで、ファイルは woff2 だけを使う。日本語の書体は字の範囲（`unicode-range`）ごとに分かれたファイルのまま使い、画面に出た字のファイルだけをブラウザが読む。Service Worker でのキャッシュの仕方は ADR-031、PDF の書体は ADR-012。
 - **アイコン**: Lucide（`lucide-react`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。
 
-**理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は Phase 2 で決めた Hermes Teal を保つことを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、のちのネイティブでも同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは一段ゆったり」をそのまま表せる。Lucide はネイティブ（`lucide-react-native`）にも同じ絵柄の版があり、線の太さと大きさを props で変えられる。変換を自前のスクリプトにするのは、出力が限られ（vanilla-extract・react-pdf・PWA のアイコン）、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため。
+**理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は moonx 独自のもの（2026-10-12 に月相に決めた）にすることを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、のちのネイティブでも同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは一段ゆったり」をそのまま表せる。Lucide はネイティブ（`lucide-react-native`）にも同じ絵柄の版があり、線の太さと大きさを props で変えられる。変換を自前のスクリプトにするのは、出力が限られ（vanilla-extract・react-pdf・PWA のアイコン）、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため。
 
-**捨てた案:** Spectrum の部品をそのまま使う（React Spectrum S2。配色と書体をほぼ変えられず、Hermes Teal を保てない）、Spectrum の Workflow アイコン（使わないとユーザーと合意した）、Style Dictionary（設定と拡張の方が大きくなる）。
+**捨てた案:** Spectrum の部品をそのまま使う（React Spectrum S2。配色と書体をほぼ変えられず、月相の見た目にできない）、Spectrum の Workflow アイコン（使わないとユーザーと合意した）、Style Dictionary（設定と拡張の方が大きくなる）。
 
 **トレードオフ:** S2 をそのまま使う案に比べ、部品の見た目を自分で作る手間がかかる。アイコンの体系は Spectrum とずれる。生成スクリプトを保守する必要がある。生成物はコミットし、`make tokens` の実行忘れを CI で検出する（生成し直して差分が出たら失敗）。
 
@@ -578,8 +579,8 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 
 **決定:**
 
-- **Web（`packages/ui-web`）**: 振る舞いとアクセシビリティは **React Aria Components**（キーボード操作・フォーカスの管理・ARIA・国際化された数値と日付の入力）。見た目は **vanilla-extract**（`*.css.ts` に型付きで書き、ビルド時に静的な CSS になる。実行時の処理なし）。大きさや種類の出し分けは `@vanilla-extract/recipes` の `recipe()`（例: `size: S | M | L | XL`、`variant: accent | primary | secondary | negative`）。React Aria の状態は `data-*` 属性（`[data-hovered]`・`[data-pressed]`・`[data-focus-visible]`・`[data-disabled]` など）で書く。Popover と Tray の切り替えは、幅がトークンの `semantic.breakpoint.tablet` より狭いときに Tray（下からのシート）にする共通の部品で行う。
-- **部品の名前と API**: design-spec 4.5 の Spectrum の名前にそろえる（例: `<Button variant="accent" size="M">`、`<StatusLight variant="positive">`）。のちのネイティブの部品も同じ名前と props にする。props の型は `packages/ui-web` で定義し、共通の部分（`size`・`variant` などの値の型）は `packages/ui-tokens` に手で書いて置く（`packages/ui-tokens/src/generated/` が `make tokens` の生成物、`src/types.ts` などそれ以外は手で書くファイル）。
+- **Web（`packages/ui-web`）**: 振る舞いとアクセシビリティは **React Aria Components**（キーボード操作・フォーカスの管理・ARIA・国際化された数値と日付の入力）。見た目は **vanilla-extract**（`*.css.ts` に型付きで書き、ビルド時に静的な CSS になる。実行時の処理なし）。大きさや種類の出し分けは `@vanilla-extract/recipes` の `recipe()`（例: `size: S | M | L | XL`、`variant: primary | secondary | negative`）。React Aria の状態は `data-*` 属性（`[data-hovered]`・`[data-pressed]`・`[data-focus-visible]`・`[data-disabled]` など）で書く。Popover と Tray の切り替えは、幅がトークンの `semantic.breakpoint.tablet` より狭いときに Tray（下からのシート）にする共通の部品で行う。
+- **部品の名前と API**: design-spec 4.5 の Spectrum の名前にそろえる（例: `<Button variant="primary" size="M">`、`<StatusLight variant="partial">`）。のちのネイティブの部品も同じ名前と props にする。props の型は `packages/ui-web` で定義し、共通の部分（`size`・`variant` などの値の型）は `packages/ui-tokens` に手で書いて置く（`packages/ui-tokens/src/generated/` が `make tokens` の生成物、`src/types.ts` などそれ以外は手で書くファイル）。
 - **画面にスタイルを書かない**: `apps/web` の画面は、部品と、レイアウトの部品（`Flex`・`Grid`。間隔はトークンの名前だけを受け取る。例: `gap="space-300"`）の組み合わせで作る。画面で `@vanilla-extract/css` を直接使うこと、`style` 属性に値を書くことは、Biome の `noRestrictedImports` と CI の検査で禁止する。必要な見た目が無ければ、design-spec 4.5 に部品を足してから `packages/ui-web` に作る。
 - **スマホ（保留）**: ネイティブの feature で決める。部品の名前と props を Web にそろえる決まりは保つ。
 
@@ -665,7 +666,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 - **マニフェスト**（`/manifest.webmanifest`）: `name` と `short_name` は下の「名前」、`display` は `standalone`、`start_url` と `scope` は `/`、`theme_color` と `background_color` はトークン（`semantic` の地の色）から作る。`make tokens` が生成する（ADR-018）。
 - **アイコン**: 形と色は design-spec 4.4「アプリのアイコン」に従う。ここは作り方だけを持つ: `make tokens` がトークンから SVG を作り、PNG（favicon 32、`apple-touch-icon` 180、192、512、maskable 512）は SVG から sharp で作る。生成物（`packages/ui-tokens/src/generated/pwa/`）は手で直さず、Web のビルドが `/icons/` に出す。
 - **Service Worker**（`/sw.js`。`apps/web` の Service Worker のソースに、ビルドしたアセットの一覧を vite-plugin-pwa の `injectManifest` で埋め込む）:
-  - キャッシュするのは画面の外側だけ: `_shell.html`、ビルドしたアセット、フォント、アイコン。ランディング（`index.html`）と 29・30 の HTML はキャッシュしない。
+  - キャッシュするのは画面の外側だけ: `_shell.html`、ビルドしたアセット、フォント、アイコン。ランディング（`index.html`）と 29・30 の HTML はキャッシュしない。フォントのうち事前にキャッシュする（インストールのときに取る）のは欧文と等幅の書体の woff2 だけ。日本語の書体の字の範囲ごとのファイル（1つの太さで100を超える）は事前にキャッシュせず、使われたときに実行時にキャッシュする（CacheFirst。ADR-018）。
   - `/api/*` はキャッシュせず、必ずネットワークに出す（オフラインでも代わりの応答を返さない）。
   - 画面のパスへのナビゲーションはネットワークを先に使い、オフラインのときだけキャッシュした `_shell.html` を返す（API が meta を入れた最新の HTML を使うため）。
   - 入力をオフラインで受けて後で送る仕組みは作らない（入力には接続が要る。ADR-021）。
@@ -1197,7 +1198,7 @@ interface ValidationHome {
     answered: number | null; total: number | null;   // 03 / 04 / 09 は null（件数だけ）
     count: number | null;                             // 03 / 04 / 09 の件数（09 は前提とリスクの2つ: countB）
     countB?: number | null;
-    fau: FauBreakdown | null;
+    fau: FauBreakdown | null;                        // 13 の画面では使わない（design-spec 6.1。2026-10-12）
   }[];
   decisions: DecisionLogSummary[];           // 新しい順。件数は design-spec 6.1
   plans: PlanSummary[];                      // アーカイブした案を除く
@@ -1254,7 +1255,7 @@ interface EconomicsInput extends Versioned {
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| V1 | — | `200 ValidationHome` | 確認項目・Next steps・F/A/U・主要指標は `packages/domain` で計算する。`sections[].title` は番号を含む固定のラベル（カタログ `validation:sections.<key>`。テンプレートの節の題とは独立） |
+| V1 | — | `200 ValidationHome` | 確認項目・Next steps・F/A/U・主要指標は `packages/domain` で計算する。`sections[].title` は番号を含む名前。出どころの決まりは design-spec 6.1（設問のセクションはテンプレートの版の題、画面のセクションはカタログ `validation:sections.<key>` の固定のラベル） |
 | V2 | — | `200 { section: TemplateSection; answers: ValidationAnswer[] }` | `sectionKey` は `01` / `02` / `10`（`04` のパターンと `08` は V8・V15 が返す。それ以外の値は `404 NOT_FOUND`）。設問ごとに必ず1件返す（未回答は `text: null`, `lockVersion: 0`。出し分けで隠れる設問も `hidden: true` で返す） |
 | V3 | `{ text?: string | null; classification?: ClassificationInput; lockVersion: number; force?: boolean }` | `200 ValidationAnswer` | `422 FACT_REQUIRES_EVIDENCE`（有効な根拠が無いのに `fact`。Fact は V4 の `setFact` で付ける）、`422 CONFIDENCE_REQUIRED`、`422 INVALID_CHOICE`（選択の設問）、`422 QUESTION_NOT_FOUND`（テンプレートの版に無い設問 ID。`V.04.SURVIVOR_PATTERNS`・`V.04.FAILURE_PATTERNS`・`V.08.WORTH` も V3 で答える）。`text` の長さは design-spec 6.0.8（超えたら `422 VALIDATION_FAILED`）。`text` を null か空白にすると F/A/U も外す（`unknown` を除く）。答えの行を作るときの `lockVersion` は 0 で、作られた行は 1 から始まる。履歴 `manual` |
 | V4 | `{ target: TargetRef; researchLogEntryId?: UUID; newResearchLog?: ResearchLogInput; url?: string; note?: string; setFact?: boolean; lockVersion: number; force?: boolean }` | `201 { evidence: Evidence; classification: Classification; lockVersion: number }` | `researchLogEntryId` / `newResearchLog` / `url` のどれか1つ。`setFact: true` なら対象を Fact にする（M2 で根拠を付けて閉じたとき）。対象は `validation_answer` / `economics_input` / `cost_item` / `competitor` / `assumption`（`lockVersion` は対象の項目の版）。同じ調査ログを同じ対象に2回付けると `422 VALIDATION_FAILED`。値の無い対象や F/A/U を持たない対象（競合・前提）への `setFact` も `422 VALIDATION_FAILED`（`details[0].path` は `setFact`）。`url` と `note` の値は design-spec 6.0.8。対象の版が食い違えば `409 CONFLICT`、`force: true` で上書きする（ADR-019）。履歴は対象の項目に1行（`newResearchLog` のときは調査ログの作成も1行）。`manual` |
@@ -1489,8 +1490,9 @@ interface HistoryEntry {
 interface Notification {
   id: UUID; kind: "mention" | "comment" | "decision";
   workspace: { id: UUID; name: string }; actor: UserRef | null;
-  title: string;          // 表示用の短い文（英語。例: "Paolo mentioned you on WHO"）
-  excerpt: string | null; link: LinkTarget;
+  title: string;          // 表示用の短い文（英語。どこでを含める。例: "Paolo mentioned you on WHO · Piaya Gift Box Delivery"）
+  excerpt: string | null; // コメント・メンションは本文の冒頭、判定・Go / No-Go は理由の冒頭。版の保存は null（design-spec 6.15）
+  link: LinkTarget;
   accessible: boolean;    // 外れた・権限がなくなったら false（「You no longer have access」）
   readAt: DateTime | null; createdAt: DateTime;
 }
@@ -1574,7 +1576,7 @@ interface TemplateFile {
 | AD2 | — | `201 { id: UUID }` | その版をコピーした下書きを作る。下書きがすでにあれば `409 DRAFT_EXISTS` |
 | AD3 GET | — | `200 TemplateVersionDetail` | |
 | AD3 PATCH | `{ aiPrompt: string }` | `200 TemplateVersionDetail` | 検証とプランの版に空でない値を送ると `422 VALIDATION_FAILED`（AI 用プロンプトを持つのは自己分析だけ。design-spec 6.17）。公開済みの版は `409 PUBLISHED_READ_ONLY`（AD4・AD5・AD6 publish も同じ。AD6 validate は書き込まないので公開済みの版にも使える） |
-| AD4 | セクション: `{ key; title; subtitle?; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（PATCH は一部。文字の値は design-spec 6.0.8） | `201` / `200` / `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`） |
+| AD4 | セクション: `{ key; title; subtitle?; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（`reference` は 27 の画面からは送らない。変えるのは AD10 の取り込みだけ。design-spec 6.17。PATCH は一部。文字の値は design-spec 6.0.8） | `201` / `200` / `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`） |
 | AD5 | order: `{ sections: { id: UUID; questionIds: UUID[] }[] }`。cost-defaults: `{ items: { category; key; name }[] }`。check-rules: `{ items: { checkKey; params }[] }`（基準値は design-spec 6.0.8）。execution-presets: `{ items: { type; title; area?; launchTiming? }[] }` | `200 TemplateVersionDetail` | 一覧ごと置き換える |
 | AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 公開をふさぐエラー: 設問が0件（`no_questions`）、セクションの `part` の過不足（`invalid_part`。プランは A / B が必須、他は無し）、設問 ID の形式（`invalid_question_key`）・セクションとの不一致（`question_key_section_mismatch`）・重複（`duplicate_question_key`）、`answerType` と `options` の食い違い（`options_mismatch`）、`displayCondition` が存在しない設問を指す（`unknown_condition_key`）。警告: 前の版から消えた ID |
 | AD6 publish | — | `200 { versionNumber: number; publishedAt: DateTime }` | 検査のエラーがあれば `422 TEMPLATE_INVALID`。既存の回答は変わらない |

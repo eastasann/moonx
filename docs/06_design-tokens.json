@@ -1,151 +1,74 @@
 {
   "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
-  "$description": "デザイントークンの正（DTCG）。具体値（色・書体・大きさ・余白・角丸・影・動き・スライドの寸法）はこのファイルだけが持つ。方針（Spectrum の仕組みと Hermes Teal の見た目）は design-spec 4.4、トークンの階層・生成先・参照の決まりは System Design Doc ADR-018。",
+  "$description": "デザイントークンの正（DTCG）。具体値（色・書体・大きさ・余白・角丸・影・動き・スライドの寸法）はこのファイルだけが持つ。方針（Spectrum の仕組みと月相の見た目）は design-spec 4.4、トークンの階層・生成先・参照の決まりは System Design Doc ADR-018。",
   "primitive": {
     "$description": "生の値のスケール（Spectrum の global に当たる）。実装から直接参照しない",
     "color": {
       "$type": "color",
-      "teal": {
-        "$description": "ブランドの深いティール。ダークの地とライトの文字",
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.847, 0.937, 0.929], "hex": "#d8efed" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.557, 0.827, 0.8], "hex": "#8ed3cc" } },
-        "600": { "$value": { "colorSpace": "srgb", "components": [0.102, 0.392, 0.384], "hex": "#1a6462" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.129, 0.286, 0.278], "hex": "#214947" } },
-        "750": { "$value": { "colorSpace": "srgb", "components": [0.106, 0.239, 0.235], "hex": "#1b3d3c" } },
-        "800": { "$value": { "colorSpace": "srgb", "components": [0.078, 0.2, 0.192], "hex": "#143331" } },
-        "850": { "$value": { "colorSpace": "srgb", "components": [0.059, 0.165, 0.161], "hex": "#0f2a29" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.043, 0.133, 0.129], "hex": "#0b2221" } },
-        "950": { "$value": { "colorSpace": "srgb", "components": [0.024, 0.094, 0.09], "hex": "#061817" } }
-      },
-      "mist": {
-        "$description": "彩度を落としたティールグレー",
-        "600": { "$value": { "colorSpace": "srgb", "components": [0.271, 0.353, 0.349], "hex": "#455a59" } }
-      },
-      "cream": {
-        "$description": "クリーム。ライトの地とダークの文字",
-        "50": { "$value": { "colorSpace": "srgb", "components": [0.988, 0.976, 0.949], "hex": "#fcf9f2" } },
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.961, 0.933, 0.875], "hex": "#f5eedf" } },
-        "200": { "$value": { "colorSpace": "srgb", "components": [0.922, 0.886, 0.804], "hex": "#ebe2cd" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.863, 0.816, 0.71], "hex": "#dcd0b5" } },
-        "400": { "$value": { "colorSpace": "srgb", "components": [0.753, 0.722, 0.655], "hex": "#c0b8a7" } }
-      },
-      "gold": {
-        "$description": "金。ごく控えめなアクセント（ブランドと主要な操作）だけ",
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.894, 0.765, 0.475], "hex": "#e4c379" } },
-        "400": { "$value": { "colorSpace": "srgb", "components": [0.847, 0.706, 0.392], "hex": "#d8b464" } },
-        "500": { "$value": { "colorSpace": "srgb", "components": [0.78, 0.643, 0.341], "hex": "#c7a457" } },
-        "600": { "$value": { "colorSpace": "srgb", "components": [0.651, 0.51, 0.165], "hex": "#a6822a" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.627, 0.49, 0.157], "hex": "#a07d28" } },
-        "800": { "$value": { "colorSpace": "srgb", "components": [0.612, 0.478, 0.153], "hex": "#9c7a27" } }
-      },
-      "stone": {
-        "$description": "温かみのあるグレー。未入力・未着手・罫線・無効",
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.91, 0.902, 0.867], "hex": "#e8e6dd" } },
-        "200": { "$value": { "colorSpace": "srgb", "components": [0.788, 0.78, 0.753], "hex": "#c9c7c0" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.651, 0.647, 0.62], "hex": "#a6a59e" } },
-        "400": { "$value": { "colorSpace": "srgb", "components": [0.58, 0.573, 0.541], "hex": "#94928a" } },
-        "500": { "$value": { "colorSpace": "srgb", "components": [0.51, 0.502, 0.471], "hex": "#828078" } },
-        "600": { "$value": { "colorSpace": "srgb", "components": [0.455, 0.447, 0.416], "hex": "#74726a" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.365, 0.357, 0.325], "hex": "#5d5b53" } },
-        "800": { "$value": { "colorSpace": "srgb", "components": [0.247, 0.239, 0.212], "hex": "#3f3d36" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.196, 0.188, 0.169], "hex": "#32302b" } }
-      },
-      "sage": {
-        "$description": "緑（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.851, 0.929, 0.831], "hex": "#d9edd4" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.655, 0.843, 0.612], "hex": "#a7d79c" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.227, 0.408, 0.188], "hex": "#3a6830" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.145, 0.208, 0.133], "hex": "#253522" } }
-      },
-      "sky": {
-        "$description": "青（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.839, 0.914, 0.976], "hex": "#d6e9f9" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.612, 0.804, 0.973], "hex": "#9ccdf8" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.122, 0.373, 0.561], "hex": "#1f5f8f" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.118, 0.196, 0.263], "hex": "#1e3243" } }
-      },
-      "plum": {
-        "$description": "紫（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.922, 0.882, 0.98], "hex": "#ebe1fa" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.835, 0.718, 1], "hex": "#d5b7ff" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.412, 0.278, 0.569], "hex": "#694791" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.208, 0.169, 0.263], "hex": "#352b43" } }
-      },
-      "rose": {
-        "$description": "ピンク（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.98, 0.867, 0.91], "hex": "#fadde8" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.996, 0.671, 0.8], "hex": "#feabcc" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.549, 0.224, 0.373], "hex": "#8c395f" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.259, 0.153, 0.196], "hex": "#422732" } }
+      "night": {
+        "$description": "夜のインク（青みの灰）。0〜300 はライトの地と線（125 はダークの文字）、400〜700 は補足の文字・枠・印、750〜950 はダークの地とライトの文字。差し色は持たない（design-spec 4.4）",
+        "0": { "$value": { "colorSpace": "srgb", "components": [1, 1, 1], "hex": "#ffffff" } },
+        "50": { "$value": { "colorSpace": "srgb", "components": [0.957, 0.961, 0.973], "hex": "#f4f5f8" } },
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.925, 0.933, 0.953], "hex": "#eceef3" } },
+        "125": { "$value": { "colorSpace": "srgb", "components": [0.902, 0.91, 0.945], "hex": "#e6e8f1" } },
+        "150": { "$value": { "colorSpace": "srgb", "components": [0.882, 0.894, 0.922], "hex": "#e1e4eb" } },
+        "200": { "$value": { "colorSpace": "srgb", "components": [0.863, 0.878, 0.91], "hex": "#dce0e8" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.776, 0.796, 0.847], "hex": "#c6cbd8" } },
+        "400": { "$value": { "colorSpace": "srgb", "components": [0.635, 0.659, 0.741], "hex": "#a2a8bd" } },
+        "450": { "$value": { "colorSpace": "srgb", "components": [0.561, 0.588, 0.682], "hex": "#8f96ae" } },
+        "500": { "$value": { "colorSpace": "srgb", "components": [0.525, 0.553, 0.631], "hex": "#868da1" } },
+        "550": { "$value": { "colorSpace": "srgb", "components": [0.478, 0.506, 0.592], "hex": "#7a8197" } },
+        "600": { "$value": { "colorSpace": "srgb", "components": [0.435, 0.463, 0.565], "hex": "#6f7690" } },
+        "650": { "$value": { "colorSpace": "srgb", "components": [0.392, 0.42, 0.51], "hex": "#646b82" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.333, 0.365, 0.447], "hex": "#555d72" } },
+        "750": { "$value": { "colorSpace": "srgb", "components": [0.227, 0.259, 0.388], "hex": "#3a4263" } },
+        "800": { "$value": { "colorSpace": "srgb", "components": [0.169, 0.192, 0.314], "hex": "#2b3150" } },
+        "825": { "$value": { "colorSpace": "srgb", "components": [0.149, 0.173, 0.267], "hex": "#262c44" } },
+        "850": { "$value": { "colorSpace": "srgb", "components": [0.106, 0.129, 0.208], "hex": "#1b2135" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.082, 0.102, 0.173], "hex": "#151a2c" } },
+        "950": { "$value": { "colorSpace": "srgb", "components": [0.055, 0.067, 0.125], "hex": "#0e1120" } }
       },
       "amber": {
-        "$description": "橙（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [1, 0.875, 0.796], "hex": "#ffdfcb" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.996, 0.71, 0.51], "hex": "#feb582" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.545, 0.271, 0.004], "hex": "#8b4501" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.259, 0.165, 0.098], "hex": "#422a19" } }
+        "$description": "注意（未分類・警告）だけ（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [1, 0.953, 0.863], "hex": "#fff3dc" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [0.949, 0.714, 0.361], "hex": "#f2b65c" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.604, 0.337, 0], "hex": "#9a5600" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.165, 0.133, 0.075], "hex": "#2a2213" } }
       },
       "red": {
-        "$description": "赤（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地。400・500 はダークの strong の hover・pressed、750・800 はライトの strong の hover・pressed）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [1, 0.867, 0.859], "hex": "#ffdddb" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [1, 0.584, 0.573], "hex": "#ff9592" } },
-        "400": { "$value": { "colorSpace": "srgb", "components": [0.949, 0.557, 0.545], "hex": "#f28e8b" } },
-        "500": { "$value": { "colorSpace": "srgb", "components": [0.902, 0.525, 0.514], "hex": "#e68683" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.631, 0.145, 0.184], "hex": "#a1252f" } },
-        "750": { "$value": { "colorSpace": "srgb", "components": [0.6, 0.137, 0.176], "hex": "#99232d" } },
-        "800": { "$value": { "colorSpace": "srgb", "components": [0.569, 0.129, 0.165], "hex": "#91212a" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.275, 0.149, 0.145], "hex": "#462625" } }
-      },
-      "sea": {
-        "$description": "青緑（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.82, 0.929, 0.922], "hex": "#d1edeb" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.51, 0.851, 0.827], "hex": "#82d9d3" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.02, 0.412, 0.396], "hex": "#056965" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.098, 0.212, 0.204], "hex": "#193634" } }
-      },
-      "sand": {
-        "$description": "砂色（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.969, 0.89, 0.773], "hex": "#f7e3c5" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.859, 0.769, 0.627], "hex": "#dbc4a0" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.427, 0.341, 0.2], "hex": "#6d5733" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.224, 0.184, 0.122], "hex": "#392f1f" } }
-      },
-      "slate": {
-        "$description": "青灰（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.882, 0.902, 0.961], "hex": "#e1e6f5" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.745, 0.776, 0.898], "hex": "#bec6e5" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.322, 0.349, 0.467], "hex": "#525977" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.173, 0.184, 0.247], "hex": "#2c2f3f" } }
+        "$description": "エラーと削除の確認だけ（判定の Drop には使わない。100・300・700・900 は amber と同じ使い分け。400・500 はダークの strong の hover・pressed、750・800 はライトの strong の hover・pressed）",
+        "100": { "$value": { "colorSpace": "srgb", "components": [0.992, 0.925, 0.918], "hex": "#fdecea" } },
+        "300": { "$value": { "colorSpace": "srgb", "components": [1, 0.541, 0.502], "hex": "#ff8a80" } },
+        "400": { "$value": { "colorSpace": "srgb", "components": [1, 0.624, 0.592], "hex": "#ff9f97" } },
+        "500": { "$value": { "colorSpace": "srgb", "components": [1, 0.706, 0.678], "hex": "#ffb4ad" } },
+        "700": { "$value": { "colorSpace": "srgb", "components": [0.702, 0.149, 0.118], "hex": "#b3261e" } },
+        "750": { "$value": { "colorSpace": "srgb", "components": [0.62, 0.129, 0.098], "hex": "#9e2119" } },
+        "800": { "$value": { "colorSpace": "srgb", "components": [0.541, 0.11, 0.082], "hex": "#8a1c15" } },
+        "900": { "$value": { "colorSpace": "srgb", "components": [0.18, 0.09, 0.086], "hex": "#2e1716" } }
       },
       "alpha": {
         "$description": "透明度つき（hex は透明度を除いた色）。影とスクリム用",
         "transparent": { "$value": { "colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0, "hex": "#000000" } },
-        "teal-950-08": { "$value": { "colorSpace": "srgb", "components": [0.024, 0.094, 0.09], "alpha": 0.08, "hex": "#061817" } },
-        "teal-950-14": { "$value": { "colorSpace": "srgb", "components": [0.024, 0.094, 0.09], "alpha": 0.14, "hex": "#061817" } },
-        "teal-900-40": { "$value": { "colorSpace": "srgb", "components": [0.043, 0.133, 0.129], "alpha": 0.4, "hex": "#0b2221" } },
-        "teal-950-72": { "$value": { "colorSpace": "srgb", "components": [0.024, 0.094, 0.09], "alpha": 0.72, "hex": "#061817" } },
+        "night-950-08": { "$value": { "colorSpace": "srgb", "components": [0.055, 0.067, 0.125], "alpha": 0.08, "hex": "#0e1120" } },
+        "night-950-16": { "$value": { "colorSpace": "srgb", "components": [0.055, 0.067, 0.125], "alpha": 0.16, "hex": "#0e1120" } },
+        "night-950-40": { "$value": { "colorSpace": "srgb", "components": [0.055, 0.067, 0.125], "alpha": 0.4, "hex": "#0e1120" } },
+        "night-950-72": { "$value": { "colorSpace": "srgb", "components": [0.055, 0.067, 0.125], "alpha": 0.72, "hex": "#0e1120" } },
         "black-55": { "$value": { "colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0.55, "hex": "#000000" } }
       }
     },
     "font": {
       "family": {
         "$type": "fontFamily",
-        "display": {
-          "$value": ["Fraunces", "Georgia", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", "serif"],
-          "$description": "見出し用のレトロなソフトセリフ Fraunces（SIL OFL 1.1）。Web は self-host（可変 wght・opsz）、Expo は静的 TTF を同梱、PDF に埋め込む。日本語は Noto Sans JP（スマホは OS の日本語フォント）に落ちる"
-        },
         "sans": {
-          "$value": ["system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "Noto Sans", "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "sans-serif"],
-          "$description": "システムのサンセリフ。日本語は Noto Sans JP（Web は self-host）か OS の日本語フォントに落ちる。RN では指定せず OS の既定を使う"
+          "$value": ["IBM Plex Sans", "IBM Plex Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "system-ui", "sans-serif"],
+          "$description": "見出し・本文・回答・入力欄の書体 IBM Plex Sans（SIL OFL 1.1）。日本語は IBM Plex Sans JP（SIL OFL 1.1）、無い字は OS の日本語フォントに落ちる。Web は self-host（SDD ADR-018）"
         },
         "mono": {
-          "$value": ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", "Noto Sans Mono", "monospace"],
-          "$description": "システムの等幅。RN は単一の名前を持たないので mono-ios / mono-android を使う"
+          "$value": ["IBM Plex Mono", "IBM Plex Sans JP", "ui-monospace", "Menlo", "Consolas", "monospace"],
+          "$description": "金額・指標・表の数字と設問の名前・ID の等幅 IBM Plex Mono（SIL OFL 1.1）。Web は self-host（SDD ADR-018）"
         },
-        "mono-ios": { "$value": ["Menlo"], "$description": "RN（iOS）の等幅" },
-        "mono-android": { "$value": ["monospace"], "$description": "RN（Android）の等幅" },
-        "print-display": { "$value": ["Fraunces", "Noto Sans JP"], "$description": "PDF 用。react-pdf に登録し、使った文字だけ埋め込む（ADR-012）" },
-        "print-sans": { "$value": ["Noto Sans", "Noto Sans JP"], "$description": "PDF 用。Noto Sans / Noto Sans JP（ともに SIL OFL 1.1）を埋め込む（ADR-012）" }
+        "print-sans": { "$value": ["IBM Plex Sans", "IBM Plex Sans JP"], "$description": "PDF 用。react-pdf に登録し、使った文字だけ埋め込む（ADR-012）" },
+        "print-mono": { "$value": ["IBM Plex Mono", "IBM Plex Sans JP"], "$description": "PDF の数字（design-spec 4.4 の決定で、数字は等幅の書体で書く。ADR-012）" }
       },
       "size": {
         "$type": "dimension",
@@ -199,14 +122,11 @@
       },
       "letter-spacing": {
         "$type": "dimension",
+        "tightest": { "$value": { "value": -0.75, "unit": "px" } },
         "tighter": { "$value": { "value": -0.5, "unit": "px" } },
         "tight": { "$value": { "value": -0.25, "unit": "px" } },
         "normal": { "$value": { "value": 0, "unit": "px" } },
         "wide": { "$value": { "value": 0.25, "unit": "px" } }
-      },
-      "feature": {
-        "$description": "DTCG に型がないため文字列。CSS font-variant-numeric / RN fontVariant / OpenType tnum に変換する",
-        "tabular-nums": { "$value": "tabular-nums" }
       }
     },
     "dimension": {
@@ -266,14 +186,15 @@
       "480": { "$value": { "value": 480, "unit": "px" } },
       "540": { "$value": { "value": 540, "unit": "px" } },
       "640": { "$value": { "value": 640, "unit": "px" } },
+      "720": { "$value": { "value": 720, "unit": "px" } },
       "960": { "$value": { "value": 960, "unit": "px" } },
       "1280": { "$value": { "value": 1280, "unit": "px" } }
     },
     "radius": {
       "$type": "dimension",
-      "sm": { "$value": { "value": 4, "unit": "px" } },
-      "md": { "$value": { "value": 6, "unit": "px" } },
-      "lg": { "$value": { "value": 10, "unit": "px" } },
+      "sm": { "$value": { "value": 6, "unit": "px" } },
+      "md": { "$value": { "value": 8, "unit": "px" } },
+      "lg": { "$value": { "value": 12, "unit": "px" } },
       "xl": { "$value": { "value": 16, "unit": "px" } },
       "full": { "$value": { "value": 9999, "unit": "px" } }
     },
@@ -281,6 +202,7 @@
       "$type": "dimension",
       "1": { "$value": { "value": 1, "unit": "px" } },
       "2": { "$value": { "value": 2, "unit": "px" } },
+      "3": { "$value": { "value": 3, "unit": "px" } },
       "4": { "$value": { "value": 4, "unit": "px" } }
     },
     "breakpoint": {
@@ -319,7 +241,7 @@
       },
       "sm-light": {
         "$value": {
-          "color": "{primitive.color.alpha.teal-950-08}",
+          "color": "{primitive.color.alpha.night-950-08}",
           "offsetX": { "value": 0, "unit": "px" },
           "offsetY": { "value": 1, "unit": "px" },
           "blur": { "value": 2, "unit": "px" },
@@ -328,11 +250,11 @@
       },
       "md-light": {
         "$value": {
-          "color": "{primitive.color.alpha.teal-950-14}",
+          "color": "{primitive.color.alpha.night-950-16}",
           "offsetX": { "value": 0, "unit": "px" },
-          "offsetY": { "value": 8, "unit": "px" },
-          "blur": { "value": 24, "unit": "px" },
-          "spread": { "value": -4, "unit": "px" }
+          "offsetY": { "value": 12, "unit": "px" },
+          "blur": { "value": 32, "unit": "px" },
+          "spread": { "value": -12, "unit": "px" }
         }
       },
       "md-dark": {
@@ -369,404 +291,194 @@
     "$description": "用途の名前の層（Spectrum の alias と component）。実装はここだけを参照する。値はすべてエイリアス。semantic.scale.medium を指す値（typography の fontSize・density の row-height）は、生成時に使っているスケールの同じキーに読み替える",
     "color": {
       "$type": "color",
-      "$description": "light / dark は同じキー（OS 追従＋手動切替）。色だけで意味を伝えない。文字 4.5:1、枠・フォーカス・点 3:1 以上。fg=文字・アイコン、bg=淡い地、strong=StatusLight の点・Meter の帯・塗りの Badge、on-strong=strong の上の文字",
+      "$description": "light / dark は同じキー（OS 追従＋手動切替）。色だけで意味を伝えず、状態は月の形とラベルで示す（design-spec 4.4）。文字 4.5:1、枠・フォーカス・印 3:1 以上。fg=文字・アイコン、bg=淡い地、strong=Meter の帯・塗りの印、on-strong=strong の上の文字",
       "light": {
-        "$description": "ライト。クリームの地に深いティールの文字",
+        "$description": "ライト。明るい灰の地に夜のインクの文字",
         "surface": {
-          "canvas": { "$value": "{primitive.color.cream.100}", "$description": "画面の地" },
-          "raised": { "$value": "{primitive.color.cream.50}", "$description": "パネル・カード" },
-          "sunken": { "$value": "{primitive.color.cream.200}", "$description": "入力欄・表の見出し行・Well" },
-          "overlay": { "$value": "{primitive.color.cream.50}", "$description": "Popover・Tray・Dialog" },
-          "hover": { "$value": "{primitive.color.cream.200}", "$description": "行・項目のホバー" },
-          "selected": { "$value": "{primitive.color.teal.100}", "$description": "選択中の行・現在のナビ" },
-          "scrim": { "$value": "{primitive.color.alpha.teal-900-40}", "$description": "Dialog・Tray の背後" }
+          "canvas": { "$value": "{primitive.color.night.50}", "$description": "画面の地" },
+          "raised": { "$value": "{primitive.color.night.0}", "$description": "パネル・カード・表" },
+          "sunken": { "$value": "{primitive.color.night.100}", "$description": "表の見出し行・Well・画面上部の帯" },
+          "overlay": { "$value": "{primitive.color.night.0}", "$description": "Popover・Tray・Dialog" },
+          "hover": { "$value": "{primitive.color.night.100}", "$description": "行・項目のホバー（overlay の上でも区別できる値）" },
+          "selected": { "$value": "{primitive.color.night.0}", "$description": "選択中の行・現在のナビ。地に加えて control.primary の線（border-width.selected-indicator）で示す" },
+          "scrim": { "$value": "{primitive.color.alpha.night-950-40}", "$description": "Dialog・Tray の背後" }
         },
         "text": {
-          "primary": { "$value": "{primitive.color.teal.900}" },
-          "secondary": { "$value": "{primitive.color.mist.600}", "$description": "補足・メタ情報・フォーカス外の設問" },
-          "placeholder": { "$value": "{primitive.color.stone.700}", "$description": "入力欄のプレースホルダー" },
-          "disabled": { "$value": "{primitive.color.stone.400}", "$description": "無効（コントラスト基準の対象外）" },
-          "on-accent": { "$value": "{primitive.color.teal.950}", "$description": "accent の上の文字" },
-          "link": { "$value": "{primitive.color.teal.600}", "$description": "Link。下線を付ける" }
+          "primary": { "$value": "{primitive.color.night.900}" },
+          "secondary": { "$value": "{primitive.color.night.700}", "$description": "補足・メタ情報・F/A/U のラベル" },
+          "tertiary": { "$value": "{primitive.color.night.650}", "$description": "Empty・Unknown の値など、薄く読ませる文字（4.5:1 以上）" },
+          "placeholder": { "$value": "{primitive.color.night.650}", "$description": "入力欄のプレースホルダー" },
+          "disabled": { "$value": "{primitive.color.night.400}", "$description": "無効（コントラスト基準の対象外）" },
+          "link": { "$value": "{primitive.color.night.900}", "$description": "Link。文字は本文と同じ色で、下線で示す" }
         },
         "border": {
-          "hairline": { "$value": "{primitive.color.cream.300}", "$description": "区切り線（装飾）" },
-          "strong": { "$value": "{primitive.color.stone.600}", "$description": "入力欄・コントロールの枠（3:1 以上）" },
-          "focus": { "$value": "{primitive.color.teal.600}", "$description": "フォーカスの表示（Spectrum の focus-indicator）" }
-        },
-        "accent": {
-          "$description": "Spectrum の accent。金。使いどころは design-spec 4.5（Button の accent とブランドマーク）。canvas と raised の上だけで使い、sunken（入力欄）の上には置かない（ライトの sunken とのコントラストが 3:1 に届かないため）",
-          "default": { "$value": "{primitive.color.gold.600}" },
-          "hover": { "$value": "{primitive.color.gold.700}" },
-          "pressed": { "$value": "{primitive.color.gold.800}" }
+          "hairline": { "$value": "{primitive.color.night.150}", "$description": "区切り線（装飾）" },
+          "strong": { "$value": "{primitive.color.night.550}", "$description": "入力欄・コントロールの枠（3:1 以上）" },
+          "focus": { "$value": "{primitive.color.night.900}", "$description": "フォーカスの表示（Spectrum の focus-indicator）" }
         },
         "control": {
-          "$description": "Button の primary / secondary と、選択したコントロール（Spectrum の neutral-background・track）",
-          "primary": { "$value": "{primitive.color.teal.900}", "$description": "Button variant=primary の地・選択した Checkbox / Radio / Switch" },
-          "primary-hover": { "$value": "{primitive.color.teal.800}" },
-          "primary-pressed": { "$value": "{primitive.color.teal.950}" },
-          "on-primary": { "$value": "{primitive.color.cream.50}", "$description": "primary の上の文字・チェック" },
-          "secondary": { "$value": "{primitive.color.cream.200}", "$description": "Button variant=secondary の地" },
-          "secondary-hover": { "$value": "{primitive.color.cream.300}" },
-          "secondary-pressed": { "$value": "{primitive.color.cream.400}" },
-          "on-secondary": { "$value": "{primitive.color.teal.900}" },
-          "disabled": { "$value": "{primitive.color.cream.200}", "$description": "無効なコントロールの地（文字は text.disabled）" },
-          "track": { "$value": "{primitive.color.cream.300}", "$description": "Meter・ProgressBar の地" },
-          "track-fill": { "$value": "{primitive.color.teal.600}", "$description": "ProgressBar の進み" }
+          "primary": { "$value": "{primitive.color.night.900}", "$description": "Button variant=primary の地・選択した Checkbox / Radio / Switch・SegmentedControl の選択" },
+          "primary-hover": { "$value": "{primitive.color.night.750}" },
+          "primary-pressed": { "$value": "{primitive.color.night.950}" },
+          "on-primary": { "$value": "{primitive.color.night.0}", "$description": "primary の上の文字・チェック" },
+          "secondary": { "$value": "{primitive.color.night.0}", "$description": "Button variant=secondary の地（枠は border.strong）" },
+          "secondary-hover": { "$value": "{primitive.color.night.100}" },
+          "secondary-pressed": { "$value": "{primitive.color.night.150}" },
+          "on-secondary": { "$value": "{primitive.color.night.900}" },
+          "disabled": { "$value": "{primitive.color.night.100}", "$description": "無効なコントロールの地（文字は text.disabled）" },
+          "track": { "$value": "{primitive.color.night.150}", "$description": "Meter・ProgressBar の地" },
+          "track-fill": { "$value": "{primitive.color.night.900}", "$description": "ProgressBar の進み" }
         },
         "informative": {
-          "$description": "Spectrum の informative。お知らせ",
-          "fg": { "$value": "{primitive.color.sky.700}" },
-          "bg": { "$value": "{primitive.color.sky.100}" },
-          "strong": { "$value": "{primitive.color.sky.700}" },
-          "on-strong": { "$value": "{primitive.color.cream.50}" }
-        },
-        "positive": {
-          "$description": "Spectrum の positive。保存済み・完了",
-          "fg": { "$value": "{primitive.color.sage.700}" },
-          "bg": { "$value": "{primitive.color.sage.100}" },
-          "strong": { "$value": "{primitive.color.sage.700}" },
-          "on-strong": { "$value": "{primitive.color.cream.50}" }
+          "$description": "情報の帯・InlineAlert（色を足さず、地とアイコンで示す）",
+          "fg": { "$value": "{primitive.color.night.700}" },
+          "bg": { "$value": "{primitive.color.night.100}" },
+          "strong": { "$value": "{primitive.color.night.700}" },
+          "on-strong": { "$value": "{primitive.color.night.0}" }
         },
         "notice": {
-          "$description": "Spectrum の notice。注意（粗利マイナス・Capacity 超過・費用の下限・Fact · No evidence）",
-          "$extensions": { "app.moonx": { "uses": ["negative-margin", "capacity-exceeded", "cost-floor", "fact-no-evidence"] } },
           "fg": { "$value": "{primitive.color.amber.700}" },
           "bg": { "$value": "{primitive.color.amber.100}" },
           "strong": { "$value": "{primitive.color.amber.700}" },
-          "on-strong": { "$value": "{primitive.color.cream.50}" }
+          "on-strong": { "$value": "{primitive.color.night.0}" },
+          "$extensions": { "app.moonx": { "uses": ["negative-margin", "capacity-exceeded", "cost-floor", "fact-no-evidence", "overdue", "unclassified"] } }
         },
         "negative": {
-          "$description": "Spectrum の negative。保存できなかった・入力エラー・破壊的な操作（Button variant=negative は strong の地）。Drop には使わない",
-          "$extensions": { "app.moonx": { "uses": ["save-failed", "field-error", "destructive-action"] } },
           "fg": { "$value": "{primitive.color.red.700}" },
           "bg": { "$value": "{primitive.color.red.100}" },
           "strong": { "$value": "{primitive.color.red.700}" },
           "strong-hover": { "$value": "{primitive.color.red.750}", "$description": "Button variant=negative と Toast の操作のホバー" },
           "strong-pressed": { "$value": "{primitive.color.red.800}", "$description": "Button variant=negative と Toast の操作の押下" },
-          "on-strong": { "$value": "{primitive.color.cream.50}" }
+          "on-strong": { "$value": "{primitive.color.night.0}" },
+          "$extensions": { "app.moonx": { "uses": ["save-failed", "field-error", "destructive-action"] } }
         },
         "neutral": {
-          "$description": "Spectrum の neutral。Badge の既定",
-          "fg": { "$value": "{primitive.color.stone.700}" },
-          "bg": { "$value": "{primitive.color.stone.100}" },
-          "strong": { "$value": "{primitive.color.stone.700}" },
-          "on-strong": { "$value": "{primitive.color.cream.50}" }
-        },
-        "seafoam": {
-          "$description": "Spectrum のカテゴリ色 seafoam。Proceed",
-          "fg": { "$value": "{primitive.color.sea.700}" },
-          "bg": { "$value": "{primitive.color.sea.100}" },
-          "strong": { "$value": "{primitive.color.sea.700}" },
-          "on-strong": { "$value": "{primitive.color.cream.50}" }
-        },
-        "indigo": {
-          "$description": "Spectrum のカテゴリ色 indigo。Drop",
-          "fg": { "$value": "{primitive.color.slate.700}" },
-          "bg": { "$value": "{primitive.color.slate.100}" },
-          "strong": { "$value": "{primitive.color.slate.700}" },
-          "on-strong": { "$value": "{primitive.color.cream.50}" }
-        },
-        "purple": {
-          "$description": "Spectrum のカテゴリ色 purple。Unknown",
-          "fg": { "$value": "{primitive.color.plum.700}" },
-          "bg": { "$value": "{primitive.color.plum.100}" },
-          "strong": { "$value": "{primitive.color.plum.700}" },
-          "on-strong": { "$value": "{primitive.color.cream.50}" }
-        },
-        "pink": {
-          "$description": "Spectrum のカテゴリ色 pink。Unclassified",
-          "fg": { "$value": "{primitive.color.rose.700}" },
-          "bg": { "$value": "{primitive.color.rose.100}" },
-          "strong": { "$value": "{primitive.color.rose.700}" },
-          "on-strong": { "$value": "{primitive.color.cream.50}" }
-        },
-        "brown": {
-          "$description": "Spectrum のカテゴリ色 brown。Hold",
-          "fg": { "$value": "{primitive.color.sand.700}" },
-          "bg": { "$value": "{primitive.color.sand.100}" },
-          "strong": { "$value": "{primitive.color.sand.700}" },
-          "on-strong": { "$value": "{primitive.color.cream.50}" }
+          "fg": { "$value": "{primitive.color.night.700}" },
+          "bg": { "$value": "{primitive.color.night.100}" },
+          "strong": { "$value": "{primitive.color.night.700}" },
+          "on-strong": { "$value": "{primitive.color.night.0}" }
         },
         "fau": {
-          "$description": "F/A/U と未分類・未入力（6.0.3）。StatusLight と Meter の帯",
+          "$description": "F/A/U の印と Meter の帯（design-spec 6.0.3）。確認項目の Done / Partial / Not started の印も fact / assumption / unknown と同じ値を使う。区別は形（月の満ち欠け）とラベルで、色は濃淡だけ。fg はラベルの文字、strong は印と帯",
           "fact": {
-            "$description": "Fact。Spectrum の positive",
-            "fg": { "$value": "{primitive.color.sage.700}" },
-            "bg": { "$value": "{primitive.color.sage.100}" },
-            "strong": { "$value": "{primitive.color.sage.700}" }
+            "$description": "Fact（満月 ●）",
+            "fg": { "$value": "{primitive.color.night.900}" },
+            "strong": { "$value": "{primitive.color.night.900}" }
           },
           "assumption": {
-            "$description": "Assumption。Spectrum の informative",
-            "fg": { "$value": "{primitive.color.sky.700}" },
-            "bg": { "$value": "{primitive.color.sky.100}" },
-            "strong": { "$value": "{primitive.color.sky.700}" }
+            "$description": "Assumption（半月 ◐）",
+            "fg": { "$value": "{primitive.color.night.700}" },
+            "strong": { "$value": "{primitive.color.night.550}" }
           },
           "unknown": {
-            "$description": "Unknown。Spectrum の purple",
-            "fg": { "$value": "{primitive.color.plum.700}" },
-            "bg": { "$value": "{primitive.color.plum.100}" },
-            "strong": { "$value": "{primitive.color.plum.700}" }
+            "$description": "Unknown（新月 ○。Meter の帯は斜線）",
+            "fg": { "$value": "{primitive.color.night.700}" },
+            "strong": { "$value": "{primitive.color.night.600}" }
           },
           "unclassified": {
-            "$description": "Unclassified。Spectrum の pink",
-            "fg": { "$value": "{primitive.color.rose.700}" },
-            "bg": { "$value": "{primitive.color.rose.100}" },
-            "strong": { "$value": "{primitive.color.rose.700}" }
+            "$description": "Unclassified（琥珀色の菱形。分類を待つ）",
+            "fg": { "$value": "{primitive.color.amber.700}" },
+            "strong": { "$value": "{primitive.color.amber.700}" }
           },
           "empty": {
-            "$description": "Empty（グレー）。Spectrum の neutral",
-            "fg": { "$value": "{primitive.color.stone.700}" },
-            "bg": { "$value": "{primitive.color.stone.100}" },
-            "strong": { "$value": "{primitive.color.stone.700}" }
-          }
-        },
-        "check": {
-          "$description": "確認項目の状態（6.1）。StatusLight",
-          "not-started": {
-            "$description": "Not started。Spectrum の neutral",
-            "fg": { "$value": "{primitive.color.stone.700}" },
-            "bg": { "$value": "{primitive.color.stone.100}" },
-            "strong": { "$value": "{primitive.color.stone.700}" }
-          },
-          "partial": {
-            "$description": "Partial。Spectrum の informative（金の accent と区別する青）",
-            "fg": { "$value": "{primitive.color.sky.700}" },
-            "bg": { "$value": "{primitive.color.sky.100}" },
-            "strong": { "$value": "{primitive.color.sky.700}" }
-          },
-          "done": {
-            "$description": "Done。Spectrum の positive",
-            "fg": { "$value": "{primitive.color.sage.700}" },
-            "bg": { "$value": "{primitive.color.sage.100}" },
-            "strong": { "$value": "{primitive.color.sage.700}" }
-          }
-        },
-        "decision": {
-          "$description": "判定の Badge。勝ち負けに見えない控えめな色",
-          "proceed": {
-            "$description": "Proceed。Spectrum の seafoam",
-            "fg": { "$value": "{primitive.color.sea.700}" },
-            "bg": { "$value": "{primitive.color.sea.100}" },
-            "strong": { "$value": "{primitive.color.sea.700}" }
-          },
-          "hold": {
-            "$description": "Hold。Spectrum の brown",
-            "fg": { "$value": "{primitive.color.sand.700}" },
-            "bg": { "$value": "{primitive.color.sand.100}" },
-            "strong": { "$value": "{primitive.color.sand.700}" }
-          },
-          "drop": {
-            "$description": "Drop。Spectrum の indigo（negative の赤にしない）",
-            "fg": { "$value": "{primitive.color.slate.700}" },
-            "bg": { "$value": "{primitive.color.slate.100}" },
-            "strong": { "$value": "{primitive.color.slate.700}" }
-          },
-          "undecided": {
-            "$description": "未判定。Spectrum の neutral",
-            "fg": { "$value": "{primitive.color.stone.700}" },
-            "bg": { "$value": "{primitive.color.stone.100}" },
-            "strong": { "$value": "{primitive.color.stone.700}" }
+            "$description": "Empty。印（点線の丸）とラベルは fg、strong は Meter の帯（地と同じ）にだけ使う",
+            "fg": { "$value": "{primitive.color.night.650}" },
+            "strong": { "$value": "{primitive.color.night.150}" }
           }
         }
       },
       "dark": {
-        "$description": "ダーク。深いティールの地にクリームの文字。金はブランドと主要な操作だけ",
+        "$description": "ダーク。夜の紺の地に月明かりの文字。主要な操作のボタンは月明かりの色",
         "surface": {
-          "canvas": { "$value": "{primitive.color.teal.900}", "$description": "画面の地" },
-          "raised": { "$value": "{primitive.color.teal.850}", "$description": "パネル・カード（影ではなく hairline で区切る）" },
-          "sunken": { "$value": "{primitive.color.teal.950}", "$description": "入力欄・表の見出し行・Well" },
-          "overlay": { "$value": "{primitive.color.teal.800}", "$description": "Popover・Tray・Dialog" },
-          "hover": { "$value": "{primitive.color.teal.750}", "$description": "行・項目のホバー" },
-          "selected": { "$value": "{primitive.color.teal.700}", "$description": "選択中の行・現在のナビ" },
-          "scrim": { "$value": "{primitive.color.alpha.teal-950-72}", "$description": "Dialog・Tray の背後" }
+          "canvas": { "$value": "{primitive.color.night.950}", "$description": "画面の地" },
+          "raised": { "$value": "{primitive.color.night.900}", "$description": "パネル・カード・表" },
+          "sunken": { "$value": "{primitive.color.night.850}", "$description": "表の見出し行・Well・画面上部の帯" },
+          "overlay": { "$value": "{primitive.color.night.850}", "$description": "Popover・Tray・Dialog" },
+          "hover": { "$value": "{primitive.color.night.825}", "$description": "行・項目のホバー（overlay の上でも区別できる値）" },
+          "selected": { "$value": "{primitive.color.night.900}", "$description": "選択中の行・現在のナビ。地に加えて control.primary の線（border-width.selected-indicator）で示す" },
+          "scrim": { "$value": "{primitive.color.alpha.night-950-72}", "$description": "Dialog・Tray の背後" }
         },
         "text": {
-          "primary": { "$value": "{primitive.color.cream.100}" },
-          "secondary": { "$value": "{primitive.color.cream.400}", "$description": "補足・メタ情報・フォーカス外の設問" },
-          "placeholder": { "$value": "{primitive.color.stone.300}", "$description": "入力欄のプレースホルダー" },
-          "disabled": { "$value": "{primitive.color.stone.700}", "$description": "無効（コントラスト基準の対象外）" },
-          "on-accent": { "$value": "{primitive.color.teal.950}", "$description": "accent の上の文字" },
-          "link": { "$value": "{primitive.color.teal.300}", "$description": "Link。下線を付ける" }
+          "primary": { "$value": "{primitive.color.night.125}" },
+          "secondary": { "$value": "{primitive.color.night.400}", "$description": "補足・メタ情報・F/A/U のラベル" },
+          "tertiary": { "$value": "{primitive.color.night.450}", "$description": "Empty・Unknown の値など、薄く読ませる文字（4.5:1 以上）" },
+          "placeholder": { "$value": "{primitive.color.night.450}", "$description": "入力欄のプレースホルダー" },
+          "disabled": { "$value": "{primitive.color.night.750}", "$description": "無効（コントラスト基準の対象外）" },
+          "link": { "$value": "{primitive.color.night.125}", "$description": "Link。文字は本文と同じ色で、下線で示す" }
         },
         "border": {
-          "hairline": { "$value": "{primitive.color.stone.800}", "$description": "区切り線（装飾）" },
-          "strong": { "$value": "{primitive.color.stone.500}", "$description": "入力欄・コントロールの枠（3:1 以上）" },
-          "focus": { "$value": "{primitive.color.teal.300}", "$description": "フォーカスの表示（Spectrum の focus-indicator）" }
-        },
-        "accent": {
-          "$description": "Spectrum の accent。金。使いどころは design-spec 4.5（Button の accent とブランドマーク）。canvas と raised の上だけで使い、sunken（入力欄）の上には置かない（ライトの sunken とのコントラストが 3:1 に届かないため）",
-          "default": { "$value": "{primitive.color.gold.400}" },
-          "hover": { "$value": "{primitive.color.gold.300}" },
-          "pressed": { "$value": "{primitive.color.gold.500}" }
+          "hairline": { "$value": "{primitive.color.night.825}", "$description": "区切り線（装飾）" },
+          "strong": { "$value": "{primitive.color.night.600}", "$description": "入力欄・コントロールの枠（3:1 以上）" },
+          "focus": { "$value": "{primitive.color.night.125}", "$description": "フォーカスの表示（Spectrum の focus-indicator）" }
         },
         "control": {
-          "$description": "Button の primary / secondary と、選択したコントロール（Spectrum の neutral-background・track）",
-          "primary": { "$value": "{primitive.color.cream.100}", "$description": "Button variant=primary の地・選択した Checkbox / Radio / Switch" },
-          "primary-hover": { "$value": "{primitive.color.cream.50}" },
-          "primary-pressed": { "$value": "{primitive.color.cream.200}" },
-          "on-primary": { "$value": "{primitive.color.teal.950}", "$description": "primary の上の文字・チェック" },
-          "secondary": { "$value": "{primitive.color.teal.800}", "$description": "Button variant=secondary の地" },
-          "secondary-hover": { "$value": "{primitive.color.teal.750}" },
-          "secondary-pressed": { "$value": "{primitive.color.teal.700}" },
-          "on-secondary": { "$value": "{primitive.color.cream.100}" },
-          "disabled": { "$value": "{primitive.color.teal.800}", "$description": "無効なコントロールの地（文字は text.disabled）" },
-          "track": { "$value": "{primitive.color.teal.700}", "$description": "Meter・ProgressBar の地" },
-          "track-fill": { "$value": "{primitive.color.teal.300}", "$description": "ProgressBar の進み" }
+          "primary": { "$value": "{primitive.color.night.125}", "$description": "Button variant=primary の地・選択した Checkbox / Radio / Switch・SegmentedControl の選択" },
+          "primary-hover": { "$value": "{primitive.color.night.0}" },
+          "primary-pressed": { "$value": "{primitive.color.night.300}" },
+          "on-primary": { "$value": "{primitive.color.night.950}", "$description": "primary の上の文字・チェック" },
+          "secondary": { "$value": "{primitive.color.night.900}", "$description": "Button variant=secondary の地（枠は border.strong）" },
+          "secondary-hover": { "$value": "{primitive.color.night.850}" },
+          "secondary-pressed": { "$value": "{primitive.color.night.825}" },
+          "on-secondary": { "$value": "{primitive.color.night.125}" },
+          "disabled": { "$value": "{primitive.color.night.850}", "$description": "無効なコントロールの地（文字は text.disabled）" },
+          "track": { "$value": "{primitive.color.night.800}", "$description": "Meter・ProgressBar の地" },
+          "track-fill": { "$value": "{primitive.color.night.125}", "$description": "ProgressBar の進み" }
         },
         "informative": {
-          "$description": "Spectrum の informative。お知らせ",
-          "fg": { "$value": "{primitive.color.sky.300}" },
-          "bg": { "$value": "{primitive.color.sky.900}" },
-          "strong": { "$value": "{primitive.color.sky.300}" },
-          "on-strong": { "$value": "{primitive.color.teal.950}" }
-        },
-        "positive": {
-          "$description": "Spectrum の positive。保存済み・完了",
-          "fg": { "$value": "{primitive.color.sage.300}" },
-          "bg": { "$value": "{primitive.color.sage.900}" },
-          "strong": { "$value": "{primitive.color.sage.300}" },
-          "on-strong": { "$value": "{primitive.color.teal.950}" }
+          "$description": "情報の帯・InlineAlert（色を足さず、地とアイコンで示す）",
+          "fg": { "$value": "{primitive.color.night.400}" },
+          "bg": { "$value": "{primitive.color.night.850}" },
+          "strong": { "$value": "{primitive.color.night.400}" },
+          "on-strong": { "$value": "{primitive.color.night.950}" }
         },
         "notice": {
-          "$description": "Spectrum の notice。注意（粗利マイナス・Capacity 超過・費用の下限・Fact · No evidence）",
-          "$extensions": { "app.moonx": { "uses": ["negative-margin", "capacity-exceeded", "cost-floor", "fact-no-evidence"] } },
           "fg": { "$value": "{primitive.color.amber.300}" },
           "bg": { "$value": "{primitive.color.amber.900}" },
           "strong": { "$value": "{primitive.color.amber.300}" },
-          "on-strong": { "$value": "{primitive.color.teal.950}" }
+          "on-strong": { "$value": "{primitive.color.night.950}" },
+          "$extensions": { "app.moonx": { "uses": ["negative-margin", "capacity-exceeded", "cost-floor", "fact-no-evidence", "overdue", "unclassified"] } }
         },
         "negative": {
-          "$description": "Spectrum の negative。保存できなかった・入力エラー・破壊的な操作（Button variant=negative は strong の地）。Drop には使わない",
-          "$extensions": { "app.moonx": { "uses": ["save-failed", "field-error", "destructive-action"] } },
           "fg": { "$value": "{primitive.color.red.300}" },
           "bg": { "$value": "{primitive.color.red.900}" },
           "strong": { "$value": "{primitive.color.red.300}" },
           "strong-hover": { "$value": "{primitive.color.red.400}", "$description": "Button variant=negative と Toast の操作のホバー" },
           "strong-pressed": { "$value": "{primitive.color.red.500}", "$description": "Button variant=negative と Toast の操作の押下" },
-          "on-strong": { "$value": "{primitive.color.teal.950}" }
+          "on-strong": { "$value": "{primitive.color.night.950}" },
+          "$extensions": { "app.moonx": { "uses": ["save-failed", "field-error", "destructive-action"] } }
         },
         "neutral": {
-          "$description": "Spectrum の neutral。Badge の既定",
-          "fg": { "$value": "{primitive.color.stone.200}" },
-          "bg": { "$value": "{primitive.color.stone.900}" },
-          "strong": { "$value": "{primitive.color.stone.300}" },
-          "on-strong": { "$value": "{primitive.color.teal.950}" }
-        },
-        "seafoam": {
-          "$description": "Spectrum のカテゴリ色 seafoam。Proceed",
-          "fg": { "$value": "{primitive.color.sea.300}" },
-          "bg": { "$value": "{primitive.color.sea.900}" },
-          "strong": { "$value": "{primitive.color.sea.300}" },
-          "on-strong": { "$value": "{primitive.color.teal.950}" }
-        },
-        "indigo": {
-          "$description": "Spectrum のカテゴリ色 indigo。Drop",
-          "fg": { "$value": "{primitive.color.slate.300}" },
-          "bg": { "$value": "{primitive.color.slate.900}" },
-          "strong": { "$value": "{primitive.color.slate.300}" },
-          "on-strong": { "$value": "{primitive.color.teal.950}" }
-        },
-        "purple": {
-          "$description": "Spectrum のカテゴリ色 purple。Unknown",
-          "fg": { "$value": "{primitive.color.plum.300}" },
-          "bg": { "$value": "{primitive.color.plum.900}" },
-          "strong": { "$value": "{primitive.color.plum.300}" },
-          "on-strong": { "$value": "{primitive.color.teal.950}" }
-        },
-        "pink": {
-          "$description": "Spectrum のカテゴリ色 pink。Unclassified",
-          "fg": { "$value": "{primitive.color.rose.300}" },
-          "bg": { "$value": "{primitive.color.rose.900}" },
-          "strong": { "$value": "{primitive.color.rose.300}" },
-          "on-strong": { "$value": "{primitive.color.teal.950}" }
-        },
-        "brown": {
-          "$description": "Spectrum のカテゴリ色 brown。Hold",
-          "fg": { "$value": "{primitive.color.sand.300}" },
-          "bg": { "$value": "{primitive.color.sand.900}" },
-          "strong": { "$value": "{primitive.color.sand.300}" },
-          "on-strong": { "$value": "{primitive.color.teal.950}" }
+          "fg": { "$value": "{primitive.color.night.400}" },
+          "bg": { "$value": "{primitive.color.night.850}" },
+          "strong": { "$value": "{primitive.color.night.400}" },
+          "on-strong": { "$value": "{primitive.color.night.950}" }
         },
         "fau": {
-          "$description": "F/A/U と未分類・未入力（6.0.3）。StatusLight と Meter の帯",
+          "$description": "F/A/U の印と Meter の帯（design-spec 6.0.3）。確認項目の Done / Partial / Not started の印も fact / assumption / unknown と同じ値を使う。区別は形（月の満ち欠け）とラベルで、色は濃淡だけ。fg はラベルの文字、strong は印と帯",
           "fact": {
-            "$description": "Fact。Spectrum の positive",
-            "fg": { "$value": "{primitive.color.sage.300}" },
-            "bg": { "$value": "{primitive.color.sage.900}" },
-            "strong": { "$value": "{primitive.color.sage.300}" }
+            "$description": "Fact（満月 ●）",
+            "fg": { "$value": "{primitive.color.night.125}" },
+            "strong": { "$value": "{primitive.color.night.125}" }
           },
           "assumption": {
-            "$description": "Assumption。Spectrum の informative",
-            "fg": { "$value": "{primitive.color.sky.300}" },
-            "bg": { "$value": "{primitive.color.sky.900}" },
-            "strong": { "$value": "{primitive.color.sky.300}" }
+            "$description": "Assumption（半月 ◐）",
+            "fg": { "$value": "{primitive.color.night.400}" },
+            "strong": { "$value": "{primitive.color.night.450}" }
           },
           "unknown": {
-            "$description": "Unknown。Spectrum の purple",
-            "fg": { "$value": "{primitive.color.plum.300}" },
-            "bg": { "$value": "{primitive.color.plum.900}" },
-            "strong": { "$value": "{primitive.color.plum.300}" }
+            "$description": "Unknown（新月 ○。Meter の帯は斜線）",
+            "fg": { "$value": "{primitive.color.night.400}" },
+            "strong": { "$value": "{primitive.color.night.550}" }
           },
           "unclassified": {
-            "$description": "Unclassified。Spectrum の pink",
-            "fg": { "$value": "{primitive.color.rose.300}" },
-            "bg": { "$value": "{primitive.color.rose.900}" },
-            "strong": { "$value": "{primitive.color.rose.300}" }
+            "$description": "Unclassified（琥珀色の菱形。分類を待つ）",
+            "fg": { "$value": "{primitive.color.amber.300}" },
+            "strong": { "$value": "{primitive.color.amber.300}" }
           },
           "empty": {
-            "$description": "Empty（グレー）。Spectrum の neutral",
-            "fg": { "$value": "{primitive.color.stone.200}" },
-            "bg": { "$value": "{primitive.color.stone.900}" },
-            "strong": { "$value": "{primitive.color.stone.300}" }
-          }
-        },
-        "check": {
-          "$description": "確認項目の状態（6.1）。StatusLight",
-          "not-started": {
-            "$description": "Not started。Spectrum の neutral",
-            "fg": { "$value": "{primitive.color.stone.200}" },
-            "bg": { "$value": "{primitive.color.stone.900}" },
-            "strong": { "$value": "{primitive.color.stone.300}" }
-          },
-          "partial": {
-            "$description": "Partial。Spectrum の informative（金の accent と区別する青）",
-            "fg": { "$value": "{primitive.color.sky.300}" },
-            "bg": { "$value": "{primitive.color.sky.900}" },
-            "strong": { "$value": "{primitive.color.sky.300}" }
-          },
-          "done": {
-            "$description": "Done。Spectrum の positive",
-            "fg": { "$value": "{primitive.color.sage.300}" },
-            "bg": { "$value": "{primitive.color.sage.900}" },
-            "strong": { "$value": "{primitive.color.sage.300}" }
-          }
-        },
-        "decision": {
-          "$description": "判定の Badge。勝ち負けに見えない控えめな色",
-          "proceed": {
-            "$description": "Proceed。Spectrum の seafoam",
-            "fg": { "$value": "{primitive.color.sea.300}" },
-            "bg": { "$value": "{primitive.color.sea.900}" },
-            "strong": { "$value": "{primitive.color.sea.300}" }
-          },
-          "hold": {
-            "$description": "Hold。Spectrum の brown",
-            "fg": { "$value": "{primitive.color.sand.300}" },
-            "bg": { "$value": "{primitive.color.sand.900}" },
-            "strong": { "$value": "{primitive.color.sand.300}" }
-          },
-          "drop": {
-            "$description": "Drop。Spectrum の indigo（negative の赤にしない）",
-            "fg": { "$value": "{primitive.color.slate.300}" },
-            "bg": { "$value": "{primitive.color.slate.900}" },
-            "strong": { "$value": "{primitive.color.slate.300}" }
-          },
-          "undecided": {
-            "$description": "未判定。Spectrum の neutral",
-            "fg": { "$value": "{primitive.color.stone.200}" },
-            "bg": { "$value": "{primitive.color.stone.900}" },
-            "strong": { "$value": "{primitive.color.stone.300}" }
+            "$description": "Empty。印（点線の丸）とラベルは fg、strong は Meter の帯（地と同じ）にだけ使う",
+            "fg": { "$value": "{primitive.color.night.450}" },
+            "strong": { "$value": "{primitive.color.night.800}" }
           }
         }
       }
@@ -919,7 +631,7 @@
             }
           },
           "status-light": {
-            "$description": "StatusLight の点",
+            "$description": "MoonGlyph（StatusLight・CheckDots・凡例の印）の大きさ",
             "dot-size": {
               "S": { "$value": "{primitive.dimension.8}" },
               "M": { "$value": "{primitive.dimension.10}" },
@@ -1122,7 +834,7 @@
             }
           },
           "status-light": {
-            "$description": "StatusLight の点",
+            "$description": "MoonGlyph（StatusLight・CheckDots・凡例の印）の大きさ",
             "dot-size": {
               "S": { "$value": "{primitive.dimension.10}" },
               "M": { "$value": "{primitive.dimension.12}" },
@@ -1177,7 +889,7 @@
             "$description": "Toast の高さ（最小）",
             "min-height": { "$value": "{primitive.dimension.60}" }
           },
-          "target-min": { "$value": "{primitive.dimension.44}", "$description": "当たり判定の最小。タッチの端末は 44px（WCAG 2.5.5 と各 OS の指針）。デスクトップ（scale.medium）は 24px（WCAG 2.2 の 2.5.8）。小さい部品は余白で広げる" }
+          "target-min": { "$value": "{primitive.dimension.44}", "$description": "当たり判定の最小。タッチの端末は 44px（WCAG 2.5.5 と Apple HIG の 44pt。Android の指針は 48dp）。デスクトップ（scale.medium）は 24px（WCAG 2.2 の 2.5.8）。小さい部品は余白で広げる" }
         }
       }
     },
@@ -1197,7 +909,7 @@
         "field-gap": { "$value": "{primitive.dimension.12}" }
       },
       "regular": {
-        "$description": "表と数字の画面。部品の size は M",
+        "$description": "表と数字と一覧の画面（design-spec 4.4）。部品の size は M",
         "row-height": { "$value": "{semantic.scale.medium.component.table.row-height.regular}", "$description": "行の高さ（スケールで変わる）" },
         "cell-padding-x": { "$value": "{primitive.dimension.12}", "$description": "セルの左右（Spectrum の table-item-padding）" },
         "cell-padding-y": { "$value": "{primitive.dimension.8}", "$description": "折り返したときのセルの上下" },
@@ -1209,7 +921,7 @@
         "field-gap": { "$value": "{primitive.dimension.16}", "$description": "フォームの入力欄どうしの間" }
       },
       "spacious": {
-        "$description": "書く画面（考えるための余白）。入力欄と主要なボタンは L。キーの意味は regular と同じ",
+        "$description": "書く・読む・手順を進める画面（考えるための余白。design-spec 4.4）。入力欄と主要なボタンは L。キーの意味は regular と同じ",
         "row-height": { "$value": "{semantic.scale.medium.component.table.row-height.spacious}" },
         "cell-padding-x": { "$value": "{primitive.dimension.16}" },
         "cell-padding-y": { "$value": "{primitive.dimension.12}" },
@@ -1243,59 +955,46 @@
     "font": {
       "family": {
         "$type": "fontFamily",
-        "display": { "$value": "{primitive.font.family.display}", "$description": "見出しとブランドだけ" },
-        "body": { "$value": "{primitive.font.family.sans}", "$description": "本文・回答・入力欄・表" },
-        "mono": { "$value": "{primitive.font.family.mono}", "$description": "設問 ID などの等幅" }
-      },
-      "numeric": {
-        "$description": "表・指標・金額の等幅数字（DTCG に型がないため文字列）",
-        "tabular": { "$value": "{primitive.font.feature.tabular-nums}" }
-      }
-    },
-    "native": {
-      "$description": "スマホだけが読む値（Web の CSS 変数には出ない）",
-      "font": {
-        "$type": "fontFamily",
-        "mono-ios": { "$value": "{primitive.font.family.mono-ios}" },
-        "mono-android": { "$value": "{primitive.font.family.mono-android}" }
+        "body": { "$value": "{primitive.font.family.sans}", "$description": "見出し・本文・回答・入力欄・表" },
+        "mono": { "$value": "{primitive.font.family.mono}", "$description": "金額・指標・表の数字と設問の名前・ID" }
       }
     },
     "typography": {
       "$type": "typography",
-      "$description": "見出し（display・heading-*）だけ Fraunces、ほかはシステムのサンセリフ。fontSize は scale.medium の値で、large では生成時に scale.large の同じ段に差し替える。等幅数字は $extensions の fontVariantNumeric",
+      "$description": "見出しも本文も IBM Plex Sans（見出しは semibold で字間を詰める）。金額・指標・表の数字と設問の名前は IBM Plex Mono（design-spec 4.4 の決定）。fontSize は scale.medium の値で、large では生成時に scale.large の同じ段に差し替える",
       "display": {
         "$value": {
-          "fontFamily": "{primitive.font.family.display}",
+          "fontFamily": "{primitive.font.family.sans}",
           "fontSize": "{semantic.scale.medium.font-size.900}",
           "fontWeight": "{primitive.font.weight.semibold}",
-          "letterSpacing": "{primitive.font.letter-spacing.tighter}",
+          "letterSpacing": "{primitive.font.letter-spacing.tightest}",
           "lineHeight": "{primitive.font.line-height.tight}"
         },
-        "$description": "空の状態・ランディングの大見出し（Spectrum の heading-size-xl）"
+        "$description": "ランディングの題名（Spectrum の heading-size-xl）"
       },
       "heading-1": {
         "$value": {
-          "fontFamily": "{primitive.font.family.display}",
+          "fontFamily": "{primitive.font.family.sans}",
           "fontSize": "{semantic.scale.medium.font-size.700}",
           "fontWeight": "{primitive.font.weight.semibold}",
-          "letterSpacing": "{primitive.font.letter-spacing.tight}",
+          "letterSpacing": "{primitive.font.letter-spacing.tighter}",
           "lineHeight": "{primitive.font.line-height.tight}"
         },
         "$description": "画面のタイトル（heading-size-l）"
       },
       "heading-2": {
         "$value": {
-          "fontFamily": "{primitive.font.family.display}",
+          "fontFamily": "{primitive.font.family.sans}",
           "fontSize": "{semantic.scale.medium.font-size.500}",
           "fontWeight": "{primitive.font.weight.semibold}",
-          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "letterSpacing": "{primitive.font.letter-spacing.tight}",
           "lineHeight": "{primitive.font.line-height.snug}"
         },
-        "$description": "ブロックの見出し（heading-size-m）"
+        "$description": "大きいまとまりの見出し（ランディングの節・空の状態の見出し。heading-size-m）"
       },
       "heading-3": {
         "$value": {
-          "fontFamily": "{primitive.font.family.display}",
+          "fontFamily": "{primitive.font.family.sans}",
           "fontSize": "{semantic.scale.medium.font-size.400}",
           "fontWeight": "{primitive.font.weight.semibold}",
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
@@ -1305,13 +1004,23 @@
       },
       "heading-4": {
         "$value": {
-          "fontFamily": "{primitive.font.family.display}",
+          "fontFamily": "{primitive.font.family.sans}",
           "fontSize": "{semantic.scale.medium.font-size.300}",
           "fontWeight": "{primitive.font.weight.semibold}",
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
           "lineHeight": "{primitive.font.line-height.snug}"
         },
-        "$description": "設問のタイトル・小見出し（heading-size-xs）"
+        "$description": "設問の問いの本文・小見出し（heading-size-xs）"
+      },
+      "heading-label": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{semantic.scale.medium.font-size.100}",
+          "fontWeight": "{primitive.font.weight.semibold}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.snug}"
+        },
+        "$description": "ブロックの小さな見出し（Next steps・Checks・Sections・Totals など）。色は text.secondary"
       },
       "body": {
         "$value": {
@@ -1383,27 +1092,35 @@
         },
         "$description": "注記・日時・保存状態（detail-size-s）"
       },
-      "number": {
+      "tab-label": {
         "$value": {
           "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.11}",
+          "fontWeight": "{primitive.font.weight.medium}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.tight}"
+        },
+        "$description": "スマホの TabBar の名前。スケールで変えない（名前を省略せずに収めるため。design-spec 4.3）"
+      },
+      "number": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.mono}",
           "fontSize": "{semantic.scale.medium.font-size.200}",
           "fontWeight": "{primitive.font.weight.medium}",
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
           "lineHeight": "{primitive.font.line-height.snug}"
         },
-        "$description": "金額・件数（入力欄と本文中）",
-        "$extensions": { "app.moonx": { "fontVariantNumeric": "{semantic.font.numeric.tabular}" } }
+        "$description": "金額・件数（入力欄と本文中）"
       },
       "metric": {
         "$value": {
-          "fontFamily": "{primitive.font.family.sans}",
+          "fontFamily": "{primitive.font.family.mono}",
           "fontSize": "{semantic.scale.medium.font-size.600}",
           "fontWeight": "{primitive.font.weight.semibold}",
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
           "lineHeight": "{primitive.font.line-height.tight}"
         },
-        "$description": "主要指標の大きな数字",
-        "$extensions": { "app.moonx": { "fontVariantNumeric": "{semantic.font.numeric.tabular}" } }
+        "$description": "主要指標の大きな数字"
       },
       "table": {
         "$value": {
@@ -1413,8 +1130,17 @@
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
           "lineHeight": "{primitive.font.line-height.normal}"
         },
-        "$description": "表のセル",
-        "$extensions": { "app.moonx": { "fontVariantNumeric": "{semantic.font.numeric.tabular}" } }
+        "$description": "表の文字のセル。数字のセルは table-number"
+      },
+      "table-number": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.mono}",
+          "fontSize": "{semantic.scale.medium.font-size.100}",
+          "fontWeight": "{primitive.font.weight.regular}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.normal}"
+        },
+        "$description": "表の数字のセル（大きさと太さは table と同じ。右にそろえる）"
       },
       "table-header": {
         "$value": {
@@ -1434,7 +1160,7 @@
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
           "lineHeight": "{primitive.font.line-height.snug}"
         },
-        "$description": "設問 ID（V.01.WHO など）"
+        "$description": "設問の名前（WHO など。テンプレートの表記のまま）と設問 ID（V.01.WHO など）"
       }
     },
     "radius": {
@@ -1444,7 +1170,7 @@
       "chip": { "$value": "{primitive.radius.sm}", "$description": "Badge・タグ・Checkbox" },
       "card": { "$value": "{primitive.radius.lg}", "$description": "Card・パネル・スライドのサムネイル" },
       "sheet": { "$value": "{primitive.radius.xl}", "$description": "Tray の上の角・Dialog" },
-      "pill": { "$value": "{primitive.radius.full}", "$description": "Switch・Avatar・StatusLight の点" }
+      "pill": { "$value": "{primitive.radius.full}", "$description": "Switch・Avatar・未読数の札" }
     },
     "border-width": {
       "$type": "dimension",
@@ -1452,6 +1178,7 @@
       "strong": { "$value": "{primitive.border-width.1}" },
       "focus-ring": { "$value": "{primitive.border-width.2}", "$description": "Spectrum の focus-indicator-thickness" },
       "focus-offset": { "$value": "{primitive.border-width.2}", "$description": "フォーカスの表示と部品の間（Spectrum の focus-indicator-gap）" },
+      "selected-indicator": { "$value": "{primitive.border-width.3}", "$description": "選択中の行・現在のナビの左の線（色は control.primary）" },
       "divider": {
         "$description": "Divider の S / M / L",
         "S": { "$value": "{primitive.border-width.1}" },
@@ -1461,7 +1188,7 @@
     },
     "shadow": {
       "$type": "shadow",
-      "$description": "控えめ。ダークは影を使わず border.hairline と地の明るさで重なりを示す",
+      "$description": "控えめ。ダークでは raised に影を使わず、border.hairline と地の明るさで重なりを示す。overlay（Popover・Tray・Dialog）だけは、ダークでも背後と分けるために濃い影を落とす",
       "light": {
         "raised": { "$value": "{primitive.shadow.sm-light}" },
         "overlay": { "$value": "{primitive.shadow.md-light}" }
@@ -1472,7 +1199,7 @@
       }
     },
     "motion": {
-      "$description": "落ち着いた短い動き。動きを減らす設定（prefers-reduced-motion / RN の AccessibilityInfo.isReduceMotionEnabled）では reduced を使う",
+      "$description": "落ち着いた短い動き。動きを減らす設定（prefers-reduced-motion）では reduced を使う",
       "transition": {
         "$type": "transition",
         "hover": {
@@ -1512,24 +1239,24 @@
     },
     "breakpoint": {
       "$type": "dimension",
-      "$description": "最小幅。<768 モバイル / 768〜1023 タブレット / ≥1024 デスクトップ。768 未満で Popover を Tray にする。Unistyles は先頭のブレークポイントが 0 であることを要求する",
+      "$description": "最小幅。<768 モバイル / 768〜1023 タブレット / ≥1024 デスクトップ。768 未満で Popover を Tray にする",
       "mobile": { "$value": "{primitive.breakpoint.base}" },
       "tablet": { "$value": "{primitive.breakpoint.md}" },
       "desktop": { "$value": "{primitive.breakpoint.lg}" }
     },
     "layout": {
       "$type": "dimension",
-      "sidebar-width": { "$value": "{primitive.dimension.256}", "$description": "デスクトップの SideNav" },
+      "sidebar-width": { "$value": "{primitive.dimension.240}", "$description": "デスクトップの SideNav" },
       "sidebar-width-collapsed": { "$value": "{primitive.dimension.64}", "$description": "タブレットのアイコンだけの SideNav" },
       "side-panel-width": { "$value": "{primitive.dimension.360}", "$description": "コメント・変更履歴の Panel" },
-      "reading-column-max": { "$value": "{primitive.dimension.640}", "$description": "設問フォーム・中央集中・設定フォームの幅の上限" },
+      "reading-column-max": { "$value": "{primitive.dimension.720}", "$description": "設問フォーム・中央集中・設定フォームの幅の上限" },
       "content-max": { "$value": "{primitive.dimension.1280}", "$description": "本文エリアの最大幅" },
       "header-height": { "$value": "{primitive.dimension.56}" },
-      "tab-bar-height": { "$value": "{primitive.dimension.56}", "$description": "スマホの TabBar（安全領域は別に足す）" },
+      "tab-bar-height": { "$value": "{primitive.dimension.64}", "$description": "スマホの TabBar（安全領域は別に足す）" },
       "list-pane-width": { "$value": "{primitive.dimension.352}", "$description": "一覧と詳細の左ペイン（一覧側）の幅。結果ペインは side-panel-width を使う" },
       "thumbnail-column-width": { "$value": "{primitive.dimension.160}", "$description": "サムネイル列の幅" },
       "popover-max-height": { "$value": "{primitive.dimension.384}", "$description": "Popover の高さの上限（画面の可視領域のほうが低ければそちら）" },
-      "bottom-action-height": { "$value": "{primitive.dimension.64}", "$description": "スマホで下部に固定する操作・結果の要約バー" },
+      "bottom-action-height": { "$value": "{primitive.dimension.64}", "$description": "スマホで下部に固定する操作と、スマホとタブレットのワークシート（パターン F）の結果の要約バー" },
       "page-gutter-mobile": { "$value": "{primitive.dimension.16}" },
       "page-gutter-tablet": { "$value": "{primitive.dimension.24}" },
       "page-gutter-desktop": { "$value": "{primitive.dimension.32}" },
@@ -1540,18 +1267,18 @@
         "L": { "$value": "{primitive.dimension.640}" }
       },
       "focus-anchor": { "$type": "number", "$value": "{primitive.ratio.half}", "$description": "入力中の設問を置く縦位置（0.5 = 画面の縦の中央）" },
-      "sheet-max-height-ratio": { "$type": "number", "$value": "{primitive.ratio.85}", "$description": "Tray・Dialog・Panel の高さの上限（0.85 = 画面の高さの 85%。使う側が vh に掛ける）" },
+      "sheet-max-height-ratio": { "$type": "number", "$value": "{primitive.ratio.85}", "$description": "Tray・Dialog（small と medium）・Panel の高さの上限（0.85 = 画面の高さの 85%。使う側が vh に掛ける）。large の Dialog をスマホで出す全画面のシートは対象外（design-spec 3.8）" },
       "z-index": {
         "$type": "number",
         "$description": "重なりの順序。下から bottom-action < nav < overlay < toast",
-        "bottom-action": { "$value": "{primitive.z-index.10}", "$description": "スマホで下部に固定する操作・結果の要約バー" },
+        "bottom-action": { "$value": "{primitive.z-index.10}", "$description": "スマホで下部に固定する操作と、スマホとタブレットのワークシート（パターン F）の結果の要約バー" },
         "nav": { "$value": "{primitive.z-index.50}", "$description": "TabBar・SideNav の固定" },
         "overlay": { "$value": "{primitive.z-index.100}", "$description": "Dialog・Tray・Popover・Panel" },
         "toast": { "$value": "{primitive.z-index.200}", "$description": "Toast（Dialog より上）" }
       }
     },
     "icon": {
-      "$description": "Lucide（lucide-react / lucide-react-native）。大きさは scale.*.component.icon.size",
+      "$description": "Lucide（lucide-react）。大きさは scale.*.component.icon.size",
       "stroke-width": { "$type": "number", "$value": "{primitive.stroke.icon}" }
     },
     "print": {
@@ -1563,15 +1290,15 @@
         "table-header": { "$value": "{semantic.color.light.surface.sunken}", "$description": "表の見出し行" },
         "text": { "$value": "{semantic.color.light.text.primary}" },
         "text-secondary": { "$value": "{semantic.color.light.text.secondary}", "$description": "副題・数字のラベル・フッター" },
-        "text-placeholder": { "$value": "{semantic.color.light.fau.empty.fg}", "$description": "Not written yet（グレー）" },
+        "text-placeholder": { "$value": "{semantic.color.light.text.secondary}", "$description": "Not written yet（灰色）" },
         "border": { "$value": "{semantic.color.light.border.hairline}" },
         "border-strong": { "$value": "{semantic.color.light.border.strong}" },
-        "accent": { "$value": "{semantic.color.light.accent.default}", "$description": "表紙の細い罫線などブランドの印だけ" }
+        "rule": { "$value": "{semantic.color.light.text.primary}", "$description": "数字の上の太い罫線・表紙の区切り" }
       },
       "font": {
         "$type": "fontFamily",
-        "display": { "$value": "{primitive.font.family.print-display}" },
-        "body": { "$value": "{primitive.font.family.print-sans}" }
+        "body": { "$value": "{primitive.font.family.print-sans}" },
+        "mono": { "$value": "{primitive.font.family.print-mono}", "$description": "数字" }
       },
       "slide": {
         "$type": "dimension",
@@ -1620,7 +1347,7 @@
         "$description": "既定の大きさの組み合わせ。縮めるときは font-size の -min まで fontSize だけ下げる",
         "title": {
           "$value": {
-            "fontFamily": "{primitive.font.family.print-display}",
+            "fontFamily": "{primitive.font.family.print-sans}",
             "fontSize": "{primitive.font.size.44}",
             "fontWeight": "{primitive.font.weight.semibold}",
             "letterSpacing": "{primitive.font.letter-spacing.normal}",
@@ -1629,7 +1356,7 @@
         },
         "heading": {
           "$value": {
-            "fontFamily": "{primitive.font.family.print-display}",
+            "fontFamily": "{primitive.font.family.print-sans}",
             "fontSize": "{primitive.font.size.32}",
             "fontWeight": "{primitive.font.weight.semibold}",
             "letterSpacing": "{primitive.font.letter-spacing.normal}",
@@ -1656,13 +1383,12 @@
         },
         "figure": {
           "$value": {
-            "fontFamily": "{primitive.font.family.print-sans}",
+            "fontFamily": "{primitive.font.family.print-mono}",
             "fontSize": "{primitive.font.size.48}",
             "fontWeight": "{primitive.font.weight.semibold}",
             "letterSpacing": "{primitive.font.letter-spacing.normal}",
             "lineHeight": "{primitive.font.line-height.tight}"
-          },
-          "$extensions": { "app.moonx": { "fontVariantNumeric": "{semantic.font.numeric.tabular}" } }
+          }
         },
         "figure-label": {
           "$value": {
@@ -1680,8 +1406,17 @@
             "fontWeight": "{primitive.font.weight.regular}",
             "letterSpacing": "{primitive.font.letter-spacing.normal}",
             "lineHeight": "{primitive.font.line-height.snug}"
+          }
+        },
+        "cell-number": {
+          "$value": {
+            "fontFamily": "{primitive.font.family.print-mono}",
+            "fontSize": "{primitive.font.size.16}",
+            "fontWeight": "{primitive.font.weight.regular}",
+            "letterSpacing": "{primitive.font.letter-spacing.normal}",
+            "lineHeight": "{primitive.font.line-height.snug}"
           },
-          "$extensions": { "app.moonx": { "fontVariantNumeric": "{semantic.font.numeric.tabular}" } }
+          "$description": "表の数字のセル（大きさと縮め方は cell と同じ）"
         },
         "footer": {
           "$value": {

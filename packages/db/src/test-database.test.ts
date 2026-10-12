@@ -1,6 +1,12 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { SQL } from "bun";
+import { getTableName, is } from "drizzle-orm";
+import { PgTable } from "drizzle-orm/pg-core";
+import { migrationsFolder } from "./migrate";
+import * as schema from "./schema";
 import {
   quoteIdentifier,
   recreateTestDatabase,
@@ -48,6 +54,15 @@ describe("testDatabaseName", () => {
     ],
     ["a NUL byte", "postgres://moonx:moonx@localhost:5432/moonx%00_test"],
     [
+      "a percent-encoded name",
+      "postgres://moonx:moonx@localhost:5432/moonx%5Fother_test",
+    ],
+    ["a non-ASCII name", "postgres://moonx:moonx@localhost:5432/moonx_ü_test"],
+    [
+      "a path with two segments",
+      "postgres://moonx:moonx@localhost:5432/moonx/other_test",
+    ],
+    [
       "a name PostgreSQL would truncate before _test",
       `postgres://moonx:moonx@localhost:5432/${"x".repeat(59)}_test`,
     ],
@@ -70,10 +85,13 @@ describe("recreateTestDatabase", () => {
     const admin = new URL(base);
     admin.pathname = "/postgres";
     const sql = new SQL(admin.toString());
-    await sql.unsafe(
-      `DROP DATABASE IF EXISTS ${quoteIdentifier(testDatabaseName(scratchUrl))} WITH (FORCE)`,
-    );
-    await sql.close();
+    try {
+      await sql.unsafe(
+        `DROP DATABASE IF EXISTS ${quoteIdentifier(testDatabaseName(scratchUrl))} WITH (FORCE)`,
+      );
+    } finally {
+      await sql.close();
+    }
   });
 
   test("creates the database when it does not exist, then empties it on the next run", async () => {
@@ -112,6 +130,52 @@ describe("recreate-test-database command", () => {
     expect(result.stderr).toContain(
       'Refusing to recreate the test database: DATABASE_URL_TEST must name a database ending in _test, got "moonx"',
     );
+  });
+
+  test("recreates the database with every migration applied", async () => {
+    const base = process.env.DATABASE_URL_TEST;
+    if (base === undefined || base === "") {
+      throw new Error("DATABASE_URL_TEST is required for make test-api");
+    }
+    const scratch = new URL(base);
+    scratch.pathname = `/${testDatabaseName(base)}_command_test`;
+    const admin = new URL(base);
+    admin.pathname = "/postgres";
+    try {
+      const result = run(scratch.toString());
+      expect(result).toEqual({ exitCode: 0, stderr: "" });
+
+      const journal = JSON.parse(
+        readFileSync(join(migrationsFolder, "meta/_journal.json"), "utf8"),
+      ) as { entries: unknown[] };
+      const sql = new SQL(scratch.toString());
+      try {
+        const [applied] =
+          await sql`SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations`;
+        const tables =
+          await sql`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`;
+        expect(applied.count).toBe(journal.entries.length);
+        expect(
+          tables.map((row: { tablename: string }) => row.tablename).sort(),
+        ).toEqual(
+          Object.values(schema)
+            .filter((value) => is(value, PgTable))
+            .map((table) => getTableName(table))
+            .sort(),
+        );
+      } finally {
+        await sql.close();
+      }
+    } finally {
+      const sql = new SQL(admin.toString());
+      try {
+        await sql.unsafe(
+          `DROP DATABASE IF EXISTS ${quoteIdentifier(testDatabaseName(scratch.toString()))} WITH (FORCE)`,
+        );
+      } finally {
+        await sql.close();
+      }
+    }
   });
 
   test("fails when DATABASE_URL_TEST is not set", () => {

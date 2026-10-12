@@ -1,4 +1,5 @@
 import { SQL } from "bun";
+import { migrateDatabase } from "./migrate";
 
 /** Thrown when a URL is not safe to drop and recreate as a test database. */
 export class UnsafeTestDatabaseError extends Error {
@@ -17,6 +18,7 @@ const MAX_IDENTIFIER_BYTES = 63;
  * could hold real data (SDD 2章「環境変数」の DATABASE_URL_TEST): the name must end in
  * `_test`, and the URL must carry no query string, since parameters such as `options`
  * or `dbname` could point the connection at a different database than the path says.
+ * The name must be plain ASCII without percent-escapes, so every client reads it alike.
  *
  * @throws {UnsafeTestDatabaseError} when the URL breaks a rule or cannot be read.
  */
@@ -28,11 +30,19 @@ export function testDatabaseName(url: string): string {
   }
   let name: string;
   try {
-    name = decodeURIComponent(new URL(url).pathname.replace(/^\//, ""));
+    name = new URL(url).pathname.replace(/^\//, "");
   } catch {
     throw new UnsafeTestDatabaseError("DATABASE_URL_TEST is not a valid URL");
   }
-  if (/[/\0]/.test(name)) {
+  // Bun SQL decodes percent-escapes in the path and postgres.js does not, so with an
+  // encoded name the two would recreate and migrate different databases. The URL parser
+  // encodes control and non-ASCII characters, so this also refuses those.
+  if (name.includes("%")) {
+    throw new UnsafeTestDatabaseError(
+      "DATABASE_URL_TEST must name the database without percent-encoding",
+    );
+  }
+  if (name.includes("/")) {
     throw new UnsafeTestDatabaseError(
       "DATABASE_URL_TEST must name a single database",
     );
@@ -75,4 +85,13 @@ export async function recreateTestDatabase(url: string): Promise<void> {
   } finally {
     await sql.close();
   }
+}
+
+/**
+ * Recreates the test database and applies every migration, so each run starts from an
+ * empty database with the current schema.
+ */
+export async function prepareTestDatabase(url: string): Promise<void> {
+  await recreateTestDatabase(url);
+  await migrateDatabase(url);
 }

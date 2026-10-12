@@ -592,7 +592,7 @@ fix/xxx     ──squash──▶   │
 
 | ツール | 対象 | 実行 | 設定 |
 |---|---|---|---|
-| Biome | TypeScript・TSX・JSON の検査と整形（生成物の `apps/web/src/routeTree.gen.ts` は除く。TanStack Router が Biome の規則に合わない形で書き直すため） | `make lint` / `make format` | リポジトリのルートの Biome の設定 |
+| Biome | TypeScript・TSX・JSON の検査と整形（生成物の `apps/web/src/routeTree.gen.ts` と `packages/db/migrations/` は除く。TanStack Router と drizzle-kit が Biome の規則に合わない形で書くため。マイグレーションは drizzle-kit が書いたままコミットする） | `make lint` / `make format` | リポジトリのルートの Biome の設定 |
 | TypeScript | 全パッケージの型チェック（Eden Treaty の型を含む） | `make typecheck` | 各パッケージの tsconfig |
 | 画面のスタイルの禁止 | `apps/web` の画面で vanilla-extract のパッケージ（`@vanilla-extract/` で始まるもの）を直接使わない、`style` 属性に値を書かない（見た目は `packages/ui-web` の部品だけで作る。ADR-025） | `make lint`（何を動かすかは SDD 2章「make ターゲット」） | リポジトリのルートの Biome の設定と `scripts/check-screens.ts` |
 | デザイントークンの生成物 | `packages/ui-tokens`（vanilla-extract・react-pdf のテーマと、PWA のアイコンとマニフェスト）が `docs/06_design-tokens.json` と合っているか | CI が `make tokens` を動かし、差分が出たら失敗（ADR-018） | — |

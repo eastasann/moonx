@@ -143,7 +143,7 @@ GitHub の環境は3つとも `main` からだけ使える。Google Cloud への
 | `WEB_DIST_DIR` | api | Web のビルドの出力の置き場所。ここにあるファイルを API が `/*` で返す（ADR-004） | 未設定（静的ファイルを返さない。Web は Vite の開発サーバーが返す） | API の Dockerfile が入れる（イメージの中のパス） |
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列（API は無ければ起動しない） | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
 | `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
-| `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直す。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと。作り直しは同じサーバーの `postgres` の DB につなぎ、その DB への接続を切って消してから作るので、ロールに CREATEDB の権限が要り、テスト用の DB の持ち主かスーパーユーザーでなければならない。local の Docker と CI のサービスコンテナのロールはスーパーユーザー） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
+| `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直してマイグレーションを当てる。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと。作り直しは同じサーバーの `postgres` の DB につなぎ、その DB への接続を切って消してから作るので、ロールに CREATEDB の権限が要り、テスト用の DB の持ち主かスーパーユーザーでなければならない。local の Docker と CI のサービスコンテナのロールはスーパーユーザー） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
 | `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32バイト以上の乱数。`openssl rand -base64 32` の出力。値が UTF-8 で32バイトに満たなければ起動しない） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
 | `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://stg.{DOMAIN}` / `https://{DOMAIN}` |
 | `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り。1つも無ければ起動しない） | `http://localhost:5173` | `https://stg.{DOMAIN}` / `https://{DOMAIN}` |
@@ -183,12 +183,12 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `build-web SHA=...` | Web をビルドする。環境ごとの値は入れないので、1回のビルドを両方の環境で使う。入れるのは Sentry の `release` に使う版（SHA。省くと `dev`）だけ。`build-api-image` が使う |
 | `build-api-image SHA=...` | `build-web` の結果と API を1つの Docker イメージにまとめて Artifact Registry に上げ、Web と API のソースマップを Sentry の `moonx-web`・`moonx-api` に上げる（`release` = SHA）。`build.yml` が `make test` の後に使う（04_deployment-procedure.md 2章） |
 | `test` | `test-domain`・`test-api`・`test-web` をまとめて実行 |
-| `test-domain` / `test-api` / `test-web` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査・`db-check`・`promote`・`promote-check`）、`test-api` は `apps/api` と `packages/db`（どちらも `DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web` |
+| `test-domain` / `test-api` / `test-web` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査・`db-check`・`promote`・`promote-check`）、`test-api` は `apps/api` と `packages/db`（どちらも `DATABASE_URL_TEST` の DB を作り直し、マイグレーションを当てて使う）、`test-web` は `apps/web`・`packages/ui-web` |
 | `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して。PWA の検査は、先に `build-web SHA=dev` でビルドした Web を API から返す形で起動する）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
 | `lint` / `format` / `typecheck` | Biome の検査・整形（`lint` は画面の検査スクリプト `scripts/check-screens.ts` も動かす）、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
-| `db-check BASE=...` | マイグレーションが足すだけになっているかを、`BASE` から `HEAD` までの差分で検査する。`packages/db/migrations/` の既にあるファイルと `meta/_journal.json` の既にある行を変えていない・消していないこと、足した行の `when` が `BASE` の最後の行より大きいこと（同じ値も失敗）を確かめる。`BASE` に journal が無ければ（最初のマイグレーション）、足した行どうしの `when` が増えていくことだけを確かめる（ADR-009）。`ci.yml` が使う（`BASE` は `promote-check` と同じ） |
+| `db-check BASE=...` | マイグレーションが足すだけになっているかを、`BASE` から `HEAD` までの差分で検査する。`packages/db/migrations/` の既にあるファイルと `meta/_journal.json` の既にある行を変えていない・消していないこと、足した行の `when` が整数で、`BASE` のどの行よりも大きく、足した行どうしでも増えていくこと（同じ値も失敗）、足した行の `tag` がほかの行と重ならず、`BASE` の後に足した同じ名前の `.sql` のファイルを指すことを確かめる。`BASE` の journal に `when` が整数でない行があれば、比べられないので失敗する。`BASE` に journal が無ければ（最初のマイグレーション）、`when` は `BASE` と比べず、足した行どうしで増えていくことを確かめる（ADR-009）。`ci.yml` が使う（`BASE` は `promote-check` と同じ） |
 | `db-migrate` | マイグレーションを適用する（`DATABASE_URL_DIRECT` か `DATABASE_URL`） |
 | `db-seed` / `db-reset` | 全テーブルの中身を消してデモデータを入れる（design-spec 8章。テンプレートは `data/templates/bcdx/` のファイルを AD10 と同じ取り込みの処理で入れて公開する。`APP_ENV=local` のときだけ動く。何度動かしても行の id は変わらない。6.5）/ DB を作り直してシードまで |
 | `db-studio` | Drizzle Studio |
@@ -1620,7 +1620,7 @@ interface TemplateFile {
 
 ## 6. データモデル
 
-**データモデルの正はこの章。** Phase 2 の design-spec 7章（論理設計）を Phase 3 で引き継いだ。スキーマを変えるときはこの章と `packages/db/src/schema.ts` を一緒に更新し、`make db-generate` でマイグレーションを作る。
+**データモデルの正はこの章。** Phase 2 の design-spec 7章（論理設計）を Phase 3 で引き継いだ。スキーマを変えるときはこの章と `packages/db/src/schema.ts` を一緒に更新し、`make db-generate` でマイグレーションを作る。`make test-api` が、6.3 のコードと `schema.ts` がコメントと整形を除いて同じであること、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB が `schema.ts` のとおりであることを確かめる（10章）。
 
 ### 6.1 ER図
 
@@ -1684,7 +1684,7 @@ self_analyses / validations / business_plans ─ N:1 template_versions（作成�
 // packages/db/src/schema.ts
 import { sql } from "drizzle-orm";
 import {
-  type AnyPgColumn, bigint, boolean, check, date, index, integer, jsonb, numeric,
+  type AnyPgColumn, bigint, boolean, check, date, foreignKey, index, integer, jsonb, numeric,
   pgEnum, pgTable, text, timestamp, uniqueIndex, uuid,
 } from "drizzle-orm/pg-core";
 
@@ -1706,6 +1706,11 @@ const versioned = () => ({
 const money = () => numeric({ precision: 15, scale: 2, mode: "number" });
 // 率。0.3500 = 35%。% の入力は小数第2位まで（design-spec 6.0.8）なので、率は小数第4位までで丸めずに持てる
 const ratio = () => numeric({ precision: 7, scale: 4, mode: "number" });
+// 次の2種類の制約とインデックスには、下のコードで名前を付ける:
+// - drizzle-kit が付ける名前が PostgreSQL の上限（63バイト）を超えるもの: 超えた名前は PostgreSQL が切り詰め、DB と
+//   drizzle-kit のスナップショットが食い違う。外部キーは foreignKey() で名前を付ける
+// - 2語以上の列の unique(): drizzle-orm は snake_case に直す前の列名で invitations_tokenHash_unique のように名前を付け、
+//   DB の名前に大文字が混ざってほかの名前とそろわない
 
 // ---------- enum ----------
 export const userStatus = pgEnum("user_status", ["active", "suspended", "deleted"]);
@@ -1838,7 +1843,7 @@ export const invitations = pgTable("invitations", {
   email: text().notNull(),
   role: workspaceRole(),
   grantsAdmin: boolean().notNull().default(false),   // true = 受諾した人を運営者にする。`make admin-create` だけが付ける（ワークスペースなしのときだけ）
-  tokenHash: text().notNull().unique(),           // SHA-256。トークンそのものは持たない
+  tokenHash: text().notNull().unique("invitations_token_hash_unique"),   // SHA-256。トークンそのものは持たない
   invitedById: uuid().references(() => users.id),   // null = `make admin-create` の招待（運営者がまだ居ない）
   status: invitationStatus().notNull().default("pending"),
   expiresAt: ts().notNull(),                      // 発行（再送）から数える。長さは design-spec 6.16
@@ -1907,37 +1912,48 @@ export const templateQuestions = pgTable("template_questions", {
 
 export const templateCostDefaults = pgTable("template_cost_defaults", {
   id: pk(),
-  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  templateVersionId: uuid().notNull(),            // 外部キーは末尾（63バイトに収まる名前を付ける）
   category: costCategory().notNull(),
   key: text().notNull(),                          // 例: "initial.permits"、"monthly.rent"
   name: text().notNull(),
   sortOrder: integer().notNull(),
   ...timestamps(),
-}, (t) => [uniqueIndex().on(t.templateVersionId, t.key)]);
+}, (t) => [
+  uniqueIndex().on(t.templateVersionId, t.key),
+  foreignKey({ name: "template_cost_defaults_template_version_id_fk", columns: [t.templateVersionId], foreignColumns: [templateVersions.id] })
+    .onDelete("cascade"),
+]);
 
 export const templateCheckRules = pgTable("template_check_rules", {
   id: pk(),
-  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  templateVersionId: uuid().notNull(),            // 外部キーは末尾（63バイトに収まる名前を付ける）
   checkKey: checkKey().notNull(),
   params: jsonb().notNull(),                      // 基準値。例: competitors は { "min": 3 }（目安の上限 5 は持たない。5.2 の CheckResult）
   ...timestamps(),
-}, (t) => [uniqueIndex().on(t.templateVersionId, t.checkKey)]);
+}, (t) => [
+  uniqueIndex().on(t.templateVersionId, t.checkKey),
+  foreignKey({ name: "template_check_rules_template_version_id_fk", columns: [t.templateVersionId], foreignColumns: [templateVersions.id] })
+    .onDelete("cascade"),
+]);
 
 export const templateExecutionPresets = pgTable("template_execution_presets", {
   id: pk(),
-  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  templateVersionId: uuid().notNull(),            // 外部キーは末尾（63バイトに収まる名前を付ける）
   type: presetType().notNull(),
   title: text().notNull(),                        // 例: "Business decision"、"30 days before launch"、"Revenue"
   area: text(),                                   // KPI だけ（Financial / Customer / Operations）
   launchTiming: launchTiming(),                   // ローンチだけ
   sortOrder: integer().notNull(),
   ...timestamps(),
-});
+}, (t) => [
+  foreignKey({ name: "template_execution_presets_template_version_id_fk", columns: [t.templateVersionId], foreignColumns: [templateVersions.id] })
+    .onDelete("cascade"),
+]);
 
 // ---------- 自己分析 ----------
 export const selfAnalyses = pgTable("self_analyses", {
   id: pk(),
-  userId: uuid().notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid().notNull().unique("self_analyses_user_id_unique").references(() => users.id, { onDelete: "cascade" }),
   templateVersionId: uuid().notNull().references(() => templateVersions.id),
   currency: text().notNull().default("PHP"),
   status: selfAnalysisStatus().notNull().default("not_started"),
@@ -1983,7 +1999,7 @@ export const ideas = pgTable("ideas", {
 
 export const validations = pgTable("validations", {
   id: pk(),
-  ideaId: uuid().notNull().unique().references(() => ideas.id, { onDelete: "cascade" }),
+  ideaId: uuid().notNull().unique("validations_idea_id_unique").references(() => ideas.id, { onDelete: "cascade" }),
   templateVersionId: uuid().notNull().references(() => templateVersions.id),
   ...timestamps(),
 });
@@ -2134,7 +2150,7 @@ export const businessPlans = pgTable("business_plans", {
   businessName: text().notNull(),
   preparedBy: text().notNull(),
   templateVersionId: uuid().notNull().references(() => templateVersions.id),
-  createdFromDecisionId: uuid().references((): AnyPgColumn => decisionLogEntries.id),
+  createdFromDecisionId: uuid(),                  // 外部キーは末尾（63バイトに収まる名前を付ける）
   archivedAt: ts(),
   deletedAt: ts(),                                // 作成の取り消し（5.11）でだけ入れる。戻さない
   lastActivityAt: ts().notNull().defaultNow(),
@@ -2144,6 +2160,7 @@ export const businessPlans = pgTable("business_plans", {
 }, (t) => [
   // 作成を取り消した案の名前は、見えない名前とぶつからないように数えない（design-spec 6.0.8）
   uniqueIndex("business_plans_name_uq").on(t.ideaId, t.name).where(sql`${t.deletedAt} is null`),
+  foreignKey({ name: "business_plans_created_from_decision_id_fk", columns: [t.createdFromDecisionId], foreignColumns: [decisionLogEntries.id] }),
 ]);
 
 export const planAnswers = pgTable("plan_answers", {
@@ -2207,7 +2224,7 @@ export const decisionLogEntries = pgTable("decision_log_entries", {
   workspaceId: uuid().notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   ideaId: uuid().notNull().references(() => ideas.id, { onDelete: "cascade" }),
   businessPlanId: uuid().references((): AnyPgColumn => businessPlans.id, { onDelete: "cascade" }),
-  planVersionId: uuid().references(() => planVersions.id),
+  planVersionId: uuid().references((): AnyPgColumn => planVersions.id),
   kind: decisionKind().notNull(),
   value: decisionLogValue(),                      // version_saved は null
   reason: text(),                                 // 判定と Go / No-Go は必須（API で検査）
@@ -2283,7 +2300,7 @@ export const changeHistory = pgTable("change_history", {
   changedById: uuid().notNull().references(() => users.id),
   changedAt: ts().notNull().defaultNow(),
 }, (t) => [
-  index().on(t.targetType, t.targetId, t.targetKey, t.changedAt),
+  index("change_history_target_idx").on(t.targetType, t.targetId, t.targetKey, t.changedAt),
   index().on(t.containerType, t.containerId, t.changedAt),
   index().on(t.workspaceId, t.changedAt),
   index().on(t.batchId),
@@ -2525,6 +2542,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 |---|---|---|---|
 | 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
+| DB のスキーマとマイグレーション（`packages/db`・`scripts/db-check.ts`） | Bun test ＋ 実際の PostgreSQL（`db-check` は一時的な Git のリポジトリ） | — | 6.3 のコードと `schema.ts` がコメントと整形を除いて同じこと、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB の列・制約・インデックス・列挙が `schema.ts` から作った一時的なテーブルと PostgreSQL の表記で一致すること、`relations()` が外部キーと1対1に対応し、名前が `relations.ts` の先頭に書いた規則に従うこと、テスト用の DB の作り直しが `_test` で終わらない名前とクエリ文字列を拒むこと、`db-check` が2章の失敗の場合をすべて捕まえること |
 | API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012） |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作（axe の検査は E2E で行う。ADR-022） |
 | Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |

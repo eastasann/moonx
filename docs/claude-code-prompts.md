@@ -92,7 +92,7 @@ make setup の通しの確認は Step 6 で行う（シードとトークンの�
 
 ## Step 2: DB スキーマとマイグレーション
 
-Status:
+Status: done 2026-10-12
 
 ```
 docs/02-01_system-design-doc.md の6章（データモデル）・7.3（接続）・2章（DATABASE_URL_TEST の決まり・make ターゲットの

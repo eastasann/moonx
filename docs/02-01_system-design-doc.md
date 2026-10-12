@@ -102,7 +102,7 @@ moonx/
 ├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA（環境ごとに、最初の `make promote` が作る）
 ├─ e2e/           Playwright（Web）
 ├─ docker/        ローカルの PostgreSQL の初期化 SQL（docker-compose.yml が使う）
-├─ scripts/       doc-lint、画面の検査（`style` 属性・JSX の生の文字列。`make lint` が呼ぶ）、マイグレーションの検査（`db-check`）、昇格（`promote`・`promote-check`）
+├─ scripts/       doc-lint、画面の検査（`style` 属性・JSX の生の文字列。`make lint` が呼ぶ）、マイグレーションの検査（`db-check`）、昇格（`promote`・`promote-check`）、無人ループの駆動（`draft-loop.sh`）
 └─ Makefile
 ```
 
@@ -669,7 +669,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 **状態・日付:** 採用（2026-10-01。この ADR を書いたのは 2026-10-11。それまでは他の ADR の前提としてだけ書かれていた）
 
-**決定:** アプリ（`apps/*`）・共有パッケージ（`packages/*`）・スクリプト（`scripts/`）は TypeScript で書く。例外は `scripts/doc-lint.sh` と `.githooks/pre-commit`（DRAFT が配る検出点。シェルのまま使う）。型チェックは `make typecheck`。
+**決定:** アプリ（`apps/*`）・共有パッケージ（`packages/*`）・スクリプト（`scripts/`）は TypeScript で書く。例外は `scripts/doc-lint.sh` と `.githooks/pre-commit`（DRAFT が配る検出点）と `scripts/draft-loop.sh`（DRAFT の無人ループの駆動スクリプト）で、シェルのまま使う。型チェックは `make typecheck`。
 
 **理由:** ユーザーの希望（design-spec 9.3）。Eden Treaty の型の共有（ADR-006）、Drizzle のスキーマ（ADR-009）、トークンの型（ADR-025）も、どれも TypeScript を前提にしている。
 

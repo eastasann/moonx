@@ -778,7 +778,7 @@ API のルートは5章。API が返す Web の静的なファイルのうち、
 | 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、API の仕様書は `/api/docs`（staging だけ。ADR-006） |
 | 値の正 | API が検査する入力の値（必須・文字数・範囲・形式・ファイルの種類と大きさ）の正は design-spec 6.0.8「入力の規則」。この章の API の表と 6.3 の check 制約は値を書かずに 6.0.8 を参照する（check 制約が値を持つときは 6.0.8 と同じ値にする）。期限（招待・パスワード再設定のリンク・再認証）と、画面に出す件数の正も design-spec（6.16・各画面）。変えるときは design-spec を先に直す |
 | 認証 | Better Auth のセッション（HttpOnly Cookie）。公開と書いたもの以外はログインが要る（未ログインは 401 `UNAUTHENTICATED`） |
-| 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601（表示はクライアントが利用者のタイムゾーンで行う） |
+| 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601 で、ミリ秒の3桁と `Z` を付ける（`"2026-10-01T02:00:00.000Z"`。表示はクライアントが利用者のタイムゾーンで行う） |
 | 金額・率 | 金額は number（ワークスペースの通貨。自己分析は自己分析の通貨）。率は 0〜1 の小数（35% は `0.35`）。DB は numeric、API で number に変換する |
 | 部分更新 | 1つの項目は `PATCH`（送った項目だけ変える）、キーで決まる項目（回答・数字）は `PUT .../{key}` で作るか更新する |
 | 同時編集 | 項目を更新するリクエストは、読んだときの `lockVersion` を送る。違えば 409 `CONFLICT` と相手の内容を返す。「自分の内容で上書きする」は同じ内容に `force: true` を付けて送る（ADR-019）。まだ行が無い項目（未回答の設問など）の `lockVersion` は `0`。一覧に出る行（調査ログ・競合・費用行など）は作成時の `lockVersion` が 0、キーで決まる項目（回答・数字）は最初の保存で 1 になる。何も変えないリクエストは `lockVersion` を上げず、履歴も書かない。キーで決まる項目を同時に作られて負けたときは、`force: true` でも 409 `CONFLICT`（`current` を読んでからやり直す）。V4・V5 は根拠の付け外しのたびに、対象の項目の `lockVersion` を上げる |
@@ -903,10 +903,11 @@ interface TemplateRef { versionId: UUID; versionNumber: number; newerVersion: { 
 
 // ---- 計算結果（packages/domain。design-spec 6.4 の計算仕様） ----
 type MetricReason = "needs_price" | "needs_monthly_costs" | "needs_expected_sales" | "needs_startup_costs"
-  | "margin_not_positive" | "target_margin_unreachable" | "not_recovered" | "empty";
+  | "margin_not_positive" | "target_margin_unreachable" | "not_recovered"
+  | "empty" | "unknown";                       // unknown は、入力そのものを出す主要指標（selling_price・capacity_units_day・cost_row:*）の入力が Unknown のとき
 interface MetricValue {
   value: number | null;                       // 丸める前の値。計算できなければ null
-  bound: "exact" | "lower" | "upper";         // lower = 「+」、upper = 「≤」（費用に未入力・Unknown の行があるとき）
+  bound: "exact" | "lower" | "upper" | "approximate";   // lower = 「+」、upper = 「≤」（費用に未入力・Unknown の行があるとき）、approximate = 「≈」（どちらにずれるか決まらないとき。design-spec 6.4 の損失の ROI）
   reason: MetricReason | null;                // value が null の理由。value も reason も null は、売上 0 の営業利益率で、ダッシュ記号で表示する
 }
 interface CostTotal { amount: number | null; isLowerBound: boolean; unknownRows: number; emptyRows: number; }
@@ -2523,9 +2524,10 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目 | 決定 |
 |---|---|
 | ライブラリ | i18next ＋ react-i18next（Web）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
-| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
+| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。どの画面でも同じ、列挙の値（5.2）の表示名は `common` に置き、キーは `<まとまり>.<値>`（例: `common:stage.launch_prep`・`common:checkState.not_started`・`common:decision.proceed`）。キーの語は camelCase にし、API の値（列挙の値・`error.code`・セクションのキー）はそのまま使う（例: `common:check.competitorsRange`・`errors:VALIDATION_FAILED`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
-| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`・`formatWaitTime()`（回数制限の待ち時間）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
+| 入力の検査の文言 | クライアントの Zod の検査（8.2）の issue の `code` から選ぶ。`too_small`・`too_big` は `origin`（文字数か数か）と `minimum`・`maximum`、`invalid_format` は `format`（`email`・`url`・`date`・`datetime` など）、`invalid_type` は `expected`（`int` は整数でない数。ほかは型の違い）、`invalid_value` は選択肢に無い値、`packages/schemas` の自前の検査（`custom`）は `params.rule`（`InputRule` の型: `required`・`decimals`・`positive`・`nul_character`・`number_format`・`currency`・`time_zone`）を見て、カタログの文言を出す。issue の `message` は開発者向けで、画面に出さない |
+| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`・`formatOverdue()`（期限切れの日数）・`formatWaitTime()`（回数制限の待ち時間）・`formatCheckName()`（確認項目の名前。競合の基準値の幅を付ける）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（ブラウザと Bun） |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |

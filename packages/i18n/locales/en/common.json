@@ -1,0 +1,60 @@
+{
+  "role": {
+    "owner": "Owner",
+    "member": "Member",
+    "viewer": "Viewer"
+  },
+  "fau": {
+    "fact": "Fact",
+    "assumption": "Assumption",
+    "unknown": "Unknown"
+  },
+  "fauState": {
+    "empty": "Empty",
+    "unclassified": "Unclassified",
+    "fact": "Fact",
+    "fact_no_evidence": "Fact · No evidence",
+    "assumption": "Assumption",
+    "unknown": "Unknown"
+  },
+  "confidence": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High"
+  },
+  "decision": {
+    "undecided": "Undecided",
+    "proceed": "Proceed",
+    "hold": "Hold",
+    "drop": "Drop"
+  },
+  "goNoGo": {
+    "launch": "Launch",
+    "delay": "Delay",
+    "stop": "Stop"
+  },
+  "stage": {
+    "validation": "Validation",
+    "planning": "Planning",
+    "launch_prep": "Launch prep"
+  },
+  "checkState": {
+    "not_started": "Not started",
+    "partial": "Partial",
+    "done": "Done"
+  },
+  "check": {
+    "competitorsRange": "Competitors ({{min}}–{{max}})",
+    "competitorsAtLeast": "Competitors ({{min}}+)",
+    "local_price": "Local price range",
+    "costs": "Startup & monthly costs",
+    "break_even": "Break-even volume",
+    "permits": "Permits",
+    "demand_signal": "Demand or problem signal"
+  },
+  "supportsCheck": {
+    "local_price": "Local price",
+    "permits": "Permits",
+    "demand_signal": "Demand or problem signal"
+  }
+}

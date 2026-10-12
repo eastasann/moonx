@@ -1,0 +1,15 @@
+{
+  "relative": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago"
+  },
+  "overdue": "overdue {{count}}d",
+  "months": "{{value}} months",
+  "wait": {
+    "minute_one": "{{count}} minute",
+    "minute_other": "{{count}} minutes",
+    "hour_one": "{{count}} hour",
+    "hour_other": "{{count}} hours"
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+.output/
+.tanstack/
+.nitro/
+.data/
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.DS_Store

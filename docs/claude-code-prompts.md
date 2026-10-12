@@ -40,7 +40,7 @@ Claude Code のチャットに1つずつコピペして使う（`/draft:implemen
 
 ## Step 1: モノレポ骨格と開発環境
 
-Status:
+Status: done 2026-10-12
 
 ```
 docs/02-01_system-design-doc.md の2章（リポジトリ構成・環境と命名・環境変数・make ターゲット）と
@@ -104,7 +104,8 @@ DB のスキーマとマイグレーションを作ってください。
 2. packages/db/src/schema.ts: 6.3 の Drizzle のスキーマを、全テーブル・列挙・check 制約・インデックスまで写す。
    6.3 が正。写している途中で記述の食い違いや欠けに気づいたら、写す前に 6.3 を直す（CLAUDE.md と /draft:implement の決まり。弱める直しになるなら止める）
 3. packages/db/src/relations.ts（外部キーと同じ対応の relations()）
-4. drizzle.config.ts と DB の接続モジュール（postgres.js、casing: "snake_case"。プールの設定は SDD 7.3）
+4. drizzle.config.ts と DB の接続モジュール（postgres.js、casing: "snake_case"。プールの設定は SDD 7.3）。
+   drizzle.config.ts は DATABASE_URL を読む（make db-migrate は DATABASE_URL_DIRECT があればそれを DATABASE_URL に入れて渡す。Step 1 の Makefile）
 5. make db-generate で最初のマイグレーションを作り、SQL を読んで 6.3 と合っているか確かめる
    （check 制約・一意制約・インデックスが入っていること）
 6. make db-migrate で開発用の DB に当てる。テスト用の DB（DATABASE_URL_TEST）を作り直して当てる処理を、
@@ -115,7 +116,7 @@ DB のスキーマとマイグレーションを作ってください。
 
 まだシード（Step 6）と API は作らない。
 
-make db-generate → make db-migrate が通り、テストで 6.3 の全テーブル・制約・インデックスがあることを確かめ、
+make db-generate → make db-migrate が通り、make db-studio が起動して 6.3 のテーブルが見え、テストで 6.3 の全テーブル・制約・インデックスがあることを確かめ、
 テスト用の DB にも同じマイグレーションが当たり、db-check のテストが上の失敗の場合をすべて捕まえ、
 make test・make typecheck・make lint が通る状態をゴールとする。
 
@@ -853,7 +854,8 @@ Status:
 
 まだ作らないもの: 29・30 と、そこへのリンク（Step 42）、ワークスペースの中のほかの画面（Step 25 以降）。
 
-make test-e2e で上の流れが通り、make build-web で 1 の HTML ができ、make test-web・make typecheck・make lint が通る状態をゴールとする。
+make test-e2e で上の流れが通り、make build-web で 1 の HTML ができ、make build・make test-web・make typecheck・make lint が通る状態をゴールとする。
+（make build と make build-web は、SPA の殻 _shell.html のプリレンダーが / を開くので、/ のルートができるこのステップまで失敗する。Step 1 で、/ に仮のルートを置けば通ることを確かめた）
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
@@ -1217,6 +1219,8 @@ docs/02-01_system-design-doc.md ADR-031 に従って、Web を PWA にしてく�
 2. マニフェストとアイコン（Step 4 の生成物を /manifest.webmanifest と /icons/ に出す）、iPhone の Safari だけの案内
 3. API の静的ファイルの配信（ADR-004・ADR-031 の Content-Type とキャッシュの見出し、_shell.html、404、HTML の meta 要素）
 4. テスト: 10章の「PWA と配信」の行（Playwright と Bun test。make build-web の結果を WEB_DIST_DIR で渡した API に対して）
+5. make test-e2e が PWA の検査の前に make build-web SHA=dev を動かすようにする（SDD 2章「make ターゲット」の test-e2e。
+   Step 1 の Makefile には入れていない。build-web は / のルートができる Step 24 まで失敗し、Step 19〜23 の make test-e2e を止めるため）
 
 まだインフラ（Step 40）は作らない。
 

@@ -102,7 +102,7 @@ moonx/
 ├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA（環境ごとに、最初の `make promote` が作る）
 ├─ e2e/           Playwright（Web）
 ├─ docker/        ローカルの PostgreSQL の初期化 SQL（docker-compose.yml が使う）
-├─ scripts/       doc-lint、画面の検査（`style` 属性・JSX の生の文字列。`make lint` が呼ぶ）、マイグレーションの検査（`db-check`）、昇格（`promote`・`promote-check`）、無人ループの駆動（`draft-loop.sh`）
+├─ scripts/       doc-lint、`.env` の作成（`make setup` が呼ぶ）、画面の検査（`style` 属性・JSX の生の文字列。`make lint` が呼ぶ）、マイグレーションの検査（`db-check`）、昇格（`promote`・`promote-check`）、無人ループの駆動（`draft-loop.sh`）
 └─ Makefile
 ```
 
@@ -112,7 +112,7 @@ moonx/
 
 | 項目 | local | staging | production |
 |---|---|---|---|
-| Web・API の URL | Web `http://localhost:5173`（Vite が `/api` を API へ転送）・API `http://localhost:3000` | `https://stg.{DOMAIN}` | `https://{DOMAIN}` |
+| Web・API の URL | Web `http://localhost:5173`（Vite が `/api/` で始まるパスを API へ転送）・API `http://localhost:3000` | `https://stg.{DOMAIN}` | `https://{DOMAIN}` |
 | Web と API（Cloud Run） | Web は `vite dev`、API は `bun --watch`（API は静的ファイルを返さない） | `moonx-api-staging`（Web も返す） | `moonx-api-production`（Web も返す） |
 | DB | Docker の PostgreSQL 17（`localhost:5432`、DB 名 `moonx`） | Neon プロジェクト `moonx` のブランチ `staging` | 同じプロジェクトのブランチ `production` |
 | メール | コンソールに出す | Resend（送信先は許可リストのメールだけ） | Resend |
@@ -139,23 +139,25 @@ GitHub の環境は3つとも `main` からだけ使える。Google Cloud への
 |---|---|---|---|---|
 | `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `WEB_DIST_DIR`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS` も必須。Web へは、API が返す HTML の meta 要素で渡す（ADR-004） | `local` | Cloud Run の環境変数 |
 | `APP_VERSION` | api | `/api/health` の `version`（コミット SHA） | 未設定なら `dev` | API の Dockerfile が `build-api-image` の build-arg から環境変数に入れる |
-| `PORT` | api | 待ち受けるポート | `3000` | Cloud Run が `8080` を渡す |
+| `PORT` | api, web（開発サーバー） | 待ち受けるポート（未設定なら `3000`。1〜65535 の整数でなければ起動しない）。API は、local では `127.0.0.1` だけで待ち受け（同じネットワークのほかの端末からは開けない）、staging・production ではすべてのインターフェースで待ち受ける。local と e2e では、Vite の開発サーバーが `/api/` で始まるパスをこのポートへ転送する（API と同じ値を、Makefile が `.env` から、e2e は Playwright の `webServer` が渡す） | `3000` | Cloud Run が `8080` を渡す |
 | `WEB_DIST_DIR` | api | Web のビルドの出力の置き場所。ここにあるファイルを API が `/*` で返す（ADR-004） | 未設定（静的ファイルを返さない。Web は Vite の開発サーバーが返す） | API の Dockerfile が入れる（イメージの中のパス） |
-| `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
+| `DATABASE_URL` | api, db | PostgreSQL の接続文字列（API は無ければ起動しない） | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
 | `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
-| `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直す。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
+| `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直す。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと。作り直しは同じサーバーの `postgres` の DB につなぎ、その DB への接続を切って消してから作るので、ロールに CREATEDB の権限が要り、テスト用の DB の持ち主かスーパーユーザーでなければならない。local の Docker と CI のサービスコンテナのロールはスーパーユーザー） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
 | `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32バイト以上の乱数。`openssl rand -base64 32` の出力。値が UTF-8 で32バイトに満たなければ起動しない） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
 | `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://stg.{DOMAIN}` / `https://{DOMAIN}` |
-| `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り） | `http://localhost:5173` | `https://stg.{DOMAIN}` / `https://{DOMAIN}` |
+| `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り。1つも無ければ起動しない） | `http://localhost:5173` | `https://stg.{DOMAIN}` / `https://{DOMAIN}` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | api | Google ログイン（OAuth クライアント。環境ごとに作る。片方だけ入れると起動しない。staging・production は空でも起動しない。local だけ空にでき、Google ログインだけが使えなくなる） | 開発用のクライアント | ID は環境変数、SECRET は Secret Manager `moonx-{env}-google-client-secret` |
 | `MAIL_TRANSPORT` | api | `console` / `resend`（それ以外の値では起動しない。staging・production は `resend` でなければ起動しない。`console` は招待のリンクを含むメールの全文をログに出すので、local とテストだけで使う） | `console` | `resend` |
-| `RESEND_API_KEY` | api | Resend の API キー | 不要 | Secret Manager `moonx-{env}-resend-api-key` |
+| `RESEND_API_KEY` | api | Resend の API キー（`MAIL_TRANSPORT=resend` のとき、空なら起動しない） | 不要 | Secret Manager `moonx-{env}-resend-api-key` |
 | `MAIL_FROM` | api | 送信元 | `moonx <no-reply@localhost>` | `moonx <no-reply@{DOMAIN}>` |
 | `MAIL_ALLOWLIST` | api | staging でだけ使う送信先の許可リスト（カンマ区切り。大文字小文字を区別しない）。staging では、ここに無い宛先にメールを送らない。空なら誰にも送らない（扱いは ADR-013）。local と production では読まない | 空 | staging だけ設定 |
 | `AVATAR_BUCKET` | api | プロフィール写真のバケット（staging・production は空なら起動しない） | 空（local はディスク `./.data/avatars`。API が `/api/avatars/{name}` で返す。U9） | `{GCP_PROJECT_ID}-moonx-{env}-avatars` |
 | `SENTRY_DSN` | api | Sentry（API。プロジェクト `moonx-api`） | 空 | Cloud Run の環境変数（Terraform の環境ごとの変数で入れる。DSN は秘密ではないので Secret Manager に置かない） |
 | `WEB_SENTRY_DSN` | api | Sentry（Web。プロジェクト `moonx-web`）。API が Web の HTML の meta 要素 `moonx-sentry-dsn` で渡す（ADR-004） | 空（local の Web は Sentry に送らない） | Cloud Run の環境変数（`SENTRY_DSN` と同じく Terraform の環境ごとの変数で入れる） |
-| `LOG_LEVEL` | api | `debug` / `info` / `warn` / `error` | `debug` | `info` |
+| `LOG_LEVEL` | api | `debug` / `info` / `warn` / `error`（それ以外の値では起動しない） | `debug` | `info` |
+
+API は値の前後の空白を除き、空の値（空白だけの値を含む）を未設定として扱う。local で未設定の `BETTER_AUTH_URL`・`TRUSTED_ORIGINS`・`MAIL_TRANSPORT`・`MAIL_FROM`・`LOG_LEVEL` には、上の表の「local の値」を使う。staging・production で未設定の `LOG_LEVEL` は `info` にする（ほかの4つは必須）。
 
 `.env` はリポジトリの直下に1つ置く。`make setup` が `.env.example` をコピーする。直下の `.env` は Makefile が読み込んで各コマンドに渡し、Vite は `envDir` をリポジトリの直下にする。Web はビルドに環境ごとの値を持たない（環境名と Sentry の DSN は、API が返す HTML から読む。local の Vite の開発サーバーでは meta 要素が無いので、環境名は `local`、Sentry は使わない）。
 
@@ -200,6 +202,8 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `promote ENV=... [SHA=...]` | 昇格の PR（戻すときも同じ。ADR-016）を手元から作る。まず `git fetch origin` し、作業ツリーに変更が無く、`main` が `origin/main` と同じことを確かめる。`SHA` は短い形でもよく、完全な SHA に直して使う。省くと、staging は `deploy/` 以外を変えた `main` の最新のコミット、production は今の `deploy/staging/version`。省いた SHA が、今の版より古い（戻すことになる）か、その環境で前に戻した版（その環境の履歴にあって、今の版より新しい）なら、止めて `SHA` の指定を求める。確かめること: SHA が今の版と違う。その `build.yml` が成功し（gh）、イメージが Artifact Registry にある（gcloud）。production なら、その SHA を `deploy/staging/version` に書いたコミットの `deploy.yml` が成功している（gh）。そのあとブランチ `promote/{env}-<SHA の先頭7文字>` を作り（同じ名前のブランチが手元か origin に残っていれば、それを使う PR が開いているときは止め、そうでなければ消してから作る）、`deploy/{env}/version` を書いて（無ければ作る）コミットし、`promote-check BASE=origin/main` が通ったら push して PR を開く（gh）。件名は 03_dev-setup.md 9章「コミットメッセージ」の形（進めるときは promote、戻すときは roll back）。本文には、今の版と出す版の SHA・コミットの一覧・マイグレーションの一覧・戻し方（今の版の SHA で `promote` を動かす）を入れる。一覧の範囲は、いちばん先まで出した版（04_deployment-procedure.md 4.1）で決める。出す版がそれより新しいときは、コミットは今の版から出す版まで、マイグレーションはいちばん先まで出した版より後のもの（この昇格で新しく当たるもの）。古いときは、どちらも出す版から、いちばん先まで出した版まで（DB に当たっていて出す版に無いもの）とし、出す版が直前の版（同 4.1）かどうかも書く。その環境の前回の `deploy.yml`（今の版を書いたコミットのもの）が成功していなければ、本文の先頭にそう書き、Cloud Run で動いている版の SHA も出す（gcloud）。最初の昇格（今の版が無い）では、今の版は「なし」とし、コミットの一覧は省き、マイグレーションはすべて出す（04_deployment-procedure.md 4.2・5.1） |
 | `promote-check BASE=...` | `BASE` から `HEAD` までの差分のうち `deploy/` を検査する。`deploy/` を変えていなければ何もしない。変えていれば、次をすべて満たさないと失敗する: 変えたファイルは `deploy/staging/version` か `deploy/production/version` のどちらか1つだけで、ほかのファイルを一緒に変えていない（消してもいない）。中身は完全な SHA が1行で、`BASE` の時点の `main` にあるコミット。その SHA が `BASE` の時点のその環境の版より古い（戻す）なら、その環境の `deploy/{env}/version` に `BASE` までに書かれたことがある（`BASE` にその環境のファイルが無ければ、この条件は無い）。production なら、`deploy/staging/version` に `BASE` までに書かれたことがある。`ci.yml`（`BASE` は、PR を検査するマージのコミットの1つ目の親）・`deploy.yml`（`BASE` は push の前のコミット）・`promote` が使う（04_deployment-procedure.md 2章） |
 | `db-backup ENV=...` | `pg_dump -Fc` を取り、`gs://{GCP_PROJECT_ID}-moonx-backups/{env}/<日付>.dump` に上げる（バケットは30日で自動削除。定期実行の GitHub Actions が使う。05_operation-runbook.md） |
+
+Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infra-plan`・`infra-apply`・`db-backup`）は、プロジェクトを `gcloud config` のプロジェクトから取る（`GCP_PROJECT_ID=...` で上書きできる）。空なら動かずに止まる。Terraform のプロジェクト ID は各 `envs` の変数に書き（03_dev-setup.md 5.4）、make はこの値を tfstate のバケットの名前（`{GCP_PROJECT_ID}-tfstate`）にだけ使う（backend は変数を読めないため）。
 
 ---
 
@@ -601,7 +605,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 - **Web（`packages/ui-web`）**: 振る舞いとアクセシビリティは **React Aria Components**（キーボード操作・フォーカスの管理・ARIA・国際化された数値と日付の入力）。見た目は **vanilla-extract**（`*.css.ts` に型付きで書き、ビルド時に静的な CSS になる。実行時の処理なし）。大きさや種類の出し分けは `@vanilla-extract/recipes` の `recipe()`（例: `size: S | M | L | XL`、`variant: primary | secondary | negative`）。React Aria の状態は `data-*` 属性（`[data-hovered]`・`[data-pressed]`・`[data-focus-visible]`・`[data-disabled]` など）で書く。Popover と Tray の切り替えは、幅がトークンの `semantic.breakpoint.tablet` より狭いときに Tray（下からのシート）にする共通の部品で行う。
 - **部品の名前と API**: design-spec 4.5 の Spectrum の名前にそろえる（例: `<Button variant="primary" size="M">`、`<StatusLight variant="partial">`）。のちのネイティブの部品も同じ名前と props にする。props の型は `packages/ui-web` で定義し、共通の部分（`size`・`variant` などの値の型）は `packages/ui-tokens` に手で書いて置く（`packages/ui-tokens/src/generated/` が `make tokens` の生成物、`src/types.ts` などそれ以外は手で書くファイル）。
-- **画面にスタイルを書かない**: `apps/web` の画面は、部品と、レイアウトの部品（`Flex`・`Grid`。間隔はトークンの名前だけを受け取る。例: `gap="space-300"`）の組み合わせで作る。画面で `@vanilla-extract/css` を直接使うこと、`style` 属性に値を書くことは、Biome の `noRestrictedImports` と CI の検査で禁止する。必要な見た目が無ければ、design-spec 4.5 に部品を足してから `packages/ui-web` に作る。
+- **画面にスタイルを書かない**: `apps/web` の画面は、部品と、レイアウトの部品（`Flex`・`Grid`。間隔はトークンの名前だけを受け取る。例: `gap="space-300"`）の組み合わせで作る。画面で vanilla-extract のパッケージ（`@vanilla-extract/css`・`@vanilla-extract/recipes` など `@vanilla-extract/` で始まるもの）を直接使うこと、`style` 属性に値を書くことは、Biome の `noRestrictedImports` と CI の検査で禁止する。必要な見た目が無ければ、design-spec 4.5 に部品を足してから `packages/ui-web` に作る。
 - **スマホ（保留）**: ネイティブの feature で決める。部品の名前と props を Web にそろえる決まりは保つ。
 
 **理由:** ユーザーが「Tailwind のクラスを画面に直接書かない」「React Aria などの headless の部品を使う」と指定した。振る舞いを実績のある部品に任せると、ダイアログのフォーカスの閉じ込め・キーボード操作・スクリーンリーダー対応を自分で作らずに済む（design-spec 4.1 の設問フォームのキーボード操作、6.0.6 のモーダルの決まり）。見た目を部品の中に閉じ込めると、画面ごとのばらつきが出ず、Spectrum を参考にしたデザインシステム（ADR-018）を守りやすい。vanilla-extract はトークンを型として扱えるので、`semantic` 以外の値を使うと型エラーになる。

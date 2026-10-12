@@ -102,7 +102,7 @@ moonx/
 ├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA（環境ごとに、最初の `make promote` が作る）
 ├─ e2e/           Playwright（Web）
 ├─ docker/        ローカルの PostgreSQL の初期化 SQL（docker-compose.yml が使う）
-├─ scripts/       doc-lint と、画面の検査（`style` 属性・JSX の生の文字列。`make lint` が呼ぶ）
+├─ scripts/       doc-lint、画面の検査（`style` 属性・JSX の生の文字列。`make lint` が呼ぶ）、マイグレーションの検査（`db-check`）、昇格（`promote`・`promote-check`）
 └─ Makefile
 ```
 
@@ -129,7 +129,7 @@ GitHub の環境は3つとも `main` からだけ使える。Google Cloud への
 | プレースホルダ | 値 | 決めた日・決める時期 |
 |---|---|---|
 | `{DOMAIN}` | `bcdx.dwnfrc.app`（既存の `dwnfrc.app` のサブドメイン。staging は `stg.{DOMAIN}`） | 2026-10-03 に決めた（ユーザーの決定。ADR-013） |
-| `{GCP_PROJECT_ID}` | 未定（staging と production で1つのプロジェクトを共有する。世界で重複できず、あとから変えられない） | インフラを作るステップの前にユーザーが決める |
+| `{GCP_PROJECT_ID}` | 未定（staging と production で1つのプロジェクトを共有する。世界で重複できず、あとから変えられない） | 最初の `make infra-apply`（Web の公開）の前にユーザーが決める |
 
 ネイティブアプリの ID（`{APP_ID}`）は、ネイティブの feature で決める（案は 01_prd.md 6章）。
 
@@ -181,11 +181,12 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `build-web SHA=...` | Web をビルドする。環境ごとの値は入れないので、1回のビルドを両方の環境で使う。入れるのは Sentry の `release` に使う版（SHA。省くと `dev`）だけ。`build-api-image` が使う |
 | `build-api-image SHA=...` | `build-web` の結果と API を1つの Docker イメージにまとめて Artifact Registry に上げ、Web と API のソースマップを Sentry の `moonx-web`・`moonx-api` に上げる（`release` = SHA）。`build.yml` が `make test` の後に使う（04_deployment-procedure.md 2章） |
 | `test` | `test-domain`・`test-api`・`test-web` をまとめて実行 |
-| `test-domain` / `test-api` / `test-web` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査スクリプト）、`test-api` は `apps/api`（`DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web` |
+| `test-domain` / `test-api` / `test-web` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査・`db-check`・`promote`・`promote-check`）、`test-api` は `apps/api` と `packages/db`（どちらも `DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web` |
 | `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して。PWA の検査は、先に `build-web SHA=dev` でビルドした Web を API から返す形で起動する）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
 | `lint` / `format` / `typecheck` | Biome の検査・整形（`lint` は画面の検査スクリプト `scripts/check-screens.ts` も動かす）、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
+| `db-check BASE=...` | マイグレーションが足すだけになっているかを、`BASE` から `HEAD` までの差分で検査する。`packages/db/migrations/` の既にあるファイルと `meta/_journal.json` の既にある行を変えていない・消していないこと、足した行の `when` が `BASE` の最後の行より大きいこと（同じ値も失敗）を確かめる。`BASE` に journal が無ければ（最初のマイグレーション）、足した行どうしの `when` が増えていくことだけを確かめる（ADR-009）。`ci.yml` が使う（`BASE` は `promote-check` と同じ） |
 | `db-migrate` | マイグレーションを適用する（`DATABASE_URL_DIRECT` か `DATABASE_URL`） |
 | `db-seed` / `db-reset` | 全テーブルの中身を消してデモデータを入れる（design-spec 8章。テンプレートは `data/templates/bcdx/` のファイルを AD10 と同じ取り込みの処理で入れて公開する。`APP_ENV=local` のときだけ動く。何度動かしても行の id は変わらない。6.5）/ DB を作り直してシードまで |
 | `db-studio` | Drizzle Studio |
@@ -218,7 +219,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | ADR-006 | 通信方式（ユーザー指定） | **REST**。クライアントは **Eden Treaty**、仕様書は OpenAPI。常時接続は使わない |
 | ADR-007 | API の実行環境（ユーザー指定） | **Cloud Run**（asia-southeast1、0〜3台） |
 | ADR-008 | DB（ユーザー指定） | **Neon の PostgreSQL** を、Neon 独自の機能を使わない標準の PostgreSQL として使う |
-| ADR-009 | ORM・入力チェック | **Drizzle ORM**（postgres.js）＋ **Zod v4** |
+| ADR-009 | ORM・入力チェック | **Drizzle ORM**（postgres.js。0.45 系に固定し、マイグレーションは足すだけ。`make db-check`）＋ **Zod v4** |
 | ADR-010 | 認証（ユーザー指定） | **Better Auth**（メール＋パスワード、**Google ログイン**）。招待制はサーバーで強制する |
 | ADR-011 | キャッシュ | サーバー側のキャッシュは置かない。クライアントは **TanStack Query** |
 | ADR-012 | Pitch Deck の PDF | API サーバーで **react-pdf** を使って作る |
@@ -358,15 +359,15 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 
 ### ADR-009: ORM は Drizzle、入力チェックは Zod v4
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-12 にマイグレーションの検査を足した。ユーザーの決定）
 
-**決定:** `packages/db` に Drizzle のスキーマ（6章のコード）を置き、drizzle-kit でマイグレーションの SQL を作る。ドライバは postgres.js。入力チェックは Zod v4 で `packages/schemas` に置き、API（Elysia）と Web のフォーム（TanStack Form）が同じスキーマを使う。DB の中身を手で見るときは Drizzle Studio（`make db-studio`）を使う。
+**決定:** `packages/db` に Drizzle のスキーマ（6章のコード）を置き、drizzle-kit でマイグレーションの SQL を作る。ドライバは postgres.js。drizzle-orm は安定版の 0.45 系（drizzle-kit はそれに合う版）に固定する。マイグレーションは足すだけにし、CI が `make db-check` で確かめる（下のトレードオフ）。入力チェックは Zod v4 で `packages/schemas` に置き、API（Elysia）と Web のフォーム（TanStack Form）が同じスキーマを使う。DB の中身を手で見るときは Drizzle Studio（`make db-studio`）を使う。
 
 **理由:** Drizzle は TypeScript でスキーマを書け、生成する SQL が素直で読める（乗り換えのときも普通の SQL として持ち出せる）。Better Auth に Drizzle 用のアダプターがある。Zod は Web と API（のちのネイティブも）で同じ入力チェックを使える。
 
 **捨てた案:** 比較の記録なし（Prisma は下のトレードオフで抽象度を比べただけ。Zod と postgres.js の代わりの候補も記録なし）。
 
-**トレードオフ:** Prisma より抽象度が低く、複雑な集計は SQL に近い書き方になる。Drizzle の破壊的な変更に追従する必要がある（バージョンを固定し、上げるときは差分を確かめる）。
+**トレードオフ:** Prisma より抽象度が低く、複雑な集計は SQL に近い書き方になる。Drizzle の破壊的な変更に追従する必要がある（バージョンを固定し、上げるときは差分を確かめる）。0.45 系は、DB に当たっている最新のマイグレーションより `when`（タイムスタンプ）が古いマイグレーションを、エラーを出さずに飛ばす（並行したブランチのマイグレーションが後からマージされたときに起きる）。名前で照合する v1 は 2026-10 時点で RC なので使わず、`make db-check` で古いタイムスタンプと既にあるマイグレーションの書き換えを止める。
 
 ### ADR-010: 認証は Better Auth。Google ログインを最初から入れ、招待制をサーバーで強制する（ユーザー指定）
 
@@ -560,7 +561,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 **状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテスト（Jest（jest-expo）＋ React Native Testing Library、E2E の Maestro。Maestro は 2026-10-03 のユーザーの決定）を外した。ネイティブの feature で足す）
 
-**決定:** Biome（リントと整形）、TypeScript の型チェック、`packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`・`scripts/`・`apps/api` は Bun test（API は実際の PostgreSQL に対する結合テスト）、`apps/web` と `packages/ui-web` は Vitest ＋ Testing Library（部品は `@react-aria/test-utils` も）、E2E は Playwright、アクセシビリティの検査は axe（`@axe-core/playwright`。Playwright の E2E の中だけで使い、部品のテストでは使わない）。画面にスタイルを書かない決まり（ADR-025）は Biome の `noRestrictedImports`、JSX の中の生の文字列（9章）は Biome の規則で足りない分を CI の小さな検査スクリプトで見つける。詳細は10章。
+**決定:** Biome（リントと整形）、TypeScript の型チェック、`packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`・`scripts/`・`packages/db`・`apps/api` は Bun test（`packages/db` と API は実際の PostgreSQL に対する結合テスト）、`apps/web` と `packages/ui-web` は Vitest ＋ Testing Library（部品は `@react-aria/test-utils` も）、E2E は Playwright、アクセシビリティの検査は axe（`@axe-core/playwright`。Playwright の E2E の中だけで使い、部品のテストでは使わない）。画面にスタイルを書かない決まり（ADR-025）は Biome の `noRestrictedImports`、JSX の中の生の文字列（9章）は Biome の規則で足りない分を CI の小さな検査スクリプトで見つける。詳細は10章。
 
 **理由:** 実行環境（Bun・Vite）ごとに標準のツールを使うのが、一番つまずきが少ない。Biome は1つのツールで速い。
 
@@ -668,7 +669,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 **状態・日付:** 採用（2026-10-01。この ADR を書いたのは 2026-10-11。それまでは他の ADR の前提としてだけ書かれていた）
 
-**決定:** アプリ（`apps/*`）・共有パッケージ（`packages/*`）・スクリプト（`scripts/`）は TypeScript で書く。型チェックは `make typecheck`。
+**決定:** アプリ（`apps/*`）・共有パッケージ（`packages/*`）・スクリプト（`scripts/`）は TypeScript で書く。例外は `scripts/doc-lint.sh` と `.githooks/pre-commit`（DRAFT が配る検出点。シェルのまま使う）。型チェックは `make typecheck`。
 
 **理由:** ユーザーの希望（design-spec 9.3）。Eden Treaty の型の共有（ADR-006）、Drizzle のスキーマ（ADR-009）、トークンの型（ADR-025）も、どれも TypeScript を前提にしている。
 
@@ -2520,7 +2521,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 |---|---|---|---|
 | 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
-| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 分岐 80% 以上 | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012） |
+| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012） |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作（axe の検査は E2E で行う。ADR-022） |
 | Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |
 | E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査 |

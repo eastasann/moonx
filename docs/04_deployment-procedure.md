@@ -29,7 +29,7 @@
 [作業ブランチの PR・昇格の PR]
     └── ci.yml: make promote-check（deploy/ を変えていない PR では何もしない）
                 deploy/ だけを変える PR（昇格の PR）はここまで。ほかの PR は続けて
-                make install → make lint → make typecheck → make test → make build → make test-e2e
+                make install → make db-check → make lint → make typecheck → make test → make build → make test-e2e
                 ＋ make tokens・make openapi の差分の確認（PostgreSQL 17 のクライアントを入れて動かす）
 
 [main へ squash マージ]（deploy/ だけの変更は除く）
@@ -56,7 +56,7 @@
 
 | ワークフロー | きっかけ | やること |
 |---|---|---|
-| `ci.yml` | すべての PR | 初めに `make promote-check BASE=<PR を検査するマージのコミットの1つ目の親>` で `deploy/` の変更を検査する（依存を入れずに、`make install` の前に動く。`deploy/` を変えていない PR では何もしない）。`deploy/` の履歴を読むので、チェックアウトは全履歴（`fetch-depth: 0`）。`deploy/` だけを変える PR（昇格の PR）はここで終える（コードは変わらず、出す版はそれぞれの PR と `build.yml` でテスト済み。戻すときに待たないため）。ほかの PR は続けて `make install` → `make lint` → `make typecheck` → `make test` → `make build` → `make test-e2e`。`DATABASE_URL_TEST` はサービスコンテナの PostgreSQL 17。ランナーに PostgreSQL 17 のクライアント（`pg_dump`）を入れる（バックアップのテストが使う。古い版の `pg_dump` は 17 のサーバーに使えない）。`make tokens` で差分が出たら失敗（ADR-018）。`make openapi` で `apps/api/openapi.json` に差分が出たら失敗（API を変えた PR は、作り直した `openapi.json` を含める） |
+| `ci.yml` | すべての PR | 初めに `make promote-check BASE=<PR を検査するマージのコミットの1つ目の親>` で `deploy/` の変更を検査する（依存を入れずに、`make install` の前に動く。`deploy/` を変えていない PR では何もしない）。`deploy/` の履歴を読むので、チェックアウトは全履歴（`fetch-depth: 0`）。`deploy/` だけを変える PR（昇格の PR）はここで終える（コードは変わらず、出す版はそれぞれの PR と `build.yml` でテスト済み。戻すときに待たないため）。ほかの PR は続けて `make install` → `make db-check BASE=<promote-check と同じ>` → `make lint` → `make typecheck` → `make test` → `make build` → `make test-e2e`。`DATABASE_URL_TEST` はサービスコンテナの PostgreSQL 17。ランナーに PostgreSQL 17 のクライアント（`pg_dump`）を入れる（バックアップのテストが使う。古い版の `pg_dump` は 17 のサーバーに使えない）。`make tokens` で差分が出たら失敗（ADR-018）。`make openapi` で `apps/api/openapi.json` に差分が出たら失敗（API を変えた PR は、作り直した `openapi.json` を含める） |
 | `build.yml` | `main` への push（`deploy/**` だけの変更は除く） | `make test` → `make build-api-image SHA=<SHA>`（イメージの名前は SDD 2章「環境と命名」）。E2E は PR の `ci.yml` で通っているので動かさない。`make build-api-image` は Web もビルドして同じイメージに入れ（ADR-004）、ソースマップを Sentry の `moonx-web` と `moonx-api` に上げる（`release` = SHA。`SENTRY_AUTH_TOKEN`）。GitHub の環境を使わないので、リポジトリの変数とシークレットだけを読む（3章） |
 | `deploy.yml` | `main` への push で `deploy/staging/version` か `deploy/production/version` が変わったとき | 下の「deploy.yml の順番」。2つのジョブに分ける。検査のジョブは GitHub の環境を使わずに動き、変わったファイルから環境を決めて、`make promote-check BASE=<push の前のコミット>` とイメージの確認をする（承認する人が検査済みの変更だけを承認するように、環境のジョブより先に動かす）。デプロイのジョブは GitHub の環境 `staging` / `production` で動き、`production` は承認されるまで待つ。環境ごとに同時に1つだけ動かし、待っているものは取り消さずに順に動かす（`concurrency` の `queue: max`。既定では待っているものが取り消される）。デプロイのジョブは初めに、`origin/main` の `deploy/$TARGET/version` がまだ `$SHA` かを確かめ、違えば（後の昇格が先に入った・古い実行を再実行した）何もせずに終える。チェックアウトは全履歴（`fetch-depth: 0`）。検査で止まった・承認されなかった・デプロイに失敗したときは、`deploy/{env}/version` が出ていない SHA を指したままになるので、正しい SHA で新しい昇格の PR を出して直す（`make promote` は本文にそのことを書く） |
 | `db-backup.yml` | 毎日（schedule）と、手で（`workflow_dispatch`。`gh workflow run db-backup.yml`） | GitHub の環境 `production-backup`（承認なし）で `make db-backup ENV=production`。`DATABASE_URL_DIRECT` は production の読み取り専用のロールの接続文字列（03 5.4 E・H）。`pg_dump` は PostgreSQL 17 のクライアントを使う（サーバーより古い版は使えない）。確かめ方と戻し方は 05 6.2 |

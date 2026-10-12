@@ -28,6 +28,7 @@
 | [04_deployment-procedure.md](04_deployment-procedure.md) | デプロイとリリース・ロールバック |
 | [05_operation-runbook.md](05_operation-runbook.md) | 監視・障害の対処・ログの見方・定期メンテナンス |
 | [06_design-tokens.json](06_design-tokens.json) | デザイントークン（色・書体・余白などの具体値。DTCG 形式、ライトとダーク） |
+| [claude-code-prompts.md](claude-code-prompts.md) | 実装のステップ別のプロンプト集（派生。`/draft:implement` が1ステップずつ使い、進み具合を各ステップの `Status:` に書く） |
 
 ## ドキュメント体系
 
@@ -36,7 +37,7 @@
 | 層 | ファイル | 扱い |
 |---|---|---|
 | ソース（正） | `design-spec.md`・`screen_flow.mermaid`・`01_prd.md`・`02-01_system-design-doc.md`・`03_dev-setup.md`・`04_deployment-procedure.md`・`05_operation-runbook.md`・`06_design-tokens.json` | 事実ごとに正は1つ（下の所有権マップ）。変更のたびに更新する生きた文書 |
-| 派生 | ソースから生成・要約するもの（06 から `make tokens` で作るテーマと PWA のアイコン・マニフェスト `packages/ui-tokens`（vanilla-extract・react-pdf 用）、`make openapi` の書き出し、Phase 4 の実装準備で作る `CLAUDE.md`（リポジトリの直下）と `claude-code-prompts.md`） | 直接直さない。ソースを直してから作り直す |
+| 派生 | ソースから生成・要約するもの（06 から `make tokens` で作るテーマと PWA のアイコン・マニフェスト `packages/ui-tokens`（vanilla-extract・react-pdf 用）、`make openapi` の書き出し、Phase 4 の実装準備で作る `CLAUDE.md`（リポジトリの直下。`AGENTS.md` はそのリンク）と `claude-code-prompts.md`） | 直接直さない。ソースを直してから作り直す（`claude-code-prompts.md` の `Status:` 行と、分けて足すステップは `/draft:implement` が書く） |
 | アーカイブ | `concept.md`・`brainstorm-notes.md`・`drive-templates/` | 決めた経緯の記録と、Drive の原本の写し。更新しない。今の正はソースを読む |
 
 ### 事実の所有権マップ
@@ -49,7 +50,7 @@
 | 画面の遷移 | `screen_flow.mermaid` |
 | 目的・対象ユーザー・ユーザーストーリーと優先度・KPI・スコープ外 | `01_prd.md` |
 | アーキテクチャ・技術選定（ADR）・環境と命名・環境変数・CI のシークレット・make ターゲット・ルーティング・API・データモデル・権限マトリクス（API の単位）・エラーの形式・i18n・テスト戦略・監視の項目と閾値 | `02-01_system-design-doc.md` |
-| 開発環境・ツール・ブランチ戦略・クラウドの初期設定の手順 | `03_dev-setup.md` |
+| 開発環境・ツール・実装のエージェントの決まり・コメントの書き方・ブランチ戦略・クラウドの初期設定の手順 | `03_dev-setup.md` |
 | デプロイ・リリース・ロールバックの手順、CI のワークフローの中身、緊急時の連絡先 | `04_deployment-procedure.md` |
 | 障害の対処・ログの見方・アラートを受けたときの確かめ方・定期メンテナンス（バックアップを戻す練習の頻度を含む）の手順 | `05_operation-runbook.md` |
 | 色・書体・余白・角丸・影・動き・スライドの寸法などの具体値 | `06_design-tokens.json` |

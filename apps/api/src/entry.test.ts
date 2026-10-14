@@ -5,7 +5,7 @@ import { sql } from "drizzle-orm";
 import { t } from "elysia";
 import { z } from "zod";
 import { JSON_BODY_MAX_BYTES } from "./body";
-import { requestContext } from "./entry";
+import { CLIENT_IP_HEADER, requestContext } from "./entry";
 import { ApiError } from "./errors";
 import {
   accessLine,
@@ -72,9 +72,12 @@ function appWithRoutes(options: Parameters<typeof buildTestApp>[1] = {}) {
         current: { lockVersion: 3 },
       });
     })
-    .get("/api/v1/whoami", ({ request }) => requestContext(request))
+    .get("/api/v1/whoami", ({ request }) => ({
+      ...requestContext(request),
+      header: request.headers.get(CLIENT_IP_HEADER),
+    }))
     .post(
-      "/api/auth/sign-in/email",
+      "/api/auth/test-echo",
       async ({ request }) => ({
         length: (await request.arrayBuffer()).byteLength,
       }),
@@ -134,7 +137,11 @@ async function errorOf(response: Response) {
 
 /** The context `/api/v1/whoami` echoes. */
 async function whoami(response: Response) {
-  return (await response.json()) as { clientIp?: string };
+  return (await response.json()) as {
+    clientIp?: string;
+    /** What the request carries in X-Moonx-Client-Ip once the entry plugin ran. */
+    header: string | null;
+  };
 }
 
 describe("caller IP (SDD 7.2)", () => {
@@ -171,6 +178,26 @@ describe("caller IP (SDD 7.2)", () => {
 
     expect((await whoami(response)).clientIp).toBeUndefined();
     expect((await accessLine(lines, response)).clientIp).toBeNull();
+  });
+
+  test("goes on in X-Moonx-Client-Ip for Better Auth, replacing what the client sent", async () => {
+    const { app } = appWithRoutes();
+    const sent = await app.handle(
+      request("GET", "/api/v1/whoami", {
+        headers: {
+          "x-forwarded-for": "198.51.100.4, 192.0.2.9",
+          [CLIENT_IP_HEADER]: "203.0.113.66",
+        },
+      }),
+    );
+    const unknown = await app.handle(
+      new Request("http://localhost/api/v1/whoami", {
+        headers: { [CLIENT_IP_HEADER]: "203.0.113.66" },
+      }),
+    );
+
+    expect((await whoami(sent)).header).toBe("192.0.2.9");
+    expect((await whoami(unknown)).header).toBeNull();
   });
 });
 
@@ -704,7 +731,7 @@ describe("body size (SDD 7.2, 8.1 の 413, ADR-029)", () => {
       json("POST", "/api/v1/echo", { a: 1 }, declared),
     );
     const auth = await app.handle(
-      request("POST", "/api/auth/sign-in/email", {
+      request("POST", "/api/auth/test-echo", {
         headers: { "content-type": "application/json", ...declared },
         body: "{}",
       }),
@@ -743,13 +770,13 @@ describe("body size (SDD 7.2, 8.1 の 413, ADR-029)", () => {
   test("answers an /api/auth/* body over 1MB in Better Auth's shape", async () => {
     const { app } = appWithRoutes();
     const declared = await app.handle(
-      request("POST", "/api/auth/sign-in/email", {
+      request("POST", "/api/auth/test-echo", {
         headers: { "content-type": "application/json" },
         body: "x".repeat(justOver),
       }),
     );
     const streamed = await app.handle(
-      request("POST", "/api/auth/sign-in/email", {
+      request("POST", "/api/auth/test-echo", {
         headers: { "content-type": "application/json" },
         body: chunked(justOver),
       }),
@@ -767,7 +794,7 @@ describe("body size (SDD 7.2, 8.1 の 413, ADR-029)", () => {
   test("leaves an /api/auth/* body within the limit for its handler to read", async () => {
     const { app } = appWithRoutes();
     const response = await app.handle(
-      request("POST", "/api/auth/sign-in/email", {
+      request("POST", "/api/auth/test-echo", {
         headers: { "content-type": "application/json" },
         body: chunked(JSON_BODY_MAX_BYTES),
       }),
@@ -842,12 +869,12 @@ describe("over a real connection", () => {
   for (const [name, path, headers] of [
     [
       "a chunked /api/auth/* body",
-      "/api/auth/sign-in/email",
+      "/api/auth/test-echo",
       "Transfer-Encoding: chunked",
     ],
     [
       "an /api/auth/* body with Content-Length",
-      "/api/auth/sign-in/email",
+      "/api/auth/test-echo",
       "Content-Length: 999999",
     ],
     [

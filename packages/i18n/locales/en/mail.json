@@ -1,0 +1,6 @@
+{
+  "passwordReset": {
+    "subject": "Reset your moonx password",
+    "text": "Someone asked to reset the password of your moonx account.\n\nOpen this link within 1 hour to choose a new password:\n{{link}}\n\nIf it wasn't you, ignore this email. Your password stays the same."
+  }
+}

@@ -1,7 +1,11 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { rateLimits } from "@moonx/db";
 import { eq, like } from "drizzle-orm";
-import { createRateLimiter, type Limit } from "./rate-limit";
+import {
+  createBetterAuthRateLimitStorage,
+  createRateLimiter,
+  type Limit,
+} from "./rate-limit";
 import { connectTestDatabase, uniqueIp } from "./test-app";
 
 const database = connectTestDatabase();
@@ -145,5 +149,62 @@ describe("createRateLimiter", () => {
     );
 
     expect(results.filter((result) => result.allowed)).toHaveLength(limit.max);
+  });
+});
+
+describe("createBetterAuthRateLimitStorage", () => {
+  test("counts Better Auth's keys as the entry plugin counts its own, in Better Auth's answer", async () => {
+    let clock = 60_000_000;
+    const storage = createBetterAuthRateLimitStorage(
+      database.db,
+      60_000,
+      () => clock,
+    );
+    const key = `${uniqueIp()}|/get-session`;
+    const rule = { window: 60, max: 2 };
+
+    const first = await storage.consume(key, rule);
+    clock += 10_000;
+    const second = await storage.consume(key, rule);
+    clock += 5_000;
+    const over = await storage.consume(key, rule);
+    clock += 60_000;
+    const later = await storage.consume(key, rule);
+
+    expect([first, second, later]).toEqual(
+      Array(3).fill({ allowed: true, retryAfter: null }),
+    );
+    // The last allowed request came 5s before, so the window frees up in 55s.
+    expect(over).toEqual({ allowed: false, retryAfter: 55 });
+  });
+
+  test("deletes only Better Auth's rows past the longest window, never app: rows", async () => {
+    const at = 70_000_000;
+    const tag = crypto.randomUUID();
+    await database.db.insert(rateLimits).values([
+      { key: `app:user:hourly:${tag}`, count: 3, lastRequest: at - 120_000 },
+      { key: `${tag}|/old`, count: 3, lastRequest: at - 120_000 },
+      { key: `${tag}|/recent`, count: 3, lastRequest: at - 119_999 },
+    ]);
+    const storage = createBetterAuthRateLimitStorage(
+      database.db,
+      60_000,
+      () => at,
+    );
+
+    // A rule with a longer window than the minimum stretches the clean-up's wait.
+    await storage.consume(`${tag}|/new`, { window: 120, max: 3 });
+
+    const keys = (
+      await database.db
+        .select({ key: rateLimits.key })
+        .from(rateLimits)
+        .where(like(rateLimits.key, `%${tag}%`))
+    )
+      .map((row) => row.key)
+      .sort();
+    expect(keys).toEqual(
+      [`${tag}|/new`, `${tag}|/recent`, `app:user:hourly:${tag}`].sort(),
+    );
   });
 });

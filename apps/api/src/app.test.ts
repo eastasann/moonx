@@ -300,6 +300,7 @@ describe("/api/docs (ADR-006)", () => {
     expect(spec.status).toBe(200);
     const document = (await spec.json()) as { paths: object };
     expect(Object.keys(document.paths).sort()).toEqual([
+      "/api/auth/*",
       "/api/health",
       "/api/health/db",
     ]);

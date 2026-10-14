@@ -2,6 +2,7 @@ import { connectDatabase } from "@moonx/db";
 import { createApp } from "./app";
 import { ConfigError, loadConfig } from "./config";
 import { createLogger } from "./log";
+import { createMailer } from "./mail";
 import { createErrorReporter } from "./sentry";
 
 function readConfig() {
@@ -21,10 +22,12 @@ const config = readConfig();
 // postgres.js connects on the first query, so the API starts even while the database
 // is down, and /api/health keeps answering (SDD 5.14).
 const { db } = connectDatabase(config.databaseUrl);
+const log = createLogger(config.logLevel);
 createApp(config, {
   db,
-  log: createLogger(config.logLevel),
+  log,
   reporter: createErrorReporter(config),
+  mailer: createMailer(config, log),
 }).listen({
   port: config.port,
   // Locally only this machine may connect, as with Vite and the Docker PostgreSQL.

@@ -270,6 +270,18 @@
         },
         "operationId": "getApiHealthDb"
       }
+    },
+    "/api/auth/*": {
+      "get": {
+        "summary": "A3, A5 (Better Auth)",
+        "description": "Better Auth decides the paths, bodies and answers (SDD 5.4). Errors come in its { code, message } shape (SDD 8.1).",
+        "operationId": "betterAuthGet"
+      },
+      "post": {
+        "summary": "A1, A2, A4, A6–A8 (Better Auth)",
+        "description": "Better Auth decides the paths, bodies and answers (SDD 5.4). Errors come in its { code, message } shape (SDD 8.1).",
+        "operationId": "betterAuthPost"
+      }
     }
   },
   "components": { "schemas": {} }

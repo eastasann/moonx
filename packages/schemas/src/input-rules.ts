@@ -20,6 +20,10 @@ export const PHOTO_MAX_BYTES = 5 * MB;
 export const AI_PASTE_MAX_CHARS = 200_000;
 export const AI_FILE_MAX_BYTES = MB;
 export const TEMPLATE_FILE_MAX_BYTES = MB;
+export const PASSWORD_MIN = 8;
+export const PASSWORD_MAX = 128;
+export const DISPLAY_NAME_MAX = 60;
+export const WORKSPACE_NAME_MAX = 60;
 
 /**
  * The rule a `custom` issue breaks, in `issue.params.rule`, so the client can pick its
@@ -235,8 +239,8 @@ export const numberTextSchema = <T extends z.ZodType<number, number>>(
  * `password.length` in UTF-16 units, so its own limits must be set wide enough never to
  * refuse a password this accepts.
  */
-export const passwordSchema = requiredText(128, 8);
-export const displayNameSchema = requiredText(60);
+export const passwordSchema = requiredText(PASSWORD_MAX, PASSWORD_MIN);
+export const displayNameSchema = requiredText(DISPLAY_NAME_MAX);
 
 const timeZoneName = /^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+)*$/;
 const isTimeZone = (value: string) => {
@@ -288,7 +292,7 @@ export const currencySchema = z
     ...ruleIssue("currency"),
   });
 
-export const workspaceNameSchema = requiredText(60);
+export const workspaceNameSchema = requiredText(WORKSPACE_NAME_MAX);
 export const ideaNameSchema = requiredText(100);
 export const oneLineConceptSchema = requiredText(200);
 

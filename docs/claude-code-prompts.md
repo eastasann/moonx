@@ -346,7 +346,7 @@ make openapi で差分が出ず、make test-api・make typecheck・make lint が
 
 ## Step 8: 認証（Better Auth と招待制）
 
-Status:
+Status: done 2026-10-15
 
 ```
 Better Auth で認証を作ってください。仮の認証は作らない。

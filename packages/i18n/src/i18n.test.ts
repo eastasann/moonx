@@ -17,7 +17,7 @@ import { createI18n, i18n, namespaces, resources } from "./i18n";
 test("the shared instance is ready on import", () => {
   expect(i18n.isInitialized).toBe(true);
   expect(i18n.language).toBe("en");
-  expect(namespaces).toEqual(["common", "format"]);
+  expect(namespaces).toEqual(["common", "format", "mail"]);
 });
 
 test("each instance is separate", () => {

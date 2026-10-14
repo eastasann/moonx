@@ -6,44 +6,46 @@ import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { connectDatabase } from "@moonx/db";
 import { createApp } from "../src/app";
+import type { Config } from "../src/config";
 import { OPENAPI_JSON_PATH } from "../src/docs";
 import { createLogger } from "../src/log";
+import { createMailer } from "../src/mail";
 
 const REPO_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const OUTPUT = fileURLToPath(new URL("../openapi.json", import.meta.url));
 
 // Only routes matter here, so the values are placeholders: nothing is read from the
 // environment, the database is never queried (postgres.js connects on the first
-// query), and nothing is logged or reported.
+// query), and nothing is logged, reported or mailed.
 const { db, close } = connectDatabase("postgres://openapi@127.0.0.1:1/none");
-const app = createApp(
-  {
-    appEnv: "staging",
-    appVersion: "openapi",
-    port: 3000,
-    webDistDir: undefined,
-    databaseUrl: "postgres://openapi@127.0.0.1:1/none",
-    betterAuthSecret: "openapi".repeat(5),
-    betterAuthUrl: "https://stg.example.invalid",
-    trustedOrigins: ["https://stg.example.invalid"],
-    google: undefined,
-    mail: {
-      transport: "resend",
-      resendApiKey: undefined,
-      from: "moonx <no-reply@example.invalid>",
-      allowlist: [],
-    },
-    avatarBucket: undefined,
-    sentryDsn: undefined,
-    webSentryDsn: undefined,
-    logLevel: "error",
+const log = createLogger("error", () => {});
+const config: Config = {
+  appEnv: "staging",
+  appVersion: "openapi",
+  port: 3000,
+  webDistDir: undefined,
+  databaseUrl: "postgres://openapi@127.0.0.1:1/none",
+  betterAuthSecret: "openapi".repeat(5),
+  betterAuthUrl: "https://stg.example.invalid",
+  trustedOrigins: ["https://stg.example.invalid"],
+  google: undefined,
+  mail: {
+    transport: "resend",
+    resendApiKey: undefined,
+    from: "moonx <no-reply@example.invalid>",
+    allowlist: [],
   },
-  {
-    db,
-    log: createLogger("error", () => {}),
-    reporter: { report: async () => {} },
-  },
-);
+  avatarBucket: undefined,
+  sentryDsn: undefined,
+  webSentryDsn: undefined,
+  logLevel: "error",
+};
+const app = createApp(config, {
+  db,
+  log,
+  reporter: { report: async () => {} },
+  mailer: createMailer(config, log),
+});
 
 const response = await app.handle(
   new Request(`http://localhost${OPENAPI_JSON_PATH}`),

@@ -2,6 +2,7 @@ import { connectDatabase, type DatabaseConnection } from "@moonx/db";
 import { createApp } from "./app";
 import type { Config } from "./config";
 import { createLogger } from "./log";
+import { createMailer, type Mailer } from "./mail";
 import type { ErrorReporter, FailureReport } from "./sentry";
 
 // Shared by the API's tests (README「テスト」): the config is assembled here instead of
@@ -56,32 +57,39 @@ export interface TestApp {
   reports: FailureReport[];
 }
 
+/**
+ * The API over `db` with {@link testConfig}. Mail goes through the console transport
+ * unless `mailer` replaces it, so a sent mail is a `message: "mail"` line in `lines`.
+ */
 export function buildTestApp(
   db: DatabaseConnection,
   options: {
     config?: Partial<Config>;
     reporter?: ErrorReporter;
+    mailer?: Mailer;
     now?: () => number;
+    /** Defaults to 0, so password-reset requests answer at once. */
+    resetAnswerMs?: number;
   } = {},
 ): TestApp {
   const lines: LogLine[] = [];
   const reports: FailureReport[] = [];
-  const app = createApp(
-    { ...testConfig, ...options.config },
-    {
-      db: db.db,
-      log: createLogger(
-        options.config?.logLevel ?? testConfig.logLevel,
-        (line) => lines.push(JSON.parse(line)),
-      ),
-      reporter: options.reporter ?? {
-        report: async (failure) => {
-          reports.push(failure);
-        },
-      },
-      now: options.now,
-    },
+  const config = { ...testConfig, ...options.config };
+  const log = createLogger(config.logLevel, (line) =>
+    lines.push(JSON.parse(line)),
   );
+  const app = createApp(config, {
+    db: db.db,
+    log,
+    reporter: options.reporter ?? {
+      report: async (failure) => {
+        reports.push(failure);
+      },
+    },
+    mailer: options.mailer ?? createMailer(config, log),
+    now: options.now,
+    resetAnswerMs: options.resetAnswerMs ?? 0,
+  });
   return { app, lines, reports };
 }
 

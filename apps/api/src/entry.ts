@@ -53,6 +53,12 @@ export function requestContext(request: Request): RequestContext {
   return state;
 }
 
+/**
+ * The header the entry plugin sets to the caller's IP it decided, for Better Auth to
+ * read (SDD 7.2「呼び出し元の IP」). A value the client sent is replaced.
+ */
+export const CLIENT_IP_HEADER = "x-moonx-client-ip";
+
 const STATE_CHANGING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const AVATAR_PATH = "/api/v1/me/avatar";
 const DENIALS_BEFORE_WARN = 10;
@@ -222,11 +228,11 @@ export interface EntryOptions {
 
 /**
  * The entry plugin of ADR-029 ②, which every request passes through before anything
- * else: it fixes the caller's IP and the request ID, adds the headers every response
- * carries (security headers of 7.2, `Cache-Control: no-store` of 5.1, `X-Request-Id`),
- * counts the paths limited per IP, enforces the CSRF and body-size rules of 7.2,
- * shapes every error as in 8.1, and writes the access log and the failure log of 8.3.
- * Install it before any route.
+ * else: it fixes the caller's IP (and hands it on in {@link CLIENT_IP_HEADER}) and the
+ * request ID, adds the headers every response carries (security headers of 7.2,
+ * `Cache-Control: no-store` of 5.1, `X-Request-Id`), counts the paths limited per IP,
+ * enforces the CSRF and body-size rules of 7.2, shapes every error as in 8.1, and
+ * writes the access log and the failure log of 8.3. Install it before any route.
  */
 export function entryPlugin({
   config,
@@ -266,6 +272,11 @@ export function entryPlugin({
       };
       states.set(request, state);
       Object.assign(set.headers, headers, { "x-request-id": state.requestId });
+      if (state.clientIp === undefined) {
+        request.headers.delete(CLIENT_IP_HEADER);
+      } else {
+        request.headers.set(CLIENT_IP_HEADER, state.clientIp);
+      }
 
       const limit = limits.get(limitKey(request.method, path));
       if (limit !== undefined) {

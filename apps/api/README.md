@@ -9,5 +9,6 @@ Bun test で書く（ADR-022）。`apps/web` と `packages/ui-web` の Vitest �
 - import: `import { describe, expect, test } from "bun:test"`
 - 置き場所: 対象のファイルの隣に `*.test.ts`
 - 実行: `make test-api`（`packages/db` のテストと一緒に動く）。先に `DATABASE_URL_TEST` の DB を作り直すので、`make db-up` で DB を起動しておく
-- 設定: 環境変数から読まず、`Config`（`appEnv: "test"`）を組み立てて `createApp()` に渡す
+- 設定: 環境変数から読まず、`Config`（`appEnv: "test"`）を組み立てて `createApp()` に渡す。DB・ログ・Sentry も `createApp()` の2つ目の引数で渡す。組み立ては `src/test-app.ts` の `buildTestApp()`（ログの行と Sentry に渡した失敗を配列に集める）を使う
+- 回数制限: `rate_limits` の数はテストをまたいで残るので、IP は `uniqueIp()` で毎回変える
 - 起動の処理（`src/index.ts`）: リポジトリの外を作業ディレクトリにした子プロセスで確かめる。リポジトリの中で動かすと、Bun が直下の `.env` を読む

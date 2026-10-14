@@ -1,0 +1,276 @@
+{
+  "info": {
+    "title": "moonx API",
+    "description": "The REST API of moonx (docs/02-01_system-design-doc.md 5章).",
+    "version": "v1"
+  },
+  "openapi": "3.1.2",
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Z1 Health check",
+        "description": "Never touches the database, so monitoring does not wake Neon (ADR-008).",
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "const": "ok" },
+                    "version": { "type": "string" },
+                    "env": { "type": "string" }
+                  },
+                  "required": ["status", "version", "env"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiHealth"
+      }
+    },
+    "/api/health/db": {
+      "get": {
+        "summary": "Z2 Database health check",
+        "description": "For the checks after a deploy. Limited per IP.",
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "const": "ok" },
+                    "latencyMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["status", "latencyMs"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Response for status 429",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Response for status 503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiHealthDb"
+      }
+    }
+  },
+  "components": { "schemas": {} }
+}

@@ -32,19 +32,24 @@ function freePort(): number {
 }
 
 /** Starts the API with a valid local configuration and waits until it answers. */
-async function startLocal(): Promise<{ port: number; health: Response }> {
+async function startLocal(): Promise<{
+  port: number;
+  health: Response;
+  stdout: ReadableStream<Uint8Array>;
+}> {
   const port = freePort();
-  running = start({
+  const child = start({
     APP_ENV: "local",
     PORT: String(port),
     DATABASE_URL: "postgres://nobody@127.0.0.1:1/none",
     BETTER_AUTH_SECRET: "x".repeat(32),
   });
+  running = child;
   for (let attempt = 0; attempt < 50; attempt++) {
     const health = await fetch(`http://127.0.0.1:${port}/api/health`).catch(
       () => undefined,
     );
-    if (health !== undefined) return { port, health };
+    if (health !== undefined) return { port, health, stdout: child.stdout };
     await Bun.sleep(100);
   }
   throw new Error(`the API did not answer on port ${port}`);
@@ -79,6 +84,38 @@ test(
       version: "dev",
       env: "local",
     });
+  },
+  TIMEOUT_MS,
+);
+
+test(
+  "logs each request on standard output, with the connection's address as clientIp",
+  async () => {
+    const { health, stdout: output } = await startLocal();
+    const requestId = health.headers.get("x-request-id");
+
+    // The access log is written after the response, so read until it arrives.
+    const reader = output.getReader();
+    const decoder = new TextDecoder();
+    let stdout = "";
+    while (!stdout.includes(`"requestId":"${requestId}"`)) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      stdout += decoder.decode(value, { stream: true });
+    }
+
+    const lines = stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        message: "request",
+        requestId,
+        route: "GET /api/health",
+        clientIp: "127.0.0.1",
+      }),
+    );
   },
   TIMEOUT_MS,
 );

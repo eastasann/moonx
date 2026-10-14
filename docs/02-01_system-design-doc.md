@@ -327,9 +327,9 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 
 ### ADR-006: 通信は REST、クライアントは Eden Treaty（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-15 に、仕様書を読む画面を API が返す Swagger UI にした）
 
-**決定:** API は `/api/v1` の下の REST（JSON、項目名は camelCase）。Web は Eden Treaty（`treaty<App>()`）で型付きで呼ぶ（のちのネイティブアプリも同じ）。仕様書は `@elysiajs/openapi` で出す（staging は `/api/docs` で読める。production は出さない）。常時接続（WebSocket・SSE）は使わず、通知の未読数は取りに行く（2章 通信フロー 6）。
+**決定:** API は `/api/v1` の下の REST（JSON、項目名は camelCase）。Web は Eden Treaty（`treaty<App>()`）で型付きで呼ぶ（のちのネイティブアプリも同じ）。仕様書は `@elysiajs/openapi` で作り、staging だけ `/api/docs` で読める（production は出さない）。読む画面は、API が返す Swagger UI（`swagger-ui-dist` のファイル）と、それを始めるスクリプトのファイルにする。`@elysiajs/openapi` が用意する画面は CDN のスクリプトとインラインのスクリプトを使い、7.2 の CSP（`script-src 'self'`）で動かないため使わない。`make openapi` は、staging が `/api/docs/json` で返すのと同じ文書を `apps/api/openapi.json` に書き出す。常時接続（WebSocket・SSE）は使わず、通知の未読数は取りに行く（2章 通信フロー 6）。
 
 **理由:** Web と、のちのネイティブアプリが同じ API を使うので、言語に依存しない REST にし、型は Eden で共有する。ユーザーが Elysia の仕組み（Eden）を使いたいとした。
 
@@ -661,7 +661,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
   - IP ごと: 秘密を受け取る認証のパス（Better Auth の6つのパス。5.4）と U5（招待からの新規登録）を、パスをまたいで1つの枠で数える（キー `app:ip:auth:<IP>`）。Better Auth はパスごとにしか数えられないので、これらのパスでは Better Auth の数え方を止める（5.4）。DB の死活確認（Z2）も IP ごとに数える（キー `app:ip:health-db:<IP>`）。
   - ユーザーごと: 招待の送信・再送（W4・W5・AD9）、PDF の作成、AI 書き出し・取り込み、アカウントの削除のパスワード確認（キー `app:user:<上限の名前>:<userId>`）。
   - 上限の回数と時間の幅は 7.2「レート制限」に書く。
-- IP は、入口のプラグインがリクエストごとに1回だけ決めた値（7.2「呼び出し元の IP」）を、① と ② の両方が使う。
+- IP は、入口のプラグインがリクエストごとに1回だけ決めた値（7.2「呼び出し元の IP」）を、① と ② の両方が使う。キーの `<IP>` には、IPv6 なら先頭の /64 にまとめた値を入れる（7.2「レート制限」）。
 
 **理由:** Better Auth の回数制限は Better Auth のエンドポイントにしか効かない。アプリの API の上限は「誰が」で数える必要があり（Resend の1日100通や PDF の CPU を守る）、ログインの後にしか分からないので API の中で数える。DB に記録すれば、Cloud Run が複数台でも数がそろい、Redis が要らない（ADR-011）。
 
@@ -775,7 +775,7 @@ API のルートは5章。API が返す Web の静的なファイルのうち、
 
 | 項目 | 決まり |
 |---|---|
-| 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、API の仕様書は `/api/docs`（staging だけ。ADR-006） |
+| 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、API の仕様書は `/api/docs`（staging だけ。文書の JSON は `/api/docs/json`。ADR-006） |
 | 値の正 | API が検査する入力の値（必須・文字数・範囲・形式・ファイルの種類と大きさ）の正は design-spec 6.0.8「入力の規則」。この章の API の表と 6.3 の check 制約は値を書かずに 6.0.8 を参照する（check 制約が値を持つときは 6.0.8 と同じ値にする）。期限（招待・パスワード再設定のリンク・再認証）と、画面に出す件数の正も design-spec（6.16・各画面）。変えるときは design-spec を先に直す |
 | 認証 | Better Auth のセッション（HttpOnly Cookie）。公開と書いたもの以外はログインが要る（未ログインは 401 `UNAUTHENTICATED`） |
 | 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601 で、ミリ秒の3桁と `Z` を付ける（`"2026-10-01T02:00:00.000Z"`。表示はクライアントが利用者のタイムゾーンで行う） |
@@ -1064,7 +1064,7 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | 内部 | | | | |
 | Z1 | GET | `/api/health` | 公開（DB に触れない） | 監視 |
 | Z2 | GET | `/api/health/db` | 公開（IP ごとの回数制限。7.2） | デプロイ後の確認 |
-| Z3 | GET | `/api/docs` | 公開（staging だけ。production は出さない。ADR-006） | 開発 |
+| Z3 | GET | `/api/docs`・`/api/docs/*`（文書の JSON `/api/docs/json` と、画面のファイル） | 公開（staging だけ。production は出さない。ADR-006） | 開発 |
 
 ### 5.4 認証・アカウント・招待
 
@@ -2418,11 +2418,11 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | シークレット | 置き場所の方針は ADR-027、CI の置き場所の一覧は2章「CI のシークレットと変数」が正。local は `.env`（コミットしない。`.env.example` だけコミットする）。staging / production の API のシークレットは Secret Manager から Cloud Run の環境変数として渡す。ローテーションの手順は 05_operation-runbook.md |
 | CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる（合わなければ 403 `FORBIDDEN`）。本体の無い POST・DELETE にも同じ決まりを適用する（Web のクライアントは、本文が無くても `application/json` を付ける）。`multipart/form-data` は `PUT /api/v1/me/avatar`（U3）だけに許す。JSON の1MB は `Content-Length` と実際に読んだ長さの両方で確かめる（`/api/auth/*` は入口のプラグインが確かめる。ADR-029）。Cookie は SameSite=Lax |
 | CORS | 使わない（Web と API は同じオリジン。ADR-004）。CORS のヘッダーを返さないので、他のオリジン（Cloud Run の `*.run.app` の URL を含む）からのブラウザのリクエストは届かない。local は Vite の転送で同じオリジンにする |
-| レート制限 | 仕組みは ADR-029（Better Auth と入口のプラグインの2段）。秘密を受け取る認証のパス（Better Auth の6パスと U5。5.4）は、IP ごとに1つの枠で1分10回（DB に記録）。DB の死活確認（Z2）は IP ごとに1分10回。アプリの API は、次の上限を同じ仕組みで持つ。ユーザーごと: 招待の送信・再送（W4・W5・AD9）1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3。X2 は既存の内容を読むだけなので数えない）、アカウントの削除のパスワード確認（U7）10分5回。超えたら 429 `RATE_LIMITED` |
+| レート制限 | 仕組みは ADR-029（Better Auth と入口のプラグインの2段）。秘密を受け取る認証のパス（Better Auth の6パスと U5。5.4）は、IP ごとに1つの枠で1分10回（DB に記録）。DB の死活確認（Z2）は IP ごとに1分10回。アプリの API は、次の上限を同じ仕組みで持つ。ユーザーごと: 招待の送信・再送（W4・W5・AD9）1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3。X2 は既存の内容を読むだけなので数えない）、アカウントの削除のパスワード確認（U7）10分5回。超えたら 429 `RATE_LIMITED`。入口のプラグインも Better Auth と同じ数え方をする。許したリクエストのたびに枠をそこから時間の幅だけ延ばし、許したリクエストの無いまま時間の幅が過ぎたら数え直す。こうすると、どの時間の幅の中でも上限を超えて通さない（最初のリクエストで枠を決めると、枠の境目で上限の倍近くを通してしまう）。`retryAfterSeconds` には、最後に許したリクエストから時間の幅が過ぎるまでの秒数を切り上げて入れる。IP ごとの上限は、Better Auth の既定と同じく、IPv6 のアドレスを先頭の /64 にまとめ、IPv4 射影アドレス（`::ffff:` で始まる）を IPv4 のアドレスとして数える（回線にはふつう /64 が割り当てられるので、その中でアドレスを変えても数え直しにならない）。時間の幅を過ぎた `app:` の行は、入口のプラグインが Cloud Run のインスタンスごと・上限ごとに、時間の幅に1回消す（残っていても無い行と同じに数えるので、結果は変わらない） |
 | 呼び出し元の IP | 入口のプラグインが、リクエストごとに1回だけ決める: `X-Forwarded-For` の右端の値。無ければ接続元のアドレス。決めた値は、回数制限（ADR-029）・Better Auth（`X-Moonx-Client-Ip` に付け直して読ませる。クライアントが同じ名前のヘッダーを送っても上書きする）・アクセスログの `clientIp`（8.3）・セッションの IP のすべてが使う。左側の値はクライアントが自由に書けるので使わない。Google は公式の説明（Cloud Run functions のリクエストのヘッダー）で「`X-Forwarded-For` は経路の IP の一覧で、最初の値はふつうクライアント」とだけ書き、クライアントが送った値に Cloud Run が足すのかは書いていない。右端の値は、Cloud Run が足す場合も置き換える場合も、Cloud Run が見た接続元になる。インフラを作るステップで、staging に偽の `X-Forwarded-For` を付けたリクエストを送り、ログの `clientIp` が偽の値でないことを確かめてから使う（04_deployment-procedure.md）。local と e2e は前段が無く、Vite の転送も値を足さない（`xfwd` を付けない）ので、送った `X-Forwarded-For` の右端の値がそのまま使われる。e2e はテストごとに値を変えて送り、別の IP として数えさせる（03_dev-setup.md） |
 | セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。ログアウトしたら、まだ保存できていない値（ADR-021）も捨てる |
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、形式と大きさは design-spec 6.0.8。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
-| セキュリティヘッダー | API が、静的ファイルを含むすべての応答に付ける（ADR-004）: `Content-Security-Policy`（`default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy`、`Strict-Transport-Security: max-age=31536000; includeSubDomains`（staging・production だけ。local は HTTP なので付けない）。環境ごとの値は meta 要素で渡し、インラインのスクリプトを使わない（ADR-004） |
+| セキュリティヘッダー | API が、静的ファイルを含むすべての応答に付ける（ADR-004）: `Content-Security-Policy`（`default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy: camera=(), geolocation=(), microphone=(), payment=(), usb=()`（アプリが使わない機能を止める。写真はファイルの選択で受け取るので、カメラの API は使わない）、`Strict-Transport-Security: max-age=31536000; includeSubDomains`（staging・production だけ。local は HTTP なので付けない）。環境ごとの値は meta 要素で渡し、インラインのスクリプトを使わない（ADR-004） |
 | 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・アクセスログの呼び出し元の IP（Cloud Logging。保持は30日。11章）・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者も、ワークスペースに所属していなければアプリから中身を見られない。自分あての招待で所属できることは 7.1「運営者」。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Vercel（DNS）のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は、利用者の情報・Cookie・ヘッダー・本文・クエリ・DB の値・スタックの変数をすべて集めない設定にする（設定の名前は使う版のドキュメントに合わせる）。さらにブレッドクラム（画面遷移の URL を記録する）はすべて捨て、イベントのリクエストのヘッダー・Cookie・クエリ文字列は消す。イベントに載る URL は、クエリ・フラグメント・招待のトークン（`/invite/<token>` のパス）を持たない）。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
 | 依存の脆弱性 | GitHub の Dependabot のアラートを有効にする。Better Auth・Elysia・Drizzle のセキュリティ修正は速やかに取り込む（05_operation-runbook.md） |
 
@@ -2512,7 +2512,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 - **リクエスト ID**: API の入口のプラグインがリクエストごとに UUID を作る（クライアントが送った `X-Request-Id` は使わない。ログに偽の値を入れさせないため）。全ログ行・エラーの応答・Sentry のタグに同じ値を入れ、応答のヘッダー `X-Request-Id` にも返す。
 - **アクセスログ**: 1リクエストに1行（`message: "request"`）。項目は ADR-023 のとおりで、`clientIp` は入口のプラグインが決めた呼び出し元の IP（7.2「呼び出し元の IP」）、`client` は 5.1「クライアントの種類」の値。
-- **レベル**: 4xx は `info`、5xx は `error`。ただし同じ IP からの 401・403 が1分に10回を超えたら、その後の 401・403 のアクセスログの行は `warn` にする（Cloud Run のインスタンスごとに数える。ログの水準を決めるだけなので、インスタンス間で数は合わせない）。5xx は、アクセスログの行（`message: "request"`）とは別に、`message: "request failed"` の行を `requestId`・`errorCode`・`errorName`・`errorMessage`・`stack` 付きで書く。DB のエラーは `pgCode` と `constraint` だけを出し、SQL とパラメーターは出さない（利用者の入力が入るため）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。
+- **レベル**: 4xx は `info`、5xx は `error`。ただし同じ IP からの 401・403 が1分に10回を超えたら、その後の 401・403 のアクセスログの行は `warn` にする（その応答を含めて直近の1分の数で決める。IP は 7.2「レート制限」と同じくまとめる。Cloud Run のインスタンスごとに数える。ログの水準を決めるだけなので、インスタンス間で数は合わせない）。5xx は、アクセスログの行（`message: "request"`）とは別に、`message: "request failed"` の行を `requestId`・`errorCode`・`errorName`・`errorMessage`・`stack` 付きで書く。DB のエラーは `pgCode` と `constraint` だけを出し、SQL とパラメーターは出さない（利用者の入力が入るため）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。
 - **探し方**: 利用者の画面の `Ref` → Cloud Logging で `jsonPayload.requestId` を検索 → 同じ ID の Sentry のイベント。手順は 05_operation-runbook.md。
 
 ---

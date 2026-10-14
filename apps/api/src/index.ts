@@ -1,5 +1,8 @@
+import { connectDatabase } from "@moonx/db";
 import { createApp } from "./app";
 import { ConfigError, loadConfig } from "./config";
+import { createLogger } from "./log";
+import { createErrorReporter } from "./sentry";
 
 function readConfig() {
   try {
@@ -15,7 +18,14 @@ function readConfig() {
 }
 
 const config = readConfig();
-createApp(config).listen({
+// postgres.js connects on the first query, so the API starts even while the database
+// is down, and /api/health keeps answering (SDD 5.14).
+const { db } = connectDatabase(config.databaseUrl);
+createApp(config, {
+  db,
+  log: createLogger(config.logLevel),
+  reporter: createErrorReporter(config),
+}).listen({
   port: config.port,
   // Locally only this machine may connect, as with Vite and the Docker PostgreSQL.
   // "localhost" would bind ::1 alone on macOS. Deployed, Cloud Run reaches the

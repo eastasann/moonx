@@ -311,7 +311,7 @@ docs/design-spec.md 8章（デモデータ仕様）のデモデータを入れ�
 
 ## Step 7: API の入口（ログ・エラー・回数制限・セキュリティ・Sentry・OpenAPI）
 
-Status:
+Status: done 2026-10-15
 
 ```
 すべてのリクエストが通る API の入口の仕組みを作ってください。認証（Step 8）と認可（Step 9）の前の土台。

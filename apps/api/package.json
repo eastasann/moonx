@@ -6,6 +6,13 @@
     ".": "./src/app.ts"
   },
   "dependencies": {
-    "elysia": "^1.4.30"
+    "@elysiajs/openapi": "^1.4.16",
+    "@moonx/db": "workspace:*",
+    "@moonx/schemas": "workspace:*",
+    "@sentry/bun": "^11.7.0",
+    "drizzle-orm": "0.45.4",
+    "elysia": "^1.4.30",
+    "swagger-ui-dist": "^5.33.2",
+    "zod": "^4.6.6"
   }
 }

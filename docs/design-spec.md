@@ -656,7 +656,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - % は 0〜100 で、小数第2位まで（例: 12.25%）。保存は 0〜1 の小数（System Design Doc 5.1）。
 - 日付は暦にある日付だけを受け付ける。年は4桁で、0年（`0000`）は暦に無いものとして扱う（PostgreSQL の date に0年が無いため）。この 0001-01-01〜9999-12-31 のほかに、前後の範囲は決めない。
 - URL は `http://` か `https://` で始まり、2,000文字まで。
-- 文字の入力（文章・名前・URL・メールなど）に NUL（U+0000）を含むものは受け付けない（PostgreSQL の text が持てないため）。
+- 文字の入力（文章・名前・URL・メールなど）に NUL（U+0000）を含むものは受け付けない（PostgreSQL の text が持てないため）。対になっていないサロゲート（JSON の `\ud800` のように、Unicode の文字にならない値）を含むものも受け付けない（PostgreSQL の text は別の文字に置き換えて保存し、jsonb は受け付けないため）。
 - 金額と数の入力の桁区切りのカンマは、3桁ごとの位置にあるときだけ受け付ける（「1,500.50」は受け付け、「1,5」は受け付けない）。
 - 大きさの MB は 1,000,000 バイト（5MB は 5,000,000 バイト）。ファイルと、API が受け付ける本体の大きさ（System Design Doc ADR-029・7.2・8.1 の 413）で同じ。
 - メールはメールアドレスの形式で、254文字まで。大文字と小文字を区別しない。
@@ -721,7 +721,8 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | PNL-1 | コメントの本文 | 必須 | 1〜5,000文字 |
 | 25 | 貼り付け | 必須 | 200,000文字まで。ファイルは 1MB まで（6.7） |
 | 26 | テンプレートのファイル | 必須 | JSON、1MB まで。書式は System Design Doc 5.13 の AD10 |
-| 27 | 設問 ID | 必須 | 6.6 の形式。公開した後は変えられない |
+| 27 | 設問 ID | 必須 | 6.6 の形式。版の中で重ならない。公開した後は変えられない |
+| 27 | セクションのキー・表の列のキー・費用行の初期値のキー | 必須 | 短文。版の中で重ならない（表の列のキーは設問の中で） |
 | 27 | セクションと設問のタイトル | 必須 | 短文 |
 | 27 | セクションの小見出し（自己分析） | 任意 | 短文 |
 | 27 | ガイダンス・ヒント | 任意 | 5,000文字まで |
@@ -729,10 +730,12 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 27 | テンプレートの名前 | 必須 | 短文 |
 | 27 | EXAMPLE | 任意 | 長文 |
 | 27 | AI 用プロンプト（自己分析のテンプレートだけ） | 任意 | 長文 |
-| 27 | 選択肢（選択の型）・表の列名（表の型） | 必須 | 短文 |
+| 27 | 選択肢（選択の型）・表の列名（表の型） | 必須 | 短文。選択肢は設問の中で重ならない |
+| 27 | 表示条件 | 任意 | 6.6 の形式の設問 ID と、出すときの答えの値の一覧（値は短文） |
 | 27 | 費用行の初期値の名前 | 任意 | 17 の費用行の名前と同じ |
-| 27 | 実行管理の初期行の1列目・Area | 1列目は必須、Area は任意 | 22 の同じ欄と同じ |
-| 27 | 確認項目の基準値 | 必須 | 整数 1〜99 |
+| 27 | 実行管理の初期行の1列目・Area | 1列目は必須、Area は任意（KPI の行だけ） | 22 の同じ欄と同じ |
+| 27 | 実行管理の初期行の時期の区分 | ローンチの行だけ、必須 | 6.13 の区分のどれか（22 は区分ごとにまとめて出す） |
+| 27 | 確認項目の基準値 | 必須 | 整数 1〜99。検証のテンプレートは、基準値を持つ4つ（競合・地元の価格帯・許認可・需要）をすべて持つ |
 
 ---
 
@@ -1761,7 +1764,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 4 | Problem | Primary problem / Frequency / Severity / Current alternatives / Why are alternatives insufficient? | コピー: 01 PROBLEM・FREQUENCY・SEVERITY → 同名の小項目、01 SWITCHING → Current alternatives | 01 の回答 |
 | 5 | Product / Service | Initial offer at launch / What will NOT be included at launch? / Core customer experience / Quality standard / Future products / services | コピー: 提案する解決策 → Initial offer | — |
 | 6 | Market & Competition | Market type / Why? / Reachable market / Required market share / Key competitors / substitutes / Why do successful competitors survive? / What must we do differently or better? / If Blue/Mixed, why has nobody captured it? | コピー: 02 OCEAN → Market type、02 WHY → Why?、02 REACHABLE → Reachable market、02 SHARE → Required market share、04 SURVIVOR_PATTERNS → Why do successful competitors survive? | 検証の競合（最大5件）、02 の回答 |
-| 7 | Positioning & Value Proposition | Positioning statement（「For ___, who ___, our business is ___ that ___. Unlike ___, we ___.」）/ Why should customers believe us? / What are we willing to compete on? / What are we NOT willing to compete on? | — | 競合の強み・弱み |
+| 7 | Positioning & Value Proposition | Positioning statement（「For ___, who ___, our business is ___ that ___. Unlike ___, we ___.」）/ Why should customers believe us? / What are we willing to compete on? / What are we NOT willing to compete on? | — | 競合の強み・弱み（最大5件） |
 | 8 | Business Model | Primary revenue stream / Secondary revenue streams / Average selling price / Variable cost per sale / Contribution profit per sale / Contribution margin / Monthly fixed cost / Break-even volume / Expected scenario / Capacity-limit scenario / Why is the startup cost justified? | 数字: Average selling price〜Capacity-limit scenario の8つ（価格・変動費/件・粗利/件・粗利率・月額固定費・損益分岐（/月・/日）・Expected・Capacity Limit のシナリオ） | — |
 | 9 | Sales & Marketing | How will the first 100 customers discover us? / Launch channels / Why should each channel work? / Retention strategy / Referral strategy / Marketing budget / Key acquisition metric | — | 費用行 Launch Marketing・Base Marketing |
 | 10 | Why Us | Founder advantages / Missing capabilities / How will we fill the gaps? | — | [S] 共有された自己分析の NOW・DO（Viewer には出さない） |
@@ -2108,6 +2111,13 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 - 技術スタック、認証方式、PDF の生成方式、保存できなかった入力の扱い（2026-10-11 に、端末に残さない形に見直した。SDD ADR-021） → Phase 3 で決定済み（`docs/02-01_system-design-doc.md` の ADR。認証はメールとパスワード＋Google ログイン）
 - デザイントークン（色・書体・余白の具体値、ライト / ダーク両方の値、Pitch Deck のスライドの型ごとの最小の文字の大きさ）→ Phase 3 の `docs/06_design-tokens.json`。2026-10-12 に月相（4.4）の値に作り直した
 - テンプレート v1 の中身（自己分析36問・検証の設問・プランの小項目の問いと Example・セクションの小見出しとガイダンス・AI 用プロンプト）は、Drive の原本の写し（`docs/drive-templates/`。2026-10-02 に書き出した）から、BCDX のテンプレートのファイル（`data/templates/bcdx/`。書式は System Design Doc 5.13 の AD10）に転記する。中身は BCDX のもので、アプリの共通の処理（マイグレーションなど）には入れない（2026-10-11 のユーザーの決定）。staging と production には、リリースの手順で運営者が 26 から取り込んで公開する（04）。local のシードも同じファイルを同じ取り込みの処理で入れる。プランの小項目の名前と表の列・初期行は 6.12 / 6.13 に記録済み。問いの本文と Example はこの写しから転記する。AI 用プロンプトは自己分析だけが持ち、検証とプランは用意しない（2026-10-02 のユーザーの決定。8.4）。自己分析のセクション見出しの横にある短い言い換え（「WHY | Why do I want this?」の後半）は、セクションの小見出しとして持つ（27 で直せ、11 で見出しの下に出す）
+- 原本からファイルへの転記の決まり（原本に無いものの埋め方）:
+  - 文面: 原本の文字のまま写す。PDF の書き出しが入れた行の折り返し・改ページ・ゼロ幅の空白は除き、段落と箇条書きの改行は残す
+  - 設問のタイトルと問い: 原本がラベルと問いを分けて持つ設問（検証 01・02 の Focus の列と Question の列）はそのまま。自己分析は原本の番号を「Q1」〜「Q36」としてタイトルにする。ラベルか問いの一方しか持たない設問（検証 04 はラベル、検証 08・10 とプランの小項目は問い）は、その文をタイトルと問いの両方に使う
+  - プランの表と実行管理の小項目: タイトルと問いは、6.12 が名前を決めた表（§11「Founders」・§13「Ownership and capital」）はその名前、ほかは項目の名前。EXAMPLE は、表が置き換えた原本の行のもの（§11 は3行に共通の1文、§13 は2行の文を改行でつなぐ）で、§21・§22 と実行管理の小項目には無い
+  - 名前: プランの項目は 6.12 の表記（原本が大文字で書く見出しも、ほかの項目にそろえる）。検証のセクションは各シートの1行目、自己分析は見出しの「|」の前。テンプレートの名前は原本の文書の名前から先頭の「_TEMPLATE - 」「TEMPLATE - 」を除いたもの（Self Analysis・Business Idea & Validation・Business Plan）
+  - ガイダンス: 自己分析は見出しの次の行、検証は各シートの2行目、プランは項目の見出しの次の行（無い項目は空）
+  - 入れる場所の無い原本の文は写さない: 文書の題と副題、記入欄の見出し（Name・Date、Business Name・Version・Prepared By・Date。アプリでは画面の項目）、自己分析の HOW TO USE THIS、プランの PURPOSE・Part A / B の説明・FINAL OUTPUT と PITCH-READY SUMMARY の見出しとその説明の1文、AI 用プロンプトの前の README の1文
 - 日時の表示はユーザーのタイムゾーン（登録時に端末から取り、4 で変えられる）
 - 技術の希望（運用費、TypeScript）は Phase 3 で反映済み。スマホのネイティブアプリの希望は、Web のデザインが固まったあとの feature に回した（初期リリースのスマホは Web（PWA）で使う。2026-10-11 のユーザーの決定。PRD 6章）。時期とスコープの正は PRD 6章、技術の決定の正は `docs/02-01_system-design-doc.md`（1章 Goal の運用費、ADR-001・ADR-003・ADR-031）
 

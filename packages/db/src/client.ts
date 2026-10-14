@@ -9,6 +9,11 @@ export const fullSchema = { ...schema, ...relations };
 /** A Drizzle client over postgres.js that knows every table and relation. */
 export type Database = PostgresJsDatabase<typeof fullSchema>;
 
+/** The client `Database.transaction` hands to its callback. */
+export type DatabaseTransaction = Parameters<
+  Parameters<Database["transaction"]>[0]
+>[0];
+
 /** A Drizzle client and the way to close its connection pool. */
 export interface DatabaseConnection {
   db: Database;

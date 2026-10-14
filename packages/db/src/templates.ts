@@ -1,0 +1,543 @@
+import {
+  type AnswerType,
+  type ErrorCode,
+  type ErrorDetail,
+  isQuestionKey,
+  issueDetails,
+  type QuestionOptions,
+  questionOptionsSchema,
+  type TemplateFile,
+  type TemplateKind,
+  templateFileSchema,
+} from "@moonx/schemas";
+import { and, asc, desc, eq, lt } from "drizzle-orm";
+import type { PgInsertValue, PgTable } from "drizzle-orm/pg-core";
+import type { Database, DatabaseTransaction } from "./client";
+import {
+  templateCheckRules,
+  templateCostDefaults,
+  templateExecutionPresets,
+  templateQuestions,
+  templateSections,
+  templates,
+  templateVersions,
+} from "./schema";
+
+// Importing a template file (AD10), checking a version before it is published and
+// publishing it (AD6), as SDD 5.13 specifies them. The operator API and the seed both
+// call these, so a template reaches every environment through the same checks.
+//
+// Locks the operator API must take as well: an edit of a draft (AD3 to AD5) locks the
+// version row, as publishing does, so a publish never checks content that changes before
+// it commits; making a draft (AD2) locks the template row, as the import does, so two
+// drafts of one template take turns instead of failing on a unique index.
+
+type Executor = Database | DatabaseTransaction;
+
+/** A template operation refused for a reason the API answers with `code` (SDD 8.1). */
+export class TemplateError extends Error {
+  constructor(
+    readonly code: ErrorCode,
+    message: string,
+    /** For VALIDATION_FAILED: where the file breaks the format. */
+    readonly details: ErrorDetail[] = [],
+  ) {
+    super(message);
+    this.name = "TemplateError";
+  }
+}
+
+/**
+ * Reads `input` as a template file of `kind`.
+ *
+ * @throws {TemplateError} VALIDATION_FAILED, with the place of each problem in `details`.
+ *   A file of another kind fails on `kind` alone, so 26 can tell it apart from a file it
+ *   cannot read (design-spec 6.17).
+ */
+export function parseTemplateFile(
+  kind: TemplateKind,
+  input: unknown,
+): TemplateFile {
+  const fileKind =
+    typeof input === "object" && input !== null && "kind" in input
+      ? input.kind
+      : undefined;
+  if (typeof fileKind === "string" && fileKind !== kind) {
+    throw new TemplateError(
+      "VALIDATION_FAILED",
+      `The file is not a ${kind} template`,
+      [{ path: "kind", code: "invalid_value", message: `Expected ${kind}` }],
+    );
+  }
+  const parsed = templateFileSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new TemplateError(
+      "VALIDATION_FAILED",
+      "The file does not follow the template file format",
+      issueDetails(parsed.error.issues),
+    );
+  }
+  return parsed.data;
+}
+
+export interface ImportOptions {
+  /**
+   * Makes the id of each row the import writes, in a fixed order: the template (when it
+   * did not exist as the import began; if a concurrent import creates it first, that id
+   * goes unused), the version, the sections, the questions, then the cost rows, check
+   * rules and execution rows. The seed passes ids derived from names (SDD 6.5).
+   */
+  newId?: () => string;
+}
+
+export interface ImportedTemplateVersion {
+  versionId: string;
+  kind: TemplateKind;
+  versionNumber: number;
+}
+
+// postgres.js refuses a statement of 65,534 parameters or more, and a 1 MB file can hold
+// thousands of questions of 16 columns each.
+const ROWS_PER_INSERT = 1000;
+
+const insertRows = async <T extends PgTable>(
+  tx: DatabaseTransaction,
+  table: T,
+  rows: PgInsertValue<T>[],
+) => {
+  for (let start = 0; start < rows.length; start += ROWS_PER_INSERT)
+    await tx.insert(table).values(rows.slice(start, start + ROWS_PER_INSERT));
+};
+
+const lockTemplate = async (tx: DatabaseTransaction, kind: TemplateKind) => {
+  const [template] = await tx
+    .select({ id: templates.id })
+    .from(templates)
+    .where(eq(templates.kind, kind))
+    .for("update");
+  return template;
+};
+
+/**
+ * Creates the draft version of the `kind` template from a template file (AD10). Creates
+ * the template first when there is none, named by the file. The draft is v1 when the
+ * template has no version, else the next number; it holds the file's content only.
+ *
+ * @throws {TemplateError} VALIDATION_FAILED when the file is not a `kind` template file
+ *   (`parseTemplateFile`); DRAFT_EXISTS when the template already has a draft.
+ */
+export async function importTemplateFile(
+  db: Database,
+  kind: TemplateKind,
+  input: unknown,
+  { newId = () => crypto.randomUUID() }: ImportOptions = {},
+): Promise<ImportedTemplateVersion> {
+  const file = parseTemplateFile(kind, input);
+  return db.transaction(async (tx) => {
+    // The lock on the template row makes concurrent imports take turns, so the second
+    // one sees the first one's draft instead of failing on a unique index.
+    let template = await lockTemplate(tx, kind);
+    if (template === undefined) {
+      await tx
+        .insert(templates)
+        .values({ id: newId(), kind, name: file.name })
+        .onConflictDoNothing({ target: templates.kind });
+      template = await lockTemplate(tx, kind);
+    }
+    if (template === undefined) throw new Error(`No ${kind} template row`);
+
+    const versions = await tx
+      .select({
+        versionNumber: templateVersions.versionNumber,
+        status: templateVersions.status,
+      })
+      .from(templateVersions)
+      .where(eq(templateVersions.templateId, template.id));
+    if (versions.some((version) => version.status === "draft")) {
+      throw new TemplateError(
+        "DRAFT_EXISTS",
+        `The ${kind} template already has a draft`,
+      );
+    }
+    const versionNumber =
+      Math.max(0, ...versions.map((version) => version.versionNumber)) + 1;
+    const versionId = newId();
+    await tx.insert(templateVersions).values({
+      id: versionId,
+      templateId: template.id,
+      versionNumber,
+      aiPrompt: file.aiPrompt,
+    });
+
+    const sections = file.sections.map((section, index) => ({
+      section,
+      row: {
+        id: newId(),
+        templateVersionId: versionId,
+        key: section.key,
+        part: section.part,
+        title: section.title,
+        subtitle: section.subtitle,
+        guidance: section.guidance,
+        sortOrder: index,
+      },
+    }));
+    const questions = sections.flatMap(({ section, row }) =>
+      section.questions.map((question, index) => ({
+        id: newId(),
+        templateVersionId: versionId,
+        templateSectionId: row.id,
+        questionKey: question.key,
+        title: question.title,
+        prompt: question.prompt,
+        example: question.example,
+        hint: question.hint,
+        answerType: question.answerType,
+        options: question.options,
+        displayCondition: question.displayCondition,
+        hasFau: question.hasFau,
+        copyFrom: question.copyFrom,
+        reference: question.reference,
+        sortOrder: index,
+      })),
+    );
+    const costDefaults = file.costDefaults.map((row, index) => ({
+      id: newId(),
+      templateVersionId: versionId,
+      category: row.category,
+      key: row.key,
+      name: row.name,
+      sortOrder: index,
+    }));
+    const checkRules = file.checkRules.map((rule) => ({
+      id: newId(),
+      templateVersionId: versionId,
+      checkKey: rule.checkKey,
+      params: rule.params,
+    }));
+    const presets = file.executionPresets.map((preset, index) => ({
+      id: newId(),
+      templateVersionId: versionId,
+      type: preset.type,
+      title: preset.title,
+      area: preset.area,
+      launchTiming: preset.launchTiming,
+      sortOrder: index,
+    }));
+    await insertRows(
+      tx,
+      templateSections,
+      sections.map(({ row }) => row),
+    );
+    await insertRows(tx, templateQuestions, questions);
+    await insertRows(tx, templateCostDefaults, costDefaults);
+    await insertRows(tx, templateCheckRules, checkRules);
+    await insertRows(tx, templateExecutionPresets, presets);
+
+    return { versionId, kind, versionNumber };
+  });
+}
+
+/** The codes of the problems that block publishing (SDD 5.13 AD6). */
+export type TemplateProblemCode =
+  | "no_questions"
+  | "invalid_part"
+  | "invalid_question_key"
+  | "question_key_section_mismatch"
+  | "duplicate_question_key"
+  | "options_mismatch"
+  | "unknown_condition_key";
+
+/** The AD6 validate response. */
+export interface TemplateCheck {
+  errors: {
+    code: TemplateProblemCode;
+    message: string;
+    /** The section or question 27 moves to; null for the version as a whole. */
+    nodeId: string | null;
+  }[];
+  /** Question IDs the previous version had and this one drops. Does not block. */
+  warnings: { code: "removed_keys"; keys: string[] }[];
+}
+
+/** What `checkTemplateContent` reads of a stored version. */
+export interface TemplateContent {
+  kind: TemplateKind;
+  sections: {
+    id: string;
+    key: string;
+    part: "a" | "b" | null;
+    questions: {
+      id: string;
+      questionKey: string;
+      answerType: AnswerType;
+      options: unknown;
+      displayCondition: unknown;
+    }[];
+  }[];
+  /** The question IDs of the version before it; null when it is the first. */
+  previousQuestionKeys: readonly string[] | null;
+}
+
+const optionsKindOf: Record<AnswerType, QuestionOptions["kind"] | null> = {
+  long_text: null,
+  short_text: null,
+  amount_with_reason: null,
+  choice: "choice",
+  table: "table",
+  linked_metric: "linked_metric",
+  execution_view: "execution_view",
+};
+
+const optionsFit = (answerType: AnswerType, options: unknown) => {
+  const kind = optionsKindOf[answerType];
+  if (kind === null) return options === null;
+  const parsed = questionOptionsSchema.safeParse(options);
+  if (!parsed.success || parsed.data.kind !== kind) return false;
+  switch (parsed.data.kind) {
+    case "choice":
+      return parsed.data.choices.length > 0;
+    case "table":
+      return parsed.data.columns.length > 0;
+    case "linked_metric":
+      return parsed.data.metricKeys.length > 0;
+    case "execution_view":
+      return true;
+  }
+};
+
+const conditionKeys = (condition: unknown) =>
+  typeof condition === "object" && condition !== null
+    ? Object.keys(condition)
+    : [];
+
+/** The checks of AD6 validate on a version's content (SDD 5.13). */
+export function checkTemplateContent(content: TemplateContent): TemplateCheck {
+  const errors: TemplateCheck["errors"] = [];
+  const questions = content.sections.flatMap((section) =>
+    section.questions.map((question) => ({ section, question })),
+  );
+  if (questions.length === 0)
+    errors.push({
+      code: "no_questions",
+      message: "The template has no questions",
+      nodeId: null,
+    });
+
+  const needsPart = content.kind === "business_plan";
+  for (const section of content.sections) {
+    if (needsPart !== (section.part !== null))
+      errors.push({
+        code: "invalid_part",
+        message: needsPart
+          ? `Section ${section.key} needs part a or b`
+          : `Section ${section.key} must not have a part`,
+        nodeId: section.id,
+      });
+  }
+
+  const keys = new Set(questions.map(({ question }) => question.questionKey));
+  const seen = new Set<string>();
+  for (const { section, question } of questions) {
+    const key = question.questionKey;
+    if (!isQuestionKey(key, content.kind)) {
+      errors.push({
+        code: "invalid_question_key",
+        message: `${key} is not a question ID of this template`,
+        nodeId: question.id,
+      });
+    } else if (key.split(".")[1] !== section.key) {
+      errors.push({
+        code: "question_key_section_mismatch",
+        message: `${key} is not a question ID of section ${section.key}`,
+        nodeId: question.id,
+      });
+    }
+    if (seen.has(key))
+      errors.push({
+        code: "duplicate_question_key",
+        message: `${key} appears more than once`,
+        nodeId: question.id,
+      });
+    seen.add(key);
+    if (!optionsFit(question.answerType, question.options))
+      errors.push({
+        code: "options_mismatch",
+        message: `The options of ${key} do not fit ${question.answerType}`,
+        nodeId: question.id,
+      });
+    for (const conditionKey of conditionKeys(question.displayCondition)) {
+      if (!keys.has(conditionKey))
+        errors.push({
+          code: "unknown_condition_key",
+          message: `${key} shows on ${conditionKey}, which is not in the template`,
+          nodeId: question.id,
+        });
+    }
+  }
+
+  const removed = (content.previousQuestionKeys ?? []).filter(
+    (key) => !keys.has(key),
+  );
+  return {
+    errors,
+    warnings:
+      removed.length > 0 ? [{ code: "removed_keys", keys: removed }] : [],
+  };
+}
+
+// Any other id names no version, and querying the uuid column with it would fail in the
+// database instead.
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const loadVersion = async (
+  db: Executor,
+  versionId: string,
+  { lock = false } = {},
+) => {
+  if (!UUID_PATTERN.test(versionId))
+    throw new TemplateError("NOT_FOUND", `No template version ${versionId}`);
+  const query = db
+    .select({
+      templateId: templateVersions.templateId,
+      versionNumber: templateVersions.versionNumber,
+      status: templateVersions.status,
+      kind: templates.kind,
+    })
+    .from(templateVersions)
+    .innerJoin(templates, eq(templates.id, templateVersions.templateId))
+    .where(eq(templateVersions.id, versionId));
+  const [version] = await (lock
+    ? query.for("update", { of: templateVersions })
+    : query);
+  if (version === undefined)
+    throw new TemplateError("NOT_FOUND", `No template version ${versionId}`);
+  return version;
+};
+
+/** A version's question IDs in the order 27 shows them. */
+const questionKeysOf = async (db: Executor, versionId: string) =>
+  (
+    await db
+      .select({ key: templateQuestions.questionKey })
+      .from(templateQuestions)
+      .innerJoin(
+        templateSections,
+        eq(templateSections.id, templateQuestions.templateSectionId),
+      )
+      .where(eq(templateQuestions.templateVersionId, versionId))
+      .orderBy(
+        asc(templateSections.sortOrder),
+        asc(templateQuestions.sortOrder),
+      )
+  ).map((row) => row.key);
+
+const checkStoredVersion = async (
+  db: Executor,
+  versionId: string,
+  version: Awaited<ReturnType<typeof loadVersion>>,
+) => {
+  const sections = await db
+    .select({
+      id: templateSections.id,
+      key: templateSections.key,
+      part: templateSections.part,
+    })
+    .from(templateSections)
+    .where(eq(templateSections.templateVersionId, versionId))
+    .orderBy(asc(templateSections.sortOrder));
+  const questions = await db
+    .select({
+      id: templateQuestions.id,
+      sectionId: templateQuestions.templateSectionId,
+      questionKey: templateQuestions.questionKey,
+      answerType: templateQuestions.answerType,
+      options: templateQuestions.options,
+      displayCondition: templateQuestions.displayCondition,
+    })
+    .from(templateQuestions)
+    .where(eq(templateQuestions.templateVersionId, versionId))
+    .orderBy(asc(templateQuestions.sortOrder));
+  const [previous] = await db
+    .select({ id: templateVersions.id })
+    .from(templateVersions)
+    .where(
+      and(
+        eq(templateVersions.templateId, version.templateId),
+        lt(templateVersions.versionNumber, version.versionNumber),
+      ),
+    )
+    .orderBy(desc(templateVersions.versionNumber))
+    .limit(1);
+  return checkTemplateContent({
+    kind: version.kind,
+    sections: sections.map((section) => ({
+      ...section,
+      questions: questions.filter(
+        (question) => question.sectionId === section.id,
+      ),
+    })),
+    previousQuestionKeys:
+      previous === undefined ? null : await questionKeysOf(db, previous.id),
+  });
+};
+
+/**
+ * Checks a version before it is published (AD6 validate). Writes nothing, so it also runs
+ * on a published version.
+ *
+ * @throws {TemplateError} NOT_FOUND when there is no such version.
+ */
+export async function validateTemplateVersion(
+  db: Executor,
+  versionId: string,
+): Promise<TemplateCheck> {
+  return checkStoredVersion(db, versionId, await loadVersion(db, versionId));
+}
+
+/**
+ * Publishes a draft (AD6 publish). Existing answers keep the version they were made with
+ * (design-spec 6.0.7).
+ *
+ * @param publishedById The operator who publishes; null when no user does (the seed).
+ * @throws {TemplateError} NOT_FOUND when there is no such version; PUBLISHED_READ_ONLY
+ *   when it is already published; TEMPLATE_INVALID when AD6 validate finds errors.
+ */
+export async function publishTemplateVersion(
+  db: Database,
+  versionId: string,
+  publishedById: string | null,
+): Promise<{ versionNumber: number; publishedAt: Date }> {
+  return db.transaction(async (tx) => {
+    // Locked so a concurrent publish of the same draft waits, then sees it published.
+    const version = await loadVersion(tx, versionId, { lock: true });
+    if (version.status === "published")
+      throw new TemplateError(
+        "PUBLISHED_READ_ONLY",
+        `Template version ${versionId} is already published`,
+      );
+    const check = await checkStoredVersion(tx, versionId, version);
+    if (check.errors.length > 0)
+      throw new TemplateError(
+        "TEMPLATE_INVALID",
+        `Template version ${versionId} has errors: ${[
+          ...new Set(check.errors.map((error) => error.code)),
+        ].join(", ")}`,
+      );
+    const [published] = await tx
+      .update(templateVersions)
+      .set({ status: "published", publishedAt: new Date(), publishedById })
+      .where(eq(templateVersions.id, versionId))
+      .returning({
+        versionNumber: templateVersions.versionNumber,
+        publishedAt: templateVersions.publishedAt,
+      });
+    if (published?.publishedAt == null)
+      throw new Error(`Template version ${versionId} was not published`);
+    return {
+      versionNumber: published.versionNumber,
+      publishedAt: published.publishedAt,
+    };
+  });
+}

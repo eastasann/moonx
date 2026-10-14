@@ -94,6 +94,18 @@ describe("text (design-spec 6.0.8 共通の決まり)", () => {
     }
   });
 
+  test("no lone surrogate, which is no character", () => {
+    for (const schema of [
+      requiredShortTextSchema,
+      shortTextSchema,
+      costRowNameSchema,
+    ]) {
+      const issue = schema.safeParse("a\ud800b").error?.issues[0];
+      expect(issue).toMatchObject({ params: { rule: "lone_surrogate" } });
+    }
+    expect(requiredShortTextSchema.parse("a\ud83c\udf19")).toBe("a🌙");
+  });
+
   test("a required text is kept as typed", () => {
     expect(requiredShortTextSchema.parse(" Piaya ")).toBe(" Piaya ");
   });

@@ -202,7 +202,7 @@ make tokens が通って生成物ができ、もう一度動かしても差分�
 
 ## Step 5: テンプレートのファイルと、取り込み・公開の処理
 
-Status:
+Status: done 2026-10-14
 
 ```
 BCDX のテンプレートのファイルと、それを DB に取り込んで公開する処理を作ってください。取り込みと公開の処理は、
@@ -217,23 +217,72 @@ BCDX のテンプレートのファイルと、それを DB に取り込んで�
 
 やること:
 1. テンプレートのファイルの Zod スキーマ（packages/schemas。SDD 5.13）
-2. data/templates/bcdx/self-analysis.json・validation.json・plan.json: docs/drive-templates/ から、
-   AD10 の書式で転記する。設問・Example・ヒント・小見出しとガイダンス・確認項目の基準値・費用と実行管理の初期行・
-   AI 用プロンプト（自己分析だけ）を、原本の文面のまま写す。design-spec が決めた構成（6.12・6.13 の小項目・表の列・初期行）と
+2. data/templates/bcdx/self-analysis.json・plan.json（validation.json は Step 5b に分けた）: docs/drive-templates/ から、
+   AD10 の書式で転記する。設問・Example・ヒント・小見出しとガイダンス・実行管理の初期行・
+   AI 用プロンプト（自己分析だけ）を、原本の文面のまま写す（確認項目の基準値と費用の初期行は検証のファイルなので Step 5b）。
+   design-spec が決めた構成（6.12・6.13 の小項目・表の列・初期行）と
    原本が食い違う所は、どちらを正にするかが仕様の決定なので、写す前に止める（無人ループでは blocked と理由）
 3. packages/db: ファイルを検査して下書きの版を作る取り込みの処理、公開の前の検査（AD6 validate）、公開（AD6 publish）
-4. テスト（make test-api。packages/db のテストは DATABASE_URL_TEST の DB を使う）: 3つのファイルが書式どおりで
+4. テスト（make test-api。packages/db のテストは DATABASE_URL_TEST の DB を使う）: 2つのファイルが書式どおりで
    取り込めること、AD6 の検査を通って公開できること、書式の誤り（種類違い・読めない内容）を design-spec 6.17 のとおりに拒むこと、
    原本の設問の数（自己分析36問など）とファイルの数が合うこと
 
 まだシード（Step 6）と運営者の API（Step 18）は作らない。
 
-3つのファイルがテスト用の DB に取り込めて AD6 の検査を通って公開でき、make test・make typecheck・make lint が通る状態をゴールとする。
+2つのファイルがテスト用の DB に取り込めて AD6 の検査を通って公開でき、make test・make typecheck・make lint が通る状態をゴールとする。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
 完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
 ```
+
+---
+
+## Step 5b: 検証のテンプレートのファイル
+
+Status: blocked 2026-10-14
+費用の初期行の名前が design-spec 6.3 と原本の 05 Costs とで24行中16行食い違い、どちらを正にするかはユーザーの決定が要る（食い違いと選択肢はこのステップの末尾）。
+
+```
+BCDX の検証のテンプレートのファイル data/templates/bcdx/validation.json を作り、Step 5 の取り込み・検査・公開の処理で
+入れられることを確かめてください（Step 5 から分けた）。
+
+参照:
+- docs/02-01_system-design-doc.md 5.13（テンプレートのファイル AD10 の書式）
+- docs/design-spec.md 6.0.3（F/A/U を付ける設問）・6.1（確認項目の基準値）・6.2（02 の出し分けと回答の型）・6.3（費用の初期行とキー）・
+  6.6（設問 ID）・9.3（転記の決まり）
+- docs/drive-templates/business-idea-validation.txt（原本の写し。転記の元）
+
+やること:
+1. data/templates/bcdx/validation.json: 01・02・04・08・10 の設問（6.6 の ID。どれも F/A/U を付ける。02 CATEGORY は短文、OCEAN は
+   Red / Blue / Mixed の選択、RED_1–4 は OCEAN が Red か Mixed、BLUE_1–3 は Blue か Mixed のときだけ出す）、セクションの名前と
+   ガイダンス、費用の初期行（6.3 のキー）、確認項目の基準値（6.1 の既定値）を、9.3 の転記の決まりで原本から写す。AI 用プロンプトは空。
+   design-spec が決めたこと（6.1 の基準値、6.2 の選択肢と出し分け、6.3 の初期行、6.6 の設問 ID）と原本が食い違う所は、
+   どちらを正にするかが仕様の決定なので、写す前に止める（無人ループでは blocked と理由）
+2. テスト（make test-api）: 取り込めて AD6 の検査を通って公開できること、原本の設問の数（01 が10問、02 が15問、04 が2問、08 が1問、
+   10 が6問）と問いの文が原本と合うこと、費用の初期行が 6.3 のキーと名前のとおりであること
+
+まだシード（Step 6）と運営者の API（Step 18）は作らない。
+
+validation.json がテスト用の DB に取り込めて AD6 の検査を通って公開でき、make test・make typecheck・make lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+費用の初期行の名前の食い違い（design-spec 6.3 の名前 → 原本の 05 Costs の名前。キーはどちらも 6.3 のとおり）:
+
+- 初期費用: Renovation → Renovation / Fit-out、Lease Deposit → Lease Deposit / Advance、Permits → Permits / Registration、Branding → Branding / Signage、Tech Setup → Technology / Systems Setup、Other → Other Startup Cost（Equipment・Initial Inventory・Launch Marketing・Working Capital Buffer は同じ）
+- 月額固定費: Utilities → Utilities - Base、Internet-Software → Internet / Software、Accounting → Accounting / Admin、Insurance-Compliance → Insurance / Compliance、Other → Other Fixed Cost（Rent・Salaries・Base Marketing は同じ）
+- 変動費: Materials → Core Product / Materials、Payment Fee → Payment / Platform Fee、Delivery → Delivery / Fulfilment、Variable Labor → Variable Labor / Commission、Other → Other Variable Cost（Packaging は同じ）
+
+6.3 の名前は壁打ちメモ（brainstorm-notes の「05 Costs の行」）が原本の行名として書いたものを引き継いでいて、原本とわざと変えた記録は無い。6.12 の参照の列と 8.3 の検算用データも 6.3 の名前で書いている。選択肢:
+
+1. 原本の名前にする: design-spec 6.3 の初期行と、6.12・8.3 の名前を原本の名前に直す（9.3 の「原本の文字のまま写す」と同じ扱い）
+2. 6.3 の名前にする: 9.3 に「費用の初期行の名前は 6.3 が正（原本の長い名前を短くした）」と書く
+
+決めたら design-spec を直し、Status を空欄に戻す。
 
 ---
 
@@ -251,7 +300,7 @@ docs/design-spec.md 8章（デモデータ仕様）のデモデータを入れ�
 - docs/03_dev-setup.md 3章
 
 やること:
-1. packages/db のシード: テンプレートは Step 5 の取り込みと公開の処理で入れる。8.1〜8.4 のユーザー・ワークスペース・招待・
+1. packages/db のシード: テンプレートは Step 5・5b のファイルを Step 5 の取り込みと公開の処理で入れる。8.1〜8.4 のユーザー・ワークスペース・招待・
    アイデア・検証・自己分析・プラン・版・実行管理・判定・決定ログ・コメント・通知・変更履歴を、8章の「見せたい状態」が
    画面で開ける形で入れる。スナップショット（決定ログ・版）は Step 3 の domain の関数（buildKeyMetrics() など）で作る。
    パスワードは better-auth/crypto の hashPassword で作る（Step 8 で使う Better Auth と同じ版に固定する）

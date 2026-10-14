@@ -93,7 +93,7 @@ moonx/
 ├─ packages/
 │  ├─ domain/     計算・確認項目・F/A/U・工程・Pitch Deck の組み立て・AI 書き出し / 取り込みの書式（純粋関数）
 │  ├─ schemas/    Zod のスキーマ（API の入出力とフォームの入力チェック）
-│  ├─ db/         Drizzle のスキーマ・マイグレーション・シード
+│  ├─ db/         Drizzle のスキーマ・マイグレーション・シード・テンプレートの取り込みと公開（AD10・AD6）
 │  ├─ i18n/       英語のメッセージカタログと書式（en-PH）
 │  ├─ ui-tokens/  06_design-tokens.json から生成するテーマ（vanilla-extract・react-pdf 用）と PWA のアイコン・マニフェスト（生成物）
 │  └─ ui-web/     Web の部品（React Aria Components ＋ vanilla-extract。design-spec 4.5 の部品）
@@ -1589,7 +1589,7 @@ interface TemplateFile {
   }[];                                 // 並びはファイルの順
   costDefaults: { category: CostCategory; key: string; name: string }[];                     // 検証だけ（他は []）
   checkRules: { checkKey: CheckKey; params: Record<string, number> }[];                       // 検証だけ（他は []）
-  executionPresets: { type: "milestone" | "launch" | "kpi"; title: string; area: string | null; launchTiming: LaunchTiming | null }[];   // プランだけ（他は []）
+  executionPresets: { type: "milestone" | "launch" | "kpi"; title: string; area: string | null; launchTiming: LaunchTiming | null }[];   // プランだけ（他は []）。area は KPI だけ、launchTiming はローンチだけで必須
 }
 ```
 
@@ -1603,7 +1603,7 @@ interface TemplateFile {
 | AD3 PATCH | `{ aiPrompt: string }` | `200 TemplateVersionDetail` | 検証とプランの版に空でない値を送ると `422 VALIDATION_FAILED`（AI 用プロンプトを持つのは自己分析だけ。design-spec 6.17）。公開済みの版は `409 PUBLISHED_READ_ONLY`（AD4・AD5・AD6 publish も同じ。AD6 validate は書き込まないので公開済みの版にも使える） |
 | AD4 | セクション: `{ key; title; subtitle?; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（`reference` は 27 の画面からは送らない。変えるのは AD10 の取り込みだけ。design-spec 6.17。PATCH は一部。文字の値は design-spec 6.0.8） | `201` / `200` / `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`） |
 | AD5 | order: `{ sections: { id: UUID; questionIds: UUID[] }[] }`。cost-defaults: `{ items: { category; key; name }[] }`。check-rules: `{ items: { checkKey; params }[] }`（基準値は design-spec 6.0.8）。execution-presets: `{ items: { type; title; area?; launchTiming? }[] }` | `200 TemplateVersionDetail` | 一覧ごと置き換える |
-| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 公開をふさぐエラー: 設問が0件（`no_questions`）、セクションの `part` の過不足（`invalid_part`。プランは A / B が必須、他は無し）、設問 ID の形式（`invalid_question_key`）・セクションとの不一致（`question_key_section_mismatch`）・重複（`duplicate_question_key`）、`answerType` と `options` の食い違い（`options_mismatch`）、`displayCondition` が存在しない設問を指す（`unknown_condition_key`）。警告: 前の版から消えた ID |
+| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 公開をふさぐエラー: 設問が0件（`no_questions`）、セクションの `part` の過不足（`invalid_part`。プランは A / B が必須、他は無し）、設問 ID の形式（`invalid_question_key`）・セクションとの不一致（`question_key_section_mismatch`）・重複（`duplicate_question_key`）、`answerType` と `options` の食い違い（`options_mismatch`。選択肢・表の列・主要指標が空のときも）、`displayCondition` が存在しない設問を指す（`unknown_condition_key`）。警告: 前の版から消えた ID |
 | AD6 publish | — | `200 { versionNumber: number; publishedAt: DateTime }` | 検査のエラーがあれば `422 TEMPLATE_INVALID`。既存の回答は変わらない |
 | AD7 users | `?q=&status=&cursor=` | `200 Page<AdminUser>` | 中身（アイデア・回答）は返さない |
 | AD7 workspaces | `?q=&cursor=` | `200 Page<AdminWorkspace>` | |
@@ -2315,8 +2315,8 @@ export const changeHistory = pgTable("change_history", {
 
 | 指定 | 内容 |
 |---|---|
-| `{ kind: "validation_answers", section?, keys? }` | 検証の回答。`section`（`"01"`）か `keys`（設問 ID の配列） |
-| `{ kind: "competitors", limit }` | 検証の競合の上位 `limit` 件（V17 で並べた `sortOrder` の順。Pitch Deck の競合のスライドも同じ順） |
+| `{ kind: "validation_answers", section?, keys? }` | 検証の回答。`section`（`"01"`）か `keys`（設問 ID の配列）のどちらか一方 |
+| `{ kind: "competitors", limit }` | 検証の競合の上位 `limit` 件（1以上の整数。V17 で並べた `sortOrder` の順。Pitch Deck の競合のスライドも同じ順） |
 | `{ kind: "cost_rows", keys }` | 費用行。`keys` はテンプレートの費用行のキー（`initial.permits`） |
 | `{ kind: "research_log", tag }` | 調査ログのうち `tag`（`local_price` / `permits` / `demand_signal`）が付いたもの |
 | `{ kind: "self_analysis", sections }` | 共有された自己分析のセクション（`WHY` など） |
@@ -2526,7 +2526,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | ライブラリ | i18next ＋ react-i18next（Web）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
 | カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。どの画面でも同じ、列挙の値（5.2）の表示名は `common` に置き、キーは `<まとまり>.<値>`（例: `common:stage.launch_prep`・`common:checkState.not_started`・`common:decision.proceed`）。キーの語は camelCase にし、API の値（列挙の値・`error.code`・セクションのキー）はそのまま使う（例: `common:check.competitorsRange`・`errors:VALIDATION_FAILED`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
-| 入力の検査の文言 | クライアントの Zod の検査（8.2）の issue の `code` から選ぶ。`too_small`・`too_big` は `origin`（文字数か数か）と `minimum`・`maximum`、`invalid_format` は `format`（`email`・`url`・`date`・`datetime` など）、`invalid_type` は `expected`（`int` は整数でない数。ほかは型の違い）、`invalid_value` は選択肢に無い値、`packages/schemas` の自前の検査（`custom`）は `params.rule`（`InputRule` の型: `required`・`decimals`・`positive`・`nul_character`・`number_format`・`currency`・`time_zone`）を見て、カタログの文言を出す。issue の `message` は開発者向けで、画面に出さない |
+| 入力の検査の文言 | クライアントの Zod の検査（8.2）の issue の `code` から選ぶ。`too_small`・`too_big` は `origin`（文字数か数か）と `minimum`・`maximum`、`invalid_format` は `format`（`email`・`url`・`date`・`datetime`、テンプレートのファイルの `question_key`・`copy_source` など）、`invalid_type` は `expected`（`int` は整数でない数。ほかは型の違い）、`invalid_value` は選択肢に無い値、`packages/schemas` の自前の検査（`custom`）は `params.rule`（`InputRule` の型: `required`・`decimals`・`positive`・`nul_character`・`number_format`・`currency`・`time_zone`・`lone_surrogate`・`unique`（テンプレートのファイルで、キーや選択肢が重なる））を見て、カタログの文言を出す。26 のファイルの取り込み（AD10）は、`path` が `kind` の issue を「テンプレートの種類が違う」、それ以外の issue を「書式が読めない」としてまとめ、`path` で場所を添える（design-spec 6.17）。issue の `message` は開発者向けで、画面に出さない |
 | 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`・`formatOverdue()`（期限切れの日数）・`formatWaitTime()`（回数制限の待ち時間）・`formatCheckName()`（確認項目の名前。競合の基準値の幅を付ける）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（ブラウザと Bun） |

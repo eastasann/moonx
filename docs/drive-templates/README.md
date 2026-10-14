@@ -1,6 +1,6 @@
 # Drive のテンプレートの原本の写し
 
-BCDX の Google Drive にある現行のテンプレートを、2026-10-02 に書き出した写し。テンプレート v1 のシード（`packages/db/seed/templates/`）は、ここから転記する（design-spec 9.3）。
+BCDX の Google Drive にある現行のテンプレートを、2026-10-02 に書き出した写し。BCDX のテンプレートのファイル（`data/templates/bcdx/`）は、ここから転記する（design-spec 9.3）。
 
 - 層: アーカイブ。Drive の原本が後で変わっても、ここは書き換えない
 - 書いてあるのはテンプレートだけ。記入済みの自己分析や検証（利用者のデータ）は入れていない

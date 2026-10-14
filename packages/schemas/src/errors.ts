@@ -86,6 +86,16 @@ export const errorDetailSchema = z.object({
 });
 export type ErrorDetail = z.infer<typeof errorDetailSchema>;
 
+/** The `details` for failed Zod issues, the path joined with dots (`sections.0.title`). */
+export const issueDetails = (
+  issues: readonly z.core.$ZodIssue[],
+): ErrorDetail[] =>
+  issues.map((issue) => ({
+    path: issue.path.map(String).join("."),
+    code: issue.code,
+    message: issue.message,
+  }));
+
 /**
  * The body of every `/api/v1` error (SDD 8.1). Codes add their own fields (`current`,
  * `conflicts`, `latest`, `invitedEmail`, `emptyCount`, `workspaces`, `retryAfterSeconds`,

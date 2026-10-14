@@ -33,9 +33,15 @@ export type InputRule =
   | "nul_character"
   | "number_format"
   | "currency"
-  | "time_zone";
+  | "time_zone"
+  | "lone_surrogate"
+  | "unique";
 
-const ruleIssue = (rule: InputRule, extra: Record<string, number> = {}) => ({
+/** The `params` of a `custom` issue that breaks `rule`. */
+export const ruleIssue = (
+  rule: InputRule,
+  extra: Record<string, number> = {},
+) => ({
   params: { rule, ...extra },
 });
 
@@ -48,7 +54,9 @@ const hasAtMostDecimals = (value: number, digits: number) =>
   Number(value.toFixed(digits)) === value;
 
 /**
- * Length, and no U+0000: PostgreSQL `text` cannot hold it, so it would fail as a 500
+ * Length, no U+0000 and no lone surrogate. PostgreSQL `text` cannot hold U+0000, and a
+ * lone surrogate (a JSON `\ud800` escape) is no character: `text` stores it as U+FFFD
+ * and `jsonb` refuses it. Either would otherwise change the input or fail as a 500
  * instead of a 422.
  */
 const checkText = (
@@ -63,6 +71,13 @@ const checkText = (
       input: value,
       message: "Must not contain a NUL character",
       ...ruleIssue("nul_character"),
+    });
+  if (!value.isWellFormed())
+    ctx.addIssue({
+      code: "custom",
+      input: value,
+      message: "Must not contain a lone surrogate",
+      ...ruleIssue("lone_surrogate"),
     });
   const length = countChars(value);
   if (length < min) {
@@ -335,11 +350,22 @@ export const assigneeNameSchema = optionalText(60);
 /** 27 A check threshold. */
 export const checkThresholdSchema = z.number().min(1).max(99).int();
 
+/** The validation sections that hold questions (design-spec 6.6). */
+export const VALIDATION_QUESTION_SECTIONS = [
+  "01",
+  "02",
+  "04",
+  "08",
+  "10",
+] as const;
+
 // The sections of design-spec 6.6: the question sections of a validation and the 30 plan
 // items. Self-analysis section names are words, so only their form is checked.
 const questionKeyPatterns: Record<TemplateKind, RegExp> = {
   self_analysis: /^SA\.[A-Z0-9_]+\.[1-9][0-9]*$/,
-  validation: /^V\.(?:01|02|04|08|10)\.[A-Z0-9_]+$/,
+  validation: new RegExp(
+    `^V\\.(?:${VALIDATION_QUESTION_SECTIONS.join("|")})\\.[A-Z0-9_]+$`,
+  ),
   business_plan: /^P\.(?:0[1-9]|[12][0-9]|30)\.[1-9][0-9]*$/,
 };
 

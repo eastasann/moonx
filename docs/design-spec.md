@@ -2117,7 +2117,7 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
   - プランの表と実行管理の小項目: タイトルと問いは、6.12 が名前を決めた表（§11「Founders」・§13「Ownership and capital」）はその名前、ほかは項目の名前。EXAMPLE は、表が置き換えた原本の行のもの（§11 は3行に共通の1文、§13 は2行の文を改行でつなぐ）で、§21・§22 と実行管理の小項目には無い
   - 名前: プランの項目は 6.12 の表記（原本が大文字で書く見出しも、ほかの項目にそろえる）。検証のセクションは各シートの1行目、自己分析は見出しの「|」の前。テンプレートの名前は原本の文書の名前から先頭の「_TEMPLATE - 」「TEMPLATE - 」を除いたもの（Self Analysis・Business Idea & Validation・Business Plan）
   - ガイダンス: 自己分析は見出しの次の行、検証は各シートの2行目、プランは項目の見出しの次の行（無い項目は空）
-  - 入れる場所の無い原本の文は写さない: 文書の題と副題、記入欄の見出し（Name・Date、Business Name・Version・Prepared By・Date。アプリでは画面の項目）、自己分析の HOW TO USE THIS、プランの PURPOSE・Part A / B の説明・FINAL OUTPUT と PITCH-READY SUMMARY の見出しとその説明の1文、AI 用プロンプトの前の README の1文
+  - 入れる場所の無い原本の文は写さない: 文書の題と副題、記入欄の見出し（Name・Date、Business Name・Version・Prepared By・Date。アプリでは画面の項目）、自己分析の HOW TO USE THIS、プランの PURPOSE・Part A / B の説明・FINAL OUTPUT と PITCH-READY SUMMARY の見出しとその説明の1文、AI 用プロンプトの前の README の1文、検証の 00 Summary（13 が他のセクションから集める。6.1）、設問の無いシート（03・05〜07・09）の1行目と2行目（13 のセクションはアプリの固定の名前。6.1）、表の列の見出しと計算の行（10 の Linked Metric の5行を含む）、10 の判定の2行（Should we develop this into a full Business Plan? と Why?。19 が置き換える）
 - 日時の表示はユーザーのタイムゾーン（登録時に端末から取り、4 で変えられる）
 - 技術の希望（運用費、TypeScript）は Phase 3 で反映済み。スマホのネイティブアプリの希望は、Web のデザインが固まったあとの feature に回した（初期リリースのスマホは Web（PWA）で使う。2026-10-11 のユーザーの決定。PRD 6章）。時期とスコープの正は PRD 6章、技術の決定の正は `docs/02-01_system-design-doc.md`（1章 Goal の運用費、ADR-001・ADR-003・ADR-031）
 

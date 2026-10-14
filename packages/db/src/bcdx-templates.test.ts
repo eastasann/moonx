@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type TemplateFile, templateFileSchema } from "@moonx/schemas";
+import {
+  type CostCategory,
+  type TemplateFile,
+  templateFileSchema,
+} from "@moonx/schemas";
 
 // The BCDX template files are transcribed from the Drive originals in docs/drive-templates/
 // (design-spec 9.3). These tests read the originals and compare the text, ignoring only
@@ -142,6 +146,265 @@ describe("self-analysis.json", () => {
       "For EVERY question, follow this process:\n\n1. Ask me",
     );
     expect(file.aiPrompt).not.toContain("\f");
+  });
+});
+
+describe("validation.json", () => {
+  const file = bcdx("validation.json");
+  const spec = read("docs/design-spec.md");
+
+  /**
+   * The sheets of the original spreadsheet: each cell's value by address, and the
+   * choice lists of its data validation.
+   */
+  const sheets = (() => {
+    type Sheet = {
+      cells: Map<string, string>;
+      lists: { ranges: string[]; choices: string[] }[];
+    };
+    const found = new Map<string, Sheet>();
+    let current: Sheet | undefined;
+    for (const line of read(
+      "docs/drive-templates/business-idea-validation.txt",
+    ).split("\n")) {
+      const sheet = line.match(/^=== Sheet: (.+) \(range /);
+      if (sheet !== null) {
+        current = { cells: new Map(), lists: [] };
+        found.set(sheet[1] ?? "", current);
+        continue;
+      }
+      const cell = line.match(/^([A-Z]+[0-9]+): (.*)$/);
+      if (cell !== null) current?.cells.set(cell[1] ?? "", cell[2] ?? "");
+      const list = line.match(/^validation (.+): type=list formula1="(.*)"$/);
+      if (list !== null)
+        current?.lists.push({
+          ranges: (list[1] ?? "").split(" "),
+          choices: (list[2] ?? "").split(","),
+        });
+    }
+    return found;
+  })();
+
+  const sheetOf = (key: string) => {
+    const entry = [...sheets].find(([name]) => name.startsWith(`${key} `));
+    if (entry === undefined) throw new Error(`No sheet ${key} in the original`);
+    return entry[1];
+  };
+
+  /**
+   * The rows of column `column` below row `below`, in order. Rows 1 to 4 of every sheet
+   * hold its name, its guidance and its table's header.
+   */
+  const columnRows = (key: string, column: string, below = 4) =>
+    [...sheetOf(key).cells]
+      .map(([address, value]) => ({
+        column: address.replace(/[0-9]+$/, ""),
+        row: Number(address.replace(/^[A-Z]+/, "")),
+        value,
+      }))
+      .filter((cell) => cell.column === column && cell.row > below)
+      .toSorted((a, b) => a.row - b.row);
+
+  /**
+   * The questions of a sheet as design-spec 9.3 reads them. 01 and 02 have a Focus
+   * label beside each Question. The other sheets have one text per row: the column A
+   * rows with nothing to calculate in column B, above the Proceed / Hold / Drop row
+   * that 19 replaces.
+   */
+  const originalQuestions = (key: string) => {
+    const { cells, lists } = sheetOf(key);
+    if (cells.get("B4") === "Question")
+      return columnRows(key, "A").map(({ row, value }) => ({
+        title: value,
+        prompt: cells.get(`B${row}`) ?? "",
+      }));
+    const decisionRow = lists
+      .filter((list) => list.choices.join(",") === "Proceed,Hold,Drop")
+      .map((list) => Number((list.ranges[0] ?? "").replace(/^[A-Z]+/, "")))
+      .at(0);
+    return columnRows(key, "A")
+      .filter(
+        ({ row }) =>
+          !cells.has(`B${row}`) &&
+          (decisionRow === undefined || row < decisionRow),
+      )
+      .map(({ value }) => ({ title: value, prompt: value }));
+  };
+
+  const sectionKeys = ["01", "02", "04", "08", "10"];
+
+  test("has the questions of the original's sheets 01, 02, 04, 08 and 10, in their order", () => {
+    expect(file.sections.map((s) => s.key)).toEqual(sectionKeys);
+    expect(sectionKeys.map((key) => originalQuestions(key).length)).toEqual([
+      10, 15, 2, 1, 6,
+    ]);
+    expect(
+      file.sections.map((s) =>
+        s.questions.map((q) => ({ title: q.title, prompt: q.prompt })),
+      ),
+    ).toEqual(sectionKeys.map(originalQuestions));
+  });
+
+  test("names its sections by the sheets' first row and guides by their second", () => {
+    expect(
+      file.sections.map((s) => ({
+        part: s.part,
+        title: s.title,
+        subtitle: s.subtitle,
+        guidance: s.guidance,
+      })),
+    ).toEqual(
+      sectionKeys.map((key) => ({
+        part: null,
+        title: sheetOf(key).cells.get("A1") ?? "",
+        subtitle: null,
+        guidance: sheetOf(key).cells.get("A2") ?? "",
+      })),
+    );
+  });
+
+  test("keys its questions as design-spec 6.6 lists them", () => {
+    const expected = spec
+      .split("\n")
+      .filter((l) => /^\| 検証 [0-9]{2} \|/.test(l))
+      .flatMap((row) => {
+        const [, , format = "", keys = ""] = row.split("|");
+        const id = format.match(/`(V\.[0-9]{2})\.([A-Z_]+|\{キー\})`/);
+        if (id?.[2] !== "{キー}") return [`${id?.[1]}.${id?.[2]}`];
+        return [...keys.matchAll(/`([A-Z_]+?)(?:_1–(\d+))?`/g)].flatMap(
+          ([, key, last]) =>
+            last === undefined
+              ? [`${id[1]}.${key}`]
+              : Array.from(
+                  { length: Number(last) },
+                  (_, i) => `${id[1]}.${key}_${i + 1}`,
+                ),
+        );
+      });
+    expect(expected).toHaveLength(34);
+    expect(questionsOf(file).map((q) => q.key)).toEqual(expected);
+  });
+
+  test("answers and shows its questions as design-spec 6.2 asks, all with F/A/U", () => {
+    const oceanChoices = sheetOf("02").lists.find((list) =>
+      list.ranges.includes("C6"),
+    )?.choices;
+    expect(oceanChoices).toEqual(["Red", "Blue", "Mixed"]);
+    for (const q of questionsOf(file)) {
+      expect({
+        answerType: q.answerType,
+        options: q.options,
+        displayCondition: q.displayCondition,
+      }).toEqual(
+        q.key === "V.02.CATEGORY"
+          ? { answerType: "short_text", options: null, displayCondition: null }
+          : q.key === "V.02.OCEAN"
+            ? {
+                answerType: "choice",
+                options: { kind: "choice", choices: oceanChoices ?? [] },
+                displayCondition: null,
+              }
+            : {
+                answerType: "long_text",
+                options: null,
+                displayCondition: q.key.startsWith("V.02.RED_")
+                  ? { "V.02.OCEAN": ["Red", "Mixed"] }
+                  : q.key.startsWith("V.02.BLUE_")
+                    ? { "V.02.OCEAN": ["Blue", "Mixed"] }
+                    : null,
+              },
+      );
+      expect(q.hasFau).toBe(true);
+      // The original has no EXAMPLE (docs/drive-templates/README.md) and no hints.
+      expect(q.example).toBeNull();
+      expect(q.hint).toBeNull();
+    }
+    // 13 counts 8 questions of 02 before OCEAN is answered, 12 for Red, 11 for Blue
+    // and 15 for Mixed (design-spec 6.1).
+    const market = file.sections.find((s) => s.key === "02")?.questions ?? [];
+    const shown = (ocean: string | null) =>
+      market.filter((q) => {
+        const values = q.displayCondition?.["V.02.OCEAN"];
+        return (
+          values === undefined || (ocean !== null && values.includes(ocean))
+        );
+      }).length;
+    expect([null, "Red", "Blue", "Mixed"].map(shown)).toEqual([8, 12, 11, 15]);
+  });
+
+  test("has the initial cost rows of design-spec 6.3, named as in the original's 05 Costs", () => {
+    const keys = [
+      ...(spec
+        .split("\n")
+        .find((l) => l.startsWith("- テンプレートの初期行のキー:"))
+        ?.matchAll(/`((?:initial|monthly|variable)\.[a-z_]+)`/g) ?? []),
+    ].map((match) => match[1] ?? "");
+    const table = spec.slice(
+      spec.indexOf("### 6.3 "),
+      spec.indexOf("#### 合計の出し方"),
+    );
+    const specNames = (label: string) =>
+      (
+        table
+          .split("\n")
+          .find((l) => l.startsWith(`| ${label} |`))
+          ?.split("|")[2] ?? ""
+      )
+        .trim()
+        .split("・");
+
+    // The original lists each table's rows under its heading, down to its TOTAL row.
+    const headings: Record<string, CostCategory> = {
+      "STARTUP COSTS": "initial",
+      "MONTHLY FIXED COSTS": "monthly_fixed",
+      "VARIABLE COST PER SALE": "variable",
+    };
+    const originalRows: { category: CostCategory; name: string }[] = [];
+    let category: CostCategory | null = null;
+    for (const { value } of columnRows("05", "A", 2)) {
+      if (value in headings) category = headings[value] ?? null;
+      else if (value.startsWith("TOTAL ")) category = null;
+      else if (category !== null) originalRows.push({ category, name: value });
+    }
+
+    expect(keys).toHaveLength(24);
+    expect(originalRows).toHaveLength(24);
+    expect(file.costDefaults.map((row) => row.key)).toEqual(keys);
+    expect(
+      file.costDefaults.map(({ category, name }) => ({ category, name })),
+    ).toEqual(originalRows);
+    expect(
+      (["initial", "monthly_fixed", "variable"] as const).map((c) =>
+        file.costDefaults
+          .filter((row) => row.category === c)
+          .map((row) => row.name),
+      ),
+    ).toEqual(
+      ["初期費用", "月額固定費", "変動費（1販売あたり）"].map(specNames),
+    );
+  });
+
+  test("gives the default check thresholds of design-spec 6.1", () => {
+    expect(file.checkRules).toEqual([
+      { checkKey: "competitors", params: { min: 3 } },
+      {
+        checkKey: "local_price",
+        params: { pricedCompetitors: 2, researchLogs: 1 },
+      },
+      { checkKey: "permits", params: { researchLogs: 1 } },
+      { checkKey: "demand_signal", params: { researchLogs: 1 } },
+    ]);
+  });
+
+  test("is named after the original without its prefix, with no AI prompt", () => {
+    const readme = read("docs/drive-templates/README.md");
+    const original = readme.match(
+      /\| `business-idea-validation\.txt` \| `TEMPLATE - ([^`]+)`/,
+    );
+    expect(file.name).toBe(original?.[1] ?? "");
+    // Only self-analysis has an AI prompt (design-spec 9.3).
+    expect(file.aiPrompt).toBe("");
+    expect(file.executionPresets).toEqual([]);
   });
 });
 

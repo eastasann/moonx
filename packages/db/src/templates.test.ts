@@ -198,6 +198,16 @@ const versionRows = () =>
     .innerJoin(templates, eq(templates.id, templateVersions.templateId))
     .orderBy(asc(templates.kind), asc(templateVersions.versionNumber));
 
+// Check rules have no order of their own.
+const byCheckKey = (a: { checkKey: string }, b: { checkKey: string }) =>
+  a.checkKey.localeCompare(b.checkKey);
+
+/** A file as `storedFile` reads it back after the import. */
+const asStored = (file: unknown) => {
+  const parsed = templateFileSchema.parse(file);
+  return { ...parsed, checkRules: parsed.checkRules.toSorted(byCheckKey) };
+};
+
 /** A stored version written back in the template file's shape. */
 async function storedFile(versionId: string) {
   const [version] = await db
@@ -266,10 +276,9 @@ async function storedFile(versionId: string) {
       key: row.key,
       name: row.name,
     })),
-    // Check rules have no order of their own.
     checkRules: rules
       .map((rule) => ({ checkKey: rule.checkKey, params: rule.params }))
-      .toSorted((a, b) => a.checkKey.localeCompare(b.checkKey)),
+      .toSorted(byCheckKey),
     executionPresets: presets.map((preset) => ({
       type: preset.type,
       title: preset.title,
@@ -282,6 +291,7 @@ async function storedFile(versionId: string) {
 describe("the BCDX template files", () => {
   const files = [
     ["self_analysis", "self-analysis.json"],
+    ["validation", "validation.json"],
     ["business_plan", "plan.json"],
   ] as const;
 
@@ -315,9 +325,7 @@ describe("the BCDX template files", () => {
     test(`${name} is stored field for field, in its order`, async () => {
       const file = bcdxFile(name);
       const { versionId } = await importTemplateFile(db, kind, file);
-      expect(await storedFile(versionId)).toEqual(
-        templateFileSchema.parse(file),
-      );
+      expect(await storedFile(versionId)).toEqual(asStored(file));
     });
   }
 });
@@ -326,13 +334,7 @@ describe("importTemplateFile", () => {
   test("stores a validation file's cost rows and check rules", async () => {
     const file = sampleFile("validation");
     const { versionId } = await importTemplateFile(db, "validation", file);
-    const parsed = templateFileSchema.parse(file);
-    expect(await storedFile(versionId)).toEqual({
-      ...parsed,
-      checkRules: parsed.checkRules.toSorted((a, b) =>
-        a.checkKey.localeCompare(b.checkKey),
-      ),
-    });
+    expect(await storedFile(versionId)).toEqual(asStored(file));
   });
 
   test("stores a file larger than one insert statement can carry", async () => {

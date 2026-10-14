@@ -240,7 +240,7 @@ BCDX のテンプレートのファイルと、それを DB に取り込んで�
 
 ## Step 5b: 検証のテンプレートのファイル
 
-Status:
+Status: done 2026-10-14
 
 ```
 BCDX の検証のテンプレートのファイル data/templates/bcdx/validation.json を作り、Step 5 の取り込み・検査・公開の処理で

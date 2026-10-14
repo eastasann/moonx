@@ -1,0 +1,11 @@
+{
+  "name": "@moonx/api",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/app.ts"
+  },
+  "dependencies": {
+    "elysia": "^1.4.30"
+  }
+}

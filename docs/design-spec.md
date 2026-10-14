@@ -54,7 +54,8 @@ BCDX は「自己分析 → アイデア検証 → ビジネスプラン」の�
 - 今年の日付は年を省く（「Oct 1」）。去年以前の日付は年を付ける（「Sep 30, 2025」）。
 - 期限（Deadline・Target Date・ローンチの Date）は相対にせず日付で出す。期限を過ぎたものは日数を添える（「overdue 2d」）。
 - 負の金額は、符号を通貨記号の前に置く（「−₱5,586」）。
-- 待ち時間（回数の上限の案内など）は、60分未満は分に切り上げて「1 minute」「45 minutes」、60分以上は時間に切り上げて「1 hour」「2 hours」と出す。
+- 通貨記号は短い形で出す（「$1,234」「¥1,234」。「US$」のように国を書き分けない）。通貨はワークスペース（自己分析は自己分析）に1つなので、書き分けなくても区別できる。
+- 待ち時間（回数の上限の案内など）は、分に切り上げて「1 minute」「45 minutes」と出す。切り上げた分が60分以上なら、時間に切り上げて「1 hour」「2 hours」と出す（59分30秒は「1 hour」）。
 
 ### 1.3 UI設計原則
 
@@ -653,8 +654,11 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - 文字数は Unicode の文字で数える。文章の種類ごとの上限は、短文 200文字、理由とコメント 5,000文字、長文 20,000文字。
 - 金額は 0 以上 1兆（1,000,000,000,000）以下で、小数第2位まで。1兆は桁あふれを防ぐための値で、実際の事業の規模には影響しない。
 - % は 0〜100 で、小数第2位まで（例: 12.25%）。保存は 0〜1 の小数（System Design Doc 5.1）。
-- 日付は暦にある日付だけを受け付け、前後の範囲は決めない。
+- 日付は暦にある日付だけを受け付ける。年は4桁で、0年（`0000`）は暦に無いものとして扱う（PostgreSQL の date に0年が無いため）。この 0001-01-01〜9999-12-31 のほかに、前後の範囲は決めない。
 - URL は `http://` か `https://` で始まり、2,000文字まで。
+- 文字の入力（文章・名前・URL・メールなど）に NUL（U+0000）を含むものは受け付けない（PostgreSQL の text が持てないため）。対になっていないサロゲート（JSON の `\ud800` のように、Unicode の文字にならない値）を含むものも受け付けない（PostgreSQL の text は別の文字に置き換えて保存し、jsonb は受け付けないため）。
+- 金額と数の入力の桁区切りのカンマは、3桁ごとの位置にあるときだけ受け付ける（「1,500.50」は受け付け、「1,5」は受け付けない）。
+- 大きさの MB は 1,000,000 バイト（5MB は 5,000,000 バイト）。ファイルと、API が受け付ける本体の大きさ（System Design Doc ADR-029・7.2・8.1 の 413）で同じ。
 - メールはメールアドレスの形式で、254文字まで。大文字と小文字を区別しない。
 - 規則に合わない入力は保存せず、欄の下に理由を出す（6.0.6 の「入力値が範囲外」）。
 - プランの下書きの作成（M5）で検証の文章をプランの小項目に写すときは、文字数の上限を超えていても切らずに全文を写す。上限を超えた欄には「Too long. Shorten to {上限} characters.」を出し、その欄の変更は上限以内に短くしたときだけ保存する（同じ項目のほかの欄は保存できる。表の小項目では欄はセルで、上限を超えたセルを残したまま、ほかのセルの変更と行の追加を保存できる）。書いた内容が黙って消えないようにするため。
@@ -668,7 +672,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 4 | タイムゾーン | 必須 | IANA のタイムゾーン名（一覧から選ぶ） |
 | 4 | アカウントの削除の確認に入れるメール | 必須 | 自分のメールと一致すること |
 | M7・9 | ワークスペース名 | 必須 | 1〜60文字。個人用ワークスペースの既定の名前「{表示名}'s workspace」も60文字に収める（はみ出す分は表示名の末尾を切る） |
-| M7・9・10 | 通貨 | 必須 | ISO 4217 の通貨コード（一覧から選ぶ） |
+| M7・9・10 | 通貨 | 必須 | ISO 4217 の通貨コードのうち、流通している通貨のもの（一覧から選ぶ。置き換えられた通貨・計算単位・基金・貴金属・試験用のコードは含めない） |
 | M1・13 | アイデア名 | 必須 | 1〜100文字。複製の既定の名前「{元の名前} (copy)」も100文字に収める（はみ出す分は元の名前の末尾を切る） |
 | M1・13 | 一行コンセプト | 必須 | 1〜200文字 |
 | M1・13 | 提案する解決策 | 任意 | 長文 |
@@ -717,7 +721,8 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | PNL-1 | コメントの本文 | 必須 | 1〜5,000文字 |
 | 25 | 貼り付け | 必須 | 200,000文字まで。ファイルは 1MB まで（6.7） |
 | 26 | テンプレートのファイル | 必須 | JSON、1MB まで。書式は System Design Doc 5.13 の AD10 |
-| 27 | 設問 ID | 必須 | 6.6 の形式。公開した後は変えられない |
+| 27 | 設問 ID | 必須 | 6.6 の形式。版の中で重ならない。公開した後は変えられない |
+| 27 | セクションのキー・表の列のキー・費用行の初期値のキー | 必須 | 短文。版の中で重ならない（表の列のキーは設問の中で） |
 | 27 | セクションと設問のタイトル | 必須 | 短文 |
 | 27 | セクションの小見出し（自己分析） | 任意 | 短文 |
 | 27 | ガイダンス・ヒント | 任意 | 5,000文字まで |
@@ -725,10 +730,12 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 27 | テンプレートの名前 | 必須 | 短文 |
 | 27 | EXAMPLE | 任意 | 長文 |
 | 27 | AI 用プロンプト（自己分析のテンプレートだけ） | 任意 | 長文 |
-| 27 | 選択肢（選択の型）・表の列名（表の型） | 必須 | 短文 |
+| 27 | 選択肢（選択の型）・表の列名（表の型） | 必須 | 短文。選択肢は設問の中で重ならない |
+| 27 | 表示条件 | 任意 | 6.6 の形式の設問 ID と、出すときの答えの値の一覧（値は短文） |
 | 27 | 費用行の初期値の名前 | 任意 | 17 の費用行の名前と同じ |
-| 27 | 実行管理の初期行の1列目・Area | 1列目は必須、Area は任意 | 22 の同じ欄と同じ |
-| 27 | 確認項目の基準値 | 必須 | 整数 1〜99 |
+| 27 | 実行管理の初期行の1列目・Area | 1列目は必須、Area は任意（KPI の行だけ） | 22 の同じ欄と同じ |
+| 27 | 実行管理の初期行の時期の区分 | ローンチの行だけ、必須 | 6.13 の区分のどれか（22 は区分ごとにまとめて出す） |
+| 27 | 確認項目の基準値 | 必須 | 整数 1〜99。検証のテンプレートは、基準値を持つ4つ（競合・地元の価格帯・許認可・需要）をすべて持つ |
 
 ---
 
@@ -784,7 +791,7 @@ Web（パターン A ハブ: 上に主要指標、その下の左に状態、右
 | ブロック | 内容 | 出どころ |
 |---|---|---|
 | ヘッダー | アイデア名、最新の判定（未判定 / Proceed / Hold / Drop）、工程、一行コンセプト、提案者、複製元（複製したアイデアだけ「Duplicated from {元のアイデア名}」） | アイデア、決定ログ |
-| 主要指標（上の横一列） | 初期費用の合計、損益分岐（件/日）、Expected の月次営業利益、回収期間。計算できないときは「Empty」か理由（例: 「Needs price」）。初期費用に未入力・Unknown の行があれば「₱450,000+」のように下限として出す | 18 の計算（6.4） |
+| 主要指標（上の横一列） | 初期費用の合計、損益分岐（件/日）、Expected の月次営業利益、回収期間。計算できないときは「Empty」か理由（例: 「Needs price」。どちらを出すかは 6.4「主要指標」）。初期費用に未入力・Unknown の行があれば「₱450,000+」のように下限として出す | 18 の計算（6.4） |
 | Next steps（左） | 次に埋めると良いもの（最大3件）。1件目だけ枠で強調し、理由を1行添える | 下の優先順 |
 | 確認項目（左） | 6つの状態（未着手 / 途中 / 達成。MoonGlyph とラベル）、件数、不足の理由、埋める画面へのリンク。合計数や達成率は出さない | 下の判定ルール |
 | F/A/U（左） | Fact / Assumption（確信度の内訳）/ Unknown / 未分類 / 未入力 の件数。1本の帯（Meter）と凡例（帯と同じ見本・ラベル・件数）で示す | 6.0.3 の対象項目 |
@@ -804,15 +811,15 @@ Web（パターン A ハブ: 上に主要指標、その下の左に状態、右
 
 #### 確認項目の自動判定ルール
 
-基準値（3件・2件など）は運営者がテンプレートで変えられ、画面の文言に入る数（「Competitors (3–5)」「Find 3 competitors」など）も基準値に合わせて変わる。確認項目1の目安の上限「5」は固定で、判定には使わない（「これだけ調べれば足りる」の目安）。基準値を4にすると「Competitors (4–5)」、5以上にすると「Competitors ({基準値}+)」（例: 「Competitors (7+)」）と出す。調査ログの「裏付ける確認項目」タグ（地元の価格帯 / 許認可 / 需要・課題シグナル。複数可）を判定に使う。削除済みの行・調査ログは数えない。確認項目の名前の英語表記は下の表に固定する。
+基準値（3件・2件など）は運営者がテンプレートで変えられ、画面の文言に入る数（「Competitors (3–5)」「Find 3 competitors」など）も基準値に合わせて変わる。確認項目1の目安の上限「5」は固定で、判定には使わない（「これだけ調べれば足りる」の目安）。基準値を4にすると「Competitors (4–5)」、5以上にすると「Competitors ({基準値}+)」（例: 「Competitors (7+)」）と出す。調査ログの「裏付ける確認項目」タグ（地元の価格帯 / 許認可 / 需要・課題シグナル。複数可）を判定に使う。削除済みの行・調査ログは数えない。確認項目5・6 は途中を持たない（調査ログの基準値を2件以上にしても、基準値に届くまでは未着手）。確認項目の名前の英語表記は下の表に固定する。
 
 | # | 確認項目（UI ラベル） | 達成 | 途中 | 未着手 |
 |---|---|---|---|---|
 | 1 | 競合・代替が3〜5件（Competitors (3–5)） | 競合カードが基準値（既定3件）以上（5件を超えても達成。目安の幅を添える） | 1件以上、基準値未満 | 0件 |
-| 2 | 地元の価格帯（Local price range） | 価格の入った競合・代替が2件以上、または「地元の価格帯」タグの調査ログが1件以上 | 価格の入った競合・代替が1件だけ | どちらもない |
+| 2 | 地元の価格帯（Local price range） | 価格の入った競合・代替が2件以上、または「地元の価格帯」タグの調査ログが1件以上 | どちらかが1件以上あるが、達成していない（既定の基準値では、価格の入った競合・代替が1件だけのとき） | どちらもない |
 | 3 | 初期費用と月額費用（Startup & monthly costs） | 初期費用・月額固定費のそれぞれで、金額のある行が1行以上あり、**この2つの表に未入力の行が残っていない**（変動費の行は対象外）（分からない行は Unknown にするか削除すればよい。Unknown は F/A/U の内訳に出る） | 金額のある行が1行以上あるが、片方に金額の行がない、または未入力の行が残っている | どちらにも金額の行がない |
 | 4 | 損益分岐量（Break-even volume） | 損益分岐が計算できる（価格と月額固定費があり、粗利がプラス） | 価格か月額固定費のどちらかはあるが、計算できない（片方がない、または粗利が0以下） | どちらもない |
-| 5 | 許認可（Permits） | 初期費用の Permits 行（テンプレートの初期行 `initial.permits`）に、Fact か Assumption で金額が入っている（0 も可。「許認可は不要と確認した」も含む）、または「許認可」タグの調査ログが1件以上。Permits の初期行を消した場合や、自分で足した「Permits」という名前の行は数えず、調査ログのタグだけで判定する | — | どちらもない |
+| 5 | 許認可（Permits） | 初期費用の Permits / Registration 行（テンプレートの初期行 `initial.permits`）に、Fact か Assumption で金額が入っている（0 も可。「許認可は不要と確認した」も含む）、または「許認可」タグの調査ログが1件以上。この初期行を消した場合や、自分で足した行（名前が「Permits / Registration」や「Permits」でも）は数えず、調査ログのタグだけで判定する | — | どちらもない |
 | 6 | 需要・課題の外部シグナル（Demand or problem signal） | 「需要・課題シグナル」タグの調査ログが1件以上 | — | ない |
 
 #### Next steps の決め方（上から順に、最大3件）
@@ -822,14 +829,14 @@ Web（パターン A ハブ: 上に主要指標、その下の左に状態、右
 | 1 | Fact（根拠なし）がある | 「Add evidence (n)」 | 該当する最初の項目がある画面を開き、その項目にフォーカスする | 「A Fact in {セクション名} lost its research log.」（2件以上は「{n} Facts have no evidence.」） |
 | 2 | 未分類がある | 「Classify answers (n)」 | 同上（セクションの順: 01 → 02 → 04 → 05 → 06〜08 → 10） | 「{n} answers have content but no Fact, Assumption or Unknown.」 |
 | 3 | どのセクションにも入力がない | 「Start with {01 のセクション名}」（名前はセクションの一覧と同じ出どころ） | 11（01） | 「Nothing is filled in yet.」 |
-| 4 | 達成していない（未着手か途中の）確認項目 | 確認項目の番号順に「Find 3 competitors」「Add local prices」「Fill or mark 2 empty cost rows」（未入力の行がなく、金額の行がない表があるときは「Add startup and monthly costs」）、確認項目4は「Add price and monthly costs」（価格と月額固定費があり、粗利が0以下のときは「Review price or variable costs」）、「Check permits」「Find a demand or problem signal」 | 1 → 15、2 → 15、3 → 17、4 → 18（価格がない）か 17（月額がない）、粗利が0以下なら 18、5 → 17 の Permits 行（Permits の初期行が無いときは 14 の新しい調査ログの入力を「許認可」のタグを付けた状態で開く）、6 → 14（新しい調査ログの入力） | その確認項目の不足の理由（確認項目の一覧と同じ文。例: 「1 row is Empty」） |
+| 4 | 達成していない（未着手か途中の）確認項目 | 確認項目の番号順に「Find 3 competitors」「Add local prices」「Fill or mark 2 empty cost rows」（未入力の行がなく、金額の行がない表があるときは「Add startup and monthly costs」）、確認項目4は「Add price and monthly costs」（価格と月額固定費があり、粗利が0以下のときは「Review price or variable costs」）、「Check permits」「Find a demand or problem signal」 | 1 → 15、2 → 15、3 → 17、4 → 18（価格がない）か 17（価格があり、月額がない）、価格と月額固定費があり粗利が0以下なら 18、5 → 17 の Permits 行（Permits の初期行が無いときは 14 の新しい調査ログの入力を「許認可」のタグを付けた状態で開く）、6 → 14（新しい調査ログの入力） | その確認項目の不足の理由（確認項目の一覧と同じ文。例: 「1 row is Empty」） |
 | 5 | 未着手のセクション | 01 から順に「Start 02 Market」 | そのセクション | 「{セクション名} has no answers yet.」 |
 | 6 | Unknown がある | 「Check unknowns (n)」 | 優先1と同じ開き方 | 「{n} items are marked Unknown.」 |
 | 7 | 上のどれもない | 「Ready to record a decision」 | 19 | 「All checks are done and every item is classified.」 |
 
 アイデアの良し悪しは言わない。おすすめは「何が足りないか」だけを示す。
 
-Viewer にも同じ Next steps を出す。ただし Viewer が入れない行き先（19 判定、14 などの新しい入力）の項目はリンクにせず文として出す（1.3）。読み取り表示で開ける画面（15・17・18 など）への項目はリンクのまま。
+Viewer にも同じ Next steps を出す。ただし Viewer が入れない行き先（19 判定、14 などの新しい入力）の項目はリンクにせず文として出す（1.3）。読み取り表示で開ける画面（15・17・18 など）への項目はリンクのまま。アーカイブ済みのアイデアでは、Owner / Member も判定と新しい入力ができないので、確認項目と Next steps のこの2つの行き先は同じく文として出す。
 
 #### 操作
 
@@ -976,28 +983,28 @@ Web（パターン C 設問フォーム）
 
 ```
 Web（パターン F ワークシート）
-┌────────────────────────────────────────────────────────────────────────────────┐
-│ Ideas / Piaya Gift Box / 05 Costs                             ✓ Saved  💬 🕘 │
-├────────────────────────────────────────────────────────┬───────────────────────┤
-│ 05 Costs ▼  What it takes to open, to run each month   │ ┌ Totals ─────────┐   │
-│ Startup costs  one time                                │ │ Startup         │   │
-│   Item              Amount  F/A/U             Why ⋯    │ │ ₱450,000+       │   │
-│ ● Equipment        ₱60,000  Fact · 1 source      …     │ │ 3 Unknown,      │   │
-│ ◐ Renovation      [₱30,000] [Assumption · M ▾]   …     │ │ 1 Empty         │   │
-│ ◐ Lease Deposit    ₱30,000  Assumption · High    …     │ │ Monthly fixed   │   │
-│ ◌ Permits            Empty                             │ │ ₱49,000         │   │
-│ ○ Initial Inventory Unknown Unknown                    │ │ Variable        │   │
-│ …                                                      │ │ ₱94.50 / sale   │   │
-│ + Add row   Subtotal ₱450,000+ · 3 Unknown, 1 Empty    │ │ Break-even      │   │
-│ Monthly fixed costs  every month                       │ │ 13+ / day       │   │
-│ ◐ Rent             ₱15,000  Assumption · Medium        │ │ Unit Economics →│   │
-│ …                                                      │ └─────────────────┘   │
-│ Variable costs  per sale                               │                       │
-│ ◐ Materials   35% · ₱77.00  Assumption · Medium        │                       │
-│ ● Packaging         ₱12.00  Fact · 1 source            │                       │
-│ …                                                      │                       │
-└────────────────────────────────────────────────────────┴───────────────────────┘
-行は値だけを見せ、触った行（例の Renovation）だけ入力欄にする。F/A/U の欄を押すと
+┌───────────────────────────────────────────────────────────────────────────────────────┐
+│ Ideas / Piaya Gift Box / 05 Costs                                      ✓ Saved  💬 🕘 │
+├───────────────────────────────────────────────────────────────┬───────────────────────┤
+│ 05 Costs ▼  What it takes to open, to run each month          │ ┌ Totals ─────────┐   │
+│ Startup costs  one time                                       │ │ Startup         │   │
+│   Item                     Amount  F/A/U             Why ⋯    │ │ ₱450,000+       │   │
+│ ● Equipment               ₱60,000  Fact · 1 source      …     │ │ 3 Unknown,      │   │
+│ ◐ Renovation / Fit-out   [₱30,000] [Assumption · M ▾]   …     │ │ 1 Empty         │   │
+│ ◐ Lease Deposit / Advance ₱30,000  Assumption · High    …     │ │ Monthly fixed   │   │
+│ ◌ Permits / Registration    Empty                             │ │ ₱49,000         │   │
+│ ○ Initial Inventory       Unknown  Unknown                    │ │ Variable        │   │
+│ …                                                             │ │ ₱94.50 / sale   │   │
+│ + Add row   Subtotal ₱450,000+ · 3 Unknown, 1 Empty           │ │ Break-even      │   │
+│ Monthly fixed costs  every month                              │ │ 13+ / day       │   │
+│ ◐ Rent                    ₱15,000  Assumption · Medium        │ │ Unit Economics →│   │
+│ …                                                             │ └─────────────────┘   │
+│ Variable costs  per sale                                      │                       │
+│ ◐ Core Product / Materials  35% · ₱77.00  Assumption · Medium │                       │
+│ ● Packaging                       ₱12.00  Fact · 1 source     │                       │
+│ …                                                             │                       │
+└───────────────────────────────────────────────────────────────┴───────────────────────┘
+行は値だけを見せ、触った行（例の Renovation / Fit-out）だけ入力欄にする。F/A/U の欄を押すと
 Popover で F/A/U と確信度を選ぶ（6.0.3・4.5 の FauPicker）。金額は等幅で右にそろえる。
 
 スマホ: 3つの表をセクションの見出しで分け、各行をカード（項目名・金額・F/A/U）にする。
@@ -1008,14 +1015,14 @@ Popover で F/A/U と確信度を選ぶ（6.0.3・4.5 の FauPicker）。金額�
 
 | 表 | 初期行（テンプレートの初期値） | 列 |
 |---|---|---|
-| 初期費用 | Equipment / Renovation / Lease Deposit / Permits / Initial Inventory / Branding / Launch Marketing / Tech Setup / Working Capital Buffer / Other | 項目名・金額・F/A/U・Why Needed・Can Reduce?（Yes / Partly / No） |
-| 月額固定費 | Rent / Salaries / Utilities / Internet-Software / Accounting / Base Marketing / Insurance-Compliance / Other | 項目名・金額・F/A/U・Notes |
-| 変動費（1販売あたり） | Materials / Packaging / Payment Fee / Delivery / Variable Labor / Other | 項目名・金額 **または価格の%**・F/A/U |
+| 初期費用 | Equipment・Renovation / Fit-out・Lease Deposit / Advance・Permits / Registration・Initial Inventory・Branding / Signage・Launch Marketing・Technology / Systems Setup・Working Capital Buffer・Other Startup Cost | 項目名・金額・F/A/U・Why Needed・Can Reduce?（Yes / Partly / No） |
+| 月額固定費 | Rent・Salaries・Utilities - Base・Internet / Software・Accounting / Admin・Base Marketing・Insurance / Compliance・Other Fixed Cost | 項目名・金額・F/A/U・Notes |
+| 変動費（1販売あたり） | Core Product / Materials・Packaging・Payment / Platform Fee・Delivery / Fulfilment・Variable Labor / Commission・Other Variable Cost | 項目名・金額 **または価格の%**・F/A/U |
 
 - 原本の「Source」列は F/A/U の根拠（M2）に置き換える。
 - 行は追加・削除・名前の変更・並べ替えができる。行数の上限はない。テンプレートの初期行も削除できる（削除は履歴から戻せる）。
 - テンプレートの初期行のキー: 初期費用は `initial.equipment`・`initial.renovation`・`initial.lease_deposit`・`initial.permits`・`initial.inventory`・`initial.branding`・`initial.launch_marketing`・`initial.tech_setup`・`initial.working_capital`・`initial.other`、月額固定費は `monthly.rent`・`monthly.salaries`・`monthly.utilities`・`monthly.internet`・`monthly.accounting`・`monthly.marketing`・`monthly.insurance`・`monthly.other`、変動費は `variable.materials`・`variable.packaging`・`variable.payment_fee`・`variable.delivery`・`variable.labor`・`variable.other`。確認項目5・主要指標の `cost_row:*`・プランの参照がこのキーで行を指す。
-- 変動費の行は「金額」か「価格の%」を切り替えて入れる（例: Materials 35%）。% の行は 18 の価格から金額を計算して添える（「35% · ₱77.00」）。価格が未入力なら「Needs price」。
+- 変動費の行は「金額」か「価格の%」を切り替えて入れる（例: Core Product / Materials 35%）。% の行は 18 の価格から金額を計算して添える（「35% · ₱77.00」）。価格が未入力なら「Needs price」。
 - 「まとめ額」: 行のメニューから「Lump sum（内訳なし）」の印を付けられる。仮置きのまとめ額であることを示すラベルを出すだけで、計算は通常の行と同じ。
 
 #### 合計の出し方
@@ -1121,12 +1128,14 @@ Web（パターン F ワークシート）
 | 回収期間（月） | IC ÷ Expected の営業利益 | IC がない・0 → 「Needs startup costs」。Expected がない → 「Needs Expected sales」。Expected の営業利益 ≤ 0 → 「Not recovered: Expected profit is zero or negative」（原本の「空欄にする」に代えて理由を出す） |
 | 単純 ROI（年） | Expected の営業利益 × 12 ÷ IC | IC がない・0 → 「Needs startup costs」。Expected がない → 「Needs Expected sales」 |
 
-- 計算できない理由の優先順は、価格がない（Needs price）、粗利が 0 以下（警告）、月額固定費がない（Needs monthly costs）の順。回収期間と ROI は、その後に表の順（IC、Expected、Expected の営業利益）で判定する。「IC がない」は、初期費用の表に金額の入った行が1行も無いこと。粗利が 0 以下のあいだは、目標利益率の件数も同じ理由（警告）にし、「This margin is not reachable」は粗利がプラスのときだけ出す。
+- 計算できない理由の優先順は、価格がない（Needs price）、粗利が 0 以下（警告）、月額固定費がない（Needs monthly costs）の順。回収期間と ROI は、その後に表の順（IC、Expected、Expected の営業利益）で判定する。「IC がない」は、初期費用の表に金額の入った行が1行も無いこと。粗利が 0 以下のあいだは、目標利益率の件数も同じ理由（警告）にし、「This margin is not reachable」は粗利がプラスのときだけ出す。目標利益率の件数は、この3つの後に「This margin is not reachable」を見る（回収期間と ROI と同じく、その指標の行の理由は共通の理由の後）。目標に届かないことは月額固定費によらないので、計算結果の警告（System Design Doc 5.2 の `EconomicsResult.warnings` の `target_margin_unreachable`）は、粗利がプラスで CP − P × m ≤ 0 なら、月額固定費が無く件数の欄が「Needs monthly costs」のときも出す。
+- 変動費の表に金額（または価格の%）の入った行が1行も無いとき、変動費/件は 17 の合計と同じく「Empty」と出し、粗利/件から先は変動費を 0 として計算する。未入力か Unknown の行が残っていれば、その 0 は下限なので、粗利/件は「≤」になる（下の「下限の伝播」）。
 - 価格と費用は全シナリオ共通で、変わるのは販売数だけ。立ち上がり期間・税・割引は考えない（原本どおり）。
 - **Capacity 警告**: Conservative / Expected / Strong のいずれかが Capacity Limit を超えたら「{Scenario} exceeds capacity limit」（例: 「Strong exceeds capacity limit」）。損益分岐の件数/日が Capacity Limit を超えたら「Break-even is above capacity」。
 - **下限の伝播**: 費用の表に未入力・Unknown の行があると、その合計は下限（実際はもっと大きいかもしれない）になる。そのとき結果を次のように示し、結果の上に「Some cost rows are Empty or Unknown, so results may look better than reality.」と添える。
   - IC が下限: 回収期間は「9.2+ months」、ROI は「≤ 130.9%」
   - FC か VC が下限: 損益分岐と目標利益率の件数・売上は「6.9+」、各シナリオの営業利益と営業利益率は「≤ ₱18,490」、回収期間は「+」、ROI は「≤」
+  - Expected の営業利益が負のときの ROI: 初期費用が大きいほど 0 に近づくので、IC だけが下限なら「+」（例: 「−24.0%+」）。FC か VC だけが下限なら「≤」。IC と、FC か VC の両方が下限なら、実際の値がどちらにずれるか決まらないので「≈」を付ける（例: 「≈ −24.0%」。結果の上の注意書きを出さない画面とスナップショットでも、正確な値に見せない）
 - **端数（原本どおり小数第1位）**: 計算の途中では丸めない。表示のときだけ四捨五入する。
   - 件数（損益分岐・目標利益率・シナリオの件数/月・件数/日）: 小数第1位（例: 6.9件/日）。末尾の .0 は省く（13.0 → 13、156.0 → 156）。入力した販売数（Capacity Limit を含む）は丸めず、入力どおりに出す（6.25 → 6.25）
   - 金額: 整数。ただし変動費/件と粗利/件は小数2桁
@@ -1154,6 +1163,13 @@ Web（パターン F ワークシート）
 | `operating_days` | Operating days | D | 18 |
 | `cost_row:{テンプレートのキー}` | 各費用行 | 金額。例: `cost_row:monthly.rent`。価格の%の行は、価格 × 率の1件あたりの金額（価格がなければ「Needs price」） | 17 |
 
+- 計算できない主要指標の表示（13・19・20・21・23 と、決定ログ・版のスナップショットで同じ）:
+  - 入力をそのまま出す指標（`selling_price`・`capacity_units_day`・`cost_row:*`）: 値が無ければ「Empty」、Unknown なら「Unknown」。`cost_row:*` は、テンプレートの初期行を削除したときも「Empty」
+  - 費用の合計と変動費/件（`initial_cost_total`・`monthly_fixed_total`・`variable_cost_per_unit`）: 17 の合計と同じ。金額の入った行が無ければ「Empty」（価格の%の行があって価格が無いときの変動費/件は「Needs price」）
+  - Expected の売上・営業利益: 上のシナリオの Expected の列と同じ（Expected の販売数に値が無ければ「Empty」）
+  - `operating_days`: D。値が空（未入力・Unknown）なら既定の 30 で、計算できないことは無い
+  - それ以外: その指標の計算に使う入力（価格・費用の行・Expected の販売数。Unknown も入力として数える）がどれも入っていなければ「Empty」、どれかが入っていれば上の計算仕様の理由（例: 「Needs price」）
+  - 作ったばかりのアイデアでは、`operating_days` を除く主要指標がすべて「Empty」になる（13 の4つも。6.1）
 - 「直す画面」は、20・21 の「Edit in validation」が移る先。1つの小項目やブロックが複数の指標を出すとき（20 の Key numbers、21 の §1 Key numbers・§20 など）は 18 へ移る（18 から 17 へ移れる）。23 の各スライドの移動先は 6.14。
 
 #### 状態
@@ -1748,19 +1764,19 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 4 | Problem | Primary problem / Frequency / Severity / Current alternatives / Why are alternatives insufficient? | コピー: 01 PROBLEM・FREQUENCY・SEVERITY → 同名の小項目、01 SWITCHING → Current alternatives | 01 の回答 |
 | 5 | Product / Service | Initial offer at launch / What will NOT be included at launch? / Core customer experience / Quality standard / Future products / services | コピー: 提案する解決策 → Initial offer | — |
 | 6 | Market & Competition | Market type / Why? / Reachable market / Required market share / Key competitors / substitutes / Why do successful competitors survive? / What must we do differently or better? / If Blue/Mixed, why has nobody captured it? | コピー: 02 OCEAN → Market type、02 WHY → Why?、02 REACHABLE → Reachable market、02 SHARE → Required market share、04 SURVIVOR_PATTERNS → Why do successful competitors survive? | 検証の競合（最大5件）、02 の回答 |
-| 7 | Positioning & Value Proposition | Positioning statement（「For ___, who ___, our business is ___ that ___. Unlike ___, we ___.」）/ Why should customers believe us? / What are we willing to compete on? / What are we NOT willing to compete on? | — | 競合の強み・弱み |
+| 7 | Positioning & Value Proposition | Positioning statement（「For ___, who ___, our business is ___ that ___. Unlike ___, we ___.」）/ Why should customers believe us? / What are we willing to compete on? / What are we NOT willing to compete on? | — | 競合の強み・弱み（最大5件） |
 | 8 | Business Model | Primary revenue stream / Secondary revenue streams / Average selling price / Variable cost per sale / Contribution profit per sale / Contribution margin / Monthly fixed cost / Break-even volume / Expected scenario / Capacity-limit scenario / Why is the startup cost justified? | 数字: Average selling price〜Capacity-limit scenario の8つ（価格・変動費/件・粗利/件・粗利率・月額固定費・損益分岐（/月・/日）・Expected・Capacity Limit のシナリオ） | — |
 | 9 | Sales & Marketing | How will the first 100 customers discover us? / Launch channels / Why should each channel work? / Retention strategy / Referral strategy / Marketing budget / Key acquisition metric | — | 費用行 Launch Marketing・Base Marketing |
 | 10 | Why Us | Founder advantages / Missing capabilities / How will we fill the gaps? | — | [S] 共有された自己分析の NOW・DO（Viewer には出さない） |
 | 11 | Founder Roles | **表（自由入力・人数自由）**: Name / Role / Responsibilities / Authority / Time。加えて文章: Shared responsibilities | — | — |
 | 12 | Decision Making & Governance | What can one founder decide alone? / What requires majority agreement? / What requires unanimous agreement? / What happens when we disagree? / How are important decisions recorded? | — | このアイデアの決定ログ |
 | 13 | Ownership & Money Between Founders | **表（自由入力・人数自由）**: Name / Initial ownership (%) / Initial capital contribution（ワークスペースの通貨）。加えて文章: Founder compensation at launch / When can founder salaries increase? / What if more capital is required? / What if one founder cannot contribute? / What if a founder wants to leave? | — | 表の下に持分の合計と出資の合計を表示（警告はしない） |
-| 14 | Legal & Company Setup | Company structure / Registrations / Permits / licenses / Tax / accounting setup / Employment requirements / Industry-specific compliance / Professional advice required | — | 費用行 Permits、「許認可」タグの調査ログ |
-| 15 | Location / Facilities / Equipment | Location requirements / Maximum acceptable rent / Required equipment / Capacity of initial setup / Primary capacity constraint / Before signing a lease / contract | — | 費用行 Rent・Lease Deposit・Renovation・Equipment、Capacity Limit |
-| 16 | Suppliers & Inventory | Critical suppliers / Alternative suppliers / Supplier selection criteria / Inventory policy / Single points of failure | — | 費用行 Initial Inventory・Materials |
+| 14 | Legal & Company Setup | Company structure / Registrations / Permits / licenses / Tax / accounting setup / Employment requirements / Industry-specific compliance / Professional advice required | — | 費用行 Permits / Registration、「許認可」タグの調査ログ |
+| 15 | Location / Facilities / Equipment | Location requirements / Maximum acceptable rent / Required equipment / Capacity of initial setup / Primary capacity constraint / Before signing a lease / contract | — | 費用行 Rent・Lease Deposit / Advance・Renovation / Fit-out・Equipment、Capacity Limit |
+| 16 | Suppliers & Inventory | Critical suppliers / Alternative suppliers / Supplier selection criteria / Inventory policy / Single points of failure | — | 費用行 Initial Inventory・Core Product / Materials |
 | 17 | Operations | Opening / operating hours / Daily operating flow / Weekly operating flow / Quality controls / Cash controls / Customer complaint process / What must be documented before launch? | — | 営業日数、Capacity Limit |
-| 18 | People & Hiring | Roles required at launch / Number of people required / Expected monthly payroll / Hiring criteria / Training required / Day-to-day manager / Trigger for the next hire | 数字: Expected monthly payroll（費用行 Salaries） | 費用行 Variable Labor |
-| 19 | Technology & Systems | Systems required at launch / What can remain manual initially? / What should be automated early? / Who owns setup and maintenance? | — | 費用行 Tech Setup・Internet-Software |
+| 18 | People & Hiring | Roles required at launch / Number of people required / Expected monthly payroll / Hiring criteria / Training required / Day-to-day manager / Trigger for the next hire | 数字: Expected monthly payroll（費用行 Salaries） | 費用行 Variable Labor / Commission |
+| 19 | Technology & Systems | Systems required at launch / What can remain manual initially? / What should be automated early? / Who owns setup and maintenance? | — | 費用行 Technology / Systems Setup・Internet / Software |
 | 20 | Financial Plan | Startup cost / Opening cash reserve / Monthly fixed cost / Unit economics / Break-even / Conservative scenario / Expected scenario / Strong scenario / Capacity-limit scenario / Runway if sales are below plan / Trigger for additional funding | 数字: Startup cost・Monthly fixed cost・Unit economics・Break-even・4つのシナリオ。文章: Opening cash reserve・Runway・Trigger for additional funding | 費用行 Working Capital Buffer、回収期間・ROI |
 | 21 | Key Assumptions | **表**: Assumption / Why We Believe It / Evidence / What Would Disprove It | コピー: `LIST.ASSUMPTIONS`（16 の前提。Evidence は根拠の一覧と自由記述を文章にする） | 16 の前提 |
 | 22 | Key Risks | **表**: Risk / Probability / Impact / Mitigation / Trigger / Indicator（原本の列名は「Trigger / Indicator」の1列） | コピー: `LIST.RISKS`（16 のリスク。Trigger / Indicator は空） | 16 のリスク |
@@ -1997,7 +2013,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 |---|---|---|---|---|
 | Piaya Gift Box Delivery | Ana | Proceed | プラン | 確認項目6つすべて達成。Plan A（版「v1 For advisors」を保存済み + 変更あり、Go / No-Go は Delay）と Plan B（下書き、版なし）。実行管理の各種類の項目（期限切れ1件・2日後1件を含む）。Pitch Deck の1分版・5分版が全スライド埋まる |
 | Piaya Gift Box (Corporate) | Kenji | 未判定 | 検証 | Piaya Gift Box Delivery の複製。価格だけ違う（₱650） |
-| Bacolod Health Bowl | Kenji | Hold | 検証 | 原本の実例に近い状態。初期費用に Unknown 3行・未入力1行（「₱…+」の下限表示、確認項目3が途中）。変動費の Materials が価格の 35%。価格 ₱220・月額固定費あり（確認項目4は達成）。許認可が未着手。AI 取り込み直後で未分類が3件。根拠の調査ログを削除した「Fact（根拠なし）」が1件 |
+| Bacolod Health Bowl | Kenji | Hold | 検証 | 原本の実例に近い状態。初期費用に Unknown 3行・未入力1行（「₱…+」の下限表示、確認項目3が途中）。変動費の Core Product / Materials が価格の 35%。価格 ₱220・月額固定費あり（確認項目4は達成）。許認可が未着手。AI 取り込み直後で未分類が3件。根拠の調査ログを削除した「Fact（根拠なし）」が1件 |
 | Student Study Café | Paolo | Proceed | 立ち上げ準備 | Plan A の版「v1 Launch review」を保存し、Launch を記録済み。KPI の実績値あり。Plan B はアーカイブ済み（13 の「1 archived plan · Show」） |
 | Bacolod Night Market Stall | Ana | Hold | プラン | Proceed で Plan A を作った後に Hold を記録した（20 に「Latest decision is Hold」）。Strong の販売数が Capacity Limit を超える（「Strong exceeds capacity limit」） |
 | Laundry Pickup | Paolo | Drop | 検証 | 一覧では既定で隠れる。粗利が0以下（価格 ₱60/kg、変動費 ₱75/kg）の警告。Drop の理由「Contribution margin is negative」 |
@@ -2013,9 +2029,9 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 価格 | ₱450 |
 | 営業日数 | 26 |
 | 目標利益率 | 空（既定値 15% で計算。「using default」と表示） |
-| 変動費 | Materials ₱120、Packaging ₱45、Payment Fee 3%（価格の%）、Delivery ₱40、Variable Labor ₱0、Other ₱0 |
-| 月額固定費 | Rent ₱12,000、Salaries ₱18,000、Utilities ₱3,500、Internet-Software ₱1,200、Accounting ₱2,000、Base Marketing ₱5,000、Insurance-Compliance ₱0、Other ₱0 |
-| 初期費用 | Equipment ₱35,000、Renovation ₱20,000、Lease Deposit ₱24,000、Permits ₱8,500、Initial Inventory ₱15,000、Branding ₱12,000、Launch Marketing ₱10,000、Tech Setup ₱5,000、Working Capital Buffer ₱40,000、Other ₱0 |
+| 変動費 | Core Product / Materials ₱120、Packaging ₱45、Payment / Platform Fee 3%（価格の%）、Delivery / Fulfilment ₱40、Variable Labor / Commission ₱0、Other Variable Cost ₱0 |
+| 月額固定費 | Rent ₱12,000、Salaries ₱18,000、Utilities - Base ₱3,500、Internet / Software ₱1,200、Accounting / Admin ₱2,000、Base Marketing ₱5,000、Insurance / Compliance ₱0、Other Fixed Cost ₱0 |
+| 初期費用 | Equipment ₱35,000、Renovation / Fit-out ₱20,000、Lease Deposit / Advance ₱24,000、Permits / Registration ₱8,500、Initial Inventory ₱15,000、Branding / Signage ₱12,000、Launch Marketing ₱10,000、Technology / Systems Setup ₱5,000、Working Capital Buffer ₱40,000、Other Startup Cost ₱0 |
 | 1日の販売数 | Conservative 6、Expected 10、Strong 15、Capacity Limit 25 |
 
 | 期待値 | 値 |
@@ -2064,7 +2080,7 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 | 調査ログの使い方 | 「裏付ける確認項目」タグ（地元の価格帯 / 許認可 / 需要・課題シグナル）で数える | 2回目は出典の種類 Price Check でも数える案だった |
 | 確認項目2 地元の価格帯 | 価格の入った競合2件、または価格帯タグの調査ログ1件 | 同じ趣旨 |
 | 確認項目3 初期費用と月額費用 | 金額のある行が1行以上、かつ未入力の行が0 | 2回目は「金額のある行が1行以上」だけの案だった |
-| 確認項目5 許認可 | Permits 行に Fact か Assumption で金額（0 も可）、または許認可タグの調査ログ | 2回目は F/A/U を見ない案だった |
+| 確認項目5 許認可 | Permits / Registration 行に Fact か Assumption で金額（0 も可）、または許認可タグの調査ログ | 2回目は F/A/U を見ない案だった |
 | 工程 | 自動の3段階（検証 / プラン / 立ち上げ準備）。判定は別の属性 | 2回目は3段階目を「実行」と呼んでいた |
 | Drop の扱い | 一覧とダッシュボードで既定で隠す。編集と再判定はいつでもできる | — |
 | 損益分岐の端数 | 原本どおり小数第1位 | 2回目は「切り上げて整数」 |
@@ -2095,6 +2111,13 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 - 技術スタック、認証方式、PDF の生成方式、保存できなかった入力の扱い（2026-10-11 に、端末に残さない形に見直した。SDD ADR-021） → Phase 3 で決定済み（`docs/02-01_system-design-doc.md` の ADR。認証はメールとパスワード＋Google ログイン）
 - デザイントークン（色・書体・余白の具体値、ライト / ダーク両方の値、Pitch Deck のスライドの型ごとの最小の文字の大きさ）→ Phase 3 の `docs/06_design-tokens.json`。2026-10-12 に月相（4.4）の値に作り直した
 - テンプレート v1 の中身（自己分析36問・検証の設問・プランの小項目の問いと Example・セクションの小見出しとガイダンス・AI 用プロンプト）は、Drive の原本の写し（`docs/drive-templates/`。2026-10-02 に書き出した）から、BCDX のテンプレートのファイル（`data/templates/bcdx/`。書式は System Design Doc 5.13 の AD10）に転記する。中身は BCDX のもので、アプリの共通の処理（マイグレーションなど）には入れない（2026-10-11 のユーザーの決定）。staging と production には、リリースの手順で運営者が 26 から取り込んで公開する（04）。local のシードも同じファイルを同じ取り込みの処理で入れる。プランの小項目の名前と表の列・初期行は 6.12 / 6.13 に記録済み。問いの本文と Example はこの写しから転記する。AI 用プロンプトは自己分析だけが持ち、検証とプランは用意しない（2026-10-02 のユーザーの決定。8.4）。自己分析のセクション見出しの横にある短い言い換え（「WHY | Why do I want this?」の後半）は、セクションの小見出しとして持つ（27 で直せ、11 で見出しの下に出す）
+- 原本からファイルへの転記の決まり（原本に無いものの埋め方）:
+  - 文面: 原本の文字のまま写す。PDF の書き出しが入れた行の折り返し・改ページ・ゼロ幅の空白は除き、段落と箇条書きの改行は残す
+  - 設問のタイトルと問い: 原本がラベルと問いを分けて持つ設問（検証 01・02 の Focus の列と Question の列）はそのまま。自己分析は原本の番号を「Q1」〜「Q36」としてタイトルにする。ラベルか問いの一方しか持たない設問（検証 04 はラベル、検証 08・10 とプランの小項目は問い）は、その文をタイトルと問いの両方に使う
+  - プランの表と実行管理の小項目: タイトルと問いは、6.12 が名前を決めた表（§11「Founders」・§13「Ownership and capital」）はその名前、ほかは項目の名前。EXAMPLE は、表が置き換えた原本の行のもの（§11 は3行に共通の1文、§13 は2行の文を改行でつなぐ）で、§21・§22 と実行管理の小項目には無い
+  - 名前: プランの項目は 6.12 の表記（原本が大文字で書く見出しも、ほかの項目にそろえる）。検証のセクションは各シートの1行目、自己分析は見出しの「|」の前。テンプレートの名前は原本の文書の名前から先頭の「_TEMPLATE - 」「TEMPLATE - 」を除いたもの（Self Analysis・Business Idea & Validation・Business Plan）
+  - ガイダンス: 自己分析は見出しの次の行、検証は各シートの2行目、プランは項目の見出しの次の行（無い項目は空）
+  - 入れる場所の無い原本の文は写さない: 文書の題と副題、記入欄の見出し（Name・Date、Business Name・Version・Prepared By・Date。アプリでは画面の項目）、自己分析の HOW TO USE THIS、プランの PURPOSE・Part A / B の説明・FINAL OUTPUT と PITCH-READY SUMMARY の見出しとその説明の1文、AI 用プロンプトの前の README の1文、検証の 00 Summary（13 が他のセクションから集める。6.1）、設問の無いシート（03・05〜07・09）の1行目と2行目（13 のセクションはアプリの固定の名前。6.1）、表の列の見出しと計算の行（10 の Linked Metric の5行を含む）、10 の判定の2行（Should we develop this into a full Business Plan? と Why?。19 が置き換える）
 - 日時の表示はユーザーのタイムゾーン（登録時に端末から取り、4 で変えられる）
 - 技術の希望（運用費、TypeScript）は Phase 3 で反映済み。スマホのネイティブアプリの希望は、Web のデザインが固まったあとの feature に回した（初期リリースのスマホは Web（PWA）で使う。2026-10-11 のユーザーの決定。PRD 6章）。時期とスコープの正は PRD 6章、技術の決定の正は `docs/02-01_system-design-doc.md`（1章 Goal の運用費、ADR-001・ADR-003・ADR-031）
 

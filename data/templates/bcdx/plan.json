@@ -1,0 +1,2458 @@
+{
+  "format": "moonx-template",
+  "formatVersion": 1,
+  "kind": "business_plan",
+  "name": "Business Plan",
+  "aiPrompt": "",
+  "sections": [
+    {
+      "key": "01",
+      "part": "a",
+      "title": "Executive Summary",
+      "subtitle": null,
+      "guidance": "A reader should understand the business in under two minutes.",
+      "questions": [
+        {
+          "key": "P.01.1",
+          "title": "What is the business?",
+          "prompt": "What is the business?",
+          "example": "A healthy fast-casual food business in Bacolod that provides convenient meals with standardized calories and macronutrients.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["IDEA.ONE_LINE_CONCEPT"],
+          "reference": null
+        },
+        {
+          "key": "P.01.2",
+          "title": "Who is the primary customer?",
+          "prompt": "Who is the primary customer?",
+          "example": "Working professionals aged 25–40 in Bacolod with enough disposable income to pay above mass-market meal prices for convenience, taste, and nutrition transparency.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.01.WHO"],
+          "reference": null
+        },
+        {
+          "key": "P.01.3",
+          "title": "What problem are we solving?",
+          "prompt": "What problem are we solving?",
+          "example": "Healthy eating is difficult to sustain because planning, cooking, portion control, and repeated decisions consume time and effort.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.01.PROBLEM"],
+          "reference": null
+        },
+        {
+          "key": "P.01.4",
+          "title": "What is our solution?",
+          "prompt": "What is our solution?",
+          "example": "A focused menu with consistent portions and clearly communicated nutrition, available via dine-in, takeaway, and delivery.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["IDEA.PROPOSED_SOLUTION"],
+          "reference": null
+        },
+        {
+          "key": "P.01.5",
+          "title": "How does the business make money?",
+          "prompt": "How does the business make money?",
+          "example": "Primarily individual meal sales, with secondary revenue such as beverages, add-ons, or corporate orders only if they prove profitable.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.01.6",
+          "title": "Why can this work?",
+          "prompt": "Why can this work?",
+          "example": "Existing alternatives prove demand for convenient food, while the proposed differentiation may support repeat behavior and acceptable margins.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.01.7",
+          "title": "Key numbers",
+          "prompt": "Key numbers",
+          "example": "Startup Cost: PHP ___ | Break-even: ___ orders/month | Expected Revenue: PHP ___/month | Expected Operating Profit: PHP ___/month | Payback: ___ months",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": [
+              "initial_cost_total",
+              "break_even_units_month",
+              "expected_revenue",
+              "expected_operating_profit",
+              "payback_months"
+            ]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "02",
+      "part": "a",
+      "title": "Vision & Purpose",
+      "subtitle": null,
+      "guidance": "Define what the business is trying to become—and what it is not trying to become.",
+      "questions": [
+        {
+          "key": "P.02.1",
+          "title": "Why should this business exist?",
+          "prompt": "Why should this business exist?",
+          "example": "Make the healthier everyday choice easier without asking customers to become nutrition experts.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "self_analysis",
+              "sections": ["WHY", "BE", "NOT", "ONE"]
+            }
+          ]
+        },
+        {
+          "key": "P.02.2",
+          "title": "3-year state",
+          "prompt": "3-year state",
+          "example": "A consistently profitable Bacolod business with reliable operations, repeat customers, and a management structure that does not require all founders in daily operations.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.02.3",
+          "title": "5-year state",
+          "prompt": "5-year state",
+          "example": "A proven model that can either expand or remain a strong cash-generating local business depending on which path creates the best outcome.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.02.4",
+          "title": "What are we explicitly NOT trying to become?",
+          "prompt": "What are we explicitly NOT trying to become?",
+          "example": "We are not trying to maximize store count at any cost, compete as the cheapest provider, or create a business that permanently depends on founder labor.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "03",
+      "part": "a",
+      "title": "Customer",
+      "subtitle": null,
+      "guidance": "Describe the actual buyer and the behavior that produces revenue.",
+      "questions": [
+        {
+          "key": "P.03.1",
+          "title": "Primary customer",
+          "prompt": "Primary customer",
+          "example": "Define age, income, location, occupation, lifestyle, purchase frequency, and decision criteria.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.01.WHO", "V.01.WHY_THEM"],
+          "reference": [
+            {
+              "kind": "validation_answers",
+              "section": "01"
+            }
+          ]
+        },
+        {
+          "key": "P.03.2",
+          "title": "Secondary customer",
+          "prompt": "Secondary customer",
+          "example": "Only include if the economics and acquisition path are meaningfully different.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.03.3",
+          "title": "Customer behavior",
+          "prompt": "Customer behavior",
+          "example": "Where do they buy today? How often? What alternatives do they use?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.01.BEHAVIOR"],
+          "reference": null
+        },
+        {
+          "key": "P.03.4",
+          "title": "Buying trigger",
+          "prompt": "Buying trigger",
+          "example": "They need the solution now, discover us through a relevant channel, trust the offer, and accept the price.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.03.5",
+          "title": "Reasons not to buy",
+          "prompt": "Reasons not to buy",
+          "example": "Price, habit, distance, trust, timing, preference, or another substitute.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.01.NON_CUSTOMER"],
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "04",
+      "part": "a",
+      "title": "Problem",
+      "subtitle": null,
+      "guidance": "Explain the problem in observable terms, not only as an opinion.",
+      "questions": [
+        {
+          "key": "P.04.1",
+          "title": "Primary problem",
+          "prompt": "Primary problem",
+          "example": "What repeated job, pain, cost, inconvenience, or unmet need are we solving?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.01.PROBLEM"],
+          "reference": [
+            {
+              "kind": "validation_answers",
+              "section": "01"
+            }
+          ]
+        },
+        {
+          "key": "P.04.2",
+          "title": "Frequency",
+          "prompt": "Frequency",
+          "example": "How often does the problem occur?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.01.FREQUENCY"],
+          "reference": null
+        },
+        {
+          "key": "P.04.3",
+          "title": "Severity",
+          "prompt": "Severity",
+          "example": "How painful or costly is it?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.01.SEVERITY"],
+          "reference": null
+        },
+        {
+          "key": "P.04.4",
+          "title": "Current alternatives",
+          "prompt": "Current alternatives",
+          "example": "How is the customer solving this today?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.01.SWITCHING"],
+          "reference": null
+        },
+        {
+          "key": "P.04.5",
+          "title": "Why are alternatives insufficient?",
+          "prompt": "Why are alternatives insufficient?",
+          "example": "Explain the gap without assuming customers are unhappy just because you would build something different.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "05",
+      "part": "a",
+      "title": "Product / Service",
+      "subtitle": null,
+      "guidance": "Define exactly what is sold at launch and deliberately limit the initial scope.",
+      "questions": [
+        {
+          "key": "P.05.1",
+          "title": "Initial offer at launch",
+          "prompt": "Initial offer at launch",
+          "example": "What can customers actually buy on Day 1?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["IDEA.PROPOSED_SOLUTION"],
+          "reference": null
+        },
+        {
+          "key": "P.05.2",
+          "title": "What will NOT be included at launch?",
+          "prompt": "What will NOT be included at launch?",
+          "example": "Reduce complexity and avoid treating future ideas as launch requirements.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.05.3",
+          "title": "Core customer experience",
+          "prompt": "Core customer experience",
+          "example": "Describe discovery → purchase → delivery/use → repeat purchase.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.05.4",
+          "title": "Quality standard",
+          "prompt": "Quality standard",
+          "example": "Define what must always remain consistent: quality, timing, safety, service, accuracy, etc.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.05.5",
+          "title": "Future products / services",
+          "prompt": "Future products / services",
+          "example": "Only list credible extensions after the initial model works.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "06",
+      "part": "a",
+      "title": "Market & Competition",
+      "subtitle": null,
+      "guidance": "Summarize the evidence from Business Idea & Validation rather than repeating all research.",
+      "questions": [
+        {
+          "key": "P.06.1",
+          "title": "Market type",
+          "prompt": "Market type",
+          "example": "Red / Blue / Mixed",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.02.OCEAN"],
+          "reference": [
+            {
+              "kind": "validation_answers",
+              "section": "02"
+            }
+          ]
+        },
+        {
+          "key": "P.06.2",
+          "title": "Why?",
+          "prompt": "Why?",
+          "example": "Explain the sources of competition and the specific underserved angle, if any.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.02.WHY"],
+          "reference": null
+        },
+        {
+          "key": "P.06.3",
+          "title": "Reachable market",
+          "prompt": "Reachable market",
+          "example": "Use a practical launch market, not an inflated total population.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.02.REACHABLE"],
+          "reference": null
+        },
+        {
+          "key": "P.06.4",
+          "title": "Required market share",
+          "prompt": "Required market share",
+          "example": "Translate break-even into active customers, purchase frequency, or contracts.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.02.SHARE"],
+          "reference": null
+        },
+        {
+          "key": "P.06.5",
+          "title": "Key competitors / substitutes",
+          "prompt": "Key competitors / substitutes",
+          "example": "Summarize 3–5 businesses or behaviors customers already use.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "competitors",
+              "limit": 5
+            }
+          ]
+        },
+        {
+          "key": "P.06.6",
+          "title": "Why do successful competitors survive?",
+          "prompt": "Why do successful competitors survive?",
+          "example": "Strong location, repeat demand, cost control, brand, distribution, or another economic engine.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["V.04.SURVIVOR_PATTERNS"],
+          "reference": null
+        },
+        {
+          "key": "P.06.7",
+          "title": "What must we do differently or better?",
+          "prompt": "What must we do differently or better?",
+          "example": "Choose the dimensions where we intend to win.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.06.8",
+          "title": "If Blue/Mixed, why has nobody captured it?",
+          "prompt": "If Blue/Mixed, why has nobody captured it?",
+          "example": "Distinguish opportunity from lack of demand.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "07",
+      "part": "a",
+      "title": "Positioning & Value Proposition",
+      "subtitle": null,
+      "guidance": "Make the reason to choose you specific and believable.",
+      "questions": [
+        {
+          "key": "P.07.1",
+          "title": "Positioning statement",
+          "prompt": "Positioning statement",
+          "example": "For ___, who ___, our business is ___ that ___. Unlike ___, we ___.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "competitors",
+              "limit": 5
+            }
+          ]
+        },
+        {
+          "key": "P.07.2",
+          "title": "Why should customers believe us?",
+          "prompt": "Why should customers believe us?",
+          "example": "Proof, process, expertise, transparency, consistency, or another reason for trust.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.07.3",
+          "title": "What are we willing to compete on?",
+          "prompt": "What are we willing to compete on?",
+          "example": "Examples: reliability, quality, convenience, transparency, service.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.07.4",
+          "title": "What are we NOT willing to compete on?",
+          "prompt": "What are we NOT willing to compete on?",
+          "example": "Example: being the absolute cheapest option.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "08",
+      "part": "a",
+      "title": "Business Model",
+      "subtitle": null,
+      "guidance": "Explain how activity becomes revenue and profit.",
+      "questions": [
+        {
+          "key": "P.08.1",
+          "title": "Primary revenue stream",
+          "prompt": "Primary revenue stream",
+          "example": "What creates most of the revenue?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.08.2",
+          "title": "Secondary revenue streams",
+          "prompt": "Secondary revenue streams",
+          "example": "Only include realistic, operationally compatible streams.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.08.3",
+          "title": "Average selling price",
+          "prompt": "Average selling price",
+          "example": "PHP ___",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["selling_price"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.08.4",
+          "title": "Variable cost per sale",
+          "prompt": "Variable cost per sale",
+          "example": "PHP ___",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["variable_cost_per_unit"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.08.5",
+          "title": "Contribution profit per sale",
+          "prompt": "Contribution profit per sale",
+          "example": "PHP ___",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["contribution_margin"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.08.6",
+          "title": "Contribution margin",
+          "prompt": "Contribution margin",
+          "example": "___ %",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["contribution_margin_rate"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.08.7",
+          "title": "Monthly fixed cost",
+          "prompt": "Monthly fixed cost",
+          "example": "PHP ___",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["monthly_fixed_total"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.08.8",
+          "title": "Break-even volume",
+          "prompt": "Break-even volume",
+          "example": "___ / month and ___ / day",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["break_even_units_month", "break_even_units_day"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.08.9",
+          "title": "Expected scenario",
+          "prompt": "Expected scenario",
+          "example": "Revenue / operating profit / margin",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["scenario:expected"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.08.10",
+          "title": "Capacity-limit scenario",
+          "prompt": "Capacity-limit scenario",
+          "example": "Maximum realistic revenue / profit with the initial setup",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["scenario:capacity"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.08.11",
+          "title": "Why is the startup cost justified?",
+          "prompt": "Why is the startup cost justified?",
+          "example": "The investment is acceptable only if expected returns remain attractive after replacing assumptions with real quotes.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "09",
+      "part": "a",
+      "title": "Sales & Marketing",
+      "subtitle": null,
+      "guidance": "Explain how customers are acquired and why the selected channels fit their behavior.",
+      "questions": [
+        {
+          "key": "P.09.1",
+          "title": "How will the first 100 customers discover us?",
+          "prompt": "How will the first 100 customers discover us?",
+          "example": "Describe specific launch paths.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.09.2",
+          "title": "Launch channels",
+          "prompt": "Launch channels",
+          "example": "Facebook, TikTok, Google Maps, delivery platforms, partnerships, direct outreach, events—only where relevant.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.09.3",
+          "title": "Why should each channel work?",
+          "prompt": "Why should each channel work?",
+          "example": "Connect the channel to observed customer behavior.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.09.4",
+          "title": "Retention strategy",
+          "prompt": "Retention strategy",
+          "example": "What creates repeat behavior?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.09.5",
+          "title": "Referral strategy",
+          "prompt": "Referral strategy",
+          "example": "If relevant, explain why customers would recommend the business.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.09.6",
+          "title": "Marketing budget",
+          "prompt": "Marketing budget",
+          "example": "PHP ___ / month",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "cost_rows",
+              "keys": ["initial.launch_marketing", "monthly.marketing"]
+            }
+          ]
+        },
+        {
+          "key": "P.09.7",
+          "title": "Key acquisition metric",
+          "prompt": "Key acquisition metric",
+          "example": "Cost per first purchase, repeat rate, orders per active customer, etc.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "10",
+      "part": "a",
+      "title": "Why Us",
+      "subtitle": null,
+      "guidance": "Be explicit about founder advantages and gaps.",
+      "questions": [
+        {
+          "key": "P.10.1",
+          "title": "Founder advantages",
+          "prompt": "Founder advantages",
+          "example": "Skills, local knowledge, relationships, technology, operations, capital, trust, industry expertise.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "self_analysis",
+              "sections": ["NOW", "DO"]
+            }
+          ]
+        },
+        {
+          "key": "P.10.2",
+          "title": "Missing capabilities",
+          "prompt": "Missing capabilities",
+          "example": "What critical knowledge or operating ability is absent?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.10.3",
+          "title": "How will we fill the gaps?",
+          "prompt": "How will we fill the gaps?",
+          "example": "Hire, partner, outsource, learn, or use advisors.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "11",
+      "part": "b",
+      "title": "Founder Roles",
+      "subtitle": null,
+      "guidance": "Make ownership of work and authority explicit.",
+      "questions": [
+        {
+          "key": "P.11.1",
+          "title": "Founders",
+          "prompt": "Founders",
+          "example": "Define what this person owns and what they can decide independently.",
+          "hint": null,
+          "answerType": "table",
+          "options": {
+            "kind": "table",
+            "columns": [
+              {
+                "key": "name",
+                "label": "Name",
+                "type": "text"
+              },
+              {
+                "key": "role",
+                "label": "Role",
+                "type": "text"
+              },
+              {
+                "key": "responsibilities",
+                "label": "Responsibilities",
+                "type": "text"
+              },
+              {
+                "key": "authority",
+                "label": "Authority",
+                "type": "text"
+              },
+              {
+                "key": "time",
+                "label": "Time",
+                "type": "text"
+              }
+            ]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.11.2",
+          "title": "Shared responsibilities",
+          "prompt": "Shared responsibilities",
+          "example": "Keep this list small; shared ownership often means unclear ownership.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "12",
+      "part": "b",
+      "title": "Decision Making & Governance",
+      "subtitle": null,
+      "guidance": "Decide how the three founders make decisions before pressure creates conflict.",
+      "questions": [
+        {
+          "key": "P.12.1",
+          "title": "What can one founder decide alone?",
+          "prompt": "What can one founder decide alone?",
+          "example": "Decisions inside their defined area and budget.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.12.2",
+          "title": "What requires majority agreement?",
+          "prompt": "What requires majority agreement?",
+          "example": "Material but reversible decisions.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.12.3",
+          "title": "What requires unanimous agreement?",
+          "prompt": "What requires unanimous agreement?",
+          "example": "Debt, major capital expenditure, ownership changes, founder compensation, sale, shutdown, or adding a co-founder.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.12.4",
+          "title": "What happens when we disagree?",
+          "prompt": "What happens when we disagree?",
+          "example": "Define discussion, evidence, escalation, and tie-breaking rules.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.12.5",
+          "title": "How are important decisions recorded?",
+          "prompt": "How are important decisions recorded?",
+          "example": "Use a shared decision log with date, owner, decision, reasoning, and follow-up.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "decision_log"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "13",
+      "part": "b",
+      "title": "Ownership & Money Between Founders",
+      "subtitle": null,
+      "guidance": "Agree on ownership, capital, compensation, and what happens when contributions differ.",
+      "questions": [
+        {
+          "key": "P.13.1",
+          "title": "Ownership and capital",
+          "prompt": "Ownership and capital",
+          "example": "Founder 1 ___% | Founder 2 ___% | Founder 3 ___%\nFounder 1 PHP ___ | Founder 2 PHP ___ | Founder 3 PHP ___",
+          "hint": null,
+          "answerType": "table",
+          "options": {
+            "kind": "table",
+            "columns": [
+              {
+                "key": "name",
+                "label": "Name",
+                "type": "text"
+              },
+              {
+                "key": "initial_ownership",
+                "label": "Initial ownership (%)",
+                "type": "percent"
+              },
+              {
+                "key": "initial_capital",
+                "label": "Initial capital contribution",
+                "type": "money"
+              }
+            ]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "totals"
+            }
+          ]
+        },
+        {
+          "key": "P.13.2",
+          "title": "Founder compensation at launch",
+          "prompt": "Founder compensation at launch",
+          "example": "Salary / no salary / reimbursement rules.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.13.3",
+          "title": "When can founder salaries increase?",
+          "prompt": "When can founder salaries increase?",
+          "example": "Tie changes to business conditions, not arbitrary dates.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.13.4",
+          "title": "What if more capital is required?",
+          "prompt": "What if more capital is required?",
+          "example": "Define whether it is debt, additional equity, or optional contribution.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.13.5",
+          "title": "What if one founder cannot contribute?",
+          "prompt": "What if one founder cannot contribute?",
+          "example": "Define dilution, loan treatment, or other agreed handling.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.13.6",
+          "title": "What if a founder wants to leave?",
+          "prompt": "What if a founder wants to leave?",
+          "example": "Define with legal advice: notice, vesting, buyback, valuation, and transfer restrictions.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "14",
+      "part": "b",
+      "title": "Legal & Company Setup",
+      "subtitle": null,
+      "guidance": "Translate legal and regulatory requirements into a launch checklist.",
+      "questions": [
+        {
+          "key": "P.14.1",
+          "title": "Company structure",
+          "prompt": "Company structure",
+          "example": "Selected structure or TBD.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.14.2",
+          "title": "Registrations",
+          "prompt": "Registrations",
+          "example": "List required registrations.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.14.3",
+          "title": "Permits / licenses",
+          "prompt": "Permits / licenses",
+          "example": "List business- and industry-specific permits.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "cost_rows",
+              "keys": ["initial.permits"]
+            },
+            {
+              "kind": "research_log",
+              "tag": "permits"
+            }
+          ]
+        },
+        {
+          "key": "P.14.4",
+          "title": "Tax / accounting setup",
+          "prompt": "Tax / accounting setup",
+          "example": "Who handles books, filings, payroll, and controls?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.14.5",
+          "title": "Employment requirements",
+          "prompt": "Employment requirements",
+          "example": "Contracts, statutory benefits, payroll obligations, workplace rules.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.14.6",
+          "title": "Industry-specific compliance",
+          "prompt": "Industry-specific compliance",
+          "example": "Food safety, professional licenses, data rules, product standards, etc.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.14.7",
+          "title": "Professional advice required",
+          "prompt": "Professional advice required",
+          "example": "Lawyer / accountant / permits specialist / industry expert.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "15",
+      "part": "b",
+      "title": "Location / Facilities / Equipment",
+      "subtitle": null,
+      "guidance": "Define what the initial physical setup must accomplish and what it must cost.",
+      "questions": [
+        {
+          "key": "P.15.1",
+          "title": "Location requirements",
+          "prompt": "Location requirements",
+          "example": "Customer access, delivery radius, size, utilities, parking, visibility, etc.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.15.2",
+          "title": "Maximum acceptable rent",
+          "prompt": "Maximum acceptable rent",
+          "example": "PHP ___ / month, with a reason linked to unit economics.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "cost_rows",
+              "keys": ["monthly.rent", "initial.lease_deposit"]
+            }
+          ]
+        },
+        {
+          "key": "P.15.3",
+          "title": "Required equipment",
+          "prompt": "Required equipment",
+          "example": "List only items needed for launch.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "cost_rows",
+              "keys": ["initial.renovation", "initial.equipment"]
+            }
+          ]
+        },
+        {
+          "key": "P.15.4",
+          "title": "Capacity of initial setup",
+          "prompt": "Capacity of initial setup",
+          "example": "___ sales / orders / customers per day.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "metrics",
+              "keys": ["capacity_units_day"]
+            }
+          ]
+        },
+        {
+          "key": "P.15.5",
+          "title": "Primary capacity constraint",
+          "prompt": "Primary capacity constraint",
+          "example": "Kitchen, staff, seating, machine throughput, delivery, or another bottleneck.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.15.6",
+          "title": "Before signing a lease / contract",
+          "prompt": "Before signing a lease / contract",
+          "example": "Define non-negotiable go/no-go conditions.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "16",
+      "part": "b",
+      "title": "Suppliers & Inventory",
+      "subtitle": null,
+      "guidance": "Reduce the chance that one supplier, material, or inventory decision can stop the business.",
+      "questions": [
+        {
+          "key": "P.16.1",
+          "title": "Critical suppliers",
+          "prompt": "Critical suppliers",
+          "example": "List the suppliers or inputs the business cannot operate without.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.16.2",
+          "title": "Alternative suppliers",
+          "prompt": "Alternative suppliers",
+          "example": "Identify backup options.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.16.3",
+          "title": "Supplier selection criteria",
+          "prompt": "Supplier selection criteria",
+          "example": "Price, quality, reliability, terms, distance, consistency.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.16.4",
+          "title": "Inventory policy",
+          "prompt": "Inventory policy",
+          "example": "Stock level, reorder point, shelf life, wastage target.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "cost_rows",
+              "keys": ["initial.inventory", "variable.materials"]
+            }
+          ]
+        },
+        {
+          "key": "P.16.5",
+          "title": "Single points of failure",
+          "prompt": "Single points of failure",
+          "example": "Inputs, people, equipment, or contracts that could stop operations.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "17",
+      "part": "b",
+      "title": "Operations",
+      "subtitle": null,
+      "guidance": "Design the repeated operating system, not just the opening day.",
+      "questions": [
+        {
+          "key": "P.17.1",
+          "title": "Opening / operating hours",
+          "prompt": "Opening / operating hours",
+          "example": "Define schedule and why it matches demand.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "metrics",
+              "keys": ["operating_days", "capacity_units_day"]
+            }
+          ]
+        },
+        {
+          "key": "P.17.2",
+          "title": "Daily operating flow",
+          "prompt": "Daily operating flow",
+          "example": "Opening, preparation, service, quality control, closing.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.17.3",
+          "title": "Weekly operating flow",
+          "prompt": "Weekly operating flow",
+          "example": "Purchasing, scheduling, inventory review, maintenance, marketing, finance.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.17.4",
+          "title": "Quality controls",
+          "prompt": "Quality controls",
+          "example": "How is consistency checked and recorded?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.17.5",
+          "title": "Cash controls",
+          "prompt": "Cash controls",
+          "example": "Who receives money, reconciles sales, approves expenses, and reviews discrepancies?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.17.6",
+          "title": "Customer complaint process",
+          "prompt": "Customer complaint process",
+          "example": "How are issues received, resolved, recorded, and learned from?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.17.7",
+          "title": "What must be documented before launch?",
+          "prompt": "What must be documented before launch?",
+          "example": "SOPs, checklists, vendor list, recipes/specs, pricing rules, safety procedures.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "18",
+      "part": "b",
+      "title": "People & Hiring",
+      "subtitle": null,
+      "guidance": "Connect staffing to actual operating capacity and service quality.",
+      "questions": [
+        {
+          "key": "P.18.1",
+          "title": "Roles required at launch",
+          "prompt": "Roles required at launch",
+          "example": "List positions, not names.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.18.2",
+          "title": "Number of people required",
+          "prompt": "Number of people required",
+          "example": "Headcount and shift assumptions.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.18.3",
+          "title": "Expected monthly payroll",
+          "prompt": "Expected monthly payroll",
+          "example": "PHP ___",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["cost_row:monthly.salaries"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "cost_rows",
+              "keys": ["variable.labor"]
+            }
+          ]
+        },
+        {
+          "key": "P.18.4",
+          "title": "Hiring criteria",
+          "prompt": "Hiring criteria",
+          "example": "Skills, reliability, attitude, licenses, experience.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.18.5",
+          "title": "Training required",
+          "prompt": "Training required",
+          "example": "What must be taught before independent work?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.18.6",
+          "title": "Day-to-day manager",
+          "prompt": "Day-to-day manager",
+          "example": "Who runs the operation each day?",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.18.7",
+          "title": "Trigger for the next hire",
+          "prompt": "Trigger for the next hire",
+          "example": "Define an operational trigger such as sustained capacity utilization or service delay.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "19",
+      "part": "b",
+      "title": "Technology & Systems",
+      "subtitle": null,
+      "guidance": "Use technology where it improves control, visibility, or customer experience—not because it is interesting.",
+      "questions": [
+        {
+          "key": "P.19.1",
+          "title": "Systems required at launch",
+          "prompt": "Systems required at launch",
+          "example": "POS, accounting, inventory, scheduling, website, CRM, analytics, etc.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "cost_rows",
+              "keys": ["initial.tech_setup", "monthly.internet"]
+            }
+          ]
+        },
+        {
+          "key": "P.19.2",
+          "title": "What can remain manual initially?",
+          "prompt": "What can remain manual initially?",
+          "example": "Avoid premature automation.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.19.3",
+          "title": "What should be automated early?",
+          "prompt": "What should be automated early?",
+          "example": "High-risk repetitive processes, financial controls, or customer-critical workflows.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.19.4",
+          "title": "Who owns setup and maintenance?",
+          "prompt": "Who owns setup and maintenance?",
+          "example": "Assign one accountable owner.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "20",
+      "part": "b",
+      "title": "Financial Plan",
+      "subtitle": null,
+      "guidance": "Turn the validation model into operating financial guardrails.",
+      "questions": [
+        {
+          "key": "P.20.1",
+          "title": "Startup cost",
+          "prompt": "Startup cost",
+          "example": "PHP ___",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["initial_cost_total"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "metrics",
+              "keys": ["payback_months", "simple_roi"]
+            }
+          ]
+        },
+        {
+          "key": "P.20.2",
+          "title": "Opening cash reserve",
+          "prompt": "Opening cash reserve",
+          "example": "PHP ___",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "cost_rows",
+              "keys": ["initial.working_capital"]
+            }
+          ]
+        },
+        {
+          "key": "P.20.3",
+          "title": "Monthly fixed cost",
+          "prompt": "Monthly fixed cost",
+          "example": "PHP ___",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["monthly_fixed_total"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.20.4",
+          "title": "Unit economics",
+          "prompt": "Unit economics",
+          "example": "Price / variable cost / contribution profit / contribution margin",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": [
+              "selling_price",
+              "variable_cost_per_unit",
+              "contribution_margin",
+              "contribution_margin_rate"
+            ]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.20.5",
+          "title": "Break-even",
+          "prompt": "Break-even",
+          "example": "Monthly and daily volume",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["break_even_units_month", "break_even_units_day"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.20.6",
+          "title": "Conservative scenario",
+          "prompt": "Conservative scenario",
+          "example": "Revenue / loss or profit / cash impact",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["scenario:conservative"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.20.7",
+          "title": "Expected scenario",
+          "prompt": "Expected scenario",
+          "example": "Revenue / operating profit / margin",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["scenario:expected"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.20.8",
+          "title": "Strong scenario",
+          "prompt": "Strong scenario",
+          "example": "Revenue / operating profit / margin",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["scenario:strong"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.20.9",
+          "title": "Capacity-limit scenario",
+          "prompt": "Capacity-limit scenario",
+          "example": "Revenue / operating profit / margin",
+          "hint": null,
+          "answerType": "linked_metric",
+          "options": {
+            "kind": "linked_metric",
+            "metricKeys": ["scenario:capacity"]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.20.10",
+          "title": "Runway if sales are below plan",
+          "prompt": "Runway if sales are below plan",
+          "example": "___ months",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.20.11",
+          "title": "Trigger for additional funding",
+          "prompt": "Trigger for additional funding",
+          "example": "Define the condition and maximum acceptable amount.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "21",
+      "part": "b",
+      "title": "Key Assumptions",
+      "subtitle": null,
+      "guidance": "List the assumptions that must be true for the plan to work.",
+      "questions": [
+        {
+          "key": "P.21.1",
+          "title": "Key Assumptions",
+          "prompt": "Key Assumptions",
+          "example": null,
+          "hint": null,
+          "answerType": "table",
+          "options": {
+            "kind": "table",
+            "columns": [
+              {
+                "key": "assumption",
+                "label": "Assumption",
+                "type": "text"
+              },
+              {
+                "key": "why_we_believe_it",
+                "label": "Why We Believe It",
+                "type": "text"
+              },
+              {
+                "key": "evidence",
+                "label": "Evidence",
+                "type": "text"
+              },
+              {
+                "key": "what_would_disprove_it",
+                "label": "What Would Disprove It",
+                "type": "text"
+              }
+            ]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["LIST.ASSUMPTIONS"],
+          "reference": [
+            {
+              "kind": "assumptions"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "22",
+      "part": "b",
+      "title": "Key Risks",
+      "subtitle": null,
+      "guidance": "Focus on risks that can materially damage economics, launch, trust, or continuity.",
+      "questions": [
+        {
+          "key": "P.22.1",
+          "title": "Key Risks",
+          "prompt": "Key Risks",
+          "example": null,
+          "hint": null,
+          "answerType": "table",
+          "options": {
+            "kind": "table",
+            "columns": [
+              {
+                "key": "risk",
+                "label": "Risk",
+                "type": "text"
+              },
+              {
+                "key": "probability",
+                "label": "Probability",
+                "type": "text"
+              },
+              {
+                "key": "impact",
+                "label": "Impact",
+                "type": "text"
+              },
+              {
+                "key": "mitigation",
+                "label": "Mitigation",
+                "type": "text"
+              },
+              {
+                "key": "trigger_indicator",
+                "label": "Trigger / Indicator",
+                "type": "text"
+              }
+            ]
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": ["LIST.RISKS"],
+          "reference": [
+            {
+              "kind": "risks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "23",
+      "part": "b",
+      "title": "Pre-launch Milestones",
+      "subtitle": null,
+      "guidance": null,
+      "questions": [
+        {
+          "key": "P.23.1",
+          "title": "Pre-launch Milestones",
+          "prompt": "Pre-launch Milestones",
+          "example": null,
+          "hint": null,
+          "answerType": "execution_view",
+          "options": {
+            "kind": "execution_view",
+            "executionType": "milestone"
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "24",
+      "part": "b",
+      "title": "Go / No-Go Conditions",
+      "subtitle": null,
+      "guidance": "Define decision thresholds before sunk cost and emotion make the decision harder.",
+      "questions": [
+        {
+          "key": "P.24.1",
+          "title": "We proceed to launch if",
+          "prompt": "We proceed to launch if",
+          "example": "Expected economics remain attractive after real supplier/rent/payroll quotes; required permits are feasible; founders can fund initial capital plus buffer.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": [
+            {
+              "kind": "go_no_go_history"
+            }
+          ]
+        },
+        {
+          "key": "P.24.2",
+          "title": "We delay if",
+          "prompt": "We delay if",
+          "example": "Critical information is still missing but can realistically be resolved without irreversible spending.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.24.3",
+          "title": "We stop / abandon if",
+          "prompt": "We stop / abandon if",
+          "example": "Realistic pricing produces structurally negative unit economics, startup capital rises far beyond expected return, or a critical legal/operational constraint cannot be solved.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "25",
+      "part": "b",
+      "title": "Launch Plan",
+      "subtitle": null,
+      "guidance": null,
+      "questions": [
+        {
+          "key": "P.25.1",
+          "title": "Launch Plan",
+          "prompt": "Launch Plan",
+          "example": null,
+          "hint": null,
+          "answerType": "execution_view",
+          "options": {
+            "kind": "execution_view",
+            "executionType": "launch"
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "26",
+      "part": "b",
+      "title": "KPI Scorecard",
+      "subtitle": null,
+      "guidance": null,
+      "questions": [
+        {
+          "key": "P.26.1",
+          "title": "KPI Scorecard",
+          "prompt": "KPI Scorecard",
+          "example": null,
+          "hint": null,
+          "answerType": "execution_view",
+          "options": {
+            "kind": "execution_view",
+            "executionType": "kpi"
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "27",
+      "part": "b",
+      "title": "Review Cadence",
+      "subtitle": null,
+      "guidance": "Define what the founders inspect regularly so problems become visible early.",
+      "questions": [
+        {
+          "key": "P.27.1",
+          "title": "Daily",
+          "prompt": "Daily",
+          "example": "Cash/sales exceptions, customer complaints, safety/quality exceptions, critical operating issues.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.27.2",
+          "title": "Weekly",
+          "prompt": "Weekly",
+          "example": "Sales, margin, volume, inventory, staffing, marketing results, major actions.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.27.3",
+          "title": "Monthly",
+          "prompt": "Monthly",
+          "example": "P&L, cash position, assumptions, pricing, hiring, capital decisions, strategy changes.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "28",
+      "part": "b",
+      "title": "Open Questions",
+      "subtitle": null,
+      "guidance": null,
+      "questions": [
+        {
+          "key": "P.28.1",
+          "title": "Open Questions",
+          "prompt": "Open Questions",
+          "example": null,
+          "hint": null,
+          "answerType": "execution_view",
+          "options": {
+            "kind": "execution_view",
+            "executionType": "open_question"
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "29",
+      "part": "b",
+      "title": "Next Actions",
+      "subtitle": null,
+      "guidance": null,
+      "questions": [
+        {
+          "key": "P.29.1",
+          "title": "Next Actions",
+          "prompt": "Next Actions",
+          "example": null,
+          "hint": null,
+          "answerType": "execution_view",
+          "options": {
+            "kind": "execution_view",
+            "executionType": "next_action"
+          },
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "30",
+      "part": "b",
+      "title": "Pitch-ready Summary",
+      "subtitle": null,
+      "guidance": "Use the completed plan to create a concise narrative.",
+      "questions": [
+        {
+          "key": "P.30.1",
+          "title": "One-minute explanation",
+          "prompt": "One-minute explanation",
+          "example": "Problem → Customer → Solution → Why now → Business model → Why us → Next step.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "P.30.2",
+          "title": "Five-minute explanation",
+          "prompt": "Five-minute explanation",
+          "example": "Problem → Customer → Solution → Market → Competition → Business model → Economics → Why us → Execution plan → Risks → Ask / next step.",
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": false,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    }
+  ],
+  "costDefaults": [],
+  "checkRules": [],
+  "executionPresets": [
+    {
+      "type": "milestone",
+      "title": "Business decision",
+      "area": null,
+      "launchTiming": null
+    },
+    {
+      "type": "milestone",
+      "title": "Legal / company setup",
+      "area": null,
+      "launchTiming": null
+    },
+    {
+      "type": "milestone",
+      "title": "Location / supplier readiness",
+      "area": null,
+      "launchTiming": null
+    },
+    {
+      "type": "milestone",
+      "title": "Product / service readiness",
+      "area": null,
+      "launchTiming": null
+    },
+    {
+      "type": "milestone",
+      "title": "Team readiness",
+      "area": null,
+      "launchTiming": null
+    },
+    {
+      "type": "milestone",
+      "title": "Launch readiness",
+      "area": null,
+      "launchTiming": null
+    },
+    {
+      "type": "launch",
+      "title": "30 days before launch",
+      "area": null,
+      "launchTiming": "t_minus_30"
+    },
+    {
+      "type": "launch",
+      "title": "7 days before launch",
+      "area": null,
+      "launchTiming": "t_minus_7"
+    },
+    {
+      "type": "launch",
+      "title": "Launch day",
+      "area": null,
+      "launchTiming": "launch_day"
+    },
+    {
+      "type": "launch",
+      "title": "First 30 days",
+      "area": null,
+      "launchTiming": "first_30"
+    },
+    {
+      "type": "launch",
+      "title": "Days 31–90",
+      "area": null,
+      "launchTiming": "days_31_90"
+    },
+    {
+      "type": "kpi",
+      "title": "Revenue",
+      "area": "Financial",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Operating Profit",
+      "area": "Financial",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Contribution Margin",
+      "area": "Financial",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Cash Balance",
+      "area": "Financial",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Orders / Customers per Day",
+      "area": "Customer",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Repeat Rate",
+      "area": "Customer",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Average Order Value",
+      "area": "Customer",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Complaints",
+      "area": "Customer",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Capacity Utilization",
+      "area": "Operations",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Waste / Defect Rate",
+      "area": "Operations",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Service Time",
+      "area": "Operations",
+      "launchTiming": null
+    },
+    {
+      "type": "kpi",
+      "title": "Staffing Cost",
+      "area": "Operations",
+      "launchTiming": null
+    }
+  ]
+}

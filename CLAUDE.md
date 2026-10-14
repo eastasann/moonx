@@ -23,7 +23,7 @@
 - apps/api: ElysiaJS。Better Auth・REST API・PDF・Web の静的ファイルの配信。Dockerfile は Web のビルドも入れる
 - packages/domain: 計算・確認項目・F/A/U・工程・Pitch Deck の組み立て・AI 書き出し / 取り込みの書式（純粋関数）
 - packages/schemas: Zod のスキーマ（API の入出力とフォームの入力チェック）
-- packages/db: Drizzle のスキーマ・マイグレーション・シード・KPI の SQL
+- packages/db: Drizzle のスキーマ・マイグレーション・シード・KPI の SQL・テンプレートの取り込みと公開（AD10・AD6）
 - packages/i18n: 英語のカタログと書式（en-PH）
 - packages/ui-tokens: `docs/06_design-tokens.json` から生成するテーマと PWA のアイコン・マニフェスト（`src/generated/` は生成物で手で直さない。`src/types.ts` などは手で書く。ADR-025）
 - packages/ui-web: Web の部品（design-spec 4.5）とレイアウトのパターン A〜J
@@ -88,7 +88,7 @@ CI が使うターゲット（`install`・`build-web`・`build-api-image`・`dep
 - **残すときは、閉じられない理由を具体的に挙げる。** 「後で」ではなく何がブロックしているか（ユーザーの決定が要る／認証情報や外部リソースが無い／別の作業に依存する）を、先送りするその時点で述べる。理由を具体的に挙げられないなら閉じられるということなので閉じる。残す先はリポジトリ内のファイルだけ。ファイルに書かれていないものは残っておらず、消えている（チャットや完了報告での言及は記録ではない）
 - **場当たり的な修正をしない。** エラーやバグは症状を抑えるパッチではなく、根本原因を特定し、原因と修正方針を提示してから直す。症状だけ抑えるパッチは原因の解決を後ろに送る先送りの一形態。設計に関わる修正はユーザーの合意を得てから行う
 - **コメントはコードから読み取れないことだけを書く。** 処理の言い換え（`// ユーザーを取得する` の直後に `getUser()`）は書かない。書くのは「なぜこの実装なのか」「不変条件」「外部制約」「呼び出し側の契約」。密度と体裁は周囲の既存コードに合わせる
-- **生成物は手で直さない。** `packages/ui-tokens/src/generated/` と `apps/api/openapi.json` は、ソースを直して `make tokens`・`make openapi` で作り直す
+- **生成物は手で直さない。** `packages/ui-tokens/src/generated/` と `apps/api/openapi.json` は、ソースを直して `make tokens`・`make openapi` で作り直す。`apps/web/src/routeTree.gen.ts` は `src/routes/` から `make dev-web`・`make build-web` が作り直す（`docs/03_dev-setup.md` 10章）
 - **`main` にあるマイグレーションは書き換えない・消さない。** 直すときは新しいマイグレーションを足す。`main` に後から入ったものより `when` が古くなったら作り直す（`make db-check` が検査する）
 - **デザインのスキルは `docs/03_dev-setup.md` 1章の使い分け（目安）を見て選ぶ。** どのスキルの案も design-spec 4.4・4.5 と `docs/06_design-tokens.json` に合うものだけを使い、使ったスキルはユーザーに伝える
 - **不要になった `.gitkeep` は削除する。** ディレクトリに実ファイルを追加したら、その中の `.gitkeep` を消す

@@ -7,72 +7,328 @@
       "$type": "color",
       "night": {
         "$description": "夜のインク（青みの灰）。0〜300 はライトの地と線（125 はダークの文字）、400〜700 は補足の文字・枠・印、750〜950 はダークの地とライトの文字。差し色は持たない（design-spec 4.4）",
-        "0": { "$value": { "colorSpace": "srgb", "components": [1, 1, 1], "hex": "#ffffff" } },
-        "50": { "$value": { "colorSpace": "srgb", "components": [0.957, 0.961, 0.973], "hex": "#f4f5f8" } },
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.925, 0.933, 0.953], "hex": "#eceef3" } },
-        "125": { "$value": { "colorSpace": "srgb", "components": [0.902, 0.91, 0.945], "hex": "#e6e8f1" } },
-        "150": { "$value": { "colorSpace": "srgb", "components": [0.882, 0.894, 0.922], "hex": "#e1e4eb" } },
-        "200": { "$value": { "colorSpace": "srgb", "components": [0.863, 0.878, 0.91], "hex": "#dce0e8" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.776, 0.796, 0.847], "hex": "#c6cbd8" } },
-        "400": { "$value": { "colorSpace": "srgb", "components": [0.635, 0.659, 0.741], "hex": "#a2a8bd" } },
-        "450": { "$value": { "colorSpace": "srgb", "components": [0.561, 0.588, 0.682], "hex": "#8f96ae" } },
-        "500": { "$value": { "colorSpace": "srgb", "components": [0.525, 0.553, 0.631], "hex": "#868da1" } },
-        "550": { "$value": { "colorSpace": "srgb", "components": [0.478, 0.506, 0.592], "hex": "#7a8197" } },
-        "600": { "$value": { "colorSpace": "srgb", "components": [0.435, 0.463, 0.565], "hex": "#6f7690" } },
-        "650": { "$value": { "colorSpace": "srgb", "components": [0.392, 0.42, 0.51], "hex": "#646b82" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.333, 0.365, 0.447], "hex": "#555d72" } },
-        "750": { "$value": { "colorSpace": "srgb", "components": [0.227, 0.259, 0.388], "hex": "#3a4263" } },
-        "800": { "$value": { "colorSpace": "srgb", "components": [0.169, 0.192, 0.314], "hex": "#2b3150" } },
-        "825": { "$value": { "colorSpace": "srgb", "components": [0.149, 0.173, 0.267], "hex": "#262c44" } },
-        "850": { "$value": { "colorSpace": "srgb", "components": [0.106, 0.129, 0.208], "hex": "#1b2135" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.082, 0.102, 0.173], "hex": "#151a2c" } },
-        "950": { "$value": { "colorSpace": "srgb", "components": [0.055, 0.067, 0.125], "hex": "#0e1120" } }
+        "0": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [1, 1, 1],
+            "hex": "#ffffff"
+          }
+        },
+        "50": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.957, 0.961, 0.973],
+            "hex": "#f4f5f8"
+          }
+        },
+        "100": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.925, 0.933, 0.953],
+            "hex": "#eceef3"
+          }
+        },
+        "125": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.902, 0.91, 0.945],
+            "hex": "#e6e8f1"
+          }
+        },
+        "150": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.882, 0.894, 0.922],
+            "hex": "#e1e4eb"
+          }
+        },
+        "200": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.863, 0.878, 0.91],
+            "hex": "#dce0e8"
+          }
+        },
+        "300": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.776, 0.796, 0.847],
+            "hex": "#c6cbd8"
+          }
+        },
+        "400": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.635, 0.659, 0.741],
+            "hex": "#a2a8bd"
+          }
+        },
+        "450": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.561, 0.588, 0.682],
+            "hex": "#8f96ae"
+          }
+        },
+        "500": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.525, 0.553, 0.631],
+            "hex": "#868da1"
+          }
+        },
+        "550": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.478, 0.506, 0.592],
+            "hex": "#7a8197"
+          }
+        },
+        "600": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.435, 0.463, 0.565],
+            "hex": "#6f7690"
+          }
+        },
+        "650": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.392, 0.42, 0.51],
+            "hex": "#646b82"
+          }
+        },
+        "700": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.333, 0.365, 0.447],
+            "hex": "#555d72"
+          }
+        },
+        "750": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.227, 0.259, 0.388],
+            "hex": "#3a4263"
+          }
+        },
+        "800": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.169, 0.192, 0.314],
+            "hex": "#2b3150"
+          }
+        },
+        "825": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.149, 0.173, 0.267],
+            "hex": "#262c44"
+          }
+        },
+        "850": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.106, 0.129, 0.208],
+            "hex": "#1b2135"
+          }
+        },
+        "900": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.082, 0.102, 0.173],
+            "hex": "#151a2c"
+          }
+        },
+        "950": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.055, 0.067, 0.125],
+            "hex": "#0e1120"
+          }
+        }
       },
       "amber": {
         "$description": "注意（未分類・警告）だけ（100 ライトの淡い地 / 300 ダークの文字 / 700 ライトの文字 / 900 ダークの淡い地）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [1, 0.953, 0.863], "hex": "#fff3dc" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [0.949, 0.714, 0.361], "hex": "#f2b65c" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.604, 0.337, 0], "hex": "#9a5600" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.165, 0.133, 0.075], "hex": "#2a2213" } }
+        "100": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [1, 0.953, 0.863],
+            "hex": "#fff3dc"
+          }
+        },
+        "300": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.949, 0.714, 0.361],
+            "hex": "#f2b65c"
+          }
+        },
+        "700": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.604, 0.337, 0],
+            "hex": "#9a5600"
+          }
+        },
+        "900": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.165, 0.133, 0.075],
+            "hex": "#2a2213"
+          }
+        }
       },
       "red": {
         "$description": "エラーと削除の確認だけ（判定の Drop には使わない。100・300・700・900 は amber と同じ使い分け。400・500 はダークの strong の hover・pressed、750・800 はライトの strong の hover・pressed）",
-        "100": { "$value": { "colorSpace": "srgb", "components": [0.992, 0.925, 0.918], "hex": "#fdecea" } },
-        "300": { "$value": { "colorSpace": "srgb", "components": [1, 0.541, 0.502], "hex": "#ff8a80" } },
-        "400": { "$value": { "colorSpace": "srgb", "components": [1, 0.624, 0.592], "hex": "#ff9f97" } },
-        "500": { "$value": { "colorSpace": "srgb", "components": [1, 0.706, 0.678], "hex": "#ffb4ad" } },
-        "700": { "$value": { "colorSpace": "srgb", "components": [0.702, 0.149, 0.118], "hex": "#b3261e" } },
-        "750": { "$value": { "colorSpace": "srgb", "components": [0.62, 0.129, 0.098], "hex": "#9e2119" } },
-        "800": { "$value": { "colorSpace": "srgb", "components": [0.541, 0.11, 0.082], "hex": "#8a1c15" } },
-        "900": { "$value": { "colorSpace": "srgb", "components": [0.18, 0.09, 0.086], "hex": "#2e1716" } }
+        "100": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.992, 0.925, 0.918],
+            "hex": "#fdecea"
+          }
+        },
+        "300": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [1, 0.541, 0.502],
+            "hex": "#ff8a80"
+          }
+        },
+        "400": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [1, 0.624, 0.592],
+            "hex": "#ff9f97"
+          }
+        },
+        "500": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [1, 0.706, 0.678],
+            "hex": "#ffb4ad"
+          }
+        },
+        "700": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.702, 0.149, 0.118],
+            "hex": "#b3261e"
+          }
+        },
+        "750": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.62, 0.129, 0.098],
+            "hex": "#9e2119"
+          }
+        },
+        "800": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.541, 0.11, 0.082],
+            "hex": "#8a1c15"
+          }
+        },
+        "900": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.18, 0.09, 0.086],
+            "hex": "#2e1716"
+          }
+        }
       },
       "alpha": {
         "$description": "透明度つき（hex は透明度を除いた色）。影とスクリム用",
-        "transparent": { "$value": { "colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0, "hex": "#000000" } },
-        "night-950-08": { "$value": { "colorSpace": "srgb", "components": [0.055, 0.067, 0.125], "alpha": 0.08, "hex": "#0e1120" } },
-        "night-950-16": { "$value": { "colorSpace": "srgb", "components": [0.055, 0.067, 0.125], "alpha": 0.16, "hex": "#0e1120" } },
-        "night-950-40": { "$value": { "colorSpace": "srgb", "components": [0.055, 0.067, 0.125], "alpha": 0.4, "hex": "#0e1120" } },
-        "night-950-72": { "$value": { "colorSpace": "srgb", "components": [0.055, 0.067, 0.125], "alpha": 0.72, "hex": "#0e1120" } },
-        "black-55": { "$value": { "colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0.55, "hex": "#000000" } }
+        "transparent": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0, 0, 0],
+            "alpha": 0,
+            "hex": "#000000"
+          }
+        },
+        "night-950-08": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.055, 0.067, 0.125],
+            "alpha": 0.08,
+            "hex": "#0e1120"
+          }
+        },
+        "night-950-16": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.055, 0.067, 0.125],
+            "alpha": 0.16,
+            "hex": "#0e1120"
+          }
+        },
+        "night-950-40": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.055, 0.067, 0.125],
+            "alpha": 0.4,
+            "hex": "#0e1120"
+          }
+        },
+        "night-950-72": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.055, 0.067, 0.125],
+            "alpha": 0.72,
+            "hex": "#0e1120"
+          }
+        },
+        "black-55": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0, 0, 0],
+            "alpha": 0.55,
+            "hex": "#000000"
+          }
+        }
       }
     },
     "font": {
       "family": {
         "$type": "fontFamily",
         "sans": {
-          "$value": ["IBM Plex Sans", "IBM Plex Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "system-ui", "sans-serif"],
+          "$value": [
+            "IBM Plex Sans",
+            "IBM Plex Sans JP",
+            "Hiragino Sans",
+            "Hiragino Kaku Gothic ProN",
+            "Yu Gothic UI",
+            "Meiryo",
+            "system-ui",
+            "sans-serif"
+          ],
           "$description": "見出し・本文・回答・入力欄の書体 IBM Plex Sans（SIL OFL 1.1）。日本語は IBM Plex Sans JP（SIL OFL 1.1）、無い字は OS の日本語フォントに落ちる。Web は self-host（SDD ADR-018）"
         },
         "mono": {
-          "$value": ["IBM Plex Mono", "IBM Plex Sans JP", "ui-monospace", "Menlo", "Consolas", "monospace"],
+          "$value": [
+            "IBM Plex Mono",
+            "IBM Plex Sans JP",
+            "ui-monospace",
+            "Menlo",
+            "Consolas",
+            "monospace"
+          ],
           "$description": "金額・指標・表の数字と設問の名前・ID の等幅 IBM Plex Mono（SIL OFL 1.1）。Web は self-host（SDD ADR-018）"
         },
-        "print-sans": { "$value": ["IBM Plex Sans", "IBM Plex Sans JP"], "$description": "PDF 用。react-pdf に登録し、使った文字だけ埋め込む（ADR-012）" },
-        "print-mono": { "$value": ["IBM Plex Mono", "IBM Plex Sans JP"], "$description": "PDF の数字（design-spec 4.4 の決定で、数字は等幅の書体で書く。ADR-012）" }
+        "print-sans": {
+          "$value": ["IBM Plex Sans", "IBM Plex Sans JP"],
+          "$description": "PDF 用。react-pdf に登録し、使った文字だけ埋め込む（ADR-012）"
+        },
+        "print-mono": {
+          "$value": ["IBM Plex Mono", "IBM Plex Sans JP"],
+          "$description": "PDF の数字（design-spec 4.4 の決定で、数字は等幅の書体で書く。ADR-012）"
+        }
       },
       "size": {
         "$type": "dimension",
-        "$description": "文字サイズの生の値（px）。Web は rem（÷16）、PDF は 1px = 1pt",
+        "$description": "文字サイズの生の値（px）。Web は rem（÷16）、PDF は 1px = 1pt。semantic.print は Web でも px のまま（画面のスライドを寸法ごと拡大縮小して PDF と同じ見た目にするため。design-spec 6.14）",
         "10": { "$value": { "value": 10, "unit": "px" } },
         "11": { "$value": { "value": 11, "unit": "px" } },
         "12": { "$value": { "value": 12, "unit": "px" } },
@@ -295,39 +551,102 @@
       "light": {
         "$description": "ライト。明るい灰の地に夜のインクの文字",
         "surface": {
-          "canvas": { "$value": "{primitive.color.night.50}", "$description": "画面の地" },
-          "raised": { "$value": "{primitive.color.night.0}", "$description": "パネル・カード・表" },
-          "sunken": { "$value": "{primitive.color.night.100}", "$description": "表の見出し行・Well・画面上部の帯" },
-          "overlay": { "$value": "{primitive.color.night.0}", "$description": "Popover・Tray・Dialog" },
-          "hover": { "$value": "{primitive.color.night.100}", "$description": "行・項目のホバー（overlay の上でも区別できる値）" },
-          "selected": { "$value": "{primitive.color.night.0}", "$description": "選択中の行・現在のナビ。地に加えて control.primary の線（border-width.selected-indicator）で示す" },
-          "scrim": { "$value": "{primitive.color.alpha.night-950-40}", "$description": "Dialog・Tray の背後" }
+          "canvas": {
+            "$value": "{primitive.color.night.50}",
+            "$description": "画面の地"
+          },
+          "raised": {
+            "$value": "{primitive.color.night.0}",
+            "$description": "パネル・カード・表"
+          },
+          "sunken": {
+            "$value": "{primitive.color.night.100}",
+            "$description": "表の見出し行・Well・画面上部の帯"
+          },
+          "overlay": {
+            "$value": "{primitive.color.night.0}",
+            "$description": "Popover・Tray・Dialog"
+          },
+          "hover": {
+            "$value": "{primitive.color.night.100}",
+            "$description": "行・項目のホバー（overlay の上でも区別できる値）"
+          },
+          "selected": {
+            "$value": "{primitive.color.night.0}",
+            "$description": "選択中の行・現在のナビ。地に加えて control.primary の線（border-width.selected-indicator）で示す"
+          },
+          "scrim": {
+            "$value": "{primitive.color.alpha.night-950-40}",
+            "$description": "Dialog・Tray の背後"
+          }
         },
         "text": {
           "primary": { "$value": "{primitive.color.night.900}" },
-          "secondary": { "$value": "{primitive.color.night.700}", "$description": "補足・メタ情報・F/A/U のラベル" },
-          "tertiary": { "$value": "{primitive.color.night.650}", "$description": "Empty・Unknown の値など、薄く読ませる文字（4.5:1 以上）" },
-          "placeholder": { "$value": "{primitive.color.night.650}", "$description": "入力欄のプレースホルダー" },
-          "disabled": { "$value": "{primitive.color.night.400}", "$description": "無効（コントラスト基準の対象外）" },
-          "link": { "$value": "{primitive.color.night.900}", "$description": "Link。文字は本文と同じ色で、下線で示す" }
+          "secondary": {
+            "$value": "{primitive.color.night.700}",
+            "$description": "補足・メタ情報・F/A/U のラベル"
+          },
+          "tertiary": {
+            "$value": "{primitive.color.night.650}",
+            "$description": "Empty・Unknown の値など、薄く読ませる文字（4.5:1 以上）"
+          },
+          "placeholder": {
+            "$value": "{primitive.color.night.650}",
+            "$description": "入力欄のプレースホルダー"
+          },
+          "disabled": {
+            "$value": "{primitive.color.night.400}",
+            "$description": "無効（コントラスト基準の対象外）"
+          },
+          "link": {
+            "$value": "{primitive.color.night.900}",
+            "$description": "Link。文字は本文と同じ色で、下線で示す"
+          }
         },
         "border": {
-          "hairline": { "$value": "{primitive.color.night.150}", "$description": "区切り線（装飾）" },
-          "strong": { "$value": "{primitive.color.night.550}", "$description": "入力欄・コントロールの枠（3:1 以上）" },
-          "focus": { "$value": "{primitive.color.night.900}", "$description": "フォーカスの表示（Spectrum の focus-indicator）" }
+          "hairline": {
+            "$value": "{primitive.color.night.150}",
+            "$description": "区切り線（装飾）"
+          },
+          "strong": {
+            "$value": "{primitive.color.night.550}",
+            "$description": "入力欄・コントロールの枠（3:1 以上）"
+          },
+          "focus": {
+            "$value": "{primitive.color.night.900}",
+            "$description": "フォーカスの表示（Spectrum の focus-indicator）"
+          }
         },
         "control": {
-          "primary": { "$value": "{primitive.color.night.900}", "$description": "Button variant=primary の地・選択した Checkbox / Radio / Switch・SegmentedControl の選択" },
+          "primary": {
+            "$value": "{primitive.color.night.900}",
+            "$description": "Button variant=primary の地・選択した Checkbox / Radio / Switch・SegmentedControl の選択"
+          },
           "primary-hover": { "$value": "{primitive.color.night.750}" },
           "primary-pressed": { "$value": "{primitive.color.night.950}" },
-          "on-primary": { "$value": "{primitive.color.night.0}", "$description": "primary の上の文字・チェック" },
-          "secondary": { "$value": "{primitive.color.night.0}", "$description": "Button variant=secondary の地（枠は border.strong）" },
+          "on-primary": {
+            "$value": "{primitive.color.night.0}",
+            "$description": "primary の上の文字・チェック"
+          },
+          "secondary": {
+            "$value": "{primitive.color.night.0}",
+            "$description": "Button variant=secondary の地（枠は border.strong）"
+          },
           "secondary-hover": { "$value": "{primitive.color.night.100}" },
           "secondary-pressed": { "$value": "{primitive.color.night.150}" },
           "on-secondary": { "$value": "{primitive.color.night.900}" },
-          "disabled": { "$value": "{primitive.color.night.100}", "$description": "無効なコントロールの地（文字は text.disabled）" },
-          "track": { "$value": "{primitive.color.night.150}", "$description": "Meter・ProgressBar の地" },
-          "track-fill": { "$value": "{primitive.color.night.900}", "$description": "ProgressBar の進み" }
+          "disabled": {
+            "$value": "{primitive.color.night.100}",
+            "$description": "無効なコントロールの地（文字は text.disabled）"
+          },
+          "track": {
+            "$value": "{primitive.color.night.150}",
+            "$description": "Meter・ProgressBar の地"
+          },
+          "track-fill": {
+            "$value": "{primitive.color.night.900}",
+            "$description": "ProgressBar の進み"
+          }
         },
         "informative": {
           "$description": "情報の帯・InlineAlert（色を足さず、地とアイコンで示す）",
@@ -341,16 +660,37 @@
           "bg": { "$value": "{primitive.color.amber.100}" },
           "strong": { "$value": "{primitive.color.amber.700}" },
           "on-strong": { "$value": "{primitive.color.night.0}" },
-          "$extensions": { "app.moonx": { "uses": ["negative-margin", "capacity-exceeded", "cost-floor", "fact-no-evidence", "overdue", "unclassified"] } }
+          "$extensions": {
+            "app.moonx": {
+              "uses": [
+                "negative-margin",
+                "capacity-exceeded",
+                "cost-floor",
+                "fact-no-evidence",
+                "overdue",
+                "unclassified"
+              ]
+            }
+          }
         },
         "negative": {
           "fg": { "$value": "{primitive.color.red.700}" },
           "bg": { "$value": "{primitive.color.red.100}" },
           "strong": { "$value": "{primitive.color.red.700}" },
-          "strong-hover": { "$value": "{primitive.color.red.750}", "$description": "Button variant=negative と Toast の操作のホバー" },
-          "strong-pressed": { "$value": "{primitive.color.red.800}", "$description": "Button variant=negative と Toast の操作の押下" },
+          "strong-hover": {
+            "$value": "{primitive.color.red.750}",
+            "$description": "Button variant=negative と Toast の操作のホバー"
+          },
+          "strong-pressed": {
+            "$value": "{primitive.color.red.800}",
+            "$description": "Button variant=negative と Toast の操作の押下"
+          },
           "on-strong": { "$value": "{primitive.color.night.0}" },
-          "$extensions": { "app.moonx": { "uses": ["save-failed", "field-error", "destructive-action"] } }
+          "$extensions": {
+            "app.moonx": {
+              "uses": ["save-failed", "field-error", "destructive-action"]
+            }
+          }
         },
         "neutral": {
           "fg": { "$value": "{primitive.color.night.700}" },
@@ -390,39 +730,102 @@
       "dark": {
         "$description": "ダーク。夜の紺の地に月明かりの文字。主要な操作のボタンは月明かりの色",
         "surface": {
-          "canvas": { "$value": "{primitive.color.night.950}", "$description": "画面の地" },
-          "raised": { "$value": "{primitive.color.night.900}", "$description": "パネル・カード・表" },
-          "sunken": { "$value": "{primitive.color.night.850}", "$description": "表の見出し行・Well・画面上部の帯" },
-          "overlay": { "$value": "{primitive.color.night.850}", "$description": "Popover・Tray・Dialog" },
-          "hover": { "$value": "{primitive.color.night.825}", "$description": "行・項目のホバー（overlay の上でも区別できる値）" },
-          "selected": { "$value": "{primitive.color.night.900}", "$description": "選択中の行・現在のナビ。地に加えて control.primary の線（border-width.selected-indicator）で示す" },
-          "scrim": { "$value": "{primitive.color.alpha.night-950-72}", "$description": "Dialog・Tray の背後" }
+          "canvas": {
+            "$value": "{primitive.color.night.950}",
+            "$description": "画面の地"
+          },
+          "raised": {
+            "$value": "{primitive.color.night.900}",
+            "$description": "パネル・カード・表"
+          },
+          "sunken": {
+            "$value": "{primitive.color.night.850}",
+            "$description": "表の見出し行・Well・画面上部の帯"
+          },
+          "overlay": {
+            "$value": "{primitive.color.night.850}",
+            "$description": "Popover・Tray・Dialog"
+          },
+          "hover": {
+            "$value": "{primitive.color.night.825}",
+            "$description": "行・項目のホバー（overlay の上でも区別できる値）"
+          },
+          "selected": {
+            "$value": "{primitive.color.night.900}",
+            "$description": "選択中の行・現在のナビ。地に加えて control.primary の線（border-width.selected-indicator）で示す"
+          },
+          "scrim": {
+            "$value": "{primitive.color.alpha.night-950-72}",
+            "$description": "Dialog・Tray の背後"
+          }
         },
         "text": {
           "primary": { "$value": "{primitive.color.night.125}" },
-          "secondary": { "$value": "{primitive.color.night.400}", "$description": "補足・メタ情報・F/A/U のラベル" },
-          "tertiary": { "$value": "{primitive.color.night.450}", "$description": "Empty・Unknown の値など、薄く読ませる文字（4.5:1 以上）" },
-          "placeholder": { "$value": "{primitive.color.night.450}", "$description": "入力欄のプレースホルダー" },
-          "disabled": { "$value": "{primitive.color.night.750}", "$description": "無効（コントラスト基準の対象外）" },
-          "link": { "$value": "{primitive.color.night.125}", "$description": "Link。文字は本文と同じ色で、下線で示す" }
+          "secondary": {
+            "$value": "{primitive.color.night.400}",
+            "$description": "補足・メタ情報・F/A/U のラベル"
+          },
+          "tertiary": {
+            "$value": "{primitive.color.night.450}",
+            "$description": "Empty・Unknown の値など、薄く読ませる文字（4.5:1 以上）"
+          },
+          "placeholder": {
+            "$value": "{primitive.color.night.450}",
+            "$description": "入力欄のプレースホルダー"
+          },
+          "disabled": {
+            "$value": "{primitive.color.night.750}",
+            "$description": "無効（コントラスト基準の対象外）"
+          },
+          "link": {
+            "$value": "{primitive.color.night.125}",
+            "$description": "Link。文字は本文と同じ色で、下線で示す"
+          }
         },
         "border": {
-          "hairline": { "$value": "{primitive.color.night.825}", "$description": "区切り線（装飾）" },
-          "strong": { "$value": "{primitive.color.night.600}", "$description": "入力欄・コントロールの枠（3:1 以上）" },
-          "focus": { "$value": "{primitive.color.night.125}", "$description": "フォーカスの表示（Spectrum の focus-indicator）" }
+          "hairline": {
+            "$value": "{primitive.color.night.825}",
+            "$description": "区切り線（装飾）"
+          },
+          "strong": {
+            "$value": "{primitive.color.night.600}",
+            "$description": "入力欄・コントロールの枠（3:1 以上）"
+          },
+          "focus": {
+            "$value": "{primitive.color.night.125}",
+            "$description": "フォーカスの表示（Spectrum の focus-indicator）"
+          }
         },
         "control": {
-          "primary": { "$value": "{primitive.color.night.125}", "$description": "Button variant=primary の地・選択した Checkbox / Radio / Switch・SegmentedControl の選択" },
+          "primary": {
+            "$value": "{primitive.color.night.125}",
+            "$description": "Button variant=primary の地・選択した Checkbox / Radio / Switch・SegmentedControl の選択"
+          },
           "primary-hover": { "$value": "{primitive.color.night.0}" },
           "primary-pressed": { "$value": "{primitive.color.night.300}" },
-          "on-primary": { "$value": "{primitive.color.night.950}", "$description": "primary の上の文字・チェック" },
-          "secondary": { "$value": "{primitive.color.night.900}", "$description": "Button variant=secondary の地（枠は border.strong）" },
+          "on-primary": {
+            "$value": "{primitive.color.night.950}",
+            "$description": "primary の上の文字・チェック"
+          },
+          "secondary": {
+            "$value": "{primitive.color.night.900}",
+            "$description": "Button variant=secondary の地（枠は border.strong）"
+          },
           "secondary-hover": { "$value": "{primitive.color.night.850}" },
           "secondary-pressed": { "$value": "{primitive.color.night.825}" },
           "on-secondary": { "$value": "{primitive.color.night.125}" },
-          "disabled": { "$value": "{primitive.color.night.850}", "$description": "無効なコントロールの地（文字は text.disabled）" },
-          "track": { "$value": "{primitive.color.night.800}", "$description": "Meter・ProgressBar の地" },
-          "track-fill": { "$value": "{primitive.color.night.125}", "$description": "ProgressBar の進み" }
+          "disabled": {
+            "$value": "{primitive.color.night.850}",
+            "$description": "無効なコントロールの地（文字は text.disabled）"
+          },
+          "track": {
+            "$value": "{primitive.color.night.800}",
+            "$description": "Meter・ProgressBar の地"
+          },
+          "track-fill": {
+            "$value": "{primitive.color.night.125}",
+            "$description": "ProgressBar の進み"
+          }
         },
         "informative": {
           "$description": "情報の帯・InlineAlert（色を足さず、地とアイコンで示す）",
@@ -436,16 +839,37 @@
           "bg": { "$value": "{primitive.color.amber.900}" },
           "strong": { "$value": "{primitive.color.amber.300}" },
           "on-strong": { "$value": "{primitive.color.night.950}" },
-          "$extensions": { "app.moonx": { "uses": ["negative-margin", "capacity-exceeded", "cost-floor", "fact-no-evidence", "overdue", "unclassified"] } }
+          "$extensions": {
+            "app.moonx": {
+              "uses": [
+                "negative-margin",
+                "capacity-exceeded",
+                "cost-floor",
+                "fact-no-evidence",
+                "overdue",
+                "unclassified"
+              ]
+            }
+          }
         },
         "negative": {
           "fg": { "$value": "{primitive.color.red.300}" },
           "bg": { "$value": "{primitive.color.red.900}" },
           "strong": { "$value": "{primitive.color.red.300}" },
-          "strong-hover": { "$value": "{primitive.color.red.400}", "$description": "Button variant=negative と Toast の操作のホバー" },
-          "strong-pressed": { "$value": "{primitive.color.red.500}", "$description": "Button variant=negative と Toast の操作の押下" },
+          "strong-hover": {
+            "$value": "{primitive.color.red.400}",
+            "$description": "Button variant=negative と Toast の操作のホバー"
+          },
+          "strong-pressed": {
+            "$value": "{primitive.color.red.500}",
+            "$description": "Button variant=negative と Toast の操作の押下"
+          },
           "on-strong": { "$value": "{primitive.color.night.950}" },
-          "$extensions": { "app.moonx": { "uses": ["save-failed", "field-error", "destructive-action"] } }
+          "$extensions": {
+            "app.moonx": {
+              "uses": ["save-failed", "field-error", "destructive-action"]
+            }
+          }
         },
         "neutral": {
           "fg": { "$value": "{primitive.color.night.400}" },
@@ -686,7 +1110,10 @@
             "$description": "Toast の高さ（最小）",
             "min-height": { "$value": "{primitive.dimension.52}" }
           },
-          "target-min": { "$value": "{primitive.dimension.24}", "$description": "当たり判定の最小（WCAG 2.2 の 24px）" }
+          "target-min": {
+            "$value": "{primitive.dimension.24}",
+            "$description": "当たり判定の最小（WCAG 2.2 の 24px）"
+          }
         }
       },
       "large": {
@@ -889,7 +1316,10 @@
             "$description": "Toast の高さ（最小）",
             "min-height": { "$value": "{primitive.dimension.60}" }
           },
-          "target-min": { "$value": "{primitive.dimension.44}", "$description": "当たり判定の最小。タッチの端末は 44px（WCAG 2.5.5 と Apple HIG の 44pt。Android の指針は 48dp）。デスクトップ（scale.medium）は 24px（WCAG 2.2 の 2.5.8）。小さい部品は余白で広げる" }
+          "target-min": {
+            "$value": "{primitive.dimension.44}",
+            "$description": "当たり判定の最小。タッチの端末は 44px（WCAG 2.5.5 と Apple HIG の 44pt。Android の指針は 48dp）。デスクトップ（scale.medium）は 24px（WCAG 2.2 の 2.5.8）。小さい部品は余白で広げる"
+          }
         }
       }
     },
@@ -898,7 +1328,9 @@
       "$description": "表とリストとフォームの密度（Spectrum の density）。どの画面にどの密度を使うかは design-spec 4.4「密度とスケールの対応」。既定は regular",
       "compact": {
         "$description": "予備（いまは使わない）。キーの意味は regular と同じ",
-        "row-height": { "$value": "{semantic.scale.medium.component.table.row-height.compact}" },
+        "row-height": {
+          "$value": "{semantic.scale.medium.component.table.row-height.compact}"
+        },
         "cell-padding-x": { "$value": "{primitive.dimension.8}" },
         "cell-padding-y": { "$value": "{primitive.dimension.4}" },
         "list-gap": { "$value": "{primitive.dimension.2}" },
@@ -910,19 +1342,48 @@
       },
       "regular": {
         "$description": "表と数字と一覧の画面（design-spec 4.4）。部品の size は M",
-        "row-height": { "$value": "{semantic.scale.medium.component.table.row-height.regular}", "$description": "行の高さ（スケールで変わる）" },
-        "cell-padding-x": { "$value": "{primitive.dimension.12}", "$description": "セルの左右（Spectrum の table-item-padding）" },
-        "cell-padding-y": { "$value": "{primitive.dimension.8}", "$description": "折り返したときのセルの上下" },
-        "list-gap": { "$value": "{primitive.dimension.4}", "$description": "ListView・カードの列の項目の間（Spectrum の list-gap）" },
-        "gap": { "$value": "{primitive.dimension.8}", "$description": "ブロック内の要素の間" },
-        "block-gap": { "$value": "{primitive.dimension.16}", "$description": "設問・カード・行のまとまりの間" },
-        "section-gap": { "$value": "{primitive.dimension.32}", "$description": "セクションの間" },
-        "panel-padding": { "$value": "{primitive.dimension.16}", "$description": "パネル・カード・Well の内側" },
-        "field-gap": { "$value": "{primitive.dimension.16}", "$description": "フォームの入力欄どうしの間" }
+        "row-height": {
+          "$value": "{semantic.scale.medium.component.table.row-height.regular}",
+          "$description": "行の高さ（スケールで変わる）"
+        },
+        "cell-padding-x": {
+          "$value": "{primitive.dimension.12}",
+          "$description": "セルの左右（Spectrum の table-item-padding）"
+        },
+        "cell-padding-y": {
+          "$value": "{primitive.dimension.8}",
+          "$description": "折り返したときのセルの上下"
+        },
+        "list-gap": {
+          "$value": "{primitive.dimension.4}",
+          "$description": "ListView・カードの列の項目の間（Spectrum の list-gap）"
+        },
+        "gap": {
+          "$value": "{primitive.dimension.8}",
+          "$description": "ブロック内の要素の間"
+        },
+        "block-gap": {
+          "$value": "{primitive.dimension.16}",
+          "$description": "設問・カード・行のまとまりの間"
+        },
+        "section-gap": {
+          "$value": "{primitive.dimension.32}",
+          "$description": "セクションの間"
+        },
+        "panel-padding": {
+          "$value": "{primitive.dimension.16}",
+          "$description": "パネル・カード・Well の内側"
+        },
+        "field-gap": {
+          "$value": "{primitive.dimension.16}",
+          "$description": "フォームの入力欄どうしの間"
+        }
       },
       "spacious": {
         "$description": "書く・読む・手順を進める画面（考えるための余白。design-spec 4.4）。入力欄と主要なボタンは L。キーの意味は regular と同じ",
-        "row-height": { "$value": "{semantic.scale.medium.component.table.row-height.spacious}" },
+        "row-height": {
+          "$value": "{semantic.scale.medium.component.table.row-height.spacious}"
+        },
         "cell-padding-x": { "$value": "{primitive.dimension.16}" },
         "cell-padding-y": { "$value": "{primitive.dimension.12}" },
         "list-gap": { "$value": "{primitive.dimension.8}" },
@@ -955,8 +1416,14 @@
     "font": {
       "family": {
         "$type": "fontFamily",
-        "body": { "$value": "{primitive.font.family.sans}", "$description": "見出し・本文・回答・入力欄・表" },
-        "mono": { "$value": "{primitive.font.family.mono}", "$description": "金額・指標・表の数字と設問の名前・ID" }
+        "body": {
+          "$value": "{primitive.font.family.sans}",
+          "$description": "見出し・本文・回答・入力欄・表"
+        },
+        "mono": {
+          "$value": "{primitive.font.family.mono}",
+          "$description": "金額・指標・表の数字と設問の名前・ID"
+        }
       }
     },
     "typography": {
@@ -1166,19 +1633,43 @@
     "radius": {
       "$type": "dimension",
       "$description": "角は少しだけ丸める（Spectrum の丸い pill のボタンにはしない）",
-      "control": { "$value": "{primitive.radius.md}", "$description": "Button・ActionButton・入力欄" },
-      "chip": { "$value": "{primitive.radius.sm}", "$description": "Badge・タグ・Checkbox" },
-      "card": { "$value": "{primitive.radius.lg}", "$description": "Card・パネル・スライドのサムネイル" },
-      "sheet": { "$value": "{primitive.radius.xl}", "$description": "Tray の上の角・Dialog" },
-      "pill": { "$value": "{primitive.radius.full}", "$description": "Switch・Avatar・未読数の札" }
+      "control": {
+        "$value": "{primitive.radius.md}",
+        "$description": "Button・ActionButton・入力欄"
+      },
+      "chip": {
+        "$value": "{primitive.radius.sm}",
+        "$description": "Badge・タグ・Checkbox"
+      },
+      "card": {
+        "$value": "{primitive.radius.lg}",
+        "$description": "Card・パネル・スライドのサムネイル"
+      },
+      "sheet": {
+        "$value": "{primitive.radius.xl}",
+        "$description": "Tray の上の角・Dialog"
+      },
+      "pill": {
+        "$value": "{primitive.radius.full}",
+        "$description": "Switch・Avatar・未読数の札"
+      }
     },
     "border-width": {
       "$type": "dimension",
       "hairline": { "$value": "{primitive.border-width.1}" },
       "strong": { "$value": "{primitive.border-width.1}" },
-      "focus-ring": { "$value": "{primitive.border-width.2}", "$description": "Spectrum の focus-indicator-thickness" },
-      "focus-offset": { "$value": "{primitive.border-width.2}", "$description": "フォーカスの表示と部品の間（Spectrum の focus-indicator-gap）" },
-      "selected-indicator": { "$value": "{primitive.border-width.3}", "$description": "選択中の行・現在のナビの左の線（色は control.primary）" },
+      "focus-ring": {
+        "$value": "{primitive.border-width.2}",
+        "$description": "Spectrum の focus-indicator-thickness"
+      },
+      "focus-offset": {
+        "$value": "{primitive.border-width.2}",
+        "$description": "フォーカスの表示と部品の間（Spectrum の focus-indicator-gap）"
+      },
+      "selected-indicator": {
+        "$value": "{primitive.border-width.3}",
+        "$description": "選択中の行・現在のナビの左の線（色は control.primary）"
+      },
       "divider": {
         "$description": "Divider の S / M / L",
         "S": { "$value": "{primitive.border-width.1}" },
@@ -1203,32 +1694,61 @@
       "transition": {
         "$type": "transition",
         "hover": {
-          "$value": { "duration": "{primitive.duration.150}", "delay": "{primitive.duration.0}", "timingFunction": "{primitive.easing.standard}" },
+          "$value": {
+            "duration": "{primitive.duration.150}",
+            "delay": "{primitive.duration.0}",
+            "timingFunction": "{primitive.easing.standard}"
+          },
           "$description": "色・地の変化"
         },
         "expand": {
-          "$value": { "duration": "{primitive.duration.200}", "delay": "{primitive.duration.0}", "timingFunction": "{primitive.easing.standard}" },
+          "$value": {
+            "duration": "{primitive.duration.200}",
+            "delay": "{primitive.duration.0}",
+            "timingFunction": "{primitive.easing.standard}"
+          },
           "$description": "Disclosure・フォーカスした設問を開く"
         },
         "enter": {
-          "$value": { "duration": "{primitive.duration.300}", "delay": "{primitive.duration.0}", "timingFunction": "{primitive.easing.decelerate}" },
+          "$value": {
+            "duration": "{primitive.duration.300}",
+            "delay": "{primitive.duration.0}",
+            "timingFunction": "{primitive.easing.decelerate}"
+          },
           "$description": "Popover・Tray・Dialog が出る"
         },
         "exit": {
-          "$value": { "duration": "{primitive.duration.200}", "delay": "{primitive.duration.0}", "timingFunction": "{primitive.easing.accelerate}" },
+          "$value": {
+            "duration": "{primitive.duration.200}",
+            "delay": "{primitive.duration.0}",
+            "timingFunction": "{primitive.easing.accelerate}"
+          },
           "$description": "Popover・Tray・Dialog が消える"
         },
         "focus-scroll": {
-          "$value": { "duration": "{primitive.duration.400}", "delay": "{primitive.duration.0}", "timingFunction": "{primitive.easing.smooth}" },
+          "$value": {
+            "duration": "{primitive.duration.400}",
+            "delay": "{primitive.duration.0}",
+            "timingFunction": "{primitive.easing.smooth}"
+          },
           "$description": "入力中の設問を画面の縦の中央へスクロール（4.1 パターン C）"
         }
       },
       "loop": {
         "$type": "duration",
         "$description": "読み込み中の繰り返しの1周期",
-        "spin": { "$value": "{primitive.duration.1000}", "$description": "ProgressCircle のくるくる" },
-        "indeterminate": { "$value": "{primitive.duration.1200}", "$description": "ProgressBar の不定の帯の往復" },
-        "pulse": { "$value": "{primitive.duration.1600}", "$description": "Skeleton の骨組みの揺れ" }
+        "spin": {
+          "$value": "{primitive.duration.1000}",
+          "$description": "ProgressCircle のくるくる"
+        },
+        "indeterminate": {
+          "$value": "{primitive.duration.1200}",
+          "$description": "ProgressBar の不定の帯の往復"
+        },
+        "pulse": {
+          "$value": "{primitive.duration.1600}",
+          "$description": "Skeleton の骨組みの揺れ"
+        }
       },
       "reduced": {
         "$type": "duration",
@@ -1246,17 +1766,47 @@
     },
     "layout": {
       "$type": "dimension",
-      "sidebar-width": { "$value": "{primitive.dimension.240}", "$description": "デスクトップの SideNav" },
-      "sidebar-width-collapsed": { "$value": "{primitive.dimension.64}", "$description": "タブレットのアイコンだけの SideNav" },
-      "side-panel-width": { "$value": "{primitive.dimension.360}", "$description": "コメント・変更履歴の Panel" },
-      "reading-column-max": { "$value": "{primitive.dimension.720}", "$description": "設問フォーム・中央集中・設定フォームの幅の上限" },
-      "content-max": { "$value": "{primitive.dimension.1280}", "$description": "本文エリアの最大幅" },
+      "sidebar-width": {
+        "$value": "{primitive.dimension.240}",
+        "$description": "デスクトップの SideNav"
+      },
+      "sidebar-width-collapsed": {
+        "$value": "{primitive.dimension.64}",
+        "$description": "タブレットのアイコンだけの SideNav"
+      },
+      "side-panel-width": {
+        "$value": "{primitive.dimension.360}",
+        "$description": "コメント・変更履歴の Panel"
+      },
+      "reading-column-max": {
+        "$value": "{primitive.dimension.720}",
+        "$description": "設問フォーム・中央集中・設定フォームの幅の上限"
+      },
+      "content-max": {
+        "$value": "{primitive.dimension.1280}",
+        "$description": "本文エリアの最大幅"
+      },
       "header-height": { "$value": "{primitive.dimension.56}" },
-      "tab-bar-height": { "$value": "{primitive.dimension.64}", "$description": "スマホの TabBar（安全領域は別に足す）" },
-      "list-pane-width": { "$value": "{primitive.dimension.352}", "$description": "一覧と詳細の左ペイン（一覧側）の幅。結果ペインは side-panel-width を使う" },
-      "thumbnail-column-width": { "$value": "{primitive.dimension.160}", "$description": "サムネイル列の幅" },
-      "popover-max-height": { "$value": "{primitive.dimension.384}", "$description": "Popover の高さの上限（画面の可視領域のほうが低ければそちら）" },
-      "bottom-action-height": { "$value": "{primitive.dimension.64}", "$description": "スマホで下部に固定する操作と、スマホとタブレットのワークシート（パターン F）の結果の要約バー" },
+      "tab-bar-height": {
+        "$value": "{primitive.dimension.64}",
+        "$description": "スマホの TabBar（安全領域は別に足す）"
+      },
+      "list-pane-width": {
+        "$value": "{primitive.dimension.352}",
+        "$description": "一覧と詳細の左ペイン（一覧側）の幅。結果ペインは side-panel-width を使う"
+      },
+      "thumbnail-column-width": {
+        "$value": "{primitive.dimension.160}",
+        "$description": "サムネイル列の幅"
+      },
+      "popover-max-height": {
+        "$value": "{primitive.dimension.384}",
+        "$description": "Popover の高さの上限（画面の可視領域のほうが低ければそちら）"
+      },
+      "bottom-action-height": {
+        "$value": "{primitive.dimension.64}",
+        "$description": "スマホで下部に固定する操作と、スマホとタブレットのワークシート（パターン F）の結果の要約バー"
+      },
       "page-gutter-mobile": { "$value": "{primitive.dimension.16}" },
       "page-gutter-tablet": { "$value": "{primitive.dimension.24}" },
       "page-gutter-desktop": { "$value": "{primitive.dimension.32}" },
@@ -1266,15 +1816,35 @@
         "M": { "$value": "{primitive.dimension.480}" },
         "L": { "$value": "{primitive.dimension.640}" }
       },
-      "focus-anchor": { "$type": "number", "$value": "{primitive.ratio.half}", "$description": "入力中の設問を置く縦位置（0.5 = 画面の縦の中央）" },
-      "sheet-max-height-ratio": { "$type": "number", "$value": "{primitive.ratio.85}", "$description": "Tray・Dialog（small と medium）・Panel の高さの上限（0.85 = 画面の高さの 85%。使う側が vh に掛ける）。large の Dialog をスマホで出す全画面のシートは対象外（design-spec 3.8）" },
+      "focus-anchor": {
+        "$type": "number",
+        "$value": "{primitive.ratio.half}",
+        "$description": "入力中の設問を置く縦位置（0.5 = 画面の縦の中央）"
+      },
+      "sheet-max-height-ratio": {
+        "$type": "number",
+        "$value": "{primitive.ratio.85}",
+        "$description": "Tray・Dialog（small と medium）・Panel の高さの上限（0.85 = 画面の高さの 85%。使う側が vh に掛ける）。large の Dialog をスマホで出す全画面のシートは対象外（design-spec 3.8）"
+      },
       "z-index": {
         "$type": "number",
         "$description": "重なりの順序。下から bottom-action < nav < overlay < toast",
-        "bottom-action": { "$value": "{primitive.z-index.10}", "$description": "スマホで下部に固定する操作と、スマホとタブレットのワークシート（パターン F）の結果の要約バー" },
-        "nav": { "$value": "{primitive.z-index.50}", "$description": "TabBar・SideNav の固定" },
-        "overlay": { "$value": "{primitive.z-index.100}", "$description": "Dialog・Tray・Popover・Panel" },
-        "toast": { "$value": "{primitive.z-index.200}", "$description": "Toast（Dialog より上）" }
+        "bottom-action": {
+          "$value": "{primitive.z-index.10}",
+          "$description": "スマホで下部に固定する操作と、スマホとタブレットのワークシート（パターン F）の結果の要約バー"
+        },
+        "nav": {
+          "$value": "{primitive.z-index.50}",
+          "$description": "TabBar・SideNav の固定"
+        },
+        "overlay": {
+          "$value": "{primitive.z-index.100}",
+          "$description": "Dialog・Tray・Popover・Panel"
+        },
+        "toast": {
+          "$value": "{primitive.z-index.200}",
+          "$description": "Toast（Dialog より上）"
+        }
       }
     },
     "icon": {
@@ -1282,34 +1852,70 @@
       "stroke-width": { "$type": "number", "$value": "{primitive.stroke.icon}" }
     },
     "print": {
-      "$description": "Pitch Deck の PDF（react-pdf）と画面のスライド表示の値。ライトの値だけを参照する（design-spec 6.14）",
+      "$description": "Pitch Deck の PDF（react-pdf）と画面のスライド表示の値。ライトの値だけを参照する（design-spec 6.14）。画面でも文字の大きさは px（primitive.font.size）",
       "color": {
         "$type": "color",
-        "page": { "$value": "{semantic.color.light.surface.canvas}", "$description": "スライドの地" },
-        "panel": { "$value": "{semantic.color.light.surface.raised}", "$description": "数字のカード・表の地" },
-        "table-header": { "$value": "{semantic.color.light.surface.sunken}", "$description": "表の見出し行" },
+        "page": {
+          "$value": "{semantic.color.light.surface.canvas}",
+          "$description": "スライドの地"
+        },
+        "panel": {
+          "$value": "{semantic.color.light.surface.raised}",
+          "$description": "数字のカード・表の地"
+        },
+        "table-header": {
+          "$value": "{semantic.color.light.surface.sunken}",
+          "$description": "表の見出し行"
+        },
         "text": { "$value": "{semantic.color.light.text.primary}" },
-        "text-secondary": { "$value": "{semantic.color.light.text.secondary}", "$description": "副題・数字のラベル・フッター" },
-        "text-placeholder": { "$value": "{semantic.color.light.text.secondary}", "$description": "Not written yet（灰色）" },
+        "text-secondary": {
+          "$value": "{semantic.color.light.text.secondary}",
+          "$description": "副題・数字のラベル・フッター"
+        },
+        "text-placeholder": {
+          "$value": "{semantic.color.light.text.secondary}",
+          "$description": "Not written yet（灰色）"
+        },
         "border": { "$value": "{semantic.color.light.border.hairline}" },
         "border-strong": { "$value": "{semantic.color.light.border.strong}" },
-        "rule": { "$value": "{semantic.color.light.text.primary}", "$description": "数字の上の太い罫線・表紙の区切り" }
+        "rule": {
+          "$value": "{semantic.color.light.text.primary}",
+          "$description": "数字の上の太い罫線・表紙の区切り"
+        }
       },
       "font": {
         "$type": "fontFamily",
         "body": { "$value": "{primitive.font.family.print-sans}" },
-        "mono": { "$value": "{primitive.font.family.print-mono}", "$description": "数字" }
+        "mono": {
+          "$value": "{primitive.font.family.print-mono}",
+          "$description": "数字"
+        }
       },
       "slide": {
         "$type": "dimension",
         "$description": "16:9。基準 960 × 540（PDF は 1px = 1pt で 13.333 × 7.5 in）。画面では幅に合わせて拡大縮小する",
         "width": { "$value": "{primitive.dimension.960}" },
         "height": { "$value": "{primitive.dimension.540}" },
-        "margin-x": { "$value": "{primitive.dimension.48}", "$description": "左右の安全余白" },
-        "margin-y": { "$value": "{primitive.dimension.40}", "$description": "上下の安全余白（フッターはこの内側）" },
-        "gap": { "$value": "{primitive.dimension.24}", "$description": "見出しと本文・要素の間" },
-        "footer-height": { "$value": "{primitive.dimension.24}", "$description": "Business Name・版の名前・日付" },
-        "shrink-step": { "$value": "{primitive.dimension.2}", "$description": "長い文章を縮める1段（最小でも入らなければ末尾を「…」で切る）" }
+        "margin-x": {
+          "$value": "{primitive.dimension.48}",
+          "$description": "左右の安全余白"
+        },
+        "margin-y": {
+          "$value": "{primitive.dimension.40}",
+          "$description": "上下の安全余白（フッターはこの内側）"
+        },
+        "gap": {
+          "$value": "{primitive.dimension.24}",
+          "$description": "見出しと本文・要素の間"
+        },
+        "footer-height": {
+          "$value": "{primitive.dimension.24}",
+          "$description": "Business Name・版の名前・日付"
+        },
+        "shrink-step": {
+          "$value": "{primitive.dimension.2}",
+          "$description": "長い文章を縮める1段（最小でも入らなければ末尾を「…」で切る）"
+        }
       },
       "font-size": {
         "$type": "dimension",
@@ -1340,7 +1946,10 @@
           "cell": { "$value": "{primitive.font.size.16}" },
           "cell-min": { "$value": "{primitive.font.size.12}" }
         },
-        "footer": { "$value": "{primitive.font.size.10}", "$description": "フッター（固定）" }
+        "footer": {
+          "$value": "{primitive.font.size.10}",
+          "$description": "フッター（固定）"
+        }
       },
       "typography": {
         "$type": "typography",

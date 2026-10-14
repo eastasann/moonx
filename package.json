@@ -1,0 +1,19 @@
+{
+  "name": "moonx",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@babel/parser": "^8.0.7",
+    "@babel/types": "^8.0.6",
+    "@biomejs/biome": "^2.5.15",
+    "@playwright/test": "^1.64.0",
+    "@sentry/cli": "3.8.0",
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,51 @@
+import i18next, { type i18n as I18n } from "i18next";
+import common from "../locales/en/common.json";
+import format from "../locales/en/format.json";
+
+/**
+ * The catalogs, one file per namespace under `locales/<lang>/` (SDD 9章). Adding a
+ * language adds a directory here; the UI stays English-only until then.
+ */
+export const resources = {
+  en: { common, format },
+} as const;
+
+export const defaultNS = "common";
+export const namespaces = Object.keys(
+  resources.en,
+) as (keyof typeof resources.en)[];
+
+declare module "i18next" {
+  interface CustomTypeOptions {
+    defaultNS: typeof defaultNS;
+    resources: (typeof resources)["en"];
+  }
+}
+
+/**
+ * A ready i18next instance with every catalog bundled, initialised synchronously so it can
+ * be used as soon as it returns. The Web hands it to react-i18next; the API uses it for
+ * notification text, PDF headings, AI export headings and mail.
+ *
+ * Interpolated values are not HTML-escaped: React escapes what it renders, and output
+ * that is HTML (mail) escapes in its own template.
+ */
+export const createI18n = (): I18n => {
+  const instance = i18next.createInstance();
+  instance.init({
+    lng: "en",
+    fallbackLng: "en",
+    supportedLngs: Object.keys(resources),
+    // i18next keeps the object it is given and adds to it in place: each instance gets
+    // its own copy, so one adding a resource cannot change another.
+    resources: structuredClone(resources),
+    ns: namespaces,
+    defaultNS,
+    initAsync: false,
+    interpolation: { escapeValue: false },
+  });
+  return instance;
+};
+
+/** The instance the formatters use, shared by every caller in a process. */
+export const i18n = createI18n();

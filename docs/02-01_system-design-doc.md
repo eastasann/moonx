@@ -93,7 +93,7 @@ moonx/
 ├─ packages/
 │  ├─ domain/     計算・確認項目・F/A/U・工程・Pitch Deck の組み立て・AI 書き出し / 取り込みの書式（純粋関数）
 │  ├─ schemas/    Zod のスキーマ（API の入出力とフォームの入力チェック）
-│  ├─ db/         Drizzle のスキーマ・マイグレーション・シード
+│  ├─ db/         Drizzle のスキーマ・マイグレーション・シード・テンプレートの取り込みと公開（AD10・AD6）
 │  ├─ i18n/       英語のメッセージカタログと書式（en-PH）
 │  ├─ ui-tokens/  06_design-tokens.json から生成するテーマ（vanilla-extract・react-pdf 用）と PWA のアイコン・マニフェスト（生成物）
 │  └─ ui-web/     Web の部品（React Aria Components ＋ vanilla-extract。design-spec 4.5 の部品）
@@ -102,7 +102,7 @@ moonx/
 ├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA（環境ごとに、最初の `make promote` が作る）
 ├─ e2e/           Playwright（Web）
 ├─ docker/        ローカルの PostgreSQL の初期化 SQL（docker-compose.yml が使う）
-├─ scripts/       doc-lint、画面の検査（`style` 属性・JSX の生の文字列。`make lint` が呼ぶ）、マイグレーションの検査（`db-check`）、昇格（`promote`・`promote-check`）
+├─ scripts/       doc-lint、`.env` の作成（`make setup` が呼ぶ）、画面の検査（`style` 属性・JSX の生の文字列。`make lint` が呼ぶ）、マイグレーションの検査（`db-check`）、昇格（`promote`・`promote-check`）、無人ループの駆動（`draft-loop.sh`）
 └─ Makefile
 ```
 
@@ -112,7 +112,7 @@ moonx/
 
 | 項目 | local | staging | production |
 |---|---|---|---|
-| Web・API の URL | Web `http://localhost:5173`（Vite が `/api` を API へ転送）・API `http://localhost:3000` | `https://stg.{DOMAIN}` | `https://{DOMAIN}` |
+| Web・API の URL | Web `http://localhost:5173`（Vite が `/api/` で始まるパスを API へ転送）・API `http://localhost:3000` | `https://stg.{DOMAIN}` | `https://{DOMAIN}` |
 | Web と API（Cloud Run） | Web は `vite dev`、API は `bun --watch`（API は静的ファイルを返さない） | `moonx-api-staging`（Web も返す） | `moonx-api-production`（Web も返す） |
 | DB | Docker の PostgreSQL 17（`localhost:5432`、DB 名 `moonx`） | Neon プロジェクト `moonx` のブランチ `staging` | 同じプロジェクトのブランチ `production` |
 | メール | コンソールに出す | Resend（送信先は許可リストのメールだけ） | Resend |
@@ -139,23 +139,25 @@ GitHub の環境は3つとも `main` からだけ使える。Google Cloud への
 |---|---|---|---|---|
 | `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `WEB_DIST_DIR`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS` も必須。Web へは、API が返す HTML の meta 要素で渡す（ADR-004） | `local` | Cloud Run の環境変数 |
 | `APP_VERSION` | api | `/api/health` の `version`（コミット SHA） | 未設定なら `dev` | API の Dockerfile が `build-api-image` の build-arg から環境変数に入れる |
-| `PORT` | api | 待ち受けるポート | `3000` | Cloud Run が `8080` を渡す |
+| `PORT` | api, web（開発サーバー） | 待ち受けるポート（未設定なら `3000`。1〜65535 の整数でなければ起動しない）。API は、local では `127.0.0.1` だけで待ち受け（同じネットワークのほかの端末からは開けない）、staging・production ではすべてのインターフェースで待ち受ける。local と e2e では、Vite の開発サーバーが `/api/` で始まるパスをこのポートへ転送する（API と同じ値を、Makefile が `.env` から、e2e は Playwright の `webServer` が渡す） | `3000` | Cloud Run が `8080` を渡す |
 | `WEB_DIST_DIR` | api | Web のビルドの出力の置き場所。ここにあるファイルを API が `/*` で返す（ADR-004） | 未設定（静的ファイルを返さない。Web は Vite の開発サーバーが返す） | API の Dockerfile が入れる（イメージの中のパス） |
-| `DATABASE_URL` | api, db | PostgreSQL の接続文字列 | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
+| `DATABASE_URL` | api, db | PostgreSQL の接続文字列（API は無ければ起動しない） | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
 | `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
-| `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直す。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
+| `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直してマイグレーションを当てる。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと。作り直しは同じサーバーの `postgres` の DB につなぎ、その DB への接続を切って消してから作るので、ロールに CREATEDB の権限が要り、テスト用の DB の持ち主かスーパーユーザーでなければならない。local の Docker と CI のサービスコンテナのロールはスーパーユーザー） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
 | `BETTER_AUTH_SECRET` | api | セッションの署名鍵（32バイト以上の乱数。`openssl rand -base64 32` の出力。値が UTF-8 で32バイトに満たなければ起動しない） | `.env` に任意の値 | Secret Manager `moonx-{env}-better-auth-secret` |
 | `BETTER_AUTH_URL` | api | 公開の URL（Cookie と OAuth のコールバックの基準） | `http://localhost:5173` | `https://stg.{DOMAIN}` / `https://{DOMAIN}` |
-| `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り） | `http://localhost:5173` | `https://stg.{DOMAIN}` / `https://{DOMAIN}` |
+| `TRUSTED_ORIGINS` | api | 許可するオリジン（カンマ区切り。1つも無ければ起動しない） | `http://localhost:5173` | `https://stg.{DOMAIN}` / `https://{DOMAIN}` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | api | Google ログイン（OAuth クライアント。環境ごとに作る。片方だけ入れると起動しない。staging・production は空でも起動しない。local だけ空にでき、Google ログインだけが使えなくなる） | 開発用のクライアント | ID は環境変数、SECRET は Secret Manager `moonx-{env}-google-client-secret` |
 | `MAIL_TRANSPORT` | api | `console` / `resend`（それ以外の値では起動しない。staging・production は `resend` でなければ起動しない。`console` は招待のリンクを含むメールの全文をログに出すので、local とテストだけで使う） | `console` | `resend` |
-| `RESEND_API_KEY` | api | Resend の API キー | 不要 | Secret Manager `moonx-{env}-resend-api-key` |
+| `RESEND_API_KEY` | api | Resend の API キー（`MAIL_TRANSPORT=resend` のとき、空なら起動しない） | 不要 | Secret Manager `moonx-{env}-resend-api-key` |
 | `MAIL_FROM` | api | 送信元 | `moonx <no-reply@localhost>` | `moonx <no-reply@{DOMAIN}>` |
 | `MAIL_ALLOWLIST` | api | staging でだけ使う送信先の許可リスト（カンマ区切り。大文字小文字を区別しない）。staging では、ここに無い宛先にメールを送らない。空なら誰にも送らない（扱いは ADR-013）。local と production では読まない | 空 | staging だけ設定 |
 | `AVATAR_BUCKET` | api | プロフィール写真のバケット（staging・production は空なら起動しない） | 空（local はディスク `./.data/avatars`。API が `/api/avatars/{name}` で返す。U9） | `{GCP_PROJECT_ID}-moonx-{env}-avatars` |
 | `SENTRY_DSN` | api | Sentry（API。プロジェクト `moonx-api`） | 空 | Cloud Run の環境変数（Terraform の環境ごとの変数で入れる。DSN は秘密ではないので Secret Manager に置かない） |
 | `WEB_SENTRY_DSN` | api | Sentry（Web。プロジェクト `moonx-web`）。API が Web の HTML の meta 要素 `moonx-sentry-dsn` で渡す（ADR-004） | 空（local の Web は Sentry に送らない） | Cloud Run の環境変数（`SENTRY_DSN` と同じく Terraform の環境ごとの変数で入れる） |
-| `LOG_LEVEL` | api | `debug` / `info` / `warn` / `error` | `debug` | `info` |
+| `LOG_LEVEL` | api | `debug` / `info` / `warn` / `error`（それ以外の値では起動しない） | `debug` | `info` |
+
+API は値の前後の空白を除き、空の値（空白だけの値を含む）を未設定として扱う。local で未設定の `BETTER_AUTH_URL`・`TRUSTED_ORIGINS`・`MAIL_TRANSPORT`・`MAIL_FROM`・`LOG_LEVEL` には、上の表の「local の値」を使う。staging・production で未設定の `LOG_LEVEL` は `info` にする（ほかの4つは必須）。
 
 `.env` はリポジトリの直下に1つ置く。`make setup` が `.env.example` をコピーする。直下の `.env` は Makefile が読み込んで各コマンドに渡し、Vite は `envDir` をリポジトリの直下にする。Web はビルドに環境ごとの値を持たない（環境名と Sentry の DSN は、API が返す HTML から読む。local の Vite の開発サーバーでは meta 要素が無いので、環境名は `local`、Sentry は使わない）。
 
@@ -181,12 +183,12 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `build-web SHA=...` | Web をビルドする。環境ごとの値は入れないので、1回のビルドを両方の環境で使う。入れるのは Sentry の `release` に使う版（SHA。省くと `dev`）だけ。`build-api-image` が使う |
 | `build-api-image SHA=...` | `build-web` の結果と API を1つの Docker イメージにまとめて Artifact Registry に上げ、Web と API のソースマップを Sentry の `moonx-web`・`moonx-api` に上げる（`release` = SHA）。`build.yml` が `make test` の後に使う（04_deployment-procedure.md 2章） |
 | `test` | `test-domain`・`test-api`・`test-web` をまとめて実行 |
-| `test-domain` / `test-api` / `test-web` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査・`db-check`・`promote`・`promote-check`）、`test-api` は `apps/api` と `packages/db`（どちらも `DATABASE_URL_TEST` の DB を作り直して使う）、`test-web` は `apps/web`・`packages/ui-web` |
+| `test-domain` / `test-api` / `test-web` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査・`db-check`・`promote`・`promote-check`）、`test-api` は `apps/api` と `packages/db`（どちらも `DATABASE_URL_TEST` の DB を作り直し、マイグレーションを当てて使う）、`test-web` は `apps/web`・`packages/ui-web` |
 | `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して。PWA の検査は、先に `build-web SHA=dev` でビルドした Web を API から返す形で起動する）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
 | `lint` / `format` / `typecheck` | Biome の検査・整形（`lint` は画面の検査スクリプト `scripts/check-screens.ts` も動かす）、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
-| `db-check BASE=...` | マイグレーションが足すだけになっているかを、`BASE` から `HEAD` までの差分で検査する。`packages/db/migrations/` の既にあるファイルと `meta/_journal.json` の既にある行を変えていない・消していないこと、足した行の `when` が `BASE` の最後の行より大きいこと（同じ値も失敗）を確かめる。`BASE` に journal が無ければ（最初のマイグレーション）、足した行どうしの `when` が増えていくことだけを確かめる（ADR-009）。`ci.yml` が使う（`BASE` は `promote-check` と同じ） |
+| `db-check BASE=...` | マイグレーションが足すだけになっているかを、`BASE` から `HEAD` までの差分で検査する。`packages/db/migrations/` の既にあるファイルと `meta/_journal.json` の既にある行を変えていない・消していないこと、足した行の `when` が整数で、`BASE` のどの行よりも大きく、足した行どうしでも増えていくこと（同じ値も失敗）、足した行の `tag` がほかの行と重ならず、`BASE` の後に足した同じ名前の `.sql` のファイルを指すことを確かめる。`BASE` の journal に `when` が整数でない行があれば、比べられないので失敗する。`BASE` に journal が無ければ（最初のマイグレーション）、`when` は `BASE` と比べず、足した行どうしで増えていくことを確かめる（ADR-009）。`ci.yml` が使う（`BASE` は `promote-check` と同じ） |
 | `db-migrate` | マイグレーションを適用する（`DATABASE_URL_DIRECT` か `DATABASE_URL`） |
 | `db-seed` / `db-reset` | 全テーブルの中身を消してデモデータを入れる（design-spec 8章。テンプレートは `data/templates/bcdx/` のファイルを AD10 と同じ取り込みの処理で入れて公開する。`APP_ENV=local` のときだけ動く。何度動かしても行の id は変わらない。6.5）/ DB を作り直してシードまで |
 | `db-studio` | Drizzle Studio |
@@ -200,6 +202,8 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `promote ENV=... [SHA=...]` | 昇格の PR（戻すときも同じ。ADR-016）を手元から作る。まず `git fetch origin` し、作業ツリーに変更が無く、`main` が `origin/main` と同じことを確かめる。`SHA` は短い形でもよく、完全な SHA に直して使う。省くと、staging は `deploy/` 以外を変えた `main` の最新のコミット、production は今の `deploy/staging/version`。省いた SHA が、今の版より古い（戻すことになる）か、その環境で前に戻した版（その環境の履歴にあって、今の版より新しい）なら、止めて `SHA` の指定を求める。確かめること: SHA が今の版と違う。その `build.yml` が成功し（gh）、イメージが Artifact Registry にある（gcloud）。production なら、その SHA を `deploy/staging/version` に書いたコミットの `deploy.yml` が成功している（gh）。そのあとブランチ `promote/{env}-<SHA の先頭7文字>` を作り（同じ名前のブランチが手元か origin に残っていれば、それを使う PR が開いているときは止め、そうでなければ消してから作る）、`deploy/{env}/version` を書いて（無ければ作る）コミットし、`promote-check BASE=origin/main` が通ったら push して PR を開く（gh）。件名は 03_dev-setup.md 9章「コミットメッセージ」の形（進めるときは promote、戻すときは roll back）。本文には、今の版と出す版の SHA・コミットの一覧・マイグレーションの一覧・戻し方（今の版の SHA で `promote` を動かす）を入れる。一覧の範囲は、いちばん先まで出した版（04_deployment-procedure.md 4.1）で決める。出す版がそれより新しいときは、コミットは今の版から出す版まで、マイグレーションはいちばん先まで出した版より後のもの（この昇格で新しく当たるもの）。古いときは、どちらも出す版から、いちばん先まで出した版まで（DB に当たっていて出す版に無いもの）とし、出す版が直前の版（同 4.1）かどうかも書く。その環境の前回の `deploy.yml`（今の版を書いたコミットのもの）が成功していなければ、本文の先頭にそう書き、Cloud Run で動いている版の SHA も出す（gcloud）。最初の昇格（今の版が無い）では、今の版は「なし」とし、コミットの一覧は省き、マイグレーションはすべて出す（04_deployment-procedure.md 4.2・5.1） |
 | `promote-check BASE=...` | `BASE` から `HEAD` までの差分のうち `deploy/` を検査する。`deploy/` を変えていなければ何もしない。変えていれば、次をすべて満たさないと失敗する: 変えたファイルは `deploy/staging/version` か `deploy/production/version` のどちらか1つだけで、ほかのファイルを一緒に変えていない（消してもいない）。中身は完全な SHA が1行で、`BASE` の時点の `main` にあるコミット。その SHA が `BASE` の時点のその環境の版より古い（戻す）なら、その環境の `deploy/{env}/version` に `BASE` までに書かれたことがある（`BASE` にその環境のファイルが無ければ、この条件は無い）。production なら、`deploy/staging/version` に `BASE` までに書かれたことがある。`ci.yml`（`BASE` は、PR を検査するマージのコミットの1つ目の親）・`deploy.yml`（`BASE` は push の前のコミット）・`promote` が使う（04_deployment-procedure.md 2章） |
 | `db-backup ENV=...` | `pg_dump -Fc` を取り、`gs://{GCP_PROJECT_ID}-moonx-backups/{env}/<日付>.dump` に上げる（バケットは30日で自動削除。定期実行の GitHub Actions が使う。05_operation-runbook.md） |
+
+Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infra-plan`・`infra-apply`・`db-backup`）は、プロジェクトを `gcloud config` のプロジェクトから取る（`GCP_PROJECT_ID=...` で上書きできる）。空なら動かずに止まる。Terraform のプロジェクト ID は各 `envs` の変数に書き（03_dev-setup.md 5.4）、make はこの値を tfstate のバケットの名前（`{GCP_PROJECT_ID}-tfstate`）にだけ使う（backend は変数を読めないため）。
 
 ---
 
@@ -499,7 +503,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
   - PWA: アイコン（SVG と PNG）とマニフェスト（ADR-031）
   - 06 はネイティブ向けの値を持たない（2026-10-12 に外した。ネイティブの feature で要るものを足す）
-- **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は `<html data-theme>` と `prefers-color-scheme`（4 アカウント設定の System / Light / Dark に従う）。
+- **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は 4 アカウント設定の System / Light / Dark に従い、Light と Dark は `<html data-theme="light|dark">` で固定し、System は属性を置かずに `prefers-color-scheme` に従う。
 - **スケール（Web）**: 既定は `medium`。タッチ操作が主の端末（`@media (pointer: coarse)`）は `large` にする。`<html data-scale="medium|large">` で固定でき、固定が優先される。タッチパネル付きのノート PC も `pointer: coarse` に当たるときは `large` になる。
 - **書体**: 書体の名前の正は 06 の `primitive.font.family`（self-host する書体はどれも SIL OFL 1.1。並びの残りは配らない OS の書体）。Web は npm の `@fontsource/ibm-plex-sans`・`@fontsource/ibm-plex-mono`・`@fontsource/ibm-plex-sans-jp` を依存に入れて self-host する（外部の CDN からは読まない）。読み込むのは 06 の `primitive.font.weight` の太さだけで、ファイルは woff2 だけを使う。日本語の書体は字の範囲（`unicode-range`）ごとに分かれたファイルのまま使い、画面に出た字のファイルだけをブラウザが読む。Service Worker でのキャッシュの仕方は ADR-031、PDF の書体は ADR-012。
 - **アイコン**: Lucide（`lucide-react`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。
@@ -601,7 +605,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 - **Web（`packages/ui-web`）**: 振る舞いとアクセシビリティは **React Aria Components**（キーボード操作・フォーカスの管理・ARIA・国際化された数値と日付の入力）。見た目は **vanilla-extract**（`*.css.ts` に型付きで書き、ビルド時に静的な CSS になる。実行時の処理なし）。大きさや種類の出し分けは `@vanilla-extract/recipes` の `recipe()`（例: `size: S | M | L | XL`、`variant: primary | secondary | negative`）。React Aria の状態は `data-*` 属性（`[data-hovered]`・`[data-pressed]`・`[data-focus-visible]`・`[data-disabled]` など）で書く。Popover と Tray の切り替えは、幅がトークンの `semantic.breakpoint.tablet` より狭いときに Tray（下からのシート）にする共通の部品で行う。
 - **部品の名前と API**: design-spec 4.5 の Spectrum の名前にそろえる（例: `<Button variant="primary" size="M">`、`<StatusLight variant="partial">`）。のちのネイティブの部品も同じ名前と props にする。props の型は `packages/ui-web` で定義し、共通の部分（`size`・`variant` などの値の型）は `packages/ui-tokens` に手で書いて置く（`packages/ui-tokens/src/generated/` が `make tokens` の生成物、`src/types.ts` などそれ以外は手で書くファイル）。
-- **画面にスタイルを書かない**: `apps/web` の画面は、部品と、レイアウトの部品（`Flex`・`Grid`。間隔はトークンの名前だけを受け取る。例: `gap="space-300"`）の組み合わせで作る。画面で `@vanilla-extract/css` を直接使うこと、`style` 属性に値を書くことは、Biome の `noRestrictedImports` と CI の検査で禁止する。必要な見た目が無ければ、design-spec 4.5 に部品を足してから `packages/ui-web` に作る。
+- **画面にスタイルを書かない**: `apps/web` の画面は、部品と、レイアウトの部品（`Flex`・`Grid`。間隔はトークンの名前だけを受け取る。例: `gap="space-300"`）の組み合わせで作る。画面で vanilla-extract のパッケージ（`@vanilla-extract/css`・`@vanilla-extract/recipes` など `@vanilla-extract/` で始まるもの）を直接使うこと、`style` 属性に値を書くことは、Biome の `noRestrictedImports` と CI の検査で禁止する。必要な見た目が無ければ、design-spec 4.5 に部品を足してから `packages/ui-web` に作る。
 - **スマホ（保留）**: ネイティブの feature で決める。部品の名前と props を Web にそろえる決まりは保つ。
 
 **理由:** ユーザーが「Tailwind のクラスを画面に直接書かない」「React Aria などの headless の部品を使う」と指定した。振る舞いを実績のある部品に任せると、ダイアログのフォーカスの閉じ込め・キーボード操作・スクリーンリーダー対応を自分で作らずに済む（design-spec 4.1 の設問フォームのキーボード操作、6.0.6 のモーダルの決まり）。見た目を部品の中に閉じ込めると、画面ごとのばらつきが出ず、Spectrum を参考にしたデザインシステム（ADR-018）を守りやすい。vanilla-extract はトークンを型として扱えるので、`semantic` 以外の値を使うと型エラーになる。
@@ -669,7 +673,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 **状態・日付:** 採用（2026-10-01。この ADR を書いたのは 2026-10-11。それまでは他の ADR の前提としてだけ書かれていた）
 
-**決定:** アプリ（`apps/*`）・共有パッケージ（`packages/*`）・スクリプト（`scripts/`）は TypeScript で書く。例外は `scripts/doc-lint.sh` と `.githooks/pre-commit`（DRAFT が配る検出点。シェルのまま使う）。型チェックは `make typecheck`。
+**決定:** アプリ（`apps/*`）・共有パッケージ（`packages/*`）・スクリプト（`scripts/`）は TypeScript で書く。例外は `scripts/doc-lint.sh` と `.githooks/pre-commit`（DRAFT が配る検出点）と `scripts/draft-loop.sh`（DRAFT の無人ループの駆動スクリプト）で、シェルのまま使う。型チェックは `make typecheck`。
 
 **理由:** ユーザーの希望（design-spec 9.3）。Eden Treaty の型の共有（ADR-006）、Drizzle のスキーマ（ADR-009）、トークンの型（ADR-025）も、どれも TypeScript を前提にしている。
 
@@ -774,7 +778,7 @@ API のルートは5章。API が返す Web の静的なファイルのうち、
 | 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、API の仕様書は `/api/docs`（staging だけ。ADR-006） |
 | 値の正 | API が検査する入力の値（必須・文字数・範囲・形式・ファイルの種類と大きさ）の正は design-spec 6.0.8「入力の規則」。この章の API の表と 6.3 の check 制約は値を書かずに 6.0.8 を参照する（check 制約が値を持つときは 6.0.8 と同じ値にする）。期限（招待・パスワード再設定のリンク・再認証）と、画面に出す件数の正も design-spec（6.16・各画面）。変えるときは design-spec を先に直す |
 | 認証 | Better Auth のセッション（HttpOnly Cookie）。公開と書いたもの以外はログインが要る（未ログインは 401 `UNAUTHENTICATED`） |
-| 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601（表示はクライアントが利用者のタイムゾーンで行う） |
+| 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601 で、ミリ秒の3桁と `Z` を付ける（`"2026-10-01T02:00:00.000Z"`。表示はクライアントが利用者のタイムゾーンで行う） |
 | 金額・率 | 金額は number（ワークスペースの通貨。自己分析は自己分析の通貨）。率は 0〜1 の小数（35% は `0.35`）。DB は numeric、API で number に変換する |
 | 部分更新 | 1つの項目は `PATCH`（送った項目だけ変える）、キーで決まる項目（回答・数字）は `PUT .../{key}` で作るか更新する |
 | 同時編集 | 項目を更新するリクエストは、読んだときの `lockVersion` を送る。違えば 409 `CONFLICT` と相手の内容を返す。「自分の内容で上書きする」は同じ内容に `force: true` を付けて送る（ADR-019）。まだ行が無い項目（未回答の設問など）の `lockVersion` は `0`。一覧に出る行（調査ログ・競合・費用行など）は作成時の `lockVersion` が 0、キーで決まる項目（回答・数字）は最初の保存で 1 になる。何も変えないリクエストは `lockVersion` を上げず、履歴も書かない。キーで決まる項目を同時に作られて負けたときは、`force: true` でも 409 `CONFLICT`（`current` を読んでからやり直す）。V4・V5 は根拠の付け外しのたびに、対象の項目の `lockVersion` を上げる |
@@ -899,10 +903,11 @@ interface TemplateRef { versionId: UUID; versionNumber: number; newerVersion: { 
 
 // ---- 計算結果（packages/domain。design-spec 6.4 の計算仕様） ----
 type MetricReason = "needs_price" | "needs_monthly_costs" | "needs_expected_sales" | "needs_startup_costs"
-  | "margin_not_positive" | "target_margin_unreachable" | "not_recovered" | "empty";
+  | "margin_not_positive" | "target_margin_unreachable" | "not_recovered"
+  | "empty" | "unknown";                       // unknown は、入力そのものを出す主要指標（selling_price・capacity_units_day・cost_row:*）の入力が Unknown のとき
 interface MetricValue {
   value: number | null;                       // 丸める前の値。計算できなければ null
-  bound: "exact" | "lower" | "upper";         // lower = 「+」、upper = 「≤」（費用に未入力・Unknown の行があるとき）
+  bound: "exact" | "lower" | "upper" | "approximate";   // lower = 「+」、upper = 「≤」（費用に未入力・Unknown の行があるとき）、approximate = 「≈」（どちらにずれるか決まらないとき。design-spec 6.4 の損失の ROI）
   reason: MetricReason | null;                // value が null の理由。value も reason も null は、売上 0 の営業利益率で、ダッシュ記号で表示する
 }
 interface CostTotal { amount: number | null; isLowerBound: boolean; unknownRows: number; emptyRows: number; }
@@ -1584,7 +1589,7 @@ interface TemplateFile {
   }[];                                 // 並びはファイルの順
   costDefaults: { category: CostCategory; key: string; name: string }[];                     // 検証だけ（他は []）
   checkRules: { checkKey: CheckKey; params: Record<string, number> }[];                       // 検証だけ（他は []）
-  executionPresets: { type: "milestone" | "launch" | "kpi"; title: string; area: string | null; launchTiming: LaunchTiming | null }[];   // プランだけ（他は []）
+  executionPresets: { type: "milestone" | "launch" | "kpi"; title: string; area: string | null; launchTiming: LaunchTiming | null }[];   // プランだけ（他は []）。area は KPI だけ、launchTiming はローンチだけで必須
 }
 ```
 
@@ -1598,7 +1603,7 @@ interface TemplateFile {
 | AD3 PATCH | `{ aiPrompt: string }` | `200 TemplateVersionDetail` | 検証とプランの版に空でない値を送ると `422 VALIDATION_FAILED`（AI 用プロンプトを持つのは自己分析だけ。design-spec 6.17）。公開済みの版は `409 PUBLISHED_READ_ONLY`（AD4・AD5・AD6 publish も同じ。AD6 validate は書き込まないので公開済みの版にも使える） |
 | AD4 | セクション: `{ key; title; subtitle?; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（`reference` は 27 の画面からは送らない。変えるのは AD10 の取り込みだけ。design-spec 6.17。PATCH は一部。文字の値は design-spec 6.0.8） | `201` / `200` / `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`） |
 | AD5 | order: `{ sections: { id: UUID; questionIds: UUID[] }[] }`。cost-defaults: `{ items: { category; key; name }[] }`。check-rules: `{ items: { checkKey; params }[] }`（基準値は design-spec 6.0.8）。execution-presets: `{ items: { type; title; area?; launchTiming? }[] }` | `200 TemplateVersionDetail` | 一覧ごと置き換える |
-| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 公開をふさぐエラー: 設問が0件（`no_questions`）、セクションの `part` の過不足（`invalid_part`。プランは A / B が必須、他は無し）、設問 ID の形式（`invalid_question_key`）・セクションとの不一致（`question_key_section_mismatch`）・重複（`duplicate_question_key`）、`answerType` と `options` の食い違い（`options_mismatch`）、`displayCondition` が存在しない設問を指す（`unknown_condition_key`）。警告: 前の版から消えた ID |
+| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 公開をふさぐエラー: 設問が0件（`no_questions`）、セクションの `part` の過不足（`invalid_part`。プランは A / B が必須、他は無し）、設問 ID の形式（`invalid_question_key`）・セクションとの不一致（`question_key_section_mismatch`）・重複（`duplicate_question_key`）、`answerType` と `options` の食い違い（`options_mismatch`。選択肢・表の列・主要指標が空のときも）、`displayCondition` が存在しない設問を指す（`unknown_condition_key`）。警告: 前の版から消えた ID |
 | AD6 publish | — | `200 { versionNumber: number; publishedAt: DateTime }` | 検査のエラーがあれば `422 TEMPLATE_INVALID`。既存の回答は変わらない |
 | AD7 users | `?q=&status=&cursor=` | `200 Page<AdminUser>` | 中身（アイデア・回答）は返さない |
 | AD7 workspaces | `?q=&cursor=` | `200 Page<AdminWorkspace>` | |
@@ -1616,7 +1621,7 @@ interface TemplateFile {
 
 ## 6. データモデル
 
-**データモデルの正はこの章。** Phase 2 の design-spec 7章（論理設計）を Phase 3 で引き継いだ。スキーマを変えるときはこの章と `packages/db/src/schema.ts` を一緒に更新し、`make db-generate` でマイグレーションを作る。
+**データモデルの正はこの章。** Phase 2 の design-spec 7章（論理設計）を Phase 3 で引き継いだ。スキーマを変えるときはこの章と `packages/db/src/schema.ts` を一緒に更新し、`make db-generate` でマイグレーションを作る。`make test-api` が、6.3 のコードと `schema.ts` がコメントと整形を除いて同じであること、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB が `schema.ts` のとおりであることを確かめる（10章）。
 
 ### 6.1 ER図
 
@@ -1680,7 +1685,7 @@ self_analyses / validations / business_plans ─ N:1 template_versions（作成�
 // packages/db/src/schema.ts
 import { sql } from "drizzle-orm";
 import {
-  type AnyPgColumn, bigint, boolean, check, date, index, integer, jsonb, numeric,
+  type AnyPgColumn, bigint, boolean, check, date, foreignKey, index, integer, jsonb, numeric,
   pgEnum, pgTable, text, timestamp, uniqueIndex, uuid,
 } from "drizzle-orm/pg-core";
 
@@ -1702,6 +1707,11 @@ const versioned = () => ({
 const money = () => numeric({ precision: 15, scale: 2, mode: "number" });
 // 率。0.3500 = 35%。% の入力は小数第2位まで（design-spec 6.0.8）なので、率は小数第4位までで丸めずに持てる
 const ratio = () => numeric({ precision: 7, scale: 4, mode: "number" });
+// 次の2種類の制約とインデックスには、下のコードで名前を付ける:
+// - drizzle-kit が付ける名前が PostgreSQL の上限（63バイト）を超えるもの: 超えた名前は PostgreSQL が切り詰め、DB と
+//   drizzle-kit のスナップショットが食い違う。外部キーは foreignKey() で名前を付ける
+// - 2語以上の列の unique(): drizzle-orm は snake_case に直す前の列名で invitations_tokenHash_unique のように名前を付け、
+//   DB の名前に大文字が混ざってほかの名前とそろわない
 
 // ---------- enum ----------
 export const userStatus = pgEnum("user_status", ["active", "suspended", "deleted"]);
@@ -1834,7 +1844,7 @@ export const invitations = pgTable("invitations", {
   email: text().notNull(),
   role: workspaceRole(),
   grantsAdmin: boolean().notNull().default(false),   // true = 受諾した人を運営者にする。`make admin-create` だけが付ける（ワークスペースなしのときだけ）
-  tokenHash: text().notNull().unique(),           // SHA-256。トークンそのものは持たない
+  tokenHash: text().notNull().unique("invitations_token_hash_unique"),   // SHA-256。トークンそのものは持たない
   invitedById: uuid().references(() => users.id),   // null = `make admin-create` の招待（運営者がまだ居ない）
   status: invitationStatus().notNull().default("pending"),
   expiresAt: ts().notNull(),                      // 発行（再送）から数える。長さは design-spec 6.16
@@ -1903,37 +1913,48 @@ export const templateQuestions = pgTable("template_questions", {
 
 export const templateCostDefaults = pgTable("template_cost_defaults", {
   id: pk(),
-  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  templateVersionId: uuid().notNull(),            // 外部キーは末尾（63バイトに収まる名前を付ける）
   category: costCategory().notNull(),
   key: text().notNull(),                          // 例: "initial.permits"、"monthly.rent"
   name: text().notNull(),
   sortOrder: integer().notNull(),
   ...timestamps(),
-}, (t) => [uniqueIndex().on(t.templateVersionId, t.key)]);
+}, (t) => [
+  uniqueIndex().on(t.templateVersionId, t.key),
+  foreignKey({ name: "template_cost_defaults_template_version_id_fk", columns: [t.templateVersionId], foreignColumns: [templateVersions.id] })
+    .onDelete("cascade"),
+]);
 
 export const templateCheckRules = pgTable("template_check_rules", {
   id: pk(),
-  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  templateVersionId: uuid().notNull(),            // 外部キーは末尾（63バイトに収まる名前を付ける）
   checkKey: checkKey().notNull(),
   params: jsonb().notNull(),                      // 基準値。例: competitors は { "min": 3 }（目安の上限 5 は持たない。5.2 の CheckResult）
   ...timestamps(),
-}, (t) => [uniqueIndex().on(t.templateVersionId, t.checkKey)]);
+}, (t) => [
+  uniqueIndex().on(t.templateVersionId, t.checkKey),
+  foreignKey({ name: "template_check_rules_template_version_id_fk", columns: [t.templateVersionId], foreignColumns: [templateVersions.id] })
+    .onDelete("cascade"),
+]);
 
 export const templateExecutionPresets = pgTable("template_execution_presets", {
   id: pk(),
-  templateVersionId: uuid().notNull().references(() => templateVersions.id, { onDelete: "cascade" }),
+  templateVersionId: uuid().notNull(),            // 外部キーは末尾（63バイトに収まる名前を付ける）
   type: presetType().notNull(),
   title: text().notNull(),                        // 例: "Business decision"、"30 days before launch"、"Revenue"
   area: text(),                                   // KPI だけ（Financial / Customer / Operations）
   launchTiming: launchTiming(),                   // ローンチだけ
   sortOrder: integer().notNull(),
   ...timestamps(),
-});
+}, (t) => [
+  foreignKey({ name: "template_execution_presets_template_version_id_fk", columns: [t.templateVersionId], foreignColumns: [templateVersions.id] })
+    .onDelete("cascade"),
+]);
 
 // ---------- 自己分析 ----------
 export const selfAnalyses = pgTable("self_analyses", {
   id: pk(),
-  userId: uuid().notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid().notNull().unique("self_analyses_user_id_unique").references(() => users.id, { onDelete: "cascade" }),
   templateVersionId: uuid().notNull().references(() => templateVersions.id),
   currency: text().notNull().default("PHP"),
   status: selfAnalysisStatus().notNull().default("not_started"),
@@ -1979,7 +2000,7 @@ export const ideas = pgTable("ideas", {
 
 export const validations = pgTable("validations", {
   id: pk(),
-  ideaId: uuid().notNull().unique().references(() => ideas.id, { onDelete: "cascade" }),
+  ideaId: uuid().notNull().unique("validations_idea_id_unique").references(() => ideas.id, { onDelete: "cascade" }),
   templateVersionId: uuid().notNull().references(() => templateVersions.id),
   ...timestamps(),
 });
@@ -2130,7 +2151,7 @@ export const businessPlans = pgTable("business_plans", {
   businessName: text().notNull(),
   preparedBy: text().notNull(),
   templateVersionId: uuid().notNull().references(() => templateVersions.id),
-  createdFromDecisionId: uuid().references((): AnyPgColumn => decisionLogEntries.id),
+  createdFromDecisionId: uuid(),                  // 外部キーは末尾（63バイトに収まる名前を付ける）
   archivedAt: ts(),
   deletedAt: ts(),                                // 作成の取り消し（5.11）でだけ入れる。戻さない
   lastActivityAt: ts().notNull().defaultNow(),
@@ -2140,6 +2161,7 @@ export const businessPlans = pgTable("business_plans", {
 }, (t) => [
   // 作成を取り消した案の名前は、見えない名前とぶつからないように数えない（design-spec 6.0.8）
   uniqueIndex("business_plans_name_uq").on(t.ideaId, t.name).where(sql`${t.deletedAt} is null`),
+  foreignKey({ name: "business_plans_created_from_decision_id_fk", columns: [t.createdFromDecisionId], foreignColumns: [decisionLogEntries.id] }),
 ]);
 
 export const planAnswers = pgTable("plan_answers", {
@@ -2203,7 +2225,7 @@ export const decisionLogEntries = pgTable("decision_log_entries", {
   workspaceId: uuid().notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   ideaId: uuid().notNull().references(() => ideas.id, { onDelete: "cascade" }),
   businessPlanId: uuid().references((): AnyPgColumn => businessPlans.id, { onDelete: "cascade" }),
-  planVersionId: uuid().references(() => planVersions.id),
+  planVersionId: uuid().references((): AnyPgColumn => planVersions.id),
   kind: decisionKind().notNull(),
   value: decisionLogValue(),                      // version_saved は null
   reason: text(),                                 // 判定と Go / No-Go は必須（API で検査）
@@ -2279,7 +2301,7 @@ export const changeHistory = pgTable("change_history", {
   changedById: uuid().notNull().references(() => users.id),
   changedAt: ts().notNull().defaultNow(),
 }, (t) => [
-  index().on(t.targetType, t.targetId, t.targetKey, t.changedAt),
+  index("change_history_target_idx").on(t.targetType, t.targetId, t.targetKey, t.changedAt),
   index().on(t.containerType, t.containerId, t.changedAt),
   index().on(t.workspaceId, t.changedAt),
   index().on(t.batchId),
@@ -2293,8 +2315,8 @@ export const changeHistory = pgTable("change_history", {
 
 | 指定 | 内容 |
 |---|---|
-| `{ kind: "validation_answers", section?, keys? }` | 検証の回答。`section`（`"01"`）か `keys`（設問 ID の配列） |
-| `{ kind: "competitors", limit }` | 検証の競合の上位 `limit` 件（V17 で並べた `sortOrder` の順。Pitch Deck の競合のスライドも同じ順） |
+| `{ kind: "validation_answers", section?, keys? }` | 検証の回答。`section`（`"01"`）か `keys`（設問 ID の配列）のどちらか一方 |
+| `{ kind: "competitors", limit }` | 検証の競合の上位 `limit` 件（1以上の整数。V17 で並べた `sortOrder` の順。Pitch Deck の競合のスライドも同じ順） |
 | `{ kind: "cost_rows", keys }` | 費用行。`keys` はテンプレートの費用行のキー（`initial.permits`） |
 | `{ kind: "research_log", tag }` | 調査ログのうち `tag`（`local_price` / `permits` / `demand_signal`）が付いたもの |
 | `{ kind: "self_analysis", sections }` | 共有された自己分析のセクション（`WHY` など） |
@@ -2502,9 +2524,10 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目 | 決定 |
 |---|---|
 | ライブラリ | i18next ＋ react-i18next（Web）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール） |
-| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
+| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。どの画面でも同じ、列挙の値（5.2）の表示名は `common` に置き、キーは `<まとまり>.<値>`（例: `common:stage.launch_prep`・`common:checkState.not_started`・`common:decision.proceed`）。キーの語は camelCase にし、API の値（列挙の値・`error.code`・セクションのキー）はそのまま使う（例: `common:check.competitorsRange`・`errors:VALIDATION_FAILED`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
-| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`・`formatWaitTime()`（回数制限の待ち時間）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
+| 入力の検査の文言 | クライアントの Zod の検査（8.2）の issue の `code` から選ぶ。`too_small`・`too_big` は `origin`（文字数か数か）と `minimum`・`maximum`、`invalid_format` は `format`（`email`・`url`・`date`・`datetime`、テンプレートのファイルの `question_key`・`copy_source` など）、`invalid_type` は `expected`（`int` は整数でない数。ほかは型の違い）、`invalid_value` は選択肢に無い値、`packages/schemas` の自前の検査（`custom`）は `params.rule`（`InputRule` の型: `required`・`decimals`・`positive`・`nul_character`・`number_format`・`currency`・`time_zone`・`lone_surrogate`・`unique`（テンプレートのファイルで、キーや選択肢が重なる））を見て、カタログの文言を出す。26 のファイルの取り込み（AD10）は、`path` が `kind` の issue を「テンプレートの種類が違う」、それ以外の issue を「書式が読めない」としてまとめ、`path` で場所を添える（design-spec 6.17）。issue の `message` は開発者向けで、画面に出さない |
+| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`・`formatOverdue()`（期限切れの日数）・`formatWaitTime()`（回数制限の待ち時間）・`formatCheckName()`（確認項目の名前。競合の基準値の幅を付ける）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（ブラウザと Bun） |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |
@@ -2521,6 +2544,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 |---|---|---|---|
 | 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
+| DB のスキーマとマイグレーション（`packages/db`・`scripts/db-check.ts`） | Bun test ＋ 実際の PostgreSQL（`db-check` は一時的な Git のリポジトリ） | — | 6.3 のコードと `schema.ts` がコメントと整形を除いて同じこと、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB の列・制約・インデックス・列挙が `schema.ts` から作った一時的なテーブルと PostgreSQL の表記で一致すること、`relations()` が外部キーと1対1に対応し、名前が `relations.ts` の先頭に書いた規則に従うこと、テスト用の DB の作り直しが `_test` で終わらない名前とクエリ文字列を拒むこと、`db-check` が2章の失敗の場合をすべて捕まえること |
 | API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012） |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作（axe の検査は E2E で行う。ADR-022） |
 | Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |

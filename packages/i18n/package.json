@@ -1,0 +1,12 @@
+{
+  "name": "@moonx/i18n",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@moonx/schemas": "workspace:*",
+    "i18next": "^26.4.4"
+  }
+}

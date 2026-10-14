@@ -1,0 +1,663 @@
+{
+  "format": "moonx-template",
+  "formatVersion": 1,
+  "kind": "validation",
+  "name": "Business Idea & Validation",
+  "aiPrompt": "",
+  "sections": [
+    {
+      "key": "01",
+      "part": null,
+      "title": "Customer & Problem",
+      "subtitle": null,
+      "guidance": "Define exactly who pays, what problem recurs, and why they would change behavior. Use evidence where possible.",
+      "questions": [
+        {
+          "key": "V.01.WHO",
+          "title": "WHO",
+          "prompt": "Who is the primary paying customer?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.01.WHY_THEM",
+          "title": "WHY THEM",
+          "prompt": "Why is this customer attractive?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.01.BEHAVIOR",
+          "title": "BEHAVIOR",
+          "prompt": "What do they do today instead?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.01.PROBLEM",
+          "title": "PROBLEM",
+          "prompt": "What problem are we solving?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.01.FREQUENCY",
+          "title": "FREQUENCY",
+          "prompt": "How often does the problem occur?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.01.SEVERITY",
+          "title": "SEVERITY",
+          "prompt": "How painful or costly is it?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.01.PAYMENT",
+          "title": "PAYMENT",
+          "prompt": "Why would the customer pay?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.01.SWITCHING",
+          "title": "SWITCHING",
+          "prompt": "What would make them switch from current alternatives?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.01.NON_CUSTOMER",
+          "title": "NON-CUSTOMER",
+          "prompt": "Who is probably NOT the customer?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.01.PROOF",
+          "title": "PROOF",
+          "prompt": "What evidence suggests this customer and problem exist?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "02",
+      "part": null,
+      "title": "Market",
+      "subtitle": null,
+      "guidance": "Judge whether this is Red, Blue, or Mixed—and explain why. Competition is evidence to study, not automatically a negative.",
+      "questions": [
+        {
+          "key": "V.02.CATEGORY",
+          "title": "CATEGORY",
+          "prompt": "How would you classify the market?",
+          "example": null,
+          "hint": null,
+          "answerType": "short_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.OCEAN",
+          "title": "OCEAN",
+          "prompt": "Red, Blue, or Mixed?",
+          "example": null,
+          "hint": null,
+          "answerType": "choice",
+          "options": {
+            "kind": "choice",
+            "choices": ["Red", "Blue", "Mixed"]
+          },
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.WHY",
+          "title": "WHY",
+          "prompt": "Why did you choose that classification?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.DRIVERS",
+          "title": "DRIVERS",
+          "prompt": "What trends could increase demand?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.BARRIERS",
+          "title": "BARRIERS",
+          "prompt": "What could limit growth or entry?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.RED_1",
+          "title": "RED: SURVIVORS",
+          "prompt": "Which competitors appear to be surviving?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": {
+            "V.02.OCEAN": ["Red", "Mixed"]
+          },
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.RED_2",
+          "title": "RED: WHY",
+          "prompt": "Why are they still alive?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": {
+            "V.02.OCEAN": ["Red", "Mixed"]
+          },
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.RED_3",
+          "title": "RED: ECONOMICS",
+          "prompt": "What appears to be their economic engine?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": {
+            "V.02.OCEAN": ["Red", "Mixed"]
+          },
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.RED_4",
+          "title": "RED: FAILURE",
+          "prompt": "Why do competitors fail?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": {
+            "V.02.OCEAN": ["Red", "Mixed"]
+          },
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.BLUE_1",
+          "title": "BLUE: GAP",
+          "prompt": "If Blue/Mixed, what is underserved?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": {
+            "V.02.OCEAN": ["Blue", "Mixed"]
+          },
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.BLUE_2",
+          "title": "BLUE: WHY EMPTY",
+          "prompt": "Why has nobody already captured this?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": {
+            "V.02.OCEAN": ["Blue", "Mixed"]
+          },
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.BLUE_3",
+          "title": "BLUE: PROOF",
+          "prompt": "Why is this an opportunity rather than no demand?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": {
+            "V.02.OCEAN": ["Blue", "Mixed"]
+          },
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.MARKET_SIZE",
+          "title": "MARKET SIZE",
+          "prompt": "How many potential customers might exist?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.REACHABLE",
+          "title": "REACHABLE",
+          "prompt": "How many can we realistically reach at launch?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.02.SHARE",
+          "title": "SHARE",
+          "prompt": "What share / active-customer count is required for break-even?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "04",
+      "part": null,
+      "title": "Competitors & Substitutes",
+      "subtitle": null,
+      "guidance": "Study not only direct competitors, but also substitutes customers already use. Focus on why surviving businesses continue to work.",
+      "questions": [
+        {
+          "key": "V.04.SURVIVOR_PATTERNS",
+          "title": "Survivor Patterns",
+          "prompt": "Survivor Patterns",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.04.FAILURE_PATTERNS",
+          "title": "Failure Patterns",
+          "prompt": "Failure Patterns",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "08",
+      "part": null,
+      "title": "Investment Return",
+      "subtitle": null,
+      "guidance": "Return is only attractive if the assumptions behind Expected volume and profit are credible. Treat this as simple screening, not formal valuation.",
+      "questions": [
+        {
+          "key": "V.08.WORTH",
+          "title": "Is the return worth the capital and effort?",
+          "prompt": "Is the return worth the capital and effort?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    },
+    {
+      "key": "10",
+      "part": null,
+      "title": "Final Assessment",
+      "subtitle": null,
+      "guidance": "Answer these after the rest of the workbook. Proceed means 'worth deeper planning', not approval to launch.",
+      "questions": [
+        {
+          "key": "V.10.WHY_WORK",
+          "title": "Why might this work?",
+          "prompt": "Why might this work?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.10.WHY_FAIL",
+          "title": "Why might this fail?",
+          "prompt": "Why might this fail?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.10.MUST_BE_TRUE",
+          "title": "What must be true?",
+          "prompt": "What must be true?",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.10.BIGGEST_UNKNOWN",
+          "title": "Biggest unknown",
+          "prompt": "Biggest unknown",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.10.BIGGEST_RISK",
+          "title": "Biggest risk",
+          "prompt": "Biggest risk",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        },
+        {
+          "key": "V.10.BIGGEST_OPPORTUNITY",
+          "title": "Biggest opportunity",
+          "prompt": "Biggest opportunity",
+          "example": null,
+          "hint": null,
+          "answerType": "long_text",
+          "options": null,
+          "displayCondition": null,
+          "hasFau": true,
+          "copyFrom": null,
+          "reference": null
+        }
+      ]
+    }
+  ],
+  "costDefaults": [
+    {
+      "category": "initial",
+      "key": "initial.equipment",
+      "name": "Equipment"
+    },
+    {
+      "category": "initial",
+      "key": "initial.renovation",
+      "name": "Renovation / Fit-out"
+    },
+    {
+      "category": "initial",
+      "key": "initial.lease_deposit",
+      "name": "Lease Deposit / Advance"
+    },
+    {
+      "category": "initial",
+      "key": "initial.permits",
+      "name": "Permits / Registration"
+    },
+    {
+      "category": "initial",
+      "key": "initial.inventory",
+      "name": "Initial Inventory"
+    },
+    {
+      "category": "initial",
+      "key": "initial.branding",
+      "name": "Branding / Signage"
+    },
+    {
+      "category": "initial",
+      "key": "initial.launch_marketing",
+      "name": "Launch Marketing"
+    },
+    {
+      "category": "initial",
+      "key": "initial.tech_setup",
+      "name": "Technology / Systems Setup"
+    },
+    {
+      "category": "initial",
+      "key": "initial.working_capital",
+      "name": "Working Capital Buffer"
+    },
+    {
+      "category": "initial",
+      "key": "initial.other",
+      "name": "Other Startup Cost"
+    },
+    {
+      "category": "monthly_fixed",
+      "key": "monthly.rent",
+      "name": "Rent"
+    },
+    {
+      "category": "monthly_fixed",
+      "key": "monthly.salaries",
+      "name": "Salaries"
+    },
+    {
+      "category": "monthly_fixed",
+      "key": "monthly.utilities",
+      "name": "Utilities - Base"
+    },
+    {
+      "category": "monthly_fixed",
+      "key": "monthly.internet",
+      "name": "Internet / Software"
+    },
+    {
+      "category": "monthly_fixed",
+      "key": "monthly.accounting",
+      "name": "Accounting / Admin"
+    },
+    {
+      "category": "monthly_fixed",
+      "key": "monthly.marketing",
+      "name": "Base Marketing"
+    },
+    {
+      "category": "monthly_fixed",
+      "key": "monthly.insurance",
+      "name": "Insurance / Compliance"
+    },
+    {
+      "category": "monthly_fixed",
+      "key": "monthly.other",
+      "name": "Other Fixed Cost"
+    },
+    {
+      "category": "variable",
+      "key": "variable.materials",
+      "name": "Core Product / Materials"
+    },
+    {
+      "category": "variable",
+      "key": "variable.packaging",
+      "name": "Packaging"
+    },
+    {
+      "category": "variable",
+      "key": "variable.payment_fee",
+      "name": "Payment / Platform Fee"
+    },
+    {
+      "category": "variable",
+      "key": "variable.delivery",
+      "name": "Delivery / Fulfilment"
+    },
+    {
+      "category": "variable",
+      "key": "variable.labor",
+      "name": "Variable Labor / Commission"
+    },
+    {
+      "category": "variable",
+      "key": "variable.other",
+      "name": "Other Variable Cost"
+    }
+  ],
+  "checkRules": [
+    {
+      "checkKey": "competitors",
+      "params": {
+        "min": 3
+      }
+    },
+    {
+      "checkKey": "local_price",
+      "params": {
+        "pricedCompetitors": 2,
+        "researchLogs": 1
+      }
+    },
+    {
+      "checkKey": "permits",
+      "params": {
+        "researchLogs": 1
+      }
+    },
+    {
+      "checkKey": "demand_signal",
+      "params": {
+        "researchLogs": 1
+      }
+    }
+  ],
+  "executionPresets": []
+}

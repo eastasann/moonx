@@ -1,0 +1,11 @@
+{
+  "name": "@moonx/domain",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@moonx/schemas": "workspace:*"
+  }
+}

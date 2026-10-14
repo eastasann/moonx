@@ -40,7 +40,7 @@ Claude Code のチャットに1つずつコピペして使う（`/draft:implemen
 
 ## Step 1: モノレポ骨格と開発環境
 
-Status:
+Status: done 2026-10-12
 
 ```
 docs/02-01_system-design-doc.md の2章（リポジトリ構成・環境と命名・環境変数・make ターゲット）と
@@ -92,7 +92,7 @@ make setup の通しの確認は Step 6 で行う（シードとトークンの�
 
 ## Step 2: DB スキーマとマイグレーション
 
-Status:
+Status: done 2026-10-12
 
 ```
 docs/02-01_system-design-doc.md の6章（データモデル）・7.3（接続）・2章（DATABASE_URL_TEST の決まり・make ターゲットの
@@ -104,7 +104,8 @@ DB のスキーマとマイグレーションを作ってください。
 2. packages/db/src/schema.ts: 6.3 の Drizzle のスキーマを、全テーブル・列挙・check 制約・インデックスまで写す。
    6.3 が正。写している途中で記述の食い違いや欠けに気づいたら、写す前に 6.3 を直す（CLAUDE.md と /draft:implement の決まり。弱める直しになるなら止める）
 3. packages/db/src/relations.ts（外部キーと同じ対応の relations()）
-4. drizzle.config.ts と DB の接続モジュール（postgres.js、casing: "snake_case"。プールの設定は SDD 7.3）
+4. drizzle.config.ts と DB の接続モジュール（postgres.js、casing: "snake_case"。プールの設定は SDD 7.3）。
+   drizzle.config.ts は DATABASE_URL を読む（make db-migrate は DATABASE_URL_DIRECT があればそれを DATABASE_URL に入れて渡す。Step 1 の Makefile）
 5. make db-generate で最初のマイグレーションを作り、SQL を読んで 6.3 と合っているか確かめる
    （check 制約・一意制約・インデックスが入っていること）
 6. make db-migrate で開発用の DB に当てる。テスト用の DB（DATABASE_URL_TEST）を作り直して当てる処理を、
@@ -115,7 +116,7 @@ DB のスキーマとマイグレーションを作ってください。
 
 まだシード（Step 6）と API は作らない。
 
-make db-generate → make db-migrate が通り、テストで 6.3 の全テーブル・制約・インデックスがあることを確かめ、
+make db-generate → make db-migrate が通り、make db-studio が起動して 6.3 のテーブルが見え、テストで 6.3 の全テーブル・制約・インデックスがあることを確かめ、
 テスト用の DB にも同じマイグレーションが当たり、db-check のテストが上の失敗の場合をすべて捕まえ、
 make test・make typecheck・make lint が通る状態をゴールとする。
 
@@ -128,7 +129,7 @@ make test・make typecheck・make lint が通る状態をゴールとする。
 
 ## Step 3: 計算と判定・共通の型・書式（packages/domain・schemas・i18n）
 
-Status:
+Status: done 2026-10-13
 
 ```
 Web と API が同じコードを使う共有パッケージを作ってください（ADR-001）。
@@ -166,7 +167,7 @@ make test-domain が通り、8.3 の期待値（損益分岐 180.1件/月・6.9�
 
 ## Step 4: デザイントークンの生成（packages/ui-tokens）
 
-Status:
+Status: done 2026-10-14
 
 ```
 docs/06_design-tokens.json から、Web と PDF のテーマと PWA のアイコン・マニフェストを生成する仕組みを作ってください。
@@ -201,7 +202,7 @@ make tokens が通って生成物ができ、もう一度動かしても差分�
 
 ## Step 5: テンプレートのファイルと、取り込み・公開の処理
 
-Status:
+Status: done 2026-10-14
 
 ```
 BCDX のテンプレートのファイルと、それを DB に取り込んで公開する処理を作ってください。取り込みと公開の処理は、
@@ -216,18 +217,53 @@ BCDX のテンプレートのファイルと、それを DB に取り込んで�
 
 やること:
 1. テンプレートのファイルの Zod スキーマ（packages/schemas。SDD 5.13）
-2. data/templates/bcdx/self-analysis.json・validation.json・plan.json: docs/drive-templates/ から、
-   AD10 の書式で転記する。設問・Example・ヒント・小見出しとガイダンス・確認項目の基準値・費用と実行管理の初期行・
-   AI 用プロンプト（自己分析だけ）を、原本の文面のまま写す。design-spec が決めた構成（6.12・6.13 の小項目・表の列・初期行）と
+2. data/templates/bcdx/self-analysis.json・plan.json（validation.json は Step 5b に分けた）: docs/drive-templates/ から、
+   AD10 の書式で転記する。設問・Example・ヒント・小見出しとガイダンス・実行管理の初期行・
+   AI 用プロンプト（自己分析だけ）を、原本の文面のまま写す（確認項目の基準値と費用の初期行は検証のファイルなので Step 5b）。
+   design-spec が決めた構成（6.12・6.13 の小項目・表の列・初期行）と
    原本が食い違う所は、どちらを正にするかが仕様の決定なので、写す前に止める（無人ループでは blocked と理由）
 3. packages/db: ファイルを検査して下書きの版を作る取り込みの処理、公開の前の検査（AD6 validate）、公開（AD6 publish）
-4. テスト（make test-api。packages/db のテストは DATABASE_URL_TEST の DB を使う）: 3つのファイルが書式どおりで
+4. テスト（make test-api。packages/db のテストは DATABASE_URL_TEST の DB を使う）: 2つのファイルが書式どおりで
    取り込めること、AD6 の検査を通って公開できること、書式の誤り（種類違い・読めない内容）を design-spec 6.17 のとおりに拒むこと、
    原本の設問の数（自己分析36問など）とファイルの数が合うこと
 
 まだシード（Step 6）と運営者の API（Step 18）は作らない。
 
-3つのファイルがテスト用の DB に取り込めて AD6 の検査を通って公開でき、make test・make typecheck・make lint が通る状態をゴールとする。
+2つのファイルがテスト用の DB に取り込めて AD6 の検査を通って公開でき、make test・make typecheck・make lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 5b: 検証のテンプレートのファイル
+
+Status: done 2026-10-14
+
+```
+BCDX の検証のテンプレートのファイル data/templates/bcdx/validation.json を作り、Step 5 の取り込み・検査・公開の処理で
+入れられることを確かめてください（Step 5 から分けた）。
+
+参照:
+- docs/02-01_system-design-doc.md 5.13（テンプレートのファイル AD10 の書式）
+- docs/design-spec.md 6.0.3（F/A/U を付ける設問）・6.1（確認項目の基準値）・6.2（02 の出し分けと回答の型）・6.3（費用の初期行とキー）・
+  6.6（設問 ID）・9.3（転記の決まり）
+- docs/drive-templates/business-idea-validation.txt（原本の写し。転記の元）
+
+やること:
+1. data/templates/bcdx/validation.json: 01・02・04・08・10 の設問（6.6 の ID。どれも F/A/U を付ける。02 CATEGORY は短文、OCEAN は
+   Red / Blue / Mixed の選択、RED_1–4 は OCEAN が Red か Mixed、BLUE_1–3 は Blue か Mixed のときだけ出す）、セクションの名前と
+   ガイダンス、費用の初期行（6.3 のキー）、確認項目の基準値（6.1 の既定値）を、9.3 の転記の決まりで原本から写す。AI 用プロンプトは空。
+   design-spec が決めたこと（6.1 の基準値、6.2 の選択肢と出し分け、6.3 の初期行、6.6 の設問 ID）と原本が食い違う所は、
+   どちらを正にするかが仕様の決定なので、写す前に止める（無人ループでは blocked と理由）
+2. テスト（make test-api）: 取り込めて AD6 の検査を通って公開できること、原本の設問の数（01 が10問、02 が15問、04 が2問、08 が1問、
+   10 が6問）と問いの文が原本と合うこと、費用の初期行が 6.3 のキーと名前のとおりであること
+
+まだシード（Step 6）と運営者の API（Step 18）は作らない。
+
+validation.json がテスト用の DB に取り込めて AD6 の検査を通って公開でき、make test・make typecheck・make lint が通る状態をゴールとする。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
@@ -238,7 +274,7 @@ BCDX のテンプレートのファイルと、それを DB に取り込んで�
 
 ## Step 6: デモデータのシード
 
-Status:
+Status: done 2026-10-15
 
 ```
 docs/design-spec.md 8章（デモデータ仕様）のデモデータを入れるシードを作ってください。
@@ -250,7 +286,7 @@ docs/design-spec.md 8章（デモデータ仕様）のデモデータを入れ�
 - docs/03_dev-setup.md 3章
 
 やること:
-1. packages/db のシード: テンプレートは Step 5 の取り込みと公開の処理で入れる。8.1〜8.4 のユーザー・ワークスペース・招待・
+1. packages/db のシード: テンプレートは Step 5・5b のファイルを Step 5 の取り込みと公開の処理で入れる。8.1〜8.4 のユーザー・ワークスペース・招待・
    アイデア・検証・自己分析・プラン・版・実行管理・判定・決定ログ・コメント・通知・変更履歴を、8章の「見せたい状態」が
    画面で開ける形で入れる。スナップショット（決定ログ・版）は Step 3 の domain の関数（buildKeyMetrics() など）で作る。
    パスワードは better-auth/crypto の hashPassword で作る（Step 8 で使う Better Auth と同じ版に固定する）
@@ -853,7 +889,8 @@ Status:
 
 まだ作らないもの: 29・30 と、そこへのリンク（Step 42）、ワークスペースの中のほかの画面（Step 25 以降）。
 
-make test-e2e で上の流れが通り、make build-web で 1 の HTML ができ、make test-web・make typecheck・make lint が通る状態をゴールとする。
+make test-e2e で上の流れが通り、make build-web で 1 の HTML ができ、make build・make test-web・make typecheck・make lint が通る状態をゴールとする。
+（make build と make build-web は、SPA の殻 _shell.html のプリレンダーが / を開くので、/ のルートができるこのステップまで失敗する。Step 1 で、/ に仮のルートを置けば通ることを確かめた）
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
@@ -1217,6 +1254,8 @@ docs/02-01_system-design-doc.md ADR-031 に従って、Web を PWA にしてく�
 2. マニフェストとアイコン（Step 4 の生成物を /manifest.webmanifest と /icons/ に出す）、iPhone の Safari だけの案内
 3. API の静的ファイルの配信（ADR-004・ADR-031 の Content-Type とキャッシュの見出し、_shell.html、404、HTML の meta 要素）
 4. テスト: 10章の「PWA と配信」の行（Playwright と Bun test。make build-web の結果を WEB_DIST_DIR で渡した API に対して）
+5. make test-e2e が PWA の検査の前に make build-web SHA=dev を動かすようにする（SDD 2章「make ターゲット」の test-e2e。
+   Step 1 の Makefile には入れていない。build-web は / のルートができる Step 24 まで失敗し、Step 19〜23 の make test-e2e を止めるため）
 
 まだインフラ（Step 40）は作らない。
 

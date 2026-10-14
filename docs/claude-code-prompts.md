@@ -240,8 +240,7 @@ BCDX のテンプレートのファイルと、それを DB に取り込んで�
 
 ## Step 5b: 検証のテンプレートのファイル
 
-Status: blocked 2026-10-14
-費用の初期行の名前が design-spec 6.3 と原本の 05 Costs とで24行中16行食い違い、どちらを正にするかはユーザーの決定が要る（食い違いと選択肢はこのステップの末尾）。
+Status:
 
 ```
 BCDX の検証のテンプレートのファイル data/templates/bcdx/validation.json を作り、Step 5 の取り込み・検査・公開の処理で
@@ -270,19 +269,6 @@ validation.json がテスト用の DB に取り込めて AD6 の検査を通っ�
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
 完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
 ```
-
-費用の初期行の名前の食い違い（design-spec 6.3 の名前 → 原本の 05 Costs の名前。キーはどちらも 6.3 のとおり）:
-
-- 初期費用: Renovation → Renovation / Fit-out、Lease Deposit → Lease Deposit / Advance、Permits → Permits / Registration、Branding → Branding / Signage、Tech Setup → Technology / Systems Setup、Other → Other Startup Cost（Equipment・Initial Inventory・Launch Marketing・Working Capital Buffer は同じ）
-- 月額固定費: Utilities → Utilities - Base、Internet-Software → Internet / Software、Accounting → Accounting / Admin、Insurance-Compliance → Insurance / Compliance、Other → Other Fixed Cost（Rent・Salaries・Base Marketing は同じ）
-- 変動費: Materials → Core Product / Materials、Payment Fee → Payment / Platform Fee、Delivery → Delivery / Fulfilment、Variable Labor → Variable Labor / Commission、Other → Other Variable Cost（Packaging は同じ）
-
-6.3 の名前は壁打ちメモ（brainstorm-notes の「05 Costs の行」）が原本の行名として書いたものを引き継いでいて、原本とわざと変えた記録は無い。6.12 の参照の列と 8.3 の検算用データも 6.3 の名前で書いている。選択肢:
-
-1. 原本の名前にする: design-spec 6.3 の初期行と、6.12・8.3 の名前を原本の名前に直す（9.3 の「原本の文字のまま写す」と同じ扱い）
-2. 6.3 の名前にする: 9.3 に「費用の初期行の名前は 6.3 が正（原本の長い名前を短くした）」と書く
-
-決めたら design-spec を直し、Status を空欄に戻す。
 
 ---
 

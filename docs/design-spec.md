@@ -819,7 +819,7 @@ Web（パターン A ハブ: 上に主要指標、その下の左に状態、右
 | 2 | 地元の価格帯（Local price range） | 価格の入った競合・代替が2件以上、または「地元の価格帯」タグの調査ログが1件以上 | どちらかが1件以上あるが、達成していない（既定の基準値では、価格の入った競合・代替が1件だけのとき） | どちらもない |
 | 3 | 初期費用と月額費用（Startup & monthly costs） | 初期費用・月額固定費のそれぞれで、金額のある行が1行以上あり、**この2つの表に未入力の行が残っていない**（変動費の行は対象外）（分からない行は Unknown にするか削除すればよい。Unknown は F/A/U の内訳に出る） | 金額のある行が1行以上あるが、片方に金額の行がない、または未入力の行が残っている | どちらにも金額の行がない |
 | 4 | 損益分岐量（Break-even volume） | 損益分岐が計算できる（価格と月額固定費があり、粗利がプラス） | 価格か月額固定費のどちらかはあるが、計算できない（片方がない、または粗利が0以下） | どちらもない |
-| 5 | 許認可（Permits） | 初期費用の Permits 行（テンプレートの初期行 `initial.permits`）に、Fact か Assumption で金額が入っている（0 も可。「許認可は不要と確認した」も含む）、または「許認可」タグの調査ログが1件以上。Permits の初期行を消した場合や、自分で足した「Permits」という名前の行は数えず、調査ログのタグだけで判定する | — | どちらもない |
+| 5 | 許認可（Permits） | 初期費用の Permits / Registration 行（テンプレートの初期行 `initial.permits`）に、Fact か Assumption で金額が入っている（0 も可。「許認可は不要と確認した」も含む）、または「許認可」タグの調査ログが1件以上。この初期行を消した場合や、自分で足した行（名前が「Permits / Registration」や「Permits」でも）は数えず、調査ログのタグだけで判定する | — | どちらもない |
 | 6 | 需要・課題の外部シグナル（Demand or problem signal） | 「需要・課題シグナル」タグの調査ログが1件以上 | — | ない |
 
 #### Next steps の決め方（上から順に、最大3件）
@@ -983,28 +983,28 @@ Web（パターン C 設問フォーム）
 
 ```
 Web（パターン F ワークシート）
-┌────────────────────────────────────────────────────────────────────────────────┐
-│ Ideas / Piaya Gift Box / 05 Costs                             ✓ Saved  💬 🕘 │
-├────────────────────────────────────────────────────────┬───────────────────────┤
-│ 05 Costs ▼  What it takes to open, to run each month   │ ┌ Totals ─────────┐   │
-│ Startup costs  one time                                │ │ Startup         │   │
-│   Item              Amount  F/A/U             Why ⋯    │ │ ₱450,000+       │   │
-│ ● Equipment        ₱60,000  Fact · 1 source      …     │ │ 3 Unknown,      │   │
-│ ◐ Renovation      [₱30,000] [Assumption · M ▾]   …     │ │ 1 Empty         │   │
-│ ◐ Lease Deposit    ₱30,000  Assumption · High    …     │ │ Monthly fixed   │   │
-│ ◌ Permits            Empty                             │ │ ₱49,000         │   │
-│ ○ Initial Inventory Unknown Unknown                    │ │ Variable        │   │
-│ …                                                      │ │ ₱94.50 / sale   │   │
-│ + Add row   Subtotal ₱450,000+ · 3 Unknown, 1 Empty    │ │ Break-even      │   │
-│ Monthly fixed costs  every month                       │ │ 13+ / day       │   │
-│ ◐ Rent             ₱15,000  Assumption · Medium        │ │ Unit Economics →│   │
-│ …                                                      │ └─────────────────┘   │
-│ Variable costs  per sale                               │                       │
-│ ◐ Materials   35% · ₱77.00  Assumption · Medium        │                       │
-│ ● Packaging         ₱12.00  Fact · 1 source            │                       │
-│ …                                                      │                       │
-└────────────────────────────────────────────────────────┴───────────────────────┘
-行は値だけを見せ、触った行（例の Renovation）だけ入力欄にする。F/A/U の欄を押すと
+┌───────────────────────────────────────────────────────────────────────────────────────┐
+│ Ideas / Piaya Gift Box / 05 Costs                                      ✓ Saved  💬 🕘 │
+├───────────────────────────────────────────────────────────────┬───────────────────────┤
+│ 05 Costs ▼  What it takes to open, to run each month          │ ┌ Totals ─────────┐   │
+│ Startup costs  one time                                       │ │ Startup         │   │
+│   Item                     Amount  F/A/U             Why ⋯    │ │ ₱450,000+       │   │
+│ ● Equipment               ₱60,000  Fact · 1 source      …     │ │ 3 Unknown,      │   │
+│ ◐ Renovation / Fit-out   [₱30,000] [Assumption · M ▾]   …     │ │ 1 Empty         │   │
+│ ◐ Lease Deposit / Advance ₱30,000  Assumption · High    …     │ │ Monthly fixed   │   │
+│ ◌ Permits / Registration    Empty                             │ │ ₱49,000         │   │
+│ ○ Initial Inventory       Unknown  Unknown                    │ │ Variable        │   │
+│ …                                                             │ │ ₱94.50 / sale   │   │
+│ + Add row   Subtotal ₱450,000+ · 3 Unknown, 1 Empty           │ │ Break-even      │   │
+│ Monthly fixed costs  every month                              │ │ 13+ / day       │   │
+│ ◐ Rent                    ₱15,000  Assumption · Medium        │ │ Unit Economics →│   │
+│ …                                                             │ └─────────────────┘   │
+│ Variable costs  per sale                                      │                       │
+│ ◐ Core Product / Materials  35% · ₱77.00  Assumption · Medium │                       │
+│ ● Packaging                       ₱12.00  Fact · 1 source     │                       │
+│ …                                                             │                       │
+└───────────────────────────────────────────────────────────────┴───────────────────────┘
+行は値だけを見せ、触った行（例の Renovation / Fit-out）だけ入力欄にする。F/A/U の欄を押すと
 Popover で F/A/U と確信度を選ぶ（6.0.3・4.5 の FauPicker）。金額は等幅で右にそろえる。
 
 スマホ: 3つの表をセクションの見出しで分け、各行をカード（項目名・金額・F/A/U）にする。
@@ -1015,14 +1015,14 @@ Popover で F/A/U と確信度を選ぶ（6.0.3・4.5 の FauPicker）。金額�
 
 | 表 | 初期行（テンプレートの初期値） | 列 |
 |---|---|---|
-| 初期費用 | Equipment / Renovation / Lease Deposit / Permits / Initial Inventory / Branding / Launch Marketing / Tech Setup / Working Capital Buffer / Other | 項目名・金額・F/A/U・Why Needed・Can Reduce?（Yes / Partly / No） |
-| 月額固定費 | Rent / Salaries / Utilities / Internet-Software / Accounting / Base Marketing / Insurance-Compliance / Other | 項目名・金額・F/A/U・Notes |
-| 変動費（1販売あたり） | Materials / Packaging / Payment Fee / Delivery / Variable Labor / Other | 項目名・金額 **または価格の%**・F/A/U |
+| 初期費用 | Equipment・Renovation / Fit-out・Lease Deposit / Advance・Permits / Registration・Initial Inventory・Branding / Signage・Launch Marketing・Technology / Systems Setup・Working Capital Buffer・Other Startup Cost | 項目名・金額・F/A/U・Why Needed・Can Reduce?（Yes / Partly / No） |
+| 月額固定費 | Rent・Salaries・Utilities - Base・Internet / Software・Accounting / Admin・Base Marketing・Insurance / Compliance・Other Fixed Cost | 項目名・金額・F/A/U・Notes |
+| 変動費（1販売あたり） | Core Product / Materials・Packaging・Payment / Platform Fee・Delivery / Fulfilment・Variable Labor / Commission・Other Variable Cost | 項目名・金額 **または価格の%**・F/A/U |
 
 - 原本の「Source」列は F/A/U の根拠（M2）に置き換える。
 - 行は追加・削除・名前の変更・並べ替えができる。行数の上限はない。テンプレートの初期行も削除できる（削除は履歴から戻せる）。
 - テンプレートの初期行のキー: 初期費用は `initial.equipment`・`initial.renovation`・`initial.lease_deposit`・`initial.permits`・`initial.inventory`・`initial.branding`・`initial.launch_marketing`・`initial.tech_setup`・`initial.working_capital`・`initial.other`、月額固定費は `monthly.rent`・`monthly.salaries`・`monthly.utilities`・`monthly.internet`・`monthly.accounting`・`monthly.marketing`・`monthly.insurance`・`monthly.other`、変動費は `variable.materials`・`variable.packaging`・`variable.payment_fee`・`variable.delivery`・`variable.labor`・`variable.other`。確認項目5・主要指標の `cost_row:*`・プランの参照がこのキーで行を指す。
-- 変動費の行は「金額」か「価格の%」を切り替えて入れる（例: Materials 35%）。% の行は 18 の価格から金額を計算して添える（「35% · ₱77.00」）。価格が未入力なら「Needs price」。
+- 変動費の行は「金額」か「価格の%」を切り替えて入れる（例: Core Product / Materials 35%）。% の行は 18 の価格から金額を計算して添える（「35% · ₱77.00」）。価格が未入力なら「Needs price」。
 - 「まとめ額」: 行のメニューから「Lump sum（内訳なし）」の印を付けられる。仮置きのまとめ額であることを示すラベルを出すだけで、計算は通常の行と同じ。
 
 #### 合計の出し方
@@ -1771,12 +1771,12 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 11 | Founder Roles | **表（自由入力・人数自由）**: Name / Role / Responsibilities / Authority / Time。加えて文章: Shared responsibilities | — | — |
 | 12 | Decision Making & Governance | What can one founder decide alone? / What requires majority agreement? / What requires unanimous agreement? / What happens when we disagree? / How are important decisions recorded? | — | このアイデアの決定ログ |
 | 13 | Ownership & Money Between Founders | **表（自由入力・人数自由）**: Name / Initial ownership (%) / Initial capital contribution（ワークスペースの通貨）。加えて文章: Founder compensation at launch / When can founder salaries increase? / What if more capital is required? / What if one founder cannot contribute? / What if a founder wants to leave? | — | 表の下に持分の合計と出資の合計を表示（警告はしない） |
-| 14 | Legal & Company Setup | Company structure / Registrations / Permits / licenses / Tax / accounting setup / Employment requirements / Industry-specific compliance / Professional advice required | — | 費用行 Permits、「許認可」タグの調査ログ |
-| 15 | Location / Facilities / Equipment | Location requirements / Maximum acceptable rent / Required equipment / Capacity of initial setup / Primary capacity constraint / Before signing a lease / contract | — | 費用行 Rent・Lease Deposit・Renovation・Equipment、Capacity Limit |
-| 16 | Suppliers & Inventory | Critical suppliers / Alternative suppliers / Supplier selection criteria / Inventory policy / Single points of failure | — | 費用行 Initial Inventory・Materials |
+| 14 | Legal & Company Setup | Company structure / Registrations / Permits / licenses / Tax / accounting setup / Employment requirements / Industry-specific compliance / Professional advice required | — | 費用行 Permits / Registration、「許認可」タグの調査ログ |
+| 15 | Location / Facilities / Equipment | Location requirements / Maximum acceptable rent / Required equipment / Capacity of initial setup / Primary capacity constraint / Before signing a lease / contract | — | 費用行 Rent・Lease Deposit / Advance・Renovation / Fit-out・Equipment、Capacity Limit |
+| 16 | Suppliers & Inventory | Critical suppliers / Alternative suppliers / Supplier selection criteria / Inventory policy / Single points of failure | — | 費用行 Initial Inventory・Core Product / Materials |
 | 17 | Operations | Opening / operating hours / Daily operating flow / Weekly operating flow / Quality controls / Cash controls / Customer complaint process / What must be documented before launch? | — | 営業日数、Capacity Limit |
-| 18 | People & Hiring | Roles required at launch / Number of people required / Expected monthly payroll / Hiring criteria / Training required / Day-to-day manager / Trigger for the next hire | 数字: Expected monthly payroll（費用行 Salaries） | 費用行 Variable Labor |
-| 19 | Technology & Systems | Systems required at launch / What can remain manual initially? / What should be automated early? / Who owns setup and maintenance? | — | 費用行 Tech Setup・Internet-Software |
+| 18 | People & Hiring | Roles required at launch / Number of people required / Expected monthly payroll / Hiring criteria / Training required / Day-to-day manager / Trigger for the next hire | 数字: Expected monthly payroll（費用行 Salaries） | 費用行 Variable Labor / Commission |
+| 19 | Technology & Systems | Systems required at launch / What can remain manual initially? / What should be automated early? / Who owns setup and maintenance? | — | 費用行 Technology / Systems Setup・Internet / Software |
 | 20 | Financial Plan | Startup cost / Opening cash reserve / Monthly fixed cost / Unit economics / Break-even / Conservative scenario / Expected scenario / Strong scenario / Capacity-limit scenario / Runway if sales are below plan / Trigger for additional funding | 数字: Startup cost・Monthly fixed cost・Unit economics・Break-even・4つのシナリオ。文章: Opening cash reserve・Runway・Trigger for additional funding | 費用行 Working Capital Buffer、回収期間・ROI |
 | 21 | Key Assumptions | **表**: Assumption / Why We Believe It / Evidence / What Would Disprove It | コピー: `LIST.ASSUMPTIONS`（16 の前提。Evidence は根拠の一覧と自由記述を文章にする） | 16 の前提 |
 | 22 | Key Risks | **表**: Risk / Probability / Impact / Mitigation / Trigger / Indicator（原本の列名は「Trigger / Indicator」の1列） | コピー: `LIST.RISKS`（16 のリスク。Trigger / Indicator は空） | 16 のリスク |
@@ -2013,7 +2013,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 |---|---|---|---|---|
 | Piaya Gift Box Delivery | Ana | Proceed | プラン | 確認項目6つすべて達成。Plan A（版「v1 For advisors」を保存済み + 変更あり、Go / No-Go は Delay）と Plan B（下書き、版なし）。実行管理の各種類の項目（期限切れ1件・2日後1件を含む）。Pitch Deck の1分版・5分版が全スライド埋まる |
 | Piaya Gift Box (Corporate) | Kenji | 未判定 | 検証 | Piaya Gift Box Delivery の複製。価格だけ違う（₱650） |
-| Bacolod Health Bowl | Kenji | Hold | 検証 | 原本の実例に近い状態。初期費用に Unknown 3行・未入力1行（「₱…+」の下限表示、確認項目3が途中）。変動費の Materials が価格の 35%。価格 ₱220・月額固定費あり（確認項目4は達成）。許認可が未着手。AI 取り込み直後で未分類が3件。根拠の調査ログを削除した「Fact（根拠なし）」が1件 |
+| Bacolod Health Bowl | Kenji | Hold | 検証 | 原本の実例に近い状態。初期費用に Unknown 3行・未入力1行（「₱…+」の下限表示、確認項目3が途中）。変動費の Core Product / Materials が価格の 35%。価格 ₱220・月額固定費あり（確認項目4は達成）。許認可が未着手。AI 取り込み直後で未分類が3件。根拠の調査ログを削除した「Fact（根拠なし）」が1件 |
 | Student Study Café | Paolo | Proceed | 立ち上げ準備 | Plan A の版「v1 Launch review」を保存し、Launch を記録済み。KPI の実績値あり。Plan B はアーカイブ済み（13 の「1 archived plan · Show」） |
 | Bacolod Night Market Stall | Ana | Hold | プラン | Proceed で Plan A を作った後に Hold を記録した（20 に「Latest decision is Hold」）。Strong の販売数が Capacity Limit を超える（「Strong exceeds capacity limit」） |
 | Laundry Pickup | Paolo | Drop | 検証 | 一覧では既定で隠れる。粗利が0以下（価格 ₱60/kg、変動費 ₱75/kg）の警告。Drop の理由「Contribution margin is negative」 |
@@ -2029,9 +2029,9 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 価格 | ₱450 |
 | 営業日数 | 26 |
 | 目標利益率 | 空（既定値 15% で計算。「using default」と表示） |
-| 変動費 | Materials ₱120、Packaging ₱45、Payment Fee 3%（価格の%）、Delivery ₱40、Variable Labor ₱0、Other ₱0 |
-| 月額固定費 | Rent ₱12,000、Salaries ₱18,000、Utilities ₱3,500、Internet-Software ₱1,200、Accounting ₱2,000、Base Marketing ₱5,000、Insurance-Compliance ₱0、Other ₱0 |
-| 初期費用 | Equipment ₱35,000、Renovation ₱20,000、Lease Deposit ₱24,000、Permits ₱8,500、Initial Inventory ₱15,000、Branding ₱12,000、Launch Marketing ₱10,000、Tech Setup ₱5,000、Working Capital Buffer ₱40,000、Other ₱0 |
+| 変動費 | Core Product / Materials ₱120、Packaging ₱45、Payment / Platform Fee 3%（価格の%）、Delivery / Fulfilment ₱40、Variable Labor / Commission ₱0、Other Variable Cost ₱0 |
+| 月額固定費 | Rent ₱12,000、Salaries ₱18,000、Utilities - Base ₱3,500、Internet / Software ₱1,200、Accounting / Admin ₱2,000、Base Marketing ₱5,000、Insurance / Compliance ₱0、Other Fixed Cost ₱0 |
+| 初期費用 | Equipment ₱35,000、Renovation / Fit-out ₱20,000、Lease Deposit / Advance ₱24,000、Permits / Registration ₱8,500、Initial Inventory ₱15,000、Branding / Signage ₱12,000、Launch Marketing ₱10,000、Technology / Systems Setup ₱5,000、Working Capital Buffer ₱40,000、Other Startup Cost ₱0 |
 | 1日の販売数 | Conservative 6、Expected 10、Strong 15、Capacity Limit 25 |
 
 | 期待値 | 値 |
@@ -2080,7 +2080,7 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 | 調査ログの使い方 | 「裏付ける確認項目」タグ（地元の価格帯 / 許認可 / 需要・課題シグナル）で数える | 2回目は出典の種類 Price Check でも数える案だった |
 | 確認項目2 地元の価格帯 | 価格の入った競合2件、または価格帯タグの調査ログ1件 | 同じ趣旨 |
 | 確認項目3 初期費用と月額費用 | 金額のある行が1行以上、かつ未入力の行が0 | 2回目は「金額のある行が1行以上」だけの案だった |
-| 確認項目5 許認可 | Permits 行に Fact か Assumption で金額（0 も可）、または許認可タグの調査ログ | 2回目は F/A/U を見ない案だった |
+| 確認項目5 許認可 | Permits / Registration 行に Fact か Assumption で金額（0 も可）、または許認可タグの調査ログ | 2回目は F/A/U を見ない案だった |
 | 工程 | 自動の3段階（検証 / プラン / 立ち上げ準備）。判定は別の属性 | 2回目は3段階目を「実行」と呼んでいた |
 | Drop の扱い | 一覧とダッシュボードで既定で隠す。編集と再判定はいつでもできる | — |
 | 損益分岐の端数 | 原本どおり小数第1位 | 2回目は「切り上げて整数」 |

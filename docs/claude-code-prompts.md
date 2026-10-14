@@ -274,7 +274,7 @@ validation.json がテスト用の DB に取り込めて AD6 の検査を通っ�
 
 ## Step 6: デモデータのシード
 
-Status:
+Status: done 2026-10-15
 
 ```
 docs/design-spec.md 8章（デモデータ仕様）のデモデータを入れるシードを作ってください。

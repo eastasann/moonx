@@ -43,8 +43,8 @@ const base = process.env.DATABASE_URL_TEST;
 if (base === undefined || base === "") {
   throw new Error("DATABASE_URL_TEST is required for make test-api");
 }
-// A database of its own: every test empties the template tables, which the rows other
-// tests (the seed's) keep in DATABASE_URL_TEST would refer to.
+// A database of its own: every test empties the template tables, which rows other tests
+// keep in DATABASE_URL_TEST would refer to.
 const scratch = new URL(base);
 scratch.pathname = `/${testDatabaseName(base)}_templates_test`;
 const url = scratch.toString();

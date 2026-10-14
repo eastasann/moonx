@@ -32,6 +32,7 @@ import {
 // it commits; making a draft (AD2) locks the template row, as the import does, so two
 // drafts of one template take turns instead of failing on a unique index.
 
+// A transaction nests as a savepoint: the seed writes every table in one transaction.
 type Executor = Database | DatabaseTransaction;
 
 /** A template operation refused for a reason the API answers with `code` (SDD 8.1). */
@@ -127,7 +128,7 @@ const lockTemplate = async (tx: DatabaseTransaction, kind: TemplateKind) => {
  *   (`parseTemplateFile`); DRAFT_EXISTS when the template already has a draft.
  */
 export async function importTemplateFile(
-  db: Database,
+  db: Executor,
   kind: TemplateKind,
   input: unknown,
   { newId = () => crypto.randomUUID() }: ImportOptions = {},
@@ -505,7 +506,7 @@ export async function validateTemplateVersion(
  *   when it is already published; TEMPLATE_INVALID when AD6 validate finds errors.
  */
 export async function publishTemplateVersion(
-  db: Database,
+  db: Executor,
   versionId: string,
   publishedById: string | null,
 ): Promise<{ versionNumber: number; publishedAt: Date }> {

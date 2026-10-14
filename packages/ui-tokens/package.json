@@ -3,6 +3,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./theme.css": "./src/generated/theme.css.ts"
+  },
+  "dependencies": {
+    "@vanilla-extract/css": "^1.21.3"
+  },
+  "devDependencies": {
+    "@vanilla-extract/compiler": "^0.7.2",
+    "sharp": "^0.35.5"
   }
 }

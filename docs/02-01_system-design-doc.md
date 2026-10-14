@@ -503,7 +503,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
   - PWA: アイコン（SVG と PNG）とマニフェスト（ADR-031）
   - 06 はネイティブ向けの値を持たない（2026-10-12 に外した。ネイティブの feature で要るものを足す）
-- **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は `<html data-theme>` と `prefers-color-scheme`（4 アカウント設定の System / Light / Dark に従う）。
+- **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は 4 アカウント設定の System / Light / Dark に従い、Light と Dark は `<html data-theme="light|dark">` で固定し、System は属性を置かずに `prefers-color-scheme` に従う。
 - **スケール（Web）**: 既定は `medium`。タッチ操作が主の端末（`@media (pointer: coarse)`）は `large` にする。`<html data-scale="medium|large">` で固定でき、固定が優先される。タッチパネル付きのノート PC も `pointer: coarse` に当たるときは `large` になる。
 - **書体**: 書体の名前の正は 06 の `primitive.font.family`（self-host する書体はどれも SIL OFL 1.1。並びの残りは配らない OS の書体）。Web は npm の `@fontsource/ibm-plex-sans`・`@fontsource/ibm-plex-mono`・`@fontsource/ibm-plex-sans-jp` を依存に入れて self-host する（外部の CDN からは読まない）。読み込むのは 06 の `primitive.font.weight` の太さだけで、ファイルは woff2 だけを使う。日本語の書体は字の範囲（`unicode-range`）ごとに分かれたファイルのまま使い、画面に出た字のファイルだけをブラウザが読む。Service Worker でのキャッシュの仕方は ADR-031、PDF の書体は ADR-012。
 - **アイコン**: Lucide（`lucide-react`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。

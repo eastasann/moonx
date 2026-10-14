@@ -167,7 +167,7 @@ make test-domain が通り、8.3 の期待値（損益分岐 180.1件/月・6.9�
 
 ## Step 4: デザイントークンの生成（packages/ui-tokens）
 
-Status:
+Status: done 2026-10-14
 
 ```
 docs/06_design-tokens.json から、Web と PDF のテーマと PWA のアイコン・マニフェストを生成する仕組みを作ってください。

@@ -77,6 +77,9 @@ export function docsRoutes(access: AccessPlugin) {
         path: "/api/docs",
         specPath: OPENAPI_JSON_PATH,
         provider: null,
+        // The plugin leaves out paths with a dot as static files by default, which
+        // would drop P13 (`pitch-deck.pdf`); the static files here are hidden routes.
+        exclude: { staticFile: false },
         documentation: {
           info: {
             title: "moonx API",

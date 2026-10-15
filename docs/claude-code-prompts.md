@@ -575,7 +575,7 @@ make test-api・make openapi（差分なし）・make typecheck・make lint が�
 
 ## Step 15: API: Pitch Deck と PDF
 
-Status:
+Status: done 2026-10-15
 
 ```
 Pitch Deck の組み立てと PDF を作ってください。

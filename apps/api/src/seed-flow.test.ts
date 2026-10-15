@@ -18,6 +18,7 @@ import {
   errorBodySchema,
   executionListSchema,
   memberSelfAnalysesSchema,
+  pitchDeckSchema,
   planHomeSchema,
   planItemSchema,
   planListSchema,
@@ -29,6 +30,7 @@ import {
   validationHomeSchema,
 } from "@moonx/schemas";
 import { eq } from "drizzle-orm";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { buildTestApp, uniqueIp } from "./test-app";
 import { apiRequest, cookiesOf } from "./test-fixtures";
 
@@ -513,5 +515,57 @@ describe("the demo data", () => {
       await get(`/api/v1/plans/${night[0]?.id}`),
     );
     expect(nightHome.latestDecision).toBe("hold");
+  }, 60_000);
+
+  test("Piaya's Plan A fills every slide of both Pitch Decks, and both PDFs are made", async () => {
+    const cookie = await cookieOf("ana@bcdx.example");
+    const get = (path: string) =>
+      app.handle(apiRequest("GET", path, { cookie }));
+    const [planA] = planListSchema.parse(
+      await (await get(`/api/v1/ideas/${PIAYA}/plans`)).json(),
+    ).items;
+    if (planA === undefined) throw new Error("No Plan A");
+    for (const [variant, slides] of [
+      ["one", 8],
+      ["five", 12],
+    ] as const) {
+      const response = await get(
+        `/api/v1/plans/${planA.id}/pitch-deck?variant=${variant}`,
+      );
+      expect(response.status).toBe(200);
+      const deck = pitchDeckSchema.parse(await response.json());
+      expect(deck.slides).toHaveLength(slides);
+      expect(deck.speakerNotes).not.toBeNull();
+      for (const slide of deck.slides) {
+        expect({
+          slide: slide.key,
+          empty: slide.emptySources,
+          overflow: slide.overflow,
+          bullets: slide.bullets.filter((bullet) => bullet.empty).length,
+          numbers: slide.numbers.filter((number) => number.value.value === null)
+            .length,
+          rows: slide.table === null ? null : slide.table.rows.length > 0,
+        }).toEqual({
+          slide: slide.key,
+          empty: [],
+          overflow: false,
+          bullets: 0,
+          numbers: 0,
+          rows: slide.table === null ? null : true,
+        });
+      }
+      const pdf = await get(
+        `/api/v1/plans/${planA.id}/pitch-deck.pdf?variant=${variant}`,
+      );
+      expect(pdf.status).toBe(200);
+      expect(pdf.headers.get("content-disposition")).toContain(
+        `Piaya Gift Box Co.-${variant}-draft-`,
+      );
+      const task = getDocument({
+        data: new Uint8Array(await pdf.arrayBuffer()),
+      });
+      expect((await task.promise).numPages).toBe(slides);
+      await task.destroy();
+    }
   }, 60_000);
 });

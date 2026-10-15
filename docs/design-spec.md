@@ -1865,12 +1865,22 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 11 | Risks（risks・表） | §22 の上位3件（Impact → Probability の順）と Mitigation |
 | 12 | Ask / next step（ask・文章） | §24 We proceed to launch if・We delay if・We stop / abandon if、§29 Next Actions（完了済みを除き、期限が近い順に最大3件。期限なしは最後。1つの箇条書きにまとめる）、§20 Trigger for additional funding |
 
-- 数字・表のスライドは、数字や表の下に注記の箇条書き（素材の文章の小項目）を持てる。
+- 数字・表のスライドは、数字や表の下に注記の箇条書き（素材の文章の小項目）を持てる。注記は表のセルと同じ大きさで、文章スライドの箇条書きより小さい。
+- 箇条書きは、素材の名前（小項目のタイトル。§29 は「Next Actions」、§11 は「Founders」）を太字で前に置き、「Primary problem: …」と出す（§24 の3つの条件のように、名前が無いと区別できない素材があるため）。空の素材は「Frequency: Not written yet」のように名前を残し、「Not written yet」をグレーで出す。
+- 表紙: 見出しは Business Name、副題は §1 What is the business?。区切りの罫線の下に「Prepared by: …」「Date: …」「Version: …」の3行（Version は版の名前か「Draft」）。日付は、Latest はプランの最終更新日、版は保存日（20 の Date と同じ。利用者のタイムゾーンの日付で、書式は 1.2）。
+- 数字のスライド: 数字の上に太い罫線、下にラベルを置き、横に並べる。数字は途中で折り返さない（各列は数字かラベルの1行の幅で、余りを等分する。入らなければ文字を小さくする。最小でも入らないときだけ、列を数字とラベルの幅の比で分けて数字を折り返し、下の「Too long for this slide…」と同じ注意を出す）。計算できない主要指標は、6.4 の表示（「Empty」「Needs price」など）をラベルの大きさでグレーで出す（「Not written yet」にはしない。文なので単語の間で折り返す）。1分版の Business model は Price・Contribution / sale・Break-even / day、5分版は Price・Variable cost / sale・Contribution / sale・Contribution margin。
+- 表の列と幅の割合（API が列ごとに返す。SDD 5.9）: Competition は Name 25% / Type 18% / Price 15% / Strength 42%。
+- Economics: 上に Startup cost・Break-even / day・Payback・ROI の数字、その下にシナリオ表（行は Conservative / Expected / Strong、列は Scenario 28% / Units / day 20% / Revenue / month 26% / Operating profit / month 26%）、注記は §20 の文章の小項目。
+- Execution plan の表: マイルストーンの Milestone 22% / Goal 34% / Assignee 16% / Deadline 14% / Status 14%（期限順、期限なしは最後、最大6件）。ローンチの要約は注記で、時期の区分ごとに1つ（区分の名前は 6.13 の「T−30」「T−7」「Launch day」「First 30 days」「Days 31–90」「Other」）、その区分の行の Actions を並べる。Actions の無い区分は出さず、どの区分にも無ければ「Launch Plan: Not written yet」。
+- Risks の表: Risk 34% / Probability 13% / Impact 13% / Mitigation 40%。Impact、Probability の順に High・Medium・Low の高い順（それ以外の値は最後、同じなら §22 の行の順）。
+- 期限（§29 と Execution plan の Deadline）は 1.2 のとおり日付で出し、Done でないものの期限を過ぎていれば「Oct 13, overdue 2d」と日数を添える（「今日」は作った日の利用者のタイムゾーンの日付）。
+- 1つの箇条書きにまとめる素材: §29 は「Get supplier quote (Oct 13, overdue 2d); Book venue (Oct 17)」のように「Action (期限)」（期限なしは Action だけ）を「; 」でつなぐ。§11 は各行を「Name (Role)」（Role が空なら Name だけ、Name が空なら Role だけ）にして「; 」でつなぐ。
+- 各ページのフッター: 「Business Name · 版の名前か Draft · 日付」（Business Name が空なら省く）。
 - 文章スライドの箇条書きは、素材の欄に並べた小項目1つにつき1つ（2026-10-11 のユーザーの決定。数の上限は設けず、プランに書いたものを落とさない）。素材が空の小項目は「Not written yet」で出し、箇条書きを減らさない。§29 Next Actions は件数（0〜3件）にかかわらず1つの箇条書きにまとめ、0件なら「Not written yet」。例: 5分版の Problem・Customer・Solution は5つ、Ask は5つ、Why us は4つ、1分版の Next step は2つ。
 - 1分版の Why us だけは §10 Founder advantages の1つだけを出す（2026-10-03 のユーザーの決定。「Missing capabilities」と「How will we fill the gaps」は載せない）。
 - 各スライドの「Edit source」の移動先は、表紙 §1、Problem §4、Customer §3、Solution §5、Why now §1、Market・Competition §6、Business model §8（Edit in validation は 18）、Economics §20（Edit in validation は 17）、Why us §10、Execution plan §23、Risks §22、Next step §29、Ask §24。
 - 空の素材は、そのスライドに「Not written yet」とグレーで出す（PDF にも出す）。
-- 文章が長くて収まらないときは文字を小さくし（型ごとに最小の文字の大きさを決める。具体値は Phase 3 のデザイントークン）、それでも収まらなければ末尾を「…」で切り、アプリの表示だけに「Too long for this slide. Shorten it in the plan.」と出す。
+- 文章が長くて収まらないときは文字を小さくし（型ごとに最小の文字の大きさを決める。具体値は Phase 3 のデザイントークン）、それでも収まらなければ末尾を「…」で切り、アプリの表示だけに「Too long for this slide. Shorten it in the plan.」と出す。小さくするときは、スライドのすべての文字を `semantic.print.slide.shrink-step` ずつ同時に下げ、それぞれ最小で止める。切るときは、最も多くの行をとる文（同じなら後のもの）から1行ずつ減らし、どの箇条書き（表紙の3行を含む）と表のセルも1行は残す（箇条書きを消さない）。数字は切らない。すべてを1行にしても高さが足りないとき（素材の数が決まっているので、ふつうは起きない）は、本文の下端で切れて出し、同じ注意を出す。収め方は API が決め、画面と PDF は同じ大きさと同じ切り方で出す（SDD 5.9 `PitchDeck`）。
 - 数字は生成元に合わせる（Latest は今の検証、版はスナップショットの値）。
 - ローディング: スライドの骨組み。PDF の作成中は「Preparing PDF…」。失敗したら再試行。
 

@@ -407,7 +407,7 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 
 **状態・日付:** 採用（2026-10-01）
 
-**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{ibm-plex-sans,ibm-plex-mono,ibm-plex-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる（PDF には書体と太さごとに1つのファイルが要る。Web 用の `@fontsource` の日本語の書体は字の範囲ごとに分かれているので、PDF には使わない。ADR-018）。表・指標・金額の数字は、画面と同じく等幅の書体（`semantic.print.font.mono`）で書く（design-spec 4.4）（API の結合テストが PDF の字送りで確かめる。10章）。
+**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{ibm-plex-sans,ibm-plex-mono,ibm-plex-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる（PDF には書体と太さごとに1つのファイルが要る。Web 用の `@fontsource` の日本語の書体は字の範囲ごとに分かれているので、PDF には使わない。ADR-018）。表・指標・金額の数字は、画面と同じく等幅の書体（`semantic.print.font.mono`）で書く（design-spec 4.4）（API の結合テストが PDF の字送りで確かめる。10章）。スライドに収める計算（design-spec 6.14 の文字を小さくする・切る）は `packages/domain` の `fitPitchDeck()` が行い、文字の幅は API が同じフォントのファイルを `fontkit`（react-pdf が使うフォントの解析のライブラリ）で測って渡す。P12 はその結果を返すので、画面のスライドも同じ大きさと同じ切り方で出せる。
 
 **理由:** どのクライアント（のちのネイティブを含む）からも同じ PDF を作るには、作る場所を1つにするのが確実。react-pdf は Chromium を使わないので、コンテナが軽く、0台からの起動も遅くならない。
 
@@ -1434,21 +1434,25 @@ interface PitchDeck {
   variant: "one" | "five";
   source: { kind: "latest" } | { kind: "version"; versionId: UUID; name: string; savedAt: DateTime };
   businessName: string; generatedAt: DateTime;
-  footer: { businessName: string; versionLabel: string /* 版の名前か "Draft" */; date: DateOnly };
+  footer: { businessName: string; versionLabel: string /* 版の名前か "Draft" */; date: DateOnly /* Latest はプランの最終更新日、版は保存日。利用者のタイムゾーンの日付 */ };
   speakerNotes: string | null;                 // §30 の One-minute / Five-minute explanation（PDF には入れない）
   slides: {
     key: string;                               // design-spec 6.14 のキー（title / problem / …）
     type: "title" | "text" | "number" | "table";
-    title: string; subtitle?: string | null;
-    bullets?: { text: string; empty: boolean }[];
-    numbers?: { label: string; metricKey: string; value: MetricValue }[];
-    table?: { columns: string[]; rows: (string | null)[][] };
+    title: PitchText;                          // スライドの名前。表紙は Business Name（空なら empty）
+    subtitle: PitchText | null;                // 表紙の §1 What is the business?。ほかは null
+    bullets: { label: string; text: string; empty: boolean }[];   // label は素材の名前。文章スライドは素材ごとに1つ、表紙は Prepared by / Date / Version、数字・表のスライドは注記
+    numbers: { label: string; metricKey: string; value: MetricValue }[];   // 数字のスライドと Economics の数字
+    table: { columns: { label: string; numeric: boolean /* 等幅の書体で右寄せ */; width: number /* 表の幅に占める割合 */ }[];
+             rows: (string | null)[][] /* 書式を当てたセル。null は空のセル。行が無ければ素材が空 */ } | null;
     emptySources: string[];                    // 「Not written yet」を出す素材の名前
-    overflow: boolean;                         // 収まらず「…」で切った（アプリの表示だけに注意を出す）
-    editSource: { itemNo: number } | null; editInValidation: "costs" | "economics" | null;
-    commentCount: number;
+    shrink: number;                            // 文字を `semantic.print.slide.shrink-step` 何段ぶん小さくしたか（それぞれ最小で止める）
+    overflow: boolean;                         // 最小でも収まらなかった: 文を「…」で切った。数字が入りきらず折り返したときと、どの文も1行まで切っても高さが足りないときも true（アプリの表示だけに注意を出す）
+    editSource: { itemNo: number } | null; editInValidation: "costs" | "economics" | null;   // Viewer・版の表示中・アーカイブ済みは null
+    commentCount: number;                      // `pitch_slide` の `{variant}.{key}` へのコメントの数
   }[];
 }
+interface PitchText { text: string; empty: boolean }   // empty のとき text は "Not written yet"
 ```
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
@@ -1468,8 +1472,8 @@ interface PitchDeck {
 | P9 POST | `ExecutionItemInput & { type: ExecutionType; title: string }` | `201 ExecutionItem` | `dueDate` は milestone・launch・open_question・next_action で任意（ローンチの行も日付を持てる。design-spec 6.13）。kpi に送ると `422 VALIDATION_FAILED`。新しい行はその種類の末尾に付く。担当のメンバーは Owner / Member だけ（`422 INVALID_ASSIGNEE`）。担当にメンバーを決める保存（P9 POST・P10 PATCH）は、メンバーの変更（W3・U6・U7）の advisory lock を共有で取ってから行う（メンバーの変更と直列になり、外れる人の担当を名前に置き換える処理が、その保存を見落とさない）。ローンチの行は `launchTiming` を省くと `other`。状態は種類ごとの値だけ（`422 INVALID_STATUS`。milestone / launch / next_action は todo・doing・done、open_question は open・resolved、kpi は null）。履歴 `manual` |
 | P10 | PATCH: `ExecutionItemInput & { lockVersion; force? }`（値は design-spec 6.0.8。P9 POST も同じ）。DELETE: なし（ロックを持たない論理削除） | `200 ExecutionItem` / `204` | 種類に無い列を送ると `422 VALIDATION_FAILED`（項目の種類は変わらないので、版の食い違いより先に返す。担当は `assigneeUserId` と `assigneeName` の一方だけで、一方に値を送るともう一方を空にする）。`done` / `resolved` にしたら `completed_at` を入れ、ほかの状態に戻したら空にする。`kpiActual` を変えたら `kpi_actual_updated_at` を入れる（P9 POST も、`done` / `resolved` や `kpiActual` を付けて作るときは同じく入れる）。履歴 `manual` |
 | P11 | `{ type: ExecutionType; ids: UUID[] }` | `204` | `type` は `milestone` / `launch` / `kpi` / `open_question`（Next Actions は期限順に並べるので並べ替えない。`next_action` は `422 VALIDATION_FAILED`。design-spec 6.13）。`ids` はその種類の（論理削除を除く）全件と一致すること（違えば `422 VALIDATION_FAILED`）。`sort_order` を振り直す。履歴は残さず、`lockVersion` と `updated_at` も変えない（V17 と同じ） |
-| P12 | `?variant=one|five&versionId=` | `200 PitchDeck` | `packages/domain` の `buildPitchDeck()` |
-| P13 | 同上 | `200 application/pdf`（`Content-Disposition: attachment; filename="{businessName}-{one|five}-{版の名前|draft}-{日付}.pdf"`） | ADR-012。常にライトの配色。回数制限は 7.2（超えたら `429 RATE_LIMITED`） |
+| P12 | `?variant=one|five&versionId=`（`variant` は必須） | `200 PitchDeck` | `packages/domain` の `buildPitchDeck()` で組み立て、`fitPitchDeck()` でスライドに収める（文字の幅は PDF と同じフォントのファイルで測る。ADR-012）。そのプランの版でなければ `404 NOT_FOUND` |
+| P13 | 同上 | `200 application/pdf`（`Content-Disposition: attachment; filename="{businessName}-{one|five}-{版の名前|draft}-{日付}.pdf"`。Business Name が空ならプランの名前。ファイル名に使えない文字（`\ / : * ? " < >`、縦線、制御文字）は `-`、続く空白は1つにする。`filename*` に UTF-8 の名前、`filename` に ASCII に落とした名前（RFC 6266。NFKD で分解して結合文字を除き、残る ASCII でない字は `_`、使えない文字はもう一度 `-`）。日付は `footer.date`） | ADR-012。P12 と同じスライドを PDF にする。常にライトの配色。回数制限は 7.2（超えたら `429 RATE_LIMITED`。数えるのは PDF を作る要求で、404・422 で断ったものは数えない。数えるのはスライドを組み立てる前） |
 
 ### 5.10 AI 往復
 
@@ -2564,7 +2568,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 | レイヤー | ツール | カバレッジ目標 | 対象 |
 |---|---|---|---|
-| 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
+| 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`・`fitPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
 | DB のスキーマとマイグレーション（`packages/db`・`scripts/db-check.ts`） | Bun test ＋ 実際の PostgreSQL（`db-check` は一時的な Git のリポジトリ） | — | 6.3 のコードと `schema.ts` がコメントと整形を除いて同じこと、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB の列・制約・インデックス・列挙が `schema.ts` から作った一時的なテーブルと PostgreSQL の表記で一致すること、`relations()` が外部キーと1対1に対応し、名前が `relations.ts` の先頭に書いた規則に従うこと、テスト用の DB の作り直しが `_test` で終わらない名前とクエリ文字列を拒むこと、`db-check` が2章の失敗の場合をすべて捕まえること |
 | API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012） |

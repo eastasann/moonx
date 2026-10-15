@@ -1425,6 +1425,32 @@ const ROWS: Row[] = [
     },
     expected: members(403, 204, 204),
   },
+  {
+    api: "P12",
+    routes: { "GET /api/v1/plans/:planId/pitch-deck": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request(
+        "GET",
+        `/api/v1/plans/${plan.id}/pitch-deck?variant=one`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "P13",
+    routes: { "GET /api/v1/plans/:planId/pitch-deck.pdf": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request(
+        "GET",
+        `/api/v1/plans/${plan.id}/pitch-deck.pdf?variant=one`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
 ];
 
 const testApp = buildTestApp(database);

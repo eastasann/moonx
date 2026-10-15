@@ -95,5 +95,44 @@
     "assumptions": "Assumptions",
     "risks": "Risks",
     "totals": "Totals"
+  },
+  "metricReason": {
+    "needs_price": "Needs price",
+    "needs_monthly_costs": "Needs monthly costs",
+    "needs_expected_sales": "Needs Expected sales",
+    "needs_startup_costs": "Needs startup costs",
+    "margin_not_positive": "Contribution margin is zero or negative. Review price or variable costs.",
+    "target_margin_unreachable": "This margin is not reachable: contribution margin is at or below the target",
+    "not_recovered": "Not recovered: Expected profit is zero or negative",
+    "empty": "Empty",
+    "unknown": "Unknown",
+    "none": "-"
+  },
+  "scenario": {
+    "break_even": "Break-even",
+    "conservative": "Conservative",
+    "expected": "Expected",
+    "strong": "Strong",
+    "capacity": "Capacity limit"
+  },
+  "competitorType": {
+    "direct": "Direct Competitor",
+    "indirect": "Indirect Competitor",
+    "substitute": "Substitute"
+  },
+  "executionStatus": {
+    "todo": "To do",
+    "doing": "Doing",
+    "done": "Done",
+    "open": "Open",
+    "resolved": "Resolved"
+  },
+  "launchTiming": {
+    "t_minus_30": "T−30",
+    "t_minus_7": "T−7",
+    "launch_day": "Launch day",
+    "first_30": "First 30 days",
+    "days_31_90": "Days 31–90",
+    "other": "Other"
   }
 }

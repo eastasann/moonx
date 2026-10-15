@@ -2,6 +2,7 @@ import i18next, { type i18n as I18n } from "i18next";
 import common from "../locales/en/common.json";
 import format from "../locales/en/format.json";
 import mail from "../locales/en/mail.json";
+import pitch from "../locales/en/pitch.json";
 import validation from "../locales/en/validation.json";
 
 /**
@@ -9,7 +10,7 @@ import validation from "../locales/en/validation.json";
  * language adds a directory here; the UI stays English-only until then.
  */
 export const resources = {
-  en: { common, format, mail, validation },
+  en: { common, format, mail, pitch, validation },
 } as const;
 
 export const defaultNS = "common";

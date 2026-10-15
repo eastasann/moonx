@@ -5,6 +5,7 @@ export * from "./errors";
 export * from "./health";
 export * from "./ideas";
 export * from "./input-rules";
+export * from "./pitch";
 export * from "./plans";
 export * from "./self-analysis";
 export * from "./template-file";

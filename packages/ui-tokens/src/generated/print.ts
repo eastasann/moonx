@@ -29,6 +29,14 @@ export const print = {
     gap: 24,
     footerHeight: 24,
     shrinkStep: 2,
+    bulletGap: 12,
+    noteGap: 6,
+    bulletIndent: 24,
+    figureGap: 8,
+    cellPaddingX: 12,
+    cellPaddingY: 6,
+    ruleWidth: 3,
+    hairlineWidth: 1,
   },
   fontSize: {
     title: {

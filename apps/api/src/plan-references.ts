@@ -1,6 +1,5 @@
 import {
   assumptions,
-  competitors,
   costItems,
   type Database,
   type DatabaseTransaction,
@@ -39,6 +38,7 @@ import {
   type IdeaContext,
   newestDecisionFirst,
 } from "./idea-views";
+import { loadTopCompetitors } from "./plan-views";
 import { loadUserRefs } from "./user-refs";
 
 // What a plan item shows beside its sub-items (SDD 5.9 PlanReference, 6.3 `reference`),
@@ -245,21 +245,7 @@ async function referenceOf(
       };
     }
     case "competitors": {
-      const rows = await db
-        .select()
-        .from(competitors)
-        .where(
-          and(
-            eq(competitors.validationId, validationId),
-            isNull(competitors.deletedAt),
-          ),
-        )
-        .orderBy(
-          asc(competitors.sortOrder),
-          asc(competitors.createdAt),
-          asc(competitors.id),
-        )
-        .limit(spec.limit);
+      const rows = await loadTopCompetitors(db, validationId, spec.limit);
       return {
         kind: "competitors",
         title: i18n.t("common:planReference.competitors"),

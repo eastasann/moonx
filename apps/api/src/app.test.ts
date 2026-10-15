@@ -344,6 +344,8 @@ describe("/api/docs (ADR-006)", () => {
       "/api/v1/plans/{planId}/go-no-go",
       "/api/v1/plans/{planId}/go-no-go-context",
       "/api/v1/plans/{planId}/items/{itemNo}",
+      "/api/v1/plans/{planId}/pitch-deck",
+      "/api/v1/plans/{planId}/pitch-deck.pdf",
       "/api/v1/plans/{planId}/restore",
       "/api/v1/plans/{planId}/versions",
       "/api/v1/research-log/{entryId}",

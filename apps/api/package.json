@@ -7,16 +7,28 @@
   },
   "dependencies": {
     "@elysiajs/openapi": "^1.4.16",
+    "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
+    "@expo-google-fonts/ibm-plex-sans": "^0.4.1",
+    "@expo-google-fonts/ibm-plex-sans-jp": "^0.4.2",
     "@moonx/db": "workspace:*",
     "@moonx/domain": "workspace:*",
     "@moonx/i18n": "workspace:*",
     "@moonx/schemas": "workspace:*",
+    "@moonx/ui-tokens": "workspace:*",
+    "@react-pdf/renderer": "^4.9.0",
     "@sentry/bun": "^11.7.0",
     "better-auth": "1.7.7",
     "drizzle-orm": "0.45.4",
     "elysia": "^1.4.30",
+    "fontkit": "^2.0.4",
+    "react": "^19.3.0",
     "sharp": "^0.35.5",
     "swagger-ui-dist": "^5.33.2",
     "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "@types/fontkit": "^2.0.9",
+    "@types/react": "^19.3.0",
+    "pdfjs-dist": "^6.4.299"
   }
 }

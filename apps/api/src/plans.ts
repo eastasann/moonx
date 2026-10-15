@@ -1,7 +1,6 @@
 import {
   businessPlanContent,
   businessPlans,
-  competitors,
   type Database,
   type DatabaseTransaction,
   decisionLogEntries,
@@ -67,20 +66,19 @@ import {
   loadPlanAnswers,
   loadPlanHome,
   loadPlanTemplate,
+  loadTopCompetitors,
   type PlanRow,
   planContentTime,
   planSummary,
   requirePlan,
   sortExecution,
+  TOP_COMPETITORS,
   versionSummaries,
 } from "./plan-views";
 import { recordChange, type Scope, writeInScope } from "./scope";
 import { quotedAnswer } from "./validation";
 
 type Executor = Database | DatabaseTransaction;
-
-/** The competitors a version keeps for the Pitch Deck (SDD 6.3 末尾). */
-const SNAPSHOT_COMPETITORS = 5;
 
 /**
  * Refuses a plan name another plan of the idea has (design-spec 6.0.8): archived plans
@@ -368,21 +366,11 @@ async function buildSnapshot(
         isNull(executionItems.deletedAt),
       ),
     );
-  const top = await tx
-    .select()
-    .from(competitors)
-    .where(
-      and(
-        eq(competitors.validationId, context.loaded.validationId),
-        isNull(competitors.deletedAt),
-      ),
-    )
-    .orderBy(
-      asc(competitors.sortOrder),
-      asc(competitors.createdAt),
-      asc(competitors.id),
-    )
-    .limit(SNAPSHOT_COMPETITORS);
+  const top = await loadTopCompetitors(
+    tx,
+    context.loaded.validationId,
+    TOP_COMPETITORS,
+  );
   return {
     evaluation,
     snapshot: {

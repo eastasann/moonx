@@ -1,5 +1,6 @@
 import {
   businessPlans,
+  competitors,
   type Database,
   type DatabaseTransaction,
   executionItemContent,
@@ -30,7 +31,7 @@ import {
   type TemplateSection,
   type UserRef,
 } from "@moonx/schemas";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { DueWindow } from "./due";
 import { ApiError } from "./errors";
@@ -154,6 +155,31 @@ export const loadExecutionRows = (db: Executor, planId: string) =>
     .select()
     .from(executionItems)
     .where(eq(executionItems.businessPlanId, planId));
+
+/** The competitors a version keeps and the Pitch Deck shows (SDD 6.3 末尾, design-spec 6.14). */
+export const TOP_COMPETITORS = 5;
+
+/** The competitors of a validation that are not deleted, in 15's order (V17), at most `limit`. */
+export const loadTopCompetitors = (
+  db: Executor,
+  validationId: string,
+  limit: number,
+) =>
+  db
+    .select()
+    .from(competitors)
+    .where(
+      and(
+        eq(competitors.validationId, validationId),
+        isNull(competitors.deletedAt),
+      ),
+    )
+    .orderBy(
+      asc(competitors.sortOrder),
+      asc(competitors.createdAt),
+      asc(competitors.id),
+    )
+    .limit(limit);
 
 /** A plan version, which must belong to `planId`. */
 export async function findVersion(

@@ -1915,6 +1915,38 @@
         "shrink-step": {
           "$value": "{primitive.dimension.2}",
           "$description": "長い文章を縮める1段（最小でも入らなければ末尾を「…」で切る）"
+        },
+        "bullet-gap": {
+          "$value": "{primitive.dimension.12}",
+          "$description": "文章スライドの箇条書きどうしの間"
+        },
+        "note-gap": {
+          "$value": "{primitive.dimension.6}",
+          "$description": "数字・表の下の注記の箇条書きどうしの間"
+        },
+        "bullet-indent": {
+          "$value": "{primitive.dimension.24}",
+          "$description": "箇条書きの記号の幅（文はこの右から始まる）"
+        },
+        "figure-gap": {
+          "$value": "{primitive.dimension.8}",
+          "$description": "数字の上の罫線と数字の間"
+        },
+        "cell-padding-x": {
+          "$value": "{primitive.dimension.12}",
+          "$description": "表のセルの左右の余白"
+        },
+        "cell-padding-y": {
+          "$value": "{primitive.dimension.6}",
+          "$description": "表のセルの上下の余白"
+        },
+        "rule-width": {
+          "$value": "{primitive.border-width.3}",
+          "$description": "数字の上の太い罫線・表紙の区切りの太さ"
+        },
+        "hairline-width": {
+          "$value": "{primitive.border-width.1}",
+          "$description": "表の罫線の太さ"
         }
       },
       "font-size": {

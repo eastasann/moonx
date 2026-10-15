@@ -603,6 +603,14 @@ export const vars = createGlobalThemeContract({
       gap: "print-slide-gap",
       footerHeight: "print-slide-footer-height",
       shrinkStep: "print-slide-shrink-step",
+      bulletGap: "print-slide-bullet-gap",
+      noteGap: "print-slide-note-gap",
+      bulletIndent: "print-slide-bullet-indent",
+      figureGap: "print-slide-figure-gap",
+      cellPaddingX: "print-slide-cell-padding-x",
+      cellPaddingY: "print-slide-cell-padding-y",
+      ruleWidth: "print-slide-rule-width",
+      hairlineWidth: "print-slide-hairline-width",
     },
     fontSize: {
       title: {

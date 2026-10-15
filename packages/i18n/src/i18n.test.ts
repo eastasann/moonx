@@ -3,13 +3,18 @@ import { readdirSync } from "node:fs";
 import {
   checkKeySchema,
   checkStateSchema,
+  competitorTypeSchema,
   confidenceSchema,
   decisionValueSchema,
   economicsFieldSchema,
+  executionStatusSchema,
   fauSchema,
   fauStateSchema,
   goNoGoValueSchema,
+  launchTimingSchema,
+  metricReasonSchema,
   roleSchema,
+  scenarioKeySchema,
   stageSchema,
   supportsCheckSchema,
 } from "@moonx/schemas";
@@ -18,7 +23,13 @@ import { createI18n, i18n, namespaces, resources } from "./i18n";
 test("the shared instance is ready on import", () => {
   expect(i18n.isInitialized).toBe(true);
   expect(i18n.language).toBe("en");
-  expect(namespaces).toEqual(["common", "format", "mail", "validation"]);
+  expect(namespaces).toEqual([
+    "common",
+    "format",
+    "mail",
+    "pitch",
+    "validation",
+  ]);
 });
 
 test("each instance is separate", () => {
@@ -53,7 +64,7 @@ test("interpolated values are not HTML-escaped", () => {
   expect(i18n.t("format:months", { value: "<9.2>" })).toBe("<9.2> months");
 });
 
-/** The enums named in the terms of design-spec 1.4 have a label for every value. */
+/** The enums shown by name (design-spec 1.4, 6.4, 6.10, 6.13) have a label for every value. */
 test.each([
   ["role", roleSchema.options],
   ["fau", fauSchema.options],
@@ -65,6 +76,11 @@ test.each([
   ["checkState", checkStateSchema.options],
   ["supportsCheck", supportsCheckSchema.options],
   ["economicsField", economicsFieldSchema.options],
+  ["metricReason", metricReasonSchema.options],
+  ["scenario", scenarioKeySchema.options],
+  ["competitorType", competitorTypeSchema.options],
+  ["executionStatus", executionStatusSchema.options],
+  ["launchTiming", launchTimingSchema.options],
 ] as const)("common:%s labels every value", (group, values) => {
   const labels = resources.en.common[group] as Record<string, string>;
   for (const value of values) expect(labels[value]).toBeString();

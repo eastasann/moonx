@@ -14,6 +14,7 @@ import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { ClientKind } from "./entry";
 import { withHistory } from "./history";
 import { advisoryLock } from "./lock";
+import { planContentTime } from "./plan-views";
 
 /**
  * Serializes the changes to `workspaceId`'s members until the transaction ends: role
@@ -21,13 +22,16 @@ import { advisoryLock } from "./lock";
  * such as "the last Owner" then count members no other change is moving. An advisory
  * lock leaves the workspace row free for the writes inside it, which update that row
  * at their end (SDD 7.1「実装」). Take it before any other lock; U7 takes several, in
- * the order of their ids.
+ * the order of their ids. A write that makes someone an assignee (P9, P10) holds it
+ * shared, so it runs wholly before a member is released ({@link releaseMember} then
+ * finds the item) or after (and finds them no longer an Owner or Member).
  */
 export async function lockMembers(
   tx: DatabaseTransaction,
   workspaceId: string,
+  mode: "exclusive" | "shared" = "exclusive",
 ): Promise<void> {
-  await advisoryLock(tx, `moonx:members:${workspaceId}`);
+  await advisoryLock(tx, `moonx:members:${workspaceId}`, mode);
 }
 
 /** How many members, and how many Owners, `workspaceId` has. */
@@ -164,6 +168,7 @@ export async function releaseMember(
     ]);
   }
   for (const [planId, planItems] of byPlan) {
+    const when = await planContentTime(tx, planId, at);
     await withHistory(
       tx,
       {
@@ -172,7 +177,7 @@ export async function releaseMember(
         source: "manual",
         batchId: null,
         client,
-        at,
+        at: when,
       },
       async () => {
         const changes = [];
@@ -185,7 +190,7 @@ export async function releaseMember(
               assigneeName,
               lockVersion: item.lockVersion + 1,
               updatedById: actorId,
-              updatedAt: at,
+              updatedAt: when,
             })
             .where(eq(executionItems.id, item.id));
           changes.push({

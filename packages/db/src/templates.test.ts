@@ -9,6 +9,7 @@ import {
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  PLAN_LIST_COLUMNS,
   type TemplateFile,
   type TemplateKind,
   templateFileSchema,
@@ -751,6 +752,51 @@ describe("checkTemplateContent", () => {
         ]),
       ),
     ).toEqual([["unknown_condition_key", "q:V.02.RED_1"]]);
+  });
+
+  test("copy_from_mismatch: a plan sub-item must hold what the draft copies", () => {
+    const table = (keys: readonly string[]) => ({
+      answerType: "table" as const,
+      options: {
+        kind: "table",
+        columns: keys.map((key) => ({ key, label: key, type: "text" })),
+      },
+    });
+    const fits: Partial<Question>[] = [
+      { copyFrom: ["V.01.WHO", "IDEA.ONE_LINE_CONCEPT"] },
+      {
+        ...table(PLAN_LIST_COLUMNS["LIST.ASSUMPTIONS"]),
+        copyFrom: ["LIST.ASSUMPTIONS"],
+      },
+      {
+        ...table([...PLAN_LIST_COLUMNS["LIST.RISKS"], "owner"]),
+        copyFrom: ["LIST.RISKS"],
+      },
+    ];
+    const mismatched: Partial<Question>[] = [
+      { ...table(["name"]), copyFrom: ["V.01.WHO"] },
+      { copyFrom: ["LIST.RISKS"] },
+      { ...table(["risk", "probability"]), copyFrom: ["LIST.RISKS"] },
+      {
+        ...table(PLAN_LIST_COLUMNS["LIST.RISKS"]),
+        copyFrom: ["LIST.RISKS", "V.01.WHO"],
+      },
+      {
+        answerType: "choice",
+        options: { kind: "choice", choices: ["A"] },
+        copyFrom: ["V.02.OCEAN"],
+      },
+      { copyFrom: [] },
+    ];
+    const check = (extra: Partial<Question>) =>
+      codes(
+        content("business_plan", [
+          { id: "s1", key: "01", part: "a", questions: [q("P.01.1", extra)] },
+        ]),
+      );
+    for (const extra of fits) expect(check(extra)).toEqual([]);
+    for (const extra of mismatched)
+      expect(check(extra)).toEqual([["copy_from_mismatch", "q:P.01.1"]]);
   });
 
   test("removed_keys warns about the previous version's IDs only", () => {

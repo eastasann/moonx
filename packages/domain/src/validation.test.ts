@@ -19,6 +19,7 @@ import {
   type CostRowState,
   type EconomicsInputState,
   evaluateValidation,
+  orderRisks,
   type ValidationAnswerInput,
   type ValidationState,
   type ViewContext,
@@ -950,4 +951,62 @@ test("the evaluation fits the shared schemas of SDD 5.2", () => {
   fauBreakdownSchema.parse(result.fau);
   for (const check of result.checks) checkResultSchema.parse(check);
   for (const step of result.nextSteps) nextStepSchema.parse(step);
+});
+
+describe("orderRisks", () => {
+  test("the risk order: by hand first, then Impact, Probability, and the order made", () => {
+    const at = (ms: number) => new Date(ms);
+    const rows = [
+      {
+        id: "a",
+        sortOrder: null,
+        impact: null,
+        probability: null,
+        createdAt: at(1),
+      },
+      {
+        id: "b",
+        sortOrder: null,
+        impact: "low",
+        probability: null,
+        createdAt: at(2),
+      },
+      {
+        id: "c",
+        sortOrder: 1,
+        impact: null,
+        probability: null,
+        createdAt: at(3),
+      },
+      {
+        id: "d",
+        sortOrder: null,
+        impact: "low",
+        probability: "low",
+        createdAt: at(4),
+      },
+      {
+        id: "e",
+        sortOrder: 0,
+        impact: "low",
+        probability: null,
+        createdAt: at(5),
+      },
+      {
+        id: "f",
+        sortOrder: null,
+        impact: "low",
+        probability: "low",
+        createdAt: at(0),
+      },
+    ] as const;
+    expect(orderRisks(rows).map((row) => row.id)).toEqual([
+      "e",
+      "c",
+      "f",
+      "d",
+      "b",
+      "a",
+    ]);
+  });
 });

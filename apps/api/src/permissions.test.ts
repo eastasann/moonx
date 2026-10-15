@@ -197,6 +197,14 @@ async function newListRows(team: Team) {
   return { validationId, log, competitor, assumption, risk, cost };
 }
 
+/** A Proceed idea of the row's workspace with one plan, made straight in the database. */
+async function newPlan(team: Team) {
+  const { idea } = await newIdea(team);
+  await fixtures.createDecision(idea, team.callers.owner.id);
+  const plan = await fixtures.createPlan(idea.id, team.callers.owner.id);
+  return { idea, plan };
+}
+
 /** The caller's own self-analysis, made straight in the database as S1 GET would. */
 const ownSelfAnalysis = (caller: Person) =>
   fixtures.createSelfAnalysis(caller.id);
@@ -1233,6 +1241,189 @@ const ROWS: Row[] = [
       );
     },
     expected: members(403, 200, 200),
+  },
+  {
+    api: "P1 GET",
+    routes: { "GET /api/v1/ideas/:ideaId/plans": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newPlan(team);
+      return request("GET", `/api/v1/ideas/${idea.id}/plans`, caller);
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "P1 POST",
+    routes: { "POST /api/v1/ideas/:ideaId/plans": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      await fixtures.createDecision(idea, team.callers.owner.id);
+      await fixtures.templateVersion("business_plan");
+      return request("POST", `/api/v1/ideas/${idea.id}/plans`, caller, {
+        name: "Plan A",
+      });
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "P2 GET",
+    routes: { "GET /api/v1/plans/:planId": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request("GET", `/api/v1/plans/${plan.id}`, caller);
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "P2 PATCH",
+    routes: { "PATCH /api/v1/plans/:planId": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request("PATCH", `/api/v1/plans/${plan.id}`, caller, {
+        businessName: "Piaya Co.",
+        lockVersion: 0,
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  ...(["archive", "restore"] as const).map(
+    (action): Row => ({
+      api: `P3 ${action}`,
+      routes: { [`POST /api/v1/plans/:planId/${action}`]: "scoped" },
+      async call(caller, team) {
+        const { plan } = await newPlan(team);
+        return request("POST", `/api/v1/plans/${plan.id}/${action}`, caller);
+      },
+      expected: members(403, 200, 200),
+    }),
+  ),
+  {
+    api: "P4",
+    routes: { "GET /api/v1/plans/:planId/items/:itemNo": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request("GET", `/api/v1/plans/${plan.id}/items/1`, caller);
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "P5",
+    routes: { "PUT /api/v1/plans/:planId/answers/:questionKey": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request("PUT", `/api/v1/plans/${plan.id}/answers/P.01.5`, caller, {
+        text: "Boxes sold to offices",
+        lockVersion: 0,
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "P6 GET",
+    routes: { "GET /api/v1/plans/:planId/versions": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request("GET", `/api/v1/plans/${plan.id}/versions`, caller);
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "P6 POST",
+    routes: { "POST /api/v1/plans/:planId/versions": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request("POST", `/api/v1/plans/${plan.id}/versions`, caller, {
+        name: "v1 For advisors",
+      });
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "P7",
+    routes: { "GET /api/v1/plans/:planId/go-no-go-context": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request(
+        "GET",
+        `/api/v1/plans/${plan.id}/go-no-go-context`,
+        caller,
+      );
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "P8",
+    routes: { "POST /api/v1/plans/:planId/go-no-go": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request("POST", `/api/v1/plans/${plan.id}/go-no-go`, caller, {
+        value: "delay",
+        reason: "Waiting for the pilot",
+      });
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "P9 GET",
+    routes: { "GET /api/v1/plans/:planId/execution-items": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request("GET", `/api/v1/plans/${plan.id}/execution-items`, caller);
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "P9 POST",
+    routes: { "POST /api/v1/plans/:planId/execution-items": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request(
+        "POST",
+        `/api/v1/plans/${plan.id}/execution-items`,
+        caller,
+        { type: "next_action", title: "Call the supplier" },
+      );
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "P10 PATCH",
+    routes: { "PATCH /api/v1/execution-items/:itemId": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      const item = await fixtures.createExecutionItem(plan.id);
+      return request("PATCH", `/api/v1/execution-items/${item.id}`, caller, {
+        status: "doing",
+        lockVersion: 0,
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "P10 DELETE",
+    routes: { "DELETE /api/v1/execution-items/:itemId": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      const item = await fixtures.createExecutionItem(plan.id);
+      return request("DELETE", `/api/v1/execution-items/${item.id}`, caller);
+    },
+    expected: members(403, 204, 204),
+  },
+  {
+    api: "P11",
+    routes: { "PUT /api/v1/plans/:planId/execution-items/order": "scoped" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      const item = await fixtures.createExecutionItem(plan.id, {
+        type: "milestone",
+      });
+      return request(
+        "PUT",
+        `/api/v1/plans/${plan.id}/execution-items/order`,
+        caller,
+        { type: "milestone", ids: [item.id] },
+      );
+    },
+    expected: members(403, 204, 204),
   },
 ];
 

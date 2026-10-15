@@ -185,7 +185,7 @@ export interface WrittenIdea {
   /** When competitors, assumptions, risks and the cost rows' values were saved. */
   workedAt: Date;
   costRowId: (templateKey: string) => string;
-  /** Research logs by key, with what M5 and the plan references show of them. */
+  /** Research logs by key, deleted ones too (`logTimes` says when), as M5 shows them. */
   researchLogs: Map<string, { id: string; observedOn: string; topic: string }>;
   /** Every save of each answer and number, oldest first, to read them at a past moment. */
   answerSaves: Map<string, { state: AnswerState; at: Date }[]>;
@@ -766,7 +766,7 @@ export async function writeIdea(
     researchLogs: new Map(
       logs.flatMap((log, index) => {
         const row = logRows[index];
-        return row === undefined || row.deletedAt !== null
+        return row === undefined
           ? []
           : [
               [

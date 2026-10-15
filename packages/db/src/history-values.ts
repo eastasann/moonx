@@ -1,10 +1,12 @@
 import type {
   assumptions,
+  businessPlans,
   competitors,
   costItems,
   economicsInputs,
   executionItems,
   ideas,
+  planAnswers,
   researchLogEntries,
   risks,
   selfAnalysisAnswers,
@@ -56,6 +58,31 @@ export const executionItemContent = (item: ExecutionItemFields) => ({
   kpiActual: item.kpiActual ?? null,
   whyItMatters: item.whyItMatters ?? null,
   answer: item.answer ?? null,
+});
+
+/**
+ * A plan's header, the item P2 PATCH saves (`business_plan`, history only), as a version
+ * keeps it too. The plan's name is the option's name on 20, not the business's.
+ */
+export const businessPlanContent = (
+  plan: Pick<
+    typeof businessPlans.$inferInsert,
+    "name" | "businessName" | "preparedBy"
+  >,
+) => ({
+  name: plan.name,
+  businessName: plan.businessName,
+  preparedBy: plan.preparedBy,
+});
+
+/** A plan answer, the item P5 saves: a text, or the rows of a table sub-item. */
+export const planAnswerContent = (
+  answer: Pick<typeof planAnswers.$inferInsert, "text" | "rows">,
+) => ({
+  text: answer.text ?? null,
+  rows: (answer.rows ?? null) as
+    | Record<string, string | number | null>[]
+    | null,
 });
 
 // The content the change history keeps of each validation item (ADR-020): what a person

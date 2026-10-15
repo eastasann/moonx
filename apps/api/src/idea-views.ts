@@ -67,7 +67,7 @@ export interface IdeaContext {
 }
 
 /** The plans of `ideaIds` not deleted, in the order they were made. */
-async function loadPlans(
+export async function loadPlans(
   db: Executor,
   ideaIds: readonly string[],
 ): Promise<Map<string, PlanState[]>> {

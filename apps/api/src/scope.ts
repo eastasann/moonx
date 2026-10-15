@@ -305,14 +305,19 @@ export async function finishWrite(
  * {@link finishWrite}: the way every write in a workspace goes, so none skips the final
  * archive check or the last activity. Writes to a self-analysis, which has no
  * workspace, open their own transaction.
+ *
+ * @param lockFirst Takes the locks that must come before the scope's rows, such as the
+ * workspace's members lock (membership.ts `lockMembers`).
  */
 export function writeInScope<T>(
   db: Database,
   scope: Scope,
   at: Date,
   work: (tx: DatabaseTransaction) => Promise<T>,
+  lockFirst?: (tx: DatabaseTransaction) => Promise<void>,
 ): Promise<T> {
   return db.transaction(async (tx) => {
+    await lockFirst?.(tx);
     await lockScope(tx, scope);
     const result = await work(tx);
     await finishWrite(tx, scope, at);

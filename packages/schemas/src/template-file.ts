@@ -116,6 +116,26 @@ export const PLAN_COPY_PSEUDO_KEYS = [
 
 const pseudoKeys = new Set<string>(PLAN_COPY_PSEUDO_KEYS);
 
+/**
+ * The table columns the draft fills from 16's lists (SDD 6.3 `copy_from`): a sub-item
+ * that copies `LIST.ASSUMPTIONS` or `LIST.RISKS` is a table with these column keys.
+ */
+export const PLAN_LIST_COLUMNS = {
+  "LIST.ASSUMPTIONS": [
+    "assumption",
+    "why_we_believe_it",
+    "evidence",
+    "what_would_disprove_it",
+  ],
+  "LIST.RISKS": [
+    "risk",
+    "probability",
+    "impact",
+    "mitigation",
+    "trigger_indicator",
+  ],
+} as const;
+
 const formatIssue = (format: string, input: string, message: string) => ({
   code: "invalid_format" as const,
   format,

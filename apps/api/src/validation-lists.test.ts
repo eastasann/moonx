@@ -25,7 +25,6 @@ import {
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { buildTestApp, connectTestDatabase } from "./test-app";
 import { apiRequest, teamWithNewIdea, testFixtures } from "./test-fixtures";
-import { orderRisks } from "./validation-lists";
 
 const database = connectTestDatabase();
 const { db } = database;
@@ -552,62 +551,6 @@ describe("V10 and V11 assumptions and risks", () => {
       expect(history[2]?.after).toMatchObject(second);
       expect(history[3]).toMatchObject({ before: second, after: null });
     }
-  });
-
-  test("the risk order: by hand first, then Impact, Probability, and the order made", () => {
-    const at = (ms: number) => new Date(ms);
-    const rows = [
-      {
-        id: "a",
-        sortOrder: null,
-        impact: null,
-        probability: null,
-        createdAt: at(1),
-      },
-      {
-        id: "b",
-        sortOrder: null,
-        impact: "low",
-        probability: null,
-        createdAt: at(2),
-      },
-      {
-        id: "c",
-        sortOrder: 1,
-        impact: null,
-        probability: null,
-        createdAt: at(3),
-      },
-      {
-        id: "d",
-        sortOrder: null,
-        impact: "low",
-        probability: "low",
-        createdAt: at(4),
-      },
-      {
-        id: "e",
-        sortOrder: 0,
-        impact: "low",
-        probability: null,
-        createdAt: at(5),
-      },
-      {
-        id: "f",
-        sortOrder: null,
-        impact: "low",
-        probability: "low",
-        createdAt: at(0),
-      },
-    ] as const;
-    expect(orderRisks(rows).map((row) => row.id)).toEqual([
-      "e",
-      "c",
-      "f",
-      "d",
-      "b",
-      "a",
-    ]);
   });
 });
 

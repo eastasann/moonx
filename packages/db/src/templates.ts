@@ -4,6 +4,7 @@ import {
   type ErrorDetail,
   isQuestionKey,
   issueDetails,
+  PLAN_LIST_COLUMNS,
   type QuestionOptions,
   questionOptionsSchema,
   type TemplateFile,
@@ -247,7 +248,8 @@ export type TemplateProblemCode =
   | "question_key_section_mismatch"
   | "duplicate_question_key"
   | "options_mismatch"
-  | "unknown_condition_key";
+  | "unknown_condition_key"
+  | "copy_from_mismatch";
 
 /** The AD6 validate response. */
 export interface TemplateCheck {
@@ -274,6 +276,8 @@ export interface TemplateContent {
       answerType: AnswerType;
       options: unknown;
       displayCondition: unknown;
+      /** Plans only: what the draft copies (SDD 6.3 `copy_from`). */
+      copyFrom?: unknown;
     }[];
   }[];
   /** The question IDs of the version before it; null when it is the first. */
@@ -305,6 +309,31 @@ const optionsFit = (answerType: AnswerType, options: unknown) => {
     case "execution_view":
       return true;
   }
+};
+
+/**
+ * Whether a plan sub-item can hold what its `copy_from` copies (SDD 6.3): texts go to a
+ * long or short text, and `LIST.ASSUMPTIONS` or `LIST.RISKS`, alone, to a table with
+ * the columns the draft fills.
+ */
+const copyFromFits = (
+  answerType: AnswerType,
+  options: unknown,
+  copyFrom: unknown,
+) => {
+  if (copyFrom == null) return true;
+  if (!Array.isArray(copyFrom) || copyFrom.length === 0) return false;
+  const list = copyFrom.find(
+    (source): source is keyof typeof PLAN_LIST_COLUMNS =>
+      typeof source === "string" && source in PLAN_LIST_COLUMNS,
+  );
+  if (list === undefined)
+    return answerType === "long_text" || answerType === "short_text";
+  const parsed = questionOptionsSchema.safeParse(options);
+  if (copyFrom.length !== 1 || !parsed.success) return false;
+  if (parsed.data.kind !== "table") return false;
+  const columns = new Set(parsed.data.columns.map((column) => column.key));
+  return PLAN_LIST_COLUMNS[list].every((key) => columns.has(key));
 };
 
 const conditionKeys = (condition: unknown) =>
@@ -365,6 +394,15 @@ export function checkTemplateContent(content: TemplateContent): TemplateCheck {
       errors.push({
         code: "options_mismatch",
         message: `The options of ${key} do not fit ${question.answerType}`,
+        nodeId: question.id,
+      });
+    if (
+      content.kind === "business_plan" &&
+      !copyFromFits(question.answerType, question.options, question.copyFrom)
+    )
+      errors.push({
+        code: "copy_from_mismatch",
+        message: `${key} cannot hold what it copies from the validation`,
         nodeId: question.id,
       });
     for (const conditionKey of conditionKeys(question.displayCondition)) {
@@ -456,6 +494,7 @@ const checkStoredVersion = async (
       answerType: templateQuestions.answerType,
       options: templateQuestions.options,
       displayCondition: templateQuestions.displayCondition,
+      copyFrom: templateQuestions.copyFrom,
     })
     .from(templateQuestions)
     .where(eq(templateQuestions.templateVersionId, versionId))

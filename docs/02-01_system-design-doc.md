@@ -1365,39 +1365,53 @@ interface PlanSummary {
 }
 interface PlanHome extends PlanSummary, Versioned {   // Versioned はヘッダ（名前・Business Name・Prepared By）
   ideaId: UUID; workspaceId: UUID; template: TemplateRef;
-  businessName: string; preparedBy: string; date: DateTime;   // 最終更新日（版の表示中は保存日）
+  businessName: string; preparedBy: string;   // 版の表示中はスナップショットのもの
+  date: DateTime;                              // 最終更新日（ヘッダ・回答・実行管理の項目の最後の変更。版の表示中は保存日）
   latestDecision: DecisionValue | null;
   ideaArchived: boolean;                       // アイデアがアーカイブ済み。20〜23 を読み取り専用にする
-  draftOnly: boolean;                          // 回答がすべて下書き作成時のコピーのままで、実行管理の初期行も未変更（20 の「Start with…」の表示に使う。版の表示中も今の内容で決める）
+  draftOnly: boolean;                          // 回答がすべて下書き作成時のコピーのままで（作った後に保存した回答が無い）、実行管理の初期行も未変更（初期行の編集・削除と、行の追加のどれも無い）。20 の「Start with…」の表示に使う。版の表示中も今の内容で決める
   viewingVersion: { id: UUID; name: string; savedAt: DateTime } | null;   // ?versionId= のとき
   keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months">;
-  versions: PlanVersionSummary[];
-  execution: { dueSoon: number; overdue: number };   // 版の表示中も今の実行管理から数える
+  versions: PlanVersionSummary[];              // 新しい順
+  execution: { dueSoon: number; overdue: number };   // Done / Resolved でない項目のうち、期限が今日から7日以内（dueSoon）と今日より前（overdue）の数。「今日」は D3 と同じく利用者の users.timezone の日付。版の表示中も今の実行管理から数える
   parts: { part: "a" | "b"; completeItems: number; totalItems: number;
            items: { itemNo: number; title: string; marks: ("V" | "S")[]; filled: number; total: number; commentCount: number }[] }[];
+  // filled / total は design-spec 6.12「項目の状態」（版の表示中はスナップショットから数える）。commentCount はその項目の回答と、その項目の実行管理の小項目が出す項目へのコメントの数（返信を含む。版の表示中はスナップショットの項目のうち、今も論理削除していないもの。C1 は削除した行へのコメントを返さないため）。marks の S は Viewer には付けない（Viewer には自己分析の参照を返さないため）
 }
 interface PlanVersionSummary { id: UUID; versionNumber: number; name: string; savedBy: UserRef; savedAt: DateTime; }
 interface PlanAnswer extends Versioned {
   questionKey: string;
   text: string | null;
   rows: Record<string, string | number | null>[] | null;   // 表の小項目（§11・§13・§21・§22）。列のキーはテンプレートの options.columns（移行で消えた列の値も残る）
-  copiedFrom: { source: string; copiedAt: DateTime } | null;
+  copiedFrom: { source: string; copiedAt: DateTime } | null;   // 下書きで写した回答に付く（その後に直しても残る）
   commentCount: number;
 }
 interface PlanReference {
   kind: "validation_answers" | "competitors" | "cost_rows" | "research_log" | "decision_log"
       | "self_analysis" | "metrics" | "assumptions" | "risks" | "go_no_go_history" | "totals";
-  title: string;
-  data: unknown;           // kind ごとの形（例: cost_rows は CostItem の一部の配列、self_analysis は { user, sections }[]）
-  link: LinkTarget | null;
+  title: string;           // 英語の見出し（カタログ common:planReference）
+  data: unknown;           // kind ごとの形（下）
+  link: LinkTarget | null; // 全体を出す画面。self_analysis（メンバーごとに 12）と totals は null
 }
+// PlanReference.data の形（packages/schemas の planReferenceSchema が型を持つ）:
+// validation_answers: { questionKey; title; text }[]（表示条件で隠れた設問は除く。空の回答は text: null）
+// competitors: { id; name; type; typicalPrice; strength; weakness }[]（15 の順の上位 limit 件）
+// cost_rows: { id; category; templateKey; name; inputMode; amount; percent; value: MetricValue }[]（CostItem の一部と、計算した金額。keys の順。value は主要指標 cost_row:{key}）
+// research_log: { id; observedOn; topic; observation; sourceType; sourceUrl }[]（14 の順）
+// decision_log・go_no_go_history: DecisionLogSummary[]（新しい順。アイデアの全件、プランの Go / No-Go）
+// self_analysis: { selfAnalysisId; user: UserRef; currency; sections: { key; part; title; subtitle; guidance; answers: { questionKey; title; text; amount }[] }[] }[]（このワークスペースに共有された自己分析を持ち主の名前の順。sections は指定のセクション）
+// metrics: { key; value: MetricValue }[]
+// assumptions: { id; statement; whyBelieve; evidence; confidence; disproveCondition }[]（evidence は §21 に写すときと同じ文。6.3 末尾の copy_from）
+// risks: { id; statement; probability; impact; mitigation }[]（16 の順）
+// totals: { ownership: number; capital: number }（表の % の列と金額の列の合計。表示中の行から数える）
 interface PlanItem {
   itemNo: number; title: string; guidance: string | null; readOnly: boolean;   // 版の表示中・アーカイブ・Viewer
-  prompts: TemplateQuestion[]; answers: PlanAnswer[];
-  metrics: KeyMetrics;                          // linked_metric の小項目が使う主要指標（版の表示中はスナップショットの値）
-  scenarios: ScenarioColumn[];                  // `scenario:*` の小項目が使うシナリオ表（metrics は1つの値だけを持つため。同上）
-  execution: ExecutionItem[];                   // execution_view の小項目の種類の項目
-  references: PlanReference[];                  // [S] の自己分析は Owner / Member にだけ返す
+  prompts: TemplateQuestion[];
+  answers: PlanAnswer[];                        // 回答を持つ小項目（文章・選択・表）ごとに1つ。未回答は lockVersion 0。版の表示中はスナップショットの値で、lockVersion 0・updatedAt と updatedBy と copiedFrom は null
+  metrics: KeyMetrics;                          // linked_metric の小項目が使う主要指標（scenario:* を除くキーだけ。版の表示中はスナップショットの値）
+  scenarios: ScenarioColumn[];                  // `scenario:*` の小項目が使うシナリオ表の列（metrics は1つの値だけを持つため。同上）
+  execution: ExecutionItem[];                   // execution_view の小項目の種類の項目（P9 GET の順。版の表示中はスナップショットの項目で、lockVersion 0）
+  references: PlanReference[];                  // 小項目の reference を順に1つずつ。版の表示中も今の検証から作る。[S] の自己分析は Owner / Member にだけ返す
 }
 interface ExecutionItem extends Versioned {
   id: UUID; type: ExecutionType; title: string;
@@ -1439,20 +1453,20 @@ interface PitchDeck {
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| P1 GET | `?includeArchived=true` | `200 { items: PlanSummary[] }` | |
-| P1 POST（M5） | `{ name: string }`（値は design-spec 6.0.8） | `201 PlanHome` | 最新の判定が Proceed でなければ `409 DECISION_NOT_PROCEED`。公開済みのプランのテンプレートが無ければ `409 TEMPLATE_NOT_PUBLISHED`。名前の重複は `409 NAME_TAKEN`（アーカイブした案の名前は数え、作成を取り消した案の名前は数えない）。テンプレートの `copy_from` で検証から文章をコピーし（文字数の上限を超えても切らない。6.3 末尾）、実行管理の初期行を作る。`created_from_decision_id` に最新の Proceed を入れる。履歴 `plan_draft`（1つの `batchId`。H3 で作成ごと取り消せる。条件と扱いは H3） |
-| P2 GET | `?versionId=` | `200 PlanHome` | 版を指定したら、`parts` などを版のスナップショットから作る |
+| P1 GET | `?includeArchived=true` | `200 { items: PlanSummary[] }` | 作った順。アーカイブした案は `includeArchived=true` のときだけ |
+| P1 POST（M5） | `{ name: string }`（値は design-spec 6.0.8） | `201 PlanHome` | 最新の判定が Proceed でなければ `409 DECISION_NOT_PROCEED`。公開済みのプランのテンプレートが無ければ `409 TEMPLATE_NOT_PUBLISHED`。名前の重複は `409 NAME_TAKEN`（アーカイブした案の名前は数え、作成を取り消した案の名前は数えない）。テンプレートの `copy_from` で検証から文章をコピーし（文字数の上限を超えても切らない。検証が表示条件で隠している回答と、検証が固定している版に無い設問は写さない。`copiedFrom.source` は `copy_from` を「, 」でつないだ文字列。6.3 末尾）、実行管理の初期行を作る（初期行の状態は種類の最初の値、並びはテンプレートの順）。`created_from_decision_id` に最新の Proceed を入れる。履歴 `plan_draft`（1つの `batchId`。H3 で作成ごと取り消せる。条件と扱いは H3） |
+| P2 GET | `?versionId=` | `200 PlanHome` | 版を指定したら、`parts`・`keyMetrics`・Business Name・Prepared By を版のスナップショットから作る（案の名前・ヘッダの `lockVersion`・`updatedAt`・`updatedBy`・`draftOnly`・`execution` は今のプランから。案の名前は案の切替と同じ名前で出し、版は読み取り専用なのでヘッダを版の値で保存させない）。そのプランの版でなければ `404 NOT_FOUND` |
 | P2 PATCH | `{ name?; businessName?; preparedBy?; lockVersion; force? }`（値は design-spec 6.0.8） | `200 PlanHome` | 名前の重複は `409 NAME_TAKEN`（数え方は P1 POST と同じ）。履歴 `manual` |
 | P3 | — | `200 PlanSummary` | |
 | P4 | `?versionId=` | `200 PlanItem` | `itemNo` は 1〜30 |
-| P5 | `{ text?: string | null; rows?: Record<string, string | number | null>[] | null; lockVersion; force? }`（文章と表のセルの値は design-spec 6.0.8） | `200 PlanAnswer` | 数字・実行管理の小項目は `422 NOT_EDITABLE`。存在しない設問は `422 QUESTION_NOT_FOUND`、選択肢にない値は `422 INVALID_CHOICE`。表の列にないキー（ただし、テンプレートの移行で消えた列のキーは、保存済みの行にあるときだけ、保存済みの値か null で受け付ける。P4 は消えた列の値も行に含めて返し、クライアントは表示せずにそのまま送り返す）・型の合わない値・表に `text`・表以外に `rows`・design-spec 6.0.8 の長さを超える文章は `422 VALIDATION_FAILED`。表の長さは、保存済みの値から変えたセルだけを検査する（下書きの作成で写して上限を超えたセルを残したまま、ほかのセルと行を保存できる。6.3 末尾）。履歴 `manual` |
+| P5 | `{ text?: string | null; rows?: Record<string, string | number | null>[] | null; lockVersion; force? }`（文章と表のセルの値は design-spec 6.0.8） | `200 PlanAnswer` | 数字・実行管理の小項目は `422 NOT_EDITABLE`。存在しない設問は `422 QUESTION_NOT_FOUND`、選択肢にない値は `422 INVALID_CHOICE`。表の列にないキー（ただし、テンプレートの移行で消えた列のキーは、保存済みの行にあるときだけ、保存済みの値か null で受け付ける。P4 は消えた列の値も行に含めて返し、クライアントは表示せずにそのまま送り返す）・型の合わない値・表に `text`・表以外に `rows`・design-spec 6.0.8 の長さを超える文章は `422 VALIDATION_FAILED`。表の長さは、保存済みの値から変えたセルだけを検査する（下書きの作成で写して上限を超えたセルを残したまま、ほかのセルと行を保存できる。6.3 末尾）。上限を超えたセルと消えた列の値は、行の位置ではなく値で保存済みの行と照らす: その列（消えた列はそのキー）の保存済みの値と同じ値だけを受け付け、同じ値は保存済みの行が持つ数までしか使えない（残すことはできるが、ほかの行に増やすことはできない。行の追加・削除・並べ替えで位置がずれても通る）。消えた列のキーの null は、保存済みの行のどれかがそのキーを持つときに受け付ける。保存済みの内容と照らすこの検査は、版の食い違い（409）より後に行う。行の無い表は `rows: null` で返す。履歴 `manual` |
 | P6 GET | — | `200 { items: PlanVersionSummary[] }` | |
 | P6 POST（M3） | `{ name: string }`（値は design-spec 6.0.8） | `201 PlanVersionSummary` | スナップショット（中身は 6.3 の末尾）を保存し、決定ログに `version_saved` を記録して通知する |
 | P7 | — | `200 { conditions: { launchIf: string | null; delayIf: string | null; stopIf: string | null }; keyMetrics: KeyMetrics; currentVersion: PlanVersionSummary | null; hasChangesSinceVersion: boolean; history: DecisionLogSummary[] }` | |
 | P8（M4） | `{ value: GoNoGoValue; reason: string }`（`reason` の長さは design-spec 6.0.8） | `201 { entry: DecisionLogEntry; stage: Stage }` | 対象の版は最新の保存済みの版（無ければ null）。決定ログに `go_no_go` を記録して通知する |
 | P9 GET | `?type=&assignee=me|<userId>&status=` | `200 { items: ExecutionItem[] }` | Next Actions は期限順（期限なしは最後）。それ以外の種類は `sortOrder` の順（P11 で並べ替えた順。ローンチは区分の中、KPI は Area の中。design-spec 6.13） |
-| P9 POST | `ExecutionItemInput & { type: ExecutionType; title: string }` | `201 ExecutionItem` | `dueDate` は milestone・launch・open_question・next_action で任意（ローンチの行も日付を持てる。design-spec 6.13）。kpi に送ると `422 VALIDATION_FAILED`。新しい行はその種類の末尾に付く。担当のメンバーは Owner / Member だけ（`422 INVALID_ASSIGNEE`）。状態は種類ごとの値だけ（`422 INVALID_STATUS`。milestone / launch / next_action は todo・doing・done、open_question は open・resolved、kpi は null）。履歴 `manual` |
-| P10 | PATCH: `ExecutionItemInput & { lockVersion; force? }`（値は design-spec 6.0.8。P9 POST も同じ）。DELETE: なし（ロックを持たない論理削除） | `200 ExecutionItem` / `204` | 種類に無い列を送ると `422 VALIDATION_FAILED`（担当は `assigneeUserId` と `assigneeName` の一方だけ）。`done` / `resolved` にしたら `completed_at` を入れる。`kpiActual` を変えたら `kpi_actual_updated_at` を入れる。履歴 `manual` |
+| P9 POST | `ExecutionItemInput & { type: ExecutionType; title: string }` | `201 ExecutionItem` | `dueDate` は milestone・launch・open_question・next_action で任意（ローンチの行も日付を持てる。design-spec 6.13）。kpi に送ると `422 VALIDATION_FAILED`。新しい行はその種類の末尾に付く。担当のメンバーは Owner / Member だけ（`422 INVALID_ASSIGNEE`）。担当にメンバーを決める保存（P9 POST・P10 PATCH）は、メンバーの変更（W3・U6・U7）の advisory lock を共有で取ってから行う（メンバーの変更と直列になり、外れる人の担当を名前に置き換える処理が、その保存を見落とさない）。ローンチの行は `launchTiming` を省くと `other`。状態は種類ごとの値だけ（`422 INVALID_STATUS`。milestone / launch / next_action は todo・doing・done、open_question は open・resolved、kpi は null）。履歴 `manual` |
+| P10 | PATCH: `ExecutionItemInput & { lockVersion; force? }`（値は design-spec 6.0.8。P9 POST も同じ）。DELETE: なし（ロックを持たない論理削除） | `200 ExecutionItem` / `204` | 種類に無い列を送ると `422 VALIDATION_FAILED`（項目の種類は変わらないので、版の食い違いより先に返す。担当は `assigneeUserId` と `assigneeName` の一方だけで、一方に値を送るともう一方を空にする）。`done` / `resolved` にしたら `completed_at` を入れ、ほかの状態に戻したら空にする。`kpiActual` を変えたら `kpi_actual_updated_at` を入れる（P9 POST も、`done` / `resolved` や `kpiActual` を付けて作るときは同じく入れる）。履歴 `manual` |
 | P11 | `{ type: ExecutionType; ids: UUID[] }` | `204` | `type` は `milestone` / `launch` / `kpi` / `open_question`（Next Actions は期限順に並べるので並べ替えない。`next_action` は `422 VALIDATION_FAILED`。design-spec 6.13）。`ids` はその種類の（論理削除を除く）全件と一致すること（違えば `422 VALIDATION_FAILED`）。`sort_order` を振り直す。履歴は残さず、`lockVersion` と `updated_at` も変えない（V17 と同じ） |
 | P12 | `?variant=one|five&versionId=` | `200 PitchDeck` | `packages/domain` の `buildPitchDeck()` |
 | P13 | 同上 | `200 application/pdf`（`Content-Disposition: attachment; filename="{businessName}-{one|five}-{版の名前|draft}-{日付}.pdf"`） | ADR-012。常にライトの配色。回数制限は 7.2（超えたら `429 RATE_LIMITED`） |
@@ -1610,7 +1624,7 @@ interface TemplateFile {
 | AD3 PATCH | `{ aiPrompt: string }` | `200 TemplateVersionDetail` | 検証とプランの版に空でない値を送ると `422 VALIDATION_FAILED`（AI 用プロンプトを持つのは自己分析だけ。design-spec 6.17）。公開済みの版は `409 PUBLISHED_READ_ONLY`（AD4・AD5・AD6 publish も同じ。AD6 validate は書き込まないので公開済みの版にも使える） |
 | AD4 | セクション: `{ key; title; subtitle?; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（`reference` は 27 の画面からは送らない。変えるのは AD10 の取り込みだけ。design-spec 6.17。PATCH は一部。文字の値は design-spec 6.0.8） | `201` / `200` / `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`） |
 | AD5 | order: `{ sections: { id: UUID; questionIds: UUID[] }[] }`。cost-defaults: `{ items: { category; key; name }[] }`。check-rules: `{ items: { checkKey; params }[] }`（基準値は design-spec 6.0.8）。execution-presets: `{ items: { type; title; area?; launchTiming? }[] }` | `200 TemplateVersionDetail` | 一覧ごと置き換える |
-| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 公開をふさぐエラー: 設問が0件（`no_questions`）、セクションの `part` の過不足（`invalid_part`。プランは A / B が必須、他は無し）、設問 ID の形式（`invalid_question_key`）・セクションとの不一致（`question_key_section_mismatch`）・重複（`duplicate_question_key`）、`answerType` と `options` の食い違い（`options_mismatch`。選択肢・表の列・主要指標が空のときも）、`displayCondition` が存在しない設問を指す（`unknown_condition_key`）。警告: 前の版から消えた ID |
+| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 公開をふさぐエラー: 設問が0件（`no_questions`）、セクションの `part` の過不足（`invalid_part`。プランは A / B が必須、他は無し）、設問 ID の形式（`invalid_question_key`）・セクションとの不一致（`question_key_section_mismatch`）・重複（`duplicate_question_key`）、`answerType` と `options` の食い違い（`options_mismatch`。選択肢・表の列・主要指標が空のときも）、`displayCondition` が存在しない設問を指す（`unknown_condition_key`）、プランの小項目が `copy_from` の写すものを持てない（`copy_from_mismatch`。条件は 6.3 末尾）。警告: 前の版から消えた ID |
 | AD6 publish | — | `200 { versionNumber: number; publishedAt: DateTime }` | 検査のエラーがあれば `422 TEMPLATE_INVALID`。既存の回答は変わらない |
 | AD7 users | `?q=&status=&cursor=` | `200 Page<AdminUser>` | 中身（アイデア・回答）は返さない |
 | AD7 workspaces | `?q=&cursor=` | `200 Page<AdminWorkspace>` | |
@@ -2317,7 +2331,7 @@ export const changeHistory = pgTable("change_history", {
 
 `template_questions` の `copy_from` と `reference` の形（どちらもプランの小項目だけが持つ）:
 
-- `copy_from`: 文字列の配列。要素は設問 ID（`V.01.WHO`）か疑似キー（`IDEA.ONE_LINE_CONCEPT`・`IDEA.PROPOSED_SOLUTION`・`LIST.ASSUMPTIONS`・`LIST.RISKS`）。要素が複数なら、書かれた順に空行でつないで1つの文章にする。`LIST.*` は表の小項目の `rows` にする（`LIST.RISKS` の Trigger / Indicator は null）。空の回答は飛ばす。写した文章が design-spec 6.0.8 の上限を超えても切らずに保存する。その欄の P5 は、上限以内に短くした内容だけを受け付ける（超えたままなら `422 VALIDATION_FAILED`。同じ項目のほかの欄は保存でき、表は変えたセルだけを検査する）
+- `copy_from`: 文字列の配列。要素は設問 ID（`V.01.WHO`）か疑似キー（`IDEA.ONE_LINE_CONCEPT`・`IDEA.PROPOSED_SOLUTION`・`LIST.ASSUMPTIONS`・`LIST.RISKS`）。要素が複数なら、書かれた順に空行でつないで1つの文章にする。`LIST.*` は表の小項目の `rows` にする（`LIST.RISKS` の Trigger / Indicator は null）。列のキーは、`LIST.ASSUMPTIONS` が `assumption`・`why_we_believe_it`・`evidence`・`what_would_disprove_it`、`LIST.RISKS` が `risk`・`probability`・`impact`・`mitigation`・`trigger_indicator`（正は `packages/schemas` の `PLAN_LIST_COLUMNS`）。行は 16 の順（リスクは自動の並び）。Evidence は、付けた順の根拠（URL は「{URL}」かメモ付きで「{URL} ({メモ})」、調査ログは「{日付} {トピック}」で日付が無ければトピックだけ、削除済みの調査ログは書かない）と自由記述を「; 」でつないだ文。Probability / Impact は原本の値（Low / Medium / High）。`LIST.*` を写す小項目は、その列のキーをすべて持つ表で、`copy_from` はその疑似キー1つだけ。文章を写す小項目は長文か短文の型（どちらも AD6 の検査 `copy_from_mismatch`）。空の回答は飛ばす。写した文章が design-spec 6.0.8 の上限を超えても切らずに保存する。その欄の P5 は、上限以内に短くした内容だけを受け付ける（超えたままなら `422 VALIDATION_FAILED`。同じ項目のほかの欄は保存でき、表は変えたセルだけを検査する）
 - `reference`: 次の指定の配列。項目の参照は、その項目の小項目の `reference` の和集合で、各指定は最も関係の深い小項目に置く。`kind` は 5.9 の `PlanReference.kind` と同じ
 
 | 指定 | 内容 |
@@ -2330,7 +2344,7 @@ export const changeHistory = pgTable("change_history", {
 | `{ kind: "metrics", keys }` | 主要指標（design-spec 6.4 のキー） |
 | `{ kind: "decision_log" \| "go_no_go_history" \| "assumptions" \| "risks" \| "totals" }` | キーを持たない参照。`totals` は表の小項目の持分と出資の合計 |
 
-`plan_versions.snapshot` の形: `{ header: { name, businessName, preparedBy }, answers: { questionKey, text, rows }[], keyMetrics, scenarios, execution: { type, title, status, dueDate, assigneeUserId, assigneeName, ... }[], competitors: { name, type, typicalPrice, strength, weakness }[] }`。`answers` は版を保存した時点の30項目の文章で、`keyMetrics` は `buildKeyMetrics()`、`scenarios` は `EconomicsResult.scenarios`、`competitors` は検証の上位5件（`sortOrder` の順）。スナップショットに何を持つかの正はここ（design-spec の M3 はここを参照する）。「+ changes」（5.9 `hasChangesSinceVersion`）は、版の保存より後に更新された回答・表・ヘッダ・実行管理の項目があるか（`updated_at` と `saved_at` の比較）で決める。
+`plan_versions.snapshot` の形: `{ header: { name, businessName, preparedBy }, answers: { questionKey, text, rows }[], keyMetrics, scenarios, execution: { id, type, title, status, dueDate, assigneeUserId, assigneeName, ..., fromPreset, completedAt, kpiActualUpdatedAt, sortOrder }[], competitors: { name, type, typicalPrice, strength, weakness }[] }`（`execution` の `...` は変更履歴と同じ項目の中身の列。形の正は `packages/db/src/history-values.ts` の `executionItemContent`。`id` は版の表示中もその項目へのコメントを数えるため）。`answers` は版を保存した時点の30項目の文章で、`keyMetrics` は `buildKeyMetrics()`、`scenarios` は `EconomicsResult.scenarios`、`competitors` は検証の上位5件（`sortOrder` の順）。スナップショットに何を持つかの正はここ（design-spec の M3 はここを参照する）。「+ changes」（5.9 `hasChangesSinceVersion`）は、版の保存より後に更新された回答・表・ヘッダ・実行管理の項目があるか（`updated_at`（削除は `deleted_at`）と `saved_at` の比較）で決める。版の保存と内容の書き込みはプランの行のロックで直列になるが、時刻はロックを待つ前に取り、インスタンスの時計もずれうる。比較が書き込みの順と合うように、ロックの中で時刻をそろえる: 版の `saved_at` は保存する内容の最後の更新と前の版の保存より後に、内容を変える書き込み（P2 PATCH・P5・P9・P10、担当の置き換え、のちの AI 取り込み・元に戻す・移行も）の時刻は最新の版の `saved_at` より後にする（1ミリ秒ずらす）。
 
 **画面と節の対応**（`change_history.section_key`・`comments.section_key`。H1 と C1 の画面の指定で、`sectionKeys` に渡す値）:
 

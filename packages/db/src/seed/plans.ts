@@ -1,5 +1,19 @@
-import { buildKeyMetrics, evaluateValidation } from "@moonx/domain";
-import type { ExecutionStatus, ExecutionType } from "@moonx/schemas";
+import {
+  buildKeyMetrics,
+  type DraftSource,
+  draftAnswer,
+  evaluateValidation,
+  GO_NO_GO_CONDITION_KEYS,
+  hasText,
+  isQuestionShown,
+  orderRisks,
+  type ValidationState,
+} from "@moonx/domain";
+import {
+  EXECUTION_STATUSES,
+  type ExecutionStatus,
+  type ExecutionType,
+} from "@moonx/schemas";
 import { asc, eq } from "drizzle-orm";
 import { executionItemContent } from "../history-values";
 import {
@@ -118,12 +132,6 @@ export interface WrittenPlan {
   conditionsAt: (moment: Date) => Conditions;
 }
 
-const PROBABILITY_LABELS = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-} as const;
-
 /** One save of anything with a history, in order. */
 interface Save<State> {
   state: State;
@@ -137,67 +145,76 @@ const stateAt = <State>(
   moment: Date,
 ) => saves.filter((save) => save.at <= moment).at(-1)?.state;
 
-/** How M5 turns 16's evidence into the Evidence column of §21 (design-spec 6.12). */
-const evidenceText = (
-  idea: WrittenIdea,
-  evidence: EvidenceSpec[] | undefined,
-  note: string | undefined,
-) =>
-  [
-    ...(evidence ?? []).map((piece) => {
-      if (piece.url !== undefined) return piece.url;
-      const log = idea.researchLogs.get(piece.log);
-      return log === undefined ? null : `${log.observedOn} ${log.topic}`;
-    }),
-    note ?? null,
-  ]
-    .filter((part): part is string => part !== null && part !== "")
-    .join("; ") || null;
-
 /**
- * What M5 copies into one sub-item from the validation as it stood at `moment` (SDD 6.3
- * `copy_from`): the texts joined by a blank line, or the rows of 16's lists. Empty
- * answers are skipped; nothing copied is null.
+ * What M5 copies from, as P1 POST reads it: the idea and its validation as they stood at
+ * `moment` (`state`, from `validationStateAt`), answers hidden by their display
+ * condition or missing from the pinned version left out, and 16's lists in their order
+ * there (the risks in the automatic order, as the seed leaves them unordered by hand).
+ * Evidence citing a research log deleted by then names nothing.
  */
-const draftCopy = (
+const draftSource = (
   idea: WrittenIdea,
-  copyFrom: string[],
+  state: ValidationState,
   moment: Date,
-): PlanAnswerState | null => {
+): DraftSource => {
   const { spec } = idea;
-  if (copyFrom.includes("LIST.ASSUMPTIONS")) {
-    const rows = spec.assumptions.map((assumption) => ({
-      assumption: assumption.statement,
-      why_we_believe_it: assumption.whyBelieve ?? null,
-      evidence: evidenceText(
-        idea,
-        assumption.evidence,
-        assumption.evidenceNote,
-      ),
-      what_would_disprove_it: assumption.disproveCondition ?? null,
-    }));
-    return rows.length === 0 ? null : { text: null, rows };
-  }
-  if (copyFrom.includes("LIST.RISKS")) {
-    const rows = spec.risks.map((risk) => ({
-      risk: risk.statement,
-      probability: risk.probability
-        ? PROBABILITY_LABELS[risk.probability]
-        : null,
-      impact: risk.impact ? PROBABILITY_LABELS[risk.impact] : null,
-      mitigation: risk.mitigation ?? null,
-      trigger_indicator: null,
-    }));
-    return rows.length === 0 ? null : { text: null, rows };
-  }
-  const texts = copyFrom
-    .map((source) => {
-      if (source === "IDEA.ONE_LINE_CONCEPT") return spec.oneLineConcept;
-      if (source === "IDEA.PROPOSED_SOLUTION") return spec.proposedSolution;
-      return stateAt(idea.answerSaves.get(source) ?? [], moment)?.text ?? null;
-    })
-    .filter((text): text is string => text !== null && text.trim() !== "");
-  return texts.length === 0 ? null : { text: texts.join("\n\n"), rows: null };
+  const logLive = (key: string) => {
+    const times = idea.logTimes.get(key);
+    return (
+      times !== undefined &&
+      times.recordedAt <= moment &&
+      (times.deletedAt === null || times.deletedAt > moment)
+    );
+  };
+  const evidenceOf = (pieces: EvidenceSpec[] | undefined) =>
+    (pieces ?? []).map((piece) => {
+      const log =
+        piece.log === undefined || !logLive(piece.log)
+          ? undefined
+          : idea.researchLogs.get(piece.log);
+      return {
+        url: piece.url ?? null,
+        note: piece.note ?? null,
+        log:
+          log === undefined
+            ? null
+            : { observedOn: log.observedOn, topic: log.topic },
+      };
+    });
+  const answers = new Map(
+    state.answers.map((answer) => [answer.questionKey, answer]),
+  );
+  const questions = state.sections.flatMap((section) => section.questions);
+  const worked = moment >= idea.workedAt;
+  return {
+    oneLineConcept: spec.oneLineConcept,
+    proposedSolution: spec.proposedSolution ?? null,
+    answerText: (key) => {
+      const question = questions.find((candidate) => candidate.key === key);
+      if (question === undefined || !isQuestionShown(question, answers))
+        return null;
+      const text = answers.get(key)?.text ?? null;
+      return hasText(text) ? text : null;
+    },
+    assumptions: (worked ? spec.assumptions : []).map((assumption) => ({
+      statement: assumption.statement,
+      whyBelieve: assumption.whyBelieve ?? null,
+      evidence: evidenceOf(assumption.evidence),
+      evidenceNote: assumption.evidenceNote ?? null,
+      disproveCondition: assumption.disproveCondition ?? null,
+    })),
+    risks: orderRisks(
+      (worked ? spec.risks : []).map((risk, index) => ({
+        id: seedId("risk", spec.key, index),
+        sortOrder: null,
+        createdAt: idea.workedAt,
+        statement: risk.statement,
+        probability: risk.probability ?? null,
+        impact: risk.impact ?? null,
+        mitigation: risk.mitigation ?? null,
+      })),
+    ),
+  };
 };
 
 type ExecutionRow = Omit<
@@ -324,11 +341,20 @@ export async function writePlan(
     .from(templateQuestions)
     .where(eq(templateQuestions.templateVersionId, templates.plan));
   const questionKeys = new Set(questions.map((q) => q.key));
+  const source = draftSource(
+    idea,
+    validationStateAt(
+      (await loadValidation(tx, idea.validationId)).state,
+      idea,
+      createdAt,
+    ),
+    createdAt,
+  );
   const copied = new Map<string, PlanAnswerState & { sources: string[] }>();
   for (const question of questions) {
     if (!Array.isArray(question.copyFrom)) continue;
     const sources = question.copyFrom as string[];
-    const state = draftCopy(idea, sources, createdAt);
+    const state = draftAnswer(sources, source);
     if (state !== null) copied.set(question.key, { ...state, sources });
   }
 
@@ -460,7 +486,7 @@ export async function writePlan(
   };
   // Each type has its own statuses; a new item starts at the first (SDD 5.9 P9).
   const startStatus = (type: ExecutionType): ExecutionStatus | null =>
-    type === "kpi" ? null : type === "open_question" ? "open" : "todo";
+    EXECUTION_STATUSES[type][0] ?? null;
   const blank = (type: ExecutionType, title: string): ExecutionRow => ({
     type,
     title,
@@ -595,7 +621,11 @@ export async function writePlan(
           : [
               {
                 ...executionItemContent(saved),
+                id: item.id,
+                fromPreset: item.fromPreset,
                 completedAt: saved.completedAt?.toISOString() ?? null,
+                kpiActualUpdatedAt:
+                  saved.kpiActualUpdatedAt?.toISOString() ?? null,
                 sortOrder: item.sortOrder,
               },
             ];
@@ -634,9 +664,9 @@ export async function writePlan(
     name: spec.name,
     version,
     conditionsAt: (moment) => ({
-      launchIf: textAt("P.24.1", moment),
-      delayIf: textAt("P.24.2", moment),
-      stopIf: textAt("P.24.3", moment),
+      launchIf: textAt(GO_NO_GO_CONDITION_KEYS.launchIf, moment),
+      delayIf: textAt(GO_NO_GO_CONDITION_KEYS.delayIf, moment),
+      stopIf: textAt(GO_NO_GO_CONDITION_KEYS.stopIf, moment),
     }),
   };
 }

@@ -81,5 +81,19 @@
       "pitch_slide": "Pitch Deck"
     },
     "templateVersion": "Template version"
+  },
+  "planReference": {
+    "validationSection": "Validation · {{section}}",
+    "validationAnswers": "Validation answers",
+    "competitors": "Competitors",
+    "cost_rows": "Costs",
+    "research_log": "Research Log · {{tag}}",
+    "self_analysis": "Shared self-analyses",
+    "metrics": "Key numbers",
+    "decision_log": "Decision log",
+    "go_no_go_history": "Go / No-Go history",
+    "assumptions": "Assumptions",
+    "risks": "Risks",
+    "totals": "Totals"
   }
 }

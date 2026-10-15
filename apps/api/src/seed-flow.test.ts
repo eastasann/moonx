@@ -16,7 +16,11 @@ import {
   decisionResultSchema,
   economicsSchema,
   errorBodySchema,
+  executionListSchema,
   memberSelfAnalysesSchema,
+  planHomeSchema,
+  planItemSchema,
+  planListSchema,
   researchLogPageSchema,
   riskListSchema,
   selfAnalysisHomeSchema,
@@ -385,4 +389,129 @@ describe("the demo data", () => {
       36,
     );
   });
+
+  test("the plans of 8.2: Piaya's Plan A saved, changed and delayed, Plan B a draft, Study Café launched", async () => {
+    const cookie = await cookieOf("grace@advisor.example");
+    const get = async (path: string) => {
+      const response = await app.handle(apiRequest("GET", path, { cookie }));
+      expect(response.status).toBe(200);
+      return response.json();
+    };
+    const piaya = planListSchema.parse(
+      await get(`/api/v1/ideas/${PIAYA}/plans`),
+    ).items;
+    expect(
+      piaya.map((plan) => [
+        plan.name,
+        plan.latestVersion?.name ?? null,
+        plan.hasChangesSinceVersion,
+        plan.latestGoNoGo?.value ?? null,
+      ]),
+    ).toEqual([
+      ["Plan A", "v1 For advisors", true, "delay"],
+      ["Plan B", null, false, null],
+    ]);
+    const [planA, planB] = piaya;
+    if (planA === undefined || planB === undefined) throw new Error("No plans");
+    const homeA = planHomeSchema.parse(await get(`/api/v1/plans/${planA.id}`));
+    expect(homeA).toMatchObject({
+      businessName: "Piaya Gift Box Co.",
+      draftOnly: false,
+      execution: { overdue: 1, dueSoon: 1 },
+      versions: [{ name: "v1 For advisors", versionNumber: 1 }],
+    });
+    const versionId = homeA.versions[0]?.id;
+    const saved = planHomeSchema.parse(
+      await get(`/api/v1/plans/${planA.id}?versionId=${versionId}`),
+    );
+    expect(saved.viewingVersion?.name).toBe("v1 For advisors");
+    expect(saved.keyMetrics.initial_cost_total.value).toBe(169500);
+    const homeB = planHomeSchema.parse(await get(`/api/v1/plans/${planB.id}`));
+    expect(homeB).toMatchObject({
+      businessName: "Piaya Gift Box Delivery",
+      draftOnly: true,
+      versions: [],
+    });
+    // Plan B's §22 is the draft's copy of 16's risks, in 16's order.
+    const risks = planItemSchema.parse(
+      await get(`/api/v1/plans/${planB.id}/items/22`),
+    );
+    const listed = risks.references.find(
+      (reference) => reference.kind === "risks",
+    );
+    expect(risks.answers[0]?.rows?.map((row) => row.risk)).toEqual(
+      listed?.kind === "risks" ? listed.data.map((risk) => risk.statement) : [],
+    );
+
+    const study = planListSchema.parse(
+      await get(
+        `/api/v1/ideas/${seedId("idea", "study-cafe")}/plans?includeArchived=true`,
+      ),
+    ).items;
+    expect(
+      study.map((plan) => [
+        plan.name,
+        plan.archived,
+        plan.latestVersion?.name ?? null,
+        plan.latestGoNoGo?.value ?? null,
+      ]),
+    ).toEqual([
+      ["Plan A", false, "v1 Launch review", "launch"],
+      ["Plan B", true, null, null],
+    ]);
+    const kpis = planItemSchema.parse(
+      await get(`/api/v1/plans/${study[0]?.id}/items/26`),
+    );
+    expect(
+      kpis.execution.filter((item) => item.kpiActual !== null).length,
+    ).toBeGreaterThan(0);
+
+    // Every seeded plan, its versions and its 30 items read through the API's shapes.
+    const ideaKeys = ["piaya", "study-cafe", "night-market"];
+    let versionsRead = 0;
+    for (const key of ideaKeys) {
+      const plans = planListSchema.parse(
+        await get(
+          `/api/v1/ideas/${seedId("idea", key)}/plans?includeArchived=true`,
+        ),
+      ).items;
+      for (const plan of plans) {
+        const home = planHomeSchema.parse(
+          await get(`/api/v1/plans/${plan.id}`),
+        );
+        const views = ["", ...home.versions.map((v) => `?versionId=${v.id}`)];
+        versionsRead += home.versions.length;
+        for (const query of views) {
+          planHomeSchema.parse(await get(`/api/v1/plans/${plan.id}${query}`));
+          for (let itemNo = 1; itemNo <= 30; itemNo += 1) {
+            planItemSchema.parse(
+              await get(`/api/v1/plans/${plan.id}/items/${itemNo}${query}`),
+            );
+          }
+        }
+        executionListSchema.parse(
+          await get(`/api/v1/plans/${plan.id}/execution-items`),
+        );
+      }
+    }
+    expect(versionsRead).toBe(2);
+    const piayaItems = executionListSchema.parse(
+      await get(`/api/v1/plans/${planA.id}/execution-items`),
+    ).items;
+    expect([...new Set(piayaItems.map((item) => item.type))]).toEqual([
+      "milestone",
+      "launch",
+      "kpi",
+      "open_question",
+      "next_action",
+    ]);
+
+    const night = planListSchema.parse(
+      await get(`/api/v1/ideas/${seedId("idea", "night-market")}/plans`),
+    ).items;
+    const nightHome = planHomeSchema.parse(
+      await get(`/api/v1/plans/${night[0]?.id}`),
+    );
+    expect(nightHome.latestDecision).toBe("hold");
+  }, 60_000);
 });

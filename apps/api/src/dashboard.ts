@@ -12,10 +12,8 @@ import {
   planVersions,
   researchLogEntries,
   risks,
-  users,
   validations,
 } from "@moonx/db";
-import { formatIsoDate } from "@moonx/i18n";
 import {
   type Activity,
   type DueItem,
@@ -44,6 +42,7 @@ import {
 } from "drizzle-orm";
 import { Elysia } from "elysia";
 import type { AccessPlugin } from "./access";
+import { dueWindow } from "./due";
 import { ideaSummaries, loadIdeaContexts } from "./idea-views";
 import { loadItemLabels } from "./labels";
 import { type ItemPlace, itemLink } from "./links";
@@ -57,11 +56,8 @@ const ACTIVITY_LIMIT = 20;
  * (design-spec 6.9): autosave writes a history row each time typing stops.
  */
 const ACTIVITY_MERGE_MS = 10 * 60 * 1000;
-/** How far ahead Due soon looks, in days (design-spec 6.9). */
-const DUE_SOON_DAYS = 7;
 /** The history rows read at a time while gathering Recent activity. */
 const HISTORY_BATCH = 200;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** `value`, which the data model guarantees here. */
 const required = <T>(value: T | null | undefined, what: string): T => {
@@ -286,18 +282,11 @@ export function dashboardRoutes({ access, db, now }: DashboardRoutesOptions) {
     .get(
       "/api/v1/workspaces/:workspaceId/dashboard/due-soon",
       async ({ scope, caller }) => {
-        const [me] = await db
-          .select({ timezone: users.timezone })
-          .from(users)
-          .where(eq(users.id, caller.id));
-        const today = formatIsoDate(new Date(now()), {
-          timeZone: me?.timezone ?? "UTC",
-        });
-        const until = new Date(
-          Date.parse(`${today}T00:00:00Z`) + DUE_SOON_DAYS * DAY_MS,
-        )
-          .toISOString()
-          .slice(0, 10);
+        const { today, until } = await dueWindow(
+          db,
+          caller.id,
+          new Date(now()),
+        );
         const rows = await db
           .select({
             id: executionItems.id,

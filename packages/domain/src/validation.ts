@@ -674,3 +674,36 @@ export const buildDecisionSnapshot = (
   fau: evaluation.fau,
   ...plan,
 });
+
+/** Low, Medium, High from the bottom; a level not set ranks below Low. */
+const RANK: Record<Confidence, number> = { low: 1, medium: 2, high: 3 };
+const rank = (level: Confidence | null) => (level === null ? 0 : RANK[level]);
+
+/**
+ * The risks of 16 in their order (SDD 5.7 V10): those put in order by hand first, then
+ * the others by Impact and Probability, highest first; ties in the order they were made.
+ */
+export function orderRisks<
+  R extends {
+    id: string;
+    sortOrder: number | null;
+    impact: Confidence | null;
+    probability: Confidence | null;
+    createdAt: Date;
+  },
+>(rows: readonly R[]): R[] {
+  const made = (a: R, b: R) =>
+    a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
+  return rows.toSorted((a, b) => {
+    if (a.sortOrder !== null || b.sortOrder !== null) {
+      if (a.sortOrder === null) return 1;
+      if (b.sortOrder === null) return -1;
+      return a.sortOrder - b.sortOrder || made(a, b);
+    }
+    return (
+      rank(b.impact) - rank(a.impact) ||
+      rank(b.probability) - rank(a.probability) ||
+      made(a, b)
+    );
+  });
+}

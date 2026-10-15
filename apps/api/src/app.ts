@@ -10,11 +10,14 @@ import { dashboardRoutes } from "./dashboard";
 import { decisionRoutes } from "./decisions";
 import { docsRoutes } from "./docs";
 import { entryPlugin } from "./entry";
+import { executionRoutes } from "./execution";
 import { HEALTH_DB_IP_LIMIT, healthRoutes } from "./health";
 import { ideaRoutes } from "./ideas";
 import { invitationRoutes, SIGN_UP_IP_LIMIT } from "./invitations";
 import type { Logger } from "./log";
 import type { Mailer } from "./mail";
+import { planItemRoutes } from "./plan-items";
+import { planRoutes } from "./plans";
 import { createRateLimiter } from "./rate-limit";
 import { researchLogRoutes } from "./research-log";
 import { selfAnalysisRoutes } from "./self-analysis";
@@ -100,7 +103,10 @@ export function createApp(config: Config, services: AppServices) {
     .use(validationListRoutes({ access, db, now }))
     .use(costRoutes({ access, db, now }))
     .use(decisionRoutes({ access, db, now }))
-    .use(selfAnalysisRoutes({ access, db, now }));
+    .use(selfAnalysisRoutes({ access, db, now }))
+    .use(planRoutes({ access, db, now }))
+    .use(planItemRoutes({ access, db, now }))
+    .use(executionRoutes({ access, db, now }));
   if (avatars.directory !== undefined) {
     app.use(avatarFileRoutes(access, avatars.directory));
   }

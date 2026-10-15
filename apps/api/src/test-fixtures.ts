@@ -3,6 +3,8 @@ import {
   businessPlans,
   type Database,
   type DatabaseTransaction,
+  decisionLogEntries,
+  executionItems,
   hashInvitationToken,
   INVITATION_VALID_MS,
   ideas,
@@ -49,15 +51,23 @@ const required = <T>(row: T | undefined, what: string): T => {
   return row;
 };
 
-const BCDX_VALIDATION = new URL(
-  "../../../data/templates/bcdx/validation.json",
-  import.meta.url,
-);
+/** The BCDX template files the tests' validations and plans pin (data/templates/bcdx). */
+const BCDX_FILES = {
+  validation: new URL(
+    "../../../data/templates/bcdx/validation.json",
+    import.meta.url,
+  ),
+  business_plan: new URL(
+    "../../../data/templates/bcdx/plan.json",
+    import.meta.url,
+  ),
+} as const;
 
-/** The published validation version, made once per process however many ask at once. */
-let validationVersion:
-  | Promise<typeof templateVersions.$inferSelect>
-  | undefined;
+/** The published BCDX versions, each made once per process however many ask at once. */
+const bcdxVersions = new Map<
+  keyof typeof BCDX_FILES,
+  Promise<typeof templateVersions.$inferSelect>
+>();
 
 /** The fixtures, bound to the test database. */
 export function testFixtures(db: Database) {
@@ -140,9 +150,10 @@ export function testFixtures(db: Database) {
    * tests pin. There is one template per kind, so tests share it.
    */
   async function templateVersion(kind: TemplateKind) {
-    if (kind === "validation") {
-      validationVersion ??= bcdxValidationVersion();
-      return validationVersion;
+    if (kind === "validation" || kind === "business_plan") {
+      const made = bcdxVersions.get(kind) ?? bcdxVersion(kind);
+      bcdxVersions.set(kind, made);
+      return made;
     }
     await db
       .insert(templates)
@@ -178,11 +189,11 @@ export function testFixtures(db: Database) {
   }
 
   /**
-   * v1 of the validation template with the BCDX file's sections, questions, check
-   * thresholds and cost rows (data/templates/bcdx), imported and published as an
-   * operator would (AD10, AD6), so validations evaluate as they do in use.
+   * v1 of the `kind` template with the BCDX file's content (data/templates/bcdx),
+   * imported and published as an operator would (AD10, AD6), so validations evaluate
+   * and plans draft as they do in use.
    */
-  async function bcdxValidationVersion() {
+  async function bcdxVersion(kind: keyof typeof BCDX_FILES) {
     const published = async () =>
       (
         await db
@@ -191,7 +202,7 @@ export function testFixtures(db: Database) {
           .innerJoin(templates, eq(templates.id, templateVersions.templateId))
           .where(
             and(
-              eq(templates.kind, "validation"),
+              eq(templates.kind, kind),
               eq(templateVersions.versionNumber, 1),
               eq(templateVersions.status, "published"),
             ),
@@ -201,11 +212,11 @@ export function testFixtures(db: Database) {
     if (existing !== undefined) return existing;
     const imported = await importTemplateFile(
       db,
-      "validation",
-      await Bun.file(BCDX_VALIDATION).json(),
+      kind,
+      await Bun.file(BCDX_FILES[kind]).json(),
     );
     await publishTemplateVersion(db, imported.versionId, null);
-    return required(await published(), "validation template version");
+    return required(await published(), `${kind} template version`);
   }
 
   /**
@@ -332,6 +343,53 @@ export function testFixtures(db: Database) {
     return required(plan, "plan");
   }
 
+  /**
+   * A decision on the idea, recorded straight in the database as V19 would (its
+   * snapshot empty): Proceed by default, which lets the idea have plans (M5).
+   */
+  async function createDecision(
+    idea: { id: string; workspaceId: string },
+    recordedById: string,
+    value: "proceed" | "hold" | "drop" = "proceed",
+  ) {
+    const [entry] = await db
+      .insert(decisionLogEntries)
+      .values({
+        workspaceId: idea.workspaceId,
+        ideaId: idea.id,
+        kind: "validation_decision",
+        value,
+        reason: "Decided in a test",
+        snapshot: {},
+        recordedById,
+      })
+      .returning();
+    await db
+      .update(ideas)
+      .set({ latestDecision: value })
+      .where(eq(ideas.id, idea.id));
+    return required(entry, "decision");
+  }
+
+  /** An execution item of `planId`, made straight in the database. */
+  async function createExecutionItem(
+    planId: string,
+    values: Partial<typeof executionItems.$inferInsert> = {},
+  ) {
+    const [item] = await db
+      .insert(executionItems)
+      .values({
+        businessPlanId: planId,
+        type: "next_action",
+        title: "Call the supplier",
+        status: "todo",
+        sortOrder: 0,
+        ...values,
+      })
+      .returning();
+    return required(item, "execution item");
+  }
+
   return {
     createUser,
     createInvitation,
@@ -343,6 +401,8 @@ export function testFixtures(db: Database) {
     createSelfAnalysis,
     createIdea,
     createPlan,
+    createDecision,
+    createExecutionItem,
   };
 }
 
@@ -493,4 +553,21 @@ export async function teamWithNewIdea(
     idea,
     validationId: idea.validationId,
   };
+}
+
+/**
+ * {@link teamWithNewIdea} with a Proceed decision by its Owner and the plan template
+ * published, so its Owner and Member can draft plans (M5).
+ */
+export async function teamWithProceedIdea(
+  app: { handle(request: Request): Promise<Response> },
+  fixtures: ReturnType<typeof testFixtures>,
+) {
+  const team = await teamWithNewIdea(app, fixtures);
+  const decision = await fixtures.createDecision(
+    { id: team.idea.id, workspaceId: team.workspace.id },
+    team.owner.id,
+  );
+  await fixtures.templateVersion("business_plan");
+  return { ...team, decision };
 }

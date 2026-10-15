@@ -544,7 +544,7 @@ make test-api・make openapi（差分なし）・make typecheck・make lint が�
 
 ## Step 14: API: プランと実行管理
 
-Status:
+Status: done 2026-10-15
 
 ```
 docs/02-01_system-design-doc.md 5.9 の P1〜P11 を作ってください。

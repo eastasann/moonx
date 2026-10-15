@@ -15,6 +15,7 @@ import {
   metricReasonSchema,
   roleSchema,
   scenarioKeySchema,
+  sourceTypeSchema,
   stageSchema,
   supportsCheckSchema,
 } from "@moonx/schemas";
@@ -24,6 +25,7 @@ test("the shared instance is ready on import", () => {
   expect(i18n.isInitialized).toBe(true);
   expect(i18n.language).toBe("en");
   expect(namespaces).toEqual([
+    "ai",
     "common",
     "format",
     "mail",
@@ -81,6 +83,7 @@ test.each([
   ["competitorType", competitorTypeSchema.options],
   ["executionStatus", executionStatusSchema.options],
   ["launchTiming", launchTimingSchema.options],
+  ["sourceType", sourceTypeSchema.options],
 ] as const)("common:%s labels every value", (group, values) => {
   const labels = resources.en.common[group] as Record<string, string>;
   for (const value of values) expect(labels[value]).toBeString();

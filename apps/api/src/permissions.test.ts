@@ -1451,6 +1451,94 @@ const ROWS: Row[] = [
     },
     expected: members(200, 200, 200),
   },
+  ...(["export", "import/context"] as const).flatMap((path): Row[] => {
+    const api = path === "export" ? "X1" : "X2";
+    const param = path === "export" ? "source" : "target";
+    const routes = { [`GET /api/v1/ai/${path}`]: "located" as const };
+    return [
+      {
+        api: `${api} validation`,
+        routes,
+        async call(caller, team) {
+          const { validation } = await newIdea(team);
+          return request(
+            "GET",
+            `/api/v1/ai/${path}?${param}=validation&id=${validation.id}`,
+            caller,
+          );
+        },
+        expected: members(403, 200, 200),
+      },
+      {
+        api: `${api} plan`,
+        routes,
+        async call(caller, team) {
+          const { plan } = await newPlan(team);
+          return request(
+            "GET",
+            `/api/v1/ai/${path}?${param}=business_plan&id=${plan.id}`,
+            caller,
+          );
+        },
+        expected: members(403, 200, 200),
+      },
+      {
+        api: `${api} self-analysis`,
+        routes,
+        async call(caller) {
+          await ownSelfAnalysis(caller);
+          return request(
+            "GET",
+            `/api/v1/ai/${path}?${param}=self_analysis`,
+            caller,
+          );
+        },
+        expected: signedInOnly(200),
+      },
+    ];
+  }),
+  {
+    api: "X3 validation",
+    routes: { "POST /api/v1/ai/import/apply": "located" },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request("POST", "/api/v1/ai/import/apply", caller, {
+        target: { type: "validation", id: validation.id },
+        changes: [
+          { questionKey: "V.01.WHO", text: "Offices", baseLockVersion: 0 },
+        ],
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "X3 plan",
+    routes: { "POST /api/v1/ai/import/apply": "located" },
+    async call(caller, team) {
+      const { plan } = await newPlan(team);
+      return request("POST", "/api/v1/ai/import/apply", caller, {
+        target: { type: "business_plan", id: plan.id },
+        changes: [
+          { questionKey: "P.01.5", text: "Offices", baseLockVersion: 0 },
+        ],
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "X3 self-analysis",
+    routes: { "POST /api/v1/ai/import/apply": "located" },
+    async call(caller) {
+      await ownSelfAnalysis(caller);
+      return request("POST", "/api/v1/ai/import/apply", caller, {
+        target: { type: "self_analysis" },
+        changes: [
+          { questionKey: "SA.WHY.1", text: "To stay", baseLockVersion: 0 },
+        ],
+      });
+    },
+    expected: signedInOnly(200),
+  },
 ];
 
 const testApp = buildTestApp(database);

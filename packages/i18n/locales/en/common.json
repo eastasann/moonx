@@ -96,6 +96,34 @@
     "risks": "Risks",
     "totals": "Totals"
   },
+  "metric": {
+    "initial_cost_total": "Startup cost",
+    "monthly_fixed_total": "Monthly fixed cost",
+    "variable_cost_per_unit": "Variable cost / sale",
+    "selling_price": "Price",
+    "contribution_margin": "Contribution / sale",
+    "contribution_margin_rate": "Contribution margin rate",
+    "break_even_units_month": "Break-even units / month",
+    "break_even_units_day": "Break-even units / day",
+    "break_even_revenue": "Break-even revenue / month",
+    "target_margin_units_month": "Units for target margin",
+    "expected_revenue": "Expected revenue per month",
+    "expected_operating_profit": "Expected profit per month",
+    "payback_months": "Payback",
+    "simple_roi": "ROI",
+    "capacity_units_day": "Capacity limit",
+    "operating_days": "Operating days"
+  },
+  "sourceType": {
+    "google_maps_reviews": "Google Maps / Reviews",
+    "website": "Website",
+    "social_media": "Social Media",
+    "public_data": "Public Data",
+    "news_report": "News / Report",
+    "store_observation": "Store Observation",
+    "price_check": "Price Check",
+    "other": "Other"
+  },
   "metricReason": {
     "needs_price": "Needs price",
     "needs_monthly_costs": "Needs monthly costs",

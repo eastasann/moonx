@@ -64,14 +64,15 @@ const ANSWERABLE = new Set<TemplateQuestion["answerType"]>([
   "amount_with_reason",
 ]);
 
-const notOpenedYet = () =>
+/** The 404 of a self-analysis S1 GET has not made yet (SDD 5.8). */
+export const notOpenedYet = () =>
   new ApiError(
     "NOT_FOUND",
     "No self-analysis yet: S1 GET makes it the first time 10 opens",
   );
 
 /** The caller's self-analysis, or undefined before the first S1 GET made it. */
-async function findSelfAnalysis(
+export async function findSelfAnalysis(
   db: Executor,
   userId: string,
 ): Promise<SelfAnalysisRow | undefined> {
@@ -89,7 +90,7 @@ async function findSelfAnalysis(
  *
  * @throws {ApiError} NOT_FOUND before the first S1 GET made it
  */
-async function lockSelfAnalysis(
+export async function lockSelfAnalysis(
   tx: DatabaseTransaction,
   userId: string,
 ): Promise<SelfAnalysisRow> {
@@ -354,7 +355,7 @@ async function refuseUnshareable(
  * or changing the pinned version, under {@link lockSelfAnalysis} (SDD 5.8). It never
  * moves back to not started.
  */
-async function startIfAnswered(
+export async function startIfAnswered(
   tx: DatabaseTransaction,
   analysis: SelfAnalysisRow,
   sections: readonly TemplateSection[],

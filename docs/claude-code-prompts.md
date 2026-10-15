@@ -606,7 +606,7 @@ make test-domain・make test-api・make openapi（差分なし）・make typeche
 
 ## Step 16: API: AI 書き出し・取り込み
 
-Status:
+Status: done 2026-10-15
 
 ```
 AI 往復（コア）の書式と API を作ってください（PRD 4章の Must）。

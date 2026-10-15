@@ -173,7 +173,8 @@ async function riskViews(
   }));
 }
 
-const liveCompetitors = (db: Executor, validationId: string) =>
+/** The competitors of `validationId` not deleted, in 15's order (V17). */
+export const liveCompetitors = (db: Executor, validationId: string) =>
   db
     .select()
     .from(competitors)
@@ -189,7 +190,8 @@ const liveCompetitors = (db: Executor, validationId: string) =>
       asc(competitors.id),
     );
 
-const liveAssumptions = (db: Executor, validationId: string) =>
+/** The assumptions of `validationId` not deleted, in 16's order. */
+export const liveAssumptions = (db: Executor, validationId: string) =>
   db
     .select()
     .from(assumptions)
@@ -205,7 +207,8 @@ const liveAssumptions = (db: Executor, validationId: string) =>
       asc(assumptions.id),
     );
 
-const liveRisks = async (db: Executor, validationId: string) =>
+/** The risks of `validationId` not deleted, in 16's order (`orderRisks`). */
+export const liveRisks = async (db: Executor, validationId: string) =>
   orderRisks(
     await db
       .select()

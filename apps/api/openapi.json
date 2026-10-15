@@ -25597,6 +25597,1045 @@
         "operationId": "getApiV1PlansByPlanIdPitch-deck.pdf"
       }
     },
+    "/api/v1/ai/export": {
+      "get": {
+        "summary": "X1 Export for an AI (24)",
+        "description": "The caller's self-analysis (no id), or the validation or plan id, archived ones included. sections (self-analysis, validation), items or part (plan) narrow the scope; without them it is the whole. Hidden questions and those an import cannot write are left out. Nothing is recorded. Counted with X3, 60 per user per hour (429 RATE_LIMITED); refusals before the export are not counted.",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["self_analysis", "validation", "business_plan"]
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sections",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" } }
+              ]
+            }
+          },
+          {
+            "name": "items",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" } }
+              ]
+            }
+          },
+          {
+            "name": "part",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["a", "b"] }
+          },
+          {
+            "name": "includeEmpty",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "includeExamples",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "includeReference",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "markdown": { "type": "string" },
+                    "json": {
+                      "type": "object",
+                      "properties": {
+                        "format": { "type": "string", "const": "moonx-export" },
+                        "version": { "type": "number", "const": 1 },
+                        "exportedAt": { "type": "string" },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "self_analysis",
+                            "validation",
+                            "business_plan"
+                          ]
+                        },
+                        "scope": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "ideaName": { "type": "string" },
+                                "sections": {
+                                  "type": ["array", "null"],
+                                  "items": { "type": "string" }
+                                }
+                              },
+                              "required": ["ideaName", "sections"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "planName": { "type": "string" },
+                                "items": {
+                                  "type": ["array", "null"],
+                                  "items": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "part": {
+                                  "type": ["string", "null"],
+                                  "enum": ["a", "b"]
+                                }
+                              },
+                              "required": ["planName", "items", "part"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "sections": {
+                                  "type": ["array", "null"],
+                                  "items": { "type": "string" }
+                                }
+                              },
+                              "required": ["sections"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "templateVersion": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "currency": { "type": "string" },
+                        "prompt": { "type": "string" },
+                        "questions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string" },
+                              "section": { "type": "string" },
+                              "title": { "type": "string" },
+                              "question": { "type": "string" },
+                              "example": { "type": ["string", "null"] },
+                              "hint": { "type": ["string", "null"] },
+                              "answerType": {
+                                "type": "string",
+                                "enum": [
+                                  "long_text",
+                                  "short_text",
+                                  "choice",
+                                  "amount_with_reason",
+                                  "table",
+                                  "linked_metric",
+                                  "execution_view"
+                                ]
+                              },
+                              "choices": {
+                                "type": "array",
+                                "items": { "type": "string" }
+                              },
+                              "answer": {
+                                "type": "object",
+                                "properties": {
+                                  "text": { "type": ["string", "null"] },
+                                  "amount": { "type": ["number", "null"] },
+                                  "reason": { "type": ["string", "null"] },
+                                  "fau": {
+                                    "type": ["string", "null"],
+                                    "enum": ["fact", "assumption", "unknown"]
+                                  },
+                                  "confidence": {
+                                    "type": ["string", "null"],
+                                    "enum": ["low", "medium", "high"]
+                                  },
+                                  "evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "oneOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "type": "string",
+                                              "const": "research_log"
+                                            },
+                                            "date": {
+                                              "type": ["string", "null"],
+                                              "format": "date",
+                                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                            },
+                                            "topic": { "type": "string" }
+                                          },
+                                          "required": ["type", "date", "topic"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "type": "string",
+                                              "const": "url"
+                                            },
+                                            "url": { "type": "string" },
+                                            "note": {
+                                              "type": ["string", "null"]
+                                            }
+                                          },
+                                          "required": ["type", "url", "note"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "section",
+                              "title",
+                              "question",
+                              "example",
+                              "hint",
+                              "answerType",
+                              "answer"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "reference": {
+                          "type": "object",
+                          "properties": {
+                            "keyNumbers": {
+                              "type": "object",
+                              "propertyNames": { "type": "string" },
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "label": { "type": "string" },
+                                  "value": { "type": "string" }
+                                },
+                                "required": ["label", "value"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "checks": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": { "type": "string" },
+                                  "state": { "type": "string" }
+                                },
+                                "required": ["name", "state"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "competitors": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": { "type": "string" },
+                                  "type": { "type": ["string", "null"] },
+                                  "typicalPrice": {
+                                    "type": ["string", "null"]
+                                  },
+                                  "strength": { "type": ["string", "null"] },
+                                  "weakness": { "type": ["string", "null"] }
+                                },
+                                "required": [
+                                  "name",
+                                  "type",
+                                  "typicalPrice",
+                                  "strength",
+                                  "weakness"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "researchLog": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "date": {
+                                    "type": ["string", "null"],
+                                    "format": "date",
+                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                  },
+                                  "topic": { "type": "string" },
+                                  "sourceType": { "type": ["string", "null"] },
+                                  "supports": {
+                                    "type": "array",
+                                    "items": { "type": "string" }
+                                  }
+                                },
+                                "required": [
+                                  "date",
+                                  "topic",
+                                  "sourceType",
+                                  "supports"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "assumptions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "assumption": { "type": "string" },
+                                  "confidence": { "type": ["string", "null"] }
+                                },
+                                "required": ["assumption", "confidence"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "risks": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "risk": { "type": "string" },
+                                  "probability": { "type": ["string", "null"] },
+                                  "impact": { "type": ["string", "null"] }
+                                },
+                                "required": ["risk", "probability", "impact"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "tables": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": { "type": "string" },
+                                  "title": { "type": "string" },
+                                  "columns": {
+                                    "type": "array",
+                                    "items": { "type": "string" }
+                                  },
+                                  "rows": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "array",
+                                      "items": { "type": ["string", "null"] }
+                                    }
+                                  }
+                                },
+                                "required": ["id", "title", "columns", "rows"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["keyNumbers"],
+                          "additionalProperties": false
+                        },
+                        "reply": {
+                          "type": "object",
+                          "properties": {
+                            "instructions": { "type": "string" },
+                            "example": {
+                              "type": "object",
+                              "properties": {
+                                "format": {
+                                  "type": "string",
+                                  "const": "moonx-reply"
+                                },
+                                "version": { "type": "number", "const": 1 },
+                                "answers": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": { "type": "string" },
+                                      "text": { "type": ["string", "null"] },
+                                      "amount": { "type": ["number", "null"] },
+                                      "reason": { "type": ["string", "null"] }
+                                    },
+                                    "required": ["id"],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": ["format", "version", "answers"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["instructions", "example"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "format",
+                        "version",
+                        "exportedAt",
+                        "kind",
+                        "scope",
+                        "templateVersion",
+                        "currency",
+                        "questions",
+                        "reply"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "fileBaseName": { "type": "string" },
+                    "questionCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "allEmpty": { "type": "boolean" }
+                  },
+                  "required": [
+                    "markdown",
+                    "json",
+                    "fileBaseName",
+                    "questionCount",
+                    "allEmpty"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Response for status 401",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "403": {
+            "description": "Response for status 403",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "404": {
+            "description": "Response for status 404",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "422": {
+            "description": "Response for status 422",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "429": {
+            "description": "Response for status 429",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          }
+        },
+        "operationId": "getApiV1AiExport"
+      }
+    },
+    "/api/v1/ai/import/context": {
+      "get": {
+        "summary": "X2 Where an import goes (24, 25)",
+        "description": "The template's sections and questions with the answers they hold now and their versions. Archived ideas and plans are read too (target.archived). Not counted.",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["self_analysis", "validation", "business_plan"]
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "self_analysis",
+                            "validation",
+                            "business_plan"
+                          ]
+                        },
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "name": { "type": "string" },
+                        "workspaceId": {
+                          "type": ["string", "null"],
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "ideaId": {
+                          "type": ["string", "null"],
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "currency": { "type": ["string", "null"] },
+                        "archived": { "type": "boolean" }
+                      },
+                      "required": [
+                        "type",
+                        "id",
+                        "name",
+                        "workspaceId",
+                        "ideaId",
+                        "currency",
+                        "archived"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "sections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "title": { "type": "string" },
+                          "part": {
+                            "type": ["string", "null"],
+                            "enum": ["a", "b"]
+                          },
+                          "importable": { "type": "boolean" }
+                        },
+                        "required": ["key", "title", "part", "importable"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "questions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "questionKey": { "type": "string" },
+                          "title": { "type": "string" },
+                          "sectionKey": { "type": "string" },
+                          "answerType": {
+                            "type": "string",
+                            "enum": [
+                              "long_text",
+                              "short_text",
+                              "choice",
+                              "amount_with_reason",
+                              "table",
+                              "linked_metric",
+                              "execution_view"
+                            ]
+                          },
+                          "options": {
+                            "anyOf": [
+                              {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "choice"
+                                      },
+                                      "choices": {
+                                        "type": "array",
+                                        "items": { "type": "string" }
+                                      }
+                                    },
+                                    "required": ["kind", "choices"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "table"
+                                      },
+                                      "columns": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "key": { "type": "string" },
+                                            "label": { "type": "string" },
+                                            "type": {
+                                              "type": "string",
+                                              "enum": [
+                                                "text",
+                                                "number",
+                                                "percent",
+                                                "money"
+                                              ]
+                                            }
+                                          },
+                                          "required": ["key", "label", "type"],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "required": ["kind", "columns"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "linked_metric"
+                                      },
+                                      "metricKeys": {
+                                        "type": "array",
+                                        "items": { "type": "string" }
+                                      }
+                                    },
+                                    "required": ["kind", "metricKeys"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "execution_view"
+                                      },
+                                      "executionType": {
+                                        "type": "string",
+                                        "enum": [
+                                          "milestone",
+                                          "launch",
+                                          "kpi",
+                                          "open_question",
+                                          "next_action"
+                                        ]
+                                      }
+                                    },
+                                    "required": ["kind", "executionType"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              { "type": "null" }
+                            ]
+                          },
+                          "importable": { "type": "boolean" },
+                          "hidden": { "type": "boolean" },
+                          "current": {
+                            "type": "object",
+                            "properties": {
+                              "lockVersion": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "updatedAt": {
+                                "type": ["string", "null"],
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                              },
+                              "updatedBy": {
+                                "type": ["object", "null"],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "displayName": { "type": "string" },
+                                  "avatarUrl": { "type": ["string", "null"] },
+                                  "badge": {
+                                    "type": ["string", "null"],
+                                    "enum": [
+                                      "former_member",
+                                      "suspended",
+                                      "deleted"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "displayName",
+                                  "avatarUrl",
+                                  "badge"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "text": { "type": ["string", "null"] },
+                              "amount": { "type": ["number", "null"] },
+                              "classification": {
+                                "type": ["object", "null"],
+                                "properties": {
+                                  "fau": {
+                                    "type": ["string", "null"],
+                                    "enum": ["fact", "assumption", "unknown"]
+                                  },
+                                  "confidence": {
+                                    "type": ["string", "null"],
+                                    "enum": ["low", "medium", "high"]
+                                  },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "empty",
+                                      "unclassified",
+                                      "fact",
+                                      "fact_no_evidence",
+                                      "assumption",
+                                      "unknown"
+                                    ]
+                                  },
+                                  "evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["research_log", "url"]
+                                        },
+                                        "researchLog": {
+                                          "type": ["object", "null"],
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "format": "uuid",
+                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                            },
+                                            "observedOn": {
+                                              "type": ["string", "null"],
+                                              "format": "date",
+                                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                            },
+                                            "topic": { "type": "string" },
+                                            "sourceType": {
+                                              "type": ["string", "null"],
+                                              "enum": [
+                                                "google_maps_reviews",
+                                                "website",
+                                                "social_media",
+                                                "public_data",
+                                                "news_report",
+                                                "store_observation",
+                                                "price_check",
+                                                "other"
+                                              ]
+                                            },
+                                            "deleted": { "type": "boolean" }
+                                          },
+                                          "required": [
+                                            "id",
+                                            "observedOn",
+                                            "topic",
+                                            "sourceType",
+                                            "deleted"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "url": { "type": ["string", "null"] },
+                                        "note": { "type": ["string", "null"] }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "kind",
+                                        "researchLog",
+                                        "url",
+                                        "note"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "fau",
+                                  "confidence",
+                                  "state",
+                                  "evidence"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "lockVersion",
+                              "updatedAt",
+                              "updatedBy",
+                              "text",
+                              "amount",
+                              "classification"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "questionKey",
+                          "title",
+                          "sectionKey",
+                          "answerType",
+                          "options",
+                          "importable",
+                          "hidden",
+                          "current"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["target", "sections", "questions"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Response for status 401",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "403": {
+            "description": "Response for status 403",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "404": {
+            "description": "Response for status 404",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "422": {
+            "description": "Response for status 422",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          }
+        },
+        "operationId": "getApiV1AiImportContext"
+      }
+    },
+    "/api/v1/ai/import/apply": {
+      "post": {
+        "summary": "X3 Apply an AI import (25)",
+        "description": "All the changes in one transaction, or none. 409 CONFLICT_MULTI (error.conflicts) when an answer that changes was saved since baseLockVersion; 422 NOT_IMPORTABLE for tables, numbers, execution items and hidden questions, QUESTION_NOT_FOUND, VALIDATION_FAILED for a value that does not fit or a question twice. A validation answer whose text changes becomes Unclassified unless classification is sent. History ai_import under one batchId. Counted with X1, 60 per user per hour (429 RATE_LIMITED); a refused import is not counted.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["self_analysis", "validation", "business_plan"]
+                      },
+                      "id": { "type": "string" }
+                    },
+                    "required": ["type"]
+                  },
+                  "changes": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "questionKey": { "type": "string" },
+                        "text": { "type": ["string", "null"] },
+                        "amount": {
+                          "type": ["number", "null"],
+                          "minimum": 0,
+                          "maximum": 1000000000000
+                        },
+                        "classification": {
+                          "type": "object",
+                          "properties": {
+                            "fau": {
+                              "type": ["string", "null"],
+                              "enum": ["fact", "assumption", "unknown"]
+                            },
+                            "confidence": {
+                              "type": ["string", "null"],
+                              "enum": ["low", "medium", "high"]
+                            }
+                          },
+                          "required": ["fau"]
+                        },
+                        "baseLockVersion": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["questionKey", "baseLockVersion"]
+                    }
+                  }
+                },
+                "required": ["target", "changes"]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "applied": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "needsClassification": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "batchId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
+                  "required": ["applied", "needsClassification", "batchId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Response for status 401",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "403": {
+            "description": "Response for status 403",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "404": {
+            "description": "Response for status 404",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "409": {
+            "description": "Response for status 409",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "422": {
+            "description": "Response for status 422",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          },
+          "429": {
+            "description": "Response for status 429",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorBody" }
+              }
+            }
+          }
+        },
+        "operationId": "postApiV1AiImportApply"
+      }
+    },
     "/api/auth/*": {
       "get": {
         "summary": "A3, A5 (Better Auth)",

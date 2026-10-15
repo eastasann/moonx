@@ -2,6 +2,7 @@ import type { Database } from "@moonx/db";
 import { Elysia } from "elysia";
 import { accessPlugin, assertAccessDeclared } from "./access";
 import { accountRoutes } from "./account";
+import { aiRoutes } from "./ai";
 import { AUTH_IP_LIMITS, createAuth } from "./auth";
 import { type AvatarStore, avatarFileRoutes } from "./avatars";
 import type { Config } from "./config";
@@ -108,7 +109,8 @@ export function createApp(config: Config, services: AppServices) {
     .use(planRoutes({ access, db, now }))
     .use(planItemRoutes({ access, db, now }))
     .use(executionRoutes({ access, db, now }))
-    .use(pitchDeckRoutes({ access, db, limiter, now }));
+    .use(pitchDeckRoutes({ access, db, limiter, now }))
+    .use(aiRoutes({ access, db, limiter, now }));
   if (avatars.directory !== undefined) {
     app.use(avatarFileRoutes(access, avatars.directory));
   }

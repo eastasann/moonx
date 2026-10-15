@@ -25,6 +25,23 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Whether `error`, or an error it was caused by, is PostgreSQL's unique violation on
+ * `constraint`: how a write learns it lost a race to create the same row, such as the
+ * first save of a keyed item (SDD 5.1「同時編集」) or two sign-ups for one address.
+ */
+export function isUniqueViolation(error: unknown, constraint: string): boolean {
+  let current: unknown = error;
+  while (current instanceof Error) {
+    const fields = current as { code?: unknown; constraint_name?: unknown };
+    if (fields.code === "23505" && fields.constraint_name === constraint) {
+      return true;
+    }
+    current = current.cause;
+  }
+  return false;
+}
+
 interface StandardIssue {
   readonly message: string;
   readonly path?: readonly (PropertyKey | { readonly key: PropertyKey })[];

@@ -1,7 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import {
   accounts,
-  hashInvitationToken,
   invitations,
   memberships,
   rateLimits,
@@ -27,75 +26,24 @@ import {
   unreachableDatabase,
   waitForLine,
 } from "./test-app";
+import {
+  cookiesOf,
+  TEST_PASSWORD as PASSWORD,
+  testFixtures,
+  uniqueEmail,
+} from "./test-fixtures";
 
 const database = connectTestDatabase();
 const { db } = database;
 afterAll(() => database.close());
 
 const ORIGIN = testConfig.trustedOrigins[0] ?? "";
-const PASSWORD = "correct horse battery";
 const GOOGLE = { clientId: "test-client", clientSecret: "test-secret" };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type App = ReturnType<typeof buildTestApp>["app"];
 
-const uniqueEmail = (label = "user") =>
-  `${label}-${crypto.randomUUID()}@example.com`;
-
-/** A user who signs in with {@link PASSWORD}, as U5 and the seed create them. */
-async function createUser(
-  options: {
-    email?: string;
-    displayName?: string;
-    status?: "active" | "suspended" | "deleted";
-  } = {},
-) {
-  const [user] = await db
-    .insert(users)
-    .values({
-      email: options.email ?? uniqueEmail(),
-      emailVerified: true,
-      displayName: options.displayName ?? "Test User",
-      status: options.status ?? "active",
-    })
-    .returning();
-  if (user === undefined) throw new Error("no user");
-  await db.insert(accounts).values({
-    userId: user.id,
-    accountId: user.id,
-    providerId: "credential",
-    password: await hashPassword(PASSWORD),
-  });
-  return user;
-}
-
-/** An invitation and the token of its link, valid for 7 days unless `values` say otherwise. */
-async function createInvitation(
-  values: Partial<typeof invitations.$inferInsert> & { email: string },
-) {
-  const token = crypto.randomUUID();
-  const [invitation] = await db
-    .insert(invitations)
-    .values({
-      tokenHash: hashInvitationToken(token),
-      expiresAt: new Date(Date.now() + 7 * DAY_MS),
-      ...values,
-    })
-    .returning();
-  if (invitation === undefined) throw new Error("no invitation");
-  return { ...invitation, token };
-}
-
-/** A workspace and its owner, for invitations that name one. */
-async function createWorkspace() {
-  const owner = await createUser();
-  const [workspace] = await db
-    .insert(workspaces)
-    .values({ name: "Team", createdById: owner.id })
-    .returning();
-  if (workspace === undefined) throw new Error("no workspace");
-  return workspace;
-}
+const { createUser, createInvitation, createWorkspace } = testFixtures(db);
 
 function call(
   method: "GET" | "POST",
@@ -123,14 +71,6 @@ function call(
   });
 }
 
-/** The `Cookie` header a browser would send back after `response`. */
-const cookiesOf = (response: Response) =>
-  response.headers
-    .getSetCookie()
-    .map((cookie) => cookie.split(";")[0])
-    .filter((pair) => !pair?.endsWith("="))
-    .join("; ");
-
 const signIn = (
   app: App,
   email: string,
@@ -141,11 +81,13 @@ const signIn = (
     call("POST", "/sign-in/email", { body: { email, password }, ...options }),
   );
 
+/** The user of the session `cookie` holds, or null when A5 refuses it as signed out. */
 async function sessionUserId(app: App, cookie: string) {
   const response = await app.handle(call("GET", "/get-session", { cookie }));
+  if (response.status === 401) return null;
   expect(response.status).toBe(200);
-  const body = (await response.json()) as { user: { id: string } } | null;
-  return body?.user.id ?? null;
+  const body = (await response.json()) as { user: { id: string } };
+  return body.user.id;
 }
 
 const userRow = async (id: string) =>
@@ -178,6 +120,50 @@ describe("sign-in with email and password (A1, A4, A5)", () => {
     );
     expect(signedOut.status).toBe(200);
     expect(await sessionUserId(app, cookies)).toBeNull();
+  });
+
+  test("refuses A4, A5 and A8 without a session with 401 UNAUTHENTICATED (SDD 7.1)", async () => {
+    const { app } = buildTestApp(database);
+
+    for (const [method, path, body] of [
+      ["GET", "/get-session", undefined],
+      ["POST", "/sign-out", {}],
+      [
+        "POST",
+        "/change-password",
+        { currentPassword: PASSWORD, newPassword: "another long password" },
+      ],
+      // Refused for the missing session, not for the body.
+      [
+        "POST",
+        "/change-password",
+        { currentPassword: "x", newPassword: "short" },
+      ],
+      ["POST", "/change-password", {}],
+    ] as const) {
+      const response = await app.handle(call(method, path, { body }));
+      expect({ path, status: response.status }).toEqual({ path, status: 401 });
+      expect(await response.json()).toEqual({
+        code: "UNAUTHENTICATED",
+        message: expect.any(String),
+      });
+    }
+  });
+
+  test("refuses a sign-out with a dead session, and still clears its cookie", async () => {
+    const user = await createUser();
+    const { app } = buildTestApp(database);
+    const cookies = cookiesOf(await signIn(app, user.email));
+    await db.delete(sessions).where(eq(sessions.userId, user.id));
+
+    const response = await app.handle(
+      call("POST", "/sign-out", { cookie: cookies, body: {} }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.getSetCookie()).toContainEqual(
+      expect.stringMatching(/^moonx\.session_token=;.*Max-Age=0/),
+    );
   });
 
   test("answers a wrong password in Better Auth's shape", async () => {
@@ -1521,7 +1507,8 @@ describe("rate limits (ADR-029, SDD 7.2「レート制限」)", () => {
 
     for (let i = 0; i < 100; i++) {
       const response = await app.handle(call("GET", "/get-session", { ip }));
-      expect(response.status).toBe(200);
+      // No session: counted all the same.
+      expect(response.status).toBe(401);
     }
     const over = await app.handle(call("GET", "/get-session", { ip }));
 

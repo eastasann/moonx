@@ -1,6 +1,6 @@
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
-import { hashInvitationToken } from "../invitations";
+import { hashInvitationToken, INVITATION_VALID_MS } from "../invitations";
 import {
   accounts,
   invitations,
@@ -26,9 +26,6 @@ export const SEED_INVITATION_TOKENS = {
   pending: "demo-invite-pending",
   expired: "demo-invite-expired",
 } as const;
-
-/** How long an invitation stays valid (design-spec 6.16, screen 9). */
-const INVITATION_DAYS = 7;
 
 interface UserSpec {
   displayName: string;
@@ -194,7 +191,7 @@ export async function seedPeople({ tx, clock }: SeedContext): Promise<void> {
     tokenHash: hashInvitationToken(SEED_INVITATION_TOKENS[key]),
     invitedById: userId("ana"),
     status: "pending" as const,
-    expiresAt: clock.ago(sentDaysAgo - INVITATION_DAYS),
+    expiresAt: new Date(clock.ago(sentDaysAgo).getTime() + INVITATION_VALID_MS),
     createdAt: clock.ago(sentDaysAgo),
     updatedAt: clock.ago(sentDaysAgo),
   });

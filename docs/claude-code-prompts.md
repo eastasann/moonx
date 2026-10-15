@@ -380,7 +380,7 @@ make test-api・make openapi（差分なし）・make typecheck・make lint が�
 
 ## Step 9: 認可・楽観ロック・変更履歴・通知の共通の処理と、招待の受諾
 
-Status:
+Status: done 2026-10-15
 
 ```
 以後の API のステップが使う共通の処理と、招待のリンクからの登録と受諾を作ってください。

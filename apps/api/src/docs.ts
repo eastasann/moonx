@@ -5,6 +5,7 @@ import swaggerUiBundle from "swagger-ui-dist/swagger-ui-bundle.js" with {
   type: "text",
 };
 import { z } from "zod";
+import type { AccessPlugin } from "./access";
 
 /** Where the OpenAPI document is served on staging; `make openapi` reads it from here. */
 export const OPENAPI_JSON_PATH = "/api/docs/json";
@@ -41,10 +42,14 @@ const hidden = { detail: { hide: true } };
 
 /**
  * `/api/docs` (ADR-006): the OpenAPI document of every route and a Swagger UI page to
- * read it. Only staging installs it.
+ * read it. Only staging installs it, open to anyone there (SDD 7.1 Z3).
  */
-export function docsRoutes() {
+export function docsRoutes(access: AccessPlugin) {
+  // The guard declares every route below open, the plugin's document route included.
+  // Its callback form would hide the app's routes from the plugin's document.
   return new Elysia()
+    .use(access)
+    .guard({ open: true })
     .use(
       openapi({
         path: "/api/docs",

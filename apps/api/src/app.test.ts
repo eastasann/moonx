@@ -8,6 +8,7 @@ import { HEALTH_DB_IP_LIMIT, healthRoutes } from "./health";
 import { createLogger } from "./log";
 import {
   accessLine,
+  buildTestAccess,
   buildTestApp,
   connectTestDatabase,
   testConfig,
@@ -220,7 +221,9 @@ describe("GET /api/health/db (Z2)", () => {
           ipLimits: [HEALTH_DB_IP_LIMIT],
         }),
       )
-      .use(healthRoutes(testConfig, unreachable.db));
+      .use(
+        healthRoutes(testConfig, unreachable.db, buildTestAccess(unreachable)),
+      );
 
     const response = await app.handle(get("/api/health/db"));
 
@@ -303,6 +306,9 @@ describe("/api/docs (ADR-006)", () => {
       "/api/auth/*",
       "/api/health",
       "/api/health/db",
+      "/api/v1/invitations/by-token/{token}",
+      "/api/v1/invitations/by-token/{token}/accept",
+      "/api/v1/invitations/by-token/{token}/sign-up",
     ]);
   });
 

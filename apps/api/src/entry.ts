@@ -204,8 +204,11 @@ async function toApiError(code: unknown, error: unknown): Promise<ApiError> {
 /** A path the entry plugin counts per IP (ADR-029 ②), and the limit it counts against. */
 export interface IpLimit {
   method: string;
-  /** An exact path, such as `/api/health/db`. Paths sharing a `limit.name` share a count. */
-  path: string;
+  /**
+   * An exact path, such as `/api/health/db`, or a pattern matching the whole path for one
+   * with a parameter (U5's token). Paths sharing a `limit.name` share a count.
+   */
+  path: string | RegExp;
   limit: Limit;
 }
 
@@ -213,6 +216,27 @@ export interface IpLimit {
 // handler, so neither may slip past a limit.
 const limitKey = (method: string, pathname: string) =>
   `${method === "HEAD" ? "GET" : method} ${pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname}`;
+
+/** Finds the limit of a request among `ipLimits`, exact paths first. */
+function limitFinder(ipLimits: readonly IpLimit[]) {
+  const exact = new Map<string, Limit>();
+  const patterns: { method: string; path: RegExp; limit: Limit }[] = [];
+  for (const { method, path, limit } of ipLimits) {
+    if (typeof path === "string") exact.set(limitKey(method, path), limit);
+    else patterns.push({ method, path, limit });
+  }
+  return (method: string, pathname: string): Limit | undefined => {
+    const key = limitKey(method, pathname);
+    const found = exact.get(key);
+    if (found !== undefined) return found;
+    const separator = key.indexOf(" ");
+    const keyMethod = key.slice(0, separator);
+    const keyPath = key.slice(separator + 1);
+    return patterns.find(
+      (entry) => entry.method === keyMethod && entry.path.test(keyPath),
+    )?.limit;
+  };
+}
 
 const routeOf = (request: Request, route: string | undefined) =>
   route === undefined || route === "" ? null : `${request.method} ${route}`;
@@ -243,9 +267,7 @@ export function entryPlugin({
   now = Date.now,
 }: EntryOptions) {
   const isFlooding = createDenialCounter(now);
-  const limits = new Map(
-    ipLimits.map((entry) => [limitKey(entry.method, entry.path), entry.limit]),
-  );
+  const limitOf = limitFinder(ipLimits);
   const headers = {
     "cache-control": "no-store",
     ...securityHeaders(config.appEnv),
@@ -278,7 +300,7 @@ export function entryPlugin({
         request.headers.set(CLIENT_IP_HEADER, state.clientIp);
       }
 
-      const limit = limits.get(limitKey(request.method, path));
+      const limit = limitOf(request.method, path);
       if (limit !== undefined) {
         // The counts live in the database, so failing to count is the database's failure.
         const counted = await limiter

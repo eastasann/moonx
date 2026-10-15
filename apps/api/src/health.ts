@@ -2,6 +2,7 @@ import type { Database } from "@moonx/db";
 import { errorBodySchema, healthDbSchema, healthSchema } from "@moonx/schemas";
 import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
+import type { AccessPlugin } from "./access";
 import type { Config } from "./config";
 import type { IpLimit } from "./entry";
 import { ApiError } from "./errors";
@@ -17,8 +18,10 @@ export const HEALTH_DB_IP_LIMIT: IpLimit = {
 export function healthRoutes(
   config: Pick<Config, "appEnv" | "appVersion">,
   db: Database,
+  access: AccessPlugin,
 ) {
   return new Elysia()
+    .use(access)
     .get(
       "/api/health",
       () => ({
@@ -27,6 +30,7 @@ export function healthRoutes(
         env: config.appEnv,
       }),
       {
+        open: true,
         response: { 200: healthSchema },
         detail: {
           summary: "Z1 Health check",
@@ -53,6 +57,7 @@ export function healthRoutes(
         };
       },
       {
+        open: true,
         response: {
           200: healthDbSchema,
           429: errorBodySchema,

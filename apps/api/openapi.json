@@ -271,6 +271,1176 @@
         "operationId": "getApiHealthDb"
       }
     },
+    "/api/v1/invitations/by-token/{token}": {
+      "get": {
+        "summary": "U4 Show an invitation",
+        "description": "Public. A revoked, expired or unknown link answers 410 INVITATION_INVALID; an accepted one answers with status accepted.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["pending", "accepted"]
+                    },
+                    "email": { "type": "string" },
+                    "workspace": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "role": {
+                      "type": ["string", "null"],
+                      "enum": ["owner", "member", "viewer"]
+                    },
+                    "invitedBy": {
+                      "type": ["object", "null"],
+                      "properties": { "displayName": { "type": "string" } },
+                      "required": ["displayName"],
+                      "additionalProperties": false
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                    },
+                    "accountExists": { "type": "boolean" }
+                  },
+                  "required": [
+                    "status",
+                    "email",
+                    "workspace",
+                    "role",
+                    "invitedBy",
+                    "expiresAt",
+                    "accountExists"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Response for status 410",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiV1InvitationsBy-tokenByToken"
+      }
+    },
+    "/api/v1/invitations/by-token/{token}/sign-up": {
+      "post": {
+        "summary": "U5 Sign up through an invitation",
+        "description": "Public, limited per IP with the sign-in paths. Creates the account for the invitation's address and answers signed in. An invitation to a workspace stays pending until U6.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "displayName": { "type": "string" },
+                  "password": { "type": "string" },
+                  "timezone": { "type": "string" }
+                },
+                "required": ["displayName", "password", "timezone"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Response for status 201",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "me": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "email": { "type": "string" },
+                        "displayName": { "type": "string" },
+                        "avatarUrl": { "type": ["string", "null"] },
+                        "timezone": { "type": "string" },
+                        "theme": {
+                          "type": "string",
+                          "enum": ["system", "light", "dark"]
+                        },
+                        "isAdmin": { "type": "boolean" },
+                        "hasPassword": { "type": "boolean" },
+                        "lastWorkspaceId": {
+                          "type": ["string", "null"],
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "memberships": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "workspace": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "name": { "type": "string" },
+                                  "isPersonal": { "type": "boolean" },
+                                  "currency": { "type": "string" }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "isPersonal",
+                                  "currency"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": ["owner", "member", "viewer"]
+                              }
+                            },
+                            "required": ["workspace", "role"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "displayName",
+                        "avatarUrl",
+                        "timezone",
+                        "theme",
+                        "isAdmin",
+                        "hasPassword",
+                        "lastWorkspaceId",
+                        "memberships"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["me"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Response for status 409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Response for status 410",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Response for status 422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Response for status 429",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiV1InvitationsBy-tokenByTokenSign-up"
+      }
+    },
+    "/api/v1/invitations/by-token/{token}/accept": {
+      "post": {
+        "summary": "U6 Accept an invitation",
+        "description": "Only for the account with the invitation's address. Joins the workspace with the invitation's role, or keeps the role of an existing member.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "workspaceId": {
+                      "type": ["string", "null"],
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "alreadyMember": { "type": "boolean" }
+                  },
+                  "required": ["workspaceId", "alreadyMember"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Response for status 401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Response for status 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Response for status 409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Response for status 410",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "FORBIDDEN",
+                            "NO_ACCESS",
+                            "INVITATION_EMAIL_MISMATCH",
+                            "INVALID_PASSWORD",
+                            "REAUTH_REQUIRED",
+                            "NOT_SHARED",
+                            "INVITATION_REQUIRED",
+                            "ACCOUNT_SUSPENDED",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "CONFLICT_MULTI",
+                            "ALREADY_REVERTED",
+                            "UNDO_BLOCKED",
+                            "BUSY",
+                            "TEMPLATE_NOT_PUBLISHED",
+                            "ARCHIVED",
+                            "LAST_OWNER",
+                            "CANNOT_LEAVE_PERSONAL",
+                            "PERSONAL_OWNER",
+                            "ALREADY_MEMBER",
+                            "INVITATION_PENDING",
+                            "INVITATION_ALREADY_ACCEPTED",
+                            "EMAIL_TAKEN",
+                            "PASSWORD_ALREADY_SET",
+                            "DECISION_CHANGED",
+                            "DECISION_NOT_PROCEED",
+                            "NAME_TAKEN",
+                            "HAS_EMPTY_QUESTIONS",
+                            "ALREADY_LATEST",
+                            "DRAFT_EXISTS",
+                            "PUBLISHED_READ_ONLY",
+                            "INVITATION_INVALID",
+                            "PAYLOAD_TOO_LARGE",
+                            "VALIDATION_FAILED",
+                            "FACT_REQUIRES_EVIDENCE",
+                            "CONFIDENCE_REQUIRED",
+                            "INVALID_CHOICE",
+                            "QUESTION_NOT_FOUND",
+                            "PERCENT_ONLY_FOR_VARIABLE",
+                            "OUT_OF_RANGE",
+                            "NOT_EDITABLE",
+                            "INVALID_ASSIGNEE",
+                            "INVALID_STATUS",
+                            "MUST_BE_DONE_TO_SHARE",
+                            "NOT_SHAREABLE",
+                            "EMPTY_SCOPE",
+                            "NOT_IMPORTABLE",
+                            "REPLY_DEPTH",
+                            "INVALID_MENTION",
+                            "INVALID_QUESTION_KEY",
+                            "TEMPLATE_INVALID",
+                            "CANNOT_SUSPEND_SELF",
+                            "CONFIRMATION_MISMATCH",
+                            "RATE_LIMITED",
+                            "INTERNAL",
+                            "UPSTREAM_UNAVAILABLE"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string" },
+                              "code": { "type": "string" },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["path", "code", "message"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiV1InvitationsBy-tokenByTokenAccept"
+      }
+    },
     "/api/auth/*": {
       "get": {
         "summary": "A3, A5 (Better Auth)",

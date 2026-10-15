@@ -844,7 +844,7 @@ interface Page<T> { items: T[]; nextCursor: string | null; }
 
 interface UserRef {
   id: UUID; displayName: string; avatarUrl: string | null;
-  badge: null | "former_member" | "suspended" | "deleted";   // 名前に添える表示（design-spec 6.16・6.17）。deleted のとき displayName は "Deleted user"
+  badge: null | "former_member" | "suspended" | "deleted";   // 名前に添える表示（design-spec 6.16・6.17）。deleted のとき displayName は "Deleted user"。重なれば deleted、former_member（そのワークスペースにもういない）、suspended の順に1つ。表示がワークスペースに属さないとき（自己分析の変更履歴と衝突の相手、運営者の画面）は former_member を付けない
 }
 
 interface Versioned { lockVersion: number; updatedAt: DateTime | null; updatedBy: UserRef | null; }
@@ -1077,7 +1077,7 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | 新規登録の制限 | Google の新規登録だけで動く（U5 はアダプターを通さず、自分で招待を確かめる。ADR-010）。`databaseHooks.user.create.before`: 始めた画面の招待（`additionalData.invitationToken` のトークンの招待。クライアントが送る値なので、招待を引く鍵にだけ使う）が有効（`pending` かつ期限内）で、そのメールが Google のメールと同じ（大文字小文字を区別しない）でなければ、またメールが確認済みでなければ（Google が `email_verified` を返さない）`INVITATION_REQUIRED` で拒否する（design-spec 6.16 の「招待のメールと同じメールの Google アカウントだけ」）。招待は、Google のプロフィールを受け取ったとき（Google の設定の `mapProfileToUser`。ユーザーを作るトランザクションの前）に引いて確かめ、`databaseHooks.user.create.before` はその結果で拒否する。このフックは Better Auth がユーザーを作るトランザクションの中で動くので、そこで DB を読むと、そのトランザクションの接続とは別の接続が要り、同時の登録がプールの接続（5本。7.3）を使い切って止まる。トークンを持たないので、ID トークンでの新規登録（A2 の `idToken`）はできない。表示名は Google の名前の前後の空白を除いて60文字（design-spec 6.0.8）までに、文字の切れ目で切る。名前が無ければメールの `@` の前を使う（3 の ② で本人が直せる）。Google の写真は使わない（写真は U3 で上げたものだけ。ADR-024） |
 | 登録の後 | Google の新規登録だけで動く（U5 は同じ処理を自前のトランザクションで行う）。`databaseHooks.user.create.after`: 個人用ワークスペース（名前と通貨は design-spec 5章「登録時」。本人が Owner）を作り、`last_workspace_id` に入れる。そのメールあてのワークスペースなしの招待があれば、その招待を受諾済みにし（3 の ① を飛ばすため、U6 は呼ばれない）、`grants_admin` が true のときだけ運営者にする。この処理は1つのトランザクションで行う。このフックは `users` の行を書いたトランザクションのコミットの後に動くので、失敗したとき（途中でインスタンスが止まったときも）は、ワークスペースの無い `users` の行が残る（Google の転送は `/login?error=unable_to_create_user`）。そのため、セッションを作る前（下の「ログインの制限」のフック）にも、個人用ワークスペースが無ければ同じ処理を行い、次のログインで整える（ユーザーの行をロックして確かめるので、同時のログインでも1つしか作らない） |
 | ログインの制限 | `databaseHooks.session.create.before`: `users.status` が `active` 以外（停止・削除）なら `ACCOUNT_SUSPENDED` で拒否する。続けて、上の「登録の後」の処理を、個人用ワークスペースが無いときだけ行う。A7 も、`hooks.before` でリンクのトークンのユーザーを引き、`active` 以外なら、パスワードを変えずに（トークンも使わずに）`ACCOUNT_SUSPENDED` で拒否する（停止の間にパスワードが変わらないように。再開で元どおりになる。design-spec 6.17「停止の効果」）。A6 は応答を変えられないので、停止したユーザーにもメールを送る |
-| セッション | 有効期限30日、毎日更新。Cookie は `__Secure-` 接頭辞・HttpOnly・Secure・SameSite=Lax（local は Secure なし。staging・production は `useSecureCookies` で必ず Secure にする）。Cookie の名前の接頭辞は `moonx`（`moonx.session_token`。localhost の Cookie はポートをまたいで共有されるので、Better Auth の既定の名前のままだと、同じ手元で動くほかのアプリの Cookie とぶつかる）。`change-password` はクライアントの指定にかかわらず他のセッションを消す（`revokeOtherSessions`）。`/api/auth/*` は A1〜A8 と、断るだけの `sign-up/email` だけを開け、Better Auth のほかのパス（`update-user`・`delete-user`・`change-email`・`verify-password`・`unlink-account`・`list-sessions` など）は閉じて 404 `NOT_FOUND`（Better Auth の形）を返す（プロフィールと削除は U2・U3・U7 だけから行う。`verify-password` はパスワードを試す入口になる）。サーバーの中から呼ぶ `auth.api` は閉じない（ただし A6・A7 は、2秒の応答と再設定の後のログインに `/api/auth/*` のリクエストが要るので、`/api/auth/*` からだけ動き、`auth.api` からは拒否する） |
+| セッション | 有効期限30日、毎日更新。Cookie は `__Secure-` 接頭辞・HttpOnly・Secure・SameSite=Lax（local は Secure なし。staging・production は `useSecureCookies` で必ず Secure にする）。Cookie の名前の接頭辞は `moonx`（`moonx.session_token`。localhost の Cookie はポートをまたいで共有されるので、Better Auth の既定の名前のままだと、同じ手元で動くほかのアプリの Cookie とぶつかる）。`change-password` はクライアントの指定にかかわらず他のセッションを消す（`revokeOtherSessions`）。セッションが無いとき（Cookie が無い・偽物・期限切れ・消されたセッション）、A4・A5・A8 は本体にかかわらず 401 `UNAUTHENTICATED`（Better Auth の形 `{ code, message }`。7.1）を返す。Better Auth のままでは A4 は何もせずに 200、A5 は 200 の `null`、A8 は本体を先に検査し、セッションが無ければ `code` が `UNAUTHORIZED` の 401 を返すので、`/api/auth/*` のルートで直す（A4・A8 は先にセッションの有無を確かめる。A4 は無くても Better Auth のサインアウトを動かして古い Cookie を消してから 401 にする）。`/api/v1` のセッションの確認（`auth.api.getSession`。5.13）が期限を延ばしたときや、期限切れのセッションの Cookie を消したときは、その応答も `Set-Cookie` を返す（返さないと、ブラウザの Cookie がログインから30日で切れる）。`/api/auth/*` は A1〜A8 と、断るだけの `sign-up/email` だけを開け、Better Auth のほかのパス（`update-user`・`delete-user`・`change-email`・`verify-password`・`unlink-account`・`list-sessions` など）は閉じて 404 `NOT_FOUND`（Better Auth の形）を返す（プロフィールと削除は U2・U3・U7 だけから行う。`verify-password` はパスワードを試す入口になる）。サーバーの中から呼ぶ `auth.api` は閉じない（ただし A6・A7 は、2秒の応答と再設定の後のログインに `/api/auth/*` のリクエストが要るので、`/api/auth/*` からだけ動き、`auth.api` からは拒否する） |
 | 回数制限 | 有効。保存先は DB（`rate_limits`）。秘密を受け取るパス（`sign-in/email`・`sign-in/social`・`sign-up/email`・`request-password-reset`・`reset-password`・`change-password`）と U5 は、パスをまたいで IP ごとに1つの枠で1分10回。入口のプラグイン（ADR-029）が数え、Better Auth 側ではこれらのパスの `customRules` を `false` にしてパスごとの数え方を止める。それ以外のパス（`get-session` など）は Better Auth が IP とパスごとに1分100回（本体の設定の `window`・`max`。1.7 の既定は10秒100回なので、設定で変える）。Better Auth の回数の保存先は、Better Auth の DB の保存先（`storage: "database"`）ではなく、入口のプラグインと同じ数え方で `rate_limits` に書く `customStorage` にする。Better Auth の DB の保存先は、自分の最も長い時間の幅（60秒）を過ぎた行を、接頭辞を問わず消すので、`app:` の1時間の枠（7.2）を数え直させてしまう。Better Auth の 429 は `code` を持たないので、`{ code: "RATE_LIMITED", message }` に直して返す（`X-Retry-After` はそのまま） |
 | 信頼するオリジン | `TRUSTED_ORIGINS`（2章） |
 | IP の取得 | 入口のプラグインが決めた値だけを読ませる（7.2「呼び出し元の IP」。Better Auth の IP のヘッダーの設定は、入口のプラグインが付け直す `X-Moonx-Client-Ip` だけにする） |
@@ -1104,7 +1104,7 @@ interface Me {
   isAdmin: boolean;
   hasPassword: boolean;             // Google だけで登録した人は false（4 では「パスワードを設定する」に変わる）
   lastWorkspaceId: UUID | null;
-  memberships: { workspace: { id: UUID; name: string; isPersonal: boolean; currency: string }; role: Role }[];
+  memberships: { workspace: { id: UUID; name: string; isPersonal: boolean; currency: string }; role: Role }[];   // 所属した順（登録時に作る個人用ワークスペースが先頭）
 }
 ```
 
@@ -1114,7 +1114,7 @@ interface Me {
 
 **U9 `GET /api/avatars/{name}`**（公開。local だけ）: 保存したファイルを返す。名前は32桁の16進＋`.webp`（それ以外は `404 NOT_FOUND`）。staging・production には無く、写真は Cloud Storage の URL を直接開く（ADR-024）。
 
-**U4 `GET /api/v1/invitations/by-token/{token}`**（公開）→ `200 InvitationPreview`。トークンが見つからない・取り消し・期限切れは `410 INVITATION_INVALID`。
+**U4 `GET /api/v1/invitations/by-token/{token}`**（公開）→ `200 InvitationPreview`。トークンが見つからない・取り消し・期限切れは `410 INVITATION_INVALID`。期限切れは受諾していない招待だけで、受諾済みの招待は期限を過ぎても `status: "accepted"` で返す（U6 も期限を見ずに `409 INVITATION_ALREADY_ACCEPTED`）。
 
 ```ts
 interface InvitationPreview {
@@ -1122,15 +1122,15 @@ interface InvitationPreview {
   email: string;
   workspace: { id: UUID; name: string } | null;   // ワークスペースなしの招待は null
   role: Role | null;
-  invitedBy: { displayName: string } | null;       // `make admin-create` の招待は null
+  invitedBy: { displayName: string } | null;       // `make admin-create` の招待は null（運営者が出した招待を作り直したものも）
   expiresAt: DateTime;
   accountExists: boolean;                          // そのメールのアカウントがあればログインへ案内する
 }
 ```
 
-**U5**（公開）`POST /api/v1/invitations/by-token/{token}/sign-up`。本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie。メールは招待のメールに固定し、1つのトランザクションで `users`・`accounts`（credential）・個人用ワークスペースを作ってから Better Auth の `signInEmail` でセッションを作る。`users.email_verified` は true にする（招待のメールのリンクから登録したので、メールは確かめてある。Better Auth は、メールが確認済みのアカウントにだけ、同じメールの Google のログインを連携させる）。ワークスペースのある招待はまだ受諾しない（3 の ① で U6）。ワークスペースなしの招待は、登録の時点で受諾済みにする。`grants_admin` が true なら運営者にもする（上の「登録の後」）。エラー: `410 INVITATION_INVALID`、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
+**U5**（公開）`POST /api/v1/invitations/by-token/{token}/sign-up`。本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie。メールは招待のメールに固定し、小文字にして保存する（Better Auth はメールを小文字にしてから完全一致で引くので、大文字が残るとログインできない。Google の新規登録も Better Auth が小文字にする）。1つのトランザクションで `users`・`accounts`（credential）・個人用ワークスペースを作ってから Better Auth の `signInEmail` でセッションを作る。同じ招待からの同時の登録は、招待の行をロックして1つだけを通す。`users.email_verified` は true にする（招待のメールのリンクから登録したので、メールは確かめてある。Better Auth は、メールが確認済みのアカウントにだけ、同じメールの Google のログインを連携させる）。ワークスペースのある招待はまだ受諾しない（3 の ① で U6）。ワークスペースなしの招待は、登録の時点で受諾済みにする。`grants_admin` が true なら運営者にもする（上の「登録の後」）。エラー: `410 INVITATION_INVALID`（受諾済みの招待も）、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
 
-**U6** `POST /api/v1/invitations/by-token/{token}/accept`。本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。ワークスペースなしの招待は、`grants_admin` が true のときだけ受諾した人を運営者にする。エラー: `410 INVITATION_INVALID`、`409 INVITATION_ALREADY_ACCEPTED`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）。
+**U6** `POST /api/v1/invitations/by-token/{token}/accept`。本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。所属を作ったときは、ワークスペースの最終利用日（`last_active_at`）も更新する。ワークスペースなしの招待は、`grants_admin` が true のときだけ受諾した人を運営者にする。エラー（確かめる順）: `410 INVITATION_INVALID`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）、`409 INVITATION_ALREADY_ACCEPTED`。
 
 **U8 `POST /api/v1/me/password`**（Set password。design-spec 6.16）本体 `{ newPassword: string }` → `204`。Google だけで登録した人（`hasPassword: false`）がパスワードを足す。パスワードがある人は `409 PASSWORD_ALREADY_SET`（A8 で変える）。新しいパスワードの規則は design-spec 6.0.8。セッションが design-spec 6.16 の再認証の時間の中で作られたものでなければ `403 REAUTH_REQUIRED`。サーバーから Better Auth の `setPassword` を呼び、この要求のセッション以外を消す。
 
@@ -1167,7 +1167,7 @@ interface Invitation {
 | W7 | — | `204` | `revoked` にする |
 | W8 | `?targetType=&targetId=` | `200 { items: UserRef[] }` | 自己分析への対象は、そのワークスペースの Owner / Member だけが呼べる（Viewer は `403 FORBIDDEN`。自己分析へのコメントを書けないため。design-spec 6.0.4）。候補も、その自己分析を読める Owner / Member だけ。その自己分析がこのワークスペースに共有されていなければ `403 NOT_SHARED`、設問が無ければ `404 NOT_FOUND` |
 
-招待のリンクは `https://{DOMAIN}/invite/{token}`。トークンは32バイトの乱数で、DB には SHA-256 のハッシュだけを持つ。リンクを API の応答で返すのは、運営者の AD9 と `make admin-create` だけ（運営者はサービスの管理者で、信頼する前提。2026-10-03 のユーザーの決定。7.1）。W4・W5・招待の一覧（W4 GET・AD7）はリンクもトークンも返さない。リンクのコピー用の API（旧 W6）は無い。
+招待のリンクは `https://{DOMAIN}/invite/{token}`。トークンは32バイトの乱数（base64url の43文字）で、DB には SHA-256 のハッシュだけを持つ。リンクを API の応答で返すのは、運営者の AD9 と `make admin-create` だけ（運営者はサービスの管理者で、信頼する前提。2026-10-03 のユーザーの決定。7.1）。W4・W5・招待の一覧（W4 GET・AD7）はリンクもトークンも返さない。リンクのコピー用の API（旧 W6）は無い。
 
 ### 5.6 ダッシュボードとアイデア
 
@@ -1520,7 +1520,7 @@ interface Notification {
   workspace: { id: UUID; name: string }; actor: UserRef | null;
   title: string;          // 表示用の短い文（英語。どこでを含める。例: "Paolo mentioned you on WHO · Piaya Gift Box Delivery"）
   excerpt: string | null; // コメント・メンションは本文の冒頭、判定・Go / No-Go は理由の冒頭。版の保存は null（design-spec 6.15）
-  link: LinkTarget;
+  link: LinkTarget;       // 判定は 13、Go / No-Go と版の保存は 20。コメント・メンションは、対象の項目を出す画面（6.3「画面と節の対応」。自己分析の回答は、持ち主には 11、それ以外の人には 12）を `panel: "comments"` と `target` を付けて開く
   accessible: boolean;    // 外れた・権限がなくなったら false（「You no longer have access」）
   readAt: DateTime | null; createdAt: DateTime;
 }
@@ -1531,7 +1531,7 @@ interface Notification {
 | L1 | `?kind=&ideaId=&planId=&recordedBy=&from=&to=&cursor=&limit=` | `200 Page<DecisionLogSummary>` | 新しい順 |
 | L2 | — | `200 DecisionLogEntry` | 更新・削除の API は無い |
 | C1 GET | 項目: `?targetType=&targetId=&targetKey=&workspaceId=`。画面: `?containerType=&containerId=&sectionKeys=&workspaceId=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾） | `200 { threads: { root: Comment; replies: Comment[] }[]; unresolvedCount: number }` | 画面の指定では、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea`）をまとめて返す（ヘッダーの 💬 のパネル。`unresolvedCount` は解決していないスレッドの数で、💬 の件数に使う。design-spec 6.0.1・6.0.4）。自己分析の回答へのコメントは、共有先の Owner / Member には `workspaceId` のワークスペースの分だけ、本人には全部を返す。削除した行へのコメントは返さない |
-| C1 POST | `{ workspaceId: UUID; target: TargetRef; parentId?: UUID; body: string; mentionUserIds: UUID[] }`（`body` の長さは design-spec 6.0.8） | `201 Comment` | 返信は1段まで（`422 REPLY_DEPTH`）。メンションできない人は `422 INVALID_MENTION`。対象から画面（`container_type`・`container_id`・`section_key`）を決めて保存する。通知（`mention` / `comment`）を design-spec 6.15 の条件で作る（プランの項目へのコメントは、プランを作った人とアイデアを提案した人の両方。受け取る人が重なれば1人に1件） |
+| C1 POST | `{ workspaceId: UUID; target: TargetRef; parentId?: UUID; body: string; mentionUserIds: UUID[] }`（`body` の長さは design-spec 6.0.8） | `201 Comment` | 返信は1段まで（`422 REPLY_DEPTH`）。メンションできない人は `422 INVALID_MENTION`。対象から画面（`container_type`・`container_id`・`section_key`）を決めて保存する。通知（`mention` / `comment`）を design-spec 6.15 の条件で作る（プランの項目へのコメントは、プランを作った人とアイデアを提案した人の両方。「自分がコメントしたスレッド」の人は、消したコメントの書き手も含む。受け取る人が重なれば1人に1件で、メンションされた人には `mention` の1件。対象の項目を読めない人と書いた本人には作らない） |
 | C2 PATCH | `{ body: string; mentionUserIds: UUID[] }` | `200 Comment` | 新しくメンションした人にだけ通知する |
 | C2 DELETE | — | `204` | 「deleted」として残す |
 | C3 | — | `200 Comment` | スレッドの最初のコメントだけ |
@@ -2348,7 +2348,7 @@ export const changeHistory = pgTable("change_history", {
 
 検証の回答の `section_key` は設問 ID の節（`V.04.SURVIVOR_PATTERNS` なら `04`）。
 
-**`change_history` の列の決め方**（ADR-020 の `withHistory`）: `workspace_id` と `owner_user_id` は画面（`container`）から決める（自己分析は `workspace_id` が null で `owner_user_id` が持ち主、それ以外は `workspace_id` が画面のワークスペースで `owner_user_id` は null）。`container_type`・`container_id`・`section_key` は対象から決める（上の表）。`action`（作成・更新・論理削除・削除の取り消し）・`source`・`batch_id`・`client`・`changed_by_id` は呼び出し元が渡す。`reverted_from_id` は H2・H3 だけが渡す（戻した元の行）。`before`・`after` は本体を変える処理が返した値。
+**`change_history` の列の決め方**（ADR-020 の `withHistory`）: `workspace_id` と `owner_user_id` は画面（`container`）から決める（自己分析は `workspace_id` が null で `owner_user_id` が持ち主、それ以外は `workspace_id` が画面のワークスペースで `owner_user_id` は null）。`container_type`・`container_id` は呼び出し元が画面として渡し、`withHistory` が対象と合うかを確かめる（対象の種類がその画面に出るか。回答・数字・プランのヘッダ・テンプレートの版は、対象の id が画面の id と同じか。アイデアの概要も同じだが、作成の取り消しの行（5.11）だけは元の側のアイデアの画面に書く。Pitch Deck は変更履歴を持たない）。`section_key` は対象から決める（上の表）。`action`（作成・更新・論理削除・削除の取り消し）・`source`・`batch_id`・`client`・`changed_by_id` は呼び出し元が渡す。`reverted_from_id` は H2・H3 だけが渡す（戻した元の行）。`before`・`after` は本体を変える処理が返した値。
 
 ### 6.4 保存しないもの（毎回計算・生成する）
 
@@ -2408,10 +2408,10 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 追加の決まり:
 
-- **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は、ロールにかかわらず 409 `ARCHIVED`（コメントを書く・元に戻すを含む。Viewer の編集も 403 ではなく 409。design-spec 6.8）。ただしワークスペースのメンバーではない人には、先に 403 `NO_ACCESS` を返す。確認は書き込みの最後（更新日時の更新）でもう一度行い、確認と書き込みのあいだにアーカイブされても書き込みは残らない。読む・複製・Restore・Pitch Deck はできる。
+- **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は、ロールにかかわらず 409 `ARCHIVED`（コメントを書く・元に戻すを含む。Viewer の編集も 403 ではなく 409。design-spec 6.8）。ただしワークスペースのメンバーではない人には、先に 403 `NO_ACCESS` を返す。確認は書き込みの最後（中身が変わったときは更新日時の更新）でもう一度行い、確認と書き込みのあいだにアーカイブされても書き込みは残らない（仕組みは下の「実装」）。読む・複製・Restore・Pitch Deck はできる。
 - **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD10）と、すべての招待の再送・取り消し（W5・W7）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。運営者はサービスの管理者で、信頼する前提にする（2026-10-03 のユーザーの決定）: 運営者は AD9 で自分あてに、ワークスペースを指定した招待を出し、そのリンクから受諾すれば、そのワークスペースの Member 以上に入れる（AD9 は運営者にリンクを返す。5.5）。これを塞ぐ仕組みは作らない。見られるのは、入ったあとの所属のロールの範囲になる。`is_admin` を直接変える API は無い。付くのは `make admin-create` の招待（`grants_admin = true`）から登録・受諾したときとシードだけで、AD9 の招待では付かず、外す API も無い。
 - **停止・削除したユーザー**: セッションを消し、ログインを拒否する。残ったリクエストも、認証のミドルウェアが `users.status` を確かめて 401 にする。
-- **実装**: 認可は、ルートごとの宣言でまとめて行う。`scoped: { to, need }` は、`to` でリソースの引き方（パスのパラメーターの名前、または Query・本文から引く関数）を宣言し、プラグインが共通の関数 `resolveScope`（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）でワークスペースとロールを求め、`need`（読む / 書く / アーカイブ済みでなければ書く / Owner）を満たさなければ拒否してから、ハンドラーに `scope` を渡す。プランのアーカイブと復元だけは、そのプラン自身のアーカイブ済みの印では止めず、アイデアのアーカイブ済みでは止める。`resolveScope` は、論理削除したアイデア・プラン（作成の取り消し。5.11）を無いものとして 404 にし、書き込みの最後の確認でも同じに扱う。自己分析のようにワークスペースを持たないものがあるルートは `located`（`scope` が null になりうる）を使う。ワークスペースを持たない他のルートは `open`（セッション不要）・`signedIn`（自分のデータだけ）・`operator`（運営者）を宣言する。宣言の無いルートがあれば API は起動しない。クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
+- **実装**: 認可は、ルートごとの宣言でまとめて行う。`scoped: { to, need }` は、`to` でリソースの引き方（パスのパラメーターの名前、または Query・本文から引く関数）を宣言し、プラグインが共通の関数 `resolveScope`（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）でワークスペースとロールを求め、`need`（読む / アーカイブ済みでなければコメントする（ロールを問わない。コメントを書く・スレッドの解決） / 書く / アーカイブ済みでなければ書く / Owner）を満たさなければ拒否してから、ハンドラーに `scope` を渡す。プランのアーカイブと復元だけは、そのプラン自身のアーカイブ済みの印では止めず、アイデアのアーカイブ済みでは止める。`resolveScope` は、論理削除したアイデア・プラン（作成の取り消し。5.11）と UUID でない id を無いものとして 404 にし、書き込みの最後の確認でも論理削除を同じに扱う。自己分析のようにワークスペースを持たないものがあるルートは `located`（`scope` が null になりうる）を使う。ワークスペースを持たない他のルートは `open`（セッション不要）・`signedIn`（自分のデータだけ）・`operator`（運営者）を宣言する。宣言の無いルートがあれば API は起動しない（宣言の無いルートや2つ以上宣言したルートの名前を1行の JSON のログに書いて終わる）。確かめる順: 入口のプラグインの検査（7.2 の CSRF と本体の大きさ、JSON として読めない本体の 400）の後、本体の型の検査（422）の前にセッションを確かめる（未ログインは、本体の型が合わなくても 401）。リソースの引き当てと `need` の確認は本体の検査の後（引き方が本体を読むことがあるため）で、順は 404 `NOT_FOUND` → 403 `NO_ACCESS` → 409 `ARCHIVED` → 403 `FORBIDDEN`。ワークスペースの中の書き込みは、1つのトランザクションの初めにアイデア、プランの順にその行をロックし（`FOR NO KEY UPDATE`。プランの行を自分でもロックする書き込み（プランのヘッダ・アーカイブ）と、ほかの書き込みのあいだのデッドロックを避ける）、最後にアーカイブと論理削除をもう一度確かめる。ワークスペースの中の何かが変わったとき（変更履歴・コメント・決定ログを書いた、アーカイブの状態・ワークスペースの設定・メンバーを変えたなど）だけ、その確認と同じ文でアイデア（プランの中の書き込みはプランも）の `last_activity_at` を、続けてワークスペースの `last_active_at` を更新する（値を変えない保存は最終利用日も変えない）。書き込みがロックを持つあいだ、アーカイブはその終わりを待ち、作成の取り消しは待たずに 409 `BUSY` を返す（5.11）。書き込みより先に終わったアーカイブ・作成の取り消しは最後の確認で見つかり、書き込みは 409 `ARCHIVED`・404 `NOT_FOUND` で何も残さない。クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
 
 ### 7.2 その他の設計判断
 
@@ -2483,7 +2483,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 409 | `TEMPLATE_NOT_PUBLISHED` | 公開済みのテンプレートの版が無い（運営者がまだ取り込んでいない。I1 POST・S1 GET・P1 POST。AD10） |
 | 409 | `ARCHIVED` | アーカイブしたものを変えようとした |
 | 409 | `LAST_OWNER`・`CANNOT_LEAVE_PERSONAL`・`PERSONAL_OWNER`・`ALREADY_MEMBER`・`INVITATION_PENDING`・`INVITATION_ALREADY_ACCEPTED`・`EMAIL_TAKEN`・`PASSWORD_ALREADY_SET`・`DECISION_CHANGED`・`DECISION_NOT_PROCEED`・`NAME_TAKEN`・`HAS_EMPTY_QUESTIONS`・`ALREADY_LATEST`・`DRAFT_EXISTS`・`PUBLISHED_READ_ONLY` | 状態がその操作を許さない（5章） |
-| 410 | `INVITATION_INVALID` | 招待のトークンが無い・取り消し・期限切れ |
+| 410 | `INVITATION_INVALID` | 招待のトークンが無い・取り消し・期限切れ（U5 では受諾済みも） |
 | 413 | `PAYLOAD_TOO_LARGE` | 本体が大きすぎる（JSON は1MB、写真は design-spec 6.0.8 の上限。`Content-Length` が無い分割転送でも読んだ量で数える） |
 | 422 | `VALIDATION_FAILED` | 入力の検査に失敗（`details` に項目ごとの `path`・Zod の `code`・`message`。入力の値そのものは返さない） |
 | 422 | `FACT_REQUIRES_EVIDENCE`・`CONFIDENCE_REQUIRED`・`INVALID_CHOICE`・`QUESTION_NOT_FOUND`・`PERCENT_ONLY_FOR_VARIABLE`・`OUT_OF_RANGE`・`NOT_EDITABLE`・`INVALID_ASSIGNEE`・`INVALID_STATUS`・`MUST_BE_DONE_TO_SHARE`・`NOT_SHAREABLE`・`EMPTY_SCOPE`・`NOT_IMPORTABLE`・`REPLY_DEPTH`・`INVALID_MENTION`・`INVALID_QUESTION_KEY`・`TEMPLATE_INVALID`・`CANNOT_SUSPEND_SELF`・`CONFIRMATION_MISMATCH` | 業務の決まりに合わない（5章） |

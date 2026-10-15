@@ -1,5 +1,7 @@
 import { connectDatabase, type DatabaseConnection } from "@moonx/db";
+import { accessPlugin } from "./access";
 import { createApp } from "./app";
+import { createAuth } from "./auth";
 import type { Config } from "./config";
 import { createLogger } from "./log";
 import { createMailer, type Mailer } from "./mail";
@@ -91,6 +93,22 @@ export function buildTestApp(
     resetAnswerMs: options.resetAnswerMs ?? 0,
   });
   return { app, lines, reports };
+}
+
+/**
+ * The authorization plugin over `db` with {@link testConfig}, for tests that assemble
+ * routes without the whole app.
+ */
+export function buildTestAccess(db: DatabaseConnection) {
+  const log = createLogger("error", () => {});
+  const { auth } = createAuth({
+    config: testConfig,
+    db: db.db,
+    log,
+    mailer: createMailer(testConfig, log),
+    now: Date.now,
+  });
+  return accessPlugin({ auth, db: db.db });
 }
 
 /**

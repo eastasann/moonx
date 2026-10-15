@@ -20,6 +20,7 @@ import {
 import { setSessionCookie } from "better-auth/cookies";
 import { and, eq, isNull, lte, or } from "drizzle-orm";
 import { Elysia } from "elysia";
+import type { AccessPlugin } from "./access";
 import type { Config } from "./config";
 import {
   CLIENT_IP_HEADER,
@@ -122,6 +123,20 @@ function withRequestIdOnError(
       : target.href,
   );
   return new Response(response.body, { status: response.status, headers });
+}
+
+/**
+ * 401 UNAUTHENTICATED in Better Auth's `{ code, message }` shape, keeping the headers of
+ * Better Auth's answer, whose `Set-Cookie` may clear a stale session cookie.
+ */
+function unauthenticated(answered: Response): Response {
+  const headers = new Headers(answered.headers);
+  headers.delete("content-length");
+  headers.set("content-type", "application/json");
+  return new Response(
+    JSON.stringify({ code: "UNAUTHENTICATED", message: "Not signed in" }),
+    { status: 401, headers },
+  );
 }
 
 /** Where `onPasswordReset` leaves the user for the after hook to sign in. */
@@ -535,14 +550,34 @@ export function createAuth({
     request: Request;
     path: string;
   }) => {
-    if (!OPEN_PATHS.has(`${request.method} ${path.slice(BASE_PATH.length)}`)) {
+    const route = `${request.method} ${path.slice(BASE_PATH.length)}`;
+    if (!OPEN_PATHS.has(route)) {
       throw new ApiError("NOT_FOUND", "No route matches the request");
     }
     const call: AuthCall = {
       request: requestContext(request),
       startedAt: performance.now(),
     };
-    const response = await calls.run(call, () => auth.handler(request));
+    const response = await calls.run(call, async () => {
+      // The session is read first where Better Auth would not refuse its absence
+      // first: it signs out without one too (200), and checks a password change's body
+      // before the session (SDD 7.1: not signed in is 401 whatever the body).
+      if (route !== "POST /sign-out" && route !== "POST /change-password") {
+        return auth.handler(request);
+      }
+      const { headers, response: session } = await auth.api.getSession({
+        headers: request.headers,
+        query: { disableRefresh: true },
+        returnHeaders: true,
+      });
+      if (session !== null) return auth.handler(request);
+      if (route === "POST /change-password") {
+        return unauthenticated(new Response(null, { headers }));
+      }
+      // The sign-out still runs, to clear a stale cookie.
+      const answered = await auth.handler(request);
+      return answered.status === 200 ? unauthenticated(answered) : answered;
+    });
     // Better Auth answers its own failures (5xx APIErrors) itself. Handing them on with
     // the error the after hook kept makes the entry plugin log and report them like any
     // other 5xx (SDD 8.3).
@@ -565,6 +600,25 @@ export function createAuth({
         config.betterAuthUrl,
       );
     }
+    // Without a session, A5 refuses like every other path that needs one (SDD 7.1),
+    // where Better Auth answers 200 with null. Every 401 of A5 means no session, and
+    // Better Auth's own refusals of a missing session elsewhere carry the code of SDD
+    // 8.1 too.
+    if (
+      (route === "GET /get-session" &&
+        (response.status === 401 ||
+          (response.status === 200 &&
+            (await response.clone().text()) === "null"))) ||
+      (response.status === 401 &&
+        (
+          (await response
+            .clone()
+            .json()
+            .catch(() => null)) as { code?: unknown } | null
+        )?.code === "UNAUTHORIZED")
+    ) {
+      return unauthenticated(response);
+    }
     if (response.status === 429) {
       // Better Auth's own limit answers with a message only; the entry plugin's
       // answers on these paths carry the code too (SDD 8.1).
@@ -577,22 +631,30 @@ export function createAuth({
   };
   const description =
     "Better Auth decides the paths, bodies and answers (SDD 5.4). Errors come in its { code, message } shape (SDD 8.1).";
-  // Better Auth serves GET and POST only.
-  const routes = new Elysia()
-    .get(`${BASE_PATH}/*`, handle, {
-      detail: {
-        summary: "A3, A5 (Better Auth)",
-        description,
-        operationId: "betterAuthGet",
-      },
-    })
-    .post(`${BASE_PATH}/*`, handle, {
-      detail: {
-        summary: "A1, A2, A4, A6–A8 (Better Auth)",
-        description,
-        operationId: "betterAuthPost",
-      },
-    });
+  // Better Auth serves GET and POST only. The routes are open: the paths that need a
+  // session (A4, A5, A8; SDD 7.1) ask for it themselves.
+  const routes = (access: AccessPlugin) =>
+    new Elysia()
+      .use(access)
+      .get(`${BASE_PATH}/*`, handle, {
+        open: true,
+        detail: {
+          summary: "A3, A5 (Better Auth)",
+          description,
+          operationId: "betterAuthGet",
+        },
+      })
+      .post(`${BASE_PATH}/*`, handle, {
+        open: true,
+        detail: {
+          summary: "A1, A2, A4, A6–A8 (Better Auth)",
+          description,
+          operationId: "betterAuthPost",
+        },
+      });
 
   return { auth, routes };
 }
+
+/** The Better Auth instance of {@link createAuth}. */
+export type Auth = ReturnType<typeof createAuth>["auth"];

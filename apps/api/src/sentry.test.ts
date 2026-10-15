@@ -145,13 +145,14 @@ describe("createErrorReporter", () => {
       config: { appEnv: "staging" },
       reporter,
     });
-    app.post("/api/v1/invitations/by-token/:token/accept", () => {
+    // A path no route of the app has, with a token segment the URL must lose.
+    app.post("/api/v1/invitations/by-token/:token/fail", () => {
       throw new TypeError("handler bug");
     });
 
     const response = await app.handle(
       new Request(
-        "http://localhost/api/v1/invitations/by-token/invite-secret-token/accept?next=query-secret#fragment-secret",
+        "http://localhost/api/v1/invitations/by-token/invite-secret-token/fail?next=query-secret#fragment-secret",
         {
           method: "POST",
           headers: {
@@ -186,11 +187,11 @@ describe("createErrorReporter", () => {
       level: "error",
       tags: {
         requestId: response.headers.get("x-request-id"),
-        route: "POST /api/v1/invitations/by-token/:token/accept",
+        route: "POST /api/v1/invitations/by-token/:token/fail",
       },
       request: {
         method: "POST",
-        url: "http://localhost/api/v1/invitations/by-token/[redacted]/accept",
+        url: "http://localhost/api/v1/invitations/by-token/[redacted]/fail",
       },
       exception: { values: [{ type: "TypeError", value: "handler bug" }] },
     });

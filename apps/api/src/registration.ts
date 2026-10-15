@@ -49,11 +49,12 @@ export function displayNameFromProvider(
   );
 }
 
-const sameAddress = (email: string) =>
+/** Invitations sent to `email`, matched ignoring case (design-spec 6.0.8). */
+export const sentTo = (email: string) =>
   sql`lower(${invitations.email}) = lower(${email})`;
 
 /** Pending and before `expires_at`: what SDD 5.4 calls a valid invitation. */
-const isValid = (at: Date) =>
+export const isValidInvitation = (at: Date) =>
   and(eq(invitations.status, "pending"), gt(invitations.expiresAt, at));
 
 /**
@@ -73,8 +74,8 @@ export async function isValidInvitationFor(
     .where(
       and(
         eq(invitations.tokenHash, hashInvitationToken(token)),
-        sameAddress(email),
-        isValid(at),
+        sentTo(email),
+        isValidInvitation(at),
       ),
     )
     .limit(1);
@@ -148,8 +149,8 @@ export async function setUpNewUser(
     })
     .where(
       and(
-        sameAddress(user.email),
-        isValid(at),
+        sentTo(user.email),
+        isValidInvitation(at),
         isNull(invitations.workspaceId),
       ),
     )

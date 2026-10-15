@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { TemplateKind } from "./common";
+import type { EconomicsField, TemplateKind } from "./common";
 import { dateOnlySchema } from "./common";
 
 // The input rules of design-spec 6.0.8, which owns the values: copy them from there, and
@@ -341,6 +341,20 @@ export const targetMarginRateSchema = decimal(0, 0.99, 4);
 
 /** 18 Daily sales of a scenario. */
 export const unitsPerDaySchema = decimal(0, UNITS_PER_DAY_MAX, 2);
+
+/** The rule of each number of 18, as the API carries it (the target margin as a rate). */
+export const economicsValueSchemas: Record<
+  EconomicsField,
+  z.ZodType<number, number>
+> = {
+  selling_price: sellingPriceSchema,
+  operating_days: operatingDaysSchema,
+  target_margin: targetMarginRateSchema,
+  units_conservative: unitsPerDaySchema,
+  units_expected: unitsPerDaySchema,
+  units_strong: unitsPerDaySchema,
+  units_capacity: unitsPerDaySchema,
+};
 
 export const versionNameSchema = requiredText(80);
 export const planNameSchema = requiredText(80);

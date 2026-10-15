@@ -5,6 +5,7 @@ import { accountRoutes } from "./account";
 import { AUTH_IP_LIMITS, createAuth } from "./auth";
 import { type AvatarStore, avatarFileRoutes } from "./avatars";
 import type { Config } from "./config";
+import { costRoutes } from "./costs";
 import { dashboardRoutes } from "./dashboard";
 import { decisionRoutes } from "./decisions";
 import { docsRoutes } from "./docs";
@@ -15,8 +16,10 @@ import { invitationRoutes, SIGN_UP_IP_LIMIT } from "./invitations";
 import type { Logger } from "./log";
 import type { Mailer } from "./mail";
 import { createRateLimiter } from "./rate-limit";
+import { researchLogRoutes } from "./research-log";
 import type { ErrorReporter } from "./sentry";
 import { validationRoutes } from "./validation";
+import { validationListRoutes } from "./validation-lists";
 import { workspaceInvitationRoutes } from "./workspace-invitations";
 import { workspaceRoutes } from "./workspaces";
 
@@ -92,6 +95,9 @@ export function createApp(config: Config, services: AppServices) {
     .use(dashboardRoutes({ access, db, now }))
     .use(ideaRoutes({ access, db, now }))
     .use(validationRoutes({ access, db, now }))
+    .use(researchLogRoutes({ access, db, now }))
+    .use(validationListRoutes({ access, db, now }))
+    .use(costRoutes({ access, db, now }))
     .use(decisionRoutes({ access, db, now }));
   if (avatars.directory !== undefined) {
     app.use(avatarFileRoutes(access, avatars.directory));

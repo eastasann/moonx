@@ -9,17 +9,24 @@ import {
 } from "@moonx/db/seed";
 import { prepareTestDatabase, testDatabaseName } from "@moonx/db/test-database";
 import {
+  assumptionListSchema,
+  competitorListSchema,
+  costsSchema,
   decisionContextSchema,
   decisionResultSchema,
+  economicsSchema,
+  researchLogPageSchema,
+  riskListSchema,
   validationHomeSchema,
 } from "@moonx/schemas";
 import { eq } from "drizzle-orm";
 import { buildTestApp, uniqueIp } from "./test-app";
 import { apiRequest, cookiesOf } from "./test-fixtures";
 
-// The step's goal on the demo data of design-spec 8: V1 of Piaya Gift Box Delivery
-// shows what 6.1 and the worked numbers of 8.3 say, and V19 records a decision there.
-// A database of its own, since the seed empties every table.
+// The steps' goals on the demo data of design-spec 8: V1 of Piaya Gift Box Delivery
+// shows what 6.1 and the worked numbers of 8.3 say, its worksheets (V6–V15) list the
+// rows of 8.4 and calculate 8.3, and V19 records a decision there. A database of its
+// own, since the seed empties every table.
 
 const base = process.env.DATABASE_URL_TEST;
 if (base === undefined || base === "") {
@@ -107,6 +114,90 @@ describe("the demo data", () => {
     ]);
     expect(view.template.newerVersion?.versionNumber).toBe(2);
     expect(view.canAddPlan).toBe(true);
+  });
+
+  test("the worksheets: Piaya's rows of 8.4 and numbers of 8.3, Health Bowl's deleted log left out", async () => {
+    const cookie = await cookieOf("grace@advisor.example");
+    const validationId = seedId("validation", "piaya");
+    const get = async (path: string) => {
+      const response = await app.handle(
+        apiRequest("GET", `/api/v1/validations/${validationId}/${path}`, {
+          cookie,
+        }),
+      );
+      expect(response.status).toBe(200);
+      return response.json();
+    };
+    const logs = researchLogPageSchema.parse(await get("research-log"));
+    expect(logs.items).toHaveLength(7);
+    const tags = new Set(logs.items.flatMap((log) => log.supportsChecks));
+    expect([...tags].sort()).toEqual([
+      "demand_signal",
+      "local_price",
+      "permits",
+    ]);
+    const competitors = competitorListSchema.parse(await get("competitors"));
+    expect(competitors.items).toHaveLength(4);
+    expect(
+      competitors.items.filter((item) => item.typicalPrice !== null),
+    ).toHaveLength(3);
+    expect(competitors.guidance).toEqual({ min: 3, max: 5 });
+    expect(
+      assumptionListSchema.parse(await get("assumptions")).items,
+    ).toHaveLength(3);
+    // 16's automatic order: Impact, then Probability, highest first.
+    expect(
+      riskListSchema
+        .parse(await get("risks"))
+        .items.map((risk) => [risk.impact, risk.probability, risk.sortOrder]),
+    ).toEqual([
+      ["high", "medium", null],
+      ["medium", "high", null],
+      ["medium", "medium", null],
+      ["medium", "low", null],
+    ]);
+    const costs = costsSchema.parse(await get("costs"));
+    expect(costs.items).toHaveLength(24);
+    const economics = economicsSchema.parse(await get("economics"));
+    const { result } = economics;
+    expect(result.variableCostPerUnit.value).toBeCloseTo(218.5, 6);
+    expect(result.contributionMarginRate.value).toBeCloseTo(0.5144, 4);
+    expect(result.totals.monthlyFixed.amount).toBe(41_700);
+    expect(result.breakEvenUnitsMonth.value).toBeCloseTo(180.13, 2);
+    expect(Math.round(result.breakEvenRevenue.value ?? 0)).toBe(81_058);
+    expect(result.targetMarginUnitsDay.value).toBeCloseTo(9.8, 1);
+    expect(
+      result.scenarios.find((column) => column.key === "expected"),
+    ).toMatchObject({
+      unitsPerMonth: { value: 260 },
+      revenue: { value: 117_000 },
+      variableCostTotal: { value: 56_810 },
+      operatingProfit: { value: 18_490 },
+    });
+    expect(
+      result.scenarios.find((column) => column.key === "conservative")
+        ?.operatingProfit.value,
+    ).toBe(-5_586);
+    expect(result.totals.initial.amount).toBe(169_500);
+    expect(result.paybackMonths.value).toBeCloseTo(9.17, 2);
+    expect(result.simpleRoi.value).toBeCloseTo(1.309, 3);
+    expect(result.defaultsUsed).toEqual({
+      operatingDays: false,
+      targetMargin: true,
+    });
+    expect(economics.costItems).toEqual(costs.items);
+    expect(costs.result).toEqual(result);
+    // Health Bowl lists 5 entries: its deleted one is left out (8.4).
+    const bowl = await app.handle(
+      apiRequest(
+        "GET",
+        `/api/v1/validations/${seedId("validation", "health-bowl")}/research-log`,
+        { cookie },
+      ),
+    );
+    expect(researchLogPageSchema.parse(await bowl.json()).items).toHaveLength(
+      5,
+    );
   });
 
   test("V19 by Kenji records the decision and notifies Ana, Paolo and Grace", async () => {

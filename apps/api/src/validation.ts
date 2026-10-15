@@ -48,13 +48,8 @@ import {
 import { and, eq, isNull } from "drizzle-orm";
 import { Elysia } from "elysia";
 import type { AccessPlugin, ScopeLocator } from "./access";
-import { requestContext } from "./entry";
 import { ApiError } from "./errors";
-import {
-  type HistoryChange,
-  type HistoryOperation,
-  withHistory,
-} from "./history";
+import { type HistoryChange, withHistory } from "./history";
 import {
   decisionSummaries,
   findIdea,
@@ -81,6 +76,11 @@ import {
   loadCommentCounts,
   loadEvidence,
 } from "./validation-items";
+import {
+  invalid,
+  judgeAgainstStored,
+  validationOperation,
+} from "./validation-writes";
 
 type Executor = Database | DatabaseTransaction;
 
@@ -94,7 +94,8 @@ const ANSWERABLE = new Set<TemplateQuestion["answerType"]>([
   "choice",
 ]);
 
-async function validationTemplate(
+/** The template version `validationId` is pinned to, and its sections. */
+export async function validationTemplate(
   db: Executor,
   validationId: string,
 ): Promise<{ templateVersionId: string; sections: TemplateSection[] }> {
@@ -111,7 +112,11 @@ async function validationTemplate(
   return { templateVersionId: validation.templateVersionId, sections };
 }
 
-const findQuestion = (sections: readonly TemplateSection[], key: string) =>
+/** The question `key` of `sections`, or undefined when the pinned version lacks it. */
+export const findQuestion = (
+  sections: readonly TemplateSection[],
+  key: string,
+) =>
   sections.flatMap((section) => section.questions).find((q) => q.key === key);
 
 /** The answers of a validation as `isQuestionShown` reads them. */
@@ -127,20 +132,22 @@ async function shownAnswers(db: Executor, validationId: string) {
 }
 
 /**
- * The answers to `questions` of `validationId` (SDD 5.7 ValidationAnswer), one per
- * question: an unanswered one is empty at version 0.
+ * The answers to the questions `keys` of `validationId` (SDD 5.7 ValidationAnswer), one
+ * per key: an unanswered one is empty at version 0. A key the pinned version (`sections`)
+ * lacks, which a template migration hid, is `hidden` like one its display condition hides.
  */
-async function answerViews(
+export async function answerViews(
   db: Executor,
   workspaceId: string,
   validationId: string,
-  questions: readonly TemplateQuestion[],
+  sections: readonly TemplateSection[],
+  keys: readonly string[],
 ): Promise<ValidationAnswer[]> {
   const { rows, inputs } = await shownAnswers(db, validationId);
-  const refs = questions.map((question) => ({
+  const refs = keys.map((key) => ({
     type: "validation_answer" as const,
     id: validationId,
-    key: question.key,
+    key,
   }));
   const evidence = await loadEvidence(db, validationId, refs);
   const comments = await loadCommentCounts(db, refs);
@@ -151,12 +158,13 @@ async function answerViews(
     ),
     workspaceId,
   );
-  return questions.map((question, index) => {
+  return keys.map((key, index) => {
     const ref = refs[index] as EvidenceRef;
-    const row = rows.get(question.key);
+    const question = findQuestion(sections, key);
+    const row = rows.get(key);
     const text = row?.text ?? null;
     return {
-      questionKey: question.key,
+      questionKey: key,
       text,
       classification: classificationOf(
         {
@@ -166,7 +174,7 @@ async function answerViews(
         },
         evidence(ref),
       ),
-      hidden: !isQuestionShown(question, inputs),
+      hidden: question === undefined || !isQuestionShown(question, inputs),
       commentCount: comments(ref),
       lockVersion: row?.lockVersion ?? 0,
       updatedAt: row?.updatedAt.toISOString() ?? null,
@@ -207,18 +215,19 @@ export function quotedAnswer(
 }
 
 /**
- * The question `key` of the pinned version, as one V3 save may answer it: its type
- * takes a text (design-spec 6.2), the text fits the type and is one of a choice's
- * choices (6.0.8), and the F/A/U sent follows 6.0.3.
+ * Checks what a V3 save of the question `key` settles without the stored answer: the
+ * pinned version has the question, its type takes a text (design-spec 6.2), the text
+ * fits the type and is one of a choice's choices (6.0.8), and the F/A/U sent follows
+ * 6.0.3, a Fact or Assumption coming with a text when it sends one.
  *
  * @throws {ApiError} QUESTION_NOT_FOUND, NOT_EDITABLE, INVALID_CHOICE,
  * CONFIDENCE_REQUIRED or VALIDATION_FAILED
  */
-function answerableQuestion(
+function checkAnswerSave(
   sections: readonly TemplateSection[],
   key: string,
   body: ValidationAnswerSave,
-): TemplateQuestion {
+): void {
   const question = findQuestion(sections, key);
   if (question === undefined) {
     throw new ApiError(
@@ -248,7 +257,7 @@ function answerableQuestion(
   ) {
     throw new ApiError("INVALID_CHOICE", "Not one of the choices");
   }
-  if (sent === undefined) return question;
+  if (sent === undefined) return;
   if (sent.fau !== null && !question.hasFau) {
     throw invalid(
       "classification.fau",
@@ -269,7 +278,22 @@ function answerableQuestion(
       "Only an Assumption has a confidence",
     );
   }
-  return question;
+  if (text !== undefined && !hasText(text)) checkValuedFau(sent.fau);
+}
+
+/**
+ * Refuses a Fact or Assumption sent for an answer with no text (design-spec 6.0.3).
+ *
+ * @throws {ApiError} VALIDATION_FAILED
+ */
+function checkValuedFau(fau: Fau | null): void {
+  if (fau === "fact" || fau === "assumption") {
+    throw invalid(
+      "classification.fau",
+      "invalid_value",
+      "A Fact or Assumption needs an answer",
+    );
+  }
 }
 
 /** V1: the hub of one idea's validation (SDD 5.7 ValidationHome). */
@@ -320,12 +344,6 @@ async function validationHome(
     canAddPlan: row.latestDecision === "proceed" && row.archivedAt === null,
   };
 }
-
-/** The 422 VALIDATION_FAILED of one input the body schema could not judge alone. */
-const invalid = (path: string, code: string, message: string) =>
-  new ApiError("VALIDATION_FAILED", message, {
-    details: [{ path, code, message }],
-  });
 
 /** An item evidence is attached to, locked for the change (ADR-019). */
 interface LockedTarget {
@@ -703,25 +721,6 @@ const writeErrors = {
 
 /** V1–V5 (SDD 5.7): the validation hub, its questions, answers and evidence. */
 export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
-  const operation = (
-    request: Request,
-    scope: Scope,
-    validationId: string,
-    userId: string,
-    at: Date,
-  ): HistoryOperation => ({
-    container: {
-      type: "validation",
-      id: validationId,
-      workspaceId: scope.workspaceId,
-    },
-    changedById: userId,
-    source: "manual",
-    batchId: null,
-    client: requestContext(request).client,
-    at,
-  });
-
   return new Elysia()
     .use(access)
     .get(
@@ -753,7 +752,8 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
             db,
             scope.workspaceId,
             params.validationId,
-            section.questions,
+            sections,
+            section.questions.map((question) => question.key),
           ),
         };
       },
@@ -773,10 +773,10 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
       async ({ scope, params, body, caller, request }) => {
         const { validationId, questionKey } = params;
         const at = new Date(now());
-        const question = await writeInScope(db, scope, at, async (tx) => {
+        const sections = await writeInScope(db, scope, at, async (tx) => {
           // Read under the idea's lock, which a template migration takes too.
           const { sections } = await validationTemplate(tx, validationId);
-          const question = answerableQuestion(sections, questionKey, body);
+          checkAnswerSave(sections, questionKey, body);
           const text = body.text;
           const sent = body.classification;
           const [current] = await tx
@@ -789,24 +789,6 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
               ),
             )
             .for("update");
-          const nextText = text === undefined ? (current?.text ?? null) : text;
-          let fau = sent === undefined ? (current?.fau ?? null) : sent.fau;
-          let confidence =
-            sent === undefined
-              ? (current?.confidence ?? null)
-              : (sent.confidence ?? null);
-          // Clearing the value clears F/A/U, Unknown aside (design-spec 6.0.3).
-          if (!hasText(nextText) && (fau === "fact" || fau === "assumption")) {
-            if (sent !== undefined) {
-              throw invalid(
-                "classification.fau",
-                "invalid_value",
-                "A Fact or Assumption needs an answer",
-              );
-            }
-            fau = null;
-            confidence = null;
-          }
           const ref = {
             type: "validation_answer" as const,
             id: validationId,
@@ -817,6 +799,34 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
             current === undefined
               ? null
               : validationAnswerContent(current, evidenceIds);
+          const nextText = text === undefined ? (current?.text ?? null) : text;
+          // A Fact or Assumption sent while keeping the stored text is judged against
+          // it, and a save that read an older text first gets 409.
+          await judgeAgainstStored(
+            tx,
+            {
+              stored:
+                current === undefined ? null : { ...current, value: before },
+              claim: body,
+              workspaceId: scope.workspaceId,
+              keyed: true,
+            },
+            () => {
+              if (sent !== undefined && !hasText(nextText)) {
+                checkValuedFau(sent.fau);
+              }
+            },
+          );
+          let fau = sent === undefined ? (current?.fau ?? null) : sent.fau;
+          let confidence =
+            sent === undefined
+              ? (current?.confidence ?? null)
+              : (sent.confidence ?? null);
+          // Clearing the value clears F/A/U, Unknown aside (design-spec 6.0.3).
+          if (!hasText(nextText) && (fau === "fact" || fau === "assumption")) {
+            fau = null;
+            confidence = null;
+          }
           const after = validationAnswerContent(
             { text: nextText, fau, confidence },
             evidenceIds,
@@ -827,7 +837,7 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
               : before?.text === after.text &&
                 before?.fau === after.fau &&
                 before?.confidence === after.confidence;
-          if (unchanged) return question;
+          if (unchanged) return sections;
           if (current !== undefined) {
             await checkKeyedLockVersion(
               tx,
@@ -904,7 +914,7 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
           }
           await withHistory(
             tx,
-            operation(request, scope, validationId, caller.id, at),
+            validationOperation(request, scope, validationId, caller.id, at),
             async () => ({
               target: ref,
               action: current === undefined ? "create" : "update",
@@ -912,13 +922,14 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
               after,
             }),
           );
-          return question;
+          return sections;
         });
         const [answer] = await answerViews(
           db,
           scope.workspaceId,
           validationId,
-          [question],
+          sections,
+          [questionKey],
         );
         if (answer === undefined) throw new Error("No answer view");
         return answer;
@@ -1083,7 +1094,7 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
           });
           await withHistory(
             tx,
-            operation(request, scope, validationId, caller.id, at),
+            validationOperation(request, scope, validationId, caller.id, at),
             async () => changes,
           );
           return {
@@ -1179,7 +1190,13 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
           await target.bump(next, at, caller.id);
           await withHistory(
             tx,
-            operation(request, scope, link.validationId, caller.id, at),
+            validationOperation(
+              request,
+              scope,
+              link.validationId,
+              caller.id,
+              at,
+            ),
             async () => ({
               target: target.ref,
               action: "update",

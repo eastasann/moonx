@@ -631,6 +631,58 @@ describe("V3 PUT /api/v1/validations/{validationId}/answers/{questionKey}", () =
     expect((await errorOf(evidence)).code).toBe("CONFLICT");
   });
 
+  test("a stale save is 409 CONFLICT before a 422 that the newer answer causes", async () => {
+    const team = await teamWithIdea();
+    await saved(
+      await saveAnswer(team, "V.01.WHO", {
+        text: "HR officers",
+        lockVersion: 0,
+      }),
+    );
+    // Another member clears the answer the owner still sees.
+    await saved(
+      await saveAnswer(
+        team,
+        "V.01.WHO",
+        { text: null, lockVersion: 1 },
+        team.memberCookie,
+      ),
+    );
+    const assumption = { fau: "assumption", confidence: "low" };
+    const stale = await saveAnswer(team, "V.01.WHO", {
+      classification: assumption,
+      lockVersion: 1,
+    });
+    expect(await errorOf(stale)).toMatchObject({
+      code: "CONFLICT",
+      current: { lockVersion: 2, value: { text: null } },
+    });
+    // At the stored version, the same request is judged against the answer.
+    const current = await saveAnswer(team, "V.01.WHO", {
+      classification: assumption,
+      lockVersion: 2,
+    });
+    expect(await errorOf(current)).toMatchObject({
+      code: "VALIDATION_FAILED",
+      details: [{ path: "classification.fau" }],
+    });
+    // What the request settles alone keeps its 422 at a stale version.
+    for (const [body, code] of [
+      [
+        { text: "HR", classification: { fau: "assumption" } },
+        "CONFIDENCE_REQUIRED",
+      ],
+      [{ text: " ", classification: assumption }, "VALIDATION_FAILED"],
+    ] as const) {
+      const response = await saveAnswer(team, "V.01.WHO", {
+        ...body,
+        lockVersion: 1,
+      });
+      expect((await errorOf(response)).code).toBe(code);
+    }
+    expect(await historyOf(team, "V.01.WHO")).toHaveLength(2);
+  });
+
   test("records the client the save came from", async () => {
     const team = await teamWithIdea();
     const request = apiRequest(

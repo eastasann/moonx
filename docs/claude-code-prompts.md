@@ -482,7 +482,7 @@ make test-api・make openapi（差分なし）・make typecheck・make lint が�
 
 ## Step 12: API: 検証のワークシート（調査ログ・競合・前提とリスク・費用・損益）
 
-Status:
+Status: done 2026-10-15
 
 ```
 docs/02-01_system-design-doc.md 5.7 の V6〜V17 を作ってください（PRD 4章の Must）。

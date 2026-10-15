@@ -1,7 +1,12 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import {
   accounts,
+  assumptions,
+  competitors,
+  costItems,
   evidenceLinks,
+  researchLogEntries,
+  risks,
   validationAnswers,
   verifications,
 } from "@moonx/db";
@@ -151,6 +156,45 @@ async function newMember(workspaceId: string) {
   const user = await fixtures.createUser();
   await fixtures.addMember(workspaceId, user.id, "member");
   return user;
+}
+
+/** A row of each worksheet list of a new idea of the team, made straight in the database. */
+async function newListRows(team: Team) {
+  const { idea, validation } = await newIdea(team);
+  const validationId = validation.id;
+  const [log] = await db
+    .insert(researchLogEntries)
+    .values({
+      validationId,
+      topic: "Price check",
+      createdById: idea.proposerId,
+    })
+    .returning();
+  const [competitor] = await db
+    .insert(competitors)
+    .values({ validationId, name: "Bongbong's", sortOrder: 0 })
+    .returning();
+  const [assumption] = await db
+    .insert(assumptions)
+    .values({ validationId, statement: "Offices order monthly", sortOrder: 0 })
+    .returning();
+  const [risk] = await db
+    .insert(risks)
+    .values({ validationId, statement: "Supplier raises prices" })
+    .returning();
+  const [cost] = await db
+    .insert(costItems)
+    .values({
+      validationId,
+      category: "monthly_fixed",
+      name: "Rent",
+      sortOrder: 0,
+    })
+    .returning();
+  if (!log || !competitor || !assumption || !risk || !cost) {
+    throw new Error("list rows were not made");
+  }
+  return { validationId, log, competitor, assumption, risk, cost };
 }
 
 const ROWS: Row[] = [
@@ -741,6 +785,324 @@ const ROWS: Row[] = [
     },
     expected: members(403, 200, 200),
   },
+  {
+    api: "V6 GET",
+    routes: {
+      "GET /api/v1/validations/:validationId/research-log": "scoped",
+    },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "GET",
+        `/api/v1/validations/${validation.id}/research-log`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "V6 POST",
+    routes: {
+      "POST /api/v1/validations/:validationId/research-log": "scoped",
+    },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "POST",
+        `/api/v1/validations/${validation.id}/research-log`,
+        caller,
+        { topic: "Price check" },
+      );
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "V7 GET",
+    routes: { "GET /api/v1/research-log/:entryId": "scoped" },
+    async call(caller, team) {
+      const { log } = await newListRows(team);
+      return request("GET", `/api/v1/research-log/${log.id}`, caller);
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "V7 PATCH",
+    routes: { "PATCH /api/v1/research-log/:entryId": "scoped" },
+    async call(caller, team) {
+      const { log } = await newListRows(team);
+      return request("PATCH", `/api/v1/research-log/${log.id}`, caller, {
+        topic: "Price check, Lacson St.",
+        lockVersion: 0,
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "V7 DELETE",
+    routes: { "DELETE /api/v1/research-log/:entryId": "scoped" },
+    async call(caller, team) {
+      const { log } = await newListRows(team);
+      return request("DELETE", `/api/v1/research-log/${log.id}`, caller);
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "V8 GET",
+    routes: {
+      "GET /api/v1/validations/:validationId/competitors": "scoped",
+    },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "GET",
+        `/api/v1/validations/${validation.id}/competitors`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "V8 POST",
+    routes: {
+      "POST /api/v1/validations/:validationId/competitors": "scoped",
+    },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "POST",
+        `/api/v1/validations/${validation.id}/competitors`,
+        caller,
+        { name: "Bongbong's" },
+      );
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "V9 PATCH",
+    routes: { "PATCH /api/v1/competitors/:competitorId": "scoped" },
+    async call(caller, team) {
+      const { competitor } = await newListRows(team);
+      return request("PATCH", `/api/v1/competitors/${competitor.id}`, caller, {
+        typicalPrice: 380,
+        lockVersion: 0,
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "V9 DELETE",
+    routes: { "DELETE /api/v1/competitors/:competitorId": "scoped" },
+    async call(caller, team) {
+      const { competitor } = await newListRows(team);
+      return request("DELETE", `/api/v1/competitors/${competitor.id}`, caller);
+    },
+    expected: members(403, 204, 204),
+  },
+  {
+    api: "V10 GET assumptions",
+    routes: {
+      "GET /api/v1/validations/:validationId/assumptions": "scoped",
+    },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "GET",
+        `/api/v1/validations/${validation.id}/assumptions`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "V10 POST assumptions",
+    routes: {
+      "POST /api/v1/validations/:validationId/assumptions": "scoped",
+    },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "POST",
+        `/api/v1/validations/${validation.id}/assumptions`,
+        caller,
+        { statement: "Offices order monthly" },
+      );
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "V10 GET risks",
+    routes: { "GET /api/v1/validations/:validationId/risks": "scoped" },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "GET",
+        `/api/v1/validations/${validation.id}/risks`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "V10 POST risks",
+    routes: { "POST /api/v1/validations/:validationId/risks": "scoped" },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "POST",
+        `/api/v1/validations/${validation.id}/risks`,
+        caller,
+        { statement: "Supplier raises prices" },
+      );
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "V11 PATCH assumptions",
+    routes: { "PATCH /api/v1/assumptions/:id": "scoped" },
+    async call(caller, team) {
+      const { assumption } = await newListRows(team);
+      return request("PATCH", `/api/v1/assumptions/${assumption.id}`, caller, {
+        confidence: "medium",
+        lockVersion: 0,
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "V11 DELETE assumptions",
+    routes: { "DELETE /api/v1/assumptions/:id": "scoped" },
+    async call(caller, team) {
+      const { assumption } = await newListRows(team);
+      return request("DELETE", `/api/v1/assumptions/${assumption.id}`, caller);
+    },
+    expected: members(403, 204, 204),
+  },
+  {
+    api: "V11 PATCH risks",
+    routes: { "PATCH /api/v1/risks/:id": "scoped" },
+    async call(caller, team) {
+      const { risk } = await newListRows(team);
+      return request("PATCH", `/api/v1/risks/${risk.id}`, caller, {
+        impact: "high",
+        lockVersion: 0,
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "V11 DELETE risks",
+    routes: { "DELETE /api/v1/risks/:id": "scoped" },
+    async call(caller, team) {
+      const { risk } = await newListRows(team);
+      return request("DELETE", `/api/v1/risks/${risk.id}`, caller);
+    },
+    expected: members(403, 204, 204),
+  },
+  {
+    api: "V12",
+    routes: { "GET /api/v1/validations/:validationId/costs": "scoped" },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "GET",
+        `/api/v1/validations/${validation.id}/costs`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "V13",
+    routes: {
+      "POST /api/v1/validations/:validationId/cost-items": "scoped",
+    },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "POST",
+        `/api/v1/validations/${validation.id}/cost-items`,
+        caller,
+        { category: "initial", name: "" },
+      );
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "V14 PATCH",
+    routes: { "PATCH /api/v1/cost-items/:costItemId": "scoped" },
+    async call(caller, team) {
+      const { cost } = await newListRows(team);
+      return request("PATCH", `/api/v1/cost-items/${cost.id}`, caller, {
+        amount: 15_000,
+        lockVersion: 0,
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "V14 DELETE",
+    routes: { "DELETE /api/v1/cost-items/:costItemId": "scoped" },
+    async call(caller, team) {
+      const { cost } = await newListRows(team);
+      return request("DELETE", `/api/v1/cost-items/${cost.id}`, caller);
+    },
+    expected: members(403, 204, 204),
+  },
+  {
+    api: "V15",
+    routes: { "GET /api/v1/validations/:validationId/economics": "scoped" },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "GET",
+        `/api/v1/validations/${validation.id}/economics`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "V16",
+    routes: {
+      "PUT /api/v1/validations/:validationId/economics/:fieldKey": "scoped",
+    },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "PUT",
+        `/api/v1/validations/${validation.id}/economics/selling_price`,
+        caller,
+        { value: 450, lockVersion: 0 },
+      );
+    },
+    expected: members(403, 200, 200),
+  },
+  ...(["competitors", "assumptions", "risks", "cost-items"] as const).map(
+    (list): Row => ({
+      api: `V17 ${list}`,
+      routes: {
+        [`PUT /api/v1/validations/:validationId/${list}/order`]: "scoped",
+      },
+      async call(caller, team) {
+        const rows = await newListRows(team);
+        const id = {
+          competitors: rows.competitor.id,
+          assumptions: rows.assumption.id,
+          risks: rows.risk.id,
+          "cost-items": rows.cost.id,
+        }[list];
+        return request(
+          "PUT",
+          `/api/v1/validations/${rows.validationId}/${list}/order`,
+          caller,
+          list === "cost-items"
+            ? { ids: [id], category: "monthly_fixed" }
+            : { ids: [id] },
+        );
+      },
+      expected: members(403, 204, 204),
+    }),
+  ),
   {
     api: "V18",
     routes: { "GET /api/v1/ideas/:ideaId/decision-context": "scoped" },

@@ -20,7 +20,7 @@ import {
   validations,
   workspaces,
 } from "@moonx/db";
-import type { Role, TemplateKind } from "@moonx/schemas";
+import { ideaDetailSchema, type Role, type TemplateKind } from "@moonx/schemas";
 import { hashPassword } from "better-auth/crypto";
 import { and, eq, sql } from "drizzle-orm";
 import sharp from "sharp";
@@ -443,4 +443,39 @@ export async function duringAccountDeletion(
     throw new Error("The request did not start");
   }
   return started.response;
+}
+
+/**
+ * A team of `fixtures` signed in to `app`, with an idea its Owner made through I1, so
+ * its validation has the template's cost rows as M1 makes them.
+ */
+export async function teamWithNewIdea(
+  app: { handle(request: Request): Promise<Response> },
+  fixtures: ReturnType<typeof testFixtures>,
+) {
+  const team = await fixtures.createTeam();
+  const cookieOf = (user: { email: string }) =>
+    signIn(app, user.email, uniqueIp());
+  const ownerCookie = await cookieOf(team.owner);
+  const memberCookie = await cookieOf(team.member);
+  const viewerCookie = await cookieOf(team.viewer);
+  await fixtures.templateVersion("validation");
+  const response = await app.handle(
+    apiRequest("POST", `/api/v1/workspaces/${team.workspace.id}/ideas`, {
+      cookie: ownerCookie,
+      body: { name: "Piaya boxes", oneLineConcept: "Gift boxes for offices" },
+    }),
+  );
+  if (response.status !== 201) {
+    throw new Error(`I1 answered ${response.status}`);
+  }
+  const idea = ideaDetailSchema.parse(await response.json());
+  return {
+    ...team,
+    ownerCookie,
+    memberCookie,
+    viewerCookie,
+    idea,
+    validationId: idea.validationId,
+  };
 }

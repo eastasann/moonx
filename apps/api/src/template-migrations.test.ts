@@ -23,6 +23,7 @@ import {
   adminTemplateListSchema,
   errorBodySchema,
   historyBatchRevertResultSchema,
+  ideaDuplicateResultSchema,
   type TemplateFile,
   templateMigrationPreviewSchema,
   templateMigrationResultSchema,
@@ -78,6 +79,16 @@ const versions = {
   selfAnalysisV2: "",
 };
 
+/** The file of validation v2, which v4 publishes again. */
+let validationV2File: TemplateFile;
+
+const withoutSignage = (file: TemplateFile): TemplateFile => ({
+  ...file,
+  costDefaults: file.costDefaults.filter(
+    (row) => row.key !== "initial.signage",
+  ),
+});
+
 const publish = async (kind: TemplateFile["kind"], file: TemplateFile) => {
   const draft = await importTemplateFile(db, kind, file);
   await publishTemplateVersion(db, draft.versionId, null);
@@ -87,7 +98,7 @@ const publish = async (kind: TemplateFile["kind"], file: TemplateFile) => {
 beforeAll(async () => {
   await prepareTestDatabase(url);
   versions.validationV1 = (await fixtures.templateVersion("validation")).id;
-  for (let i = 0; i < 11; i++) teams.push(await teamWithNewIdea(app, fixtures));
+  for (let i = 0; i < 13; i++) teams.push(await teamWithNewIdea(app, fixtures));
 
   // v2 asks how to reach the customer, drops BIGGEST_OPPORTUNITY and adds a cost row.
   const validation = bcdxFile("validation.json");
@@ -111,8 +122,10 @@ beforeAll(async () => {
     name: "Signage",
   });
   versions.validationV2 = await publish("validation", validation);
+  validationV2File = validation;
+  // v3 drops Signage again, so v4, which has it, adds it to an idea on v3.
   versions.validationDraft = (
-    await importTemplateFile(db, "validation", validation)
+    await importTemplateFile(db, "validation", withoutSignage(validation))
   ).versionId;
 
   versions.planV1 = (await fixtures.templateVersion("business_plan")).id;
@@ -423,7 +436,7 @@ describe("T2 POST /api/v1/template-migrations", () => {
     });
   });
 
-  test("does not bring back a starting cost row the person deleted", async () => {
+  test("adds no row of a key both versions have, though the person deleted it", async () => {
     const team = takeTeam();
     const [equipment] = await costRowsOf(team, "initial.equipment");
     if (equipment === undefined) throw new Error("No equipment row");
@@ -455,6 +468,60 @@ describe("T2 POST /api/v1/template-migrations", () => {
     const equipmentRows = await costRowsOf(team, "initial.equipment");
     expect(equipmentRows).toHaveLength(1);
     expect(equipmentRows[0]?.deletedAt).not.toBe(null);
+  });
+
+  test("adds no row to a duplicate of an idea whose starting row was deleted", async () => {
+    const team = takeTeam();
+    const [equipment] = await costRowsOf(team, "initial.equipment");
+    if (equipment === undefined) throw new Error("No equipment row");
+    expect(
+      (
+        await app.handle(
+          apiRequest("DELETE", `/api/v1/cost-items/${equipment.id}`, {
+            cookie: team.ownerCookie,
+          }),
+        )
+      ).status,
+    ).toBe(204);
+    const copied = await app.handle(
+      apiRequest("POST", `/api/v1/ideas/${team.idea.id}/duplicate`, {
+        cookie: team.ownerCookie,
+        body: {},
+      }),
+    );
+    expect(copied.status).toBe(201);
+    // I3 copies no deleted row, so the duplicate has no row of the key at all.
+    const duplicate = {
+      ...team,
+      validationId: ideaDuplicateResultSchema.parse(await copied.json())
+        .validationId,
+    };
+    expect(await costRowsOf(duplicate, "initial.equipment")).toEqual([]);
+
+    const preview = await previewOf(
+      "validation",
+      duplicate.validationId,
+      team.ownerCookie,
+    );
+    expect(
+      templateMigrationPreviewSchema.parse(await preview.json()).addedCostRows,
+    ).toEqual(["Signage"]);
+    expect(
+      (
+        await migrate(
+          "validation",
+          duplicate.validationId,
+          versions.validationV2,
+          team.ownerCookie,
+        )
+      ).status,
+    ).toBe(200);
+    expect(await costRowsOf(duplicate, "initial.equipment")).toEqual([]);
+    expect(
+      (await costRowsOf(duplicate, "initial.signage")).map(
+        (row) => row.deletedAt,
+      ),
+    ).toEqual([null]);
   });
 
   test("refuses a version that is not a newer published one of the same template", async () => {
@@ -731,7 +798,8 @@ describe("AD1 GET /api/v1/admin/templates", () => {
   });
 });
 
-// Last: it publishes the validation draft, after which v2 is no longer the newest.
+// Last, as they publish newer versions than the tests above expect: v3, then v4. The
+// test that expects v3 as the newest runs before the one that publishes v4.
 // The validation draft published as v3, once whichever test asks first.
 let v3: Promise<void> | undefined;
 const publishV3 = () => {
@@ -742,6 +810,25 @@ const publishV3 = () => {
 };
 
 describe("T2 after a migration was undone and redone", () => {
+  test("moves to a newer published version that is not the newest", async () => {
+    await publishV3();
+    const team = takeTeam();
+    const response = await migrate(
+      "validation",
+      team.validationId,
+      versions.validationV2,
+      team.ownerCookie,
+    );
+    expect(response.status).toBe(200);
+    expect(
+      templateMigrationResultSchema.parse(await response.json()).template,
+    ).toEqual({
+      versionId: versions.validationV2,
+      versionNumber: 2,
+      newerVersion: { versionId: versions.validationDraft, versionNumber: 3 },
+    });
+  });
+
   test("does not add a row again the person deleted after a migration added it back", async () => {
     const team = takeTeam();
     const first = templateMigrationResultSchema.parse(
@@ -779,16 +866,9 @@ describe("T2 after a migration was undone and redone", () => {
       ).status,
     ).toBe(204);
 
+    // v3 has no Signage and v4 has it again: a key v3 lacks, whose last row the person
+    // deleted.
     await publishV3();
-    const preview = templateMigrationPreviewSchema.parse(
-      await (
-        await previewOf("validation", team.validationId, team.ownerCookie)
-      ).json(),
-    );
-    expect(preview).toMatchObject({
-      to: { versionId: versions.validationDraft, versionNumber: 3 },
-      addedCostRows: [],
-    });
     expect(
       (
         await migrate(
@@ -799,27 +879,32 @@ describe("T2 after a migration was undone and redone", () => {
         )
       ).status,
     ).toBe(200);
+    const v4 = await publish("validation", validationV2File);
+    const preview = templateMigrationPreviewSchema.parse(
+      await (
+        await previewOf("validation", team.validationId, team.ownerCookie)
+      ).json(),
+    );
+    expect(preview).toMatchObject({
+      to: { versionId: v4, versionNumber: 4 },
+      addedCostRows: [],
+    });
+    expect(
+      (await migrate("validation", team.validationId, v4, team.ownerCookie))
+        .status,
+    ).toBe(200);
     const rows = await costRowsOf(team, "initial.signage");
     expect(rows).toHaveLength(2);
     expect(rows.every((row) => row.deletedAt !== null)).toBe(true);
-  });
 
-  test("moves to a newer published version that is not the newest", async () => {
-    await publishV3();
-    const team = takeTeam();
-    const response = await migrate(
-      "validation",
-      team.validationId,
-      versions.validationV2,
-      team.ownerCookie,
-    );
-    expect(response.status).toBe(200);
+    // An idea that never had Signage gets it from v4 all the same.
+    const fresh = takeTeam();
     expect(
-      templateMigrationResultSchema.parse(await response.json()).template,
-    ).toEqual({
-      versionId: versions.validationV2,
-      versionNumber: 2,
-      newerVersion: { versionId: versions.validationDraft, versionNumber: 3 },
-    });
+      (await migrate("validation", fresh.validationId, v4, fresh.ownerCookie))
+        .status,
+    ).toBe(200);
+    expect(
+      (await costRowsOf(fresh, "initial.signage")).map((row) => row.deletedAt),
+    ).toEqual([null]);
   });
 });

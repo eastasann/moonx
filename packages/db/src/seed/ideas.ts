@@ -330,7 +330,8 @@ export async function writeIdea(
       sourceUrl: log.sourceUrl ?? null,
       supportsChecks: log.supports ?? [],
       supportsNote: log.supportsNote ?? null,
-      createdById: userId(copy?.by ?? log.by),
+      // A copy keeps who recorded the log (6.8).
+      createdById: userId(log.by),
       deletedAt:
         copy === undefined && log.deleted !== undefined
           ? at(log.deleted)

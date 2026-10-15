@@ -767,12 +767,14 @@ const ROWS: Row[] = [
     routes: {
       "GET /api/v1/workspaces/:workspaceId/mention-candidates": "scoped",
     },
-    call: (caller, { workspaceId }) =>
-      request(
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request(
         "GET",
-        `/api/v1/workspaces/${workspaceId}/mention-candidates?targetType=idea&targetId=${crypto.randomUUID()}`,
+        `/api/v1/workspaces/${team.workspaceId}/mention-candidates?targetType=idea&targetId=${idea.id}`,
         caller,
-      ),
+      );
+    },
     expected: members(200, 200, 200),
   },
   {
@@ -2440,7 +2442,7 @@ describe("SDD 7.1 authorization matrix", () => {
       );
     const workspaceCalls: Record<
       string,
-      (caller: Person, workspaceId: string) => Request
+      (caller: Person, workspaceId: string, ideaId: string) => Request
     > = {
       "W1 GET": (caller, id) =>
         request("GET", `/api/v1/workspaces/${id}`, caller),
@@ -2452,10 +2454,10 @@ describe("SDD 7.1 authorization matrix", () => {
         request("GET", `/api/v1/workspaces/${id}/members`, caller),
       "W4 GET": (caller, id) =>
         request("GET", `/api/v1/workspaces/${id}/invitations`, caller),
-      W8: (caller, id) =>
+      W8: (caller, id, ideaId) =>
         request(
           "GET",
-          `/api/v1/workspaces/${id}/mention-candidates?targetType=idea&targetId=${crypto.randomUUID()}`,
+          `/api/v1/workspaces/${id}/mention-candidates?targetType=idea&targetId=${ideaId}`,
           caller,
         ),
     };
@@ -2476,9 +2478,15 @@ describe("SDD 7.1 authorization matrix", () => {
         email: team.admin.email,
         cookie: await signIn(app, team.admin.email, uniqueIp()),
       };
+      const { idea } = await fixtures.createIdea(
+        team.workspace.id,
+        team.owner.id,
+      );
       const call = workspaceCalls[key];
       if (call === undefined) throw new Error(`No call for ${key}`);
-      const response = await app.handle(call(admin, team.workspace.id));
+      const response = await app.handle(
+        call(admin, team.workspace.id, idea.id),
+      );
       expect({ key, role, status: response.status }).toEqual({
         key,
         role,

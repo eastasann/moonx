@@ -9,6 +9,7 @@ import {
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  type AnswerType,
   PLAN_LIST_COLUMNS,
   type TemplateFile,
   type TemplateKind,
@@ -732,6 +733,60 @@ describe("checkTemplateContent", () => {
           ]),
         ),
       ).toEqual([["options_mismatch", "q:P.01.1"]]);
+    }
+  });
+
+  test("answer_type_mismatch: each kind takes only the answer types its answers hold", () => {
+    const fitting: Record<AnswerType, unknown> = {
+      long_text: null,
+      short_text: null,
+      choice: { kind: "choice", choices: ["Yes", "No"] },
+      amount_with_reason: null,
+      table: {
+        kind: "table",
+        columns: [{ key: "name", label: "Name", type: "text" }],
+      },
+      linked_metric: { kind: "linked_metric", metricKeys: ["selling_price"] },
+      execution_view: { kind: "execution_view", executionType: "milestone" },
+    };
+    const refused: Record<TemplateKind, AnswerType[]> = {
+      self_analysis: ["table", "linked_metric", "execution_view"],
+      validation: [
+        "amount_with_reason",
+        "table",
+        "linked_metric",
+        "execution_view",
+      ],
+      business_plan: ["amount_with_reason"],
+    };
+    const sectionOf = {
+      self_analysis: { key: "WHY", part: null, questionKey: "SA.WHY.1" },
+      validation: { key: "01", part: null, questionKey: "V.01.WHO" },
+      business_plan: { key: "01", part: "a", questionKey: "P.01.1" },
+    } as const;
+    for (const kind of Object.keys(refused) as TemplateKind[]) {
+      const { key, part, questionKey } = sectionOf[kind];
+      for (const answerType of Object.keys(fitting) as AnswerType[]) {
+        const found = codes(
+          content(kind, [
+            {
+              id: "s1",
+              key,
+              part,
+              questions: [
+                q(questionKey, { answerType, options: fitting[answerType] }),
+              ],
+            },
+          ]),
+        );
+        expect({ kind, answerType, found }).toEqual({
+          kind,
+          answerType,
+          found: refused[kind].includes(answerType)
+            ? [["answer_type_mismatch", `q:${questionKey}`]]
+            : [],
+        });
+      }
     }
   });
 

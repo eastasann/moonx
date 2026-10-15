@@ -745,6 +745,76 @@ describe("the settings only one kind of template has", () => {
   });
 });
 
+describe("AD6 and the answer types of each kind", () => {
+  /** The draft of `kind`, imported from the BCDX file when there is none. */
+  const draftOf = async (kind: "validation" | "business_plan") => {
+    const list = adminTemplateListSchema.parse(
+      await (await call("GET", "/templates")).json(),
+    );
+    const draft = list.items
+      .find((template) => template.kind === kind)
+      ?.versions.find((version) => version.status === "draft");
+    if (draft !== undefined) return draft.id;
+    const file = bcdxFile(
+      kind === "validation" ? "validation.json" : "plan.json",
+    );
+    return templateImportResultSchema.parse(
+      await (await importFile(kind, file)).json(),
+    ).versionId;
+  };
+
+  test("an amount with a reason blocks publishing a validation or a plan", async () => {
+    for (const kind of ["validation", "business_plan"] as const) {
+      const id = await draftOf(kind);
+      const section = (
+        await detailOf(await call("GET", `/template-versions/${id}`))
+      ).sections.at(-1);
+      if (section === undefined) throw new Error(`No section in ${kind}`);
+      const key =
+        kind === "validation"
+          ? `V.${section.key}.BUDGET`
+          : `P.${section.key}.99`;
+      const added = questionOf(
+        await detailOf(
+          await call("POST", `/template-sections/${section.id}/questions`, {
+            key,
+            title: "Budget",
+            prompt: "How much will you spend?",
+            answerType: "amount_with_reason",
+          }),
+          201,
+        ),
+        key,
+      );
+
+      const check = templateCheckSchema.parse(
+        await (await call("POST", `/template-versions/${id}/validate`)).json(),
+      );
+      expect(check.errors.filter((error) => error.nodeId === added.id)).toEqual(
+        [
+          {
+            code: "answer_type_mismatch",
+            message: expect.any(String),
+            nodeId: added.id,
+          },
+        ],
+      );
+      const publish = await call("POST", `/template-versions/${id}/publish`);
+      expect(publish.status).toBe(422);
+      expect((await errorOf(publish)).code).toBe("TEMPLATE_INVALID");
+
+      expect(
+        (await call("DELETE", `/template-questions/${added.id}`)).status,
+      ).toBe(204);
+      const after = templateCheckSchema.parse(
+        await (await call("POST", `/template-versions/${id}/validate`)).json(),
+      );
+      // The question was the draft's only problem.
+      expect(after.errors).toEqual([]);
+    }
+  });
+});
+
 describe("what does not exist", () => {
   test("answers 404 for unknown and malformed ids", async () => {
     for (const response of [

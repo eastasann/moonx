@@ -628,8 +628,10 @@ describe("I3 POST /api/v1/ideas/{ideaId}/duplicate", () => {
       .select()
       .from(researchLogEntries)
       .where(eq(researchLogEntries.validationId, copy.validationId));
+    // The Owner recorded the log; the Member who duplicated it does not become its
+    // recorder (design-spec 6.8).
     expect(logs.map((log) => [log.topic, log.createdById])).toEqual([
-      ["Price check", team.member.id],
+      ["Price check", team.owner.id],
     ]);
     const rivals = await db
       .select()

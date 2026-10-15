@@ -9,6 +9,7 @@ import {
   workspaces,
 } from "@moonx/db";
 import {
+  type CommentTargetType,
   errorBodySchema,
   type Member,
   memberListSchema,
@@ -38,7 +39,8 @@ import {
   releaseMember,
   removeMember,
 } from "./membership";
-import { recordChange, writeInScope } from "./scope";
+import { recordChange, resolveScope, writeInScope } from "./scope";
+import { locateTarget } from "./targets";
 import { loadUserRefs } from "./user-refs";
 
 /** W0's currency when none is sent (SDD 5.5). */
@@ -172,6 +174,36 @@ async function lockedMembership(
     )
     .for("update", { of: memberships });
   return row;
+}
+
+/**
+ * The users who may be mentioned on a comment about `target` in `workspaceId`: every
+ * member, Viewers included (design-spec 6.0.4). The candidates do not depend on the
+ * item, so its key is not checked.
+ *
+ * @throws {ApiError} NOT_FOUND when the item is not in the workspace: it does not
+ * exist, is deleted on its screen, is an idea or plan whose creation was undone, or lies
+ * in another workspace
+ */
+async function workspaceCandidates(
+  db: Database,
+  workspaceId: string,
+  callerId: string,
+  target: { type: CommentTargetType; id: string },
+): Promise<string[]> {
+  const place = await locateTarget(db, target);
+  const found =
+    place?.scope == null || place.deleted
+      ? null
+      : await resolveScope(db, place.scope, callerId);
+  if (found === null || found.workspaceId !== workspaceId) {
+    throw new ApiError("NOT_FOUND", "No such item in this workspace");
+  }
+  const rows = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(eq(memberships.workspaceId, workspaceId));
+  return rows.map((row) => row.userId);
 }
 
 /**
@@ -538,7 +570,7 @@ export function workspaceRoutes({ access, db, now }: WorkspaceRoutesOptions) {
     )
     .get(
       "/api/v1/workspaces/:workspaceId/mention-candidates",
-      async ({ scope, query }) => {
+      async ({ scope, query, caller }) => {
         const userIds =
           query.targetType === "self_analysis_answer"
             ? await selfAnalysisCandidates(
@@ -548,12 +580,10 @@ export function workspaceRoutes({ access, db, now }: WorkspaceRoutesOptions) {
                 query.targetId,
                 query.targetKey,
               )
-            : (
-                await db
-                  .select({ userId: memberships.userId })
-                  .from(memberships)
-                  .where(eq(memberships.workspaceId, scope.workspaceId))
-              ).map((row) => row.userId);
+            : await workspaceCandidates(db, scope.workspaceId, caller.id, {
+                type: query.targetType,
+                id: query.targetId,
+              });
         const refs = await loadUserRefs(db, userIds, scope.workspaceId);
         return { items: [...refs.values()].sort(byName) };
       },
@@ -570,7 +600,7 @@ export function workspaceRoutes({ access, db, now }: WorkspaceRoutesOptions) {
         detail: {
           summary: "W8 Whom a comment may mention",
           description:
-            "Every member, Viewers included. On a self-analysis answer (targetKey is its question), only the Owners and Members of a workspace it is shared with, and Viewers may not ask.",
+            "Every member, Viewers included; 404 NOT_FOUND when the item is not in the workspace (missing, deleted, or another workspace's). On a self-analysis answer (targetKey is its question), only the Owners and Members of a workspace it is shared with, and Viewers may not ask.",
         },
       },
     );

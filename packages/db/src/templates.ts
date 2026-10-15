@@ -265,6 +265,7 @@ export type TemplateProblemCode =
   | "invalid_question_key"
   | "question_key_section_mismatch"
   | "duplicate_question_key"
+  | "answer_type_mismatch"
   | "options_mismatch"
   | "unknown_condition_key"
   | "copy_from_mismatch";
@@ -301,6 +302,30 @@ export interface TemplateContent {
   /** The question IDs of the version before it; null when it is the first. */
   previousQuestionKeys: readonly string[] | null;
 }
+
+/**
+ * The answer types the questions of each kind may have (SDD 5.13 AD6): those its answers
+ * table holds (6.3: a self-analysis keeps a text and an amount, a validation a text, a
+ * plan a text and table rows), and in a plan the sub-items that show the validation's
+ * numbers and the plan's execution items and keep no answer.
+ */
+const ANSWER_TYPES: Record<TemplateKind, ReadonlySet<AnswerType>> = {
+  self_analysis: new Set([
+    "long_text",
+    "short_text",
+    "choice",
+    "amount_with_reason",
+  ]),
+  validation: new Set(["long_text", "short_text", "choice"]),
+  business_plan: new Set([
+    "long_text",
+    "short_text",
+    "choice",
+    "table",
+    "linked_metric",
+    "execution_view",
+  ]),
+};
 
 const optionsKindOf: Record<AnswerType, QuestionOptions["kind"] | null> = {
   long_text: null,
@@ -408,6 +433,12 @@ export function checkTemplateContent(content: TemplateContent): TemplateCheck {
         nodeId: question.id,
       });
     seen.add(key);
+    if (!ANSWER_TYPES[content.kind].has(question.answerType))
+      errors.push({
+        code: "answer_type_mismatch",
+        message: `${key} is ${question.answerType}, which answers of this template cannot hold`,
+        nodeId: question.id,
+      });
     if (!optionsFit(question.answerType, question.options))
       errors.push({
         code: "options_mismatch",

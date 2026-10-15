@@ -333,6 +333,7 @@ export const templateCheckSchema = z.object({
         "invalid_question_key",
         "question_key_section_mismatch",
         "duplicate_question_key",
+        "answer_type_mismatch",
         "options_mismatch",
         "unknown_condition_key",
         "copy_from_mismatch",

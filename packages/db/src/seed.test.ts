@@ -572,12 +572,34 @@ describe("ideas (design-spec 8.2)", () => {
     expect([price(piaya.loaded.state), price(copy.loaded.state)]).toEqual([
       450, 650,
     ]);
-    // Research logs are copied, and the copied evidence points at the copies.
-    const copiedLogs = await db
-      .select({ id: researchLogEntries.id })
-      .from(researchLogEntries)
-      .where(eq(researchLogEntries.validationId, copy.validation.id));
+    // Research logs are copied with their recorders (6.8), and the copied evidence
+    // points at the copies.
+    const logsOf = (validationId: string) =>
+      db
+        .select({
+          id: researchLogEntries.id,
+          topic: researchLogEntries.topic,
+          createdById: researchLogEntries.createdById,
+        })
+        .from(researchLogEntries)
+        .where(
+          and(
+            eq(researchLogEntries.validationId, validationId),
+            isNull(researchLogEntries.deletedAt),
+          ),
+        )
+        .orderBy(asc(researchLogEntries.topic));
+    const copiedLogs = await logsOf(copy.validation.id);
     expect(copiedLogs).toHaveLength(7);
+    const recorders = (logs: typeof copiedLogs) =>
+      logs.map((log) => [log.topic, log.createdById]);
+    expect(recorders(copiedLogs)).toEqual(
+      recorders(await logsOf(piaya.validation.id)),
+    );
+    // Kenji duplicated it; the logs stay recorded by others too.
+    expect(copiedLogs.some((log) => log.createdById !== userId("kenji"))).toBe(
+      true,
+    );
     const copiedLogIds = new Set(copiedLogs.map((log) => log.id));
     const links = await db
       .select({ logId: evidenceLinks.researchLogEntryId })

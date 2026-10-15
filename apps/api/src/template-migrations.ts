@@ -207,27 +207,36 @@ async function answeredKeys(
 }
 
 /**
- * The starting cost rows of `versionId` that migrating the validation `validationId`
- * adds (SDD 5.12 T2, design-spec 6.0.7), in template order. A key with no row is added.
- * A key whose rows are all deleted is added again only when the latest deletion undid a
- * migration (H3): a row the person deleted stays deleted, and a row a migration added
- * comes back with the next one.
+ * The starting cost rows that migrating the validation `pinned` to `versionId` adds
+ * (SDD 5.12 T2, design-spec 6.0.7), in template order: those of keys the pinned version
+ * lacks. A key both versions have is never added, even with no row of it: a duplicate
+ * copies no deleted row, so its missing row is one the person deleted. Of the new keys,
+ * one with no row is added; one whose rows are all deleted is added again only when the
+ * latest deletion undid a migration (H3): a row the person deleted stays deleted, and a
+ * row a migration added comes back with the next one.
  */
-async function costRowsToAdd(
-  db: Executor,
-  validationId: string,
-  versionId: string,
-) {
-  const defaults = await db
-    .select({
-      category: templateCostDefaults.category,
-      key: templateCostDefaults.key,
-      name: templateCostDefaults.name,
-    })
-    .from(templateCostDefaults)
-    .where(eq(templateCostDefaults.templateVersionId, versionId))
-    .orderBy(asc(templateCostDefaults.sortOrder), asc(templateCostDefaults.id));
+async function costRowsToAdd(db: Executor, pinned: Pinned, versionId: string) {
+  const defaultsOf = (id: string) =>
+    db
+      .select({
+        category: templateCostDefaults.category,
+        key: templateCostDefaults.key,
+        name: templateCostDefaults.name,
+      })
+      .from(templateCostDefaults)
+      .where(eq(templateCostDefaults.templateVersionId, id))
+      .orderBy(
+        asc(templateCostDefaults.sortOrder),
+        asc(templateCostDefaults.id),
+      );
+  const kept = new Set(
+    (await defaultsOf(pinned.versionId)).map((row) => row.key),
+  );
+  const defaults = (await defaultsOf(versionId)).filter(
+    (row) => !kept.has(row.key),
+  );
   if (defaults.length === 0) return [];
+  const validationId = pinned.id;
   const rows = await db
     .select({
       id: costItems.id,
@@ -319,9 +328,7 @@ async function preview(
     addedQuestions: [...next].filter((key) => !kept.has(key)).length,
     addedCostRows:
       pinned.kind === "validation"
-        ? (await costRowsToAdd(db, pinned.id, to.versionId)).map(
-            (row) => row.name,
-          )
+        ? (await costRowsToAdd(db, pinned, to.versionId)).map((row) => row.name)
         : [],
   };
 }
@@ -398,7 +405,7 @@ async function migrate(
   const done = { changes, versionId: to.versionId };
   if (pinned.kind !== "validation") return done;
 
-  const added = await costRowsToAdd(tx, pinned.id, to.versionId);
+  const added = await costRowsToAdd(tx, pinned, to.versionId);
   if (added.length === 0) return done;
   // After every row of the category, deleted ones too, so no order repeats.
   const lastOrders = await tx

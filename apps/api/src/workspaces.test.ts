@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import {
   businessPlans,
   changeHistory,
+  competitors,
   executionItems,
   ideas,
   memberships,
@@ -688,10 +689,14 @@ describe("W8 GET /api/v1/workspaces/{workspaceId}/mention-candidates", () => {
       status: "suspended",
     });
     await fixtures.addMember(team.workspace.id, suspended.id, "member");
+    const { idea } = await fixtures.createIdea(
+      team.workspace.id,
+      team.owner.id,
+    );
 
     const response = await candidates(
       team.workspace.id,
-      `targetType=idea&targetId=${crypto.randomUUID()}`,
+      `targetType=idea&targetId=${idea.id}`,
       team.viewer,
     );
 
@@ -705,6 +710,71 @@ describe("W8 GET /api/v1/workspaces/{workspaceId}/mention-candidates", () => {
       ["Owner", null],
       ["Viewer", null],
     ]);
+  });
+
+  test("answers 404 NOT_FOUND for an item that is not in the workspace", async () => {
+    const team = await fixtures.createTeam();
+    const other = await fixtures.createTeam();
+    const { idea, validation } = await fixtures.createIdea(
+      team.workspace.id,
+      team.owner.id,
+    );
+    const plan = await fixtures.createPlan(idea.id, team.owner.id);
+    const [kept, gone] = await db
+      .insert(competitors)
+      .values([
+        { validationId: validation.id, name: "Rival", sortOrder: 0 },
+        {
+          validationId: validation.id,
+          name: "Closed",
+          sortOrder: 1,
+          deletedAt: new Date(),
+        },
+      ])
+      .returning();
+    const elsewhere = await fixtures.createIdea(
+      other.workspace.id,
+      other.owner.id,
+    );
+    const undone = await fixtures.createIdea(team.workspace.id, team.owner.id, {
+      deletedAt: new Date(),
+    });
+    const undonePlan = await fixtures.createPlan(idea.id, team.owner.id, {
+      deletedAt: new Date(),
+    });
+    const removedItem = await fixtures.createExecutionItem(plan.id, {
+      deletedAt: new Date(),
+    });
+    const statusOf = async (query: string) =>
+      (await candidates(team.workspace.id, query, team.member)).status;
+
+    for (const query of [
+      `targetType=idea&targetId=${idea.id}`,
+      `targetType=validation_answer&targetId=${validation.id}&targetKey=V.01.WHO`,
+      `targetType=competitor&targetId=${kept?.id}`,
+      `targetType=plan_answer&targetId=${plan.id}&targetKey=P.01.1`,
+    ]) {
+      expect({ query, status: await statusOf(query) }).toEqual({
+        query,
+        status: 200,
+      });
+    }
+    for (const query of [
+      `targetType=idea&targetId=${crypto.randomUUID()}`,
+      `targetType=idea&targetId=${elsewhere.idea.id}`,
+      `targetType=validation_answer&targetId=${elsewhere.validation.id}`,
+      `targetType=idea&targetId=${undone.idea.id}`,
+      `targetType=plan_answer&targetId=${undonePlan.id}&targetKey=P.01.1`,
+      `targetType=competitor&targetId=${gone?.id}`,
+      `targetType=execution_item&targetId=${removedItem.id}`,
+    ]) {
+      const response = await candidates(team.workspace.id, query, team.member);
+      expect({ query, status: response.status }).toEqual({
+        query,
+        status: 404,
+      });
+      expect((await errorOf(response)).code).toBe("NOT_FOUND");
+    }
   });
 
   test("on a shared self-analysis, offers its workspace's Owners and Members only", async () => {
@@ -762,6 +832,9 @@ describe("W8 GET /api/v1/workspaces/{workspaceId}/mention-candidates", () => {
       "",
       "targetType=nothing&targetId=x",
       "targetType=idea",
+      // Items C1 takes no comments on.
+      `targetType=business_plan&targetId=${crypto.randomUUID()}`,
+      `targetType=template_version&targetId=${crypto.randomUUID()}&targetKey=validation`,
       // design-spec 6.0.8 refuses NUL in any text, which PostgreSQL cannot hold.
       `targetType=self_analysis_answer&targetId=${crypto.randomUUID()}&targetKey=SA.WHY.1%00`,
     ]) {

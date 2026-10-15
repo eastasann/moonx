@@ -1,8 +1,8 @@
 import { z } from "zod";
+import { commentTargetTypeSchema } from "./collaboration";
 import {
   dateTimeSchema,
   roleSchema,
-  targetTypeSchema,
   userRefSchema,
   uuidSchema,
 } from "./common";
@@ -128,11 +128,11 @@ export const invitationIdParamsSchema = z.object({ invitationId: z.string() });
 
 /**
  * The query of W8 `GET /api/v1/workspaces/{workspaceId}/mention-candidates`: the item a
- * comment is being written on, as a TargetRef. `targetKey` names the question of a keyed
- * item; a self-analysis answer needs it.
+ * comment is being written on, as a TargetRef of a type C1 takes comments on.
+ * `targetKey` names the question of a self-analysis answer, which needs it.
  */
 export const mentionCandidatesQuerySchema = z.object({
-  targetType: targetTypeSchema,
+  targetType: commentTargetTypeSchema,
   targetId: uuidSchema,
   targetKey: requiredText(TEXT_LIMITS.short).optional(),
 });

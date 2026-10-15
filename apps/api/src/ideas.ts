@@ -197,12 +197,12 @@ async function duplicateIdea(
       .where(eq(researchLogEntries.validationId, fromId))
       .orderBy(asc(researchLogEntries.createdAt), asc(researchLogEntries.id)),
   ).map(({ id, deletedAt, lockVersion, ...log }, index) => ({
+    // The recorder stays the source's (design-spec 6.8).
     ...log,
     ...fresh,
     ...nth(index),
     id: renew(id),
     validationId,
-    createdById: callerId,
   }));
   const competitorRows = live(
     await tx

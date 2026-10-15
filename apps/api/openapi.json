@@ -1524,7 +1524,7 @@
     "/api/v1/workspaces/{workspaceId}/mention-candidates": {
       "get": {
         "summary": "W8 Whom a comment may mention",
-        "description": "Every member, Viewers included. On a self-analysis answer (targetKey is its question), only the Owners and Members of a workspace it is shared with, and Viewers may not ask.",
+        "description": "Every member, Viewers included; 404 NOT_FOUND when the item is not in the workspace (missing, deleted, or another workspace's). On a self-analysis answer (targetKey is its question), only the Owners and Members of a workspace it is shared with, and Viewers may not ask.",
         "parameters": [
           {
             "name": "workspaceId",
@@ -1550,9 +1550,7 @@
                 "assumption",
                 "risk",
                 "cost_item",
-                "execution_item",
-                "business_plan",
-                "template_version"
+                "execution_item"
               ]
             }
           },
@@ -36738,6 +36736,7 @@
                               "invalid_question_key",
                               "question_key_section_mismatch",
                               "duplicate_question_key",
+                              "answer_type_mismatch",
                               "options_mismatch",
                               "unknown_condition_key",
                               "copy_from_mismatch"

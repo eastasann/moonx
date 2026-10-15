@@ -486,7 +486,7 @@ export async function latestTemplateVersion(db: Executor, kind: TemplateKind) {
  * The start of a reason, at most {@link EXCERPT_MAX} characters with "…" when cut, for
  * lists that show one or two lines of it (design-spec 6.15).
  */
-const excerpt = (text: string | null): string | null => {
+export const excerpt = (text: string | null): string | null => {
   if (text === null) return null;
   const fitted = fitWithSuffix(text, "", EXCERPT_MAX);
   return fitted === text ? text : fitWithSuffix(text, "…", EXCERPT_MAX);

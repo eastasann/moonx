@@ -5,18 +5,22 @@ import { accountRoutes } from "./account";
 import { aiRoutes } from "./ai";
 import { AUTH_IP_LIMITS, createAuth } from "./auth";
 import { type AvatarStore, avatarFileRoutes } from "./avatars";
+import { commentRoutes } from "./comments";
 import type { Config } from "./config";
 import { costRoutes } from "./costs";
 import { dashboardRoutes } from "./dashboard";
+import { decisionLogRoutes } from "./decision-log";
 import { decisionRoutes } from "./decisions";
 import { docsRoutes } from "./docs";
 import { entryPlugin } from "./entry";
 import { executionRoutes } from "./execution";
 import { HEALTH_DB_IP_LIMIT, healthRoutes } from "./health";
+import { historyRoutes } from "./history-routes";
 import { ideaRoutes } from "./ideas";
 import { invitationRoutes, SIGN_UP_IP_LIMIT } from "./invitations";
 import type { Logger } from "./log";
 import type { Mailer } from "./mail";
+import { notificationRoutes } from "./notification-routes";
 import { pitchDeckRoutes } from "./pitch-deck";
 import { planItemRoutes } from "./plan-items";
 import { planRoutes } from "./plans";
@@ -110,7 +114,11 @@ export function createApp(config: Config, services: AppServices) {
     .use(planItemRoutes({ access, db, now }))
     .use(executionRoutes({ access, db, now }))
     .use(pitchDeckRoutes({ access, db, limiter, now }))
-    .use(aiRoutes({ access, db, limiter, now }));
+    .use(aiRoutes({ access, db, limiter, now }))
+    .use(decisionLogRoutes({ access, db }))
+    .use(commentRoutes({ access, db, now }))
+    .use(historyRoutes({ access, db, now }))
+    .use(notificationRoutes({ access, db, now }));
   if (avatars.directory !== undefined) {
     app.use(avatarFileRoutes(access, avatars.directory));
   }

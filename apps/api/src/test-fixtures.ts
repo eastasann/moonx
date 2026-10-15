@@ -345,7 +345,8 @@ export function testFixtures(db: Database) {
 
   /**
    * A decision on the idea, recorded straight in the database as V19 would (its
-   * snapshot empty): Proceed by default, which lets the idea have plans (M5).
+   * snapshot that of an empty validation): Proceed by default, which lets the idea have
+   * plans (M5).
    */
   async function createDecision(
     idea: { id: string; workspaceId: string },
@@ -360,7 +361,18 @@ export function testFixtures(db: Database) {
         kind: "validation_decision",
         value,
         reason: "Decided in a test",
-        snapshot: {},
+        snapshot: {
+          missingChecks: [],
+          keyMetrics: {},
+          fau: {
+            fact: 0,
+            factNoEvidence: 0,
+            assumption: { total: 0, low: 0, medium: 0, high: 0 },
+            unknown: 0,
+            unclassified: 0,
+            empty: 0,
+          },
+        },
         recordedById,
       })
       .returning();

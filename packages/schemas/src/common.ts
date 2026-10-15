@@ -217,6 +217,19 @@ export const pageQuerySchema = z.object({
     .default(PAGE_LIMIT_DEFAULT),
 });
 
+/**
+ * A comma-separated list in a query string ("01,02"); empty is the empty list. Elysia
+ * hands over a parameter it reads as an array (repeated, or split at its commas) as
+ * an array, which reads the same.
+ */
+export const queryListSchema = z
+  .union([z.string(), z.array(z.string())])
+  .transform((value) =>
+    (Array.isArray(value) ? value : [value]).flatMap((part) =>
+      part === "" ? [] : part.split(","),
+    ),
+  );
+
 /** `true` or `false` in a query string. */
 export const queryBooleanSchema = z
   .enum(["true", "false"])

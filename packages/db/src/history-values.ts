@@ -85,6 +85,15 @@ export const planAnswerContent = (
     | null,
 });
 
+/**
+ * The template version a self-analysis, validation or plan is pinned to (`template_version`,
+ * written by a template migration): H3 pins `versionId` again to undo it.
+ */
+export const templateVersionContent = (version: {
+  versionId: string;
+  versionNumber: number;
+}) => ({ versionId: version.versionId, versionNumber: version.versionNumber });
+
 // The content the change history keeps of each validation item (ADR-020): what a person
 // edits, without ids, order, lock version or timestamps. `evidenceIds` lists the evidence
 // links attached (not detached), oldest first, for the items that take evidence. The

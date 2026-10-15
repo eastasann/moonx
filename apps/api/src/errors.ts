@@ -42,6 +42,19 @@ export function isUniqueViolation(error: unknown, constraint: string): boolean {
   return false;
 }
 
+/**
+ * Whether `error`, or an error it was caused by, is PostgreSQL's `lock_not_available`:
+ * a `NOWAIT` lock found the row held by another transaction.
+ */
+export function isLockNotAvailable(error: unknown): boolean {
+  let current: unknown = error;
+  while (current instanceof Error) {
+    if ((current as { code?: unknown }).code === "55P03") return true;
+    current = current.cause;
+  }
+  return false;
+}
+
 interface StandardIssue {
   readonly message: string;
   readonly path?: readonly (PropertyKey | { readonly key: PropertyKey })[];

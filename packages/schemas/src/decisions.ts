@@ -1,11 +1,14 @@
 import { z } from "zod";
 import {
   checkResultSchema,
+  dateOnlySchema,
   dateTimeSchema,
   decisionValueSchema,
   fauBreakdownSchema,
   goNoGoValueSchema,
   keyMetricsSchema,
+  pageQuerySchema,
+  pageSchema,
   userRefSchema,
   uuidSchema,
 } from "./common";
@@ -68,3 +71,23 @@ export const decisionLogEntrySchema = decisionLogSummarySchema.extend({
   snapshot: decisionSnapshotSchema,
 });
 export type DecisionLogEntry = z.infer<typeof decisionLogEntrySchema>;
+
+/** L1 GET. */
+export const decisionLogPageSchema = pageSchema(decisionLogSummarySchema);
+
+/**
+ * The query of L1. `from` and `to` are dates in the caller's time zone, both included:
+ * the period of 7 filters by the day an entry was recorded on, as the caller sees it.
+ */
+export const decisionLogQuerySchema = pageQuerySchema.extend({
+  kind: decisionLogKindSchema.optional(),
+  ideaId: uuidSchema.optional(),
+  planId: uuidSchema.optional(),
+  recordedBy: uuidSchema.optional(),
+  from: dateOnlySchema.optional(),
+  to: dateOnlySchema.optional(),
+});
+export type DecisionLogQuery = z.infer<typeof decisionLogQuerySchema>;
+
+/** The `{entryId}` of L2. */
+export const decisionLogEntryParamsSchema = z.object({ entryId: z.string() });

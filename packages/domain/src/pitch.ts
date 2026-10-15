@@ -776,6 +776,13 @@ const versionLabel = (source: PitchDeck["source"]) =>
   source.kind === "version" ? source.name : i18n.t("pitch:draft");
 
 /**
+ * The slides of a deck, in its order: what a comment on a slide may name as its key
+ * (`{variant}.{slide}`, SDD 5.1 TargetRef).
+ */
+export const pitchSlideKeys = (variant: PitchVariant): PitchSlideKey[] =>
+  SLIDES[variant].map((spec) => spec.key);
+
+/**
  * The slides of the one- or five-minute deck (design-spec 6.14) with every source in
  * place: blank sources show "Not written yet" and are named in `emptySources`, and
  * nothing is cut yet (`fitPitchDeck` shrinks and cuts for the slide's size).

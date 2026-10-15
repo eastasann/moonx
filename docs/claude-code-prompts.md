@@ -638,7 +638,7 @@ make test-domain・make test-api・make openapi（差分なし）・make typeche
 
 ## Step 17: API: 決定ログ・コメント・変更履歴・通知
 
-Status:
+Status: done 2026-10-15
 
 ```
 docs/02-01_system-design-doc.md 5.11 の L1・L2・C1〜C3・H1〜H3・N1〜N3 を作ってください。

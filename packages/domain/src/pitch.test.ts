@@ -8,6 +8,7 @@ import {
   type PitchDeckInput,
   type PitchExecutionItem,
   type PitchSection,
+  pitchSlideKeys,
 } from "./pitch";
 import {
   breakLongWords,
@@ -699,6 +700,18 @@ describe("buildPitchDeck: the slides", () => {
     expect(
       deck.slides.every((slide) => !slide.overflow && slide.shrink === 0),
     ).toBe(true);
+  });
+});
+
+describe("pitchSlideKeys", () => {
+  test("names the slides of each deck in order, as their comments' keys use them", () => {
+    for (const variant of ["one", "five"] as const) {
+      expect(pitchSlideKeys(variant)).toEqual(
+        buildPitchDeck(input({ variant })).slides.map((slide) => slide.key),
+      );
+    }
+    expect(pitchSlideKeys("one")).toHaveLength(8);
+    expect(pitchSlideKeys("five")).toHaveLength(12);
   });
 });
 

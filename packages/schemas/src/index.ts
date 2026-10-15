@@ -1,5 +1,6 @@
 export * from "./accounts";
 export * from "./ai";
+export * from "./collaboration";
 export * from "./common";
 export * from "./decisions";
 export * from "./errors";

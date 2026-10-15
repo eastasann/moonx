@@ -2,9 +2,12 @@ import { afterAll, describe, expect, test } from "bun:test";
 import {
   accounts,
   assumptions,
+  changeHistory,
+  comments,
   competitors,
   costItems,
   evidenceLinks,
+  notifications,
   researchLogEntries,
   risks,
   validationAnswers,
@@ -203,6 +206,84 @@ async function newPlan(team: Team) {
   await fixtures.createDecision(idea, team.callers.owner.id);
   const plan = await fixtures.createPlan(idea.id, team.callers.owner.id);
   return { idea, plan };
+}
+
+/** A comment by `authorId` on the idea `ideaId`, made straight in the database. */
+async function newComment(
+  workspaceId: string,
+  ideaId: string,
+  authorId: string,
+) {
+  const [comment] = await db
+    .insert(comments)
+    .values({
+      workspaceId,
+      containerType: "idea",
+      containerId: ideaId,
+      targetType: "idea",
+      targetId: ideaId,
+      authorId,
+      body: "A thought",
+    })
+    .returning();
+  if (comment === undefined) throw new Error("no comment");
+  return comment;
+}
+
+/** The history row of a first answer to V.01.WHO, which H2 and H3 can revert. */
+async function newAnswerChange(
+  team: Team,
+  validationId: string,
+  batchId: string | null,
+) {
+  const [entry] = await db
+    .insert(changeHistory)
+    .values({
+      workspaceId: team.workspaceId,
+      containerType: "validation",
+      containerId: validationId,
+      sectionKey: "01",
+      targetType: "validation_answer",
+      targetId: validationId,
+      targetKey: "V.01.WHO",
+      action: "create",
+      before: null,
+      after: { text: "Offices", fau: null, confidence: null, evidenceIds: [] },
+      source: batchId === null ? "manual" : "ai_import",
+      batchId,
+      changedById: team.callers.owner.id,
+    })
+    .returning();
+  if (entry === undefined) throw new Error("no history row");
+  return entry;
+}
+
+/** The history row of a first answer to SA.WHY.1 of `userId`'s self-analysis. */
+async function newSelfAnalysisChange(
+  userId: string,
+  selfAnalysisId: string,
+  batchId: string | null,
+) {
+  const [entry] = await db
+    .insert(changeHistory)
+    .values({
+      ownerUserId: userId,
+      containerType: "self_analysis",
+      containerId: selfAnalysisId,
+      sectionKey: "WHY",
+      targetType: "self_analysis_answer",
+      targetId: selfAnalysisId,
+      targetKey: "SA.WHY.1",
+      action: "create",
+      before: null,
+      after: { text: "To stay home", amount: null },
+      source: batchId === null ? "manual" : "ai_import",
+      batchId,
+      changedById: userId,
+    })
+    .returning();
+  if (entry === undefined) throw new Error("no history row");
+  return entry;
 }
 
 /** The caller's own self-analysis, made straight in the database as S1 GET would. */
@@ -1538,6 +1619,284 @@ const ROWS: Row[] = [
       });
     },
     expected: signedInOnly(200),
+  },
+  {
+    api: "L1",
+    routes: {
+      "GET /api/v1/workspaces/:workspaceId/decision-log": "scoped",
+    },
+    call: (caller, { workspaceId }) =>
+      request("GET", `/api/v1/workspaces/${workspaceId}/decision-log`, caller),
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "L2",
+    routes: { "GET /api/v1/decision-log/:entryId": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      const entry = await fixtures.createDecision(idea, team.callers.owner.id);
+      return request("GET", `/api/v1/decision-log/${entry.id}`, caller);
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "C1 GET",
+    routes: { "GET /api/v1/comments": "located" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request(
+        "GET",
+        `/api/v1/comments?workspaceId=${team.workspaceId}&targetType=idea&targetId=${idea.id}`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "C1 GET (a shared self-analysis)",
+    routes: { "GET /api/v1/comments": "located" },
+    async call(caller, { workspaceId }) {
+      const author = await newMember(workspaceId);
+      const analysis = await fixtures.createSelfAnalysis(author.id, [
+        workspaceId,
+      ]);
+      return request(
+        "GET",
+        `/api/v1/comments?workspaceId=${workspaceId}&containerType=self_analysis&containerId=${analysis.id}`,
+        caller,
+      );
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "C1 POST",
+    routes: { "POST /api/v1/comments": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request("POST", "/api/v1/comments", caller, {
+        workspaceId: team.workspaceId,
+        target: { type: "idea", id: idea.id },
+        body: "Looks good",
+        mentionUserIds: [],
+      });
+    },
+    expected: members(201, 201, 201),
+  },
+  {
+    api: "C1 POST (a shared self-analysis)",
+    routes: { "POST /api/v1/comments": "scoped" },
+    async call(caller, { workspaceId }) {
+      const author = await newMember(workspaceId);
+      const analysis = await fixtures.createSelfAnalysis(author.id, [
+        workspaceId,
+      ]);
+      return request("POST", "/api/v1/comments", caller, {
+        workspaceId,
+        target: {
+          type: "self_analysis_answer",
+          id: analysis.id,
+          key: "SA.WHY.1",
+        },
+        body: "Strong",
+        mentionUserIds: [],
+      });
+    },
+    expected: members(403, 201, 201),
+  },
+  ...(["PATCH", "DELETE"] as const).map(
+    (method): Row => ({
+      api: `C2 ${method}`,
+      routes: { [`${method} /api/v1/comments/:commentId`]: "scoped" as const },
+      async call(caller, team) {
+        const { idea } = await newIdea(team);
+        const comment = await newComment(team.workspaceId, idea.id, caller.id);
+        return request(
+          method,
+          `/api/v1/comments/${comment.id}`,
+          caller,
+          method === "PATCH"
+            ? { body: "Edited", mentionUserIds: [] }
+            : undefined,
+        );
+      },
+      expected:
+        method === "PATCH" ? members(200, 200, 200) : members(204, 204, 204),
+    }),
+  ),
+  ...(["POST", "DELETE"] as const).flatMap((method): Row[] => {
+    const routes = {
+      [`${method} /api/v1/comments/:commentId/resolve`]: "scoped" as const,
+    };
+    return [
+      {
+        api: `C3 ${method}`,
+        routes,
+        async call(caller, team) {
+          const { idea } = await newIdea(team);
+          const comment = await newComment(
+            team.workspaceId,
+            idea.id,
+            team.callers.owner.id,
+          );
+          return request(
+            method,
+            `/api/v1/comments/${comment.id}/resolve`,
+            caller,
+          );
+        },
+        expected: members(200, 200, 200),
+      },
+      {
+        api: `C3 ${method} (a shared self-analysis)`,
+        routes,
+        async call(caller, { workspaceId }) {
+          const author = await newMember(workspaceId);
+          const analysis = await fixtures.createSelfAnalysis(author.id, [
+            workspaceId,
+          ]);
+          const [comment] = await db
+            .insert(comments)
+            .values({
+              workspaceId,
+              containerType: "self_analysis",
+              containerId: analysis.id,
+              sectionKey: "WHY",
+              targetType: "self_analysis_answer",
+              targetId: analysis.id,
+              targetKey: "SA.WHY.1",
+              authorId: author.id,
+              body: "Mine",
+            })
+            .returning();
+          return request(
+            method,
+            `/api/v1/comments/${comment?.id}/resolve`,
+            caller,
+          );
+        },
+        expected: members(403, 200, 200),
+      },
+    ];
+  }),
+  {
+    api: "H1",
+    routes: { "GET /api/v1/history": "located" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request(
+        "GET",
+        `/api/v1/history?containerType=idea&containerId=${idea.id}`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "H1 (own self-analysis)",
+    routes: { "GET /api/v1/history": "located" },
+    async call(caller) {
+      const analysis = await ownSelfAnalysis(caller);
+      return request(
+        "GET",
+        `/api/v1/history?containerType=self_analysis&containerId=${analysis.id}`,
+        caller,
+      );
+    },
+    expected: signedInOnly(200),
+  },
+  {
+    api: "H2",
+    routes: { "POST /api/v1/history/:entryId/revert": "located" },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      const entry = await newAnswerChange(team, validation.id, null);
+      return request("POST", `/api/v1/history/${entry.id}/revert`, caller);
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "H2 (own self-analysis)",
+    routes: { "POST /api/v1/history/:entryId/revert": "located" },
+    async call(caller) {
+      const analysis = await ownSelfAnalysis(caller);
+      const entry = await newSelfAnalysisChange(caller.id, analysis.id, null);
+      return request("POST", `/api/v1/history/${entry.id}/revert`, caller);
+    },
+    expected: signedInOnly(200),
+  },
+  {
+    api: "H3",
+    routes: { "POST /api/v1/history/batches/:batchId/revert": "located" },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      const batchId = crypto.randomUUID();
+      await newAnswerChange(team, validation.id, batchId);
+      return request(
+        "POST",
+        `/api/v1/history/batches/${batchId}/revert`,
+        caller,
+      );
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "H3 (own self-analysis)",
+    routes: { "POST /api/v1/history/batches/:batchId/revert": "located" },
+    async call(caller) {
+      const analysis = await ownSelfAnalysis(caller);
+      const batchId = crypto.randomUUID();
+      await newSelfAnalysisChange(caller.id, analysis.id, batchId);
+      return request(
+        "POST",
+        `/api/v1/history/batches/${batchId}/revert`,
+        caller,
+      );
+    },
+    expected: signedInOnly(200),
+  },
+  {
+    api: "N1",
+    routes: { "GET /api/v1/notifications": "signedIn" },
+    call: (caller) => request("GET", "/api/v1/notifications", caller),
+    expected: signedInOnly(200),
+  },
+  {
+    api: "N2",
+    routes: { "GET /api/v1/notifications/unread-count": "signedIn" },
+    call: (caller) =>
+      request("GET", "/api/v1/notifications/unread-count", caller),
+    expected: signedInOnly(200),
+  },
+  {
+    api: "N3",
+    routes: { "POST /api/v1/notifications/:id/read": "signedIn" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      const entry = await fixtures.createDecision(idea, team.callers.owner.id);
+      const [notification] = await db
+        .insert(notifications)
+        .values({
+          userId: caller.id,
+          workspaceId: team.workspaceId,
+          kind: "decision",
+          actorId: team.callers.owner.id,
+          decisionLogEntryId: entry.id,
+          link: { screen: 13, workspaceId: team.workspaceId, ideaId: idea.id },
+        })
+        .returning();
+      return request(
+        "POST",
+        `/api/v1/notifications/${notification?.id}/read`,
+        caller,
+      );
+    },
+    expected: signedInOnly(204),
+  },
+  {
+    api: "N3 (all)",
+    routes: { "POST /api/v1/notifications/read-all": "signedIn" },
+    call: (caller) => request("POST", "/api/v1/notifications/read-all", caller),
+    expected: signedInOnly(204),
   },
 ];
 

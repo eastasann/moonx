@@ -1535,41 +1535,47 @@ interface HistoryEntry {
   source: HistorySource;   // 作成の取り消しの行は source が revert、action が delete、target.type が idea か business_plan の組み合わせ。画面はこの組み合わせで「作成の取り消し」と出す（design-spec 6.0.5）
   before: unknown | null; after: unknown | null;   // 本文・数字・F/A/U・確信度・根拠の id の一覧など（差分の強調はクライアント）
   changedBy: UserRef; changedAt: DateTime;
-  revertible: boolean;   // 呼んだ人がこの行を戻せる（Viewer・アーカイブ済みは false）。`template_version` の行は H2 では戻せないが、H3 で操作全体を戻せるときは true。`duplicate`・`plan_draft` の行は作成の取り消し（H3）の対象で、条件を満たすかは確かめずに true（呼んだ人の権限だけで決める）。作成の取り消しで書いた行（下の「作成の取り消し」）は false
+  revertible: boolean;   // 呼んだ人がこの行を戻せる（Viewer・アーカイブ済みは false）。`template_version` の行は H2 では戻せないが、H3 で操作全体を戻せるとき（その移行がまだ戻されていない、または戻したことが取り消されている）は true。`duplicate`・`plan_draft` の行は作成の取り消し（H3）の対象で、条件を満たすかは確かめずに true（呼んだ人の権限だけで決める）。作成の取り消しで書いた行（下の「作成の取り消し」）は false
 }
 interface Notification {
   id: UUID; kind: "mention" | "comment" | "decision";
   workspace: { id: UUID; name: string }; actor: UserRef | null;
-  title: string;          // 表示用の短い文（英語。どこでを含める。例: "Paolo mentioned you on WHO · Piaya Gift Box Delivery"）
-  excerpt: string | null; // コメント・メンションは本文の冒頭、判定・Go / No-Go は理由の冒頭。版の保存は null（design-spec 6.15）
+  title: string;          // 表示用の短い文（英語。どこでを含める。例: "Paolo Gonzaga mentioned you on 01 WHO · Piaya Gift Box Delivery"）。下の「通知の文」
+  excerpt: string | null; // コメント・メンションは本文の冒頭、判定・Go / No-Go は理由の冒頭（EXCERPT_MAX の 200 文字。切ったときは末尾の1文字を「…」）。今の本文から作り、削除したコメントは null。版の保存は null（design-spec 6.15）。accessible が false なら null
   link: LinkTarget;       // 判定は 13、Go / No-Go と版の保存は 20。コメント・メンションは、対象の項目を出す画面（6.3「画面と節の対応」。自己分析の回答は、持ち主には 11、それ以外の人には 12）を `panel: "comments"` と `target` を付けて開く
-  accessible: boolean;    // 外れた・権限がなくなったら false（「You no longer have access」）
+  accessible: boolean;    // 外れた・権限がなくなったら false（「You no longer have access」）。ワークスペースのメンバーでなくなったとき。自己分析へのコメントは、そのワークスペースへの共有が外れたとき（持ち主でも）と、持ち主以外が Owner / Member でなくなったとき
   readAt: DateTime | null; createdAt: DateTime;
+}
+interface RevertedItem {   // H2 の後の項目
+  value: unknown | null;   // 変更履歴の before / after と同じ形（形の正は packages/db/src/history-values.ts）。削除した行は null
+  deleted: boolean; lockVersion: number; updatedAt: DateTime | null; updatedBy: UserRef | null;
 }
 ```
 
+**通知の文（`Notification.title`）:** 英語の文言はカタログ `notifications`。「{行った人の表示名} mentioned you on {どこで}」「… commented on {どこで}」、判定と Go / No-Go は「… recorded {値} on {どこで}」、版の保存は「… saved the version “{版の名前}” of {どこで}」。どこでは、項目は「{項目の名前} · {アイデア名}」（項目の名前は `HistoryEntry.label` と同じ。プランの項目は「{項目の名前} · {案名} · {アイデア名}」）、アイデアへのコメントはアイデア名、自己分析の回答は「{項目の名前} · your self-analysis」（持ち主）か「{項目の名前} · {持ち主の表示名}'s self-analysis」、判定はアイデア名、Go / No-Go と版の保存は「{案名} · {アイデア名}」。名前は読んだ時点のもの。`accessible` が false の通知は、どこでと `excerpt` を出さず「{表示名} mentioned you」「… commented」「… recorded a decision」「… recorded a Go / No-Go」「… saved a version」だけにする（読めなくなった項目の今の名前や、編集した後の本文を見せない。7.1「実装」の「クエリは必ずそのワークスペースで絞る」）。
+
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| L1 | `?kind=&ideaId=&planId=&recordedBy=&from=&to=&cursor=&limit=` | `200 Page<DecisionLogSummary>` | 新しい順 |
+| L1 | `?kind=&ideaId=&planId=&recordedBy=&from=&to=&cursor=&limit=` | `200 Page<DecisionLogSummary>` | 新しい順（記録した時刻、同じなら行を作った時刻の新しい順）。`from`・`to` は日付だけの値で、呼んだ人の `users.timezone` での記録の日付で絞り、両端を含む（7 の期間の絞り込み。表示の日付と同じ暦で選ぶため）。アーカイブしたアイデア・プランの行も返す |
 | L2 | — | `200 DecisionLogEntry` | 更新・削除の API は無い |
-| C1 GET | 項目: `?targetType=&targetId=&targetKey=&workspaceId=`。画面: `?containerType=&containerId=&sectionKeys=&workspaceId=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾） | `200 { threads: { root: Comment; replies: Comment[] }[]; unresolvedCount: number }` | 画面の指定では、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea`）をまとめて返す（ヘッダーの 💬 のパネル。`unresolvedCount` は解決していないスレッドの数で、💬 の件数に使う。design-spec 6.0.1・6.0.4）。自己分析の回答へのコメントは、共有先の Owner / Member には `workspaceId` のワークスペースの分だけ、本人には今の共有先の分を全部返す（共有をやめたワークスペースのコメントは、共有し直すまで返さない。design-spec 6.0.4。S2 の `commentCounts` と同じ範囲）。削除した行へのコメントは返さない |
-| C1 POST | `{ workspaceId: UUID; target: TargetRef; parentId?: UUID; body: string; mentionUserIds: UUID[] }`（`body` の長さは design-spec 6.0.8） | `201 Comment` | 返信は1段まで（`422 REPLY_DEPTH`）。メンションできない人は `422 INVALID_MENTION`。対象から画面（`container_type`・`container_id`・`section_key`）を決めて保存する。通知（`mention` / `comment`）を design-spec 6.15 の条件で作る（プランの項目へのコメントは、プランを作った人とアイデアを提案した人の両方。「自分がコメントしたスレッド」の人は、消したコメントの書き手も含む。受け取る人が重なれば1人に1件で、メンションされた人には `mention` の1件。対象の項目を読めない人と書いた本人には作らない） |
-| C2 PATCH | `{ body: string; mentionUserIds: UUID[] }` | `200 Comment` | 新しくメンションした人にだけ通知する |
-| C2 DELETE | — | `204` | 「deleted」として残す |
-| C3 | — | `200 Comment` | スレッドの最初のコメントだけ |
-| H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKeys=&cursor=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾。省くと画面全体） | `200 Page<HistoryEntry>` | 新しい順。`containerType=idea`（13）は、アイデア自身の行に加え、そのアイデアの検証のテンプレートの版の行（テンプレートの移行。design-spec 6.0.7）と、作成の取り消しの行も返す。項目の指定と `sectionKeys` の指定では、テンプレートの版の行を返さない |
-| H2 | — | `200 { entry: HistoryEntry; target: unknown }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す。衝突の検査はしない（戻すのは意図した上書き）。`template_version` の行は `422 VALIDATION_FAILED`（H3 で戻す）。作成の取り消しで書いた行も `422 VALIDATION_FAILED`（取り消したものは戻さない）。自己分析の回答を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落） |
-| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 ALREADY_REVERTED`。複製（`duplicate`）と下書き作成（`plan_draft`）は、戻すのではなく作ったものを論理削除する「作成の取り消し」になる（下の「作成の取り消し」）。自己分析の操作を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落） |
+| C1 GET | 項目: `?targetType=&targetId=&targetKey=&workspaceId=`。画面: `?containerType=&containerId=&sectionKeys=&workspaceId=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾） | `200 { threads: { root: Comment; replies: Comment[] }[]; unresolvedCount: number }` | 画面の指定では、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea`）をまとめて返す（ヘッダーの 💬 のパネル。`unresolvedCount` は解決していないスレッドの数で、💬 の件数に使う。design-spec 6.0.1・6.0.4）。自己分析の回答へのコメントは、共有先の Owner / Member には `workspaceId` のワークスペースの分だけ、本人には今の共有先の分を全部返す（共有をやめたワークスペースのコメントは、共有し直すまで返さない。design-spec 6.0.4。S2 の `commentCounts` と同じ範囲）。削除した行へのコメントと、テンプレートの移行で隠れた設問へのコメント（design-spec 6.0.7）は返さない。スレッドは最初のコメントの古い順、返信も古い順。削除したコメントは `deleted` として本文を空、`mentions` を空にして返す（すべて削除したスレッドも残し、解決していなければ `unresolvedCount` に数える）。項目の指定で、削除した行・隠れた設問・無い項目は `404 NOT_FOUND`（`targetKey` の決まりは C1 POST）。`workspaceId` は見ているワークスペースで、ワークスペースの中の項目がそのワークスペースのものでなければ `404 NOT_FOUND`。自己分析の持ち主以外は、W8 と同じ順に、Viewer は `403 FORBIDDEN`、`workspaceId` に共有されていなければ `403 NOT_SHARED` |
+| C1 POST | `{ workspaceId: UUID; target: TargetRef; parentId?: UUID; body: string; mentionUserIds: UUID[] }`（`body` の長さは design-spec 6.0.8） | `201 Comment` | 返信は1段まで（`422 REPLY_DEPTH`）。メンションできない人は `422 INVALID_MENTION`。対象から画面（`container_type`・`container_id`・`section_key`）を決めて保存する。通知（`mention` / `comment`）を design-spec 6.15 の条件で作る（プランの項目へのコメントは、プランを作った人とアイデアを提案した人の両方。「自分がコメントしたスレッド」の人は、消したコメントの書き手も含む。受け取る人が重なれば1人に1件で、メンションされた人には `mention` の1件。対象の項目を読めない人と書いた本人には作らない）。`target.key` は回答・数字・スライド（`{版の種類}.{スライドのキー}`）で必須、行とアイデアは持たない（どちらも `422 VALIDATION_FAILED`。`business_plan`・`template_version` は対象にならない）。固定している版に無い設問、その版の種類に無いスライド、無い数字、削除した行は `404 NOT_FOUND`。本体の `workspaceId` が項目のワークスペースでなければ `404 NOT_FOUND`。`parentId` が同じ項目・同じワークスペースのコメントでなければ `422 VALIDATION_FAILED`（`details[0].path` は `parentId`）。`mentionUserIds` の重複は1人にまとめる。自己分析へのコメントは、そのワークスペースのメンバーの変更の lock を共有で取り、ロールと共有の行（`FOR SHARE`）を確かめ直してから書く（W3 の降格・S5 の共有の解除と行き違わない） |
+| C2 PATCH | `{ body: string; mentionUserIds: UUID[] }` | `200 Comment` | 本文とメンションを置き換える（どちらも変わらなければ何もせず、`editedAt` も変えない）。新しくメンションした人にだけ通知する。削除したコメントは `404 NOT_FOUND` |
+| C2 DELETE | — | `204` | 「deleted」として残す。本文を空にしてメンションを外す（消した本文を残さない）。削除済みをもう一度消しても `204`。C2 は、書いた人なら今のロールにかかわらずできる（7.1。自己分析へのコメントで、書いた後に Viewer になった人も）。自己分析へのコメントの C2・C3 は、C1 POST と同じくメンバーの変更の lock を共有で取り、所属（無ければ `403 NO_ACCESS`）と共有の行（`FOR SHARE`。無ければ `404 NOT_FOUND`）を確かめ直してから書く |
+| C3 | — | `200 Comment` | スレッドの最初のコメントだけ（返信は `422 VALIDATION_FAILED`、`details[0].path` は `commentId`）。すでにその状態なら何も変えない。自己分析へのコメントは Viewer なら `403 FORBIDDEN`（ロックの後にも確かめる） |
+| H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKeys=&cursor=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾。省くと画面全体） | `200 Page<HistoryEntry>` | 新しい順。`containerType=idea`（13）は、アイデア自身の行に加え、そのアイデアの検証のテンプレートの版の行（テンプレートの移行。design-spec 6.0.7）と、作成の取り消しの行も返す。項目の指定と `sectionKeys` の指定では、テンプレートの版の行を返さない（項目に `template_version` を指定すると空の一覧）。同じ時刻の行は id の降順。項目の指定は削除した行の履歴も返す（削除を取り消すため）。`limit` も受け付ける（5.1「一覧」）。自己分析の履歴は持ち主以外 `403 FORBIDDEN`（無い自己分析は `404 NOT_FOUND`） |
+| H2 | — | `200 { entry: HistoryEntry | null; target: RevertedItem }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す（`batchId` は持たず、`revertedFromId` は戻した元の行。削除した行を戻すと `action` は `restore` で `before` は null）。項目がすでにその状態なら何も書かず、`entry` は null（値を変えない保存と同じ。ADR-020）。衝突の検査はしない（戻すのは意図した上書き）。`template_version` の行は `422 VALIDATION_FAILED`（H3 で戻す）。作成の取り消しで書いた行も `422 VALIDATION_FAILED`（取り消したものは戻さない）。自己分析の回答を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落）。案の名前がほかの案で使われていれば `409 NAME_TAKEN`（P2 PATCH と同じ）。実行管理の担当が今は Owner / Member でなければ、W3 と同じくその人の表示名に置き換えて戻す。行が無くなっていれば `404 NOT_FOUND` |
+| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 ALREADY_REVERTED`。複製（`duplicate`）と下書き作成（`plan_draft`）は、戻すのではなく作ったものを論理削除する「作成の取り消し」になる（下の「作成の取り消し」）。自己分析の操作を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落）。各項目は、その操作の最初の行の `before` の状態に戻す（`before` が null の行は、一覧の行なら論理削除、回答・数字なら空にする。テンプレートの版は `before` の版に戻す）。戻した操作は `revert` の新しい `batchId` で書く。応答の `reverted` は戻した項目の数（すでに操作の前の状態だった項目は数えない）、`batchId` はその新しい `batchId`（H3 でさらに戻せる）。戻す項目が無ければ何も書かず、`reverted` は 0（このとき `batchId` の行は無く、元の操作は戻していない扱いのまま） |
 | N1 | `?filter=all|unread&cursor=&limit=` | `200 Page<Notification>` | ワークスペースをまたいで新しい順 |
 | N2 | — | `200 { total: number }` | クライアントは画面を開いたとき・前面に戻ったとき・60秒ごとに呼ぶ |
-| N3 | — | `204` | |
+| N3 | — | `204` | 自分の通知だけ。ほかの人の通知と無い id は `404 NOT_FOUND`（ほかの人の通知の有無を答えない）。既読をもう一度既読にしても `readAt` は変えない |
 
 **作成の取り消し（H3 の `duplicate` と `plan_draft`）:** 複製したアイデア、または下書きのプランを、作った操作の単位で取り消す（2026-10-03 のユーザーの決定）。作ったものは論理削除し、変更履歴は消さずに残す（2026-10-11 のユーザーの決定）。一般の削除ではない（design-spec 6.8 の「アイデア・プランの削除は初期リリースでは作らない」は変えない）。
 - 条件: 作ったあとに何も足されていないこと。次のどれかがあれば、何も変えずに `409 UNDO_BLOCKED` を返す（文言は design-spec 6.0.5）。(1) その操作の行以外の変更履歴（作ったアイデアなら `idea`・`validation` の画面、プランなら `business_plan` の画面。AI 取り込み・移行・元に戻すを含む）。(2) 作ったものの項目（アイデア・検証・各行、プラン・実行管理の項目）へのコメント（消したコメントを含む）。(3) 決定ログの行（アイデアの判定、プランの Go / No-Go と版の保存）。(4) 作ったアイデアに付いたプラン、作ったプランに保存した版。(5) 作ったアイデアを複製元にしたアイデア。作ったあとの仕事を巻き込んで隠さないための条件で、足されたものを個別に片づける処理は持たない。
 - 論理削除するもの: 作ったアイデア（`ideas.deleted_at`）、または作ったプラン（`business_plans.deleted_at`）。子の行（検証・回答・調査ログ・競合・前提・リスク・費用行・数字・根拠の紐づけ、プランの回答・実行管理の項目）は変えずに残す。親が論理削除されたものは、どの API でも無いものとして扱う（5.1）。論理削除したアイデア・プランを戻す操作は作らない。
-- 履歴の扱い: 取り消しは `withHistory` を通して書く（ADR-020 の例外を作らない）。書く先は元の側の画面で、複製はコピー元のアイデア、下書き作成はそのプランのアイデア（どちらも `containerType = idea`）。対象は作ったアイデア（`idea`）かプラン（`business_plan`）、`action` は `delete`、`source` は `revert`、`revertedFromId` は取り消した操作の作成の行。この行は H2 で戻せない（`revertible: false`）。その操作の `batchId` の行はそのまま残る。同じ `batchId` をもう一度呼ぶと `409 ALREADY_REVERTED`。
+- 履歴の扱い: 取り消しは `withHistory` を通して書く（ADR-020 の例外を作らない）。書く先は元の側の画面で、複製はコピー元のアイデア、下書き作成はそのプランのアイデア（どちらも `containerType = idea`）。対象は作ったアイデア（`idea`）かプラン（`business_plan`）、`action` は `delete`、`source` は `revert`、`revertedFromId` は取り消した操作の作成の行。この行は `batchId` を持たず（H3 で戻せる操作ではない）、H2 でも戻せない（`revertible: false`）。その操作の `batchId` の行はそのまま残る。同じ `batchId` をもう一度呼ぶと `409 ALREADY_REVERTED`。
 - 応答: `reverted` は取り消した操作の履歴の行の数（行は消さない）、`batchId` は取り消した操作の `batchId`。
-- 実行: 1つのトランザクションで、`batchId` の advisory lock、アイデアの行（プランの取り消しはそのプランの行も）の `FOR UPDATE NOWAIT`、条件の確認、論理削除と履歴の書き込みの順に行う。ロックを持ったまま別のロックを待たないので、進行中の書き込みがデッドロックの犠牲になることはない。ほかの書き込みがその行を持っていれば、取り消しはすぐに `409 BUSY`（文言は design-spec 6.0.5）を返す。取り消しの完了を待っていた書き込みは、`resolveScope` と書き込みの最後の確認（アーカイブの確認と同じ場所。7.1）で親の `deleted_at` を見て `404 NOT_FOUND` になり、足されたものは残らない。ワークスペースの最終更新を更新する。
+- 実行: 1つのトランザクションで、`batchId` の advisory lock、アイデアの行（プランの取り消しはそのプランの行も）の `FOR UPDATE NOWAIT`（複製の取り消しは、取り消しを書くコピー元のアイデアの行も `FOR NO KEY UPDATE NOWAIT` で取る）、条件の確認、論理削除と履歴の書き込みの順に行う。ロックを持ったまま別のロックを待たないので、進行中の書き込みがデッドロックの犠牲になることはない。ほかの書き込みがその行を持っていれば、取り消しはすぐに `409 BUSY`（文言は design-spec 6.0.5）を返す。取り消しの完了を待っていた書き込みは、`resolveScope` と書き込みの最後の確認（アーカイブの確認と同じ場所。7.1）で親の `deleted_at` を見て `404 NOT_FOUND` になり、足されたものは残らない。履歴を書いた元の側のアイデアの `last_activity_at` と、ワークスペースの最終更新を更新する（7.1「実装」）。
 - 権限: 戻す操作の `need` と同じ（Owner / Member。アーカイブ済みのアイデアの中身は `409 ARCHIVED`）。作ったアイデア自身がアーカイブ済みなら取り消せない。
 
 ### 5.12 テンプレートの移行（M8）
@@ -1577,7 +1583,7 @@ interface Notification {
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
 | T1 | `?targetType=self_analysis|validation|business_plan&targetId=` | `200 { from: { versionNumber: number }; to: { versionId: UUID; versionNumber: number }; carried: number; hiddenQuestions: { questionKey: string; title: string; hasAnswer: boolean }[]; addedQuestions: number; addedCostRows: string[] }` | 新しい版が無ければ `409 ALREADY_LATEST` |
-| T2 | `{ targetType; targetId; toVersionId: UUID }` | `200 { batchId: UUID; template: TemplateRef }` | design-spec 6.0.7 の表のとおり移す。履歴 `template_migration`（1つの `batchId`。H3 で戻せる）。費用の初期行: 新しい版の初期行のキー（`template_key`）について、そのキーの行が無ければ足す。そのキーの行が論理削除されていて、その削除が移行を戻した操作（H3。`source = revert` で、`revertedFromId` が `template_migration` の行）によるものなら、新しい行として足し直す。利用者が消した行（`source = manual` の `delete`）しか無ければ足さない（design-spec 6.0.7）。移行を H3 で戻すと、その移行で足した費用の行は論理削除する。自己分析の移行は、S3 などの保存と同じく `lockActiveCaller` の後に自己分析の行をロックしてから版を替え、状態を進める（5.8 の表の下の段落。保存の途中で固定している版が変わらないようにする。隠れていた設問の回答が新しい版で出ると、回答済みに入る） |
+| T2 | `{ targetType; targetId; toVersionId: UUID }` | `200 { batchId: UUID; template: TemplateRef }` | design-spec 6.0.7 の表のとおり移す。履歴 `template_migration`（1つの `batchId`。H3 で戻せる）。固定している版の行（`template_version`）の `before`・`after` は `{ versionId, versionNumber }`（形の正は `packages/db/src/history-values.ts` の `templateVersionContent`）。費用の初期行: 新しい版の初期行のキー（`template_key`）について、そのキーの行が無ければ足す。そのキーの行が論理削除されていて、その削除が移行を戻した操作（H3。`source = revert` で、`revertedFromId` が `template_migration` の行）によるものなら、新しい行として足し直す。利用者が消した行（`source = manual` の `delete`）しか無ければ足さない（design-spec 6.0.7）。移行を H3 で戻すと、その移行で足した費用の行は論理削除する。自己分析の移行は、S3 などの保存と同じく `lockActiveCaller` の後に自己分析の行をロックしてから版を替え、状態を進める（5.8 の表の下の段落。保存の途中で固定している版が変わらないようにする。隠れていた設問の回答が新しい版で出ると、回答済みに入る） |
 
 ### 5.13 運営者
 

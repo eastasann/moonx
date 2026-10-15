@@ -8,6 +8,7 @@ import {
   fauSchema,
   queryBooleanSchema,
   queryIntSchema,
+  queryListSchema,
   questionOptionsSchema,
   templateKindSchema,
   uuidSchema,
@@ -24,19 +25,6 @@ export const AI_EXPORT_FORMAT = "moonx-export";
 export const AI_REPLY_FORMAT = "moonx-reply";
 /** `version` of both formats. */
 export const AI_FORMAT_VERSION = 1;
-
-/**
- * A comma-separated list in a query string ("01,02"); empty is the empty list. Elysia
- * hands over a parameter it reads as an array (repeated, or split at its commas) as
- * an array, which reads the same.
- */
-const queryListSchema = z
-  .union([z.string(), z.array(z.string())])
-  .transform((value) =>
-    (Array.isArray(value) ? value : [value]).flatMap((part) =>
-      part === "" ? [] : part.split(","),
-    ),
-  );
 
 /**
  * The query of X1. Without `sections`, `items` or `part` the scope is the whole

@@ -1,15 +1,22 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { connectDatabase, notifications } from "@moonx/db";
+import {
+  changeHistory,
+  connectDatabase,
+  notifications,
+  validationAnswers,
+} from "@moonx/db";
 import {
   BCDX_WORKSPACE_ID,
   SEED_PASSWORD,
   seedDatabase,
   seedId,
+  selfAnalysisId,
   userId,
 } from "@moonx/db/seed";
 import { prepareTestDatabase, testDatabaseName } from "@moonx/db/test-database";
 import {
   assumptionListSchema,
+  commentListSchema,
   competitorListSchema,
   costsSchema,
   decisionContextSchema,
@@ -17,7 +24,11 @@ import {
   economicsSchema,
   errorBodySchema,
   executionListSchema,
+  historyBatchRevertResultSchema,
+  historyPageSchema,
+  historyRevertResultSchema,
   memberSelfAnalysesSchema,
+  notificationPageSchema,
   pitchDeckSchema,
   planHomeSchema,
   planItemSchema,
@@ -27,9 +38,10 @@ import {
   selfAnalysisHomeSchema,
   selfAnalysisSectionSchema,
   sharedSelfAnalysisSchema,
+  unreadCountSchema,
   validationHomeSchema,
 } from "@moonx/schemas";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { buildTestApp, uniqueIp } from "./test-app";
 import { apiRequest, cookiesOf } from "./test-fixtures";
@@ -568,4 +580,180 @@ describe("the demo data", () => {
       await task.destroy();
     }
   }, 60_000);
+});
+
+// SDD 5.11 on the demo data: the comments, notifications and history of 8.4, and H2 and
+// H3 on them. These change the data, so they run after everything above.
+describe("comments, notifications and history of the demo data", () => {
+  const HEALTH_BOWL_VALIDATION = seedId("validation", "health-bowl");
+  const call = async (
+    method: "GET" | "POST",
+    path: string,
+    email = "ana@bcdx.example",
+  ) => app.handle(apiRequest(method, path, { cookie: await cookieOf(email) }));
+
+  test("Kenji has his two mentions unread, and Ana reads Paolo's comment on her self-analysis", async () => {
+    const count = await call(
+      "GET",
+      "/api/v1/notifications/unread-count",
+      "kenji@bcdx.example",
+    );
+    expect(unreadCountSchema.parse(await count.json()).total).toBe(2);
+    const inbox = notificationPageSchema.parse(
+      await (
+        await call(
+          "GET",
+          "/api/v1/notifications?filter=unread",
+          "kenji@bcdx.example",
+        )
+      ).json(),
+    );
+    expect(inbox.items.map((item) => [item.kind, item.title])).toEqual([
+      [
+        "mention",
+        "Ana Villanueva mentioned you on Costs · Permits / Registration · Bacolod Health Bowl",
+      ],
+      [
+        "mention",
+        "Ana Villanueva mentioned you on 02 SHARE · Piaya Gift Box Delivery",
+      ],
+    ]);
+    const comments = commentListSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/comments?workspaceId=${BCDX_WORKSPACE_ID}&containerType=self_analysis&containerId=${selfAnalysisId("ana")}&sectionKeys=WHY`,
+        )
+      ).json(),
+    );
+    expect(comments.threads.map((thread) => thread.root.author.id)).toEqual([
+      userId("paolo"),
+    ]);
+  });
+
+  test("H2 brings Health Bowl's deleted research log back, and its Fact has evidence again", async () => {
+    const [deletion] = await database.db
+      .select()
+      .from(changeHistory)
+      .where(
+        and(
+          eq(
+            changeHistory.targetId,
+            seedId("research_log", "health-bowl", "clinic-report"),
+          ),
+          eq(changeHistory.action, "delete"),
+        ),
+      );
+    const response = await call(
+      "POST",
+      `/api/v1/history/${deletion?.id}/revert`,
+      "kenji@bcdx.example",
+    );
+    expect(response.status).toBe(200);
+    expect(
+      historyRevertResultSchema.parse(await response.json()).entry,
+    ).toMatchObject({
+      action: "restore",
+      source: "revert",
+    });
+    const home = validationHomeSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/ideas/${seedId("idea", "health-bowl")}/validation`,
+        )
+      ).json(),
+    );
+    expect(home.fau.factNoEvidence).toBe(0);
+  });
+
+  test("H3 reverts Health Bowl's AI import once, and the revert can be undone", async () => {
+    const batch = seedId("batch", "health-bowl/ai-import");
+    const response = await call(
+      "POST",
+      `/api/v1/history/batches/${batch}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(response.status).toBe(200);
+    const result = historyBatchRevertResultSchema.parse(await response.json());
+    expect(result.reverted).toBe(3);
+    const [behavior] = await database.db
+      .select()
+      .from(validationAnswers)
+      .where(
+        and(
+          eq(validationAnswers.validationId, HEALTH_BOWL_VALIDATION),
+          eq(validationAnswers.questionKey, "V.01.BEHAVIOR"),
+        ),
+      );
+    expect(behavior).toMatchObject({
+      text: "Carinderia or food court.",
+      fau: "assumption",
+      confidence: "medium",
+    });
+    const again = await call(
+      "POST",
+      `/api/v1/history/batches/${batch}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(again.status).toBe(409);
+    expect(errorBodySchema.parse(await again.json()).error.code).toBe(
+      "ALREADY_REVERTED",
+    );
+    const redo = await call(
+      "POST",
+      `/api/v1/history/batches/${result.batchId}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(redo.status).toBe(200);
+  });
+
+  test("the Corporate copy cannot be undone, Piaya's Plan B draft can, once", async () => {
+    const copy = await call(
+      "POST",
+      `/api/v1/history/batches/${seedId("batch", "duplicate/corporate")}/revert`,
+      "kenji@bcdx.example",
+    );
+    expect(copy.status).toBe(409);
+    expect(errorBodySchema.parse(await copy.json()).error.code).toBe(
+      "UNDO_BLOCKED",
+    );
+    const draft = seedId("batch", "plan-draft/piaya/b");
+    const undone = await call(
+      "POST",
+      `/api/v1/history/batches/${draft}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(undone.status).toBe(200);
+    expect(
+      historyBatchRevertResultSchema.parse(await undone.json()).batchId,
+    ).toBe(draft);
+    const plans = planListSchema.parse(
+      await (await call("GET", `/api/v1/ideas/${PIAYA}/plans`)).json(),
+    ).items;
+    expect(plans.map((plan) => plan.name)).not.toContain("Plan B");
+    const onPiaya = historyPageSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/history?containerType=idea&containerId=${PIAYA}`,
+        )
+      ).json(),
+    );
+    expect(onPiaya.items[0]).toMatchObject({
+      target: { type: "business_plan", id: seedId("plan", "piaya", "b") },
+      label: "Plan B",
+      action: "delete",
+      revertible: false,
+    });
+    const twice = await call(
+      "POST",
+      `/api/v1/history/batches/${draft}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(twice.status).toBe(409);
+    expect(errorBodySchema.parse(await twice.json()).error.code).toBe(
+      "ALREADY_REVERTED",
+    );
+  });
 });

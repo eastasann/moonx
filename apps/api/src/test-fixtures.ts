@@ -63,14 +63,21 @@ const BCDX_FILES = {
   ),
 } as const;
 
-/** The published BCDX versions, each made once per process however many ask at once. */
-const bcdxVersions = new Map<
-  keyof typeof BCDX_FILES,
-  Promise<typeof templateVersions.$inferSelect>
+/**
+ * The published BCDX versions of each database, each made once per process however many
+ * ask at once. Keyed by the connection: a test file on a database of its own (templates
+ * change there) must not get another database's rows.
+ */
+const bcdxVersionsOf = new WeakMap<
+  Database,
+  Map<keyof typeof BCDX_FILES, Promise<typeof templateVersions.$inferSelect>>
 >();
 
 /** The fixtures, bound to the test database. */
 export function testFixtures(db: Database) {
+  const bcdxVersions = bcdxVersionsOf.get(db) ?? new Map();
+  bcdxVersionsOf.set(db, bcdxVersions);
+
   /** A user who signs in with {@link TEST_PASSWORD}, as U5 and the seed create them. */
   async function createUser(
     options: {

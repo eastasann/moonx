@@ -135,15 +135,19 @@ export async function advisoryLock(
   );
 }
 
+/** The advisory lock of `userId`'s account, which {@link lockActiveCaller} takes. */
+export const userLockKey = (userId: string) => `moonx:user:${userId}`;
+
 /**
  * Serializes the caller's own writes that leave something of theirs behind (a
  * membership, an invitation they send, their profile, photo, password or
- * self-analysis) with the deletion of their account (U7), which holds the same lock
- * exclusively: each runs whole before the other starts. A write that waited for U7
- * then finds the account gone and is refused, as a request of a deleted user is (SDD
- * 7.1「停止・削除したユーザー」); one that ran first leaves what U7 then deletes or
- * revokes. Writes hold it shared, so they do not wait for each other, except those that
- * must also run one at a time per user (U8). Take it before any other lock.
+ * self-analysis) with the deletion of their account (U7) and its suspension (AD8),
+ * which hold the same lock exclusively: each runs whole before the other starts. A
+ * write that waited for U7 then finds the account gone and is refused, as a request of
+ * a deleted user is (SDD 7.1「停止・削除したユーザー」); one that ran first leaves what
+ * U7 then deletes or revokes. Writes hold it shared, so they do not wait for each
+ * other, except those that must also run one at a time per user (U8). Take it before
+ * any other lock.
  *
  * @throws {ApiError} UNAUTHENTICATED when the account is no longer active
  */
@@ -152,7 +156,7 @@ export async function lockActiveCaller(
   userId: string,
   mode: "exclusive" | "shared" = "shared",
 ): Promise<void> {
-  await advisoryLock(tx, `moonx:user:${userId}`, mode);
+  await advisoryLock(tx, userLockKey(userId), mode);
   const [user] = await tx
     .select({ status: users.status })
     .from(users)

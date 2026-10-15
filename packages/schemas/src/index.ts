@@ -1,4 +1,5 @@
 export * from "./accounts";
+export * from "./admin";
 export * from "./ai";
 export * from "./collaboration";
 export * from "./common";
@@ -11,6 +12,7 @@ export * from "./pitch";
 export * from "./plans";
 export * from "./self-analysis";
 export * from "./template-file";
+export * from "./templates";
 export * from "./validation";
 export * from "./worksheets";
 export * from "./workspaces";

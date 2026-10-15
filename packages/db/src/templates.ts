@@ -12,7 +12,7 @@ import {
   templateFileSchema,
 } from "@moonx/schemas";
 import { and, asc, desc, eq, lt } from "drizzle-orm";
-import type { PgInsertValue, PgTable } from "drizzle-orm/pg-core";
+import type { PgColumn, PgInsertValue, PgTable } from "drizzle-orm/pg-core";
 import type { Database, DatabaseTransaction } from "./client";
 import {
   templateCheckRules,
@@ -121,6 +121,41 @@ const lockTemplate = async (tx: DatabaseTransaction, kind: TemplateKind) => {
 };
 
 /**
+ * Inserts the draft version of `template`, which the caller has locked
+ * ({@link lockTemplate}): v1 when the template has no version, else the next number.
+ *
+ * @throws {TemplateError} DRAFT_EXISTS when the template already has a draft.
+ */
+const insertDraft = async (
+  tx: DatabaseTransaction,
+  template: { id: string; kind: TemplateKind },
+  draft: { id: string; aiPrompt: string },
+) => {
+  const versions = await tx
+    .select({
+      versionNumber: templateVersions.versionNumber,
+      status: templateVersions.status,
+    })
+    .from(templateVersions)
+    .where(eq(templateVersions.templateId, template.id));
+  if (versions.some((version) => version.status === "draft")) {
+    throw new TemplateError(
+      "DRAFT_EXISTS",
+      `The ${template.kind} template already has a draft`,
+    );
+  }
+  const versionNumber =
+    Math.max(0, ...versions.map((version) => version.versionNumber)) + 1;
+  await tx.insert(templateVersions).values({
+    id: draft.id,
+    templateId: template.id,
+    versionNumber,
+    aiPrompt: draft.aiPrompt,
+  });
+  return versionNumber;
+};
+
+/**
  * Creates the draft version of the `kind` template from a template file (AD10). Creates
  * the template first when there is none, named by the file. The draft is v1 when the
  * template has no version, else the next number; it holds the file's content only.
@@ -147,29 +182,12 @@ export async function importTemplateFile(
       template = await lockTemplate(tx, kind);
     }
     if (template === undefined) throw new Error(`No ${kind} template row`);
-
-    const versions = await tx
-      .select({
-        versionNumber: templateVersions.versionNumber,
-        status: templateVersions.status,
-      })
-      .from(templateVersions)
-      .where(eq(templateVersions.templateId, template.id));
-    if (versions.some((version) => version.status === "draft")) {
-      throw new TemplateError(
-        "DRAFT_EXISTS",
-        `The ${kind} template already has a draft`,
-      );
-    }
-    const versionNumber =
-      Math.max(0, ...versions.map((version) => version.versionNumber)) + 1;
     const versionId = newId();
-    await tx.insert(templateVersions).values({
-      id: versionId,
-      templateId: template.id,
-      versionNumber,
-      aiPrompt: file.aiPrompt,
-    });
+    const versionNumber = await insertDraft(
+      tx,
+      { id: template.id, kind },
+      { id: versionId, aiPrompt: file.aiPrompt },
+    );
 
     const sections = file.sections.map((section, index) => ({
       section,
@@ -439,6 +457,7 @@ const loadVersion = async (
     throw new TemplateError("NOT_FOUND", `No template version ${versionId}`);
   const query = db
     .select({
+      id: templateVersions.id,
       templateId: templateVersions.templateId,
       versionNumber: templateVersions.versionNumber,
       status: templateVersions.status,
@@ -580,4 +599,148 @@ export async function publishTemplateVersion(
       publishedAt: published.publishedAt,
     };
   });
+}
+
+/**
+ * Creates the draft of a template as a copy of its version `versionId` (AD2): the AI
+ * prompt, the sections and questions, and the cost rows, check rules and execution rows,
+ * each with a new id. The draft takes the next version number, as an import does.
+ *
+ * @throws {TemplateError} NOT_FOUND when there is no such version; DRAFT_EXISTS when the
+ *   template already has a draft.
+ */
+export async function copyTemplateVersion(
+  db: Executor,
+  versionId: string,
+  { newId = () => crypto.randomUUID() }: ImportOptions = {},
+): Promise<ImportedTemplateVersion> {
+  return db.transaction(async (tx) => {
+    const source = await loadVersion(tx, versionId);
+    const template = await lockTemplate(tx, source.kind);
+    if (template === undefined) throw new Error(`No ${source.kind} template`);
+    const [content] = await tx
+      .select({ aiPrompt: templateVersions.aiPrompt })
+      .from(templateVersions)
+      .where(eq(templateVersions.id, versionId));
+    if (content === undefined) throw new Error(`No version ${versionId}`);
+    const draftId = newId();
+    const versionNumber = await insertDraft(
+      tx,
+      { id: template.id, kind: source.kind },
+      { id: draftId, aiPrompt: content.aiPrompt },
+    );
+
+    const ofSource = <T extends { templateVersionId: PgColumn }>(table: T) =>
+      eq(table.templateVersionId, versionId);
+    const sections = await tx
+      .select()
+      .from(templateSections)
+      .where(ofSource(templateSections))
+      .orderBy(asc(templateSections.sortOrder), asc(templateSections.id));
+    const sectionIds = new Map(
+      sections.map((section) => [section.id, newId()]),
+    );
+    const questions = await tx
+      .select()
+      .from(templateQuestions)
+      .where(ofSource(templateQuestions))
+      .orderBy(asc(templateQuestions.sortOrder), asc(templateQuestions.id));
+    const costDefaults = await tx
+      .select()
+      .from(templateCostDefaults)
+      .where(ofSource(templateCostDefaults))
+      .orderBy(
+        asc(templateCostDefaults.sortOrder),
+        asc(templateCostDefaults.id),
+      );
+    const checkRules = await tx
+      .select()
+      .from(templateCheckRules)
+      .where(ofSource(templateCheckRules))
+      .orderBy(asc(templateCheckRules.checkKey));
+    const presets = await tx
+      .select()
+      .from(templateExecutionPresets)
+      .where(ofSource(templateExecutionPresets))
+      .orderBy(
+        asc(templateExecutionPresets.sortOrder),
+        asc(templateExecutionPresets.id),
+      );
+
+    const fresh = { templateVersionId: draftId };
+    await insertRows(
+      tx,
+      templateSections,
+      sections.map(({ createdAt, updatedAt, ...section }) => ({
+        ...section,
+        ...fresh,
+        id: sectionIds.get(section.id) as string,
+      })),
+    );
+    await insertRows(
+      tx,
+      templateQuestions,
+      questions.map(({ createdAt, updatedAt, ...question }) => ({
+        ...question,
+        ...fresh,
+        id: newId(),
+        templateSectionId: sectionIds.get(question.templateSectionId) as string,
+      })),
+    );
+    await insertRows(
+      tx,
+      templateCostDefaults,
+      costDefaults.map(({ createdAt, updatedAt, ...row }) => ({
+        ...row,
+        ...fresh,
+        id: newId(),
+      })),
+    );
+    await insertRows(
+      tx,
+      templateCheckRules,
+      checkRules.map(({ createdAt, updatedAt, ...rule }) => ({
+        ...rule,
+        ...fresh,
+        id: newId(),
+      })),
+    );
+    await insertRows(
+      tx,
+      templateExecutionPresets,
+      presets.map(({ createdAt, updatedAt, ...preset }) => ({
+        ...preset,
+        ...fresh,
+        id: newId(),
+      })),
+    );
+    return { versionId: draftId, kind: source.kind, versionNumber };
+  });
+}
+
+/**
+ * Locks the draft `versionId` for an edit of its content (AD3 PATCH, AD4, AD5) until the
+ * transaction ends, as publishing locks it: a publish never checks content that changes
+ * before it commits, and no edit lands on a version once it is published.
+ *
+ * @throws {TemplateError} NOT_FOUND when there is no such version; PUBLISHED_READ_ONLY
+ *   when it is published.
+ */
+export async function lockTemplateDraft(
+  tx: DatabaseTransaction,
+  versionId: string,
+): Promise<{
+  /** As stored: lowercase, whatever case `versionId` was written in. */
+  id: string;
+  templateId: string;
+  kind: TemplateKind;
+}> {
+  const version = await loadVersion(tx, versionId, { lock: true });
+  if (version.status === "published") {
+    throw new TemplateError(
+      "PUBLISHED_READ_ONLY",
+      `Template version ${versionId} is published and cannot change`,
+    );
+  }
+  return { id: version.id, templateId: version.templateId, kind: version.kind };
 }

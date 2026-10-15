@@ -2,18 +2,26 @@ import { afterAll, describe, expect, test } from "bun:test";
 import {
   accounts,
   assumptions,
+  businessPlans,
   changeHistory,
   comments,
   competitors,
   costItems,
   evidenceLinks,
+  importTemplateFile,
   notifications,
+  publishTemplateVersion,
   researchLogEntries,
   risks,
+  selfAnalyses,
+  templateQuestions,
+  templateSections,
+  templateVersions,
   validationAnswers,
+  validations,
   verifications,
 } from "@moonx/db";
-import type { Role } from "@moonx/schemas";
+import type { Role, TemplateFile } from "@moonx/schemas";
 import { eq } from "drizzle-orm";
 import { type AccessKind, accessDeclarations } from "./access";
 import { newAvatarName } from "./avatars";
@@ -133,6 +141,8 @@ interface Row {
   app?: "google" | "staging";
   call(caller: Person, team: Team): Promise<Request> | Request;
   expected: Record<CallerName, number>;
+  /** Puts back what the row changed that other rows and tests share (the templates). */
+  cleanup?: () => Promise<void>;
 }
 
 /** Statuses of a workspace route for its members, refusing the operator outside it. */
@@ -289,6 +299,129 @@ async function newSelfAnalysisChange(
 /** The caller's own self-analysis, made straight in the database as S1 GET would. */
 const ownSelfAnalysis = (caller: Person) =>
   fixtures.createSelfAnalysis(caller.id);
+
+/** Statuses of the operator's routes (AD1–AD10): operators only. */
+const operatorOnly = (status: number): Record<CallerName, number> => ({
+  ...members(403, 403, 403),
+  admin: status,
+});
+
+/** `make` once per row, however many callers ask. */
+const once = <T>(make: () => Promise<T>) => {
+  let made: Promise<T> | undefined;
+  return () => {
+    made ??= make();
+    return made;
+  };
+};
+
+/** A self-analysis template file: WHY with two long texts, a part of the fixtures' v1. */
+const selfAnalysisFile = (): TemplateFile => ({
+  format: "moonx-template",
+  formatVersion: 1,
+  kind: "self_analysis",
+  name: "Self analysis",
+  aiPrompt: "",
+  sections: [
+    {
+      key: "WHY",
+      part: null,
+      title: "Why",
+      subtitle: null,
+      guidance: null,
+      questions: ["SA.WHY.1", "SA.WHY.2"].map((key) => ({
+        key,
+        title: key,
+        prompt: `${key}?`,
+        example: null,
+        hint: null,
+        answerType: "long_text",
+        options: null,
+        displayCondition: null,
+        hasFau: false,
+        copyFrom: null,
+        reference: null,
+      })),
+    },
+  ],
+  costDefaults: [],
+  checkRules: [],
+  executionPresets: [],
+});
+
+/** A published version of the `kind` template newer than the one the fixtures pin. */
+async function publishNewer(
+  kind: "validation" | "business_plan" | "self_analysis",
+) {
+  await (kind === "self_analysis"
+    ? fixtures.selfAnalysisVersion()
+    : fixtures.templateVersion(kind));
+  const file =
+    kind === "self_analysis"
+      ? selfAnalysisFile()
+      : await Bun.file(
+          new URL(
+            `../../../data/templates/bcdx/${kind === "validation" ? "validation" : "plan"}.json`,
+            import.meta.url,
+          ),
+        ).json();
+  const draft = await importTemplateFile(db, kind, file);
+  await publishTemplateVersion(db, draft.versionId, null);
+  return draft.versionId;
+}
+
+/** The ids of a self-analysis draft made from {@link selfAnalysisFile}. */
+async function selfAnalysisDraft() {
+  await fixtures.selfAnalysisVersion();
+  const { versionId } = await importTemplateFile(
+    db,
+    "self_analysis",
+    selfAnalysisFile(),
+  );
+  const [section] = await db
+    .select({ id: templateSections.id })
+    .from(templateSections)
+    .where(eq(templateSections.templateVersionId, versionId));
+  const questions = await db
+    .select({ id: templateQuestions.id })
+    .from(templateQuestions)
+    .where(eq(templateQuestions.templateVersionId, versionId))
+    .orderBy(templateQuestions.sortOrder);
+  if (section === undefined) throw new Error("The draft has no section");
+  return {
+    versionId,
+    sectionId: section.id,
+    questionIds: questions.map((question) => question.id),
+  };
+}
+
+/**
+ * Leaves each template with its v1 only, as the other tests share them: what a row
+ * pinned to a newer version goes back to v1, and the newer versions go.
+ */
+async function restoreTemplates() {
+  const versions = await db
+    .select({
+      id: templateVersions.id,
+      templateId: templateVersions.templateId,
+      versionNumber: templateVersions.versionNumber,
+    })
+    .from(templateVersions);
+  for (const newer of versions.filter((v) => v.versionNumber > 1)) {
+    const first = versions.find(
+      (v) => v.templateId === newer.templateId && v.versionNumber === 1,
+    );
+    if (first !== undefined) {
+      for (const table of [validations, selfAnalyses, businessPlans] as const) {
+        await db
+          .update(table)
+          .set({ templateVersionId: first.id })
+          .where(eq(table.templateVersionId, newer.id));
+      }
+    }
+    await db.delete(templateVersions).where(eq(templateVersions.id, newer.id));
+  }
+}
 
 const ROWS: Row[] = [
   {
@@ -1898,6 +2031,376 @@ const ROWS: Row[] = [
     call: (caller) => request("POST", "/api/v1/notifications/read-all", caller),
     expected: signedInOnly(204),
   },
+  ...(() => {
+    const route = {
+      "GET /api/v1/template-migrations/preview": "located",
+    } as const;
+    const validationV2 = once(() => publishNewer("validation"));
+    const planV2 = once(() => publishNewer("business_plan"));
+    const selfAnalysisV2 = once(() => publishNewer("self_analysis"));
+    return [
+      {
+        api: "T1",
+        routes: route,
+        async call(caller, team) {
+          await validationV2();
+          const { validation } = await newIdea(team);
+          return request(
+            "GET",
+            `/api/v1/template-migrations/preview?targetType=validation&targetId=${validation.id}`,
+            caller,
+          );
+        },
+        expected: members(403, 200, 200),
+        cleanup: restoreTemplates,
+      },
+      {
+        api: "T1 plan",
+        routes: route,
+        async call(caller, team) {
+          await planV2();
+          const { plan } = await newPlan(team);
+          return request(
+            "GET",
+            `/api/v1/template-migrations/preview?targetType=business_plan&targetId=${plan.id}`,
+            caller,
+          );
+        },
+        expected: members(403, 200, 200),
+        cleanup: restoreTemplates,
+      },
+      {
+        api: "T1 (own self-analysis)",
+        routes: route,
+        async call(caller) {
+          await selfAnalysisV2();
+          const analysis = await ownSelfAnalysis(caller);
+          return request(
+            "GET",
+            `/api/v1/template-migrations/preview?targetType=self_analysis&targetId=${analysis.id}`,
+            caller,
+          );
+        },
+        expected: signedInOnly(200),
+        cleanup: restoreTemplates,
+      },
+    ] satisfies Row[];
+  })(),
+  ...(() => {
+    const route = { "POST /api/v1/template-migrations": "located" } as const;
+    const validationV2 = once(() => publishNewer("validation"));
+    const planV2 = once(() => publishNewer("business_plan"));
+    const selfAnalysisV2 = once(() => publishNewer("self_analysis"));
+    return [
+      {
+        api: "T2",
+        routes: route,
+        async call(caller, team) {
+          const toVersionId = await validationV2();
+          const { validation } = await newIdea(team);
+          return request("POST", "/api/v1/template-migrations", caller, {
+            targetType: "validation",
+            targetId: validation.id,
+            toVersionId,
+          });
+        },
+        expected: members(403, 200, 200),
+        cleanup: restoreTemplates,
+      },
+      {
+        api: "T2 plan",
+        routes: route,
+        async call(caller, team) {
+          const toVersionId = await planV2();
+          const { plan } = await newPlan(team);
+          return request("POST", "/api/v1/template-migrations", caller, {
+            targetType: "business_plan",
+            targetId: plan.id,
+            toVersionId,
+          });
+        },
+        expected: members(403, 200, 200),
+        cleanup: restoreTemplates,
+      },
+      {
+        api: "T2 (own self-analysis)",
+        routes: route,
+        async call(caller) {
+          const toVersionId = await selfAnalysisV2();
+          const analysis = await ownSelfAnalysis(caller);
+          return request("POST", "/api/v1/template-migrations", caller, {
+            targetType: "self_analysis",
+            targetId: analysis.id,
+            toVersionId,
+          });
+        },
+        expected: signedInOnly(200),
+        cleanup: restoreTemplates,
+      },
+    ] satisfies Row[];
+  })(),
+  {
+    api: "AD1",
+    routes: { "GET /api/v1/admin/templates": "operator" },
+    call: (caller) => request("GET", "/api/v1/admin/templates", caller),
+    expected: operatorOnly(200),
+  },
+  {
+    api: "AD2",
+    routes: {
+      "POST /api/v1/admin/template-versions/:versionId/draft": "operator",
+    },
+    async call(caller) {
+      const versionId = await fixtures.selfAnalysisVersion();
+      return request(
+        "POST",
+        `/api/v1/admin/template-versions/${versionId}/draft`,
+        caller,
+      );
+    },
+    expected: operatorOnly(201),
+    cleanup: restoreTemplates,
+  },
+  {
+    api: "AD3 GET",
+    routes: { "GET /api/v1/admin/template-versions/:versionId": "operator" },
+    async call(caller) {
+      const versionId = await fixtures.selfAnalysisVersion();
+      return request(
+        "GET",
+        `/api/v1/admin/template-versions/${versionId}`,
+        caller,
+      );
+    },
+    expected: operatorOnly(200),
+  },
+  (() => {
+    const draft = once(selfAnalysisDraft);
+    return {
+      api: "AD3 PATCH",
+      routes: {
+        "PATCH /api/v1/admin/template-versions/:versionId": "operator",
+      },
+      async call(caller) {
+        const { versionId } = await draft();
+        return request(
+          "PATCH",
+          `/api/v1/admin/template-versions/${versionId}`,
+          caller,
+          { aiPrompt: "Ask one question at a time." },
+        );
+      },
+      expected: operatorOnly(200),
+      cleanup: restoreTemplates,
+    } satisfies Row;
+  })(),
+  (() => {
+    const draft = once(selfAnalysisDraft);
+    return {
+      api: "AD4 POST section",
+      routes: {
+        "POST /api/v1/admin/template-versions/:versionId/sections": "operator",
+      },
+      async call(caller) {
+        const { versionId } = await draft();
+        return request(
+          "POST",
+          `/api/v1/admin/template-versions/${versionId}/sections`,
+          caller,
+          { key: "INCOME", title: "Personal income" },
+        );
+      },
+      expected: operatorOnly(201),
+      cleanup: restoreTemplates,
+    } satisfies Row;
+  })(),
+  ...(["PATCH", "DELETE"] as const).map((method): Row => {
+    const draft = once(selfAnalysisDraft);
+    return {
+      api: `AD4 ${method} section`,
+      routes: {
+        [`${method} /api/v1/admin/template-sections/:id`]: "operator" as const,
+      },
+      async call(caller) {
+        const { sectionId } = await draft();
+        return request(
+          method,
+          `/api/v1/admin/template-sections/${sectionId}`,
+          caller,
+          method === "PATCH" ? { title: "Why I want this" } : undefined,
+        );
+      },
+      expected: operatorOnly(method === "PATCH" ? 200 : 204),
+      cleanup: restoreTemplates,
+    };
+  }),
+  (() => {
+    const draft = once(selfAnalysisDraft);
+    return {
+      api: "AD4 POST question",
+      routes: {
+        "POST /api/v1/admin/template-sections/:id/questions": "operator",
+      },
+      async call(caller) {
+        const { sectionId } = await draft();
+        return request(
+          "POST",
+          `/api/v1/admin/template-sections/${sectionId}/questions`,
+          caller,
+          {
+            key: "SA.WHY.3",
+            title: "Why now",
+            prompt: "Why now?",
+            answerType: "long_text",
+          },
+        );
+      },
+      expected: operatorOnly(201),
+      cleanup: restoreTemplates,
+    } satisfies Row;
+  })(),
+  ...(["PATCH", "DELETE"] as const).map((method): Row => {
+    const draft = once(selfAnalysisDraft);
+    return {
+      api: `AD4 ${method} question`,
+      routes: {
+        [`${method} /api/v1/admin/template-questions/:id`]: "operator" as const,
+      },
+      async call(caller) {
+        const { questionIds } = await draft();
+        return request(
+          method,
+          `/api/v1/admin/template-questions/${questionIds[0]}`,
+          caller,
+          method === "PATCH" ? { title: "Why" } : undefined,
+        );
+      },
+      expected: operatorOnly(method === "PATCH" ? 200 : 204),
+      cleanup: restoreTemplates,
+    };
+  }),
+  ...(
+    [
+      [
+        "order",
+        async (made: Awaited<ReturnType<typeof selfAnalysisDraft>>) => ({
+          sections: [
+            { id: made.sectionId, questionIds: made.questionIds.toReversed() },
+          ],
+        }),
+      ],
+      ["cost-defaults", async () => ({ items: [] })],
+      ["check-rules", async () => ({ items: [] })],
+      ["execution-presets", async () => ({ items: [] })],
+    ] as const
+  ).map(([list, body]): Row => {
+    const draft = once(selfAnalysisDraft);
+    return {
+      api: `AD5 ${list}`,
+      routes: {
+        [`PUT /api/v1/admin/template-versions/:versionId/${list}`]:
+          "operator" as const,
+      },
+      async call(caller) {
+        const made = await draft();
+        return request(
+          "PUT",
+          `/api/v1/admin/template-versions/${made.versionId}/${list}`,
+          caller,
+          await body(made),
+        );
+      },
+      expected: operatorOnly(200),
+      cleanup: restoreTemplates,
+    };
+  }),
+  {
+    api: "AD6 validate",
+    routes: {
+      "POST /api/v1/admin/template-versions/:versionId/validate": "operator",
+    },
+    async call(caller) {
+      const versionId = await fixtures.selfAnalysisVersion();
+      return request(
+        "POST",
+        `/api/v1/admin/template-versions/${versionId}/validate`,
+        caller,
+      );
+    },
+    expected: operatorOnly(200),
+  },
+  (() => {
+    const draft = once(selfAnalysisDraft);
+    return {
+      api: "AD6 publish",
+      routes: {
+        "POST /api/v1/admin/template-versions/:versionId/publish": "operator",
+      },
+      async call(caller) {
+        const { versionId } = await draft();
+        return request(
+          "POST",
+          `/api/v1/admin/template-versions/${versionId}/publish`,
+          caller,
+        );
+      },
+      expected: operatorOnly(200),
+      cleanup: restoreTemplates,
+    } satisfies Row;
+  })(),
+  ...(["users", "workspaces", "invitations"] as const).map(
+    (list): Row => ({
+      api: `AD7 ${list}`,
+      routes: { [`GET /api/v1/admin/${list}`]: "operator" as const },
+      call: (caller) => request("GET", `/api/v1/admin/${list}`, caller),
+      expected: operatorOnly(200),
+    }),
+  ),
+  ...(["suspend", "reactivate"] as const).map(
+    (action): Row => ({
+      api: `AD8 ${action}`,
+      routes: {
+        [`POST /api/v1/admin/users/:userId/${action}`]: "operator" as const,
+      },
+      async call(caller) {
+        const user = await fixtures.createUser({
+          status: action === "suspend" ? "active" : "suspended",
+        });
+        return request(
+          "POST",
+          `/api/v1/admin/users/${user.id}/${action}`,
+          caller,
+        );
+      },
+      expected: operatorOnly(200),
+    }),
+  ),
+  {
+    api: "AD9",
+    routes: { "POST /api/v1/admin/invitations": "operator" },
+    call: (caller, { workspaceId }) =>
+      request("POST", "/api/v1/admin/invitations", caller, {
+        email: uniqueEmail("invitee"),
+        workspaceId,
+        role: "member",
+      }),
+    expected: operatorOnly(201),
+  },
+  {
+    api: "AD10",
+    routes: { "POST /api/v1/admin/templates/import": "operator" },
+    async call(caller) {
+      await fixtures.selfAnalysisVersion();
+      return request(
+        "POST",
+        "/api/v1/admin/templates/import?kind=self_analysis",
+        caller,
+        selfAnalysisFile(),
+      );
+    },
+    expected: operatorOnly(201),
+    cleanup: restoreTemplates,
+  },
 ];
 
 const testApp = buildTestApp(database);
@@ -1915,11 +2418,15 @@ describe("SDD 7.1 authorization matrix", () => {
       const app = apps[row.app ?? "default"];
       const team = await people(app);
       const statuses: Partial<Record<CallerName, number>> = {};
-      for (const name of CALLERS) {
-        const response = await app.handle(
-          await row.call(team.callers[name], team),
-        );
-        statuses[name] = response.status;
+      try {
+        for (const name of CALLERS) {
+          const response = await app.handle(
+            await row.call(team.callers[name], team),
+          );
+          statuses[name] = response.status;
+        }
+      } finally {
+        await row.cleanup?.();
       }
       expect(statuses).toEqual(row.expected);
     });

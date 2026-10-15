@@ -670,7 +670,7 @@ make test-api・make openapi（差分なし）・make typecheck・make lint が�
 
 ## Step 18: API: テンプレートの移行と運営者
 
-Status:
+Status: done 2026-10-16
 
 ```
 docs/02-01_system-design-doc.md 5.12（T1・T2）と 5.13（AD1〜AD10）の API を作ってください。これで API はすべてそろう。

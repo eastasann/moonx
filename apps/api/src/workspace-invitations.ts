@@ -52,67 +52,95 @@ type InvitationRow = typeof invitations.$inferSelect;
 const statusOf = (row: InvitationRow, at: Date): Invitation["status"] =>
   row.status === "pending" && row.expiresAt <= at ? "expired" : row.status;
 
+/** How a list of invitations is read: a page of it, and for whom. */
+export interface InvitationListOptions {
+  /** A page of `limit` from `offset`; every invitation when left out. */
+  page?: { offset: number; limit: number };
+  /**
+   * Operators see the inviter outside any workspace (SDD 5.2 UserRef), so nobody shows
+   * as a former member on 28.
+   */
+  operator?: boolean;
+}
+
 /**
  * The invitations matching `where`, newest first, as SDD 5.5 shows them. The inviter is
- * shown as seen from the invitation's workspace, so one who left is a former member.
+ * shown as seen from the invitation's workspace, so one who left is a former member,
+ * unless `operator`. An operator who invited (AD9) is shown as seen from no workspace
+ * everywhere: they may never have been a member.
  */
-async function loadInvitations(
+export async function loadInvitations(
   db: Database | DatabaseTransaction,
   where: SQL | undefined,
   at: Date,
+  { page, operator = false }: InvitationListOptions = {},
 ): Promise<Invitation[]> {
-  const rows = await db
+  const query = db
     .select({
       invitation: invitations,
       workspace: { id: workspaces.id, name: workspaces.name },
+      inviterIsAdmin: users.isAdmin,
     })
     .from(invitations)
     .leftJoin(workspaces, eq(workspaces.id, invitations.workspaceId))
+    .leftJoin(users, eq(users.id, invitations.invitedById))
     .where(where)
     .orderBy(desc(invitations.createdAt), desc(invitations.id));
+  const rows = await (page === undefined
+    ? query
+    : query.limit(page.limit).offset(page.offset));
+  /** The workspace the inviter of `row` is seen from; null for none. */
+  const seenFrom = (row: (typeof rows)[number]) =>
+    operator || row.inviterIsAdmin === true ? null : row.invitation.workspaceId;
   const inviters = new Map<
     string | null,
     Map<string, Invitation["invitedBy"]>
   >();
-  for (const workspaceId of new Set(
-    rows.map((row) => row.invitation.workspaceId),
-  )) {
+  for (const workspaceId of new Set(rows.map(seenFrom))) {
     const ids = rows
-      .filter((row) => row.invitation.workspaceId === workspaceId)
+      .filter((row) => seenFrom(row) === workspaceId)
       .flatMap((row) =>
         row.invitation.invitedById === null ? [] : [row.invitation.invitedById],
       );
     inviters.set(workspaceId, await loadUserRefs(db, ids, workspaceId));
   }
-  return rows.map(({ invitation, workspace }) => ({
-    id: invitation.id,
-    email: invitation.email,
-    role: invitation.role,
-    workspace,
-    status: statusOf(invitation, at),
-    invitedBy:
-      invitation.invitedById === null
-        ? null
-        : (inviters.get(invitation.workspaceId)?.get(invitation.invitedById) ??
-          null),
-    createdAt: invitation.createdAt.toISOString(),
-    expiresAt: invitation.expiresAt.toISOString(),
-    acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
-  }));
+  return rows.map((row) => {
+    const { invitation, workspace } = row;
+    return {
+      id: invitation.id,
+      email: invitation.email,
+      role: invitation.role,
+      workspace,
+      status: statusOf(invitation, at),
+      invitedBy:
+        invitation.invitedById === null
+          ? null
+          : (inviters.get(seenFrom(row))?.get(invitation.invitedById) ?? null),
+      createdAt: invitation.createdAt.toISOString(),
+      expiresAt: invitation.expiresAt.toISOString(),
+      acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
+    };
+  });
 }
 
-async function loadInvitation(
+export async function loadInvitation(
   db: Database | DatabaseTransaction,
   id: string,
   at: Date,
+  options: Pick<InvitationListOptions, "operator"> = {},
 ): Promise<Invitation> {
-  const [invitation] = await loadInvitations(db, eq(invitations.id, id), at);
+  const [invitation] = await loadInvitations(
+    db,
+    eq(invitations.id, id),
+    at,
+    options,
+  );
   if (invitation === undefined) throw new Error(`No invitation ${id}`);
   return invitation;
 }
 
 /** What an invitation mail says (design-spec 6.16「招待のメール」). */
-interface InvitationMail {
+export interface InvitationMail {
   to: string;
   token: string;
   workspace: { name: string; role: Role } | null;
@@ -120,8 +148,12 @@ interface InvitationMail {
   inviterName: string | null;
 }
 
+/** The link of an invitation's mail, which AD9 also answers with (SDD 5.5). */
+export const invitationLink = (baseUrl: string, token: string) =>
+  new URL(`/invite/${token}`, baseUrl).href;
+
 /** Sends the mail of an invitation, link included (design-spec 6.16「招待のメール」). */
-async function sendInvitationMail(
+export async function sendInvitationMail(
   mailer: Mailer,
   baseUrl: string,
   mail: InvitationMail,
@@ -142,7 +174,7 @@ async function sendInvitationMail(
       : workspace === null
         ? i18n.t("mail:invitation.invitedByNoWorkspace", values)
         : i18n.t("mail:invitation.invitedBy", values);
-  const link = new URL(`/invite/${mail.token}`, baseUrl);
+  const link = invitationLink(baseUrl, mail.token);
   await mailer.send(
     {
       to: mail.to,
@@ -150,7 +182,7 @@ async function sendInvitationMail(
         workspace === null
           ? i18n.t("mail:invitation.subjectNoWorkspace")
           : i18n.t("mail:invitation.subject", values),
-      text: i18n.t("mail:invitation.text", { opening, link: link.href }),
+      text: i18n.t("mail:invitation.text", { opening, link }),
     },
     requestId,
   );
@@ -160,7 +192,7 @@ async function sendInvitationMail(
  * The name the mail gives for `invitedById`: none for `make admin-create`, and none for
  * an inviter whose account was deleted ("Deleted user" invites nobody).
  */
-async function inviterNameOf(
+export async function inviterNameOf(
   tx: DatabaseTransaction,
   invitedById: string | null,
 ): Promise<string | null> {
@@ -182,7 +214,7 @@ async function inviterNameOf(
  *
  * @throws {ApiError} ALREADY_MEMBER, or INVITATION_PENDING with `invitationId`
  */
-async function refuseDuplicate(
+export async function refuseDuplicate(
   db: Database | DatabaseTransaction,
   invitation: { workspaceId: string | null; email: string; except?: string },
   at: Date,
@@ -227,6 +259,31 @@ async function refuseDuplicate(
       "A valid invitation to the address exists",
       { invitationId: pending.id },
     );
+  }
+}
+
+/**
+ * Counts a send by `caller` in `tx` once its checks have passed, so a refusal counts
+ * none, and neither does a mail Resend did not take, which rolls the count back with the
+ * rest (SDD 7.2).
+ *
+ * @throws {ApiError} RATE_LIMITED
+ */
+export async function countInvitationSend(
+  limiter: RateLimiter,
+  caller: Caller,
+  tx: DatabaseTransaction,
+): Promise<void> {
+  const counted = await limiter.consume(
+    "user",
+    INVITATION_SEND_LIMIT,
+    caller.id,
+    tx,
+  );
+  if (!counted.allowed) {
+    throw new ApiError("RATE_LIMITED", "Too many invitations sent", {
+      retryAfterSeconds: counted.retryAfterSeconds,
+    });
   }
 }
 
@@ -275,27 +332,6 @@ export function workspaceInvitationRoutes({
   limiter,
   now,
 }: WorkspaceInvitationRoutesOptions) {
-  /**
-   * Counts a send in `tx` once its checks have passed, so a refusal counts none, and
-   * neither does a mail Resend did not take, which rolls the count back with the rest
-   * (SDD 7.2).
-   *
-   * @throws {ApiError} RATE_LIMITED
-   */
-  const countSend = async (caller: Caller, tx: DatabaseTransaction) => {
-    const counted = await limiter.consume(
-      "user",
-      INVITATION_SEND_LIMIT,
-      caller.id,
-      tx,
-    );
-    if (!counted.allowed) {
-      throw new ApiError("RATE_LIMITED", "Too many invitations sent", {
-        retryAfterSeconds: counted.retryAfterSeconds,
-      });
-    }
-  };
-
   /**
    * The invitation of W5 or W7, refusing one that is accepted or revoked; locked when
    * read in a transaction.
@@ -369,7 +405,7 @@ export function workspaceInvitationRoutes({
             { workspaceId: scope.workspaceId, email: body.email },
             at,
           );
-          await countSend(caller, tx);
+          await countInvitationSend(limiter, caller, tx);
           const token = createInvitationToken();
           const [invitation] = await tx
             .insert(invitations)
@@ -452,7 +488,7 @@ export function workspaceInvitationRoutes({
             },
             at,
           );
-          await countSend(caller, tx);
+          await countInvitationSend(limiter, caller, tx);
           const token = createInvitationToken();
           // A new token ends the old link, and the expiry counts from now (SDD 5.5).
           // Both stay as they were if the mail cannot be sent.

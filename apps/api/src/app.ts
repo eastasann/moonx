@@ -2,6 +2,8 @@ import type { Database } from "@moonx/db";
 import { Elysia } from "elysia";
 import { accessPlugin, assertAccessDeclared } from "./access";
 import { accountRoutes } from "./account";
+import { adminRoutes } from "./admin";
+import { adminTemplateRoutes } from "./admin-templates";
 import { aiRoutes } from "./ai";
 import { AUTH_IP_LIMITS, createAuth } from "./auth";
 import { type AvatarStore, avatarFileRoutes } from "./avatars";
@@ -28,6 +30,7 @@ import { createRateLimiter } from "./rate-limit";
 import { researchLogRoutes } from "./research-log";
 import { selfAnalysisRoutes } from "./self-analysis";
 import type { ErrorReporter } from "./sentry";
+import { templateMigrationRoutes } from "./template-migrations";
 import { validationRoutes } from "./validation";
 import { validationListRoutes } from "./validation-lists";
 import { workspaceInvitationRoutes } from "./workspace-invitations";
@@ -118,7 +121,10 @@ export function createApp(config: Config, services: AppServices) {
     .use(decisionLogRoutes({ access, db }))
     .use(commentRoutes({ access, db, now }))
     .use(historyRoutes({ access, db, now }))
-    .use(notificationRoutes({ access, db, now }));
+    .use(notificationRoutes({ access, db, now }))
+    .use(templateMigrationRoutes({ access, db, now }))
+    .use(adminTemplateRoutes({ access, db, now }))
+    .use(adminRoutes({ access, config, db, mailer, limiter, now }));
   if (avatars.directory !== undefined) {
     app.use(avatarFileRoutes(access, avatars.directory));
   }

@@ -15,6 +15,10 @@ import {
 } from "@moonx/db/seed";
 import { prepareTestDatabase, testDatabaseName } from "@moonx/db/test-database";
 import {
+  adminInvitationPageSchema,
+  adminTemplateListSchema,
+  adminUserPageSchema,
+  adminWorkspacePageSchema,
   assumptionListSchema,
   commentListSchema,
   competitorListSchema,
@@ -38,8 +42,13 @@ import {
   selfAnalysisHomeSchema,
   selfAnalysisSectionSchema,
   sharedSelfAnalysisSchema,
+  templateCheckSchema,
+  templateMigrationPreviewSchema,
+  templateMigrationResultSchema,
+  templateVersionDetailSchema,
   unreadCountSchema,
   validationHomeSchema,
+  validationQuestionsSchema,
 } from "@moonx/schemas";
 import { and, eq } from "drizzle-orm";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
@@ -755,5 +764,196 @@ describe("comments, notifications and history of the demo data", () => {
     expect(errorBodySchema.parse(await twice.json()).error.code).toBe(
       "ALREADY_REVERTED",
     );
+  });
+});
+
+describe("templates and the operator's screens on the demo data", () => {
+  const call = async (
+    method: "GET" | "POST",
+    path: string,
+    email: string,
+    body?: unknown,
+  ) =>
+    app.handle(
+      apiRequest(method, path, { cookie: await cookieOf(email), body }),
+    );
+  const ADMIN = "admin@moonx.example";
+
+  test("T1 and T2 move Laundry Pickup to validation v2, and H3 moves it back", async () => {
+    const validationId = seedId("validation", "laundry");
+    const preview = await call(
+      "GET",
+      `/api/v1/template-migrations/preview?targetType=validation&targetId=${validationId}`,
+      "paolo@bcdx.example",
+    );
+    expect(preview.status).toBe(200);
+    const shown = templateMigrationPreviewSchema.parse(await preview.json());
+    // v2 only adds a question (design-spec 8.4), and M1 made every cost row.
+    expect(shown).toMatchObject({
+      from: { versionNumber: 1 },
+      to: { versionNumber: 2 },
+      hiddenQuestions: [],
+      addedQuestions: 1,
+      addedCostRows: [],
+    });
+    expect(shown.carried).toBeGreaterThan(0);
+
+    const migrated = await call(
+      "POST",
+      "/api/v1/template-migrations",
+      "paolo@bcdx.example",
+      {
+        targetType: "validation",
+        targetId: validationId,
+        toVersionId: shown.to.versionId,
+      },
+    );
+    expect(migrated.status).toBe(200);
+    const { batchId, template } = templateMigrationResultSchema.parse(
+      await migrated.json(),
+    );
+    expect(template).toMatchObject({ versionNumber: 2, newerVersion: null });
+    const section = validationQuestionsSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/validations/${validationId}/questions/01`,
+          "paolo@bcdx.example",
+        )
+      ).json(),
+    );
+    expect(section.section.questions.at(-1)?.key).toBe("V.01.REACH");
+    const history = historyPageSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/history?containerType=idea&containerId=${seedId("idea", "laundry")}`,
+          "paolo@bcdx.example",
+        )
+      ).json(),
+    );
+    expect(history.items[0]).toMatchObject({
+      batchId,
+      target: { type: "template_version", id: validationId },
+      label: "Template version",
+      source: "template_migration",
+      revertible: true,
+    });
+
+    const undone = await call(
+      "POST",
+      `/api/v1/history/batches/${batchId}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(undone.status).toBe(200);
+    expect(
+      historyBatchRevertResultSchema.parse(await undone.json()).reverted,
+    ).toBe(1);
+    const home = validationHomeSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/ideas/${seedId("idea", "laundry")}/validation`,
+          "paolo@bcdx.example",
+        )
+      ).json(),
+    );
+    expect(home.template).toMatchObject({
+      versionNumber: 1,
+      newerVersion: { versionNumber: 2 },
+    });
+  });
+
+  test("AD1 lists the demo templates, and v3 is a draft that passes the checks", async () => {
+    const response = await call("GET", "/api/v1/admin/templates", ADMIN);
+    expect(response.status).toBe(200);
+    const { items } = adminTemplateListSchema.parse(await response.json());
+    expect(
+      items.map((item) => [
+        item.kind,
+        item.versions.map((v) => [v.versionNumber, v.status]),
+      ]),
+    ).toEqual([
+      ["self_analysis", [[1, "published"]]],
+      [
+        "validation",
+        [
+          [3, "draft"],
+          [2, "published"],
+          [1, "published"],
+        ],
+      ],
+      ["business_plan", [[1, "published"]]],
+    ]);
+    const validation = items[1];
+    // Mobile Bike Repair alone was made on v2 (design-spec 8.4).
+    expect(validation?.versions[1]).toMatchObject({
+      usageCount: 1,
+      publishedBy: null,
+    });
+    const v3 = validation?.versions[0]?.id;
+    const draft = templateVersionDetailSchema.parse(
+      await (
+        await call("GET", `/api/v1/admin/template-versions/${v3}`, ADMIN)
+      ).json(),
+    );
+    expect(
+      draft.sections.find((s) => s.key === "10")?.questions.at(-1)?.key,
+    ).toBe("V.10.NEXT_STEP");
+    const check = templateCheckSchema.parse(
+      await (
+        await call(
+          "POST",
+          `/api/v1/admin/template-versions/${v3}/validate`,
+          ADMIN,
+        )
+      ).json(),
+    );
+    expect(check).toEqual({ errors: [], warnings: [] });
+  });
+
+  test("AD7 lists the demo people, BCDX and its invitations", async () => {
+    const people = adminUserPageSchema.parse(
+      await (
+        await call("GET", "/api/v1/admin/users?q=@bcdx.example", ADMIN)
+      ).json(),
+    );
+    expect(
+      people.items.map((user) => [
+        user.displayName,
+        user.workspaceCount,
+        user.status,
+      ]),
+    ).toEqual([
+      ["Ana Villanueva", 2, "active"],
+      ["Kenji Mori", 2, "active"],
+      ["Paolo Gonzaga", 2, "active"],
+    ]);
+    const [bcdx] = adminWorkspacePageSchema.parse(
+      await (
+        await call("GET", "/api/v1/admin/workspaces?q=BCDX", ADMIN)
+      ).json(),
+    ).items;
+    expect(bcdx).toMatchObject({
+      id: BCDX_WORKSPACE_ID,
+      isPersonal: false,
+      owners: [{ displayName: "Ana Villanueva" }],
+      memberCount: 4,
+      ideaCount: 8,
+    });
+    const pending = adminInvitationPageSchema.parse(
+      await (await call("GET", "/api/v1/admin/invitations", ADMIN)).json(),
+    );
+    expect(pending.items.map((i) => i.email)).toEqual([
+      "new.member@bcdx.example",
+    ]);
+    const all = adminInvitationPageSchema.parse(
+      await (
+        await call("GET", "/api/v1/admin/invitations?status=all", ADMIN)
+      ).json(),
+    );
+    expect(
+      all.items.find((i) => i.email === "late.joiner@bcdx.example")?.status,
+    ).toBe("expired");
   });
 });

@@ -40,7 +40,11 @@ const uniqueIssue = (path: PropertyKey[], message: string) => ({
   ...ruleIssue("unique"),
 });
 
-const flagRepeats = (
+/**
+ * Reports each entry whose value an earlier one already has, at its path, under the rule
+ * `unique`: keys the database keeps unique per version, or that answers are stored by.
+ */
+export const flagRepeats = (
   ctx: z.RefinementCtx,
   entries: readonly { value: string; path: PropertyKey[] }[],
   what: string,
@@ -272,7 +276,8 @@ const sectionSchema = (kind: TemplateKind) =>
     questions: z.array(questionSchema(kind)),
   });
 
-const costDefaultSchema = z.strictObject({
+/** A starting cost row of a validation template (17), as a file or AD5 gives it. */
+export const templateCostDefaultSchema = z.strictObject({
   category: costCategorySchema,
   key: keyText,
   name: costRowNameSchema,
@@ -367,7 +372,7 @@ export const templateFileSchema = z
       kind: z.literal("self_analysis"),
       aiPrompt: plainText(longText),
       sections: z.array(sectionSchema("self_analysis")),
-      costDefaults: noneOf(costDefaultSchema),
+      costDefaults: noneOf(templateCostDefaultSchema),
       checkRules: noneOf(checkRuleSchema),
       executionPresets: noneOf(executionPresetSchema),
     }),
@@ -376,7 +381,7 @@ export const templateFileSchema = z
       kind: z.literal("validation"),
       aiPrompt: noAiPrompt,
       sections: z.array(sectionSchema("validation")),
-      costDefaults: z.array(costDefaultSchema),
+      costDefaults: z.array(templateCostDefaultSchema),
       checkRules: z.array(checkRuleSchema),
       executionPresets: noneOf(executionPresetSchema),
     }),
@@ -385,7 +390,7 @@ export const templateFileSchema = z
       kind: z.literal("business_plan"),
       aiPrompt: noAiPrompt,
       sections: z.array(sectionSchema("business_plan")),
-      costDefaults: noneOf(costDefaultSchema),
+      costDefaults: noneOf(templateCostDefaultSchema),
       checkRules: noneOf(checkRuleSchema),
       executionPresets: z.array(executionPresetSchema),
     }),

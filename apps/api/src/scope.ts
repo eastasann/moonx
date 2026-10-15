@@ -89,6 +89,8 @@ const membershipOf = (workspaceId: AnyPgColumn, userId: string) =>
  * The workspace and role behind `ref` for `userId` (SDD 7.1 `resolveScope`), or null
  * when the resource does not exist. Ideas and plans whose creation was undone count as
  * missing (SDD 5.11), and so does an id that is not a UUID, which could exist nowhere.
+ * The ids it answers are the stored ones, lowercase whatever case the request wrote a
+ * UUID in, so the keys of advisory locks and maps built from them agree.
  */
 export async function resolveScope(
   db: Database | DatabaseTransaction,
@@ -99,14 +101,14 @@ export async function resolveScope(
   if (!isUuid(id)) return null;
   if ("workspaceId" in ref) {
     const [row] = await db
-      .select({ role: memberships.role })
+      .select({ id: workspaces.id, role: memberships.role })
       .from(workspaces)
       .leftJoin(memberships, membershipOf(workspaces.id, userId))
       .where(eq(workspaces.id, id));
     return row === undefined
       ? null
       : {
-          workspaceId: id,
+          workspaceId: row.id,
           role: row.role,
           ideaId: null,
           planId: null,
@@ -124,6 +126,7 @@ export async function resolveScope(
     const [row] = await db
       .select({
         ...ideaFields,
+        planId: businessPlans.id,
         planArchived: sql<boolean>`${businessPlans.archivedAt} is not null`,
       })
       .from(businessPlans)
@@ -136,7 +139,7 @@ export async function resolveScope(
           isNull(ideas.deletedAt),
         ),
       );
-    return row === undefined ? null : { ...row, planId: id };
+    return row === undefined ? null : row;
   }
   const [row] =
     "ideaId" in ref

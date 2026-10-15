@@ -15,8 +15,13 @@ import {
   decisionContextSchema,
   decisionResultSchema,
   economicsSchema,
+  errorBodySchema,
+  memberSelfAnalysesSchema,
   researchLogPageSchema,
   riskListSchema,
+  selfAnalysisHomeSchema,
+  selfAnalysisSectionSchema,
+  sharedSelfAnalysisSchema,
   validationHomeSchema,
 } from "@moonx/schemas";
 import { eq } from "drizzle-orm";
@@ -25,8 +30,9 @@ import { apiRequest, cookiesOf } from "./test-fixtures";
 
 // The steps' goals on the demo data of design-spec 8: V1 of Piaya Gift Box Delivery
 // shows what 6.1 and the worked numbers of 8.3 say, its worksheets (V6–V15) list the
-// rows of 8.4 and calculate 8.3, and V19 records a decision there. A database of its
-// own, since the seed empties every table.
+// rows of 8.4 and calculate 8.3, V19 records a decision there, and the self-analyses
+// (S1, S6, S7) are as 8.1 has them. A database of its own, since the seed empties every
+// table.
 
 const base = process.env.DATABASE_URL_TEST;
 if (base === undefined || base === "") {
@@ -241,5 +247,142 @@ describe("the demo data", () => {
       workspaceId: BCDX_WORKSPACE_ID,
       ideaId: PIAYA,
     });
+  });
+  test("the self-analyses of 8.1, and Kenji's unshared one out of Ana's reach", async () => {
+    const home = async (email: string) => {
+      const response = await app.handle(
+        apiRequest("GET", "/api/v1/me/self-analysis", {
+          cookie: await cookieOf(email),
+        }),
+      );
+      expect(response.status).toBe(200);
+      return selfAnalysisHomeSchema.parse(await response.json());
+    };
+    const bcdx = { id: BCDX_WORKSPACE_ID, name: "BCDX" };
+    const ana = await home("ana@bcdx.example");
+    expect(ana).toMatchObject({
+      id: seedId("self_analysis", "ana"),
+      status: "done",
+      answered: 36,
+      total: 36,
+      firstUnanswered: null,
+      shares: [{ workspace: bcdx }],
+      shareableWorkspaces: [bcdx],
+    });
+    expect(ana.sections.map((section) => section.title)).toEqual([
+      "WHY",
+      "BE",
+      "DO",
+      "GIVE",
+      "HAVE",
+      "PERSONAL INCOME",
+      "ENOUGH",
+      "NOT",
+      "NOW",
+      "FINAL REFLECTION",
+      "ONE-SENTENCE SUMMARY",
+    ]);
+    expect(await home("kenji@bcdx.example")).toMatchObject({
+      status: "in_progress",
+      answered: 21,
+      total: 36,
+      shares: [],
+    });
+    expect(await home("grace@advisor.example")).toMatchObject({
+      status: "not_started",
+      answered: 0,
+      total: 36,
+      shareableWorkspaces: [],
+    });
+    expect(await home("admin@moonx.example")).toMatchObject({
+      status: "not_started",
+      answered: 0,
+      total: 36,
+    });
+
+    const anaCookie = await cookieOf("ana@bcdx.example");
+    const team = await app.handle(
+      apiRequest(
+        "GET",
+        `/api/v1/workspaces/${BCDX_WORKSPACE_ID}/self-analyses`,
+        {
+          cookie: anaCookie,
+        },
+      ),
+    );
+    expect(
+      memberSelfAnalysesSchema
+        .parse(await team.json())
+        .items.map(({ user, shared, status }) => [
+          user.displayName,
+          shared,
+          status,
+        ]),
+    ).toEqual([
+      ["Ana Villanueva", true, "done"],
+      ["Kenji Mori", false, null],
+      ["Paolo Gonzaga", true, "done"],
+    ]);
+
+    const read = (who: "kenji" | "paolo") =>
+      app.handle(
+        apiRequest(
+          "GET",
+          `/api/v1/workspaces/${BCDX_WORKSPACE_ID}/self-analyses/${userId(who)}`,
+          { cookie: anaCookie },
+        ),
+      );
+    // Paolo's comment on Ana's first answer (8.2), as Ana and the team read it.
+    const anaWhy = await app.handle(
+      apiRequest("GET", "/api/v1/me/self-analysis/sections/WHY", {
+        cookie: anaCookie,
+      }),
+    );
+    expect(
+      selfAnalysisSectionSchema
+        .parse(await anaWhy.json())
+        .answers.map((answer) => [answer.questionKey, answer.commentCounts]),
+    ).toEqual([
+      [
+        "SA.WHY.1",
+        [{ workspaceId: BCDX_WORKSPACE_ID, workspaceName: "BCDX", count: 1 }],
+      ],
+      [
+        "SA.WHY.2",
+        [{ workspaceId: BCDX_WORKSPACE_ID, workspaceName: "BCDX", count: 0 }],
+      ],
+    ]);
+    const anaShared = await app.handle(
+      apiRequest(
+        "GET",
+        `/api/v1/workspaces/${BCDX_WORKSPACE_ID}/self-analyses/${userId("ana")}`,
+        { cookie: await cookieOf("paolo@bcdx.example") },
+      ),
+    );
+    expect(anaShared.status).toBe(200);
+    const why = sharedSelfAnalysisSchema
+      .parse(await anaShared.json())
+      .sections.find((section) => section.key === "WHY");
+    expect(why?.answers[0]).toMatchObject({
+      questionKey: "SA.WHY.1",
+      commentCount: 1,
+    });
+
+    const kenji = await read("kenji");
+    expect(kenji.status).toBe(403);
+    expect(errorBodySchema.parse(await kenji.json()).error.code).toBe(
+      "NOT_SHARED",
+    );
+    const paolo = await read("paolo");
+    expect(paolo.status).toBe(200);
+    const view = sharedSelfAnalysisSchema.parse(await paolo.json());
+    expect(view).toMatchObject({
+      user: { displayName: "Paolo Gonzaga" },
+      status: "done",
+      currency: "PHP",
+    });
+    expect(view.sections.flatMap((section) => section.answers)).toHaveLength(
+      36,
+    );
   });
 });

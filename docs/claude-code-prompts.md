@@ -515,7 +515,7 @@ make test-api・make openapi（差分なし）・make typecheck・make lint が�
 
 ## Step 13: API: 自己分析
 
-Status:
+Status: done 2026-10-15
 
 ```
 docs/02-01_system-design-doc.md 5.8（S1〜S7）の API を作ってください。

@@ -680,6 +680,27 @@ describe("optimistic lock (ADR-019)", () => {
   });
 });
 
+describe("resolveScope (SDD 7.1「実装」)", () => {
+  test("answers the stored ids, whatever case the request wrote the UUID in", async () => {
+    const t = await setUp();
+    const upper = (id: string) => id.toUpperCase();
+    expect(
+      await resolveScope(
+        db,
+        { workspaceId: upper(t.workspace.id) },
+        t.member.id,
+      ),
+    ).toMatchObject({ workspaceId: t.workspace.id, role: "member" });
+    expect(
+      await resolveScope(db, { planId: upper(t.plan.id) }, t.member.id),
+    ).toMatchObject({
+      workspaceId: t.workspace.id,
+      ideaId: t.idea.id,
+      planId: t.plan.id,
+    });
+  });
+});
+
 describe("the write path (SDD 7.1「アーカイブ」)", () => {
   const lastActivity = async (t: Awaited<ReturnType<typeof setUp>>) => {
     const [plan] = await db

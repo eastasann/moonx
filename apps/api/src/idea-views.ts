@@ -32,6 +32,7 @@ import {
   type PlanSummary,
   type Role,
   type Stage,
+  type TemplateKind,
   type TemplateRef,
   type UserRef,
 } from "@moonx/schemas";
@@ -464,17 +465,17 @@ export async function templateRef(
   };
 }
 
-/** The newest published version of the validation template, or undefined. */
-export async function latestValidationTemplate(db: Executor) {
+/**
+ * The newest published version of the `kind` template, which a new validation,
+ * self-analysis or plan pins; undefined before the operator publishes one.
+ */
+export async function latestTemplateVersion(db: Executor, kind: TemplateKind) {
   const [version] = await db
     .select({ id: templateVersions.id })
     .from(templateVersions)
     .innerJoin(templates, eq(templates.id, templateVersions.templateId))
     .where(
-      and(
-        eq(templates.kind, "validation"),
-        eq(templateVersions.status, "published"),
-      ),
+      and(eq(templates.kind, kind), eq(templateVersions.status, "published")),
     )
     .orderBy(desc(templateVersions.versionNumber))
     .limit(1);

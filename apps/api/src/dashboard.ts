@@ -9,12 +9,9 @@ import {
   decisionLogEntries,
   executionItems,
   ideas,
-  memberships,
   planVersions,
   researchLogEntries,
   risks,
-  selfAnalyses,
-  selfAnalysisShares,
   users,
   validations,
 } from "@moonx/db";
@@ -29,7 +26,6 @@ import {
   errorBodySchema,
   type LinkTarget,
   type TargetRef,
-  type UserRef,
 } from "@moonx/schemas";
 import {
   and,
@@ -51,6 +47,7 @@ import type { AccessPlugin } from "./access";
 import { ideaSummaries, loadIdeaContexts } from "./idea-views";
 import { loadItemLabels } from "./labels";
 import { type ItemPlace, itemLink } from "./links";
+import { memberSelfAnalyses } from "./self-analysis";
 import { loadUserRefs } from "./user-refs";
 
 /** How many moves Recent activity shows (design-spec 6.9). */
@@ -71,11 +68,6 @@ const required = <T>(value: T | null | undefined, what: string): T => {
   if (value === null || value === undefined) throw new Error(`No ${what}`);
   return value;
 };
-
-/** By display name, then id, so the list reads alphabetically and never reorders. */
-const byName = (a: UserRef, b: UserRef) =>
-  a.displayName.localeCompare(b.displayName, "en", { sensitivity: "base" }) ||
-  a.id.localeCompare(b.id);
 
 /** Whether a comment is on a `type` row of `table` that is deleted (design-spec 6.9). */
 const onDeletedRow = (
@@ -280,50 +272,7 @@ export function dashboardRoutes({ access, db, now }: DashboardRoutesOptions) {
     )
     .get(
       "/api/v1/workspaces/:workspaceId/dashboard/self-analyses",
-      async ({ scope }) => {
-        const members = await db
-          .select({ userId: memberships.userId })
-          .from(memberships)
-          .where(
-            and(
-              eq(memberships.workspaceId, scope.workspaceId),
-              inArray(memberships.role, ["owner", "member"]),
-            ),
-          );
-        const ids = members.map((member) => member.userId);
-        const analyses =
-          ids.length === 0
-            ? []
-            : await db
-                .select({
-                  userId: selfAnalyses.userId,
-                  status: selfAnalyses.status,
-                  shared: sql<boolean>`exists (${db
-                    .select({ one: sql`1` })
-                    .from(selfAnalysisShares)
-                    .where(
-                      and(
-                        eq(selfAnalysisShares.selfAnalysisId, selfAnalyses.id),
-                        eq(selfAnalysisShares.workspaceId, scope.workspaceId),
-                      ),
-                    )})`,
-                })
-                .from(selfAnalyses)
-                .where(inArray(selfAnalyses.userId, ids));
-        const analysisOf = new Map(analyses.map((a) => [a.userId, a]));
-        const refs = await loadUserRefs(db, ids, scope.workspaceId);
-        return {
-          items: [...refs.values()].sort(byName).map((user) => {
-            const analysis = analysisOf.get(user.id);
-            const shared = analysis?.shared ?? false;
-            return {
-              user,
-              shared,
-              status: shared ? (analysis?.status ?? null) : null,
-            };
-          }),
-        };
-      },
+      ({ scope }) => memberSelfAnalyses(db, scope.workspaceId),
       {
         scoped: { to: "workspaceId", need: "write" },
         response: { 200: dashboardSelfAnalysesSchema, ...errors },

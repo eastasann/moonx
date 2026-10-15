@@ -1,3 +1,4 @@
+import { selfAnalysisAnswerContent } from "../history-values";
 import {
   selfAnalyses,
   selfAnalysisAnswers,
@@ -426,7 +427,7 @@ export async function seedSelfAnalyses({
           },
           { state: { text: answer.text, amount: answer.amount }, edit },
           earlier,
-          (state) => ({ text: state.text, amount: state.amount ?? null }),
+          selfAnalysisAnswerContent,
         ),
       );
       return {

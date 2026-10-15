@@ -197,6 +197,10 @@ async function newListRows(team: Team) {
   return { validationId, log, competitor, assumption, risk, cost };
 }
 
+/** The caller's own self-analysis, made straight in the database as S1 GET would. */
+const ownSelfAnalysis = (caller: Person) =>
+  fixtures.createSelfAnalysis(caller.id);
+
 const ROWS: Row[] = [
   {
     api: "Z1",
@@ -1128,6 +1132,107 @@ const ROWS: Row[] = [
       });
     },
     expected: members(403, 201, 201),
+  },
+  {
+    api: "S1 GET",
+    routes: { "GET /api/v1/me/self-analysis": "signedIn" },
+    async call(caller) {
+      await fixtures.selfAnalysisVersion();
+      return request("GET", "/api/v1/me/self-analysis", caller);
+    },
+    expected: signedInOnly(200),
+  },
+  {
+    api: "S1 PATCH",
+    routes: { "PATCH /api/v1/me/self-analysis": "signedIn" },
+    async call(caller) {
+      await ownSelfAnalysis(caller);
+      return request("PATCH", "/api/v1/me/self-analysis", caller, {
+        currency: "USD",
+      });
+    },
+    expected: signedInOnly(200),
+  },
+  {
+    api: "S2",
+    routes: {
+      "GET /api/v1/me/self-analysis/sections/:sectionKey": "signedIn",
+    },
+    async call(caller) {
+      await ownSelfAnalysis(caller);
+      return request("GET", "/api/v1/me/self-analysis/sections/WHY", caller);
+    },
+    expected: signedInOnly(200),
+  },
+  {
+    api: "S3",
+    routes: {
+      "PUT /api/v1/me/self-analysis/answers/:questionKey": "signedIn",
+    },
+    async call(caller) {
+      await ownSelfAnalysis(caller);
+      return request(
+        "PUT",
+        "/api/v1/me/self-analysis/answers/SA.WHY.1",
+        caller,
+        { text: "To stay", lockVersion: 0 },
+      );
+    },
+    expected: signedInOnly(200),
+  },
+  {
+    api: "S4 complete",
+    routes: { "POST /api/v1/me/self-analysis/complete": "signedIn" },
+    async call(caller) {
+      await ownSelfAnalysis(caller);
+      return request("POST", "/api/v1/me/self-analysis/complete", caller, {
+        confirmEmpty: true,
+      });
+    },
+    expected: signedInOnly(200),
+  },
+  {
+    api: "S4 reopen",
+    routes: { "POST /api/v1/me/self-analysis/reopen": "signedIn" },
+    async call(caller) {
+      await ownSelfAnalysis(caller);
+      return request("POST", "/api/v1/me/self-analysis/reopen", caller);
+    },
+    expected: signedInOnly(200),
+  },
+  {
+    api: "S5",
+    routes: { "PUT /api/v1/me/self-analysis/shares": "signedIn" },
+    async call(caller) {
+      await ownSelfAnalysis(caller);
+      return request("PUT", "/api/v1/me/self-analysis/shares", caller, {
+        workspaceIds: [],
+      });
+    },
+    expected: signedInOnly(200),
+  },
+  {
+    api: "S6",
+    routes: { "GET /api/v1/workspaces/:workspaceId/self-analyses": "scoped" },
+    call: (caller, { workspaceId }) =>
+      request("GET", `/api/v1/workspaces/${workspaceId}/self-analyses`, caller),
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "S7 (shared with the workspace)",
+    routes: {
+      "GET /api/v1/workspaces/:workspaceId/self-analyses/:userId": "scoped",
+    },
+    async call(caller, { workspaceId }) {
+      const author = await newMember(workspaceId);
+      await fixtures.createSelfAnalysis(author.id, [workspaceId]);
+      return request(
+        "GET",
+        `/api/v1/workspaces/${workspaceId}/self-analyses/${author.id}`,
+        caller,
+      );
+    },
+    expected: members(403, 200, 200),
   },
 ];
 

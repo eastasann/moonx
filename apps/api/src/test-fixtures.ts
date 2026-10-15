@@ -209,46 +209,60 @@ export function testFixtures(db: Database) {
   }
 
   /**
-   * The self-analysis template version the tests share, with its question `SA.WHY.1` in
-   * section `WHY`, made once.
+   * The self-analysis template version the tests share, made once: section `WHY` with
+   * the long texts `SA.WHY.1` and `SA.WHY.2`, then `INCOME` with the amount-with-reason
+   * question `SA.INCOME.1`. S1 makes new self-analyses on it, as the latest published.
    */
   async function selfAnalysisVersion() {
     const version = await templateVersion("self_analysis");
-    await db
-      .insert(templateSections)
-      .values({
-        templateVersionId: version.id,
-        key: "WHY",
-        title: "Why",
-        sortOrder: 0,
-      })
-      .onConflictDoNothing();
-    const section = required(
-      (
+    const questions = {
+      WHY: [
+        { key: "SA.WHY.1", answerType: "long_text" },
+        { key: "SA.WHY.2", answerType: "long_text" },
+      ],
+      INCOME: [{ key: "SA.INCOME.1", answerType: "amount_with_reason" }],
+    } as const;
+    for (const [sortOrder, [key, keyed]] of Object.entries(
+      questions,
+    ).entries()) {
+      await db
+        .insert(templateSections)
+        .values({
+          templateVersionId: version.id,
+          key,
+          title: key === "WHY" ? "Why" : "Personal income",
+          sortOrder,
+        })
+        .onConflictDoNothing();
+      const section = required(
+        (
+          await db
+            .select()
+            .from(templateSections)
+            .where(
+              and(
+                eq(templateSections.templateVersionId, version.id),
+                eq(templateSections.key, key),
+              ),
+            )
+        )[0],
+        "template section",
+      );
+      for (const [order, question] of keyed.entries()) {
         await db
-          .select()
-          .from(templateSections)
-          .where(
-            and(
-              eq(templateSections.templateVersionId, version.id),
-              eq(templateSections.key, "WHY"),
-            ),
-          )
-      )[0],
-      "template section",
-    );
-    await db
-      .insert(templateQuestions)
-      .values({
-        templateVersionId: version.id,
-        templateSectionId: section.id,
-        questionKey: "SA.WHY.1",
-        title: "Why",
-        prompt: "Why do you want this?",
-        answerType: "long_text",
-        sortOrder: 0,
-      })
-      .onConflictDoNothing();
+          .insert(templateQuestions)
+          .values({
+            templateVersionId: version.id,
+            templateSectionId: section.id,
+            questionKey: question.key,
+            title: question.key,
+            prompt: `${question.key}?`,
+            answerType: question.answerType,
+            sortOrder: order,
+          })
+          .onConflictDoNothing();
+      }
+    }
     return version.id;
   }
 
@@ -325,6 +339,7 @@ export function testFixtures(db: Database) {
     addMember,
     createTeam,
     templateVersion,
+    selfAnalysisVersion,
     createSelfAnalysis,
     createIdea,
     createPlan,

@@ -49,7 +49,7 @@ import {
 import {
   type IdeaRow,
   ideaSummaries,
-  latestValidationTemplate,
+  latestTemplateVersion,
   loadIdeaContexts,
   loadIdeaDetail,
   loadStages,
@@ -526,7 +526,7 @@ export function ideaRoutes({ access, db, now }: IdeaRoutesOptions) {
         const at = new Date(now());
         const ideaId = await writeInScope(db, scope, at, async (tx) => {
           await holdWorkspace(tx, scope.workspaceId);
-          const version = await latestValidationTemplate(tx);
+          const version = await latestTemplateVersion(tx, "validation");
           if (version === undefined) {
             throw new ApiError(
               "TEMPLATE_NOT_PUBLISHED",

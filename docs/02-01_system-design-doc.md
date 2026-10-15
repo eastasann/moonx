@@ -1328,29 +1328,31 @@ interface DecisionContext {
 interface SelfAnalysisHome {
   id: UUID; status: "not_started" | "in_progress" | "done"; completedAt: DateTime | null;
   currency: string; template: TemplateRef;
-  answered: number; total: number;
+  answered: number; total: number;   // 数え方は design-spec 6.11（固定している版の設問だけを数える）。packages/domain で数える
   sections: { key: string; title: string; answered: number; total: number }[];
-  firstUnanswered: { sectionKey: string; questionKey: string } | null;
-  shares: { workspace: { id: UUID; name: string }; sharedAt: DateTime }[];
-  shareableWorkspaces: { id: UUID; name: string }[];   // 自分が Owner / Member の、個人用以外のワークスペース（他人の個人用ワークスペースも含めない）
+  firstUnanswered: { sectionKey: string; questionKey: string } | null;   // テンプレートの順で最初の未回答。すべて回答済みなら null
+  shares: { workspace: { id: UUID; name: string }; sharedAt: DateTime }[];   // 共有した順（同じ S5 で足したものはワークスペースの id の順。外してから足し直したものは、足し直した時点の順で `sharedAt` もその時点）
+  shareableWorkspaces: { id: UUID; name: string }[];   // 自分が Owner / Member の、個人用以外のワークスペース（他人の個人用ワークスペースも含めない）。所属した順（U1 と同じ）
 }
 interface SelfAnalysisAnswer extends Versioned {
   questionKey: string; text: string | null; amount: number | null;   // amount は金額＋理由の設問だけ
-  commentCounts: { workspaceId: UUID; workspaceName: string; count: number }[];  // 本人には共有先ごとの件数
+  commentCounts: { workspaceId: UUID; workspaceName: string; count: number }[];  // 本人には共有先ごとの件数。今の共有先ごとに1件（0 件も返す。shares の順）。共有をやめたワークスペースのコメントは数えない（design-spec 6.0.4）
 }
 ```
 
 | API | 本体 | 応答 | エラー・副作用 |
 |---|---|---|---|
-| S1 GET | — | `200 SelfAnalysisHome` | 初めて開いたときに自己分析を作る（最新の公開済みの版、`not_started`）。運営者も同じ（design-spec 2.1）。公開済みの版が無ければ `409 TEMPLATE_NOT_PUBLISHED` |
-| S1 PATCH | `{ currency: string }` | `200 SelfAnalysisHome` | 換算しない |
-| S2 | — | `200 { section: TemplateSection; answers: SelfAnalysisAnswer[] }` | |
-| S3 | `{ text?: string | null; amount?: number | null; lockVersion; force? }`（値は design-spec 6.0.8） | `200 SelfAnalysisAnswer` | 最初の回答で `in_progress` にする。金額を送れるのは金額＋理由の設問だけ（それ以外は `422 VALIDATION_FAILED`）。存在しない設問は `422 QUESTION_NOT_FOUND`。履歴 `manual`（本人だけが見られる） |
-| S4 complete | `{ confirmEmpty?: boolean }` | `200 SelfAnalysisHome` | 未回答があり `confirmEmpty` が無ければ `409 HAS_EMPTY_QUESTIONS`（`error.emptyCount`） |
-| S4 reopen | — | `200 SelfAnalysisHome` | 共有は続く |
-| S5 | `{ workspaceIds: UUID[] }`（共有先の全体） | `200 SelfAnalysisHome` | 新しく足すのは `done` のときだけ（`422 MUST_BE_DONE_TO_SHARE`）。外すのはいつでも。Owner / Member でないワークスペースと、個人用ワークスペース（自分のものも他人のものも）は `422 NOT_SHAREABLE`（design-spec 6.11） |
-| S6 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | 今のワークスペースの Owner / Member |
-| S7 | — | `200 { id: UUID; user: UserRef; status; currency: string; sections: (TemplateSection & { answers: { questionKey: string; text: string | null; amount: number | null; commentCount: number }[] })[] }` | `id` は自己分析の ID で、回答へのコメント（C1）の `targetId` に使う。今のワークスペースに共有済みでなければ `403 NOT_SHARED`。変更履歴は返さない |
+| S1 GET | — | `200 SelfAnalysisHome` | 初めて開いたときに自己分析を作る（最新の公開済みの版、`not_started`）。運営者も同じ（design-spec 2.1）。公開済みの版が無ければ `409 TEMPLATE_NOT_PUBLISHED`。自己分析を作るのは S1 GET だけで、作る前の S1 PATCH・S2〜S5 は `404 NOT_FOUND`（10 も 11 も、開いたときに先に S1 GET を呼ぶ。design-spec 6.11） |
+| S1 PATCH | `{ currency: string }` | `200 SelfAnalysisHome` | 換算しない。通貨は設定なので履歴を書かない（design-spec 6.0.5） |
+| S2 | — | `200 { section: TemplateSection; answers: SelfAnalysisAnswer[] }` | 固定している版に無いセクションは `404 NOT_FOUND`。設問ごとに必ず1件返す（未回答は `text: null`・`amount: null`・`lockVersion: 0`） |
+| S3 | `{ text?: string | null; amount?: number | null; lockVersion; force? }`（値は design-spec 6.0.8） | `200 SelfAnalysisAnswer` | 最初の回答で `not_started` を `in_progress` にする（下の段落）。金額を送れるのは金額＋理由の設問だけ（それ以外の設問に null でない `amount` を送ると `422 VALIDATION_FAILED`、`details[0].path` は `amount`）。金額＋理由の `text` は理由。存在しない設問（固定している版に無い設問）は `422 QUESTION_NOT_FOUND`。設問の型の決まりは V3 と同じ（長文・短文・選択・金額＋理由以外は `422 NOT_EDITABLE`、選択は `422 INVALID_CHOICE`、短文の上限は設問を引いてから確かめる）。キーで決まる項目で、最初の保存で版 1 になる（5.1）。値の変わらない保存は版を上げず、履歴も書かない。履歴 `manual`（本人だけが見られる）。409 の `current.value` と履歴の値は `{ text, amount }` |
+| S4 complete | `{ confirmEmpty?: boolean }`（本体が無い（API は null として読む）ときは `{}` と同じ） | `200 SelfAnalysisHome` | 未回答があり `confirmEmpty` が true でなければ `409 HAS_EMPTY_QUESTIONS`（`error.emptyCount` は未回答の数。数え方は design-spec 6.11）。すでに `done` なら何も変えずに返す（`completedAt` も変えない） |
+| S4 reopen | — | `200 SelfAnalysisHome` | `in_progress` に戻し、`completedAt` を null にする。共有は続く。`done` でなければ何も変えずに返す |
+| S5 | `{ workspaceIds: UUID[] }`（共有先の全体。同じ id を2回入れると `422 VALIDATION_FAILED`。大文字と小文字は区別しない） | `200 SelfAnalysisHome` | 新しく足すのは `done` のときだけ（`422 MUST_BE_DONE_TO_SHARE`）。外すのはいつでも。Owner / Member でないワークスペース（無いワークスペースを含む）と、個人用ワークスペース（自分のものも他人のものも）は `422 NOT_SHAREABLE`（design-spec 6.11）で、`MUST_BE_DONE_TO_SHARE` より先に確かめる。共有先にできるかは lock を取る前に確かめ（送った数だけ lock を取らないため）、送ったワークスペースのメンバーの変更の lock（W3・U6・U7 と同じ）を取ってからもう一度確かめる（確かめてから足すまでに降格・削除が割り込まないようにする）。共有を足した・外したワークスペースの最終利用日（`last_active_at`）を更新する（共有の行はそのワークスペースに属する。自己分析の回答と状態はワークスペースに属さないので、S3・S4 では更新しない。7.1「実装」の「ワークスペースの中の何かが変わったとき」）。外しても、そのワークスペースのコメントは消さない（共有し直すと戻る。design-spec 6.0.4）。履歴は書かない（design-spec 6.0.5） |
+| S6 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | 今のワークスペースの Owner / Member。D2 と同じ形と並び（表示名の順）。`status` は今のワークスペースに共有しているときだけで、そうでなければ null |
+| S7 | — | `200 { id: UUID; user: UserRef; status; currency: string; sections: (TemplateSection & { answers: { questionKey: string; text: string | null; amount: number | null; commentCount: number }[] })[] }` | `id` は自己分析の ID で、回答へのコメント（C1）の `targetId` に使う。`commentCount` はこのワークスペースのコメントの数。今のワークスペースに共有済みでなければ `403 NOT_SHARED`（自己分析がまだ無いとき、ユーザーが無いときも同じにして、ワークスペースの外のユーザーの有無を答えない）。`userId` が UUID でなければ `404 NOT_FOUND`（`resolveScope` と同じ。ワークスペースの権限（`NO_ACCESS`・`FORBIDDEN`）を確かめた後）。共有の確認と回答は同じ時点の内容で読む（読んでいる間に共有をやめても、やめた後に書いた回答を返さない）。変更履歴は返さない |
+
+自己分析への書き込み（S1 PATCH・S3〜S5 と、自己分析を対象にした X3・H2・H3・T2）は、`lockActiveCaller`（7.1「停止・削除したユーザー」）の後に（S5 は、続けて送ったワークスペースのメンバーの lock を id の順に取った後に）自己分析の行をロックしてから書く（同じ自己分析への書き込みを1つずつにする。Reopen と共有の追加が行き違わず、保存の途中で固定している版が変わらず、最初の回答で状態が1回だけ変わる）。回答を書く処理（S3・X3・H2・H3）と、固定している版を替える T2 は、書いた後に design-spec 6.11 の回答済みの設問が1つ以上あり（表示条件で隠れる設問は数えないので、隠れる設問だけに書いても進めない）、状態が `not_started` なら `in_progress` にする。`done` はそのまま。回答をすべて消しても `not_started` には戻さない。
 
 ### 5.9 プラン
 
@@ -1463,7 +1465,7 @@ interface PitchDeck {
 |---|---|---|---|
 | X1 | `?source=self_analysis|validation|business_plan&id=<検証かプランの id。自己分析は省く>&sections=01,02&items=1,3&part=a|b&includeEmpty=true&includeExamples=true&includeReference=true` | `200 { markdown: string; json: object; fileBaseName: string; questionCount: number; allEmpty: boolean }` | `json` は design-spec 6.6 の `moonx-export`。範囲が空なら `422 EMPTY_SCOPE`。記録しない。回数制限は 7.2（超えたら `429 RATE_LIMITED`） |
 | X2 | `?target=self_analysis|validation|business_plan&id=` | `200 ImportContext` | アーカイブ中のアイデア・プランも読める（X1 も同じ）。`target.archived` で 24・25 が操作を止め、X3 は 409 `ARCHIVED` |
-| X3 | `{ target: { type: TemplateKind; id?: UUID }; changes: ImportChange[] }` | `200 { applied: number; needsClassification: number; batchId: UUID }` | 1つのトランザクションで全部反映するか、何もしない。どれかの `baseLockVersion` が古ければ `409 CONFLICT_MULTI`（`error.conflicts: { questionKey; current: ConflictCurrent }[]`）。取り込めない設問・隠れた設問は `422 NOT_IMPORTABLE`、存在しない設問は `422 QUESTION_NOT_FOUND`、金額・選択の値が読めない・同じ設問が2回ある・回答の長さや金額の範囲が design-spec 6.0.8（11・21 の行）に合わなければ `422 VALIDATION_FAILED`。`applied` は内容が変わった回答の数（変わらないものは数えない）。`conflicts[].current.value` は `{ text, amount }`。検証の回答で本文が変わったものは F/A/U を外して未分類にする（`classification` を送ったらそれを使う。`fact` は根拠が残っているときだけ）。回数制限は 7.2（超えたら `429 RATE_LIMITED`）。履歴 `ai_import`（1つの `batchId`） |
+| X3 | `{ target: { type: TemplateKind; id?: UUID }; changes: ImportChange[] }` | `200 { applied: number; needsClassification: number; batchId: UUID }` | 1つのトランザクションで全部反映するか、何もしない。どれかの `baseLockVersion` が古ければ `409 CONFLICT_MULTI`（`error.conflicts: { questionKey; current: ConflictCurrent }[]`）。取り込めない設問・隠れた設問は `422 NOT_IMPORTABLE`、存在しない設問は `422 QUESTION_NOT_FOUND`、金額・選択の値が読めない・同じ設問が2回ある・回答の長さや金額の範囲が design-spec 6.0.8（11・21 の行）に合わなければ `422 VALIDATION_FAILED`。`applied` は内容が変わった回答の数（変わらないものは数えない）。`conflicts[].current.value` は `{ text, amount }`。検証の回答で本文が変わったものは F/A/U を外して未分類にする（`classification` を送ったらそれを使う。`fact` は根拠が残っているときだけ）。回数制限は 7.2（超えたら `429 RATE_LIMITED`）。履歴 `ai_import`（1つの `batchId`）。自己分析への反映は、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落） |
 
 ```ts
 interface ImportContext {
@@ -1532,14 +1534,14 @@ interface Notification {
 |---|---|---|---|
 | L1 | `?kind=&ideaId=&planId=&recordedBy=&from=&to=&cursor=&limit=` | `200 Page<DecisionLogSummary>` | 新しい順 |
 | L2 | — | `200 DecisionLogEntry` | 更新・削除の API は無い |
-| C1 GET | 項目: `?targetType=&targetId=&targetKey=&workspaceId=`。画面: `?containerType=&containerId=&sectionKeys=&workspaceId=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾） | `200 { threads: { root: Comment; replies: Comment[] }[]; unresolvedCount: number }` | 画面の指定では、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea`）をまとめて返す（ヘッダーの 💬 のパネル。`unresolvedCount` は解決していないスレッドの数で、💬 の件数に使う。design-spec 6.0.1・6.0.4）。自己分析の回答へのコメントは、共有先の Owner / Member には `workspaceId` のワークスペースの分だけ、本人には全部を返す。削除した行へのコメントは返さない |
+| C1 GET | 項目: `?targetType=&targetId=&targetKey=&workspaceId=`。画面: `?containerType=&containerId=&sectionKeys=&workspaceId=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾） | `200 { threads: { root: Comment; replies: Comment[] }[]; unresolvedCount: number }` | 画面の指定では、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea`）をまとめて返す（ヘッダーの 💬 のパネル。`unresolvedCount` は解決していないスレッドの数で、💬 の件数に使う。design-spec 6.0.1・6.0.4）。自己分析の回答へのコメントは、共有先の Owner / Member には `workspaceId` のワークスペースの分だけ、本人には今の共有先の分を全部返す（共有をやめたワークスペースのコメントは、共有し直すまで返さない。design-spec 6.0.4。S2 の `commentCounts` と同じ範囲）。削除した行へのコメントは返さない |
 | C1 POST | `{ workspaceId: UUID; target: TargetRef; parentId?: UUID; body: string; mentionUserIds: UUID[] }`（`body` の長さは design-spec 6.0.8） | `201 Comment` | 返信は1段まで（`422 REPLY_DEPTH`）。メンションできない人は `422 INVALID_MENTION`。対象から画面（`container_type`・`container_id`・`section_key`）を決めて保存する。通知（`mention` / `comment`）を design-spec 6.15 の条件で作る（プランの項目へのコメントは、プランを作った人とアイデアを提案した人の両方。「自分がコメントしたスレッド」の人は、消したコメントの書き手も含む。受け取る人が重なれば1人に1件で、メンションされた人には `mention` の1件。対象の項目を読めない人と書いた本人には作らない） |
 | C2 PATCH | `{ body: string; mentionUserIds: UUID[] }` | `200 Comment` | 新しくメンションした人にだけ通知する |
 | C2 DELETE | — | `204` | 「deleted」として残す |
 | C3 | — | `200 Comment` | スレッドの最初のコメントだけ |
 | H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKeys=&cursor=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾。省くと画面全体） | `200 Page<HistoryEntry>` | 新しい順。`containerType=idea`（13）は、アイデア自身の行に加え、そのアイデアの検証のテンプレートの版の行（テンプレートの移行。design-spec 6.0.7）と、作成の取り消しの行も返す。項目の指定と `sectionKeys` の指定では、テンプレートの版の行を返さない |
-| H2 | — | `200 { entry: HistoryEntry; target: unknown }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す。衝突の検査はしない（戻すのは意図した上書き）。`template_version` の行は `422 VALIDATION_FAILED`（H3 で戻す）。作成の取り消しで書いた行も `422 VALIDATION_FAILED`（取り消したものは戻さない） |
-| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 ALREADY_REVERTED`。複製（`duplicate`）と下書き作成（`plan_draft`）は、戻すのではなく作ったものを論理削除する「作成の取り消し」になる（下の「作成の取り消し」） |
+| H2 | — | `200 { entry: HistoryEntry; target: unknown }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す。衝突の検査はしない（戻すのは意図した上書き）。`template_version` の行は `422 VALIDATION_FAILED`（H3 で戻す）。作成の取り消しで書いた行も `422 VALIDATION_FAILED`（取り消したものは戻さない）。自己分析の回答を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落） |
+| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 ALREADY_REVERTED`。複製（`duplicate`）と下書き作成（`plan_draft`）は、戻すのではなく作ったものを論理削除する「作成の取り消し」になる（下の「作成の取り消し」）。自己分析の操作を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落） |
 | N1 | `?filter=all|unread&cursor=&limit=` | `200 Page<Notification>` | ワークスペースをまたいで新しい順 |
 | N2 | — | `200 { total: number }` | クライアントは画面を開いたとき・前面に戻ったとき・60秒ごとに呼ぶ |
 | N3 | — | `204` | |
@@ -1557,7 +1559,7 @@ interface Notification {
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
 | T1 | `?targetType=self_analysis|validation|business_plan&targetId=` | `200 { from: { versionNumber: number }; to: { versionId: UUID; versionNumber: number }; carried: number; hiddenQuestions: { questionKey: string; title: string; hasAnswer: boolean }[]; addedQuestions: number; addedCostRows: string[] }` | 新しい版が無ければ `409 ALREADY_LATEST` |
-| T2 | `{ targetType; targetId; toVersionId: UUID }` | `200 { batchId: UUID; template: TemplateRef }` | design-spec 6.0.7 の表のとおり移す。履歴 `template_migration`（1つの `batchId`。H3 で戻せる）。費用の初期行: 新しい版の初期行のキー（`template_key`）について、そのキーの行が無ければ足す。そのキーの行が論理削除されていて、その削除が移行を戻した操作（H3。`source = revert` で、`revertedFromId` が `template_migration` の行）によるものなら、新しい行として足し直す。利用者が消した行（`source = manual` の `delete`）しか無ければ足さない（design-spec 6.0.7）。移行を H3 で戻すと、その移行で足した費用の行は論理削除する |
+| T2 | `{ targetType; targetId; toVersionId: UUID }` | `200 { batchId: UUID; template: TemplateRef }` | design-spec 6.0.7 の表のとおり移す。履歴 `template_migration`（1つの `batchId`。H3 で戻せる）。費用の初期行: 新しい版の初期行のキー（`template_key`）について、そのキーの行が無ければ足す。そのキーの行が論理削除されていて、その削除が移行を戻した操作（H3。`source = revert` で、`revertedFromId` が `template_migration` の行）によるものなら、新しい行として足し直す。利用者が消した行（`source = manual` の `delete`）しか無ければ足さない（design-spec 6.0.7）。移行を H3 で戻すと、その移行で足した費用の行は論理削除する。自己分析の移行は、S3 などの保存と同じく `lockActiveCaller` の後に自己分析の行をロックしてから版を替え、状態を進める（5.8 の表の下の段落。保存の途中で固定している版が変わらないようにする。隠れていた設問の回答が新しい版で出ると、回答済みに入る） |
 
 ### 5.13 運営者
 

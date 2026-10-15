@@ -328,6 +328,12 @@ describe("/api/docs (ADR-006)", () => {
       "/api/v1/me/avatar",
       "/api/v1/me/delete",
       "/api/v1/me/password",
+      "/api/v1/me/self-analysis",
+      "/api/v1/me/self-analysis/answers/{questionKey}",
+      "/api/v1/me/self-analysis/complete",
+      "/api/v1/me/self-analysis/reopen",
+      "/api/v1/me/self-analysis/sections/{sectionKey}",
+      "/api/v1/me/self-analysis/shares",
       "/api/v1/research-log/{entryId}",
       "/api/v1/risks/{id}",
       "/api/v1/validations/{validationId}/answers/{questionKey}",
@@ -356,6 +362,8 @@ describe("/api/docs (ADR-006)", () => {
       "/api/v1/workspaces/{workspaceId}/members",
       "/api/v1/workspaces/{workspaceId}/members/{userId}",
       "/api/v1/workspaces/{workspaceId}/mention-candidates",
+      "/api/v1/workspaces/{workspaceId}/self-analyses",
+      "/api/v1/workspaces/{workspaceId}/self-analyses/{userId}",
     ]);
   });
 

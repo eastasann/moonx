@@ -17,6 +17,7 @@ import type { Logger } from "./log";
 import type { Mailer } from "./mail";
 import { createRateLimiter } from "./rate-limit";
 import { researchLogRoutes } from "./research-log";
+import { selfAnalysisRoutes } from "./self-analysis";
 import type { ErrorReporter } from "./sentry";
 import { validationRoutes } from "./validation";
 import { validationListRoutes } from "./validation-lists";
@@ -98,7 +99,8 @@ export function createApp(config: Config, services: AppServices) {
     .use(researchLogRoutes({ access, db, now }))
     .use(validationListRoutes({ access, db, now }))
     .use(costRoutes({ access, db, now }))
-    .use(decisionRoutes({ access, db, now }));
+    .use(decisionRoutes({ access, db, now }))
+    .use(selfAnalysisRoutes({ access, db, now }));
   if (avatars.directory !== undefined) {
     app.use(avatarFileRoutes(access, avatars.directory));
   }

@@ -7,6 +7,7 @@ import type {
   ideas,
   researchLogEntries,
   risks,
+  selfAnalysisAnswers,
   validationAnswers,
 } from "./schema";
 
@@ -71,6 +72,18 @@ export const ideaContent = (
   name: idea.name,
   oneLineConcept: idea.oneLineConcept,
   proposedSolution: idea.proposedSolution ?? null,
+});
+
+/**
+ * A self-analysis answer, the item S3 saves; its history is filed under the
+ * self-analysis and only its owner sees it. `amount` is set on amount-with-reason
+ * questions only.
+ */
+export const selfAnalysisAnswerContent = (
+  answer: Pick<Row<typeof selfAnalysisAnswers>, "text" | "amount">,
+) => ({
+  text: answer.text ?? null,
+  amount: answer.amount ?? null,
 });
 
 export const validationAnswerContent = (

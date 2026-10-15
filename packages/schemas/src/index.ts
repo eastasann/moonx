@@ -6,6 +6,7 @@ export * from "./health";
 export * from "./ideas";
 export * from "./input-rules";
 export * from "./plans";
+export * from "./self-analysis";
 export * from "./template-file";
 export * from "./validation";
 export * from "./worksheets";

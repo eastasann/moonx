@@ -293,7 +293,9 @@ export const currencySchema = z
   });
 
 export const workspaceNameSchema = requiredText(WORKSPACE_NAME_MAX);
-export const ideaNameSchema = requiredText(100);
+/** Also what the default name of a copy keeps to (design-spec 6.8). */
+export const IDEA_NAME_MAX = 100;
+export const ideaNameSchema = requiredText(IDEA_NAME_MAX);
 export const oneLineConceptSchema = requiredText(200);
 
 export const shortTextSchema = optionalText(TEXT_LIMITS.short);

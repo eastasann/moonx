@@ -781,7 +781,7 @@ API のルートは5章。API が返す Web の静的なファイルのうち、
 | 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601 で、ミリ秒の3桁と `Z` を付ける（`"2026-10-01T02:00:00.000Z"`。表示はクライアントが利用者のタイムゾーンで行う） |
 | 金額・率 | 金額は number（ワークスペースの通貨。自己分析は自己分析の通貨）。率は 0〜1 の小数（35% は `0.35`）。DB は numeric、API で number に変換する |
 | 部分更新 | 1つの項目は `PATCH`（送った項目だけ変える）、キーで決まる項目（回答・数字）は `PUT .../{key}` で作るか更新する |
-| 同時編集 | 項目を更新するリクエストは、読んだときの `lockVersion` を送る。違えば 409 `CONFLICT` と相手の内容を返す。「自分の内容で上書きする」は同じ内容に `force: true` を付けて送る（ADR-019）。まだ行が無い項目（未回答の設問など）の `lockVersion` は `0`。一覧に出る行（調査ログ・競合・費用行など）は作成時の `lockVersion` が 0、キーで決まる項目（回答・数字）は最初の保存で 1 になる。何も変えないリクエストは `lockVersion` を上げず、履歴も書かない。キーで決まる項目を同時に作られて負けたときは、`force: true` でも 409 `CONFLICT`（`current` を読んでからやり直す）。V4・V5 は根拠の付け外しのたびに、対象の項目の `lockVersion` を上げる |
+| 同時編集 | 項目を更新するリクエストは、読んだときの `lockVersion` を送る。違えば 409 `CONFLICT` と相手の内容を返す。「自分の内容で上書きする」は同じ内容に `force: true` を付けて送る（ADR-019）。まだ行が無い項目（未回答の設問など）の `lockVersion` は `0`。一覧に出る行（調査ログ・競合・費用行など）は作成時の `lockVersion` が 0、キーで決まる項目（回答・数字）は最初の保存で 1 になる。何も変えないリクエストは `lockVersion` を上げず、履歴も書かない。キーで決まる項目を同時に作られて負けたときは、`force: true` でも 409 `CONFLICT`（`current` を読んでからやり直す。`lockVersion` 0 の保存が、すでにある行に当たったとき）。V4・V5 は根拠の付け外しのたびに、対象の項目の `lockVersion` を上げる |
 | 一覧 | `?cursor=&limit=`（既定50、上限200）。応答は `{ items, nextCursor }`。`cursor` は並べ替えた結果へのオフセット（上限 1,000,000）で、読めない値は 422 `VALIDATION_FAILED`（`details[0].path` は `cursor`）。件数の少ない一覧（競合・費用行など）はページに分けず `{ items }` |
 | 権限 | 下の表の記号。O = Owner、M = Member、V = Viewer（いずれもその資源が属するワークスペースのロール）、本人 = 自分のもの（自己分析は持ち主、アカウントと通知は自分）、書いた人 = そのコメントを書いた人、対象を読める人 = その項目を読めるロール（自己分析は本人と、共有先のワークスペースの O・M）、コメントできる人 = その対象に C1 の POST ができる人（7.1）、Admin = 運営者、ログイン = ログインしていれば誰でも、公開 = ログイン不要。足りなければ 403 `FORBIDDEN`、ワークスペースに所属していなければ 403 `NO_ACCESS`、無ければ 404 `NOT_FOUND`。権限の対応の全体は 7.1 |
 | アーカイブ | アーカイブしたアイデア・プランの中身を変えるリクエスト（コメントを書く・元に戻すを含む）は、ロールにかかわらず 409 `ARCHIVED`（design-spec 6.8） |
@@ -945,7 +945,7 @@ interface NextStep {
 }
 
 // ---- 衝突（409 CONFLICT の error.current） ----
-interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: DateTime; updatedBy: UserRef | null; }
+interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: DateTime; updatedBy: UserRef | null; }   // value は保存されている項目の中身で、変更履歴の before / after と同じ形（回答なら { text, fau, confidence, evidenceIds }。形の正は packages/db/src/history-values.ts）
 ```
 
 ### 5.3 エンドポイント一覧
@@ -1177,7 +1177,7 @@ interface IdeaSummary {
   proposer: UserRef; stage: Stage; latestDecision: DecisionValue | null; archived: boolean;
   checks: { key: CheckKey; state: CheckState; params: Record<string, number> }[];   // 6つ。合計や点数は返さない。params は CheckResult（5.2）と同じ基準値（一覧が競合の範囲「Competitors (3–5)」を出すため）
   keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months">;
-  plans: { id: UUID; name: string; latestVersionName: string | null; latestGoNoGo: GoNoGoValue | null }[];
+  plans: { id: UUID; name: string; latestVersionName: string | null; latestGoNoGo: GoNoGoValue | null }[];   // アーカイブしていない案を作った順に
   lastActivityAt: DateTime; createdAt: DateTime;
 }
 interface IdeaDetail extends IdeaSummary, Versioned {
@@ -1191,7 +1191,7 @@ interface DueItem {
 }
 interface Activity {
   kind: "change" | "comment" | "decision" | "go_no_go" | "version_saved";
-  actor: UserRef; at: DateTime; summary: string /* 動きの対象のラベル。change・comment は項目のラベル（"01 WHO"・"Costs · Rent"）かアイデア名、decision・go_no_go は記録した値、version_saved は版の名前。文はクライアントが kind・actor・summary から組み立てる */;
+  actor: UserRef; at: DateTime; summary: string /* 動きの対象のラベル。change・comment は項目のラベル（"01 WHO"・"Costs · Rent"。決め方は 5.11 HistoryEntry の label）か、複数の項目にまたがる操作ではアイデア名（プランの中ならプラン名）、decision・go_no_go は記録した値（"hold" など）、version_saved は版の名前。文はクライアントが kind・actor・summary から組み立てる */;
   idea: { id: UUID; name: string } | null; plan: { id: UUID; name: string } | null; link: LinkTarget;
 }
 ```
@@ -1199,14 +1199,14 @@ interface Activity {
 | API | 本体・クエリ | 応答 | 補足 |
 |---|---|---|---|
 | D1 | — | `200 { items: IdeaSummary[]; droppedCount: number }` | アーカイブ・Drop を除く。更新順。`droppedCount` はアーカイブしていない Drop の件数 |
-| D2 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | Owner / Member の一覧。共有していない人の `status` は null（進み具合を見せない） |
-| D3 | — | `200 { items: DueItem[] }` | 対象の期間は design-spec 6.9（Due soon）。期限（`due_date`）のある実行管理の項目（milestone・launch・open_question・next_action。kpi は期限を持たない）から、Done / Resolved のもの、アーカイブ・論理削除したものを除く。自分の担当を先、次に期限順。「今日」は利用者の `users.timezone` の日付で、`overdue` と期間もそれで決める |
-| D4 | — | `200 { items: Activity[] }` | 件数は design-spec 6.9。自己分析に関わる動きは除く。変更・コメント・決定ログを合わせて新しい順に並べる。`batch_id` のある変更は1回の操作を1件にまとめる（複製は新しいアイデアの行で示す）。同じ人が同じ項目を続けて変えたものは、design-spec 6.9 の時間の幅の中なら1件にまとめ、最後の時刻で出す（自動保存のたびに履歴が1行増えるため。履歴の行そのものは1件ずつ残る）。削除した行へのコメントは除く |
-| I1 GET | `?stage=&decision=not_dropped|all|undecided|proceed|hold|drop&proposerId=&includeArchived=true&sort=updated|created|name&q=&cursor=&limit=` | `200 Page<IdeaSummary> & { hiddenDroppedCount: number }` | `decision` の既定は `not_dropped`。`q` は名前と一行コンセプトの部分一致（大文字小文字を区別しない）。`hiddenDroppedCount` は `decision=not_dropped` のときだけ数え、他は 0 |
-| I1 POST | `{ name: string; oneLineConcept: string; proposedSolution?: string }`（値は design-spec 6.0.8） | `201 IdeaDetail` | 最新の公開済みの検証のテンプレートの版で検証を作り、費用の初期行を Empty で作る（履歴なし: 作成の記録だけ）。公開済みの版が無ければ `409 TEMPLATE_NOT_PUBLISHED`（運営者がまだテンプレートを取り込んでいない。AD10）。`proposedSolution` は空白だけなら null |
+| D2 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | Owner / Member の一覧（表示名の順）。共有していない人の `status` は null（進み具合を見せない） |
+| D3 | — | `200 { items: DueItem[] }` | 対象の期間は design-spec 6.9（Due soon）。期限（`due_date`）のある実行管理の項目（milestone・launch・open_question・next_action。kpi は期限を持たない）から、Done / Resolved のもの、アーカイブ・論理削除したものを除く。自分の担当を先、次に期限順（同じ期限は項目名の順）。「今日」は利用者の `users.timezone` の日付で、`overdue` と期間もそれで決める |
+| D4 | — | `200 { items: Activity[] }` | 件数は design-spec 6.9。自己分析に関わる動きは除く。変更・コメント・決定ログを合わせて新しい順に並べる。`batch_id` のある変更は1回の操作を1件にまとめる（複製は新しいアイデアの行で示す）。`batch_id` の無い変更も、1回の要求で書いた行（同じ人・同じ時刻・同じアイデア。I1 POST のアイデアと費用の初期行、V4 の調査ログと根拠を付けた項目など）は1件にまとめる。1つの項目だけを変えた操作は、同じ人が同じ項目を続けて変えたものなら、design-spec 6.9 の時間の幅の中で1件にまとめ、最後の時刻で出す（前の変更からの間が時間の幅を超えたら別の1件。自動保存のたびに履歴が1行増えるため。履歴の行そのものは1件ずつ残る）。`link`: 1つの項目の変更はその項目を出す画面（コメントの通知と同じ行き先で、パネルは開かない）、コメントはその行き先に `panel: "comments"` と `target` を付けたもの、複数の項目にまたがる操作・判定は 13、プランの中の操作・Go / No-Go・版の保存は 20。削除した行へのコメントと、削除したコメントは除く |
+| I1 GET | `?stage=&decision=not_dropped|all|undecided|proceed|hold|drop&proposerId=&includeArchived=true&sort=updated|created|name&q=&cursor=&limit=` | `200 Page<IdeaSummary> & { hiddenDroppedCount: number }` | `decision` の既定は `not_dropped`。`q` は名前と一行コンセプトの部分一致（大文字小文字を区別しない。空白だけなら絞り込まない）。`sort` の既定は `updated`: `updated` は最終活動（`lastActivityAt`）の新しい順、`created` は作成の新しい順、`name` は名前の順（大文字小文字を区別しない）。`q` は短文の上限（design-spec 6.0.8）まで。`hiddenDroppedCount` は `decision=not_dropped` のときだけ、ほかの条件（工程・提案者・アーカイブ・`q`）に合う Drop のアイデアを数え、他は 0 |
+| I1 POST | `{ name: string; oneLineConcept: string; proposedSolution?: string }`（値は design-spec 6.0.8） | `201 IdeaDetail` | 最新の公開済みの検証のテンプレートの版で検証を作り、費用の初期行を Empty で作る（履歴は作成の記録だけ: アイデアの作成と、費用の初期行それぞれの作成を1行ずつ。`manual`）。公開済みの版が無ければ `409 TEMPLATE_NOT_PUBLISHED`（運営者がまだテンプレートを取り込んでいない。AD10）。`proposedSolution` は空白だけなら null |
 | I2 GET | — | `200 IdeaDetail` | |
 | I2 PATCH | `{ name?; oneLineConcept?; proposedSolution?; lockVersion: number; force?: boolean }` | `200 IdeaDetail` | 履歴 `manual`（対象 `idea`） |
-| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail & { batchId: UUID }`（トーストの「Undo」が H3 に渡す） | design-spec 6.8 の複製。履歴 `duplicate`: 新しいアイデアの作成と、コピーした記録対象の項目（回答・数字・調査ログ・競合・前提・リスク・費用行）それぞれの作成を、同じ `batchId` で1行ずつ残す（履歴で1回の操作としてまとめて見せるため。H3 で作成ごと取り消せる。条件と扱いは H3）。既定の名前は名前の上限（design-spec 6.0.8）に収める |
+| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail & { batchId: UUID }`（トーストの「Undo」が H3 に渡す） | design-spec 6.8 の複製。履歴 `duplicate`: 新しいアイデアの作成と、コピーした記録対象の項目（回答・数字・調査ログ・競合・前提・リスク・費用行）それぞれの作成を、同じ `batchId` で1行ずつ残す（履歴で1回の操作としてまとめて見せるため。H3 で作成ごと取り消せる。条件と扱いは H3）。既定の名前は名前の上限（design-spec 6.0.8）に収める。コピーした行の並び順はそのまま（作成の時刻で並べる調査ログ・リスク・根拠の紐づけは、元の順に作成の時刻を 1 ミリ秒ずつずらす）、版はキーで決まる項目（回答・数字）が 1、一覧に出る行が 0。コピーした調査ログの記録者は複製した人。論理削除した行・削除した調査ログを指す根拠・外した根拠はコピーしない |
 | I4 | — | `200 IdeaDetail` | すでにその状態なら何もせず 200。履歴は書かず、`updatedAt` と `updatedBy` も変えない（`lastActivityAt` だけ更新する） |
 
 ### 5.7 検証
@@ -1283,11 +1283,11 @@ interface EconomicsInput extends Versioned {
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| V1 | — | `200 ValidationHome` | 確認項目・Next steps・F/A/U・主要指標は `packages/domain` で計算する。`sections[].title` は番号を含む名前。出どころの決まりは design-spec 6.1（設問のセクションはテンプレートの版の題、画面のセクションはカタログ `validation:sections.<key>` の固定のラベル） |
-| V2 | — | `200 { section: TemplateSection; answers: ValidationAnswer[] }` | `sectionKey` は `01` / `02` / `10`（`04` のパターンと `08` は V8・V15 が返す。それ以外の値は `404 NOT_FOUND`）。設問ごとに必ず1件返す（未回答は `text: null`, `lockVersion: 0`。出し分けで隠れる設問も `hidden: true` で返す） |
-| V3 | `{ text?: string | null; classification?: ClassificationInput; lockVersion: number; force?: boolean }` | `200 ValidationAnswer` | `422 FACT_REQUIRES_EVIDENCE`（有効な根拠が無いのに `fact`。Fact は V4 の `setFact` で付ける）、`422 CONFIDENCE_REQUIRED`、`422 INVALID_CHOICE`（選択の設問）、`422 QUESTION_NOT_FOUND`（テンプレートの版に無い設問 ID。`V.04.SURVIVOR_PATTERNS`・`V.04.FAILURE_PATTERNS`・`V.08.WORTH` も V3 で答える）。`text` の長さは design-spec 6.0.8（超えたら `422 VALIDATION_FAILED`）。`text` を null か空白にすると F/A/U も外す（`unknown` を除く）。答えの行を作るときの `lockVersion` は 0 で、作られた行は 1 から始まる。履歴 `manual` |
-| V4 | `{ target: TargetRef; researchLogEntryId?: UUID; newResearchLog?: ResearchLogInput; url?: string; note?: string; setFact?: boolean; lockVersion: number; force?: boolean }` | `201 { evidence: Evidence; classification: Classification; lockVersion: number }` | `researchLogEntryId` / `newResearchLog` / `url` のどれか1つ。`setFact: true` なら対象を Fact にする（M2 で根拠を付けて閉じたとき）。対象は `validation_answer` / `economics_input` / `cost_item` / `competitor` / `assumption`（`lockVersion` は対象の項目の版）。同じ調査ログを同じ対象に2回付けると `422 VALIDATION_FAILED`。値の無い対象や F/A/U を持たない対象（競合・前提）への `setFact` も `422 VALIDATION_FAILED`（`details[0].path` は `setFact`）。`url` と `note` の値は design-spec 6.0.8。対象の版が食い違えば `409 CONFLICT`、`force: true` で上書きする（ADR-019）。履歴は対象の項目に1行（`newResearchLog` のときは調査ログの作成も1行）。`manual` |
-| V5 | `?lockVersion=` | `200 { classification: Classification; lockVersion: number }` | Fact の最後の根拠を外すと未分類に戻す（クライアントは事前に確認を出す）。`?force=true` で版の食い違いを上書きする。履歴は対象の項目に1行（`manual`） |
+| V1 | — | `200 ValidationHome` | 確認項目・Next steps・F/A/U・主要指標は `packages/domain` で計算する。`summary` は 01 WHO・01 PROBLEM・アイデアの提案する解決策・02 OCEAN（空白だけ・固定している版に無い・出し分けで隠れている回答は null）。`decisions` は判定（`validation_decision`）だけ。`plans` は作った順。`sections[].title` は番号を含む名前。出どころの決まりは design-spec 6.1（設問のセクションはテンプレートの版の題、画面のセクションはカタログ `validation:sections.<key>` の固定のラベル） |
+| V2 | — | `200 { section: TemplateSection; answers: ValidationAnswer[] }` | `sectionKey` は `01` / `02` / `10`（`04` のパターンと `08` は V8・V15 が返す。それ以外の値は `404 NOT_FOUND`）。設問ごとに必ず1件返す（未回答は `text: null`, `lockVersion: 0`。出し分けで隠れる設問も `hidden: true` で返す）。`classification.evidence` は付けた順。`commentCount` はその項目の削除していないコメント（返信を含む）の数（ほかの型の `commentCount` も同じ） |
+| V3 | `{ text?: string | null; classification?: ClassificationInput; lockVersion: number; force?: boolean }` | `200 ValidationAnswer` | `422 FACT_REQUIRES_EVIDENCE`（有効な根拠が無いのに `fact`。Fact は V4 の `setFact` で付ける）、`422 CONFIDENCE_REQUIRED`、`422 INVALID_CHOICE`（選択の設問）、`422 QUESTION_NOT_FOUND`（テンプレートの版に無い設問 ID。`V.04.SURVIVOR_PATTERNS`・`V.04.FAILURE_PATTERNS`・`V.08.WORTH` も V3 で答える）。`text` の長さは design-spec 6.0.8（超えたら `422 VALIDATION_FAILED`。短文の型の上限は設問を引いてから確かめる）。`text` を null か空白にすると F/A/U も外す（`unknown` を除く）。`FACT_REQUIRES_EVIDENCE` は Fact にするときだけ確かめる（すでに Fact の回答は、根拠の調査ログが削除されていても保存できる。6.5）。F/A/U を持たない設問への `fau`、Assumption 以外への `confidence`、値の無い回答を Fact か Assumption にする送信は `422 VALIDATION_FAILED`（`details[0].path` は `classification.fau` / `classification.confidence`）。長文・短文・選択以外の型の設問は `422 NOT_EDITABLE`。答えの行を作るときの `lockVersion` は 0 で、作られた行は 1 から始まる。履歴 `manual` |
+| V4 | `{ target: TargetRef; researchLogEntryId?: UUID; newResearchLog?: ResearchLogInput; url?: string; note?: string; setFact?: boolean; lockVersion: number; force?: boolean }` | `201 { evidence: Evidence; classification: Classification; lockVersion: number }` | `researchLogEntryId` / `newResearchLog` / `url` のどれか1つ。`setFact: true` なら対象を Fact にする（M2 で根拠を付けて閉じたとき）。対象は `validation_answer` / `economics_input` / `cost_item` / `competitor` / `assumption`（`lockVersion` は対象の項目の版）。同じ調査ログを同じ対象に2回付けると `422 VALIDATION_FAILED`。値の無い対象や F/A/U を持たない対象（競合・前提）への `setFact` も `422 VALIDATION_FAILED`（`details[0].path` は `setFact`）。`url` と `note` の値は design-spec 6.0.8。対象の版が食い違えば `409 CONFLICT`、`force: true` で上書きする（ADR-019）。対象がこの検証に無い・論理削除した行なら `404 NOT_FOUND`、回答の設問 ID が固定している版に無ければ `422 QUESTION_NOT_FOUND`、数字の `key` が `EconomicsField` でなければ `422 VALIDATION_FAILED`（`target.key`）。`researchLogEntryId` がこの検証の削除していない調査ログでなければ `422 VALIDATION_FAILED`（`researchLogEntryId`）。まだ行の無い回答・数字に付けると、その行を版 1 で作る（履歴は作成の1行）。応答の `lockVersion` は付けた後の版。F/A/U を持たない対象（競合・前提）の `classification` は `fau: null`・`state: "unclassified"`。履歴は対象の項目に1行（`newResearchLog` のときは調査ログの作成も1行）。`manual` |
+| V5 | `?lockVersion=` | `200 { classification: Classification; lockVersion: number }` | Fact の最後の根拠を外すと未分類に戻す（クライアントは事前に確認を出す）。最後かどうかは数える根拠（削除した調査ログを指すものを除く）で決め、外した後に数える根拠が残らない Fact は未分類に戻す（「Fact（根拠なし）」の項目から、削除した調査ログを指す根拠を外したときも）。固定している版に無い設問の回答（移行で隠れたもの）の根拠も外せる。すでに外した根拠は `404 NOT_FOUND`。`?force=true` で版の食い違いを上書きする。履歴は対象の項目に1行（`manual`） |
 | V6 GET | `?supports=&sourceType=&q=&cursor=&limit=` | `200 Page<ResearchLogEntry>` | `observedOn` の新しい順（日付なしは末尾）、同じなら作成の新しい順。`q` は topic と observation の部分一致 |
 | V6 POST | `ResearchLogInput`（値は design-spec 6.0.8） | `201 ResearchLogEntry` | 履歴 `manual` |
 | V7 GET | — | `200 ResearchLogEntry & { usages: EvidenceUsage[] }` | |
@@ -1307,8 +1307,8 @@ interface EconomicsInput extends Versioned {
 | V15 | — | `200 { inputs: EconomicsInput[]; worth: ValidationAnswer; result: EconomicsResult; costItems: CostItem[] }` | `inputs` は7つすべて（未入力は `value: null`）。`worth` は `V.08.WORTH`（更新は V3） |
 | V16 | `{ value: number | null; classification?: ClassificationInput; lockVersion; force? }` | `200 EconomicsInput` | 範囲は design-spec 6.0.8。外れたら `422 OUT_OF_RANGE`。値も F/A/U も変わらないリクエストは行を作らず、履歴も書かない。履歴 `manual` |
 | V17 | `{ ids: UUID[]; category?: CostCategory }`（費用行は表ごと） | `204` | `ids` はその一覧の（論理削除を除く）全件と一致すること（違えば `422 VALIDATION_FAILED`）。`sort_order` を振り直す（リスクは手の並びに切り替わる）。履歴は残さず、`lockVersion` と `updated_at` も変えない（並べ替えは対象外で、開いている編集と衝突させない） |
-| V18 | — | `200 DecisionContext` | |
-| V19 | `{ value: DecisionValue; reason: string; basedOnDecisionId: UUID | null; confirmNewer?: boolean }`（`reason` の長さは design-spec 6.0.8） | `201 { entry: DecisionLogEntry; latestDecision: DecisionValue; canCreatePlan: boolean }` | 画面を開いた後に別の判定が記録されていて `confirmNewer` が無ければ `409 DECISION_CHANGED`（`error.latest: DecisionLogSummary`）。決定ログに記録し、`ideas.latest_decision` を変え、ワークスペースの他のメンバー（停止・削除したユーザーを除く Owner / Member / Viewer）に通知（`decision`）を作る。通知の開き先は 13（`{ screen: 13, workspaceId, ideaId }`。Go / No-Go は 20）。`recordedAt` は idea の行を押さえた後に決め、先に確定した記録より後になるようにする |
+| V18 | — | `200 DecisionContext` | アーカイブ済みのアイデアでも Owner / Member には返す（19 は判断材料を出す。design-spec 6.5）。`summary` の回答の扱いは V1 と同じ。`lastDecision` は判定（`validation_decision`）の最新 |
+| V19 | `{ value: DecisionValue; reason: string; basedOnDecisionId: UUID | null; confirmNewer?: boolean }`（`reason` の長さは design-spec 6.0.8） | `201 { entry: DecisionLogEntry; latestDecision: DecisionValue; canCreatePlan: boolean }` | 画面を開いた後に別の判定が記録されていて `confirmNewer` が無ければ `409 DECISION_CHANGED`（`error.latest: DecisionLogSummary`）。決定ログに記録し、`ideas.latest_decision` を変え、ワークスペースの他のメンバー（停止・削除したユーザーを除く Owner / Member / Viewer）に通知（`decision`）を作る。通知の開き先は 13（`{ screen: 13, workspaceId, ideaId }`。Go / No-Go は 20）。`recordedAt` は idea の行を押さえた後に決め、先に確定した記録より後になるようにする（API のインスタンスの時計がずれていても、最新の判定の `recordedAt` の 1 ミリ秒後より前にしない）。「別の判定が記録されていて」は、最新の判定が `basedOnDecisionId` と違うこと（`basedOnDecisionId` が null で判定があるときも）。`basedOnDecisionId` がこのアイデアの判定でなければ `422 VALIDATION_FAILED`（`basedOnDecisionId`）。スナップショットは記録するトランザクションの中で計算する。アイデアの概要の版（`lockVersion`・`updatedAt`）は変えない |
 
 ```ts
 interface DecisionContext {
@@ -1491,11 +1491,12 @@ interface DecisionLogSummary {
   id: UUID; kind: "validation_decision" | "go_no_go" | "version_saved";
   value: DecisionValue | GoNoGoValue | null; versionName: string | null;
   idea: { id: UUID; name: string }; plan: { id: UUID; name: string } | null;
-  reasonExcerpt: string | null; recordedBy: UserRef; recordedAt: DateTime;
+  reasonExcerpt: string | null;   // 理由の先頭 200 文字（切ったときは末尾の1文字を「…」にする。画面が1〜2行に収める。design-spec 6.15）
+  recordedBy: UserRef; recordedAt: DateTime;
 }
 interface DecisionLogEntry extends DecisionLogSummary {
   reason: string | null;
-  snapshot: {
+  snapshot: {   // missingChecks の link は、書き込みの画面（19・14 の新しい入力）へ入れない人の見え方で求める（後で読む Viewer にも同じものを返すため）
     missingChecks: CheckResult[]; keyMetrics: KeyMetrics; fau: FauBreakdown;
     conditions?: { launchIf: string | null; delayIf: string | null; stopIf: string | null };  // go_no_go
     planVersion?: { id: UUID; name: string } | null;  // go_no_go・version_saved
@@ -1508,7 +1509,7 @@ interface Comment {
   editedAt: DateTime | null; deleted: boolean; createdAt: DateTime;
 }
 interface HistoryEntry {
-  id: UUID; batchId: UUID | null; target: TargetRef; label: string;   // 例: "01 WHO"、"Costs · Rent"
+  id: UUID; batchId: UUID | null; target: TargetRef; label: string;   // 例: "01 WHO"、"Costs · Rent"。設問の回答は「{節} {設問のタイトル}」（固定している版に無い設問は設問 ID の末尾）、数字は「Unit Economics · {入力の名前}」、行は「{一覧の名前} · {行の文}」（調査ログはトピック、競合と費用行は名前、前提とリスクは文、実行管理は1列目。80 文字を超える文は切って「…」、空なら「Untitled」）、アイデアとプランのヘッダは名前、Pitch Deck のスライドは「Pitch Deck」、テンプレートの版は「Template version」。英語の文言はカタログ `common:itemLabel`・`common:economicsField`
   action: "create" | "update" | "delete" | "restore";
   source: HistorySource;   // 作成の取り消しの行は source が revert、action が delete、target.type が idea か business_plan の組み合わせ。画面はこの組み合わせで「作成の取り消し」と出す（design-spec 6.0.5）
   before: unknown | null; after: unknown | null;   // 本文・数字・F/A/U・確信度・根拠の id の一覧など（差分の強調はクライアント）

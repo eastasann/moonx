@@ -6,8 +6,10 @@ import {
   hashInvitationToken,
   INVITATION_VALID_MS,
   ideas,
+  importTemplateFile,
   invitations,
   memberships,
+  publishTemplateVersion,
   selfAnalyses,
   selfAnalysisShares,
   templateQuestions,
@@ -46,6 +48,16 @@ const required = <T>(row: T | undefined, what: string): T => {
   if (row === undefined) throw new Error(`no ${what} row`);
   return row;
 };
+
+const BCDX_VALIDATION = new URL(
+  "../../../data/templates/bcdx/validation.json",
+  import.meta.url,
+);
+
+/** The published validation version, made once per process however many ask at once. */
+let validationVersion:
+  | Promise<typeof templateVersions.$inferSelect>
+  | undefined;
 
 /** The fixtures, bound to the test database. */
 export function testFixtures(db: Database) {
@@ -128,6 +140,10 @@ export function testFixtures(db: Database) {
    * tests pin. There is one template per kind, so tests share it.
    */
   async function templateVersion(kind: TemplateKind) {
+    if (kind === "validation") {
+      validationVersion ??= bcdxValidationVersion();
+      return validationVersion;
+    }
     await db
       .insert(templates)
       .values({ kind, name: `Test ${kind}` })
@@ -159,6 +175,37 @@ export function testFixtures(db: Database) {
       )[0],
       "template version",
     );
+  }
+
+  /**
+   * v1 of the validation template with the BCDX file's sections, questions, check
+   * thresholds and cost rows (data/templates/bcdx), imported and published as an
+   * operator would (AD10, AD6), so validations evaluate as they do in use.
+   */
+  async function bcdxValidationVersion() {
+    const published = async () =>
+      (
+        await db
+          .select({ version: templateVersions })
+          .from(templateVersions)
+          .innerJoin(templates, eq(templates.id, templateVersions.templateId))
+          .where(
+            and(
+              eq(templates.kind, "validation"),
+              eq(templateVersions.versionNumber, 1),
+              eq(templateVersions.status, "published"),
+            ),
+          )
+      )[0]?.version;
+    const existing = await published();
+    if (existing !== undefined) return existing;
+    const imported = await importTemplateFile(
+      db,
+      "validation",
+      await Bun.file(BCDX_VALIDATION).json(),
+    );
+    await publishTemplateVersion(db, imported.versionId, null);
+    return required(await published(), "validation template version");
   }
 
   /**

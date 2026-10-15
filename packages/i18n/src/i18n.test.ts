@@ -5,6 +5,7 @@ import {
   checkStateSchema,
   confidenceSchema,
   decisionValueSchema,
+  economicsFieldSchema,
   fauSchema,
   fauStateSchema,
   goNoGoValueSchema,
@@ -17,7 +18,7 @@ import { createI18n, i18n, namespaces, resources } from "./i18n";
 test("the shared instance is ready on import", () => {
   expect(i18n.isInitialized).toBe(true);
   expect(i18n.language).toBe("en");
-  expect(namespaces).toEqual(["common", "format", "mail"]);
+  expect(namespaces).toEqual(["common", "format", "mail", "validation"]);
 });
 
 test("each instance is separate", () => {
@@ -63,6 +64,7 @@ test.each([
   ["stage", stageSchema.options],
   ["checkState", checkStateSchema.options],
   ["supportsCheck", supportsCheckSchema.options],
+  ["economicsField", economicsFieldSchema.options],
 ] as const)("common:%s labels every value", (group, values) => {
   const labels = resources.en.common[group] as Record<string, string>;
   for (const value of values) expect(labels[value]).toBeString();

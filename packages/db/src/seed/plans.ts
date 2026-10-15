@@ -10,6 +10,7 @@ import {
   templateExecutionPresets,
   templateQuestions,
 } from "../schema";
+import { loadValidation, validationView } from "../validation-state";
 import {
   BCDX_WORKSPACE_ID,
   type HistoryContainer,
@@ -30,7 +31,6 @@ import {
   recordRevisions,
   type When,
 } from "./revisions";
-import { loadValidation, writerView } from "./validation-state";
 
 type Rows = Record<string, string | number | null>[];
 
@@ -563,7 +563,10 @@ export async function writePlan(
     const savedAt = clock.ago(spec.version.savedDaysAgo);
     const loaded = await loadValidation(tx, idea.validationId);
     const state = validationStateAt(loaded.state, idea, savedAt);
-    const evaluation = evaluateValidation(state, writerView(loaded));
+    const evaluation = evaluateValidation(
+      state,
+      validationView(loaded, "owner"),
+    );
     const snapshot = {
       header: stateAt(headerSaves, savedAt),
       answers: [...answerSaves.entries()].flatMap(([key, saves]) => {

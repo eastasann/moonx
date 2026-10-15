@@ -8,6 +8,7 @@ import {
   decisionLogEntries,
   notifications,
 } from "../schema";
+import { loadValidation, snapshotView } from "../validation-state";
 import {
   BCDX_MEMBERS,
   BCDX_WORKSPACE_ID,
@@ -18,7 +19,6 @@ import {
 import { validationStateAt, type WrittenIdea } from "./ideas";
 import { seedId } from "./ids";
 import type { WrittenPlan } from "./plans";
-import { loadValidation, writerView } from "./validation-state";
 
 const HOUR = 60 * 60 * 1000;
 /** How long after a notification arrived its reader opened it. */
@@ -79,7 +79,7 @@ export async function recordDecision(
   const loaded = await loadValidation(tx, idea.validationId);
   const evaluation = evaluateValidation(
     validationStateAt(loaded.state, idea, recordedAt),
-    writerView(loaded),
+    snapshotView(loaded),
   );
   const planVersion =
     version !== null && version.savedAt <= recordedAt

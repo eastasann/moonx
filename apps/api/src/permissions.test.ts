@@ -1,5 +1,10 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { accounts, verifications } from "@moonx/db";
+import {
+  accounts,
+  evidenceLinks,
+  validationAnswers,
+  verifications,
+} from "@moonx/db";
 import type { Role } from "@moonx/schemas";
 import { eq } from "drizzle-orm";
 import { type AccessKind, accessDeclarations } from "./access";
@@ -134,6 +139,12 @@ const members = (
   owner,
   admin: 403,
 });
+
+/** A new idea of the row's workspace proposed by its Owner, with its validation. */
+const newIdea = (
+  team: Team,
+  values: Parameters<typeof fixtures.createIdea>[2] = {},
+) => fixtures.createIdea(team.workspaceId, team.callers.owner.id, values);
 
 /** A new member of the row's workspace, for a call that changes or removes one. */
 async function newMember(workspaceId: string) {
@@ -511,6 +522,250 @@ const ROWS: Row[] = [
       );
     },
     expected: members(403, 200, 200),
+  },
+  {
+    api: "D1",
+    routes: {
+      "GET /api/v1/workspaces/:workspaceId/dashboard/ideas": "scoped",
+    },
+    call: (caller, { workspaceId }) =>
+      request(
+        "GET",
+        `/api/v1/workspaces/${workspaceId}/dashboard/ideas`,
+        caller,
+      ),
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "D2",
+    routes: {
+      "GET /api/v1/workspaces/:workspaceId/dashboard/self-analyses": "scoped",
+    },
+    call: (caller, { workspaceId }) =>
+      request(
+        "GET",
+        `/api/v1/workspaces/${workspaceId}/dashboard/self-analyses`,
+        caller,
+      ),
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "D3",
+    routes: {
+      "GET /api/v1/workspaces/:workspaceId/dashboard/due-soon": "scoped",
+    },
+    call: (caller, { workspaceId }) =>
+      request(
+        "GET",
+        `/api/v1/workspaces/${workspaceId}/dashboard/due-soon`,
+        caller,
+      ),
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "D4",
+    routes: {
+      "GET /api/v1/workspaces/:workspaceId/dashboard/activity": "scoped",
+    },
+    call: (caller, { workspaceId }) =>
+      request(
+        "GET",
+        `/api/v1/workspaces/${workspaceId}/dashboard/activity`,
+        caller,
+      ),
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "I1 GET",
+    routes: { "GET /api/v1/workspaces/:workspaceId/ideas": "scoped" },
+    call: (caller, { workspaceId }) =>
+      request("GET", `/api/v1/workspaces/${workspaceId}/ideas`, caller),
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "I1 POST",
+    routes: { "POST /api/v1/workspaces/:workspaceId/ideas": "scoped" },
+    async call(caller, { workspaceId }) {
+      // Made on the latest published validation template, which must exist.
+      await fixtures.templateVersion("validation");
+      return request(
+        "POST",
+        `/api/v1/workspaces/${workspaceId}/ideas`,
+        caller,
+        {
+          name: "Idea",
+          oneLineConcept: "Worth checking",
+        },
+      );
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "I2 GET",
+    routes: { "GET /api/v1/ideas/:ideaId": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request("GET", `/api/v1/ideas/${idea.id}`, caller);
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "I2 PATCH",
+    routes: { "PATCH /api/v1/ideas/:ideaId": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request("PATCH", `/api/v1/ideas/${idea.id}`, caller, {
+        name: "Renamed",
+        lockVersion: 0,
+      });
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "I3",
+    routes: { "POST /api/v1/ideas/:ideaId/duplicate": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request("POST", `/api/v1/ideas/${idea.id}/duplicate`, caller, {});
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "I4 archive",
+    routes: { "POST /api/v1/ideas/:ideaId/archive": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request("POST", `/api/v1/ideas/${idea.id}/archive`, caller);
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "I4 restore",
+    routes: { "POST /api/v1/ideas/:ideaId/restore": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team, { archivedAt: new Date() });
+      return request("POST", `/api/v1/ideas/${idea.id}/restore`, caller);
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "V1",
+    routes: { "GET /api/v1/ideas/:ideaId/validation": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request("GET", `/api/v1/ideas/${idea.id}/validation`, caller);
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "V2",
+    routes: {
+      "GET /api/v1/validations/:validationId/questions/:sectionKey": "scoped",
+    },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "GET",
+        `/api/v1/validations/${validation.id}/questions/01`,
+        caller,
+      );
+    },
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "V3",
+    routes: {
+      "PUT /api/v1/validations/:validationId/answers/:questionKey": "scoped",
+    },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "PUT",
+        `/api/v1/validations/${validation.id}/answers/V.01.WHO`,
+        caller,
+        { text: "Office workers", lockVersion: 0 },
+      );
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "V4",
+    routes: { "POST /api/v1/validations/:validationId/evidence": "scoped" },
+    async call(caller, team) {
+      const { validation } = await newIdea(team);
+      return request(
+        "POST",
+        `/api/v1/validations/${validation.id}/evidence`,
+        caller,
+        {
+          target: {
+            type: "validation_answer",
+            id: validation.id,
+            key: "V.01.WHO",
+          },
+          url: "https://example.com/source",
+          lockVersion: 0,
+        },
+      );
+    },
+    expected: members(403, 201, 201),
+  },
+  {
+    api: "V5",
+    routes: { "DELETE /api/v1/evidence/:evidenceId": "scoped" },
+    async call(caller, team) {
+      const { idea, validation } = await newIdea(team);
+      await db.insert(validationAnswers).values({
+        validationId: validation.id,
+        questionKey: "V.01.WHO",
+        text: "Office workers",
+        lockVersion: 1,
+      });
+      const [link] = await db
+        .insert(evidenceLinks)
+        .values({
+          workspaceId: idea.workspaceId,
+          validationId: validation.id,
+          targetType: "validation_answer",
+          targetId: validation.id,
+          targetKey: "V.01.WHO",
+          url: "https://example.com/source",
+          createdById: idea.proposerId,
+        })
+        .returning();
+      return request(
+        "DELETE",
+        `/api/v1/evidence/${link?.id}?lockVersion=1`,
+        caller,
+      );
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "V18",
+    routes: { "GET /api/v1/ideas/:ideaId/decision-context": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request(
+        "GET",
+        `/api/v1/ideas/${idea.id}/decision-context`,
+        caller,
+      );
+    },
+    expected: members(403, 200, 200),
+  },
+  {
+    api: "V19",
+    routes: { "POST /api/v1/ideas/:ideaId/decisions": "scoped" },
+    async call(caller, team) {
+      const { idea } = await newIdea(team);
+      return request("POST", `/api/v1/ideas/${idea.id}/decisions`, caller, {
+        value: "hold",
+        reason: "Permits are unclear",
+        basedOnDecisionId: null,
+      });
+    },
+    expected: members(403, 201, 201),
   },
 ];
 

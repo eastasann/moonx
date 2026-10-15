@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./seed": "./src/seed/index.ts",
+    "./test-database": "./src/test-database.ts"
   },
   "dependencies": {
     "@moonx/domain": "workspace:*",

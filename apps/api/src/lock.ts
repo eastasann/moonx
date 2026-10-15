@@ -73,6 +73,27 @@ export async function checkLockVersion(
 }
 
 /**
+ * {@link checkLockVersion} for a keyed item (an answer, a number). A save that claims
+ * version 0 never saw the stored row: another request made it first, and the writes in
+ * an idea run one at a time, so this save reads that row instead of meeting it at the
+ * insert. It lost the race to create the item and gets 409 CONFLICT even with `force`
+ * (SDD 5.1「同時編集」), as {@link createKeyedItem} answers a save that does meet it.
+ *
+ * @throws {ApiError} CONFLICT
+ */
+export async function checkKeyedLockVersion(
+  db: Database | DatabaseTransaction,
+  current: LockedItem | null,
+  claim: LockClaim,
+  workspaceId: string | null,
+): Promise<void> {
+  if (current !== null && claim.lockVersion === 0) {
+    throw await conflictError(db, current, workspaceId);
+  }
+  await checkLockVersion(db, current, claim, workspaceId);
+}
+
+/**
  * Creates a keyed item (an answer, a number) on its first save, or refuses the save that
  * lost the race to create it: two first saves both read nothing, and the second insert
  * meets the first one's row. The loser gets 409 CONFLICT with the winner's version even

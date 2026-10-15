@@ -8,6 +8,7 @@
   "dependencies": {
     "@elysiajs/openapi": "^1.4.16",
     "@moonx/db": "workspace:*",
+    "@moonx/domain": "workspace:*",
     "@moonx/i18n": "workspace:*",
     "@moonx/schemas": "workspace:*",
     "@sentry/bun": "^11.7.0",

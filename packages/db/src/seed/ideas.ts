@@ -8,6 +8,16 @@ import type {
 } from "@moonx/schemas";
 import { asc, eq } from "drizzle-orm";
 import {
+  assumptionContent,
+  competitorContent,
+  costItemContent,
+  economicsInputContent,
+  ideaContent,
+  researchLogContent,
+  riskContent,
+  validationAnswerContent,
+} from "../history-values";
+import {
   assumptions,
   competitors,
   costItems,
@@ -282,7 +292,7 @@ export async function writeIdea(
   created(
     null,
     { type: "idea", id: ideaId },
-    ideaRow,
+    ideaContent(ideaRow),
     copy ?? { daysAgo: spec.createdDaysAgo, by: spec.proposer },
     ideaContainer,
   );
@@ -299,8 +309,17 @@ export async function writeIdea(
     // A duplicate copies what the idea has; a deleted log is not part of it (SDD 6.5).
     (log) => copy === undefined || log.deleted === undefined,
   );
+  // A copy keeps the order of rows that lists sort by when they were made, as I3 does:
+  // each is made a millisecond after the one before it, logs in the order they were
+  // recorded, then the evidence.
+  const copied = (index: number) => new Date(createdAt.getTime() + index);
+  const copyOrder = logs
+    .map((log, index) => ({ log, index }))
+    .sort((a, b) => b.log.daysAgo - a.log.daysAgo || a.index - b.index)
+    .map(({ log }) => log);
   const logRows = logs.map((log) => {
-    const recordedAt = copy === undefined ? at(log) : createdAt;
+    const recordedAt =
+      copy === undefined ? at(log) : copied(copyOrder.indexOf(log));
     return {
       id: seedId("research_log", spec.key, log.key),
       validationId,
@@ -322,20 +341,11 @@ export async function writeIdea(
     };
   });
   if (logRows.length > 0) await tx.insert(researchLogEntries).values(logRows);
-  const logContent = (row: (typeof logRows)[number]) => ({
-    observedOn: row.observedOn,
-    topic: row.topic,
-    observation: row.observation,
-    sourceType: row.sourceType,
-    sourceUrl: row.sourceUrl,
-    supportsChecks: row.supportsChecks,
-    supportsNote: row.supportsNote,
-  });
   logs.forEach((log, index) => {
     const row = logRows[index];
     if (row === undefined) return;
     const target = { type: "research_log_entry", id: row.id };
-    created("research_log", target, logContent(row), copy ?? log);
+    created("research_log", target, researchLogContent(row), copy ?? log);
     if (copy !== undefined || log.deleted === undefined) return;
     touch(at(log.deleted));
     history.add({
@@ -343,7 +353,7 @@ export async function writeIdea(
       sectionKey: "research_log",
       target,
       action: "delete",
-      before: logContent(row),
+      before: researchLogContent(row),
       after: null,
       source: "manual",
       by: log.deleted.by,
@@ -392,7 +402,13 @@ export async function writeIdea(
         throw new Error(`${label} cites an unknown research log ${piece.log}`);
       const recordedAt =
         piece.log === undefined ? undefined : logRecordedAt.get(piece.log);
-      if (recordedAt !== undefined && when.at < recordedAt)
+      // Evidence put on an item at once is made in the order listed, a millisecond
+      // apart, so it lists in that order (by when it was made) here and in a copy.
+      const madeAt =
+        copy === undefined
+          ? new Date(when.at.getTime() + index)
+          : copied(logRows.length + evidenceRows.length);
+      if (recordedAt !== undefined && madeAt < recordedAt)
         throw new Error(`${label} cites ${piece.log} before it is recorded`);
       const id = seedId("evidence", spec.key, label, index);
       evidenceRows.push({
@@ -406,8 +422,8 @@ export async function writeIdea(
         url: piece.url ?? null,
         note: piece.note ?? null,
         createdById: userId(when.by),
-        createdAt: when.at,
-        updatedAt: when.at,
+        createdAt: madeAt,
+        updatedAt: madeAt,
       });
       return id;
     });
@@ -436,7 +452,7 @@ export async function writeIdea(
     created(
       "competitors",
       { type: "competitor", id },
-      { ...content, evidenceIds },
+      competitorContent(content, evidenceIds),
       worked,
     );
     return {
@@ -471,7 +487,7 @@ export async function writeIdea(
     created(
       "assumptions_risks",
       { type: "assumption", id },
-      { ...content, evidenceIds },
+      assumptionContent(content, evidenceIds),
       worked,
     );
     return {
@@ -497,7 +513,12 @@ export async function writeIdea(
       mitigation: risk.mitigation ?? null,
       howToValidate: risk.howToValidate ?? null,
     };
-    created("assumptions_risks", { type: "risk", id }, content, worked);
+    created(
+      "assumptions_risks",
+      { type: "risk", id },
+      riskContent(content),
+      worked,
+    );
     return {
       id,
       validationId,
@@ -505,8 +526,8 @@ export async function writeIdea(
       // Null keeps 16's automatic order (Impact, then Probability).
       sortOrder: null,
       updatedById: userId(worked.by),
-      createdAt: at(worked),
-      updatedAt: at(worked),
+      createdAt: copy === undefined ? at(worked) : copied(index),
+      updatedAt: copy === undefined ? at(worked) : copied(index),
     };
   });
   if (riskRows.length > 0) await tx.insert(risks).values(riskRows);
@@ -570,7 +591,7 @@ export async function writeIdea(
         at: createdAt,
         by: copyEdit.by,
       });
-      created("costs", target, { ...content, evidenceIds }, copyEdit);
+      created("costs", target, costItemContent(content, evidenceIds), copyEdit);
       return {
         ...base,
         ...content,
@@ -579,15 +600,10 @@ export async function writeIdea(
       };
     }
     // M1 makes the row empty; filling it in on 17 is a later save.
-    created(
-      "costs",
-      target,
-      { ...empty, evidenceIds: [] },
-      {
-        daysAgo: spec.createdDaysAgo,
-        by: spec.proposer,
-      },
-    );
+    created("costs", target, costItemContent(empty, []), {
+      daysAgo: spec.createdDaysAgo,
+      by: spec.proposer,
+    });
     if (cost === undefined)
       return {
         ...base,
@@ -606,8 +622,8 @@ export async function writeIdea(
       sectionKey: "costs",
       target,
       action: "update",
-      before: { ...empty, evidenceIds: [] },
-      after: { ...content, evidenceIds },
+      before: costItemContent(empty, []),
+      after: costItemContent(content, evidenceIds),
       source: "manual",
       by: worked.by,
       at: workedAt.at,
@@ -679,12 +695,9 @@ export async function writeIdea(
       { type: "validation_answer", key, sectionKey: answerSection(key) },
       answer,
       state,
-      (s, evidenceIds) => ({
-        text: s.text,
-        fau: s.fau,
-        confidence: s.confidence,
-        evidenceIds: s.fau === "fact" ? evidenceIds : [],
-      }),
+      // The evidence was attached by the save that made it a Fact (M2).
+      (s, evidenceIds) =>
+        validationAnswerContent(s, s.fau === "fact" ? evidenceIds : []),
     );
     answerSaves.set(key, saved.saves);
     const { first, last } = firstAndLast(saved.saves);
@@ -720,12 +733,8 @@ export async function writeIdea(
       { type: "economics_input", key: field, sectionKey: "economics" },
       input,
       state,
-      (s, evidenceIds) => ({
-        value: s.value,
-        fau: s.fau,
-        confidence: s.confidence,
-        evidenceIds: s.fau === "fact" ? evidenceIds : [],
-      }),
+      (s, evidenceIds) =>
+        economicsInputContent(s, s.fau === "fact" ? evidenceIds : []),
     );
     numberSaves.set(field, saved.saves);
     const { first, last } = firstAndLast(saved.saves);

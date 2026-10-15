@@ -49,7 +49,6 @@ import {
 } from "./schema";
 import {
   BCDX_WORKSPACE_ID,
-  loadValidation,
   personalWorkspaceId,
   SEED_INVITATION_TOKENS,
   SEED_PASSWORD,
@@ -64,6 +63,7 @@ import {
   quoteIdentifier,
   testDatabaseName,
 } from "./test-database";
+import { loadValidation } from "./validation-state";
 
 const base = process.env.DATABASE_URL_TEST;
 if (base === undefined || base === "") {

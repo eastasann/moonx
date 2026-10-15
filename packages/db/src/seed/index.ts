@@ -36,7 +36,6 @@ export {
   SEED_USERS,
 } from "./people";
 export { selfAnalysisId } from "./self-analyses";
-export { loadValidation } from "./validation-state";
 
 /** Every table of the schema, emptied together so no foreign key is left dangling. */
 const truncateAll = async (tx: DatabaseTransaction) => {

@@ -449,7 +449,7 @@ make test-api・make openapi（差分なし）・make typecheck・make lint が�
 
 ## Step 11: API: アイデア・検証の中心・判定・ダッシュボード
 
-Status:
+Status: done 2026-10-15
 
 ```
 コアフローの API を作ってください（PRD 4章の Must）。

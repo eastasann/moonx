@@ -1,4 +1,14 @@
-import type { executionItems } from "./schema";
+import type {
+  assumptions,
+  competitors,
+  costItems,
+  economicsInputs,
+  executionItems,
+  ideas,
+  researchLogEntries,
+  risks,
+  validationAnswers,
+} from "./schema";
 
 type ExecutionItemFields = Pick<
   typeof executionItems.$inferInsert,
@@ -45,4 +55,164 @@ export const executionItemContent = (item: ExecutionItemFields) => ({
   kpiActual: item.kpiActual ?? null,
   whyItMatters: item.whyItMatters ?? null,
   answer: item.answer ?? null,
+});
+
+// The content the change history keeps of each validation item (ADR-020): what a person
+// edits, without ids, order, lock version or timestamps. `evidenceIds` lists the evidence
+// links attached (not detached), oldest first, for the items that take evidence. The
+// seed writes the same shapes, and 409 CONFLICT shows the stored item in them.
+
+type Row<T extends { $inferInsert: unknown }> = T["$inferInsert"];
+
+/** An idea's overview, the item I2 PATCH saves; its history is filed under the idea (13). */
+export const ideaContent = (
+  idea: Pick<Row<typeof ideas>, "name" | "oneLineConcept" | "proposedSolution">,
+) => ({
+  name: idea.name,
+  oneLineConcept: idea.oneLineConcept,
+  proposedSolution: idea.proposedSolution ?? null,
+});
+
+export const validationAnswerContent = (
+  answer: Pick<Row<typeof validationAnswers>, "text" | "fau" | "confidence">,
+  evidenceIds: readonly string[],
+) => ({
+  text: answer.text ?? null,
+  fau: answer.fau ?? null,
+  confidence: answer.confidence ?? null,
+  evidenceIds: [...evidenceIds],
+});
+
+export const economicsInputContent = (
+  input: Pick<Row<typeof economicsInputs>, "value" | "fau" | "confidence">,
+  evidenceIds: readonly string[],
+) => ({
+  value: input.value ?? null,
+  fau: input.fau ?? null,
+  confidence: input.confidence ?? null,
+  evidenceIds: [...evidenceIds],
+});
+
+export const researchLogContent = (
+  entry: Pick<
+    Row<typeof researchLogEntries>,
+    | "observedOn"
+    | "topic"
+    | "observation"
+    | "sourceType"
+    | "sourceUrl"
+    | "supportsChecks"
+    | "supportsNote"
+  >,
+) => ({
+  observedOn: entry.observedOn ?? null,
+  topic: entry.topic,
+  observation: entry.observation ?? null,
+  sourceType: entry.sourceType ?? null,
+  sourceUrl: entry.sourceUrl ?? null,
+  supportsChecks: [...(entry.supportsChecks ?? [])],
+  supportsNote: entry.supportsNote ?? null,
+});
+
+export const competitorContent = (
+  competitor: Pick<
+    Row<typeof competitors>,
+    | "name"
+    | "type"
+    | "targetCustomer"
+    | "offering"
+    | "typicalPrice"
+    | "priceNote"
+    | "strength"
+    | "weakness"
+    | "whyChosen"
+    | "whySurvive"
+  >,
+  evidenceIds: readonly string[],
+) => ({
+  name: competitor.name,
+  type: competitor.type ?? null,
+  targetCustomer: competitor.targetCustomer ?? null,
+  offering: competitor.offering ?? null,
+  typicalPrice: competitor.typicalPrice ?? null,
+  priceNote: competitor.priceNote ?? null,
+  strength: competitor.strength ?? null,
+  weakness: competitor.weakness ?? null,
+  whyChosen: competitor.whyChosen ?? null,
+  whySurvive: competitor.whySurvive ?? null,
+  evidenceIds: [...evidenceIds],
+});
+
+export const assumptionContent = (
+  assumption: Pick<
+    Row<typeof assumptions>,
+    | "statement"
+    | "whyBelieve"
+    | "evidenceNote"
+    | "confidence"
+    | "disproveCondition"
+    | "nextCheck"
+  >,
+  evidenceIds: readonly string[],
+) => ({
+  statement: assumption.statement,
+  whyBelieve: assumption.whyBelieve ?? null,
+  evidenceNote: assumption.evidenceNote ?? null,
+  confidence: assumption.confidence ?? null,
+  disproveCondition: assumption.disproveCondition ?? null,
+  nextCheck: assumption.nextCheck ?? null,
+  evidenceIds: [...evidenceIds],
+});
+
+/** Risks take no evidence. */
+export const riskContent = (
+  risk: Pick<
+    Row<typeof risks>,
+    | "statement"
+    | "probability"
+    | "impact"
+    | "whyMatters"
+    | "mitigation"
+    | "howToValidate"
+  >,
+) => ({
+  statement: risk.statement,
+  probability: risk.probability ?? null,
+  impact: risk.impact ?? null,
+  whyMatters: risk.whyMatters ?? null,
+  mitigation: risk.mitigation ?? null,
+  howToValidate: risk.howToValidate ?? null,
+});
+
+export const costItemContent = (
+  item: Pick<
+    Row<typeof costItems>,
+    | "category"
+    | "templateKey"
+    | "name"
+    | "inputMode"
+    | "amount"
+    | "percent"
+    | "isLumpSum"
+    | "whyNeeded"
+    | "canReduce"
+    | "notes"
+    | "fau"
+    | "confidence"
+  >,
+  evidenceIds: readonly string[],
+) => ({
+  category: item.category,
+  templateKey: item.templateKey ?? null,
+  name: item.name,
+  inputMode: item.inputMode ?? "amount",
+  amount: item.amount ?? null,
+  percent: item.percent ?? null,
+  isLumpSum: item.isLumpSum ?? false,
+  whyNeeded: item.whyNeeded ?? null,
+  canReduce: item.canReduce ?? null,
+  notes: item.notes ?? null,
+  fau: item.fau ?? null,
+  confidence: item.confidence ?? null,
+  evidenceIds: [...evidenceIds],
 });

@@ -2,13 +2,14 @@ import i18next, { type i18n as I18n } from "i18next";
 import common from "../locales/en/common.json";
 import format from "../locales/en/format.json";
 import mail from "../locales/en/mail.json";
+import validation from "../locales/en/validation.json";
 
 /**
  * The catalogs, one file per namespace under `locales/<lang>/` (SDD 9章). Adding a
  * language adds a directory here; the UI stays English-only until then.
  */
 export const resources = {
-  en: { common, format, mail },
+  en: { common, format, mail, validation },
 } as const;
 
 export const defaultNS = "common";

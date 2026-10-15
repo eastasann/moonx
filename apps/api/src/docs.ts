@@ -1,4 +1,5 @@
 import { openapi } from "@elysiajs/openapi";
+import { errorBodySchema } from "@moonx/schemas";
 import { Elysia } from "elysia";
 import swaggerUiCss from "swagger-ui-dist/swagger-ui.css" with { type: "text" };
 import swaggerUiBundle from "swagger-ui-dist/swagger-ui-bundle.js" with {
@@ -41,6 +42,27 @@ const asset = (body: string, contentType: string) => () =>
 const hidden = { detail: { hide: true } };
 
 /**
+ * A schema as JSON Schema, on the side the API produces. A request schema that reads
+ * what was sent into another value (a blank text into null, a query string into a
+ * number) holds a transform, which JSON Schema cannot express on that side; the plugin
+ * does not say which side it asks for, and only requests have transforms, so such a
+ * schema is documented as it is sent.
+ */
+function toJsonSchema(schema: z.ZodType) {
+  try {
+    return z.toJSONSchema(schema);
+  } catch {
+    return z.toJSONSchema(schema, { io: "input" });
+  }
+}
+
+/** A schema as a component, which takes no `$schema` of its own. */
+function componentOf(schema: z.ZodType) {
+  const { $schema: _, ...component } = toJsonSchema(schema);
+  return component;
+}
+
+/**
  * `/api/docs` (ADR-006): the OpenAPI document of every route and a Swagger UI page to
  * read it. Only staging installs it, open to anyone there (SDD 7.1 Z3).
  */
@@ -62,14 +84,22 @@ export function docsRoutes(access: AccessPlugin) {
               "The REST API of moonx (docs/02-01_system-design-doc.md 5章).",
             version: "v1",
           },
+          components: {
+            // Zod writes JSON Schema draft 2020-12, which an OpenAPI 3.1 schema is;
+            // the plugin's types spell `type` more narrowly than Zod's.
+            schemas: { ErrorBody: componentOf(errorBodySchema) as never },
+          },
         },
         mapJsonSchema: {
           // A 204 declares `z.undefined()`, which JSON Schema cannot express: it is
-          // documented by its description alone.
+          // documented by its description alone. Every error shares one body (SDD 8.1),
+          // written once: inline in each of them, it outgrew the size Biome checks.
           zod: (schema: z.ZodType) =>
             schema instanceof z.ZodUndefined
               ? { description: schema.description }
-              : z.toJSONSchema(schema),
+              : schema === errorBodySchema
+                ? { $ref: "#/components/schemas/ErrorBody" }
+                : toJsonSchema(schema),
         },
       }),
     )

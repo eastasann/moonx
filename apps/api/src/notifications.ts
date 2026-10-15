@@ -11,8 +11,9 @@ import {
   users,
   validations,
 } from "@moonx/db";
-import type { EconomicsField, LinkTarget, TargetRef } from "@moonx/schemas";
+import type { LinkTarget, TargetRef } from "@moonx/schemas";
 import { and, eq, inArray, or } from "drizzle-orm";
+import { itemLink } from "./links";
 
 type CommentRow = Pick<
   typeof comments.$inferSelect,
@@ -222,13 +223,9 @@ async function threadAuthors(
   return rows.map((row) => row.authorId);
 }
 
-const questionSection = (key: string | null) => key?.split(".")[1] ?? "";
-
 /**
  * Where a notification about `comment` takes `recipientId`: the commented item with
- * the comment panel open (design-spec 6.15), on the screen that shows it (SDD 6.3
- * 「画面と節の対応」, 4章). A comment on a self-analysis opens 11 for its owner and 12,
- * the member's self-analysis, for anyone else.
+ * the comment panel open (design-spec 6.15), on the screen that shows it.
  */
 export function commentLink(
   comment: CommentRow,
@@ -240,73 +237,15 @@ export function commentLink(
     id: comment.targetId,
     key: comment.targetKey,
   };
-  const base = {
-    workspaceId: comment.workspaceId,
-    panel: "comments" as const,
+  return {
+    ...itemLink(
+      target,
+      { workspaceId: comment.workspaceId, ...place },
+      recipientId,
+    ),
+    panel: "comments",
     target,
   };
-  const idea = place.ideaId === null ? {} : { ideaId: place.ideaId };
-  const plan = {
-    ...idea,
-    ...(place.planId === null ? {} : { planId: place.planId }),
-  };
-  const rowId = comment.targetId;
-  switch (comment.targetType) {
-    case "idea":
-      return { screen: 13, ...base, ...idea };
-    case "validation_answer": {
-      const section = questionSection(comment.targetKey);
-      const questionKey = comment.targetKey ?? undefined;
-      if (section === "04")
-        return { screen: 15, ...base, ...idea, questionKey };
-      if (section === "08")
-        return { screen: 18, ...base, ...idea, questionKey };
-      return { screen: 11, ...base, ...idea, sectionKey: section, questionKey };
-    }
-    case "research_log_entry":
-      return { screen: 14, ...base, ...idea, rowId };
-    case "competitor":
-      return { screen: 15, ...base, ...idea, rowId };
-    case "assumption":
-      return { screen: 16, ...base, ...idea, tab: "assumptions", rowId };
-    case "risk":
-      return { screen: 16, ...base, ...idea, tab: "risks", rowId };
-    case "cost_item":
-      return { screen: 17, ...base, ...idea, rowId };
-    case "economics_input":
-      return {
-        screen: 18,
-        ...base,
-        ...idea,
-        field: (comment.targetKey ?? undefined) as EconomicsField | undefined,
-      };
-    case "plan_answer":
-      return {
-        screen: 21,
-        ...base,
-        ...plan,
-        itemNo: Number(questionSection(comment.targetKey)),
-        questionKey: comment.targetKey ?? undefined,
-      };
-    case "execution_item":
-      return { screen: 22, ...base, ...plan, rowId };
-    case "pitch_slide":
-      return { screen: 23, ...base, ...plan };
-    case "self_analysis_answer": {
-      const focus = {
-        sectionKey: questionSection(comment.targetKey),
-        questionKey: comment.targetKey ?? undefined,
-      };
-      return recipientId === place.selfAnalysisOwnerId
-        ? { screen: 11, ...base, ...focus }
-        : {
-            screen: 12,
-            ...base,
-            userId: place.selfAnalysisOwnerId ?? undefined,
-            ...focus,
-          };
-    }
-  }
 }
 
 /** Who {@link notifyComment} tells about a comment. */

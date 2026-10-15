@@ -56,5 +56,30 @@
     "local_price": "Local price",
     "permits": "Permits",
     "demand_signal": "Demand or problem signal"
+  },
+  "economicsField": {
+    "selling_price": "Price",
+    "operating_days": "Operating days",
+    "target_margin": "Target margin",
+    "units_conservative": "Conservative",
+    "units_expected": "Expected",
+    "units_strong": "Strong",
+    "units_capacity": "Capacity limit"
+  },
+  "itemLabel": {
+    "question": "{{section}} {{title}}",
+    "row": "{{list}} · {{text}}",
+    "untitled": "Untitled",
+    "list": {
+      "research_log_entry": "Research Log",
+      "competitor": "Competitors",
+      "assumption": "Assumptions",
+      "risk": "Risks",
+      "cost_item": "Costs",
+      "economics_input": "Unit Economics",
+      "execution_item": "Execution",
+      "pitch_slide": "Pitch Deck"
+    },
+    "templateVersion": "Template version"
   }
 }

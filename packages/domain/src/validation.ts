@@ -175,10 +175,11 @@ const SECTION_SCREENS: Record<ValidationSectionKey, number> = {
   "10": 11,
 };
 
-const answerText = (
-  answers: ReadonlyMap<string, ValidationAnswerInput>,
-  key: string,
-) => answers.get(key)?.text?.trim() ?? null;
+/** What a display condition reads of an answer. */
+type ShownAnswers = ReadonlyMap<string, Pick<ValidationAnswerInput, "text">>;
+
+const answerText = (answers: ShownAnswers, key: string) =>
+  answers.get(key)?.text?.trim() ?? null;
 
 /**
  * Whether a question shows under the display condition of its template (02 OCEAN). A
@@ -186,7 +187,7 @@ const answerText = (
  */
 export const isQuestionShown = (
   question: Pick<TemplateQuestion, "displayCondition">,
-  answers: ReadonlyMap<string, ValidationAnswerInput>,
+  answers: ShownAnswers,
 ) => {
   if (question.displayCondition === null) return true;
   return Object.entries(question.displayCondition).every(([key, values]) => {

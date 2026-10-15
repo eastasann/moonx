@@ -2,11 +2,16 @@ import {
   accounts,
   businessPlans,
   type Database,
+  type DatabaseTransaction,
   hashInvitationToken,
   INVITATION_VALID_MS,
   ideas,
   invitations,
   memberships,
+  selfAnalyses,
+  selfAnalysisShares,
+  templateQuestions,
+  templateSections,
   templates,
   templateVersions,
   users,
@@ -15,7 +20,10 @@ import {
 } from "@moonx/db";
 import type { Role, TemplateKind } from "@moonx/schemas";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
+import sharp from "sharp";
+import { lockActiveCaller } from "./lock";
+import { testConfig, uniqueIp } from "./test-app";
 
 // Rows the API's tests build on, made straight in the database. Every row gets fresh
 // ids and addresses, so tests never meet each other's data.
@@ -153,6 +161,69 @@ export function testFixtures(db: Database) {
     );
   }
 
+  /**
+   * The self-analysis template version the tests share, with its question `SA.WHY.1` in
+   * section `WHY`, made once.
+   */
+  async function selfAnalysisVersion() {
+    const version = await templateVersion("self_analysis");
+    await db
+      .insert(templateSections)
+      .values({
+        templateVersionId: version.id,
+        key: "WHY",
+        title: "Why",
+        sortOrder: 0,
+      })
+      .onConflictDoNothing();
+    const section = required(
+      (
+        await db
+          .select()
+          .from(templateSections)
+          .where(
+            and(
+              eq(templateSections.templateVersionId, version.id),
+              eq(templateSections.key, "WHY"),
+            ),
+          )
+      )[0],
+      "template section",
+    );
+    await db
+      .insert(templateQuestions)
+      .values({
+        templateVersionId: version.id,
+        templateSectionId: section.id,
+        questionKey: "SA.WHY.1",
+        title: "Why",
+        prompt: "Why do you want this?",
+        answerType: "long_text",
+        sortOrder: 0,
+      })
+      .onConflictDoNothing();
+    return version.id;
+  }
+
+  /** `userId`'s self-analysis, shared with the workspaces in `sharedWith`. */
+  async function createSelfAnalysis(
+    userId: string,
+    sharedWith: readonly string[] = [],
+  ) {
+    const versionId = await selfAnalysisVersion();
+    const [analysis] = await db
+      .insert(selfAnalyses)
+      .values({ userId, templateVersionId: versionId })
+      .returning();
+    const created = required(analysis, "self-analysis");
+    for (const workspaceId of sharedWith) {
+      await db
+        .insert(selfAnalysisShares)
+        .values({ selfAnalysisId: created.id, workspaceId });
+    }
+    return created;
+  }
+
   /** An idea of `workspaceId` with its validation. */
   async function createIdea(
     workspaceId: string,
@@ -207,10 +278,31 @@ export function testFixtures(db: Database) {
     addMember,
     createTeam,
     templateVersion,
+    createSelfAnalysis,
     createIdea,
     createPlan,
   };
 }
+
+/** A small PNG made of one grey square, for the photo uploads of U3. */
+export const testPng = (side = 16) =>
+  sharp({
+    create: {
+      width: side,
+      height: side,
+      channels: 3,
+      background: { r: 128, g: 128, b: 128 },
+    },
+  })
+    .png()
+    .toBuffer();
+
+/** The `multipart/form-data` body of U3 with `bytes` as its `file`. */
+export const photoForm = (bytes: Uint8Array, name = "photo.png") => {
+  const form = new FormData();
+  form.set("file", new File([bytes], name, { type: "image/png" }));
+  return form;
+};
 
 /** Signs in through A1 and returns the `Cookie` header of the session. */
 export async function signIn(
@@ -229,4 +321,79 @@ export async function signIn(
     throw new Error(`sign-in answered ${response.status}`);
   }
   return cookiesOf(response);
+}
+
+/**
+ * A request to `/api/v1` as the Web sends it (SDD 7.2「CSRF」): from a trusted origin,
+ * with a JSON body on every state-changing call (an empty one is `null`), or a form for
+ * the photo upload. Each comes from a fresh IP.
+ */
+export function apiRequest(
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  options: { cookie?: string; body?: unknown } = {},
+): Request {
+  const { cookie, body } = options;
+  const form = body instanceof FormData;
+  const json = !form && method !== "GET";
+  return new Request(`http://localhost${path}`, {
+    method,
+    headers: {
+      "x-forwarded-for": uniqueIp(),
+      origin: testConfig.trustedOrigins[0] ?? "",
+      ...(json ? { "content-type": "application/json" } : {}),
+      ...(cookie === undefined ? {} : { cookie }),
+    },
+    body: form ? body : json ? JSON.stringify(body ?? null) : undefined,
+  });
+}
+
+/**
+ * Resolves once a query waits for a lock `holder` keeps, so a test holding one knows
+ * the request it started has reached it.
+ */
+export async function untilBlockedBy(
+  db: Database,
+  holder: DatabaseTransaction,
+): Promise<void> {
+  const [own] = await holder.execute<{ pid: number }>(
+    sql`select pg_backend_pid() as pid`,
+  );
+  if (own === undefined) throw new Error("No backend pid");
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const [row] = await db.execute<{ waiting: number }>(
+      sql`select count(*)::int as waiting from pg_stat_activity
+        where ${own.pid}::int = any(pg_blocking_pids(pid))`,
+    );
+    if ((row?.waiting ?? 0) > 0) return;
+    await Bun.sleep(10);
+  }
+  throw new Error("Nothing waited for the test's lock within 5 s");
+}
+
+/**
+ * Starts `request` while holding the lock U7 takes first on `userId`'s account, deletes
+ * the account under it as U7 would, and answers the response once that has committed:
+ * the request reached the lock before the account was gone.
+ */
+export async function duringAccountDeletion(
+  db: Database,
+  userId: string,
+  request: () => Promise<Response>,
+): Promise<Response> {
+  const started: { response?: Promise<Response> } = {};
+  await db.transaction(async (tx) => {
+    await lockActiveCaller(tx, userId, "exclusive");
+    started.response = request();
+    await untilBlockedBy(db, tx);
+    await tx
+      .update(users)
+      .set({ status: "deleted" })
+      .where(eq(users.id, userId));
+  });
+  if (started.response === undefined) {
+    throw new Error("The request did not start");
+  }
+  return started.response;
 }

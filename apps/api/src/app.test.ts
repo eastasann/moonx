@@ -272,7 +272,9 @@ describe("GET /api/health/db (Z2)", () => {
 
 describe("/api/docs (ADR-006)", () => {
   test("serves the OpenAPI document and a Swagger UI page on staging", async () => {
-    const { app } = buildTestApp(database, { config: { appEnv: "staging" } });
+    const { app } = buildTestApp(database, {
+      config: { appEnv: "staging", avatarBucket: "test-moonx-staging-avatars" },
+    });
 
     const page = await app.handle(get("/api/docs"));
     expect(page.status).toBe(200);
@@ -309,6 +311,18 @@ describe("/api/docs (ADR-006)", () => {
       "/api/v1/invitations/by-token/{token}",
       "/api/v1/invitations/by-token/{token}/accept",
       "/api/v1/invitations/by-token/{token}/sign-up",
+      "/api/v1/invitations/{invitationId}",
+      "/api/v1/invitations/{invitationId}/resend",
+      "/api/v1/me",
+      "/api/v1/me/avatar",
+      "/api/v1/me/delete",
+      "/api/v1/me/password",
+      "/api/v1/workspaces",
+      "/api/v1/workspaces/{workspaceId}",
+      "/api/v1/workspaces/{workspaceId}/invitations",
+      "/api/v1/workspaces/{workspaceId}/members",
+      "/api/v1/workspaces/{workspaceId}/members/{userId}",
+      "/api/v1/workspaces/{workspaceId}/mention-candidates",
     ]);
   });
 

@@ -1,6 +1,11 @@
+import { resolve } from "node:path";
 import { connectDatabase } from "@moonx/db";
 import { AccessDeclarationError } from "./access";
 import { createApp } from "./app";
+import {
+  createCloudStorageAvatarStore,
+  createDiskAvatarStore,
+} from "./avatars";
 import { ConfigError, loadConfig } from "./config";
 import { createLogger } from "./log";
 import { createMailer } from "./mail";
@@ -34,6 +39,12 @@ function buildApp() {
       log,
       reporter: createErrorReporter(config),
       mailer: createMailer(config, log),
+      // Without a bucket (local) photos live on disk, under the directory make dev-api
+      // runs in (SDD 2章 AVATAR_BUCKET).
+      avatars:
+        config.avatarBucket === undefined
+          ? createDiskAvatarStore(resolve(".data/avatars"))
+          : createCloudStorageAvatarStore({ bucket: config.avatarBucket }),
     });
   } catch (error) {
     if (!(error instanceof AccessDeclarationError)) throw error;

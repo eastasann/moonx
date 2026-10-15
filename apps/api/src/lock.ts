@@ -1,4 +1,5 @@
-import type { Database, DatabaseTransaction } from "@moonx/db";
+import { type Database, type DatabaseTransaction, users } from "@moonx/db";
+import { eq, sql } from "drizzle-orm";
 import { ApiError } from "./errors";
 import { loadUserRefs } from "./user-refs";
 
@@ -93,3 +94,61 @@ export async function createKeyedItem<T>(
   if (created !== undefined) return created;
   throw await conflictError(db, await readCurrent(), workspaceId);
 }
+
+/**
+ * Holds the transaction-scoped advisory lock named `key` until `tx` ends: serializes
+ * the transactions that take the same key without locking any row, so the writes that
+ * need the rows go on meanwhile. Keys are namespaced (`moonx:<what>:<id>`); two keys
+ * hashing alike only make their transactions wait for each other. A shared hold only
+ * waits for, and holds off, exclusive ones.
+ */
+export async function advisoryLock(
+  tx: DatabaseTransaction,
+  key: string,
+  mode: "exclusive" | "shared" = "exclusive",
+): Promise<void> {
+  await tx.execute(
+    mode === "shared"
+      ? sql`select pg_advisory_xact_lock_shared(hashtextextended(${key}, 0))`
+      : sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`,
+  );
+}
+
+/**
+ * Serializes the caller's own writes that leave something of theirs behind (a
+ * membership, an invitation they send, their profile, photo, password or
+ * self-analysis) with the deletion of their account (U7), which holds the same lock
+ * exclusively: each runs whole before the other starts. A write that waited for U7
+ * then finds the account gone and is refused, as a request of a deleted user is (SDD
+ * 7.1「停止・削除したユーザー」); one that ran first leaves what U7 then deletes or
+ * revokes. Writes hold it shared, so they do not wait for each other, except those that
+ * must also run one at a time per user (U8). Take it before any other lock.
+ *
+ * @throws {ApiError} UNAUTHENTICATED when the account is no longer active
+ */
+export async function lockActiveCaller(
+  tx: DatabaseTransaction,
+  userId: string,
+  mode: "exclusive" | "shared" = "shared",
+): Promise<void> {
+  await advisoryLock(tx, `moonx:user:${userId}`, mode);
+  const [user] = await tx
+    .select({ status: users.status })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (user?.status !== "active") {
+    throw new ApiError("UNAUTHENTICATED", "The account is no longer active");
+  }
+}
+
+/**
+ * Serializes the invitations to `workspaceId`, or to no workspace for null, until the
+ * transaction ends: W4, W5, AD9 and `make admin-create` check for another valid
+ * invitation to the address under it, so two cannot both pass. Not the workspace row:
+ * these transactions wait for Resend, and the writes inside the workspace update that
+ * row (SDD 5.5).
+ */
+export const lockInvitations = (
+  tx: DatabaseTransaction,
+  workspaceId: string | null,
+) => advisoryLock(tx, `moonx:invitations:${workspaceId ?? "none"}`);

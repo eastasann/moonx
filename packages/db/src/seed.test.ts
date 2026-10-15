@@ -347,6 +347,19 @@ describe("users and workspaces (design-spec 8.1)", () => {
           ),
         ),
       ).toBe(1);
+      // U1 lists memberships in the order they were made, the personal one first.
+      const joined = await db
+        .select({
+          workspaceId: memberships.workspaceId,
+          createdAt: memberships.createdAt,
+        })
+        .from(memberships)
+        .where(eq(memberships.userId, userId(key)))
+        .orderBy(asc(memberships.createdAt));
+      expect(joined[0]?.workspaceId).toBe(personalWorkspaceId(key));
+      expect(joined[1]?.createdAt.getTime() ?? Infinity).toBeGreaterThan(
+        joined[0]?.createdAt.getTime() ?? Infinity,
+      );
     }
   });
 

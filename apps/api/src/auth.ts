@@ -100,6 +100,28 @@ const sleepUntil = async (deadline: number) => {
 };
 
 /**
+ * Deletes the account or session Better Auth has just written for `userId` when the
+ * user is no longer active. Better Auth checks the user before it writes, outside any
+ * transaction of ours, so an account deletion (U7) can commit in between, its deletes
+ * missing the row being written. FOR SHARE waits for a U7 in progress, which holds the
+ * user's row from before those deletes until it commits (SDD 7.1「停止・削除したユーザー」).
+ */
+async function dropIfInactive(
+  db: Database,
+  row: { table: typeof accounts | typeof sessions; id: string; userId: string },
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [user] = await tx
+      .select({ status: users.status })
+      .from(users)
+      .where(eq(users.id, row.userId))
+      .for("share");
+    if (user?.status === "active") return;
+    await tx.delete(row.table).where(eq(row.table.id, row.id));
+  });
+}
+
+/**
  * Puts `requestId` on a redirect of Better Auth's that carries an `error`, so the login
  * screen can show it as the Ref of an unexpected failure (SDD 5.4, 4章 `/login`).
  * Other answers pass unchanged.
@@ -510,6 +532,14 @@ export function createAuth({
               },
             };
           },
+          // A7 gives a password to a user who signed up with Google only.
+          async after(account) {
+            await dropIfInactive(db, {
+              table: accounts,
+              id: account.id,
+              userId: account.userId,
+            });
+          },
         },
       },
       session: {
@@ -529,14 +559,28 @@ export function createAuth({
                 message: "This account is suspended or deleted",
               });
             }
-            // Finishes a sign-up whose set-up did not complete; a no-op otherwise.
-            await db.transaction((tx) =>
+            // Finishes a sign-up whose set-up did not complete; a no-op otherwise. It
+            // finds an account deleted since the check above, and that refuses too.
+            const active = await db.transaction((tx) =>
               setUpNewUser(
                 tx,
                 { id: session.userId, ...user },
                 new Date(now()),
               ),
             );
+            if (!active) {
+              throw new APIError("FORBIDDEN", {
+                code: "ACCOUNT_SUSPENDED",
+                message: "This account is suspended or deleted",
+              });
+            }
+          },
+          async after(session) {
+            await dropIfInactive(db, {
+              table: sessions,
+              id: session.id,
+              userId: session.userId,
+            });
           },
         },
       },

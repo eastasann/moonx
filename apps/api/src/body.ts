@@ -53,7 +53,7 @@ const disconnected = () =>
  *
  * @throws {ApiError} PAYLOAD_TOO_LARGE, or BAD_REQUEST when the client disconnects
  */
-async function readBodyWithin(
+export async function readBodyWithin(
   body: ReadableStream<Uint8Array> | null,
   maxBytes: number,
   signal: AbortSignal,

@@ -1,7 +1,9 @@
 import type { Database } from "@moonx/db";
 import { Elysia } from "elysia";
 import { accessPlugin, assertAccessDeclared } from "./access";
+import { accountRoutes } from "./account";
 import { AUTH_IP_LIMITS, createAuth } from "./auth";
+import { type AvatarStore, avatarFileRoutes } from "./avatars";
 import type { Config } from "./config";
 import { docsRoutes } from "./docs";
 import { entryPlugin } from "./entry";
@@ -11,6 +13,8 @@ import type { Logger } from "./log";
 import type { Mailer } from "./mail";
 import { createRateLimiter } from "./rate-limit";
 import type { ErrorReporter } from "./sentry";
+import { workspaceInvitationRoutes } from "./workspace-invitations";
+import { workspaceRoutes } from "./workspaces";
 
 /** What the API talks to. `src/index.ts` builds the real ones; tests pass their own. */
 export interface AppServices {
@@ -18,6 +22,11 @@ export interface AppServices {
   log: Logger;
   reporter: ErrorReporter;
   mailer: Mailer;
+  /**
+   * Where profile photos go (ADR-024): the disk locally, whose files U9 then serves,
+   * and Cloud Storage when `AVATAR_BUCKET` is set.
+   */
+  avatars: AvatarStore;
   /**
    * How long A6 takes to answer, and so how long its mail may take (SDD 5.4). Tests
    * shorten it; it defaults to 2 s.
@@ -39,7 +48,15 @@ export interface AppServices {
  * so the API does not start.
  */
 export function createApp(config: Config, services: AppServices) {
-  const { db, log, reporter, mailer, resetAnswerMs, now = Date.now } = services;
+  const {
+    db,
+    log,
+    reporter,
+    mailer,
+    avatars,
+    resetAnswerMs,
+    now = Date.now,
+  } = services;
   const { auth, routes: authRoutes } = createAuth({
     config,
     db,
@@ -49,19 +66,28 @@ export function createApp(config: Config, services: AppServices) {
     resetAnswerMs,
   });
   const access = accessPlugin({ auth, db });
+  const limiter = createRateLimiter(db, now);
   const app = new Elysia()
     .use(
       entryPlugin({
         config,
         log,
         reporter,
-        limiter: createRateLimiter(db, now),
+        limiter,
         ipLimits: [HEALTH_DB_IP_LIMIT, ...AUTH_IP_LIMITS, SIGN_UP_IP_LIMIT],
         now,
       }),
     )
     .use(healthRoutes(config, db, access))
-    .use(invitationRoutes({ access, auth, db, now }));
+    .use(invitationRoutes({ access, auth, db, now }))
+    .use(accountRoutes({ access, auth, db, avatars, limiter, log, now }))
+    .use(workspaceRoutes({ access, db, now }))
+    .use(
+      workspaceInvitationRoutes({ access, config, db, mailer, limiter, now }),
+    );
+  if (avatars.directory !== undefined) {
+    app.use(avatarFileRoutes(access, avatars.directory));
+  }
   // Better Auth's paths take its own shapes (SDD 5.4), not the typed REST API Eden
   // reads (ADR-006), so they and the docs stay out of the app's type.
   app.use(authRoutes(access));

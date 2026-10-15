@@ -2,7 +2,9 @@ import { z } from "zod";
 import { dateTimeSchema, roleSchema, uuidSchema } from "./common";
 import {
   displayNameSchema,
+  EMAIL_MAX,
   passwordSchema,
+  requiredText,
   timeZoneSchema,
 } from "./input-rules";
 
@@ -81,3 +83,40 @@ export const invitationAcceptResultSchema = z.object({
 export type InvitationAcceptResult = z.infer<
   typeof invitationAcceptResultSchema
 >;
+
+/** The body of U2 `PATCH /api/v1/me`: only the fields sent change. */
+export const meUpdateSchema = z.object({
+  displayName: displayNameSchema.optional(),
+  timezone: timeZoneSchema.optional(),
+  theme: themeSchema.optional(),
+  /** One of the caller's workspaces (422 otherwise). */
+  lastWorkspaceId: uuidSchema.optional(),
+});
+export type MeUpdate = z.infer<typeof meUpdateSchema>;
+
+/**
+ * The body of U3 `PUT /api/v1/me/avatar`, as `multipart/form-data`. Its type and size are
+ * checked by the API against the file's content (design-spec 6.0.8), not here: a type
+ * the client declares proves nothing.
+ */
+export const avatarUploadSchema = z.object({ file: z.file() });
+
+/** What U3 `PUT /api/v1/me/avatar` answers with. */
+export const avatarResultSchema = z.object({ avatarUrl: z.string() });
+export type AvatarResult = z.infer<typeof avatarResultSchema>;
+
+/** The `{name}` of U9 `GET /api/avatars/{name}`. */
+export const avatarNameParamsSchema = z.object({ name: z.string() });
+
+/** The body of U7 `POST /api/v1/me/delete` (design-spec 6.16「アカウントの削除」). */
+export const accountDeletionSchema = z.object({
+  /** Must be the caller's address, ignoring case (422 CONFIRMATION_MISMATCH otherwise). */
+  confirmEmail: requiredText(EMAIL_MAX),
+  /** Required of an account with a password; the current password, so no rule applies. */
+  password: z.string().optional(),
+});
+export type AccountDeletion = z.infer<typeof accountDeletionSchema>;
+
+/** The body of U8 `POST /api/v1/me/password`. */
+export const passwordSetSchema = z.object({ newPassword: passwordSchema });
+export type PasswordSet = z.infer<typeof passwordSetSchema>;

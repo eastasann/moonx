@@ -1,6 +1,7 @@
 import { buildKeyMetrics, evaluateValidation } from "@moonx/domain";
 import type { ExecutionStatus, ExecutionType } from "@moonx/schemas";
 import { asc, eq } from "drizzle-orm";
+import { executionItemContent } from "../history-values";
 import {
   businessPlans,
   executionItems,
@@ -207,27 +208,6 @@ type ExecutionRow = Omit<
   completedAt: Date | null;
   kpiActualUpdatedAt: Date | null;
 };
-
-/** What the history and the version snapshot hold of an execution item. */
-const executionContent = (item: ExecutionRow) => ({
-  type: item.type,
-  title: item.title,
-  assigneeUserId: item.assigneeUserId ?? null,
-  assigneeName: item.assigneeName ?? null,
-  dueDate: item.dueDate ?? null,
-  status: item.status ?? null,
-  goal: item.goal ?? null,
-  exitCondition: item.exitCondition ?? null,
-  launchTiming: item.launchTiming ?? null,
-  actions: item.actions ?? null,
-  completionCriteria: item.completionCriteria ?? null,
-  kpiArea: item.kpiArea ?? null,
-  kpiTarget: item.kpiTarget ?? null,
-  kpiReviewFrequency: item.kpiReviewFrequency ?? null,
-  kpiActual: item.kpiActual ?? null,
-  whyItMatters: item.whyItMatters ?? null,
-  answer: item.answer ?? null,
-});
 
 /**
  * Writes a plan as M5 drafts it (the latest plan template, the sub-items copied from the
@@ -553,7 +533,7 @@ export async function writePlan(
       "execution",
       { type: "execution_item", id: item.id },
       item.saves,
-      executionContent,
+      executionItemContent,
       item.firstSource,
     ),
   }));
@@ -611,7 +591,7 @@ export async function writePlan(
           ? []
           : [
               {
-                ...executionContent(saved),
+                ...executionItemContent(saved),
                 completedAt: saved.completedAt?.toISOString() ?? null,
                 sortOrder: item.sortOrder,
               },

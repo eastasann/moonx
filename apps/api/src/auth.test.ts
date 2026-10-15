@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { tmpdir } from "node:os";
 import {
   accounts,
   invitations,
@@ -13,6 +14,7 @@ import { hashPassword } from "better-auth/crypto";
 import { eq, like, sql } from "drizzle-orm";
 import { createApp } from "./app";
 import { AUTH_IP_LIMIT, createAuth } from "./auth";
+import { createDiskAvatarStore } from "./avatars";
 import { ApiError } from "./errors";
 import { createLogger } from "./log";
 import { createMailer } from "./mail";
@@ -31,6 +33,7 @@ import {
   TEST_PASSWORD as PASSWORD,
   testFixtures,
   uniqueEmail,
+  untilBlockedBy,
 } from "./test-fixtures";
 
 const database = connectTestDatabase();
@@ -1217,6 +1220,116 @@ describe("password reset (A6, A7)", () => {
   });
 });
 
+describe("an account deleted while Better Auth writes for it (SDD 7.1「停止・削除したユーザー」)", () => {
+  /**
+   * Runs `body` while a trigger marks `userId` deleted as a row of theirs goes into
+   * `table`: an account deletion (U7) committing between Better Auth's check of the
+   * user and its write.
+   */
+  async function deletedOnInsert(
+    table: "sessions" | "accounts",
+    userId: string,
+    body: () => Promise<unknown>,
+  ) {
+    await db.execute(sql`
+      create or replace function delete_test_user() returns trigger as $$
+      begin update users set status = 'deleted' where id = new.user_id; return new; end
+      $$ language plpgsql`);
+    await db.execute(
+      sql.raw(`create trigger delete_test_user after insert on ${table}
+        for each row when (new.user_id = '${userId}')
+        execute function delete_test_user()`),
+    );
+    try {
+      await body();
+    } finally {
+      await db.execute(sql.raw(`drop trigger delete_test_user on ${table}`));
+      await db.execute(sql`drop function delete_test_user`);
+    }
+  }
+
+  test("drops the session a sign-in made", async () => {
+    const user = await createUser();
+    const { app } = buildTestApp(database);
+
+    await deletedOnInsert("sessions", user.id, () => signIn(app, user.email));
+
+    expect(
+      await db.select().from(sessions).where(eq(sessions.userId, user.id)),
+    ).toEqual([]);
+  });
+
+  test("drops the password a reset gave a Google-only user", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: uniqueEmail(),
+        emailVerified: true,
+        displayName: "Google Only",
+      })
+      .returning();
+    if (user === undefined) throw new Error("no user");
+    await db.insert(accounts).values({
+      userId: user.id,
+      accountId: crypto.randomUUID(),
+      providerId: "google",
+    });
+    const { app, lines } = buildTestApp(database);
+    await app.handle(
+      call("POST", "/request-password-reset", { body: { email: user.email } }),
+    );
+    const token = (await resetLink(lines, user.email)).searchParams.get(
+      "token",
+    );
+
+    await deletedOnInsert("accounts", user.id, () =>
+      app.handle(
+        call("POST", "/reset-password", {
+          body: { token, newPassword: "a brand new password" },
+        }),
+      ),
+    );
+
+    const linked = await db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.userId, user.id));
+    expect(linked.map((account) => account.providerId)).toEqual(["google"]);
+  });
+
+  test("refuses a sign-in whose set-up waited for the deletion", async () => {
+    const user = await createUser();
+    const { app } = buildTestApp(database);
+
+    // Holds the user's row as U7 does until it commits.
+    const started: { response?: Promise<Response> } = {};
+    await db.transaction(async (tx) => {
+      await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, user.id))
+        .for("no key update");
+      started.response = signIn(app, user.email);
+      await untilBlockedBy(db, tx);
+      await tx
+        .update(users)
+        .set({ status: "deleted" })
+        .where(eq(users.id, user.id));
+    });
+    const response = await started.response;
+
+    expect(response?.status).toBe(403);
+    expect(
+      response === undefined
+        ? null
+        : ((await response.json()) as { code: string }).code,
+    ).toBe("ACCOUNT_SUSPENDED");
+    expect(
+      await db.select().from(sessions).where(eq(sessions.userId, user.id)),
+    ).toEqual([]);
+  });
+});
+
 describe("the time A6 takes to answer (SDD 5.4)", () => {
   test("is the same with or without an account, and stops a mail still under way then", async () => {
     const user = await createUser();
@@ -1265,6 +1378,7 @@ describe("the time A6 takes to answer (SDD 5.4)", () => {
       log,
       reporter: { report: async () => {} },
       mailer: createMailer(testConfig, log),
+      avatars: createDiskAvatarStore(tmpdir()),
     });
 
     const started = performance.now();

@@ -27,7 +27,9 @@ import type { AccessPlugin } from "./access";
 import { AUTH_IP_LIMIT, type Auth } from "./auth";
 import type { IpLimit } from "./entry";
 import { ApiError, isUniqueViolation } from "./errors";
+import { lockActiveCaller, lockInvitations } from "./lock";
 import { loadMe } from "./me";
+import { lockMembers } from "./membership";
 import { isValidInvitation, sentTo, setUpNewUser } from "./registration";
 
 const BY_TOKEN = "/api/v1/invitations/by-token";
@@ -100,6 +102,7 @@ export function invitationRoutes({
             invitation: invitations,
             workspace: { id: workspaces.id, name: workspaces.name },
             inviterName: inviters.displayName,
+            inviterStatus: inviters.status,
             accountExists: sql<boolean>`exists (${db
               .select({ one: sql`1` })
               .from(users)
@@ -120,8 +123,11 @@ export function invitationRoutes({
           email: invitation.email,
           workspace: row.workspace,
           role: invitation.role,
+          // A deleted inviter is no inviter, as in the invitation mail (design-spec 6.16).
           invitedBy:
-            row.inviterName === null ? null : { displayName: row.inviterName },
+            row.inviterName === null || row.inviterStatus === "deleted"
+              ? null
+              : { displayName: row.inviterName },
           expiresAt: invitation.expiresAt.toISOString(),
           accountExists: row.accountExists,
         };
@@ -233,6 +239,7 @@ export function invitationRoutes({
       async ({ params, caller }) => {
         const at = new Date(now());
         return db.transaction(async (tx) => {
+          await lockActiveCaller(tx, caller.id);
           const invitation = await findByToken(tx, params.token, true);
           if (invitation === undefined || !isUsable(invitation, at)) {
             throw invalid();
@@ -252,6 +259,7 @@ export function invitationRoutes({
           }
           let alreadyMember = false;
           if (invitation.workspaceId !== null && invitation.role !== null) {
+            await lockMembers(tx, invitation.workspaceId);
             // A member keeps the role they have (design-spec 6.16 3).
             const joined = await tx
               .insert(memberships)
@@ -339,6 +347,8 @@ export async function issueAdminInvitation(
     updatedAt: at,
   };
   const invitation = await db.transaction(async (tx) => {
+    // As W5 does, so a resend cannot make a second valid one meanwhile.
+    await lockInvitations(tx, null);
     const [existing] = await tx
       .select({ id: invitations.id })
       .from(invitations)

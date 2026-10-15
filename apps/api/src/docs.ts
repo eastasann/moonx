@@ -63,7 +63,14 @@ export function docsRoutes(access: AccessPlugin) {
             version: "v1",
           },
         },
-        mapJsonSchema: { zod: z.toJSONSchema },
+        mapJsonSchema: {
+          // A 204 declares `z.undefined()`, which JSON Schema cannot express: it is
+          // documented by its description alone.
+          zod: (schema: z.ZodType) =>
+            schema instanceof z.ZodUndefined
+              ? { description: schema.description }
+              : z.toJSONSchema(schema),
+        },
       }),
     )
     .get("/api/docs", asset(PAGE, "text/html; charset=utf-8"), hidden)

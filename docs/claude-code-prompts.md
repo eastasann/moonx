@@ -416,7 +416,7 @@ make admin-create でリンクが出てそこから運営者を作れ、make tes
 
 ## Step 10: API: アカウントとワークスペース
 
-Status:
+Status: done 2026-10-15
 
 ```
 docs/02-01_system-design-doc.md 5.4（U1〜U3・U7〜U9）と 5.5（W0〜W5・W7・W8。W6 は欠番）の API を作ってください。

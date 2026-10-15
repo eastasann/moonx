@@ -6,6 +6,7 @@ import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { connectDatabase } from "@moonx/db";
 import { createApp } from "../src/app";
+import { createCloudStorageAvatarStore } from "../src/avatars";
 import type { Config } from "../src/config";
 import { OPENAPI_JSON_PATH } from "../src/docs";
 import { createLogger } from "../src/log";
@@ -35,7 +36,7 @@ const config: Config = {
     from: "moonx <no-reply@example.invalid>",
     allowlist: [],
   },
-  avatarBucket: undefined,
+  avatarBucket: "openapi-placeholder",
   sentryDsn: undefined,
   webSentryDsn: undefined,
   logLevel: "error",
@@ -45,6 +46,8 @@ const app = createApp(config, {
   log,
   reporter: { report: async () => {} },
   mailer: createMailer(config, log),
+  // A bucket, as on staging: photos are not served by the API there (U9 is local only).
+  avatars: createCloudStorageAvatarStore({ bucket: "openapi-placeholder" }),
 });
 
 const response = await app.handle(

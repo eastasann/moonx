@@ -11,10 +11,17 @@ import {
 } from "@moonx/db";
 import { errorBodySchema, meSchema } from "@moonx/schemas";
 import { and, eq } from "drizzle-orm";
+import { DELETED_USER_NAME } from "./account-deletion";
 import { AUTH_IP_LIMIT } from "./auth";
 import { issueAdminInvitation } from "./invitations";
 import { buildTestApp, connectTestDatabase, uniqueIp } from "./test-app";
-import { cookiesOf, signIn, testFixtures, uniqueEmail } from "./test-fixtures";
+import {
+  cookiesOf,
+  duringAccountDeletion,
+  signIn,
+  testFixtures,
+  uniqueEmail,
+} from "./test-fixtures";
 
 const database = connectTestDatabase();
 const { db } = database;
@@ -141,6 +148,18 @@ describe("U4 GET /api/v1/invitations/by-token/{token}", () => {
       email,
       workspace: null,
       role: null,
+      invitedBy: null,
+    });
+  });
+
+  test("names no inviter whose account was deleted, as the mail does", async () => {
+    const { invitation, owner } = await workspaceInvitation();
+    await db
+      .update(users)
+      .set({ status: "deleted", displayName: DELETED_USER_NAME })
+      .where(eq(users.id, owner.id));
+
+    expect(await (await preview(invitation.token)).json()).toMatchObject({
       invitedBy: null,
     });
   });
@@ -461,6 +480,28 @@ describe("U6 POST /api/v1/invitations/by-token/{token}/accept", () => {
       .from(workspaces)
       .where(eq(workspaces.id, workspace.id));
     expect(touched?.lastActiveAt).not.toBeNull();
+  });
+
+  test("makes no member of an account deleted while the request waits", async () => {
+    const { workspace, invitation, user, cookie } = await invitee();
+
+    const response = await duringAccountDeletion(db, user.id, () =>
+      accept(invitation.token, cookie),
+    );
+
+    expect(response.status).toBe(401);
+    expect(
+      await db
+        .select()
+        .from(memberships)
+        .where(
+          and(
+            eq(memberships.workspaceId, workspace.id),
+            eq(memberships.userId, user.id),
+          ),
+        ),
+    ).toEqual([]);
+    expect((await invitationRow(invitation.id))?.status).toBe("pending");
   });
 
   test("keeps the role of someone already in the workspace", async () => {

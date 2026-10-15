@@ -1,7 +1,15 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { connectDatabase, type DatabaseConnection } from "@moonx/db";
 import { accessPlugin } from "./access";
 import { createApp } from "./app";
 import { createAuth } from "./auth";
+import {
+  type AvatarStore,
+  createCloudStorageAvatarStore,
+  createDiskAvatarStore,
+} from "./avatars";
 import type { Config } from "./config";
 import { createLogger } from "./log";
 import { createMailer, type Mailer } from "./mail";
@@ -53,6 +61,11 @@ export type LogLine = Record<string, unknown>;
 
 export interface TestApp {
   app: ReturnType<typeof createApp>;
+  /**
+   * Where the app keeps photos: a fresh directory on disk, or Cloud Storage when the
+   * config names a bucket, unless `avatars` replaces it.
+   */
+  avatars: AvatarStore;
   /** Every log line written so far, parsed. */
   lines: LogLine[];
   /** Every failure handed to Sentry so far. */
@@ -69,6 +82,7 @@ export function buildTestApp(
     config?: Partial<Config>;
     reporter?: ErrorReporter;
     mailer?: Mailer;
+    avatars?: AvatarStore;
     now?: () => number;
     /** Defaults to 0, so password-reset requests answer at once. */
     resetAnswerMs?: number;
@@ -80,9 +94,16 @@ export function buildTestApp(
   const log = createLogger(config.logLevel, (line) =>
     lines.push(JSON.parse(line)),
   );
+  // As src/index.ts chooses: a bucket makes the app a deployed one, without U9.
+  const avatars =
+    options.avatars ??
+    (config.avatarBucket === undefined
+      ? createDiskAvatarStore(mkdtempSync(join(tmpdir(), "moonx-avatars-")))
+      : createCloudStorageAvatarStore({ bucket: config.avatarBucket }));
   const app = createApp(config, {
     db: db.db,
     log,
+    avatars,
     reporter: options.reporter ?? {
       report: async (failure) => {
         reports.push(failure);
@@ -92,7 +113,7 @@ export function buildTestApp(
     now: options.now,
     resetAnswerMs: options.resetAnswerMs ?? 0,
   });
-  return { app, lines, reports };
+  return { app, avatars, lines, reports };
 }
 
 /**

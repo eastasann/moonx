@@ -2,5 +2,14 @@
   "passwordReset": {
     "subject": "Reset your moonx password",
     "text": "Someone asked to reset the password of your moonx account.\n\nOpen this link within 1 hour to choose a new password:\n{{link}}\n\nIf it wasn't you, ignore this email. Your password stays the same."
+  },
+  "invitation": {
+    "subject": "Join {{workspace}} on moonx",
+    "subjectNoWorkspace": "Join moonx",
+    "invitedBy": "{{inviter}} invited you to join {{workspace}} on moonx as {{role}}.",
+    "invitedByNoWorkspace": "{{inviter}} invited you to join moonx.",
+    "invited": "You're invited to join {{workspace}} on moonx as {{role}}.",
+    "invitedNoWorkspace": "You're invited to join moonx.",
+    "text": "{{opening}}\n\nOpen this link within 7 days to accept:\n{{link}}\n\nIf you weren't expecting this, ignore this email."
   }
 }

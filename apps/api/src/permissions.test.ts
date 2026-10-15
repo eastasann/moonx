@@ -1,6 +1,9 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { verifications } from "@moonx/db";
+import { accounts, verifications } from "@moonx/db";
+import type { Role } from "@moonx/schemas";
+import { eq } from "drizzle-orm";
 import { type AccessKind, accessDeclarations } from "./access";
+import { newAvatarName } from "./avatars";
 import {
   buildTestApp,
   connectTestDatabase,
@@ -8,9 +11,11 @@ import {
   uniqueIp,
 } from "./test-app";
 import {
+  photoForm,
   signIn,
   TEST_PASSWORD,
   testFixtures,
+  testPng,
   uniqueEmail,
 } from "./test-fixtures";
 
@@ -63,15 +68,20 @@ async function people(app: { handle(request: Request): Promise<Response> }) {
   };
 }
 
+/**
+ * A request as the Web sends it: JSON for every state-changing `/api/v1` call, bodyless
+ * ones included (SDD 7.2「CSRF」), or the form of a photo upload.
+ */
 function request(
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   caller: Person,
   body?: unknown,
 ) {
-  const json = path.startsWith("/api/v1/")
-    ? method === "POST"
-    : body !== undefined;
+  const form = body instanceof FormData;
+  const json =
+    !form &&
+    (path.startsWith("/api/v1/") ? method !== "GET" : body !== undefined);
   return new Request(`http://localhost${path}`, {
     method,
     headers: {
@@ -80,7 +90,7 @@ function request(
       ...(json ? { "content-type": "application/json" } : {}),
       ...(caller.cookie === undefined ? {} : { cookie: caller.cookie }),
     },
-    body: json ? JSON.stringify(body ?? null) : undefined,
+    body: form ? body : json ? JSON.stringify(body ?? null) : undefined,
   });
 }
 
@@ -95,6 +105,12 @@ const signedInOnly = (status: number): Record<CallerName, number> => ({
   anonymous: 401,
 });
 
+/** The workspace of a row's people, and the people. */
+interface Team {
+  workspaceId: string;
+  callers: People;
+}
+
 interface Row {
   /** The API numbers of SDD 5.3. */
   api: string;
@@ -102,8 +118,28 @@ interface Row {
   routes: Record<string, AccessKind>;
   /** The app to call: the default, Google configured, or staging. */
   app?: "google" | "staging";
-  call(caller: Person, workspaceId: string): Promise<Request> | Request;
+  call(caller: Person, team: Team): Promise<Request> | Request;
   expected: Record<CallerName, number>;
+}
+
+/** Statuses of a workspace route for its members, refusing the operator outside it. */
+const members = (
+  viewer: number,
+  member: number,
+  owner: number,
+): Record<CallerName, number> => ({
+  anonymous: 401,
+  viewer,
+  member,
+  owner,
+  admin: 403,
+});
+
+/** A new member of the row's workspace, for a call that changes or removes one. */
+async function newMember(workspaceId: string) {
+  const user = await fixtures.createUser();
+  await fixtures.addMember(workspaceId, user.id, "member");
+  return user;
 }
 
 const ROWS: Row[] = [
@@ -219,7 +255,7 @@ const ROWS: Row[] = [
   {
     api: "U4",
     routes: { "GET /api/v1/invitations/by-token/:token": "open" },
-    async call(caller, workspaceId) {
+    async call(caller, { workspaceId }) {
       const { token } = await fixtures.createInvitation({
         email: uniqueEmail(),
         workspaceId,
@@ -232,7 +268,7 @@ const ROWS: Row[] = [
   {
     api: "U5",
     routes: { "POST /api/v1/invitations/by-token/:token/sign-up": "open" },
-    async call(caller, workspaceId) {
+    async call(caller, { workspaceId }) {
       const { token } = await fixtures.createInvitation({
         email: uniqueEmail(),
         workspaceId,
@@ -269,29 +305,294 @@ const ROWS: Row[] = [
     },
     expected: signedInOnly(200),
   },
+  {
+    api: "U1",
+    routes: { "GET /api/v1/me": "signedIn" },
+    call: (caller) => request("GET", "/api/v1/me", caller),
+    expected: signedInOnly(200),
+  },
+  {
+    api: "U2",
+    routes: { "PATCH /api/v1/me": "signedIn" },
+    call: (caller) => request("PATCH", "/api/v1/me", caller, { theme: "dark" }),
+    expected: signedInOnly(200),
+  },
+  {
+    api: "U3 PUT",
+    routes: { "PUT /api/v1/me/avatar": "signedIn" },
+    call: async (caller) =>
+      request("PUT", "/api/v1/me/avatar", caller, photoForm(await testPng())),
+    expected: signedInOnly(200),
+  },
+  {
+    api: "U3 DELETE",
+    routes: { "DELETE /api/v1/me/avatar": "signedIn" },
+    call: (caller) => request("DELETE", "/api/v1/me/avatar", caller),
+    expected: signedInOnly(204),
+  },
+  {
+    // The Viewer and the Member go first, so the Owner is left alone and may go too.
+    api: "U7",
+    routes: { "POST /api/v1/me/delete": "signedIn" },
+    call: (caller) =>
+      request("POST", "/api/v1/me/delete", caller, {
+        confirmEmail: caller.email,
+        password: TEST_PASSWORD,
+      }),
+    expected: signedInOnly(204),
+  },
+  {
+    api: "U8 (an account without a password)",
+    routes: { "POST /api/v1/me/password": "signedIn" },
+    async call(caller) {
+      await db
+        .update(accounts)
+        .set({ password: null })
+        .where(eq(accounts.userId, caller.id));
+      return request("POST", "/api/v1/me/password", caller, {
+        newPassword: "a brand new password",
+      });
+    },
+    expected: signedInOnly(204),
+  },
+  {
+    api: "U9 (local only)",
+    routes: { "GET /api/avatars/:name": "open" },
+    async call(caller) {
+      const url = await testApp.avatars.save(newAvatarName(), await testPng());
+      return request("GET", url, caller);
+    },
+    expected: everyone(200),
+  },
+  {
+    api: "W0",
+    routes: { "POST /api/v1/workspaces": "signedIn" },
+    call: (caller) =>
+      request("POST", "/api/v1/workspaces", caller, { name: "Side project" }),
+    expected: signedInOnly(201),
+  },
+  {
+    api: "W1 GET",
+    routes: { "GET /api/v1/workspaces/:workspaceId": "scoped" },
+    call: (caller, { workspaceId }) =>
+      request("GET", `/api/v1/workspaces/${workspaceId}`, caller),
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "W1 PATCH",
+    routes: { "PATCH /api/v1/workspaces/:workspaceId": "scoped" },
+    call: (caller, { workspaceId }) =>
+      request("PATCH", `/api/v1/workspaces/${workspaceId}`, caller, {
+        name: `Renamed by ${caller.id}`,
+      }),
+    expected: members(403, 403, 200),
+  },
+  {
+    api: "W2",
+    routes: { "GET /api/v1/workspaces/:workspaceId/members": "scoped" },
+    call: (caller, { workspaceId }) =>
+      request("GET", `/api/v1/workspaces/${workspaceId}/members`, caller),
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "W3 PATCH",
+    routes: {
+      "PATCH /api/v1/workspaces/:workspaceId/members/:userId": "scoped",
+    },
+    async call(caller, { workspaceId }) {
+      const target = await newMember(workspaceId);
+      return request(
+        "PATCH",
+        `/api/v1/workspaces/${workspaceId}/members/${target.id}`,
+        caller,
+        { role: "viewer" },
+      );
+    },
+    expected: members(403, 403, 200),
+  },
+  {
+    api: "W3 DELETE (another member)",
+    routes: {
+      "DELETE /api/v1/workspaces/:workspaceId/members/:userId": "scoped",
+    },
+    async call(caller, { workspaceId }) {
+      const target = await newMember(workspaceId);
+      return request(
+        "DELETE",
+        `/api/v1/workspaces/${workspaceId}/members/${target.id}`,
+        caller,
+      );
+    },
+    expected: members(403, 403, 204),
+  },
+  {
+    api: "W3 DELETE (leaving; the Owner is the last)",
+    routes: {
+      "DELETE /api/v1/workspaces/:workspaceId/members/:userId": "scoped",
+    },
+    call: (caller, { workspaceId }) =>
+      request("DELETE", `/api/v1/workspaces/${workspaceId}/members/me`, caller),
+    expected: members(204, 204, 409),
+  },
+  {
+    api: "W4 GET",
+    routes: { "GET /api/v1/workspaces/:workspaceId/invitations": "scoped" },
+    call: (caller, { workspaceId }) =>
+      request("GET", `/api/v1/workspaces/${workspaceId}/invitations`, caller),
+    expected: members(403, 403, 200),
+  },
+  {
+    api: "W4 POST",
+    routes: { "POST /api/v1/workspaces/:workspaceId/invitations": "scoped" },
+    call: (caller, { workspaceId }) =>
+      request("POST", `/api/v1/workspaces/${workspaceId}/invitations`, caller, {
+        email: uniqueEmail("invitee"),
+        role: "member",
+      }),
+    expected: members(403, 403, 201),
+  },
+  {
+    api: "W5",
+    routes: { "POST /api/v1/invitations/:invitationId/resend": "located" },
+    async call(caller, { workspaceId }) {
+      const invitation = await fixtures.createInvitation({
+        email: uniqueEmail("invitee"),
+        workspaceId,
+        role: "member",
+      });
+      return request(
+        "POST",
+        `/api/v1/invitations/${invitation.id}/resend`,
+        caller,
+      );
+    },
+    expected: { ...members(403, 403, 200), admin: 200 },
+  },
+  {
+    api: "W7",
+    routes: { "DELETE /api/v1/invitations/:invitationId": "located" },
+    async call(caller, { workspaceId }) {
+      const invitation = await fixtures.createInvitation({
+        email: uniqueEmail("invitee"),
+        workspaceId,
+        role: "member",
+      });
+      return request("DELETE", `/api/v1/invitations/${invitation.id}`, caller);
+    },
+    expected: { ...members(403, 403, 204), admin: 204 },
+  },
+  {
+    api: "W8",
+    routes: {
+      "GET /api/v1/workspaces/:workspaceId/mention-candidates": "scoped",
+    },
+    call: (caller, { workspaceId }) =>
+      request(
+        "GET",
+        `/api/v1/workspaces/${workspaceId}/mention-candidates?targetType=idea&targetId=${crypto.randomUUID()}`,
+        caller,
+      ),
+    expected: members(200, 200, 200),
+  },
+  {
+    api: "W8 (a shared self-analysis)",
+    routes: {
+      "GET /api/v1/workspaces/:workspaceId/mention-candidates": "scoped",
+    },
+    async call(caller, { workspaceId }) {
+      const author = await newMember(workspaceId);
+      const analysis = await fixtures.createSelfAnalysis(author.id, [
+        workspaceId,
+      ]);
+      return request(
+        "GET",
+        `/api/v1/workspaces/${workspaceId}/mention-candidates?targetType=self_analysis_answer&targetId=${analysis.id}&targetKey=SA.WHY.1`,
+        caller,
+      );
+    },
+    expected: members(403, 200, 200),
+  },
 ];
 
+const testApp = buildTestApp(database);
 const apps = {
-  default: buildTestApp(database).app,
+  default: testApp.app,
   google: buildTestApp(database, { config: { google: GOOGLE } }).app,
-  staging: buildTestApp(database, { config: { appEnv: "staging" } }).app,
+  staging: buildTestApp(database, {
+    config: { appEnv: "staging", avatarBucket: "test-moonx-staging-avatars" },
+  }).app,
 };
 
 describe("SDD 7.1 authorization matrix", () => {
   for (const row of ROWS) {
     test(row.api, async () => {
       const app = apps[row.app ?? "default"];
-      const { workspaceId, callers } = await people(app);
+      const team = await people(app);
       const statuses: Partial<Record<CallerName, number>> = {};
       for (const name of CALLERS) {
         const response = await app.handle(
-          await row.call(callers[name], workspaceId),
+          await row.call(team.callers[name], team),
         );
         statuses[name] = response.status;
       }
       expect(statuses).toEqual(row.expected);
     });
   }
+
+  test("holds an operator inside a workspace to their role there (Admin column)", async () => {
+    const app = apps.default;
+    const cases = (role: Role, statuses: Record<string, number>) =>
+      Object.entries(statuses).map(
+        ([key, status]) => [key, role, status] as const,
+      );
+    const workspaceCalls: Record<
+      string,
+      (caller: Person, workspaceId: string) => Request
+    > = {
+      "W1 GET": (caller, id) =>
+        request("GET", `/api/v1/workspaces/${id}`, caller),
+      "W1 PATCH": (caller, id) =>
+        request("PATCH", `/api/v1/workspaces/${id}`, caller, {
+          currency: "USD",
+        }),
+      W2: (caller, id) =>
+        request("GET", `/api/v1/workspaces/${id}/members`, caller),
+      "W4 GET": (caller, id) =>
+        request("GET", `/api/v1/workspaces/${id}/invitations`, caller),
+      W8: (caller, id) =>
+        request(
+          "GET",
+          `/api/v1/workspaces/${id}/mention-candidates?targetType=idea&targetId=${crypto.randomUUID()}`,
+          caller,
+        ),
+    };
+    for (const [key, role, expected] of [
+      ...cases("viewer", {
+        "W1 GET": 200,
+        "W1 PATCH": 403,
+        W2: 200,
+        "W4 GET": 403,
+        W8: 200,
+      }),
+      ...cases("owner", { "W1 PATCH": 200, "W4 GET": 200 }),
+    ]) {
+      const team = await fixtures.createTeam();
+      await fixtures.addMember(team.workspace.id, team.admin.id, role);
+      const admin: Person = {
+        id: team.admin.id,
+        email: team.admin.email,
+        cookie: await signIn(app, team.admin.email, uniqueIp()),
+      };
+      const call = workspaceCalls[key];
+      if (call === undefined) throw new Error(`No call for ${key}`);
+      const response = await app.handle(call(admin, team.workspace.id));
+      expect({ key, role, status: response.status }).toEqual({
+        key,
+        role,
+        status: expected,
+      });
+    }
+  });
 
   test("covers every route of the API, declared as the table expects", () => {
     const covered = new Map<string, AccessKind>();

@@ -1,4 +1,4 @@
-import { type Database, rateLimits } from "@moonx/db";
+import { type Database, type DatabaseTransaction, rateLimits } from "@moonx/db";
 import type { BetterAuthOptions } from "better-auth";
 import { and, lte, not, type SQL, sql } from "drizzle-orm";
 
@@ -18,11 +18,15 @@ export type LimitResult =
   | { allowed: false; retryAfterSeconds: number };
 
 export interface RateLimiter {
-  /** Counts one request of `subject` (an IP or a user id) against `limit`. */
+  /**
+   * Counts one request of `subject` (an IP or a user id) against `limit`. Given `within`,
+   * the count is written in that transaction, so it goes if the transaction rolls back.
+   */
   consume(
     scope: LimitScope,
     limit: Limit,
     subject: string,
+    within?: DatabaseTransaction,
   ): Promise<LimitResult>;
 }
 
@@ -40,7 +44,7 @@ const APP_PREFIX = "app:";
  * One upsert reads and counts, so concurrent requests cannot both take the last slot.
  */
 async function consumeKey(
-  db: Database,
+  db: Database | DatabaseTransaction,
   key: string,
   max: number,
   windowMs: number,
@@ -93,7 +97,7 @@ export function createRateLimiter(
 ): RateLimiter {
   const lastSweeps = new Map<string, number>();
   return {
-    async consume(scope, limit, subject) {
+    async consume(scope, limit, subject, within) {
       const at = now();
       const prefix = `${APP_PREFIX}${scope}:${limit.name}:`;
       const lastSweep = lastSweeps.get(prefix);
@@ -107,7 +111,7 @@ export function createRateLimiter(
         );
       }
       return consumeKey(
-        db,
+        within ?? db,
         `${prefix}${subject}`,
         limit.max,
         limit.windowMs,

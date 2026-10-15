@@ -13,6 +13,7 @@ import {
   WORKSPACE_NAME_MAX,
 } from "@moonx/schemas";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { personalWorkspaceOf } from "./membership";
 
 const PERSONAL_WORKSPACE_SUFFIX = "'s workspace";
 const PERSONAL_WORKSPACE_CURRENCY = "PHP";
@@ -99,26 +100,23 @@ export interface NewUser {
  * Does nothing for a user who already has a personal workspace, so it can run again
  * for one whose sign-up stopped halfway. Takes a transaction so that U5, which creates
  * the user itself, runs this in the same one.
+ *
+ * @returns false, having done nothing, when the account is no longer active
  */
 export async function setUpNewUser(
   tx: DatabaseTransaction,
   user: NewUser,
   at: Date,
-): Promise<void> {
-  // The lock makes a second run for the same user wait, then see the first one's work.
-  await tx
-    .select({ id: users.id })
+): Promise<boolean> {
+  // The lock makes a second run for the same user wait, then see the first one's work,
+  // and a run behind an account deletion (U7) see the account gone.
+  const [locked] = await tx
+    .select({ status: users.status })
     .from(users)
     .where(eq(users.id, user.id))
-    .for("update");
-  const [existing] = await tx
-    .select({ id: workspaces.id })
-    .from(workspaces)
-    .where(
-      and(eq(workspaces.createdById, user.id), eq(workspaces.isPersonal, true)),
-    )
-    .limit(1);
-  if (existing !== undefined) return;
+    .for("no key update");
+  if (locked?.status !== "active") return false;
+  if ((await personalWorkspaceOf(tx, user.id)) !== null) return true;
   const [workspace] = await tx
     .insert(workspaces)
     .values({
@@ -164,4 +162,5 @@ export async function setUpNewUser(
         : {}),
     })
     .where(eq(users.id, user.id));
+  return true;
 }

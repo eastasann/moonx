@@ -954,37 +954,45 @@ make test-web・make typecheck・make lint が通る状態をゴールとする�
 
 ---
 
-## Step 19b: Web の部品: size・React Aria の文言・日付の入力欄の形の決定
+## Step 19b: Web の部品: size・React Aria の文言・日付の入力欄の形
 
-Status: blocked 2026-10-16
-理由: 3つとも docs の決まりを文字どおりに当てると実装の手がかり（06 のトークン・上書きできる文言）が無く、当てない部品や場合を決めると決まりを狭めることになるため、ユーザーの決定が要る（下の 1〜3）
+Status:
 
 ```
-Step 19 の独立レビューで見つかった、docs の決まりと部品の食い違いのうち、ユーザーの決定が要る3つを決めて、docs と部品に入れてください。
+Step 19 の独立レビューで見つかった、docs の決まりと部品の食い違い3つを、2026-10-16 のユーザーの決定どおりに docs と部品に入れてください。
+3つとも、Step 20〜22 の部品にも同じ基準で当てます。基準に当てはめて決まることは、止めずに docs の一覧に足してください。
 
 参照:
 - docs/design-spec.md 1.2（書式: 日付は「Sep 30, 2026」）・4.5（部品の補足:「種類・大きさの列に値の無い部品も、size（S / M / L / XL）を受ける」）
 - docs/02-01_system-design-doc.md 9章（UI の文言はすべてカタログに置く）
 - docs/06_design-tokens.json（semantic.scale.*.component・semantic.typography）
 
-決めること（ユーザー）:
-1. size: 4.5 の補足は、種類・大きさの列に値の無い部品も S / M / L / XL を受けるとする。Step 19 の部品のうち、
-   Heading / Text・Link・Well・FileTrigger・Flex / Stack / Grid / Container は size を受けていない（Form は受ける）。
-   06 にはこれらの size の値が無く、受けるなら何を大きさに対応させるか（例: Link は文字の大きさとタップ領域、Well は内側の余白）を
-   06 に足すことになる。受けない部品を決めるなら 4.5 の補足に書き足す（決まりを狭める）。Step 20〜22 の、同じ列に値の無い部品
-   （Tooltip・Disclosure・Tabs・Breadcrumbs・Skeleton・IllustratedMessage・Toast など）にも同じ問いがある
-2. React Aria が持つ文言: SDD 9章は UI の文言をすべてカタログに置くとするが、React Aria が自前の文言を出す。
-   見えるもの: Picker の既定のプレースホルダー「Select an item」、DatePicker の欄の「mm / dd / yyyy」。
-   読み上げだけのもの: SearchField の「Clear search」、ComboBox の「Show suggestions」、DatePicker の「Calendar」、
-   カレンダーの「Previous」「Next」、TagGroup の「Remove」、Popover とトレイの「Dismiss」、日付の欄の名前（month・day・year）、
-   選んだときの読み上げ。上書きできるものはカタログに置き、上書きできないもの（Dismiss・日付の欄の名前・選んだときの読み上げ）は
-   React Aria の en-US の文言を使うと 9章に書くか、ほかの扱いにするか
-3. DatePicker の入力欄の日付の形: 1.2 は日付を「Sep 30, 2026」で出すとする。React Aria の日付の欄は数字の欄だけで、
-   入力欄は en-PH の数字の並び（9 / 30 / 2026）になる。入力欄は数字の並びのままにして 1.2 に入力欄の例外を書くか、
-   月の欄を名前（Sep）で出して区切りを「Sep 30, 2026」に合わせるか
+決まったこと（ユーザー）:
+1. size は Spectrum 2 に合わせる。4.5 の補足を次の基準に書き換え、size を受けない部品の一覧を書く。
+   - 受ける: Spectrum 2（@react-spectrum/s2）の同じ名前の部品が size を持つもの（Button・ButtonGroup・ActionButton・ActionGroup・
+     ToggleButtonGroup・ActionMenu・Menu・Form・TextField・NumberField・SearchField・Picker・ComboBox・RadioGroup・Checkbox・
+     Switch・DatePicker・TagGroup・Disclosure / Accordion・Breadcrumbs・IllustratedMessage・Badge・StatusLight・ProgressBar・
+     ProgressCircle・Meter・Divider・Card / CardView・Avatar・Popover・ContextualHelp・Dialog）と、06 に size ごとの値が既にあるもの
+     （Tabs の item-height、SegmentedControl が使う action-button の値）。大きさの段は、4.5 の表に段があればそれ、
+     無ければ Spectrum 2 のその部品の段（例: Breadcrumbs は M / L、Popover は S / M / L、ContextualHelp は XS / S）
+   - 受けない: Spectrum 2 の部品が size を持たず、06 にも値が無いもの（Heading / Text・Link・Well・FileTrigger・
+     Flex / Stack / Grid / Container・Tooltip・Toast・Skeleton・InlineAlert・TableView / ListView / Tree（密度で変える）・Steps）
+   - 独自の部品は、いちばん近い Spectrum 2 の部品に合わせる（MentionTextArea は TextArea、FauPicker は ActionButton、
+     CheckDots と MoonGlyph は 4.5 の表の S / M）。枠・パネル・表示だけの部品（SideNav / TabBar・AppFrame・PageFrame・
+     RouterProvider・Panel・DiffText・QuestionCard・MetricTile・RowList・Slide・パターンの枠）は受けない
+   - 06 に値を足すのは、受ける部品で値が無いものだけ（Spectrum 2 のトークンの値を使い、出典を $description に書く）
+2. React Aria が持つ文言は、上書きできるものをカタログに置く。
+   - カタログに置く: Picker のプレースホルダー（Select an item）・日付の欄のプレースホルダー（mm / dd / yyyy）・SearchField の
+     「Clear search」・ComboBox の「Show suggestions」・DatePicker の「Calendar」・カレンダーの「Previous」「Next」・TagGroup の「Remove」
+   - 上書きできないもの（Popover とトレイの「Dismiss」・日付の欄の名前（month・day・year）・選んだときの読み上げ）は React Aria の
+     英語（en-US）の文言を使う。SDD 9章の表に、例外の行としてこの一覧と理由（React Aria の内部で作り、渡す口が無い）を書く
+   - Step 20〜22 の部品で見つけた React Aria の文言も同じ基準で扱い、上書きできないものは 9章の一覧に足す
+3. DatePicker の入力欄は en-PH の数字の並び（9/30/2026）のままにする。design-spec 1.2 に、日付の入力欄はこの例外で、
+   ほかの場所に表示する日付は「Sep 30, 2026」と書く（React Aria と Spectrum 2 の DatePicker と同じ形。キーボードで数字を打てる）
 
-やること（決定のあと）:
+やること:
 - 決定を design-spec 1.2・4.5、SDD 9章、06 に書き、packages/ui-web の部品・/dev/components・テスト（make test-web・make test-e2e）に入れる
+- size を受ける部品は、すべての段がテストで描かれることを確かめる。カタログに置いた文言は、部品がカタログの文言を出すことをテストで確かめる
 
 決めた扱いが docs と部品とテストに入り、make test-web・make test-e2e・make typecheck・make lint・make doc-lint が通る状態をゴールとする。
 

@@ -1,5 +1,7 @@
 import {
+  type KeyMetrics,
   launchTimingSchema,
+  type MetricReason,
   type MetricValue,
   type PitchSlideKey,
   type PitchVariant,
@@ -19,8 +21,9 @@ import type { PlanAnswerContent } from "./plan";
 // AD6 `pitch_deck_overflow`). A cut leaves each text one line (two with CJK in it) and its
 // whole label, at the smallest sizes, so a slide is cut at its bottom when even those do
 // not fit: what the template decides (its sub-items and their titles) and the lists at
-// their limits, not the length of the answers. Numbers stay in the range 6.14 gives, where
-// none wraps.
+// their limits, not the length of the answers. Amounts stay in the range 6.14 gives, where
+// none wraps; the calculated figures are also set wide, and as the reasons 6.4 shows in
+// their place, as plans without a margin or a profit show them.
 
 /** Texts that take one line at the smallest sizes, in English and in Japanese. */
 export const PITCH_SHORT_TEXTS = { en: "Yes", ja: "はい" } as const;
@@ -32,6 +35,46 @@ const exact = (value: number): MetricValue => ({
   bound: "exact",
   reason: null,
 });
+
+const lower = (value: number): MetricValue => ({
+  value,
+  bound: "lower",
+  reason: null,
+});
+
+const because = (reason: MetricReason): MetricValue => ({
+  value: null,
+  bound: "exact",
+  reason,
+});
+
+const WIDE: KeyMetrics = {
+  break_even_units_day: lower(99_999.9),
+  payback_months: lower(9_999.9),
+  simple_roi: { value: -99.999, bound: "approximate", reason: null },
+};
+
+/**
+ * The calculated figures the check sets in turn over those of {@link
+ * fullestPitchDeckInput} (SDD 5.13 AD6): as they are there; wide, as design-spec 6.14
+ * measures them; a contribution margin at or below zero, which leaves Break-even,
+ * Payback and ROI without a value (6.4); and an Expected profit at or below zero, which
+ * leaves Payback without one beside a wide Break-even and a negative ROI.
+ */
+export const PITCH_TEMPLATE_FIGURES: readonly KeyMetrics[] = [
+  {},
+  WIDE,
+  {
+    variable_cost_per_unit: exact(2_181.25),
+    contribution_margin: exact(-731.25),
+    contribution_margin_rate: exact(-0.5043),
+    break_even_units_day: because("margin_not_positive"),
+    payback_months: because("margin_not_positive"),
+    simple_roi: because("margin_not_positive"),
+  },
+  { payback_months: because("not_recovered") },
+  { ...WIDE, payback_months: because("not_recovered") },
+];
 
 const scenario = (
   key: ScenarioColumn["key"],
@@ -176,25 +219,34 @@ export interface PitchTemplateOverflow {
 /**
  * The slides of the one- and five-minute decks of a plan template of `sections` that
  * are cut at the bottom of their body on the most material ({@link
- * fullestPitchDeckInput}), with English or with Japanese texts: once each, one-minute
- * deck first, in slide order.
+ * fullestPitchDeckInput}), with English or with Japanese texts, and with any of the
+ * calculated figures the check sets: once each, one-minute deck first, in slide order.
  */
 export function pitchTemplateOverflows(
   sections: readonly PitchSection[],
   options: Omit<FitOptions, "currency">,
 ): PitchTemplateOverflow[] {
   return pitchVariantSchema.options.flatMap((variant) => {
-    const decks = Object.values(PITCH_SHORT_TEXTS).map((text) => {
+    const decks = Object.values(PITCH_SHORT_TEXTS).flatMap((text) => {
       const input = fullestPitchDeckInput(variant, text, sections);
-      return {
-        slides: buildPitchDeck(input).slides,
+      return PITCH_TEMPLATE_FIGURES.map((figures, set) => ({
+        slides: buildPitchDeck({
+          ...input,
+          keyMetrics: { ...input.keyMetrics, ...figures },
+        }).slides,
+        // The figures change only the slides that show them.
+        figuresOnly: set > 0,
         fit: { ...options, currency: input.currency },
-      };
+      }));
     });
     return (decks[0]?.slides ?? []).flatMap((slide, index) => {
-      const cut = decks.some(({ slides, fit }) => {
+      const cut = decks.some(({ slides, figuresOnly, fit }) => {
         const same = slides[index];
-        return same !== undefined && pitchSlideCutAtBottom(same, fit);
+        return (
+          same !== undefined &&
+          (!figuresOnly || same.numbers.length > 0) &&
+          pitchSlideCutAtBottom(same, fit)
+        );
       });
       if (!cut) return [];
       if (slide.editSource === null)

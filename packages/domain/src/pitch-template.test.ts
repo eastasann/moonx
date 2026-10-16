@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { print } from "@moonx/ui-tokens/print";
 import template from "../../../data/templates/bcdx/plan.json";
-import { buildPitchDeck, type PitchSection } from "./pitch";
+import { buildPitchDeck, formatMetric, type PitchSection } from "./pitch";
 import {
   fitPitchSlide,
   type MeasureText,
@@ -10,6 +10,7 @@ import {
 import {
   fullestPitchDeckInput,
   PITCH_SHORT_TEXTS,
+  PITCH_TEMPLATE_FIGURES,
   pitchTemplateOverflows,
 } from "./pitch-template";
 
@@ -100,11 +101,7 @@ describe("pitchSlideCutAtBottom", () => {
   });
 
   test("a slide still too tall with every text cut is", () => {
-    const slide = slideOf(
-      withTexts("20", 30),
-      PITCH_SHORT_TEXTS.en,
-      "economics",
-    );
+    const slide = slideOf(withTexts("20", 30), PITCH_SHORT_TEXTS.en, "funding");
     expect(fitPitchSlide(slide, fit).overflow).toBe(true);
     expect(pitchSlideCutAtBottom(slide, fit)).toBe(true);
   });
@@ -140,7 +137,55 @@ describe("pitchTemplateOverflows", () => {
     }));
     expect(pitchTemplateOverflows(longTitles, { print, measure })).toEqual([
       { variant: "five", slide: "problem", itemNo: 4 },
-      { variant: "five", slide: "economics", itemNo: 20 },
+      { variant: "five", slide: "funding", itemNo: 20 },
     ]);
+  });
+
+  test("the figures it sets: as they are, wide, without a margin, and without a profit (SDD 5.13)", () => {
+    const shown = PITCH_TEMPLATE_FIGURES.map((figures) => {
+      const metrics = {
+        ...fullestPitchDeckInput("five", PITCH_SHORT_TEXTS.en, SECTIONS)
+          .keyMetrics,
+        ...figures,
+      };
+      return [
+        "contribution_margin",
+        "break_even_units_day",
+        "payback_months",
+        "simple_roi",
+      ].map((key) => {
+        const value = metrics[key];
+        if (value === undefined) throw new Error(`No ${key}`);
+        return formatMetric(key, value, "PHP");
+      });
+    });
+    const margin =
+      "Contribution margin is zero or negative. Review price or variable costs.";
+    const notRecovered = "Not recovered: Expected profit is zero or negative";
+    expect(shown).toEqual([
+      ["₱731.25", "116.9", "19.2 months", "130.9%"],
+      ["₱731.25", "99,999.9+", "9,999.9+ months", "≈ −9,999.9%"],
+      ["−₱731.25", margin, margin, margin],
+      ["₱731.25", "116.9", notRecovered, "130.9%"],
+      ["₱731.25", "99,999.9+", notRecovered, "≈ −9,999.9%"],
+    ]);
+  });
+
+  test("sets the calculated figures wide and as reasons too, on the slides that show them", () => {
+    // Slides just tall enough for Economics with the figures of fullestPitchDeckInput.
+    const shorter = (height: number) => ({
+      ...print,
+      slide: { ...print.slide, height },
+    });
+    const economics = slideOf(SECTIONS, PITCH_SHORT_TEXTS.en, "economics");
+    let height = print.slide.height;
+    while (
+      !pitchSlideCutAtBottom(economics, { ...fit, print: shorter(height - 1) })
+    ) {
+      height -= 1;
+    }
+    expect(
+      pitchTemplateOverflows(SECTIONS, { print: shorter(height), measure }),
+    ).toContainEqual({ variant: "five", slide: "economics", itemNo: 20 });
   });
 });

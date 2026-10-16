@@ -621,7 +621,7 @@ describe("validateTemplateVersion and publishTemplateVersion", () => {
       errors: [
         {
           code: "pitch_deck_overflow",
-          message: expect.stringContaining("economics slide"),
+          message: expect.stringContaining("funding slide"),
           nodeId: financialPlan?.id ?? "",
         },
       ],
@@ -912,7 +912,7 @@ describe("checkTemplateContent", () => {
   });
 
   test("pitch_deck_overflow: a plan whose deck the most material runs past a slide's bottom", () => {
-    // Notes under the five-minute Economics figures and table: §20's text sub-items.
+    // The five-minute Funding plan: a bullet for each of §20's text sub-items.
     const financialPlan = (texts: number) =>
       content("business_plan", [
         {
@@ -929,7 +929,7 @@ describe("checkTemplateContent", () => {
     expect(
       checkTemplateContent(financialPlan(20), measure).errors[0]?.message,
     ).toBe(
-      "The economics slide of the five-minute deck runs past the bottom of its body with the most material",
+      "The funding slide of the five-minute deck runs past the bottom of its body with the most material",
     );
     // Other kinds have no deck.
     expect(

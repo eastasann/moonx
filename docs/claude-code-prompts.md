@@ -849,7 +849,7 @@ pitch-fit.test.ts の「more §20 text sub-items」のテストは、AD6 が断�
 
 ## Step 18e: API: 5分版の Economics を2枚に分ける
 
-Status:
+Status: done 2026-10-16
 
 ```
 Step 18d の独立レビューで、18d で決めた2つの場合（テンプレートから来る場合・金額が大きくて数字が折り返す場合）のほかに、

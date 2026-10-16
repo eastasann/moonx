@@ -183,8 +183,11 @@ export const formatMetric = (
 type BulletSource =
   /** A text sub-item. */
   | { kind: "answer"; key: string }
-  /** The text sub-items of an item, in template order (§8, §20). */
-  | { kind: "texts"; section: string }
+  /**
+   * The text sub-items of an item, in template order (§8, §20). With `none`, a template
+   * with no such sub-item shows one bullet named by that slide, as Not written yet.
+   */
+  | { kind: "texts"; section: string; none?: HeadedSlideKey }
   /** §29: open Next Actions, soonest first, in one bullet. */
   | { kind: "next_actions" }
   /** §11: the founders as "Name (Role)", in one bullet. */
@@ -319,6 +322,8 @@ const SLIDES: Record<PitchVariant, readonly SlideSpec[]> = {
       ],
       bullets: [{ kind: "texts", section: "08" }],
     },
+    // Two slides: wide or missing figures over the scenario table leave §20's notes no
+    // room (design-spec 6.14, the user's decision of 2026-10-16).
     {
       key: "economics",
       type: "table",
@@ -331,7 +336,12 @@ const SLIDES: Record<PitchVariant, readonly SlideSpec[]> = {
         "simple_roi",
       ],
       table: "scenarios",
-      bullets: [{ kind: "texts", section: "20" }],
+    },
+    {
+      key: "funding",
+      type: "text",
+      itemNo: 20,
+      bullets: [{ kind: "texts", section: "20", none: "funding" }],
     },
     {
       key: "why_us",
@@ -475,8 +485,8 @@ class DeckBuilder {
         return [
           this.filled(this.sourceName(source.key), this.text(source.key)),
         ];
-      case "texts":
-        return (
+      case "texts": {
+        const texts =
           this.input.sections
             .find((section) => section.key === source.section)
             ?.questions.filter((question) =>
@@ -484,8 +494,11 @@ class DeckBuilder {
             )
             .map((question) =>
               this.filled(question.title, this.text(question.key)),
-            ) ?? []
-        );
+            ) ?? [];
+        return texts.length === 0 && source.none !== undefined
+          ? [this.filled(i18n.t(`pitch:slide.${source.none}`), null)]
+          : texts;
+      }
       case "next_actions": {
         const open = this.input.execution
           .filter(

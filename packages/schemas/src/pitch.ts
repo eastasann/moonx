@@ -10,7 +10,7 @@ import { PLAN_ITEM_COUNT } from "./plans";
 // The Pitch Deck of SDD 5.9 (P12, P13): the slides packages/domain builds from a plan
 // (design-spec 6.14), as 23 shows them and the PDF prints them.
 
-/** One-minute (8 slides) or five-minute (13 slides). */
+/** One-minute (8 slides) or five-minute (14 slides). */
 export const pitchVariantSchema = z.enum(["one", "five"]);
 export type PitchVariant = z.infer<typeof pitchVariantSchema>;
 
@@ -24,6 +24,7 @@ export const pitchSlideKeySchema = z.enum([
   "competition",
   "business_model",
   "economics",
+  "funding",
   "why_us",
   "execution",
   "launch",
@@ -102,7 +103,10 @@ export const pitchSlideSchema = z.object({
    * went down to fit, each stopping at its `-min`.
    */
   shrink: z.int().nonnegative(),
-  /** It did not fit at the smallest sizes and texts were cut with "…". */
+  /**
+   * It did not fit at the smallest sizes: texts were cut with "…", or it runs past the
+   * bottom of its body even so. Figures that only break do not set it (design-spec 6.14).
+   */
   overflow: z.boolean(),
   /** Null for a Viewer, a version, an archived plan or idea (design-spec 6.14). */
   editSource: z

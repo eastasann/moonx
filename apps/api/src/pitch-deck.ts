@@ -290,7 +290,7 @@ export function pitchDeckRoutes({
         detail: {
           summary: "P12 The Pitch Deck (23)",
           description:
-            "The one-minute (8) or five-minute (13) slides from the plan now, or from the saved version versionId, fitted to the slide: font sizes down by shrink steps, then texts cut with an ellipsis (overflow). Edit source links only for Owners and Members on the plan now, neither plan nor idea archived.",
+            "The one-minute (8) or five-minute (14) slides from the plan now, or from the saved version versionId, fitted to the slide: font sizes down by shrink steps, then texts cut with an ellipsis (overflow, also set when a slide still runs past its bottom). Edit source links only for Owners and Members on the plan now, neither plan nor idea archived.",
         },
       },
     )

@@ -166,6 +166,28 @@ export const bulletTypography = (type: PitchSlideType, print: PitchPrint) =>
 export const bulletGap = (type: PitchSlideType, print: PitchPrint) =>
   type === "text" ? print.slide.bulletGap : print.slide.noteGap;
 
+/** The width a table cell sets its text in: its column's share of the slide, less padding. */
+const cellWidth = (share: number, print: PitchPrint) =>
+  share * pitchFrame(print).contentWidth - 2 * print.slide.cellPaddingX;
+
+/** The font of a table cell: numbers in the monospaced font (design-spec 4.4). */
+const cellFont = (
+  numeric: boolean,
+  sizes: PitchSizes,
+  print: PitchPrint,
+): PitchFont =>
+  numeric
+    ? {
+        family: "mono",
+        weight: print.typography.cellNumber.fontWeight,
+        size: sizes.cell,
+      }
+    : {
+        family: "body",
+        weight: print.typography.cell.fontWeight,
+        size: sizes.cell,
+      };
+
 /** The shrink level at which every size a slide uses is at its minimum. */
 const maxShrink = (slide: PitchSlide, print: PitchPrint) => {
   const { fontSize: f, slide: frame } = print;
@@ -734,8 +756,7 @@ function layout(
     if (table === null) return () => 0;
     const padding = 2 * frame.cellPaddingY + frame.hairlineWidth;
     const lineHeight = sizes.cell * typography.cell.lineHeight;
-    const inner = (share: number) =>
-      share * contentWidth - 2 * frame.cellPaddingX;
+    const inner = (share: number) => cellWidth(share, print);
     const header = Math.max(
       ...table.columns.map(
         (column) =>
@@ -761,7 +782,7 @@ function layout(
             font: body(sizes.cell, typography.cell.fontWeight),
           },
         ],
-        contentWidth - 2 * frame.cellPaddingX,
+        cellWidth(1, print),
         lineHeight,
         () => {},
         null,
@@ -772,17 +793,9 @@ function layout(
       row.map((cell, columnIndex) => {
         const column = table.columns[columnIndex];
         if (column === undefined) throw new Error("A cell without a column");
-        const share = column.width;
-        const font: PitchFont = column.numeric
-          ? {
-              family: "mono",
-              weight: typography.cellNumber.fontWeight,
-              size: sizes.cell,
-            }
-          : body(sizes.cell, typography.cell.fontWeight);
         return block(
-          [{ text: cell ?? "", font }],
-          inner(share),
+          [{ text: cell ?? "", font: cellFont(column.numeric, sizes, print) }],
+          inner(column.width),
           lineHeight,
           (text) => {
             const target = slide.table?.rows[rowIndex];
@@ -891,10 +904,10 @@ function fit(slide: PitchSlide, given: FitOptions): Fitted {
     if (longest === undefined) break;
     longest.cap -= 1;
   }
-  // Values that break, or still too tall once every text is down to a line: shown as
-  // cut all the same.
+  // Still too tall once every text is down to a line: shown as cut all the same. Values
+  // that break are not: they cannot be shortened in the plan (6.14).
   const cutAtBottom = at.height() > bodyHeight;
-  let overflow = !at.figuresFit || cutAtBottom;
+  let overflow = cutAtBottom;
   for (const made of at.blocks) {
     if (made.cap < made.lines) {
       made.apply(
@@ -925,6 +938,38 @@ export const pitchSlideCutAtBottom = (
   slide: PitchSlide,
   options: FitOptions,
 ): boolean => fit(slide, options).cutAtBottom;
+
+/**
+ * Whether a value of `slide`, fitted as {@link fitPitchSlide} fits it, takes more than a
+ * line: its figures are too wide to stand side by side, or a number cell of its table is
+ * wider than its column (design-spec 6.14 gives the amounts at which none is). A reason in
+ * place of a figure is not a value: it always breaks between its words.
+ */
+export function pitchNumbersBreak(
+  slide: PitchSlide,
+  options: FitOptions,
+): boolean {
+  const { print, measure } = options;
+  const sizes = pitchSizes(slide.type, slide.shrink, print);
+  if (!figureColumns(slide, sizes, options).fits) return true;
+  const table = slide.table;
+  if (table === null) return false;
+  return table.rows.some((row) =>
+    row.some((cell, index) => {
+      const column = table.columns[index];
+      if (column === undefined) throw new Error("A cell without a column");
+      return (
+        column.numeric &&
+        cell !== null &&
+        wrap(
+          [{ text: cell, font: cellFont(true, sizes, print) }],
+          cellWidth(column.width, print) * FIT_WIDTH,
+          measure,
+        ).length > 1
+      );
+    }),
+  );
+}
 
 /**
  * `slide` with {@link breakLongWords} applied to each text in the box and font the fit
@@ -997,14 +1042,8 @@ export function breakSlideWords(
                   ? null
                   : breakLongWords(
                       cell,
-                      column.numeric
-                        ? {
-                            family: "mono",
-                            weight: typography.cellNumber.fontWeight,
-                            size: sizes.cell,
-                          }
-                        : body(sizes.cell, typography.cell.fontWeight),
-                      column.width * contentWidth - 2 * frame.cellPaddingX,
+                      cellFont(column.numeric, sizes, print),
+                      cellWidth(column.width, print),
                       measure,
                     );
               }),

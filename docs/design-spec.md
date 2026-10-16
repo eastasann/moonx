@@ -1849,7 +1849,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - プランから毎回生成する。スライドは直接編集しない。各スライドに「Edit source」（元の項目の 21 へ。Owner / Member）。数字の入るスライドには「Edit in validation」（17 / 18 へ。Owner / Member）も置く。版を指定して開いているとき、プラン・アイデアがアーカイブ済みのときは、どちらのリンクも出さない（遷移先が読み取り専用のため）。
 - スライドの型は4つ: 表紙（大きな見出しと副題）/ 文章（見出しと箇条書き。箇条書きの数は素材で決まる。下の決まり）/ 数字（見出しと大きな数字2〜4つ）/ 表（見出しと表）。各スライドの型は下の表のとおり。ロゴは置かず、Business Name を表紙とフッターに出す。
 - スライドへのコメントは「版の種類 + スライドのキー」で指す（例: `five.market`）。
-- 上部で **1分版（One-minute）/ 5分版（Five-minute）** を切り替える（原本 §30 の流れどおり。ただし5分版は、原本の Execution plan を Execution plan と Launch plan の2枚に分ける）。
+- 上部で **1分版（One-minute）/ 5分版（Five-minute）** を切り替える（原本 §30 の流れどおり。ただし5分版は、原本の Economics を Economics と Funding plan の2枚に、Execution plan を Execution plan と Launch plan の2枚に分ける）。
 - 上部で生成元を選ぶ: 「Latest」（今の内容）か、保存済みの版。
 - スライドの下に「話す内容」として §30 の One-minute / Five-minute explanation を出す（アプリの表示だけ。PDF には入れない）。
 - 画面のスライドも PDF と同じ見た目にするため、ダークモードでもライトの配色で出す（スライドの外側の画面はモードに従う）。
@@ -1868,7 +1868,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 7 | Why us（why_us・文章。箇条書きは1つ） | §10 Founder advantages |
 | 8 | Next step（next_step・文章） | §29 Next Actions（完了済みを除き、期限が近い順に最大3件。期限なしは最後。1つの箇条書きにまとめる）・§24 We proceed to launch if |
 
-5分版（13枚）:
+5分版（14枚）:
 
 | # | スライド | 素材 |
 |---|---|---|
@@ -1879,30 +1879,35 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 5 | Market（market・文章） | §6 Market type・Why?・Reachable market・Required market share |
 | 6 | Competition（competition・表） | §6 Key competitors・What must we do differently or better?、検証の競合（15 で並べた順の上から最大5件: 名前・種類・価格・強み） |
 | 7 | Business model（business_model・数字） | §8 の文章の小項目、価格・変動費/件・粗利/件・粗利率 |
-| 8 | Economics（economics・表） | §20、シナリオ表（Conservative / Expected / Strong の件数/日・売上・営業利益）、初期費用、損益分岐、回収期間、ROI |
-| 9 | Why us（why_us・文章） | §10 Founder advantages・Missing capabilities・How will we fill the gaps?、§11 の表（各行を「Name (Role)」と並べて1つの箇条書きにする） |
-| 10 | Execution plan（execution・表） | §23 マイルストーン（期限順に最大6件） |
-| 11 | Launch plan（launch・文章） | §25 ローンチを時期の区分ごとにまとめた要約（区分の固定の名前で出す。Timing の文言を直しても変わらない） |
-| 12 | Risks（risks・表） | §22 の上位3件（Impact → Probability の順）と Mitigation |
-| 13 | Ask / next step（ask・文章） | §24 We proceed to launch if・We delay if・We stop / abandon if、§29 Next Actions（完了済みを除き、期限が近い順に最大3件。期限なしは最後。1つの箇条書きにまとめる）、§20 Trigger for additional funding |
+| 8 | Economics（economics・表） | 初期費用、損益分岐、回収期間、ROI、シナリオ表（Conservative / Expected / Strong の件数/日・売上・営業利益） |
+| 9 | Funding plan（funding・文章） | §20 の文章の小項目（Opening cash reserve・Runway if sales are below plan・Trigger for additional funding） |
+| 10 | Why us（why_us・文章） | §10 Founder advantages・Missing capabilities・How will we fill the gaps?、§11 の表（各行を「Name (Role)」と並べて1つの箇条書きにする） |
+| 11 | Execution plan（execution・表） | §23 マイルストーン（期限順に最大6件） |
+| 12 | Launch plan（launch・文章） | §25 ローンチを時期の区分ごとにまとめた要約（区分の固定の名前で出す。Timing の文言を直しても変わらない） |
+| 13 | Risks（risks・表） | §22 の上位3件（Impact → Probability の順）と Mitigation |
+| 14 | Ask / next step（ask・文章） | §24 We proceed to launch if・We delay if・We stop / abandon if、§29 Next Actions（完了済みを除き、期限が近い順に最大3件。期限なしは最後。1つの箇条書きにまとめる）、§20 Trigger for additional funding |
 
 - 数字・表のスライドは、数字や表の下に注記の箇条書き（素材の文章の小項目）を持てる。注記は表のセルと同じ大きさで、文章スライドの箇条書きより小さい。
 - 箇条書きは、素材の名前（小項目のタイトル。§29 は「Next Actions」、§11 は「Founders」、Launch plan は時期の区分の名前）を太字で前に置き、「Primary problem: …」と出す（§24 の3つの条件のように、名前が無いと区別できない素材があるため）。空の素材は「Frequency: Not written yet」のように名前を残し、「Not written yet」をグレーで出す。
 - 表紙: 見出しは Business Name、副題は §1 What is the business?。区切りの罫線の下に「Prepared by: …」「Date: …」「Version: …」の3行（Version は版の名前か「Draft」）。日付は、Latest はプランの最終更新日、版は保存日（20 の Date と同じ。利用者のタイムゾーンの日付で、書式は 1.2）。
-- 数字のスライド: 数字の上に太い罫線、下にラベルを置き、横に並べる。数字は途中で折り返さない（各列は数字かラベルの1行の幅で、余りを等分する。入らなければ文字を小さくする。最小でも入らないときだけ、列を数字とラベルの幅の比で分けて数字を折り返し、下の「Too long for this slide…」と同じ注意を出す）。計算できない主要指標は、6.4 の表示（「Empty」「Needs price」など）をラベルの大きさでグレーで出す（「Not written yet」にはしない。文なので単語の間で折り返す）。1分版の Business model は Price・Contribution / sale・Break-even / day、5分版は Price・Variable cost / sale・Contribution / sale・Contribution margin。
+- 数字のスライド: 数字の上に太い罫線、下にラベルを置き、横に並べる。数字は途中で折り返さない（各列は数字かラベルの1行の幅で、余りを等分する。入らなければ文字を小さくする。最小でも入らないときだけ、列を数字とラベルの幅の比で分けて数字を折り返す。数字は短くできないので、折り返しただけでは下の「Too long for this slide…」の注意を出さない）。計算できない主要指標は、6.4 の表示（「Empty」「Needs price」など）をラベルの大きさでグレーで出す（「Not written yet」にはしない。文なので単語の間で折り返す）。1分版の Business model は Price・Contribution / sale・Break-even / day、5分版は Price・Variable cost / sale・Contribution / sale・Contribution margin。
 - 表の列と幅の割合（API が列ごとに返す。SDD 5.9）: Competition は Name 25% / Type 18% / Price 15% / Strength 42%。
-- Economics: 上に Startup cost・Break-even / day・Payback・ROI の数字、その下にシナリオ表（行は Conservative / Expected / Strong、列は Scenario 28% / Units / day 20% / Revenue / month 26% / Operating profit / month 26%）、注記は §20 の文章の小項目。
+- Economics: 上に Startup cost・Break-even / day・Payback・ROI の数字、その下にシナリオ表（行は Conservative / Expected / Strong、列は Scenario 28% / Units / day 20% / Revenue / month 26% / Operating profit / month 26%）。注記は持たない（§20 の文章の小項目は次の Funding plan に出す）。
+- Funding plan: §20 の文章の小項目を、ほかの文章のスライドと同じく小項目1つにつき1つの箇条書きにする（空の素材は「Opening cash reserve: Not written yet」のように名前を残す）。テンプレートの §20 に文章の小項目が1つも無ければ、Launch plan と同じく「Funding plan: Not written yet」の1つにする。数字を持たないので「Edit in validation」は置かない。Economics の数字は、計算した指標が大きいときや計算できない主要指標の理由の文（6.4）を出すときに折り返して高くなり、シナリオ表と §20 の注記と合わせると最小の文字でも1枚に収まらないので、素材を削らず、最小の文字の大きさ（`semantic.print` のトークン）も下げずに2枚に分ける（2026-10-16 のユーザーの決定）。
 - Execution plan の表: マイルストーンの Milestone 22% / Goal 34% / Assignee 16% / Deadline 14% / Status 14%（期限順、期限なしは最後、最大6件）。注記は持たない。
 - Launch plan: 時期の区分ごとに1つの箇条書き（区分の名前は 6.13 の「T−30」「T−7」「Launch day」「First 30 days」「Days 31–90」「Other」で、この順に出す）で、その区分の行の Actions を区分の中の並び順に「; 」でつなぐ。Actions の無い区分は出さず、どの区分にも無ければ「Launch Plan: Not written yet」の1つ。マイルストーンとローンチの要約は、上限の件数（マイルストーン6件・区分6つ）だと最小の文字でも1枚に収まらないので、素材を削らず、最小の文字の大きさ（`semantic.print` のトークン）も下げずに2枚に分ける（2026-10-16 のユーザーの決定）。
 - Risks の表: Risk 34% / Probability 13% / Impact 13% / Mitigation 40%。Impact、Probability の順に High・Medium・Low の高い順（それ以外の値は最後、同じなら §22 の行の順）。
 - 期限（§29 と Execution plan の Deadline）は 1.2 のとおり日付で出し、Done でないものの期限を過ぎていれば「Oct 13, overdue 2d」と日数を添える（「今日」は作った日の利用者のタイムゾーンの日付）。
 - 1つの箇条書きにまとめる素材: §29 は「Get supplier quote (Oct 13, overdue 2d); Book venue (Oct 17)」のように「Action (期限)」（期限なしは Action だけ）を「; 」でつなぐ。§11 は各行を「Name (Role)」（Role が空なら Name だけ、Name が空なら Role だけ）にして「; 」でつなぐ。
 - 各ページのフッター: 「Business Name · 版の名前か Draft · 日付」（Business Name が空なら省く）。
-- 文章スライドの箇条書きは、素材の欄に並べた小項目1つにつき1つ（2026-10-11 のユーザーの決定。数の上限は設けず、プランに書いたものを落とさない）。Launch plan だけは、Actions のある時期の区分1つにつき1つ（1〜6。どの区分にも無ければ「Not written yet」の1つ。上の Launch plan の決まり）。素材が空の小項目は「Not written yet」で出し、箇条書きを減らさない。§29 Next Actions は件数（0〜3件）にかかわらず1つの箇条書きにまとめ、0件なら「Not written yet」。例: 5分版の Problem・Customer・Solution は5つ、Ask は5つ、Why us は4つ、1分版の Next step は2つ。
+- 文章スライドの箇条書きは、素材の欄に並べた小項目1つにつき1つ（2026-10-11 のユーザーの決定。数の上限は設けず、プランに書いたものを落とさない）。Launch plan だけは、Actions のある時期の区分1つにつき1つ（1〜6。どの区分にも無ければ「Not written yet」の1つ。上の Launch plan の決まり）。素材が空の小項目は「Not written yet」で出し、箇条書きを減らさない。§29 Next Actions は件数（0〜3件）にかかわらず1つの箇条書きにまとめ、0件なら「Not written yet」。例: 5分版の Problem・Customer・Solution は5つ、Ask は5つ、Why us は4つ、Funding plan は3つ、1分版の Next step は2つ。
 - 1分版の Why us だけは §10 Founder advantages の1つだけを出す（2026-10-03 のユーザーの決定。「Missing capabilities」と「How will we fill the gaps」は載せない）。
-- 各スライドの「Edit source」の移動先は、表紙 §1、Problem §4、Customer §3、Solution §5、Why now §1、Market・Competition §6、Business model §8（Edit in validation は 18）、Economics §20（Edit in validation は 17）、Why us §10、Execution plan §23、Launch plan §25、Risks §22、Next step §29、Ask §24。
+- 各スライドの「Edit source」の移動先は、表紙 §1、Problem §4、Customer §3、Solution §5、Why now §1、Market・Competition §6、Business model §8（Edit in validation は 18）、Economics §20（Edit in validation は 17）、Funding plan §20、Why us §10、Execution plan §23、Launch plan §25、Risks §22、Next step §29、Ask §24。
 - 空の素材は、そのスライドに「Not written yet」とグレーで出す（PDF にも出す）。
-- 文章が長くて収まらないときは文字を小さくし（型ごとに最小の文字の大きさを決める。具体値は Phase 3 のデザイントークン）、それでも収まらなければ末尾を「…」で切り、アプリの表示だけに「Too long for this slide. Shorten it in the plan.」と出す。小さくするときは、スライドのすべての文字を `semantic.print.slide.shrink-step` ずつ同時に下げ、それぞれ最小で止める。切るときは、最も多くの行をとる文（同じなら後のもの）から1行ずつ減らし、どの箇条書き（表紙の3行を含む）と表のセルも1行は残す（箇条書きを消さない）。箇条書きの素材の名前と数字（数字のスライドの数字と、表の数字の列のセル）は切らない。名前が「…」と合わせて1行に収まらなければ、その箇条書きは名前と「…」の行数を残し、セルに入らない数字は折り返す。公開したプランのテンプレートでは、上限の件数の素材（競合5・マイルストーン6・ローンチの区分6・リスク3・Next Actions 3、§11 の表、シナリオの表）でも、数字と計算できない主要指標の表示が折り返さないかぎり、文を切れば1分版と5分版のどのスライドも本文の高さに収まる（英語の文でも日本語の文でも）。テンプレートの §8・§20 に文章の小項目を足した版や、小項目のタイトルが長くて「…」と合わせて1行に収まらない版で、収まらないスライドがあれば、公開の前の検査（SDD 5.13 AD6 の `pitch_deck_overflow`）で公開を断る（2026-10-16 のユーザーの決定）。BCDX のプランのテンプレートはこの検査を通る（API のテストで確かめている）。すべてを切っても高さが足りないのは、数字のスライドと Economics の数字が折り返したとき（金額や計算した指標が大きいとき）と、計算できない主要指標の表示（6.4）が折り返したときで、そのときは本文の下端で切れて出し、同じ注意を出す。次の金額では数字が折り返さないことを確かめている（2026-10-16 に API の PDF のフォントで、BCDX のプランのテンプレートと上限の件数の素材で測った。計算した指標は Break-even / day「116.9」・Payback「19.2 months」・ROI「130.9%」のまま。英語の文でも日本語の文でも。API のテストで確かめている）。1個あたりの金額（販売価格・変動費・貢献利益）は ₱999,999 まで（変動費に「+」、貢献利益と貢献利益率に「≤」が付くときは ₱9,999 まで）、初期費用は「₱999,999,999+」まで、シナリオの売上と営業利益は ₱99,999,999 まで（営業利益が「≤ −₱99,999,999」でも）、競合の価格は ₱999,999,999,999 まで。この外では、1個あたりの3つの金額がどれも ₱1,000,000 のとき（「+」「≤」が付けば ₱99,999 のとき）に5分版の Business model の数字が折り返し（本文の高さには収まる）、初期費用が「₱99,999,999,999+」のときに5分版の Economics が本文の下端で切れる。5分版の Economics は4つの数字の幅の合計で折り返しが決まるので、金額が上の範囲でも、計算した指標が大きいと本文の下端で切れる（例: Payback が「9,999.9+ months」か ROI が「≈ −9,999.9%」のとき。英語の文でも）。上限の件数の素材の日本語の文では、Break-even / day・Payback・ROI のどれかが「Contribution margin is zero or negative. …」か「Not recovered: …」になっても下端で切れる（英語の文では収まる）。収め方は API が決め、画面と PDF は同じ大きさと同じ切り方で出す（SDD 5.9 `PitchDeck`）。
+- 文章が長くて収まらないときは文字を小さくし（型ごとに最小の文字の大きさを決める。具体値は Phase 3 のデザイントークン）、それでも収まらなければ末尾を「…」で切り、アプリの表示だけに「Too long for this slide. Shorten it in the plan.」と出す。小さくするときは、スライドのすべての文字を `semantic.print.slide.shrink-step` ずつ同時に下げ、それぞれ最小で止める。切るときは、最も多くの行をとる文（同じなら後のもの）から1行ずつ減らし、どの箇条書き（表紙の3行を含む）と表のセルも1行は残す（箇条書きを消さない）。箇条書きの素材の名前と数字（数字のスライドの数字と、表の数字の列のセル）は切らない。名前が「…」と合わせて1行に収まらなければ、その箇条書きは名前と「…」の行数を残し、セルに入らない数字は折り返す。注意を出すのは、文を「…」で切ったときと、下のとおり本文の下端で切れたときだけ（数字は短くできないので、数字が折り返しただけでは出さない。2026-10-16 のユーザーの決定）。プランのテンプレートは、公開のときに、上限の件数の素材（競合5・マイルストーン6・ローンチの区分6・リスク3・Next Actions 3、§11 の表、シナリオの表）でも文を切れば1分版と5分版のどのスライドも本文の高さに収まることを確かめる（英語の文でも日本語の文でも、計算した指標が下の大きな表示や計算できない主要指標の理由の文でも。素材の組み方は SDD 5.13 AD6 の `pitch_deck_overflow`）。テンプレートの §8・§20 に文章の小項目を足した版や、小項目のタイトルが長くて「…」と合わせて1行に収まらない版で、収まらないスライドがあれば、公開を断る（2026-10-16 のユーザーの決定）。確かめるのは公開のときで、公開のあとでフォントやデザイントークンを変えても、公開済みの版を自動では確かめ直さない（AD6 validate は公開済みの版にも使える）。BCDX のプランのテンプレートはこの検査を通る（API のテストで確かめている）。公開したときのフォントとデザイントークンでは、すべてを切っても高さが足りないのは、金額がとても大きくて数字が何行にも折り返したときだけで、そのときは本文の下端で切れて出し、同じ注意を出す。収め方は API が決め、画面と PDF は同じ大きさと同じ切り方で出す（SDD 5.9 `PitchDeck`）。2026-10-16 に API の PDF のフォントで、BCDX のプランのテンプレートと上限の件数の素材で測った範囲は次のとおり（英語の文でも日本語の文でも。API のテストで確かめている）。
+  - 数字が折り返さない範囲: 5分版の Business model は、1個あたりの金額（販売価格・変動費・貢献利益）が ₱999,999 まで（貢献利益率「99.9%」で。変動費に「+」、貢献利益と貢献利益率に「≤」が付けば ₱9,999 まで。貢献利益が負で貢献利益率が「−100.0%」（変動費が販売価格の2倍）なら ₱99,999 まで、「+」「≤」も付けば ₱999 まで）。1分版の Business model は数字が3つで、この範囲では折り返さない。5分版の Economics は4つの数字の幅の合計で決まり、初期費用が「₱999,999,999+」でも、計算した指標が Break-even / day「116.9」・Payback「19.2 months」・ROI「130.9%」なら折り返さない。初期費用が上限の件数の素材の「₱1,269,500+」なら、計算した指標のどれか1つだけが、Break-even / day「9,999.9+」・Payback「999.9+ months」・ROI「≈ −999.9%」まで大きくなっても折り返さない（3つが同時に大きいと、もっと小さい値で折り返す。初期費用が「₱999,999,999+」なら、Break-even / day は「999.9+」まで、Payback は「99.9+ months」まで）。表のセルの数字は文字を小さくしていないスライド（セルの文字が最も大きい）で測り、シナリオの売上と営業利益は ₱999,999,999,999 まで（営業利益が「≤ −₱999,999,999,999」でも）、1日の販売数は入力の上限（6.0.8）まで、競合の価格は ₱9,999,999 まで折り返さない。
+  - 計算した指標が大きいときと計算できないとき: Break-even / day「99,999.9+」・Payback「9,999.9+ months」・ROI「≈ −9,999.9%」（1つでも3つ同時でも）では5分版の Economics の数字が折り返すが、上の範囲の金額と合わせても本文に収まる。計算できない主要指標の理由の文（「Contribution margin is zero or negative. …」「Not recovered: …」）は単語の間で折り返し、5分版の Economics と1分版の Business model の本文に収まる（Payback が「Not recovered: …」で、Break-even / day と ROI が上の大きな表示でも）。
+  - 範囲の外: 1個あたりの金額が ₱1,000,000 のとき（「+」「≤」が付けば ₱10,000 のとき）に5分版の Business model の数字が、初期費用が「₱1,000,000,000+」のときに5分版の Economics の数字が折り返す。文字を小さくしていないスライドでは、競合の価格は ₱10,000,000 から、シナリオの売上と営業利益は ₱1,000,000,000,000 から、表のセルで折り返す。1個あたりの金額と競合の価格が入力の上限（₱1,000,000,000,000。6.0.8）、初期費用が「₱999,999,999,999+」、シナリオの売上と営業利益が ₱10,000,000,000,000,000 でも、計算した指標が上の大きな表示や理由の文でも、どのスライドも本文の高さに収まる（数字は折り返し、注意は出さない）。シナリオの売上と営業利益がもっと大きいと、5分版の Economics が本文の下端で切れることがある（測った例: 初期費用「₱999,999,999,999+」で、売上と営業利益が ₱1,000,000,000,000,000,000 のとき）。
 - 数字は生成元に合わせる（Latest は今の検証、版はスナップショットの値）。
 - ローディング: スライドの骨組み。PDF の作成中は「Preparing PDF…」。失敗したら再試行。
 
@@ -2126,7 +2131,7 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 | プランの版 | 名前付きスナップショット（版の保存） | 同じ趣旨 |
 | §11 Founder Roles・§13 持分 | 自由入力、人数自由（メンバーと紐づけない） | 同じ |
 | §24 Go / No-Go | 条件は3つの文章、決定（Launch / Delay / Stop）は決定ログへ | 同じ趣旨 |
-| Pitch Deck | 1分版（8枚）と5分版（13枚）を切り替え | 2回目は「標準10枚」 |
+| Pitch Deck | 1分版（8枚）と5分版（14枚）を切り替え | 2回目は「標準10枚」 |
 | AI 書き出しの形式 | Markdown ＋ JSON（壁打ちで決定済み）。見出し規則・JSON のスキーマ・設問 ID は 6.6 の案で確定 | — |
 | データモデル | 確定し、Phase 3 で System Design Doc の6章へ移した | — |
 | チームのワークスペースの作成 | M7 の「New workspace」から誰でも作れる（作った人が Owner）。Phase 3 で抜けが見つかり決定 | — |

@@ -19,6 +19,7 @@ import {
   fitPitchSlide,
   type MeasureText,
   pitchFrame,
+  pitchNumbersBreak,
   pitchSizes,
 } from "./pitch-fit";
 import type { PlanAnswerContent } from "./plan";
@@ -129,7 +130,7 @@ const slideOf = (deck: ReturnType<typeof buildPitchDeck>, key: string) => {
 };
 
 describe("buildPitchDeck: the slides", () => {
-  test("eight slides for one minute and thirteen for five, in the order of 6.14", () => {
+  test("eight slides for one minute and fourteen for five, in the order of 6.14", () => {
     const one = buildPitchDeck(input({ variant: "one" }));
     expect(one.slides.map((slide) => [slide.key, slide.type])).toEqual([
       ["title", "title"],
@@ -151,6 +152,7 @@ describe("buildPitchDeck: the slides", () => {
       ["competition", "table"],
       ["business_model", "number"],
       ["economics", "table"],
+      ["funding", "text"],
       ["why_us", "text"],
       ["execution", "table"],
       ["launch", "text"],
@@ -471,7 +473,7 @@ describe("buildPitchDeck: the slides", () => {
     expect(none.emptySources).toEqual(["Competitors"]);
   });
 
-  test("Economics: the scenario table, the startup figures and §20's text sub-items", () => {
+  test("Economics: the startup figures and the scenario table, without notes", () => {
     const slide = slideOf(buildPitchDeck(input()), "economics");
     expect(slide.table?.rows).toEqual([
       ["Conservative", "5", "₱58,500", "−₱5,586"],
@@ -490,12 +492,57 @@ describe("buildPitchDeck: the slides", () => {
       ["Payback", "payback_months"],
       ["ROI", "simple_roi"],
     ]);
-    expect(slide.bullets.map((b) => b.label)).toEqual([
-      "Opening cash reserve",
-      "Runway if sales are below plan",
-      "Trigger for additional funding",
-    ]);
+    // §20's text sub-items are on the next slide.
+    expect(slide.bullets).toEqual([]);
     expect(slide.editInValidation).toBe("costs");
+  });
+
+  test("Funding plan: §20's text sub-items, one bullet each, blank ones kept", () => {
+    const slide = slideOf(buildPitchDeck(input()), "funding");
+    expect(slide.title).toEqual({ text: "Funding plan", empty: false });
+    expect(slide.numbers).toEqual([]);
+    expect(slide.table).toBeNull();
+    expect(slide.bullets).toEqual([
+      { label: "Opening cash reserve", text: "P.20.2", empty: false },
+      {
+        label: "Runway if sales are below plan",
+        text: "P.20.10",
+        empty: false,
+      },
+      {
+        label: "Trigger for additional funding",
+        text: "P.20.11",
+        empty: false,
+      },
+    ]);
+    expect(slide.editSource).toEqual({ itemNo: 20 });
+    expect(slide.editInValidation).toBeNull();
+    const answers = allAnswered();
+    answers.delete("P.20.2");
+    const blank = slideOf(buildPitchDeck(input({ answers })), "funding");
+    expect(blank.bullets[0]).toEqual({
+      label: "Opening cash reserve",
+      text: "Not written yet",
+      empty: true,
+    });
+    expect(blank.emptySources).toEqual(["Opening cash reserve"]);
+    // A template with no text sub-item in §20: one bullet named by the slide, as Launch
+    // plan does; §8's notes on Business model stay away.
+    const sections = SECTIONS.map((section) => ({
+      ...section,
+      questions: section.questions.filter(
+        (question) =>
+          !["08", "20"].includes(section.key) ||
+          question.answerType === "linked_metric",
+      ),
+    }));
+    const none = buildPitchDeck(input({ sections }));
+    expect(slideOf(none, "funding").bullets).toEqual([
+      { label: "Funding plan", text: "Not written yet", empty: true },
+    ]);
+    expect(slideOf(none, "funding").emptySources).toEqual(["Funding plan"]);
+    expect(slideOf(none, "business_model").bullets).toEqual([]);
+    expect(pitchSlideKeys("one").some((key) => key === "funding")).toBe(false);
   });
 
   test("Execution plan: milestones by deadline, at most six, and no notes", () => {
@@ -673,6 +720,7 @@ describe("buildPitchDeck: the slides", () => {
       ["competition", 6, null],
       ["business_model", 8, "economics"],
       ["economics", 20, "costs"],
+      ["funding", 20, null],
       ["why_us", 10, null],
       ["execution", 23, null],
       ["launch", 25, null],
@@ -737,7 +785,7 @@ describe("pitchSlideKeys", () => {
       );
     }
     expect(pitchSlideKeys("one")).toHaveLength(8);
-    expect(pitchSlideKeys("five")).toHaveLength(13);
+    expect(pitchSlideKeys("five")).toHaveLength(14);
   });
 });
 
@@ -941,7 +989,7 @@ describe("fitPitchDeck", () => {
   });
 
   test("a slide still too tall with every text on a line overflows, keeping every bullet", () => {
-    // An operator's template with more text sub-items in §20 than its notes can hold.
+    // An operator's template with more text sub-items in §20 than Funding plan can hold.
     const sections = SECTIONS.map((section) =>
       section.key === "20"
         ? {
@@ -957,10 +1005,10 @@ describe("fitPitchDeck", () => {
           }
         : section,
     );
-    const built = slideOf(buildPitchDeck(input({ sections })), "economics");
+    const built = slideOf(buildPitchDeck(input({ sections })), "funding");
     const slide = fitPitchSlide(built, fit);
     expect(slide.overflow).toBe(true);
-    expect(slide.shrink).toBe(6);
+    expect(slide.shrink).toBe(3);
     expect(slide.bullets).toEqual(built.bullets);
     expect(slide.bullets).toHaveLength(33);
   });
@@ -1085,7 +1133,7 @@ describe("fitPitchDeck", () => {
     expect(/^(👍🏽)+…$/u.test(cutText)).toBe(true);
   });
 
-  test("figures as wide as their values and labels; values too wide for the slide break and show as cut", () => {
+  test("figures as wide as their values and labels; values too wide for the slide break, without the warning", () => {
     const deck = buildPitchDeck(input());
     const model = slideOf(deck, "business_model");
     const sizes = pitchSizes("number", 0, print);
@@ -1119,8 +1167,63 @@ describe("fitPitchDeck", () => {
       ),
       fit,
     );
-    expect(wide.overflow).toBe(true);
+    // Numbers cannot be shortened in the plan, so a break alone is not warned of (6.14).
+    expect(wide.overflow).toBe(false);
     expect(wide.shrink).toBe(6);
+    expect(pitchNumbersBreak(wide, fit)).toBe(true);
+    expect(pitchNumbersBreak(fitPitchSlide(model, fit), fit)).toBe(false);
+  });
+
+  test("pitchNumbersBreak: a number cell wider than its column, not a reason in place of a figure", () => {
+    const competition = (typicalPrice: number) =>
+      fitPitchSlide(
+        slideOf(
+          buildPitchDeck(
+            input({
+              competitors: [
+                {
+                  name: "Bongbong's",
+                  type: "direct",
+                  typicalPrice,
+                  strength: "Fresh",
+                },
+              ],
+            }),
+          ),
+          "competition",
+        ),
+        fit,
+      );
+    // The Price column is 15% of 864 pt less its padding, at 95%: 16 pt cells of the
+    // monospaced font fit 10 characters.
+    expect(competition(9_999_999).shrink).toBe(0);
+    expect(competition(9_999_999).table?.rows[0]?.[2]).toBe("₱9,999,999");
+    expect(pitchNumbersBreak(competition(9_999_999), fit)).toBe(false);
+    const wide = competition(999_999_999_999);
+    expect(wide.overflow).toBe(false);
+    expect(pitchNumbersBreak(wide, fit)).toBe(true);
+    const margin: MetricValue = {
+      value: null,
+      bound: "exact",
+      reason: "margin_not_positive",
+    };
+    const reasons = fitPitchSlide(
+      slideOf(
+        buildPitchDeck(
+          input({
+            keyMetrics: {
+              ...input().keyMetrics,
+              break_even_units_day: margin,
+              payback_months: margin,
+              simple_roi: margin,
+            },
+          }),
+        ),
+        "economics",
+      ),
+      fit,
+    );
+    expect(pitchNumbersBreak(reasons, fit)).toBe(false);
   });
 
   test("a figure's reason breaks between its words, so it does not count as cut", () => {

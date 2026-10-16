@@ -109,7 +109,7 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
 
     expect(pitch.variant).toBe("five");
     expect(pitch.source).toEqual({ kind: "latest" });
-    expect(pitch.slides).toHaveLength(13);
+    expect(pitch.slides).toHaveLength(14);
     expect(pitch.businessName).toBe(plan.businessName);
     expect(pitch.footer).toEqual({
       businessName: plan.businessName,
@@ -356,7 +356,7 @@ describe("P13 GET /api/v1/plans/{planId}/pitch-deck.pdf", () => {
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(response.headers.get("cache-control")).toBe("no-store");
     const pages = await readPdf(await response.arrayBuffer());
-    expect(pages).toHaveLength(13);
+    expect(pages).toHaveLength(14);
     for (const page of pages) {
       expect([page.width, page.height]).toEqual([960, 540]);
     }
@@ -467,7 +467,7 @@ describe("P13 GET /api/v1/plans/{planId}/pitch-deck.pdf", () => {
       team.memberCookie,
     );
     const pages = await readPdf(await response.arrayBuffer());
-    expect(pages).toHaveLength(13);
+    expect(pages).toHaveLength(14);
     expect(pageText(pages[2] ?? { texts: [] })).toContain("ピアヤ");
     expect(textsBelowBody(pages)).toEqual([]);
   });

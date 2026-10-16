@@ -844,25 +844,39 @@ describe("AD6 and the Pitch Deck of a plan template (design-spec 6.14)", () => {
     });
     expect(await validate()).toEqual([]);
 
-    // One more note under the five-minute Economics: past its bottom in Japanese.
+    // Four more bullets on the five-minute Funding plan: past its bottom in Japanese.
     const financialPlan = sectionOf("20");
-    const added = questionOf(
-      await detailOf(
-        await call("POST", `/template-sections/${financialPlan.id}/questions`, {
-          key: "P.20.12",
-          title: "Reserve top-up",
-          prompt: "How will you top up the reserve?",
-          answerType: "long_text",
-        }),
-        201,
-      ),
-      "P.20.12",
-    );
-    expect(await validate()).toEqual([overflow(financialPlan.id)]);
+    const added: { id: string }[] = [];
+    for (const number of [12, 13, 14, 15]) {
+      const key = `P.20.${number}`;
+      added.push(
+        questionOf(
+          await detailOf(
+            await call(
+              "POST",
+              `/template-sections/${financialPlan.id}/questions`,
+              {
+                key,
+                title: `Reserve top-up ${number}`,
+                prompt: "How will you top up the reserve?",
+                answerType: "long_text",
+              },
+            ),
+            201,
+          ),
+          key,
+        ),
+      );
+      expect(await validate()).toEqual(
+        number < 15 ? [] : [overflow(financialPlan.id)],
+      );
+    }
     await refused();
-    expect(
-      (await call("DELETE", `/template-questions/${added.id}`)).status,
-    ).toBe(204);
+    for (const question of added) {
+      expect(
+        (await call("DELETE", `/template-questions/${question.id}`)).status,
+      ).toBe(204);
+    }
 
     // §4's titles at 197 characters, near the 200 a title may take: the Problem slides of
     // both decks.

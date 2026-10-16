@@ -154,6 +154,11 @@ describe("C1 POST /api/v1/comments", () => {
         "business_plan",
         "pitch",
       ],
+      [
+        { type: "pitch_slide", id: plan.id, key: "five.funding" },
+        "business_plan",
+        "pitch",
+      ],
       [{ type: "execution_item", id: item.id }, "business_plan", "execution"],
     ] as const;
     for (const [target, containerType, sectionKey] of cases) {
@@ -196,7 +201,7 @@ describe("C1 POST /api/v1/comments", () => {
         404,
         "NOT_FOUND",
       ],
-      // The one-minute deck has no market or launch slide (design-spec 6.14).
+      // The one-minute deck has no market, launch or funding slide (design-spec 6.14).
       [
         { type: "pitch_slide", id: plan.id, key: "one.market" },
         404,
@@ -204,6 +209,11 @@ describe("C1 POST /api/v1/comments", () => {
       ],
       [
         { type: "pitch_slide", id: plan.id, key: "one.launch" },
+        404,
+        "NOT_FOUND",
+      ],
+      [
+        { type: "pitch_slide", id: plan.id, key: "one.funding" },
         404,
         "NOT_FOUND",
       ],

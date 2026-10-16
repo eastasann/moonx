@@ -1,4 +1,4 @@
-import type { Size } from "@moonx/ui-tokens";
+import type { SizeWithXS } from "@moonx/ui-tokens";
 import { createContext, type ReactNode, useContext } from "react";
 import {
   ToggleButton as AriaToggleButton,
@@ -10,7 +10,10 @@ import { IconSlot } from "../internal/IconSlot";
 import { isIconOnly } from "../internal/iconOnly";
 import * as styles from "./ActionButton.css";
 
-const ToggleDefaults = createContext<{ size: Size; isQuiet: boolean }>({
+const ToggleDefaults = createContext<{
+  size: SizeWithXS;
+  isQuiet: boolean;
+}>({
   size: "M",
   isQuiet: false,
 });
@@ -29,8 +32,8 @@ export interface ToggleButtonGroupProps
     | "aria-labelledby"
     | "aria-describedby"
   > {
-  /** @default "M" */
-  size?: Size;
+  /** XS to XL, Spectrum 2's steps (design-spec 4.5). @default "M" */
+  size?: SizeWithXS;
   isQuiet?: boolean;
   children: ReactNode;
 }

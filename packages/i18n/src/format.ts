@@ -180,6 +180,13 @@ export const formatCount = (count: number) =>
     ? `${numberFormat({}).format(99)}+`
     : numberFormat({}).format(count);
 
+/**
+ * How far a ProgressCircle or ProgressBar has got, read out as a whole percent ("40%").
+ * Not a calculated rate, so it has no decimal (formatPercent has one).
+ */
+export const formatProgress = (fraction: number) =>
+  numberFormat({ style: "percent", maximumFractionDigits: 0 }).format(fraction);
+
 /** A Date, a UTC ISO 8601 date-time, or a date-only "2026-10-01". */
 export type DateInput = Date | string;
 
@@ -306,6 +313,28 @@ export const formatTime = (value: DateInput, { timeZone }: ZoneOptions) =>
     hour: "numeric",
     minute: "2-digit",
   }).format(toInstant(value, timeZone).date);
+
+// A DatePicker's calendar works in date-only values ("2026-10-16"), shown in UTC like
+// every calendar day (toInstant).
+const calendarFormat = (options: Intl.DateTimeFormatOptions) => {
+  const format = new Intl.DateTimeFormat(LOCALE, {
+    timeZone: "UTC",
+    ...options,
+  });
+  return (date: string) => format.format(toInstant(date, "UTC").date);
+};
+
+/** The month a DatePicker's calendar shows, from any day in it ("October 2026"). */
+export const formatCalendarMonth = calendarFormat({
+  month: "long",
+  year: "numeric",
+});
+
+/** The initial of a calendar column's weekday ("S" for Sunday). */
+export const formatWeekdayInitial = calendarFormat({ weekday: "narrow" });
+
+/** A calendar day's number ("16"). */
+export const formatDayOfMonth = calendarFormat({ day: "numeric" });
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;

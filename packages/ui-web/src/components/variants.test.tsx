@@ -1,10 +1,19 @@
-import { sizes } from "@moonx/ui-tokens";
+import {
+  dividerSizes,
+  progressCircleSizes,
+  sizes,
+  sizesWithXS,
+  tagSizes,
+} from "@moonx/ui-tokens";
 import { User } from "@react-aria/test-utils";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import type { ChoiceItem } from "../internal/ChoiceListBox";
+import type { ContainerProps } from "../layout/Container";
+import type { FlexProps, StackProps } from "../layout/Flex";
+import type { GridProps } from "../layout/Grid";
 import { setPhoneWidth } from "../test/helpers";
 import { ActionButton, ActionGroup } from "./ActionButton";
 import { Button, ButtonGroup } from "./Button";
@@ -12,15 +21,22 @@ import { Checkbox, CheckboxGroup } from "./Checkbox";
 import { ComboBox } from "./ComboBox";
 import { DatePicker } from "./DatePicker";
 import { Divider } from "./Divider";
-import { FileTrigger } from "./FileTrigger";
+import { FileTrigger, type FileTriggerProps } from "./FileTrigger";
+import { Form } from "./Form";
+import type { HeadingProps } from "./Heading";
+import type { LinkProps } from "./Link";
 import { NumberField } from "./NumberField";
 import { Picker } from "./Picker";
+import { ProgressCircle } from "./ProgressCircle";
+import { Radio, RadioGroup } from "./RadioGroup";
 import { SearchField } from "./SearchField";
+import { SegmentedControl, SegmentedControlItem } from "./SegmentedControl";
+import { Switch } from "./Switch";
 import { TagGroup } from "./TagGroup";
-import { Text } from "./Text";
-import { TextArea } from "./TextField";
+import { Text, type TextProps } from "./Text";
+import { TextArea, TextField } from "./TextField";
 import { ToggleButton, ToggleButtonGroup } from "./ToggleButtonGroup";
-import { Well } from "./Well";
+import { Well, type WellProps } from "./Well";
 
 const items: ChoiceItem[] = [
   { id: "a", label: "Ana" },
@@ -31,59 +47,165 @@ const items: ChoiceItem[] = [
 const fieldRoot = (input: Element) =>
   input.parentElement?.parentElement as HTMLElement;
 
-// Each case renders one instance per size and returns the element whose class carries
-// the size; every size must look different.
-const sized: [
-  string,
-  (size: (typeof sizes)[number]) => ReactElement,
-  () => (Element | null)[],
-][] = [
-  [
+interface SizeCase {
+  name: string;
+  steps: readonly string[];
+  /** One instance per step. */
+  render: () => ReactElement;
+  /** The elements whose class carries the size, one per step. */
+  targets: () => (Element | null)[];
+}
+
+// Every component that takes `size`, with its own steps (design-spec 4.5): each step must
+// render and look different from the others.
+const sizeCase = <S extends string>(
+  name: string,
+  steps: readonly S[],
+  make: (size: S) => ReactElement,
+  targets: () => (Element | null)[],
+): SizeCase => ({
+  name,
+  steps,
+  render: () => (
+    <div>
+      {steps.map((size) => (
+        <div key={size}>{make(size)}</div>
+      ))}
+    </div>
+  ),
+  targets,
+});
+
+const sized: SizeCase[] = [
+  sizeCase(
+    "Button",
+    sizes,
+    (size) => <Button size={size}>Save</Button>,
+    () => screen.getAllByRole("button"),
+  ),
+  sizeCase(
+    "ButtonGroup",
+    sizes,
+    (size) => (
+      <ButtonGroup aria-label={size} size={size}>
+        <Button>Save</Button>
+      </ButtonGroup>
+    ),
+    () => screen.getAllByRole("button"),
+  ),
+  sizeCase(
     "ActionButton",
+    sizes,
     (size) => <ActionButton size={size}>Tool</ActionButton>,
     () => screen.getAllByRole("button"),
-  ],
-  [
+  ),
+  sizeCase(
+    "ActionGroup",
+    sizes,
+    (size) => (
+      <ActionGroup aria-label={size} size={size}>
+        <ActionButton>Tool</ActionButton>
+      </ActionGroup>
+    ),
+    () => screen.getAllByRole("button"),
+  ),
+  sizeCase(
     "ToggleButtonGroup",
+    sizesWithXS,
     (size) => (
       <ToggleButtonGroup aria-label={size} size={size}>
         <ToggleButton id="fact">Fact</ToggleButton>
       </ToggleButtonGroup>
     ),
     () => screen.getAllByRole("radio"),
-  ],
-  [
+  ),
+  sizeCase(
+    "SegmentedControl",
+    sizes,
+    (size) => (
+      <SegmentedControl aria-label={size} size={size}>
+        <SegmentedControlItem id="low">Low</SegmentedControlItem>
+      </SegmentedControl>
+    ),
+    () => screen.getAllByRole("radio"),
+  ),
+  sizeCase(
+    "Form",
+    sizes,
+    (size) => (
+      <Form aria-label={size} size={size}>
+        <TextField aria-label={`Field ${size}`} />
+      </Form>
+    ),
+    () => screen.getAllByRole("textbox").map(fieldRoot),
+  ),
+  sizeCase(
+    "TextField",
+    sizes,
+    (size) => <TextField aria-label={size} size={size} />,
+    () => screen.getAllByRole("textbox").map(fieldRoot),
+  ),
+  sizeCase(
     "TextArea",
+    sizes,
     (size) => <TextArea aria-label={size} size={size} />,
     () => screen.getAllByRole("textbox").map(fieldRoot),
-  ],
-  [
+  ),
+  sizeCase(
     "NumberField",
+    sizes,
     (size) => <NumberField aria-label={size} size={size} />,
     () => screen.getAllByRole("textbox").map(fieldRoot),
-  ],
-  [
+  ),
+  sizeCase(
     "SearchField",
+    sizes,
     (size) => <SearchField aria-label={size} size={size} />,
     () => screen.getAllByRole("searchbox").map(fieldRoot),
-  ],
-  [
+  ),
+  sizeCase(
     "Picker",
+    sizes,
     (size) => <Picker aria-label={size} size={size} items={items} />,
     () => screen.getAllByRole("button").map((button) => button.parentElement),
-  ],
-  [
+  ),
+  sizeCase(
     "ComboBox",
+    sizes,
     (size) => <ComboBox aria-label={size} size={size} items={items} />,
     () => screen.getAllByRole("combobox").map(fieldRoot),
-  ],
-  [
+  ),
+  sizeCase(
     "DatePicker",
+    sizes,
     (size) => <DatePicker aria-label={size} size={size} />,
     () => screen.getAllByRole("group").map((group) => group.parentElement),
-  ],
-  [
+  ),
+  sizeCase(
+    "RadioGroup",
+    sizes,
+    (size) => (
+      <RadioGroup aria-label={size} size={size}>
+        <Radio value="a">{size}</Radio>
+      </RadioGroup>
+    ),
+    () =>
+      screen
+        .getAllByRole("radio")
+        .map((radio) => radio.closest("label") as HTMLElement),
+  ),
+  sizeCase(
+    "Checkbox",
+    sizes,
+    (size) => <Checkbox size={size}>{size}</Checkbox>,
+    () =>
+      screen
+        .getAllByRole("checkbox")
+        .map((box) => box.closest("label") as HTMLElement),
+  ),
+  sizeCase(
     "CheckboxGroup",
+    sizes,
     (size) => (
       <CheckboxGroup aria-label={size} size={size}>
         <Checkbox value="x">{size}</Checkbox>
@@ -93,9 +215,19 @@ const sized: [
       screen
         .getAllByRole("checkbox")
         .map((box) => box.closest("label") as HTMLElement),
-  ],
-  [
+  ),
+  sizeCase(
+    "Switch",
+    sizes,
+    (size) => <Switch size={size}>{size}</Switch>,
+    () =>
+      screen
+        .getAllByRole("switch")
+        .map((input) => input.closest("label") as HTMLElement),
+  ),
+  sizeCase(
     "TagGroup",
+    tagSizes,
     (size) => (
       <TagGroup
         aria-label={size}
@@ -104,21 +236,72 @@ const sized: [
       />
     ),
     () => screen.getAllByRole("row"),
-  ],
+  ),
+  sizeCase(
+    "Divider",
+    dividerSizes,
+    (size) => <Divider size={size} />,
+    () => screen.getAllByRole("separator"),
+  ),
+  sizeCase(
+    "ProgressCircle",
+    progressCircleSizes,
+    (size) => <ProgressCircle size={size} aria-label={size} isIndeterminate />,
+    () => screen.getAllByRole("progressbar"),
+  ),
 ];
 
-describe.each(sized)("%s sizes", (_, make, targets) => {
-  test("S, M, L and XL look different", () => {
+describe.each(sized)("$name sizes", ({ steps, render: make, targets }) => {
+  test(`${steps.join(", ")} each render with their own look`, () => {
+    render(make());
+    const classes = targets().map((element) => element?.className);
+    expect(classes).toHaveLength(steps.length);
+    expect(new Set(classes).size).toBe(steps.length);
+  });
+});
+
+test("components Spectrum 2 gives no size take none (design-spec 4.5)", () => {
+  expectTypeOf<HeadingProps>().not.toHaveProperty("size");
+  expectTypeOf<TextProps>().not.toHaveProperty("size");
+  expectTypeOf<LinkProps>().not.toHaveProperty("size");
+  expectTypeOf<WellProps>().not.toHaveProperty("size");
+  expectTypeOf<FileTriggerProps>().not.toHaveProperty("size");
+  expectTypeOf<FlexProps>().not.toHaveProperty("size");
+  expectTypeOf<StackProps>().not.toHaveProperty("size");
+  expectTypeOf<GridProps>().not.toHaveProperty("size");
+  expectTypeOf<ContainerProps>().not.toHaveProperty("size");
+});
+
+test("ButtonGroup: a Button's own size wins over the group's", () => {
+  render(
+    <div>
+      <ButtonGroup aria-label="Group" size="S">
+        <Button size="XL">Own</Button>
+        <Button>Group's</Button>
+      </ButtonGroup>
+      <Button size="XL">Alone XL</Button>
+      <Button size="S">Alone S</Button>
+    </div>,
+  );
+  const look = (name: string) => screen.getByRole("button", { name }).className;
+  expect(look("Own")).toBe(look("Alone XL"));
+  expect(look("Group's")).toBe(look("Alone S"));
+});
+
+describe("ComboBox sizes on a phone", () => {
+  test("S, M, L and XL each render with their own look", () => {
+    setPhoneWidth();
     render(
       <div>
         {sizes.map((size) => (
-          <div key={size}>{make(size)}</div>
+          <ComboBox key={size} aria-label={size} size={size} items={items} />
         ))}
       </div>,
     );
-    const classes = targets().map((element) => element?.className);
-    expect(classes).toHaveLength(4);
-    expect(new Set(classes).size).toBe(4);
+    const classes = sizes.map(
+      (size) => screen.getByRole("button", { name: size }).className,
+    );
+    expect(new Set(classes).size).toBe(sizes.length);
   });
 });
 

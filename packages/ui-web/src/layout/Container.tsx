@@ -8,7 +8,7 @@ export interface ContainerProps extends LayoutDomProps {
    * `layout.reading-column-max` (question forms, focused flows, settings).
    * @default "content"
    */
-  size?: "content" | "reading";
+  width?: "content" | "reading";
   /** Pads the sides by the page gutter of the breakpoint. @default true */
   hasGutters?: boolean;
   children?: ReactNode;
@@ -17,14 +17,14 @@ export interface ContainerProps extends LayoutDomProps {
 /** A centred column of limited width. */
 export function Container({
   elementType = "div",
-  size = "content",
+  width = "content",
   hasGutters = true,
   children,
   ...dom
 }: ContainerProps) {
   return createElement(
     elementType,
-    { ...dom, className: styles.container({ size, gutters: hasGutters }) },
+    { ...dom, className: styles.container({ width, gutters: hasGutters }) },
     children,
   );
 }

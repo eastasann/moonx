@@ -390,6 +390,7 @@
       "$description": "寸法の生の値（px）。余白・部品の寸法・レイアウト・スライド",
       "1": { "$value": { "value": 1, "unit": "px" } },
       "2": { "$value": { "value": 2, "unit": "px" } },
+      "3": { "$value": { "value": 3, "unit": "px" } },
       "4": { "$value": { "value": 4, "unit": "px" } },
       "5": { "$value": { "value": 5, "unit": "px" } },
       "6": { "$value": { "value": 6, "unit": "px" } },
@@ -932,7 +933,7 @@
           "1300": { "$value": "{primitive.font.size.58}" }
         },
         "component": {
-          "$description": "Spectrum の component 層（部品の寸法）。S / M / L / XL は部品の size、既定は M",
+          "$description": "Spectrum の component 層（部品の寸法）。XS / S / M / L / XL は部品の size。既定は M（部品ごとの段と既定は design-spec 4.5）",
           "button": {
             "$description": "Button。padding-x は Spectrum の pill-edge-to-text（角は radius.control）",
             "height": {
@@ -955,24 +956,52 @@
             }
           },
           "action-button": {
-            "$description": "ActionButton・ActionGroup・ToggleButtonGroup（F/A/U のボタン）・SegmentedControl",
+            "$description": "ActionButton・ActionGroup・ToggleButtonGroup（F/A/U のボタン）・ActionMenu・SegmentedControl。XS を使うのは、design-spec 4.5 で段が XS から始まる部品のボタン（ToggleButtonGroup・ActionMenu・ContextualHelp）。ActionButton・ActionGroup・SegmentedControl は S〜XL。XS の値は Spectrum 2 のトークンの component-height-50・component-edge-to-text-50・component-edge-to-visual-only-50・font-size-50。font-size の S〜XL は Button と同じ font-size-75・100・200・300",
             "height": {
+              "XS": { "$value": "{primitive.dimension.20}" },
               "S": { "$value": "{primitive.dimension.24}" },
               "M": { "$value": "{primitive.dimension.32}" },
               "L": { "$value": "{primitive.dimension.40}" },
               "XL": { "$value": "{primitive.dimension.48}" }
             },
             "padding-x": {
+              "XS": { "$value": "{primitive.dimension.8}" },
               "S": { "$value": "{primitive.dimension.9}" },
               "M": { "$value": "{primitive.dimension.12}" },
               "L": { "$value": "{primitive.dimension.15}" },
               "XL": { "$value": "{primitive.dimension.18}" }
             },
             "padding-icon-only": {
+              "XS": { "$value": "{primitive.dimension.3}" },
               "S": { "$value": "{primitive.dimension.4}" },
               "M": { "$value": "{primitive.dimension.6}" },
               "L": { "$value": "{primitive.dimension.9}" },
               "XL": { "$value": "{primitive.dimension.11}" }
+            },
+            "font-size": {
+              "XS": { "$value": "{primitive.font.size.11}" },
+              "S": { "$value": "{primitive.font.size.12}" },
+              "M": { "$value": "{primitive.font.size.14}" },
+              "L": { "$value": "{primitive.font.size.16}" },
+              "XL": { "$value": "{primitive.font.size.18}" }
+            }
+          },
+          "tag": {
+            "$description": "TagGroup のタグ（S / M / L。design-spec 4.5）。Spectrum 2 の Tag と同じく、Spectrum 2 のトークンの component-height-75・100・200、component-edge-to-text-75・100・200、font-size-75・100・200",
+            "height": {
+              "S": { "$value": "{primitive.dimension.24}" },
+              "M": { "$value": "{primitive.dimension.32}" },
+              "L": { "$value": "{primitive.dimension.40}" }
+            },
+            "padding-x": {
+              "S": { "$value": "{primitive.dimension.9}" },
+              "M": { "$value": "{primitive.dimension.12}" },
+              "L": { "$value": "{primitive.dimension.15}" }
+            },
+            "font-size": {
+              "S": { "$value": "{primitive.font.size.12}" },
+              "M": { "$value": "{primitive.font.size.14}" },
+              "L": { "$value": "{primitive.font.size.16}" }
             }
           },
           "field": {
@@ -1151,7 +1180,7 @@
           "1300": { "$value": "{primitive.font.size.70}" }
         },
         "component": {
-          "$description": "Spectrum の component 層（部品の寸法）。S / M / L / XL は部品の size、既定は M",
+          "$description": "Spectrum の component 層（部品の寸法）。XS / S / M / L / XL は部品の size。既定は M（部品ごとの段と既定は design-spec 4.5）",
           "button": {
             "$description": "Button。padding-x は Spectrum の pill-edge-to-text（角は radius.control）",
             "height": {
@@ -1174,24 +1203,52 @@
             }
           },
           "action-button": {
-            "$description": "ActionButton・ActionGroup・ToggleButtonGroup（F/A/U のボタン）・SegmentedControl",
+            "$description": "ActionButton・ActionGroup・ToggleButtonGroup（F/A/U のボタン）・ActionMenu・SegmentedControl。XS を使うのは、design-spec 4.5 で段が XS から始まる部品のボタン（ToggleButtonGroup・ActionMenu・ContextualHelp）。ActionButton・ActionGroup・SegmentedControl は S〜XL。XS の値は Spectrum 2 のトークンの component-height-50・component-edge-to-text-50・component-edge-to-visual-only-50・font-size-50。font-size の S〜XL は Button と同じ font-size-75・100・200・300",
             "height": {
+              "XS": { "$value": "{primitive.dimension.26}" },
               "S": { "$value": "{primitive.dimension.30}" },
               "M": { "$value": "{primitive.dimension.40}" },
               "L": { "$value": "{primitive.dimension.50}" },
               "XL": { "$value": "{primitive.dimension.60}" }
             },
             "padding-x": {
+              "XS": { "$value": "{primitive.dimension.10}" },
               "S": { "$value": "{primitive.dimension.11}" },
               "M": { "$value": "{primitive.dimension.15}" },
               "L": { "$value": "{primitive.dimension.19}" },
               "XL": { "$value": "{primitive.dimension.22}" }
             },
             "padding-icon-only": {
+              "XS": { "$value": "{primitive.dimension.5}" },
               "S": { "$value": "{primitive.dimension.6}" },
               "M": { "$value": "{primitive.dimension.8}" },
               "L": { "$value": "{primitive.dimension.11}" },
               "XL": { "$value": "{primitive.dimension.15}" }
+            },
+            "font-size": {
+              "XS": { "$value": "{primitive.font.size.13}" },
+              "S": { "$value": "{primitive.font.size.15}" },
+              "M": { "$value": "{primitive.font.size.17}" },
+              "L": { "$value": "{primitive.font.size.19}" },
+              "XL": { "$value": "{primitive.font.size.22}" }
+            }
+          },
+          "tag": {
+            "$description": "TagGroup のタグ（S / M / L。design-spec 4.5）。Spectrum 2 の Tag と同じく、Spectrum 2 のトークンの component-height-75・100・200、component-edge-to-text-75・100・200、font-size-75・100・200",
+            "height": {
+              "S": { "$value": "{primitive.dimension.30}" },
+              "M": { "$value": "{primitive.dimension.40}" },
+              "L": { "$value": "{primitive.dimension.50}" }
+            },
+            "padding-x": {
+              "S": { "$value": "{primitive.dimension.11}" },
+              "M": { "$value": "{primitive.dimension.15}" },
+              "L": { "$value": "{primitive.dimension.19}" }
+            },
+            "font-size": {
+              "S": { "$value": "{primitive.font.size.15}" },
+              "M": { "$value": "{primitive.font.size.17}" },
+              "L": { "$value": "{primitive.font.size.19}" }
             }
           },
           "field": {

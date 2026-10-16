@@ -1,4 +1,4 @@
-import { sizes } from "@moonx/ui-tokens";
+import { sizes, tagSizes } from "@moonx/ui-tokens";
 import { FileText, Upload } from "lucide-react";
 import { useState } from "react";
 import { ActionButton } from "../components/ActionButton";
@@ -155,9 +155,9 @@ export function FileAndTagSection() {
       <Specimen name="TagGroup without onRemove">
         <TagGroup aria-label="Filters" items={initialTags} />
       </Specimen>
-      <Specimen name="TagGroup size S / M / L / XL">
+      <Specimen name="TagGroup size S / M / L">
         <Stack gap="space-200">
-          {sizes.map((size) => (
+          {tagSizes.map((size) => (
             <TagGroup
               key={size}
               size={size}

@@ -1,3 +1,4 @@
+import { i18n } from "@moonx/i18n";
 import type { Size } from "@moonx/ui-tokens";
 import { ChevronDown } from "lucide-react";
 import {
@@ -39,7 +40,7 @@ export interface PickerProps
   value?: string | null;
   defaultValue?: string | null;
   onChange?: (value: string | null) => void;
-  /** Shown while nothing is chosen. */
+  /** Shown while nothing is chosen. @default the catalog's "Select an item" */
   placeholder?: string;
   /** @default "M", or "L" inside a spacious `Form` */
   size?: Size;
@@ -58,6 +59,7 @@ export function Picker({
   isInvalid,
   items,
   onChange,
+  placeholder,
   size,
   width = "default",
   ...props
@@ -67,6 +69,7 @@ export function Picker({
     <FixedLocale>
       <Select
         {...props}
+        placeholder={placeholder ?? i18n.t("components:picker.placeholder")}
         onChange={(key) => onChange?.(key === null ? null : String(key))}
         isInvalid={invalidOf({ errorMessage, isInvalid })}
         validationBehavior="aria"

@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
+  formatCalendarMonth,
   formatCheckName,
   formatCount,
   formatDate,
+  formatDayOfMonth,
   formatInputNumber,
   formatInputPercent,
   formatIsoDate,
@@ -13,10 +15,12 @@ import {
   formatNumberText,
   formatOverdue,
   formatPercent,
+  formatProgress,
   formatRelativeTime,
   formatTime,
   formatUnits,
   formatWaitTime,
+  formatWeekdayInitial,
 } from "./format";
 
 const timeZone = "Asia/Manila";
@@ -158,6 +162,26 @@ describe("counts, rates and months (design-spec 6.4 端数)", () => {
     expect(formatCount(99)).toBe("99");
     expect(formatCount(100)).toBe("99+");
   });
+});
+
+test("progress is a whole percent", () => {
+  expect(formatProgress(0)).toBe("0%");
+  expect(formatProgress(0.4)).toBe("40%");
+  expect(formatProgress(0.666)).toBe("67%");
+  expect(formatProgress(1)).toBe("100%");
+});
+
+test("a DatePicker's calendar: month, weekday initials and day numbers", () => {
+  expect(formatCalendarMonth("2026-10-16")).toBe("October 2026");
+  expect(formatCalendarMonth("2026-01-01")).toBe("January 2026");
+  // 2026-10-11 is a Sunday.
+  expect(
+    ["11", "12", "13", "14", "15", "16", "17"].map((day) =>
+      formatWeekdayInitial(`2026-10-${day}`),
+    ),
+  ).toEqual(["S", "M", "T", "W", "T", "F", "S"]);
+  expect(formatDayOfMonth("2026-10-01")).toBe("1");
+  expect(formatDayOfMonth("2026-10-31")).toBe("31");
 });
 
 describe("dates and times (design-spec 1.2)", () => {

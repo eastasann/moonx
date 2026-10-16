@@ -5,7 +5,7 @@ Web の部品（React Aria Components ＋ vanilla-extract。design-spec 4.5）�
 ## 中身
 
 - `src/index.ts`: 画面が読み込む入口。読み込むとテーマ（`@moonx/ui-tokens/theme.css`）・ページの土台・書体（`src/styles/`）も入る
-- `src/components/`: design-spec 4.5 の部品。見た目は `*.css.ts` に書き、`@moonx/ui-tokens` の `vars`（semantic 層）だけを参照する
+- `src/components/`: design-spec 4.5 の部品。見た目は `*.css.ts` に書き、`@moonx/ui-tokens` の `vars`（semantic 層）だけを参照する。React Aria が持つ文言のうち上書きできるものは、`@moonx/i18n` の `components` のカタログから引いて React Aria に渡す（SDD 9章「React Aria の文言」）。引く先は書式関数と同じ共有の i18next のインスタンス（`i18n`）で、描くたびに引く。UI は英語だけで言語を切り替えないので、言語の変更を購読しない
 - `src/layout/`: Flex・Stack・Grid・Container。間隔はトークンの名前（`gap="space-300"`）で、幅の段ごとの値（`{ mobile, tablet, desktop }`）も受ける
 - `src/internal/`: 部品の中だけで使うもの。`ResponsivePopover` は Picker と DatePicker の、タブレットの幅から上では Popover、下ではトレイになる重ね方（design-spec 4.5）。ほかにフィールドの共通の見た目・ラベルと説明とエラー・キーボードで隠れないようにする処理（4.3）
 - `src/preview/`: 開発用の確認のページ（`/dev/components`。docs/03_dev-setup.md 3.3）。英語の文字列を直接持つ（SDD 9章）

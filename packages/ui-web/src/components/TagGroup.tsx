@@ -1,4 +1,5 @@
-import type { Size } from "@moonx/ui-tokens";
+import { i18n } from "@moonx/i18n";
+import type { TagSize } from "@moonx/ui-tokens";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import {
@@ -30,7 +31,7 @@ export interface TagGroupProps {
   /** Shown in place of the tags when there are none. */
   renderEmptyState?: () => ReactNode;
   /** @default "M" */
-  size?: Size;
+  size?: TagSize;
   id?: string;
   "aria-label"?: string;
 }
@@ -74,8 +75,12 @@ export function TagGroup({
                 <>
                   <span className={styles.tagLabel}>{item.label}</span>
                   {allowsRemoving && (
-                    <Button slot="remove" className={styles.remove}>
-                      <IconSlot size="XS">
+                    <Button
+                      slot="remove"
+                      aria-label={i18n.t("components:tagGroup.remove")}
+                      className={styles.remove}
+                    >
+                      <IconSlot size={size}>
                         <X />
                       </IconSlot>
                     </Button>

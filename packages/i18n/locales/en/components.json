@@ -1,0 +1,29 @@
+{
+  "picker": {
+    "placeholder": "Select an item"
+  },
+  "dateField": {
+    "placeholder": {
+      "month": "mm",
+      "day": "dd",
+      "year": "yyyy"
+    }
+  },
+  "searchField": {
+    "clear": "Clear search"
+  },
+  "comboBox": {
+    "showSuggestions": "Show suggestions",
+    "suggestions": "Suggestions"
+  },
+  "datePicker": {
+    "calendar": "Calendar"
+  },
+  "calendar": {
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "tagGroup": {
+    "remove": "Remove"
+  }
+}

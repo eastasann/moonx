@@ -1,3 +1,4 @@
+import { i18n } from "@moonx/i18n";
 import type { Size } from "@moonx/ui-tokens";
 import { Search, X } from "lucide-react";
 import { useRef } from "react";
@@ -81,7 +82,10 @@ export function SearchField({
                 placeholder={placeholder}
               />
               {!isEmpty && (
-                <Button className={styles.fieldButton({ size: resolved })}>
+                <Button
+                  aria-label={i18n.t("components:searchField.clear")}
+                  className={styles.fieldButton({ size: resolved })}
+                >
                   <IconSlot size={resolved}>
                     <X />
                   </IconSlot>

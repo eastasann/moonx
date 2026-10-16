@@ -466,7 +466,7 @@ describe("DatePicker", () => {
     expect(onChange).toHaveBeenLastCalledWith("2026-10-20");
   });
 
-  test("keeps en-PH even when the browser speaks another language", () => {
+  test("keeps en-PH and React Aria's English even when the browser speaks another language", () => {
     const language = vi
       .spyOn(navigator, "language", "get")
       .mockReturnValue("ja-JP");
@@ -496,6 +496,14 @@ describe("DatePicker", () => {
       // A field outside FixedLocale follows the browser: year first in Japanese.
       expect(order("Unfixed")[0]).toBe("2026");
       expect(order("Deadline")).toEqual(["10", "16", "2026"]);
+      // The segments' names come from React Aria, not the catalog (SDD 9章「React Aria の
+      // 文言」): English under FixedLocale, the browser's language without it.
+      const names = (name: string) =>
+        within(screen.getByRole("group", { name }))
+          .getAllByRole("spinbutton")
+          .map((segment) => segment.getAttribute("aria-label")?.split(",")[0]);
+      expect(names("Deadline")).toEqual(["month", "day", "year"]);
+      expect(names("Unfixed")).not.toContain("year");
     } finally {
       language.mockRestore();
       act(() => {

@@ -11,8 +11,10 @@ import {
   progressCircleSizes,
   scales,
   sizes,
+  sizesWithXS,
   spaces,
   statusVariants,
+  tagSizes,
 } from "./types";
 
 const paths = [...flattenTokens(await loadTokens()).keys()];
@@ -44,6 +46,22 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
       "semantic.scale.medium.component.progress-circle.thickness",
     ],
     ["dividerSizes", dividerSizes, "semantic.border-width.divider"],
+    ...["height", "padding-x", "padding-icon-only", "font-size"].map(
+      (dimension) =>
+        [
+          "sizesWithXS",
+          sizesWithXS,
+          `semantic.scale.medium.component.action-button.${dimension}`,
+        ] as const,
+    ),
+    ...["height", "padding-x", "font-size"].map(
+      (dimension) =>
+        [
+          "tagSizes",
+          tagSizes,
+          `semantic.scale.medium.component.tag.${dimension}`,
+        ] as const,
+    ),
     ["dialogWidths", dialogWidths, "semantic.layout.dialog-max-width"],
     ["fauStates", fauStates, "semantic.color.light.fau"],
   ])("%s", (_, list, prefix) => {
@@ -57,8 +75,8 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
   });
 
   test("sizes are the keys of every component dimension sized S to XL", () => {
-    // Groups such as icon.size (XS–XL), avatar.size (S–M) and progress-circle (S–L)
-    // have their own lists.
+    // Groups such as icon.size (XS–XL), action-button (XS–XL), avatar.size (S–M), tag
+    // and progress-circle (S–L) have their own lists.
     const groups = paths
       .filter((path) =>
         /^semantic\.scale\.medium\.component\.[^.]+\.[^.]+\.(S|M|L|XL)$/.test(
@@ -70,6 +88,8 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
       (group) =>
         !group.endsWith(".icon.size") &&
         !group.endsWith(".avatar.size") &&
+        !group.includes(".action-button.") &&
+        !group.includes(".tag.") &&
         !group.includes(".progress-circle."),
     );
     expect(sized.length).toBeGreaterThan(0);

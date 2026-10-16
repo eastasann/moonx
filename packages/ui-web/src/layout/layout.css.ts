@@ -17,7 +17,7 @@ export const container = recipe({
     marginInline: "auto",
   },
   variants: {
-    size: {
+    width: {
       content: { maxWidth: vars.layout.contentMax },
       reading: { maxWidth: vars.layout.readingColumnMax },
     },
@@ -32,5 +32,5 @@ export const container = recipe({
       false: {},
     },
   },
-  defaultVariants: { size: "content", gutters: true },
+  defaultVariants: { width: "content", gutters: true },
 });

@@ -1,4 +1,4 @@
-import { sizes } from "@moonx/ui-tokens";
+import { sizes, sizesWithXS } from "@moonx/ui-tokens";
 import { History, MessageSquare, MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
 import { ActionButton, ActionGroup } from "../components/ActionButton";
@@ -83,6 +83,16 @@ export function ButtonSection() {
           <Button variant="secondary">Cancel</Button>
         </ButtonGroup>
       </Specimen>
+      <Specimen name="ButtonGroup size S / M / L / XL">
+        <Stack gap="space-200">
+          {sizes.map((size) => (
+            <ButtonGroup key={size} size={size} aria-label={`Group ${size}`}>
+              <Button variant="secondary">Cancel</Button>
+              <Button>Apply</Button>
+            </ButtonGroup>
+          ))}
+        </Stack>
+      </Specimen>
     </Section>
   );
 }
@@ -124,6 +134,16 @@ export function ActionButtonSection() {
             <MoreHorizontal />
           </ActionButton>
         </ActionGroup>
+      </Specimen>
+      <Specimen name="ActionGroup size S / M / L / XL">
+        <Stack gap="space-200">
+          {sizes.map((size) => (
+            <ActionGroup key={size} size={size} aria-label={`Tools ${size}`}>
+              <ActionButton>Duplicate</ActionButton>
+              <ActionButton>Archive</ActionButton>
+            </ActionGroup>
+          ))}
+        </Stack>
       </Specimen>
       <Specimen name='ActionGroup density="compact" size="S", orientation="vertical"'>
         <Flex gap="space-600" wrap alignItems="start">
@@ -169,9 +189,9 @@ export function ToggleSection() {
           <ToggleButton id="unknown">Unknown</ToggleButton>
         </ToggleButtonGroup>
       </Specimen>
-      <Specimen name="ToggleButtonGroup size S / M / L / XL">
+      <Specimen name="ToggleButtonGroup size XS / S / M / L / XL">
         <Stack gap="space-200">
-          {sizes.map((size) => (
+          {sizesWithXS.map((size) => (
             <ToggleButtonGroup
               key={size}
               size={size}

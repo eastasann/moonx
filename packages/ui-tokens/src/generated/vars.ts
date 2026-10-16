@@ -136,22 +136,49 @@ export const vars = createGlobalThemeContract({
       },
       actionButton: {
         height: {
+          XS: "scale-component-action-button-height-XS",
           S: "scale-component-action-button-height-S",
           M: "scale-component-action-button-height-M",
           L: "scale-component-action-button-height-L",
           XL: "scale-component-action-button-height-XL",
         },
         paddingX: {
+          XS: "scale-component-action-button-padding-x-XS",
           S: "scale-component-action-button-padding-x-S",
           M: "scale-component-action-button-padding-x-M",
           L: "scale-component-action-button-padding-x-L",
           XL: "scale-component-action-button-padding-x-XL",
         },
         paddingIconOnly: {
+          XS: "scale-component-action-button-padding-icon-only-XS",
           S: "scale-component-action-button-padding-icon-only-S",
           M: "scale-component-action-button-padding-icon-only-M",
           L: "scale-component-action-button-padding-icon-only-L",
           XL: "scale-component-action-button-padding-icon-only-XL",
+        },
+        fontSize: {
+          XS: "scale-component-action-button-font-size-XS",
+          S: "scale-component-action-button-font-size-S",
+          M: "scale-component-action-button-font-size-M",
+          L: "scale-component-action-button-font-size-L",
+          XL: "scale-component-action-button-font-size-XL",
+        },
+      },
+      tag: {
+        height: {
+          S: "scale-component-tag-height-S",
+          M: "scale-component-tag-height-M",
+          L: "scale-component-tag-height-L",
+        },
+        paddingX: {
+          S: "scale-component-tag-padding-x-S",
+          M: "scale-component-tag-padding-x-M",
+          L: "scale-component-tag-padding-x-L",
+        },
+        fontSize: {
+          S: "scale-component-tag-font-size-S",
+          M: "scale-component-tag-font-size-M",
+          L: "scale-component-tag-font-size-L",
         },
       },
       field: {

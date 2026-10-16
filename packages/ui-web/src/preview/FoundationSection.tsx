@@ -1,3 +1,4 @@
+import { sizes } from "@moonx/ui-tokens";
 import { useState } from "react";
 import { Button } from "../components/Button";
 import { Divider } from "../components/Divider";
@@ -48,9 +49,9 @@ export function LayoutSection() {
           <Box>D</Box>
         </Grid>
       </Specimen>
-      <Specimen name='Container size="reading"'>
+      <Specimen name='Container width="reading"'>
         <div className={styles.frame}>
-          <Container size="reading">
+          <Container width="reading">
             <Box>Reading column</Box>
           </Container>
         </div>
@@ -185,11 +186,15 @@ export function FormSection() {
           </Button>
         </Form>
       </Specimen>
-      <Specimen name='size="XL" (fields and Buttons XL)'>
-        <Form aria-label="Extra large form" size="XL">
-          <TextField label="Business name" />
-          <Button variant="secondary">Save</Button>
-        </Form>
+      <Specimen name="size S / M / L / XL (fields and Buttons take the form's size)">
+        <Stack gap="space-400">
+          {sizes.map((size) => (
+            <Form key={size} aria-label={`Form ${size}`} size={size}>
+              <TextField label={`Business name ${size}`} />
+              <Button variant="secondary">Save</Button>
+            </Form>
+          ))}
+        </Stack>
       </Specimen>
       <Specimen name='density="spacious" (fields L)'>
         <Form aria-label="Spacious form" density="spacious">

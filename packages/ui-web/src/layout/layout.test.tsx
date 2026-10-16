@@ -83,7 +83,7 @@ describe("Container", () => {
     render(
       <>
         <Container id="content" />
-        <Container id="reading" size="reading" />
+        <Container id="reading" width="reading" />
         <Container id="bare" hasGutters={false} elementType="main" />
       </>,
     );

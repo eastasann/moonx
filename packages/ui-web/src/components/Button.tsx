@@ -6,7 +6,7 @@ import {
   Group,
 } from "react-aria-components";
 import { IconSlot } from "../internal/IconSlot";
-import { useSize } from "../internal/size";
+import { SizeContext, useSize } from "../internal/size";
 import * as styles from "./Button.css";
 import { PendingCircle } from "./ProgressCircle";
 
@@ -78,6 +78,11 @@ export interface ButtonGroupProps {
   align?: "start" | "center" | "end";
   /** `vertical` stacks the buttons at full width. @default "horizontal" */
   orientation?: "horizontal" | "vertical";
+  /**
+   * The size of the Buttons that do not set their own.
+   * @default the surrounding `Form`'s, otherwise "M"
+   */
+  size?: Size;
   "aria-label"?: string;
   children: ReactNode;
 }
@@ -86,12 +91,17 @@ export interface ButtonGroupProps {
 export function ButtonGroup({
   align = "start",
   orientation = "horizontal",
+  size,
   children,
   ...props
 }: ButtonGroupProps) {
   return (
     <Group {...props} className={styles.group({ align, orientation })}>
-      {children}
+      {size === undefined ? (
+        children
+      ) : (
+        <SizeContext.Provider value={size}>{children}</SizeContext.Provider>
+      )}
     </Group>
   );
 }

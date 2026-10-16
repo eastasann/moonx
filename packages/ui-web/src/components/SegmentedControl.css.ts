@@ -70,7 +70,7 @@ export const item = recipe({
             `calc(${vars.scale.component.actionButton.height[size]} - 2 * (${vars.space["25"]} + ${vars.borderWidth.strong}))`,
           ),
           paddingInline: vars.scale.component.actionButton.paddingX[size],
-          fontSize: vars.scale.component.button.fontSize[size],
+          fontSize: vars.scale.component.actionButton.fontSize[size],
         },
       ]),
     ) as Record<

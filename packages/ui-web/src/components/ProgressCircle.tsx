@@ -1,3 +1,4 @@
+import { formatProgress } from "@moonx/i18n";
 import type { ProgressCircleSize } from "@moonx/ui-tokens";
 import { ProgressBar } from "react-aria-components";
 import { FixedLocale } from "../internal/FixedLocale";
@@ -46,12 +47,26 @@ function Circle({
 export function ProgressCircle({
   size = "M",
   isIndeterminate = false,
+  value = 0,
+  minValue = 0,
+  maxValue = 100,
   ...props
 }: ProgressCircleProps) {
+  // React Aria would read the percentage out in its own format; the shared formatter's
+  // replaces it (SDD 9章「書式」). Clamped, and 0 for an empty range, as React Aria does.
+  const range = maxValue - minValue;
+  const fraction =
+    range === 0
+      ? 0
+      : (Math.min(Math.max(value, minValue), maxValue) - minValue) / range;
   return (
     <FixedLocale>
       <ProgressBar
         {...props}
+        value={value}
+        minValue={minValue}
+        maxValue={maxValue}
+        valueLabel={isIndeterminate ? undefined : formatProgress(fraction)}
         isIndeterminate={isIndeterminate}
         className={`${styles.root} ${styles.size[size]}`}
       >

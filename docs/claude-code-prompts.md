@@ -956,7 +956,7 @@ make test-web・make typecheck・make lint が通る状態をゴールとする�
 
 ## Step 19b: Web の部品: size・React Aria の文言・日付の入力欄の形
 
-Status:
+Status: done 2026-10-16
 
 ```
 Step 19 の独立レビューで見つかった、docs の決まりと部品の食い違い3つを、2026-10-16 のユーザーの決定どおりに docs と部品に入れてください。

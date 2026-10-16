@@ -23,9 +23,24 @@ export type Density = (typeof densities)[number];
 /** The densities a screen picks: compact is held in reserve (06 semantic.density). */
 export type ScreenDensity = Exclude<Density, "compact">;
 
-/** The `size` every component takes (design-spec 4.5). */
+/**
+ * The `size` of the components that take one, unless they have their own steps below
+ * (design-spec 4.5). Components Spectrum 2 gives no size, such as Heading or Link, take
+ * none.
+ */
 export const sizes = ["S", "M", "L", "XL"] as const;
 export type Size = (typeof sizes)[number];
+
+/**
+ * The steps of the components whose sizes start at XS, as Spectrum 2's do: ToggleButtonGroup
+ * here (design-spec 4.5 lists the rest). Its values are 06 component.action-button.
+ */
+export const sizesWithXS = ["XS", "S", "M", "L", "XL"] as const;
+export type SizeWithXS = (typeof sizesWithXS)[number];
+
+/** TagGroup's sizes: Spectrum 2's steps (design-spec 4.5, 06 component.tag). */
+export const tagSizes = ["S", "M", "L"] as const;
+export type TagSize = (typeof tagSizes)[number];
 
 /** Lucide icon sizes (`semantic.scale.*.component.icon.size`). */
 export const iconSizes = ["XS", "S", "M", "L", "XL"] as const;

@@ -1,3 +1,4 @@
+import { i18n } from "@moonx/i18n";
 import { popoverMaxHeight, type Size } from "@moonx/ui-tokens";
 import { ChevronDown, CircleAlert } from "lucide-react";
 import {
@@ -213,7 +214,10 @@ function PopoverComboBox({
       {label != null && <Label className={styles.label}>{label}</Label>}
       <div ref={frameRef} className={styles.frame({ size: resolved })}>
         <Input className={styles.input} placeholder={placeholder} />
-        <Button className={styles.fieldButton({ size: resolved })}>
+        <Button
+          aria-label={i18n.t("components:comboBox.showSuggestions")}
+          className={styles.fieldButton({ size: resolved })}
+        >
           <IconSlot size={resolved}>
             <ChevronDown />
           </IconSlot>
@@ -221,7 +225,7 @@ function PopoverComboBox({
       </div>
       <FieldHelp description={description} errorMessage={errorMessage} />
       <Popover maxHeight={popoverMaxHeight} className={overlay.popover}>
-        <ChoiceListBox />
+        <ChoiceListBox aria-label={i18n.t("components:comboBox.suggestions")} />
       </Popover>
     </AriaComboBox>
   );
@@ -395,6 +399,7 @@ function TrayComboBox({
                 </CustomValueButton>
               )}
               <ChoiceListBox
+                aria-label={i18n.t("components:comboBox.suggestions")}
                 items={items}
                 selectionMode="single"
                 selectedKeys={value === null ? [] : [value]}

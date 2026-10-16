@@ -41,7 +41,7 @@ BCDX は「自己分析 → アイデア検証 → ビジネスプラン」の�
 | 対応言語（UI） | **英語のみ**。ただし多言語化できる作りは残す（UI の文言はすべてコードから分けて管理し、日付・数値・通貨は書式を切り替えられるようにする） |
 | 対応言語（回答） | 自由（英語・タガログ語・Hiligaynon・日本語・混在など）。アプリは回答を翻訳しない。日本語を含む多言語の文字を表示できること |
 | 通貨 | ワークスペースごとに設定し、既定は PHP。換算はしない（PRD 6章）。自己分析の金額は自己分析ごとの通貨 |
-| 書式 | 初期リリースは en-PH に固定（日付は「Sep 30, 2026」、時刻は12時間制。細則は下）。書き出しの日付は ISO 8601。金額の入力は桁区切りのカンマを受け付ける。テンプレートの中身（設問・EXAMPLE）は1言語で持ち、UI の多言語化とは別に扱う |
+| 書式 | 初期リリースは en-PH に固定（日付は「Sep 30, 2026」（日付の入力欄だけは「9/30/2026」）、時刻は12時間制。細則は下）。書き出しの日付は ISO 8601。金額の入力は桁区切りのカンマを受け付ける。テンプレートの中身（設問・EXAMPLE）は1言語で持ち、UI の多言語化とは別に扱う |
 | AI | アプリに組み込まない（PRD 6章）。外部の AI（ChatGPT・Claude など）との往復（書き出し・取り込み）だけを支える |
 | 通知 | アプリ内のみ（メール通知とプッシュ通知はスコープ外。PRD 6章）。招待とパスワード再設定のメールは送る（認証に必要な連絡で、通知とは別） |
 | 既存データ | Google Drive の既存データ（自己分析1件、記入済みの検証1件）は手で入れ直す。Drive との取り込み・同期・書き出しは作らない（PRD 6章） |
@@ -53,6 +53,8 @@ BCDX は「自己分析 → アイデア検証 → ビジネスプラン」の�
 - 24時間以内の日時は相対で出す（1分未満は「just now」、それ以降は「5m ago」「2h ago」）。それより前は日付で出す。
 - 今年の日付は年を省く（「Oct 1」）。去年以前の日付は年を付ける（「Sep 30, 2025」）。
 - 期限（Deadline・Target Date・ローンチの Date）は相対にせず日付で出す。期限を過ぎたものは日数を添える（「overdue 2d」）。
+- 日付の入力欄（DatePicker）は例外で、en-PH の数字の並び（「9/30/2026」。空の欄は「mm/dd/yyyy」）で出す。月・日・年の欄にキーボードで数字を打てるようにするため（React Aria と Spectrum 2 の DatePicker と同じ形）。入力欄の外に出す日付は、上の細則どおり「Sep 30, 2026」で出す（2026-10-16 のユーザーの決定）。
+- DatePicker が開くカレンダーは、見出しを月と年（「October 2026」）、曜日を頭文字（「S」「M」）、日を数字（「16」）で出す。カレンダーの読み上げ（日・選んだ日付・表示中の月）は、React Aria が作る形のままにする（SDD 9章「React Aria の文言」）。
 - 負の金額は、符号を通貨記号の前に置く（「−₱5,586」）。
 - 通貨記号は短い形で出す（「$1,234」「¥1,234」。「US$」のように国を書き分けない）。通貨はワークスペース（自己分析は自己分析）に1つなので、書き分けなくても区別できる。
 - 待ち時間（回数の上限の案内など）は、分に切り上げて「1 minute」「45 minutes」と出す。切り上げた分が60分以上なら、時間に切り上げて「1 hour」「2 hours」と出す（59分30秒は「1 hour」）。
@@ -369,7 +371,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | アイコン | 線のアイコンの1つのセットにそろえる（Phase 3 で Lucide に決定）。この文書の ASCII 図の絵文字は位置を示す仮置き |
 | アプリのアイコン | 三日月と小さな丸（2026-10-11 にユーザーが選んだ案 B）。512 の正方形に、中心 (246, 266) 半径 150 の円から中心 (300, 215) 半径 132 の円を抜いた三日月と、中心 (378, 150) 半径 28 の丸を置く。地は `surface.canvas`、三日月と丸は `text.primary`（どちらも semantic のライトの値。差し色を持たないので丸も同じ色。2026-10-12）。maskable の安全域（中心から半径 40%）に収まる。形と色の正はこの行で、作り方は SDD ADR-031 |
 | 情報密度 | **画面で使い分け**。設問フォーム・判定・プラン項目など書く画面はゆったり（考えるための余白）。費用・損益・調査ログ・一覧・ダッシュボードなど表と数字の画面は中密度（比べて読むため）。スマホは全体を一段ゆったりにする |
-| デザインシステムの参考 | **Adobe Spectrum の仕組みを取り入れ、見た目は上の月相にする**（Phase 3 で決定。見た目は 2026-10-12 に作り直した）。取り入れるもの: 部品の種類と名前（4.5）、部品の大きさの段階（S / M / L / XL）、端末で切り替える2つのスケール（デスクトップは medium、タッチの端末は large）、表とリストの密度（compact / regular / spacious）、状態の色の名前（informative / notice / negative / neutral。Spectrum の accent と positive は、差し色を持たないので使わない）、スマホではポップオーバーを下からのトレイ（ボトムシート）にする振る舞い、キーボード操作とフォーカスの表示の決まり。Spectrum の配色・書体（Adobe Clean）・アイコン（Workflow）は使わない |
+| デザインシステムの参考 | **Adobe Spectrum の仕組みを取り入れ、見た目は上の月相にする**（Phase 3 で決定。見た目は 2026-10-12 に作り直した）。取り入れるもの: 部品の種類と名前（4.5）、部品の大きさの段階（XS / S / M / L / XL。部品ごとの段は 4.5）、端末で切り替える2つのスケール（デスクトップは medium、タッチの端末は large）、表とリストの密度（compact / regular / spacious）、状態の色の名前（informative / notice / negative / neutral。Spectrum の accent と positive は、差し色を持たないので使わない）、スマホではポップオーバーを下からのトレイ（ボトムシート）にする振る舞い、キーボード操作とフォーカスの表示の決まり。Spectrum の配色・書体（Adobe Clean）・アイコン（Workflow）は使わない |
 | 密度とスケールの対応 | 書く・読む・手順を進める画面（1〜4・9・11・19・21・24・25・29・30・M1〜M9）は spacious、表と数字と一覧の画面（5〜8・10・12〜18・20・22・23・26〜28）は regular。スマホとタブレットは large のスケール（部品が一段大きくなる）、デスクトップは medium。具体的な値は `docs/06_design-tokens.json` |
 | 状態の形の共有 | F/A/U と確認項目は同じ月の形を使う（Fact と Done は満月、Assumption と Partial は半月、Unknown と Not started は新月）。同じ帯に並ぶとき（13・19）は、ラベルで区別する（形だけで伝えない） |
 
@@ -438,7 +440,11 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 
 部品の補足:
 
-- 種類・大きさの列に値の無い部品も、size（S / M / L / XL）を受ける。Avatar は S / M、Divider と ProgressCircle は S / M / L。
+- size（大きさ）は、Spectrum 2（`@react-spectrum/s2`）の同じ名前の部品が size を持つ部品（Button・ButtonGroup・ActionButton・ActionGroup・ToggleButtonGroup・ActionMenu・Menu・Form・TextField / TextArea・NumberField・SearchField・Picker・ComboBox・RadioGroup・Checkbox / CheckboxGroup・Switch・DatePicker・TagGroup・Disclosure / Accordion・Breadcrumbs・IllustratedMessage・Badge・StatusLight・ProgressBar / ProgressCircle・Meter・Divider・Card / CardView・Avatar・Popover・ContextualHelp・Dialog / AlertDialog）と、06 に size ごとの値が既にある部品（Tabs の `item-height`、SegmentedControl が使う `action-button` の値）が受ける。独自の部品は、いちばん近い Spectrum 2 の部品に合わせる（MentionTextArea は TextArea、FauPicker は ActionButton、CheckDots と MoonGlyph は表の S / M）（2026-10-16 のユーザーの決定）。
+- 大きさの段は、表の「種類・大きさ」の列に段があればそれ、無ければ Spectrum 2 のその部品の段にする。表に段の無い部品の段: ToggleButtonGroup・ActionMenu・Card / CardView は XS / S / M / L / XL、TagGroup・IllustratedMessage・ProgressCircle・Popover は S / M / L、Breadcrumbs は M / L、ContextualHelp は XS / S、SegmentedControl と Tabs は S / M / L / XL（06 に元からある段。06 の `action-button` の XS は使わない）、ほかは S / M / L / XL。MentionTextArea は TextArea と同じ S / M / L / XL、FauPicker は表の ActionButton と同じ S / M / L / XL。
+- 既定の大きさは、Spectrum 2 のその部品の既定にそろえる。M が既定で、Badge は S、Avatar は S（Spectrum 2 の既定の 24px が 06 の S）、ContextualHelp は XS、Popover は大きさを指定しなければ中身に合わせる。
+- size を受ける部品で 06 に値の無い段は、Spectrum 2 のトークン（`@adobe/spectrum-tokens`）の値を 06 に足し、出典を `$description` に書く。06 に値を足すのは size を受ける部品だけ。
+- size を受けない部品: Spectrum 2 の部品が size を持たず、06 にも値の無いもの（Heading / Text・Link・Well・FileTrigger・Flex / Stack / Grid / Container・Tray・Tooltip・Toast・Skeleton・InlineAlert・TableView / ListView / Tree（密度で変える）・Steps）と、枠・パネル・表示だけの独自の部品（SideNav / TabBar・AppFrame・PageFrame・RouterProvider・Panel・DiffText・QuestionCard・MetricTile・RowList・Slide・パターンの枠）。
 - タップ領域は、どの大きさでも `semantic.scale.{medium,large}.component.target-min` 以上にする（4.3）。見た目の高さが小さい部品は、最小の高さで広げる。
 - Link は、単独の行・リストに置く primary がタップ領域の下限を守る。文中に置く secondary は折り返すため、WCAG 2.5.5 / 2.5.8 の Inline の例外として下限を求めない。文中のリンクは読み物（29・30・ヒント・EXAMPLE）だけに置き、ほかの画面では単独の行にする（4.4「画面の組み方」。2026-10-12 のユーザーの決定）。
 - Menu・Picker・ComboBox・DatePicker・ContextualHelp・Panel は、幅が `semantic.breakpoint.tablet` より狭いときトレイで開く。Dialog は 3.8 の大きさに従い、small と medium はトレイ、large は全画面のシートで開く。Panel はタブレットの幅では右のドロワー（モーダル）、デスクトップでは右の固定パネル（モーダルにしない）。

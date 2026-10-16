@@ -19,6 +19,8 @@ const scales = ["medium", "large"] as const;
 const canvas = { light: "rgb(244, 245, 248)", dark: "rgb(14, 17, 32)" };
 /** A size M Button: 06 component.button.height.M, grown to target-min on large. */
 const buttonHeightM = { medium: 32, large: 44 };
+/** 06 component.target-min: 24px with a mouse, 44px on touch (design-spec 4.3). */
+const targetMin = { medium: 24, large: 44 };
 
 const capitalised = (word: string) => word[0]?.toUpperCase() + word.slice(1);
 
@@ -197,6 +199,24 @@ for (const width of Object.keys(widths) as WidthName[]) {
         expect((await buttonM.boundingBox())?.height).toBe(
           buttonHeightM[scale],
         );
+
+        // The smallest steps grow to target-min and no further (design-spec 4.5): an XS
+        // toggle (20px or 26px in 06), and an S tag (24px or 30px) whose remove button
+        // keeps its own target-min inside it.
+        const toggleXS = region(page, "ToggleButtonGroup and SegmentedControl")
+          .getByRole("radiogroup", { name: "F/A/U XS" })
+          .getByRole("radio")
+          .first();
+        expect((await toggleXS.boundingBox())?.height).toBe(targetMin[scale]);
+        const tagS = region(page, "FileTrigger and TagGroup")
+          .getByRole("grid", { name: "Conditions S" })
+          .getByRole("row")
+          .first();
+        await tagS.scrollIntoViewIfNeeded();
+        expect((await tagS.boundingBox())?.height).toBe(targetMin[scale]);
+        expect(
+          (await tagS.getByRole("button").boundingBox())?.height,
+        ).toBeGreaterThanOrEqual(targetMin[scale]);
 
         // design-spec 4.3: nothing scrolls sideways.
         const overflow = await page.evaluate(

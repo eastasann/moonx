@@ -1,12 +1,12 @@
-import { vars } from "@moonx/ui-tokens";
+import { type SizeWithXS, sizesWithXS, vars } from "@moonx/ui-tokens";
 import { recipe } from "@vanilla-extract/recipes";
 import { atLeastTarget, focusRing, hoverTransition } from "../styles/helpers";
 
-const sizes = ["S", "M", "L", "XL"] as const;
-
-const sized = <T>(make: (size: (typeof sizes)[number]) => T) =>
-  Object.fromEntries(sizes.map((size) => [size, make(size)])) as Record<
-    (typeof sizes)[number],
+// XS is for the components whose steps start at XS (ToggleButtonGroup); ActionButton's
+// own prop starts at S (design-spec 4.5).
+const sized = <T>(make: (size: SizeWithXS) => T) =>
+  Object.fromEntries(sizesWithXS.map((size) => [size, make(size)])) as Record<
+    SizeWithXS,
     T
   >;
 
@@ -74,14 +74,14 @@ export const actionButton = recipe({
       minHeight: atLeastTarget(vars.scale.component.actionButton.height[size]),
       minWidth: atLeastTarget(vars.scale.component.actionButton.height[size]),
       paddingInline: vars.scale.component.actionButton.paddingX[size],
-      fontSize: vars.scale.component.button.fontSize[size],
+      fontSize: vars.scale.component.actionButton.fontSize[size],
     })),
     iconOnly: {
       true: {},
       false: {},
     },
   },
-  compoundVariants: sizes.map((size) => ({
+  compoundVariants: sizesWithXS.map((size) => ({
     variants: { iconOnly: true, size },
     style: {
       paddingInline: vars.scale.component.actionButton.paddingIconOnly[size],

@@ -430,7 +430,9 @@
       "70": { "$value": { "value": 70, "unit": "px" } },
       "80": { "$value": { "value": 80, "unit": "px" } },
       "96": { "$value": { "value": 96, "unit": "px" } },
+      "100": { "$value": { "value": 100, "unit": "px" } },
       "120": { "$value": { "value": 120, "unit": "px" } },
+      "150": { "$value": { "value": 150, "unit": "px" } },
       "160": { "$value": { "value": 160, "unit": "px" } },
       "192": { "$value": { "value": 192, "unit": "px" } },
       "200": { "$value": { "value": 200, "unit": "px" } },
@@ -439,9 +441,11 @@
       "240": { "$value": { "value": 240, "unit": "px" } },
       "256": { "$value": { "value": 256, "unit": "px" } },
       "268": { "$value": { "value": 268, "unit": "px" } },
+      "270": { "$value": { "value": 270, "unit": "px" } },
       "272": { "$value": { "value": 272, "unit": "px" } },
       "288": { "$value": { "value": 288, "unit": "px" } },
       "336": { "$value": { "value": 336, "unit": "px" } },
+      "340": { "$value": { "value": 340, "unit": "px" } },
       "352": { "$value": { "value": 352, "unit": "px" } },
       "360": { "$value": { "value": 360, "unit": "px" } },
       "384": { "$value": { "value": 384, "unit": "px" } },
@@ -1287,6 +1291,54 @@
               "spacious": { "$value": "{primitive.dimension.48}" }
             }
           },
+          "card": {
+            "$description": "Card（XS〜XL。既定は M。design-spec 4.5）。Spectrum 2 のトークンに Card の寸法は無いので @react-spectrum/s2 の Card の値（regular の密度）。padding は内側（S2 の --card-spacing。S2 は padding をタッチの端末でも大きくしないので large も同じ値）、gap は中の行の間（S2 の content の rowGap）、title-font-size は題（S2 の title-xs・title-xs・title-sm・title・title-lg。Spectrum 2 のトークンの title-size-xs〜l）、description-font-size は説明（S2 の body-2xs・body-2xs・body-xs・body-sm・body。Spectrum 2 のトークンの font-size-50・body-size-xs〜m）",
+            "padding": {
+              "XS": { "$value": "{primitive.dimension.8}" },
+              "S": { "$value": "{primitive.dimension.12}" },
+              "M": { "$value": "{primitive.dimension.16}" },
+              "L": { "$value": "{primitive.dimension.20}" },
+              "XL": { "$value": "{primitive.dimension.24}" }
+            },
+            "gap": {
+              "XS": { "$value": "{primitive.dimension.4}" },
+              "S": { "$value": "{primitive.dimension.4}" },
+              "M": { "$value": "{primitive.dimension.6}" },
+              "L": { "$value": "{primitive.dimension.6}" },
+              "XL": { "$value": "{primitive.dimension.8}" }
+            },
+            "title-font-size": {
+              "XS": { "$value": "{primitive.font.size.12}" },
+              "S": { "$value": "{primitive.font.size.12}" },
+              "M": { "$value": "{primitive.font.size.14}" },
+              "L": { "$value": "{primitive.font.size.16}" },
+              "XL": { "$value": "{primitive.font.size.18}" }
+            },
+            "description-font-size": {
+              "XS": { "$value": "{primitive.font.size.11}" },
+              "S": { "$value": "{primitive.font.size.11}" },
+              "M": { "$value": "{primitive.font.size.12}" },
+              "L": { "$value": "{primitive.font.size.14}" },
+              "XL": { "$value": "{primitive.font.size.16}" }
+            }
+          },
+          "card-view": {
+            "$description": "CardView（XS〜XL。既定は M。design-spec 4.5）。Spectrum 2 のトークンに無いので @react-spectrum/s2 の CardView の値。min-width はカードの最小の幅（S2 の GridLayout の minItemSize）、gap はカードの間（S2 の minSpace の regular）。S2 はどちらもタッチの端末で大きくしないので large も同じ値",
+            "min-width": {
+              "XS": { "$value": "{primitive.dimension.100}" },
+              "S": { "$value": "{primitive.dimension.150}" },
+              "M": { "$value": "{primitive.dimension.200}" },
+              "L": { "$value": "{primitive.dimension.270}" },
+              "XL": { "$value": "{primitive.dimension.340}" }
+            },
+            "gap": {
+              "XS": { "$value": "{primitive.dimension.8}" },
+              "S": { "$value": "{primitive.dimension.12}" },
+              "M": { "$value": "{primitive.dimension.16}" },
+              "L": { "$value": "{primitive.dimension.20}" },
+              "XL": { "$value": "{primitive.dimension.24}" }
+            }
+          },
           "toast": {
             "$description": "Toast の高さ（最小）",
             "min-height": { "$value": "{primitive.dimension.52}" }
@@ -1660,6 +1712,54 @@
               "compact": { "$value": "{primitive.dimension.40}" },
               "regular": { "$value": "{primitive.dimension.50}" },
               "spacious": { "$value": "{primitive.dimension.60}" }
+            }
+          },
+          "card": {
+            "$description": "Card（XS〜XL。既定は M。design-spec 4.5）。Spectrum 2 のトークンに Card の寸法は無いので @react-spectrum/s2 の Card の値（regular の密度）。padding は内側（S2 の --card-spacing。S2 は padding をタッチの端末でも大きくしないので large も同じ値）、gap は中の行の間（S2 の content の rowGap）、title-font-size は題（S2 の title-xs・title-xs・title-sm・title・title-lg。Spectrum 2 のトークンの title-size-xs〜l）、description-font-size は説明（S2 の body-2xs・body-2xs・body-xs・body-sm・body。Spectrum 2 のトークンの font-size-50・body-size-xs〜m）",
+            "padding": {
+              "XS": { "$value": "{primitive.dimension.8}" },
+              "S": { "$value": "{primitive.dimension.12}" },
+              "M": { "$value": "{primitive.dimension.16}" },
+              "L": { "$value": "{primitive.dimension.20}" },
+              "XL": { "$value": "{primitive.dimension.24}" }
+            },
+            "gap": {
+              "XS": { "$value": "{primitive.dimension.4}" },
+              "S": { "$value": "{primitive.dimension.4}" },
+              "M": { "$value": "{primitive.dimension.6}" },
+              "L": { "$value": "{primitive.dimension.6}" },
+              "XL": { "$value": "{primitive.dimension.8}" }
+            },
+            "title-font-size": {
+              "XS": { "$value": "{primitive.font.size.15}" },
+              "S": { "$value": "{primitive.font.size.15}" },
+              "M": { "$value": "{primitive.font.size.17}" },
+              "L": { "$value": "{primitive.font.size.19}" },
+              "XL": { "$value": "{primitive.font.size.22}" }
+            },
+            "description-font-size": {
+              "XS": { "$value": "{primitive.font.size.13}" },
+              "S": { "$value": "{primitive.font.size.13}" },
+              "M": { "$value": "{primitive.font.size.15}" },
+              "L": { "$value": "{primitive.font.size.17}" },
+              "XL": { "$value": "{primitive.font.size.19}" }
+            }
+          },
+          "card-view": {
+            "$description": "CardView（XS〜XL。既定は M。design-spec 4.5）。Spectrum 2 のトークンに無いので @react-spectrum/s2 の CardView の値。min-width はカードの最小の幅（S2 の GridLayout の minItemSize）、gap はカードの間（S2 の minSpace の regular）。S2 はどちらもタッチの端末で大きくしないので large も同じ値",
+            "min-width": {
+              "XS": { "$value": "{primitive.dimension.100}" },
+              "S": { "$value": "{primitive.dimension.150}" },
+              "M": { "$value": "{primitive.dimension.200}" },
+              "L": { "$value": "{primitive.dimension.270}" },
+              "XL": { "$value": "{primitive.dimension.340}" }
+            },
+            "gap": {
+              "XS": { "$value": "{primitive.dimension.8}" },
+              "S": { "$value": "{primitive.dimension.12}" },
+              "M": { "$value": "{primitive.dimension.16}" },
+              "L": { "$value": "{primitive.dimension.20}" },
+              "XL": { "$value": "{primitive.dimension.24}" }
             }
           },
           "toast": {

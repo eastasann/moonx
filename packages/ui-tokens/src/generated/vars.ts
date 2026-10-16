@@ -436,6 +436,52 @@ export const vars = createGlobalThemeContract({
           spacious: "scale-component-table-row-height-spacious",
         },
       },
+      card: {
+        padding: {
+          XS: "scale-component-card-padding-XS",
+          S: "scale-component-card-padding-S",
+          M: "scale-component-card-padding-M",
+          L: "scale-component-card-padding-L",
+          XL: "scale-component-card-padding-XL",
+        },
+        gap: {
+          XS: "scale-component-card-gap-XS",
+          S: "scale-component-card-gap-S",
+          M: "scale-component-card-gap-M",
+          L: "scale-component-card-gap-L",
+          XL: "scale-component-card-gap-XL",
+        },
+        titleFontSize: {
+          XS: "scale-component-card-title-font-size-XS",
+          S: "scale-component-card-title-font-size-S",
+          M: "scale-component-card-title-font-size-M",
+          L: "scale-component-card-title-font-size-L",
+          XL: "scale-component-card-title-font-size-XL",
+        },
+        descriptionFontSize: {
+          XS: "scale-component-card-description-font-size-XS",
+          S: "scale-component-card-description-font-size-S",
+          M: "scale-component-card-description-font-size-M",
+          L: "scale-component-card-description-font-size-L",
+          XL: "scale-component-card-description-font-size-XL",
+        },
+      },
+      cardView: {
+        minWidth: {
+          XS: "scale-component-card-view-min-width-XS",
+          S: "scale-component-card-view-min-width-S",
+          M: "scale-component-card-view-min-width-M",
+          L: "scale-component-card-view-min-width-L",
+          XL: "scale-component-card-view-min-width-XL",
+        },
+        gap: {
+          XS: "scale-component-card-view-gap-XS",
+          S: "scale-component-card-view-gap-S",
+          M: "scale-component-card-view-gap-M",
+          L: "scale-component-card-view-gap-L",
+          XL: "scale-component-card-view-gap-XL",
+        },
+      },
       toast: {
         minHeight: "scale-component-toast-min-height",
       },

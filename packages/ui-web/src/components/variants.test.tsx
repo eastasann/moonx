@@ -1,9 +1,12 @@
 import {
+  avatarSizes,
   breadcrumbsSizes,
+  cardSizes,
   contextualHelpSizes,
   dialogWidths,
   dividerSizes,
   illustratedMessageSizes,
+  moonGlyphSizes,
   progressCircleSizes,
   sizes,
   sizesWithXS,
@@ -21,33 +24,49 @@ import type { FlexProps, StackProps } from "../layout/Flex";
 import type { GridProps } from "../layout/Grid";
 import { setPhoneWidth } from "../test/helpers";
 import { ActionButton, ActionGroup } from "./ActionButton";
+import { Avatar } from "./Avatar";
 import { Badge } from "./Badge";
 import { Breadcrumb, Breadcrumbs } from "./Breadcrumbs";
 import { Button, ButtonGroup } from "./Button";
+import { Card, CardView } from "./Card";
 import { Checkbox, CheckboxGroup } from "./Checkbox";
+import { CheckDots } from "./CheckDots";
 import { ComboBox } from "./ComboBox";
 import { ContextualHelp } from "./ContextualHelp";
 import { DatePicker } from "./DatePicker";
 import { AlertDialog } from "./Dialog";
+import type { DiffTextProps } from "./DiffText";
 import { Accordion, Disclosure } from "./Disclosure";
 import { Divider } from "./Divider";
+import { FauPicker } from "./FauPicker";
 import { FileTrigger, type FileTriggerProps } from "./FileTrigger";
 import { Form } from "./Form";
 import type { HeadingProps } from "./Heading";
 import { IllustratedMessage } from "./IllustratedMessage";
 import type { InlineAlertProps } from "./InlineAlert";
 import type { LinkProps } from "./Link";
+import type { ListViewProps } from "./ListView";
+import { MentionTextArea } from "./MentionTextArea";
 import { ActionMenu, Menu, MenuItem, MenuTrigger } from "./Menu";
+import { Meter } from "./Meter";
+import type { MetricTileProps } from "./MetricTile";
+import { MoonGlyph } from "./MoonGlyph";
 import { NumberField } from "./NumberField";
+import type { PanelProps } from "./Panel";
 import { Picker } from "./Picker";
 import { ProgressBar } from "./ProgressBar";
 import { ProgressCircle } from "./ProgressCircle";
+import type { QuestionCardProps } from "./QuestionCard";
 import { Radio, RadioGroup } from "./RadioGroup";
+import type { RowListItemProps, RowListProps } from "./RowList";
 import { SearchField } from "./SearchField";
 import { SegmentedControl, SegmentedControlItem } from "./SegmentedControl";
 import type { SkeletonProps } from "./Skeleton";
+import type { SlideProps } from "./Slide";
 import { StatusLight } from "./StatusLight";
+import type { StepsProps } from "./Steps";
 import { Switch } from "./Switch";
+import type { TableViewProps } from "./TableView";
 import { Tab, TabList, TabPanel, Tabs } from "./Tabs";
 import { TagGroup } from "./TagGroup";
 import { Text, type TextProps } from "./Text";
@@ -56,6 +75,7 @@ import type { ToastContainerProps, ToastOptions } from "./Toast";
 import { ToggleButton, ToggleButtonGroup } from "./ToggleButtonGroup";
 import type { TooltipProps, TooltipTriggerProps } from "./Tooltip";
 import type { TrayProps } from "./Tray";
+import type { TreeProps } from "./Tree";
 import { Well, type WellProps } from "./Well";
 
 const items: ChoiceItem[] = [
@@ -368,6 +388,87 @@ const sized: SizeCase[] = [
     (size) => <ProgressCircle size={size} aria-label={size} isIndeterminate />,
     () => screen.getAllByRole("progressbar"),
   ),
+  sizeCase(
+    "Meter",
+    sizes,
+    (size) => (
+      <Meter
+        size={size}
+        label={`meter-${size}`}
+        segments={[{ state: "fact", label: "Fact", count: 1 }]}
+      />
+    ),
+    () => screen.getAllByRole("figure"),
+  ),
+  sizeCase(
+    "Card",
+    cardSizes,
+    (size) => <Card size={size} title={`card-${size}`} />,
+    () =>
+      cardSizes.map((size) => screen.getByText(`card-${size}`).parentElement),
+  ),
+  sizeCase(
+    "CardView",
+    cardSizes,
+    (size) => (
+      <CardView aria-label={`view-${size}`} size={size}>
+        <Card id="a" textValue="A" title="A" />
+      </CardView>
+    ),
+    () => screen.getAllByRole("grid"),
+  ),
+  sizeCase(
+    "Avatar",
+    avatarSizes,
+    (size) => <Avatar name="Ana Reyes" alt={`avatar-${size}`} size={size} />,
+    () => screen.getAllByRole("img"),
+  ),
+  sizeCase(
+    "MoonGlyph",
+    moonGlyphSizes,
+    (size) => <MoonGlyph state="partial" size={size} />,
+    () => [...document.querySelectorAll("svg")],
+  ),
+  sizeCase(
+    "CheckDots",
+    moonGlyphSizes,
+    (size) => (
+      <CheckDots size={size} checks={[{ name: size, state: "done" }]} />
+    ),
+    () => [...document.querySelectorAll("svg")],
+  ),
+  sizeCase(
+    "FauPicker",
+    sizes,
+    (size) => (
+      <FauPicker
+        aria-label={size}
+        size={size}
+        state="unclassified"
+        confidence={null}
+        hasValue
+        onChange={() => {}}
+        onFactPress={() => {}}
+      />
+    ),
+    () => screen.getAllByRole("button"),
+  ),
+  sizeCase(
+    "MentionTextArea",
+    sizes,
+    (size) => (
+      <MentionTextArea
+        aria-label={size}
+        size={size}
+        value=""
+        onChange={() => {}}
+        mentions={[]}
+        onMentionsChange={() => {}}
+        candidates={[]}
+      />
+    ),
+    () => screen.getAllByRole("textbox").map(fieldRoot),
+  ),
 ];
 
 describe.each(sized)("$name sizes", ({ steps, render: make, targets }) => {
@@ -396,6 +497,18 @@ test("components Spectrum 2 gives no size take none (design-spec 4.5)", () => {
   expectTypeOf<ToastOptions>().not.toHaveProperty("size");
   expectTypeOf<SkeletonProps>().not.toHaveProperty("size");
   expectTypeOf<InlineAlertProps>().not.toHaveProperty("size");
+  // Lists and tables change by density instead; frames and displays have no size.
+  expectTypeOf<TableViewProps<{ id: string }>>().not.toHaveProperty("size");
+  expectTypeOf<ListViewProps<object>>().not.toHaveProperty("size");
+  expectTypeOf<TreeProps<object>>().not.toHaveProperty("size");
+  expectTypeOf<StepsProps>().not.toHaveProperty("size");
+  expectTypeOf<PanelProps>().not.toHaveProperty("size");
+  expectTypeOf<DiffTextProps>().not.toHaveProperty("size");
+  expectTypeOf<QuestionCardProps>().not.toHaveProperty("size");
+  expectTypeOf<MetricTileProps>().not.toHaveProperty("size");
+  expectTypeOf<RowListProps>().not.toHaveProperty("size");
+  expectTypeOf<RowListItemProps>().not.toHaveProperty("size");
+  expectTypeOf<SlideProps>().not.toHaveProperty("size");
 });
 
 describe("sizes of the overlays, one open at a time", () => {

@@ -9,6 +9,7 @@ import {
   type PitchDeckInput,
   type PitchExecutionItem,
   type PitchSection,
+  pitchFooterText,
   pitchSlideKeys,
 } from "./pitch";
 import {
@@ -774,6 +775,25 @@ describe("buildPitchDeck: the slides", () => {
     expect(
       deck.slides.every((slide) => !slide.overflow && slide.shrink === 0),
     ).toBe(true);
+  });
+});
+
+describe("pitchFooterText", () => {
+  test("the name, the version or Draft and the date (no year in the year it was made); a blank name is left out", () => {
+    const deck = buildPitchDeck(input());
+    const options = { timeZone: "Asia/Manila" };
+    expect(pitchFooterText(deck, options)).toBe(
+      "Piaya Gift Box Co. · Draft · Oct 1",
+    );
+    expect(
+      pitchFooterText(
+        {
+          ...deck,
+          footer: { ...deck.footer, businessName: "  ", versionLabel: "v1" },
+        },
+        options,
+      ),
+    ).toBe("v1 · Oct 1");
   });
 });
 

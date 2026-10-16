@@ -1,4 +1,4 @@
-import { vars } from "@moonx/ui-tokens";
+import { type Size, sizes, vars } from "@moonx/ui-tokens";
 import { style, styleVariants } from "@vanilla-extract/css";
 
 export const mark = style({
@@ -29,3 +29,26 @@ export const line = style({
 });
 
 export const lit = style({ fill: "currentColor" });
+
+const sized = Object.fromEntries(sizes.map((size) => [size, size])) as Record<
+  Size,
+  Size
+>;
+
+/** The mark's size: StatusLight's dot at each step; MoonGlyph uses S and M (06 status-light). */
+export const dot = styleVariants(sized, (size) => ({
+  width: vars.scale.component.statusLight.dotSize[size],
+  height: vars.scale.component.statusLight.dotSize[size],
+}));
+
+/**
+ * The ring around the current question's dot (11 on a phone, design-spec 4.5): a hairline
+ * circle a little outside the moon, in the ink of the text.
+ */
+export const current = style({
+  display: "inline-flex",
+  flexShrink: 0,
+  padding: vars.space["50"],
+  border: `${vars.borderWidth.strong} solid ${vars.color.text.primary}`,
+  borderRadius: vars.radius.pill,
+});

@@ -1036,7 +1036,7 @@ make test-web・make typecheck・make lint が通る状態をゴールとする�
 
 ## Step 21: Web の部品（3）: データの表示と独自の部品
 
-Status:
+Status: done 2026-10-17
 
 ```
 docs/design-spec.md 4.5 の部品のうち、データの表示と独自の部品を packages/ui-web に作ってください。

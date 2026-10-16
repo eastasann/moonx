@@ -799,3 +799,23 @@ export const pitchSlideKeys = (variant: PitchVariant): PitchSlideKey[] =>
  */
 export const buildPitchDeck = (input: PitchDeckInput): PitchDeck =>
   new DeckBuilder(input).build();
+
+/**
+ * Each slide's footer, in the PDF and on 23 alike (design-spec 6.14): "Business Name ·
+ * version or Draft · date", the date in the user's time zone, without the name when it is
+ * blank.
+ */
+export const pitchFooterText = (
+  deck: Pick<PitchDeck, "footer" | "generatedAt">,
+  { timeZone }: { timeZone: string },
+): string =>
+  [
+    deck.footer.businessName.trim(),
+    deck.footer.versionLabel,
+    formatDate(deck.footer.date, {
+      timeZone,
+      now: new Date(deck.generatedAt),
+    }),
+  ]
+    .filter((part) => part !== "")
+    .join(i18n.t("pitch:footerSeparator"));

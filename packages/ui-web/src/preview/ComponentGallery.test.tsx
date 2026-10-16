@@ -1,7 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { mockTextMeasure } from "../test/helpers";
 import { ComponentGallery } from "./ComponentGallery";
+
+// The gallery's slides measure their figures with a canvas happy-dom does not have.
+beforeEach(mockTextMeasure);
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 test("the gallery renders every section", () => {
   render(<ComponentGallery />);
@@ -34,6 +41,22 @@ test("the gallery renders every section", () => {
     "Disclosure and Accordion",
     "Tabs",
     "Breadcrumbs",
+    "TableView",
+    "ListView",
+    "Card and CardView",
+    "Tree",
+    "Meter",
+    "MoonGlyph and CheckDots",
+    "Avatar",
+    "FauPicker",
+    "MetricTile",
+    "RowList",
+    "QuestionCard",
+    "DiffText",
+    "MentionTextArea",
+    "Panel",
+    "Slide",
+    "Steps",
   ]) {
     expect(screen.getByRole("region", { name: title })).toBeTruthy();
   }

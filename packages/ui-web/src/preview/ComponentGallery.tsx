@@ -15,6 +15,26 @@ import {
 } from "./ActionsSection";
 import { ChoiceSection, FileAndTagSection } from "./ChoicesSection";
 import {
+  DiffTextSection,
+  MentionTextAreaSection,
+  MetricTileSection,
+  PanelSection,
+  QuestionCardSection,
+  RowListSection,
+  SlideSection,
+  StepsSection,
+} from "./CustomSection";
+import {
+  AvatarSection,
+  CardSection,
+  FauPickerSection,
+  ListViewSection,
+  MeterSection,
+  MoonGlyphSection,
+  TableViewSection,
+  TreeSection,
+} from "./DataSection";
+import {
   BadgeSection,
   IllustratedMessageSection,
   InlineAlertSection,
@@ -156,6 +176,22 @@ export function ComponentGallery() {
           <DisclosureSection />
           <TabsSection />
           <BreadcrumbsSection />
+          <TableViewSection />
+          <ListViewSection />
+          <CardSection />
+          <TreeSection />
+          <MeterSection />
+          <MoonGlyphSection />
+          <AvatarSection />
+          <FauPickerSection />
+          <MetricTileSection />
+          <RowListSection />
+          <QuestionCardSection />
+          <DiffTextSection />
+          <MentionTextAreaSection />
+          <PanelSection />
+          <SlideSection />
+          <StepsSection />
         </Stack>
       </Container>
       <ToastContainer aboveTabBar={aboveTabBar} />

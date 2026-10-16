@@ -2,7 +2,7 @@ import type { Size, StatusLightVariant } from "@moonx/ui-tokens";
 import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { IconSlot } from "../internal/IconSlot";
-import { MoonMark } from "../internal/MoonMark";
+import { MoonGlyphAt } from "./MoonGlyph";
 import * as styles from "./StatusLight.css";
 
 const labelColour = {
@@ -58,7 +58,7 @@ export function StatusLight({
         <IconSlot size={size}>{saveIcons[variant]}</IconSlot>
       </span>
     ) : (
-      <MoonMark state={variant} className={styles.dot[size]} />
+      <MoonGlyphAt state={variant} size={size} />
     );
   return (
     <span

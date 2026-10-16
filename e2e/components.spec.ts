@@ -230,6 +230,73 @@ const components: [string, string, (section: Locator) => Locator][] = [
     (s) => s.getByRole("button", { name: "Resolved thread: pricing" }),
   ],
   ["Tabs", "Tabs", (s) => s.getByRole("tablist", { name: "Execution" })],
+  [
+    // A table on tablet and wider; a card per row on a phone (a grid either way).
+    "TableView",
+    "TableView",
+    (s) => s.getByRole("grid", { name: "Startup costs" }),
+  ],
+  [
+    "ListView",
+    "ListView",
+    (s) => s.getByRole("grid", { name: "Ideas regular" }),
+  ],
+  [
+    "Card",
+    "Card and CardView",
+    (s) => s.getByText("Airport kiosk XL", { exact: true }),
+  ],
+  [
+    "CardView",
+    "Card and CardView",
+    (s) => s.getByRole("grid", { name: "Competitors" }),
+  ],
+  [
+    "Tree",
+    "Tree",
+    (s) => s.getByRole("treegrid", { name: "Template regular" }),
+  ],
+  ["Meter", "Meter", (s) => s.getByText("Fact / Assumption / Unknown M")],
+  [
+    // The moon beside its caption: drawn at a size, not only present.
+    "MoonGlyph",
+    "MoonGlyph and CheckDots",
+    (s) =>
+      s
+        .getByText("assumption M", { exact: true })
+        .locator("xpath=preceding-sibling::*[local-name()='svg'][1]"),
+  ],
+  [
+    "CheckDots",
+    "MoonGlyph and CheckDots",
+    (s) => s.getByRole("img", { name: /Demand or problem signal M: Done/ }),
+  ],
+  ["Avatar", "Avatar", (s) => s.getByRole("img", { name: "Paolo Gonzaga M" })],
+  [
+    // A button that opens the popover on tablet and wider; the buttons on a phone.
+    "FauPicker",
+    "FauPicker",
+    (s) =>
+      s
+        .getByRole("button", { name: "F/A/U of Rent: Unclassified" })
+        .or(s.getByRole("group", { name: "F/A/U of Rent" })),
+  ],
+  ["MetricTile", "MetricTile", (s) => s.getByText("₱169,500+")],
+  ["RowList", "RowList", (s) => s.getByRole("list", { name: "Next steps" })],
+  [
+    "QuestionCard",
+    "QuestionCard",
+    (s) => s.getByRole("region", { name: "WHO" }),
+  ],
+  ["DiffText", "DiffText", (s) => s.getByText("in Bacolod", { exact: true })],
+  [
+    "MentionTextArea",
+    "MentionTextArea",
+    (s) => s.getByRole("textbox", { name: "Comment" }),
+  ],
+  ["Panel", "Panel", (s) => s.getByRole("button", { name: "Open comments" })],
+  ["Slide", "Slide", (s) => s.getByRole("region", { name: "Competition" })],
+  ["Steps", "Steps", (s) => s.getByRole("list", { name: "Import from AI" })],
 ];
 
 /** Shown on tablet and wider only (design-spec 4.5): a phone shows ← instead. */
@@ -928,6 +995,359 @@ test.describe("open overlays pass axe", () => {
         await page.getByRole("button", { name: "Duplicate idea" }).click();
         await settled(page.getByRole("alertdialog"));
         await check("Toast");
+      });
+    }
+  }
+});
+
+test.describe("data and moonx's own components in a real browser (design-spec 4.5)", () => {
+  test("TableView: a pressed row types in place, ← moves the caret; Escape gives the arrows back; a focused row shows its inputs", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const table = page.getByRole("grid", { name: "Startup costs" });
+    await table.getByText("₱15,000").click();
+    const amount = table.getByRole("textbox", { name: "Amount of Rent" });
+    await expect(amount).toBeFocused();
+    await expect(table.getByRole("textbox")).toHaveCount(3);
+    await page.keyboard.press("End");
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.type("9");
+    await expect(amount).toHaveValue("15,0090");
+    // Escape: the focus is on the cell again, the row still shows its inputs.
+    await page.keyboard.press("Escape");
+    const focusedColumn = () =>
+      page.evaluate(() => document.activeElement?.getAttribute("data-column"));
+    await expect.poll(focusedColumn).toBe("amount");
+    await expect(table.getByRole("textbox")).toHaveCount(3);
+    // The arrows move again: the next row shows its inputs, this one its values.
+    await page.keyboard.press("ArrowDown");
+    await expect(table.getByText("₱15,0090")).toBeVisible();
+    await expect(
+      table.getByRole("textbox", { name: "Amount of Permits / Registration" }),
+    ).toBeVisible();
+    await expect.poll(focusedColumn).toBe("amount");
+    await page.keyboard.press("Enter");
+    await expect(
+      table.getByRole("textbox", { name: "Amount of Permits / Registration" }),
+    ).toBeFocused();
+  });
+
+  test("TableView: a popover opened from an edited row keeps the row edited", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const table = page.getByRole("grid", { name: "Startup costs" });
+    await table.getByText("Packaging", { exact: true }).click();
+    await expect(table.getByRole("textbox")).toHaveCount(3);
+    await table
+      .getByRole("button", { name: "F/A/U of Packaging: Empty" })
+      .click();
+    const popover = page.getByRole("dialog", { name: "F/A/U of Packaging" });
+    await popover.getByRole("radio", { name: "Unknown" }).click();
+    await expect(popover).toBeHidden();
+    await expect(
+      table.getByRole("button", { name: "F/A/U of Packaging: Unknown" }),
+    ).toBeFocused();
+    await expect(table.getByRole("textbox")).toHaveCount(3);
+  });
+
+  test("TableView: one press on an untouched row's F/A/U opens its popover (6.3)", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const table = page.getByRole("grid", { name: "Startup costs" });
+    await table
+      .getByRole("button", { name: "F/A/U of Rent: Assumption · Medium" })
+      .click();
+    const popover = page.getByRole("dialog", { name: "F/A/U of Rent" });
+    await expect(popover).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(popover).toBeHidden();
+    await expect(
+      table.getByRole("button", { name: "F/A/U of Rent: Assumption · Medium" }),
+    ).toBeFocused();
+  });
+
+  test("TableView: from the keyboard, the F/A/U popover gives focus back to its button", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const table = page.getByRole("grid", { name: "Startup costs" });
+    await table.getByText("₱15,000").click();
+    await expect(
+      table.getByRole("textbox", { name: "Amount of Rent" }),
+    ).toBeFocused();
+    await page.keyboard.press("Tab");
+    const trigger = table.getByRole("button", {
+      name: "F/A/U of Rent: Assumption · Medium",
+    });
+    await expect(trigger).toBeFocused();
+    await page.keyboard.press("Enter");
+    const popover = page.getByRole("dialog", { name: "F/A/U of Rent" });
+    await expect(popover).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(popover).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test("TableView on a phone: a card per row, no table", async ({ page }) => {
+    await openGallery(page, "mobile");
+    const costs = page.getByRole("grid", { name: "Startup costs" });
+    await expect(costs.locator("table")).toHaveCount(0);
+    await expect(costs.getByRole("row")).toHaveCount(3);
+  });
+
+  test("CardView: the arrows move across and down the grid of cards", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const view = page.getByRole("grid", { name: "Competitors" });
+    await view.getByText("Airport kiosk", { exact: true }).click();
+    await page.keyboard.press("ArrowRight");
+    await expect(
+      view.getByRole("row", { name: "Bakeshop boxes" }),
+    ).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(
+      view.getByRole("row", { name: "Airport kiosk" }),
+    ).toBeFocused();
+  });
+
+  test("Tree: ← closes a branch, → opens it, ↓ moves into it", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const tree = page.getByRole("treegrid", { name: "Template regular" });
+    await tree.getByText("01 Customer & Problem").click();
+    await page.keyboard.press("ArrowLeft");
+    await expect(tree.getByText("WHO", { exact: true })).toBeHidden();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowDown");
+    await expect(tree.getByRole("row", { name: "WHO" })).toBeFocused();
+  });
+
+  test("FauPicker: the popover's Assumption waits for a confidence, then closes on it", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const trigger = page.getByRole("button", {
+      name: "F/A/U of Rent: Unclassified",
+    });
+    await trigger.click();
+    const popover = page.getByRole("dialog", { name: "F/A/U of Rent" });
+    await expect(popover).toBeVisible();
+    expect(await placement(popover, "desktop")).toBe("floating");
+    await popover.getByRole("radio", { name: "Assumption" }).click();
+    await popover.getByRole("radio", { name: "High" }).click();
+    await expect(popover).toBeHidden();
+    await expect(
+      page.getByRole("button", { name: "F/A/U of Rent: Assumption · High" }),
+    ).toBeFocused();
+  });
+
+  test("FauPicker: Unknown on a number asks, and clears the value", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    await page
+      .getByRole("button", { name: "F/A/U of Rent: Unclassified" })
+      .click();
+    const popover = page.getByRole("dialog", { name: "F/A/U of Rent" });
+    await popover.getByRole("radio", { name: "Unknown" }).click();
+    const alert = page.getByRole("alertdialog");
+    await expect(alert.getByRole("button", { name: "Cancel" })).toBeFocused();
+    await alert.getByRole("button", { name: "Mark Unknown" }).click();
+    await expect(page.getByRole("textbox", { name: "Rent" })).toHaveValue("");
+    await expect(
+      page.getByRole("button", { name: "F/A/U of Rent: Unknown" }),
+    ).toBeVisible();
+  });
+
+  test("MentionTextArea: the list opens under the field; ↓ and Enter write the name", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const field = page.getByRole("textbox", { name: "Comment" });
+    await field.click();
+    await page.keyboard.type("Thanks @");
+    const list = page.getByRole("listbox", { name: "Members" });
+    await expect(list).toBeVisible();
+    const [fieldBox, listBox] = await Promise.all([
+      field.boundingBox(),
+      list.boundingBox(),
+    ]);
+    expect(listBox?.y ?? 0).toBeGreaterThanOrEqual(
+      (fieldBox?.y ?? 0) + (fieldBox?.height ?? 0) - 1,
+    );
+    await page.keyboard.type("k");
+    await page.keyboard.press("Enter");
+    await expect(field).toHaveValue("Thanks @Kenji Sato ");
+    await expect(field).toBeFocused();
+    await expect(page.getByText("Mentions: Kenji Sato")).toBeVisible();
+  });
+
+  test("MentionTextArea on a phone: a tray with its own input", async ({
+    page,
+  }) => {
+    await openGallery(page, "mobile");
+    const field = page.getByRole("textbox", { name: "Comment" });
+    await field.click();
+    await page.keyboard.type("@");
+    const tray = page.getByRole("dialog", { name: "Members" });
+    expect(await placement(tray.locator("xpath=.."), "mobile")).toBe("tray");
+    await expect(
+      tray.getByRole("textbox", { name: "Search members" }),
+    ).toBeFocused();
+    await page.keyboard.type("pa");
+    await tray.getByRole("option", { name: "Paolo Gonzaga" }).click();
+    await expect(field).toHaveValue("@Paolo Gonzaga ");
+  });
+
+  for (const [width, form] of [
+    ["desktop", "column"],
+    ["tablet", "drawer"],
+    ["mobile", "tray"],
+  ] as const) {
+    test(`Panel at ${width} is a ${form}`, async ({ page }) => {
+      await openGallery(page, width);
+      const trigger = page.getByRole("button", { name: "Open comments" });
+      await trigger.click();
+      const viewport = widths[width];
+      if (form === "column") {
+        const panel = page.getByRole("complementary", { name: "Comments" });
+        await expect(panel).toBeFocused();
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+        expect((await panel.boundingBox())?.width).toBe(360);
+        await page.keyboard.press("Escape");
+        await expect(panel).toBeHidden();
+        await expect(trigger).toBeFocused();
+        return;
+      }
+      const dialog = page.getByRole("dialog", { name: "Comments" });
+      await expect(dialog).toBeVisible();
+      const sheet = dialog.locator("xpath=..");
+      await settled(sheet);
+      const box = await sheet.boundingBox();
+      if (form === "drawer") {
+        // The right edge, the window's height, 06 layout.side-panel-width wide.
+        expect(Math.round((box?.x ?? 0) + (box?.width ?? 0))).toBe(
+          viewport.width,
+        );
+        expect(Math.round(box?.height ?? 0)).toBe(viewport.height);
+        expect(Math.round(box?.width ?? 0)).toBe(360);
+      } else {
+        expect(await placement(dialog, "mobile")).toBe("tray");
+      }
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+      await expect(trigger).toBeFocused();
+    });
+  }
+
+  test("QuestionCard: pressing a quiet question opens it, its answer focused in the middle of the view", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    await page
+      .getByRole("region", { name: "QuestionCard" })
+      .getByRole("button", { name: "PROBLEM" })
+      .click();
+    const answer = page.getByRole("textbox", { name: "Answer PROBLEM" });
+    await expect(answer).toBeFocused();
+    const card = page.getByRole("region", { name: "PROBLEM", exact: true });
+    // 06 layout.focus-anchor: the card's middle at half the window's height.
+    await expect(async () => {
+      const box = await card.boundingBox();
+      const middle = (box?.y ?? 0) + (box?.height ?? 0) / 2;
+      expect(Math.abs(middle - widths.desktop.height / 2)).toBeLessThanOrEqual(
+        2,
+      );
+    }).toPass();
+  });
+
+  for (const theme of themes) {
+    test(`Slide: the PDF's sizes in shares of its width, light in the ${theme} theme`, async ({
+      page,
+    }) => {
+      await openGallery(page, "desktop");
+      await choose(page, "Theme", theme);
+      const slide = page
+        .getByRole("region", { name: "Business model" })
+        .first();
+      await slide.scrollIntoViewIfNeeded();
+      const width = (await slide.boundingBox())?.width ?? 0;
+      const scale = width / 960;
+      // 06 semantic.print: the number slide's title 32pt, its figures 48pt.
+      const heading = slide.getByRole("heading", { name: "Business model" });
+      const fontSize = await heading.evaluate((node) =>
+        Number.parseFloat(getComputedStyle(node).fontSize),
+      );
+      expect(Math.abs(fontSize - 32 * scale)).toBeLessThan(0.5);
+      const price = slide.getByText("₱450", { exact: true });
+      const figure = await price.evaluate((node) =>
+        Number.parseFloat(getComputedStyle(node).fontSize),
+      );
+      expect(Math.abs(figure - 48 * scale)).toBeLessThan(0.5);
+      // A value never breaks: one line.
+      const lineHeight = await price.evaluate((node) =>
+        Number.parseFloat(getComputedStyle(node).lineHeight),
+      );
+      expect((await price.boundingBox())?.height ?? 0).toBeLessThan(
+        lineHeight * 1.5,
+      );
+      // The page's light colour at every theme (06 semantic.print.color.page).
+      await expect(slide).toHaveCSS("background-color", "rgb(244, 245, 248)");
+      await expect(heading).toHaveCSS("color", "rgb(21, 26, 44)");
+    });
+  }
+
+  for (const width of ["mobile", "desktop"] as const) {
+    for (const theme of themes) {
+      test(`open FauPicker, mention list and Panel pass axe: ${width}, ${theme}`, async ({
+        page,
+      }) => {
+        await openGallery(page, width);
+        await choose(page, "Theme", theme);
+        const check = async (what: string) => {
+          const { violations } = await new AxeBuilder({ page })
+            .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+            .analyze();
+          expect(
+            violations.map((violation) => ({
+              what,
+              id: violation.id,
+              targets: violation.nodes.map((node) => node.target.join(" ")),
+            })),
+          ).toEqual([]);
+        };
+        if (width === "desktop") {
+          await page
+            .getByRole("button", { name: "F/A/U of Rent: Unclassified" })
+            .click();
+          await settled(frameOf(page.getByRole("dialog")));
+          await check("FauPicker");
+          await page.keyboard.press("Escape");
+          await expect(page.getByRole("dialog")).toBeHidden();
+        }
+        await page.getByRole("textbox", { name: "Comment" }).click();
+        await page.keyboard.type("@");
+        const members = page.getByRole(
+          width === "mobile" ? "dialog" : "listbox",
+          { name: "Members" },
+        );
+        await expect(members).toBeVisible();
+        // Checked once still: colours mid-animation are not the ones shown.
+        await settled(members.locator("xpath=.."));
+        await check("MentionTextArea");
+        await page.keyboard.press("Escape");
+        await page.getByRole("button", { name: "Open comments" }).click();
+        const panel = page
+          .getByRole("complementary", { name: "Comments" })
+          .or(page.getByRole("dialog", { name: "Comments" }));
+        await expect(panel).toBeVisible();
+        await settled(panel.locator("xpath=.."));
+        await check("Panel");
       });
     }
   }

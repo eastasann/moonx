@@ -52,5 +52,32 @@
   },
   "breadcrumbs": {
     "label": "Breadcrumbs"
+  },
+  "checkDots": {
+    "check": "{{name}}: {{state}}"
+  },
+  "fauPicker": {
+    "trigger": "{{name}}: {{state}}",
+    "confidence": "Confidence",
+    "unknownTitle": "Clear the value and mark it Unknown?",
+    "unknownBody": "An Unknown number has no value. To keep the value, choose Assumption with Low confidence.",
+    "markUnknown": "Mark Unknown",
+    "cancel": "Cancel"
+  },
+  "tree": {
+    "expand": "Expand",
+    "collapse": "Collapse"
+  },
+  "questionCard": {
+    "empty": "Empty",
+    "comments_one": "{{formatted}} comment",
+    "comments_other": "{{formatted}} comments"
+  },
+  "panel": {
+    "close": "Close"
+  },
+  "mentionTextArea": {
+    "members": "Members",
+    "search": "Search members"
   }
 }

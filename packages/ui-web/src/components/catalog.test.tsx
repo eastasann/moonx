@@ -16,6 +16,7 @@ import { Picker } from "./Picker";
 import { SearchField } from "./SearchField";
 import { TagGroup } from "./TagGroup";
 import { ToastContainer, ToastQueue } from "./Toast";
+import { Tree, TreeItem } from "./Tree";
 
 // React Aria's strings that the components pass in from the `components` catalog (SDD 9章
 // 「React Aria の文言」). The catalog holds React Aria's own English, so each test swaps
@@ -221,5 +222,22 @@ describe("strings from the components catalog", () => {
     );
     expect(screen.getByRole("list", { name: text })).toBeTruthy();
     expect(screen.getByRole("list", { name: "Plan path" })).toBeTruthy();
+  });
+
+  test("Tree: a branch's button, Expand or Collapse", async () => {
+    const expand = swap("tree.expand");
+    const collapse = swap("tree.collapse");
+    const user = userEvent.setup();
+    render(
+      <Tree aria-label="Template">
+        <TreeItem id="01" textValue="Section" title="Section">
+          <TreeItem id="who" textValue="WHO" title="WHO" />
+        </TreeItem>
+      </Tree>,
+    );
+    await user.click(screen.getByRole("button", { name: `${expand} Section` }));
+    expect(
+      screen.getByRole("button", { name: `${collapse} Section` }),
+    ).toBeTruthy();
   });
 });

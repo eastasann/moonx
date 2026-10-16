@@ -3,6 +3,7 @@ import { flattenTokens, loadTokens } from "../scripts/tokens";
 import {
   avatarSizes,
   breadcrumbsSizes,
+  cardSizes,
   colorSchemes,
   contextualHelpSizes,
   densities,
@@ -12,6 +13,7 @@ import {
   fauStates,
   iconSizes,
   illustratedMessageSizes,
+  moonGlyphSizes,
   popoverSizes,
   progressCircleSizes,
   scales,
@@ -83,6 +85,22 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
           `semantic.scale.medium.component.illustrated-message.${dimension}`,
         ] as const,
     ),
+    ...["padding", "gap", "title-font-size", "description-font-size"].map(
+      (dimension) =>
+        [
+          "cardSizes",
+          cardSizes,
+          `semantic.scale.medium.component.card.${dimension}`,
+        ] as const,
+    ),
+    ...["min-width", "gap"].map(
+      (dimension) =>
+        [
+          "cardSizes",
+          cardSizes,
+          `semantic.scale.medium.component.card-view.${dimension}`,
+        ] as const,
+    ),
     ["dialogWidths", dialogWidths, "semantic.layout.dialog-max-width"],
     [
       "popoverSizes",
@@ -98,6 +116,15 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
     expect([...dialogSizes]).toEqual([...dialogWidths, "fullscreen"]);
   });
 
+  test("MoonGlyph sizes are steps of status-light.dot-size, which draws its mark", () => {
+    const dotSizes = keysAfter(
+      "semantic.scale.medium.component.status-light.dot-size",
+    );
+    for (const size of moonGlyphSizes) {
+      expect(dotSizes).toContain(size);
+    }
+  });
+
   test("ContextualHelp sizes are steps of action-button, which draws its button", () => {
     for (const size of contextualHelpSizes) {
       expect(sizesWithXS).toContain(size);
@@ -111,9 +138,9 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
   });
 
   test("sizes are the keys of every component dimension sized S to XL", () => {
-    // Groups such as icon.size (XS–XL), action-button (XS–XL), avatar.size (S–M), tag,
-    // progress-circle, popover and illustrated-message (S–L) and breadcrumbs (M–L) have
-    // their own lists.
+    // Groups such as icon.size (XS–XL), action-button, card and card-view (XS–XL),
+    // avatar.size (S–M), tag, progress-circle, popover and illustrated-message (S–L) and
+    // breadcrumbs (M–L) have their own lists.
     const groups = paths
       .filter((path) =>
         /^semantic\.scale\.medium\.component\.[^.]+\.[^.]+\.(S|M|L|XL)$/.test(
@@ -130,7 +157,9 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
         !group.includes(".progress-circle.") &&
         !group.includes(".breadcrumbs.") &&
         !group.includes(".popover.") &&
-        !group.includes(".illustrated-message."),
+        !group.includes(".illustrated-message.") &&
+        !group.includes(".card.") &&
+        !group.includes(".card-view."),
     );
     expect(sized.length).toBeGreaterThan(0);
     for (const group of sized) {

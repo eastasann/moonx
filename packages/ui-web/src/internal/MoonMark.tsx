@@ -37,17 +37,24 @@ function litPath(lit: number): string {
 }
 
 /**
- * The moon of a state, sized by the caller's class (width and height from a token).
- * Decorative: the label beside it carries the state (design-spec 4.4: never shape or
- * colour alone).
+ * What a mark shows: a state, or a share lit (0 to 1) such as a section's progress. A
+ * share outside 0–1 is held to it; NaN (none of none answered) is the new moon.
+ */
+export type MoonShape = { state: MoonState } | { value: number };
+
+/**
+ * The moon of a state or a share, sized by the caller's class (width and height from a
+ * token). Decorative: the label beside it carries the state (design-spec 4.4: never shape
+ * or colour alone). The one drawing of the moons: MoonGlyph and StatusLight both use it.
  */
 export function MoonMark({
-  state,
+  shape,
   className,
 }: {
-  state: MoonState;
+  shape: MoonShape;
   className: string;
 }) {
+  const state = "state" in shape ? shape.state : null;
   if (state === "unclassified") {
     return (
       <svg
@@ -78,7 +85,18 @@ export function MoonMark({
       </svg>
     );
   }
-  const { colour, lit } = moon[state];
+  // A share is drawn in the ink of a full moon at every value: it counts how much is
+  // there, it is not a state of its own.
+  const { colour, lit } =
+    state !== null
+      ? moon[state]
+      : {
+          colour: "fact" as const,
+          lit:
+            "value" in shape && !Number.isNaN(shape.value)
+              ? Math.min(Math.max(shape.value, 0), 1)
+              : 0,
+        };
   return (
     <svg
       aria-hidden="true"

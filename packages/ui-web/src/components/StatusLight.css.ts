@@ -20,11 +20,6 @@ export const root = styleVariants(sized, (size) => ({
   fontSize: vars.scale.component.statusLight.fontSize[size],
 }));
 
-export const dot = styleVariants(sized, (size) => ({
-  width: vars.scale.component.statusLight.dotSize[size],
-  height: vars.scale.component.statusLight.dotSize[size],
-}));
-
 /**
  * Label colours (06 color.fau.*.fg): F/A/U and the check states read in their ink, the
  * unclassified one in amber; Couldn't save in the red of errors (4.4).

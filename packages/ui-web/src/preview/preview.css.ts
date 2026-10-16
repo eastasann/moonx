@@ -69,3 +69,19 @@ export const verticalRule = style({
 export const narrowBox = style({
   width: vars.space["1000"],
 });
+
+/** Where the gallery's Panel docks on a desktop: a column of a screen's height. */
+export const panelPlace = style({
+  display: "flex",
+  height: vars.layout.popoverMaxHeight,
+});
+
+/** Slides at the width of 23's slide column, and of its thumbnails. */
+export const slidePlace = style({
+  width: "100%",
+  maxWidth: vars.layout.readingColumnMax,
+});
+
+export const thumbnailPlace = style({
+  width: vars.layout.thumbnailColumnWidth,
+});

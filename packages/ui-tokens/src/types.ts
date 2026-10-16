@@ -46,6 +46,42 @@ export type TagSize = (typeof tagSizes)[number];
 export const iconSizes = ["XS", "S", "M", "L", "XL"] as const;
 export type IconSize = (typeof iconSizes)[number];
 
+/**
+ * MoonGlyph and CheckDots sizes (design-spec 4.5): the S and M steps of 06
+ * component.status-light.dot-size, which StatusLight uses at every step.
+ */
+export const moonGlyphSizes = ["S", "M"] as const;
+export type MoonGlyphSize = (typeof moonGlyphSizes)[number];
+
+/**
+ * Card and CardView sizes: Spectrum 2's steps, XS to XL (design-spec 4.5, 06
+ * component.card and card-view).
+ */
+export const cardSizes = sizesWithXS;
+export type CardSize = SizeWithXS;
+
+/**
+ * TableView's `layout` (design-spec 4.5): `auto` is a table on tablet and wider and cards
+ * on a phone; a phone shows cards whatever the layout.
+ */
+export const tableLayouts = ["auto", "table", "cards"] as const;
+export type TableLayout = (typeof tableLayouts)[number];
+
+/** DiffText's `variant`: the text before a change with what it removed, or after with what it added. */
+export const diffTextVariants = ["before", "after"] as const;
+export type DiffTextVariant = (typeof diffTextVariants)[number];
+
+/**
+ * QuestionCard's `mode` (design-spec 4.1 C): `focused` is the question being answered,
+ * `open` a question shown whole without the focus (Focus off, Viewer), `quiet` the others.
+ */
+export const questionCardModes = ["focused", "open", "quiet"] as const;
+export type QuestionCardMode = (typeof questionCardModes)[number];
+
+/** MetricTile's supplement: plain, or the amber of a warning (design-spec 4.4). */
+export const metricTileTones = ["neutral", "notice"] as const;
+export type MetricTileTone = (typeof metricTileTones)[number];
+
 /** Avatar sizes (design-spec 4.5). */
 export const avatarSizes = ["S", "M"] as const;
 export type AvatarSize = (typeof avatarSizes)[number];

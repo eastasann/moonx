@@ -56,6 +56,7 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import type { AccessPlugin } from "./access";
 import { ApiError } from "./errors";
+import { loadPitchFonts } from "./pitch-fonts";
 import { loadUserRefs } from "./user-refs";
 import { invalid } from "./validation-writes";
 
@@ -493,6 +494,8 @@ export function adminTemplateRoutes({
   db,
   now,
 }: AdminTemplateRoutesOptions) {
+  // AD6 sets a plan template's Pitch Deck in the PDF's fonts (design-spec 6.14).
+  const measured = loadPitchFonts();
   return new Elysia()
     .use(access)
     .get("/api/v1/admin/templates", () => loadTemplateList(db), {
@@ -1079,7 +1082,9 @@ export function adminTemplateRoutes({
     .post(
       "/api/v1/admin/template-versions/:versionId/validate",
       ({ params }) =>
-        answering(() => validateTemplateVersion(db, params.versionId)),
+        answering(async () =>
+          validateTemplateVersion(db, params.versionId, await measured),
+        ),
       {
         operator: true,
         params: templateVersionParamsSchema,
@@ -1094,8 +1099,13 @@ export function adminTemplateRoutes({
     .post(
       "/api/v1/admin/template-versions/:versionId/publish",
       async ({ params, caller }) => {
-        const published = await answering(() =>
-          publishTemplateVersion(db, params.versionId, caller.id),
+        const published = await answering(async () =>
+          publishTemplateVersion(
+            db,
+            params.versionId,
+            caller.id,
+            await measured,
+          ),
         );
         return {
           versionNumber: published.versionNumber,

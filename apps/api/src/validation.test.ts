@@ -26,8 +26,11 @@ import {
 } from "@moonx/schemas";
 import { and, asc, eq } from "drizzle-orm";
 import { templateRef } from "./idea-views";
+import { loadPitchFonts } from "./pitch-fonts";
 import { buildTestApp, connectTestDatabase, uniqueIp } from "./test-app";
 import { apiRequest, signIn, testFixtures } from "./test-fixtures";
+
+const measure = await loadPitchFonts();
 
 const database = connectTestDatabase();
 const { db } = database;
@@ -310,7 +313,7 @@ describe("V1 GET /api/v1/ideas/{ideaId}/validation", () => {
     };
     const imported = await importTemplateFile(db, "self_analysis", file);
     try {
-      await publishTemplateVersion(db, imported.versionId, null);
+      await publishTemplateVersion(db, imported.versionId, null, measure);
       expect(await templateRef(db, v1.id)).toEqual({
         versionId: v1.id,
         versionNumber: 1,

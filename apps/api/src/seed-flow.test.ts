@@ -52,6 +52,7 @@ import {
 } from "@moonx/schemas";
 import { and, eq } from "drizzle-orm";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { loadPitchFonts } from "./pitch-fonts";
 import { buildTestApp, uniqueIp } from "./test-app";
 import { apiRequest, cookiesOf } from "./test-fixtures";
 
@@ -73,7 +74,7 @@ const { app } = buildTestApp(database);
 
 beforeAll(async () => {
   await prepareTestDatabase(url);
-  await seedDatabase(database.db);
+  await seedDatabase(database.db, { measure: await loadPitchFonts() });
 }, 60_000);
 afterAll(() => database.close());
 
@@ -864,7 +865,7 @@ describe("templates and the operator's screens on the demo data", () => {
     });
   });
 
-  test("AD1 lists the demo templates, and v3 is a draft that passes the checks", async () => {
+  test("AD1 lists the demo templates, v3 is a draft that passes the checks, and the plan template's Pitch Deck fits", async () => {
     const response = await call("GET", "/api/v1/admin/templates", ADMIN);
     expect(response.status).toBe(200);
     const { items } = adminTemplateListSchema.parse(await response.json());
@@ -910,6 +911,20 @@ describe("templates and the operator's screens on the demo data", () => {
       ).json(),
     );
     expect(check).toEqual({ errors: [], warnings: [] });
+
+    // The seed published it through AD6's checks, pitch_deck_overflow among them.
+    const plan = items[2]?.versions[0]?.id;
+    expect(
+      templateCheckSchema.parse(
+        await (
+          await call(
+            "POST",
+            `/api/v1/admin/template-versions/${plan}/validate`,
+            ADMIN,
+          )
+        ).json(),
+      ),
+    ).toEqual({ errors: [], warnings: [] });
   });
 
   test("AD7 lists the demo people, BCDX and its invitations", async () => {

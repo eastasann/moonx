@@ -1,3 +1,4 @@
+import type { MeasureText } from "@moonx/domain";
 import { and, eq, getTableName, is, sql } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import type { Database, DatabaseTransaction } from "../client";
@@ -50,6 +51,8 @@ const HISTORY_ROWS_PER_INSERT = 500;
 export interface SeedOptions {
   /** The moment every relative time counts from. Defaults to now. */
   now?: Date;
+  /** The PDF's fonts, for the check that publishes the plan template (AD6). */
+  measure: MeasureText;
 }
 
 /**
@@ -60,7 +63,7 @@ export interface SeedOptions {
  */
 export async function seedDatabase(
   db: Database,
-  { now = new Date() }: SeedOptions = {},
+  { now = new Date(), measure }: SeedOptions,
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await truncateAll(tx);
@@ -68,7 +71,7 @@ export async function seedDatabase(
     const ctx: SeedContext = {
       tx,
       clock,
-      templates: await seedTemplates(tx, clock),
+      templates: await seedTemplates(tx, clock, measure),
       history: new HistoryLog(),
       activity: new ActivityLog(),
     };

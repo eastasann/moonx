@@ -144,7 +144,7 @@ db-migrate:
 	cd packages/db && DATABASE_URL="$${DATABASE_URL_DIRECT:-$$DATABASE_URL}" $(BUNX) drizzle-kit migrate
 
 db-seed:
-	bun packages/db/src/seed.ts
+	bun apps/api/scripts/seed.ts
 
 # Dropping the Docker volume can only ever reach the local database, whatever
 # DATABASE_URL says. The init script recreates moonx_test with it.

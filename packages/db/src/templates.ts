@@ -1,4 +1,9 @@
 import {
+  type MeasureText,
+  type PitchSection,
+  pitchTemplateOverflows,
+} from "@moonx/domain";
+import {
   type AnswerType,
   type ErrorCode,
   type ErrorDetail,
@@ -11,6 +16,7 @@ import {
   type TemplateKind,
   templateFileSchema,
 } from "@moonx/schemas";
+import { print } from "@moonx/ui-tokens/print";
 import { and, asc, desc, eq, lt } from "drizzle-orm";
 import type { PgColumn, PgInsertValue, PgTable } from "drizzle-orm/pg-core";
 import type { Database, DatabaseTransaction } from "./client";
@@ -27,6 +33,10 @@ import {
 // Importing a template file (AD10), checking a version before it is published and
 // publishing it (AD6), as SDD 5.13 specifies them. The operator API and the seed both
 // call these, so a template reaches every environment through the same checks.
+//
+// The check of a plan template sets its Pitch Deck in the PDF's fonts, which only the API
+// loads (ADR-012). So the check takes their measure as an argument, which no caller can
+// leave out: the seed gets the API's from `make db-seed` (apps/api/scripts/seed.ts).
 //
 // Locks the operator API must take as well: an edit of a draft (AD3 to AD5) locks the
 // version row, as publishing does, so a publish never checks content that changes before
@@ -268,7 +278,8 @@ export type TemplateProblemCode =
   | "answer_type_mismatch"
   | "options_mismatch"
   | "unknown_condition_key"
-  | "copy_from_mismatch";
+  | "copy_from_mismatch"
+  | "pitch_deck_overflow";
 
 /** The AD6 validate response. */
 export interface TemplateCheck {
@@ -292,6 +303,8 @@ export interface TemplateContent {
     questions: {
       id: string;
       questionKey: string;
+      /** The name a Pitch Deck bullet shows it by. */
+      title: string;
       answerType: AnswerType;
       options: unknown;
       displayCondition: unknown;
@@ -384,8 +397,47 @@ const conditionKeys = (condition: unknown) =>
     ? Object.keys(condition)
     : [];
 
-/** The checks of AD6 validate on a version's content (SDD 5.13). */
-export function checkTemplateContent(content: TemplateContent): TemplateCheck {
+const DECK_NAMES = { one: "one-minute", five: "five-minute" } as const;
+
+/**
+ * The slides of a plan template's decks that the most material runs past the bottom of
+ * (`pitch_deck_overflow`, design-spec 6.14), each at the section its Edit source goes to.
+ */
+const pitchDeckErrors = (
+  content: TemplateContent,
+  measure: MeasureText,
+): TemplateCheck["errors"] => {
+  const sections: PitchSection[] = content.sections.map((section) => ({
+    key: section.key,
+    questions: section.questions.map((question) => ({
+      key: question.questionKey,
+      title: question.title,
+      answerType: question.answerType,
+    })),
+  }));
+  return pitchTemplateOverflows(sections, { print, measure }).map(
+    (overflow) => ({
+      code: "pitch_deck_overflow",
+      message: `The ${overflow.slide} slide of the ${DECK_NAMES[overflow.variant]} deck runs past the bottom of its body with the most material`,
+      // Plan items are numbered by their section keys, as 21 opens them.
+      nodeId:
+        content.sections.find(
+          (section) => Number(section.key) === overflow.itemNo,
+        )?.id ?? null,
+    }),
+  );
+};
+
+/**
+ * The checks of AD6 validate on a version's content (SDD 5.13).
+ *
+ * @param measure The width of a text in the PDF's fonts, to set a plan template's Pitch
+ *   Deck as the PDF does.
+ */
+export function checkTemplateContent(
+  content: TemplateContent,
+  measure: MeasureText,
+): TemplateCheck {
   const errors: TemplateCheck["errors"] = [];
   const questions = content.sections.flatMap((section) =>
     section.questions.map((question) => ({ section, question })),
@@ -464,6 +516,9 @@ export function checkTemplateContent(content: TemplateContent): TemplateCheck {
     }
   }
 
+  if (content.kind === "business_plan")
+    errors.push(...pitchDeckErrors(content, measure));
+
   const removed = (content.previousQuestionKeys ?? []).filter(
     (key) => !keys.has(key),
   );
@@ -526,6 +581,7 @@ const checkStoredVersion = async (
   db: Executor,
   versionId: string,
   version: Awaited<ReturnType<typeof loadVersion>>,
+  measure: MeasureText,
 ) => {
   const sections = await db
     .select({
@@ -541,6 +597,7 @@ const checkStoredVersion = async (
       id: templateQuestions.id,
       sectionId: templateQuestions.templateSectionId,
       questionKey: templateQuestions.questionKey,
+      title: templateQuestions.title,
       answerType: templateQuestions.answerType,
       options: templateQuestions.options,
       displayCondition: templateQuestions.displayCondition,
@@ -560,30 +617,40 @@ const checkStoredVersion = async (
     )
     .orderBy(desc(templateVersions.versionNumber))
     .limit(1);
-  return checkTemplateContent({
-    kind: version.kind,
-    sections: sections.map((section) => ({
-      ...section,
-      questions: questions.filter(
-        (question) => question.sectionId === section.id,
-      ),
-    })),
-    previousQuestionKeys:
-      previous === undefined ? null : await questionKeysOf(db, previous.id),
-  });
+  return checkTemplateContent(
+    {
+      kind: version.kind,
+      sections: sections.map((section) => ({
+        ...section,
+        questions: questions.filter(
+          (question) => question.sectionId === section.id,
+        ),
+      })),
+      previousQuestionKeys:
+        previous === undefined ? null : await questionKeysOf(db, previous.id),
+    },
+    measure,
+  );
 };
 
 /**
  * Checks a version before it is published (AD6 validate). Writes nothing, so it also runs
  * on a published version.
  *
+ * @param measure As {@link checkTemplateContent} takes it.
  * @throws {TemplateError} NOT_FOUND when there is no such version.
  */
 export async function validateTemplateVersion(
   db: Executor,
   versionId: string,
+  measure: MeasureText,
 ): Promise<TemplateCheck> {
-  return checkStoredVersion(db, versionId, await loadVersion(db, versionId));
+  return checkStoredVersion(
+    db,
+    versionId,
+    await loadVersion(db, versionId),
+    measure,
+  );
 }
 
 /**
@@ -591,6 +658,7 @@ export async function validateTemplateVersion(
  * (design-spec 6.0.7).
  *
  * @param publishedById The operator who publishes; null when no user does (the seed).
+ * @param measure As {@link checkTemplateContent} takes it.
  * @throws {TemplateError} NOT_FOUND when there is no such version; PUBLISHED_READ_ONLY
  *   when it is already published; TEMPLATE_INVALID when AD6 validate finds errors.
  */
@@ -598,6 +666,7 @@ export async function publishTemplateVersion(
   db: Executor,
   versionId: string,
   publishedById: string | null,
+  measure: MeasureText,
 ): Promise<{ versionNumber: number; publishedAt: Date }> {
   return db.transaction(async (tx) => {
     // Locked so a concurrent publish of the same draft waits, then sees it published.
@@ -607,7 +676,7 @@ export async function publishTemplateVersion(
         "PUBLISHED_READ_ONLY",
         `Template version ${versionId} is already published`,
       );
-    const check = await checkStoredVersion(tx, versionId, version);
+    const check = await checkStoredVersion(tx, versionId, version, measure);
     if (check.errors.length > 0)
       throw new TemplateError(
         "TEMPLATE_INVALID",

@@ -337,6 +337,7 @@ export const templateCheckSchema = z.object({
         "options_mismatch",
         "unknown_condition_key",
         "copy_from_mismatch",
+        "pitch_deck_overflow",
       ]),
       message: z.string(),
       /** The section or question 27 moves to; null for the version as a whole. */

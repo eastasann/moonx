@@ -31,6 +31,7 @@ import {
 } from "@moonx/schemas";
 import { SQL } from "bun";
 import { and, asc, eq } from "drizzle-orm";
+import { loadPitchFonts } from "./pitch-fonts";
 import { buildTestApp, uniqueIp } from "./test-app";
 import {
   apiRequest,
@@ -38,6 +39,8 @@ import {
   teamWithNewIdea,
   testFixtures,
 } from "./test-fixtures";
+
+const measure = await loadPitchFonts();
 
 // T1 and T2 (SDD 5.12, design-spec 6.0.7), and H3 undoing a migration. A database of its
 // own: the tests publish newer template versions, which every idea, plan and
@@ -91,7 +94,7 @@ const withoutSignage = (file: TemplateFile): TemplateFile => ({
 
 const publish = async (kind: TemplateFile["kind"], file: TemplateFile) => {
   const draft = await importTemplateFile(db, kind, file);
-  await publishTemplateVersion(db, draft.versionId, null);
+  await publishTemplateVersion(db, draft.versionId, null, measure);
   return draft.versionId;
 };
 
@@ -803,9 +806,12 @@ describe("AD1 GET /api/v1/admin/templates", () => {
 // The validation draft published as v3, once whichever test asks first.
 let v3: Promise<void> | undefined;
 const publishV3 = () => {
-  v3 ??= publishTemplateVersion(db, versions.validationDraft, null).then(
-    () => {},
-  );
+  v3 ??= publishTemplateVersion(
+    db,
+    versions.validationDraft,
+    null,
+    measure,
+  ).then(() => {});
   return v3;
 };
 

@@ -4,6 +4,7 @@ export * from "./economics";
 export * from "./fau";
 export * from "./pitch";
 export * from "./pitch-fit";
+export * from "./pitch-template";
 export * from "./plan";
 export * from "./self-analysis";
 export * from "./stage";

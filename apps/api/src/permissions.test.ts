@@ -25,6 +25,7 @@ import type { Role, TemplateFile } from "@moonx/schemas";
 import { eq } from "drizzle-orm";
 import { type AccessKind, accessDeclarations } from "./access";
 import { newAvatarName } from "./avatars";
+import { loadPitchFonts } from "./pitch-fonts";
 import {
   buildTestApp,
   connectTestDatabase,
@@ -39,6 +40,8 @@ import {
   testPng,
   uniqueEmail,
 } from "./test-fixtures";
+
+const measure = await loadPitchFonts();
 
 // The table-driven test of SDD 7.1 (10章): each endpoint, called by each kind of caller,
 // against the status the table allows or refuses with. A route without a row fails the
@@ -366,7 +369,7 @@ async function publishNewer(
           ),
         ).json();
   const draft = await importTemplateFile(db, kind, file);
-  await publishTemplateVersion(db, draft.versionId, null);
+  await publishTemplateVersion(db, draft.versionId, null, measure);
   return draft.versionId;
 }
 

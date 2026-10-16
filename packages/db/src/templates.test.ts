@@ -8,6 +8,7 @@ import {
 } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { MeasureText } from "@moonx/domain";
 import {
   type AnswerType,
   PLAN_LIST_COLUMNS,
@@ -67,6 +68,11 @@ afterAll(async () => {
     await sql.close();
   }
 });
+
+// The API passes the PDF's fonts (ADR-012), which this package does not load. Here no text
+// wraps, so a plan template's deck fits unless its sources are too many lines even so;
+// apps/api tests the check in the PDF's fonts.
+const measure: MeasureText = () => 0;
 
 const BCDX = join(import.meta.dir, "../../../data/templates/bcdx");
 /** A BCDX file as the seed reads it: raw JSON, which the import checks. */
@@ -306,7 +312,9 @@ describe("the BCDX template files", () => {
         kind,
         versionNumber: 1,
       });
-      expect(await validateTemplateVersion(db, imported.versionId)).toEqual({
+      expect(
+        await validateTemplateVersion(db, imported.versionId, measure),
+      ).toEqual({
         errors: [],
         warnings: [],
       });
@@ -314,6 +322,7 @@ describe("the BCDX template files", () => {
         db,
         imported.versionId,
         null,
+        measure,
       );
       expect(published.versionNumber).toBe(1);
       expect(published.publishedAt).toBeInstanceOf(Date);
@@ -361,7 +370,7 @@ describe("importTemplateFile", () => {
   test("numbers a new draft after the published versions, from the file only", async () => {
     const first = sampleFile("self_analysis");
     const v1 = await importTemplateFile(db, "self_analysis", first);
-    await publishTemplateVersion(db, v1.versionId, null);
+    await publishTemplateVersion(db, v1.versionId, null, measure);
     const second = {
       ...first,
       name: "Renamed",
@@ -394,13 +403,14 @@ describe("importTemplateFile", () => {
       .from(templateQuestions)
       .where(eq(templateQuestions.templateVersionId, v2.versionId));
     expect(questions).toEqual([{ key: "SA.WHY.1" }]);
-    expect(await validateTemplateVersion(db, v2.versionId)).toEqual({
+    expect(await validateTemplateVersion(db, v2.versionId, measure)).toEqual({
       errors: [],
       warnings: [{ code: "removed_keys", keys: ["SA.WHY.2"] }],
     });
     // Warnings do not block publishing.
     expect(
-      (await publishTemplateVersion(db, v2.versionId, null)).versionNumber,
+      (await publishTemplateVersion(db, v2.versionId, null, measure))
+        .versionNumber,
     ).toBe(2);
   });
 
@@ -432,7 +442,7 @@ describe("importTemplateFile", () => {
   test("lets only one of two concurrent imports make the next draft", async () => {
     const file = sampleFile("validation");
     const v1 = await importTemplateFile(db, "validation", file);
-    await publishTemplateVersion(db, v1.versionId, null);
+    await publishTemplateVersion(db, v1.versionId, null, measure);
     const results = await Promise.allSettled([
       importTemplateFile(db, "validation", file),
       importTemplateFile(db, "validation", file),
@@ -556,7 +566,7 @@ describe("validateTemplateVersion and publishTemplateVersion", () => {
       .update(templateQuestions)
       .set({ displayCondition: { "V.02.OCEAN": ["Red"] } })
       .where(eq(templateQuestions.questionKey, "V.01.WHO"));
-    const check = await validateTemplateVersion(db, versionId);
+    const check = await validateTemplateVersion(db, versionId, measure);
     expect(check.errors.map((error) => error.code)).toEqual([
       "unknown_condition_key",
     ]);
@@ -567,7 +577,7 @@ describe("validateTemplateVersion and publishTemplateVersion", () => {
     expect(check.errors[0]?.nodeId).toBe(who?.id ?? "");
 
     const error = await templateError(() =>
-      publishTemplateVersion(db, versionId, null),
+      publishTemplateVersion(db, versionId, null, measure),
     );
     expect(error.code).toBe("TEMPLATE_INVALID");
     expect(await versionRows()).toEqual([
@@ -580,18 +590,63 @@ describe("validateTemplateVersion and publishTemplateVersion", () => {
     ]);
   });
 
+  test("block publishing a plan template whose Pitch Deck runs past a slide's bottom", async () => {
+    const file = bcdxFile("plan.json");
+    const added = Array.from({ length: 20 }, (_, index) => ({
+      key: `P.20.${index + 12}`,
+      title: `Added ${index}`,
+      prompt: "Anything else?",
+      example: null,
+      hint: null,
+      answerType: "long_text" as const,
+      options: null,
+      displayCondition: null,
+      hasFau: false,
+      copyFrom: null,
+      reference: null,
+    }));
+    const { versionId } = await importTemplateFile(db, "business_plan", {
+      ...file,
+      sections: file.sections.map((section) =>
+        section.key === "20"
+          ? { ...section, questions: [...section.questions, ...added] }
+          : section,
+      ),
+    });
+    const [financialPlan] = await db
+      .select({ id: templateSections.id })
+      .from(templateSections)
+      .where(eq(templateSections.key, "20"));
+    expect(await validateTemplateVersion(db, versionId, measure)).toEqual({
+      errors: [
+        {
+          code: "pitch_deck_overflow",
+          message: expect.stringContaining("economics slide"),
+          nodeId: financialPlan?.id ?? "",
+        },
+      ],
+      warnings: [],
+    });
+    const error = await templateError(() =>
+      publishTemplateVersion(db, versionId, null, measure),
+    );
+    expect(error.code).toBe("TEMPLATE_INVALID");
+    expect(error.message).toContain("pitch_deck_overflow");
+    expect((await versionRows()).map((row) => row.status)).toEqual(["draft"]);
+  });
+
   test("refuse a published version with PUBLISHED_READ_ONLY, but still validate it", async () => {
     const { versionId } = await importTemplateFile(
       db,
       "business_plan",
       sampleFile("business_plan"),
     );
-    await publishTemplateVersion(db, versionId, null);
+    await publishTemplateVersion(db, versionId, null, measure);
     const error = await templateError(() =>
-      publishTemplateVersion(db, versionId, null),
+      publishTemplateVersion(db, versionId, null, measure),
     );
     expect(error.code).toBe("PUBLISHED_READ_ONLY");
-    expect(await validateTemplateVersion(db, versionId)).toEqual({
+    expect(await validateTemplateVersion(db, versionId, measure)).toEqual({
       errors: [],
       warnings: [],
     });
@@ -600,8 +655,8 @@ describe("validateTemplateVersion and publishTemplateVersion", () => {
   test("answer an unknown version with NOT_FOUND", async () => {
     for (const missing of ["00000000-0000-4000-8000-000000000000", "v1"]) {
       for (const run of [
-        () => validateTemplateVersion(db, missing),
-        () => publishTemplateVersion(db, missing, null),
+        () => validateTemplateVersion(db, missing, measure),
+        () => publishTemplateVersion(db, missing, null, measure),
       ]) {
         expect((await templateError(run)).code).toBe("NOT_FOUND");
       }
@@ -614,6 +669,7 @@ describe("checkTemplateContent", () => {
   const q = (questionKey: string, extra: Partial<Question> = {}): Question => ({
     id: `q:${questionKey}`,
     questionKey,
+    title: "TITLE",
     answerType: "long_text",
     options: null,
     displayCondition: null,
@@ -625,7 +681,7 @@ describe("checkTemplateContent", () => {
     previousQuestionKeys: string[] | null = null,
   ): TemplateContent => ({ kind, sections, previousQuestionKeys });
   const codes = (input: TemplateContent) =>
-    checkTemplateContent(input).errors.map((error) => [
+    checkTemplateContent(input, measure).errors.map((error) => [
       error.code,
       error.nodeId,
     ]);
@@ -649,6 +705,7 @@ describe("checkTemplateContent", () => {
             ],
           },
         ]),
+        measure,
       ),
     ).toEqual({ errors: [], warnings: [] });
   });
@@ -854,6 +911,43 @@ describe("checkTemplateContent", () => {
       expect(check(extra)).toEqual([["copy_from_mismatch", "q:P.01.1"]]);
   });
 
+  test("pitch_deck_overflow: a plan whose deck the most material runs past a slide's bottom", () => {
+    // Notes under the five-minute Economics figures and table: §20's text sub-items.
+    const financialPlan = (texts: number) =>
+      content("business_plan", [
+        {
+          id: "s20",
+          key: "20",
+          part: "b",
+          questions: Array.from({ length: texts }, (_, index) =>
+            q(`P.20.${index + 1}`),
+          ),
+        },
+      ]);
+    expect(codes(financialPlan(3))).toEqual([]);
+    expect(codes(financialPlan(20))).toEqual([["pitch_deck_overflow", "s20"]]);
+    expect(
+      checkTemplateContent(financialPlan(20), measure).errors[0]?.message,
+    ).toBe(
+      "The economics slide of the five-minute deck runs past the bottom of its body with the most material",
+    );
+    // Other kinds have no deck.
+    expect(
+      codes(
+        content("validation", [
+          {
+            id: "s1",
+            key: "10",
+            part: null,
+            questions: Array.from({ length: 20 }, (_, index) =>
+              q(`V.10.Q${index}`),
+            ),
+          },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
   test("removed_keys warns about the previous version's IDs only", () => {
     const sections = [
       {
@@ -866,11 +960,14 @@ describe("checkTemplateContent", () => {
     expect(
       checkTemplateContent(
         content("self_analysis", sections, ["SA.WHY.1", "SA.WHY.2"]),
+        measure,
       ).warnings,
     ).toEqual([{ code: "removed_keys", keys: ["SA.WHY.2"] }]);
     expect(
-      checkTemplateContent(content("self_analysis", sections, ["SA.WHY.1"]))
-        .warnings,
+      checkTemplateContent(
+        content("self_analysis", sections, ["SA.WHY.1"]),
+        measure,
+      ).warnings,
     ).toEqual([]);
   });
 });

@@ -745,24 +745,24 @@ describe("the settings only one kind of template has", () => {
   });
 });
 
-describe("AD6 and the answer types of each kind", () => {
-  /** The draft of `kind`, imported from the BCDX file when there is none. */
-  const draftOf = async (kind: "validation" | "business_plan") => {
-    const list = adminTemplateListSchema.parse(
-      await (await call("GET", "/templates")).json(),
-    );
-    const draft = list.items
-      .find((template) => template.kind === kind)
-      ?.versions.find((version) => version.status === "draft");
-    if (draft !== undefined) return draft.id;
-    const file = bcdxFile(
-      kind === "validation" ? "validation.json" : "plan.json",
-    );
-    return templateImportResultSchema.parse(
-      await (await importFile(kind, file)).json(),
-    ).versionId;
-  };
+/** The draft of `kind`, imported from the BCDX file when there is none. */
+const draftOf = async (kind: "validation" | "business_plan") => {
+  const list = adminTemplateListSchema.parse(
+    await (await call("GET", "/templates")).json(),
+  );
+  const draft = list.items
+    .find((template) => template.kind === kind)
+    ?.versions.find((version) => version.status === "draft");
+  if (draft !== undefined) return draft.id;
+  const file = bcdxFile(
+    kind === "validation" ? "validation.json" : "plan.json",
+  );
+  return templateImportResultSchema.parse(
+    await (await importFile(kind, file)).json(),
+  ).versionId;
+};
 
+describe("AD6 and the answer types of each kind", () => {
   test("an amount with a reason blocks publishing a validation or a plan", async () => {
     for (const kind of ["validation", "business_plan"] as const) {
       const id = await draftOf(kind);
@@ -813,6 +813,79 @@ describe("AD6 and the answer types of each kind", () => {
       expect(after.errors).toEqual([]);
     }
   });
+});
+
+describe("AD6 and the Pitch Deck of a plan template (design-spec 6.14)", () => {
+  test("a slide the most material runs past the bottom of blocks publishing, once in each deck", async () => {
+    const id = await draftOf("business_plan");
+    const detail = await detailOf(
+      await call("GET", `/template-versions/${id}`),
+    );
+    const sectionOf = (key: string) => {
+      const section = detail.sections.find(
+        (candidate) => candidate.key === key,
+      );
+      if (section === undefined) throw new Error(`No section ${key}`);
+      return section;
+    };
+    const validate = async () =>
+      templateCheckSchema.parse(
+        await (await call("POST", `/template-versions/${id}/validate`)).json(),
+      ).errors;
+    const refused = async () => {
+      const publish = await call("POST", `/template-versions/${id}/publish`);
+      expect(publish.status).toBe(422);
+      expect((await errorOf(publish)).code).toBe("TEMPLATE_INVALID");
+    };
+    const overflow = (nodeId: string) => ({
+      code: "pitch_deck_overflow" as const,
+      message: expect.any(String),
+      nodeId,
+    });
+    expect(await validate()).toEqual([]);
+
+    // One more note under the five-minute Economics: past its bottom in Japanese.
+    const financialPlan = sectionOf("20");
+    const added = questionOf(
+      await detailOf(
+        await call("POST", `/template-sections/${financialPlan.id}/questions`, {
+          key: "P.20.12",
+          title: "Reserve top-up",
+          prompt: "How will you top up the reserve?",
+          answerType: "long_text",
+        }),
+        201,
+      ),
+      "P.20.12",
+    );
+    expect(await validate()).toEqual([overflow(financialPlan.id)]);
+    await refused();
+    expect(
+      (await call("DELETE", `/template-questions/${added.id}`)).status,
+    ).toBe(204);
+
+    // §4's titles at 197 characters, near the 200 a title may take: the Problem slides of
+    // both decks.
+    const problem = sectionOf("04");
+    const rename = async (title: (question: { title: string }) => string) => {
+      for (const question of problem.questions) {
+        const response = await call(
+          "PATCH",
+          `/template-questions/${question.id}`,
+          { title: title(question) },
+        );
+        expect(response.status).toBe(200);
+      }
+    };
+    await rename(() => "MMMMM ".repeat(33).trim());
+    expect(await validate()).toEqual([
+      overflow(problem.id),
+      overflow(problem.id),
+    ]);
+    await refused();
+    await rename((question) => question.title);
+    expect(await validate()).toEqual([]);
+  }, 30_000);
 });
 
 describe("what does not exist", () => {

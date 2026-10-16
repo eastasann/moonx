@@ -852,28 +852,32 @@ export interface FitOptions {
 
 const copy = (slide: PitchSlide): PitchSlide => structuredClone(slide);
 
-/**
- * Fits one slide (design-spec 6.14): the first shrink level at which it fits; or, at the
- * smallest sizes, the texts cut from the one taking the most lines (the later one on a
- * tie) until it fits, each keeping at least one line and its whole label.
- */
-export function fitPitchSlide(
-  slide: PitchSlide,
-  given: FitOptions,
-): PitchSlide {
+/** A fitted slide, and whether it still runs past the bottom of its body. */
+interface Fitted {
+  slide: PitchSlide;
+  cutAtBottom: boolean;
+}
+
+function fit(slide: PitchSlide, given: FitOptions): Fitted {
   const options = { ...given, measure: remembering(given.measure) };
   const { bodyHeight } = pitchFrame(options.print);
   const last = maxShrink(slide, options.print);
   for (let shrink = 0; shrink < last; shrink += 1) {
     const tried = layout(copy(slide), shrink, options);
     if (tried.figuresFit && tried.height() <= bodyHeight) {
-      return { ...slide, shrink, overflow: false };
+      return {
+        slide: { ...slide, shrink, overflow: false },
+        cutAtBottom: false,
+      };
     }
   }
   const fitted = copy(slide);
   const at = layout(fitted, last, options);
   if (at.figuresFit && at.height() <= bodyHeight)
-    return { ...fitted, shrink: last, overflow: false };
+    return {
+      slide: { ...fitted, shrink: last, overflow: false },
+      cutAtBottom: false,
+    };
   while (at.height() > bodyHeight) {
     let longest: Block | undefined;
     for (const made of at.blocks) {
@@ -889,7 +893,8 @@ export function fitPitchSlide(
   }
   // Values that break, or still too tall once every text is down to a line: shown as
   // cut all the same.
-  let overflow = !at.figuresFit || at.height() > bodyHeight;
+  const cutAtBottom = at.height() > bodyHeight;
+  let overflow = !at.figuresFit || cutAtBottom;
   for (const made of at.blocks) {
     if (made.cap < made.lines) {
       made.apply(
@@ -898,8 +903,28 @@ export function fitPitchSlide(
       overflow = true;
     }
   }
-  return { ...fitted, shrink: last, overflow };
+  return { slide: { ...fitted, shrink: last, overflow }, cutAtBottom };
 }
+
+/**
+ * Fits one slide (design-spec 6.14): the first shrink level at which it fits; or, at the
+ * smallest sizes, the texts cut from the one taking the most lines (the later one on a
+ * tie) until it fits, each keeping at least one line and its whole label.
+ */
+export const fitPitchSlide = (
+  slide: PitchSlide,
+  options: FitOptions,
+): PitchSlide => fit(slide, options).slide;
+
+/**
+ * Whether `slide`, fitted as {@link fitPitchSlide} fits it, still runs past the bottom of
+ * its body: too tall at the smallest sizes with every text cut to its fewest lines. Cut
+ * texts alone (`overflow`) do not count.
+ */
+export const pitchSlideCutAtBottom = (
+  slide: PitchSlide,
+  options: FitOptions,
+): boolean => fit(slide, options).cutAtBottom;
 
 /**
  * `slide` with {@link breakLongWords} applied to each text in the box and font the fit

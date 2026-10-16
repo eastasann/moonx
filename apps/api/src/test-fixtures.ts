@@ -27,6 +27,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { lockActiveCaller } from "./lock";
+import { loadPitchFonts } from "./pitch-fonts";
 import { testConfig, uniqueIp } from "./test-app";
 
 // Rows the API's tests build on, made straight in the database. Every row gets fresh
@@ -222,7 +223,12 @@ export function testFixtures(db: Database) {
       kind,
       await Bun.file(BCDX_FILES[kind]).json(),
     );
-    await publishTemplateVersion(db, imported.versionId, null);
+    await publishTemplateVersion(
+      db,
+      imported.versionId,
+      null,
+      await loadPitchFonts(),
+    );
     return required(await published(), `${kind} template version`);
   }
 

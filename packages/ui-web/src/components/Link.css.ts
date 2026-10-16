@@ -33,6 +33,7 @@ export const link = recipe({
         display: "inline-flex",
         alignItems: "center",
         minHeight: atLeastTarget("0px"),
+        minWidth: vars.scale.component.targetMin,
       },
       // Inside running text: wraps with it, so it takes the inline exception of WCAG
       // 2.5.5 / 2.5.8 and inherits the text's font.

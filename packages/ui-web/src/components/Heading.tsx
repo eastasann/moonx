@@ -1,6 +1,7 @@
 import type { HeadingVariant } from "@moonx/ui-tokens";
 import type { ReactNode } from "react";
 import { Heading as AriaHeading } from "react-aria-components";
+import { SkeletonText } from "./Skeleton";
 import * as styles from "./typography.css";
 
 export interface HeadingProps {
@@ -17,7 +18,10 @@ export interface HeadingProps {
   children: ReactNode;
 }
 
-/** A heading in the body face, set heavier and tighter (design-spec 4.4). */
+/**
+ * A heading in the body face, set heavier and tighter (design-spec 4.4); inside a loading
+ * `Skeleton`, its bar.
+ */
 export function Heading({ level, variant, children, ...props }: HeadingProps) {
   return (
     <AriaHeading
@@ -25,7 +29,7 @@ export function Heading({ level, variant, children, ...props }: HeadingProps) {
       level={level}
       className={styles.heading({ style: variant ?? level })}
     >
-      {children}
+      <SkeletonText>{children}</SkeletonText>
     </AriaHeading>
   );
 }

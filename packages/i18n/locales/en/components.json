@@ -25,5 +25,32 @@
   },
   "tagGroup": {
     "remove": "Remove"
+  },
+  "dialog": {
+    "close": "Close"
+  },
+  "actionMenu": {
+    "label": "More actions"
+  },
+  "contextualHelp": {
+    "help": "Help",
+    "info": "Information"
+  },
+  "alertDialog": {
+    "alert": "Alert"
+  },
+  "inlineAlert": {
+    "close": "Close",
+    "informative": "Information",
+    "notice": "Warning",
+    "negative": "Error"
+  },
+  "toast": {
+    "close": "Close",
+    "region_one": "{{count}} notification.",
+    "region_other": "{{count}} notifications."
+  },
+  "breadcrumbs": {
+    "label": "Breadcrumbs"
   }
 }

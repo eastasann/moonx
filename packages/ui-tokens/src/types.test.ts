@@ -2,12 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { flattenTokens, loadTokens } from "../scripts/tokens";
 import {
   avatarSizes,
+  breadcrumbsSizes,
   colorSchemes,
+  contextualHelpSizes,
   densities,
+  dialogSizes,
   dialogWidths,
   dividerSizes,
   fauStates,
   iconSizes,
+  illustratedMessageSizes,
+  popoverSizes,
   progressCircleSizes,
   scales,
   sizes,
@@ -62,10 +67,41 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
           `semantic.scale.medium.component.tag.${dimension}`,
         ] as const,
     ),
+    ...["height", "font-size", "gap"].map(
+      (dimension) =>
+        [
+          "breadcrumbsSizes",
+          breadcrumbsSizes,
+          `semantic.scale.medium.component.breadcrumbs.${dimension}`,
+        ] as const,
+    ),
+    ...["icon-size", "title-font-size", "body-font-size"].map(
+      (dimension) =>
+        [
+          "illustratedMessageSizes",
+          illustratedMessageSizes,
+          `semantic.scale.medium.component.illustrated-message.${dimension}`,
+        ] as const,
+    ),
     ["dialogWidths", dialogWidths, "semantic.layout.dialog-max-width"],
+    [
+      "popoverSizes",
+      popoverSizes,
+      "semantic.scale.medium.component.popover.width",
+    ],
     ["fauStates", fauStates, "semantic.color.light.fau"],
   ])("%s", (_, list, prefix) => {
     expect(keysAfter(prefix)).toEqual([...list]);
+  });
+
+  test("Dialog sizes are the widths and fullscreen", () => {
+    expect([...dialogSizes]).toEqual([...dialogWidths, "fullscreen"]);
+  });
+
+  test("ContextualHelp sizes are steps of action-button, which draws its button", () => {
+    for (const size of contextualHelpSizes) {
+      expect(sizesWithXS).toContain(size);
+    }
   });
 
   test("spaces are semantic.space by name", () => {
@@ -75,8 +111,9 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
   });
 
   test("sizes are the keys of every component dimension sized S to XL", () => {
-    // Groups such as icon.size (XS–XL), action-button (XS–XL), avatar.size (S–M), tag
-    // and progress-circle (S–L) have their own lists.
+    // Groups such as icon.size (XS–XL), action-button (XS–XL), avatar.size (S–M), tag,
+    // progress-circle, popover and illustrated-message (S–L) and breadcrumbs (M–L) have
+    // their own lists.
     const groups = paths
       .filter((path) =>
         /^semantic\.scale\.medium\.component\.[^.]+\.[^.]+\.(S|M|L|XL)$/.test(
@@ -90,7 +127,10 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
         !group.endsWith(".avatar.size") &&
         !group.includes(".action-button.") &&
         !group.includes(".tag.") &&
-        !group.includes(".progress-circle."),
+        !group.includes(".progress-circle.") &&
+        !group.includes(".breadcrumbs.") &&
+        !group.includes(".popover.") &&
+        !group.includes(".illustrated-message."),
     );
     expect(sized.length).toBeGreaterThan(0);
     for (const group of sized) {

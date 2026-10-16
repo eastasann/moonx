@@ -20,6 +20,20 @@ test("the gallery renders every section", () => {
     "FileTrigger and TagGroup",
     "Form",
     "ProgressCircle",
+    "Dialog and AlertDialog",
+    "Popover and Tray",
+    "ActionMenu and Menu",
+    "Tooltip and ContextualHelp",
+    "InlineAlert",
+    "Toast",
+    "ProgressBar",
+    "Skeleton",
+    "IllustratedMessage",
+    "StatusLight",
+    "Badge",
+    "Disclosure and Accordion",
+    "Tabs",
+    "Breadcrumbs",
   ]) {
     expect(screen.getByRole("region", { name: title })).toBeTruthy();
   }

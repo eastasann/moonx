@@ -1,6 +1,7 @@
 import type { TextTone, TextVariant } from "@moonx/ui-tokens";
 import type { ReactNode } from "react";
 import { Text as AriaText } from "react-aria-components";
+import { SkeletonText } from "./Skeleton";
 import * as styles from "./typography.css";
 
 export interface TextProps {
@@ -20,7 +21,7 @@ export interface TextProps {
   children: ReactNode;
 }
 
-/** Body text in one of the 06 typography styles. */
+/** Body text in one of the 06 typography styles; inside a loading `Skeleton`, its bar. */
 export function Text({
   variant = "body",
   tone = "primary",
@@ -34,7 +35,7 @@ export function Text({
       elementType={elementType}
       className={styles.text({ variant, tone })}
     >
-      {children}
+      <SkeletonText>{children}</SkeletonText>
     </AriaText>
   );
 }

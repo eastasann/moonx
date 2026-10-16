@@ -1,27 +1,30 @@
-import { popoverMaxHeight } from "@moonx/ui-tokens";
+import { type PopoverSize, popoverMaxHeight } from "@moonx/ui-tokens";
 import type { ReactNode } from "react";
 import {
-  Modal,
-  ModalOverlay,
   Popover,
   PopoverContext,
   type PopoverProps,
   useSlottedContext,
 } from "react-aria-components";
+import { TraySheet } from "../components/Tray";
 import * as styles from "./overlay.css";
 import { useIsNarrow } from "./useIsNarrow";
 
 export interface ResponsivePopoverProps
   extends Pick<PopoverProps, "placement" | "offset"> {
+  /** A fixed width (06 component.popover.width); without it the popover fits its content. */
+  size?: PopoverSize;
   children: ReactNode;
 }
 
 /**
- * The overlay of Picker and DatePicker: a popover on tablet and wider, a tray below
- * `semantic.breakpoint.tablet` (design-spec 4.5, ADR-025). Put it where React Aria
- * expects a `Popover`; both forms take the open state from the surrounding component.
+ * The overlay of Popover, Menu, Picker, DatePicker and ContextualHelp: a popover on
+ * tablet and wider, a tray below `semantic.breakpoint.tablet` (design-spec 4.5, ADR-025).
+ * Put it where React Aria expects a `Popover`; both forms take the open state from the
+ * surrounding trigger.
  */
 export function ResponsivePopover({
+  size,
   children,
   ...popoverProps
 }: ResponsivePopoverProps) {
@@ -32,7 +35,7 @@ export function ResponsivePopover({
       <Popover
         {...popoverProps}
         maxHeight={popoverMaxHeight}
-        className={styles.popover}
+        className={`${styles.popover} ${size === undefined ? "" : styles.popoverWidth[size]}`}
       >
         {children}
       </Popover>
@@ -49,9 +52,7 @@ export function ResponsivePopover({
       {/* React Aria builds a Picker's items in a hidden render that only Popover passes
           through to its children; closed, this one renders nothing on the page. */}
       <Popover isOpen={false}>{children}</Popover>
-      <ModalOverlay isDismissable className={styles.trayOverlay}>
-        <Modal className={styles.tray}>{content}</Modal>
-      </ModalOverlay>
+      <TraySheet>{content}</TraySheet>
     </>
   );
 }

@@ -158,7 +158,83 @@ const components: [string, string, (section: Locator) => Locator][] = [
     "ProgressCircle",
     (s) => s.getByRole("progressbar", { name: "Preparing PDF" }),
   ],
+  // Overlays are drawn closed: their trigger is on screen; the tests below open them.
+  [
+    "Dialog",
+    "Dialog and AlertDialog",
+    (s) => s.getByRole("button", { name: "Open M" }),
+  ],
+  [
+    "AlertDialog",
+    "Dialog and AlertDialog",
+    (s) => s.getByRole("button", { name: "Delete row" }),
+  ],
+  [
+    "Popover",
+    "Popover and Tray",
+    (s) => s.getByRole("button", { name: "Open popover" }),
+  ],
+  [
+    "Tray",
+    "Popover and Tray",
+    (s) => s.getByRole("button", { name: "Open tray" }),
+  ],
+  [
+    "ActionMenu",
+    "ActionMenu and Menu",
+    (s) => s.getByRole("button", { name: "Idea actions M" }),
+  ],
+  [
+    "Menu",
+    "ActionMenu and Menu",
+    (s) => s.getByRole("button", { name: "AI", exact: true }),
+  ],
+  [
+    "Tooltip",
+    "Tooltip and ContextualHelp",
+    (s) => s.getByRole("button", { name: "Comments" }),
+  ],
+  [
+    "ContextualHelp",
+    "Tooltip and ContextualHelp",
+    (s) => s.getByRole("button", { name: "Hint" }),
+  ],
+  ["InlineAlert", "InlineAlert", (s) => s.getByRole("alert").first()],
+  ["Toast", "Toast", (s) => s.getByRole("button", { name: "Duplicate idea" })],
+  [
+    "ProgressBar",
+    "ProgressBar",
+    (s) => s.getByRole("progressbar", { name: "Uploading M" }),
+  ],
+  [
+    "Skeleton",
+    "Skeleton",
+    (s) =>
+      s.getByText("Office workers in Bacolod who buy pasalubong for family."),
+  ],
+  [
+    "IllustratedMessage",
+    "IllustratedMessage",
+    (s) => s.getByRole("heading", { name: "No ideas yet (M)" }),
+  ],
+  ["StatusLight", "StatusLight", (s) => s.getByText("Assumption · Medium")],
+  ["Badge", "Badge", (s) => s.getByText("Undecided")],
+  [
+    "Disclosure",
+    "Disclosure and Accordion",
+    (s) => s.getByRole("button", { name: "EXAMPLE M" }),
+  ],
+  [
+    "Accordion",
+    "Disclosure and Accordion",
+    (s) => s.getByRole("button", { name: "Resolved thread: pricing" }),
+  ],
+  ["Tabs", "Tabs", (s) => s.getByRole("tablist", { name: "Execution" })],
 ];
+
+/** Shown on tablet and wider only (design-spec 4.5): a phone shows ← instead. */
+const breadcrumbs = (page: Page) =>
+  region(page, "Breadcrumbs").getByRole("list", { name: "Breadcrumbs M" });
 
 for (const width of Object.keys(widths) as WidthName[]) {
   for (const theme of themes) {
@@ -191,6 +267,12 @@ for (const width of Object.keys(widths) as WidthName[]) {
           const instance = find(region(page, sectionName));
           await instance.scrollIntoViewIfNeeded();
           await expect(instance, component).toBeVisible();
+        }
+        if (width === "mobile") {
+          await expect(breadcrumbs(page), "Breadcrumbs").toBeHidden();
+        } else {
+          await breadcrumbs(page).scrollIntoViewIfNeeded();
+          await expect(breadcrumbs(page), "Breadcrumbs").toBeVisible();
         }
 
         const buttonM = region(page, "Button")
@@ -456,4 +538,397 @@ test.describe("keyboard in a real browser", () => {
     await expect(margin).toHaveValue("12.5");
     await expect(margin).not.toHaveAttribute("aria-invalid", "true");
   });
+});
+
+// Dialog, Popover, Tray, Menu and ContextualHelp: how each opens at each width, where focus
+// goes, and what closes it.
+
+/** The element React Aria sizes and moves: the dialog's or menu's frame. */
+const frameOf = (inner: Locator) =>
+  inner.locator(
+    "xpath=ancestor-or-self::*[contains(@class, 'tray') or contains(@class, 'sheet') or @data-placement or contains(@class, 'centered')][1]",
+  );
+
+/** Waits until the element's own entering animation (slide, rise, fade) has ended. */
+async function settled(element: Locator) {
+  await expect
+    .poll(() =>
+      element.evaluate(
+        (node) =>
+          node.getAnimations().filter((a) => a.playState === "running").length,
+      ),
+    )
+    .toBe(0);
+}
+
+/** Where an overlay sits: a tray on the bottom edge, a full sheet, or a card or popover. */
+async function placement(overlay: Locator, width: WidthName) {
+  const viewport = widths[width];
+  const frame = frameOf(overlay);
+  await settled(frame);
+  const box = await frame.boundingBox();
+  if (box === null) throw new Error("not on screen");
+  const fullWidth = box.width > viewport.width * 0.9;
+  const onBottom = Math.round(box.y + box.height) === viewport.height;
+  if (fullWidth && onBottom && Math.round(box.y) <= 0) return "sheet";
+  if (fullWidth && onBottom) return "tray";
+  return "floating";
+}
+
+/** The specimen with an observable press, not the toolbars' Comments buttons. */
+const tooltipButton = (page: Page, name: string) =>
+  region(page, "Tooltip and ContextualHelp").getByRole("button", { name });
+
+test.describe("dialogs, popovers and menus follow the width (design-spec 3.8・4.5)", () => {
+  for (const [width, expected] of [
+    ["mobile", "tray"],
+    ["tablet", "floating"],
+    ["desktop", "floating"],
+  ] as const) {
+    test(`Popover is ${expected} at ${width}; Escape returns focus`, async ({
+      page,
+    }) => {
+      await openGallery(page, width);
+      const trigger = page.getByRole("button", { name: "Open popover" });
+      await trigger.click();
+      const dialog = page.getByRole("dialog", { name: "F/A/U" });
+      await expect(dialog).toBeVisible();
+      expect(await placement(dialog, width)).toBe(expected);
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+      await expect(trigger).toBeFocused();
+    });
+
+    test(`Menu is ${expected} at ${width}`, async ({ page }) => {
+      await openGallery(page, width);
+      await page.getByRole("button", { name: "Idea actions M" }).click();
+      const menu = page.getByRole("menu");
+      await expect(menu).toBeVisible();
+      expect(await placement(menu, width)).toBe(expected);
+    });
+
+    test(`ContextualHelp is ${expected} at ${width}`, async ({ page }) => {
+      await openGallery(page, width);
+      await page.getByRole("button", { name: "Hint" }).click();
+      const dialog = page.getByRole("dialog", { name: "Hint" });
+      await expect(dialog).toBeVisible();
+      expect(await placement(dialog, width)).toBe(expected);
+    });
+  }
+
+  test("Dialog M is a card in the middle on a desktop; Escape returns focus", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const trigger = page.getByRole("button", { name: "Open M" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "New idea" });
+    await expect(dialog).toBeVisible();
+    expect(await placement(dialog, "desktop")).toBe("floating");
+    const box = await frameOf(dialog).boundingBox();
+    // 06 layout.dialog-max-width.M, centred.
+    expect(box?.width).toBeLessThanOrEqual(480);
+    expect(
+      Math.abs(
+        (box?.x ?? 0) + (box?.width ?? 0) / 2 - widths.desktop.width / 2,
+      ),
+    ).toBeLessThanOrEqual(1);
+    await expect(async () => {
+      expect(
+        await dialog.evaluate((element) =>
+          element.contains(document.activeElement),
+        ),
+      ).toBe(true);
+    }).toPass();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  for (const [size, form] of [
+    ["S", "tray"],
+    ["M", "tray"],
+    ["L", "sheet"],
+    ["fullscreen", "sheet"],
+  ] as const) {
+    test(`Dialog ${size} on a phone is a ${form}`, async ({ page }) => {
+      await openGallery(page, "mobile");
+      await page.getByRole("button", { name: `Open ${size}` }).click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      expect(await placement(dialog, "mobile")).toBe(form);
+      // The buttons stay in view at the bottom (design-spec 4.1).
+      const save = dialog.getByRole("button", { name: "Save" });
+      await expect(save).toBeInViewport();
+    });
+  }
+
+  test("a Tray is a bottom sheet on a desktop too, and returns focus", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const trigger = page.getByRole("button", { name: "Open tray" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "Tray" });
+    await expect(dialog).toBeVisible();
+    expect(await placement(dialog, "desktop")).toBe("tray");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test("a fullscreen Dialog fills a desktop too", async ({ page }) => {
+    await openGallery(page, "desktop");
+    await page.getByRole("button", { name: "Open fullscreen" }).click();
+    const dialog = page.getByRole("dialog", { name: "Update template" });
+    await expect(dialog).toBeVisible();
+    expect(await placement(dialog, "desktop")).toBe("sheet");
+  });
+
+  for (const width of ["mobile", "desktop"] as const) {
+    test(`AlertDialog at ${width}: focus on Cancel, Escape does not close, an answer does`, async ({
+      page,
+    }) => {
+      await openGallery(page, width);
+      const trigger = page.getByRole("button", { name: "Delete row" });
+      await trigger.click();
+      const alert = page.getByRole("alertdialog", { name: "Delete this row?" });
+      await expect(alert).toBeVisible();
+      expect(await placement(alert, width)).toBe(
+        width === "mobile" ? "tray" : "floating",
+      );
+      await expect(alert.getByRole("button", { name: "Cancel" })).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(alert).toBeVisible();
+      await alert.getByRole("button", { name: "Delete" }).click();
+      await expect(alert).toBeHidden();
+      await expect(page.getByText("Last answer: Delete")).toBeVisible();
+      await expect(trigger).toBeFocused();
+    });
+  }
+});
+
+test.describe("keyboard in a real browser: menus, tabs and tooltips", () => {
+  test("ActionMenu: Enter opens on the first item, arrows move, Enter acts and returns focus", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const trigger = page.getByRole("button", { name: "Idea actions M" });
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const menu = page.getByRole("menu");
+    await expect(
+      menu.getByRole("menuitem", { name: "Duplicate" }),
+    ).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    const archive = menu.getByRole("menuitem", { name: "Archive" });
+    await expect(archive).toBeFocused();
+    // The look of keyboard focus hangs on this attribute (ADR-025).
+    await expect(archive).toHaveAttribute("data-focus-visible", "true");
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await expect(menu).toBeHidden();
+    await expect(page.getByText("Last action: archive")).toBeVisible();
+    await expect(trigger).toBeFocused();
+  });
+
+  test("Tabs: arrows move both ways and select", async ({ page }) => {
+    await openGallery(page, "desktop");
+    const list = page.getByRole("tablist", { name: "Execution" });
+    await list.getByRole("tab", { name: "Tasks" }).focus();
+    await page.keyboard.press("ArrowRight");
+    const milestones = list.getByRole("tab", { name: "Milestones" });
+    await expect(milestones).toBeFocused();
+    await expect(milestones).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("ArrowLeft");
+    await expect(list.getByRole("tab", { name: "Tasks" })).toBeFocused();
+  });
+
+  test("Tooltip: keyboard focus shows it, Escape hides it", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    await tooltipButton(page, "Comments").focus();
+    await page.keyboard.press("Tab");
+    await expect(tooltipButton(page, "History")).toBeFocused();
+    await expect(page.getByRole("tooltip")).toHaveText("History");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toBeHidden();
+  });
+});
+
+test.describe("Tooltip on a touch screen (design-spec 4.5)", () => {
+  test.use({ hasTouch: true });
+
+  async function touch(page: Page, target: Locator, holdMs: number) {
+    const box = await target.boundingBox();
+    if (box === null) throw new Error("not on screen");
+    const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [point],
+    });
+    await page.waitForTimeout(holdMs);
+    return async () => {
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+    };
+  }
+
+  test("a long press shows it without pressing; it hides after the finger lifts", async ({
+    page,
+  }) => {
+    await openGallery(page, "mobile");
+    const button = tooltipButton(page, "Comments");
+    await button.scrollIntoViewIfNeeded();
+    const lift = await touch(page, button, 800);
+    await expect(page.getByRole("tooltip")).toHaveText("Comments");
+    await lift();
+    await expect(page.getByText("Comments pressed: 0")).toBeVisible();
+    await expect(page.getByRole("tooltip")).toBeVisible();
+    await expect(page.getByRole("tooltip")).toBeHidden({ timeout: 3000 });
+    await expect(page.getByText("Comments pressed: 0")).toBeVisible();
+  });
+
+  test("a tap presses the button and shows no tooltip", async ({ page }) => {
+    await openGallery(page, "mobile");
+    const button = tooltipButton(page, "Comments");
+    await button.scrollIntoViewIfNeeded();
+    await button.tap();
+    await expect(page.getByText("Comments pressed: 1")).toBeVisible();
+    await expect(page.getByRole("tooltip")).toBeHidden();
+  });
+});
+
+test.describe("Toast and Breadcrumbs", () => {
+  for (const width of ["mobile", "desktop"] as const) {
+    test(`Toast at ${width}: at the bottom, its action works, it closes`, async ({
+      page,
+    }) => {
+      await openGallery(page, width);
+      await page.getByRole("button", { name: "Duplicate idea" }).click();
+      const toast = page.getByRole("alertdialog", {
+        name: "Duplicated from Piaya Gift Box",
+      });
+      await expect(toast).toBeVisible();
+      await settled(toast);
+      const box = await toast.boundingBox();
+      // 06 layout.page-gutter-mobile from the bottom edge (the gallery has no TabBar).
+      expect(widths[width].height - ((box?.y ?? 0) + (box?.height ?? 0))).toBe(
+        16,
+      );
+      await toast.getByRole("button", { name: "Undo" }).click();
+      await expect(toast).toBeHidden();
+      await expect(page.getByText("Undone: 1")).toBeVisible();
+
+      await page.getByRole("button", { name: "Apply changes" }).click();
+      const second = page.getByRole("alertdialog", {
+        name: "2 answers updated · 1 needs F/A/U",
+      });
+      await second.getByRole("button", { name: "Close" }).click();
+      await expect(second).toBeHidden();
+    });
+  }
+
+  test("Toast on a phone with a TabBar sits above it (design-spec 4.5)", async ({
+    page,
+  }) => {
+    await openGallery(page, "mobile");
+    await page.getByText("aboveTabBar (a phone with a TabBar)").click();
+    await region(page, "Toast")
+      .getByRole("button", { name: "Record decision" })
+      .click();
+    const toast = page.getByRole("alertdialog", { name: "Decision recorded" });
+    await settled(toast);
+    const box = await toast.boundingBox();
+    // 06 layout.page-gutter-mobile above layout.tab-bar-height.
+    expect(widths.mobile.height - ((box?.y ?? 0) + (box?.height ?? 0))).toBe(
+      16 + 64,
+    );
+  });
+
+  test("Breadcrumb links are full targets on a touch tablet (design-spec 4.3)", async ({
+    page,
+  }) => {
+    await openGallery(page, "tablet");
+    await choose(page, "Scale", "large");
+    const link = breadcrumbs(page).getByRole("link", { name: "Ideas" });
+    await link.scrollIntoViewIfNeeded();
+    const box = await link.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(targetMin.large);
+    expect(box?.width).toBeGreaterThanOrEqual(targetMin.large);
+  });
+
+  test("Breadcrumbs: the current page is text; the others are links", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const list = breadcrumbs(page);
+    await expect(list.getByRole("link")).toHaveText([
+      "Ideas",
+      "Piaya Gift Box",
+    ]);
+    await expect(list.getByText("05 Costs")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+});
+
+test.describe("open overlays pass axe", () => {
+  for (const width of ["mobile", "desktop"] as const) {
+    for (const theme of themes) {
+      test(`${width}, ${theme}`, async ({ page }) => {
+        await openGallery(page, width);
+        await choose(page, "Theme", theme);
+        const check = async (what: string) => {
+          const { violations } = await new AxeBuilder({ page })
+            .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+            .analyze();
+          expect(
+            violations.map((violation) => ({
+              what,
+              id: violation.id,
+              targets: violation.nodes.map((node) => node.target.join(" ")),
+            })),
+          ).toEqual([]);
+        };
+
+        await page.getByRole("button", { name: "Open M" }).click();
+        await settled(frameOf(page.getByRole("dialog")));
+        await check("Dialog");
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog")).toBeHidden();
+
+        await page.getByRole("button", { name: "Show error" }).click();
+        await settled(frameOf(page.getByRole("alertdialog")));
+        await check("AlertDialog");
+        await page
+          .getByRole("alertdialog")
+          .getByRole("button", { name: "Close" })
+          .click();
+        await expect(page.getByRole("alertdialog")).toBeHidden();
+
+        await page.getByRole("button", { name: "Idea actions M" }).click();
+        await settled(frameOf(page.getByRole("menu")));
+        await check("Menu");
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("menu")).toBeHidden();
+
+        await page.getByRole("button", { name: "Hint" }).click();
+        await settled(frameOf(page.getByRole("dialog")));
+        await check("ContextualHelp");
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog")).toBeHidden();
+
+        await page.getByRole("button", { name: "Duplicate idea" }).click();
+        await settled(page.getByRole("alertdialog"));
+        await check("Toast");
+      });
+    }
+  }
 });

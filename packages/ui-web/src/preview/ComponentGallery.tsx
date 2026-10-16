@@ -5,6 +5,7 @@ import {
   SegmentedControlItem,
 } from "../components/SegmentedControl";
 import { Text } from "../components/Text";
+import { ToastContainer } from "../components/Toast";
 import { Container } from "../layout/Container";
 import { Flex, Stack } from "../layout/Flex";
 import {
@@ -13,6 +14,15 @@ import {
   ToggleSection,
 } from "./ActionsSection";
 import { ChoiceSection, FileAndTagSection } from "./ChoicesSection";
+import {
+  BadgeSection,
+  IllustratedMessageSection,
+  InlineAlertSection,
+  ProgressBarSection,
+  SkeletonSection,
+  StatusLightSection,
+  ToastSection,
+} from "./FeedbackSection";
 import {
   NumberFieldSection,
   SearchAndPickSection,
@@ -26,6 +36,17 @@ import {
   SurfacesSection,
   TypographySection,
 } from "./FoundationSection";
+import {
+  BreadcrumbsSection,
+  DisclosureSection,
+  TabsSection,
+} from "./NavigationSection";
+import {
+  DialogSection,
+  MenuSection,
+  PopoverSection,
+  TooltipSection,
+} from "./OverlaysSection";
 import * as styles from "./preview.css";
 
 type Theme = "system" | "light" | "dark";
@@ -59,6 +80,7 @@ export function ComponentGallery() {
   }, []);
   const [theme, setTheme] = useState<Theme>("system");
   const [scale, setScale] = useState<Scale>("auto");
+  const [aboveTabBar, setAboveTabBar] = useState(false);
   useDocumentAttribute("data-theme", theme === "system" ? null : theme);
   useDocumentAttribute("data-scale", scale === "auto" ? null : scale);
 
@@ -100,7 +122,8 @@ export function ComponentGallery() {
         <Stack>
           <Text tone="secondary" elementType="p">
             Popovers turn into trays below the tablet breakpoint: narrow the
-            window to see Picker, ComboBox and DatePicker change.
+            window to see Picker, ComboBox, DatePicker, Popover, Menu,
+            ContextualHelp and Dialog change.
           </Text>
           <LayoutSection />
           <TypographySection />
@@ -116,8 +139,26 @@ export function ComponentGallery() {
           <FileAndTagSection />
           <FormSection />
           <ProgressSection />
+          <DialogSection />
+          <PopoverSection />
+          <MenuSection />
+          <TooltipSection />
+          <InlineAlertSection />
+          <ToastSection
+            aboveTabBar={aboveTabBar}
+            onAboveTabBarChange={setAboveTabBar}
+          />
+          <ProgressBarSection />
+          <SkeletonSection />
+          <IllustratedMessageSection />
+          <StatusLightSection />
+          <BadgeSection />
+          <DisclosureSection />
+          <TabsSection />
+          <BreadcrumbsSection />
         </Stack>
       </Container>
+      <ToastContainer aboveTabBar={aboveTabBar} />
     </div>
   );
 }

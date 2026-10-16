@@ -402,12 +402,12 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | Tooltip / ContextualHelp | アイコンだけのボタンの説明 / 設問のヒント（▸ Hint） | — | ContextualHelp はトレイ |
 | Disclosure / Accordion | EXAMPLE・関連する調査ログの開閉、解決済みのスレッド | — | 同じ |
 | Tabs | 16 の Assumptions / Risks、22 の5つのタブ、26 と 28 の切り替え、28 の3つのタブ | — | 横にスクロールできるタブ |
-| Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | — | 出さない（部品が幅で隠す。画面は ← 戻る を出す） |
+| Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | 区切りは「/」。今の画面はリンクにせず文字で出す（`aria-current`） | 出さない（部品が幅で隠す。画面は ← 戻る を出す） |
 | CheckDots | 5・6 の一覧の行の、確認項目6つの状態の点列（MoonGlyph の ●達成 ◐途中 ○未着手）。形で状態を伝え、読み上げは全項目の名前と状態を1つの画像として読む | S / M | 同じ |
-| StatusLight | F/A/U（Fact / Assumption / Unknown / Unclassified / Empty）、確認項目の状態（Not started / Partial / Done）、保存状態 | MoonGlyph の印＋ラベル（4.4「状態の形」。形だけ・色だけで伝えない）。保存状態は印の代わりにアイコン（Saved は ✓、Couldn't save は警告） | 同じ |
-| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、「Overdue」「Lump sum」「(former member)」 | 色を付けない枠の札（Undecided は点線の枠）。未読数だけインクの塗り。「Overdue」と期限切れの日数（「overdue 3d」）は注意の琥珀色の文字。Drop を negative にしない | 同じ |
+| StatusLight | F/A/U（Fact / Assumption / Unknown / Unclassified / Empty）、確認項目の状態（Not started / Partial / Done）、保存状態 | MoonGlyph の印＋ラベル（4.4「状態の形」。形だけ・色だけで伝えない）。保存状態は印の代わりにアイコン（Saving… は回る読み込みの印、Saved は ✓、Couldn't save は警告。Couldn't save は文字とアイコンを negative の赤にする） | 同じ |
+| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、「Overdue」「Lump sum」「(former member)」 | 色を付けない枠の札（Undecided は点線の枠）。未読数だけインクの塗り。「Overdue」と期限切れの日数（「overdue 3d」）は注意の琥珀色の文字。Drop を negative にしない。props は `fillStyle`（Spectrum 2 の outline = 枠と bold = 塗りに、moonx の dashed = 点線の枠を足したもの。既定は outline で、Spectrum 2 の既定の bold と違う）と `variant`（neutral / notice。notice は outline の枠の中の琥珀色の文字だけ） | 同じ |
 | InlineAlert | 粗利のマイナス・Capacity 超過・費用の下限の注意・「Latest decision is Hold」・アーカイブ中・新しいテンプレートの案内（6.0.7）・画面上部の帯（オフライン・新しい版・ホーム画面への追加の案内。6.0.6） | informative / notice / negative / neutral | 同じ |
-| Toast | 「Decision recorded」「2 answers updated · 1 needs F/A/U」 | — | 下部（タブの上） |
+| Toast | 「Decision recorded」「2 answers updated · 1 needs F/A/U」「Duplicated from …」と「Undo」（6.8） | 文と、任意の操作のボタン1つと、閉じるボタン。デスクトップとタブレットは下の中央 | 下部（タブの上） |
 | ProgressBar / ProgressCircle | 「Preparing PDF…」、送信中のボタン | — | 同じ |
 | Meter（積み上げ） | F/A/U の内訳の帯（13）。Spectrum の Meter を内訳の数だけ積み上げる moonx 独自の拡張。帯の濃さは `semantic.color.{light,dark}.fau.*.strong`（Unknown は斜線、Empty は地のまま）。凡例には、帯の区間と同じ見本・ラベル・件数を並べる | — | 同じ |
 | Skeleton | ローディングの骨組み（6.0.6） | — | 同じ |
@@ -457,10 +457,19 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - spacious の Form の中の入力欄と Button（variant と quiet を問わない。ActionButton は含めない）は L にする（06 `semantic.density.spacious` の「入力欄と主要なボタンは L」）。
 - パターン D（リスト＋詳細）は、デスクトップ未満では1ペインずつ全幅で出す（4.1 のタブレットの列）。パターン C はスマホの幅で、フォーカス中の設問のカードだけを出す。
 - スマホの TableView は常に行ごとのカードで出す（`layout` は受けるが全部カード）。
-- タッチの端末の Tooltip は長押しで開き、指を離してしばらくしたら閉じる（ホバーが無いため）。子の押す操作は邪魔しない。
+- タッチの端末の Tooltip は長押しで開き、指を離してしばらくしたら閉じる（ホバーが無いため）。子の押す操作は邪魔しない。長押しは 0.5 秒（React Aria の長押しと同じ）、閉じるのは指を離して 1.5 秒後（Android の長押しのツールチップと同じ）。短く押せば子が押され、長押しはツールチップだけを開いて子を押さない（React Aria の長押しと同じく、子の押す操作を取り消す）。
 - Steps は済みのステップの名前の後ろに、画面が渡す `doneLabel`（「completed」）を読み上げる（チェックの印は読み上げの対象外のため）。
 - 押せる Card の中にボタンを置かない（押せる要素の入れ子になり、読み上げで中のボタンに届かない）。操作は Card の外に並べる。
-- Tray は中身がスクロールでき、`isDismissable` を false にすると背景のタップや Esc で閉じなくなる。AlertDialog は閉じられない Tray で開く（答えるまで残す）。
+- Tray は中身がスクロールでき、`isDismissable` を false にすると背景のタップや Esc で閉じなくなる。AlertDialog は閉じられない Tray で開く（答えるまで残す）。AlertDialog はスマホの幅ではどの大きさでもこのトレイで開き、タブレットの幅から上でも背景のタップと Esc では閉じない（どの幅でも答えるまで残す。Spectrum 2 の AlertDialog は Esc で閉じるが、moonx は答えを待つ）。`isDismissable` は React Aria の綴りで、Tray と Dialog の両方がこの名前で受ける（Spectrum 2 の Dialog は `isDismissible`）。
+- Dialog は Esc で閉じる（`isKeyboardDismissDisabled` で止められる）。背景のタップで閉じるのと、題の右の閉じるボタン（「Close」）は `isDismissable` のときだけ（振る舞いは Spectrum 2 と同じ）。題と下のボタンは、本文がスクロールしても見えたままにする。画面の中央に出す Dialog の高さは、見えている高さの 85% まで（06 `semantic.layout.sheet-max-height-ratio`）。fullscreen はどの幅でも画面いっぱいのシートで開く。AlertDialog の error と warning は題の前の印に「Alert」と名前を付け、本文を dialog の説明として読み上げる。
+- Popover はタブレットの幅から上でも開くとフォーカスを中へ移し、Esc と外側のタップで閉じて、開いたボタンへフォーカスを戻す（React Aria と Spectrum 2 と同じ）。Menu・Dialog・ContextualHelp も閉じたら開いたボタンへ戻す。
+- Toast は `ToastQueue` から出し、アプリのルートに1つ置く `ToastContainer` に、下の中央から新しいものほど下に積む。出したものは閉じるまですべて出す（Spectrum 2 の queue と同じ。Spectrum 2 の、重ねて畳む見せ方は使わない）。スマホで TabBar のある画面では TabBar の上に出す（`aboveTabBar`）。自動で閉じるのは `timeout` を渡したときだけで、5 秒より短くしない。操作のボタン（「Undo」）を持つものは自動で閉じない（この2つは Spectrum 2 と同じ。押す前に消えないため）。見た目は Spectrum 2 の塗りの札にせず、Popover と同じカードの枠と影にする（4.4「画面の組み方」: 重なっているものはカードの枠と影で示す）。閉じたトーストは動きを付けずに消える（React Aria のトーストは閉じる途中の状態を持たない）。
+- InlineAlert は出たときに読み上げる（`role="alert"`。Spectrum 2 と同じ）。閉じられる帯（新しい版・ホーム画面への追加の案内。6.0.6）は `onDismiss` で閉じるボタン（「Close」）を出す。neutral はアイコンを持たない。ほかのアイコンには、Spectrum 2 と同じく種類の名前（informative は「Information」、notice は「Warning」、negative は「Error」）を付ける。
+- Skeleton は画面の並びのまま、中の Text と Heading を文字の幅の帯にする（Spectrum 2 と同じ）。読み込みの間は中身を読み上げとフォーカスの対象から外す（`inert`）。読み込み中であることは画面が伝える。
+- ContextualHelp はアイコンだけのボタン（help は ?、info は i）。設問の「Hint」（6.2）のように文字を添えるときは `label` を渡す。中身は Spectrum のトークンの ContextualHelp の幅（06 `semantic.layout.contextual-help-width`。トークンはスケールで変わらない。S2 のコードはタッチの端末で 1.25 倍に描くが、トークンがあるものはトークンの値を使う）で開き、見出しは heading-4 の大きさ（Spectrum 2 の heading-xs と同じ）。
+- Disclosure の `isQuiet` は区切り線の無い見出しにする（6.2 の「▸ EXAMPLE  ▸ Hint」のように横に並べる）。isQuiet でない Disclosure と Accordion は、区切り線の間の行にする（4.4）。
+- Tabs は幅に入らないとき、どの幅でも横にスクロールする（Spectrum 2 のように Picker に畳まない）。タブはどれもタップ領域の下限より狭くしない。
+- Dialog・AlertDialog・IllustratedMessage・ContextualHelp・InlineAlert・Disclosure は、Spectrum 2 が子の部品（Heading・Content・ButtonGroup）で受けるものを props（`title`・`buttons`・`heading`・`actions`・`label` など）で受ける。中の並びは部品が決め、画面に並べ方を書かせないため（画面にスタイルを書かない。SDD ADR-025）。名前と props のほかの部分は Spectrum 2 にそろえる。
 - 開発専用の確認用ページ（`/dev/components`）に全部品を並べる。
 
 ---

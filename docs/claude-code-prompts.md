@@ -1005,7 +1005,7 @@ Step 19 の独立レビューで見つかった、docs の決まりと部品の�
 
 ## Step 20: Web の部品（2）: 重ねて出す部品と知らせる部品
 
-Status:
+Status: done 2026-10-16
 
 ```
 docs/design-spec.md 4.5 の部品のうち、重ねて出す部品と知らせる部品を packages/ui-web に作ってください。
@@ -1049,6 +1049,9 @@ docs/design-spec.md 4.5 の部品のうち、データの表示と独自の部�
 やること:
 1. データの表示: TableView、ListView、Card / CardView、Tree、Meter（積み上げ）、CheckDots、Avatar
 2. 独自の部品: MoonGlyph、FauPicker、MetricTile、RowList / RowListItem、QuestionCard、DiffText、MentionTextArea、Panel、Slide、Steps
+   MoonGlyph は、Step 20 が StatusLight の印のために作った packages/ui-web/src/internal/MoonMark.tsx（状態ごとの月の形と色。
+   中の litPath は満ちる割合 0〜1 を受ける。MoonMark 自体は state だけを受ける）を核にして作り、StatusLight の印を MoonGlyph に
+   置き換える（月の描き方を2つにしない）
 3. /dev/components に並べ、Step 19 の E2E に足す
 4. テスト（make test-web）: 各部品の種類・大きさ・状態、FauPicker の操作、表のキーボード操作
 

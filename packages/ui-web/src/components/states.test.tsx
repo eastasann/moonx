@@ -3,13 +3,16 @@ import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { describe, expect, test } from "vitest";
 import { ActionButton } from "./ActionButton";
+import { Breadcrumb, Breadcrumbs } from "./Breadcrumbs";
 import { Button } from "./Button";
 import { Checkbox } from "./Checkbox";
+import { Disclosure } from "./Disclosure";
 import { Link } from "./Link";
 import { Picker } from "./Picker";
 import { Radio, RadioGroup } from "./RadioGroup";
 import { SegmentedControl, SegmentedControlItem } from "./SegmentedControl";
 import { Switch } from "./Switch";
+import { Tab, TabList, TabPanel, Tabs } from "./Tabs";
 import { TagGroup } from "./TagGroup";
 import { ToggleButton, ToggleButtonGroup } from "./ToggleButtonGroup";
 
@@ -119,6 +122,42 @@ const cases: Case[] = [
     ),
     target: () => screen.getByRole("row"),
     hoverable: false,
+    canBeDisabled: false,
+  },
+  {
+    name: "Disclosure title",
+    render: (disabled) => (
+      <Disclosure title="EXAMPLE" isDisabled={disabled}>
+        Body
+      </Disclosure>
+    ),
+    target: () => screen.getByRole("button"),
+    pressable: true,
+  },
+  {
+    name: "Tab",
+    render: (disabled) => (
+      <Tabs isDisabled={disabled}>
+        <TabList aria-label="Views">
+          <Tab id="a">Assumptions</Tab>
+        </TabList>
+        <TabPanel id="a">Rows</TabPanel>
+      </Tabs>
+    ),
+    target: () => screen.getByRole("tab"),
+    pressable: true,
+  },
+  {
+    name: "Breadcrumb link",
+    render: () => (
+      <Breadcrumbs>
+        <Breadcrumb href="#ideas">Ideas</Breadcrumb>
+        <Breadcrumb>05 Costs</Breadcrumb>
+      </Breadcrumbs>
+    ),
+    target: () => screen.getByRole("link"),
+    pressable: true,
+    // A crumb is a level above the page: it is always a link (design-spec 6.0.1).
     canBeDisabled: false,
   },
 ];

@@ -1,5 +1,9 @@
 import {
+  breadcrumbsSizes,
+  contextualHelpSizes,
+  dialogWidths,
   dividerSizes,
+  illustratedMessageSizes,
   progressCircleSizes,
   sizes,
   sizesWithXS,
@@ -8,6 +12,7 @@ import {
 import { User } from "@react-aria/test-utils";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Inbox } from "lucide-react";
 import type { ReactElement } from "react";
 import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import type { ChoiceItem } from "../internal/ChoiceListBox";
@@ -16,26 +21,41 @@ import type { FlexProps, StackProps } from "../layout/Flex";
 import type { GridProps } from "../layout/Grid";
 import { setPhoneWidth } from "../test/helpers";
 import { ActionButton, ActionGroup } from "./ActionButton";
+import { Badge } from "./Badge";
+import { Breadcrumb, Breadcrumbs } from "./Breadcrumbs";
 import { Button, ButtonGroup } from "./Button";
 import { Checkbox, CheckboxGroup } from "./Checkbox";
 import { ComboBox } from "./ComboBox";
+import { ContextualHelp } from "./ContextualHelp";
 import { DatePicker } from "./DatePicker";
+import { AlertDialog } from "./Dialog";
+import { Accordion, Disclosure } from "./Disclosure";
 import { Divider } from "./Divider";
 import { FileTrigger, type FileTriggerProps } from "./FileTrigger";
 import { Form } from "./Form";
 import type { HeadingProps } from "./Heading";
+import { IllustratedMessage } from "./IllustratedMessage";
+import type { InlineAlertProps } from "./InlineAlert";
 import type { LinkProps } from "./Link";
+import { ActionMenu, Menu, MenuItem, MenuTrigger } from "./Menu";
 import { NumberField } from "./NumberField";
 import { Picker } from "./Picker";
+import { ProgressBar } from "./ProgressBar";
 import { ProgressCircle } from "./ProgressCircle";
 import { Radio, RadioGroup } from "./RadioGroup";
 import { SearchField } from "./SearchField";
 import { SegmentedControl, SegmentedControlItem } from "./SegmentedControl";
+import type { SkeletonProps } from "./Skeleton";
+import { StatusLight } from "./StatusLight";
 import { Switch } from "./Switch";
+import { Tab, TabList, TabPanel, Tabs } from "./Tabs";
 import { TagGroup } from "./TagGroup";
 import { Text, type TextProps } from "./Text";
 import { TextArea, TextField } from "./TextField";
+import type { ToastContainerProps, ToastOptions } from "./Toast";
 import { ToggleButton, ToggleButtonGroup } from "./ToggleButtonGroup";
+import type { TooltipProps, TooltipTriggerProps } from "./Tooltip";
+import type { TrayProps } from "./Tray";
 import { Well, type WellProps } from "./Well";
 
 const items: ChoiceItem[] = [
@@ -244,6 +264,105 @@ const sized: SizeCase[] = [
     () => screen.getAllByRole("separator"),
   ),
   sizeCase(
+    "ActionMenu",
+    sizesWithXS,
+    (size) => (
+      <ActionMenu size={size} aria-label={size}>
+        <MenuItem id="a">A</MenuItem>
+      </ActionMenu>
+    ),
+    () => screen.getAllByRole("button"),
+  ),
+  sizeCase(
+    "ContextualHelp",
+    contextualHelpSizes,
+    (size) => (
+      <ContextualHelp size={size} title={size}>
+        Help
+      </ContextualHelp>
+    ),
+    () => screen.getAllByRole("button"),
+  ),
+  sizeCase(
+    "Disclosure",
+    sizes,
+    (size) => (
+      <Disclosure size={size} title={size}>
+        Body
+      </Disclosure>
+    ),
+    () => screen.getAllByRole("button"),
+  ),
+  sizeCase(
+    "Accordion",
+    sizes,
+    (size) => (
+      <Accordion size={size}>
+        <Disclosure id="a" title={size}>
+          Body
+        </Disclosure>
+      </Accordion>
+    ),
+    () => screen.getAllByRole("button"),
+  ),
+  sizeCase(
+    "Tabs",
+    sizes,
+    (size) => (
+      <Tabs size={size}>
+        <TabList aria-label={size}>
+          <Tab id="a">{size}</Tab>
+        </TabList>
+        <TabPanel id="a">Panel</TabPanel>
+      </Tabs>
+    ),
+    () => screen.getAllByRole("tab"),
+  ),
+  sizeCase(
+    "Breadcrumbs",
+    breadcrumbsSizes,
+    (size) => (
+      <Breadcrumbs size={size} aria-label={size}>
+        <Breadcrumb href="#a">Ideas</Breadcrumb>
+        <Breadcrumb>Here</Breadcrumb>
+      </Breadcrumbs>
+    ),
+    () => screen.getAllByRole("list"),
+  ),
+  sizeCase(
+    "IllustratedMessage",
+    illustratedMessageSizes,
+    (size) => (
+      <IllustratedMessage size={size} icon={<Inbox />} heading={size}>
+        Body
+      </IllustratedMessage>
+    ),
+    () => screen.getAllByRole("heading"),
+  ),
+  sizeCase(
+    "Badge",
+    sizes,
+    (size) => <Badge size={size}>{`badge-${size}`}</Badge>,
+    // The text sits in the badge's ellipsis span; the size is on the badge.
+    () => sizes.map((size) => screen.getByText(`badge-${size}`).parentElement),
+  ),
+  sizeCase(
+    "StatusLight",
+    sizes,
+    (size) => (
+      <StatusLight size={size} variant="partial">
+        {`light-${size}`}
+      </StatusLight>
+    ),
+    () => sizes.map((size) => screen.getByText(`light-${size}`).parentElement),
+  ),
+  sizeCase(
+    "ProgressBar",
+    sizes,
+    (size) => <ProgressBar size={size} aria-label={size} value={10} />,
+    () => screen.getAllByRole("progressbar"),
+  ),
+  sizeCase(
     "ProgressCircle",
     progressCircleSizes,
     (size) => <ProgressCircle size={size} aria-label={size} isIndeterminate />,
@@ -270,6 +389,49 @@ test("components Spectrum 2 gives no size take none (design-spec 4.5)", () => {
   expectTypeOf<StackProps>().not.toHaveProperty("size");
   expectTypeOf<GridProps>().not.toHaveProperty("size");
   expectTypeOf<ContainerProps>().not.toHaveProperty("size");
+  expectTypeOf<TrayProps>().not.toHaveProperty("size");
+  expectTypeOf<TooltipProps>().not.toHaveProperty("size");
+  expectTypeOf<TooltipTriggerProps>().not.toHaveProperty("size");
+  expectTypeOf<ToastContainerProps>().not.toHaveProperty("size");
+  expectTypeOf<ToastOptions>().not.toHaveProperty("size");
+  expectTypeOf<SkeletonProps>().not.toHaveProperty("size");
+  expectTypeOf<InlineAlertProps>().not.toHaveProperty("size");
+});
+
+describe("sizes of the overlays, one open at a time", () => {
+  test("Menu: S, M, L and XL items each have their own look", async () => {
+    const user = userEvent.setup();
+    const looks = new Set<string>();
+    for (const size of sizes) {
+      const { unmount } = render(
+        <MenuTrigger>
+          <Button>Open</Button>
+          <Menu size={size}>
+            <MenuItem id="a">Item</MenuItem>
+          </Menu>
+        </MenuTrigger>,
+      );
+      await user.click(screen.getByRole("button", { name: "Open" }));
+      looks.add(screen.getByRole("menuitem").className);
+      unmount();
+    }
+    expect(looks.size).toBe(sizes.length);
+  });
+
+  test("AlertDialog: S, M and L each take their own width", () => {
+    const looks = new Set<string>();
+    for (const size of dialogWidths) {
+      const { unmount } = render(
+        <AlertDialog isOpen size={size} title={size} primaryActionLabel="OK">
+          Body
+        </AlertDialog>,
+      );
+      const frame = screen.getByRole("alertdialog").parentElement;
+      looks.add(frame?.className ?? "");
+      unmount();
+    }
+    expect(looks.size).toBe(dialogWidths.length);
+  });
 });
 
 test("ButtonGroup: a Button's own size wins over the group's", () => {

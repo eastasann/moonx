@@ -64,3 +64,8 @@ export const verticalRule = style({
   gap: vars.space["300"],
   height: vars.space["700"],
 });
+
+/** A narrow box that squeezes what it holds. */
+export const narrowBox = style({
+  width: vars.space["1000"],
+});

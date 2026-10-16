@@ -65,6 +65,29 @@ export type DividerSize = (typeof dividerSizes)[number];
 export const dialogWidths = ["S", "M", "L"] as const;
 export type DialogWidth = (typeof dialogWidths)[number];
 
+/**
+ * Dialog's `size` (design-spec 4.5): the three widths, and `fullscreen`, which fills the
+ * window at every width. Which modal takes which is design-spec 3.8.
+ */
+export const dialogSizes = [...dialogWidths, "fullscreen"] as const;
+export type DialogSize = (typeof dialogSizes)[number];
+
+/** Popover widths (design-spec 4.5, 06 component.popover.width). Unsized, it fits its content. */
+export const popoverSizes = ["S", "M", "L"] as const;
+export type PopoverSize = (typeof popoverSizes)[number];
+
+/** ContextualHelp sizes: its button's, from 06 component.action-button (design-spec 4.5). */
+export const contextualHelpSizes = ["XS", "S"] as const;
+export type ContextualHelpSize = (typeof contextualHelpSizes)[number];
+
+/** Breadcrumbs sizes (design-spec 4.5, 06 component.breadcrumbs). */
+export const breadcrumbsSizes = ["M", "L"] as const;
+export type BreadcrumbsSize = (typeof breadcrumbsSizes)[number];
+
+/** IllustratedMessage sizes (design-spec 4.5, 06 component.illustrated-message). */
+export const illustratedMessageSizes = ["S", "M", "L"] as const;
+export type IllustratedMessageSize = (typeof illustratedMessageSizes)[number];
+
 /** InlineAlert variants and the status colours (design-spec 4.4・4.5). */
 export const statusVariants = [
   "informative",
@@ -73,6 +96,41 @@ export const statusVariants = [
   "neutral",
 ] as const;
 export type StatusVariant = (typeof statusVariants)[number];
+
+/**
+ * Badge's `variant`: the text in ink, or the amber text of "Overdue" and "overdue 3d"
+ * (design-spec 4.5). Notice only takes the outline frame.
+ */
+export const badgeVariants = ["neutral", "notice"] as const;
+export type BadgeVariant = (typeof badgeVariants)[number];
+
+/**
+ * Badge's `fillStyle`: Spectrum 2's `outline` and `bold` and moonx's `dashed`. `outline`
+ * is the uncoloured frame (Proceed / Hold / Drop, stages), `dashed` the frame of
+ * Undecided, `bold` the ink fill of an unread count (design-spec 4.5).
+ */
+export const badgeFillStyles = ["outline", "dashed", "bold"] as const;
+export type BadgeFillStyle = (typeof badgeFillStyles)[number];
+
+/**
+ * StatusLight's `variant` (design-spec 4.5): the F/A/U states and the check states drawn
+ * as MoonGlyph's moons (4.4「状態の形」), and the save states, which show an icon instead
+ * (6.0.2: Saving…, Saved ✓, Couldn't save with a warning).
+ */
+export const statusLightVariants = [
+  "fact",
+  "assumption",
+  "unknown",
+  "unclassified",
+  "empty",
+  "not-started",
+  "partial",
+  "done",
+  "saving",
+  "saved",
+  "save-failed",
+] as const;
+export type StatusLightVariant = (typeof statusLightVariants)[number];
 
 /** The F/A/U states that have colours (design-spec 6.0.3). */
 export const fauStates = [

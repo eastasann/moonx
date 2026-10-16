@@ -1,5 +1,5 @@
 import { vars } from "@moonx/ui-tokens";
-import { keyframes, style } from "@vanilla-extract/css";
+import { keyframes, style, styleVariants } from "@vanilla-extract/css";
 import { reducedMotion } from "../styles/helpers";
 
 const fadeIn = keyframes({ from: { opacity: 0 }, to: { opacity: 1 } });
@@ -122,4 +122,105 @@ export const trayDialog = style({
   flexDirection: "column",
   minHeight: 0,
   outline: "none",
+});
+
+/** Content of a popover or tray that is a dialog (Popover, Tray): its own padding. */
+export const popoverDialog = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: vars.density.regular.gap,
+  minHeight: 0,
+  padding: vars.density.regular.panelPadding,
+  outline: "none",
+});
+
+/**
+ * Popover widths (06 component.popover.width), kept inside the window. On a phone the
+ * tray is the window's width instead.
+ */
+export const popoverWidth = styleVariants(
+  vars.scale.component.popover.width,
+  (width) => ({
+    width,
+    maxWidth: `calc(100vw - 2 * ${vars.layout.pageGutterMobile})`,
+  }),
+);
+
+/**
+ * The scrim behind a Dialog on tablet and wider, centring it in the visual viewport, so
+ * the on-screen keyboard of a tablet does not cover it.
+ */
+export const centeredOverlay = style([
+  trayOverlay,
+  {
+    alignItems: "center",
+    padding: vars.layout.pageGutterTablet,
+  },
+]);
+
+/** A Dialog in the middle of the screen: a card at most 85% of the visible height. */
+export const centeredFrame = style({
+  display: "flex",
+  flexDirection: "column",
+  width: "100%",
+  maxHeight: `calc(${vars.layout.sheetMaxHeightRatio} * var(--visual-viewport-height))`,
+  overflow: "hidden",
+  background: vars.color.surface.overlay,
+  border: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
+  borderRadius: vars.radius.sheet,
+  boxShadow: vars.shadow.overlay,
+  color: vars.color.text.primary,
+  outline: "none",
+  selectors: {
+    "&[data-entering]": { animation: enter(riseIn) },
+    "&[data-exiting]": { animation: exit(fadeOut) },
+  },
+  "@media": {
+    [reducedMotion]: {
+      selectors: {
+        "&[data-entering]": { animation: reducedFade(fadeIn) },
+        "&[data-exiting]": { animation: reducedFade(fadeOut) },
+      },
+    },
+  },
+});
+
+/** Dialog widths: small, medium and large (06 layout.dialog-max-width, design-spec 3.8). */
+export const dialogWidth = styleVariants(
+  vars.layout.dialogMaxWidth,
+  (width) => ({
+    maxWidth: width,
+  }),
+);
+
+/**
+ * The scrim of a full-screen sheet: a large Dialog on a phone, and a fullscreen Dialog at
+ * every width (design-spec 3.8). As tall as the visual viewport, like the tray's.
+ */
+export const sheetOverlay = style([trayOverlay, { alignItems: "stretch" }]);
+
+/** A sheet that fills the visible window, clear of the notch and the home indicator. */
+export const sheet = style({
+  display: "flex",
+  flexDirection: "column",
+  width: "100%",
+  height: "100%",
+  overflow: "hidden",
+  paddingBlockStart: "env(safe-area-inset-top)",
+  paddingBlockEnd: "env(safe-area-inset-bottom)",
+  background: vars.color.surface.overlay,
+  color: vars.color.text.primary,
+  outline: "none",
+  selectors: {
+    "&[data-entering]": { animation: enter(slideUp) },
+    "&[data-exiting]": { animation: exit(slideDown) },
+  },
+  "@media": {
+    [reducedMotion]: {
+      selectors: {
+        "&[data-entering]": { animation: reducedFade(fadeIn) },
+        "&[data-exiting]": { animation: reducedFade(fadeOut) },
+      },
+    },
+  },
 });

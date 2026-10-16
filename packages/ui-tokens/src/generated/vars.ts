@@ -181,6 +181,53 @@ export const vars = createGlobalThemeContract({
           L: "scale-component-tag-font-size-L",
         },
       },
+      menu: {
+        itemHeight: {
+          S: "scale-component-menu-item-height-S",
+          M: "scale-component-menu-item-height-M",
+          L: "scale-component-menu-item-height-L",
+          XL: "scale-component-menu-item-height-XL",
+        },
+        paddingX: {
+          S: "scale-component-menu-padding-x-S",
+          M: "scale-component-menu-padding-x-M",
+          L: "scale-component-menu-padding-x-L",
+          XL: "scale-component-menu-padding-x-XL",
+        },
+        fontSize: {
+          S: "scale-component-menu-font-size-S",
+          M: "scale-component-menu-font-size-M",
+          L: "scale-component-menu-font-size-L",
+          XL: "scale-component-menu-font-size-XL",
+        },
+      },
+      badge: {
+        height: {
+          S: "scale-component-badge-height-S",
+          M: "scale-component-badge-height-M",
+          L: "scale-component-badge-height-L",
+          XL: "scale-component-badge-height-XL",
+        },
+        paddingX: {
+          S: "scale-component-badge-padding-x-S",
+          M: "scale-component-badge-padding-x-M",
+          L: "scale-component-badge-padding-x-L",
+          XL: "scale-component-badge-padding-x-XL",
+        },
+        fontSize: {
+          S: "scale-component-badge-font-size-S",
+          M: "scale-component-badge-font-size-M",
+          L: "scale-component-badge-font-size-L",
+          XL: "scale-component-badge-font-size-XL",
+        },
+      },
+      popover: {
+        width: {
+          S: "scale-component-popover-width-S",
+          M: "scale-component-popover-width-M",
+          L: "scale-component-popover-width-L",
+        },
+      },
       field: {
         height: {
           S: "scale-component-field-height-S",
@@ -263,6 +310,18 @@ export const vars = createGlobalThemeContract({
           L: "scale-component-status-light-dot-size-L",
           XL: "scale-component-status-light-dot-size-XL",
         },
+        fontSize: {
+          S: "scale-component-status-light-font-size-S",
+          M: "scale-component-status-light-font-size-M",
+          L: "scale-component-status-light-font-size-L",
+          XL: "scale-component-status-light-font-size-XL",
+        },
+        gap: {
+          S: "scale-component-status-light-gap-S",
+          M: "scale-component-status-light-gap-M",
+          L: "scale-component-status-light-gap-L",
+          XL: "scale-component-status-light-gap-XL",
+        },
       },
       icon: {
         size: {
@@ -286,6 +345,12 @@ export const vars = createGlobalThemeContract({
           L: "scale-component-meter-thickness-L",
           XL: "scale-component-meter-thickness-XL",
         },
+        fontSize: {
+          S: "scale-component-meter-font-size-S",
+          M: "scale-component-meter-font-size-M",
+          L: "scale-component-meter-font-size-L",
+          XL: "scale-component-meter-font-size-XL",
+        },
       },
       progressCircle: {
         size: {
@@ -305,6 +370,63 @@ export const vars = createGlobalThemeContract({
           M: "scale-component-tabs-item-height-M",
           L: "scale-component-tabs-item-height-L",
           XL: "scale-component-tabs-item-height-XL",
+        },
+      },
+      disclosure: {
+        titleHeight: {
+          S: "scale-component-disclosure-title-height-S",
+          M: "scale-component-disclosure-title-height-M",
+          L: "scale-component-disclosure-title-height-L",
+          XL: "scale-component-disclosure-title-height-XL",
+        },
+        titleFontSize: {
+          S: "scale-component-disclosure-title-font-size-S",
+          M: "scale-component-disclosure-title-font-size-M",
+          L: "scale-component-disclosure-title-font-size-L",
+          XL: "scale-component-disclosure-title-font-size-XL",
+        },
+        titlePaddingX: {
+          S: "scale-component-disclosure-title-padding-x-S",
+          M: "scale-component-disclosure-title-padding-x-M",
+          L: "scale-component-disclosure-title-padding-x-L",
+          XL: "scale-component-disclosure-title-padding-x-XL",
+        },
+        panelPaddingX: {
+          S: "scale-component-disclosure-panel-padding-x-S",
+          M: "scale-component-disclosure-panel-padding-x-M",
+          L: "scale-component-disclosure-panel-padding-x-L",
+          XL: "scale-component-disclosure-panel-padding-x-XL",
+        },
+      },
+      breadcrumbs: {
+        height: {
+          M: "scale-component-breadcrumbs-height-M",
+          L: "scale-component-breadcrumbs-height-L",
+        },
+        fontSize: {
+          M: "scale-component-breadcrumbs-font-size-M",
+          L: "scale-component-breadcrumbs-font-size-L",
+        },
+        gap: {
+          M: "scale-component-breadcrumbs-gap-M",
+          L: "scale-component-breadcrumbs-gap-L",
+        },
+      },
+      illustratedMessage: {
+        iconSize: {
+          S: "scale-component-illustrated-message-icon-size-S",
+          M: "scale-component-illustrated-message-icon-size-M",
+          L: "scale-component-illustrated-message-icon-size-L",
+        },
+        titleFontSize: {
+          S: "scale-component-illustrated-message-title-font-size-S",
+          M: "scale-component-illustrated-message-title-font-size-M",
+          L: "scale-component-illustrated-message-title-font-size-L",
+        },
+        bodyFontSize: {
+          S: "scale-component-illustrated-message-body-font-size-S",
+          M: "scale-component-illustrated-message-body-font-size-M",
+          L: "scale-component-illustrated-message-body-font-size-L",
         },
       },
       table: {
@@ -596,6 +718,7 @@ export const vars = createGlobalThemeContract({
     tabBarHeight: "layout-tab-bar-height",
     listPaneWidth: "layout-list-pane-width",
     thumbnailColumnWidth: "layout-thumbnail-column-width",
+    contextualHelpWidth: "layout-contextual-help-width",
     popoverMaxHeight: "layout-popover-max-height",
     bottomActionHeight: "layout-bottom-action-height",
     pageGutterMobile: "layout-page-gutter-mobile",

@@ -394,6 +394,7 @@
       "4": { "$value": { "value": 4, "unit": "px" } },
       "5": { "$value": { "value": 5, "unit": "px" } },
       "6": { "$value": { "value": 6, "unit": "px" } },
+      "7": { "$value": { "value": 7, "unit": "px" } },
       "8": { "$value": { "value": 8, "unit": "px" } },
       "9": { "$value": { "value": 9, "unit": "px" } },
       "10": { "$value": { "value": 10, "unit": "px" } },
@@ -403,6 +404,7 @@
       "14": { "$value": { "value": 14, "unit": "px" } },
       "15": { "$value": { "value": 15, "unit": "px" } },
       "16": { "$value": { "value": 16, "unit": "px" } },
+      "17": { "$value": { "value": 17, "unit": "px" } },
       "18": { "$value": { "value": 18, "unit": "px" } },
       "19": { "$value": { "value": 19, "unit": "px" } },
       "20": { "$value": { "value": 20, "unit": "px" } },
@@ -428,20 +430,28 @@
       "70": { "$value": { "value": 70, "unit": "px" } },
       "80": { "$value": { "value": 80, "unit": "px" } },
       "96": { "$value": { "value": 96, "unit": "px" } },
+      "120": { "$value": { "value": 120, "unit": "px" } },
       "160": { "$value": { "value": 160, "unit": "px" } },
       "192": { "$value": { "value": 192, "unit": "px" } },
+      "200": { "$value": { "value": 200, "unit": "px" } },
       "208": { "$value": { "value": 208, "unit": "px" } },
       "224": { "$value": { "value": 224, "unit": "px" } },
       "240": { "$value": { "value": 240, "unit": "px" } },
       "256": { "$value": { "value": 256, "unit": "px" } },
+      "268": { "$value": { "value": 268, "unit": "px" } },
       "272": { "$value": { "value": 272, "unit": "px" } },
       "288": { "$value": { "value": 288, "unit": "px" } },
+      "336": { "$value": { "value": 336, "unit": "px" } },
       "352": { "$value": { "value": 352, "unit": "px" } },
       "360": { "$value": { "value": 360, "unit": "px" } },
       "384": { "$value": { "value": 384, "unit": "px" } },
       "400": { "$value": { "value": 400, "unit": "px" } },
+      "416": { "$value": { "value": 416, "unit": "px" } },
+      "420": { "$value": { "value": 420, "unit": "px" } },
       "480": { "$value": { "value": 480, "unit": "px" } },
+      "520": { "$value": { "value": 520, "unit": "px" } },
       "540": { "$value": { "value": 540, "unit": "px" } },
+      "576": { "$value": { "value": 576, "unit": "px" } },
       "640": { "$value": { "value": 640, "unit": "px" } },
       "720": { "$value": { "value": 720, "unit": "px" } },
       "960": { "$value": { "value": 960, "unit": "px" } },
@@ -1004,6 +1014,56 @@
               "L": { "$value": "{primitive.font.size.16}" }
             }
           },
+          "menu": {
+            "$description": "Menu と ActionMenu の項目（S〜XL。design-spec 4.5）。Spectrum 2 の Menu と同じく、Spectrum 2 のトークンの component-height-75〜300（項目の最小の高さ）・component-edge-to-text-75〜300・font-size-75〜300",
+            "item-height": {
+              "S": { "$value": "{primitive.dimension.24}" },
+              "M": { "$value": "{primitive.dimension.32}" },
+              "L": { "$value": "{primitive.dimension.40}" },
+              "XL": { "$value": "{primitive.dimension.48}" }
+            },
+            "padding-x": {
+              "S": { "$value": "{primitive.dimension.9}" },
+              "M": { "$value": "{primitive.dimension.12}" },
+              "L": { "$value": "{primitive.dimension.15}" },
+              "XL": { "$value": "{primitive.dimension.18}" }
+            },
+            "font-size": {
+              "S": { "$value": "{primitive.font.size.12}" },
+              "M": { "$value": "{primitive.font.size.14}" },
+              "L": { "$value": "{primitive.font.size.16}" },
+              "XL": { "$value": "{primitive.font.size.18}" }
+            }
+          },
+          "badge": {
+            "$description": "Badge（S〜XL。既定は S。design-spec 4.5）。Spectrum 2 の Badge と同じく、Spectrum 2 のトークンの component-height-75〜300（最小の高さ）・component-edge-to-text-75〜300・font-size-75〜300",
+            "height": {
+              "S": { "$value": "{primitive.dimension.24}" },
+              "M": { "$value": "{primitive.dimension.32}" },
+              "L": { "$value": "{primitive.dimension.40}" },
+              "XL": { "$value": "{primitive.dimension.48}" }
+            },
+            "padding-x": {
+              "S": { "$value": "{primitive.dimension.9}" },
+              "M": { "$value": "{primitive.dimension.12}" },
+              "L": { "$value": "{primitive.dimension.15}" },
+              "XL": { "$value": "{primitive.dimension.18}" }
+            },
+            "font-size": {
+              "S": { "$value": "{primitive.font.size.12}" },
+              "M": { "$value": "{primitive.font.size.14}" },
+              "L": { "$value": "{primitive.font.size.16}" },
+              "XL": { "$value": "{primitive.font.size.18}" }
+            }
+          },
+          "popover": {
+            "$description": "Popover の size（S / M / L。design-spec 4.5）の幅。トークンが無いので @react-spectrum/s2 の Popover の値で、large は S2 がタッチの端末で掛ける 1.25 倍。size を指定しない Popover は中身の幅に合わせる",
+            "width": {
+              "S": { "$value": "{primitive.dimension.336}" },
+              "M": { "$value": "{primitive.dimension.416}" },
+              "L": { "$value": "{primitive.dimension.576}" }
+            }
+          },
           "field": {
             "$description": "TextField・TextArea・NumberField・SearchField・Picker・ComboBox・DatePicker。large の S は 15px のため、スマホの Web では入力欄に S を使わない（iOS の拡大を防ぐ）",
             "height": {
@@ -1085,12 +1145,24 @@
             }
           },
           "status-light": {
-            "$description": "MoonGlyph（StatusLight・CheckDots・凡例の印）の大きさ",
+            "$description": "StatusLight（S〜XL）と MoonGlyph（CheckDots・凡例の印）。dot-size は印の大きさ（Spectrum 2 のトークンの status-light-dot-size-*）。font-size はラベルの文字、gap は印とラベルの間で、Spectrum 2 の StatusLight と同じく font-size-75〜300・status-light-text-to-visual-75〜300",
             "dot-size": {
               "S": { "$value": "{primitive.dimension.8}" },
               "M": { "$value": "{primitive.dimension.10}" },
               "L": { "$value": "{primitive.dimension.12}" },
               "XL": { "$value": "{primitive.dimension.14}" }
+            },
+            "font-size": {
+              "S": { "$value": "{primitive.font.size.12}" },
+              "M": { "$value": "{primitive.font.size.14}" },
+              "L": { "$value": "{primitive.font.size.16}" },
+              "XL": { "$value": "{primitive.font.size.18}" }
+            },
+            "gap": {
+              "S": { "$value": "{primitive.dimension.5}" },
+              "M": { "$value": "{primitive.dimension.6}" },
+              "L": { "$value": "{primitive.dimension.7}" },
+              "XL": { "$value": "{primitive.dimension.8}" }
             }
           },
           "icon": {
@@ -1111,12 +1183,18 @@
             }
           },
           "meter": {
-            "$description": "Meter（F/A/U の内訳の帯）と ProgressBar の太さ",
+            "$description": "Meter（F/A/U の内訳の帯）と ProgressBar（S〜XL）。thickness は帯の太さ、font-size はラベルと値の文字（Spectrum 2 の ProgressBar・Meter と同じく font-size-75〜300）",
             "thickness": {
               "S": { "$value": "{primitive.dimension.4}" },
               "M": { "$value": "{primitive.dimension.6}" },
               "L": { "$value": "{primitive.dimension.8}" },
               "XL": { "$value": "{primitive.dimension.10}" }
+            },
+            "font-size": {
+              "S": { "$value": "{primitive.font.size.12}" },
+              "M": { "$value": "{primitive.font.size.14}" },
+              "L": { "$value": "{primitive.font.size.16}" },
+              "XL": { "$value": "{primitive.font.size.18}" }
             }
           },
           "progress-circle": {
@@ -1139,6 +1217,66 @@
               "M": { "$value": "{primitive.dimension.48}" },
               "L": { "$value": "{primitive.dimension.56}" },
               "XL": { "$value": "{primitive.dimension.64}" }
+            }
+          },
+          "disclosure": {
+            "$description": "Disclosure / Accordion（S〜XL。design-spec 4.5）。見出しの最小の高さ（component-height-75〜300。regular の密度）と見出しの文字（title-size-s〜xl）は Spectrum 2 の Disclosure と同じ。見出しの左右は Spectrum 2 のトークンの accordion-edge-to-content-area-small〜extra-large（S2 の Disclosure は高さから計算する）、中身の左右は accordion-content-area-edge-to-content-small〜extra-large",
+            "title-height": {
+              "S": { "$value": "{primitive.dimension.24}" },
+              "M": { "$value": "{primitive.dimension.32}" },
+              "L": { "$value": "{primitive.dimension.40}" },
+              "XL": { "$value": "{primitive.dimension.48}" }
+            },
+            "title-font-size": {
+              "S": { "$value": "{primitive.font.size.14}" },
+              "M": { "$value": "{primitive.font.size.16}" },
+              "L": { "$value": "{primitive.font.size.18}" },
+              "XL": { "$value": "{primitive.font.size.20}" }
+            },
+            "title-padding-x": {
+              "S": { "$value": "{primitive.dimension.7}" },
+              "M": { "$value": "{primitive.dimension.11}" },
+              "L": { "$value": "{primitive.dimension.14}" },
+              "XL": { "$value": "{primitive.dimension.17}" }
+            },
+            "panel-padding-x": {
+              "S": { "$value": "{primitive.dimension.8}" },
+              "M": { "$value": "{primitive.dimension.9}" },
+              "L": { "$value": "{primitive.dimension.12}" },
+              "XL": { "$value": "{primitive.dimension.15}" }
+            }
+          },
+          "breadcrumbs": {
+            "$description": "Breadcrumbs（M / L。design-spec 4.5）。Spectrum 2 の Breadcrumbs と同じく、項目の高さは Spectrum 2 のトークンの component-height-100・200、文字は font-size-100・200、文字と区切りの間は breadcrumbs-text-to-separator-medium・large",
+            "height": {
+              "M": { "$value": "{primitive.dimension.32}" },
+              "L": { "$value": "{primitive.dimension.40}" }
+            },
+            "font-size": {
+              "M": { "$value": "{primitive.font.size.14}" },
+              "L": { "$value": "{primitive.font.size.16}" }
+            },
+            "gap": {
+              "M": { "$value": "{primitive.dimension.6}" },
+              "L": { "$value": "{primitive.dimension.9}" }
+            }
+          },
+          "illustrated-message": {
+            "$description": "IllustratedMessage（S / M / L。design-spec 4.5）。絵の代わりに置く Lucide のアイコンの大きさは、Spectrum 2 の IllustratedMessage が描く絵の大きさ（S と M は絵の M の 96、L は絵の L の 160。トークンが無いので @react-spectrum/s2 の値で、large は S2 がタッチの端末で掛ける 1.25 倍）。見出しの文字は Spectrum 2 のトークンの illustrated-message-small・medium・large-title-font-size、説明の文字は illustrated-message-small・medium・large-body-font-size",
+            "icon-size": {
+              "S": { "$value": "{primitive.dimension.96}" },
+              "M": { "$value": "{primitive.dimension.96}" },
+              "L": { "$value": "{primitive.dimension.160}" }
+            },
+            "title-font-size": {
+              "S": { "$value": "{primitive.font.size.16}" },
+              "M": { "$value": "{primitive.font.size.20}" },
+              "L": { "$value": "{primitive.font.size.22}" }
+            },
+            "body-font-size": {
+              "S": { "$value": "{primitive.font.size.12}" },
+              "M": { "$value": "{primitive.font.size.14}" },
+              "L": { "$value": "{primitive.font.size.14}" }
             }
           },
           "table": {
@@ -1251,6 +1389,56 @@
               "L": { "$value": "{primitive.font.size.19}" }
             }
           },
+          "menu": {
+            "$description": "Menu と ActionMenu の項目（S〜XL。design-spec 4.5）。Spectrum 2 の Menu と同じく、Spectrum 2 のトークンの component-height-75〜300（項目の最小の高さ）・component-edge-to-text-75〜300・font-size-75〜300",
+            "item-height": {
+              "S": { "$value": "{primitive.dimension.30}" },
+              "M": { "$value": "{primitive.dimension.40}" },
+              "L": { "$value": "{primitive.dimension.50}" },
+              "XL": { "$value": "{primitive.dimension.60}" }
+            },
+            "padding-x": {
+              "S": { "$value": "{primitive.dimension.11}" },
+              "M": { "$value": "{primitive.dimension.15}" },
+              "L": { "$value": "{primitive.dimension.19}" },
+              "XL": { "$value": "{primitive.dimension.22}" }
+            },
+            "font-size": {
+              "S": { "$value": "{primitive.font.size.15}" },
+              "M": { "$value": "{primitive.font.size.17}" },
+              "L": { "$value": "{primitive.font.size.19}" },
+              "XL": { "$value": "{primitive.font.size.22}" }
+            }
+          },
+          "badge": {
+            "$description": "Badge（S〜XL。既定は S。design-spec 4.5）。Spectrum 2 の Badge と同じく、Spectrum 2 のトークンの component-height-75〜300（最小の高さ）・component-edge-to-text-75〜300・font-size-75〜300",
+            "height": {
+              "S": { "$value": "{primitive.dimension.30}" },
+              "M": { "$value": "{primitive.dimension.40}" },
+              "L": { "$value": "{primitive.dimension.50}" },
+              "XL": { "$value": "{primitive.dimension.60}" }
+            },
+            "padding-x": {
+              "S": { "$value": "{primitive.dimension.11}" },
+              "M": { "$value": "{primitive.dimension.15}" },
+              "L": { "$value": "{primitive.dimension.19}" },
+              "XL": { "$value": "{primitive.dimension.22}" }
+            },
+            "font-size": {
+              "S": { "$value": "{primitive.font.size.15}" },
+              "M": { "$value": "{primitive.font.size.17}" },
+              "L": { "$value": "{primitive.font.size.19}" },
+              "XL": { "$value": "{primitive.font.size.22}" }
+            }
+          },
+          "popover": {
+            "$description": "Popover の size（S / M / L。design-spec 4.5）の幅。トークンが無いので @react-spectrum/s2 の Popover の値で、large は S2 がタッチの端末で掛ける 1.25 倍。size を指定しない Popover は中身の幅に合わせる",
+            "width": {
+              "S": { "$value": "{primitive.dimension.420}" },
+              "M": { "$value": "{primitive.dimension.520}" },
+              "L": { "$value": "{primitive.dimension.720}" }
+            }
+          },
           "field": {
             "$description": "TextField・TextArea・NumberField・SearchField・Picker・ComboBox・DatePicker。large の S は 15px のため、スマホの Web では入力欄に S を使わない（iOS の拡大を防ぐ）",
             "height": {
@@ -1332,12 +1520,24 @@
             }
           },
           "status-light": {
-            "$description": "MoonGlyph（StatusLight・CheckDots・凡例の印）の大きさ",
+            "$description": "StatusLight（S〜XL）と MoonGlyph（CheckDots・凡例の印）。dot-size は印の大きさ（Spectrum 2 のトークンの status-light-dot-size-*）。font-size はラベルの文字、gap は印とラベルの間で、Spectrum 2 の StatusLight と同じく font-size-75〜300・status-light-text-to-visual-75〜300",
             "dot-size": {
               "S": { "$value": "{primitive.dimension.10}" },
               "M": { "$value": "{primitive.dimension.12}" },
               "L": { "$value": "{primitive.dimension.14}" },
               "XL": { "$value": "{primitive.dimension.16}" }
+            },
+            "font-size": {
+              "S": { "$value": "{primitive.font.size.15}" },
+              "M": { "$value": "{primitive.font.size.17}" },
+              "L": { "$value": "{primitive.font.size.19}" },
+              "XL": { "$value": "{primitive.font.size.22}" }
+            },
+            "gap": {
+              "S": { "$value": "{primitive.dimension.7}" },
+              "M": { "$value": "{primitive.dimension.8}" },
+              "L": { "$value": "{primitive.dimension.9}" },
+              "XL": { "$value": "{primitive.dimension.10}" }
             }
           },
           "icon": {
@@ -1358,12 +1558,18 @@
             }
           },
           "meter": {
-            "$description": "Meter（F/A/U の内訳の帯）と ProgressBar の太さ",
+            "$description": "Meter（F/A/U の内訳の帯）と ProgressBar（S〜XL）。thickness は帯の太さ、font-size はラベルと値の文字（Spectrum 2 の ProgressBar・Meter と同じく font-size-75〜300）",
             "thickness": {
               "S": { "$value": "{primitive.dimension.5}" },
               "M": { "$value": "{primitive.dimension.8}" },
               "L": { "$value": "{primitive.dimension.10}" },
               "XL": { "$value": "{primitive.dimension.13}" }
+            },
+            "font-size": {
+              "S": { "$value": "{primitive.font.size.15}" },
+              "M": { "$value": "{primitive.font.size.17}" },
+              "L": { "$value": "{primitive.font.size.19}" },
+              "XL": { "$value": "{primitive.font.size.22}" }
             }
           },
           "progress-circle": {
@@ -1386,6 +1592,66 @@
               "M": { "$value": "{primitive.dimension.60}" },
               "L": { "$value": "{primitive.dimension.70}" },
               "XL": { "$value": "{primitive.dimension.80}" }
+            }
+          },
+          "disclosure": {
+            "$description": "Disclosure / Accordion（S〜XL。design-spec 4.5）。見出しの最小の高さ（component-height-75〜300。regular の密度）と見出しの文字（title-size-s〜xl）は Spectrum 2 の Disclosure と同じ。見出しの左右は Spectrum 2 のトークンの accordion-edge-to-content-area-small〜extra-large（S2 の Disclosure は高さから計算する）、中身の左右は accordion-content-area-edge-to-content-small〜extra-large",
+            "title-height": {
+              "S": { "$value": "{primitive.dimension.30}" },
+              "M": { "$value": "{primitive.dimension.40}" },
+              "L": { "$value": "{primitive.dimension.50}" },
+              "XL": { "$value": "{primitive.dimension.60}" }
+            },
+            "title-font-size": {
+              "S": { "$value": "{primitive.font.size.17}" },
+              "M": { "$value": "{primitive.font.size.19}" },
+              "L": { "$value": "{primitive.font.size.22}" },
+              "XL": { "$value": "{primitive.font.size.24}" }
+            },
+            "title-padding-x": {
+              "S": { "$value": "{primitive.dimension.7}" },
+              "M": { "$value": "{primitive.dimension.11}" },
+              "L": { "$value": "{primitive.dimension.14}" },
+              "XL": { "$value": "{primitive.dimension.17}" }
+            },
+            "panel-padding-x": {
+              "S": { "$value": "{primitive.dimension.10}" },
+              "M": { "$value": "{primitive.dimension.11}" },
+              "L": { "$value": "{primitive.dimension.15}" },
+              "XL": { "$value": "{primitive.dimension.19}" }
+            }
+          },
+          "breadcrumbs": {
+            "$description": "Breadcrumbs（M / L。design-spec 4.5）。Spectrum 2 の Breadcrumbs と同じく、項目の高さは Spectrum 2 のトークンの component-height-100・200、文字は font-size-100・200、文字と区切りの間は breadcrumbs-text-to-separator-medium・large",
+            "height": {
+              "M": { "$value": "{primitive.dimension.40}" },
+              "L": { "$value": "{primitive.dimension.50}" }
+            },
+            "font-size": {
+              "M": { "$value": "{primitive.font.size.17}" },
+              "L": { "$value": "{primitive.font.size.19}" }
+            },
+            "gap": {
+              "M": { "$value": "{primitive.dimension.8}" },
+              "L": { "$value": "{primitive.dimension.11}" }
+            }
+          },
+          "illustrated-message": {
+            "$description": "IllustratedMessage（S / M / L。design-spec 4.5）。絵の代わりに置く Lucide のアイコンの大きさは、Spectrum 2 の IllustratedMessage が描く絵の大きさ（S と M は絵の M の 96、L は絵の L の 160。トークンが無いので @react-spectrum/s2 の値で、large は S2 がタッチの端末で掛ける 1.25 倍）。見出しの文字は Spectrum 2 のトークンの illustrated-message-small・medium・large-title-font-size、説明の文字は illustrated-message-small・medium・large-body-font-size",
+            "icon-size": {
+              "S": { "$value": "{primitive.dimension.120}" },
+              "M": { "$value": "{primitive.dimension.120}" },
+              "L": { "$value": "{primitive.dimension.200}" }
+            },
+            "title-font-size": {
+              "S": { "$value": "{primitive.font.size.17}" },
+              "M": { "$value": "{primitive.font.size.22}" },
+              "L": { "$value": "{primitive.font.size.24}" }
+            },
+            "body-font-size": {
+              "S": { "$value": "{primitive.font.size.15}" },
+              "M": { "$value": "{primitive.font.size.15}" },
+              "L": { "$value": "{primitive.font.size.15}" }
             }
           },
           "table": {
@@ -1883,6 +2149,10 @@
         "$value": "{primitive.dimension.160}",
         "$description": "サムネイル列の幅"
       },
+      "contextual-help-width": {
+        "$value": "{primitive.dimension.268}",
+        "$description": "ContextualHelp が開く中身の幅（Spectrum 2 のトークンの contextual-help-minimum-width。トークンはスケールで変わらない。@react-spectrum/s2 のコードはタッチの端末で 1.25 倍に描くが、トークンがあるものはトークンの値を使う）"
+      },
       "popover-max-height": {
         "$value": "{primitive.dimension.384}",
         "$description": "Popover の高さの上限（画面の可視領域のほうが低ければそちら）"
@@ -1908,7 +2178,7 @@
       "sheet-max-height-ratio": {
         "$type": "number",
         "$value": "{primitive.ratio.85}",
-        "$description": "Tray・Dialog（small と medium）・Panel の高さの上限（0.85 = 見えている高さの 85%。使う側が見えている高さ（スマホのキーボードが出ている間はその上の高さ。Web は React Aria の --visual-viewport-height）に掛ける）。large の Dialog をスマホで出す全画面のシートは対象外（design-spec 3.8）"
+        "$description": "Tray・Dialog・Panel の高さの上限（0.85 = 見えている高さの 85%。使う側が見えている高さ（スマホのキーボードが出ている間はその上の高さ。Web は React Aria の --visual-viewport-height）に掛ける）。Dialog は、タブレットの幅から上の画面の中央に出すもの（small・medium・large）と、スマホの幅のトレイ（small・medium）に掛ける。large の Dialog をスマホで出す全画面のシートと fullscreen の Dialog は対象外（design-spec 3.8）"
       },
       "z-index": {
         "$type": "number",

@@ -1,4 +1,4 @@
-import type { Size } from "@moonx/ui-tokens";
+import type { Size, SizeWithXS } from "@moonx/ui-tokens";
 import { createContext, type ReactNode, useContext } from "react";
 import {
   Button as AriaButton,
@@ -38,12 +38,21 @@ export interface ActionButtonProps
 }
 
 /** A tool on the screen (the toolbar's 💬・🕘・⋯), as opposed to its main action. */
-export function ActionButton({
+export function ActionButton(props: ActionButtonProps) {
+  return <ActionButtonBase {...props} />;
+}
+
+/**
+ * ActionButton with the XS step too, for the components whose button starts at XS
+ * (ActionMenu, ContextualHelp; design-spec 4.5). Not exported from the package: an
+ * ActionButton of its own starts at S.
+ */
+export function ActionButtonBase({
   isQuiet: ownQuiet,
   size: ownSize,
   children,
   ...props
-}: ActionButtonProps) {
+}: Omit<ActionButtonProps, "size"> & { size?: SizeWithXS }) {
   const defaults = useContext(ActionGroupContext);
   const size = ownSize ?? defaults.size ?? "M";
   const isQuiet = ownQuiet ?? defaults.isQuiet ?? false;

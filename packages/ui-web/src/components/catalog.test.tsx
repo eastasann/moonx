@@ -1,14 +1,21 @@
 import { i18n } from "@moonx/i18n";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test } from "vitest";
 import type { ChoiceItem } from "../internal/ChoiceListBox";
 import { setPhoneWidth } from "../test/helpers";
+import { Breadcrumb, Breadcrumbs } from "./Breadcrumbs";
+import { Button } from "./Button";
 import { ComboBox } from "./ComboBox";
+import { ContextualHelp } from "./ContextualHelp";
 import { DatePicker } from "./DatePicker";
+import { Dialog, DialogTrigger } from "./Dialog";
+import { InlineAlert } from "./InlineAlert";
+import { ActionMenu, MenuItem } from "./Menu";
 import { Picker } from "./Picker";
 import { SearchField } from "./SearchField";
 import { TagGroup } from "./TagGroup";
+import { ToastContainer, ToastQueue } from "./Toast";
 
 // React Aria's strings that the components pass in from the `components` catalog (SDD 9章
 // 「React Aria の文言」). The catalog holds React Aria's own English, so each test swaps
@@ -131,5 +138,88 @@ describe("strings from the components catalog", () => {
     );
     const remove = within(screen.getByRole("row")).getByRole("button");
     expect(remove.getAttribute("aria-label")).toBe(text);
+  });
+
+  test("Dialog: the close button of a dismissable dialog", async () => {
+    const text = swap("dialog.close");
+    const user = userEvent.setup();
+    render(
+      <DialogTrigger>
+        <Button>Open</Button>
+        <Dialog title="Share" isDismissable>
+          Body
+        </Dialog>
+      </DialogTrigger>,
+    );
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    expect(
+      within(screen.getByRole("dialog")).getByRole("button", { name: text }),
+    ).toBeTruthy();
+  });
+
+  test("ActionMenu: the ⋯ button, unless the screen names it", () => {
+    const text = swap("actionMenu.label");
+    render(
+      <>
+        <ActionMenu>
+          <MenuItem id="a">A</MenuItem>
+        </ActionMenu>
+        <ActionMenu aria-label="Row actions">
+          <MenuItem id="a">A</MenuItem>
+        </ActionMenu>
+      </>,
+    );
+    expect(screen.getByRole("button", { name: text })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Row actions" })).toBeTruthy();
+  });
+
+  test("ContextualHelp: the help and the info button", () => {
+    const help = swap("contextualHelp.help");
+    const info = swap("contextualHelp.info");
+    render(
+      <>
+        <ContextualHelp title="A">a</ContextualHelp>
+        <ContextualHelp variant="info" title="B">
+          b
+        </ContextualHelp>
+      </>,
+    );
+    expect(screen.getByRole("button", { name: help })).toBeTruthy();
+    expect(screen.getByRole("button", { name: info })).toBeTruthy();
+  });
+
+  test("InlineAlert: the close button", () => {
+    const text = swap("inlineAlert.close");
+    render(<InlineAlert onDismiss={() => {}}>A new version</InlineAlert>);
+    expect(screen.getByRole("button", { name: text })).toBeTruthy();
+  });
+
+  test("Toast: the close button and the region's name with its count", () => {
+    const close = swap("toast.close");
+    const region = swap("toast.region_one");
+    render(<ToastContainer />);
+    let dismiss = () => {};
+    act(() => {
+      dismiss = ToastQueue.neutral("Decision recorded");
+    });
+    expect(screen.getByRole("region", { name: region })).toBeTruthy();
+    expect(screen.getByRole("button", { name: close })).toBeTruthy();
+    act(dismiss);
+  });
+
+  test("Breadcrumbs: the list's name, unless the screen gives one", () => {
+    const text = swap("breadcrumbs.label");
+    render(
+      <>
+        <Breadcrumbs>
+          <Breadcrumb>Here</Breadcrumb>
+        </Breadcrumbs>
+        <Breadcrumbs aria-label="Plan path">
+          <Breadcrumb>There</Breadcrumb>
+        </Breadcrumbs>
+      </>,
+    );
+    expect(screen.getByRole("list", { name: text })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Plan path" })).toBeTruthy();
   });
 });

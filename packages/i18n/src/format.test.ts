@@ -6,6 +6,7 @@ import {
   formatInputNumber,
   formatInputPercent,
   formatIsoDate,
+  formatIsoDateTime,
   formatMoney,
   formatMonths,
   formatOverdue,
@@ -151,6 +152,30 @@ describe("dates and times (design-spec 1.2)", () => {
     ).toBe("Oct 1");
     expect(formatIsoDate("2026-10-01", { timeZone: "Pacific/Honolulu" })).toBe(
       "2026-10-01",
+    );
+  });
+
+  test("an instant as local ISO 8601 with its offset (design-spec 6.6)", () => {
+    expect(formatIsoDateTime("2026-10-01T02:00:00.000Z", { timeZone })).toBe(
+      "2026-10-01T10:00+08:00",
+    );
+    expect(
+      formatIsoDateTime(
+        "2026-10-01T02:00:09.900Z",
+        { timeZone },
+        { seconds: true },
+      ),
+    ).toBe("2026-10-01T10:00:09+08:00");
+    expect(
+      formatIsoDateTime("2026-10-01T02:00:00.000Z", { timeZone: "UTC" }),
+    ).toBe("2026-10-01T02:00+00:00");
+    expect(
+      formatIsoDateTime("2026-10-01T02:00:00.000Z", {
+        timeZone: "America/St_Johns",
+      }),
+    ).toBe("2026-09-30T23:30-02:30");
+    expect(formatIsoDateTime("2026-09-30T16:00:00.000Z", { timeZone })).toBe(
+      "2026-10-01T00:00+08:00",
     );
   });
 

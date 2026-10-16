@@ -15,5 +15,8 @@
     "@sentry/cli": "3.8.0",
     "@types/bun": "^1.4.2",
     "typescript": "^7.0.2"
+  },
+  "scarfSettings": {
+    "enabled": false
   }
 }

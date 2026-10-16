@@ -195,6 +195,53 @@ export const pageSchema = <T extends z.ZodType>(item: T) =>
   z.object({ items: z.array(item), nextCursor: z.string().nullable() });
 export type Page<T> = { items: T[]; nextCursor: string | null };
 
+/** The largest `cursor`, an offset into the sorted list (SDD 5.1 一覧). */
+export const CURSOR_MAX = 1_000_000;
+export const PAGE_LIMIT_DEFAULT = 50;
+export const PAGE_LIMIT_MAX = 200;
+
+/** A whole number written in a query string, without sign, spaces or leading zeros. */
+export const queryIntSchema = z
+  .string()
+  .regex(/^(?:0|[1-9][0-9]{0,15})$/)
+  .transform(Number);
+
+/**
+ * `?cursor=&limit=` of a paged list (SDD 5.1 一覧). The cursor is the offset of the
+ * next page; an unreadable one fails on the path `cursor`.
+ */
+export const pageQuerySchema = z.object({
+  cursor: queryIntSchema.pipe(z.int().max(CURSOR_MAX)).optional(),
+  limit: queryIntSchema
+    .pipe(z.int().min(1).max(PAGE_LIMIT_MAX))
+    .default(PAGE_LIMIT_DEFAULT),
+});
+
+/**
+ * A comma-separated list in a query string ("01,02"); empty is the empty list. Elysia
+ * hands over a parameter it reads as an array (repeated, or split at its commas) as
+ * an array, which reads the same.
+ */
+export const queryListSchema = z
+  .union([z.string(), z.array(z.string())])
+  .transform((value) =>
+    (Array.isArray(value) ? value : [value]).flatMap((part) =>
+      part === "" ? [] : part.split(","),
+    ),
+  );
+
+/** `true` or `false` in a query string. */
+export const queryBooleanSchema = z
+  .enum(["true", "false"])
+  .transform((value) => value === "true");
+
+/** What a save under the optimistic lock sends about the version it read (ADR-019). */
+export const lockClaimShape = {
+  lockVersion: z.int().nonnegative(),
+  /** "Overwrite with mine": saves over a newer version. */
+  force: z.boolean().optional(),
+};
+
 export const userRefSchema = z.object({
   id: uuidSchema,
   /** `"Deleted user"` when `badge` is `deleted`. */

@@ -1,0 +1,974 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import {
+  changeHistory,
+  connectDatabase,
+  notifications,
+  validationAnswers,
+} from "@moonx/db";
+import {
+  BCDX_WORKSPACE_ID,
+  SEED_PASSWORD,
+  seedDatabase,
+  seedId,
+  selfAnalysisId,
+  userId,
+} from "@moonx/db/seed";
+import { prepareTestDatabase, testDatabaseName } from "@moonx/db/test-database";
+import {
+  adminInvitationPageSchema,
+  adminTemplateListSchema,
+  adminUserPageSchema,
+  adminWorkspacePageSchema,
+  assumptionListSchema,
+  commentListSchema,
+  competitorListSchema,
+  costsSchema,
+  decisionContextSchema,
+  decisionResultSchema,
+  economicsSchema,
+  errorBodySchema,
+  executionListSchema,
+  historyBatchRevertResultSchema,
+  historyPageSchema,
+  historyRevertResultSchema,
+  memberSelfAnalysesSchema,
+  notificationPageSchema,
+  pitchDeckSchema,
+  planHomeSchema,
+  planItemSchema,
+  planListSchema,
+  researchLogPageSchema,
+  riskListSchema,
+  selfAnalysisHomeSchema,
+  selfAnalysisSectionSchema,
+  sharedSelfAnalysisSchema,
+  templateCheckSchema,
+  templateMigrationPreviewSchema,
+  templateMigrationResultSchema,
+  templateVersionDetailSchema,
+  unreadCountSchema,
+  validationHomeSchema,
+  validationQuestionsSchema,
+} from "@moonx/schemas";
+import { and, eq } from "drizzle-orm";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { loadPitchFonts } from "./pitch-fonts";
+import { buildTestApp, uniqueIp } from "./test-app";
+import { apiRequest, cookiesOf } from "./test-fixtures";
+
+// The steps' goals on the demo data of design-spec 8: V1 of Piaya Gift Box Delivery
+// shows what 6.1 and the worked numbers of 8.3 say, its worksheets (V6–V15) list the
+// rows of 8.4 and calculate 8.3, V19 records a decision there, and the self-analyses
+// (S1, S6, S7) are as 8.1 has them. A database of its own, since the seed empties every
+// table.
+
+const base = process.env.DATABASE_URL_TEST;
+if (base === undefined || base === "") {
+  throw new Error("DATABASE_URL_TEST is required for make test-api");
+}
+const scratch = new URL(base);
+scratch.pathname = `/${testDatabaseName(base)}_seed_api_test`;
+const url = scratch.toString();
+const database = connectDatabase(url);
+const { app } = buildTestApp(database);
+
+beforeAll(async () => {
+  await prepareTestDatabase(url);
+  await seedDatabase(database.db, { measure: await loadPitchFonts() });
+}, 60_000);
+afterAll(() => database.close());
+
+const PIAYA = seedId("idea", "piaya");
+
+async function cookieOf(email: string) {
+  const response = await app.handle(
+    new Request("http://localhost/api/auth/sign-in/email", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": uniqueIp(),
+      },
+      body: JSON.stringify({ email, password: SEED_PASSWORD }),
+    }),
+  );
+  expect(response.status).toBe(200);
+  return cookiesOf(response);
+}
+
+describe("the demo data", () => {
+  test("V1 of Piaya Gift Box Delivery: the numbers of 8.3, all six checks done, its decisions and plans", async () => {
+    const response = await app.handle(
+      apiRequest("GET", `/api/v1/ideas/${PIAYA}/validation`, {
+        cookie: await cookieOf("grace@advisor.example"),
+      }),
+    );
+    expect(response.status).toBe(200);
+    const view = validationHomeSchema.parse(await response.json());
+    expect(view.idea).toMatchObject({
+      name: "Piaya Gift Box Delivery",
+      stage: "planning",
+      latestDecision: "proceed",
+      proposer: { displayName: "Ana Villanueva" },
+    });
+    expect(view.keyMetrics.initial_cost_total).toEqual({
+      value: 169_500,
+      bound: "exact",
+      reason: null,
+    });
+    expect(view.keyMetrics.break_even_units_day.value).toBeCloseTo(6.93, 2);
+    expect(view.keyMetrics.expected_operating_profit.value).toBe(18_490);
+    expect(view.keyMetrics.payback_months.value).toBeCloseTo(9.17, 2);
+    expect(view.checks.map((check) => [check.key, check.state])).toEqual([
+      ["competitors", "done"],
+      ["local_price", "done"],
+      ["costs", "done"],
+      ["break_even", "done"],
+      ["permits", "done"],
+      ["demand_signal", "done"],
+    ]);
+    expect(view.checks[0]?.count).toBe(4);
+    // A Viewer cannot open a new research log entry: the link is text.
+    expect(
+      view.checks.find((check) => check.key === "demand_signal")?.link,
+    ).toBeNull();
+    expect(view.summary.marketType).toBe("Mixed");
+    expect(view.sections.find((s) => s.key === "03")).toMatchObject({
+      title: "03 Research Log",
+      count: 7,
+    });
+    expect(view.decisions.map((d) => d.value)).toEqual(["proceed"]);
+    expect(view.plans).toMatchObject([
+      {
+        name: "Plan A",
+        latestVersion: { name: "v1 For advisors" },
+        hasChangesSinceVersion: true,
+        latestGoNoGo: { value: "delay" },
+      },
+      { name: "Plan B", latestVersion: null, latestGoNoGo: null },
+    ]);
+    expect(view.template.newerVersion?.versionNumber).toBe(2);
+    expect(view.canAddPlan).toBe(true);
+  });
+
+  test("the worksheets: Piaya's rows of 8.4 and numbers of 8.3, Health Bowl's deleted log left out", async () => {
+    const cookie = await cookieOf("grace@advisor.example");
+    const validationId = seedId("validation", "piaya");
+    const get = async (path: string) => {
+      const response = await app.handle(
+        apiRequest("GET", `/api/v1/validations/${validationId}/${path}`, {
+          cookie,
+        }),
+      );
+      expect(response.status).toBe(200);
+      return response.json();
+    };
+    const logs = researchLogPageSchema.parse(await get("research-log"));
+    expect(logs.items).toHaveLength(7);
+    const tags = new Set(logs.items.flatMap((log) => log.supportsChecks));
+    expect([...tags].sort()).toEqual([
+      "demand_signal",
+      "local_price",
+      "permits",
+    ]);
+    const competitors = competitorListSchema.parse(await get("competitors"));
+    expect(competitors.items).toHaveLength(4);
+    expect(
+      competitors.items.filter((item) => item.typicalPrice !== null),
+    ).toHaveLength(3);
+    expect(competitors.guidance).toEqual({ min: 3, max: 5 });
+    expect(
+      assumptionListSchema.parse(await get("assumptions")).items,
+    ).toHaveLength(3);
+    // 16's automatic order: Impact, then Probability, highest first.
+    expect(
+      riskListSchema
+        .parse(await get("risks"))
+        .items.map((risk) => [risk.impact, risk.probability, risk.sortOrder]),
+    ).toEqual([
+      ["high", "medium", null],
+      ["medium", "high", null],
+      ["medium", "medium", null],
+      ["medium", "low", null],
+    ]);
+    const costs = costsSchema.parse(await get("costs"));
+    expect(costs.items).toHaveLength(24);
+    const economics = economicsSchema.parse(await get("economics"));
+    const { result } = economics;
+    expect(result.variableCostPerUnit.value).toBeCloseTo(218.5, 6);
+    expect(result.contributionMarginRate.value).toBeCloseTo(0.5144, 4);
+    expect(result.totals.monthlyFixed.amount).toBe(41_700);
+    expect(result.breakEvenUnitsMonth.value).toBeCloseTo(180.13, 2);
+    expect(Math.round(result.breakEvenRevenue.value ?? 0)).toBe(81_058);
+    expect(result.targetMarginUnitsDay.value).toBeCloseTo(9.8, 1);
+    expect(
+      result.scenarios.find((column) => column.key === "expected"),
+    ).toMatchObject({
+      unitsPerMonth: { value: 260 },
+      revenue: { value: 117_000 },
+      variableCostTotal: { value: 56_810 },
+      operatingProfit: { value: 18_490 },
+    });
+    expect(
+      result.scenarios.find((column) => column.key === "conservative")
+        ?.operatingProfit.value,
+    ).toBe(-5_586);
+    expect(result.totals.initial.amount).toBe(169_500);
+    expect(result.paybackMonths.value).toBeCloseTo(9.17, 2);
+    expect(result.simpleRoi.value).toBeCloseTo(1.309, 3);
+    expect(result.defaultsUsed).toEqual({
+      operatingDays: false,
+      targetMargin: true,
+    });
+    expect(economics.costItems).toEqual(costs.items);
+    expect(costs.result).toEqual(result);
+    // Health Bowl lists 5 entries: its deleted one is left out (8.4).
+    const bowl = await app.handle(
+      apiRequest(
+        "GET",
+        `/api/v1/validations/${seedId("validation", "health-bowl")}/research-log`,
+        { cookie },
+      ),
+    );
+    expect(researchLogPageSchema.parse(await bowl.json()).items).toHaveLength(
+      5,
+    );
+  });
+
+  test("V19 by Kenji records the decision and notifies Ana, Paolo and Grace", async () => {
+    const cookie = await cookieOf("kenji@bcdx.example");
+    const context = decisionContextSchema.parse(
+      await (
+        await app.handle(
+          apiRequest("GET", `/api/v1/ideas/${PIAYA}/decision-context`, {
+            cookie,
+          }),
+        )
+      ).json(),
+    );
+    expect(context.missingChecks).toEqual([]);
+    const response = await app.handle(
+      apiRequest("POST", `/api/v1/ideas/${PIAYA}/decisions`, {
+        cookie,
+        body: {
+          value: "hold",
+          reason: "The supplier raised the box price",
+          basedOnDecisionId: context.lastDecision?.id ?? null,
+        },
+      }),
+    );
+    expect(response.status).toBe(201);
+    const { entry } = decisionResultSchema.parse(await response.json());
+    expect(entry).toMatchObject({
+      value: "hold",
+      recordedBy: { displayName: "Kenji Mori" },
+      snapshot: { missingChecks: [] },
+    });
+    const sent = await database.db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.decisionLogEntryId, entry.id));
+    expect(sent.map((row) => row.userId).sort()).toEqual(
+      [userId("ana"), userId("paolo"), userId("grace")].sort(),
+    );
+    expect(sent[0]?.link).toEqual({
+      screen: 13,
+      workspaceId: BCDX_WORKSPACE_ID,
+      ideaId: PIAYA,
+    });
+  });
+  test("the self-analyses of 8.1, and Kenji's unshared one out of Ana's reach", async () => {
+    const home = async (email: string) => {
+      const response = await app.handle(
+        apiRequest("GET", "/api/v1/me/self-analysis", {
+          cookie: await cookieOf(email),
+        }),
+      );
+      expect(response.status).toBe(200);
+      return selfAnalysisHomeSchema.parse(await response.json());
+    };
+    const bcdx = { id: BCDX_WORKSPACE_ID, name: "BCDX" };
+    const ana = await home("ana@bcdx.example");
+    expect(ana).toMatchObject({
+      id: seedId("self_analysis", "ana"),
+      status: "done",
+      answered: 36,
+      total: 36,
+      firstUnanswered: null,
+      shares: [{ workspace: bcdx }],
+      shareableWorkspaces: [bcdx],
+    });
+    expect(ana.sections.map((section) => section.title)).toEqual([
+      "WHY",
+      "BE",
+      "DO",
+      "GIVE",
+      "HAVE",
+      "PERSONAL INCOME",
+      "ENOUGH",
+      "NOT",
+      "NOW",
+      "FINAL REFLECTION",
+      "ONE-SENTENCE SUMMARY",
+    ]);
+    expect(await home("kenji@bcdx.example")).toMatchObject({
+      status: "in_progress",
+      answered: 21,
+      total: 36,
+      shares: [],
+    });
+    expect(await home("grace@advisor.example")).toMatchObject({
+      status: "not_started",
+      answered: 0,
+      total: 36,
+      shareableWorkspaces: [],
+    });
+    expect(await home("admin@moonx.example")).toMatchObject({
+      status: "not_started",
+      answered: 0,
+      total: 36,
+    });
+
+    const anaCookie = await cookieOf("ana@bcdx.example");
+    const team = await app.handle(
+      apiRequest(
+        "GET",
+        `/api/v1/workspaces/${BCDX_WORKSPACE_ID}/self-analyses`,
+        {
+          cookie: anaCookie,
+        },
+      ),
+    );
+    expect(
+      memberSelfAnalysesSchema
+        .parse(await team.json())
+        .items.map(({ user, shared, status }) => [
+          user.displayName,
+          shared,
+          status,
+        ]),
+    ).toEqual([
+      ["Ana Villanueva", true, "done"],
+      ["Kenji Mori", false, null],
+      ["Paolo Gonzaga", true, "done"],
+    ]);
+
+    const read = (who: "kenji" | "paolo") =>
+      app.handle(
+        apiRequest(
+          "GET",
+          `/api/v1/workspaces/${BCDX_WORKSPACE_ID}/self-analyses/${userId(who)}`,
+          { cookie: anaCookie },
+        ),
+      );
+    // Paolo's comment on Ana's first answer (8.2), as Ana and the team read it.
+    const anaWhy = await app.handle(
+      apiRequest("GET", "/api/v1/me/self-analysis/sections/WHY", {
+        cookie: anaCookie,
+      }),
+    );
+    expect(
+      selfAnalysisSectionSchema
+        .parse(await anaWhy.json())
+        .answers.map((answer) => [answer.questionKey, answer.commentCounts]),
+    ).toEqual([
+      [
+        "SA.WHY.1",
+        [{ workspaceId: BCDX_WORKSPACE_ID, workspaceName: "BCDX", count: 1 }],
+      ],
+      [
+        "SA.WHY.2",
+        [{ workspaceId: BCDX_WORKSPACE_ID, workspaceName: "BCDX", count: 0 }],
+      ],
+    ]);
+    const anaShared = await app.handle(
+      apiRequest(
+        "GET",
+        `/api/v1/workspaces/${BCDX_WORKSPACE_ID}/self-analyses/${userId("ana")}`,
+        { cookie: await cookieOf("paolo@bcdx.example") },
+      ),
+    );
+    expect(anaShared.status).toBe(200);
+    const why = sharedSelfAnalysisSchema
+      .parse(await anaShared.json())
+      .sections.find((section) => section.key === "WHY");
+    expect(why?.answers[0]).toMatchObject({
+      questionKey: "SA.WHY.1",
+      commentCount: 1,
+    });
+
+    const kenji = await read("kenji");
+    expect(kenji.status).toBe(403);
+    expect(errorBodySchema.parse(await kenji.json()).error.code).toBe(
+      "NOT_SHARED",
+    );
+    const paolo = await read("paolo");
+    expect(paolo.status).toBe(200);
+    const view = sharedSelfAnalysisSchema.parse(await paolo.json());
+    expect(view).toMatchObject({
+      user: { displayName: "Paolo Gonzaga" },
+      status: "done",
+      currency: "PHP",
+    });
+    expect(view.sections.flatMap((section) => section.answers)).toHaveLength(
+      36,
+    );
+  });
+
+  test("the plans of 8.2: Piaya's Plan A saved, changed and delayed, Plan B a draft, Study Café launched", async () => {
+    const cookie = await cookieOf("grace@advisor.example");
+    const get = async (path: string) => {
+      const response = await app.handle(apiRequest("GET", path, { cookie }));
+      expect(response.status).toBe(200);
+      return response.json();
+    };
+    const piaya = planListSchema.parse(
+      await get(`/api/v1/ideas/${PIAYA}/plans`),
+    ).items;
+    expect(
+      piaya.map((plan) => [
+        plan.name,
+        plan.latestVersion?.name ?? null,
+        plan.hasChangesSinceVersion,
+        plan.latestGoNoGo?.value ?? null,
+      ]),
+    ).toEqual([
+      ["Plan A", "v1 For advisors", true, "delay"],
+      ["Plan B", null, false, null],
+    ]);
+    const [planA, planB] = piaya;
+    if (planA === undefined || planB === undefined) throw new Error("No plans");
+    const homeA = planHomeSchema.parse(await get(`/api/v1/plans/${planA.id}`));
+    expect(homeA).toMatchObject({
+      businessName: "Piaya Gift Box Co.",
+      draftOnly: false,
+      execution: { overdue: 1, dueSoon: 1 },
+      versions: [{ name: "v1 For advisors", versionNumber: 1 }],
+    });
+    const versionId = homeA.versions[0]?.id;
+    const saved = planHomeSchema.parse(
+      await get(`/api/v1/plans/${planA.id}?versionId=${versionId}`),
+    );
+    expect(saved.viewingVersion?.name).toBe("v1 For advisors");
+    expect(saved.keyMetrics.initial_cost_total.value).toBe(169500);
+    const homeB = planHomeSchema.parse(await get(`/api/v1/plans/${planB.id}`));
+    expect(homeB).toMatchObject({
+      businessName: "Piaya Gift Box Delivery",
+      draftOnly: true,
+      versions: [],
+    });
+    // Plan B's §22 is the draft's copy of 16's risks, in 16's order.
+    const risks = planItemSchema.parse(
+      await get(`/api/v1/plans/${planB.id}/items/22`),
+    );
+    const listed = risks.references.find(
+      (reference) => reference.kind === "risks",
+    );
+    expect(risks.answers[0]?.rows?.map((row) => row.risk)).toEqual(
+      listed?.kind === "risks" ? listed.data.map((risk) => risk.statement) : [],
+    );
+
+    const study = planListSchema.parse(
+      await get(
+        `/api/v1/ideas/${seedId("idea", "study-cafe")}/plans?includeArchived=true`,
+      ),
+    ).items;
+    expect(
+      study.map((plan) => [
+        plan.name,
+        plan.archived,
+        plan.latestVersion?.name ?? null,
+        plan.latestGoNoGo?.value ?? null,
+      ]),
+    ).toEqual([
+      ["Plan A", false, "v1 Launch review", "launch"],
+      ["Plan B", true, null, null],
+    ]);
+    const kpis = planItemSchema.parse(
+      await get(`/api/v1/plans/${study[0]?.id}/items/26`),
+    );
+    expect(
+      kpis.execution.filter((item) => item.kpiActual !== null).length,
+    ).toBeGreaterThan(0);
+
+    // Every seeded plan, its versions and its 30 items read through the API's shapes.
+    const ideaKeys = ["piaya", "study-cafe", "night-market"];
+    let versionsRead = 0;
+    for (const key of ideaKeys) {
+      const plans = planListSchema.parse(
+        await get(
+          `/api/v1/ideas/${seedId("idea", key)}/plans?includeArchived=true`,
+        ),
+      ).items;
+      for (const plan of plans) {
+        const home = planHomeSchema.parse(
+          await get(`/api/v1/plans/${plan.id}`),
+        );
+        const views = ["", ...home.versions.map((v) => `?versionId=${v.id}`)];
+        versionsRead += home.versions.length;
+        for (const query of views) {
+          planHomeSchema.parse(await get(`/api/v1/plans/${plan.id}${query}`));
+          for (let itemNo = 1; itemNo <= 30; itemNo += 1) {
+            planItemSchema.parse(
+              await get(`/api/v1/plans/${plan.id}/items/${itemNo}${query}`),
+            );
+          }
+        }
+        executionListSchema.parse(
+          await get(`/api/v1/plans/${plan.id}/execution-items`),
+        );
+      }
+    }
+    expect(versionsRead).toBe(2);
+    const piayaItems = executionListSchema.parse(
+      await get(`/api/v1/plans/${planA.id}/execution-items`),
+    ).items;
+    expect([...new Set(piayaItems.map((item) => item.type))]).toEqual([
+      "milestone",
+      "launch",
+      "kpi",
+      "open_question",
+      "next_action",
+    ]);
+
+    const night = planListSchema.parse(
+      await get(`/api/v1/ideas/${seedId("idea", "night-market")}/plans`),
+    ).items;
+    const nightHome = planHomeSchema.parse(
+      await get(`/api/v1/plans/${night[0]?.id}`),
+    );
+    expect(nightHome.latestDecision).toBe("hold");
+  }, 60_000);
+
+  test("Piaya's Plan A fills every slide of both Pitch Decks, and both PDFs are made", async () => {
+    const cookie = await cookieOf("ana@bcdx.example");
+    const get = (path: string) =>
+      app.handle(apiRequest("GET", path, { cookie }));
+    const [planA] = planListSchema.parse(
+      await (await get(`/api/v1/ideas/${PIAYA}/plans`)).json(),
+    ).items;
+    if (planA === undefined) throw new Error("No Plan A");
+    for (const [variant, slides] of [
+      ["one", 8],
+      ["five", 14],
+    ] as const) {
+      const response = await get(
+        `/api/v1/plans/${planA.id}/pitch-deck?variant=${variant}`,
+      );
+      expect(response.status).toBe(200);
+      const deck = pitchDeckSchema.parse(await response.json());
+      expect(deck.slides).toHaveLength(slides);
+      expect(deck.speakerNotes).not.toBeNull();
+      for (const slide of deck.slides) {
+        expect({
+          slide: slide.key,
+          empty: slide.emptySources,
+          overflow: slide.overflow,
+          bullets: slide.bullets.filter((bullet) => bullet.empty).length,
+          numbers: slide.numbers.filter((number) => number.value.value === null)
+            .length,
+          rows: slide.table === null ? null : slide.table.rows.length > 0,
+        }).toEqual({
+          slide: slide.key,
+          empty: [],
+          overflow: false,
+          bullets: 0,
+          numbers: 0,
+          rows: slide.table === null ? null : true,
+        });
+      }
+      const pdf = await get(
+        `/api/v1/plans/${planA.id}/pitch-deck.pdf?variant=${variant}`,
+      );
+      expect(pdf.status).toBe(200);
+      expect(pdf.headers.get("content-disposition")).toContain(
+        `Piaya Gift Box Co.-${variant}-draft-`,
+      );
+      const task = getDocument({
+        data: new Uint8Array(await pdf.arrayBuffer()),
+      });
+      expect((await task.promise).numPages).toBe(slides);
+      await task.destroy();
+    }
+  }, 60_000);
+});
+
+// SDD 5.11 on the demo data: the comments, notifications and history of 8.4, and H2 and
+// H3 on them. These change the data, so they run after everything above.
+describe("comments, notifications and history of the demo data", () => {
+  const HEALTH_BOWL_VALIDATION = seedId("validation", "health-bowl");
+  const call = async (
+    method: "GET" | "POST",
+    path: string,
+    email = "ana@bcdx.example",
+  ) => app.handle(apiRequest(method, path, { cookie: await cookieOf(email) }));
+
+  test("Kenji has his two mentions unread, and Ana reads Paolo's comment on her self-analysis", async () => {
+    const count = await call(
+      "GET",
+      "/api/v1/notifications/unread-count",
+      "kenji@bcdx.example",
+    );
+    expect(unreadCountSchema.parse(await count.json()).total).toBe(2);
+    const inbox = notificationPageSchema.parse(
+      await (
+        await call(
+          "GET",
+          "/api/v1/notifications?filter=unread",
+          "kenji@bcdx.example",
+        )
+      ).json(),
+    );
+    expect(inbox.items.map((item) => [item.kind, item.title])).toEqual([
+      [
+        "mention",
+        "Ana Villanueva mentioned you on Costs · Permits / Registration · Bacolod Health Bowl",
+      ],
+      [
+        "mention",
+        "Ana Villanueva mentioned you on 02 SHARE · Piaya Gift Box Delivery",
+      ],
+    ]);
+    const comments = commentListSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/comments?workspaceId=${BCDX_WORKSPACE_ID}&containerType=self_analysis&containerId=${selfAnalysisId("ana")}&sectionKeys=WHY`,
+        )
+      ).json(),
+    );
+    expect(comments.threads.map((thread) => thread.root.author.id)).toEqual([
+      userId("paolo"),
+    ]);
+  });
+
+  test("H2 brings Health Bowl's deleted research log back, and its Fact has evidence again", async () => {
+    const [deletion] = await database.db
+      .select()
+      .from(changeHistory)
+      .where(
+        and(
+          eq(
+            changeHistory.targetId,
+            seedId("research_log", "health-bowl", "clinic-report"),
+          ),
+          eq(changeHistory.action, "delete"),
+        ),
+      );
+    const response = await call(
+      "POST",
+      `/api/v1/history/${deletion?.id}/revert`,
+      "kenji@bcdx.example",
+    );
+    expect(response.status).toBe(200);
+    expect(
+      historyRevertResultSchema.parse(await response.json()).entry,
+    ).toMatchObject({
+      action: "restore",
+      source: "revert",
+    });
+    const home = validationHomeSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/ideas/${seedId("idea", "health-bowl")}/validation`,
+        )
+      ).json(),
+    );
+    expect(home.fau.factNoEvidence).toBe(0);
+  });
+
+  test("H3 reverts Health Bowl's AI import once, and the revert can be undone", async () => {
+    const batch = seedId("batch", "health-bowl/ai-import");
+    const response = await call(
+      "POST",
+      `/api/v1/history/batches/${batch}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(response.status).toBe(200);
+    const result = historyBatchRevertResultSchema.parse(await response.json());
+    expect(result.reverted).toBe(3);
+    const [behavior] = await database.db
+      .select()
+      .from(validationAnswers)
+      .where(
+        and(
+          eq(validationAnswers.validationId, HEALTH_BOWL_VALIDATION),
+          eq(validationAnswers.questionKey, "V.01.BEHAVIOR"),
+        ),
+      );
+    expect(behavior).toMatchObject({
+      text: "Carinderia or food court.",
+      fau: "assumption",
+      confidence: "medium",
+    });
+    const again = await call(
+      "POST",
+      `/api/v1/history/batches/${batch}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(again.status).toBe(409);
+    expect(errorBodySchema.parse(await again.json()).error.code).toBe(
+      "ALREADY_REVERTED",
+    );
+    const redo = await call(
+      "POST",
+      `/api/v1/history/batches/${result.batchId}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(redo.status).toBe(200);
+  });
+
+  test("the Corporate copy cannot be undone, Piaya's Plan B draft can, once", async () => {
+    const copy = await call(
+      "POST",
+      `/api/v1/history/batches/${seedId("batch", "duplicate/corporate")}/revert`,
+      "kenji@bcdx.example",
+    );
+    expect(copy.status).toBe(409);
+    expect(errorBodySchema.parse(await copy.json()).error.code).toBe(
+      "UNDO_BLOCKED",
+    );
+    const draft = seedId("batch", "plan-draft/piaya/b");
+    const undone = await call(
+      "POST",
+      `/api/v1/history/batches/${draft}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(undone.status).toBe(200);
+    expect(
+      historyBatchRevertResultSchema.parse(await undone.json()).batchId,
+    ).toBe(draft);
+    const plans = planListSchema.parse(
+      await (await call("GET", `/api/v1/ideas/${PIAYA}/plans`)).json(),
+    ).items;
+    expect(plans.map((plan) => plan.name)).not.toContain("Plan B");
+    const onPiaya = historyPageSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/history?containerType=idea&containerId=${PIAYA}`,
+        )
+      ).json(),
+    );
+    expect(onPiaya.items[0]).toMatchObject({
+      target: { type: "business_plan", id: seedId("plan", "piaya", "b") },
+      label: "Plan B",
+      action: "delete",
+      revertible: false,
+    });
+    const twice = await call(
+      "POST",
+      `/api/v1/history/batches/${draft}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(twice.status).toBe(409);
+    expect(errorBodySchema.parse(await twice.json()).error.code).toBe(
+      "ALREADY_REVERTED",
+    );
+  });
+});
+
+describe("templates and the operator's screens on the demo data", () => {
+  const call = async (
+    method: "GET" | "POST",
+    path: string,
+    email: string,
+    body?: unknown,
+  ) =>
+    app.handle(
+      apiRequest(method, path, { cookie: await cookieOf(email), body }),
+    );
+  const ADMIN = "admin@moonx.example";
+
+  test("T1 and T2 move Laundry Pickup to validation v2, and H3 moves it back", async () => {
+    const validationId = seedId("validation", "laundry");
+    const preview = await call(
+      "GET",
+      `/api/v1/template-migrations/preview?targetType=validation&targetId=${validationId}`,
+      "paolo@bcdx.example",
+    );
+    expect(preview.status).toBe(200);
+    const shown = templateMigrationPreviewSchema.parse(await preview.json());
+    // v2 only adds a question (design-spec 8.4), and M1 made every cost row.
+    expect(shown).toMatchObject({
+      from: { versionNumber: 1 },
+      to: { versionNumber: 2 },
+      hiddenQuestions: [],
+      addedQuestions: 1,
+      addedCostRows: [],
+    });
+    expect(shown.carried).toBeGreaterThan(0);
+
+    const migrated = await call(
+      "POST",
+      "/api/v1/template-migrations",
+      "paolo@bcdx.example",
+      {
+        targetType: "validation",
+        targetId: validationId,
+        toVersionId: shown.to.versionId,
+      },
+    );
+    expect(migrated.status).toBe(200);
+    const { batchId, template } = templateMigrationResultSchema.parse(
+      await migrated.json(),
+    );
+    expect(template).toMatchObject({ versionNumber: 2, newerVersion: null });
+    const section = validationQuestionsSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/validations/${validationId}/questions/01`,
+          "paolo@bcdx.example",
+        )
+      ).json(),
+    );
+    expect(section.section.questions.at(-1)?.key).toBe("V.01.REACH");
+    const history = historyPageSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/history?containerType=idea&containerId=${seedId("idea", "laundry")}`,
+          "paolo@bcdx.example",
+        )
+      ).json(),
+    );
+    expect(history.items[0]).toMatchObject({
+      batchId,
+      target: { type: "template_version", id: validationId },
+      label: "Template version",
+      source: "template_migration",
+      revertible: true,
+    });
+
+    const undone = await call(
+      "POST",
+      `/api/v1/history/batches/${batchId}/revert`,
+      "paolo@bcdx.example",
+    );
+    expect(undone.status).toBe(200);
+    expect(
+      historyBatchRevertResultSchema.parse(await undone.json()).reverted,
+    ).toBe(1);
+    const home = validationHomeSchema.parse(
+      await (
+        await call(
+          "GET",
+          `/api/v1/ideas/${seedId("idea", "laundry")}/validation`,
+          "paolo@bcdx.example",
+        )
+      ).json(),
+    );
+    expect(home.template).toMatchObject({
+      versionNumber: 1,
+      newerVersion: { versionNumber: 2 },
+    });
+  });
+
+  test("AD1 lists the demo templates, v3 is a draft that passes the checks, and the plan template's Pitch Deck fits", async () => {
+    const response = await call("GET", "/api/v1/admin/templates", ADMIN);
+    expect(response.status).toBe(200);
+    const { items } = adminTemplateListSchema.parse(await response.json());
+    expect(
+      items.map((item) => [
+        item.kind,
+        item.versions.map((v) => [v.versionNumber, v.status]),
+      ]),
+    ).toEqual([
+      ["self_analysis", [[1, "published"]]],
+      [
+        "validation",
+        [
+          [3, "draft"],
+          [2, "published"],
+          [1, "published"],
+        ],
+      ],
+      ["business_plan", [[1, "published"]]],
+    ]);
+    const validation = items[1];
+    // Mobile Bike Repair alone was made on v2 (design-spec 8.4).
+    expect(validation?.versions[1]).toMatchObject({
+      usageCount: 1,
+      publishedBy: null,
+    });
+    const v3 = validation?.versions[0]?.id;
+    const draft = templateVersionDetailSchema.parse(
+      await (
+        await call("GET", `/api/v1/admin/template-versions/${v3}`, ADMIN)
+      ).json(),
+    );
+    expect(
+      draft.sections.find((s) => s.key === "10")?.questions.at(-1)?.key,
+    ).toBe("V.10.NEXT_STEP");
+    const check = templateCheckSchema.parse(
+      await (
+        await call(
+          "POST",
+          `/api/v1/admin/template-versions/${v3}/validate`,
+          ADMIN,
+        )
+      ).json(),
+    );
+    expect(check).toEqual({ errors: [], warnings: [] });
+
+    // The seed published it through AD6's checks, pitch_deck_overflow among them.
+    const plan = items[2]?.versions[0]?.id;
+    expect(
+      templateCheckSchema.parse(
+        await (
+          await call(
+            "POST",
+            `/api/v1/admin/template-versions/${plan}/validate`,
+            ADMIN,
+          )
+        ).json(),
+      ),
+    ).toEqual({ errors: [], warnings: [] });
+  });
+
+  test("AD7 lists the demo people, BCDX and its invitations", async () => {
+    const people = adminUserPageSchema.parse(
+      await (
+        await call("GET", "/api/v1/admin/users?q=@bcdx.example", ADMIN)
+      ).json(),
+    );
+    expect(
+      people.items.map((user) => [
+        user.displayName,
+        user.workspaceCount,
+        user.status,
+      ]),
+    ).toEqual([
+      ["Ana Villanueva", 2, "active"],
+      ["Kenji Mori", 2, "active"],
+      ["Paolo Gonzaga", 2, "active"],
+    ]);
+    const [bcdx] = adminWorkspacePageSchema.parse(
+      await (
+        await call("GET", "/api/v1/admin/workspaces?q=BCDX", ADMIN)
+      ).json(),
+    ).items;
+    expect(bcdx).toMatchObject({
+      id: BCDX_WORKSPACE_ID,
+      isPersonal: false,
+      owners: [{ displayName: "Ana Villanueva" }],
+      memberCount: 4,
+      ideaCount: 8,
+    });
+    const pending = adminInvitationPageSchema.parse(
+      await (await call("GET", "/api/v1/admin/invitations", ADMIN)).json(),
+    );
+    expect(pending.items.map((i) => i.email)).toEqual([
+      "new.member@bcdx.example",
+    ]);
+    const all = adminInvitationPageSchema.parse(
+      await (
+        await call("GET", "/api/v1/admin/invitations?status=all", ADMIN)
+      ).json(),
+    );
+    expect(
+      all.items.find((i) => i.email === "late.joiner@bcdx.example")?.status,
+    ).toBe("expired");
+  });
+});

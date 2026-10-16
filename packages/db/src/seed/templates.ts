@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { MeasureText } from "@moonx/domain";
 import type { TemplateFile, TemplateKind } from "@moonx/schemas";
 import { eq } from "drizzle-orm";
 import type { DatabaseTransaction } from "../client";
@@ -100,6 +101,7 @@ const VERSION_DAYS = {
 export async function seedTemplates(
   tx: DatabaseTransaction,
   clock: SeedClock,
+  measure: MeasureText,
 ): Promise<SeededTemplates> {
   const importVersion = async (
     kind: TemplateKind,
@@ -146,7 +148,7 @@ export async function seedTemplates(
     "business_plan",
   ] as const) {
     v1[kind] = await importVersion(kind, "v1", readBcdxFile(kind));
-    await publishTemplateVersion(tx, v1[kind], null);
+    await publishTemplateVersion(tx, v1[kind], null, measure);
     await date(v1[kind], VERSION_DAYS.v1);
   }
   const templatesCreatedAt = clock.ago(VERSION_DAYS.v1.created);
@@ -160,7 +162,7 @@ export async function seedTemplates(
     V2_ADDED_QUESTION,
   );
   const v2 = await importVersion("validation", "v2", v2File);
-  await publishTemplateVersion(tx, v2, null);
+  await publishTemplateVersion(tx, v2, null, measure);
   await date(v2, VERSION_DAYS.validationV2);
 
   const v3 = await importVersion(

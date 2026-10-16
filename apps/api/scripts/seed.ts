@@ -1,8 +1,12 @@
-import { connectDatabase } from "./client";
-import { seedDatabase } from "./seed/index";
-
 // make db-seed. Demo data only ever goes into a local database (SDD 2章「make ターゲット」);
-// templates reach staging and production through the operator's import instead.
+// templates reach staging and production through the operator's import instead. It runs
+// here rather than in packages/db because publishing the plan template checks its Pitch
+// Deck in the PDF's fonts, which the API loads (AD6, ADR-012).
+
+import { connectDatabase } from "@moonx/db";
+import { seedDatabase } from "@moonx/db/seed";
+import { loadPitchFonts } from "../src/pitch-fonts";
+
 const appEnv = process.env.APP_ENV?.trim();
 if (appEnv !== "local") {
   console.error(
@@ -17,7 +21,7 @@ if (!url) {
 }
 const { db, close } = connectDatabase(url);
 try {
-  await seedDatabase(db);
+  await seedDatabase(db, { measure: await loadPitchFonts() });
   console.log("Seeded the demo data of design-spec 8");
 } finally {
   await close();

@@ -56,5 +56,111 @@
     "local_price": "Local price",
     "permits": "Permits",
     "demand_signal": "Demand or problem signal"
+  },
+  "economicsField": {
+    "selling_price": "Price",
+    "operating_days": "Operating days",
+    "target_margin": "Target margin",
+    "units_conservative": "Conservative",
+    "units_expected": "Expected",
+    "units_strong": "Strong",
+    "units_capacity": "Capacity limit"
+  },
+  "itemLabel": {
+    "question": "{{section}} {{title}}",
+    "row": "{{list}} · {{text}}",
+    "untitled": "Untitled",
+    "list": {
+      "research_log_entry": "Research Log",
+      "competitor": "Competitors",
+      "assumption": "Assumptions",
+      "risk": "Risks",
+      "cost_item": "Costs",
+      "economics_input": "Unit Economics",
+      "execution_item": "Execution",
+      "pitch_slide": "Pitch Deck"
+    },
+    "templateVersion": "Template version"
+  },
+  "planReference": {
+    "validationSection": "Validation · {{section}}",
+    "validationAnswers": "Validation answers",
+    "competitors": "Competitors",
+    "cost_rows": "Costs",
+    "research_log": "Research Log · {{tag}}",
+    "self_analysis": "Shared self-analyses",
+    "metrics": "Key numbers",
+    "decision_log": "Decision log",
+    "go_no_go_history": "Go / No-Go history",
+    "assumptions": "Assumptions",
+    "risks": "Risks",
+    "totals": "Totals"
+  },
+  "metric": {
+    "initial_cost_total": "Startup cost",
+    "monthly_fixed_total": "Monthly fixed cost",
+    "variable_cost_per_unit": "Variable cost / sale",
+    "selling_price": "Price",
+    "contribution_margin": "Contribution / sale",
+    "contribution_margin_rate": "Contribution margin rate",
+    "break_even_units_month": "Break-even units / month",
+    "break_even_units_day": "Break-even units / day",
+    "break_even_revenue": "Break-even revenue / month",
+    "target_margin_units_month": "Units for target margin",
+    "expected_revenue": "Expected revenue per month",
+    "expected_operating_profit": "Expected profit per month",
+    "payback_months": "Payback",
+    "simple_roi": "ROI",
+    "capacity_units_day": "Capacity limit",
+    "operating_days": "Operating days"
+  },
+  "sourceType": {
+    "google_maps_reviews": "Google Maps / Reviews",
+    "website": "Website",
+    "social_media": "Social Media",
+    "public_data": "Public Data",
+    "news_report": "News / Report",
+    "store_observation": "Store Observation",
+    "price_check": "Price Check",
+    "other": "Other"
+  },
+  "metricReason": {
+    "needs_price": "Needs price",
+    "needs_monthly_costs": "Needs monthly costs",
+    "needs_expected_sales": "Needs Expected sales",
+    "needs_startup_costs": "Needs startup costs",
+    "margin_not_positive": "Contribution margin is zero or negative. Review price or variable costs.",
+    "target_margin_unreachable": "This margin is not reachable: contribution margin is at or below the target",
+    "not_recovered": "Not recovered: Expected profit is zero or negative",
+    "empty": "Empty",
+    "unknown": "Unknown",
+    "none": "-"
+  },
+  "scenario": {
+    "break_even": "Break-even",
+    "conservative": "Conservative",
+    "expected": "Expected",
+    "strong": "Strong",
+    "capacity": "Capacity limit"
+  },
+  "competitorType": {
+    "direct": "Direct Competitor",
+    "indirect": "Indirect Competitor",
+    "substitute": "Substitute"
+  },
+  "executionStatus": {
+    "todo": "To do",
+    "doing": "Doing",
+    "done": "Done",
+    "open": "Open",
+    "resolved": "Resolved"
+  },
+  "launchTiming": {
+    "t_minus_30": "T−30",
+    "t_minus_7": "T−7",
+    "launch_day": "Launch day",
+    "first_30": "First 30 days",
+    "days_31_90": "Days 31–90",
+    "other": "Other"
   }
 }

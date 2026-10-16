@@ -5,6 +5,7 @@ import {
   evaluateValidation,
   fauState,
   ideaStage,
+  type MeasureText,
   scenarioOf,
 } from "@moonx/domain";
 import { verifyPassword } from "better-auth/crypto";
@@ -49,7 +50,6 @@ import {
 } from "./schema";
 import {
   BCDX_WORKSPACE_ID,
-  loadValidation,
   personalWorkspaceId,
   SEED_INVITATION_TOKENS,
   SEED_PASSWORD,
@@ -64,6 +64,7 @@ import {
   quoteIdentifier,
   testDatabaseName,
 } from "./test-database";
+import { loadValidation } from "./validation-state";
 
 const base = process.env.DATABASE_URL_TEST;
 if (base === undefined || base === "") {
@@ -75,6 +76,11 @@ const scratch = new URL(base);
 scratch.pathname = `/${testDatabaseName(base)}_seed_test`;
 const url = scratch.toString();
 const { db, close } = connectDatabase(url);
+
+// The API passes the PDF's fonts (ADR-012), which this package does not load. Here no text
+// wraps: the BCDX plan template's deck fits even so, and apps/api checks it in the PDF's
+// fonts.
+const measure: MeasureText = () => 0;
 
 /** The moment the seed runs, so dates can be checked exactly. */
 const NOW = new Date("2026-10-14T03:00:00.000Z");
@@ -117,10 +123,15 @@ const allRows = async () => {
 /**
  * Runs `make db-seed`'s script with `env` added to this process's environment. Bun would
  * read the repository's .env into the child, putting back an APP_ENV the test leaves out.
+ * The script is the API's: it passes the PDF's fonts to the seed (AD6).
  */
 const runSeedScript = async (env: Record<string, string | undefined>) => {
   const child = Bun.spawn(
-    ["bun", "--no-env-file", join(import.meta.dir, "seed.ts")],
+    [
+      "bun",
+      "--no-env-file",
+      join(import.meta.dir, "../../../apps/api/scripts/seed.ts"),
+    ],
     {
       env: { ...process.env, DATABASE_URL: url, ...env },
       stdout: "pipe",
@@ -175,11 +186,11 @@ describe("make db-seed", () => {
     if (code !== 0) throw new Error(`make db-seed failed: ${stderr}`);
     const first = await allRows();
     expect(Object.keys(first.users ?? {})).toHaveLength(5);
-    await seedDatabase(db);
+    await seedDatabase(db, { measure });
     expect(await allRows()).toEqual(first);
 
     // The rest of this file reads a run made at a fixed moment.
-    await seedDatabase(db, { now: NOW });
+    await seedDatabase(db, { now: NOW, measure });
   });
 });
 
@@ -347,6 +358,19 @@ describe("users and workspaces (design-spec 8.1)", () => {
           ),
         ),
       ).toBe(1);
+      // U1 lists memberships in the order they were made, the personal one first.
+      const joined = await db
+        .select({
+          workspaceId: memberships.workspaceId,
+          createdAt: memberships.createdAt,
+        })
+        .from(memberships)
+        .where(eq(memberships.userId, userId(key)))
+        .orderBy(asc(memberships.createdAt));
+      expect(joined[0]?.workspaceId).toBe(personalWorkspaceId(key));
+      expect(joined[1]?.createdAt.getTime() ?? Infinity).toBeGreaterThan(
+        joined[0]?.createdAt.getTime() ?? Infinity,
+      );
     }
   });
 
@@ -559,12 +583,34 @@ describe("ideas (design-spec 8.2)", () => {
     expect([price(piaya.loaded.state), price(copy.loaded.state)]).toEqual([
       450, 650,
     ]);
-    // Research logs are copied, and the copied evidence points at the copies.
-    const copiedLogs = await db
-      .select({ id: researchLogEntries.id })
-      .from(researchLogEntries)
-      .where(eq(researchLogEntries.validationId, copy.validation.id));
+    // Research logs are copied with their recorders (6.8), and the copied evidence
+    // points at the copies.
+    const logsOf = (validationId: string) =>
+      db
+        .select({
+          id: researchLogEntries.id,
+          topic: researchLogEntries.topic,
+          createdById: researchLogEntries.createdById,
+        })
+        .from(researchLogEntries)
+        .where(
+          and(
+            eq(researchLogEntries.validationId, validationId),
+            isNull(researchLogEntries.deletedAt),
+          ),
+        )
+        .orderBy(asc(researchLogEntries.topic));
+    const copiedLogs = await logsOf(copy.validation.id);
     expect(copiedLogs).toHaveLength(7);
+    const recorders = (logs: typeof copiedLogs) =>
+      logs.map((log) => [log.topic, log.createdById]);
+    expect(recorders(copiedLogs)).toEqual(
+      recorders(await logsOf(piaya.validation.id)),
+    );
+    // Kenji duplicated it; the logs stay recorded by others too.
+    expect(copiedLogs.some((log) => log.createdById !== userId("kenji"))).toBe(
+      true,
+    );
     const copiedLogIds = new Set(copiedLogs.map((log) => log.id));
     const links = await db
       .select({ logId: evidenceLinks.researchLogEntryId })

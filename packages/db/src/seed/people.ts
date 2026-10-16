@@ -1,6 +1,6 @@
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
-import { hashInvitationToken } from "../invitations";
+import { hashInvitationToken, INVITATION_VALID_MS } from "../invitations";
 import {
   accounts,
   invitations,
@@ -26,9 +26,6 @@ export const SEED_INVITATION_TOKENS = {
   pending: "demo-invite-pending",
   expired: "demo-invite-expired",
 } as const;
-
-/** How long an invitation stays valid (design-spec 6.16, screen 9). */
-const INVITATION_DAYS = 7;
 
 interface UserSpec {
   displayName: string;
@@ -88,6 +85,8 @@ const USER_KEYS = Object.keys(SEED_USERS) as UserKey[];
 
 /** When Ana made the BCDX workspace, right after joining. */
 const BCDX_CREATED_DAYS_AGO = 99;
+/** How long after signing up through an invitation its onboarding accepted it. */
+const ACCEPTED_AFTER_SIGN_UP_MS = 5 * 60 * 1000;
 
 /**
  * Users with their credential accounts, the BCDX workspace, a personal workspace each, the
@@ -159,14 +158,23 @@ export async function seedPeople({ tx, clock }: SeedContext): Promise<void> {
     ...BCDX_MEMBERS.map((key) => {
       const user = SEED_USERS[key];
       if (user.role === null) throw new Error(`${key} has no BCDX role`);
-      const joined = Math.min(user.joinedDaysAgo, BCDX_CREATED_DAYS_AGO);
+      // Ana made BCDX after signing up. The others signed up through its invitation,
+      // which they accepted (U6) just after sign-up made their personal workspace, so
+      // that one stays first in their memberships (SDD 5.4 U1).
+      const joined =
+        user.joinedDaysAgo > BCDX_CREATED_DAYS_AGO
+          ? clock.ago(BCDX_CREATED_DAYS_AGO)
+          : new Date(
+              clock.ago(user.joinedDaysAgo).getTime() +
+                ACCEPTED_AFTER_SIGN_UP_MS,
+            );
       return {
         id: seedId("membership", "bcdx", key),
         workspaceId: BCDX_WORKSPACE_ID,
         userId: userId(key),
         role: user.role,
-        createdAt: clock.ago(joined),
-        updatedAt: clock.ago(joined),
+        createdAt: joined,
+        updatedAt: joined,
       };
     }),
   ]);
@@ -194,7 +202,7 @@ export async function seedPeople({ tx, clock }: SeedContext): Promise<void> {
     tokenHash: hashInvitationToken(SEED_INVITATION_TOKENS[key]),
     invitedById: userId("ana"),
     status: "pending" as const,
-    expiresAt: clock.ago(sentDaysAgo - INVITATION_DAYS),
+    expiresAt: new Date(clock.ago(sentDaysAgo).getTime() + INVITATION_VALID_MS),
     createdAt: clock.ago(sentDaysAgo),
     updatedAt: clock.ago(sentDaysAgo),
   });

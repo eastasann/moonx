@@ -1,0 +1,67 @@
+{
+  "slide": {
+    "problem": "Problem",
+    "customer": "Customer",
+    "solution": "Solution",
+    "why_now": "Why now",
+    "market": "Market",
+    "competition": "Competition",
+    "business_model": "Business model",
+    "economics": "Economics",
+    "funding": "Funding plan",
+    "why_us": "Why us",
+    "execution": "Execution plan",
+    "launch": "Launch plan",
+    "risks": "Risks",
+    "next_step": "Next step",
+    "ask": "Ask / next step"
+  },
+  "notWrittenYet": "Not written yet",
+  "draft": "Draft",
+  "meta": {
+    "preparedBy": "Prepared by",
+    "date": "Date",
+    "version": "Version"
+  },
+  "source": {
+    "businessName": "Business Name",
+    "competitors": "Competitors"
+  },
+  "number": {
+    "initial_cost_total": "Startup cost",
+    "variable_cost_per_unit": "Variable cost / sale",
+    "selling_price": "Price",
+    "contribution_margin": "Contribution / sale",
+    "contribution_margin_rate": "Contribution margin",
+    "break_even_units_day": "Break-even / day",
+    "payback_months": "Payback",
+    "simple_roi": "ROI"
+  },
+  "column": {
+    "name": "Name",
+    "type": "Type",
+    "price": "Price",
+    "strength": "Strength",
+    "scenario": "Scenario",
+    "unitsPerDay": "Units / day",
+    "revenue": "Revenue / month",
+    "operatingProfit": "Operating profit / month",
+    "milestone": "Milestone",
+    "goal": "Goal",
+    "assignee": "Assignee",
+    "deadline": "Deadline",
+    "status": "Status",
+    "risk": "Risk",
+    "probability": "Probability",
+    "impact": "Impact",
+    "mitigation": "Mitigation"
+  },
+  "dated": "{{text}} ({{date}})",
+  "founder": "{{name}} ({{role}})",
+  "separator": "; ",
+  "label": "{{label}}: ",
+  "footerSeparator": " · ",
+  "overdueDeadline": "{{date}}, {{overdue}}",
+  "bullet": "•",
+  "ellipsis": "…"
+}

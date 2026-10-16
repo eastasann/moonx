@@ -6,7 +6,8 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/routeTree.gen.ts", "!packages/db/migrations"]
+    "includes": ["**", "!**/routeTree.gen.ts", "!packages/db/migrations"],
+    "maxSize": 8388608
   },
   "formatter": {
     "indentStyle": "space"

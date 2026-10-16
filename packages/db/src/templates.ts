@@ -1,17 +1,24 @@
 import {
+  type MeasureText,
+  type PitchSection,
+  pitchTemplateOverflows,
+} from "@moonx/domain";
+import {
   type AnswerType,
   type ErrorCode,
   type ErrorDetail,
   isQuestionKey,
   issueDetails,
+  PLAN_LIST_COLUMNS,
   type QuestionOptions,
   questionOptionsSchema,
   type TemplateFile,
   type TemplateKind,
   templateFileSchema,
 } from "@moonx/schemas";
+import { print } from "@moonx/ui-tokens/print";
 import { and, asc, desc, eq, lt } from "drizzle-orm";
-import type { PgInsertValue, PgTable } from "drizzle-orm/pg-core";
+import type { PgColumn, PgInsertValue, PgTable } from "drizzle-orm/pg-core";
 import type { Database, DatabaseTransaction } from "./client";
 import {
   templateCheckRules,
@@ -26,6 +33,10 @@ import {
 // Importing a template file (AD10), checking a version before it is published and
 // publishing it (AD6), as SDD 5.13 specifies them. The operator API and the seed both
 // call these, so a template reaches every environment through the same checks.
+//
+// The check of a plan template sets its Pitch Deck in the PDF's fonts, which only the API
+// loads (ADR-012). So the check takes their measure as an argument, which no caller can
+// leave out: the seed gets the API's from `make db-seed` (apps/api/scripts/seed.ts).
 //
 // Locks the operator API must take as well: an edit of a draft (AD3 to AD5) locks the
 // version row, as publishing does, so a publish never checks content that changes before
@@ -120,6 +131,41 @@ const lockTemplate = async (tx: DatabaseTransaction, kind: TemplateKind) => {
 };
 
 /**
+ * Inserts the draft version of `template`, which the caller has locked
+ * ({@link lockTemplate}): v1 when the template has no version, else the next number.
+ *
+ * @throws {TemplateError} DRAFT_EXISTS when the template already has a draft.
+ */
+const insertDraft = async (
+  tx: DatabaseTransaction,
+  template: { id: string; kind: TemplateKind },
+  draft: { id: string; aiPrompt: string },
+) => {
+  const versions = await tx
+    .select({
+      versionNumber: templateVersions.versionNumber,
+      status: templateVersions.status,
+    })
+    .from(templateVersions)
+    .where(eq(templateVersions.templateId, template.id));
+  if (versions.some((version) => version.status === "draft")) {
+    throw new TemplateError(
+      "DRAFT_EXISTS",
+      `The ${template.kind} template already has a draft`,
+    );
+  }
+  const versionNumber =
+    Math.max(0, ...versions.map((version) => version.versionNumber)) + 1;
+  await tx.insert(templateVersions).values({
+    id: draft.id,
+    templateId: template.id,
+    versionNumber,
+    aiPrompt: draft.aiPrompt,
+  });
+  return versionNumber;
+};
+
+/**
  * Creates the draft version of the `kind` template from a template file (AD10). Creates
  * the template first when there is none, named by the file. The draft is v1 when the
  * template has no version, else the next number; it holds the file's content only.
@@ -146,29 +192,12 @@ export async function importTemplateFile(
       template = await lockTemplate(tx, kind);
     }
     if (template === undefined) throw new Error(`No ${kind} template row`);
-
-    const versions = await tx
-      .select({
-        versionNumber: templateVersions.versionNumber,
-        status: templateVersions.status,
-      })
-      .from(templateVersions)
-      .where(eq(templateVersions.templateId, template.id));
-    if (versions.some((version) => version.status === "draft")) {
-      throw new TemplateError(
-        "DRAFT_EXISTS",
-        `The ${kind} template already has a draft`,
-      );
-    }
-    const versionNumber =
-      Math.max(0, ...versions.map((version) => version.versionNumber)) + 1;
     const versionId = newId();
-    await tx.insert(templateVersions).values({
-      id: versionId,
-      templateId: template.id,
-      versionNumber,
-      aiPrompt: file.aiPrompt,
-    });
+    const versionNumber = await insertDraft(
+      tx,
+      { id: template.id, kind },
+      { id: versionId, aiPrompt: file.aiPrompt },
+    );
 
     const sections = file.sections.map((section, index) => ({
       section,
@@ -246,8 +275,11 @@ export type TemplateProblemCode =
   | "invalid_question_key"
   | "question_key_section_mismatch"
   | "duplicate_question_key"
+  | "answer_type_mismatch"
   | "options_mismatch"
-  | "unknown_condition_key";
+  | "unknown_condition_key"
+  | "copy_from_mismatch"
+  | "pitch_deck_overflow";
 
 /** The AD6 validate response. */
 export interface TemplateCheck {
@@ -271,14 +303,42 @@ export interface TemplateContent {
     questions: {
       id: string;
       questionKey: string;
+      /** The name a Pitch Deck bullet shows it by. */
+      title: string;
       answerType: AnswerType;
       options: unknown;
       displayCondition: unknown;
+      /** Plans only: what the draft copies (SDD 6.3 `copy_from`). */
+      copyFrom?: unknown;
     }[];
   }[];
   /** The question IDs of the version before it; null when it is the first. */
   previousQuestionKeys: readonly string[] | null;
 }
+
+/**
+ * The answer types the questions of each kind may have (SDD 5.13 AD6): those its answers
+ * table holds (6.3: a self-analysis keeps a text and an amount, a validation a text, a
+ * plan a text and table rows), and in a plan the sub-items that show the validation's
+ * numbers and the plan's execution items and keep no answer.
+ */
+const ANSWER_TYPES: Record<TemplateKind, ReadonlySet<AnswerType>> = {
+  self_analysis: new Set([
+    "long_text",
+    "short_text",
+    "choice",
+    "amount_with_reason",
+  ]),
+  validation: new Set(["long_text", "short_text", "choice"]),
+  business_plan: new Set([
+    "long_text",
+    "short_text",
+    "choice",
+    "table",
+    "linked_metric",
+    "execution_view",
+  ]),
+};
 
 const optionsKindOf: Record<AnswerType, QuestionOptions["kind"] | null> = {
   long_text: null,
@@ -307,13 +367,77 @@ const optionsFit = (answerType: AnswerType, options: unknown) => {
   }
 };
 
+/**
+ * Whether a plan sub-item can hold what its `copy_from` copies (SDD 6.3): texts go to a
+ * long or short text, and `LIST.ASSUMPTIONS` or `LIST.RISKS`, alone, to a table with
+ * the columns the draft fills.
+ */
+const copyFromFits = (
+  answerType: AnswerType,
+  options: unknown,
+  copyFrom: unknown,
+) => {
+  if (copyFrom == null) return true;
+  if (!Array.isArray(copyFrom) || copyFrom.length === 0) return false;
+  const list = copyFrom.find(
+    (source): source is keyof typeof PLAN_LIST_COLUMNS =>
+      typeof source === "string" && source in PLAN_LIST_COLUMNS,
+  );
+  if (list === undefined)
+    return answerType === "long_text" || answerType === "short_text";
+  const parsed = questionOptionsSchema.safeParse(options);
+  if (copyFrom.length !== 1 || !parsed.success) return false;
+  if (parsed.data.kind !== "table") return false;
+  const columns = new Set(parsed.data.columns.map((column) => column.key));
+  return PLAN_LIST_COLUMNS[list].every((key) => columns.has(key));
+};
+
 const conditionKeys = (condition: unknown) =>
   typeof condition === "object" && condition !== null
     ? Object.keys(condition)
     : [];
 
-/** The checks of AD6 validate on a version's content (SDD 5.13). */
-export function checkTemplateContent(content: TemplateContent): TemplateCheck {
+const DECK_NAMES = { one: "one-minute", five: "five-minute" } as const;
+
+/**
+ * The slides of a plan template's decks that the most material runs past the bottom of
+ * (`pitch_deck_overflow`, design-spec 6.14), each at the section its Edit source goes to.
+ */
+const pitchDeckErrors = (
+  content: TemplateContent,
+  measure: MeasureText,
+): TemplateCheck["errors"] => {
+  const sections: PitchSection[] = content.sections.map((section) => ({
+    key: section.key,
+    questions: section.questions.map((question) => ({
+      key: question.questionKey,
+      title: question.title,
+      answerType: question.answerType,
+    })),
+  }));
+  return pitchTemplateOverflows(sections, { print, measure }).map(
+    (overflow) => ({
+      code: "pitch_deck_overflow",
+      message: `The ${overflow.slide} slide of the ${DECK_NAMES[overflow.variant]} deck runs past the bottom of its body with the most material`,
+      // Plan items are numbered by their section keys, as 21 opens them.
+      nodeId:
+        content.sections.find(
+          (section) => Number(section.key) === overflow.itemNo,
+        )?.id ?? null,
+    }),
+  );
+};
+
+/**
+ * The checks of AD6 validate on a version's content (SDD 5.13).
+ *
+ * @param measure The width of a text in the PDF's fonts, to set a plan template's Pitch
+ *   Deck as the PDF does.
+ */
+export function checkTemplateContent(
+  content: TemplateContent,
+  measure: MeasureText,
+): TemplateCheck {
   const errors: TemplateCheck["errors"] = [];
   const questions = content.sections.flatMap((section) =>
     section.questions.map((question) => ({ section, question })),
@@ -361,10 +485,25 @@ export function checkTemplateContent(content: TemplateContent): TemplateCheck {
         nodeId: question.id,
       });
     seen.add(key);
+    if (!ANSWER_TYPES[content.kind].has(question.answerType))
+      errors.push({
+        code: "answer_type_mismatch",
+        message: `${key} is ${question.answerType}, which answers of this template cannot hold`,
+        nodeId: question.id,
+      });
     if (!optionsFit(question.answerType, question.options))
       errors.push({
         code: "options_mismatch",
         message: `The options of ${key} do not fit ${question.answerType}`,
+        nodeId: question.id,
+      });
+    if (
+      content.kind === "business_plan" &&
+      !copyFromFits(question.answerType, question.options, question.copyFrom)
+    )
+      errors.push({
+        code: "copy_from_mismatch",
+        message: `${key} cannot hold what it copies from the validation`,
         nodeId: question.id,
       });
     for (const conditionKey of conditionKeys(question.displayCondition)) {
@@ -376,6 +515,9 @@ export function checkTemplateContent(content: TemplateContent): TemplateCheck {
         });
     }
   }
+
+  if (content.kind === "business_plan")
+    errors.push(...pitchDeckErrors(content, measure));
 
   const removed = (content.previousQuestionKeys ?? []).filter(
     (key) => !keys.has(key),
@@ -401,6 +543,7 @@ const loadVersion = async (
     throw new TemplateError("NOT_FOUND", `No template version ${versionId}`);
   const query = db
     .select({
+      id: templateVersions.id,
       templateId: templateVersions.templateId,
       versionNumber: templateVersions.versionNumber,
       status: templateVersions.status,
@@ -438,6 +581,7 @@ const checkStoredVersion = async (
   db: Executor,
   versionId: string,
   version: Awaited<ReturnType<typeof loadVersion>>,
+  measure: MeasureText,
 ) => {
   const sections = await db
     .select({
@@ -453,9 +597,11 @@ const checkStoredVersion = async (
       id: templateQuestions.id,
       sectionId: templateQuestions.templateSectionId,
       questionKey: templateQuestions.questionKey,
+      title: templateQuestions.title,
       answerType: templateQuestions.answerType,
       options: templateQuestions.options,
       displayCondition: templateQuestions.displayCondition,
+      copyFrom: templateQuestions.copyFrom,
     })
     .from(templateQuestions)
     .where(eq(templateQuestions.templateVersionId, versionId))
@@ -471,30 +617,40 @@ const checkStoredVersion = async (
     )
     .orderBy(desc(templateVersions.versionNumber))
     .limit(1);
-  return checkTemplateContent({
-    kind: version.kind,
-    sections: sections.map((section) => ({
-      ...section,
-      questions: questions.filter(
-        (question) => question.sectionId === section.id,
-      ),
-    })),
-    previousQuestionKeys:
-      previous === undefined ? null : await questionKeysOf(db, previous.id),
-  });
+  return checkTemplateContent(
+    {
+      kind: version.kind,
+      sections: sections.map((section) => ({
+        ...section,
+        questions: questions.filter(
+          (question) => question.sectionId === section.id,
+        ),
+      })),
+      previousQuestionKeys:
+        previous === undefined ? null : await questionKeysOf(db, previous.id),
+    },
+    measure,
+  );
 };
 
 /**
  * Checks a version before it is published (AD6 validate). Writes nothing, so it also runs
  * on a published version.
  *
+ * @param measure As {@link checkTemplateContent} takes it.
  * @throws {TemplateError} NOT_FOUND when there is no such version.
  */
 export async function validateTemplateVersion(
   db: Executor,
   versionId: string,
+  measure: MeasureText,
 ): Promise<TemplateCheck> {
-  return checkStoredVersion(db, versionId, await loadVersion(db, versionId));
+  return checkStoredVersion(
+    db,
+    versionId,
+    await loadVersion(db, versionId),
+    measure,
+  );
 }
 
 /**
@@ -502,6 +658,7 @@ export async function validateTemplateVersion(
  * (design-spec 6.0.7).
  *
  * @param publishedById The operator who publishes; null when no user does (the seed).
+ * @param measure As {@link checkTemplateContent} takes it.
  * @throws {TemplateError} NOT_FOUND when there is no such version; PUBLISHED_READ_ONLY
  *   when it is already published; TEMPLATE_INVALID when AD6 validate finds errors.
  */
@@ -509,6 +666,7 @@ export async function publishTemplateVersion(
   db: Executor,
   versionId: string,
   publishedById: string | null,
+  measure: MeasureText,
 ): Promise<{ versionNumber: number; publishedAt: Date }> {
   return db.transaction(async (tx) => {
     // Locked so a concurrent publish of the same draft waits, then sees it published.
@@ -518,7 +676,7 @@ export async function publishTemplateVersion(
         "PUBLISHED_READ_ONLY",
         `Template version ${versionId} is already published`,
       );
-    const check = await checkStoredVersion(tx, versionId, version);
+    const check = await checkStoredVersion(tx, versionId, version, measure);
     if (check.errors.length > 0)
       throw new TemplateError(
         "TEMPLATE_INVALID",
@@ -541,4 +699,148 @@ export async function publishTemplateVersion(
       publishedAt: published.publishedAt,
     };
   });
+}
+
+/**
+ * Creates the draft of a template as a copy of its version `versionId` (AD2): the AI
+ * prompt, the sections and questions, and the cost rows, check rules and execution rows,
+ * each with a new id. The draft takes the next version number, as an import does.
+ *
+ * @throws {TemplateError} NOT_FOUND when there is no such version; DRAFT_EXISTS when the
+ *   template already has a draft.
+ */
+export async function copyTemplateVersion(
+  db: Executor,
+  versionId: string,
+  { newId = () => crypto.randomUUID() }: ImportOptions = {},
+): Promise<ImportedTemplateVersion> {
+  return db.transaction(async (tx) => {
+    const source = await loadVersion(tx, versionId);
+    const template = await lockTemplate(tx, source.kind);
+    if (template === undefined) throw new Error(`No ${source.kind} template`);
+    const [content] = await tx
+      .select({ aiPrompt: templateVersions.aiPrompt })
+      .from(templateVersions)
+      .where(eq(templateVersions.id, versionId));
+    if (content === undefined) throw new Error(`No version ${versionId}`);
+    const draftId = newId();
+    const versionNumber = await insertDraft(
+      tx,
+      { id: template.id, kind: source.kind },
+      { id: draftId, aiPrompt: content.aiPrompt },
+    );
+
+    const ofSource = <T extends { templateVersionId: PgColumn }>(table: T) =>
+      eq(table.templateVersionId, versionId);
+    const sections = await tx
+      .select()
+      .from(templateSections)
+      .where(ofSource(templateSections))
+      .orderBy(asc(templateSections.sortOrder), asc(templateSections.id));
+    const sectionIds = new Map(
+      sections.map((section) => [section.id, newId()]),
+    );
+    const questions = await tx
+      .select()
+      .from(templateQuestions)
+      .where(ofSource(templateQuestions))
+      .orderBy(asc(templateQuestions.sortOrder), asc(templateQuestions.id));
+    const costDefaults = await tx
+      .select()
+      .from(templateCostDefaults)
+      .where(ofSource(templateCostDefaults))
+      .orderBy(
+        asc(templateCostDefaults.sortOrder),
+        asc(templateCostDefaults.id),
+      );
+    const checkRules = await tx
+      .select()
+      .from(templateCheckRules)
+      .where(ofSource(templateCheckRules))
+      .orderBy(asc(templateCheckRules.checkKey));
+    const presets = await tx
+      .select()
+      .from(templateExecutionPresets)
+      .where(ofSource(templateExecutionPresets))
+      .orderBy(
+        asc(templateExecutionPresets.sortOrder),
+        asc(templateExecutionPresets.id),
+      );
+
+    const fresh = { templateVersionId: draftId };
+    await insertRows(
+      tx,
+      templateSections,
+      sections.map(({ createdAt, updatedAt, ...section }) => ({
+        ...section,
+        ...fresh,
+        id: sectionIds.get(section.id) as string,
+      })),
+    );
+    await insertRows(
+      tx,
+      templateQuestions,
+      questions.map(({ createdAt, updatedAt, ...question }) => ({
+        ...question,
+        ...fresh,
+        id: newId(),
+        templateSectionId: sectionIds.get(question.templateSectionId) as string,
+      })),
+    );
+    await insertRows(
+      tx,
+      templateCostDefaults,
+      costDefaults.map(({ createdAt, updatedAt, ...row }) => ({
+        ...row,
+        ...fresh,
+        id: newId(),
+      })),
+    );
+    await insertRows(
+      tx,
+      templateCheckRules,
+      checkRules.map(({ createdAt, updatedAt, ...rule }) => ({
+        ...rule,
+        ...fresh,
+        id: newId(),
+      })),
+    );
+    await insertRows(
+      tx,
+      templateExecutionPresets,
+      presets.map(({ createdAt, updatedAt, ...preset }) => ({
+        ...preset,
+        ...fresh,
+        id: newId(),
+      })),
+    );
+    return { versionId: draftId, kind: source.kind, versionNumber };
+  });
+}
+
+/**
+ * Locks the draft `versionId` for an edit of its content (AD3 PATCH, AD4, AD5) until the
+ * transaction ends, as publishing locks it: a publish never checks content that changes
+ * before it commits, and no edit lands on a version once it is published.
+ *
+ * @throws {TemplateError} NOT_FOUND when there is no such version; PUBLISHED_READ_ONLY
+ *   when it is published.
+ */
+export async function lockTemplateDraft(
+  tx: DatabaseTransaction,
+  versionId: string,
+): Promise<{
+  /** As stored: lowercase, whatever case `versionId` was written in. */
+  id: string;
+  templateId: string;
+  kind: TemplateKind;
+}> {
+  const version = await loadVersion(tx, versionId, { lock: true });
+  if (version.status === "published") {
+    throw new TemplateError(
+      "PUBLISHED_READ_ONLY",
+      `Template version ${versionId} is published and cannot change`,
+    );
+  }
+  return { id: version.id, templateId: version.templateId, kind: version.kind };
 }

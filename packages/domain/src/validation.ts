@@ -175,10 +175,11 @@ const SECTION_SCREENS: Record<ValidationSectionKey, number> = {
   "10": 11,
 };
 
-const answerText = (
-  answers: ReadonlyMap<string, ValidationAnswerInput>,
-  key: string,
-) => answers.get(key)?.text?.trim() ?? null;
+/** What a display condition reads of an answer. */
+type ShownAnswers = ReadonlyMap<string, Pick<ValidationAnswerInput, "text">>;
+
+const answerText = (answers: ShownAnswers, key: string) =>
+  answers.get(key)?.text?.trim() ?? null;
 
 /**
  * Whether a question shows under the display condition of its template (02 OCEAN). A
@@ -186,7 +187,7 @@ const answerText = (
  */
 export const isQuestionShown = (
   question: Pick<TemplateQuestion, "displayCondition">,
-  answers: ReadonlyMap<string, ValidationAnswerInput>,
+  answers: ShownAnswers,
 ) => {
   if (question.displayCondition === null) return true;
   return Object.entries(question.displayCondition).every(([key, values]) => {
@@ -673,3 +674,36 @@ export const buildDecisionSnapshot = (
   fau: evaluation.fau,
   ...plan,
 });
+
+/** Low, Medium, High from the bottom; a level not set ranks below Low. */
+const RANK: Record<Confidence, number> = { low: 1, medium: 2, high: 3 };
+const rank = (level: Confidence | null) => (level === null ? 0 : RANK[level]);
+
+/**
+ * The risks of 16 in their order (SDD 5.7 V10): those put in order by hand first, then
+ * the others by Impact and Probability, highest first; ties in the order they were made.
+ */
+export function orderRisks<
+  R extends {
+    id: string;
+    sortOrder: number | null;
+    impact: Confidence | null;
+    probability: Confidence | null;
+    createdAt: Date;
+  },
+>(rows: readonly R[]): R[] {
+  const made = (a: R, b: R) =>
+    a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
+  return rows.toSorted((a, b) => {
+    if (a.sortOrder !== null || b.sortOrder !== null) {
+      if (a.sortOrder === null) return 1;
+      if (b.sortOrder === null) return -1;
+      return a.sortOrder - b.sortOrder || made(a, b);
+    }
+    return (
+      rank(b.impact) - rank(a.impact) ||
+      rank(b.probability) - rank(a.probability) ||
+      made(a, b)
+    );
+  });
+}

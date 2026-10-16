@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { TemplateKind } from "./common";
+import type { EconomicsField, TemplateKind } from "./common";
 import { dateOnlySchema } from "./common";
 
 // The input rules of design-spec 6.0.8, which owns the values: copy them from there, and
@@ -20,6 +20,10 @@ export const PHOTO_MAX_BYTES = 5 * MB;
 export const AI_PASTE_MAX_CHARS = 200_000;
 export const AI_FILE_MAX_BYTES = MB;
 export const TEMPLATE_FILE_MAX_BYTES = MB;
+export const PASSWORD_MIN = 8;
+export const PASSWORD_MAX = 128;
+export const DISPLAY_NAME_MAX = 60;
+export const WORKSPACE_NAME_MAX = 60;
 
 /**
  * The rule a `custom` issue breaks, in `issue.params.rule`, so the client can pick its
@@ -235,8 +239,8 @@ export const numberTextSchema = <T extends z.ZodType<number, number>>(
  * `password.length` in UTF-16 units, so its own limits must be set wide enough never to
  * refuse a password this accepts.
  */
-export const passwordSchema = requiredText(128, 8);
-export const displayNameSchema = requiredText(60);
+export const passwordSchema = requiredText(PASSWORD_MAX, PASSWORD_MIN);
+export const displayNameSchema = requiredText(DISPLAY_NAME_MAX);
 
 const timeZoneName = /^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+)*$/;
 const isTimeZone = (value: string) => {
@@ -288,8 +292,10 @@ export const currencySchema = z
     ...ruleIssue("currency"),
   });
 
-export const workspaceNameSchema = requiredText(60);
-export const ideaNameSchema = requiredText(100);
+export const workspaceNameSchema = requiredText(WORKSPACE_NAME_MAX);
+/** Also what the default name of a copy keeps to (design-spec 6.8). */
+export const IDEA_NAME_MAX = 100;
+export const ideaNameSchema = requiredText(IDEA_NAME_MAX);
 export const oneLineConceptSchema = requiredText(200);
 
 export const shortTextSchema = optionalText(TEXT_LIMITS.short);
@@ -335,6 +341,20 @@ export const targetMarginRateSchema = decimal(0, 0.99, 4);
 
 /** 18 Daily sales of a scenario. */
 export const unitsPerDaySchema = decimal(0, UNITS_PER_DAY_MAX, 2);
+
+/** The rule of each number of 18, as the API carries it (the target margin as a rate). */
+export const economicsValueSchemas: Record<
+  EconomicsField,
+  z.ZodType<number, number>
+> = {
+  selling_price: sellingPriceSchema,
+  operating_days: operatingDaysSchema,
+  target_margin: targetMarginRateSchema,
+  units_conservative: unitsPerDaySchema,
+  units_expected: unitsPerDaySchema,
+  units_strong: unitsPerDaySchema,
+  units_capacity: unitsPerDaySchema,
+};
 
 export const versionNameSchema = requiredText(80);
 export const planNameSchema = requiredText(80);

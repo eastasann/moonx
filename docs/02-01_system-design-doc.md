@@ -327,9 +327,9 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 
 ### ADR-006: 通信は REST、クライアントは Eden Treaty（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-15 に、仕様書を読む画面を API が返す Swagger UI にした）
 
-**決定:** API は `/api/v1` の下の REST（JSON、項目名は camelCase）。Web は Eden Treaty（`treaty<App>()`）で型付きで呼ぶ（のちのネイティブアプリも同じ）。仕様書は `@elysiajs/openapi` で出す（staging は `/api/docs` で読める。production は出さない）。常時接続（WebSocket・SSE）は使わず、通知の未読数は取りに行く（2章 通信フロー 6）。
+**決定:** API は `/api/v1` の下の REST（JSON、項目名は camelCase）。Web は Eden Treaty（`treaty<App>()`）で型付きで呼ぶ（のちのネイティブアプリも同じ）。仕様書は `@elysiajs/openapi` で作り、staging だけ `/api/docs` で読める（production は出さない）。読む画面は、API が返す Swagger UI（`swagger-ui-dist` のファイル）と、それを始めるスクリプトのファイルにする。`@elysiajs/openapi` が用意する画面は CDN のスクリプトとインラインのスクリプトを使い、7.2 の CSP（`script-src 'self'`）で動かないため使わない。`make openapi` は、staging が `/api/docs/json` で返すのと同じ文書を `apps/api/openapi.json` に書き出す。常時接続（WebSocket・SSE）は使わず、通知の未読数は取りに行く（2章 通信フロー 6）。
 
 **理由:** Web と、のちのネイティブアプリが同じ API を使うので、言語に依存しない REST にし、型は Eden で共有する。ユーザーが Elysia の仕組み（Eden）を使いたいとした。
 
@@ -379,8 +379,8 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 
 **決定:** Better Auth を API に組み込む（Drizzle アダプター、テーブルは6章）。ログインはメール＋パスワードと Google。プラグインは使わない。回数制限は本体の設定（`rateLimit`）で有効にする（保存先は DB。ADR-029）。呼び出し元の IP は、入口のプラグインが決めた値だけを読ませる（7.2「呼び出し元の IP」）。招待制は次のとおりサーバーで強制する:
 
-- メール＋パスワードの新規登録は Better Auth の公開エンドポイントを閉じ（`emailAndPassword.disableSignUp`）、moonx の `POST /api/v1/invitations/by-token/{token}/sign-up`（5章 U5）だけから作る。メールは招待のメールに固定する。U5 は Better Auth のアダプターを通さず、招待の確認・ユーザーと個人用ワークスペースの作成を自前のトランザクションで行う（下の2つのフックは U5 では動かない）。
-- Google の新規登録は、招待の画面からだけ `requestSignUp` 付きで始める（`disableImplicitSignUp`）。さらにユーザーを作る直前のフック（`databaseHooks.user.create.before`）で、**そのメールあての有効な招待があること**を確かめ、無ければ拒否する（有効 = pending・期限内）。
+- メール＋パスワードの新規登録は、Better Auth の公開エンドポイント（`sign-up/email`）に `emailAndPassword.disableSignUp` で断らせ、moonx の `POST /api/v1/invitations/by-token/{token}/sign-up`（5章 U5）だけから作る。メールは招待のメールに固定する。U5 は Better Auth のアダプターを通さず、招待の確認・ユーザーと個人用ワークスペースの作成を自前のトランザクションで行う（下の2つのフックは U5 では動かない）。
+- Google の新規登録は、招待の画面からだけ `requestSignUp` 付きで始める（`disableImplicitSignUp`）。さらにユーザーを作る直前のフック（`databaseHooks.user.create.before`）で、**始めた画面の招待が有効で、そのメールあてであること**を確かめ、そうでなければ拒否する（有効 = pending・期限内。確かめ方は 5.4「新規登録の制限」）。
 - Google の新規登録では、ユーザーを作った直後のフック（`databaseHooks.user.create.after`）で個人用ワークスペースを作る（design-spec 5章。U5 と同じ処理）。
 - 運営者は `make admin-create EMAIL=...` が発行する招待（`invitations.grants_admin = true`。ワークスペースなし）から登録・受諾した人と、local のシードのデモの運営者だけがなる（`is_admin`）。AD9 のワークスペースなしの招待は `grants_admin = false` で、登録した人は個人用ワークスペースだけを持つ一般の利用者になる。同じメールあての有効なワークスペースなしの招待が AD9 で出ている状態で `make admin-create` を再実行すると、その招待に `grants_admin = true` を付けて新しいリンクを出す（前のリンクは無効になる）。`grants_admin` を付ける API は無い。
 - 停止したユーザー（`status = suspended`）はセッションを消し、ログインのフックで拒否する。
@@ -407,7 +407,7 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 
 **状態・日付:** 採用（2026-10-01）
 
-**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{ibm-plex-sans,ibm-plex-mono,ibm-plex-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる（PDF には書体と太さごとに1つのファイルが要る。Web 用の `@fontsource` の日本語の書体は字の範囲ごとに分かれているので、PDF には使わない。ADR-018）。表・指標・金額の数字は、画面と同じく等幅の書体（`semantic.print.font.mono`）で書く（design-spec 4.4）（API の結合テストが PDF の字送りで確かめる。10章）。
+**決定:** `GET /api/v1/plans/{planId}/pitch-deck.pdf` で、API サーバーが react-pdf（`@react-pdf/renderer`）を使って PDF を作って返す。スライドの中身は `packages/domain` の `buildPitchDeck()`（プランと検証からスライドの素材を組み立てる関数）が作り、画面の表示（Web）と PDF が同じ素材を使う。フォントは 06_design-tokens.json の PDF 用のフォント（`semantic.print`。日本語を含む代替フォントを含む）をコンテナに入れ、使った文字だけを PDF に埋め込む。PDF は常にライトの配色（design-spec 6.14）。フォントは npm の `@expo-google-fonts/{ibm-plex-sans,ibm-plex-mono,ibm-plex-sans-jp}`（SIL OFL 1.1。TTF）を API の依存に含めてコンテナに入れる（PDF には書体と太さごとに1つのファイルが要る。Web 用の `@fontsource` の日本語の書体は字の範囲ごとに分かれているので、PDF には使わない。ADR-018）。表・指標・金額の数字は、画面と同じく等幅の書体（`semantic.print.font.mono`）で書く（design-spec 4.4）（API の結合テストが PDF の字送りで確かめる。10章）。スライドに収める計算（design-spec 6.14 の文字を小さくする・切る）は `packages/domain` の `fitPitchDeck()` が行い、文字の幅は API が同じフォントのファイルを `fontkit`（react-pdf が使うフォントの解析のライブラリ）で測って渡す。P12 はその結果を返すので、画面のスライドも同じ大きさと同じ切り方で出せる。プランのテンプレートを公開する前の検査（5.13 AD6 の `pitch_deck_overflow`）も同じ測り方を使うので、`packages/db` の公開の関数は API から測り方を受け取る（シードの公開には、API の側にある `make db-seed` の入口が渡す）。
 
 **理由:** どのクライアント（のちのネイティブを含む）からも同じ PDF を作るには、作る場所を1つにするのが確実。react-pdf は Chromium を使わないので、コンテナが軽く、0台からの起動も遅くならない。
 
@@ -589,7 +589,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 **状態・日付:** 採用（2026-10-01）
 
-**決定:** 4 アカウント設定の写真は、API が受け取って sharp（libvips）で 512×512 の WebP に縮め、Cloud Storage のバケット `{GCP_PROJECT_ID}-moonx-{env}-avatars`（公開読み取り、ファイル名は推測できない乱数）に置く。URL を `users.avatar_url` に入れる。local はバケットを使わず、ディスク（`./.data/avatars`）に置いて、API が `GET /api/avatars/{name}`（U9。公開）で返す。
+**決定:** 4 アカウント設定の写真は、API が受け取って sharp（libvips）で 512×512 の WebP に縮め、Cloud Storage のバケット `{GCP_PROJECT_ID}-moonx-{env}-avatars`（公開読み取り、ファイル名は推測できない乱数）に置く。URL を `users.avatar_url` に入れる。API は Cloud Storage の JSON API を直接呼び、Cloud Run のサービスアカウントのトークン（メタデータサーバーから取る）で写真を書き込み、消す（Google のクライアントライブラリは使わない。呼ぶのは2つだけのため）。そのため、このバケットでは API のサービスアカウントにオブジェクトの作成と削除を許し、公開読み取りは `allUsers` にオブジェクトの閲覧だけを許す。local はバケットを使わず、ディスク（`./.data/avatars`。API の作業ディレクトリから数える）に置いて、API が `GET /api/avatars/{name}`（U9。公開）で返す。
 
 **理由:** 写真は任意で小さいので、費用は月 $0.1 未満（Cloud Storage の無料枠は米国の3リージョンだけなので、asia-southeast1 のバケットには少しかかる）。バケット名は全体で一意なので、ほかのバケットと同じくプロジェクト ID を前に付ける。
 
@@ -661,7 +661,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
   - IP ごと: 秘密を受け取る認証のパス（Better Auth の6つのパス。5.4）と U5（招待からの新規登録）を、パスをまたいで1つの枠で数える（キー `app:ip:auth:<IP>`）。Better Auth はパスごとにしか数えられないので、これらのパスでは Better Auth の数え方を止める（5.4）。DB の死活確認（Z2）も IP ごとに数える（キー `app:ip:health-db:<IP>`）。
   - ユーザーごと: 招待の送信・再送（W4・W5・AD9）、PDF の作成、AI 書き出し・取り込み、アカウントの削除のパスワード確認（キー `app:user:<上限の名前>:<userId>`）。
   - 上限の回数と時間の幅は 7.2「レート制限」に書く。
-- IP は、入口のプラグインがリクエストごとに1回だけ決めた値（7.2「呼び出し元の IP」）を、① と ② の両方が使う。
+- IP は、入口のプラグインがリクエストごとに1回だけ決めた値（7.2「呼び出し元の IP」）を、① と ② の両方が使う。キーの `<IP>` には、IPv6 なら先頭の /64 にまとめた値を入れる（7.2「レート制限」）。
 
 **理由:** Better Auth の回数制限は Better Auth のエンドポイントにしか効かない。アプリの API の上限は「誰が」で数える必要があり（Resend の1日100通や PDF の CPU を守る）、ログインの後にしか分からないので API の中で数える。DB に記録すれば、Cloud Run が複数台でも数がそろい、Redis が要らない（ADR-011）。
 
@@ -735,7 +735,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 | `/` | 1 ランディング | ビルド時に HTML を作る |
 | `/privacy` | 29 プライバシーポリシー | 公開。ビルド時に HTML を作る。本文は BCDX が用意する文章（9章「規約のページの本文」） |
 | `/support` | 30 サポート | 同上 |
-| `/login` | 2 ログイン / 新規登録（ログイン） | `?next=<戻る先のパス>&error=<エラーコード>`（`error` は 2 に出す状態。例: `ACCOUNT_SUSPENDED`、Google のログインの失敗） |
+| `/login` | 2 ログイン / 新規登録（ログイン） | `?next=<戻る先のパス>&error=<エラーコード>&requestId=<…>`（`error` は 2 に出す状態。例: `ACCOUNT_SUSPENDED`、Google のログインの失敗。`requestId` は、Google のログインの失敗の転送に API が付ける、その転送の応答のリクエスト ID（8.3）。想定外のエラーの `Ref` に使う。5.4） |
 | `/forgot-password` | 2（パスワード再設定のメールを送る） | |
 | `/reset-password` | 2（新しいパスワードを決める） | `?token=`（メールのリンク） |
 | `/invite/$token` | 2（新規登録）、または 3 の ①（ログイン済み） | 出し分けは design-spec 6.16 |
@@ -775,13 +775,13 @@ API のルートは5章。API が返す Web の静的なファイルのうち、
 
 | 項目 | 決まり |
 |---|---|
-| 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、API の仕様書は `/api/docs`（staging だけ。ADR-006） |
+| 基準のパス | アプリの API は `/api/v1`、Better Auth は `/api/auth`、死活確認は `/api/health`、API の仕様書は `/api/docs`（staging だけ。文書の JSON は `/api/docs/json`。ADR-006） |
 | 値の正 | API が検査する入力の値（必須・文字数・範囲・形式・ファイルの種類と大きさ）の正は design-spec 6.0.8「入力の規則」。この章の API の表と 6.3 の check 制約は値を書かずに 6.0.8 を参照する（check 制約が値を持つときは 6.0.8 と同じ値にする）。期限（招待・パスワード再設定のリンク・再認証）と、画面に出す件数の正も design-spec（6.16・各画面）。変えるときは design-spec を先に直す |
 | 認証 | Better Auth のセッション（HttpOnly Cookie）。公開と書いたもの以外はログインが要る（未ログインは 401 `UNAUTHENTICATED`） |
 | 形式 | JSON（UTF-8）。項目名は camelCase。ID は UUID の文字列。日付だけの値は `"2026-10-01"`、日時は UTC の ISO 8601 で、ミリ秒の3桁と `Z` を付ける（`"2026-10-01T02:00:00.000Z"`。表示はクライアントが利用者のタイムゾーンで行う） |
 | 金額・率 | 金額は number（ワークスペースの通貨。自己分析は自己分析の通貨）。率は 0〜1 の小数（35% は `0.35`）。DB は numeric、API で number に変換する |
 | 部分更新 | 1つの項目は `PATCH`（送った項目だけ変える）、キーで決まる項目（回答・数字）は `PUT .../{key}` で作るか更新する |
-| 同時編集 | 項目を更新するリクエストは、読んだときの `lockVersion` を送る。違えば 409 `CONFLICT` と相手の内容を返す。「自分の内容で上書きする」は同じ内容に `force: true` を付けて送る（ADR-019）。まだ行が無い項目（未回答の設問など）の `lockVersion` は `0`。一覧に出る行（調査ログ・競合・費用行など）は作成時の `lockVersion` が 0、キーで決まる項目（回答・数字）は最初の保存で 1 になる。何も変えないリクエストは `lockVersion` を上げず、履歴も書かない。キーで決まる項目を同時に作られて負けたときは、`force: true` でも 409 `CONFLICT`（`current` を読んでからやり直す）。V4・V5 は根拠の付け外しのたびに、対象の項目の `lockVersion` を上げる |
+| 同時編集 | 項目を更新するリクエストは、読んだときの `lockVersion` を送る。違えば 409 `CONFLICT` と相手の内容を返す。「自分の内容で上書きする」は同じ内容に `force: true` を付けて送る（ADR-019）。まだ行が無い項目（未回答の設問など）の `lockVersion` は `0`。一覧に出る行（調査ログ・競合・費用行など）は作成時の `lockVersion` が 0、キーで決まる項目（回答・数字）は最初の保存で 1 になる。何も変えないリクエストは `lockVersion` を上げず、履歴も書かない。版が食い違う保存は、保存されている内容と照らして決まる 422（保存されている値の無い項目を Fact か Assumption にする送信、保存されている入力方式で使わない値など）より先に 409 `CONFLICT` を返す（本体だけで決まる 422 はそれより先に返す）。キーで決まる項目を同時に作られて負けたときは、`force: true` でも 409 `CONFLICT`（`current` を読んでからやり直す。`lockVersion` 0 の保存が、すでにある行に当たったとき）。ただし、送った内容が保存されている内容と同じ更新は、版が食い違っても、`lockVersion` 0 の保存がすでにある行に当たっても 409 にせず、何も書かずに 200 で通す（両方が同じ内容のときに衝突の確認を出さないため。I2 PATCH・V3・V7 PATCH・V9 PATCH・V11 PATCH・V14 PATCH・V16・S3・P2 PATCH・P5・P10 PATCH・X3 のすべて。V4・V5 は根拠を必ず付けるか外すので、内容が同じ更新にならない）。V4・V5 は根拠の付け外しのたびに、対象の項目の `lockVersion` を上げる |
 | 一覧 | `?cursor=&limit=`（既定50、上限200）。応答は `{ items, nextCursor }`。`cursor` は並べ替えた結果へのオフセット（上限 1,000,000）で、読めない値は 422 `VALIDATION_FAILED`（`details[0].path` は `cursor`）。件数の少ない一覧（競合・費用行など）はページに分けず `{ items }` |
 | 権限 | 下の表の記号。O = Owner、M = Member、V = Viewer（いずれもその資源が属するワークスペースのロール）、本人 = 自分のもの（自己分析は持ち主、アカウントと通知は自分）、書いた人 = そのコメントを書いた人、対象を読める人 = その項目を読めるロール（自己分析は本人と、共有先のワークスペースの O・M）、コメントできる人 = その対象に C1 の POST ができる人（7.1）、Admin = 運営者、ログイン = ログインしていれば誰でも、公開 = ログイン不要。足りなければ 403 `FORBIDDEN`、ワークスペースに所属していなければ 403 `NO_ACCESS`、無ければ 404 `NOT_FOUND`。権限の対応の全体は 7.1 |
 | アーカイブ | アーカイブしたアイデア・プランの中身を変えるリクエスト（コメントを書く・元に戻すを含む）は、ロールにかかわらず 409 `ARCHIVED`（design-spec 6.8） |
@@ -844,7 +844,7 @@ interface Page<T> { items: T[]; nextCursor: string | null; }
 
 interface UserRef {
   id: UUID; displayName: string; avatarUrl: string | null;
-  badge: null | "former_member" | "suspended" | "deleted";   // 名前に添える表示（design-spec 6.16・6.17）。deleted のとき displayName は "Deleted user"
+  badge: null | "former_member" | "suspended" | "deleted";   // 名前に添える表示（design-spec 6.16・6.17）。deleted のとき displayName は "Deleted user"。重なれば deleted、former_member（そのワークスペースにもういない）、suspended の順に1つ。表示がワークスペースに属さないとき（自己分析の変更履歴と衝突の相手、運営者の画面）は former_member を付けない
 }
 
 interface Versioned { lockVersion: number; updatedAt: DateTime | null; updatedBy: UserRef | null; }
@@ -945,7 +945,7 @@ interface NextStep {
 }
 
 // ---- 衝突（409 CONFLICT の error.current） ----
-interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: DateTime; updatedBy: UserRef | null; }
+interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: DateTime; updatedBy: UserRef | null; }   // value は保存されている項目の中身で、変更履歴の before / after と同じ形（回答なら { text, fau, confidence, evidenceIds }。形の正は packages/db/src/history-values.ts）
 ```
 
 ### 5.3 エンドポイント一覧
@@ -1064,7 +1064,7 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | 内部 | | | | |
 | Z1 | GET | `/api/health` | 公開（DB に触れない） | 監視 |
 | Z2 | GET | `/api/health/db` | 公開（IP ごとの回数制限。7.2） | デプロイ後の確認 |
-| Z3 | GET | `/api/docs` | 公開（staging だけ。production は出さない。ADR-006） | 開発 |
+| Z3 | GET | `/api/docs`・`/api/docs/*`（文書の JSON `/api/docs/json` と、画面のファイル） | 公開（staging だけ。production は出さない。ADR-006） | 開発 |
 
 ### 5.4 認証・アカウント・招待
 
@@ -1072,13 +1072,13 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 
 | 項目 | 設定 |
 |---|---|
-| メール＋パスワード | 有効。`disableSignUp: true`（新規登録は U5 だけ）。パスワードの規則は design-spec 6.0.8（Better Auth の `minPasswordLength`・`maxPasswordLength` もその値にする）。パスワード再設定のリンクの期限は design-spec 6.16。再設定すると他のセッションを消し、`hooks.after`（`/reset-password`）でそのユーザーの新しいセッションを作って Cookie を返す（ログインした状態で 5 へ。design-spec 6.16） |
-| Google | 有効。`disableImplicitSignUp: true`。新規登録は招待の画面（`/invite/$token`）からだけ `requestSignUp: true` で始め、`callbackURL` を `/welcome?step=invite&token=…&new=1`、`errorCallbackURL` を `/login?error=…` にする。2 からのログインは、`callbackURL` を `next` の値（無ければ最後に開いたワークスペースの 5）にする |
-| 新規登録の制限 | Google の新規登録だけで動く（U5 はアダプターを通さず、自分で招待を確かめる。ADR-010）。`databaseHooks.user.create.before`: そのメールあての有効な招待（`pending` かつ期限内。大文字小文字を区別しない）が無いか、メールが確認済みでなければ（Google が `email_verified` を返さない）`INVITATION_REQUIRED` で拒否する |
-| 登録の後 | Google の新規登録だけで動く（U5 は同じ処理を自前のトランザクションで行う）。`databaseHooks.user.create.after`: 個人用ワークスペース（名前と通貨は design-spec 5章「登録時」。本人が Owner）を作り、`last_workspace_id` に入れる。そのメールあてのワークスペースなしの招待があれば、その招待を受諾済みにし（3 の ① を飛ばすため、U6 は呼ばれない）、`grants_admin` が true のときだけ運営者にする |
-| ログインの制限 | `databaseHooks.session.create.before`: `users.status` が `active` 以外（停止・削除）なら `ACCOUNT_SUSPENDED` で拒否する |
-| セッション | 有効期限30日、毎日更新。Cookie は `__Secure-` 接頭辞・HttpOnly・Secure・SameSite=Lax（local は Secure なし）。`change-password` はクライアントの指定にかかわらず他のセッションを消す（`revokeOtherSessions`）。Better Auth の `update-user`・`delete-user`・`change-email` は閉じて 404 を返す（プロフィールと削除は U2・U3・U7 だけから行う） |
-| 回数制限 | 有効。保存先は DB（`rate_limits`）。秘密を受け取るパス（`sign-in/email`・`sign-in/social`・`sign-up/email`・`request-password-reset`・`reset-password`・`change-password`）と U5 は、パスをまたいで IP ごとに1つの枠で1分10回。入口のプラグイン（ADR-029）が数え、Better Auth 側ではこれらのパスの `customRules` を `false` にしてパスごとの数え方を止める。それ以外のパス（`get-session` など）は Better Auth の既定（IP あたり1分100回） |
+| メール＋パスワード | 有効。`disableSignUp: true`（新規登録は U5 だけ）。パスワードの規則は design-spec 6.0.8。Better Auth は長さを UTF-16 の単位で数え、6.0.8 は文字で数えるので、Better Auth の `minPasswordLength` は 8、`maxPasswordLength` は 256（128文字の倍）にして規則に合うパスワードを拒まない幅にし、新しいパスワード（A7・A8 の `newPassword`）は `hooks.before` で 6.0.8 の規則（`packages/schemas` の `passwordSchema`）で確かめる（合わなければ 422 `VALIDATION_FAILED`。Better Auth の形）。パスワード再設定のリンクの期限は design-spec 6.16。リンクは `BETTER_AUTH_URL` の `/reset-password?token=…`（4章）で、メールの文面は design-spec 6.16。メールが送れなくても A6 の応答は変えず（登録の有無を明かさないため。送るのは登録のあるメールだけなので、応答を変えると分かってしまう）、API のログに `error` で書く。同じ理由で、A6 は登録の有無にかかわらず、受け取ってから2秒たってから答える（送信を待つ時間で登録の有無が分からないように）。送信はその2秒の中で終える（Cloud Run は応答の後に CPU を割り当てないので、応答の後に続けた送信は止まりうる。ADR-007）。2秒で終わらなければ送信をやめ、送れなかったときと同じく API のログに `error` で書く（Resend が受け取っていれば届く）。Google だけで登録した人も、A6・A7 でパスワードを作れる（メールを受け取れることで本人を確かめる。U8 の再認証の時間は、ログイン中の端末から作るときの決まり）。再設定すると他のセッションを消し、`hooks.after`（`/reset-password`）でそのユーザーの新しいセッションを作って Cookie を返す（ログインした状態で 5 へ。design-spec 6.16） |
+| Google | 有効。`disableImplicitSignUp: true`。新規登録は招待の画面（`/invite/$token`）からだけ `requestSignUp: true` と `additionalData: { invitationToken: <その画面のトークン> }` で始め、`callbackURL` を `/welcome?step=invite&token=…&new=1`、`errorCallbackURL` を `/login?error=…` にする。2 からのログインは、`callbackURL` を `next` の値（無ければ最後に開いたワークスペースの 5）にする。`errorCallbackURL` を持たない失敗（OAuth の state が期限切れ・偽物）も `onAPIError.errorURL` で `/login?error=…` へ送る（Better Auth のエラーのページを使わない）。Google のトークン（アクセス・リフレッシュ・ID）は持たない（ログインにしか使わないため。`accounts` の該当の列は空にし、ログインのたびに書き直す設定（`updateAccountOnSignIn`）も止める） |
+| 新規登録の制限 | Google の新規登録だけで動く（U5 はアダプターを通さず、自分で招待を確かめる。ADR-010）。`databaseHooks.user.create.before`: 始めた画面の招待（`additionalData.invitationToken` のトークンの招待。クライアントが送る値なので、招待を引く鍵にだけ使う）が有効（`pending` かつ期限内）で、そのメールが Google のメールと同じ（大文字小文字を区別しない）でなければ、またメールが確認済みでなければ（Google が `email_verified` を返さない）`INVITATION_REQUIRED` で拒否する（design-spec 6.16 の「招待のメールと同じメールの Google アカウントだけ」）。招待は、Google のプロフィールを受け取ったとき（Google の設定の `mapProfileToUser`。ユーザーを作るトランザクションの前）に引いて確かめ、`databaseHooks.user.create.before` はその結果で拒否する。このフックは Better Auth がユーザーを作るトランザクションの中で動くので、そこで DB を読むと、そのトランザクションの接続とは別の接続が要り、同時の登録がプールの接続（5本。7.3）を使い切って止まる。トークンを持たないので、ID トークンでの新規登録（A2 の `idToken`）はできない。表示名は Google の名前の前後の空白を除いて60文字（design-spec 6.0.8）までに、文字の切れ目で切る。名前が無ければメールの `@` の前を使う（3 の ② で本人が直せる）。Google の写真は使わない（写真は U3 で上げたものだけ。ADR-024） |
+| 登録の後 | Google の新規登録だけで動く（U5 は同じ処理を自前のトランザクションで行う）。`databaseHooks.user.create.after`: 個人用ワークスペース（名前と通貨は design-spec 5章「登録時」。本人が Owner）を作り、`last_workspace_id` に入れる。そのメールあてのワークスペースなしの招待があれば、その招待を受諾済みにし（3 の ① を飛ばすため、U6 は呼ばれない）、`grants_admin` が true のときだけ運営者にする。この処理は1つのトランザクションで行う。このフックは `users` の行を書いたトランザクションのコミットの後に動くので、失敗したとき（途中でインスタンスが止まったときも）は、ワークスペースの無い `users` の行が残る（Google の転送は `/login?error=unable_to_create_user`）。そのため、セッションを作る前（下の「ログインの制限」のフック）にも、個人用ワークスペースが無ければ同じ処理を行い、次のログインで整える（ユーザーの行をロックして確かめるので、同時のログインでも1つしか作らない） |
+| ログインの制限 | `databaseHooks.session.create.before`: `users.status` が `active` 以外（停止・削除）なら `ACCOUNT_SUSPENDED` で拒否する。続けて、上の「登録の後」の処理を、個人用ワークスペースが無いときだけ行う。A7 も、`hooks.before` でリンクのトークンのユーザーを引き、`active` 以外なら、パスワードを変えずに（トークンも使わずに）`ACCOUNT_SUSPENDED` で拒否する（停止の間にパスワードが変わらないように。再開で元どおりになる。design-spec 6.17「停止の効果」）。A6 は応答を変えられないので、停止したユーザーにもメールを送る |
+| セッション | 有効期限30日、毎日更新。Cookie は `__Secure-` 接頭辞・HttpOnly・Secure・SameSite=Lax（local は Secure なし。staging・production は `useSecureCookies` で必ず Secure にする）。Cookie の名前の接頭辞は `moonx`（`moonx.session_token`。localhost の Cookie はポートをまたいで共有されるので、Better Auth の既定の名前のままだと、同じ手元で動くほかのアプリの Cookie とぶつかる）。`change-password` はクライアントの指定にかかわらず他のセッションを消す（`revokeOtherSessions`）。セッションが無いとき（Cookie が無い・偽物・期限切れ・消されたセッション）、A4・A5・A8 は本体にかかわらず 401 `UNAUTHENTICATED`（Better Auth の形 `{ code, message }`。7.1）を返す。Better Auth のままでは A4 は何もせずに 200、A5 は 200 の `null`、A8 は本体を先に検査し、セッションが無ければ `code` が `UNAUTHORIZED` の 401 を返すので、`/api/auth/*` のルートで直す（A4・A8 は先にセッションの有無を確かめる。A4 は無くても Better Auth のサインアウトを動かして古い Cookie を消してから 401 にする）。`/api/v1` のセッションの確認（`auth.api.getSession`。5.13）が期限を延ばしたときや、期限切れのセッションの Cookie を消したときは、その応答も `Set-Cookie` を返す（返さないと、ブラウザの Cookie がログインから30日で切れる）。`/api/auth/*` は A1〜A8 と、断るだけの `sign-up/email` だけを開け、Better Auth のほかのパス（`update-user`・`delete-user`・`change-email`・`verify-password`・`unlink-account`・`list-sessions` など）は閉じて 404 `NOT_FOUND`（Better Auth の形）を返す（プロフィールと削除は U2・U3・U7 だけから行う。`verify-password` はパスワードを試す入口になる）。サーバーの中から呼ぶ `auth.api` は閉じない（ただし A6・A7 は、2秒の応答と再設定の後のログインに `/api/auth/*` のリクエストが要るので、`/api/auth/*` からだけ動き、`auth.api` からは拒否する） |
+| 回数制限 | 有効。保存先は DB（`rate_limits`）。秘密を受け取るパス（`sign-in/email`・`sign-in/social`・`sign-up/email`・`request-password-reset`・`reset-password`・`change-password`）と U5 は、パスをまたいで IP ごとに1つの枠で1分10回。入口のプラグイン（ADR-029）が数え、Better Auth 側ではこれらのパスの `customRules` を `false` にしてパスごとの数え方を止める。それ以外のパス（`get-session` など）は Better Auth が IP とパスごとに1分100回（本体の設定の `window`・`max`。1.7 の既定は10秒100回なので、設定で変える）。Better Auth の回数の保存先は、Better Auth の DB の保存先（`storage: "database"`）ではなく、入口のプラグインと同じ数え方で `rate_limits` に書く `customStorage` にする。Better Auth の DB の保存先は、自分の最も長い時間の幅（60秒）を過ぎた行を、接頭辞を問わず消すので、`app:` の1時間の枠（7.2）を数え直させてしまう。Better Auth の 429 は `code` を持たないので、`{ code: "RATE_LIMITED", message }` に直して返す（`X-Retry-After` はそのまま） |
 | 信頼するオリジン | `TRUSTED_ORIGINS`（2章） |
 | IP の取得 | 入口のプラグインが決めた値だけを読ませる（7.2「呼び出し元の IP」。Better Auth の IP のヘッダーの設定は、入口のプラグインが付け直す `X-Moonx-Client-Ip` だけにする） |
 
@@ -1090,6 +1090,9 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | 回数の上限（429） | 2 と M9 の回数の上限（design-spec 6.0.6。M9 は開いたまま、値を持ち続ける） |
 | `ACCOUNT_SUSPENDED` | 2 の停止されたユーザー。M9 で返ったときも、保存できていない値とキャッシュを捨てて 2 へ移り、同じ文言を出す |
 | `INVITATION_REQUIRED`（Google の新規登録） | 2 の招待リンクが無効・期限切れ |
+| `signup_disabled`（Google の転送の `error`。アカウントの無い Google でログインした・新規登録で `requestSignUp` が無い） | 2 の招待なしに Google で新規登録しようとした（招待リンクが無効・期限切れと同じ文言） |
+| `INVALID_TOKEN`（A7） | 2 の再設定のリンクが期限切れ・使用済み・無効 |
+| Google の転送のほかの `error`（`unable_to_create_user`・`state_mismatch` など） | design-spec 6.0.6 の想定外のエラー。`Ref` は転送の URL の `requestId`（4章 `/login`）の先頭8文字。API は Better Auth の転送のうち `error` を持つものに、その応答のリクエスト ID を `requestId` として付ける |
 
 **U1 `GET /api/v1/me`** → `200 Me`
 
@@ -1101,17 +1104,17 @@ interface Me {
   isAdmin: boolean;
   hasPassword: boolean;             // Google だけで登録した人は false（4 では「パスワードを設定する」に変わる）
   lastWorkspaceId: UUID | null;
-  memberships: { workspace: { id: UUID; name: string; isPersonal: boolean; currency: string }; role: Role }[];
+  memberships: { workspace: { id: UUID; name: string; isPersonal: boolean; currency: string }; role: Role }[];   // 所属した順（登録時に作る個人用ワークスペースが先頭）
 }
 ```
 
 **U2 `PATCH /api/v1/me`** 本体 `{ displayName?: string (design-spec 6.0.8); timezone?: string; theme?: "system" | "light" | "dark"; lastWorkspaceId?: UUID }` → `200 Me`。`lastWorkspaceId` は所属するワークスペースだけ（違えば 422 `VALIDATION_FAILED`）。
 
-**U3 `PUT /api/v1/me/avatar`** 本体は `multipart/form-data` の `file`（受け付ける形式と大きさは design-spec 6.0.8）→ `200 { avatarUrl: string }`。512×512 の WebP に縮めて保存する（ADR-024）。ファイルの中身が受け付ける形式の画像でなければ `422 VALIDATION_FAILED`（`details` の `path` は `file`）、大きさの上限を超えれば `413 PAYLOAD_TOO_LARGE`。古い写真のファイルは新しい写真を保存してから消す。`DELETE` → `204`。
+**U3 `PUT /api/v1/me/avatar`** 本体は `multipart/form-data` の `file`（受け付ける形式と大きさは design-spec 6.0.8）→ `200 { avatarUrl: string }`。512×512 の WebP に縮めて保存する（ADR-024）。ファイルの中身が受け付ける形式の画像でなければ `422 VALIDATION_FAILED`（`details` の `path` は `file`）、大きさの上限を超えれば `413 PAYLOAD_TOO_LARGE`、Cloud Storage に届かなければ `503 UPSTREAM_UNAVAILABLE`。古い写真のファイルは新しい写真を保存してから消す。`DELETE` → `204`。
 
 **U9 `GET /api/avatars/{name}`**（公開。local だけ）: 保存したファイルを返す。名前は32桁の16進＋`.webp`（それ以外は `404 NOT_FOUND`）。staging・production には無く、写真は Cloud Storage の URL を直接開く（ADR-024）。
 
-**U4 `GET /api/v1/invitations/by-token/{token}`**（公開）→ `200 InvitationPreview`。トークンが見つからない・取り消し・期限切れは `410 INVITATION_INVALID`。
+**U4 `GET /api/v1/invitations/by-token/{token}`**（公開）→ `200 InvitationPreview`。トークンが見つからない・取り消し・期限切れは `410 INVITATION_INVALID`。期限切れは受諾していない招待だけで、受諾済みの招待は期限を過ぎても `status: "accepted"` で返す（U6 も期限を見ずに `409 INVITATION_ALREADY_ACCEPTED`）。
 
 ```ts
 interface InvitationPreview {
@@ -1119,22 +1122,22 @@ interface InvitationPreview {
   email: string;
   workspace: { id: UUID; name: string } | null;   // ワークスペースなしの招待は null
   role: Role | null;
-  invitedBy: { displayName: string } | null;       // `make admin-create` の招待は null
+  invitedBy: { displayName: string } | null;       // `make admin-create` の招待は null（運営者が出した招待を作り直したものも）。招待した人がアカウントを削除した招待も null（招待のメールと同じ。design-spec 6.16）
   expiresAt: DateTime;
   accountExists: boolean;                          // そのメールのアカウントがあればログインへ案内する
 }
 ```
 
-**U5**（公開）`POST /api/v1/invitations/by-token/{token}/sign-up`。本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie。メールは招待のメールに固定し、1つのトランザクションで `users`・`accounts`（credential）・個人用ワークスペースを作ってから Better Auth の `signInEmail` でセッションを作る。ワークスペースのある招待はまだ受諾しない（3 の ① で U6）。ワークスペースなしの招待は、登録の時点で受諾済みにする。`grants_admin` が true なら運営者にもする（上の「登録の後」）。エラー: `410 INVITATION_INVALID`、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
+**U5**（公開）`POST /api/v1/invitations/by-token/{token}/sign-up`。本体 `{ displayName: string; password: string; timezone: string }` → `201 { me: Me }` と、ログインした状態のセッション Cookie。メールは招待のメールに固定し、小文字にして保存する（Better Auth はメールを小文字にしてから完全一致で引くので、大文字が残るとログインできない。Google の新規登録も Better Auth が小文字にする）。1つのトランザクションで `users`・`accounts`（credential）・個人用ワークスペースを作ってから Better Auth の `signInEmail` でセッションを作る。同じ招待からの同時の登録は、招待の行をロックして1つだけを通す。`users.email_verified` は true にする（招待のメールのリンクから登録したので、メールは確かめてある。Better Auth は、メールが確認済みのアカウントにだけ、同じメールの Google のログインを連携させる）。ワークスペースのある招待はまだ受諾しない（3 の ① で U6）。ワークスペースなしの招待は、登録の時点で受諾済みにする。`grants_admin` が true なら運営者にもする（上の「登録の後」）。エラー: `410 INVITATION_INVALID`（受諾済みの招待も）、`409 EMAIL_TAKEN`（「ログインしてから招待を開く」へ案内）、`422 VALIDATION_FAILED`。
 
-**U6** `POST /api/v1/invitations/by-token/{token}/accept`。本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。ワークスペースなしの招待は、`grants_admin` が true のときだけ受諾した人を運営者にする。エラー: `410 INVITATION_INVALID`、`409 INVITATION_ALREADY_ACCEPTED`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）。
+**U6** `POST /api/v1/invitations/by-token/{token}/accept`。本体なし → `200 { workspaceId: UUID | null; alreadyMember: boolean }`。所属を作り（すでにメンバーならロールを変えない）、招待を `accepted` にする。所属を作ったときは、ワークスペースの最終利用日（`last_active_at`）も更新する。ワークスペースなしの招待は、`grants_admin` が true のときだけ受諾した人を運営者にする。エラー（確かめる順）: `410 INVITATION_INVALID`、`403 INVITATION_EMAIL_MISMATCH`（`error.invitedEmail` を付ける。「This invitation was sent to {email}. Log in with that email.」）、`409 INVITATION_ALREADY_ACCEPTED`。
 
-**U8 `POST /api/v1/me/password`**（Set password。design-spec 6.16）本体 `{ newPassword: string }` → `204`。Google だけで登録した人（`hasPassword: false`）がパスワードを足す。パスワードがある人は `409 PASSWORD_ALREADY_SET`（A8 で変える）。新しいパスワードの規則は design-spec 6.0.8。セッションが design-spec 6.16 の再認証の時間の中で作られたものでなければ `403 REAUTH_REQUIRED`。サーバーから Better Auth の `setPassword` を呼び、この要求のセッション以外を消す。
+**U8 `POST /api/v1/me/password`**（Set password。design-spec 6.16）本体 `{ newPassword: string }` → `204`。Google だけで登録した人（`hasPassword: false`）がパスワードを足す。パスワードがある人は `409 PASSWORD_ALREADY_SET`（A8 で変える）。新しいパスワードの規則は design-spec 6.0.8。セッションが design-spec 6.16 の再認証の時間の中で作られたものでなければ `403 REAUTH_REQUIRED`。パスワードは Better Auth の `setPassword` と同じ形（credential の `accounts` の行。ハッシュは Better Auth の設定のハッシュ関数）で作り、この要求のセッション以外を消す。この2つは、7.1「停止・削除したユーザー」のユーザーごとの lock を排他で取った1つのトランザクションで行う（Better Auth の `setPassword` は API のトランザクションの外で書くので、同時の2つの U8 がどちらもパスワードの無いことを確かめて通ってしまう）。同時の U8 は1つだけが通り、ほかは `409 PASSWORD_ALREADY_SET`（同時の A7 が先にパスワードを作ったときも同じ）。
 
 **U7 `POST /api/v1/me/delete`**（アカウントの削除。design-spec 6.16）本体 `{ confirmEmail: string; password?: string }` → `204`（セッションの Cookie を消す）。
 - `confirmEmail` が自分のメールと違えば `422 CONFIRMATION_MISMATCH`。パスワードがある人は `password` が必須で、違えば `403 INVALID_PASSWORD`（ユーザーごとに10分5回まで。超えたら `429 RATE_LIMITED`）。パスワードが無い人（Google だけ）は、セッションが design-spec 6.16 の再認証の時間の中で作られたものでなければ `403 REAUTH_REQUIRED`。
-- ほかにメンバーのいるワークスペースで最後の Owner なら `409 LAST_OWNER`（`error.workspaces: { id; name }[]`）。
-- 何を消し何を残すかは design-spec 6.16 の表のとおり。1つのトランザクションで行い、この文書に固有の扱いは次のとおり: `users` の行は残して列を置き換える（`email` を `deleted+{id}@deleted.invalid`、`display_name` を `Deleted user`、`avatar_url` を null、`status` を `deleted`）。`sessions`・`accounts`・パスワード再設定のトークン（`verifications`）は行を消す。所属を外す処理は W3 DELETE と同じ。トランザクションをコミットしてから、保存した写真を消す（Cloud Storage または local のディスク）。
+- ほかにメンバーのいるワークスペースで最後の Owner なら `409 LAST_OWNER`（`error.workspaces: { id; name }[]`）。ロールは、W3 と同じメンバーの lock（5.5 W3）を取ってから読む（待つあいだにほかの Owner が変えたロールで決める）。
+- 何を消し何を残すかは design-spec 6.16 の表のとおり。1つのトランザクションで行い、この文書に固有の扱いは次のとおり（中身ごと消す個人用ワークスペースは、7.1「実装」の順にアイデア、プランの行をロックしてから消す。ワークスペースの行を先に押さえると、中身への書き込みとデッドロックする）: `users` の行は残して列を置き換える（`email` を `deleted+{id}@deleted.invalid`、`display_name` を `Deleted user`、`avatar_url` を null、`status` を `deleted`）。`sessions`・`accounts`・パスワード再設定のトークン（`verifications`）は行を消す。所属を外す処理は W3 DELETE と同じ。トランザクションをコミットしてから、保存した写真を消す（Cloud Storage または local のディスク）。
 - Better Auth の `deleteUser`（行ごと消す）は使わない（チームの記録が `users` を参照しているため）。
 
 ### 5.5 ワークスペース・メンバー・招待
@@ -1147,7 +1150,7 @@ interface Invitation {
   workspace: { id: UUID; name: string } | null;
   status: "pending" | "accepted" | "revoked" | "expired";
   invitedBy: UserRef | null; createdAt: DateTime; expiresAt: DateTime; acceptedAt: DateTime | null;
-}
+}   // invitedBy は招待のワークスペースから見た UserRef（抜けた人は former_member）。招待した人が運営者なら、ワークスペースに属さない表示にして former_member を付けない（メンバーでない運営者も AD9 で招待を出せるため）
 ```
 
 | API | 本体 | 応答 | エラーと副作用 |
@@ -1155,16 +1158,16 @@ interface Invitation {
 | W0 | `{ name: string (design-spec 6.0.8); currency?: string (ISO 4217。既定 PHP) }` | `201 Workspace` | 作った人を Owner にし、`last_workspace_id` を新しいワークスペースにする（`is_personal = false`） |
 | W1 GET | — | `200 Workspace` | |
 | W1 PATCH | `{ name?: string (design-spec 6.0.8); currency?: string (ISO 4217) }` | `200 Workspace` | 通貨を変えても金額は換算しない |
-| W2 GET | — | `200 { items: Member[] }` | |
-| W3 PATCH | `{ role: Role }` | `200 Member` | `409 LAST_OWNER`（最後の Owner を降格できない）、`409 PERSONAL_OWNER`（個人用ワークスペースの持ち主は、ほかの Owner も降格できない。持ち主は `is_personal` のワークスペースの `created_by_id`）。Viewer に降格したら design-spec 6.16 の表のとおり処理する（自己分析の共有を解除、担当を名前に置き換え。担当の置き換えは実行管理の項目の変更履歴 `manual` に残す）。`userId` は UUID だけを受け付ける。対象がメンバーでなければ `404 NOT_FOUND`、ロールが同じなら何も変えず 200 |
-| W3 DELETE | — | `204` | `409 LAST_OWNER`、`409 CANNOT_LEAVE_PERSONAL`（本人が個人用ワークスペースから Leave する）、`409 PERSONAL_OWNER`（ほかの Owner が個人用ワークスペースの持ち主を外す）。外れたときの処理は design-spec 6.16 の表（担当の置き換えは W3 PATCH と同じ。`last_workspace_id` が外れたワークスペースなら個人用ワークスペースに戻す） |
-| W4 GET | `?status=pending|all` | `200 { items: Invitation[] }` | `status` の既定は `pending`: 受諾できるものだけ（期限切れは含まない）。`all` は受諾・取り消し・期限切れも返す。期限を過ぎた `pending` は `status: "expired"` として返す |
-| W4 POST | `{ email: string; role: Role }`（メールの形式は design-spec 6.0.8） | `201 { invitation: Invitation }` | 招待のメールを送る。招待のリンクは応答に含めない（招待した人が相手のメールで先にアカウントを作れてしまうため。リンクは招待されたメールにだけ届く。local は API のログ）。`409 ALREADY_MEMBER`、`409 INVITATION_PENDING`（同じメールの有効な招待がある。`error.invitationId` に付ける id の招待を W5 で再送する）。メールの送信は招待を作るトランザクションの中で行い、Resend に届かなければ招待も作らず `503 UPSTREAM_UNAVAILABLE` を返す（利用者は再試行する）。同じワークスペースへの招待は、ワークスペースの id で取る advisory lock（`pg_advisory_xact_lock`。トランザクションの終わりで外れる）で直列にする。トランザクションが Resend の応答を待つので、ワークスペースの行を `FOR UPDATE` で押さえると、そのあいだ中身の書き込みがすべて止まる。W5・AD9 と合わせて1時間20回まで（7.2。超えたら `429 RATE_LIMITED`） |
-| W5 | — | `200 { invitation: Invitation }` | トークンを作り直してメールを再送する（前のリンクは無効。リンクは応答に含めない）。期限は再送した時点から数え直す（期限の長さは design-spec 6.16）。期限切れの招待も再送できる。受諾済みは `409 INVITATION_ALREADY_ACCEPTED`、取り消し済みは `410 INVITATION_INVALID`（W7 も同じ）。招待のワークスペースに所属しない人は `403 NO_ACCESS`、所属していても Owner でなければ `403 FORBIDDEN`（Admin は除く） |
+| W2 GET | — | `200 { items: Member[] }` | 所属した順 |
+| W3 PATCH | `{ role: Role }` | `200 Member` | `409 PERSONAL_OWNER`（個人用ワークスペースの持ち主は、本人もほかの Owner も降格できない。持ち主は `is_personal` のワークスペースの `created_by_id`）、`409 LAST_OWNER`（最後の Owner を降格できない）の順に確かめる。メンバーの変更（W3・U6・U7）は、ワークスペースの id で取る advisory lock で直列にする。W3 は、その中で呼び出した人がまだ Owner かを確かめる（待つあいだにほかの Owner が降格・削除していれば `403 FORBIDDEN`・`403 NO_ACCESS`）。Viewer に降格したら design-spec 6.16 の表のとおり処理する（自己分析の共有を解除、担当を名前に置き換え。担当の置き換えは実行管理の項目の変更履歴 `manual` に残す）。`userId` は UUID だけを受け付ける。対象がメンバーでなければ `404 NOT_FOUND`、ロールが同じなら何も変えず 200 |
+| W3 DELETE | — | `204` | `userId` は UUID か `me`（自分の id も `me` と同じく Leave。それ以外は `422 VALIDATION_FAILED`）。`409 CANNOT_LEAVE_PERSONAL`（本人が個人用ワークスペースから Leave する）・`409 PERSONAL_OWNER`（ほかの Owner が個人用ワークスペースの持ち主を外す）、`409 LAST_OWNER` の順に確かめる。ほかの人を外すときは、W3 PATCH と同じく lock の中で呼び出した人がまだ Owner かを確かめる。外れたときの処理は design-spec 6.16 の表（担当の置き換えは W3 PATCH と同じ。`last_workspace_id` が外れたワークスペースなら個人用ワークスペースに戻す） |
+| W4 GET | `?status=pending|all` | `200 { items: Invitation[] }` | 新しい順。`status` の既定は `pending`: 受諾できるものだけ（期限切れは含まない）。`all` は受諾・取り消し・期限切れも返す。期限を過ぎた `pending` は `status: "expired"` として返す |
+| W4 POST | `{ email: string; role: Role }`（メールの形式は design-spec 6.0.8） | `201 { invitation: Invitation }` | 招待のメールを送る。招待のリンクは応答に含めない（招待した人が相手のメールで先にアカウントを作れてしまうため。リンクは招待されたメールにだけ届く。local は API のログ）。`409 ALREADY_MEMBER`、`409 INVITATION_PENDING`（同じメールの有効な招待がある。`error.invitationId` に付ける id の招待を W5 で再送する）。メールの送信は招待を作るトランザクションの中で行い、Resend に届かなければ招待も作らず `503 UPSTREAM_UNAVAILABLE` を返す（利用者は再試行する）。同じワークスペースへの招待は、ワークスペースの id で取る advisory lock（`pg_advisory_xact_lock`。トランザクションの終わりで外れる）で直列にする。トランザクションが Resend の応答を待つので、ワークスペースの行を `FOR UPDATE` で押さえると、そのあいだ中身の書き込みがすべて止まる。W5・AD9 と合わせて1時間20回まで（7.2。超えたら `429 RATE_LIMITED`）。招待の発行・再送・取り消し（W4・W5・W7）は、ワークスペースの最終利用日（7.1「実装」）を変えない（メンバーが変わるのは受諾の U6） |
+| W5 | — | `200 { invitation: Invitation }` | トークンを作り直してメールを再送する（前のリンクは無効。リンクは応答に含めない）。期限は再送した時点から数え直す（期限の長さは design-spec 6.16）。期限切れの招待も再送できる。受諾済みは `409 INVITATION_ALREADY_ACCEPTED`、取り消し済みは `410 INVITATION_INVALID`（W7 も同じ）。招待のワークスペースに所属しない人は `403 NO_ACCESS`、所属していても Owner でなければ `403 FORBIDDEN`（Admin は除く）。ワークスペースなしの招待は Admin だけで、ほかの人は `403 FORBIDDEN`。W4 POST と同じく、`409 ALREADY_MEMBER`（招待のメールの人がすでにそのワークスペースのメンバー）・`409 INVITATION_PENDING`（同じメールあての、同じワークスペース（またはワークスペースなし）のほかの有効な招待がある。`error.invitationId` はその招待。期限切れの招待を再送して、有効な招待が2つにならないようにする）を返し、同じ advisory lock を取る。Resend に届かなければトークンも期限も変えずに `503 UPSTREAM_UNAVAILABLE`（前のリンクはそのまま使える）。メールに書く招待した人は、再送した人ではなく招待を出した人（design-spec 6.16「招待のメール」） |
 | W7 | — | `204` | `revoked` にする |
-| W8 | `?targetType=&targetId=` | `200 { items: UserRef[] }` | 自己分析への対象は、そのワークスペースの Owner / Member だけが呼べる（Viewer は `403 FORBIDDEN`。自己分析へのコメントを書けないため。design-spec 6.0.4）。候補も、その自己分析を読める Owner / Member だけ。その自己分析がこのワークスペースに共有されていなければ `403 NOT_SHARED`、設問が無ければ `404 NOT_FOUND` |
+| W8 | `?targetType=&targetId=&targetKey=`（対象の TargetRef。`targetType` は C1 がコメントを受け付ける種類だけで、`business_plan`・`template_version` は `422 VALIDATION_FAILED`。`targetKey` は自己分析の回答の設問 ID） | `200 { items: UserRef[] }` | 表示名の順。ワークスペースの中の対象は、そのワークスペースのメンバー全員（Viewer を含む）。対象（`targetType`・`targetId`）がこのワークスペースに無ければ `404 NOT_FOUND`（無い・画面で削除した行・作成を取り消したアイデアとプラン・ほかのワークスペースのもの。コメントを書く C1 と同じ）。候補は対象によらない。自己分析への対象は、そのワークスペースの Owner / Member だけが呼べる（Viewer は `403 FORBIDDEN`。自己分析へのコメントを書けないため。design-spec 6.0.4）。候補も、その自己分析を読める Owner / Member だけ。その自己分析がこのワークスペースに共有されていなければ `403 NOT_SHARED`、`targetKey` が無いか、その設問が無ければ `404 NOT_FOUND` |
 
-招待のリンクは `https://{DOMAIN}/invite/{token}`。トークンは32バイトの乱数で、DB には SHA-256 のハッシュだけを持つ。リンクを API の応答で返すのは、運営者の AD9 と `make admin-create` だけ（運営者はサービスの管理者で、信頼する前提。2026-10-03 のユーザーの決定。7.1）。W4・W5・招待の一覧（W4 GET・AD7）はリンクもトークンも返さない。リンクのコピー用の API（旧 W6）は無い。
+招待のリンクは `https://{DOMAIN}/invite/{token}`。トークンは32バイトの乱数（base64url の43文字）で、DB には SHA-256 のハッシュだけを持つ。リンクを API の応答で返すのは、運営者の AD9 と `make admin-create` だけ（運営者はサービスの管理者で、信頼する前提。2026-10-03 のユーザーの決定。7.1）。W4・W5・招待の一覧（W4 GET・AD7）はリンクもトークンも返さない。リンクのコピー用の API（旧 W6）は無い。
 
 ### 5.6 ダッシュボードとアイデア
 
@@ -1174,7 +1177,7 @@ interface IdeaSummary {
   proposer: UserRef; stage: Stage; latestDecision: DecisionValue | null; archived: boolean;
   checks: { key: CheckKey; state: CheckState; params: Record<string, number> }[];   // 6つ。合計や点数は返さない。params は CheckResult（5.2）と同じ基準値（一覧が競合の範囲「Competitors (3–5)」を出すため）
   keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months">;
-  plans: { id: UUID; name: string; latestVersionName: string | null; latestGoNoGo: GoNoGoValue | null }[];
+  plans: { id: UUID; name: string; latestVersionName: string | null; latestGoNoGo: GoNoGoValue | null }[];   // アーカイブしていない案を作った順に
   lastActivityAt: DateTime; createdAt: DateTime;
 }
 interface IdeaDetail extends IdeaSummary, Versioned {
@@ -1188,7 +1191,7 @@ interface DueItem {
 }
 interface Activity {
   kind: "change" | "comment" | "decision" | "go_no_go" | "version_saved";
-  actor: UserRef; at: DateTime; summary: string /* 動きの対象のラベル。change・comment は項目のラベル（"01 WHO"・"Costs · Rent"）かアイデア名、decision・go_no_go は記録した値、version_saved は版の名前。文はクライアントが kind・actor・summary から組み立てる */;
+  actor: UserRef; at: DateTime; summary: string /* 動きの対象のラベル。change・comment は項目のラベル（"01 WHO"・"Costs · Rent"。決め方は 5.11 HistoryEntry の label）か、複数の項目にまたがる操作ではアイデア名（プランの中ならプラン名）、decision・go_no_go は記録した値（"hold" など）、version_saved は版の名前。文はクライアントが kind・actor・summary から組み立てる */;
   idea: { id: UUID; name: string } | null; plan: { id: UUID; name: string } | null; link: LinkTarget;
 }
 ```
@@ -1196,14 +1199,14 @@ interface Activity {
 | API | 本体・クエリ | 応答 | 補足 |
 |---|---|---|---|
 | D1 | — | `200 { items: IdeaSummary[]; droppedCount: number }` | アーカイブ・Drop を除く。更新順。`droppedCount` はアーカイブしていない Drop の件数 |
-| D2 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | Owner / Member の一覧。共有していない人の `status` は null（進み具合を見せない） |
-| D3 | — | `200 { items: DueItem[] }` | 対象の期間は design-spec 6.9（Due soon）。期限（`due_date`）のある実行管理の項目（milestone・launch・open_question・next_action。kpi は期限を持たない）から、Done / Resolved のもの、アーカイブ・論理削除したものを除く。自分の担当を先、次に期限順。「今日」は利用者の `users.timezone` の日付で、`overdue` と期間もそれで決める |
-| D4 | — | `200 { items: Activity[] }` | 件数は design-spec 6.9。自己分析に関わる動きは除く。変更・コメント・決定ログを合わせて新しい順に並べる。`batch_id` のある変更は1回の操作を1件にまとめる（複製は新しいアイデアの行で示す）。同じ人が同じ項目を続けて変えたものは、design-spec 6.9 の時間の幅の中なら1件にまとめ、最後の時刻で出す（自動保存のたびに履歴が1行増えるため。履歴の行そのものは1件ずつ残る）。削除した行へのコメントは除く |
-| I1 GET | `?stage=&decision=not_dropped|all|undecided|proceed|hold|drop&proposerId=&includeArchived=true&sort=updated|created|name&q=&cursor=&limit=` | `200 Page<IdeaSummary> & { hiddenDroppedCount: number }` | `decision` の既定は `not_dropped`。`q` は名前と一行コンセプトの部分一致（大文字小文字を区別しない）。`hiddenDroppedCount` は `decision=not_dropped` のときだけ数え、他は 0 |
-| I1 POST | `{ name: string; oneLineConcept: string; proposedSolution?: string }`（値は design-spec 6.0.8） | `201 IdeaDetail` | 最新の公開済みの検証のテンプレートの版で検証を作り、費用の初期行を Empty で作る（履歴なし: 作成の記録だけ）。公開済みの版が無ければ `409 TEMPLATE_NOT_PUBLISHED`（運営者がまだテンプレートを取り込んでいない。AD10）。`proposedSolution` は空白だけなら null |
+| D2 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | Owner / Member の一覧（表示名の順）。共有していない人の `status` は null（進み具合を見せない） |
+| D3 | — | `200 { items: DueItem[] }` | 対象の期間は design-spec 6.9（Due soon）。期限（`due_date`）のある実行管理の項目（milestone・launch・open_question・next_action。kpi は期限を持たない）から、Done / Resolved のもの、アーカイブ・論理削除したものを除く。自分の担当を先、次に期限順（同じ期限は項目名の順）。「今日」は利用者の `users.timezone` の日付で、`overdue` と期間もそれで決める |
+| D4 | — | `200 { items: Activity[] }` | 件数は design-spec 6.9。自己分析に関わる動きは除く。変更・コメント・決定ログを合わせて新しい順に並べる。`batch_id` のある変更は1回の操作を1件にまとめる（複製は新しいアイデアの行で示す）。`batch_id` の無い変更も、1回の要求で書いた行（同じ人・同じ時刻・同じアイデア。I1 POST のアイデアと費用の初期行、V4 の調査ログと根拠を付けた項目など）は1件にまとめる。1つの項目だけを変えた操作は、同じ人が同じ項目を続けて変えたものなら、design-spec 6.9 の時間の幅の中で1件にまとめ、最後の時刻で出す（前の変更からの間が時間の幅を超えたら別の1件。自動保存のたびに履歴が1行増えるため。履歴の行そのものは1件ずつ残る）。`link`: 1つの項目の変更はその項目を出す画面（コメントの通知と同じ行き先で、パネルは開かない）、コメントはその行き先に `panel: "comments"` と `target` を付けたもの、複数の項目にまたがる操作・判定は 13、プランの中の操作・Go / No-Go・版の保存は 20。削除した行へのコメントと、削除したコメントは除く |
+| I1 GET | `?stage=&decision=not_dropped|all|undecided|proceed|hold|drop&proposerId=&includeArchived=true&sort=updated|created|name&q=&cursor=&limit=` | `200 Page<IdeaSummary> & { hiddenDroppedCount: number }` | `decision` の既定は `not_dropped`。`q` は名前と一行コンセプトの部分一致（大文字小文字を区別しない。空白だけなら絞り込まない）。`sort` の既定は `updated`: `updated` は最終活動（`lastActivityAt`）の新しい順、`created` は作成の新しい順、`name` は名前の順（大文字小文字を区別しない）。`q` は短文の上限（design-spec 6.0.8）まで。`hiddenDroppedCount` は `decision=not_dropped` のときだけ、ほかの条件（工程・提案者・アーカイブ・`q`）に合う Drop のアイデアを数え、他は 0 |
+| I1 POST | `{ name: string; oneLineConcept: string; proposedSolution?: string }`（値は design-spec 6.0.8） | `201 IdeaDetail` | 最新の公開済みの検証のテンプレートの版で検証を作り、費用の初期行を Empty で作る（履歴は作成の記録だけ: アイデアの作成と、費用の初期行それぞれの作成を1行ずつ。`manual`）。公開済みの版が無ければ `409 TEMPLATE_NOT_PUBLISHED`（運営者がまだテンプレートを取り込んでいない。AD10）。`proposedSolution` は空白だけなら null |
 | I2 GET | — | `200 IdeaDetail` | |
 | I2 PATCH | `{ name?; oneLineConcept?; proposedSolution?; lockVersion: number; force?: boolean }` | `200 IdeaDetail` | 履歴 `manual`（対象 `idea`） |
-| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail & { batchId: UUID }`（トーストの「Undo」が H3 に渡す） | design-spec 6.8 の複製。履歴 `duplicate`: 新しいアイデアの作成と、コピーした記録対象の項目（回答・数字・調査ログ・競合・前提・リスク・費用行）それぞれの作成を、同じ `batchId` で1行ずつ残す（履歴で1回の操作としてまとめて見せるため。H3 で作成ごと取り消せる。条件と扱いは H3）。既定の名前は名前の上限（design-spec 6.0.8）に収める |
+| I3 | `{ name?: string }`（既定「{元の名前} (copy)」） | `201 IdeaDetail & { batchId: UUID }`（トーストの「Undo」が H3 に渡す） | design-spec 6.8 の複製。履歴 `duplicate`: 新しいアイデアの作成と、コピーした記録対象の項目（回答・数字・調査ログ・競合・前提・リスク・費用行）それぞれの作成を、同じ `batchId` で1行ずつ残す（履歴で1回の操作としてまとめて見せるため。H3 で作成ごと取り消せる。条件と扱いは H3）。既定の名前は名前の上限（design-spec 6.0.8）に収める。コピーした行の並び順はそのまま（作成の時刻で並べる調査ログ・リスク・根拠の紐づけは、元の順に作成の時刻を 1 ミリ秒ずつずらす）、版はキーで決まる項目（回答・数字）が 1、一覧に出る行が 0。コピーした調査ログの記録者（`created_by_id`）は元の調査ログのまま。論理削除した行・削除した調査ログを指す根拠・外した根拠はコピーしない |
 | I4 | — | `200 IdeaDetail` | すでにその状態なら何もせず 200。履歴は書かず、`updatedAt` と `updatedBy` も変えない（`lastActivityAt` だけ更新する） |
 
 ### 5.7 検証
@@ -1245,15 +1248,16 @@ interface ResearchLogEntry extends Versioned {
   id: UUID; observedOn: DateOnly | null; topic: string; observation: string | null;
   sourceType: SourceType | null; sourceUrl: string | null;
   supportsChecks: SupportsCheck[]; supportsNote: string | null;
-  createdBy: UserRef; usedAsEvidenceCount: number; commentCount: number;
+  createdBy: UserRef; usedAsEvidenceCount: number; commentCount: number;   // usedAsEvidenceCount は V7 の usages の件数
 }
-interface EvidenceUsage { target: TargetRef; label: string; link: LinkTarget; isOnlyEvidenceOfFact: boolean; }
+interface EvidenceUsage { target: TargetRef; label: string; link: LinkTarget; isOnlyEvidenceOfFact: boolean; }   // isOnlyEvidenceOfFact は、Fact で、数える根拠（6.0.3）がすべてこの調査ログのもの
 interface Competitor extends Versioned {
   id: UUID; name: string; type: "direct" | "indirect" | "substitute" | null;
   targetCustomer: string | null; offering: string | null;
   typicalPrice: number | null; priceNote: string | null;
   strength: string | null; weakness: string | null; whyChosen: string | null; whySurvive: string | null;
-  evidence: Evidence[]; sortOrder: number; commentCount: number;
+  evidence: Evidence[];                              // 付けた順。削除した調査ログを指す根拠は除く（F/A/U を持たない行。design-spec 6.0.3）。Assumption も同じ
+  sortOrder: number; commentCount: number;
 }
 interface Assumption extends Versioned {
   id: UUID; statement: string; whyBelieve: string | null;
@@ -1280,32 +1284,32 @@ interface EconomicsInput extends Versioned {
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| V1 | — | `200 ValidationHome` | 確認項目・Next steps・F/A/U・主要指標は `packages/domain` で計算する。`sections[].title` は番号を含む名前。出どころの決まりは design-spec 6.1（設問のセクションはテンプレートの版の題、画面のセクションはカタログ `validation:sections.<key>` の固定のラベル） |
-| V2 | — | `200 { section: TemplateSection; answers: ValidationAnswer[] }` | `sectionKey` は `01` / `02` / `10`（`04` のパターンと `08` は V8・V15 が返す。それ以外の値は `404 NOT_FOUND`）。設問ごとに必ず1件返す（未回答は `text: null`, `lockVersion: 0`。出し分けで隠れる設問も `hidden: true` で返す） |
-| V3 | `{ text?: string | null; classification?: ClassificationInput; lockVersion: number; force?: boolean }` | `200 ValidationAnswer` | `422 FACT_REQUIRES_EVIDENCE`（有効な根拠が無いのに `fact`。Fact は V4 の `setFact` で付ける）、`422 CONFIDENCE_REQUIRED`、`422 INVALID_CHOICE`（選択の設問）、`422 QUESTION_NOT_FOUND`（テンプレートの版に無い設問 ID。`V.04.SURVIVOR_PATTERNS`・`V.04.FAILURE_PATTERNS`・`V.08.WORTH` も V3 で答える）。`text` の長さは design-spec 6.0.8（超えたら `422 VALIDATION_FAILED`）。`text` を null か空白にすると F/A/U も外す（`unknown` を除く）。答えの行を作るときの `lockVersion` は 0 で、作られた行は 1 から始まる。履歴 `manual` |
-| V4 | `{ target: TargetRef; researchLogEntryId?: UUID; newResearchLog?: ResearchLogInput; url?: string; note?: string; setFact?: boolean; lockVersion: number; force?: boolean }` | `201 { evidence: Evidence; classification: Classification; lockVersion: number }` | `researchLogEntryId` / `newResearchLog` / `url` のどれか1つ。`setFact: true` なら対象を Fact にする（M2 で根拠を付けて閉じたとき）。対象は `validation_answer` / `economics_input` / `cost_item` / `competitor` / `assumption`（`lockVersion` は対象の項目の版）。同じ調査ログを同じ対象に2回付けると `422 VALIDATION_FAILED`。値の無い対象や F/A/U を持たない対象（競合・前提）への `setFact` も `422 VALIDATION_FAILED`（`details[0].path` は `setFact`）。`url` と `note` の値は design-spec 6.0.8。対象の版が食い違えば `409 CONFLICT`、`force: true` で上書きする（ADR-019）。履歴は対象の項目に1行（`newResearchLog` のときは調査ログの作成も1行）。`manual` |
-| V5 | `?lockVersion=` | `200 { classification: Classification; lockVersion: number }` | Fact の最後の根拠を外すと未分類に戻す（クライアントは事前に確認を出す）。`?force=true` で版の食い違いを上書きする。履歴は対象の項目に1行（`manual`） |
-| V6 GET | `?supports=&sourceType=&q=&cursor=&limit=` | `200 Page<ResearchLogEntry>` | `observedOn` の新しい順（日付なしは末尾）、同じなら作成の新しい順。`q` は topic と observation の部分一致 |
-| V6 POST | `ResearchLogInput`（値は design-spec 6.0.8） | `201 ResearchLogEntry` | 履歴 `manual` |
-| V7 GET | — | `200 ResearchLogEntry & { usages: EvidenceUsage[] }` | |
+| V1 | — | `200 ValidationHome` | 確認項目・Next steps・F/A/U・主要指標は `packages/domain` で計算する。`summary` は 01 WHO・01 PROBLEM・アイデアの提案する解決策・02 OCEAN（空白だけ・固定している版に無い・出し分けで隠れている回答は null）。`decisions` は判定（`validation_decision`）だけ。`plans` は作った順。`sections[].title` は番号を含む名前。出どころの決まりは design-spec 6.1（設問のセクションはテンプレートの版の題、画面のセクションはカタログ `validation:sections.<key>` の固定のラベル） |
+| V2 | — | `200 { section: TemplateSection; answers: ValidationAnswer[] }` | `sectionKey` は `01` / `02` / `10`（`04` のパターンと `08` は V8・V15 が返す。それ以外の値は `404 NOT_FOUND`）。設問ごとに必ず1件返す（未回答は `text: null`, `lockVersion: 0`。出し分けで隠れる設問も `hidden: true` で返す）。`classification.evidence` は付けた順。`commentCount` はその項目の削除していないコメント（返信を含む）の数（ほかの型の `commentCount` も同じ） |
+| V3 | `{ text?: string | null; classification?: ClassificationInput; lockVersion: number; force?: boolean }` | `200 ValidationAnswer` | `422 FACT_REQUIRES_EVIDENCE`（有効な根拠が無いのに `fact`。Fact は V4 の `setFact` で付ける）、`422 CONFIDENCE_REQUIRED`、`422 INVALID_CHOICE`（選択の設問）、`422 QUESTION_NOT_FOUND`（テンプレートの版に無い設問 ID。`V.04.SURVIVOR_PATTERNS`・`V.04.FAILURE_PATTERNS`・`V.08.WORTH` も V3 で答える）。`text` の長さは design-spec 6.0.8（超えたら `422 VALIDATION_FAILED`。短文の型の上限は設問を引いてから確かめる）。`text` を null か空白にすると F/A/U も外す（`unknown` を除く）。`FACT_REQUIRES_EVIDENCE` は Fact にするときだけ確かめる（すでに Fact の回答は、根拠の調査ログが削除されていても保存できる。6.5）。F/A/U を持たない設問への `fau`、Assumption 以外への `confidence`、値の無い回答を Fact か Assumption にする送信は `422 VALIDATION_FAILED`（`details[0].path` は `classification.fau` / `classification.confidence`）。長文・短文・選択以外の型の設問は `422 NOT_EDITABLE`。答えの行を作るときの `lockVersion` は 0 で、作られた行は 1 から始まる。履歴 `manual` |
+| V4 | `{ target: TargetRef; researchLogEntryId?: UUID; newResearchLog?: ResearchLogInput; url?: string; note?: string; setFact?: boolean; lockVersion: number; force?: boolean }` | `201 { evidence: Evidence; classification: Classification; lockVersion: number }` | `researchLogEntryId` / `newResearchLog` / `url` のどれか1つ。`setFact: true` なら対象を Fact にする（M2 で根拠を付けて閉じたとき）。対象は `validation_answer` / `economics_input` / `cost_item` / `competitor` / `assumption`（`lockVersion` は対象の項目の版）。同じ調査ログを同じ対象に2回付けると `422 VALIDATION_FAILED`。値の無い対象や F/A/U を持たない対象（競合・前提）への `setFact` も `422 VALIDATION_FAILED`（`details[0].path` は `setFact`）。`url` と `note` の値は design-spec 6.0.8。対象の版が食い違えば `409 CONFLICT`、`force: true` で上書きする（ADR-019）。対象がこの検証に無い・論理削除した行なら `404 NOT_FOUND`、回答の設問 ID が固定している版に無ければ `422 QUESTION_NOT_FOUND`、数字の `key` が `EconomicsField` でなければ `422 VALIDATION_FAILED`（`target.key`）。`researchLogEntryId` がこの検証の削除していない調査ログでなければ `422 VALIDATION_FAILED`（`researchLogEntryId`）。まだ行の無い回答・数字に付けると、その行を版 1 で作る（履歴は作成の1行）。応答の `lockVersion` は付けた後の版。F/A/U を持たない対象（競合・前提）の `classification` は `fau: null`・`state: "unclassified"`。履歴は対象の項目に1行（`newResearchLog` のときは調査ログの作成も1行）。`manual` |
+| V5 | `?lockVersion=` | `200 { classification: Classification; lockVersion: number }` | Fact の最後の根拠を外すと未分類に戻す（クライアントは事前に確認を出す）。最後かどうかは数える根拠（削除した調査ログを指すものを除く）で決め、外した後に数える根拠が残らない Fact は未分類に戻す（「Fact（根拠なし）」の項目から、削除した調査ログを指す根拠を外したときも）。固定している版に無い設問の回答（移行で隠れたもの）の根拠も外せる。すでに外した根拠は `404 NOT_FOUND`。`?force=true` で版の食い違いを上書きする。履歴は対象の項目に1行（`manual`） |
+| V6 GET | `?supports=&sourceType=&q=&cursor=&limit=` | `200 Page<ResearchLogEntry>` | 削除した調査ログは出さない。`observedOn` の新しい順（日付なしは末尾）、同じなら作成の新しい順。`supports` は `SupportsCheck` を1つ（そのタグを含むもの）、`sourceType` は `SourceType` を1つ。`q` は topic と observation の部分一致で、大文字と小文字を区別しない（短文。空白だけはすべてに一致） |
+| V6 POST | `ResearchLogInput`（値は design-spec 6.0.8） | `201 ResearchLogEntry` | `observedOn` を送らなければ日付なしで保存する（「既定は今日」は入力欄の初期値。V4 の `newResearchLog` も同じ）。履歴 `manual` |
+| V7 GET | — | `200 ResearchLogEntry & { usages: EvidenceUsage[]; hiddenUsageCount: number }` | `usages` は根拠を付けた順。数えるのは、外していない根拠で、削除していない行（6.5）・数字・固定している版にある設問の回答（02 OCEAN の出し分けで隠れている回答も含む。答えを変えればまた出るため）。`hiddenUsageCount` は、外していない根拠でこの調査ログを使っている、移行で隠れた回答（固定している版に無い設問の回答）の数。隠れた回答は画面に出さないので（design-spec 6.0.7）、削除の確認には数だけを出す（6.0.3）。削除した調査ログは V7 のどのメソッドでも `404 NOT_FOUND` |
 | V7 PATCH | `Partial<ResearchLogInput> & { lockVersion; force? }` | `200 ResearchLogEntry` | 履歴 `manual` |
-| V7 DELETE | — | `200 { affected: EvidenceUsage[] }` | 論理削除。`affected` はその調査ログを根拠にしているすべての項目（`isOnlyEvidenceOfFact` でそれが唯一の根拠かを示す）。根拠の紐づけは残し、数えなくなる。その根拠しかなかった Fact は「Fact（根拠なし）」になる（design-spec 6.0.3）。クライアントは事前に V7 GET の `usages` で確認を出す。履歴 `manual`（`delete`） |
-| V8 GET | — | `200 { items: Competitor[]; patterns: { question: TemplateQuestion; answer: ValidationAnswer }[]; guidance: { min: number; max: number } }` | `patterns` は `V.04.SURVIVOR_PATTERNS` と `V.04.FAILURE_PATTERNS` の設問（問い・EXAMPLE・ヒント。15 に出す。design-spec 6.10）と回答（更新は V3）。`items` は `sortOrder` の順 |
-| V8 POST | `{ name: string; type?; targetCustomer?; offering?; typicalPrice?: number; priceNote?; strength?; weakness?; whyChosen?; whySurvive? }`（値は design-spec 6.0.8） | `201 Competitor` | 新しい行は末尾に付く。履歴 `manual` |
+| V7 DELETE | — | `200 { affected: EvidenceUsage[]; hiddenAffectedCount: number }` | 論理削除（調査ログの `lockVersion` と `updated_at` は変えない。V9・V11・V14 の DELETE も同じ）。`affected` と `hiddenAffectedCount` は、削除する前の V7 GET の `usages` と `hiddenUsageCount` と同じもので、合わせてその調査ログを根拠にしているすべての項目になる（`isOnlyEvidenceOfFact` でそれが唯一の根拠かを示す。移行で隠れた回答は数だけ）。根拠の紐づけは残し、数えなくなる。その根拠しかなかった Fact は「Fact（根拠なし）」になる（design-spec 6.0.3）。クライアントは事前に V7 GET の `usages` と `hiddenUsageCount` で確認を出す。履歴 `manual`（`delete`） |
+| V8 GET | — | `200 { items: Competitor[]; patterns: { question: TemplateQuestion; answer: ValidationAnswer }[]; guidance: { min: number; max: number } }` | `patterns` は `V.04.SURVIVOR_PATTERNS` と `V.04.FAILURE_PATTERNS` の設問（問い・EXAMPLE・ヒント。15 に出す。design-spec 6.10）と回答（更新は V3）。固定している版に無い設問は `patterns` に入れない（design-spec 6.0.7）。`items` は `sortOrder` の順 |
+| V8 POST | `{ name: string; type?; targetCustomer?; offering?; typicalPrice?: number; priceNote?; strength?; weakness?; whyChosen?; whySurvive? }`（値は design-spec 6.0.8） | `201 Competitor` | 新しい行は末尾に付く（削除していない行の最大の `sortOrder` の次。V10・V13 も同じ）。履歴 `manual` |
 | V9 PATCH | 上の項目の一部 ＋ `{ lockVersion; force? }`（値は design-spec 6.0.8） | `200 Competitor` | 履歴 `manual` |
-| V9 DELETE | — | `204` | 論理削除（行へのコメントも隠れる）。履歴 `manual`（`delete`） |
-| V10 GET | — | `200 { items: Assumption[] }` / `200 { items: Risk[] }` | Risks は並び順を適用済み: 手の並び（`sort_order`）のある行が先で、無い行は Impact → Probability の高い順（同順位は作成順）。手の並びのある一覧に足したリスクは末尾に付く |
+| V9 DELETE | — | `204` | 論理削除（行へのコメントも隠れる）。削除済みの行は、V9・V11・V14 のどのメソッドでも `404 NOT_FOUND`。履歴 `manual`（`delete`） |
+| V10 GET | — | `200 { items: Assumption[] }` / `200 { items: Risk[] }` | Assumptions は `sortOrder` の順。Risks は並び順を適用済み: 手の並び（`sort_order`）のある行が先で、無い行は Impact → Probability の高い順（未設定は Low より下。同順位は作成順）。手の並びのある一覧に足したリスクは末尾に付く |
 | V10 POST | 前提: `{ statement; whyBelieve?; evidenceNote?; confidence?; disproveCondition?; nextCheck? }`。リスク: `{ statement; probability?; impact?; whyMatters?; mitigation?; howToValidate? }` | `201 Assumption` / `201 Risk` | 新しい行は末尾に付く（リスクは手の並びのときだけ末尾に付き、そうでなければ `sortOrder` は null）。必須の `statement` が空白だけなら `422 VALIDATION_FAILED`。任意の文章の項目は、空白だけなら null で保存する（V11 も同じ）。値は design-spec 6.0.8。履歴 `manual` |
-| V11 | PATCH: 上の項目の一部 ＋ `{ lockVersion; force? }`。DELETE: なし | `200` / `204` | 履歴 `manual` |
-| V12 | — | `200 { items: CostItem[]; result: EconomicsResult; economicsInputs: EconomicsInput[] }` | `result` は Totals と 18 の損益分岐の表示用。`economicsInputs` はクライアントがその場で計算し直すために返す |
+| V11 | PATCH: 上の項目の一部 ＋ `{ lockVersion; force? }`。DELETE: なし | `200 Assumption` / `200 Risk` / `204` | 履歴 `manual` |
+| V12 | — | `200 { items: CostItem[]; result: EconomicsResult; economicsInputs: EconomicsInput[] }` | `items` は表ごと（初期費用・月額固定費・変動費）に、それぞれ `sortOrder` の順。`result` は Totals と 18 の損益分岐の表示用。`economicsInputs` はクライアントがその場で計算し直すために返す（V15 の `inputs` と同じく7つすべて） |
 | V13 | `{ category: CostCategory; name: string (空も可。上限は design-spec 6.0.8) }` | `201 CostItem` | 表の末尾に Empty の行を作る（名前は空でよい。「+ Add row」は空の名前で呼ぶ）。履歴 `manual` |
-| V14 PATCH | `{ name? (空も可); inputMode?; amount?: number | null; percent?: number | null (0〜1 の小数。5.1); isLumpSum?; whyNeeded?; canReduce?; notes?; classification?; lockVersion; force? }`（値の範囲は design-spec 6.0.8） | `200 CostItem` | `422 PERCENT_ONLY_FOR_VARIABLE`、`422 OUT_OF_RANGE`、F/A/U の決まりは V3 と同じ。`unknown` にすると金額と % を null にする（Unknown の数字に値を入れると未分類になる）。使わない入力方式の値を送ると `422 VALIDATION_FAILED`、`inputMode` を切り替えると使わなくなった側の値を null にする。履歴 `manual` |
+| V14 PATCH | `{ name? (空も可); inputMode?; amount?: number | null; percent?: number | null (0〜1 の小数。5.1); isLumpSum?; whyNeeded?; canReduce?; notes?; classification?; lockVersion; force? }`（値の範囲は design-spec 6.0.8） | `200 CostItem` | `422 PERCENT_ONLY_FOR_VARIABLE`（変動費でない行に `percent_of_price` か null でない `percent` を送った）、`422 OUT_OF_RANGE`（`amount`・`percent` が範囲か小数の桁を外れた。`details[0].path` は `amount` / `percent`）、F/A/U の決まりは V3 と同じ。`unknown` にすると金額と % を null にする（Unknown の数字に値を入れると未分類になる。同じリクエストで null でない値と `unknown` を送ると `422 VALIDATION_FAILED`（`details[0].path` は `amount` / `percent`））。使わない入力方式の値を送ると `422 VALIDATION_FAILED`（`details[0].path` は `amount` / `percent`）、`inputMode` を切り替えると使わなくなった側の値を null にする（値が無くなるので Fact・Assumption も外れる）。履歴 `manual` |
 | V14 DELETE | — | `204` | 論理削除。履歴 `manual`（`delete`） |
-| V15 | — | `200 { inputs: EconomicsInput[]; worth: ValidationAnswer; result: EconomicsResult; costItems: CostItem[] }` | `inputs` は7つすべて（未入力は `value: null`）。`worth` は `V.08.WORTH`（更新は V3） |
-| V16 | `{ value: number | null; classification?: ClassificationInput; lockVersion; force? }` | `200 EconomicsInput` | 範囲は design-spec 6.0.8。外れたら `422 OUT_OF_RANGE`。値も F/A/U も変わらないリクエストは行を作らず、履歴も書かない。履歴 `manual` |
-| V17 | `{ ids: UUID[]; category?: CostCategory }`（費用行は表ごと） | `204` | `ids` はその一覧の（論理削除を除く）全件と一致すること（違えば `422 VALIDATION_FAILED`）。`sort_order` を振り直す（リスクは手の並びに切り替わる）。履歴は残さず、`lockVersion` と `updated_at` も変えない（並べ替えは対象外で、開いている編集と衝突させない） |
-| V18 | — | `200 DecisionContext` | |
-| V19 | `{ value: DecisionValue; reason: string; basedOnDecisionId: UUID | null; confirmNewer?: boolean }`（`reason` の長さは design-spec 6.0.8） | `201 { entry: DecisionLogEntry; latestDecision: DecisionValue; canCreatePlan: boolean }` | 画面を開いた後に別の判定が記録されていて `confirmNewer` が無ければ `409 DECISION_CHANGED`（`error.latest: DecisionLogSummary`）。決定ログに記録し、`ideas.latest_decision` を変え、ワークスペースの他のメンバー（停止・削除したユーザーを除く Owner / Member / Viewer）に通知（`decision`）を作る。通知の開き先は 13（`{ screen: 13, workspaceId, ideaId }`。Go / No-Go は 20）。`recordedAt` は idea の行を押さえた後に決め、先に確定した記録より後になるようにする |
+| V15 | — | `200 { inputs: EconomicsInput[]; worth: ValidationAnswer; worthQuestion: TemplateQuestion | null; result: EconomicsResult; costItems: CostItem[] }` | `inputs` は7つすべて（`EconomicsField` の順。未入力は `value: null`、`lockVersion: 0`）。`worth` は `V.08.WORTH`（更新は V3。固定している版に無ければ `hidden: true`）。`worthQuestion` はその設問（問い・EXAMPLE・ヒント。18 に出す。design-spec 6.4）で、固定している版に無ければ null。`costItems` は V12 の `items` と同じ |
+| V16 | `{ value: number | null; classification?: ClassificationInput; lockVersion; force? }` | `200 EconomicsInput` | 範囲は design-spec 6.0.8（項目ごと。整数・小数の桁を含む）。外れたら `422 OUT_OF_RANGE`（`details[0].path` は `value`）。`fieldKey` が `EconomicsField` でなければ `422 VALIDATION_FAILED`（`details[0].path` は `fieldKey`）。F/A/U と Unknown の決まりは V14 と同じ。キーで決まる項目で、最初の保存で版 1 になる（5.1）。値も F/A/U も変わらないリクエストは行を作らず、履歴も書かない。履歴 `manual` |
+| V17 | `{ ids: UUID[]; category?: CostCategory }`（費用行は表ごと） | `204` | `category` は費用行には必須で、ほかの一覧には送らない（どちらも違えば `422 VALIDATION_FAILED`、`details[0].path` は `category`）。`ids` はその一覧の（論理削除を除く）全件を1回ずつ並べたものであること（違えば `422 VALIDATION_FAILED`、`details[0].path` は `ids`。UUID でない要素は本体の型の誤りで、`details[0].path` は `ids.<n>`）。`sort_order` を 0 から振り直す（リスクは手の並びに切り替わる）。履歴は残さず、`lockVersion` と `updated_at` も変えない（並べ替えは対象外で、開いている編集と衝突させない）。並びが変わったときは、ワークスペースの中の変更として最終利用日を更新する（7.1「実装」） |
+| V18 | — | `200 DecisionContext` | アーカイブ済みのアイデアでも Owner / Member には返す（19 は判断材料を出す。design-spec 6.5）。`summary` の回答の扱いは V1 と同じ。`lastDecision` は判定（`validation_decision`）の最新 |
+| V19 | `{ value: DecisionValue; reason: string; basedOnDecisionId: UUID | null; confirmNewer?: boolean }`（`reason` の長さは design-spec 6.0.8） | `201 { entry: DecisionLogEntry; latestDecision: DecisionValue; canCreatePlan: boolean }` | 画面を開いた後に別の判定が記録されていて `confirmNewer` が無ければ `409 DECISION_CHANGED`（`error.latest: DecisionLogSummary`）。決定ログに記録し、`ideas.latest_decision` を変え、ワークスペースの他のメンバー（停止・削除したユーザーを除く Owner / Member / Viewer）に通知（`decision`）を作る。通知の開き先は 13（`{ screen: 13, workspaceId, ideaId }`。Go / No-Go は 20）。`recordedAt` は idea の行を押さえた後に決め、先に確定した記録より後になるようにする（API のインスタンスの時計がずれていても、最新の判定の `recordedAt` の 1 ミリ秒後より前にしない）。「別の判定が記録されていて」は、最新の判定が `basedOnDecisionId` と違うこと（`basedOnDecisionId` が null で判定があるときも）。`basedOnDecisionId` がこのアイデアの判定でなければ `422 VALIDATION_FAILED`（`basedOnDecisionId`）。スナップショットは記録するトランザクションの中で計算する。アイデアの概要の版（`lockVersion`・`updatedAt`）は変えない |
 
 ```ts
 interface DecisionContext {
@@ -1324,29 +1328,31 @@ interface DecisionContext {
 interface SelfAnalysisHome {
   id: UUID; status: "not_started" | "in_progress" | "done"; completedAt: DateTime | null;
   currency: string; template: TemplateRef;
-  answered: number; total: number;
+  answered: number; total: number;   // 数え方は design-spec 6.11（固定している版の設問だけを数える）。packages/domain で数える
   sections: { key: string; title: string; answered: number; total: number }[];
-  firstUnanswered: { sectionKey: string; questionKey: string } | null;
-  shares: { workspace: { id: UUID; name: string }; sharedAt: DateTime }[];
-  shareableWorkspaces: { id: UUID; name: string }[];   // 自分が Owner / Member の、個人用以外のワークスペース（他人の個人用ワークスペースも含めない）
+  firstUnanswered: { sectionKey: string; questionKey: string } | null;   // テンプレートの順で最初の未回答。すべて回答済みなら null
+  shares: { workspace: { id: UUID; name: string }; sharedAt: DateTime }[];   // 共有した順（同じ S5 で足したものはワークスペースの id の順。外してから足し直したものは、足し直した時点の順で `sharedAt` もその時点）
+  shareableWorkspaces: { id: UUID; name: string }[];   // 自分が Owner / Member の、個人用以外のワークスペース（他人の個人用ワークスペースも含めない）。所属した順（U1 と同じ）
 }
 interface SelfAnalysisAnswer extends Versioned {
   questionKey: string; text: string | null; amount: number | null;   // amount は金額＋理由の設問だけ
-  commentCounts: { workspaceId: UUID; workspaceName: string; count: number }[];  // 本人には共有先ごとの件数
+  commentCounts: { workspaceId: UUID; workspaceName: string; count: number }[];  // 本人には共有先ごとの件数。今の共有先ごとに1件（0 件も返す。shares の順）。共有をやめたワークスペースのコメントは数えない（design-spec 6.0.4）
 }
 ```
 
 | API | 本体 | 応答 | エラー・副作用 |
 |---|---|---|---|
-| S1 GET | — | `200 SelfAnalysisHome` | 初めて開いたときに自己分析を作る（最新の公開済みの版、`not_started`）。運営者も同じ（design-spec 2.1）。公開済みの版が無ければ `409 TEMPLATE_NOT_PUBLISHED` |
-| S1 PATCH | `{ currency: string }` | `200 SelfAnalysisHome` | 換算しない |
-| S2 | — | `200 { section: TemplateSection; answers: SelfAnalysisAnswer[] }` | |
-| S3 | `{ text?: string | null; amount?: number | null; lockVersion; force? }`（値は design-spec 6.0.8） | `200 SelfAnalysisAnswer` | 最初の回答で `in_progress` にする。金額を送れるのは金額＋理由の設問だけ（それ以外は `422 VALIDATION_FAILED`）。存在しない設問は `422 QUESTION_NOT_FOUND`。履歴 `manual`（本人だけが見られる） |
-| S4 complete | `{ confirmEmpty?: boolean }` | `200 SelfAnalysisHome` | 未回答があり `confirmEmpty` が無ければ `409 HAS_EMPTY_QUESTIONS`（`error.emptyCount`） |
-| S4 reopen | — | `200 SelfAnalysisHome` | 共有は続く |
-| S5 | `{ workspaceIds: UUID[] }`（共有先の全体） | `200 SelfAnalysisHome` | 新しく足すのは `done` のときだけ（`422 MUST_BE_DONE_TO_SHARE`）。外すのはいつでも。Owner / Member でないワークスペースと、個人用ワークスペース（自分のものも他人のものも）は `422 NOT_SHAREABLE`（design-spec 6.11） |
-| S6 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | 今のワークスペースの Owner / Member |
-| S7 | — | `200 { id: UUID; user: UserRef; status; currency: string; sections: (TemplateSection & { answers: { questionKey: string; text: string | null; amount: number | null; commentCount: number }[] })[] }` | `id` は自己分析の ID で、回答へのコメント（C1）の `targetId` に使う。今のワークスペースに共有済みでなければ `403 NOT_SHARED`。変更履歴は返さない |
+| S1 GET | — | `200 SelfAnalysisHome` | 初めて開いたときに自己分析を作る（最新の公開済みの版、`not_started`）。運営者も同じ（design-spec 2.1）。公開済みの版が無ければ `409 TEMPLATE_NOT_PUBLISHED`。自己分析を作るのは S1 GET だけで、作る前の S1 PATCH・S2〜S5 は `404 NOT_FOUND`（10 も 11 も、開いたときに先に S1 GET を呼ぶ。design-spec 6.11） |
+| S1 PATCH | `{ currency: string }` | `200 SelfAnalysisHome` | 換算しない。通貨は設定なので履歴を書かない（design-spec 6.0.5） |
+| S2 | — | `200 { section: TemplateSection; answers: SelfAnalysisAnswer[] }` | 固定している版に無いセクションは `404 NOT_FOUND`。設問ごとに必ず1件返す（未回答は `text: null`・`amount: null`・`lockVersion: 0`） |
+| S3 | `{ text?: string | null; amount?: number | null; lockVersion; force? }`（値は design-spec 6.0.8） | `200 SelfAnalysisAnswer` | 最初の回答で `not_started` を `in_progress` にする（下の段落）。金額を送れるのは金額＋理由の設問だけ（それ以外の設問に null でない `amount` を送ると `422 VALIDATION_FAILED`、`details[0].path` は `amount`）。金額＋理由の `text` は理由。存在しない設問（固定している版に無い設問）は `422 QUESTION_NOT_FOUND`。設問の型の決まりは V3 と同じ（長文・短文・選択・金額＋理由以外は `422 NOT_EDITABLE`、選択は `422 INVALID_CHOICE`、短文の上限は設問を引いてから確かめる）。キーで決まる項目で、最初の保存で版 1 になる（5.1）。値の変わらない保存は版を上げず、履歴も書かない。履歴 `manual`（本人だけが見られる）。409 の `current.value` と履歴の値は `{ text, amount }` |
+| S4 complete | `{ confirmEmpty?: boolean }`（本体が無い（API は null として読む）ときは `{}` と同じ） | `200 SelfAnalysisHome` | 未回答があり `confirmEmpty` が true でなければ `409 HAS_EMPTY_QUESTIONS`（`error.emptyCount` は未回答の数。数え方は design-spec 6.11）。すでに `done` なら何も変えずに返す（`completedAt` も変えない） |
+| S4 reopen | — | `200 SelfAnalysisHome` | `in_progress` に戻し、`completedAt` を null にする。共有は続く。`done` でなければ何も変えずに返す |
+| S5 | `{ workspaceIds: UUID[] }`（共有先の全体。同じ id を2回入れると `422 VALIDATION_FAILED`。大文字と小文字は区別しない） | `200 SelfAnalysisHome` | 新しく足すのは `done` のときだけ（`422 MUST_BE_DONE_TO_SHARE`）。外すのはいつでも。Owner / Member でないワークスペース（無いワークスペースを含む）と、個人用ワークスペース（自分のものも他人のものも）は `422 NOT_SHAREABLE`（design-spec 6.11）で、`MUST_BE_DONE_TO_SHARE` より先に確かめる。共有先にできるかは lock を取る前に確かめ（送った数だけ lock を取らないため）、送ったワークスペースのメンバーの変更の lock（W3・U6・U7 と同じ）を取ってからもう一度確かめる（確かめてから足すまでに降格・削除が割り込まないようにする）。共有を足した・外したワークスペースの最終利用日（`last_active_at`）を更新する（共有の行はそのワークスペースに属する。自己分析の回答と状態はワークスペースに属さないので、S3・S4 では更新しない。7.1「実装」の「ワークスペースの中の何かが変わったとき」）。外しても、そのワークスペースのコメントは消さない（共有し直すと戻る。design-spec 6.0.4）。履歴は書かない（design-spec 6.0.5） |
+| S6 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | 今のワークスペースの Owner / Member。D2 と同じ形と並び（表示名の順）。`status` は今のワークスペースに共有しているときだけで、そうでなければ null |
+| S7 | — | `200 { id: UUID; user: UserRef; status; currency: string; sections: (TemplateSection & { answers: { questionKey: string; text: string | null; amount: number | null; commentCount: number }[] })[] }` | `id` は自己分析の ID で、回答へのコメント（C1）の `targetId` に使う。`commentCount` はこのワークスペースのコメントの数。今のワークスペースに共有済みでなければ `403 NOT_SHARED`（自己分析がまだ無いとき、ユーザーが無いときも同じにして、ワークスペースの外のユーザーの有無を答えない）。`userId` が UUID でなければ `404 NOT_FOUND`（`resolveScope` と同じ。ワークスペースの権限（`NO_ACCESS`・`FORBIDDEN`）を確かめた後）。共有の確認と回答は同じ時点の内容で読む（読んでいる間に共有をやめても、やめた後に書いた回答を返さない）。変更履歴は返さない |
+
+自己分析への書き込み（S1 PATCH・S3〜S5 と、自己分析を対象にした X3・H2・H3・T2）は、`lockActiveCaller`（7.1「停止・削除したユーザー」）の後に（S5 は、続けて送ったワークスペースのメンバーの lock を id の順に取った後に）自己分析の行をロックしてから書く（同じ自己分析への書き込みを1つずつにする。Reopen と共有の追加が行き違わず、保存の途中で固定している版が変わらず、最初の回答で状態が1回だけ変わる）。回答を書く処理（S3・X3・H2・H3）と、固定している版を替える T2 は、書いた後に design-spec 6.11 の回答済みの設問が1つ以上あり（表示条件で隠れる設問は数えないので、隠れる設問だけに書いても進めない）、状態が `not_started` なら `in_progress` にする。`done` はそのまま。回答をすべて消しても `not_started` には戻さない。
 
 ### 5.9 プラン
 
@@ -1359,39 +1365,53 @@ interface PlanSummary {
 }
 interface PlanHome extends PlanSummary, Versioned {   // Versioned はヘッダ（名前・Business Name・Prepared By）
   ideaId: UUID; workspaceId: UUID; template: TemplateRef;
-  businessName: string; preparedBy: string; date: DateTime;   // 最終更新日（版の表示中は保存日）
+  businessName: string; preparedBy: string;   // 版の表示中はスナップショットのもの
+  date: DateTime;                              // 最終更新日（ヘッダ・回答・実行管理の項目の最後の変更。版の表示中は保存日）
   latestDecision: DecisionValue | null;
   ideaArchived: boolean;                       // アイデアがアーカイブ済み。20〜23 を読み取り専用にする
-  draftOnly: boolean;                          // 回答がすべて下書き作成時のコピーのままで、実行管理の初期行も未変更（20 の「Start with…」の表示に使う。版の表示中も今の内容で決める）
+  draftOnly: boolean;                          // 回答がすべて下書き作成時のコピーのままで（作った後に保存した回答が無い）、実行管理の初期行も未変更（初期行の編集・削除と、行の追加のどれも無い）。20 の「Start with…」の表示に使う。版の表示中も今の内容で決める
   viewingVersion: { id: UUID; name: string; savedAt: DateTime } | null;   // ?versionId= のとき
   keyMetrics: Pick<KeyMetrics, "initial_cost_total" | "break_even_units_day" | "expected_operating_profit" | "payback_months">;
-  versions: PlanVersionSummary[];
-  execution: { dueSoon: number; overdue: number };   // 版の表示中も今の実行管理から数える
+  versions: PlanVersionSummary[];              // 新しい順
+  execution: { dueSoon: number; overdue: number };   // Done / Resolved でない項目のうち、期限が今日から7日以内（dueSoon）と今日より前（overdue）の数。「今日」は D3 と同じく利用者の users.timezone の日付。版の表示中も今の実行管理から数える
   parts: { part: "a" | "b"; completeItems: number; totalItems: number;
            items: { itemNo: number; title: string; marks: ("V" | "S")[]; filled: number; total: number; commentCount: number }[] }[];
+  // filled / total は design-spec 6.12「項目の状態」（版の表示中はスナップショットから数える）。commentCount はその項目の回答と、その項目の実行管理の小項目が出す項目へのコメントの数（返信を含む。版の表示中はスナップショットの項目のうち、今も論理削除していないもの。C1 は削除した行へのコメントを返さないため）。marks の S は Viewer には付けない（Viewer には自己分析の参照を返さないため）
 }
 interface PlanVersionSummary { id: UUID; versionNumber: number; name: string; savedBy: UserRef; savedAt: DateTime; }
 interface PlanAnswer extends Versioned {
   questionKey: string;
   text: string | null;
   rows: Record<string, string | number | null>[] | null;   // 表の小項目（§11・§13・§21・§22）。列のキーはテンプレートの options.columns（移行で消えた列の値も残る）
-  copiedFrom: { source: string; copiedAt: DateTime } | null;
+  copiedFrom: { source: string; copiedAt: DateTime } | null;   // 下書きで写した回答に付く（その後に直しても残る）
   commentCount: number;
 }
 interface PlanReference {
   kind: "validation_answers" | "competitors" | "cost_rows" | "research_log" | "decision_log"
       | "self_analysis" | "metrics" | "assumptions" | "risks" | "go_no_go_history" | "totals";
-  title: string;
-  data: unknown;           // kind ごとの形（例: cost_rows は CostItem の一部の配列、self_analysis は { user, sections }[]）
-  link: LinkTarget | null;
+  title: string;           // 英語の見出し（カタログ common:planReference）
+  data: unknown;           // kind ごとの形（下）
+  link: LinkTarget | null; // 全体を出す画面。self_analysis（メンバーごとに 12）と totals は null
 }
+// PlanReference.data の形（packages/schemas の planReferenceSchema が型を持つ）:
+// validation_answers: { questionKey; title; text }[]（表示条件で隠れた設問は除く。空の回答は text: null）
+// competitors: { id; name; type; typicalPrice; strength; weakness }[]（15 の順の上位 limit 件）
+// cost_rows: { id; category; templateKey; name; inputMode; amount; percent; value: MetricValue }[]（CostItem の一部と、計算した金額。keys の順。value は主要指標 cost_row:{key}）
+// research_log: { id; observedOn; topic; observation; sourceType; sourceUrl }[]（14 の順）
+// decision_log・go_no_go_history: DecisionLogSummary[]（新しい順。アイデアの全件、プランの Go / No-Go）
+// self_analysis: { selfAnalysisId; user: UserRef; currency; sections: { key; part; title; subtitle; guidance; answers: { questionKey; title; text; amount }[] }[] }[]（このワークスペースに共有された自己分析を持ち主の名前の順。sections は指定のセクション）
+// metrics: { key; value: MetricValue }[]
+// assumptions: { id; statement; whyBelieve; evidence; confidence; disproveCondition }[]（evidence は §21 に写すときと同じ文。6.3 末尾の copy_from）
+// risks: { id; statement; probability; impact; mitigation }[]（16 の順）
+// totals: { ownership: number; capital: number }（表の % の列と金額の列の合計。表示中の行から数える）
 interface PlanItem {
   itemNo: number; title: string; guidance: string | null; readOnly: boolean;   // 版の表示中・アーカイブ・Viewer
-  prompts: TemplateQuestion[]; answers: PlanAnswer[];
-  metrics: KeyMetrics;                          // linked_metric の小項目が使う主要指標（版の表示中はスナップショットの値）
-  scenarios: ScenarioColumn[];                  // `scenario:*` の小項目が使うシナリオ表（metrics は1つの値だけを持つため。同上）
-  execution: ExecutionItem[];                   // execution_view の小項目の種類の項目
-  references: PlanReference[];                  // [S] の自己分析は Owner / Member にだけ返す
+  prompts: TemplateQuestion[];
+  answers: PlanAnswer[];                        // 回答を持つ小項目（文章・選択・表）ごとに1つ。未回答は lockVersion 0。版の表示中はスナップショットの値で、lockVersion 0・updatedAt と updatedBy と copiedFrom は null
+  metrics: KeyMetrics;                          // linked_metric の小項目が使う主要指標（scenario:* を除くキーだけ。版の表示中はスナップショットの値）
+  scenarios: ScenarioColumn[];                  // `scenario:*` の小項目が使うシナリオ表の列（metrics は1つの値だけを持つため。同上）
+  execution: ExecutionItem[];                   // execution_view の小項目の種類の項目（P9 GET の順。版の表示中はスナップショットの項目で、lockVersion 0）
+  references: PlanReference[];                  // 小項目の reference を順に1つずつ。版の表示中も今の検証から作る。[S] の自己分析は Owner / Member にだけ返す
 }
 interface ExecutionItem extends Versioned {
   id: UUID; type: ExecutionType; title: string;
@@ -1414,42 +1434,46 @@ interface PitchDeck {
   variant: "one" | "five";
   source: { kind: "latest" } | { kind: "version"; versionId: UUID; name: string; savedAt: DateTime };
   businessName: string; generatedAt: DateTime;
-  footer: { businessName: string; versionLabel: string /* 版の名前か "Draft" */; date: DateOnly };
+  footer: { businessName: string; versionLabel: string /* 版の名前か "Draft" */; date: DateOnly /* Latest はプランの最終更新日、版は保存日。利用者のタイムゾーンの日付 */ };
   speakerNotes: string | null;                 // §30 の One-minute / Five-minute explanation（PDF には入れない）
   slides: {
-    key: string;                               // design-spec 6.14 のキー（title / problem / …）
+    key: string;                               // design-spec 6.14 のキー（title / problem / …）。5分版は 6.14 の表の14枚で、Economics（economics）の直後が Funding plan（funding）、Execution plan（execution）の直後が Launch plan（launch）
     type: "title" | "text" | "number" | "table";
-    title: string; subtitle?: string | null;
-    bullets?: { text: string; empty: boolean }[];
-    numbers?: { label: string; metricKey: string; value: MetricValue }[];
-    table?: { columns: string[]; rows: (string | null)[][] };
+    title: PitchText;                          // スライドの名前。表紙は Business Name（空なら empty）
+    subtitle: PitchText | null;                // 表紙の §1 What is the business?。ほかは null
+    bullets: { label: string; text: string; empty: boolean }[];   // label は素材の名前。文章スライドは素材ごとに1つ（Launch plan は Actions のある時期の区分ごとに1つで、label は区分の名前。Funding plan はテンプレートの §20 に文章の小項目が無ければ、label が Funding plan の1つ）、表紙は Prepared by / Date / Version、数字・表のスライドは注記
+    numbers: { label: string; metricKey: string; value: MetricValue }[];   // 数字のスライドと Economics の数字
+    table: { columns: { label: string; numeric: boolean /* 等幅の書体で右寄せ */; width: number /* 表の幅に占める割合 */ }[];
+             rows: (string | null)[][] /* 書式を当てたセル。null は空のセル。行が無ければ素材が空 */ } | null;
     emptySources: string[];                    // 「Not written yet」を出す素材の名前
-    overflow: boolean;                         // 収まらず「…」で切った（アプリの表示だけに注意を出す）
-    editSource: { itemNo: number } | null; editInValidation: "costs" | "economics" | null;
-    commentCount: number;
+    shrink: number;                            // 文字を `semantic.print.slide.shrink-step` 何段ぶん小さくしたか（それぞれ最小で止める）
+    overflow: boolean;                         // 最小でも収まらなかった: 文を「…」で切った。どの文も1行（名前が「…」と合わせて1行に収まらない箇条書きは、名前と「…」の行数）まで切っても高さが足りないときも true（アプリの表示だけに注意を出す。高さが足りないスライドは本文の下端で切れる）。数字が入りきらず折り返しただけでは false（design-spec 6.14）
+    editSource: { itemNo: number } | null; editInValidation: "costs" | "economics" | null;   // Viewer・版の表示中・アーカイブ済みは null
+    commentCount: number;                      // `pitch_slide` の `{variant}.{key}` へのコメントの数
   }[];
 }
+interface PitchText { text: string; empty: boolean }   // empty のとき text は "Not written yet"
 ```
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| P1 GET | `?includeArchived=true` | `200 { items: PlanSummary[] }` | |
-| P1 POST（M5） | `{ name: string }`（値は design-spec 6.0.8） | `201 PlanHome` | 最新の判定が Proceed でなければ `409 DECISION_NOT_PROCEED`。公開済みのプランのテンプレートが無ければ `409 TEMPLATE_NOT_PUBLISHED`。名前の重複は `409 NAME_TAKEN`（アーカイブした案の名前は数え、作成を取り消した案の名前は数えない）。テンプレートの `copy_from` で検証から文章をコピーし（文字数の上限を超えても切らない。6.3 末尾）、実行管理の初期行を作る。`created_from_decision_id` に最新の Proceed を入れる。履歴 `plan_draft`（1つの `batchId`。H3 で作成ごと取り消せる。条件と扱いは H3） |
-| P2 GET | `?versionId=` | `200 PlanHome` | 版を指定したら、`parts` などを版のスナップショットから作る |
+| P1 GET | `?includeArchived=true` | `200 { items: PlanSummary[] }` | 作った順。アーカイブした案は `includeArchived=true` のときだけ |
+| P1 POST（M5） | `{ name: string }`（値は design-spec 6.0.8） | `201 PlanHome` | 最新の判定が Proceed でなければ `409 DECISION_NOT_PROCEED`。公開済みのプランのテンプレートが無ければ `409 TEMPLATE_NOT_PUBLISHED`。名前の重複は `409 NAME_TAKEN`（アーカイブした案の名前は数え、作成を取り消した案の名前は数えない）。テンプレートの `copy_from` で検証から文章をコピーし（文字数の上限を超えても切らない。検証が表示条件で隠している回答と、検証が固定している版に無い設問は写さない。`copiedFrom.source` は `copy_from` を「, 」でつないだ文字列。6.3 末尾）、実行管理の初期行を作る（初期行の状態は種類の最初の値、並びはテンプレートの順）。`created_from_decision_id` に最新の Proceed を入れる。履歴 `plan_draft`（1つの `batchId`。H3 で作成ごと取り消せる。条件と扱いは H3） |
+| P2 GET | `?versionId=` | `200 PlanHome` | 版を指定したら、`parts`・`keyMetrics`・Business Name・Prepared By を版のスナップショットから作る（案の名前・ヘッダの `lockVersion`・`updatedAt`・`updatedBy`・`draftOnly`・`execution` は今のプランから。案の名前は案の切替と同じ名前で出し、版は読み取り専用なのでヘッダを版の値で保存させない）。そのプランの版でなければ `404 NOT_FOUND` |
 | P2 PATCH | `{ name?; businessName?; preparedBy?; lockVersion; force? }`（値は design-spec 6.0.8） | `200 PlanHome` | 名前の重複は `409 NAME_TAKEN`（数え方は P1 POST と同じ）。履歴 `manual` |
 | P3 | — | `200 PlanSummary` | |
 | P4 | `?versionId=` | `200 PlanItem` | `itemNo` は 1〜30 |
-| P5 | `{ text?: string | null; rows?: Record<string, string | number | null>[] | null; lockVersion; force? }`（文章と表のセルの値は design-spec 6.0.8） | `200 PlanAnswer` | 数字・実行管理の小項目は `422 NOT_EDITABLE`。存在しない設問は `422 QUESTION_NOT_FOUND`、選択肢にない値は `422 INVALID_CHOICE`。表の列にないキー（ただし、テンプレートの移行で消えた列のキーは、保存済みの行にあるときだけ、保存済みの値か null で受け付ける。P4 は消えた列の値も行に含めて返し、クライアントは表示せずにそのまま送り返す）・型の合わない値・表に `text`・表以外に `rows`・design-spec 6.0.8 の長さを超える文章は `422 VALIDATION_FAILED`。表の長さは、保存済みの値から変えたセルだけを検査する（下書きの作成で写して上限を超えたセルを残したまま、ほかのセルと行を保存できる。6.3 末尾）。履歴 `manual` |
+| P5 | `{ text?: string | null; rows?: Record<string, string | number | null>[] | null; lockVersion; force? }`（文章と表のセルの値は design-spec 6.0.8） | `200 PlanAnswer` | 数字・実行管理の小項目は `422 NOT_EDITABLE`。存在しない設問は `422 QUESTION_NOT_FOUND`、選択肢にない値は `422 INVALID_CHOICE`。表の列にないキー（ただし、テンプレートの移行で消えた列のキーは、保存済みの行にあるときだけ、保存済みの値か null で受け付ける。P4 は消えた列の値も行に含めて返し、クライアントは表示せずにそのまま送り返す）・型の合わない値・表に `text`・表以外に `rows`・design-spec 6.0.8 の長さを超える文章は `422 VALIDATION_FAILED`。表の長さは、保存済みの値から変えたセルだけを検査する（下書きの作成で写して上限を超えたセルを残したまま、ほかのセルと行を保存できる。6.3 末尾）。上限を超えたセルと消えた列の値は、行の位置ではなく値で保存済みの行と照らす: その列（消えた列はそのキー）の保存済みの値と同じ値だけを受け付け、同じ値は保存済みの行が持つ数までしか使えない（残すことはできるが、ほかの行に増やすことはできない。行の追加・削除・並べ替えで位置がずれても通る）。消えた列のキーの null は、保存済みの行のどれかがそのキーを持つときに受け付ける。保存済みの内容と照らすこの検査は、版の食い違い（409）より後に行う。行の無い表は `rows: null` で返す。履歴 `manual` |
 | P6 GET | — | `200 { items: PlanVersionSummary[] }` | |
 | P6 POST（M3） | `{ name: string }`（値は design-spec 6.0.8） | `201 PlanVersionSummary` | スナップショット（中身は 6.3 の末尾）を保存し、決定ログに `version_saved` を記録して通知する |
 | P7 | — | `200 { conditions: { launchIf: string | null; delayIf: string | null; stopIf: string | null }; keyMetrics: KeyMetrics; currentVersion: PlanVersionSummary | null; hasChangesSinceVersion: boolean; history: DecisionLogSummary[] }` | |
 | P8（M4） | `{ value: GoNoGoValue; reason: string }`（`reason` の長さは design-spec 6.0.8） | `201 { entry: DecisionLogEntry; stage: Stage }` | 対象の版は最新の保存済みの版（無ければ null）。決定ログに `go_no_go` を記録して通知する |
 | P9 GET | `?type=&assignee=me|<userId>&status=` | `200 { items: ExecutionItem[] }` | Next Actions は期限順（期限なしは最後）。それ以外の種類は `sortOrder` の順（P11 で並べ替えた順。ローンチは区分の中、KPI は Area の中。design-spec 6.13） |
-| P9 POST | `ExecutionItemInput & { type: ExecutionType; title: string }` | `201 ExecutionItem` | `dueDate` は milestone・launch・open_question・next_action で任意（ローンチの行も日付を持てる。design-spec 6.13）。kpi に送ると `422 VALIDATION_FAILED`。新しい行はその種類の末尾に付く。担当のメンバーは Owner / Member だけ（`422 INVALID_ASSIGNEE`）。状態は種類ごとの値だけ（`422 INVALID_STATUS`。milestone / launch / next_action は todo・doing・done、open_question は open・resolved、kpi は null）。履歴 `manual` |
-| P10 | PATCH: `ExecutionItemInput & { lockVersion; force? }`（値は design-spec 6.0.8。P9 POST も同じ）。DELETE: なし（ロックを持たない論理削除） | `200 ExecutionItem` / `204` | 種類に無い列を送ると `422 VALIDATION_FAILED`（担当は `assigneeUserId` と `assigneeName` の一方だけ）。`done` / `resolved` にしたら `completed_at` を入れる。`kpiActual` を変えたら `kpi_actual_updated_at` を入れる。履歴 `manual` |
+| P9 POST | `ExecutionItemInput & { type: ExecutionType; title: string }` | `201 ExecutionItem` | `dueDate` は milestone・launch・open_question・next_action で任意（ローンチの行も日付を持てる。design-spec 6.13）。kpi に送ると `422 VALIDATION_FAILED`。新しい行はその種類の末尾に付く。担当のメンバーは Owner / Member だけ（`422 INVALID_ASSIGNEE`）。担当にメンバーを決める保存（P9 POST・P10 PATCH）は、メンバーの変更（W3・U6・U7）の advisory lock を共有で取ってから行う（メンバーの変更と直列になり、外れる人の担当を名前に置き換える処理が、その保存を見落とさない）。ローンチの行は `launchTiming` を省くと `other`。状態は種類ごとの値だけ（`422 INVALID_STATUS`。milestone / launch / next_action は todo・doing・done、open_question は open・resolved、kpi は null）。履歴 `manual` |
+| P10 | PATCH: `ExecutionItemInput & { lockVersion; force? }`（値は design-spec 6.0.8。P9 POST も同じ）。DELETE: なし（ロックを持たない論理削除） | `200 ExecutionItem` / `204` | 種類に無い列を送ると `422 VALIDATION_FAILED`（項目の種類は変わらないので、版の食い違いより先に返す。担当は `assigneeUserId` と `assigneeName` の一方だけで、一方に値を送るともう一方を空にする）。`done` / `resolved` にしたら `completed_at` を入れ、ほかの状態に戻したら空にする。`kpiActual` を変えたら `kpi_actual_updated_at` を入れる（P9 POST も、`done` / `resolved` や `kpiActual` を付けて作るときは同じく入れる）。履歴 `manual` |
 | P11 | `{ type: ExecutionType; ids: UUID[] }` | `204` | `type` は `milestone` / `launch` / `kpi` / `open_question`（Next Actions は期限順に並べるので並べ替えない。`next_action` は `422 VALIDATION_FAILED`。design-spec 6.13）。`ids` はその種類の（論理削除を除く）全件と一致すること（違えば `422 VALIDATION_FAILED`）。`sort_order` を振り直す。履歴は残さず、`lockVersion` と `updated_at` も変えない（V17 と同じ） |
-| P12 | `?variant=one|five&versionId=` | `200 PitchDeck` | `packages/domain` の `buildPitchDeck()` |
-| P13 | 同上 | `200 application/pdf`（`Content-Disposition: attachment; filename="{businessName}-{one|five}-{版の名前|draft}-{日付}.pdf"`） | ADR-012。常にライトの配色。回数制限は 7.2（超えたら `429 RATE_LIMITED`） |
+| P12 | `?variant=one|five&versionId=`（`variant` は必須） | `200 PitchDeck` | `packages/domain` の `buildPitchDeck()` で組み立て、`fitPitchDeck()` でスライドに収める（文字の幅は PDF と同じフォントのファイルで測る。ADR-012）。そのプランの版でなければ `404 NOT_FOUND` |
+| P13 | 同上 | `200 application/pdf`（`Content-Disposition: attachment; filename="{businessName}-{one|five}-{版の名前|draft}-{日付}.pdf"`。Business Name が空ならプランの名前。ファイル名に使えない文字（`\ / : * ? " < >`、縦線、制御文字）は `-`、続く空白は1つにする。`filename*` に UTF-8 の名前、`filename` に ASCII に落とした名前（RFC 6266。NFKD で分解して結合文字を除き、残る ASCII でない字は `_`、使えない文字はもう一度 `-`）。日付は `footer.date`） | ADR-012。P12 と同じスライドを PDF にする。常にライトの配色。回数制限は 7.2（超えたら `429 RATE_LIMITED`。数えるのは PDF を作る要求で、404・422 で断ったものは数えない。数えるのはスライドを組み立てる前） |
 
 ### 5.10 AI 往復
 
@@ -1457,9 +1481,9 @@ interface PitchDeck {
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| X1 | `?source=self_analysis|validation|business_plan&id=<検証かプランの id。自己分析は省く>&sections=01,02&items=1,3&part=a|b&includeEmpty=true&includeExamples=true&includeReference=true` | `200 { markdown: string; json: object; fileBaseName: string; questionCount: number; allEmpty: boolean }` | `json` は design-spec 6.6 の `moonx-export`。範囲が空なら `422 EMPTY_SCOPE`。記録しない。回数制限は 7.2（超えたら `429 RATE_LIMITED`） |
-| X2 | `?target=self_analysis|validation|business_plan&id=` | `200 ImportContext` | アーカイブ中のアイデア・プランも読める（X1 も同じ）。`target.archived` で 24・25 が操作を止め、X3 は 409 `ARCHIVED` |
-| X3 | `{ target: { type: TemplateKind; id?: UUID }; changes: ImportChange[] }` | `200 { applied: number; needsClassification: number; batchId: UUID }` | 1つのトランザクションで全部反映するか、何もしない。どれかの `baseLockVersion` が古ければ `409 CONFLICT_MULTI`（`error.conflicts: { questionKey; current: ConflictCurrent }[]`）。取り込めない設問・隠れた設問は `422 NOT_IMPORTABLE`、存在しない設問は `422 QUESTION_NOT_FOUND`、金額・選択の値が読めない・同じ設問が2回ある・回答の長さや金額の範囲が design-spec 6.0.8（11・21 の行）に合わなければ `422 VALIDATION_FAILED`。`applied` は内容が変わった回答の数（変わらないものは数えない）。`conflicts[].current.value` は `{ text, amount }`。検証の回答で本文が変わったものは F/A/U を外して未分類にする（`classification` を送ったらそれを使う。`fact` は根拠が残っているときだけ）。回数制限は 7.2（超えたら `429 RATE_LIMITED`）。履歴 `ai_import`（1つの `batchId`） |
+| X1 | `?source=self_analysis|validation|business_plan&id=<検証かプランの id。自己分析は省く>&sections=01,02&items=1,3&part=a|b&includeEmpty=true&includeExamples=true&includeReference=true` | `200 { markdown: string; json: object; fileBaseName: string; questionCount: number; allEmpty: boolean }` | `json` は design-spec 6.6 の `moonx-export`。`sections` は自己分析と検証、`items` と `part` はプランだけが受け付け、`items` と `part` は同時に送れず、自己分析は `id` を送らない（違えば `422 VALIDATION_FAILED`）。範囲の指定が無いときは全体。`include*` の既定は true。テンプレートに無いセクション・項目は `422 VALIDATION_FAILED`（`details[0].path` は `sections` か `items`）。範囲に取り込める型の設問が無い（`sections=` のような空の一覧を含む）なら `422 EMPTY_SCOPE`。自己分析を S1 GET が作る前は `404 NOT_FOUND`（X2・X3 も同じ）。記録しない。回数制限は 7.2（超えたら `429 RATE_LIMITED`） |
+| X2 | `?target=self_analysis|validation|business_plan&id=` | `200 ImportContext` | アーカイブ中のアイデア・プランも読める（X1 も同じ）。`target.archived` で 24・25 が操作を止め、X3 は 409 `ARCHIVED`。`target.name` は自己分析なら持ち主の表示名、検証ならアイデア名、プランなら案の名前。移行で隠れた設問の定義は、同じテンプレートの公開済みの版のうち、その設問 ID を持つ最も新しい版のもの |
+| X3 | `{ target: { type: TemplateKind; id?: UUID }; changes: ImportChange[] }` | `200 { applied: number; needsClassification: number; batchId: UUID }` | 1つのトランザクションで全部反映するか、何もしない。どれかの `baseLockVersion` が古ければ `409 CONFLICT_MULTI`（`error.conflicts: { questionKey; current: ConflictCurrent }[]`）。取り込めない設問・隠れた設問は `422 NOT_IMPORTABLE`、存在しない設問は `422 QUESTION_NOT_FOUND`、金額・選択の値が読めない・同じ設問が2回ある・回答の長さや金額の範囲が design-spec 6.0.8（11・21 の行）に合わなければ `422 VALIDATION_FAILED`。`applied` は内容が変わった回答の数（変わらないものは数えない）。`conflicts[].current.value` は `{ text, amount }`。検証の回答で本文が変わったものは F/A/U を外して未分類にする（`classification` を送ったらそれを使う。`fact` は根拠が残っているときだけ）。回数制限は 7.2（超えたら `429 RATE_LIMITED`）。履歴 `ai_import`（1つの `batchId`）。自己分析への反映は、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落）。`changes` は1件以上。確かめる順（5.1「同時編集」）: 各変更をテンプレートで確かめ（`QUESTION_NOT_FOUND`、表・数字・実行管理の `NOT_IMPORTABLE`、値の `VALIDATION_FAILED` と `CONFIDENCE_REQUIRED`。最初に見つかった変更のエラーで、`details[0].path` は `changes.{i}.text` など）、次に版（衝突をまとめて `CONFLICT_MULTI`）、最後に保存されている内容による検査（02 OCEAN の回答や移行で隠れた設問の `NOT_IMPORTABLE`、`fact` は数える根拠が残っていなければ `422 FACT_REQUIRES_EVIDENCE`、本文の無い回答への Fact・Assumption は `422 VALIDATION_FAILED`）。金額＋理由は自己分析の設問だけが取り込める（design-spec 6.6）。内容の変わらない変更は、`baseLockVersion` が古くても通して数えない（V3 と同じ）。選択の値は大文字小文字を問わず、テンプレートの表記で保存する。`classification` は検証の F/A/U を持つ設問だけ（ほかは `422 VALIDATION_FAILED`）。`needsClassification` は反映した検証の回答のうち、本文があり F/A/U が未分類のものの数 |
 
 ```ts
 interface ImportContext {
@@ -1488,11 +1512,12 @@ interface DecisionLogSummary {
   id: UUID; kind: "validation_decision" | "go_no_go" | "version_saved";
   value: DecisionValue | GoNoGoValue | null; versionName: string | null;
   idea: { id: UUID; name: string }; plan: { id: UUID; name: string } | null;
-  reasonExcerpt: string | null; recordedBy: UserRef; recordedAt: DateTime;
+  reasonExcerpt: string | null;   // 理由の先頭 200 文字（切ったときは末尾の1文字を「…」にする。画面が1〜2行に収める。design-spec 6.15）
+  recordedBy: UserRef; recordedAt: DateTime;
 }
 interface DecisionLogEntry extends DecisionLogSummary {
   reason: string | null;
-  snapshot: {
+  snapshot: {   // missingChecks の link は、書き込みの画面（19・14 の新しい入力）へ入れない人の見え方で求める（後で読む Viewer にも同じものを返すため）
     missingChecks: CheckResult[]; keyMetrics: KeyMetrics; fau: FauBreakdown;
     conditions?: { launchIf: string | null; delayIf: string | null; stopIf: string | null };  // go_no_go
     planVersion?: { id: UUID; name: string } | null;  // go_no_go・version_saved
@@ -1505,54 +1530,60 @@ interface Comment {
   editedAt: DateTime | null; deleted: boolean; createdAt: DateTime;
 }
 interface HistoryEntry {
-  id: UUID; batchId: UUID | null; target: TargetRef; label: string;   // 例: "01 WHO"、"Costs · Rent"
+  id: UUID; batchId: UUID | null; target: TargetRef; label: string;   // 例: "01 WHO"、"Costs · Rent"。設問の回答は「{節} {設問のタイトル}」（固定している版に無い設問は設問 ID の末尾）、数字は「Unit Economics · {入力の名前}」、行は「{一覧の名前} · {行の文}」（調査ログはトピック、競合と費用行は名前、前提とリスクは文、実行管理は1列目。80 文字を超える文は切って「…」、空なら「Untitled」）、アイデアとプランのヘッダは名前、Pitch Deck のスライドは「Pitch Deck」、テンプレートの版は「Template version」。英語の文言はカタログ `common:itemLabel`・`common:economicsField`
   action: "create" | "update" | "delete" | "restore";
   source: HistorySource;   // 作成の取り消しの行は source が revert、action が delete、target.type が idea か business_plan の組み合わせ。画面はこの組み合わせで「作成の取り消し」と出す（design-spec 6.0.5）
   before: unknown | null; after: unknown | null;   // 本文・数字・F/A/U・確信度・根拠の id の一覧など（差分の強調はクライアント）
   changedBy: UserRef; changedAt: DateTime;
-  revertible: boolean;   // 呼んだ人がこの行を戻せる（Viewer・アーカイブ済みは false）。`template_version` の行は H2 では戻せないが、H3 で操作全体を戻せるときは true。`duplicate`・`plan_draft` の行は作成の取り消し（H3）の対象で、条件を満たすかは確かめずに true（呼んだ人の権限だけで決める）。作成の取り消しで書いた行（下の「作成の取り消し」）は false
+  revertible: boolean;   // 呼んだ人がこの行を戻せる（Viewer・アーカイブ済みは false）。`template_version` の行は H2 では戻せないが、H3 で操作全体を戻せるとき（その移行がまだ戻されていない、または戻したことが取り消されている）は true。`duplicate`・`plan_draft` の行は作成の取り消し（H3）の対象で、条件を満たすかは確かめずに true（呼んだ人の権限だけで決める）。作成の取り消しで書いた行（下の「作成の取り消し」）は false
 }
 interface Notification {
   id: UUID; kind: "mention" | "comment" | "decision";
   workspace: { id: UUID; name: string }; actor: UserRef | null;
-  title: string;          // 表示用の短い文（英語。どこでを含める。例: "Paolo mentioned you on WHO · Piaya Gift Box Delivery"）
-  excerpt: string | null; // コメント・メンションは本文の冒頭、判定・Go / No-Go は理由の冒頭。版の保存は null（design-spec 6.15）
-  link: LinkTarget;
-  accessible: boolean;    // 外れた・権限がなくなったら false（「You no longer have access」）
+  title: string;          // 表示用の短い文（英語。どこでを含める。例: "Paolo Gonzaga mentioned you on 01 WHO · Piaya Gift Box Delivery"）。下の「通知の文」
+  excerpt: string | null; // コメント・メンションは本文の冒頭、判定・Go / No-Go は理由の冒頭（EXCERPT_MAX の 200 文字。切ったときは末尾の1文字を「…」）。今の本文から作り、削除したコメントは null。版の保存は null（design-spec 6.15）。accessible が false なら null
+  link: LinkTarget;       // 判定は 13、Go / No-Go と版の保存は 20。コメント・メンションは、対象の項目を出す画面（6.3「画面と節の対応」。自己分析の回答は、持ち主には 11、それ以外の人には 12）を `panel: "comments"` と `target` を付けて開く
+  accessible: boolean;    // 外れた・権限がなくなったら false（「You no longer have access」）。ワークスペースのメンバーでなくなったとき。自己分析へのコメントは、そのワークスペースへの共有が外れたとき（持ち主でも）と、持ち主以外が Owner / Member でなくなったとき
   readAt: DateTime | null; createdAt: DateTime;
+}
+interface RevertedItem {   // H2 の後の項目
+  value: unknown | null;   // 変更履歴の before / after と同じ形（形の正は packages/db/src/history-values.ts）。削除した行は null
+  deleted: boolean; lockVersion: number; updatedAt: DateTime | null; updatedBy: UserRef | null;
 }
 ```
 
+**通知の文（`Notification.title`）:** 英語の文言はカタログ `notifications`。「{行った人の表示名} mentioned you on {どこで}」「… commented on {どこで}」、判定と Go / No-Go は「… recorded {値} on {どこで}」、版の保存は「… saved the version “{版の名前}” of {どこで}」。どこでは、項目は「{項目の名前} · {アイデア名}」（項目の名前は `HistoryEntry.label` と同じ。プランの項目は「{項目の名前} · {案名} · {アイデア名}」）、アイデアへのコメントはアイデア名、自己分析の回答は「{項目の名前} · your self-analysis」（持ち主）か「{項目の名前} · {持ち主の表示名}'s self-analysis」、判定はアイデア名、Go / No-Go と版の保存は「{案名} · {アイデア名}」。名前は読んだ時点のもの。`accessible` が false の通知は、どこでと `excerpt` を出さず「{表示名} mentioned you」「… commented」「… recorded a decision」「… recorded a Go / No-Go」「… saved a version」だけにする（読めなくなった項目の今の名前や、編集した後の本文を見せない。7.1「実装」の「クエリは必ずそのワークスペースで絞る」）。
+
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| L1 | `?kind=&ideaId=&planId=&recordedBy=&from=&to=&cursor=&limit=` | `200 Page<DecisionLogSummary>` | 新しい順 |
+| L1 | `?kind=&ideaId=&planId=&recordedBy=&from=&to=&cursor=&limit=` | `200 Page<DecisionLogSummary>` | 新しい順（記録した時刻、同じなら行を作った時刻の新しい順）。`from`・`to` は日付だけの値で、呼んだ人の `users.timezone` での記録の日付で絞り、両端を含む（7 の期間の絞り込み。表示の日付と同じ暦で選ぶため）。アーカイブしたアイデア・プランの行も返す |
 | L2 | — | `200 DecisionLogEntry` | 更新・削除の API は無い |
-| C1 GET | 項目: `?targetType=&targetId=&targetKey=&workspaceId=`。画面: `?containerType=&containerId=&sectionKeys=&workspaceId=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾） | `200 { threads: { root: Comment; replies: Comment[] }[]; unresolvedCount: number }` | 画面の指定では、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea`）をまとめて返す（ヘッダーの 💬 のパネル。`unresolvedCount` は解決していないスレッドの数で、💬 の件数に使う。design-spec 6.0.1・6.0.4）。自己分析の回答へのコメントは、共有先の Owner / Member には `workspaceId` のワークスペースの分だけ、本人には全部を返す。削除した行へのコメントは返さない |
-| C1 POST | `{ workspaceId: UUID; target: TargetRef; parentId?: UUID; body: string; mentionUserIds: UUID[] }`（`body` の長さは design-spec 6.0.8） | `201 Comment` | 返信は1段まで（`422 REPLY_DEPTH`）。メンションできない人は `422 INVALID_MENTION`。対象から画面（`container_type`・`container_id`・`section_key`）を決めて保存する。通知（`mention` / `comment`）を design-spec 6.15 の条件で作る（プランの項目へのコメントは、プランを作った人とアイデアを提案した人の両方。受け取る人が重なれば1人に1件） |
-| C2 PATCH | `{ body: string; mentionUserIds: UUID[] }` | `200 Comment` | 新しくメンションした人にだけ通知する |
-| C2 DELETE | — | `204` | 「deleted」として残す |
-| C3 | — | `200 Comment` | スレッドの最初のコメントだけ |
-| H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKeys=&cursor=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾。省くと画面全体） | `200 Page<HistoryEntry>` | 新しい順。`containerType=idea`（13）は、アイデア自身の行に加え、そのアイデアの検証のテンプレートの版の行（テンプレートの移行。design-spec 6.0.7）と、作成の取り消しの行も返す。項目の指定と `sectionKeys` の指定では、テンプレートの版の行を返さない |
-| H2 | — | `200 { entry: HistoryEntry; target: unknown }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す。衝突の検査はしない（戻すのは意図した上書き）。`template_version` の行は `422 VALIDATION_FAILED`（H3 で戻す）。作成の取り消しで書いた行も `422 VALIDATION_FAILED`（取り消したものは戻さない） |
-| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 ALREADY_REVERTED`。複製（`duplicate`）と下書き作成（`plan_draft`）は、戻すのではなく作ったものを論理削除する「作成の取り消し」になる（下の「作成の取り消し」） |
+| C1 GET | 項目: `?targetType=&targetId=&targetKey=&workspaceId=`。画面: `?containerType=&containerId=&sectionKeys=&workspaceId=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾） | `200 { threads: { root: Comment; replies: Comment[] }[]; unresolvedCount: number }` | 画面の指定では、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea`）をまとめて返す（ヘッダーの 💬 のパネル。`unresolvedCount` は解決していないスレッドの数で、💬 の件数に使う。design-spec 6.0.1・6.0.4）。自己分析の回答へのコメントは、共有先の Owner / Member には `workspaceId` のワークスペースの分だけ、本人には今の共有先の分を全部返す（共有をやめたワークスペースのコメントは、共有し直すまで返さない。design-spec 6.0.4。S2 の `commentCounts` と同じ範囲）。削除した行へのコメントと、テンプレートの移行で隠れた設問へのコメント（design-spec 6.0.7）は返さない。スレッドは最初のコメントの古い順、返信も古い順。削除したコメントは `deleted` として本文を空、`mentions` を空にして返す（すべて削除したスレッドも残し、解決していなければ `unresolvedCount` に数える）。項目の指定で、削除した行・隠れた設問・無い項目は `404 NOT_FOUND`（`targetKey` の決まりは C1 POST）。`workspaceId` は見ているワークスペースで、ワークスペースの中の項目がそのワークスペースのものでなければ `404 NOT_FOUND`。自己分析の持ち主以外は、W8 と同じ順に、Viewer は `403 FORBIDDEN`、`workspaceId` に共有されていなければ `403 NOT_SHARED` |
+| C1 POST | `{ workspaceId: UUID; target: TargetRef; parentId?: UUID; body: string; mentionUserIds: UUID[] }`（`body` の長さは design-spec 6.0.8） | `201 Comment` | 返信は1段まで（`422 REPLY_DEPTH`）。メンションできない人は `422 INVALID_MENTION`。対象から画面（`container_type`・`container_id`・`section_key`）を決めて保存する。通知（`mention` / `comment`）を design-spec 6.15 の条件で作る（プランの項目へのコメントは、プランを作った人とアイデアを提案した人の両方。「自分がコメントしたスレッド」の人は、消したコメントの書き手も含む。受け取る人が重なれば1人に1件で、メンションされた人には `mention` の1件。対象の項目を読めない人と書いた本人には作らない）。`target.key` は回答・数字・スライド（`{版の種類}.{スライドのキー}`）で必須、行とアイデアは持たない（どちらも `422 VALIDATION_FAILED`。`business_plan`・`template_version` は対象にならない）。固定している版に無い設問、その版の種類に無いスライド、無い数字、削除した行は `404 NOT_FOUND`。本体の `workspaceId` が項目のワークスペースでなければ `404 NOT_FOUND`。`parentId` が同じ項目・同じワークスペースのコメントでなければ `422 VALIDATION_FAILED`（`details[0].path` は `parentId`）。`mentionUserIds` の重複は1人にまとめる。自己分析へのコメントは、そのワークスペースのメンバーの変更の lock を共有で取り、ロールと共有の行（`FOR SHARE`）を確かめ直してから書く（W3 の降格・S5 の共有の解除と行き違わない） |
+| C2 PATCH | `{ body: string; mentionUserIds: UUID[] }` | `200 Comment` | 本文とメンションを置き換える（どちらも変わらなければ何もせず、`editedAt` も変えない）。新しくメンションした人にだけ通知する。削除したコメントは `404 NOT_FOUND` |
+| C2 DELETE | — | `204` | 「deleted」として残す。本文を空にしてメンションを外す（消した本文を残さない）。削除済みをもう一度消しても `204`。C2 は、書いた人なら今のロールにかかわらずできる（7.1。自己分析へのコメントで、書いた後に Viewer になった人も）。自己分析へのコメントの C2・C3 は、C1 POST と同じくメンバーの変更の lock を共有で取り、所属（無ければ `403 NO_ACCESS`）と共有の行（`FOR SHARE`。無ければ `404 NOT_FOUND`）を確かめ直してから書く |
+| C3 | — | `200 Comment` | スレッドの最初のコメントだけ（返信は `422 VALIDATION_FAILED`、`details[0].path` は `commentId`）。すでにその状態なら何も変えない。自己分析へのコメントは Viewer なら `403 FORBIDDEN`（ロックの後にも確かめる） |
+| H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKeys=&cursor=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾。省くと画面全体） | `200 Page<HistoryEntry>` | 新しい順。`containerType=idea`（13）は、アイデア自身の行に加え、そのアイデアの検証のテンプレートの版の行（テンプレートの移行。design-spec 6.0.7）と、作成の取り消しの行も返す。項目の指定と `sectionKeys` の指定では、テンプレートの版の行を返さない（項目に `template_version` を指定すると空の一覧）。同じ時刻の行は id の降順。項目の指定は削除した行の履歴も返す（削除を取り消すため）。`limit` も受け付ける（5.1「一覧」）。自己分析の履歴は持ち主以外 `403 FORBIDDEN`（無い自己分析は `404 NOT_FOUND`） |
+| H2 | — | `200 { entry: HistoryEntry | null; target: RevertedItem }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す（`batchId` は持たず、`revertedFromId` は戻した元の行。削除した行を戻すと `action` は `restore` で `before` は null）。項目がすでにその状態なら何も書かず、`entry` は null（値を変えない保存と同じ。ADR-020）。衝突の検査はしない（戻すのは意図した上書き）。`template_version` の行は `422 VALIDATION_FAILED`（H3 で戻す）。作成の取り消しで書いた行も `422 VALIDATION_FAILED`（取り消したものは戻さない）。自己分析の回答を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落）。案の名前がほかの案で使われていれば `409 NAME_TAKEN`（P2 PATCH と同じ）。実行管理の担当が今は Owner / Member でなければ、W3 と同じくその人の表示名に置き換えて戻す。行が無くなっていれば `404 NOT_FOUND` |
+| H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 ALREADY_REVERTED`。複製（`duplicate`）と下書き作成（`plan_draft`）は、戻すのではなく作ったものを論理削除する「作成の取り消し」になる（下の「作成の取り消し」）。自己分析の操作を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落）。各項目は、その操作の最初の行の `before` の状態に戻す（`before` が null の行は、一覧の行なら論理削除、回答・数字なら空にする。テンプレートの版は `before` の版に戻す）。戻した操作は `revert` の新しい `batchId` で書く。応答の `reverted` は戻した項目の数（すでに操作の前の状態だった項目は数えない）、`batchId` はその新しい `batchId`（H3 でさらに戻せる）。戻す項目が無ければ何も書かず、`reverted` は 0（このとき `batchId` の行は無く、元の操作は戻していない扱いのまま） |
 | N1 | `?filter=all|unread&cursor=&limit=` | `200 Page<Notification>` | ワークスペースをまたいで新しい順 |
 | N2 | — | `200 { total: number }` | クライアントは画面を開いたとき・前面に戻ったとき・60秒ごとに呼ぶ |
-| N3 | — | `204` | |
+| N3 | — | `204` | 自分の通知だけ。ほかの人の通知と無い id は `404 NOT_FOUND`（ほかの人の通知の有無を答えない）。既読をもう一度既読にしても `readAt` は変えない |
 
 **作成の取り消し（H3 の `duplicate` と `plan_draft`）:** 複製したアイデア、または下書きのプランを、作った操作の単位で取り消す（2026-10-03 のユーザーの決定）。作ったものは論理削除し、変更履歴は消さずに残す（2026-10-11 のユーザーの決定）。一般の削除ではない（design-spec 6.8 の「アイデア・プランの削除は初期リリースでは作らない」は変えない）。
 - 条件: 作ったあとに何も足されていないこと。次のどれかがあれば、何も変えずに `409 UNDO_BLOCKED` を返す（文言は design-spec 6.0.5）。(1) その操作の行以外の変更履歴（作ったアイデアなら `idea`・`validation` の画面、プランなら `business_plan` の画面。AI 取り込み・移行・元に戻すを含む）。(2) 作ったものの項目（アイデア・検証・各行、プラン・実行管理の項目）へのコメント（消したコメントを含む）。(3) 決定ログの行（アイデアの判定、プランの Go / No-Go と版の保存）。(4) 作ったアイデアに付いたプラン、作ったプランに保存した版。(5) 作ったアイデアを複製元にしたアイデア。作ったあとの仕事を巻き込んで隠さないための条件で、足されたものを個別に片づける処理は持たない。
 - 論理削除するもの: 作ったアイデア（`ideas.deleted_at`）、または作ったプラン（`business_plans.deleted_at`）。子の行（検証・回答・調査ログ・競合・前提・リスク・費用行・数字・根拠の紐づけ、プランの回答・実行管理の項目）は変えずに残す。親が論理削除されたものは、どの API でも無いものとして扱う（5.1）。論理削除したアイデア・プランを戻す操作は作らない。
-- 履歴の扱い: 取り消しは `withHistory` を通して書く（ADR-020 の例外を作らない）。書く先は元の側の画面で、複製はコピー元のアイデア、下書き作成はそのプランのアイデア（どちらも `containerType = idea`）。対象は作ったアイデア（`idea`）かプラン（`business_plan`）、`action` は `delete`、`source` は `revert`、`revertedFromId` は取り消した操作の作成の行。この行は H2 で戻せない（`revertible: false`）。その操作の `batchId` の行はそのまま残る。同じ `batchId` をもう一度呼ぶと `409 ALREADY_REVERTED`。
+- 履歴の扱い: 取り消しは `withHistory` を通して書く（ADR-020 の例外を作らない）。書く先は元の側の画面で、複製はコピー元のアイデア、下書き作成はそのプランのアイデア（どちらも `containerType = idea`）。対象は作ったアイデア（`idea`）かプラン（`business_plan`）、`action` は `delete`、`source` は `revert`、`revertedFromId` は取り消した操作の作成の行。この行は `batchId` を持たず（H3 で戻せる操作ではない）、H2 でも戻せない（`revertible: false`）。その操作の `batchId` の行はそのまま残る。同じ `batchId` をもう一度呼ぶと `409 ALREADY_REVERTED`。
 - 応答: `reverted` は取り消した操作の履歴の行の数（行は消さない）、`batchId` は取り消した操作の `batchId`。
-- 実行: 1つのトランザクションで、`batchId` の advisory lock、アイデアの行（プランの取り消しはそのプランの行も）の `FOR UPDATE NOWAIT`、条件の確認、論理削除と履歴の書き込みの順に行う。ロックを持ったまま別のロックを待たないので、進行中の書き込みがデッドロックの犠牲になることはない。ほかの書き込みがその行を持っていれば、取り消しはすぐに `409 BUSY`（文言は design-spec 6.0.5）を返す。取り消しの完了を待っていた書き込みは、`resolveScope` と書き込みの最後の確認（アーカイブの確認と同じ場所。7.1）で親の `deleted_at` を見て `404 NOT_FOUND` になり、足されたものは残らない。ワークスペースの最終更新を更新する。
+- 実行: 1つのトランザクションで、`batchId` の advisory lock、アイデアの行（プランの取り消しはそのプランの行も）の `FOR UPDATE NOWAIT`（複製の取り消しは、取り消しを書くコピー元のアイデアの行も `FOR NO KEY UPDATE NOWAIT` で取る）、条件の確認、論理削除と履歴の書き込みの順に行う。ロックを持ったまま別のロックを待たないので、進行中の書き込みがデッドロックの犠牲になることはない。ほかの書き込みがその行を持っていれば、取り消しはすぐに `409 BUSY`（文言は design-spec 6.0.5）を返す。取り消しの完了を待っていた書き込みは、`resolveScope` と書き込みの最後の確認（アーカイブの確認と同じ場所。7.1）で親の `deleted_at` を見て `404 NOT_FOUND` になり、足されたものは残らない。履歴を書いた元の側のアイデアの `last_activity_at` と、ワークスペースの最終更新を更新する（7.1「実装」）。
 - 権限: 戻す操作の `need` と同じ（Owner / Member。アーカイブ済みのアイデアの中身は `409 ARCHIVED`）。作ったアイデア自身がアーカイブ済みなら取り消せない。
 
 ### 5.12 テンプレートの移行（M8）
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| T1 | `?targetType=self_analysis|validation|business_plan&targetId=` | `200 { from: { versionNumber: number }; to: { versionId: UUID; versionNumber: number }; carried: number; hiddenQuestions: { questionKey: string; title: string; hasAnswer: boolean }[]; addedQuestions: number; addedCostRows: string[] }` | 新しい版が無ければ `409 ALREADY_LATEST` |
-| T2 | `{ targetType; targetId; toVersionId: UUID }` | `200 { batchId: UUID; template: TemplateRef }` | design-spec 6.0.7 の表のとおり移す。履歴 `template_migration`（1つの `batchId`。H3 で戻せる）。費用の初期行: 新しい版の初期行のキー（`template_key`）について、そのキーの行が無ければ足す。そのキーの行が論理削除されていて、その削除が移行を戻した操作（H3。`source = revert` で、`revertedFromId` が `template_migration` の行）によるものなら、新しい行として足し直す。利用者が消した行（`source = manual` の `delete`）しか無ければ足さない（design-spec 6.0.7）。移行を H3 で戻すと、その移行で足した費用の行は論理削除する |
+| T1 | `?targetType=self_analysis|validation|business_plan&targetId=` | `200 { from: { versionNumber: number }; to: { versionId: UUID; versionNumber: number }; carried: number; hiddenQuestions: { questionKey: string; title: string; hasAnswer: boolean }[]; addedQuestions: number; addedCostRows: string[] }` | `to` は公開済みの最新の版。`carried` は、今の版の設問のうち新しい版にもあり、回答が入っているものの数。`hiddenQuestions` は今の版にあって新しい版に無い設問（今の版の順。`title` は今の版のもの）。回答が入っているとは、自己分析は文か金額があること（design-spec 6.11）、検証は空白でない文があるか Unknown であること、プランは空白でない文か表の行があること。`addedQuestions` は新しい版にだけある設問の数。`addedCostRows` は T2 が足す費用の初期行の名前（新しい版の順。検証だけで、ほかは `[]`）。アーカイブ済みでも読める（書き込まないため）。新しい版が無ければ `409 ALREADY_LATEST` |
+| T2 | `{ targetType; targetId; toVersionId: UUID }` | `200 { batchId: UUID; template: TemplateRef }` | design-spec 6.0.7 の表のとおり移す。履歴 `template_migration`（1つの `batchId`。H3 で戻せる）。固定している版の行（`template_version`）の `before`・`after` は `{ versionId, versionNumber }`（形の正は `packages/db/src/history-values.ts` の `templateVersionContent`）。費用の初期行: 対象は、固定している版に無く新しい版にある初期行のキー（`template_key`）だけ。両方の版にあるキーは、そのキーの行が無くても足さない（複製は削除した行を写さないので、元で削除した行が移行で戻らないように。design-spec 6.0.7）。対象のキーの行が無ければ足す。対象のキーの行が論理削除されていて、その削除が移行を戻した操作（H3。`source = revert` で、`revertedFromId` が `template_migration` の行）によるものなら、新しい行として足し直す。利用者が消した行（`source = manual` の `delete`）しか無ければ足さない（design-spec 6.0.7）。キーの行がすべて論理削除されているときは、最後に論理削除された行の、最後の `delete` の履歴で決める（移行で足し直した行を利用者が消したら、もう足さない）。移行を H3 で戻すと、その移行で足した費用の行は論理削除する。足した行は、その区分の行（論理削除した行を含む）の後ろに、新しい版の順で並べる。自己分析の移行は、S3 などの保存と同じく `lockActiveCaller` の後に自己分析の行をロックしてから版を替え、状態を進める（5.8 の表の下の段落。保存の途中で固定している版が変わらないようにする。隠れていた設問の回答が新しい版で出ると、回答済みに入る）。検証とプランの移行は、ほかの書き込みと同じく `writeInScope` のロックの中で版を読み直してから替える（プランの履歴の時刻は 6.3 末尾「+ changes」のとおり最新の版の後にする）。確かめる順: 新しい版が無ければ（ほかの人が先に移行した）`409 ALREADY_LATEST`、`toVersionId` が同じテンプレートの、今の版より新しい公開済みの版でなければ `422 VALIDATION_FAILED`（`details[0].path` は `toVersionId`。最新でなくても、それより新しい公開済みの版なら移れる）。T1・T2 の `targetId` の自己分析がほかの人のものなら `403 FORBIDDEN`、無ければ `404 NOT_FOUND`（H1 と同じ） |
 
 ### 5.13 運営者
 
@@ -1560,7 +1591,7 @@ interface Notification {
 interface TemplateVersionDetail {
   id: UUID; kind: TemplateKind; versionNumber: number; status: "draft" | "published"; aiPrompt: string;
   sections: (Omit<TemplateSection, "questions"> & { id: UUID; sortOrder: number;
-    questions: (TemplateQuestion & { id: UUID; sortOrder: number; copyFrom: unknown | null; reference: unknown | null })[] })[];
+    questions: (TemplateQuestion & { id: UUID; sortOrder: number; copyFrom: string[] | null; reference: PlanReferenceSpec[] | null })[] })[];   // copyFrom と reference はプランだけ。形は 6.3 の末尾（PlanReferenceSpec は packages/schemas の型）
   costDefaults: { id: UUID; category: CostCategory; key: string; name: string; sortOrder: number }[];
   checkRules: { checkKey: CheckKey; params: Record<string, number> }[];
   executionPresets: { id: UUID; type: "milestone" | "launch" | "kpi"; title: string; area: string | null; launchTiming: LaunchTiming | null; sortOrder: number }[];
@@ -1593,23 +1624,23 @@ interface TemplateFile {
 }
 ```
 
-`AdminUser.lastActiveAt` は `users.last_active_at` で、ログイン中のユーザーの API 呼び出しが書く。書き込みは、前回の値から5分以上たっているときだけにする（呼び出しのたびに users を更新しないため）。表示は最大5分遅れる。
+`AdminUser.lastActiveAt` は `users.last_active_at` で、ログイン中のユーザーの API 呼び出しが書く。書き込みは、前回の値から5分以上たっているときだけにする（呼び出しのたびに users を更新しないため）。表示は最大5分遅れる。書くのは Better Auth の `hooks.after` で、セッションを読むか作った呼び出しのたびに動く（ログイン・`get-session` など）。`/api/v1` は呼び出した人のセッションを Better Auth の `auth.api.getSession` で読み、このフックを通す。
 
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
-| AD1 | — | `200 { items: { kind: TemplateKind; name: string | null; versions: { id: UUID; versionNumber: number; status: "draft" | "published"; publishedAt: DateTime | null; publishedBy: UserRef | null; usageCount: number }[] }[] }` | 3つの種類を必ず返す。まだ取り込んでいない種類は `name: null`・`versions: []`（26 の空の状態。design-spec 6.17） |
+| AD1 | — | `200 { items: { kind: TemplateKind; name: string | null; versions: { id: UUID; versionNumber: number; status: "draft" | "published"; publishedAt: DateTime | null; publishedBy: UserRef | null; usageCount: number }[] }[] }` | 3つの種類を必ず返す（自己分析・検証・プランの順）。まだ取り込んでいない種類は `name: null`・`versions: []`（26 の空の状態。design-spec 6.17）。版は新しい順。`usageCount` はその版を固定している自己分析・検証・プランの数（作成を取り消したアイデア・プランは数えない。5.1） |
 | AD2 | — | `201 { id: UUID }` | その版をコピーした下書きを作る。下書きがすでにあれば `409 DRAFT_EXISTS` |
 | AD3 GET | — | `200 TemplateVersionDetail` | |
 | AD3 PATCH | `{ aiPrompt: string }` | `200 TemplateVersionDetail` | 検証とプランの版に空でない値を送ると `422 VALIDATION_FAILED`（AI 用プロンプトを持つのは自己分析だけ。design-spec 6.17）。公開済みの版は `409 PUBLISHED_READ_ONLY`（AD4・AD5・AD6 publish も同じ。AD6 validate は書き込まないので公開済みの版にも使える） |
-| AD4 | セクション: `{ key; title; subtitle?; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（`reference` は 27 の画面からは送らない。変えるのは AD10 の取り込みだけ。design-spec 6.17。PATCH は一部。文字の値は design-spec 6.0.8） | `201` / `200` / `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`） |
-| AD5 | order: `{ sections: { id: UUID; questionIds: UUID[] }[] }`。cost-defaults: `{ items: { category; key; name }[] }`。check-rules: `{ items: { checkKey; params }[] }`（基準値は design-spec 6.0.8）。execution-presets: `{ items: { type; title; area?; launchTiming? }[] }` | `200 TemplateVersionDetail` | 一覧ごと置き換える |
-| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 公開をふさぐエラー: 設問が0件（`no_questions`）、セクションの `part` の過不足（`invalid_part`。プランは A / B が必須、他は無し）、設問 ID の形式（`invalid_question_key`）・セクションとの不一致（`question_key_section_mismatch`）・重複（`duplicate_question_key`）、`answerType` と `options` の食い違い（`options_mismatch`。選択肢・表の列・主要指標が空のときも）、`displayCondition` が存在しない設問を指す（`unknown_condition_key`）。警告: 前の版から消えた ID |
+| AD4 | セクション: `{ key; title; subtitle?; guidance?; part? }`。設問: `{ key; title; prompt; example?; hint?; answerType; options?; displayCondition?; hasFau?; copyFrom?; reference? }`（`reference` は 27 の画面からは送らない。変えるのは AD10 の取り込みだけ。design-spec 6.17。PATCH は一部。文字の値は design-spec 6.0.8） | POST は `201 TemplateVersionDetail`、PATCH は `200 TemplateVersionDetail`、DELETE は `204` | 設問 ID の形式（design-spec 6.6）を検査する（`422 INVALID_QUESTION_KEY`）。セクションのキーと設問 ID は版の中で重ならない（`422 VALIDATION_FAILED`、`details[0].path` は `key`）。テンプレートの種類で決まる値は `422 VALIDATION_FAILED`: `hasFau` を true にできるのは検証だけ、`copyFrom`・`reference` を持てるのはプランだけ、`displayCondition` のキーはその種類の設問 ID の形式。足したセクションは版の最後に、足した設問はそのセクションの最後に置く。PATCH で `answerType` を変えて `options` を送らなければ、`options` を空にする（design-spec 6.17）。公開した版にある設問 ID は、その後の下書きでも変えられない（design-spec 6.6。下書きの設問の ID を変える PATCH は、その ID が同じテンプレートの公開済みの版にあれば `422 VALIDATION_FAILED`、`details[0].path` は `key`）。設問を消すことはでき、前の版から消えた ID は AD6 の警告 `removed_keys` に出る。セクションを消すと、その設問も消える。下書きの版の行をロックしてから書く（公開と行き違わない） |
+| AD5 | order: `{ sections: { id: UUID; questionIds: UUID[] }[] }`。cost-defaults: `{ items: { category; key; name }[] }`。check-rules: `{ items: { checkKey; params }[] }`（基準値は design-spec 6.0.8）。execution-presets: `{ items: { type; title; area?; launchTiming? }[] }` | `200 TemplateVersionDetail` | 一覧ごと置き換える。order は版のすべてのセクションと設問をちょうど1回ずつ並べる（設問はほかのセクションへ移せる。そろっていなければ `422 VALIDATION_FAILED`）。cost-defaults と check-rules は検証だけ、execution-presets はプランだけが持ち、ほかの種類に空でない一覧を送ると `422 VALIDATION_FAILED`。費用の初期行のキーと確認項目は重ならない。検証の check-rules は基準値を持つ4つを必ず含む（design-spec 6.0.8） |
+| AD6 validate | — | `200 { errors: { code: string; message: string; nodeId: UUID | null }[]; warnings: { code: "removed_keys"; keys: string[] }[] }` | 公開をふさぐエラー: 設問が0件（`no_questions`）、セクションの `part` の過不足（`invalid_part`。プランは A / B が必須、他は無し）、設問 ID の形式（`invalid_question_key`）・セクションとの不一致（`question_key_section_mismatch`）・重複（`duplicate_question_key`）、テンプレートの種類の回答が持てない回答の型（`answer_type_mismatch`。使える型は、自己分析が長文・短文・選択・金額＋理由（`self_analysis_answers` の `text`・`amount`）、検証が長文・短文・選択（`validation_answers` の `text`）、プランが長文・短文・選択・表（`plan_answers` の `text`・`rows`）と、回答を持たずに検証の数字と実行管理の項目を出す主要指標・実行管理（5.9 `PlanItem` の `metrics`・`execution`）。回答のテーブルは 6.3、11 の回答の型は design-spec 6.2）、`answerType` と `options` の食い違い（`options_mismatch`。選択肢・表の列・主要指標が空のときも）、`displayCondition` が存在しない設問を指す（`unknown_condition_key`）、プランの小項目が `copy_from` の写すものを持てない（`copy_from_mismatch`。条件は 6.3 末尾）、プランのテンプレートの Pitch Deck に、上限の件数の素材で本文の下端で切れるスライドがある（`pitch_deck_overflow`。design-spec 6.14。1分版と5分版のそれぞれで、スライドごとに1つ。`nodeId` はそのスライドの「Edit source」の移動先のセクションで、テンプレートにそのセクションが無ければ null。素材は、すべての文を最小の大きさで1行に収まる短い文にし（英語の文と日本語の文のそれぞれで組み、どちらかで切れれば出す）、リストは 6.14 の上限の件数、金額は 6.14 の折り返さない範囲の値にし、計算した指標（Break-even / day・Payback・ROI）は、6.14 で測ったときの値、6.14 の大きな表示（「99,999.9+」・「9,999.9+ months」・「≈ −9,999.9%」を同時に）、貢献利益が0以下のとき（貢献利益と貢献利益率が負で、3つとも「Contribution margin is zero or negative…」）、期待シナリオの営業利益が0以下のとき（Payback が「Not recovered: …」。ほかの2つは 6.14 で測ったときの値と、大きな表示の2通り）のそれぞれで組み（どれかで切れれば出す。変わるのは数字を出すスライドだけ。`packages/domain` の `PITCH_TEMPLATE_FIGURES`）、API の PDF のフォントで測る（ADR-012）。文を切れば収まるかを見るので、回答の長さではなく、テンプレートの文章の小項目の数と小項目のタイトルで決まる）。警告: 前の版から消えた ID |
 | AD6 publish | — | `200 { versionNumber: number; publishedAt: DateTime }` | 検査のエラーがあれば `422 TEMPLATE_INVALID`。既存の回答は変わらない |
-| AD7 users | `?q=&status=&cursor=` | `200 Page<AdminUser>` | 中身（アイデア・回答）は返さない |
-| AD7 workspaces | `?q=&cursor=` | `200 Page<AdminWorkspace>` | |
-| AD7 invitations | `?status=&cursor=` | `200 Page<Invitation>` | |
-| AD8 | — | `200 AdminUser` | 停止: セッションを全部消す。通知を作らない。再開で元どおり。自分自身は停止できない（`422 CANNOT_SUSPEND_SELF`） |
-| AD9 | `{ email: string; workspaceId?: UUID; role?: Role }` | `201 { invitation: Invitation; link: string }` | `workspaceId` があれば `role` は必須。`workspaceId` なしの招待は `grantsAdmin = false`（受諾した人は運営者にならない）。招待のメールを送り、リンクは応答にも返す（運営者が直接渡せる。2026-10-03 のユーザーの決定。5.5）。期限・メールの送り方・エラー・回数制限は W4 POST と同じ: 期限は design-spec 6.16、`409 ALREADY_MEMBER`（`workspaceId` があり、すでにメンバー）、`409 INVITATION_PENDING`（同じメールあての、同じワークスペース（またはワークスペースなし）の有効な招待がある）、Resend に届かなければ招待も作らず `503 UPSTREAM_UNAVAILABLE`、運営者ごとに W4・W5 と合わせて1時間20回（7.2） |
+| AD7 users | `?q=&status=active|suspended|deleted&cursor=&limit=` | `200 Page<AdminUser>` | 中身（アイデア・回答）は返さない。削除したユーザーを最後に、ほかは表示名の順（大文字と小文字を区別しない）。`q` は表示名かメールに含まれる文字（大文字と小文字を区別しない） |
+| AD7 workspaces | `?q=&cursor=&limit=` | `200 Page<AdminWorkspace>` | 名前の順（大文字と小文字を区別しない）。`q` は名前に含まれる文字（大文字と小文字を区別しない）。`ideaCount` はアーカイブしたアイデアを含み、作成を取り消したアイデアを含まない。`owners` は表示名の順 |
+| AD7 invitations | `?status=pending|all&cursor=&limit=` | `200 Page<Invitation>` | すべてのワークスペースと、ワークスペースなしの招待。新しい順。`status` は W4 GET と同じ（既定は `pending`）。`invitedBy` に `former_member` を付けない（5.2 UserRef） |
+| AD8 | — | `200 AdminUser` | 停止: セッションを全部消す。通知を作らない。再開で元どおり。自分自身は停止できない（`422 CANNOT_SUSPEND_SELF`）。停止済みの停止と、有効な人の再開は何も変えずに `200`。削除したユーザーは操作できない（`404 NOT_FOUND`。design-spec 6.17）。そのユーザーの lock（7.1「停止・削除したユーザー」の advisory lock）を排他で取り、ユーザーの行をロックしてから状態を変える（本人の書き込みとログインの後の処理と行き違わない） |
+| AD9 | `{ email: string; workspaceId?: UUID; role?: Role }` | `201 { invitation: Invitation; link: string }` | `workspaceId` があれば `role` は必須で、無ければ `role` を送れない（どちらも `422 VALIDATION_FAILED`、`details[0].path` は `role`）。無いワークスペースは `404 NOT_FOUND`。`link` は招待のメールと同じリンク（5.5）。`workspaceId` なしの招待は `grantsAdmin = false`（受諾した人は運営者にならない）。招待のメールを送り、リンクは応答にも返す（運営者が直接渡せる。2026-10-03 のユーザーの決定。5.5）。期限・メールの送り方・エラー・回数制限は W4 POST と同じ: 期限は design-spec 6.16、`409 ALREADY_MEMBER`（`workspaceId` があり、すでにメンバー）、`409 INVITATION_PENDING`（同じメールあての、同じワークスペース（またはワークスペースなし）の有効な招待がある）、Resend に届かなければ招待も作らず `503 UPSTREAM_UNAVAILABLE`、運営者ごとに W4・W5 と合わせて1時間20回（7.2） |
 | AD10 | `?kind=<TemplateKind>`（26 で選んだテンプレート）。本体は下の「テンプレートのファイル」（`Content-Type: application/json`。大きさは design-spec 6.0.8） | `201 { versionId: UUID; kind: TemplateKind; versionNumber: number }` | ファイルの中身で、そのテンプレートの下書きの版を作る（26 は作った下書きを 27 で開く）。テンプレートの行がまだ無ければ作る（名前はファイルの `name`）。版が1つも無ければ v1 の下書き、あれば次の番号の下書き。直したファイルの取り込み直しもできる: 下書きが無ければ、前の版から何もコピーせずにファイルの中身だけで新しい下書きを作る。下書きがすでにあれば `409 DRAFT_EXISTS`（下書きは1つのテンプレートに1つまで。その下書きを 27 で直して公開してからでないと取り込めない。design-spec 6.17）。ファイルの `kind` が `?kind=` と違う・形が違えば `422 VALIDATION_FAILED`（`details` に場所）。各値の長さと範囲は design-spec 6.0.8 の 27 の行で検査し、検証とプランのファイルの `aiPrompt` が空でなければ `422 VALIDATION_FAILED`（AI 用プロンプトを持つのは自己分析だけ）。中身の検査と公開は AD6（検査のエラーがあれば公開できない） |
 
 ### 5.14 死活確認
@@ -2310,7 +2341,7 @@ export const changeHistory = pgTable("change_history", {
 
 `template_questions` の `copy_from` と `reference` の形（どちらもプランの小項目だけが持つ）:
 
-- `copy_from`: 文字列の配列。要素は設問 ID（`V.01.WHO`）か疑似キー（`IDEA.ONE_LINE_CONCEPT`・`IDEA.PROPOSED_SOLUTION`・`LIST.ASSUMPTIONS`・`LIST.RISKS`）。要素が複数なら、書かれた順に空行でつないで1つの文章にする。`LIST.*` は表の小項目の `rows` にする（`LIST.RISKS` の Trigger / Indicator は null）。空の回答は飛ばす。写した文章が design-spec 6.0.8 の上限を超えても切らずに保存する。その欄の P5 は、上限以内に短くした内容だけを受け付ける（超えたままなら `422 VALIDATION_FAILED`。同じ項目のほかの欄は保存でき、表は変えたセルだけを検査する）
+- `copy_from`: 文字列の配列。要素は設問 ID（`V.01.WHO`）か疑似キー（`IDEA.ONE_LINE_CONCEPT`・`IDEA.PROPOSED_SOLUTION`・`LIST.ASSUMPTIONS`・`LIST.RISKS`）。要素が複数なら、書かれた順に空行でつないで1つの文章にする。`LIST.*` は表の小項目の `rows` にする（`LIST.RISKS` の Trigger / Indicator は null）。列のキーは、`LIST.ASSUMPTIONS` が `assumption`・`why_we_believe_it`・`evidence`・`what_would_disprove_it`、`LIST.RISKS` が `risk`・`probability`・`impact`・`mitigation`・`trigger_indicator`（正は `packages/schemas` の `PLAN_LIST_COLUMNS`）。行は 16 の順（リスクは自動の並び）。Evidence は、付けた順の根拠（URL は「{URL}」かメモ付きで「{URL} ({メモ})」、調査ログは「{日付} {トピック}」で日付が無ければトピックだけ、削除済みの調査ログは書かない）と自由記述を「; 」でつないだ文。Probability / Impact は原本の値（Low / Medium / High）。`LIST.*` を写す小項目は、その列のキーをすべて持つ表で、`copy_from` はその疑似キー1つだけ。文章を写す小項目は長文か短文の型（どちらも AD6 の検査 `copy_from_mismatch`）。空の回答は飛ばす。写した文章が design-spec 6.0.8 の上限を超えても切らずに保存する。その欄の P5 は、上限以内に短くした内容だけを受け付ける（超えたままなら `422 VALIDATION_FAILED`。同じ項目のほかの欄は保存でき、表は変えたセルだけを検査する）
 - `reference`: 次の指定の配列。項目の参照は、その項目の小項目の `reference` の和集合で、各指定は最も関係の深い小項目に置く。`kind` は 5.9 の `PlanReference.kind` と同じ
 
 | 指定 | 内容 |
@@ -2323,7 +2354,7 @@ export const changeHistory = pgTable("change_history", {
 | `{ kind: "metrics", keys }` | 主要指標（design-spec 6.4 のキー） |
 | `{ kind: "decision_log" \| "go_no_go_history" \| "assumptions" \| "risks" \| "totals" }` | キーを持たない参照。`totals` は表の小項目の持分と出資の合計 |
 
-`plan_versions.snapshot` の形: `{ header: { name, businessName, preparedBy }, answers: { questionKey, text, rows }[], keyMetrics, scenarios, execution: { type, title, status, dueDate, assigneeUserId, assigneeName, ... }[], competitors: { name, type, typicalPrice, strength, weakness }[] }`。`answers` は版を保存した時点の30項目の文章で、`keyMetrics` は `buildKeyMetrics()`、`scenarios` は `EconomicsResult.scenarios`、`competitors` は検証の上位5件（`sortOrder` の順）。スナップショットに何を持つかの正はここ（design-spec の M3 はここを参照する）。「+ changes」（5.9 `hasChangesSinceVersion`）は、版の保存より後に更新された回答・表・ヘッダ・実行管理の項目があるか（`updated_at` と `saved_at` の比較）で決める。
+`plan_versions.snapshot` の形: `{ header: { name, businessName, preparedBy }, answers: { questionKey, text, rows }[], keyMetrics, scenarios, execution: { id, type, title, status, dueDate, assigneeUserId, assigneeName, ..., fromPreset, completedAt, kpiActualUpdatedAt, sortOrder }[], competitors: { name, type, typicalPrice, strength, weakness }[] }`（`execution` の `...` は変更履歴と同じ項目の中身の列。形の正は `packages/db/src/history-values.ts` の `executionItemContent`。`id` は版の表示中もその項目へのコメントを数えるため）。`answers` は版を保存した時点の30項目の文章で、`keyMetrics` は `buildKeyMetrics()`、`scenarios` は `EconomicsResult.scenarios`、`competitors` は検証の上位5件（`sortOrder` の順）。スナップショットに何を持つかの正はここ（design-spec の M3 はここを参照する）。「+ changes」（5.9 `hasChangesSinceVersion`）は、版の保存より後に更新された回答・表・ヘッダ・実行管理の項目があるか（`updated_at`（削除は `deleted_at`）と `saved_at` の比較）で決める。版の保存と内容の書き込みはプランの行のロックで直列になるが、時刻はロックを待つ前に取り、インスタンスの時計もずれうる。比較が書き込みの順と合うように、ロックの中で時刻をそろえる: 版の `saved_at` は保存する内容の最後の更新と前の版の保存より後に、内容を変える書き込み（P2 PATCH・P5・P9・P10、担当の置き換え、のちの AI 取り込み・元に戻す・移行も）の時刻は最新の版の `saved_at` より後にする（1ミリ秒ずらす）。
 
 **画面と節の対応**（`change_history.section_key`・`comments.section_key`。H1 と C1 の画面の指定で、`sectionKeys` に渡す値）:
 
@@ -2345,7 +2376,7 @@ export const changeHistory = pgTable("change_history", {
 
 検証の回答の `section_key` は設問 ID の節（`V.04.SURVIVOR_PATTERNS` なら `04`）。
 
-**`change_history` の列の決め方**（ADR-020 の `withHistory`）: `workspace_id` と `owner_user_id` は画面（`container`）から決める（自己分析は `workspace_id` が null で `owner_user_id` が持ち主、それ以外は `workspace_id` が画面のワークスペースで `owner_user_id` は null）。`container_type`・`container_id`・`section_key` は対象から決める（上の表）。`action`（作成・更新・論理削除・削除の取り消し）・`source`・`batch_id`・`client`・`changed_by_id` は呼び出し元が渡す。`reverted_from_id` は H2・H3 だけが渡す（戻した元の行）。`before`・`after` は本体を変える処理が返した値。
+**`change_history` の列の決め方**（ADR-020 の `withHistory`）: `workspace_id` と `owner_user_id` は画面（`container`）から決める（自己分析は `workspace_id` が null で `owner_user_id` が持ち主、それ以外は `workspace_id` が画面のワークスペースで `owner_user_id` は null）。`container_type`・`container_id` は呼び出し元が画面として渡し、`withHistory` が対象と合うかを確かめる（対象の種類がその画面に出るか。回答・数字・プランのヘッダ・テンプレートの版は、対象の id が画面の id と同じか。アイデアの概要も同じだが、作成の取り消しの行（5.11）だけは元の側のアイデアの画面に書く。Pitch Deck は変更履歴を持たない）。`section_key` は対象から決める（上の表）。`action`（作成・更新・論理削除・削除の取り消し）・`source`・`batch_id`・`client`・`changed_by_id` は呼び出し元が渡す。`reverted_from_id` は H2・H3 だけが渡す（戻した元の行）。`before`・`after` は本体を変える処理が返した値。
 
 ### 6.4 保存しないもの（毎回計算・生成する）
 
@@ -2405,10 +2436,10 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 追加の決まり:
 
-- **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は、ロールにかかわらず 409 `ARCHIVED`（コメントを書く・元に戻すを含む。Viewer の編集も 403 ではなく 409。design-spec 6.8）。ただしワークスペースのメンバーではない人には、先に 403 `NO_ACCESS` を返す。確認は書き込みの最後（更新日時の更新）でもう一度行い、確認と書き込みのあいだにアーカイブされても書き込みは残らない。読む・複製・Restore・Pitch Deck はできる。
+- **アーカイブ**: アーカイブしたアイデア・プランの中身を変える操作は、ロールにかかわらず 409 `ARCHIVED`（コメントを書く・元に戻すを含む。Viewer の編集も 403 ではなく 409。design-spec 6.8）。ただしワークスペースのメンバーではない人には、先に 403 `NO_ACCESS` を返す。確認は書き込みの最後（中身が変わったときは更新日時の更新）でもう一度行い、確認と書き込みのあいだにアーカイブされても書き込みは残らない（仕組みは下の「実装」）。読む・複製・Restore・Pitch Deck はできる。
 - **運営者**: `is_admin` で開けるのは運営者の画面（AD1〜AD10）と、すべての招待の再送・取り消し（W5・W7）だけ。ワークスペースの中身は、そのワークスペースに所属しているときだけ、所属のロールのとおりに見られる（design-spec 2.1）。運営者はサービスの管理者で、信頼する前提にする（2026-10-03 のユーザーの決定）: 運営者は AD9 で自分あてに、ワークスペースを指定した招待を出し、そのリンクから受諾すれば、そのワークスペースの Member 以上に入れる（AD9 は運営者にリンクを返す。5.5）。これを塞ぐ仕組みは作らない。見られるのは、入ったあとの所属のロールの範囲になる。`is_admin` を直接変える API は無い。付くのは `make admin-create` の招待（`grants_admin = true`）から登録・受諾したときとシードだけで、AD9 の招待では付かず、外す API も無い。
-- **停止・削除したユーザー**: セッションを消し、ログインを拒否する。残ったリクエストも、認証のミドルウェアが `users.status` を確かめて 401 にする。
-- **実装**: 認可は、ルートごとの宣言でまとめて行う。`scoped: { to, need }` は、`to` でリソースの引き方（パスのパラメーターの名前、または Query・本文から引く関数）を宣言し、プラグインが共通の関数 `resolveScope`（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）でワークスペースとロールを求め、`need`（読む / 書く / アーカイブ済みでなければ書く / Owner）を満たさなければ拒否してから、ハンドラーに `scope` を渡す。プランのアーカイブと復元だけは、そのプラン自身のアーカイブ済みの印では止めず、アイデアのアーカイブ済みでは止める。`resolveScope` は、論理削除したアイデア・プラン（作成の取り消し。5.11）を無いものとして 404 にし、書き込みの最後の確認でも同じに扱う。自己分析のようにワークスペースを持たないものがあるルートは `located`（`scope` が null になりうる）を使う。ワークスペースを持たない他のルートは `open`（セッション不要）・`signedIn`（自分のデータだけ）・`operator`（運営者）を宣言する。宣言の無いルートがあれば API は起動しない。クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
+- **停止・削除したユーザー**: セッションを消し、ログインを拒否する。残ったリクエストも、認証のミドルウェアが `users.status` を確かめて 401 にする。U7 が消す・置き換える行を、本人の要求で作る・変える書き込み（所属を作る W0・U6、招待を出す W4・W5・AD9、プロフィール・写真・パスワードの U2・U3・U8、自己分析の S1〜S5。後から足す書き込みも同じ）は、ユーザーごとの advisory lock を取ってから `users.status` をもう一度確かめる（`active` でなければ 401 `UNAUTHENTICATED`）。U7 はこの lock を排他で、ほかの書き込みは共有で取る（本人の書き込みどうしは待たせない。U8 は同時の U8 を1つにするため排他）。認証のミドルウェアを通った後に U7 が終わっても、削除したアカウントの所属・招待・写真・パスワード・自己分析が残らないようにするため。Better Auth が書くもの（ログインのセッション、A7 が Google だけの人に作るパスワード）は、ログインの後の処理（5.4「ログインの制限」）がユーザーの行をロックした後に `users.status` を確かめて `ACCOUNT_SUSPENDED` で拒否し、書いた後のフック（`databaseHooks` の `create.after`）でもユーザーの行を `FOR SHARE` で読み、`active` でなければ書いた行を消す（U7 はこの行を、セッションとパスワードを消す前からコミットまでロックする）。
+- **実装**: 認可は、ルートごとの宣言でまとめて行う。`scoped: { to, need }` は、`to` でリソースの引き方（パスのパラメーターの名前、または Query・本文から引く関数）を宣言し、プラグインが共通の関数 `resolveScope`（例: `resolveScope({ ideaId })` → `{ workspaceId, role, ideaArchived, planArchived }`）でワークスペースとロールを求め、`need`（読む / アーカイブ済みでなければコメントする（ロールを問わない。コメントを書く・スレッドの解決） / 書く / アーカイブ済みでなければ書く / Owner）を満たさなければ拒否してから、ハンドラーに `scope` を渡す。プランのアーカイブと復元だけは、そのプラン自身のアーカイブ済みの印では止めず、アイデアのアーカイブ済みでは止める。`resolveScope` は、論理削除したアイデア・プラン（作成の取り消し。5.11）と UUID でない id を無いものとして 404 にし、書き込みの最後の確認でも論理削除を同じに扱う。自己分析のようにワークスペースを持たないものがあるルートは `located`（`scope` が null になりうる）を使う。ワークスペースを持たない他のルートは `open`（セッション不要）・`signedIn`（自分のデータだけ）・`operator`（運営者）を宣言する。宣言の無いルートがあれば API は起動しない（宣言の無いルートや2つ以上宣言したルートの名前を1行の JSON のログに書いて終わる）。確かめる順: 入口のプラグインの検査（7.2 の CSRF と本体の大きさ、JSON として読めない本体の 400）の後、本体の型の検査（422）の前にセッションを確かめる（未ログインは、本体の型が合わなくても 401）。リソースの引き当てと `need` の確認は本体の検査の後（引き方が本体を読むことがあるため）で、順は 404 `NOT_FOUND` → 403 `NO_ACCESS` → 409 `ARCHIVED` → 403 `FORBIDDEN`。ワークスペースの中の書き込みは、1つのトランザクションの初めにアイデア、プランの順にその行をロックし（`FOR NO KEY UPDATE`。プランの行を自分でもロックする書き込み（プランのヘッダ・アーカイブ）と、ほかの書き込みのあいだのデッドロックを避ける）、最後にアーカイブと論理削除をもう一度確かめる。ワークスペースの中の何かが変わったとき（変更履歴・コメント・決定ログを書いた、アーカイブの状態・ワークスペースの設定・メンバーを変えたなど）だけ、その確認と同じ文でアイデア（プランの中の書き込みはプランも）の `last_activity_at` を、続けてワークスペースの `last_active_at` を更新する（値を変えない保存は最終利用日も変えない）。書き込みがロックを持つあいだ、アーカイブはその終わりを待ち、作成の取り消しは待たずに 409 `BUSY` を返す（5.11）。書き込みより先に終わったアーカイブ・作成の取り消しは最後の確認で見つかり、書き込みは 409 `ARCHIVED`・404 `NOT_FOUND` で何も残さない。クエリは必ずそのワークスペースで絞る（他のワークスペースの ID を指定しても読めないようにする）。自己分析は `self_analyses.user_id = ログイン中のユーザー` で絞る。結合テストで、この表のエンドポイント × ロールをすべて確かめる（10章）。
 
 ### 7.2 その他の設計判断
 
@@ -2418,12 +2449,12 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | シークレット | 置き場所の方針は ADR-027、CI の置き場所の一覧は2章「CI のシークレットと変数」が正。local は `.env`（コミットしない。`.env.example` だけコミットする）。staging / production の API のシークレットは Secret Manager から Cloud Run の環境変数として渡す。ローテーションの手順は 05_operation-runbook.md |
 | CSRF | Better Auth はオリジンを確かめる（`TRUSTED_ORIGINS`）。`/api/v1` の状態を変えるリクエストは `Content-Type: application/json`（写真は `multipart/form-data`）に限り、`Origin` ヘッダーがあれば `TRUSTED_ORIGINS` と一致するかを確かめる（合わなければ 403 `FORBIDDEN`）。本体の無い POST・DELETE にも同じ決まりを適用する（Web のクライアントは、本文が無くても `application/json` を付ける）。`multipart/form-data` は `PUT /api/v1/me/avatar`（U3）だけに許す。JSON の1MB は `Content-Length` と実際に読んだ長さの両方で確かめる（`/api/auth/*` は入口のプラグインが確かめる。ADR-029）。Cookie は SameSite=Lax |
 | CORS | 使わない（Web と API は同じオリジン。ADR-004）。CORS のヘッダーを返さないので、他のオリジン（Cloud Run の `*.run.app` の URL を含む）からのブラウザのリクエストは届かない。local は Vite の転送で同じオリジンにする |
-| レート制限 | 仕組みは ADR-029（Better Auth と入口のプラグインの2段）。秘密を受け取る認証のパス（Better Auth の6パスと U5。5.4）は、IP ごとに1つの枠で1分10回（DB に記録）。DB の死活確認（Z2）は IP ごとに1分10回。アプリの API は、次の上限を同じ仕組みで持つ。ユーザーごと: 招待の送信・再送（W4・W5・AD9）1時間20回（Resend の1日100通を守る）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3。X2 は既存の内容を読むだけなので数えない）、アカウントの削除のパスワード確認（U7）10分5回。超えたら 429 `RATE_LIMITED` |
-| 呼び出し元の IP | 入口のプラグインが、リクエストごとに1回だけ決める: `X-Forwarded-For` の右端の値。無ければ接続元のアドレス。決めた値は、回数制限（ADR-029）・Better Auth（`X-Moonx-Client-Ip` に付け直して読ませる。クライアントが同じ名前のヘッダーを送っても上書きする）・アクセスログの `clientIp`（8.3）・セッションの IP のすべてが使う。左側の値はクライアントが自由に書けるので使わない。Google は公式の説明（Cloud Run functions のリクエストのヘッダー）で「`X-Forwarded-For` は経路の IP の一覧で、最初の値はふつうクライアント」とだけ書き、クライアントが送った値に Cloud Run が足すのかは書いていない。右端の値は、Cloud Run が足す場合も置き換える場合も、Cloud Run が見た接続元になる。インフラを作るステップで、staging に偽の `X-Forwarded-For` を付けたリクエストを送り、ログの `clientIp` が偽の値でないことを確かめてから使う（04_deployment-procedure.md）。local と e2e は前段が無く、Vite の転送も値を足さない（`xfwd` を付けない）ので、送った `X-Forwarded-For` の右端の値がそのまま使われる。e2e はテストごとに値を変えて送り、別の IP として数えさせる（03_dev-setup.md） |
+| レート制限 | 仕組みは ADR-029（Better Auth と入口のプラグインの2段）。秘密を受け取る認証のパス（Better Auth の6パスと U5。5.4）は、IP ごとに1つの枠で1分10回（DB に記録）。DB の死活確認（Z2）は IP ごとに1分10回。アプリの API は、次の上限を同じ仕組みで持つ。ユーザーごと: 招待の送信・再送（W4・W5・AD9）1時間20回（Resend の1日100通を守る。数えるのはメールを送った要求で、409・410 で断ったものと、Resend に届かなかったもの（503）は数えない。招待の lock の中で確かめた後に、同じトランザクションで数える）、PDF の作成 1時間30回、AI 書き出し・取り込み 1時間60回（数えるのは X1 と X3 の合計。X2 は既存の内容を読むだけなので数えない。X1 は 404・422 で断ったものを、X3 は反映しなかったもの（409・422 で断ったもの）を数えない。X3 は反映のトランザクションの中で数える）、アカウントの削除のパスワード確認（U7）10分5回。超えたら 429 `RATE_LIMITED`。入口のプラグインも Better Auth と同じ数え方をする。許したリクエストのたびに枠をそこから時間の幅だけ延ばし、許したリクエストの無いまま時間の幅が過ぎたら数え直す。こうすると、どの時間の幅の中でも上限を超えて通さない（最初のリクエストで枠を決めると、枠の境目で上限の倍近くを通してしまう）。`retryAfterSeconds` には、最後に許したリクエストから時間の幅が過ぎるまでの秒数を切り上げて入れる。IP ごとの上限は、Better Auth の既定と同じく、IPv6 のアドレスを先頭の /64 にまとめ、IPv4 射影アドレス（`::ffff:` で始まる）を IPv4 のアドレスとして数える（回線にはふつう /64 が割り当てられるので、その中でアドレスを変えても数え直しにならない）。時間の幅を過ぎた `app:` の行は、入口のプラグインが Cloud Run のインスタンスごと・上限ごとに、時間の幅に1回消す（残っていても無い行と同じに数えるので、結果は変わらない）。Better Auth の行（`app:` で始まらない）は、Better Auth の回数の保存先（5.4「回数制限」）が、インスタンスごとに Better Auth の最も長い時間の幅に1回、その幅を過ぎた行だけを消す |
+| 呼び出し元の IP | 入口のプラグインが、リクエストごとに1回だけ決める: `X-Forwarded-For` の右端の値。無ければ接続元のアドレス。決めた値は、回数制限（ADR-029）・Better Auth（`X-Moonx-Client-Ip` に付け直して読ませる。クライアントが同じ名前のヘッダーを送っても上書きする。決まらないときはヘッダーを消す。決まらないのは接続の無い呼び出し（テストの `app.handle`）だけ）・アクセスログの `clientIp`（8.3）・セッションの IP のすべてが使う。セッションの IP は、Better Auth が回数制限のキーと同じ形で持つ（IPv6 は先頭の /64 にまとめ、残りを 0 にする）。左側の値はクライアントが自由に書けるので使わない。Google は公式の説明（Cloud Run functions のリクエストのヘッダー）で「`X-Forwarded-For` は経路の IP の一覧で、最初の値はふつうクライアント」とだけ書き、クライアントが送った値に Cloud Run が足すのかは書いていない。右端の値は、Cloud Run が足す場合も置き換える場合も、Cloud Run が見た接続元になる。インフラを作るステップで、staging に偽の `X-Forwarded-For` を付けたリクエストを送り、ログの `clientIp` が偽の値でないことを確かめてから使う（04_deployment-procedure.md）。local と e2e は前段が無く、Vite の転送も値を足さない（`xfwd` を付けない）ので、送った `X-Forwarded-For` の右端の値がそのまま使われる。e2e はテストごとに値を変えて送り、別の IP として数えさせる（03_dev-setup.md） |
 | セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。ログアウトしたら、まだ保存できていない値（ADR-021）も捨てる |
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、形式と大きさは design-spec 6.0.8。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
-| セキュリティヘッダー | API が、静的ファイルを含むすべての応答に付ける（ADR-004）: `Content-Security-Policy`（`default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy`、`Strict-Transport-Security: max-age=31536000; includeSubDomains`（staging・production だけ。local は HTTP なので付けない）。環境ごとの値は meta 要素で渡し、インラインのスクリプトを使わない（ADR-004） |
-| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・アクセスログの呼び出し元の IP（Cloud Logging。保持は30日。11章）・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（運営者も、ワークスペースに所属していなければアプリから中身を見られない。自分あての招待で所属できることは 7.1「運営者」。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Vercel（DNS）のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は、利用者の情報・Cookie・ヘッダー・本文・クエリ・DB の値・スタックの変数をすべて集めない設定にする（設定の名前は使う版のドキュメントに合わせる）。さらにブレッドクラム（画面遷移の URL を記録する）はすべて捨て、イベントのリクエストのヘッダー・Cookie・クエリ文字列は消す。イベントに載る URL は、クエリ・フラグメント・招待のトークン（`/invite/<token>` のパス）を持たない）。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
+| セキュリティヘッダー | API が、静的ファイルを含むすべての応答に付ける（ADR-004）: `Content-Security-Policy`（`default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy: camera=(), geolocation=(), microphone=(), payment=(), usb=()`（アプリが使わない機能を止める。写真はファイルの選択で受け取るので、カメラの API は使わない）、`Strict-Transport-Security: max-age=31536000; includeSubDomains`（staging・production だけ。local は HTTP なので付けない）。環境ごとの値は meta 要素で渡し、インラインのスクリプトを使わない（ADR-004） |
+| 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・アクセスログの呼び出し元の IP（Cloud Logging。保持は30日。11章）・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（Google のログインのトークンは持たない。5.4「Google」。運営者も、ワークスペースに所属していなければアプリから中身を見られない。自分あての招待で所属できることは 7.1「運営者」。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Vercel（DNS）のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は、利用者の情報・Cookie・ヘッダー・本文・クエリ・DB の値・スタックの変数をすべて集めない設定にする（設定の名前は使う版のドキュメントに合わせる）。さらにブレッドクラム（画面遷移の URL を記録する）はすべて捨て、イベントのリクエストのヘッダー・Cookie・クエリ文字列は消す。イベントに載る URL は、クエリ・フラグメント・招待のトークン（`/invite/<token>` のパス）を持たない）。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
 | 依存の脆弱性 | GitHub の Dependabot のアラートを有効にする。Better Auth・Elysia・Drizzle のセキュリティ修正は速やかに取り込む（05_operation-runbook.md） |
 
 ### 7.3 パフォーマンス
@@ -2436,7 +2467,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | ハブの画面（V1・P2・D1） | p95 800ms 以内 | 検証1件分のデータを決まった数のクエリでまとめて読み（N+1 をしない）、`packages/domain` でメモリ上で計算する。アイデアの一覧は検証ごとのデータを `IN (...)` でまとめて読む。一覧はページに分ける（I1 は50件） |
 | 0台からの最初の応答 | 5秒以内（Cloud Run の起動＋Neon の起動） | Bun で起動を速くし、Cloud Run の起動時の CPU ブーストを有効にする。死活確認（Z1）は DB に触れない |
 | Web の最初の表示 | 4G のミドルクラスのスマホで LCP 2.5秒以内（Cloud Run が0台のときは、上の「0台からの最初の応答」の分を足す） | ランディングはプリレンダー。アプリはルートごとにコードを分割し、静的アセットはハッシュ付きのファイル名で長期キャッシュ（ADR-004）。2回目からは Service Worker のキャッシュから画面の外側を出す（ADR-031） |
-| PDF の作成（P13） | 5秒以内（12枚） | react-pdf をサーバーで実行。フォントは起動時に読み込んでおく |
+| PDF の作成（P13） | 5秒以内（14枚） | react-pdf をサーバーで実行。フォントは起動時に読み込んでおく |
 | DB の接続 | Neon のプールの上限を超えない | postgres.js のプールはインスタンスごとに最大5。Cloud Run は最大3台なので最大15接続 |
 | クライアントのデータ | 画面の移動を速くする | TanStack Query。一覧は `staleTime` 30秒、編集中の画面は保存の応答で該当のキャッシュだけを更新する。通知の未読数は60秒ごと |
 
@@ -2480,13 +2511,13 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 409 | `TEMPLATE_NOT_PUBLISHED` | 公開済みのテンプレートの版が無い（運営者がまだ取り込んでいない。I1 POST・S1 GET・P1 POST。AD10） |
 | 409 | `ARCHIVED` | アーカイブしたものを変えようとした |
 | 409 | `LAST_OWNER`・`CANNOT_LEAVE_PERSONAL`・`PERSONAL_OWNER`・`ALREADY_MEMBER`・`INVITATION_PENDING`・`INVITATION_ALREADY_ACCEPTED`・`EMAIL_TAKEN`・`PASSWORD_ALREADY_SET`・`DECISION_CHANGED`・`DECISION_NOT_PROCEED`・`NAME_TAKEN`・`HAS_EMPTY_QUESTIONS`・`ALREADY_LATEST`・`DRAFT_EXISTS`・`PUBLISHED_READ_ONLY` | 状態がその操作を許さない（5章） |
-| 410 | `INVITATION_INVALID` | 招待のトークンが無い・取り消し・期限切れ |
+| 410 | `INVITATION_INVALID` | 招待のトークンが無い・取り消し・期限切れ（U5 では受諾済みも） |
 | 413 | `PAYLOAD_TOO_LARGE` | 本体が大きすぎる（JSON は1MB、写真は design-spec 6.0.8 の上限。`Content-Length` が無い分割転送でも読んだ量で数える） |
 | 422 | `VALIDATION_FAILED` | 入力の検査に失敗（`details` に項目ごとの `path`・Zod の `code`・`message`。入力の値そのものは返さない） |
 | 422 | `FACT_REQUIRES_EVIDENCE`・`CONFIDENCE_REQUIRED`・`INVALID_CHOICE`・`QUESTION_NOT_FOUND`・`PERCENT_ONLY_FOR_VARIABLE`・`OUT_OF_RANGE`・`NOT_EDITABLE`・`INVALID_ASSIGNEE`・`INVALID_STATUS`・`MUST_BE_DONE_TO_SHARE`・`NOT_SHAREABLE`・`EMPTY_SCOPE`・`NOT_IMPORTABLE`・`REPLY_DEPTH`・`INVALID_MENTION`・`INVALID_QUESTION_KEY`・`TEMPLATE_INVALID`・`CANNOT_SUSPEND_SELF`・`CONFIRMATION_MISMATCH` | 業務の決まりに合わない（5章） |
 | 429 | `RATE_LIMITED` | 7.2 のレート制限 |
 | 500 | `INTERNAL` | 想定外のエラー（詳細は返さない） |
-| 502 / 503 / 504 | `UPSTREAM_UNAVAILABLE` | API が必要な依存先に届かないとき（Z2 の DB、招待のメールの送信）に API が 503 で返す。Cloud Run の前段が返す 502・503・504（本体がこの形でないもの。起動の失敗・タイムアウトなど）は、クライアントが `UPSTREAM_UNAVAILABLE` として扱う |
+| 502 / 503 / 504 | `UPSTREAM_UNAVAILABLE` | API が必要な依存先に届かないとき（Z2 の DB、招待のメールの送信、プロフィール写真の保存）に API が 503 で返す。Cloud Run の前段が返す 502・503・504（本体がこの形でないもの。起動の失敗・タイムアウトなど）は、クライアントが `UPSTREAM_UNAVAILABLE` として扱う |
 
 コードの一覧は `packages/schemas/src/errors.ts` に型として置き、API とクライアントが共有する。Better Auth のフックで拒否するとき（`INVITATION_REQUIRED`・`ACCOUNT_SUSPENDED`）は、Better Auth のエラーの `code` に同じ名前を入れる。
 
@@ -2512,7 +2543,8 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 - **リクエスト ID**: API の入口のプラグインがリクエストごとに UUID を作る（クライアントが送った `X-Request-Id` は使わない。ログに偽の値を入れさせないため）。全ログ行・エラーの応答・Sentry のタグに同じ値を入れ、応答のヘッダー `X-Request-Id` にも返す。
 - **アクセスログ**: 1リクエストに1行（`message: "request"`）。項目は ADR-023 のとおりで、`clientIp` は入口のプラグインが決めた呼び出し元の IP（7.2「呼び出し元の IP」）、`client` は 5.1「クライアントの種類」の値。
-- **レベル**: 4xx は `info`、5xx は `error`。ただし同じ IP からの 401・403 が1分に10回を超えたら、その後の 401・403 のアクセスログの行は `warn` にする（Cloud Run のインスタンスごとに数える。ログの水準を決めるだけなので、インスタンス間で数は合わせない）。5xx は、アクセスログの行（`message: "request"`）とは別に、`message: "request failed"` の行を `requestId`・`errorCode`・`errorName`・`errorMessage`・`stack` 付きで書く。DB のエラーは `pgCode` と `constraint` だけを出し、SQL とパラメーターは出さない（利用者の入力が入るため）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。
+- **レベル**: 4xx は `info`、5xx は `error`。ただし同じ IP からの 401・403 が1分に10回を超えたら、その後の 401・403 のアクセスログの行は `warn` にする（その応答を含めて直近の1分の数で決める。IP は 7.2「レート制限」と同じくまとめる。Cloud Run のインスタンスごとに数える。ログの水準を決めるだけなので、インスタンス間で数は合わせない）。5xx は、アクセスログの行（`message: "request"`）とは別に、`message: "request failed"` の行を `requestId`・`errorCode`・`errorName`・`errorMessage`・`stack` 付きで書く。DB のエラーは `pgCode` と `constraint` だけを出し、SQL とパラメーターは出さない（利用者の入力が入るため）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。Better Auth が自分で 5xx を返したとき（Better Auth の 5xx の `APIError`）も、入口のプラグインが `INTERNAL` として同じく扱い、その `APIError` を原因として失敗のログと Sentry に入れる。Better Auth の中で投げられた、Better Auth の応答でないエラーも同じく 500 `INTERNAL` になる。Better Auth が転送の応答に変えて返す失敗（Google の新規登録の後の処理の失敗は `/login?error=unable_to_create_user` への転送になる）は 5xx でないので Sentry に送らず、下の「Better Auth のログ」の行に `error` で残る。
+- **Better Auth のログ**: Better Auth の `logger` を API のロガーに通し、1行1つの JSON で `requestId` を付け、`message` を `better-auth: ` で始める。引数のエラーは `request failed` の行と同じ項目だけを出し、ほかの引数は出さない（利用者の値やメールが入りうるため）。
 - **探し方**: 利用者の画面の `Ref` → Cloud Logging で `jsonPayload.requestId` を検索 → 同じ ID の Sentry のイベント。手順は 05_operation-runbook.md。
 
 ---
@@ -2527,7 +2559,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。どの画面でも同じ、列挙の値（5.2）の表示名は `common` に置き、キーは `<まとまり>.<値>`（例: `common:stage.launch_prep`・`common:checkState.not_started`・`common:decision.proceed`）。キーの語は camelCase にし、API の値（列挙の値・`error.code`・セクションのキー）はそのまま使う（例: `common:check.competitorsRange`・`errors:VALIDATION_FAILED`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
 | 入力の検査の文言 | クライアントの Zod の検査（8.2）の issue の `code` から選ぶ。`too_small`・`too_big` は `origin`（文字数か数か）と `minimum`・`maximum`、`invalid_format` は `format`（`email`・`url`・`date`・`datetime`、テンプレートのファイルの `question_key`・`copy_source` など）、`invalid_type` は `expected`（`int` は整数でない数。ほかは型の違い）、`invalid_value` は選択肢に無い値、`packages/schemas` の自前の検査（`custom`）は `params.rule`（`InputRule` の型: `required`・`decimals`・`positive`・`nul_character`・`number_format`・`currency`・`time_zone`・`lone_surrogate`・`unique`（テンプレートのファイルで、キーや選択肢が重なる））を見て、カタログの文言を出す。26 のファイルの取り込み（AD10）は、`path` が `kind` の issue を「テンプレートの種類が違う」、それ以外の issue を「書式が読めない」としてまとめ、`path` で場所を添える（design-spec 6.17）。issue の `message` は開発者向けで、画面に出さない |
-| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatRelativeTime()`・`formatOverdue()`（期限切れの日数）・`formatWaitTime()`（回数制限の待ち時間）・`formatCheckName()`（確認項目の名前。競合の基準値の幅を付ける）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
+| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatIsoDateTime()`（AI 書き出しの時刻。タイムゾーンのオフセット付き）・`formatRelativeTime()`・`formatOverdue()`（期限切れの日数）・`formatWaitTime()`（回数制限の待ち時間）・`formatCheckName()`（確認項目の名前。競合の基準値の幅を付ける）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（ブラウザと Bun） |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |
@@ -2542,10 +2574,10 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 
 | レイヤー | ツール | カバレッジ目標 | 対象 |
 |---|---|---|---|
-| 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
+| 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`・`fitPitchDeck()`・`pitchNumbersBreak()`・`pitchTemplateOverflows()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
 | DB のスキーマとマイグレーション（`packages/db`・`scripts/db-check.ts`） | Bun test ＋ 実際の PostgreSQL（`db-check` は一時的な Git のリポジトリ） | — | 6.3 のコードと `schema.ts` がコメントと整形を除いて同じこと、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB の列・制約・インデックス・列挙が `schema.ts` から作った一時的なテーブルと PostgreSQL の表記で一致すること、`relations()` が外部キーと1対1に対応し、名前が `relations.ts` の先頭に書いた規則に従うこと、テスト用の DB の作り直しが `_test` で終わらない名前とクエリ文字列を拒むこと、`db-check` が2章の失敗の場合をすべて捕まえること |
-| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012） |
+| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012）、上限の件数の素材で Pitch Deck のどのスライドも本文の下端で切れないこと（英語の文と日本語の文、1分版と5分版、計算した指標が 6.14 の大きな表示でも計算できない主要指標の理由の文でも。PDF と同じフォントで測る。design-spec 6.14）、6.14 の範囲の金額と計算した指標で数字が折り返さないことと、範囲の外で 6.14 のとおりに折り返し、折り返しただけでは注意を出さないこと、6.14 が本文に収まるとする金額の外で5分版の Economics が本文の下端で切れて注意を出すこと、公開の前の検査（AD6 の `pitch_deck_overflow`）が、§20 に文章の小項目を足した版と小項目のタイトルを長くした版を、英語の文で溢れる場合も日本語の文だけで溢れる場合も断り、BCDX のプランのテンプレートとシードを通すこと |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作（axe の検査は E2E で行う。ADR-022） |
 | Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |
 | E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査 |

@@ -1,0 +1,54 @@
+{
+  "heading": {
+    "prompt": "Prompt",
+    "questions": "Questions",
+    "reference": "Reference (read-only)",
+    "howToReply": "How to reply"
+  },
+  "field": {
+    "question": "Question",
+    "example": "Example",
+    "choices": "Choices",
+    "currentAnswer": "Current answer",
+    "fau": "F/A/U",
+    "evidence": "Evidence"
+  },
+  "choiceSeparator": " / ",
+  "amount": {
+    "amount": "Amount",
+    "reason": "Why this amount?"
+  },
+  "empty": "(empty)",
+  "fauWithConfidence": "{{fau}} ({{confidence}})",
+  "evidence": {
+    "researchLog": "Research log {{date}} \"{{topic}}\"",
+    "researchLogUndated": "Research log \"{{topic}}\"",
+    "urlWithNote": "{{url}} ({{note}})",
+    "separator": "; "
+  },
+  "reply": {
+    "markdown": "Reply in Markdown. For each question you want to update, write one block:",
+    "placeholder": "<the final answer, in the same language I used>",
+    "reasonPlaceholder": "<why this amount, in the same language I used>",
+    "exactIds": "Use the exact IDs in square brackets.",
+    "onlyUpdated": "Only include questions you are updating.",
+    "noTranslation": "Do not translate my answers. Do not add F/A/U labels.",
+    "amounts": "For amount questions ({{keys}}), use \"### {{amount}}\" and \"### {{reason}}\" under the heading.",
+    "json": "Reply in JSON in the form of example: one item in answers for each question you want to update, with its exact id and the final answer as text, in the same language I used. Only include questions you are updating. Do not translate my answers. Do not add F/A/U labels.",
+    "jsonAmounts": "For amount questions ({{keys}}), give amount as a number and reason instead of text."
+  },
+  "reference": {
+    "keyNumbers": "Key numbers",
+    "checks": "Checks",
+    "competitors": "Competitors",
+    "researchLog": "Research log",
+    "assumptions": "Assumptions",
+    "risks": "Risks",
+    "confidence": "Confidence: {{value}}",
+    "probability": "Probability: {{value}}",
+    "impact": "Impact: {{value}}",
+    "strength": "Strength: {{value}}",
+    "weakness": "Weakness: {{value}}",
+    "separator": " · "
+  }
+}

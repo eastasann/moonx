@@ -40,7 +40,11 @@ const uniqueIssue = (path: PropertyKey[], message: string) => ({
   ...ruleIssue("unique"),
 });
 
-const flagRepeats = (
+/**
+ * Reports each entry whose value an earlier one already has, at its path, under the rule
+ * `unique`: keys the database keeps unique per version, or that answers are stored by.
+ */
+export const flagRepeats = (
   ctx: z.RefinementCtx,
   entries: readonly { value: string; path: PropertyKey[] }[],
   what: string,
@@ -115,6 +119,26 @@ export const PLAN_COPY_PSEUDO_KEYS = [
 ] as const;
 
 const pseudoKeys = new Set<string>(PLAN_COPY_PSEUDO_KEYS);
+
+/**
+ * The table columns the draft fills from 16's lists (SDD 6.3 `copy_from`): a sub-item
+ * that copies `LIST.ASSUMPTIONS` or `LIST.RISKS` is a table with these column keys.
+ */
+export const PLAN_LIST_COLUMNS = {
+  "LIST.ASSUMPTIONS": [
+    "assumption",
+    "why_we_believe_it",
+    "evidence",
+    "what_would_disprove_it",
+  ],
+  "LIST.RISKS": [
+    "risk",
+    "probability",
+    "impact",
+    "mitigation",
+    "trigger_indicator",
+  ],
+} as const;
 
 const formatIssue = (format: string, input: string, message: string) => ({
   code: "invalid_format" as const,
@@ -252,7 +276,8 @@ const sectionSchema = (kind: TemplateKind) =>
     questions: z.array(questionSchema(kind)),
   });
 
-const costDefaultSchema = z.strictObject({
+/** A starting cost row of a validation template (17), as a file or AD5 gives it. */
+export const templateCostDefaultSchema = z.strictObject({
   category: costCategorySchema,
   key: keyText,
   name: costRowNameSchema,
@@ -347,7 +372,7 @@ export const templateFileSchema = z
       kind: z.literal("self_analysis"),
       aiPrompt: plainText(longText),
       sections: z.array(sectionSchema("self_analysis")),
-      costDefaults: noneOf(costDefaultSchema),
+      costDefaults: noneOf(templateCostDefaultSchema),
       checkRules: noneOf(checkRuleSchema),
       executionPresets: noneOf(executionPresetSchema),
     }),
@@ -356,7 +381,7 @@ export const templateFileSchema = z
       kind: z.literal("validation"),
       aiPrompt: noAiPrompt,
       sections: z.array(sectionSchema("validation")),
-      costDefaults: z.array(costDefaultSchema),
+      costDefaults: z.array(templateCostDefaultSchema),
       checkRules: z.array(checkRuleSchema),
       executionPresets: noneOf(executionPresetSchema),
     }),
@@ -365,7 +390,7 @@ export const templateFileSchema = z
       kind: z.literal("business_plan"),
       aiPrompt: noAiPrompt,
       sections: z.array(sectionSchema("business_plan")),
-      costDefaults: noneOf(costDefaultSchema),
+      costDefaults: noneOf(templateCostDefaultSchema),
       checkRules: noneOf(checkRuleSchema),
       executionPresets: z.array(executionPresetSchema),
     }),

@@ -6,6 +6,10 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@moonx/i18n": "workspace:*",
     "@moonx/schemas": "workspace:*"
+  },
+  "devDependencies": {
+    "@moonx/ui-tokens": "workspace:*"
   }
 }

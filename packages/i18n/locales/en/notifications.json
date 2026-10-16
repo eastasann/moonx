@@ -1,0 +1,22 @@
+{
+  "title": {
+    "mention": "{{actor}} mentioned you on {{place}}",
+    "comment": "{{actor}} commented on {{place}}",
+    "validation_decision": "{{actor}} recorded {{value}} on {{place}}",
+    "go_no_go": "{{actor}} recorded {{value}} on {{place}}",
+    "version_saved": "{{actor}} saved the version “{{version}}” of {{place}}"
+  },
+  "place": {
+    "separator": " · ",
+    "ownSelfAnalysis": "your self-analysis",
+    "selfAnalysis": "{{name}}'s self-analysis"
+  },
+  "someone": "Someone",
+  "titleNoAccess": {
+    "mention": "{{actor}} mentioned you",
+    "comment": "{{actor}} commented",
+    "validation_decision": "{{actor}} recorded a decision",
+    "go_no_go": "{{actor}} recorded a Go / No-Go",
+    "version_saved": "{{actor}} saved a version"
+  }
+}

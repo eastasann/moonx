@@ -182,6 +182,48 @@ export const formatIsoDate = (value: DateInput, { timeZone }: ZoneOptions) => {
   return `${year}-${month}-${day}`;
 };
 
+const pad2 = (value: number) => String(value).padStart(2, "0");
+
+/**
+ * The wall-clock time in the user's time zone with its UTC offset, as the AI export
+ * writes when it was made (design-spec 6.6): "2026-10-01T10:00+08:00", or with
+ * `seconds` "2026-10-01T10:00:00+08:00". An instant, never a date-only value.
+ */
+export const formatIsoDateTime = (
+  value: Date | string,
+  { timeZone }: ZoneOptions,
+  { seconds = false }: { seconds?: boolean } = {},
+) => {
+  const date = typeof value === "string" ? new Date(value) : value;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value ?? "0");
+  const wall = new Date(0);
+  wall.setUTCFullYear(part("year"), part("month") - 1, part("day"));
+  wall.setUTCHours(part("hour"), part("minute"), part("second"));
+  const offset = Math.round(
+    (wall.getTime() - Math.floor(date.getTime() / 1000) * 1000) / 60_000,
+  );
+  const size = Math.abs(offset);
+  const time = [
+    part("hour"),
+    part("minute"),
+    ...(seconds ? [part("second")] : []),
+  ]
+    .map(pad2)
+    .join(":");
+  return `${formatIsoDate(date, { timeZone })}T${time}${offset < 0 ? "-" : "+"}${pad2(Math.floor(size / 60))}:${pad2(size % 60)}`;
+};
+
 /** A date: "Oct 1" this year, "Sep 30, 2025" before it (design-spec 1.2). */
 export const formatDate = (
   value: DateInput,

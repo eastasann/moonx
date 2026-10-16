@@ -747,7 +747,7 @@ API の段階（Step 7〜18）の docs の差分を見直して、ユーザー�
 
 ## Step 18c: API: Pitch Deck が上限の素材で収まらないときの決定
 
-Status:
+Status: done 2026-10-16
 
 ```
 Step 18b の 6（design-spec 6.14「すべてを1行にしても高さが足りないときは、本文の下端で切れて出し」）を確かめたら、

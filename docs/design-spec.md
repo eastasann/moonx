@@ -1849,7 +1849,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - プランから毎回生成する。スライドは直接編集しない。各スライドに「Edit source」（元の項目の 21 へ。Owner / Member）。数字の入るスライドには「Edit in validation」（17 / 18 へ。Owner / Member）も置く。版を指定して開いているとき、プラン・アイデアがアーカイブ済みのときは、どちらのリンクも出さない（遷移先が読み取り専用のため）。
 - スライドの型は4つ: 表紙（大きな見出しと副題）/ 文章（見出しと箇条書き。箇条書きの数は素材で決まる。下の決まり）/ 数字（見出しと大きな数字2〜4つ）/ 表（見出しと表）。各スライドの型は下の表のとおり。ロゴは置かず、Business Name を表紙とフッターに出す。
 - スライドへのコメントは「版の種類 + スライドのキー」で指す（例: `five.market`）。
-- 上部で **1分版（One-minute）/ 5分版（Five-minute）** を切り替える（原本 §30 の流れどおり）。
+- 上部で **1分版（One-minute）/ 5分版（Five-minute）** を切り替える（原本 §30 の流れどおり。ただし5分版は、原本の Execution plan を Execution plan と Launch plan の2枚に分ける）。
 - 上部で生成元を選ぶ: 「Latest」（今の内容）か、保存済みの版。
 - スライドの下に「話す内容」として §30 の One-minute / Five-minute explanation を出す（アプリの表示だけ。PDF には入れない）。
 - 画面のスライドも PDF と同じ見た目にするため、ダークモードでもライトの配色で出す（スライドの外側の画面はモードに従う）。
@@ -1868,7 +1868,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 7 | Why us（why_us・文章。箇条書きは1つ） | §10 Founder advantages |
 | 8 | Next step（next_step・文章） | §29 Next Actions（完了済みを除き、期限が近い順に最大3件。期限なしは最後。1つの箇条書きにまとめる）・§24 We proceed to launch if |
 
-5分版（12枚）:
+5分版（13枚）:
 
 | # | スライド | 素材 |
 |---|---|---|
@@ -1881,26 +1881,28 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 7 | Business model（business_model・数字） | §8 の文章の小項目、価格・変動費/件・粗利/件・粗利率 |
 | 8 | Economics（economics・表） | §20、シナリオ表（Conservative / Expected / Strong の件数/日・売上・営業利益）、初期費用、損益分岐、回収期間、ROI |
 | 9 | Why us（why_us・文章） | §10 Founder advantages・Missing capabilities・How will we fill the gaps?、§11 の表（各行を「Name (Role)」と並べて1つの箇条書きにする） |
-| 10 | Execution plan（execution・表） | §23 マイルストーン（期限順に最大6件）、§25 ローンチを時期の区分ごとにまとめた要約（区分の固定の名前で出す。Timing の文言を直しても変わらない） |
-| 11 | Risks（risks・表） | §22 の上位3件（Impact → Probability の順）と Mitigation |
-| 12 | Ask / next step（ask・文章） | §24 We proceed to launch if・We delay if・We stop / abandon if、§29 Next Actions（完了済みを除き、期限が近い順に最大3件。期限なしは最後。1つの箇条書きにまとめる）、§20 Trigger for additional funding |
+| 10 | Execution plan（execution・表） | §23 マイルストーン（期限順に最大6件） |
+| 11 | Launch plan（launch・文章） | §25 ローンチを時期の区分ごとにまとめた要約（区分の固定の名前で出す。Timing の文言を直しても変わらない） |
+| 12 | Risks（risks・表） | §22 の上位3件（Impact → Probability の順）と Mitigation |
+| 13 | Ask / next step（ask・文章） | §24 We proceed to launch if・We delay if・We stop / abandon if、§29 Next Actions（完了済みを除き、期限が近い順に最大3件。期限なしは最後。1つの箇条書きにまとめる）、§20 Trigger for additional funding |
 
 - 数字・表のスライドは、数字や表の下に注記の箇条書き（素材の文章の小項目）を持てる。注記は表のセルと同じ大きさで、文章スライドの箇条書きより小さい。
-- 箇条書きは、素材の名前（小項目のタイトル。§29 は「Next Actions」、§11 は「Founders」）を太字で前に置き、「Primary problem: …」と出す（§24 の3つの条件のように、名前が無いと区別できない素材があるため）。空の素材は「Frequency: Not written yet」のように名前を残し、「Not written yet」をグレーで出す。
+- 箇条書きは、素材の名前（小項目のタイトル。§29 は「Next Actions」、§11 は「Founders」、Launch plan は時期の区分の名前）を太字で前に置き、「Primary problem: …」と出す（§24 の3つの条件のように、名前が無いと区別できない素材があるため）。空の素材は「Frequency: Not written yet」のように名前を残し、「Not written yet」をグレーで出す。
 - 表紙: 見出しは Business Name、副題は §1 What is the business?。区切りの罫線の下に「Prepared by: …」「Date: …」「Version: …」の3行（Version は版の名前か「Draft」）。日付は、Latest はプランの最終更新日、版は保存日（20 の Date と同じ。利用者のタイムゾーンの日付で、書式は 1.2）。
 - 数字のスライド: 数字の上に太い罫線、下にラベルを置き、横に並べる。数字は途中で折り返さない（各列は数字かラベルの1行の幅で、余りを等分する。入らなければ文字を小さくする。最小でも入らないときだけ、列を数字とラベルの幅の比で分けて数字を折り返し、下の「Too long for this slide…」と同じ注意を出す）。計算できない主要指標は、6.4 の表示（「Empty」「Needs price」など）をラベルの大きさでグレーで出す（「Not written yet」にはしない。文なので単語の間で折り返す）。1分版の Business model は Price・Contribution / sale・Break-even / day、5分版は Price・Variable cost / sale・Contribution / sale・Contribution margin。
 - 表の列と幅の割合（API が列ごとに返す。SDD 5.9）: Competition は Name 25% / Type 18% / Price 15% / Strength 42%。
 - Economics: 上に Startup cost・Break-even / day・Payback・ROI の数字、その下にシナリオ表（行は Conservative / Expected / Strong、列は Scenario 28% / Units / day 20% / Revenue / month 26% / Operating profit / month 26%）、注記は §20 の文章の小項目。
-- Execution plan の表: マイルストーンの Milestone 22% / Goal 34% / Assignee 16% / Deadline 14% / Status 14%（期限順、期限なしは最後、最大6件）。ローンチの要約は注記で、時期の区分ごとに1つ（区分の名前は 6.13 の「T−30」「T−7」「Launch day」「First 30 days」「Days 31–90」「Other」）、その区分の行の Actions を並べる。Actions の無い区分は出さず、どの区分にも無ければ「Launch Plan: Not written yet」。
+- Execution plan の表: マイルストーンの Milestone 22% / Goal 34% / Assignee 16% / Deadline 14% / Status 14%（期限順、期限なしは最後、最大6件）。注記は持たない。
+- Launch plan: 時期の区分ごとに1つの箇条書き（区分の名前は 6.13 の「T−30」「T−7」「Launch day」「First 30 days」「Days 31–90」「Other」で、この順に出す）で、その区分の行の Actions を区分の中の並び順に「; 」でつなぐ。Actions の無い区分は出さず、どの区分にも無ければ「Launch Plan: Not written yet」の1つ。マイルストーンとローンチの要約は、上限の件数（マイルストーン6件・区分6つ）だと最小の文字でも1枚に収まらないので、素材を削らず、最小の文字の大きさ（`semantic.print` のトークン）も下げずに2枚に分ける（2026-10-16 のユーザーの決定）。
 - Risks の表: Risk 34% / Probability 13% / Impact 13% / Mitigation 40%。Impact、Probability の順に High・Medium・Low の高い順（それ以外の値は最後、同じなら §22 の行の順）。
 - 期限（§29 と Execution plan の Deadline）は 1.2 のとおり日付で出し、Done でないものの期限を過ぎていれば「Oct 13, overdue 2d」と日数を添える（「今日」は作った日の利用者のタイムゾーンの日付）。
 - 1つの箇条書きにまとめる素材: §29 は「Get supplier quote (Oct 13, overdue 2d); Book venue (Oct 17)」のように「Action (期限)」（期限なしは Action だけ）を「; 」でつなぐ。§11 は各行を「Name (Role)」（Role が空なら Name だけ、Name が空なら Role だけ）にして「; 」でつなぐ。
 - 各ページのフッター: 「Business Name · 版の名前か Draft · 日付」（Business Name が空なら省く）。
-- 文章スライドの箇条書きは、素材の欄に並べた小項目1つにつき1つ（2026-10-11 のユーザーの決定。数の上限は設けず、プランに書いたものを落とさない）。素材が空の小項目は「Not written yet」で出し、箇条書きを減らさない。§29 Next Actions は件数（0〜3件）にかかわらず1つの箇条書きにまとめ、0件なら「Not written yet」。例: 5分版の Problem・Customer・Solution は5つ、Ask は5つ、Why us は4つ、1分版の Next step は2つ。
+- 文章スライドの箇条書きは、素材の欄に並べた小項目1つにつき1つ（2026-10-11 のユーザーの決定。数の上限は設けず、プランに書いたものを落とさない）。Launch plan だけは、Actions のある時期の区分1つにつき1つ（1〜6。どの区分にも無ければ「Not written yet」の1つ。上の Launch plan の決まり）。素材が空の小項目は「Not written yet」で出し、箇条書きを減らさない。§29 Next Actions は件数（0〜3件）にかかわらず1つの箇条書きにまとめ、0件なら「Not written yet」。例: 5分版の Problem・Customer・Solution は5つ、Ask は5つ、Why us は4つ、1分版の Next step は2つ。
 - 1分版の Why us だけは §10 Founder advantages の1つだけを出す（2026-10-03 のユーザーの決定。「Missing capabilities」と「How will we fill the gaps」は載せない）。
-- 各スライドの「Edit source」の移動先は、表紙 §1、Problem §4、Customer §3、Solution §5、Why now §1、Market・Competition §6、Business model §8（Edit in validation は 18）、Economics §20（Edit in validation は 17）、Why us §10、Execution plan §23、Risks §22、Next step §29、Ask §24。
+- 各スライドの「Edit source」の移動先は、表紙 §1、Problem §4、Customer §3、Solution §5、Why now §1、Market・Competition §6、Business model §8（Edit in validation は 18）、Economics §20（Edit in validation は 17）、Why us §10、Execution plan §23、Launch plan §25、Risks §22、Next step §29、Ask §24。
 - 空の素材は、そのスライドに「Not written yet」とグレーで出す（PDF にも出す）。
-- 文章が長くて収まらないときは文字を小さくし（型ごとに最小の文字の大きさを決める。具体値は Phase 3 のデザイントークン）、それでも収まらなければ末尾を「…」で切り、アプリの表示だけに「Too long for this slide. Shorten it in the plan.」と出す。小さくするときは、スライドのすべての文字を `semantic.print.slide.shrink-step` ずつ同時に下げ、それぞれ最小で止める。切るときは、最も多くの行をとる文（同じなら後のもの）から1行ずつ減らし、どの箇条書き（表紙の3行を含む）と表のセルも1行は残す（箇条書きを消さない）。数字は切らない。すべてを1行にしても高さが足りないとき（素材の数が決まっているので、ふつうは起きない）は、本文の下端で切れて出し、同じ注意を出す。収め方は API が決め、画面と PDF は同じ大きさと同じ切り方で出す（SDD 5.9 `PitchDeck`）。
+- 文章が長くて収まらないときは文字を小さくし（型ごとに最小の文字の大きさを決める。具体値は Phase 3 のデザイントークン）、それでも収まらなければ末尾を「…」で切り、アプリの表示だけに「Too long for this slide. Shorten it in the plan.」と出す。小さくするときは、スライドのすべての文字を `semantic.print.slide.shrink-step` ずつ同時に下げ、それぞれ最小で止める。切るときは、最も多くの行をとる文（同じなら後のもの）から1行ずつ減らし、どの箇条書き（表紙の3行を含む）と表のセルも1行は残す（箇条書きを消さない）。箇条書きの素材の名前と数字（数字のスライドの数字と、表の数字の列のセル）は切らない。名前が「…」と合わせて1行に収まらなければ、その箇条書きは名前と「…」の行数を残し、セルに入らない数字は折り返す。BCDX のプランのテンプレートでは、上限の件数の素材（競合5・マイルストーン6・ローンチの区分6・リスク3・Next Actions 3、§11 の表、シナリオの表）でも、数字が折り返さないかぎり、文を切れば1分版と5分版のどのスライドも本文の高さに収まる（英語の文でも日本語の文でも。API のテストで確かめている）。すべてを切っても高さが足りないのは、テンプレートの §8・§20 に文章の小項目を足したとき、小項目のタイトルが長くて「…」と合わせて1行に収まらないとき、数字が折り返したときで、そのときは本文の下端で切れて出し、同じ注意を出す。収め方は API が決め、画面と PDF は同じ大きさと同じ切り方で出す（SDD 5.9 `PitchDeck`）。
 - 数字は生成元に合わせる（Latest は今の検証、版はスナップショットの値）。
 - ローディング: スライドの骨組み。PDF の作成中は「Preparing PDF…」。失敗したら再試行。
 
@@ -2124,7 +2126,7 @@ Phase 2 の深掘りは2つのセッションにまたがった（1回目は書�
 | プランの版 | 名前付きスナップショット（版の保存） | 同じ趣旨 |
 | §11 Founder Roles・§13 持分 | 自由入力、人数自由（メンバーと紐づけない） | 同じ |
 | §24 Go / No-Go | 条件は3つの文章、決定（Launch / Delay / Stop）は決定ログへ | 同じ趣旨 |
-| Pitch Deck | 1分版（8枚）と5分版（12枚）を切り替え | 2回目は「標準10枚」 |
+| Pitch Deck | 1分版（8枚）と5分版（13枚）を切り替え | 2回目は「標準10枚」 |
 | AI 書き出しの形式 | Markdown ＋ JSON（壁打ちで決定済み）。見出し規則・JSON のスキーマ・設問 ID は 6.6 の案で確定 | — |
 | データモデル | 確定し、Phase 3 で System Design Doc の6章へ移した | — |
 | チームのワークスペースの作成 | M7 の「New workspace」から誰でも作れる（作った人が Owner）。Phase 3 で抜けが見つかり決定 | — |

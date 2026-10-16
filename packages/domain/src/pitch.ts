@@ -339,13 +339,10 @@ const SLIDES: Record<PitchVariant, readonly SlideSpec[]> = {
       itemNo: 10,
       bullets: [...answers("P.10.1", "P.10.2", "P.10.3"), { kind: "founders" }],
     },
-    {
-      key: "execution",
-      type: "table",
-      itemNo: 23,
-      table: "milestones",
-      bullets: [{ kind: "launch" }],
-    },
+    // Two slides: six milestones and six launch groups do not fit one (design-spec
+    // 6.14, the user's decision of 2026-10-16).
+    { key: "execution", type: "table", itemNo: 23, table: "milestones" },
+    { key: "launch", type: "text", itemNo: 25, bullets: [{ kind: "launch" }] },
     { key: "risks", type: "table", itemNo: 22, table: "risks" },
     {
       key: "ask",

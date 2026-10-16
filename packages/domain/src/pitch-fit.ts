@@ -565,6 +565,11 @@ interface Block {
   cap: number;
   /** Lines counted beyond first-fit (CJK_EXTRA_LINES), which a cut keeps. */
   extra: number;
+  /**
+   * The fewest lines a cut leaves: a bullet's label is never cut, so one too long for a
+   * line keeps its lines, and "…" follows it.
+   */
+  floor: number;
   /** Its place in drawing order. */
   order: number;
   apply(text: string): void;
@@ -621,6 +626,18 @@ function layout(
       ? CJK_EXTRA_LINES
       : 0;
     const lines = wrap(segments, width * share, measure).length + extra;
+    const last = segments.at(-1);
+    const floor =
+      segments.length === 1 || last === undefined
+        ? 1 + extra
+        : wrap(
+            [
+              ...segments.slice(0, -1),
+              { text: i18n.t("pitch:ellipsis"), font: last.font },
+            ],
+            width * share,
+            measure,
+          ).length + extra;
     const made: Block = {
       segments,
       width: width * share,
@@ -628,6 +645,7 @@ function layout(
       lines,
       cap: lines,
       extra,
+      floor: Math.min(floor, lines),
       order: order ?? 0,
       apply,
     };
@@ -770,7 +788,8 @@ function layout(
             const target = slide.table?.rows[rowIndex];
             if (target !== undefined) target[columnIndex] = text;
           },
-          cell === null
+          // A number is never cut (6.14): it wraps instead, as breakSlideWords breaks it.
+          cell === null || column.numeric
             ? null
             : DRAWN.table +
                 (rowIndex * table.columns.length + columnIndex) / 1e6,
@@ -836,7 +855,7 @@ const copy = (slide: PitchSlide): PitchSlide => structuredClone(slide);
 /**
  * Fits one slide (design-spec 6.14): the first shrink level at which it fits; or, at the
  * smallest sizes, the texts cut from the one taking the most lines (the later one on a
- * tie) until it fits, each keeping at least one line.
+ * tie) until it fits, each keeping at least one line and its whole label.
  */
 export function fitPitchSlide(
   slide: PitchSlide,
@@ -859,7 +878,7 @@ export function fitPitchSlide(
     let longest: Block | undefined;
     for (const made of at.blocks) {
       if (
-        made.cap > 1 + made.extra &&
+        made.cap > made.floor &&
         (longest === undefined || made.cap >= longest.cap)
       ) {
         longest = made;

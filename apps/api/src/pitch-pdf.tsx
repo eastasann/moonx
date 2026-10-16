@@ -30,9 +30,16 @@ const BODY = [...print.font.body];
 const MONO = [...print.font.mono];
 
 /**
- * A slide's content keeps its height: Yoga would otherwise squeeze a slide taller than
- * the body, its lines overlapping. A slide the fit cannot fit (`overflow`) is cut at the
- * body's bottom instead.
+ * A slide's content, at the top of the body in a box of no height of its own: react-pdf
+ * sets each text in the height left to it, so a box the body's height would squeeze a
+ * slide taller than the body, its lines overlapping. A slide still too tall once every
+ * text is cut runs past the body's bottom and is cut there instead (design-spec 6.14).
+ */
+const UNBOUNDED = { position: "absolute", top: 0, left: 0, right: 0 } as const;
+
+/**
+ * The title slide is centred in the body, so it is set in it, keeping its height. Its
+ * texts cut to a line or two always fit the body.
  */
 const KEEP_HEIGHT = { flexShrink: 0 } as const;
 
@@ -47,16 +54,28 @@ function Bullet({
   size,
   slide,
   last,
+  measure,
 }: {
   bullet: PitchBullet;
   size: number;
   slide: PitchSlide;
   last: boolean;
+  measure: MeasureText;
 }) {
   const type = bulletTypography(slide.type, print);
+  const { contentWidth } = pitchFrame(print);
+  // The label is set as the fit measured it, a word wider than the line in pieces
+  // (breakSlideWords breaks the texts, which P12 also returns, but not the labels).
   const label = (
     <Text style={{ fontWeight: typography.heading.fontWeight }}>
-      {i18n.t("pitch:label", { label: bullet.label })}
+      {breakLongWords(
+        i18n.t("pitch:label", { label: bullet.label }),
+        { family: "body", weight: typography.heading.fontWeight, size },
+        slide.type === "title"
+          ? contentWidth
+          : contentWidth - frame.bulletIndent,
+        measure,
+      )}
     </Text>
   );
   const text = (
@@ -110,7 +129,15 @@ function Bullet({
   );
 }
 
-function Bullets({ slide, size }: { slide: PitchSlide; size: number }) {
+function Bullets({
+  slide,
+  size,
+  measure,
+}: {
+  slide: PitchSlide;
+  size: number;
+  measure: MeasureText;
+}) {
   return (
     <View>
       {slide.bullets.map((bullet, index) => (
@@ -121,6 +148,7 @@ function Bullets({ slide, size }: { slide: PitchSlide; size: number }) {
           size={size}
           slide={slide}
           last={index === slide.bullets.length - 1}
+          measure={measure}
         />
       ))}
     </View>
@@ -317,7 +345,7 @@ function SlideBody({
           style={{ height: frame.ruleWidth, backgroundColor: color.rule }}
         />
         {gap}
-        <Bullets slide={slide} size={sizes.bullet} />
+        <Bullets slide={slide} size={sizes.bullet} measure={options.measure} />
       </View>
     );
   }
@@ -327,7 +355,7 @@ function SlideBody({
     currency: options.currency,
   });
   return (
-    <View style={KEEP_HEIGHT}>
+    <View style={UNBOUNDED}>
       <Text
         style={{
           fontSize: sizes.heading,
@@ -364,7 +392,7 @@ function SlideBody({
         <Table table={slide.table} size={sizes.cell} />
       )}
       {slide.type !== "text" && slide.bullets.length > 0 ? gap : null}
-      <Bullets slide={slide} size={sizes.bullet} />
+      <Bullets slide={slide} size={sizes.bullet} measure={options.measure} />
     </View>
   );
 }

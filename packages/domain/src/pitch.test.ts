@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { formatMoney } from "@moonx/i18n";
 import type { MetricValue, ScenarioColumn } from "@moonx/schemas";
 import { print } from "@moonx/ui-tokens/print";
 import template from "../../../data/templates/bcdx/plan.json";
@@ -128,7 +129,7 @@ const slideOf = (deck: ReturnType<typeof buildPitchDeck>, key: string) => {
 };
 
 describe("buildPitchDeck: the slides", () => {
-  test("eight slides for one minute and twelve for five, in the order of 6.14", () => {
+  test("eight slides for one minute and thirteen for five, in the order of 6.14", () => {
     const one = buildPitchDeck(input({ variant: "one" }));
     expect(one.slides.map((slide) => [slide.key, slide.type])).toEqual([
       ["title", "title"],
@@ -152,6 +153,7 @@ describe("buildPitchDeck: the slides", () => {
       ["economics", "table"],
       ["why_us", "text"],
       ["execution", "table"],
+      ["launch", "text"],
       ["risks", "table"],
       ["ask", "text"],
     ]);
@@ -496,7 +498,7 @@ describe("buildPitchDeck: the slides", () => {
     expect(slide.editInValidation).toBe("costs");
   });
 
-  test("Execution plan: milestones by deadline, at most six, and the launch by timing", () => {
+  test("Execution plan: milestones by deadline, at most six, and no notes", () => {
     const milestones = Array.from({ length: 8 }, (_, index) =>
       item({
         type: "milestone",
@@ -509,44 +511,13 @@ describe("buildPitchDeck: the slides", () => {
         sortOrder: index,
       }),
     );
-    const launch = [
-      item({
-        type: "launch",
-        title: "Launch day",
-        launchTiming: "launch_day",
-        actions: "Deliver",
-        sortOrder: 2,
-      }),
-      item({
-        type: "launch",
-        title: "Renamed T-30",
-        launchTiming: "t_minus_30",
-        actions: "Sign the lease",
-        sortOrder: 0,
-      }),
-      item({
-        type: "launch",
-        title: "Also T-30",
-        launchTiming: "t_minus_30",
-        actions: "Order the oven",
-        sortOrder: 1,
-      }),
-      item({
-        type: "launch",
-        title: "Nothing to do",
-        launchTiming: "first_30",
-        sortOrder: 3,
-      }),
-      item({
-        type: "launch",
-        title: "Loose",
-        launchTiming: null,
-        actions: "Print flyers",
-        sortOrder: 4,
-      }),
-    ];
+    const launch = item({
+      type: "launch",
+      launchTiming: "launch_day",
+      actions: "Deliver",
+    });
     const slide = slideOf(
-      buildPitchDeck(input({ execution: [...milestones, ...launch] })),
+      buildPitchDeck(input({ execution: [...milestones, launch] })),
       "execution",
     );
     expect(slide.table?.rows.map((row) => row[0])).toEqual([
@@ -589,17 +560,71 @@ describe("buildPitchDeck: the slides", () => {
       "Oct 10, overdue 5d",
       "Oct 11",
     ]);
+    // The launch rows are on the next slide.
+    expect(slide.bullets).toEqual([]);
+    const none = slideOf(buildPitchDeck(input()), "execution");
+    expect(none.table?.rows).toEqual([]);
+    expect(none.bullets).toEqual([]);
+    expect(none.emptySources).toEqual(["Pre-launch Milestones"]);
+  });
+
+  test("Launch plan: one bullet per timing with actions, in the timings' order", () => {
+    // The groups go by timing, not by their rows' order; inside a group, by the rows'.
+    const launch = [
+      item({
+        type: "launch",
+        title: "Loose",
+        launchTiming: null,
+        actions: "Print flyers",
+        sortOrder: 0,
+      }),
+      item({
+        type: "launch",
+        title: "Launch day",
+        launchTiming: "launch_day",
+        actions: "Deliver",
+        sortOrder: 1,
+      }),
+      item({
+        type: "launch",
+        title: "Also T-30",
+        launchTiming: "t_minus_30",
+        actions: "Order the oven",
+        sortOrder: 3,
+      }),
+      item({
+        type: "launch",
+        title: "Renamed T-30",
+        launchTiming: "t_minus_30",
+        actions: "Sign the lease",
+        sortOrder: 2,
+      }),
+      item({
+        type: "launch",
+        title: "Nothing to do",
+        launchTiming: "first_30",
+        sortOrder: 4,
+      }),
+      item({ type: "milestone", title: "Not here", goal: "Goal" }),
+    ];
+    const slide = slideOf(
+      buildPitchDeck(input({ execution: launch })),
+      "launch",
+    );
+    expect(slide.title).toEqual({ text: "Launch plan", empty: false });
+    expect(slide.table).toBeNull();
+    expect(slide.numbers).toEqual([]);
     expect(slide.bullets).toEqual([
       { label: "T−30", text: "Sign the lease; Order the oven", empty: false },
       { label: "Launch day", text: "Deliver", empty: false },
       { label: "Other", text: "Print flyers", empty: false },
     ]);
-    const none = slideOf(buildPitchDeck(input()), "execution");
-    expect(none.table?.rows).toEqual([]);
+    expect(slide.emptySources).toEqual([]);
+    const none = slideOf(buildPitchDeck(input()), "launch");
     expect(none.bullets).toEqual([
       { label: "Launch Plan", text: "Not written yet", empty: true },
     ]);
-    expect(none.emptySources).toEqual(["Launch Plan", "Pre-launch Milestones"]);
+    expect(none.emptySources).toEqual(["Launch Plan"]);
   });
 
   test("Risks: §22's top three by impact, then probability, keeping the table's order on ties", () => {
@@ -650,6 +675,7 @@ describe("buildPitchDeck: the slides", () => {
       ["economics", 20, "costs"],
       ["why_us", 10, null],
       ["execution", 23, null],
+      ["launch", 25, null],
       ["risks", 22, null],
       ["ask", 24, null],
     ]);
@@ -711,7 +737,7 @@ describe("pitchSlideKeys", () => {
       );
     }
     expect(pitchSlideKeys("one")).toHaveLength(8);
-    expect(pitchSlideKeys("five")).toHaveLength(12);
+    expect(pitchSlideKeys("five")).toHaveLength(13);
   });
 });
 
@@ -889,6 +915,56 @@ describe("fitPitchDeck", () => {
     expect(last.length).toBeLessThanOrEqual(first.length);
   });
 
+  test("a label too long for a line is kept whole, and the cut leaves its lines", () => {
+    // Labels of three lines on the last two bullets: cutting those to two lines would
+    // leave their labels three, so the earlier bullets are cut instead.
+    const sections = SECTIONS.map((section) => ({
+      ...section,
+      questions: section.questions.map((question) =>
+        question.key === "P.04.4" || question.key === "P.04.5"
+          ? { ...question, title: "Why ".repeat(50).trim() }
+          : question,
+      ),
+    }));
+    const answers = allAnswered();
+    for (const key of ["P.04.1", "P.04.2", "P.04.3", "P.04.4", "P.04.5"]) {
+      answers.set(key, { text: "word ".repeat(200).trim(), rows: null });
+    }
+    const slide = fitPitchSlide(
+      slideOf(buildPitchDeck(input({ sections, answers })), "problem"),
+      fit,
+    );
+    expect(slide.overflow).toBe(true);
+    for (const bullet of slide.bullets) {
+      expect(bullet.text).toMatch(/^word( word)*…$/u);
+    }
+  });
+
+  test("a slide still too tall with every text on a line overflows, keeping every bullet", () => {
+    // An operator's template with more text sub-items in §20 than its notes can hold.
+    const sections = SECTIONS.map((section) =>
+      section.key === "20"
+        ? {
+            ...section,
+            questions: [
+              ...section.questions,
+              ...Array.from({ length: 30 }, (_, index) => ({
+                key: `P.20.${index + 12}`,
+                title: `Added ${index}`,
+                answerType: "long_text" as const,
+              })),
+            ],
+          }
+        : section,
+    );
+    const built = slideOf(buildPitchDeck(input({ sections })), "economics");
+    const slide = fitPitchSlide(built, fit);
+    expect(slide.overflow).toBe(true);
+    expect(slide.shrink).toBe(6);
+    expect(slide.bullets).toEqual(built.bullets);
+    expect(slide.bullets).toHaveLength(33);
+  });
+
   test("text without spaces breaks between characters, as Japanese does", () => {
     const answers = allAnswered();
     answers.set("P.04.1", { text: "ピアヤ".repeat(600), rows: null });
@@ -927,6 +1003,31 @@ describe("fitPitchDeck", () => {
       "High",
       "High",
     ]);
+  });
+
+  test("a number in a table is never cut, even on a slide too short for every row", () => {
+    const price = 999_999_999_999;
+    const short = { ...print, slide: { ...print.slide, height: 300 } };
+    const slide = fitPitchSlide(
+      slideOf(
+        buildPitchDeck(
+          input({
+            competitors: Array.from({ length: 5 }, () => ({
+              name: "Bongbong's",
+              type: "direct" as const,
+              typicalPrice: price,
+              strength: "Fresh",
+            })),
+          }),
+        ),
+        "competition",
+      ),
+      { ...fit, print: short },
+    );
+    expect(slide.overflow).toBe(true);
+    expect(slide.table?.rows.map((row) => row[2])).toEqual(
+      Array.from({ length: 5 }, () => formatMoney(price, "PHP")),
+    );
   });
 
   test("the title slide cuts a long Business Name and §1, keeping its three lines", () => {

@@ -10,7 +10,7 @@ import { PLAN_ITEM_COUNT } from "./plans";
 // The Pitch Deck of SDD 5.9 (P12, P13): the slides packages/domain builds from a plan
 // (design-spec 6.14), as 23 shows them and the PDF prints them.
 
-/** One-minute (8 slides) or five-minute (12 slides). */
+/** One-minute (8 slides) or five-minute (13 slides). */
 export const pitchVariantSchema = z.enum(["one", "five"]);
 export type PitchVariant = z.infer<typeof pitchVariantSchema>;
 
@@ -26,6 +26,7 @@ export const pitchSlideKeySchema = z.enum([
   "economics",
   "why_us",
   "execution",
+  "launch",
   "risks",
   "next_step",
   "ask",

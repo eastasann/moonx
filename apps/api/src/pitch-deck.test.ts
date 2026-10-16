@@ -1,5 +1,4 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { dirname } from "node:path";
 import { comments, competitors, economicsInputs, planAnswers } from "@moonx/db";
 import { formatDate, formatIsoDate } from "@moonx/i18n";
 import {
@@ -10,10 +9,10 @@ import {
   planVersionSummarySchema,
 } from "@moonx/schemas";
 import { print } from "@moonx/ui-tokens/print";
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { PITCH_PDF_LIMIT } from "./pitch-deck";
 import { buildTestApp, connectTestDatabase } from "./test-app";
 import { apiRequest, teamWithProceedIdea, testFixtures } from "./test-fixtures";
+import { pageText, readPdf, textsBelowBody } from "./test-pdf";
 
 // P12 and P13 (SDD 5.9) on a plan drafted through M5: the slides from the plan now and
 // from a saved version, who gets the edit links, comment counts, and the PDF read back
@@ -83,69 +82,6 @@ const slideOf = (pitch: PitchDeck, key: string) => {
   return slide;
 };
 
-/** pdf.js's own data of the standard 14 fonts. */
-const STANDARD_FONTS = `${dirname(
-  Bun.resolveSync("pdfjs-dist/package.json", import.meta.dir),
-)}/standard_fonts/`;
-
-interface PdfText {
-  str: string;
-  x: number;
-  /** From the top of the page to the baseline, in pt. */
-  y: number;
-  size: number;
-  width: number;
-  font: string;
-}
-
-/** The pages of a PDF as pdf.js reads them: their size and their text runs. */
-async function readPdf(bytes: ArrayBuffer) {
-  const task = getDocument({
-    data: new Uint8Array(bytes),
-    disableFontFace: true,
-    fontExtraProperties: true,
-    // react-pdf names Helvetica, unembedded, for a line feed in a text.
-    standardFontDataUrl: STANDARD_FONTS,
-  });
-  const document = await task.promise;
-  const pages: { width: number; height: number; texts: PdfText[] }[] = [];
-  for (let number = 1; number <= document.numPages; number += 1) {
-    const page = await document.getPage(number);
-    await page.getOperatorList();
-    const [, , width = 0, height = 0] = page.view;
-    const content = await page.getTextContent();
-    const texts = content.items.flatMap((item) => {
-      if (!("str" in item) || item.str.trim() === "") return [];
-      const font = page.commonObjs.get(item.fontName) as {
-        name?: string;
-      } | null;
-      return [
-        {
-          str: item.str,
-          x: item.transform[4] as number,
-          y: height - (item.transform[5] as number),
-          size: item.transform[0] as number,
-          width: item.width,
-          font: font?.name ?? "",
-        },
-      ];
-    });
-    pages.push({ width, height, texts });
-  }
-  await task.destroy();
-  return pages;
-}
-
-const pageText = (page: { texts: PdfText[] }) =>
-  page.texts.map((text) => text.str).join(" ");
-
-/** The bottom of a slide's body: everything but the footer stays above it. */
-const BODY_BOTTOM =
-  print.slide.height -
-  print.slide.marginY -
-  print.slide.footerHeight -
-  print.slide.gap;
-
 describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
   test("builds the five-minute deck from the plan now, with the validation's competitors", async () => {
     const team = await newTeam();
@@ -173,7 +109,7 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
 
     expect(pitch.variant).toBe("five");
     expect(pitch.source).toEqual({ kind: "latest" });
-    expect(pitch.slides).toHaveLength(12);
+    expect(pitch.slides).toHaveLength(13);
     expect(pitch.businessName).toBe(plan.businessName);
     expect(pitch.footer).toEqual({
       businessName: plan.businessName,
@@ -201,6 +137,11 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
       "Team readiness",
       "Launch readiness",
     ]);
+    // Its starting launch rows have no actions yet.
+    expect(slideOf(pitch, "launch").bullets).toEqual([
+      { label: "Launch Plan", text: "Not written yet", empty: true },
+    ]);
+    expect(slideOf(pitch, "launch").editSource).toEqual({ itemNo: 25 });
     // A new idea has no numbers yet (design-spec 6.4).
     expect(
       slideOf(pitch, "business_model").numbers.map((n) => n.value.reason),
@@ -335,6 +276,7 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
       .values([
         comment("five.market"),
         comment("five.market"),
+        comment("five.launch"),
         comment("one.problem"),
       ]);
     const five = await deck(plan.id, team.viewerCookie, "variant=five");
@@ -342,7 +284,10 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
       five.slides
         .map((slide) => [slide.key, slide.commentCount])
         .filter(([, n]) => n !== 0),
-    ).toEqual([["market", 2]]);
+    ).toEqual([
+      ["market", 2],
+      ["launch", 1],
+    ]);
     const one = await deck(plan.id, team.viewerCookie, "variant=one");
     expect(slideOf(one, "problem").commentCount).toBe(1);
   });
@@ -411,7 +356,7 @@ describe("P13 GET /api/v1/plans/{planId}/pitch-deck.pdf", () => {
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(response.headers.get("cache-control")).toBe("no-store");
     const pages = await readPdf(await response.arrayBuffer());
-    expect(pages).toHaveLength(12);
+    expect(pages).toHaveLength(13);
     for (const page of pages) {
       expect([page.width, page.height]).toEqual([960, 540]);
     }
@@ -522,22 +467,9 @@ describe("P13 GET /api/v1/plans/{planId}/pitch-deck.pdf", () => {
       team.memberCookie,
     );
     const pages = await readPdf(await response.arrayBuffer());
-    expect(pages).toHaveLength(12);
+    expect(pages).toHaveLength(13);
     expect(pageText(pages[2] ?? { texts: [] })).toContain("ピアヤ");
-    for (const [index, page] of pages.entries()) {
-      for (const text of page.texts) {
-        if (text.size === print.fontSize.footer) continue;
-        expect({
-          page: index + 1,
-          str: text.str,
-          below: text.y > BODY_BOTTOM,
-        }).toEqual({
-          page: index + 1,
-          str: text.str,
-          below: false,
-        });
-      }
-    }
+    expect(textsBelowBody(pages)).toEqual([]);
   });
 
   test("breaks a word wider than its column inside the column", async () => {

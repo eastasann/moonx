@@ -548,7 +548,7 @@ describe("the demo data", () => {
     if (planA === undefined) throw new Error("No Plan A");
     for (const [variant, slides] of [
       ["one", 8],
-      ["five", 12],
+      ["five", 13],
     ] as const) {
       const response = await get(
         `/api/v1/plans/${planA.id}/pitch-deck?variant=${variant}`,

@@ -25193,7 +25193,7 @@
     "/api/v1/plans/{planId}/pitch-deck": {
       "get": {
         "summary": "P12 The Pitch Deck (23)",
-        "description": "The one-minute (8) or five-minute (12) slides from the plan now, or from the saved version versionId, fitted to the slide: font sizes down by shrink steps, then texts cut with an ellipsis (overflow). Edit source links only for Owners and Members on the plan now, neither plan nor idea archived.",
+        "description": "The one-minute (8) or five-minute (13) slides from the plan now, or from the saved version versionId, fitted to the slide: font sizes down by shrink steps, then texts cut with an ellipsis (overflow). Edit source links only for Owners and Members on the plan now, neither plan nor idea archived.",
         "parameters": [
           {
             "name": "planId",
@@ -25299,6 +25299,7 @@
                               "economics",
                               "why_us",
                               "execution",
+                              "launch",
                               "risks",
                               "next_step",
                               "ask"

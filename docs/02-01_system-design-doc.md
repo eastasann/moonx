@@ -1437,17 +1437,17 @@ interface PitchDeck {
   footer: { businessName: string; versionLabel: string /* 版の名前か "Draft" */; date: DateOnly /* Latest はプランの最終更新日、版は保存日。利用者のタイムゾーンの日付 */ };
   speakerNotes: string | null;                 // §30 の One-minute / Five-minute explanation（PDF には入れない）
   slides: {
-    key: string;                               // design-spec 6.14 のキー（title / problem / …）
+    key: string;                               // design-spec 6.14 のキー（title / problem / …）。5分版は 6.14 の表の13枚で、Execution plan（execution）の直後が Launch plan（launch）
     type: "title" | "text" | "number" | "table";
     title: PitchText;                          // スライドの名前。表紙は Business Name（空なら empty）
     subtitle: PitchText | null;                // 表紙の §1 What is the business?。ほかは null
-    bullets: { label: string; text: string; empty: boolean }[];   // label は素材の名前。文章スライドは素材ごとに1つ、表紙は Prepared by / Date / Version、数字・表のスライドは注記
+    bullets: { label: string; text: string; empty: boolean }[];   // label は素材の名前。文章スライドは素材ごとに1つ（Launch plan は Actions のある時期の区分ごとに1つで、label は区分の名前）、表紙は Prepared by / Date / Version、数字・表のスライドは注記
     numbers: { label: string; metricKey: string; value: MetricValue }[];   // 数字のスライドと Economics の数字
     table: { columns: { label: string; numeric: boolean /* 等幅の書体で右寄せ */; width: number /* 表の幅に占める割合 */ }[];
              rows: (string | null)[][] /* 書式を当てたセル。null は空のセル。行が無ければ素材が空 */ } | null;
     emptySources: string[];                    // 「Not written yet」を出す素材の名前
     shrink: number;                            // 文字を `semantic.print.slide.shrink-step` 何段ぶん小さくしたか（それぞれ最小で止める）
-    overflow: boolean;                         // 最小でも収まらなかった: 文を「…」で切った。数字が入りきらず折り返したときと、どの文も1行まで切っても高さが足りないときも true（アプリの表示だけに注意を出す）
+    overflow: boolean;                         // 最小でも収まらなかった: 文を「…」で切った。数字が入りきらず折り返したときと、どの文も1行（名前が「…」と合わせて1行に収まらない箇条書きは、名前と「…」の行数）まで切っても高さが足りないときも true（アプリの表示だけに注意を出す。高さが足りないスライドは本文の下端で切れる。design-spec 6.14）
     editSource: { itemNo: number } | null; editInValidation: "costs" | "economics" | null;   // Viewer・版の表示中・アーカイブ済みは null
     commentCount: number;                      // `pitch_slide` の `{variant}.{key}` へのコメントの数
   }[];
@@ -2467,7 +2467,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | ハブの画面（V1・P2・D1） | p95 800ms 以内 | 検証1件分のデータを決まった数のクエリでまとめて読み（N+1 をしない）、`packages/domain` でメモリ上で計算する。アイデアの一覧は検証ごとのデータを `IN (...)` でまとめて読む。一覧はページに分ける（I1 は50件） |
 | 0台からの最初の応答 | 5秒以内（Cloud Run の起動＋Neon の起動） | Bun で起動を速くし、Cloud Run の起動時の CPU ブーストを有効にする。死活確認（Z1）は DB に触れない |
 | Web の最初の表示 | 4G のミドルクラスのスマホで LCP 2.5秒以内（Cloud Run が0台のときは、上の「0台からの最初の応答」の分を足す） | ランディングはプリレンダー。アプリはルートごとにコードを分割し、静的アセットはハッシュ付きのファイル名で長期キャッシュ（ADR-004）。2回目からは Service Worker のキャッシュから画面の外側を出す（ADR-031） |
-| PDF の作成（P13） | 5秒以内（12枚） | react-pdf をサーバーで実行。フォントは起動時に読み込んでおく |
+| PDF の作成（P13） | 5秒以内（13枚） | react-pdf をサーバーで実行。フォントは起動時に読み込んでおく |
 | DB の接続 | Neon のプールの上限を超えない | postgres.js のプールはインスタンスごとに最大5。Cloud Run は最大3台なので最大15接続 |
 | クライアントのデータ | 画面の移動を速くする | TanStack Query。一覧は `staleTime` 30秒、編集中の画面は保存の応答で該当のキャッシュだけを更新する。通知の未読数は60秒ごと |
 
@@ -2577,7 +2577,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`・`fitPitchDeck()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
 | DB のスキーマとマイグレーション（`packages/db`・`scripts/db-check.ts`） | Bun test ＋ 実際の PostgreSQL（`db-check` は一時的な Git のリポジトリ） | — | 6.3 のコードと `schema.ts` がコメントと整形を除いて同じこと、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB の列・制約・インデックス・列挙が `schema.ts` から作った一時的なテーブルと PostgreSQL の表記で一致すること、`relations()` が外部キーと1対1に対応し、名前が `relations.ts` の先頭に書いた規則に従うこと、テスト用の DB の作り直しが `_test` で終わらない名前とクエリ文字列を拒むこと、`db-check` が2章の失敗の場合をすべて捕まえること |
-| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012） |
+| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012）、上限の件数の素材で Pitch Deck のどのスライドも本文の下端で切れないこと（英語の文と日本語の文、1分版と5分版。PDF と同じフォントで測る。design-spec 6.14） |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作（axe の検査は E2E で行う。ADR-022） |
 | Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |
 | E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査 |

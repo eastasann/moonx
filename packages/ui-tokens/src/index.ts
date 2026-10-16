@@ -1,3 +1,3 @@
 export { print } from "./generated/print";
-export { breakpoints, vars } from "./generated/vars";
+export { breakpoints, popoverMaxHeight, vars } from "./generated/vars";
 export * from "./types";

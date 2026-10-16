@@ -8,6 +8,7 @@ import {
   dividerSizes,
   fauStates,
   iconSizes,
+  progressCircleSizes,
   scales,
   sizes,
   spaces,
@@ -32,6 +33,16 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
     ["densities", densities, "semantic.density"],
     ["iconSizes", iconSizes, "semantic.scale.medium.component.icon.size"],
     ["avatarSizes", avatarSizes, "semantic.scale.medium.component.avatar.size"],
+    [
+      "progressCircleSizes",
+      progressCircleSizes,
+      "semantic.scale.medium.component.progress-circle.size",
+    ],
+    [
+      "progressCircleSizes",
+      progressCircleSizes,
+      "semantic.scale.medium.component.progress-circle.thickness",
+    ],
     ["dividerSizes", dividerSizes, "semantic.border-width.divider"],
     ["dialogWidths", dialogWidths, "semantic.layout.dialog-max-width"],
     ["fauStates", fauStates, "semantic.color.light.fau"],
@@ -46,7 +57,8 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
   });
 
   test("sizes are the keys of every component dimension sized S to XL", () => {
-    // Groups such as icon.size (XS–XL) and avatar.size (S–M) have their own lists.
+    // Groups such as icon.size (XS–XL), avatar.size (S–M) and progress-circle (S–L)
+    // have their own lists.
     const groups = paths
       .filter((path) =>
         /^semantic\.scale\.medium\.component\.[^.]+\.[^.]+\.(S|M|L|XL)$/.test(
@@ -56,7 +68,9 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
       .map((path) => path.slice(0, path.lastIndexOf(".")));
     const sized = [...new Set(groups)].filter(
       (group) =>
-        !group.endsWith(".icon.size") && !group.endsWith(".avatar.size"),
+        !group.endsWith(".icon.size") &&
+        !group.endsWith(".avatar.size") &&
+        !group.includes(".progress-circle."),
     );
     expect(sized.length).toBeGreaterThan(0);
     for (const group of sized) {

@@ -459,7 +459,8 @@
       "1": { "$value": { "value": 1, "unit": "px" } },
       "2": { "$value": { "value": 2, "unit": "px" } },
       "3": { "$value": { "value": 3, "unit": "px" } },
-      "4": { "$value": { "value": 4, "unit": "px" } }
+      "4": { "$value": { "value": 4, "unit": "px" } },
+      "5": { "$value": { "value": 5, "unit": "px" } }
     },
     "breakpoint": {
       "$type": "dimension",
@@ -1089,6 +1090,19 @@
               "XL": { "$value": "{primitive.dimension.10}" }
             }
           },
+          "progress-circle": {
+            "$description": "ProgressCircle の直径と輪の太さ（Spectrum の progress-circle-size・progress-circle-thickness。S / M / L だけ。design-spec 4.5）。Button の送信中は S",
+            "size": {
+              "S": { "$value": "{primitive.dimension.16}" },
+              "M": { "$value": "{primitive.dimension.32}" },
+              "L": { "$value": "{primitive.dimension.64}" }
+            },
+            "thickness": {
+              "S": { "$value": "{primitive.border-width.2}" },
+              "M": { "$value": "{primitive.border-width.3}" },
+              "L": { "$value": "{primitive.border-width.4}" }
+            }
+          },
           "tabs": {
             "$description": "Tabs の項目の高さ",
             "item-height": {
@@ -1293,6 +1307,19 @@
               "M": { "$value": "{primitive.dimension.8}" },
               "L": { "$value": "{primitive.dimension.10}" },
               "XL": { "$value": "{primitive.dimension.13}" }
+            }
+          },
+          "progress-circle": {
+            "$description": "ProgressCircle の直径と輪の太さ（Spectrum の progress-circle-size・progress-circle-thickness。S / M / L だけ。design-spec 4.5）。Button の送信中は S",
+            "size": {
+              "S": { "$value": "{primitive.dimension.20}" },
+              "M": { "$value": "{primitive.dimension.40}" },
+              "L": { "$value": "{primitive.dimension.80}" }
+            },
+            "thickness": {
+              "S": { "$value": "{primitive.border-width.3}" },
+              "M": { "$value": "{primitive.border-width.4}" },
+              "L": { "$value": "{primitive.border-width.5}" }
             }
           },
           "tabs": {
@@ -1824,7 +1851,7 @@
       "sheet-max-height-ratio": {
         "$type": "number",
         "$value": "{primitive.ratio.85}",
-        "$description": "Tray・Dialog（small と medium）・Panel の高さの上限（0.85 = 画面の高さの 85%。使う側が vh に掛ける）。large の Dialog をスマホで出す全画面のシートは対象外（design-spec 3.8）"
+        "$description": "Tray・Dialog（small と medium）・Panel の高さの上限（0.85 = 見えている高さの 85%。使う側が見えている高さ（スマホのキーボードが出ている間はその上の高さ。Web は React Aria の --visual-viewport-height）に掛ける）。large の Dialog をスマホで出す全画面のシートは対象外（design-spec 3.8）"
       },
       "z-index": {
         "$type": "number",

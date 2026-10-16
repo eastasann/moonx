@@ -920,7 +920,7 @@ Break-even / day・Payback・ROI）が折り返して高くなり、シナリオ
 
 ## Step 19: Web の部品（1）: 土台・文字・ボタン・入力欄
 
-Status:
+Status: done 2026-10-16
 
 ```
 docs/design-spec.md 4.5 の部品のうち、土台・文字・ボタン・入力欄を packages/ui-web に作ってください。
@@ -946,6 +946,47 @@ docs/design-spec.md 4.5 の部品のうち、土台・文字・ボタン・入�
 
 make test-e2e で /dev/components のこのステップの部品がライトとダーク・2つのスケール・3つの幅で描かれ、
 make test-web・make typecheck・make lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 19b: Web の部品: size・React Aria の文言・日付の入力欄の形の決定
+
+Status: blocked 2026-10-16
+理由: 3つとも docs の決まりを文字どおりに当てると実装の手がかり（06 のトークン・上書きできる文言）が無く、当てない部品や場合を決めると決まりを狭めることになるため、ユーザーの決定が要る（下の 1〜3）
+
+```
+Step 19 の独立レビューで見つかった、docs の決まりと部品の食い違いのうち、ユーザーの決定が要る3つを決めて、docs と部品に入れてください。
+
+参照:
+- docs/design-spec.md 1.2（書式: 日付は「Sep 30, 2026」）・4.5（部品の補足:「種類・大きさの列に値の無い部品も、size（S / M / L / XL）を受ける」）
+- docs/02-01_system-design-doc.md 9章（UI の文言はすべてカタログに置く）
+- docs/06_design-tokens.json（semantic.scale.*.component・semantic.typography）
+
+決めること（ユーザー）:
+1. size: 4.5 の補足は、種類・大きさの列に値の無い部品も S / M / L / XL を受けるとする。Step 19 の部品のうち、
+   Heading / Text・Link・Well・FileTrigger・Flex / Stack / Grid / Container は size を受けていない（Form は受ける）。
+   06 にはこれらの size の値が無く、受けるなら何を大きさに対応させるか（例: Link は文字の大きさとタップ領域、Well は内側の余白）を
+   06 に足すことになる。受けない部品を決めるなら 4.5 の補足に書き足す（決まりを狭める）。Step 20〜22 の、同じ列に値の無い部品
+   （Tooltip・Disclosure・Tabs・Breadcrumbs・Skeleton・IllustratedMessage・Toast など）にも同じ問いがある
+2. React Aria が持つ文言: SDD 9章は UI の文言をすべてカタログに置くとするが、React Aria が自前の文言を出す。
+   見えるもの: Picker の既定のプレースホルダー「Select an item」、DatePicker の欄の「mm / dd / yyyy」。
+   読み上げだけのもの: SearchField の「Clear search」、ComboBox の「Show suggestions」、DatePicker の「Calendar」、
+   カレンダーの「Previous」「Next」、TagGroup の「Remove」、Popover とトレイの「Dismiss」、日付の欄の名前（month・day・year）、
+   選んだときの読み上げ。上書きできるものはカタログに置き、上書きできないもの（Dismiss・日付の欄の名前・選んだときの読み上げ）は
+   React Aria の en-US の文言を使うと 9章に書くか、ほかの扱いにするか
+3. DatePicker の入力欄の日付の形: 1.2 は日付を「Sep 30, 2026」で出すとする。React Aria の日付の欄は数字の欄だけで、
+   入力欄は en-PH の数字の並び（9 / 30 / 2026）になる。入力欄は数字の並びのままにして 1.2 に入力欄の例外を書くか、
+   月の欄を名前（Sep）で出して区切りを「Sep 30, 2026」に合わせるか
+
+やること（決定のあと）:
+- 決定を design-spec 1.2・4.5、SDD 9章、06 に書き、packages/ui-web の部品・/dev/components・テスト（make test-web・make test-e2e）に入れる
+
+決めた扱いが docs と部品とテストに入り、make test-web・make test-e2e・make typecheck・make lint・make doc-lint が通る状態をゴールとする。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。

@@ -1,0 +1,96 @@
+import type { Size } from "@moonx/ui-tokens";
+import { X } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  TagGroup as AriaTagGroup,
+  Button,
+  type Key,
+  Label,
+  Tag,
+  TagList,
+  Text,
+} from "react-aria-components";
+import { FixedLocale } from "../internal/FixedLocale";
+import * as field from "../internal/field.css";
+import { IconSlot } from "../internal/IconSlot";
+import * as styles from "./TagGroup.css";
+
+/** One tag. */
+export interface TagItem {
+  id: string;
+  label: string;
+}
+
+export interface TagGroupProps {
+  items: Iterable<TagItem>;
+  /** Removes tags; each tag shows a remove button when given (design-spec 4.5). */
+  onRemove?: (ids: Set<string>) => void;
+  label?: ReactNode;
+  description?: ReactNode;
+  /** Shown in place of the tags when there are none. */
+  renderEmptyState?: () => ReactNode;
+  /** @default "M" */
+  size?: Size;
+  id?: string;
+  "aria-label"?: string;
+}
+
+/**
+ * A row of tags, removable one by one (the checks a research log supports, the
+ * conditions of a filter). Arrow keys move between the tags; Delete removes one.
+ */
+export function TagGroup({
+  items,
+  onRemove,
+  label,
+  description,
+  renderEmptyState,
+  size = "M",
+  ...props
+}: TagGroupProps) {
+  return (
+    <FixedLocale>
+      <AriaTagGroup
+        {...props}
+        onRemove={
+          onRemove &&
+          ((keys: Set<Key>) => onRemove(new Set([...keys].map(String))))
+        }
+        className={styles.group}
+      >
+        {label != null && <Label className={field.label}>{label}</Label>}
+        <TagList
+          items={items}
+          renderEmptyState={renderEmptyState}
+          className={styles.list}
+        >
+          {(item) => (
+            <Tag
+              id={item.id}
+              textValue={item.label}
+              className={styles.tag({ size })}
+            >
+              {({ allowsRemoving }) => (
+                <>
+                  <span className={styles.tagLabel}>{item.label}</span>
+                  {allowsRemoving && (
+                    <Button slot="remove" className={styles.remove}>
+                      <IconSlot size="XS">
+                        <X />
+                      </IconSlot>
+                    </Button>
+                  )}
+                </>
+              )}
+            </Tag>
+          )}
+        </TagList>
+        {description != null && (
+          <Text slot="description" className={field.description}>
+            {description}
+          </Text>
+        )}
+      </AriaTagGroup>
+    </FixedLocale>
+  );
+}

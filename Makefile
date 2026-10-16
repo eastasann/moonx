@@ -43,7 +43,7 @@ REGION := asia-southeast1
 # Recursive, so gcloud runs only for the targets that touch Google Cloud.
 GCP_PROJECT_ID ?= $(shell gcloud config get-value project 2>/dev/null)
 IMAGE = $(REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/moonx/api
-TS_PROJECTS := . $(patsubst %/tsconfig.json,%,$(wildcard apps/*/tsconfig.json packages/*/tsconfig.json))
+TS_PROJECTS := . $(patsubst %/tsconfig.json,%,$(wildcard apps/*/tsconfig.json packages/*/tsconfig.json e2e/tsconfig.json))
 
 require = $(if $($(1)),,$(error $(1) is required: make $@ $(1)=...))
 require-project = $(if $(GCP_PROJECT_ID),,$(error No Google Cloud project: run gcloud config set project, or make $@ GCP_PROJECT_ID=...))

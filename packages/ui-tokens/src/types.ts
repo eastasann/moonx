@@ -20,6 +20,9 @@ export type Scale = (typeof scales)[number];
 export const densities = ["compact", "regular", "spacious"] as const;
 export type Density = (typeof densities)[number];
 
+/** The densities a screen picks: compact is held in reserve (06 semantic.density). */
+export type ScreenDensity = Exclude<Density, "compact">;
+
 /** The `size` every component takes (design-spec 4.5). */
 export const sizes = ["S", "M", "L", "XL"] as const;
 export type Size = (typeof sizes)[number];
@@ -31,6 +34,10 @@ export type IconSize = (typeof iconSizes)[number];
 /** Avatar sizes (design-spec 4.5). */
 export const avatarSizes = ["S", "M"] as const;
 export type AvatarSize = (typeof avatarSizes)[number];
+
+/** ProgressCircle sizes (design-spec 4.5, 06 component.progress-circle). */
+export const progressCircleSizes = ["S", "M", "L"] as const;
+export type ProgressCircleSize = (typeof progressCircleSizes)[number];
 
 /** Divider sizes (design-spec 4.5). */
 export const dividerSizes = ["S", "M", "L"] as const;
@@ -81,3 +88,38 @@ export const spaces = [
   "space-1000",
 ] as const;
 export type Space = (typeof spaces)[number];
+
+/**
+ * Button's `variant` (design-spec 4.5): primary is the one main action of a screen,
+ * negative only confirms a deletion.
+ */
+export const buttonVariants = ["primary", "secondary", "negative"] as const;
+export type ButtonVariant = (typeof buttonVariants)[number];
+
+/** Link's `variant`: primary on its own line, secondary inside running text. */
+export const linkVariants = ["primary", "secondary"] as const;
+export type LinkVariant = (typeof linkVariants)[number];
+
+/** Heading's `variant`, when its look differs from its level's (design-spec 4.5). */
+export const headingVariants = ["display", "label"] as const;
+export type HeadingVariant = (typeof headingVariants)[number];
+
+/** Text's `variant` (design-spec 4.5). */
+export const textVariants = [
+  "body",
+  "body-long",
+  "body-sm",
+  "caption",
+  "label",
+  "number",
+] as const;
+export type TextVariant = (typeof textVariants)[number];
+
+/** Text's `tone` (design-spec 4.5). */
+export const textTones = [
+  "primary",
+  "secondary",
+  "tertiary",
+  "negative",
+] as const;
+export type TextTone = (typeof textTones)[number];

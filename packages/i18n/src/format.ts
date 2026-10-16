@@ -1,4 +1,9 @@
-import type { CheckKey, DateOnly, MetricBound } from "@moonx/schemas";
+import {
+  type CheckKey,
+  type DateOnly,
+  groupedNumberPattern,
+  type MetricBound,
+} from "@moonx/schemas";
 import { i18n } from "./i18n";
 
 // The display formats of design-spec 1.2 (locale and dates) and 6.4 (rounding, lower and
@@ -106,6 +111,59 @@ export const formatPercent = (rate: number, options: BoundOption = {}) =>
 /** A typed rate (0.15) as the % the user typed ("15%", "12.25%"). */
 export const formatInputPercent = (rate: number) =>
   signed(rate, { style: "percent", maximumFractionDigits: 2 });
+
+/**
+ * A number as typed into a field, its whole part regrouped by thousands: "1500.5" becomes
+ * "1,500.5". Only separators move: the digits, the decimals and any leading zero stay as
+ * typed, so the field never rewrites what the form's check reads. Text the check would
+ * refuse ("1,5", "12.") comes back unchanged, so the field keeps what the user typed next
+ * to the reason (design-spec 6.0.8).
+ */
+export const formatNumberText = (text: string) => {
+  const trimmed = text.trim();
+  if (!groupedNumberPattern.test(trimmed)) return text;
+  const [whole = "", decimals] = trimmed.split(".");
+  const digits = whole.replaceAll(",", "");
+  // "007" stays "007": grouping it would make a new text, not regroup the typed one.
+  if (digits.length > 1 && digits.startsWith("0")) return trimmed;
+  const separator =
+    numberFormat({})
+      .formatToParts(1000)
+      .find((part) => part.type === "group")?.value ?? ",";
+  const grouped = digits.replace(/\B(?=(\d{3})+$)/g, separator);
+  return decimals === undefined ? grouped : `${grouped}.${decimals}`;
+};
+
+/**
+ * What a number field shows around the typed number: the currency symbol of an amount
+ * (ISO 4217, as `formatMoney` writes it: "₱") or the percent sign of a percent, each on
+ * the side the locale puts it.
+ */
+export const formatNumberAffixes = (
+  unit: { currency: string } | { percent: true },
+) => {
+  const parts = numberFormat(
+    "currency" in unit
+      ? {
+          style: "currency",
+          currency: unit.currency,
+          currencyDisplay: "narrowSymbol",
+        }
+      : { style: "percent" },
+  ).formatToParts(1);
+  const digits = new Set(["integer", "group", "decimal", "fraction"]);
+  const number = parts.findIndex((part) => digits.has(part.type));
+  const text = (side: Intl.NumberFormatPart[]) =>
+    side
+      .filter((part) => !digits.has(part.type))
+      .map((part) => part.value)
+      .join("")
+      .trim();
+  return {
+    prefix: text(parts.slice(0, number)),
+    suffix: text(parts.slice(number)),
+  };
+};
 
 /** The payback period: one decimal, keeping ".0" ("9.2 months", "9.2+ months"). */
 export const formatMonths = (months: number, options: BoundOption = {}) =>

@@ -27,6 +27,20 @@ export default defineConfig({
     },
   },
   plugins: [
+    {
+      // The @fontsource stylesheets list a woff fallback after each woff2. Every browser
+      // the app supports reads woff2, and ADR-018 serves woff2 only, so the fallback is
+      // cut before Vite resolves the URLs and the woff files never reach the build.
+      name: "moonx-woff2-only",
+      enforce: "pre",
+      transform(code, id) {
+        if (!/[\\/]@fontsource[\\/].+\.css$/.test(id)) return;
+        return code.replace(
+          /,\s*url\([^)]*\.woff\)\s*format\(['"]woff['"]\)/g,
+          "",
+        );
+      },
+    },
     tanstackStart({
       spa: { enabled: true },
       // Tests sit next to the routes they cover without becoming routes themselves.

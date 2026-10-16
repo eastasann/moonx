@@ -9,6 +9,8 @@ import {
   formatIsoDateTime,
   formatMoney,
   formatMonths,
+  formatNumberAffixes,
+  formatNumberText,
   formatOverdue,
   formatPercent,
   formatRelativeTime,
@@ -88,6 +90,47 @@ describe("counts, rates and months (design-spec 6.4 端数)", () => {
     expect(formatInputNumber(6.25)).toBe("6.25");
     expect(formatInputNumber(26)).toBe("26");
     expect(formatInputNumber(1000)).toBe("1,000");
+  });
+
+  test("typed number text is regrouped, its decimals untouched", () => {
+    expect(formatNumberText("1500.5")).toBe("1,500.5");
+    expect(formatNumberText(" 1234567 ")).toBe("1,234,567");
+    expect(formatNumberText("1,500.505")).toBe("1,500.505");
+    expect(formatNumberText("1000000000000.00")).toBe("1,000,000,000,000.00");
+    expect(formatNumberText("12345678901234567890")).toBe(
+      "12,345,678,901,234,567,890",
+    );
+    expect(formatNumberText("0")).toBe("0");
+    expect(formatNumberText("0.75")).toBe("0.75");
+  });
+
+  test("leading zeros stay as typed", () => {
+    expect(formatNumberText("007.50")).toBe("007.50");
+    expect(formatNumberText("0,500")).toBe("0,500");
+  });
+
+  test("number text the form refuses comes back as typed", () => {
+    for (const text of ["1,5", "12.", "₱1,500", "-3", "1e3", "", "abc"]) {
+      expect(formatNumberText(text)).toBe(text);
+    }
+  });
+
+  test("number fields show the narrow currency symbol before, the % after", () => {
+    expect(formatNumberAffixes({ currency: "PHP" })).toEqual({
+      prefix: "₱",
+      suffix: "",
+    });
+    expect(formatNumberAffixes({ currency: "USD" })).toEqual({
+      prefix: "$",
+      suffix: "",
+    });
+    expect(formatMoney(1, "JPY")).toBe(
+      `${formatNumberAffixes({ currency: "JPY" }).prefix}1`,
+    );
+    expect(formatNumberAffixes({ percent: true })).toEqual({
+      prefix: "",
+      suffix: "%",
+    });
   });
 
   test("rates: one decimal, keeping .0", () => {

@@ -260,6 +260,18 @@ export const vars = createGlobalThemeContract({
           XL: "scale-component-meter-thickness-XL",
         },
       },
+      progressCircle: {
+        size: {
+          S: "scale-component-progress-circle-size-S",
+          M: "scale-component-progress-circle-size-M",
+          L: "scale-component-progress-circle-size-L",
+        },
+        thickness: {
+          S: "scale-component-progress-circle-thickness-S",
+          M: "scale-component-progress-circle-thickness-M",
+          L: "scale-component-progress-circle-thickness-L",
+        },
+      },
       tabs: {
         itemHeight: {
           S: "scale-component-tabs-item-height-S",
@@ -715,3 +727,9 @@ export const breakpoints = {
   tablet: 768,
   desktop: 1024,
 } as const;
+
+/**
+ * `semantic.layout.popover-max-height` in px, for React Aria's Popover, which takes its
+ * height cap as a number and lowers it to the space the window has.
+ */
+export const popoverMaxHeight = 384;

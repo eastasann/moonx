@@ -85,3 +85,14 @@ export const slidePlace = style({
 export const thumbnailPlace = style({
   width: vars.layout.thumbnailColumnWidth,
 });
+
+/**
+ * Where a layout pattern or a frame is shown: a dashed box it fills as it fills the
+ * body. No overflow of its own, so the pattern's sticky bars stick to the window.
+ */
+export const patternBox = style({
+  display: "flex",
+  flexDirection: "column",
+  border: `${vars.borderWidth.hairline} dashed ${vars.color.border.strong}`,
+  borderRadius: vars.radius.chip,
+});

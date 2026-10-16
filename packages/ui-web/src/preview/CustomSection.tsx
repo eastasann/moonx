@@ -249,7 +249,7 @@ export function PanelSection() {
   );
 }
 
-const footer = "Piaya Gift Box Co. · Draft · Oct 16";
+export const footer = "Piaya Gift Box Co. · Draft · Oct 16";
 
 const exact = (value: number) => ({
   value,
@@ -257,7 +257,7 @@ const exact = (value: number) => ({
   reason: null,
 });
 
-const slides: PitchSlide[] = [
+export const slides: PitchSlide[] = [
   {
     key: "title",
     type: "title",

@@ -4,6 +4,16 @@ import { breakpoints, vars } from "@moonx/ui-tokens";
 // here rather than in a .css.ts file, which may only export what vanilla-extract can
 // serialise.
 
+/**
+ * The custom property inside a vanilla-extract variable (`var(--name)` → `--name`), to
+ * read it with getComputedStyle or set it from a style attribute.
+ */
+export function cssVarName(reference: string): string {
+  const name = /var\((--[^),]+)/.exec(reference)?.[1];
+  if (name === undefined) throw new Error(`${reference} is not a CSS variable`);
+  return name;
+}
+
 /** `prefers-reduced-motion`: movement stops, colour and opacity fade (06 motion.reduced). */
 export const reducedMotion = "(prefers-reduced-motion: reduce)";
 

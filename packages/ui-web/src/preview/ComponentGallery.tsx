@@ -56,6 +56,7 @@ import {
   SurfacesSection,
   TypographySection,
 } from "./FoundationSection";
+import { FrameSection, PageFrameSection } from "./FrameSection";
 import {
   BreadcrumbsSection,
   DisclosureSection,
@@ -67,6 +68,18 @@ import {
   PopoverSection,
   TooltipSection,
 } from "./OverlaysSection";
+import {
+  CardComparePatternSection,
+  FocusPatternSection,
+  HubPatternSection,
+  ListDetailPatternSection,
+  PresentationPatternSection,
+  PublicPatternSection,
+  QuestionFormPatternSection,
+  SettingsPatternSection,
+  StepsPatternSection,
+  WorksheetPatternSection,
+} from "./PatternsSection";
 import * as styles from "./preview.css";
 
 type Theme = "system" | "light" | "dark";
@@ -192,6 +205,18 @@ export function ComponentGallery() {
           <PanelSection />
           <SlideSection />
           <StepsSection />
+          <FrameSection />
+          <PageFrameSection />
+          <HubPatternSection />
+          <FocusPatternSection />
+          <QuestionFormPatternSection />
+          <ListDetailPatternSection />
+          <CardComparePatternSection />
+          <WorksheetPatternSection />
+          <StepsPatternSection />
+          <SettingsPatternSection />
+          <PresentationPatternSection />
+          <PublicPatternSection />
         </Stack>
       </Container>
       <ToastContainer aboveTabBar={aboveTabBar} />

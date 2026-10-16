@@ -79,5 +79,37 @@
   "mentionTextArea": {
     "members": "Members",
     "search": "Search members"
+  },
+  "appFrame": {
+    "skipToContent": "Skip to content",
+    "back": "Back to {{label}}",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "saveFailed": "Couldn't save",
+    "retry": "Retry",
+    "comments": "Comments",
+    "commentsUnresolved_one": "Comments, {{formatted}} unresolved thread",
+    "commentsUnresolved_other": "Comments, {{formatted}} unresolved threads",
+    "history": "History"
+  },
+  "nav": {
+    "label": "Main",
+    "workspace": "{{name}}, switch workspace",
+    "itemUnread_one": "{{label}}, {{formatted}} unread",
+    "itemUnread_other": "{{label}}, {{formatted}} unread",
+    "more": "More"
+  },
+  "questionFormPattern": {
+    "focus": "Focus",
+    "previous": "Previous question",
+    "next": "Next question"
+  },
+  "listDetailPattern": {
+    "back": "Back to {{label}}"
+  },
+  "cardComparePattern": {
+    "view": "View",
+    "cards": "Cards",
+    "table": "Table"
   }
 }

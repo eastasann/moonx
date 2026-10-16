@@ -405,7 +405,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | 区切りは「/」。今の画面はリンクにせず文字で出す（`aria-current`） | 出さない（部品が幅で隠す。画面は ← 戻る を出す） |
 | CheckDots | 5・6 の一覧の行の、確認項目6つの状態の点列（MoonGlyph の ●達成 ◐途中 ○未着手）。形で状態を伝え、読み上げは全項目の名前と状態を1つの画像として読む | S / M | 同じ |
 | StatusLight | F/A/U（Fact / Assumption / Unknown / Unclassified / Empty）、確認項目の状態（Not started / Partial / Done）、保存状態 | MoonGlyph の印＋ラベル（4.4「状態の形」。形だけ・色だけで伝えない）。保存状態は印の代わりにアイコン（Saving… は回る読み込みの印、Saved は ✓、Couldn't save は警告。Couldn't save は文字とアイコンを negative の赤にする） | 同じ |
-| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、「Overdue」「Lump sum」「(former member)」 | 色を付けない枠の札（Undecided は点線の枠）。未読数だけインクの塗り。「Overdue」と期限切れの日数（「overdue 3d」）は注意の琥珀色の文字。Drop を negative にしない。props は `fillStyle`（Spectrum 2 の outline = 枠と bold = 塗りに、moonx の dashed = 点線の枠を足したもの。既定は outline で、Spectrum 2 の既定の bold と違う）と `variant`（neutral / notice。notice は outline の枠の中の琥珀色の文字だけ） | 同じ |
+| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、ヘッダーの 💬 の未解決のスレッドの数（6.0.1）、「Overdue」「Lump sum」「(former member)」 | 色を付けない枠の札（Undecided は点線の枠）。未読数だけインクの塗り。「Overdue」と期限切れの日数（「overdue 3d」）は注意の琥珀色の文字。Drop を negative にしない。props は `fillStyle`（Spectrum 2 の outline = 枠と bold = 塗りに、moonx の dashed = 点線の枠を足したもの。既定は outline で、Spectrum 2 の既定の bold と違う）と `variant`（neutral / notice。notice は outline の枠の中の琥珀色の文字だけ） | 同じ |
 | InlineAlert | 粗利のマイナス・Capacity 超過・費用の下限の注意・「Latest decision is Hold」・アーカイブ中・新しいテンプレートの案内（6.0.7）・画面上部の帯（オフライン・新しい版・ホーム画面への追加の案内。6.0.6） | informative / notice / negative / neutral | 同じ |
 | Toast | 「Decision recorded」「2 answers updated · 1 needs F/A/U」「Duplicated from …」と「Undo」（6.8） | 文と、任意の操作のボタン1つと、閉じるボタン。デスクトップとタブレットは下の中央 | 下部（タブの上） |
 | ProgressBar / ProgressCircle | 「Preparing PDF…」、送信中のボタン | — | 同じ |
@@ -425,7 +425,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | Steps（Spectrum の名前） | パターン G のステップ表示（1 → 2 → 3）。済み・今・これから | — | 同じ |
 | 独自: SideNav / TabBar | 共通ナビ（6.0.1）。デスクトップは左のサイドバー、スマホは下のタブ | — | 下のタブ |
 | 独自: AppFrame | ログイン後の全画面の枠（6.0.1）。SideNav・TabBar・ヘッダー（パンくず・保存状態・パネルの入口）・本文・パネル（デスクトップは本文の右の列）・スキップリンクを並べる | — | 下のタブとヘッダーの戻る |
-| 独自: PageFrame | 枠の無い画面（1 ランディング・2 ログイン系・3 オンボーディング）の main ランドマーク。見た目は持たず、中のレイアウトパターンが並びを決める | — | 同じ |
+| 独自: PageFrame | 枠の無い画面（1 ランディング・2 ログイン系・3 オンボーディング・29・30）の main ランドマーク。見た目は持たず、中のレイアウトパターンが並びを決める。画面上部の帯（オフライン・新しい版。6.0.6）は main の先頭に出す | — | 同じ |
 | 独自: RouterProvider | `href` を持つ部品（Link・MenuItem・Breadcrumb）をアプリのルーターで移動させる。アプリのルートに1つ置く | — | 同じ |
 | 独自: Panel | コメント・変更履歴のパネル（PNL-1・PNL-2） | — | トレイ |
 | 独自: DiffText | 変更履歴（PNL-2）の変更前・変更後の文章。変わった文字を追加（下線）・削除（取り消し線）で強調し、色だけで伝えない | before / after | 同じ |
@@ -972,7 +972,7 @@ Web（パターン C 設問フォーム）
 
 - 検証のときだけ、各回答に F/A/U（6.0.3）。自己分析には出さない。
 - フォーカス中の設問だけに出すもの: EXAMPLE（テンプレートの例。最初は開いた状態）、ヒント、検証のときは「関連する調査ログ」（この設問の根拠に付いているもの）。
-- スマホの問いのドット（MoonGlyph）: 回答済み（●）・未回答（点線の丸 ◌）・今の問い（輪で囲む ◉）。押すとその問いへ移る。
+- スマホの問いのドット（MoonGlyph）: 回答済み（●）・未回答（点線の丸 ◌）・今の問い（輪で囲む ◉）。押すとその問いへ移る。押せるドットはどれもタップ領域の下限（4.3）を持つ。← と → の間に入らないとき（検証の 02 は15問）は、ドットの列だけを横にスクロールし、今の問いのドットを見える所に保つ（ページは横にスクロールさせない。4.5 の Tabs と同じ）。
 
 #### 操作と状態遷移
 

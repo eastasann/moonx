@@ -1,8 +1,8 @@
 import { vars } from "@moonx/ui-tokens";
-import { reducedMotion } from "../styles/helpers";
+import { cssVarName, reducedMotion } from "../styles/helpers";
 
 /** `--layout-focus-anchor`, read from the page: 06 layout.focus-anchor. */
-const anchorProperty = /var\((--[^),]+)/.exec(vars.layout.focusAnchor)?.[1];
+const anchorProperty = cssVarName(vars.layout.focusAnchor);
 
 function scrollParent(element: HTMLElement): HTMLElement | null {
   for (
@@ -29,9 +29,6 @@ function scrollParent(element: HTMLElement): HTMLElement | null {
  * it is.
  */
 export function scrollToFocusAnchor(element: HTMLElement, focused: Element) {
-  if (anchorProperty === undefined) {
-    throw new Error("layout.focus-anchor is not a CSS variable");
-  }
   const anchor = Number.parseFloat(
     getComputedStyle(element).getPropertyValue(anchorProperty),
   );

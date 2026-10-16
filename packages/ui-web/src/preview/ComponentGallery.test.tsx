@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockTextMeasure } from "../test/helpers";
@@ -57,6 +57,18 @@ test("the gallery renders every section", () => {
     "Panel",
     "Slide",
     "Steps",
+    "SideNav, TabBar, AppFrame and RouterProvider",
+    "PageFrame",
+    "HubPattern",
+    "FocusPattern",
+    "QuestionFormPattern",
+    "ListDetailPattern",
+    "CardComparePattern",
+    "WorksheetPattern",
+    "StepsPattern",
+    "SettingsPattern",
+    "PresentationPattern",
+    "PublicPattern",
   ]) {
     expect(screen.getByRole("region", { name: title })).toBeTruthy();
   }
@@ -66,16 +78,21 @@ test("the theme and scale switches set the html attributes, System and Auto clea
   const user = userEvent.setup();
   const { unmount } = render(<ComponentGallery />);
   const root = document.documentElement;
+  // The toolbar's switches; SettingsPattern's sample has its own System / Light / Dark.
+  const option = (group: "Theme" | "Scale", name: string) =>
+    within(screen.getByRole("radiogroup", { name: group })).getByRole("radio", {
+      name,
+    });
   expect(root.hasAttribute("data-theme")).toBe(false);
-  await user.click(screen.getByRole("radio", { name: "Dark" }));
-  await user.click(screen.getByRole("radio", { name: "Large" }));
+  await user.click(option("Theme", "Dark"));
+  await user.click(option("Scale", "Large"));
   expect(root.getAttribute("data-theme")).toBe("dark");
   expect(root.getAttribute("data-scale")).toBe("large");
-  await user.click(screen.getByRole("radio", { name: "System" }));
-  await user.click(screen.getByRole("radio", { name: "Auto" }));
+  await user.click(option("Theme", "System"));
+  await user.click(option("Scale", "Auto"));
   expect(root.hasAttribute("data-theme")).toBe(false);
   expect(root.hasAttribute("data-scale")).toBe(false);
-  await user.click(screen.getByRole("radio", { name: "Light" }));
+  await user.click(option("Theme", "Light"));
   unmount();
   expect(root.hasAttribute("data-theme")).toBe(false);
 });

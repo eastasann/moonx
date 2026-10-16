@@ -168,6 +168,17 @@ export const statusLightVariants = [
 ] as const;
 export type StatusLightVariant = (typeof statusLightVariants)[number];
 
+/**
+ * AppFrame's save state in the header (design-spec 6.0.2): StatusLight's save variants,
+ * "Couldn't save" with Retry.
+ */
+export const saveStates = ["saving", "saved", "save-failed"] as const;
+export type SaveState = (typeof saveStates)[number];
+
+/** CardComparePattern's view (design-spec 4.1 E, 15's `?view=`): the cards or the table. */
+export const compareViews = ["cards", "table"] as const;
+export type CompareView = (typeof compareViews)[number];
+
 /** The F/A/U states that have colours (design-spec 6.0.3). */
 export const fauStates = [
   "fact",

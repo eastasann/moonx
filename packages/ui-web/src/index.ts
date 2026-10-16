@@ -9,6 +9,7 @@ export {
   ActionGroup,
   type ActionGroupProps,
 } from "./components/ActionButton";
+export { AppFrame, type AppFrameProps } from "./components/AppFrame";
 export { Avatar, type AvatarProps } from "./components/Avatar";
 export { Badge, type BadgeProps } from "./components/Badge";
 export {
@@ -111,6 +112,7 @@ export {
   type MoonState,
 } from "./components/MoonGlyph";
 export { NumberField, type NumberFieldProps } from "./components/NumberField";
+export { PageFrame, type PageFrameProps } from "./components/PageFrame";
 export { Panel, type PanelProps } from "./components/Panel";
 export { Picker, type PickerProps } from "./components/Picker";
 export { Popover, type PopoverProps } from "./components/Popover";
@@ -130,6 +132,10 @@ export {
   type RadioProps,
 } from "./components/RadioGroup";
 export {
+  RouterProvider,
+  type RouterProviderProps,
+} from "./components/RouterProvider";
+export {
   RowList,
   RowListItem,
   type RowListItemProps,
@@ -142,11 +148,17 @@ export {
   type SegmentedControlItemProps,
   type SegmentedControlProps,
 } from "./components/SegmentedControl";
+export {
+  type NavItem,
+  SideNav,
+  type SideNavProps,
+} from "./components/SideNav";
 export { Skeleton, type SkeletonProps } from "./components/Skeleton";
 export { Slide, type SlideProps } from "./components/Slide";
 export { StatusLight, type StatusLightProps } from "./components/StatusLight";
 export { Steps, type StepsProps } from "./components/Steps";
 export { Switch, type SwitchProps } from "./components/Switch";
+export { TabBar, type TabBarProps } from "./components/TabBar";
 export {
   type TableColumn,
   TableView,
@@ -205,3 +217,39 @@ export { Container, type ContainerProps } from "./layout/Container";
 export { Flex, type FlexProps, Stack, type StackProps } from "./layout/Flex";
 export { Grid, type GridColumns, type GridProps } from "./layout/Grid";
 export type { Responsive } from "./layout/types";
+export {
+  CardComparePattern,
+  type CardComparePatternProps,
+} from "./patterns/CardComparePattern";
+export { FocusPattern, type FocusPatternProps } from "./patterns/FocusPattern";
+export {
+  type HubBlock,
+  HubPattern,
+  type HubPatternProps,
+} from "./patterns/HubPattern";
+export {
+  ListDetailPattern,
+  type ListDetailPatternProps,
+} from "./patterns/ListDetailPattern";
+export {
+  PresentationPattern,
+  type PresentationPatternProps,
+} from "./patterns/PresentationPattern";
+export {
+  PublicPattern,
+  type PublicPatternProps,
+} from "./patterns/PublicPattern";
+export {
+  QuestionFormPattern,
+  type QuestionFormPatternProps,
+} from "./patterns/QuestionFormPattern";
+export {
+  type SettingsGroup,
+  SettingsPattern,
+  type SettingsPatternProps,
+} from "./patterns/SettingsPattern";
+export { StepsPattern, type StepsPatternProps } from "./patterns/StepsPattern";
+export {
+  WorksheetPattern,
+  type WorksheetPatternProps,
+} from "./patterns/WorksheetPattern";

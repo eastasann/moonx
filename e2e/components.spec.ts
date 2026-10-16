@@ -42,6 +42,8 @@ async function choose(page: Page, group: "Theme" | "Scale", option: string) {
 const region = (page: Page, name: string) =>
   page.getByRole("region", { name, exact: true });
 
+const frameSection = "SideNav, TabBar, AppFrame and RouterProvider";
+
 /** Every component of the gallery, by one instance that must be on screen. */
 const components: [string, string, (section: Locator) => Locator][] = [
   ["Flex", "Layout", (s) => s.getByText("Start", { exact: true })],
@@ -297,6 +299,70 @@ const components: [string, string, (section: Locator) => Locator][] = [
   ["Panel", "Panel", (s) => s.getByRole("button", { name: "Open comments" })],
   ["Slide", "Slide", (s) => s.getByRole("region", { name: "Competition" })],
   ["Steps", "Steps", (s) => s.getByRole("list", { name: "Import from AI" })],
+  // The frame: the SideNav from the tablet breakpoint up, the TabBar on a phone, both
+  // named Main; the width checks below tell them apart.
+  ["SideNav / TabBar", frameSection, (s) => s.getByRole("navigation")],
+  ["AppFrame", frameSection, (s) => s.getByRole("button", { name: "History" })],
+  [
+    "RouterProvider",
+    frameSection,
+    (s) => s.getByText("RouterProvider moved to: nothing yet"),
+  ],
+  [
+    "PageFrame",
+    "PageFrame",
+    (s) => s.getByRole("heading", { name: "Sign in to moonx" }),
+  ],
+  [
+    "HubPattern",
+    "HubPattern",
+    (s) => s.getByRole("heading", { name: "Piaya Gift Box Delivery" }),
+  ],
+  [
+    "FocusPattern",
+    "FocusPattern",
+    (s) => s.getByRole("button", { name: "Save decision" }),
+  ],
+  [
+    "QuestionFormPattern",
+    "QuestionFormPattern",
+    (s) => s.getByRole("textbox", { name: "Form answer WHO" }),
+  ],
+  [
+    "ListDetailPattern",
+    "ListDetailPattern",
+    (s) => s.getByRole("heading", { name: "Piaya Gift Box Delivery" }),
+  ],
+  [
+    "CardComparePattern",
+    "CardComparePattern",
+    (s) => s.getByText("Airport kiosk", { exact: true }),
+  ],
+  [
+    "WorksheetPattern",
+    "WorksheetPattern",
+    (s) => s.getByRole("grid", { name: "Worksheet costs" }),
+  ],
+  [
+    "StepsPattern",
+    "StepsPattern",
+    (s) => s.getByText("Office workers in Bacolod who buy pasalubong."),
+  ],
+  [
+    "SettingsPattern",
+    "SettingsPattern",
+    (s) => s.getByRole("textbox", { name: "Display name" }),
+  ],
+  [
+    "PresentationPattern",
+    "PresentationPattern",
+    (s) => s.getByRole("region", { name: "Business model" }).first(),
+  ],
+  [
+    "PublicPattern",
+    "PublicPattern",
+    (s) => s.getByRole("link", { name: "Sign in" }),
+  ],
 ];
 
 /** Shown on tablet and wider only (design-spec 4.5): a phone shows ← instead. */
@@ -1351,4 +1417,656 @@ test.describe("data and moonx's own components in a real browser (design-spec 4.
       });
     }
   }
+});
+
+// The frame and the layout patterns (design-spec 4.1・4.3・6.0.1): where their parts land
+// at each width.
+
+type Box = { x: number; y: number; width: number; height: number };
+
+async function boxOf(locator: Locator): Promise<Box> {
+  const box = await locator.boundingBox();
+  if (box === null) throw new Error("not on screen");
+  return box;
+}
+
+async function openPattern(
+  page: Page,
+  width: WidthName,
+  scale: (typeof scales)[number],
+) {
+  await openGallery(page, width);
+  await choose(page, "Scale", scale);
+}
+
+/** Scrolls the section's top under the gallery's toolbar, where a screen's top would be. */
+async function showSection(page: Page, name: string) {
+  await region(page, name).evaluate((node) => {
+    node.scrollIntoView({ block: "start" });
+  });
+}
+
+/**
+ * A phone's main action in its bar across the bottom: the bar as wide as the pattern's
+ * box (4.3「主要な操作は下部に固定する」).
+ */
+async function inPhoneBar(button: Locator, box: Locator) {
+  const [bar, outer] = [
+    await boxOf(button.locator("xpath=..")),
+    await boxOf(box),
+  ];
+  expect(Math.abs(bar.width - outer.width)).toBeLessThanOrEqual(2);
+}
+
+/** `a` and `b` side by side: `b` to the right, their tops level. */
+async function sideBySide(a: Locator, b: Locator) {
+  const [left, right] = [await boxOf(a), await boxOf(b)];
+  expect(right.x).toBeGreaterThanOrEqual(left.x + left.width);
+  expect(Math.abs(right.y - left.y)).toBeLessThanOrEqual(2);
+}
+
+/** Each one under the one before it, in one column. */
+async function stacked(...locators: Locator[]) {
+  const boxes = await Promise.all(locators.map(boxOf));
+  for (const [index, box] of boxes.entries()) {
+    const previous = boxes[index - 1];
+    if (previous === undefined) continue;
+    expect(box.y).toBeGreaterThanOrEqual(previous.y + previous.height);
+    expect(Math.abs(box.x - previous.x)).toBeLessThanOrEqual(2);
+  }
+}
+
+test.describe("the frame follows the width (design-spec 4.3・6.0.1)", () => {
+  test("desktop: the sidebar with names, the breadcrumbs, the panel docked beside the body", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const frame = region(page, frameSection);
+    await showSection(page, frameSection);
+    const nav = frame.getByRole("navigation", { name: "Main" });
+    // 06 layout.sidebar-width.
+    expect(Math.round((await boxOf(nav)).width)).toBe(240);
+    await expect(nav.getByText("Ideas", { exact: true })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Ideas" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(frame.getByRole("button", { name: "More" })).toBeHidden();
+    await expect(
+      frame.getByRole("list", { name: "Frame breadcrumbs" }),
+    ).toBeVisible();
+    await expect(
+      frame.getByRole("link", { name: "Back to Validation" }),
+    ).toBeHidden();
+    // 11's Focus switch sits in the header, beside the save state.
+    const header = frame.locator("header");
+    await expect(header.getByRole("switch", { name: "Focus" })).toBeVisible();
+    await expect(header.getByRole("status")).toHaveText("Saved");
+
+    // The panel is a column at the body's right, not over it.
+    await header.getByRole("button", { name: /^Comments/ }).click();
+    const panel = frame.getByRole("complementary", { name: "Comments" });
+    await expect(panel).toBeVisible();
+    await sideBySide(frame.getByRole("main"), panel);
+    // 06 layout.side-panel-width.
+    expect(Math.round((await boxOf(panel)).width)).toBe(360);
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+  });
+
+  test("desktop: links go through the router; the workspace opens M7", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const frame = region(page, frameSection);
+    await showSection(page, frameSection);
+    await frame
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: "Decision Log" })
+      .click();
+    await expect(
+      frame.getByText("RouterProvider moved to: /w/demo/decisions"),
+    ).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/dev/components");
+    await frame.getByRole("button", { name: "BCDX, switch workspace" }).click();
+    await expect(
+      frame.getByText("RouterProvider moved to: Switch workspace"),
+    ).toBeVisible();
+    await frame.getByRole("button", { name: "Ana Reyes" }).click();
+    await page.getByRole("menuitem", { name: "Account" }).click();
+    await expect(
+      frame.getByText("RouterProvider moved to: /account"),
+    ).toBeVisible();
+  });
+
+  test("tablet: icons only, named in tooltips; the panel is a drawer", async ({
+    page,
+  }) => {
+    await openGallery(page, "tablet");
+    const frame = region(page, frameSection);
+    await showSection(page, frameSection);
+    const nav = frame.getByRole("navigation", { name: "Main" });
+    // 06 layout.sidebar-width-collapsed.
+    expect(Math.round((await boxOf(nav)).width)).toBe(64);
+    // The name is only read: a 1px clipped box beside the icon.
+    expect(
+      (await boxOf(nav.getByText("Ideas", { exact: true }))).width,
+    ).toBeLessThanOrEqual(1);
+    await nav.getByRole("link", { name: "Dashboard" }).focus();
+    await page.keyboard.press("Tab");
+    await expect(nav.getByRole("link", { name: "Ideas" })).toBeFocused();
+    await expect(page.getByRole("tooltip")).toHaveText("Ideas");
+    await page.keyboard.press("Escape");
+    await expect(frame.getByRole("button", { name: "More" })).toBeHidden();
+    await frame
+      .locator("header")
+      .getByRole("button", { name: /^Comments/ })
+      .click();
+    const drawer = page.getByRole("dialog", { name: "Comments" });
+    await expect(drawer).toBeVisible();
+    await settled(drawer.locator("xpath=.."));
+    const box = await boxOf(drawer.locator("xpath=.."));
+    expect(Math.round(box.x + box.width)).toBe(widths.tablet.width);
+  });
+
+  test("phone: the TabBar under the body, ← in the header, the bottom bar on the TabBar", async ({
+    page,
+  }) => {
+    await openGallery(page, "mobile");
+    const frame = region(page, frameSection);
+    await showSection(page, frameSection);
+    const tabs = frame.getByRole("navigation", { name: "Main" });
+    await expect(tabs.getByRole("link")).toHaveCount(4);
+    await expect(tabs.getByRole("button", { name: "More" })).toBeVisible();
+    await expect(tabs.getByText("Self Analysis")).toBeVisible();
+    await expect(
+      frame.getByRole("button", { name: "BCDX, switch workspace" }),
+    ).toBeHidden();
+    await expect(
+      frame.getByRole("link", { name: "Back to Validation" }),
+    ).toBeVisible();
+    await expect(
+      frame.getByRole("list", { name: "Frame breadcrumbs" }),
+    ).toBeHidden();
+    // Saved keeps its mark and gives up its word on a phone (4.3).
+    const status = frame.locator("header").getByRole("status");
+    await expect(status).toHaveText("Saved");
+    expect((await boxOf(status)).width).toBeLessThan(40);
+    await expect(frame.getByRole("switch", { name: "Focus" })).toBeHidden();
+
+    // The frame fills the window: the TabBar on its bottom edge, the question form's bar
+    // resting on the TabBar (4.3).
+    const tabBox = await boxOf(tabs);
+    expect(Math.round(tabBox.y + tabBox.height)).toBe(widths.mobile.height);
+    // 06 layout.tab-bar-height.
+    expect(Math.round(tabBox.height)).toBe(64);
+    const next = frame.getByRole("button", { name: "Next question" });
+    const bar = next.locator("xpath=..");
+    const barBox = await boxOf(bar);
+    expect(Math.round(barBox.y + barBox.height)).toBe(Math.round(tabBox.y));
+
+    // More opens the rest in a tray.
+    await tabs.getByRole("button", { name: "More" }).click();
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    expect(await placement(menu, "mobile")).toBe("tray");
+    await page.getByRole("menuitem", { name: "Decision Log" }).click();
+    await expect(
+      frame.getByText("RouterProvider moved to: /w/demo/decisions"),
+    ).toBeVisible();
+  });
+
+  test("phone: Couldn't save keeps its words, with Retry (4.3)", async ({
+    page,
+  }) => {
+    await openGallery(page, "mobile");
+    const frame = region(page, frameSection);
+    await frame
+      .getByRole("radiogroup", { name: "Save state" })
+      .getByRole("radio", { name: "Failed" })
+      .click();
+    await showSection(page, frameSection);
+    const header = frame.locator("header");
+    await expect(header.getByText("Couldn't save")).toBeVisible();
+    expect(
+      (await boxOf(header.getByText("Couldn't save"))).width,
+    ).toBeGreaterThan(40);
+    await expect(header.getByRole("button", { name: "Retry" })).toBeVisible();
+  });
+
+  test("phone: the tab names keep the tab-label size at both scales (4.3)", async ({
+    page,
+  }) => {
+    const sizes: string[] = [];
+    for (const scale of scales) {
+      await openGallery(page, "mobile");
+      await choose(page, "Scale", scale);
+      const tab = region(page, frameSection)
+        .getByRole("navigation", { name: "Main" })
+        .getByRole("link", { name: "Ideas" });
+      await tab.scrollIntoViewIfNeeded();
+      sizes.push(
+        await tab.evaluate(
+          (node) => getComputedStyle(node.children[1] as Element).fontSize,
+        ),
+      );
+    }
+    // 06 typography.tab-label: 11px.
+    expect(sizes).toEqual(["11px", "11px"]);
+  });
+
+  test("phone, large scale: the tab names fit without being cut short", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto("/dev/components");
+    await choose(page, "Scale", "large");
+    const tabs = region(page, frameSection).getByRole("navigation", {
+      name: "Main",
+    });
+    await tabs.scrollIntoViewIfNeeded();
+    // Each name stays whole inside its tab, on two lines at most, and the tab keeps its
+    // height (the unread badge may hang past the icon's corner).
+    for (const tab of await tabs.locator("a, button").all()) {
+      const fit = await tab.evaluate((node) => {
+        // The icon, then the name (then the count, if any).
+        const label = node.children[1] as HTMLElement;
+        const lineHeight = Number.parseFloat(
+          getComputedStyle(label).lineHeight,
+        );
+        return {
+          name: label.textContent,
+          inside: label.scrollWidth <= label.clientWidth,
+          lines: Math.round(label.getBoundingClientRect().height / lineHeight),
+          tall: node.scrollHeight <= node.clientHeight,
+        };
+      });
+      expect(fit.inside, fit.name ?? "").toBe(true);
+      expect(fit.lines, fit.name ?? "").toBeLessThanOrEqual(2);
+      expect(fit.tall, fit.name ?? "").toBe(true);
+    }
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+});
+
+test.describe("the patterns follow the width (design-spec 4.1)", () => {
+  // At both scales: a phone and a tablet use the large one, whose larger parts must keep
+  // the same arrangement.
+  for (const [width, scale] of (Object.keys(widths) as WidthName[]).flatMap(
+    (name) => scales.map((each) => [name, each] as const),
+  )) {
+    const isDesktop = width === "desktop";
+    const isPhone = width === "mobile";
+
+    test(`A HubPattern at ${width}, ${scale}`, async ({ page }) => {
+      await openPattern(page, width, scale);
+      const hub = region(page, "HubPattern");
+      await showSection(page, "HubPattern");
+      const block = (name: string) =>
+        hub.getByRole("heading", { name, exact: true });
+      if (isDesktop) {
+        // The main column and the side column, each keeping the listed order.
+        await sideBySide(block("Next steps"), block("Sections"));
+        await stacked(block("Next steps"), block("Checks"), block("Summary"));
+        await stacked(block("Sections"), block("Decisions"));
+      } else {
+        await stacked(
+          block("Next steps"),
+          block("Checks"),
+          block("Sections"),
+          block("Summary"),
+          block("Decisions"),
+        );
+      }
+      const decide = await boxOf(hub.getByRole("button", { name: "Decide" }));
+      const metrics = await boxOf(hub.getByText("Startup costs"));
+      if (isPhone) {
+        // Fixed to the bottom: in view while the blocks above it scroll.
+        expect(decide.y + decide.height).toBeLessThanOrEqual(
+          widths.mobile.height,
+        );
+        expect(decide.y).toBeGreaterThan(widths.mobile.height - 64);
+      } else {
+        // In the header with the title (beside it, or under it when the title's line
+        // is long), above the numbers.
+        expect(decide.y + decide.height).toBeLessThanOrEqual(metrics.y);
+      }
+    });
+
+    test(`B FocusPattern at ${width}, ${scale}`, async ({ page }) => {
+      await openPattern(page, width, scale);
+      const focus = region(page, "FocusPattern");
+      await showSection(page, "FocusPattern");
+      // The Well holding the material.
+      const material = await boxOf(
+        focus
+          .getByText("Break-even 6.9 / day · 4 of 6 checks done")
+          .locator("xpath=ancestor::div[1]"),
+      );
+      const save = await boxOf(
+        focus.getByRole("button", { name: "Save decision" }),
+      );
+      // One reading column (06 layout.reading-column-max), the action under it.
+      expect(material.width).toBeLessThanOrEqual(720);
+      expect(save.y).toBeGreaterThan(material.y + material.height);
+      if (isPhone) {
+        const bar = await boxOf(
+          focus
+            .getByRole("button", { name: "Save decision" })
+            .locator("xpath=.."),
+        );
+        const box = await boxOf(focus.locator("xpath=div").first());
+        expect(Math.abs(bar.width - box.width)).toBeLessThanOrEqual(2);
+      } else {
+        // At the end of the column.
+        expect(
+          Math.abs(save.x + save.width - (material.x + material.width)),
+        ).toBeLessThanOrEqual(2);
+      }
+    });
+
+    test(`C QuestionFormPattern at ${width}, ${scale}`, async ({ page }) => {
+      await openPattern(page, width, scale);
+      const form = region(page, "QuestionFormPattern");
+      await showSection(page, "QuestionFormPattern");
+      const card = (name: string) =>
+        form.getByRole("region", { name, exact: true });
+      if (isPhone) {
+        await expect(card("Form WHO")).toBeVisible();
+        await expect(card("Form WHY THEM")).toHaveCount(0);
+        await expect(form.getByRole("switch", { name: "Focus" })).toHaveCount(
+          0,
+        );
+        await form.getByRole("button", { name: "Next question" }).click();
+        await expect(card("Form WHY THEM")).toBeVisible();
+        await expect(card("Form WHO")).toHaveCount(0);
+      } else {
+        await stacked(
+          card("Form WHO"),
+          card("Form WHY THEM"),
+          card("Form PROBLEM"),
+        );
+        await expect(form.getByRole("switch", { name: "Focus" })).toBeVisible();
+        // Ctrl+↓ opens the next question with its answer focused, in the middle.
+        await form.getByRole("textbox", { name: "Form answer WHO" }).click();
+        await page.keyboard.press("Control+ArrowDown");
+        const next = form.getByRole("textbox", {
+          name: "Form answer WHY THEM",
+        });
+        await expect(next).toBeFocused();
+        await expect(
+          form.getByRole("textbox", { name: "Form answer WHO" }),
+        ).toHaveCount(0);
+        // Focus off opens them all.
+        await form.getByText("Focus", { exact: true }).click();
+        await expect(form.getByRole("textbox")).toHaveCount(3);
+      }
+    });
+
+    test(`D ListDetailPattern at ${width}, ${scale}`, async ({ page }) => {
+      await openPattern(page, width, scale);
+      const pattern = region(page, "ListDetailPattern");
+      await showSection(page, "ListDetailPattern");
+      const list = pattern.getByRole("grid", { name: "Pattern ideas" });
+      const detail = pattern.getByRole("heading", {
+        name: "Piaya Gift Box Delivery",
+      });
+      const create = pattern.getByRole("button", { name: "New idea" });
+      if (isDesktop) {
+        // 06 layout.list-pane-width, the detail at its right.
+        expect(Math.round((await boxOf(list)).width)).toBe(352);
+        expect((await boxOf(detail)).x).toBeGreaterThan(
+          (await boxOf(list)).x + 352,
+        );
+        await expect(create).toBeVisible();
+        return;
+      }
+      // One pane at a time across the width: the detail, then ← back to the list.
+      await expect(list).toHaveCount(0);
+      await pattern.getByRole("button", { name: "Back to Ideas" }).click();
+      await expect(list).toBeVisible();
+      await expect(detail).toHaveCount(0);
+      const listBox = await boxOf(list);
+      const patternBox = await boxOf(pattern.locator("xpath=div").first());
+      expect(listBox.width).toBeGreaterThan(patternBox.width * 0.85);
+      const action = await boxOf(create);
+      if (isPhone) {
+        // Floating at the bottom right, after the list.
+        expect(action.y).toBeGreaterThan(listBox.y + listBox.height);
+        expect(
+          Math.abs(action.x + action.width - (listBox.x + listBox.width)),
+        ).toBeLessThanOrEqual(2);
+      } else {
+        expect(action.y).toBeLessThan(listBox.y);
+      }
+    });
+
+    test(`E CardComparePattern at ${width}, ${scale}`, async ({ page }) => {
+      await openPattern(page, width, scale);
+      const pattern = region(page, "CardComparePattern");
+      await showSection(page, "CardComparePattern");
+      const card = (name: string) => pattern.getByText(name, { exact: true });
+      const add = pattern.getByRole("button", { name: "Add competitor" });
+      const box = pattern.locator("xpath=div").first();
+      if (isPhone) {
+        await stacked(card("Airport kiosk"), card("Bakeshop boxes"));
+        await expect(
+          pattern.getByRole("radiogroup", { name: "View" }),
+        ).toHaveCount(0);
+        // The main action under the cards, in the bar across the bottom.
+        expect((await boxOf(add)).y).toBeGreaterThan(
+          (await boxOf(card("Home bakers"))).y,
+        );
+        await inPhoneBar(add, box);
+        return;
+      }
+      // The main action beside the title, above the cards.
+      expect((await boxOf(add)).y).toBeLessThan(
+        (await boxOf(card("Airport kiosk"))).y,
+      );
+      await sideBySide(card("Airport kiosk"), card("Bakeshop boxes"));
+      await pattern
+        .getByRole("radiogroup", { name: "View" })
+        .getByRole("radio", { name: "Table" })
+        .click();
+      await expect(
+        pattern.getByRole("grid", { name: "Compared in a table" }),
+      ).toBeVisible();
+      await expect(
+        pattern.getByRole("grid", { name: "Compared rivals" }),
+      ).toHaveCount(0);
+    });
+
+    test(`F WorksheetPattern at ${width}, ${scale}`, async ({ page }) => {
+      await openPattern(page, width, scale);
+      const pattern = region(page, "WorksheetPattern");
+      await showSection(page, "WorksheetPattern");
+      const inputs = pattern.getByRole("grid", { name: "Worksheet costs" });
+      if (isDesktop) {
+        const results = pattern.getByRole("complementary", { name: "Totals" });
+        await sideBySide(inputs, results);
+        expect(Math.round((await boxOf(results)).width)).toBe(360);
+        return;
+      }
+      // The table across the width; the summary bar opens the results.
+      const summary = pattern.getByRole("button", {
+        name: /Startup total ₱19,500/,
+      });
+      expect((await boxOf(summary)).y).toBeGreaterThan((await boxOf(inputs)).y);
+      await summary.click();
+      const dialog = page.getByRole("dialog", { name: "Totals" });
+      await expect(dialog).toBeVisible();
+      await settled(dialog.locator("xpath=.."));
+      const box = await boxOf(dialog.locator("xpath=.."));
+      const viewport = widths[width];
+      if (isPhone) {
+        expect(await placement(dialog, width)).toBe("tray");
+      } else {
+        // The drawer from the right (4.1 F).
+        expect(Math.round(box.x + box.width)).toBe(viewport.width);
+        expect(box.width).toBeLessThan(viewport.width / 2);
+      }
+    });
+
+    test(`G StepsPattern at ${width}, ${scale}`, async ({ page }) => {
+      await openPattern(page, width, scale);
+      const pattern = region(page, "StepsPattern");
+      await showSection(page, "StepsPattern");
+      const steps = pattern.getByRole("list", { name: "Pattern import steps" });
+      const before = pattern.getByRole("heading", {
+        name: "Current",
+        exact: true,
+      });
+      const after = pattern.getByRole("heading", {
+        name: "From AI",
+        exact: true,
+      });
+      expect((await boxOf(steps)).y).toBeLessThan((await boxOf(before)).y);
+      if (isPhone) await stacked(before, after);
+      else await sideBySide(before, after);
+      // Apply under the diff: fixed to the bottom on a phone (6.7), at the end of the
+      // column on wider screens.
+      const apply = pattern.getByRole("button", { name: "Apply 1 change" });
+      const afterBox = await boxOf(after);
+      const applyBox = await boxOf(apply);
+      expect(applyBox.y).toBeGreaterThan(afterBox.y + afterBox.height);
+      if (isPhone) {
+        await inPhoneBar(apply, pattern.locator("xpath=div").first());
+      } else {
+        expect(
+          Math.abs(applyBox.x + applyBox.width - (afterBox.x + afterBox.width)),
+        ).toBeLessThan(afterBox.width);
+      }
+    });
+
+    test(`H SettingsPattern at ${width}, ${scale}`, async ({ page }) => {
+      await openPattern(page, width, scale);
+      const pattern = region(page, "SettingsPattern");
+      await showSection(page, "SettingsPattern");
+      const group = pattern.getByRole("region", { name: "Profile" });
+      const name = group.getByRole("heading", { name: "Profile" });
+      const field = group.getByRole("textbox", { name: "Display name" });
+      const [nameBox, fieldBox] = [await boxOf(name), await boxOf(field)];
+      if (isPhone) {
+        expect(fieldBox.y).toBeGreaterThan(nameBox.y + nameBox.height);
+      } else {
+        expect(fieldBox.x).toBeGreaterThan(nameBox.x + nameBox.width);
+      }
+    });
+
+    test(`I PresentationPattern at ${width}, ${scale}`, async ({ page }) => {
+      await openPattern(page, width, scale);
+      const pattern = region(page, "PresentationPattern");
+      await showSection(page, "PresentationPattern");
+      const thumbnails = pattern.getByRole("grid", { name: "Pattern slides" });
+      const download = pattern.getByRole("button", { name: "Download PDF" });
+      if (isPhone) {
+        await expect(thumbnails).toHaveCount(0);
+        await stacked(
+          pattern.getByRole("region", { name: "Piaya Gift Box Co." }),
+          pattern.getByRole("region", { name: "Problem" }),
+        );
+        // The slides are taller than the window: the bar holds to its bottom edge.
+        const button = await boxOf(download);
+        expect(button.y + button.height).toBeLessThanOrEqual(
+          widths.mobile.height,
+        );
+        expect(button.y).toBeGreaterThan(widths.mobile.height - 64);
+        await inPhoneBar(download, pattern.locator("xpath=div").first());
+        await expect(pattern.getByText(/^Say:/)).toBeAttached();
+        return;
+      }
+      expect((await boxOf(download)).y).toBeLessThan(
+        (await boxOf(thumbnails)).y,
+      );
+      const slide = pattern.getByRole("region", { name: "Business model" });
+      await sideBySide(thumbnails, slide);
+      // 06 layout.thumbnail-column-width.
+      expect(Math.round((await boxOf(thumbnails)).width)).toBe(160);
+      expect((await boxOf(pattern.getByText(/^Say:/))).y).toBeGreaterThan(
+        (await boxOf(slide)).y + (await boxOf(slide)).height,
+      );
+      await thumbnails.getByText("2 Problem").click();
+      await expect(
+        pattern.getByRole("region", { name: "Problem" }),
+      ).toBeVisible();
+    });
+
+    test(`J PublicPattern at ${width}, ${scale}`, async ({ page }) => {
+      await openPattern(page, width, scale);
+      const pattern = region(page, "PublicPattern");
+      await showSection(page, "PublicPattern");
+      const signIn = pattern.getByRole("link", { name: "Sign in" });
+      const title = pattern.getByRole("heading", {
+        name: "Start a local business, one step at a time",
+      });
+      const example = pattern
+        .getByText("Validate an idea before you spend on it.")
+        .locator("xpath=ancestor::div[1]");
+      const privacy = pattern.getByRole("link", { name: "Privacy" });
+      expect((await boxOf(signIn)).y).toBeLessThan((await boxOf(title)).y);
+      expect((await boxOf(privacy)).y).toBeGreaterThan(
+        (await boxOf(example)).y + (await boxOf(example)).height,
+      );
+      // The hero's two columns, one where the width runs out.
+      if (isPhone) await stacked(title, example);
+      else await sideBySide(title, example);
+    });
+  }
+
+  test("D without a detail (8): the list alone, in the reading column", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const pattern = region(page, "ListDetailPattern");
+    const list = pattern.getByRole("grid", { name: "Pattern notifications" });
+    await list.scrollIntoViewIfNeeded();
+    // 06 layout.reading-column-max, less the page's gutters.
+    expect((await boxOf(list)).width).toBeLessThanOrEqual(720);
+    await expect(
+      pattern.getByRole("button", { name: "Back to Ideas" }),
+    ).toHaveCount(0);
+  });
+
+  test("PageFrame: the main landmark, the action fixed under the form on a phone", async ({
+    page,
+  }) => {
+    await openGallery(page, "mobile");
+    const pattern = region(page, "PageFrame");
+    await showSection(page, "PageFrame");
+    const main = pattern.getByRole("main");
+    await expect(main).toBeVisible();
+    // PageFrame fills the window's height, so the bar is held to the window's bottom
+    // edge however short the form is.
+    const mainBox = await boxOf(main);
+    expect(Math.round(mainBox.height)).toBeGreaterThanOrEqual(
+      widths.mobile.height,
+    );
+    const button = await boxOf(main.getByRole("button", { name: "Continue" }));
+    expect(button.y + button.height).toBeLessThanOrEqual(widths.mobile.height);
+    expect(button.y).toBeGreaterThan(widths.mobile.height - 64);
+  });
+
+  test("open WorksheetPattern drawer passes axe", async ({ page }) => {
+    await openGallery(page, "tablet");
+    await showSection(page, "WorksheetPattern");
+    await region(page, "WorksheetPattern")
+      .getByRole("button", { name: /Startup total/ })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "Totals" });
+    await expect(dialog).toBeVisible();
+    await settled(dialog.locator("xpath=.."));
+    const { violations } = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(
+      violations.map((violation) => ({
+        id: violation.id,
+        targets: violation.nodes.map((node) => node.target.join(" ")),
+      })),
+    ).toEqual([]);
+  });
 });

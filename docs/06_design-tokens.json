@@ -1118,13 +1118,13 @@
     },
     "scale": {
       "$type": "dimension",
-      "$description": "端末で切り替える Spectrum のスケール（同じキー）。デスクトップは medium、タッチの端末（スマホ・タブレット）は large（design-spec 4.4）。large が medium と違うのは target-min と押せる部品の高さと入力欄の文字の下限（field.font-size-min）だけで、それ以外の文字の大きさ・余白・印・アイコンは同じ（2026-10-17 のユーザーの決定。スマホの文字は semantic.font-size.narrow。入力欄の文字の下限は design-spec 4.3）",
+      "$description": "端末で切り替える Spectrum のスケール（同じキー）。デスクトップは medium、タッチの端末（スマホ・タブレット）は large（design-spec 4.4）。large が medium と違うのは target-min と押せる部品の高さと、入力欄の文字の下限（field.font-size-min）だけで、それ以外の文字の大きさ・余白・印・アイコンは同じ（2026-10-17 のユーザーの決定。スマホの文字は semantic.font-size.narrow）。入力欄の文字の下限は、large が文字を変えない決まりの唯一の例外（2026-10-18 のユーザーの決定。design-spec 4.3・4.4）",
       "medium": {
         "$description": "デスクトップ（Spectrum の desktop）",
         "component": {
           "$description": "Spectrum の component 層（部品の寸法）。XS / S / M / L / XL は部品の size。既定が M の部品は M（部品ごとの段と既定は design-spec 4.5。Spectrum 2 のその部品の既定にそろえ、Badge と Avatar は S、ContextualHelp は XS、Popover は大きさを指定しなければ中身に合わせる。2026-10-17 のユーザーの決定）",
           "button": {
-            "$description": "Button。値は docs/mockups（2026-10-17 のユーザーの決定）: M は moon-base.css の .btn（36px・14px・角丸 8・左右 14、quiet は左右 8）、S は s06-ideas.html の絞り込みのボタン（30px・13px・角丸 7・左右 10）、L は spacious の画面（s09・s11・s19・s25）の Button が M と同じ見た目のため M と同じ値、XL は s01-landing.html の Log in（.btn.lg の 48px・16px・角丸 10・左右 22）。d1-moon.html のスマホの下部の操作も 48px・16px（角丸と左右は .btn の 8・14 のまま）で、XL の1つの段に s01 の値を使う。XL の quiet の左右は、quiet の M の 8 を L と XL の左右の比（14 : 22）で広げた 12.6 の小数を切り捨てた 12。large は高さだけを target-min（44）以上にする（moon-base.css のスマホの .btn は 44）",
+            "$description": "Button。値は docs/mockups（2026-10-17 のユーザーの決定）: M は moon-base.css の .btn（36px・14px・角丸 8・左右 14、quiet は左右 8）、S は s06-ideas.html の絞り込みのボタン（30px・13px・角丸 7・左右 10）、L は spacious の画面（s09・s11・s19・s25）の Button が M と同じ見た目のため M と同じ値、XL は s01-landing.html の Log in（.btn.lg の 48px・16px・角丸 10・左右 22）。d1-moon.html のスマホの下部の操作も 48px・16px（角丸と左右は .btn の 8・14 のまま）で、XL の1つの段に s01 の値を使う。large は高さだけを target-min（44）以上にする（moon-base.css のスマホの .btn は 44）",
             "height": {
               "S": { "$value": "{primitive.dimension.30}" },
               "M": { "$value": "{primitive.dimension.36}" },
@@ -1138,11 +1138,11 @@
               "XL": { "$value": "{primitive.dimension.22}" }
             },
             "padding-x-quiet": {
-              "$description": "quiet（枠なし）の左右",
-              "S": { "$value": "{primitive.dimension.6}" },
+              "$description": "quiet（枠なし）の左右。M は moon-base.css の .btn.quiet の 8、L は M と同じ、XL はスマホの下部の操作の quiet の Cancel（s19-decision.html の 390px の .formbar の高さ 48 の .btn.quiet の 8。下部の操作は XL）。S はモックアップに無く、Spectrum 2 の quiet の ActionButton の左右（トークンの component-edge-to-text-75 の 9。Spectrum 2 は quiet の左右を枠のあるボタンと同じにする）は M の 8 より大きくなるので、段の並びを保つために M の 8 で止める",
+              "S": { "$value": "{primitive.dimension.8}" },
               "M": { "$value": "{primitive.dimension.8}" },
               "L": { "$value": "{primitive.dimension.8}" },
-              "XL": { "$value": "{primitive.dimension.12}" }
+              "XL": { "$value": "{primitive.dimension.8}" }
             },
             "font-size": {
               "S": { "$value": "{primitive.font.size.13}" },
@@ -1189,7 +1189,7 @@
               "XL": { "$value": "{primitive.font.size.16}" }
             },
             "radius": {
-              "$description": "角丸（Button と同じ。XS は semantic.radius.chip と同じ 6）",
+              "$description": "角丸（Button と同じ。XS は Spectrum 2 のトークンの corner-radius-medium-size-extra-small の 6）",
               "XS": { "$value": "{primitive.dimension.6}" },
               "S": { "$value": "{primitive.dimension.7}" },
               "M": { "$value": "{primitive.dimension.8}" },
@@ -1198,7 +1198,7 @@
             }
           },
           "segmented-control": {
-            "$description": "SegmentedControl と F/A/U の ToggleButtonGroup の溝の中の項目（S〜XL。ToggleButtonGroup の XS は action-button の XS）。docs/mockups の溝: S は s25-import.html の .seg（28px・13px・左右 10）、M は s15-competitors.html と s23-deck.html（30px・13.5px・左右 12）、L は s11-form.html の F/A/U の .seg（32px・14px・左右 12。s17-costs.html の F/A/U の溝は FauPicker の Popover の中の大きさで fau-picker が持つ）。XL はモックアップに無いので、@react-spectrum/s2 の SegmentedControl の項目の大きさ（control の XL: Spectrum 2 のトークンの component-height-300 の 48・component-edge-to-text-300 の 18・font-size-300 の 18）。溝の外側は、項目に上下の余白 2px と枠 1px を足した高さ。large は高さを target-min（44）にする",
+            "$description": "SegmentedControl と F/A/U の ToggleButtonGroup の溝の中の項目（S〜XL。ToggleButtonGroup の XS は action-button の XS）。docs/mockups の溝: S は s25-import.html の .seg（28px・13px・左右 10）、M は s15-competitors.html と s23-deck.html（30px・13.5px・左右 12）、L は s11-form.html の F/A/U の .seg（32px・14px・左右 12。s17-costs.html の F/A/U の溝は FauPicker の Popover の中の大きさで fau-picker が持つ）。XL はモックアップに無いので Spectrum 2 のトークンの component-height-300 の 48・component-edge-to-text-300 の 18・font-size-300 の 18。溝の外側は、項目に上下の余白 2px と枠 1px を足した高さ。large は高さを target-min（44）にする",
             "item-height": {
               "S": { "$value": "{primitive.dimension.28}" },
               "M": { "$value": "{primitive.dimension.30}" },
@@ -1294,7 +1294,7 @@
             }
           },
           "field": {
-            "$description": "TextField・TextArea・NumberField・SearchField・Picker・ComboBox・DatePicker。値は docs/mockups（2026-10-17 のユーザーの決定）: S は s06-ideas.html の検索（30px・角丸 7・左右 10）、M は s23-deck.html の Picker（36px・角丸 8・左右 12）、L は s09-settings.html の入力欄（38px・角丸 8・左右 12。spacious の画面の入力欄）。XL はモックアップに無いので Spectrum 2 のトークン（component-height-300 の 48、component-edge-to-text-300 の 18、corner-radius-medium-size-extra-large の 10）。文字の大きさは semantic.font-size の field（スマホの幅ではどの段も 16px）。枠の色は border.strong（3:1。design-spec 4.4）。large は高さだけを target-min（44）以上にする（s09-settings.html のスマホの入力欄は 44）。font-size-min は入力欄の文字の下限で、タッチの端末（large）は 16px（横向きのスマホは tablet の幅を超えて wide の文字になるが、iOS は 16px より小さい入力欄にフォーカスすると画面を拡大するため。2026-10-17 に Claude が決めた。target-min と同じく押す端末の下限）、medium は下限なし",
+            "$description": "TextField・TextArea・NumberField・SearchField・Picker・ComboBox・DatePicker。値は docs/mockups（2026-10-17 のユーザーの決定）: S は s06-ideas.html の検索（30px・角丸 7・左右 10）、M は s23-deck.html の Picker（36px・角丸 8・左右 12）、L は s09-settings.html の入力欄（38px・角丸 8・左右 12。spacious の画面の入力欄）。XL はモックアップに無いので Spectrum 2 のトークン（component-height-300 の 48、component-edge-to-text-300 の 18、corner-radius-medium-size-extra-large の 10）。文字の大きさは semantic.font-size の field（スマホの幅ではどの段も 16px）。枠の色は border.strong（3:1。design-spec 4.4）。large は高さだけを target-min（44）以上にする（s09-settings.html のスマホの入力欄は 44）。font-size-min は入力欄の文字の下限で、タッチの端末（large）は 16px、medium は下限なし（2026-10-18 のユーザーの決定。iOS は 16px より小さい入力欄を押すと画面を拡大し、入力のあとも拡大したままになる。横向きのスマホは tablet の幅を超えて wide の文字になるので、narrow の 16px が効かない。タッチの端末では、モックアップの入力欄（semantic.font-size.wide.field）より大きくなる（M と L は 1〜2px、S は 3px）。large が文字の大きさを変えない決まり（semantic.scale）の唯一の例外で、target-min と同じく押す端末の下限）",
             "height": {
               "S": { "$value": "{primitive.dimension.30}" },
               "M": { "$value": "{primitive.dimension.36}" },
@@ -1314,21 +1314,25 @@
               "XL": { "$value": "{semantic.font-size.wide.field.XL}" }
             },
             "default-width": {
+              "$description": "大きさの既定の幅（Spectrum 2 のトークンの field-default-width-small〜extra-large の desktop の値）",
               "S": { "$value": "{primitive.dimension.192}" },
               "M": { "$value": "{primitive.dimension.208}" },
               "L": { "$value": "{primitive.dimension.224}" },
               "XL": { "$value": "{primitive.dimension.240}" }
             },
             "label-gap": {
-              "$description": "ラベルと入力欄の間（Spectrum の form-item-gap）",
+              "$description": "ラベルと入力欄の間（Spectrum 2 のトークンの form-item-gap-small〜extra-large）",
               "S": { "$value": "{primitive.dimension.4}" },
               "M": { "$value": "{primitive.dimension.6}" },
               "L": { "$value": "{primitive.dimension.6}" },
               "XL": { "$value": "{primitive.dimension.6}" }
             },
-            "text-area-min-height": { "$value": "{primitive.dimension.56}" },
+            "text-area-min-height": {
+              "$description": "TextArea の最小の高さ（Spectrum 2 のトークンの text-area-minimum-height の desktop の値）",
+              "$value": "{primitive.dimension.56}"
+            },
             "radius": {
-              "$description": "角丸",
+              "$description": "角丸（S は s06、M は s23、L は s09、XL は corner-radius-medium-size-extra-large）",
               "S": { "$value": "{primitive.dimension.7}" },
               "M": { "$value": "{primitive.dimension.8}" },
               "L": { "$value": "{primitive.dimension.8}" },
@@ -1344,41 +1348,41 @@
             "font-size-min": { "$value": "{primitive.dimension.0}" }
           },
           "checkbox": {
-            "$description": "Checkbox・CheckboxGroup の四角。M は s25-import.html の 18px・角丸 5、S は s05-dashboard.html の 16px・角丸 4（docs/mockups）。L と XL は 2px ずつ大きくした。border-width は選んでいないときの枠の太さ（s05 の .box・s19 の .r の 1.5px。色は border.strong）",
+            "$description": "Checkbox・CheckboxGroup の四角。L は s25-import.html の .cb の 18px・角丸 5（spacious の画面。design-spec 4.5 で spacious のパターンとダイアログは L）。S・M・XL はモックアップに無いので Spectrum 2 のトークンの checkbox-control-size-small・medium・extra-large と corner-radius-small-size-small・medium・extra-large（desktop の 14・16・20 と 3・4・6。L の 18・5 も Spectrum 2 と同じ）。s05-dashboard.html の 16px・角丸 4 の四角は Checkbox ではなく RowList の TaskMark（row-list.task-mark-*）。border-width は選んでいないときの枠の太さで、モックアップに選んでいない Checkbox は無いので、同じ形の s05 の .due .box と s19-decision.html の Radio の輪（.r）の 1.5px にそろえる（色は border.strong）",
             "control-size": {
-              "S": { "$value": "{primitive.dimension.16}" },
-              "M": { "$value": "{primitive.dimension.18}" },
-              "L": { "$value": "{primitive.dimension.20}" },
-              "XL": { "$value": "{primitive.dimension.22}" }
+              "S": { "$value": "{primitive.dimension.14}" },
+              "M": { "$value": "{primitive.dimension.16}" },
+              "L": { "$value": "{primitive.dimension.18}" },
+              "XL": { "$value": "{primitive.dimension.20}" }
             },
             "radius": {
-              "$description": "角丸",
-              "S": { "$value": "{primitive.dimension.4}" },
-              "M": { "$value": "{primitive.dimension.5}" },
+              "$description": "角丸（corner-radius-small-size-*。L は s25 の 5）",
+              "S": { "$value": "{primitive.dimension.3}" },
+              "M": { "$value": "{primitive.dimension.4}" },
               "L": { "$value": "{primitive.dimension.5}" },
               "XL": { "$value": "{primitive.dimension.6}" }
             },
             "border-width": { "$value": "{primitive.border-width.1-5}" }
           },
           "radio-button": {
-            "$description": "RadioGroup の丸。M は s19-decision.html の 18px（Checkbox と同じ段）。選んだ状態は輪と点で、点は dot-size（s19 の 8px）。border-width は Checkbox と同じ",
+            "$description": "RadioGroup の丸。L は s19-decision.html の .r の 18px（spacious の画面。design-spec 4.5 で spacious のパターンとダイアログは L）。S・M・XL はモックアップに無いので Spectrum 2 のトークンの radio-button-control-size-small・medium・extra-large（desktop の 12・14・18）。選んだ状態は輪と点で、点は dot-size: L は s19 の 8px、S と M は Spectrum 2 のトークンの radio-button-selection-indicator の 4 を当てる（Spectrum 2 は選んだ状態を太い輪の中の 4 の穴で示し、点の大きさのトークンを持たない。moonx は輪と点で示すので、選んだ印の大きさとしてこの値を使う）、XL は 4 では L より小さくなるので、段の並びを保つために L の 8 で止める。border-width は Checkbox と同じ",
             "control-size": {
-              "S": { "$value": "{primitive.dimension.16}" },
-              "M": { "$value": "{primitive.dimension.18}" },
-              "L": { "$value": "{primitive.dimension.20}" },
-              "XL": { "$value": "{primitive.dimension.22}" }
+              "S": { "$value": "{primitive.dimension.12}" },
+              "M": { "$value": "{primitive.dimension.14}" },
+              "L": { "$value": "{primitive.dimension.18}" },
+              "XL": { "$value": "{primitive.dimension.18}" }
             },
             "dot-size": {
               "$description": "選んだ状態の中の点",
-              "S": { "$value": "{primitive.dimension.6}" },
-              "M": { "$value": "{primitive.dimension.8}" },
+              "S": { "$value": "{primitive.dimension.4}" },
+              "M": { "$value": "{primitive.dimension.4}" },
               "L": { "$value": "{primitive.dimension.8}" },
-              "XL": { "$value": "{primitive.dimension.10}" }
+              "XL": { "$value": "{primitive.dimension.8}" }
             },
             "border-width": { "$value": "{primitive.border-width.1-5}" }
           },
           "switch": {
-            "$description": "Switch の溝とつまみ",
+            "$description": "Switch の溝とつまみ。L は s11-form.html のヘッダーの Focus（spacious の画面。.switch .track の溝 30×18、オンのつまみ 14）。ほかの値はモックアップに無いので Spectrum 2 のトークンの switch-control-width-*・switch-control-height-*・switch-handle-size-*・switch-handle-selected-size-*（desktop の値。L の溝 30×18 も Spectrum 2 と同じ）。L のオンのつまみの 14 は Spectrum 2 の L の 12 より大きいが、XL の Spectrum 2 の 14 を超えないので段の並びは崩れない。L のオフのつまみはモックアップに無いので Spectrum 2 の 10",
             "control-width": {
               "S": { "$value": "{primitive.dimension.22}" },
               "M": { "$value": "{primitive.dimension.26}" },
@@ -1400,17 +1404,17 @@
             "handle-size-selected": {
               "S": { "$value": "{primitive.dimension.8}" },
               "M": { "$value": "{primitive.dimension.10}" },
-              "L": { "$value": "{primitive.dimension.12}" },
+              "L": { "$value": "{primitive.dimension.14}" },
               "XL": { "$value": "{primitive.dimension.14}" }
             }
           },
           "status-light": {
-            "$description": "StatusLight（S〜XL）と、F/A/U のボタンの中の印。dot-size は印の大きさで、docs/mockups の印（S は s05-dashboard.html の「Shared · Done」の 12px、M は s11-form.html の F/A/U のボタンの 14px。L と XL は 2px ずつ大きくした）。font-size はラベルの文字、gap は印とラベルの間で、Spectrum 2 の StatusLight と同じく font-size-75〜300・status-light-text-to-visual-75〜300",
+            "$description": "StatusLight（S〜XL）と、F/A/U のボタンの中の印。dot-size は印の大きさで、docs/mockups の印: S は s05-dashboard.html の「Shared · Done」と s25-import.html の F/A/U の溝（segmented-control の S）の 12px、L は s11-form.html の F/A/U の溝（segmented-control の L）の 14px。M はモックアップに無く、Spectrum 2 のトークンの status-light-dot-size-medium（desktop の 10）は S より小さくなるので、段の並びを保つために S の 12 で止める。XL は Spectrum 2 のトークンの status-light-dot-size-extra-large の 14。font-size はラベルの文字、gap は印とラベルの間で、Spectrum 2 の StatusLight と同じく font-size-75〜300・status-light-text-to-visual-75〜300",
             "dot-size": {
               "S": { "$value": "{primitive.dimension.12}" },
-              "M": { "$value": "{primitive.dimension.14}" },
-              "L": { "$value": "{primitive.dimension.16}" },
-              "XL": { "$value": "{primitive.dimension.18}" }
+              "M": { "$value": "{primitive.dimension.12}" },
+              "L": { "$value": "{primitive.dimension.14}" },
+              "XL": { "$value": "{primitive.dimension.14}" }
             },
             "font-size": {
               "S": { "$value": "{primitive.font.size.12}" },
@@ -1426,7 +1430,7 @@
             }
           },
           "icon": {
-            "$description": "Lucide の大きさ（Spectrum の workflow-icon-size）。部品と同じ size を使う。M は docs/mockups の既定の 18px（shared.js）、S は山形の 16px、L は TabBar の 22px",
+            "$description": "Lucide の大きさ（Spectrum の workflow-icon-size）。部品と同じ size を使う。M は docs/mockups の既定の 18px（shared.js）、S は山形の 16px、L は TabBar の 22px（S と L は Spectrum 2 のトークンの workflow-icon-size-75・200 とも同じ）。XS と XL はモックアップに無いので Spectrum 2 のトークンの workflow-icon-size-50・300（desktop の 14・26）",
             "size": {
               "XS": { "$value": "{primitive.dimension.14}" },
               "S": { "$value": "{primitive.dimension.16}" },
@@ -1451,12 +1455,12 @@
             }
           },
           "meter": {
-            "$description": "Meter（F/A/U の内訳の帯）と ProgressBar（S〜XL）。thickness は帯の太さで、M は d1-moon.html の 10px（S は 6、L と XL は 2px ずつ大きくした）。font-size はラベルと値の文字で、M は d1-moon.html の凡例の 13px、ほかは Spectrum 2 の ProgressBar・Meter と同じく font-size-75・200・300。radius・gap・swatch は Meter の帯の角丸・区間の間・凡例の見本（d1-moon.html の 3px・2px・10px 角丸 2）、legend の gap は凡例の項目の間（18px）と行の間（6px）。hatch- は Unknown の区間の斜線（d1-moon.html の .fau-u: 135deg、線 2px、間隔 5px）。indeterminate-length は値の無い ProgressBar が流す帯の長さ（帯の幅に対する割合。モックアップに無いので @react-spectrum/s2 の ProgressBar の scaleX(0.7)）",
+            "$description": "Meter（F/A/U の内訳の帯）と ProgressBar（S〜XL）。thickness は帯の太さで、M は d1-moon.html の 10px。S・L・XL はモックアップに無いので Spectrum 2 のトークンの meter-thickness-small・large・extra-large（desktop の 4・8・10）で、L の 8 は M より小さくなるので、段の並びを保つために M の 10 で止める（XL は Spectrum 2 の 10）。font-size はラベルと値の文字で、M は d1-moon.html の凡例の 13px、ほかは Spectrum 2 の ProgressBar・Meter と同じく font-size-75・200・300。radius・gap・swatch は Meter の帯の角丸・区間の間・凡例の見本（d1-moon.html の 3px・2px・10px 角丸 2）、legend の gap は凡例の項目の間（18px）と行の間（6px）。hatch- は Unknown の区間の斜線（d1-moon.html の .fau-u: 135deg、線 2px、間隔 5px）。indeterminate-length は値の無い ProgressBar が流す帯の長さ（帯の幅に対する割合。モックアップに無いので @react-spectrum/s2 の ProgressBar の scaleX(0.7)）",
             "thickness": {
-              "S": { "$value": "{primitive.dimension.6}" },
+              "S": { "$value": "{primitive.dimension.4}" },
               "M": { "$value": "{primitive.dimension.10}" },
-              "L": { "$value": "{primitive.dimension.12}" },
-              "XL": { "$value": "{primitive.dimension.14}" }
+              "L": { "$value": "{primitive.dimension.10}" },
+              "XL": { "$value": "{primitive.dimension.10}" }
             },
             "font-size": {
               "S": { "$value": "{primitive.font.size.12}" },
@@ -1499,7 +1503,7 @@
             }
           },
           "tabs": {
-            "$description": "Tabs の項目の高さ",
+            "$description": "Tabs の項目の高さ。モックアップに Tabs は無いので Spectrum 2 のトークンの tab-item-height-small〜extra-large（large のスケールは mobile の値）",
             "item-height": {
               "S": { "$value": "{primitive.dimension.40}" },
               "M": { "$value": "{primitive.dimension.48}" },
@@ -1508,7 +1512,7 @@
             }
           },
           "disclosure": {
-            "$description": "Disclosure / Accordion（S〜XL。design-spec 4.5）。見出しの最小の高さ（component-height-75〜300。regular の密度）は Spectrum 2 の Disclosure と同じ。見出しの左右は Spectrum 2 のトークンの accordion-edge-to-content-area-small〜extra-large（S2 の Disclosure は高さから計算する）、中身の左右は accordion-content-area-edge-to-content-small〜extra-large。title-font-size は docs/mockups（s11-form.html の「Related research」の 14px。S は 13、L と XL は Spectrum 2 の段の差で大きくした）",
+            "$description": "Disclosure / Accordion（S〜XL。design-spec 4.5）。見出しの最小の高さ（component-height-75〜300。regular の密度）は Spectrum 2 の Disclosure と同じ。見出しの左右は Spectrum 2 のトークンの accordion-edge-to-content-area-small〜extra-large（S2 の Disclosure は高さから計算する）、中身の左右は accordion-content-area-edge-to-content-small〜extra-large。title-font-size は M が docs/mockups（s11-form.html の「Related research」の 14px）、S・L・XL はモックアップに無いので @react-spectrum/s2 の Disclosure の題の大きさ（title-sm・title-lg・title-xl。Spectrum 2 のトークンの title-size-s・l・xl の desktop の 14・18・20）",
             "title-height": {
               "S": { "$value": "{primitive.dimension.24}" },
               "M": { "$value": "{primitive.dimension.32}" },
@@ -1516,10 +1520,10 @@
               "XL": { "$value": "{primitive.dimension.48}" }
             },
             "title-font-size": {
-              "S": { "$value": "{primitive.font.size.13}" },
+              "S": { "$value": "{primitive.font.size.14}" },
               "M": { "$value": "{primitive.font.size.14}" },
-              "L": { "$value": "{primitive.font.size.16}" },
-              "XL": { "$value": "{primitive.font.size.18}" }
+              "L": { "$value": "{primitive.font.size.18}" },
+              "XL": { "$value": "{primitive.font.size.20}" }
             },
             "title-padding-x": {
               "S": { "$value": "{primitive.dimension.7}" },
@@ -1666,9 +1670,9 @@
           "check-dots": {
             "gap": {
               "S": { "$value": "{primitive.dimension.3}" },
-              "M": { "$value": "{primitive.dimension.4}" }
+              "M": { "$value": "{primitive.dimension.3}" }
             },
-            "$description": "CheckDots の印の間（S は s05・s06 の 3px。M は 16px の印に合わせて 4px）"
+            "$description": "CheckDots の印の間。S は s05・s06 の 3px。M はモックアップに無く、Spectrum 2 に同じ部品もトークンも無いので、S の 3 のまま（外挿しない）"
           },
           "well": {
             "padding-x": { "$value": "{primitive.dimension.22}" },
@@ -1807,10 +1811,10 @@
               "XL": { "$value": "{primitive.dimension.22}" }
             },
             "padding-x-quiet": {
-              "S": { "$value": "{primitive.dimension.6}" },
+              "S": { "$value": "{primitive.dimension.8}" },
               "M": { "$value": "{primitive.dimension.8}" },
               "L": { "$value": "{primitive.dimension.8}" },
-              "XL": { "$value": "{primitive.dimension.12}" }
+              "XL": { "$value": "{primitive.dimension.8}" }
             },
             "font-size": {
               "S": { "$value": "{primitive.font.size.13}" },
@@ -2001,14 +2005,14 @@
           },
           "checkbox": {
             "control-size": {
-              "S": { "$value": "{primitive.dimension.16}" },
-              "M": { "$value": "{primitive.dimension.18}" },
-              "L": { "$value": "{primitive.dimension.20}" },
-              "XL": { "$value": "{primitive.dimension.22}" }
+              "S": { "$value": "{primitive.dimension.14}" },
+              "M": { "$value": "{primitive.dimension.16}" },
+              "L": { "$value": "{primitive.dimension.18}" },
+              "XL": { "$value": "{primitive.dimension.20}" }
             },
             "radius": {
-              "S": { "$value": "{primitive.dimension.4}" },
-              "M": { "$value": "{primitive.dimension.5}" },
+              "S": { "$value": "{primitive.dimension.3}" },
+              "M": { "$value": "{primitive.dimension.4}" },
               "L": { "$value": "{primitive.dimension.5}" },
               "XL": { "$value": "{primitive.dimension.6}" }
             },
@@ -2016,16 +2020,16 @@
           },
           "radio-button": {
             "control-size": {
-              "S": { "$value": "{primitive.dimension.16}" },
-              "M": { "$value": "{primitive.dimension.18}" },
-              "L": { "$value": "{primitive.dimension.20}" },
-              "XL": { "$value": "{primitive.dimension.22}" }
+              "S": { "$value": "{primitive.dimension.12}" },
+              "M": { "$value": "{primitive.dimension.14}" },
+              "L": { "$value": "{primitive.dimension.18}" },
+              "XL": { "$value": "{primitive.dimension.18}" }
             },
             "dot-size": {
-              "S": { "$value": "{primitive.dimension.6}" },
-              "M": { "$value": "{primitive.dimension.8}" },
+              "S": { "$value": "{primitive.dimension.4}" },
+              "M": { "$value": "{primitive.dimension.4}" },
               "L": { "$value": "{primitive.dimension.8}" },
-              "XL": { "$value": "{primitive.dimension.10}" }
+              "XL": { "$value": "{primitive.dimension.8}" }
             },
             "border-width": { "$value": "{primitive.border-width.1-5}" }
           },
@@ -2051,16 +2055,16 @@
             "handle-size-selected": {
               "S": { "$value": "{primitive.dimension.8}" },
               "M": { "$value": "{primitive.dimension.10}" },
-              "L": { "$value": "{primitive.dimension.12}" },
+              "L": { "$value": "{primitive.dimension.14}" },
               "XL": { "$value": "{primitive.dimension.14}" }
             }
           },
           "status-light": {
             "dot-size": {
               "S": { "$value": "{primitive.dimension.12}" },
-              "M": { "$value": "{primitive.dimension.14}" },
-              "L": { "$value": "{primitive.dimension.16}" },
-              "XL": { "$value": "{primitive.dimension.18}" }
+              "M": { "$value": "{primitive.dimension.12}" },
+              "L": { "$value": "{primitive.dimension.14}" },
+              "XL": { "$value": "{primitive.dimension.14}" }
             },
             "font-size": {
               "S": { "$value": "{primitive.font.size.12}" },
@@ -2100,10 +2104,10 @@
           },
           "meter": {
             "thickness": {
-              "S": { "$value": "{primitive.dimension.6}" },
+              "S": { "$value": "{primitive.dimension.4}" },
               "M": { "$value": "{primitive.dimension.10}" },
-              "L": { "$value": "{primitive.dimension.12}" },
-              "XL": { "$value": "{primitive.dimension.14}" }
+              "L": { "$value": "{primitive.dimension.10}" },
+              "XL": { "$value": "{primitive.dimension.10}" }
             },
             "font-size": {
               "S": { "$value": "{primitive.font.size.12}" },
@@ -2160,10 +2164,10 @@
               "XL": { "$value": "{primitive.dimension.60}" }
             },
             "title-font-size": {
-              "S": { "$value": "{primitive.font.size.13}" },
+              "S": { "$value": "{primitive.font.size.14}" },
               "M": { "$value": "{primitive.font.size.14}" },
-              "L": { "$value": "{primitive.font.size.16}" },
-              "XL": { "$value": "{primitive.font.size.18}" }
+              "L": { "$value": "{primitive.font.size.18}" },
+              "XL": { "$value": "{primitive.font.size.20}" }
             },
             "title-padding-x": {
               "S": { "$value": "{primitive.dimension.7}" },
@@ -2304,7 +2308,7 @@
           "check-dots": {
             "gap": {
               "S": { "$value": "{primitive.dimension.3}" },
-              "M": { "$value": "{primitive.dimension.4}" }
+              "M": { "$value": "{primitive.dimension.3}" }
             }
           },
           "well": {
@@ -2474,7 +2478,7 @@
         }
       },
       "spacious": {
-        "$description": "書く・読む・手順を進める画面（考えるための余白。design-spec 4.4）。入力欄と主要なボタン（Button）は L で、spacious のパターンとダイアログと Form が渡す（design-spec 4.5）。キーの意味は regular と同じ",
+        "$description": "書く・読む・手順を進める画面（考えるための余白。design-spec 4.4）。入力欄と、選ぶ部品（Checkbox・Radio・Switch）と、主要なボタン（Button）は L で、spacious のパターンとダイアログと Form が渡す（design-spec 4.5）。キーの意味は regular と同じ",
         "row-height": {
           "$value": "{semantic.scale.medium.component.table.row-height.spacious}"
         },
@@ -2522,7 +2526,7 @@
     },
     "font-size": {
       "$type": "dimension",
-      "$description": "画面の幅で変わる文字の大きさ（2026-10-17 のユーザーの決定: スマホの文字はモックアップの大きさにし、スケール（medium / large）では文字を変えない。例外はタッチの端末の入力欄の文字の下限で、scale の field.font-size-min が持つ）。wide と narrow は同じキーを持ち、typography と入力欄の文字は wide を参照して、生成のときに narrow へ差し替える（ADR-018）。Web は rem で出し、端末の文字の大きさの設定に従う。幅で変わらない文字は primitive.font.size を直接参照する",
+      "$description": "画面の幅で変わる文字の大きさ（2026-10-17 のユーザーの決定: スマホの文字はモックアップの大きさにし、スケール（medium / large）では文字を変えない）。唯一の例外はタッチの端末の入力欄の文字の下限で、scale の field.font-size-min が持つ（2026-10-18 のユーザーの決定）。wide と narrow は同じキーを持ち、typography と入力欄の文字は wide を参照して、生成のときに narrow へ差し替える（ADR-018）。Web は rem で出し、端末の文字の大きさの設定に従う。幅で変わらない文字は primitive.font.size を直接参照する",
       "wide": {
         "$description": "タブレットの幅から上。docs/mockups の 1440px の値",
         "body": {
@@ -2759,6 +2763,16 @@
           "lineHeight": "{primitive.font.line-height.1-3}"
         },
         "$description": "設問の問い（QuestionCard。s11-form.html）"
+      },
+      "heading-help": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.sans}",
+          "fontSize": "{primitive.font.size.16}",
+          "fontWeight": "{primitive.font.weight.semibold}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.1-3}"
+        },
+        "$description": "ContextualHelp の見出し。モックアップに ContextualHelp は無いので Spectrum 2 のトークンの contextual-help-title-font-size（desktop の 16。title-size-m）と title-line-height の 1.3。太さは moonx の見出しの semibold（Spectrum の見出しの太さは使わない。design-spec 4.4 の見出しの太さ）"
       },
       "heading-choice": {
         "$value": {
@@ -3212,7 +3226,7 @@
         "$description": "TabBar の今のタブの上のインクの線（moon-base.css の .tabbar a[aria-current]::before の 2）"
       },
       "divider": {
-        "$description": "Divider の S / M / L",
+        "$description": "Divider の S / M / L（Spectrum 2 のトークンの divider-thickness-small・medium・large）",
         "S": { "$value": "{primitive.border-width.1}" },
         "M": { "$value": "{primitive.border-width.2}" },
         "L": { "$value": "{primitive.border-width.4}" }
@@ -3698,9 +3712,18 @@
         "$value": "{primitive.dimension.10}",
         "$description": "スマホで下部に固定する操作の行の上下の内側（d1-moon.html の .actionbar・s19-decision.html の .formbar の 10）"
       },
-      "page-gutter-mobile": { "$value": "{primitive.dimension.16}" },
-      "page-gutter-tablet": { "$value": "{primitive.dimension.24}" },
-      "page-gutter-desktop": { "$value": "{primitive.dimension.32}" },
+      "page-gutter-mobile": {
+        "$description": "スマホの幅のページの左右の余白（docs/mockups の 767px 以下の .page の 16）",
+        "$value": "{primitive.dimension.16}"
+      },
+      "page-gutter-tablet": {
+        "$description": "タブレットの幅のページの左右の余白（docs/mockups の各画面の .page の 32。モックアップは 767px 以下だけを上書きするので、768px から上は 32）。layout.two-column-min-width はデスクトップの余白（page-gutter-desktop）で、presentation.two-column-min-width はスライドの列の内側（presentation.stage-padding-x）で決まるので、この値は切り替えの幅に入らない",
+        "$value": "{primitive.dimension.32}"
+      },
+      "page-gutter-desktop": {
+        "$description": "デスクトップの幅のページの左右の余白（docs/mockups の各画面の .page の 32）",
+        "$value": "{primitive.dimension.32}"
+      },
       "dialog-max-width": {
         "$description": "Dialog の small / medium / large（Spectrum の standard-dialog-maximum-width）。fullscreen は画面いっぱい",
         "S": { "$value": "{primitive.dimension.400}" },

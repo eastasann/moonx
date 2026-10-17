@@ -2,9 +2,9 @@ import type { Size } from "@moonx/ui-tokens";
 import { createContext, useContext } from "react";
 
 /**
- * The size fields and buttons take when they are not given one. `Density` sets it from the
- * density of the pattern, the dialog or the `Form` around: regular uses M, spacious L (06
- * semantic.density).
+ * The size fields, buttons and choices (Checkbox, Radio, Switch) take when they are not
+ * given one. `Density` sets it from the density of the pattern, the dialog or the `Form`
+ * around: regular uses M, spacious L (06 semantic.density).
  */
 export const SizeContext = createContext<Size>("M");
 

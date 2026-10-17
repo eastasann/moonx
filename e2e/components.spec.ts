@@ -787,8 +787,33 @@ test.describe("dialogs, popovers and menus follow the width (design-spec 3.8・4
       const dialog = page.getByRole("dialog", { name: "Hint" });
       await expect(dialog).toBeVisible();
       expect(await placement(dialog, width)).toBe(expected);
+      // Spectrum 2's ContextualHelp title size (06 typography.heading-help).
+      const title = dialog.getByRole("heading", { level: 4 });
+      expect(
+        await title.evaluate((node) => getComputedStyle(node).fontSize),
+      ).toBe("16px");
     });
   }
+
+  test("a centred Dialog takes the light frame a Popover and a Toast have (design-spec 4.4)", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    await page.getByRole("button", { name: "Open M" }).click();
+    const dialog = page.getByRole("dialog", { name: "New idea" });
+    await expect(dialog).toBeVisible();
+    const frameColor = await dialog.evaluate((node) => {
+      let element: Element | null = node;
+      while (element !== null) {
+        const style = getComputedStyle(element);
+        if (style.borderTopStyle === "solid") return style.borderTopColor;
+        element = element.parentElement;
+      }
+      return null;
+    });
+    // 06 semantic.color.light.border.default.
+    expect(frameColor).toBe("rgb(198, 203, 216)");
+  });
 
   test("Dialog M is a card in the middle on a desktop; Escape returns focus", async ({
     page,
@@ -2924,7 +2949,7 @@ test.describe("the parts match docs/mockups (Step 22c, design-spec 4.4・4.5)", 
         "border-top-left-radius": "9px",
       });
 
-      // Checkbox 18px, corner 5.
+      // Checkbox L, as on the spacious s25: 18px, corner 5.
       const checkbox = section
         .getByText("Apply this change")
         .locator("xpath=preceding-sibling::span[1]");

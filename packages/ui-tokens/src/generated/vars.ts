@@ -887,6 +887,13 @@ export const vars = createGlobalThemeContract({
       letterSpacing: "typography-heading-question-letter-spacing",
       lineHeight: "typography-heading-question-line-height",
     },
+    headingHelp: {
+      fontFamily: "typography-heading-help-font-family",
+      fontSize: "typography-heading-help-font-size",
+      fontWeight: "typography-heading-help-font-weight",
+      letterSpacing: "typography-heading-help-letter-spacing",
+      lineHeight: "typography-heading-help-line-height",
+    },
     headingChoice: {
       fontFamily: "typography-heading-choice-font-family",
       fontSize: "typography-heading-choice-font-size",

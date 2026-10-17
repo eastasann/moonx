@@ -1,6 +1,6 @@
 import { vars } from "@moonx/ui-tokens";
 import { style } from "@vanilla-extract/css";
-import { narrowQuery } from "../styles/helpers";
+import { narrowQuery, typography } from "../styles/helpers";
 
 /**
  * The help's content at Spectrum 2's ContextualHelp width (06 layout.contextual-help-width)
@@ -17,4 +17,11 @@ export const content = style({
   "@media": {
     [narrowQuery]: { width: "auto", maxWidth: "none" },
   },
+});
+
+/** Spectrum 2's ContextualHelp title size (06 typography.heading-help). */
+export const title = style({
+  ...typography("headingHelp"),
+  margin: 0,
+  color: vars.color.text.primary,
 });

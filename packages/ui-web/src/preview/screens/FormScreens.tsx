@@ -478,7 +478,7 @@ export function SettingsScreen() {
     <MockupFrame
       current="settings"
       crumbs={["Workspace Settings"]}
-      title={{ label: "Workspace Settings" }}
+      isInMore
       saveState="saved"
     >
       <SettingsPattern

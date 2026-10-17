@@ -14,7 +14,7 @@ import { MenuItem } from "../../components/Menu";
 import { Panel } from "../../components/Panel";
 import { RouterProvider } from "../../components/RouterProvider";
 import { type NavItem, SideNav } from "../../components/SideNav";
-import { TabBar } from "../../components/TabBar";
+import { TabBar, useMoreMenu } from "../../components/TabBar";
 import { Text } from "../../components/Text";
 import type { FrameBanners } from "../../internal/frame";
 
@@ -53,8 +53,10 @@ export interface MockupFrameProps {
   current: "dashboard" | "ideas" | "settings";
   /** The breadcrumbs' levels; the last is the screen. */
   crumbs: string[];
-  /** ← on a phone, or the title of a screen the TabBar or its More menu opens. */
+  /** Where ← leads on a phone. */
   back?: string;
+  /** A screen the More menu opens: its ← More opens the menu again (design-spec 6.0.1). */
+  isInMore?: boolean;
   title?: { label: string; isWorkspace?: boolean };
   saveState?: SaveState;
   /** The count of unresolved threads, when the screen has 💬. */
@@ -69,6 +71,7 @@ export function MockupFrame({
   current,
   crumbs,
   back,
+  isInMore = false,
   title,
   saveState,
   comments,
@@ -77,6 +80,7 @@ export function MockupFrame({
   children,
 }: MockupFrameProps) {
   const [panel, setPanel] = useState<"comments" | "history" | null>(null);
+  const moreMenu = useMoreMenu();
   const toggle = (name: "comments" | "history") =>
     setPanel(panel === name ? null : name);
   const ignore = () => {};
@@ -103,6 +107,7 @@ export function MockupFrame({
           <TabBar
             items={pages}
             currentId={current}
+            moreMenu={moreMenu.tabBar}
             more={
               <>
                 <MenuItem id="decisions">Decision Log</MenuItem>
@@ -124,7 +129,13 @@ export function MockupFrame({
             ))}
           </Breadcrumbs>
         }
-        back={back === undefined ? undefined : { href: "#back", label: back }}
+        back={
+          isInMore
+            ? moreMenu.back
+            : back === undefined
+              ? undefined
+              : { href: "#back", label: back }
+        }
         title={
           title === undefined
             ? undefined

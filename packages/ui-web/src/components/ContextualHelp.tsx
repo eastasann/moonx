@@ -2,6 +2,7 @@ import type { ContextualHelpSize } from "@moonx/ui-tokens";
 import { CircleHelp, Info } from "lucide-react";
 import type { ReactNode } from "react";
 import {
+  Heading as AriaHeading,
   type PopoverProps as AriaPopoverProps,
   Dialog,
 } from "react-aria-components";
@@ -11,7 +12,6 @@ import { ResponsivePopover } from "../internal/ResponsivePopover";
 import { ActionButtonBase } from "./ActionButton";
 import * as styles from "./ContextualHelp.css";
 import { DialogTrigger } from "./Dialog";
-import { Heading } from "./Heading";
 import { Text } from "./Text";
 
 export interface ContextualHelpProps
@@ -64,10 +64,9 @@ export function ContextualHelp({
       <FixedLocale>
         <ResponsivePopover placement={placement}>
           <Dialog className={styles.content}>
-            {/* Spectrum 2's help heading is heading-xs, the size of heading-4. */}
-            <Heading level={4} slot="title">
+            <AriaHeading level={4} slot="title" className={styles.title}>
               {title}
-            </Heading>
+            </AriaHeading>
             <Text variant="body-sm" elementType="div">
               {children}
             </Text>

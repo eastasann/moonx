@@ -10,7 +10,11 @@ export {
   type ActionGroupProps,
 } from "./components/ActionButton";
 export { AlertBanner, type AlertBannerProps } from "./components/AlertBanner";
-export { AppFrame, type AppFrameProps } from "./components/AppFrame";
+export {
+  AppFrame,
+  type AppFrameBack,
+  type AppFrameProps,
+} from "./components/AppFrame";
 export { Avatar, type AvatarProps } from "./components/Avatar";
 export { Badge, type BadgeProps } from "./components/Badge";
 export {
@@ -179,7 +183,12 @@ export { Slide, type SlideProps } from "./components/Slide";
 export { StatusLight, type StatusLightProps } from "./components/StatusLight";
 export { Steps, type StepsProps } from "./components/Steps";
 export { Switch, type SwitchProps } from "./components/Switch";
-export { TabBar, type TabBarProps } from "./components/TabBar";
+export {
+  type MoreMenuState,
+  TabBar,
+  type TabBarProps,
+  useMoreMenu,
+} from "./components/TabBar";
 export {
   type TableColumn,
   TableView,

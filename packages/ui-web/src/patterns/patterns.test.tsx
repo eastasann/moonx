@@ -326,7 +326,7 @@ describe("the density a pattern gives what is inside (design-spec 4.4・4.5)", (
     expect(buttonOf("Hub button")).toBe(buttonOf("M button"));
   });
 
-  test("C, G and J are spacious too; Checkbox, Radio and Switch stay M in every pattern", () => {
+  test("C, G and J are spacious too; Checkbox, Radio and Switch take L in a spacious pattern", () => {
     render(
       <>
         <QuestionFormPattern
@@ -352,12 +352,35 @@ describe("the density a pattern gives what is inside (design-spec 4.4・4.5)", (
           </RadioGroup>
           <Switch>Switch in B</Switch>
         </FocusPattern>
+        <HubPattern
+          header={<h1>Home</h1>}
+          blocks={[
+            {
+              id: "choices",
+              column: "main",
+              content: (
+                <>
+                  <Checkbox>Box in A</Checkbox>
+                  <RadioGroup label="Radios in A">
+                    <Radio value="drop">Drop</Radio>
+                  </RadioGroup>
+                  <Switch>Switch in A</Switch>
+                </>
+              ),
+            },
+          ]}
+        />
         <TextField label="L field" size="L" />
-        <Checkbox>M box</Checkbox>
-        <RadioGroup label="M radios">
+        <Checkbox size="L">L box</Checkbox>
+        <RadioGroup label="L radios" size="L">
           <Radio value="hold">Hold</Radio>
         </RadioGroup>
-        <Switch>M switch</Switch>
+        <Switch size="L">L switch</Switch>
+        <Checkbox size="M">M box</Checkbox>
+        <RadioGroup label="M radios" size="M">
+          <Radio value="later">Later</Radio>
+        </RadioGroup>
+        <Switch size="M">M switch</Switch>
       </>,
     );
     for (const name of ["In C", "In G", "In J"]) {
@@ -368,9 +391,13 @@ describe("the density a pattern gives what is inside (design-spec 4.4・4.5)", (
     }
     const rowOf = (role: "checkbox" | "radio" | "switch", name: string) =>
       screen.getByRole(role, { name }).closest("label")?.className;
-    expect(rowOf("checkbox", "Box in B")).toBe(rowOf("checkbox", "M box"));
+    expect(rowOf("checkbox", "Box in B")).toBe(rowOf("checkbox", "L box"));
     expect(rowOf("radio", "Proceed")).toBe(rowOf("radio", "Hold"));
-    expect(rowOf("switch", "Switch in B")).toBe(rowOf("switch", "M switch"));
+    expect(rowOf("switch", "Switch in B")).toBe(rowOf("switch", "L switch"));
+    expect(rowOf("checkbox", "Box in A")).toBe(rowOf("checkbox", "M box"));
+    expect(rowOf("radio", "Drop")).toBe(rowOf("radio", "Later"));
+    expect(rowOf("switch", "Switch in A")).toBe(rowOf("switch", "M switch"));
+    expect(rowOf("checkbox", "L box")).not.toBe(rowOf("checkbox", "M box"));
   });
 
   test("a size given to a part wins over the pattern's", () => {

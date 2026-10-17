@@ -4,6 +4,7 @@ import {
   Switch as AriaSwitch,
   type SwitchProps as AriaSwitchProps,
 } from "react-aria-components";
+import { useSize } from "../internal/size";
 import * as styles from "./choice.css";
 
 export interface SwitchProps
@@ -21,10 +22,7 @@ export interface SwitchProps
     | "aria-label"
     | "aria-describedby"
   > {
-  /**
-   * @default "M". Not the density's L: 06 semantic.density gives L to fields and Buttons,
-   * and the spacious mockups draw boxes, circles and switches at M (s19, s25).
-   */
+  /** @default the one the density around sets: L in a spacious one (design-spec 4.5) */
   size?: Size;
   /** The label beside the switch. */
   children?: ReactNode;
@@ -42,7 +40,7 @@ export function Switch({
   labelPosition = "end",
   ...props
 }: SwitchProps) {
-  const resolved = size ?? "M";
+  const resolved = useSize(size);
   const label = children != null && (
     <span className={styles.rowLabel}>{children}</span>
   );

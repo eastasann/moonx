@@ -9,9 +9,9 @@ import { SizeContext } from "./size";
 export const DensityContext = createContext<ScreenDensity>("regular");
 
 /**
- * Sets the density of what is inside, and the size its fields and Buttons take when they
- * are given none: L in a spacious one, M in a regular one (06 semantic.density: "入力欄と
- * 主要なボタンは L"), inside a `Form` or not.
+ * Sets the density of what is inside, and the size its fields, Buttons, Checkboxes, Radios
+ * and Switches take when they are given none: L in a spacious one, M in a regular one (06
+ * semantic.density, design-spec 4.5), inside a `Form` or not.
  */
 export function Density({
   density,

@@ -12,7 +12,7 @@ export interface FormProps {
    * pattern or the dialog around (regular outside them).
    */
   density?: ScreenDensity;
-  /** The size of the fields and Buttons inside, in place of the density's. */
+  /** The size of the fields, Buttons and choices inside, in place of the density's. */
   size?: Size;
   /**
    * Reasons by field `name`, from the screen's Zod check or the API's 422. Each field shows

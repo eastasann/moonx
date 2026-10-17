@@ -17,7 +17,7 @@ import { MenuItem } from "./Menu";
 import { PageFrame } from "./PageFrame";
 import { RouterProvider } from "./RouterProvider";
 import { type NavItem, SideNav } from "./SideNav";
-import { TabBar } from "./TabBar";
+import { TabBar, useMoreMenu } from "./TabBar";
 
 const follows = (first: Element, second: Element) =>
   Boolean(
@@ -219,6 +219,122 @@ describe("TabBar", () => {
   });
 });
 
+describe("← More (design-spec 6.0.1)", () => {
+  function MoreScreen() {
+    const moreMenu = useMoreMenu();
+    return (
+      <AppFrame
+        sideNav={null}
+        tabBar={
+          <TabBar
+            items={pages}
+            currentId="decisions"
+            moreMenu={moreMenu.tabBar}
+            more={
+              <>
+                <MenuItem id="decisions">Decision Log</MenuItem>
+                <MenuItem id="logout">Log out</MenuItem>
+              </>
+            }
+          />
+        }
+        back={moreMenu.back}
+      >
+        <p>Body</p>
+      </AppFrame>
+    );
+  }
+
+  test("a press on ← More opens the More menu; closing it gives focus back to ← More", async () => {
+    const user = userEvent.setup();
+    setPhoneWidth();
+    render(<MoreScreen />);
+    const header = document.querySelector("header") as HTMLElement;
+    const back = within(header).getByRole("button", { name: "Back to More" });
+    expect(back.textContent).toBe("More");
+    expect(back.getAttribute("aria-haspopup")).toBe("menu");
+    expect(back.getAttribute("aria-expanded")).toBe("false");
+    await user.click(back);
+    await settle();
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(2);
+    expect(back.getAttribute("aria-expanded")).toBe("true");
+    await user.keyboard("{Escape}");
+    await settle();
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(back);
+    await user.click(screen.getByRole("button", { name: "More" }));
+    await settle();
+    expect(await screen.findByRole("menu")).toBeTruthy();
+  });
+
+  test("from the keyboard, focus lands on the first item, as from More", async () => {
+    const user = userEvent.setup();
+    setPhoneWidth();
+    render(<MoreScreen />);
+    const header = document.querySelector("header") as HTMLElement;
+    within(header).getByRole("button", { name: "Back to More" }).focus();
+    await user.keyboard("{Enter}");
+    await settle();
+    const menu = await screen.findByRole("menu");
+    expect(document.activeElement).toBe(
+      within(menu).getByRole("menuitem", { name: "Decision Log" }),
+    );
+    // Closed, a click on More focuses the menu itself again, as React Aria does for a
+    // pointer: the keyboard's first item does not carry over.
+    await user.keyboard("{Escape}");
+    await settle();
+    await user.click(screen.getByRole("button", { name: "More" }));
+    await settle();
+    expect(document.activeElement).toBe(await screen.findByRole("menu"));
+  });
+
+  test("↓ and ↑ open it on its first and last item, as on More", async () => {
+    const user = userEvent.setup();
+    setPhoneWidth();
+    render(<MoreScreen />);
+    const header = document.querySelector("header") as HTMLElement;
+    const back = within(header).getByRole("button", { name: "Back to More" });
+    back.focus();
+    await user.keyboard("{ArrowUp}");
+    await settle();
+    let menu = await screen.findByRole("menu");
+    expect(document.activeElement).toBe(
+      within(menu).getByRole("menuitem", { name: "Log out" }),
+    );
+    await user.keyboard("{Escape}");
+    await settle();
+    expect(document.activeElement).toBe(back);
+    await user.keyboard("{ArrowDown}");
+    await settle();
+    menu = await screen.findByRole("menu");
+    expect(document.activeElement).toBe(
+      within(menu).getByRole("menuitem", { name: "Decision Log" }),
+    );
+  });
+
+  test("a press that is not a link: the back button calls it", async () => {
+    const user = userEvent.setup();
+    const onPress = vi.fn();
+    render(
+      <AppFrame sideNav={null} tabBar={null} back={{ label: "Plan", onPress }}>
+        <p>Body</p>
+      </AppFrame>,
+    );
+    const back = screen.getByRole("button", { name: "Back to Plan" });
+    expect(back.hasAttribute("aria-haspopup")).toBe(false);
+    await user.click(back);
+    expect(onPress).toHaveBeenCalledOnce();
+    // Its keys go on to the page, as a link's do.
+    const onPageKey = vi.fn();
+    document.addEventListener("keydown", onPageKey);
+    back.focus();
+    await user.keyboard("{ArrowDown}");
+    document.removeEventListener("keydown", onPageKey);
+    expect(onPageKey).toHaveBeenCalled();
+  });
+});
+
 describe("AppFrame", () => {
   const frame = (props: Partial<Omit<AppFrameProps, "children">> = {}) =>
     render(
@@ -319,11 +435,12 @@ describe("AppFrame", () => {
     expect(screen.getByRole("button", { name: "Comments" })).toBeTruthy();
   });
 
-  test("bands go under the header, offline first; the panel beside the body", () => {
+  test("bands go under the header, offline, new version, Home Screen, template; the panel beside the body", () => {
     frame({
       saveState: "saved",
       // Given in another order: the frame keeps 6.0.1's.
       banners: {
+        template: <p role="note">A newer template</p>,
         addToHomeScreen: <p role="note">Add to Home Screen</p>,
         newVersion: <p role="note">New version</p>,
         offline: <div role="alert">You're offline.</div>,
@@ -332,9 +449,10 @@ describe("AppFrame", () => {
     });
     const header = document.querySelector("header") as HTMLElement;
     const alert = screen.getByRole("alert");
-    const [newVersion, install] = screen.getAllByRole("note");
+    const [newVersion, install, template] = screen.getAllByRole("note");
     expect(newVersion?.textContent).toBe("New version");
     expect(install?.textContent).toBe("Add to Home Screen");
+    expect(template?.textContent).toBe("A newer template");
     expect(follows(alert, newVersion as Element)).toBe(true);
     const main = screen.getByRole("main");
     const panel = screen.getByRole("complementary", { name: "Comments panel" });

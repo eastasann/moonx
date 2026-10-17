@@ -200,10 +200,12 @@ export function MockupBasicsSection() {
               </Text>
             </Stack>
           </Well>
+          {/* s19 and s25 are spacious screens: their choices are L (design-spec 4.5). */}
           <RadioGroup
             label="Decision"
             defaultValue="hold"
             orientation="horizontal"
+            size="L"
           >
             <Radio value="proceed">Proceed</Radio>
             <Radio value="hold">Hold</Radio>
@@ -216,7 +218,9 @@ export function MockupBasicsSection() {
       </Specimen>
       <Specimen name="s25: the checked box, removed and added text">
         <Stack gap="space-200">
-          <Checkbox defaultSelected>Apply this change</Checkbox>
+          <Checkbox defaultSelected size="L">
+            Apply this change
+          </Checkbox>
           <DiffText
             variant="before"
             before="Working professionals aged 25–40 in Bacolod who pay for convenient meals."

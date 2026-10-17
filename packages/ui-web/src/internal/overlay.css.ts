@@ -167,7 +167,8 @@ export const centeredFrame = style({
   maxHeight: `calc(${vars.layout.sheetMaxHeightRatio} * var(--visual-viewport-height))`,
   overflow: "hidden",
   background: vars.color.surface.overlay,
-  border: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
+  // Framed as a Popover and a Toast are (design-spec 4.4「画面の組み方」).
+  border: `${vars.borderWidth.hairline} solid ${vars.color.border.default}`,
   borderRadius: vars.radius.sheet,
   boxShadow: vars.shadow.overlay,
   color: vars.color.text.primary,

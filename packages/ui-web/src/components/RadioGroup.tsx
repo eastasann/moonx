@@ -12,6 +12,7 @@ import {
   type FieldTextProps,
   invalidOf,
 } from "../internal/FieldHelp";
+import { useSize } from "../internal/size";
 import * as styles from "./choice.css";
 
 const GroupContext = createContext<{
@@ -43,10 +44,7 @@ export interface RadioGroupProps
    * @default "default"
    */
   variant?: RadioGroupVariant;
-  /**
-   * @default "M". Not the density's L: 06 semantic.density gives L to fields and Buttons,
-   * and the spacious mockups draw boxes, circles and switches at M (s19, s25).
-   */
+  /** @default the one the density around sets: L in a spacious one (design-spec 4.5) */
   size?: Size;
   /** `Radio`s. */
   children: ReactNode;
@@ -64,7 +62,7 @@ export function RadioGroup({
   children,
   ...props
 }: RadioGroupProps) {
-  const resolved = size ?? "M";
+  const resolved = useSize(size);
   const isCards = variant === "cards";
   return (
     <AriaRadioGroup

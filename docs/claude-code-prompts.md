@@ -1443,7 +1443,7 @@ make test・make test-web・make test-e2e・make typecheck・make lint・make do
 
 ## Step 22h: 2回目の点検の直しとユーザーの決定（docs と枠）
 
-Status:
+Status: done 2026-10-18
 
 ```
 Step 22b〜22g が終わったあと、2026-10-17 に docs の差分を点検し、11画面をモックアップと並べて測り直しました。

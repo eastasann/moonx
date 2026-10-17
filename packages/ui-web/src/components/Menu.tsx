@@ -39,6 +39,11 @@ export interface MenuProps
     AriaMenuProps<object>,
     "onAction" | "disabledKeys" | "aria-label" | "aria-labelledby"
   > {
+  /**
+   * Where focus lands on opening, in place of the one its `MenuTrigger` picks for the
+   * press: for a menu opened from outside its trigger (`useMoreMenu`).
+   */
+  autoFocus?: boolean | "first" | "last";
   /** @default "M" */
   size?: Size;
   /** `MenuItem`s. */

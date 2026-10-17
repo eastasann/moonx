@@ -13,7 +13,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { Button as AriaButton, Link as AriaLink } from "react-aria-components";
+import {
+  Button as AriaButton,
+  Link as AriaLink,
+  type PressEvent,
+} from "react-aria-components";
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -46,6 +50,21 @@ const saveLabels = {
   "save-failed": "components:appFrame.saveFailed",
 } as const;
 
+/**
+ * On a phone, ← and where it leads: a link ("Validation", "Plan", "Self Analysis",
+ * "Ideas"), or a press that does something, as ← More opening the More menu again on
+ * 7・4・9・26 (`useMoreMenu`). `menu` makes it a menu button: it reads that it opens one
+ * and whether it is open, and ↓ / ↑ open it on its first or last item.
+ */
+export type AppFrameBack =
+  | { label: string; href: string; onPress?: never; menu?: never }
+  | {
+      label: string;
+      href?: never;
+      onPress: (event: PressEvent) => void;
+      menu?: { isOpen: boolean; open: (focus: "first" | "last") => void };
+    };
+
 export interface AppFrameProps {
   /** The `SideNav`: tablet and wider. */
   sideNav: ReactNode;
@@ -53,12 +72,12 @@ export interface AppFrameProps {
   tabBar: ReactNode;
   /** The `Breadcrumbs` (tablet and wider): "Ideas / Piaya Gift Box / 05 Costs". */
   breadcrumbs?: ReactNode;
-  /** On a phone, ← and where it leads: "Validation", "Plan", "Self Analysis", "Ideas". */
-  back?: { href: string; label: string };
+  /** On a phone, ← and where it leads (`AppFrameBack`). */
+  back?: AppFrameBack;
   /**
-   * On a phone, the title of a screen the TabBar or its More menu opens, which has no ←: "Ideas",
+   * On a phone, the title of a screen the TabBar opens, which has no ←: "Ideas",
    * "Notifications". With `onPress`, it is a button with ▾: 5's workspace, which opens M7
-   * (6.0.1).
+   * (6.0.1). The screens the More menu opens have ← More instead (`useMoreMenu`).
    */
   title?: { label: string; onPress?: () => void };
   /** The save state of the screen's fields; none on screens that save nothing. */
@@ -312,20 +331,58 @@ export function AppFrame({
                   </IconSlot>
                   <span className={styles.backLabel}>{backOverride.label}</span>
                 </AriaButton>
+              ) : back?.href !== undefined ? (
+                <AriaLink
+                  href={back.href}
+                  aria-label={t("components:appFrame.back", {
+                    label: back.label,
+                  })}
+                  className={styles.back}
+                >
+                  <IconSlot size="nav">
+                    <ArrowLeft />
+                  </IconSlot>
+                  <span className={styles.backLabel}>{back.label}</span>
+                </AriaLink>
               ) : (
                 back !== undefined && (
-                  <AriaLink
-                    href={back.href}
+                  <AriaButton
                     aria-label={t("components:appFrame.back", {
                       label: back.label,
                     })}
+                    aria-haspopup={back.menu !== undefined ? "menu" : undefined}
+                    aria-expanded={back.menu?.isOpen}
+                    // A press focuses the button where the browser does not (Safari), so
+                    // a menu it opens has a button to give focus back to.
+                    onPressStart={(event) => {
+                      if (event.target instanceof HTMLElement)
+                        event.target.focus();
+                    }}
+                    onPress={back.onPress}
+                    // A menu button opens on ↓ and ↑ as well (as React Aria's
+                    // MenuTrigger does for More). Other keys go on to the page.
+                    onKeyDown={(event) => {
+                      const menu = back.menu;
+                      if (menu !== undefined && event.key === "ArrowDown") {
+                        menu.open("first");
+                      } else if (
+                        menu !== undefined &&
+                        event.key === "ArrowUp"
+                      ) {
+                        menu.open("last");
+                      } else {
+                        event.continuePropagation();
+                        return;
+                      }
+                      event.preventDefault();
+                    }}
                     className={styles.back}
                   >
                     <IconSlot size="nav">
                       <ArrowLeft />
                     </IconSlot>
                     <span className={styles.backLabel}>{back.label}</span>
-                  </AriaLink>
+                  </AriaButton>
                 )
               )}
               {backOverride === null &&

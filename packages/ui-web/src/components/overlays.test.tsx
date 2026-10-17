@@ -8,12 +8,15 @@ import { setPhoneWidth, settle } from "../test/helpers";
 import { ActionButton } from "./ActionButton";
 import { Button } from "./Button";
 import * as buttonStyles from "./Button.css";
+import { Checkbox } from "./Checkbox";
 import { ComboBox } from "./ComboBox";
 import { ContextualHelp } from "./ContextualHelp";
 import { AlertDialog, Dialog, DialogTrigger } from "./Dialog";
 import { ActionMenu, Menu, MenuItem, MenuTrigger } from "./Menu";
 import { Picker } from "./Picker";
 import { Popover } from "./Popover";
+import { Radio, RadioGroup } from "./RadioGroup";
+import { Switch } from "./Switch";
 import { TextField } from "./TextField";
 import { Tooltip, TooltipTrigger } from "./Tooltip";
 import { Tray } from "./Tray";
@@ -164,7 +167,7 @@ describe("Dialog", () => {
 });
 
 describe("the density of a dialog (design-spec 4.4・4.5)", () => {
-  test("M1〜M9 pass spacious: fields and Buttons L; another Dialog stays M, even over a spacious screen", () => {
+  test("M1〜M9 pass spacious: fields, Buttons and choices L; another Dialog stays M, even over a spacious screen", () => {
     render(
       <>
         <Dialog
@@ -174,17 +177,54 @@ describe("the density of a dialog (design-spec 4.4・4.5)", () => {
           buttons={<Button>Create idea</Button>}
         >
           <TextField label="Idea name" />
+          <Checkbox>Share with Kenji</Checkbox>
+          <RadioGroup label="Go / No-Go">
+            <Radio value="go">Launch</Radio>
+          </RadioGroup>
+          <Switch>Notify the team</Switch>
         </Dialog>
         <FocusPattern header={<h1>Decide</h1>}>
           <Dialog isOpen title="Edit competitor">
             <TextField label="Competitor name" />
+            <Checkbox>Direct competitor</Checkbox>
+            <RadioGroup label="Type">
+              <Radio value="direct">Direct</Radio>
+            </RadioGroup>
+            <Switch>Show on the card</Switch>
           </Dialog>
         </FocusPattern>
         <TextField label="L field" size="L" />
         <TextField label="M field" size="M" />
         <Button size="L">L button</Button>
+        <Checkbox size="L">L box</Checkbox>
+        <Checkbox size="M">M box</Checkbox>
+        <RadioGroup label="L radios" size="L">
+          <Radio value="l">L radio</Radio>
+        </RadioGroup>
+        <RadioGroup label="M radios" size="M">
+          <Radio value="m">M radio</Radio>
+        </RadioGroup>
+        <Switch size="L">L switch</Switch>
+        <Switch size="M">M switch</Switch>
       </>,
     );
+    const rowOf = (role: "checkbox" | "radio" | "switch", name: string) =>
+      screen.getByRole(role, { name }).closest("label")?.className;
+    expect(rowOf("checkbox", "Share with Kenji")).toBe(
+      rowOf("checkbox", "L box"),
+    );
+    expect(rowOf("radio", "Launch")).toBe(rowOf("radio", "L radio"));
+    expect(rowOf("switch", "Notify the team")).toBe(
+      rowOf("switch", "L switch"),
+    );
+    expect(rowOf("checkbox", "Direct competitor")).toBe(
+      rowOf("checkbox", "M box"),
+    );
+    expect(rowOf("radio", "Direct")).toBe(rowOf("radio", "M radio"));
+    expect(rowOf("switch", "Show on the card")).toBe(
+      rowOf("switch", "M switch"),
+    );
+    expect(rowOf("checkbox", "L box")).not.toBe(rowOf("checkbox", "M box"));
     const frameOf = (name: string) =>
       screen.getByRole("textbox", { name }).parentElement?.className;
     expect(frameOf("Idea name")).toBe(frameOf("L field"));

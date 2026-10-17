@@ -18,6 +18,7 @@ const light = {
   strong: "rgb(122, 129, 151)",
   primary: "rgb(25, 28, 42)",
   secondary: "rgb(85, 93, 114)",
+  tertiary: "rgb(100, 107, 130)",
   notice: "rgb(154, 86, 0)",
   transparent: "rgba(0, 0, 0, 0)",
 };
@@ -411,6 +412,98 @@ test.describe("the frame is moon-base.css's (design-spec 6.0.1, 4.5 SideNav・Ta
     const main = await boxOf(page.getByRole("main"));
     expect(Math.round((await boxOf(band)).width)).toBe(Math.round(main.width));
   });
+
+  test("tablet: the page's gutters are the mockups' 32px from 768px up (06 layout.page-gutter-tablet)", async ({
+    page,
+  }) => {
+    for (const width of [768, 900]) {
+      await open(page, "d1-moon", { width, height: 900 });
+      const band = page.getByRole("alert").filter({
+        hasText: "A newer template is available.",
+      });
+      expect({ width, padding: await css(band, "padding-left") }).toEqual({
+        width,
+        padding: "32px",
+      });
+      const main = await boxOf(page.getByRole("main"));
+      const title = await boxOf(page.getByRole("heading", { level: 1 }));
+      expect({ width, inset: Math.round(title.x - main.x) }).toEqual({
+        width,
+        inset: 32,
+      });
+    }
+  });
+});
+
+test.describe("← More on a phone (design-spec 6.0.1, 4.5 AppFrame)", () => {
+  test.use({ hasTouch: true, isMobile: true });
+
+  test("a screen the More menu opens shows ← More, which opens the menu as More does (s09)", async ({
+    page,
+  }) => {
+    await open(page, "s09-settings", phone);
+    const header = page.locator("header").first();
+    const back = header.getByRole("button", { name: "Back to More" });
+    await expect(back).toHaveText("More");
+    await expect(back).toHaveAttribute("aria-haspopup", "menu");
+    await expect(back).toHaveAttribute("aria-expanded", "false");
+    const tabs = page.getByRole("navigation", { name: "Main" });
+    const more = tabs.getByRole("button", { name: "More" });
+    await expect(more).toHaveAttribute("aria-current", "true");
+    const menu = page.getByRole("menu");
+    const focusedRole = () =>
+      page.evaluate(() => document.activeElement?.getAttribute("role"));
+
+    // A tap: the More menu opens in its tray, focus in it as when More is tapped, and
+    // goes back to ← More when it closes.
+    await back.tap();
+    await expect(
+      menu.getByRole("menuitem", { name: "Workspace Settings" }),
+    ).toBeVisible();
+    await expect(back).toHaveAttribute("aria-expanded", "true");
+    await expect.poll(focusedRole).toBe("menu");
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(back).toBeFocused();
+    await more.tap();
+    await expect(menu).toBeVisible();
+    await expect.poll(focusedRole).toBe("menu");
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+
+    // A key: the first item takes focus, as from More.
+    await back.focus();
+    await page.keyboard.press("Enter");
+    await expect(menu.getByRole("menuitem").first()).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(back).toBeFocused();
+    await more.focus();
+    await page.keyboard.press("Enter");
+    await expect(menu.getByRole("menuitem").first()).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(more).toBeFocused();
+
+    // ↑ on ← More opens it on its last item, as on More.
+    await back.focus();
+    await page.keyboard.press("ArrowUp");
+    await expect(menu.getByRole("menuitem").last()).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(back).toBeFocused();
+  });
+
+  test("a screen the TabBar opens keeps its title, with no ← (s05)", async ({
+    page,
+  }) => {
+    await open(page, "s05-dashboard", phone);
+    const header = page.locator("header").first();
+    await expect(
+      header.getByRole("button", { name: "BCDX, switch workspace" }),
+    ).toBeVisible();
+    await expect(header.getByRole("button", { name: /Back to/ })).toHaveCount(
+      0,
+    );
+    await expect(header.getByRole("link", { name: /Back to/ })).toHaveCount(0);
+  });
 });
 
 test.describe("the patterns are the mockups' (design-spec 4.1, 06 semantic.layout)", () => {
@@ -479,6 +572,44 @@ test.describe("the patterns are the mockups' (design-spec 4.1, 06 semantic.layou
     expect(Math.round(record.x + record.width)).toBe(
       Math.round(material.x + material.width),
     );
+  });
+
+  test("B, C, G: Checkbox, Radio and Switch take L in a spacious pattern (s19, s11, s25: 18px)", async ({
+    page,
+  }) => {
+    // The control beside an input's label: the part of its label drawn as a box or a track
+    // (the label's first child is React Aria's hidden input).
+    const controlOf = (input: Locator, index: number) =>
+      input.evaluate((node, at) => {
+        const label = node.closest("label");
+        const part = label?.children[at];
+        if (!(part instanceof HTMLElement)) throw new Error("no control");
+        const box = part.getBoundingClientRect();
+        const handle = part.firstElementChild?.getBoundingClientRect();
+        return {
+          width: Math.round(box.width),
+          height: Math.round(box.height),
+          handle: handle === undefined ? null : Math.round(handle.width),
+        };
+      }, index);
+    await open(page, "s19-decision");
+    expect(
+      await controlOf(page.getByRole("radio", { name: /Hold/ }), 1),
+    ).toMatchObject({ width: 18, height: 18 });
+    await open(page, "s25-import");
+    expect(
+      await controlOf(
+        page.getByRole("checkbox", { name: "Apply the change to 01 · WHO" }),
+        1,
+      ),
+    ).toMatchObject({ width: 18, height: 18 });
+    await open(page, "s11-form");
+    expect(
+      await controlOf(
+        page.locator("header").getByRole("switch", { name: "Focus" }),
+        2,
+      ),
+    ).toEqual({ width: 30, height: 18, handle: 14 });
   });
 
   test("B on a phone: Cancel and the main action XL in the bar, the main one wider", async ({
@@ -649,6 +780,18 @@ test.describe("the patterns are the mockups' (design-spec 4.1, 06 semantic.layou
     expect(Math.round((await boxOf(bar)).height)).toBe(56);
     expect(await css(bar, "background-color")).toBe(light.raised);
     expect(await css(bar, "border-top-color")).toBe(light.default);
+    // An Empty row says what a tap is for, under its name (design-spec 6.3).
+    const startup = page.getByRole("grid", { name: "Startup costs" });
+    const buffer = startup.getByRole("row", { name: /Working Capital Buffer/ });
+    await expect(buffer.getByText("Tap to fill or mark Unknown")).toBeVisible();
+    expect(
+      await css(buffer.getByText("Tap to fill or mark Unknown"), "color"),
+    ).toBe(light.tertiary);
+    await expect(
+      startup
+        .getByRole("row", { name: /Permits/ })
+        .getByText("Tap to fill or mark Unknown"),
+    ).toHaveCount(0);
   });
 
   test("G: each question in its frame, two sides, the note on the bar; added text stays underlined while typing", async ({

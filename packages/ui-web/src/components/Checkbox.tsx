@@ -16,6 +16,7 @@ import {
   invalidOf,
 } from "../internal/FieldHelp";
 import { IconSlot } from "../internal/IconSlot";
+import { useSize } from "../internal/size";
 import * as styles from "./choice.css";
 
 const GroupSize = createContext<Size | undefined>(undefined);
@@ -37,7 +38,7 @@ export interface CheckboxProps
     | "aria-label"
     | "aria-describedby"
   > {
-  /** @default the group's size, else "M" */
+  /** @default the group's size, else the one the density around sets (L in a spacious one) */
   size?: Size;
   /** The label beside the box. */
   children?: ReactNode;
@@ -50,7 +51,7 @@ export interface CheckboxProps
  */
 export function Checkbox({ size, children, ...props }: CheckboxProps) {
   const groupSize = useContext(GroupSize);
-  const resolved = size ?? groupSize ?? "M";
+  const resolved = useSize(size ?? groupSize);
   const isInGroup = useContext(CheckboxGroupStateContext) !== null;
   const box = (
     <AriaCheckbox
@@ -100,10 +101,7 @@ export interface CheckboxGroupProps
     > {
   /** @default "vertical" */
   orientation?: "vertical" | "horizontal";
-  /**
-   * @default "M". Not the density's L: 06 semantic.density gives L to fields and Buttons,
-   * and the spacious mockups draw boxes, circles and switches at M (s19, s25).
-   */
+  /** @default the one the density around sets: L in a spacious one (design-spec 4.5) */
   size?: Size;
   /** `Checkbox`es, each with a `value`. */
   children: ReactNode;
@@ -120,7 +118,7 @@ export function CheckboxGroup({
   children,
   ...props
 }: CheckboxGroupProps) {
-  const resolved = size ?? "M";
+  const resolved = useSize(size);
   return (
     <AriaCheckboxGroup
       {...props}

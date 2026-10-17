@@ -1,6 +1,7 @@
 import type { Confidence, FauState } from "@moonx/schemas";
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { FauPicker } from "../../components/FauPicker";
@@ -200,6 +201,7 @@ export interface CostTableProps {
  * rows edit in place as TableView's do; the subtotal is the figure s17 shows.
  */
 export function CostTable({ kind, title, unit, total }: CostTableProps) {
+  const { t } = useTranslation(["validation"]);
   const [rows, setRows] = useState(rowsOf[kind]);
   const edit = (id: string, change: Partial<CostRow>) =>
     setRows((current) =>
@@ -275,6 +277,15 @@ export function CostTable({ kind, title, unit, total }: CostTableProps) {
                 </>
               );
             case "fau":
+              // A phone's Empty row says what pressing it is for, in the place of its
+              // F/A/U (s17-costs.html, design-spec 6.3).
+              if (isCard && row.state === "empty") {
+                return (
+                  <Text variant="caption" tone="tertiary">
+                    {t("validation:costs.emptyRowHint")}
+                  </Text>
+                );
+              }
               return (
                 <FauPicker
                   aria-label={`F/A/U of ${row.name}`}

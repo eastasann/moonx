@@ -1,15 +1,21 @@
 import { i18n } from "@moonx/i18n";
 import type { FauState, PitchSlide } from "@moonx/schemas";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { BodyRoomContext } from "../internal/frame";
-import { mockTextMeasure, setPhoneWidth, settle } from "../test/helpers";
+import { setPhoneWidth, settle } from "../test/helpers";
 import { DescriptionList, DescriptionListItem } from "./DescriptionList";
 import { Dialog } from "./Dialog";
 import { DiffText } from "./DiffText";
-import { type FauChange, FauPicker, fauLabel } from "./FauPicker";
+import { type FauChange, FauPicker, useFauLabel } from "./FauPicker";
 import { type MentionCandidate, MentionTextArea } from "./MentionTextArea";
 import { MetricGroup, MetricTile } from "./MetricTile";
 import * as metricStyles from "./MetricTile.css";
@@ -26,8 +32,9 @@ import { ToggleButton, ToggleButtonGroup } from "./ToggleButtonGroup";
 // moonx's own components (design-spec 4.5): FauPicker, MetricTile, RowList, QuestionCard,
 // DiffText, MentionTextArea, Panel, Slide and Steps. Sizes are in variants.test.tsx.
 
-describe("fauLabel", () => {
+describe("useFauLabel", () => {
   test("the labels of 6.0.3", () => {
+    const fauLabel = renderHook(() => useFauLabel()).result.current;
     expect(fauLabel("fact", { evidenceCount: 2 })).toBe("Fact · 2 sources");
     expect(fauLabel("fact", { evidenceCount: 1 })).toBe("Fact · 1 source");
     expect(fauLabel("fact_no_evidence")).toBe("Fact · No evidence");
@@ -994,6 +1001,7 @@ const slide = (overrides: Partial<PitchSlide>): PitchSlide => ({
   subtitle: null,
   bullets: [],
   numbers: [],
+  figureColumns: null,
   table: null,
   emptySources: [],
   shrink: 0,
@@ -1007,7 +1015,6 @@ const slide = (overrides: Partial<PitchSlide>): PitchSlide => ({
 describe("Slide", () => {
   // happy-dom drops lengths in cqw, so the sizes in shares of the slide's width are
   // checked in e2e/components.spec.ts.
-  beforeEach(mockTextMeasure);
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -1040,28 +1047,32 @@ describe("Slide", () => {
     expect(within(region).getByText("Piaya · Draft · Oct 16")).toBeTruthy();
   });
 
-  test("a number slide's figures share the width as the PDF's do; a reason replaces a missing value", () => {
-    render(
+  test("a number slide's figures: a reason replaces a missing value, and values break only where P12 says they do not fit", () => {
+    const numbers: PitchSlide["numbers"] = [
+      {
+        label: "Price",
+        metricKey: "selling_price",
+        value: { value: 450, bound: "exact", reason: null },
+      },
+      {
+        label: "Break-even / day",
+        metricKey: "break_even_units_day",
+        value: { value: null, bound: "exact", reason: "needs_price" },
+      },
+    ];
+    const model = (figureColumns: PitchSlide["figureColumns"]) =>
+      slide({
+        key: "business_model",
+        type: "number",
+        title: { text: "Business model", empty: false },
+        numbers,
+        figureColumns,
+      });
+    const { unmount } = render(
       <Slide
         footer=""
         currency="PHP"
-        slide={slide({
-          key: "business_model",
-          type: "number",
-          title: { text: "Business model", empty: false },
-          numbers: [
-            {
-              label: "Price",
-              metricKey: "selling_price",
-              value: { value: 450, bound: "exact", reason: null },
-            },
-            {
-              label: "Break-even / day",
-              metricKey: "break_even_units_day",
-              value: { value: null, bound: "exact", reason: "needs_price" },
-            },
-          ],
-        })}
+        slide={model({ widths: [300, 420], fits: true })}
       />,
     );
     const terms = screen.getAllByRole("term").map((term) => term.textContent);
@@ -1072,6 +1083,42 @@ describe("Slide", () => {
       i18n.t("common:metricReason.needs_price"),
     );
     expect(values[1]?.className).not.toBe(values[0]?.className);
+    // happy-dom drops widths in cqw: e2e/components.spec.ts measures the columns.
+    const unbroken = values[0]?.className;
+    unmount();
+
+    // Too wide to stand unbroken: the value may break in its column, as in the PDF.
+    render(
+      <Slide
+        footer=""
+        currency="PHP"
+        slide={model({ widths: [300, 420], fits: false })}
+      />,
+    );
+    expect(screen.getAllByRole("definition")[0]?.className).not.toBe(unbroken);
+  });
+
+  test("a slide whose figures lack the fit's columns is refused", () => {
+    // React logs the error it rethrows; the spy is undone in afterEach.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() =>
+      render(
+        <Slide
+          footer=""
+          currency="PHP"
+          slide={slide({
+            type: "number",
+            numbers: [
+              {
+                label: "Price",
+                metricKey: "selling_price",
+                value: { value: 450, bound: "exact", reason: null },
+              },
+            ],
+          })}
+        />,
+      ),
+    ).toThrow("A slide's figures without the columns the fit set");
   });
 
   test("a table slide: its columns, numbers in their own cells, no rows as Not written yet", () => {

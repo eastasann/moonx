@@ -30,7 +30,7 @@ export interface NumberFieldProps extends FieldTextProps {
   isPercent?: boolean;
   /** Whole numbers only (days): the phone shows a keypad without a decimal point. */
   isInteger?: boolean;
-  /** @default "M", or "L" inside a spacious `Form` */
+  /** @default "M"; "L" in a spacious pattern, dialog or `Form` (06 semantic.density) */
   size?: Size;
   /** @default "default" */
   width?: "default" | "full";

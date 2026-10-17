@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import type { Size } from "@moonx/ui-tokens";
 import { ChevronDown } from "lucide-react";
 import { useId } from "react";
@@ -10,6 +9,7 @@ import {
   SelectValue,
   VisuallyHidden,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { type ChoiceItem, ChoiceListBox } from "../internal/ChoiceListBox";
 import {
   FieldHelp,
@@ -45,7 +45,7 @@ export interface PickerProps
   onChange?: (value: string | null) => void;
   /** Shown while nothing is chosen. @default the catalog's "Select an item" */
   placeholder?: string;
-  /** @default "M", or "L" inside a spacious `Form` */
+  /** @default "M"; "L" in a spacious pattern, dialog or `Form` (06 semantic.density) */
   size?: Size;
   /**
    * `fit` is as wide as its value, beside other fields in a line (9's role to invite as,
@@ -79,6 +79,7 @@ export function Picker({
   labelPosition = "top",
   ...props
 }: PickerProps) {
+  const { t } = useTranslation(["components"]);
   const isInside = labelPosition === "inside" && label != null;
   // Inside, the button reads its label before its value, as they show ("Stage All"):
   // React Aria names it by the value first.
@@ -90,7 +91,7 @@ export function Picker({
     <FixedLocale>
       <Select
         {...props}
-        placeholder={placeholder ?? i18n.t("components:picker.placeholder")}
+        placeholder={placeholder ?? t("components:picker.placeholder")}
         onChange={(key) => onChange?.(key === null ? null : String(key))}
         isInvalid={invalidOf({ errorMessage, isInvalid })}
         validationBehavior="aria"

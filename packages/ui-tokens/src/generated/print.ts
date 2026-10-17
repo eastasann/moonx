@@ -10,11 +10,11 @@ export const print = {
     page: "#ffffff",
     panel: "#ffffff",
     tableHeader: "#eceef3",
-    text: "#151a2c",
+    text: "#191c2a",
     textSecondary: "#555d72",
     textPlaceholder: "#555d72",
     border: "#e1e4eb",
-    rule: "#151a2c",
+    rule: "#191c2a",
   },
   font: {
     body: ["IBM Plex Sans", "IBM Plex Sans JP"],

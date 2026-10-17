@@ -63,3 +63,6 @@ export const alertIcon = styleVariants({
   error: { display: "inline-flex", color: vars.color.negative.strong },
   warning: { display: "inline-flex", color: vars.color.notice.strong },
 });
+
+/** Hears Escape around the dialog without a box of its own. */
+export const escapeAnswer = style({ display: "contents" });

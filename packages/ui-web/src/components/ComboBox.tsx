@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import { popoverMaxHeight, type Size } from "@moonx/ui-tokens";
 import { ChevronDown, CircleAlert, TriangleAlert } from "lucide-react";
 import {
@@ -23,6 +22,7 @@ import {
   TextField,
   useFilter,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { type ChoiceItem, ChoiceListBox } from "../internal/ChoiceListBox";
 import {
   FieldHelp,
@@ -50,7 +50,7 @@ interface ComboBoxBaseProps extends FieldTextProps {
   defaultInputValue?: string;
   onInputChange?: (text: string) => void;
   placeholder?: string;
-  /** @default "M", or "L" inside a spacious `Form` */
+  /** @default "M"; "L" in a spacious pattern, dialog or `Form` (06 semantic.density) */
   size?: Size;
   /** @default "default" */
   width?: "default" | "full";
@@ -175,6 +175,7 @@ function PopoverComboBox({
   id,
   "aria-label": ariaLabel,
 }: ComboBoxProps & SharedState & { isTextControlled: boolean }) {
+  const { t } = useTranslation(["components"]);
   const resolved = useSize(size);
   const width = useFieldWidth(givenWidth);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -217,7 +218,7 @@ function PopoverComboBox({
       <div ref={frameRef} className={styles.frame({ size: resolved })}>
         <Input className={styles.input} placeholder={placeholder} />
         <Button
-          aria-label={i18n.t("components:comboBox.showSuggestions")}
+          aria-label={t("components:comboBox.showSuggestions")}
           className={styles.fieldButton({ size: resolved })}
         >
           <IconSlot size={resolved}>
@@ -231,7 +232,7 @@ function PopoverComboBox({
         errorMessage={errorMessage}
       />
       <Popover maxHeight={popoverMaxHeight} className={overlay.popover}>
-        <ChoiceListBox aria-label={i18n.t("components:comboBox.suggestions")} />
+        <ChoiceListBox aria-label={t("components:comboBox.suggestions")} />
       </Popover>
     </AriaComboBox>
   );
@@ -259,6 +260,7 @@ function TrayComboBox({
   id,
   "aria-label": ariaLabel,
 }: ComboBoxProps & SharedState) {
+  const { t } = useTranslation(["components"]);
   const resolved = useSize(size);
   const width = useFieldWidth(givenWidth);
   const { contains } = useFilter({ sensitivity: "base" });
@@ -339,7 +341,7 @@ function TrayComboBox({
             <>
               {" "}
               <span className={styles.necessity}>
-                {i18n.t("components:field.required")}
+                {t("components:field.required")}
               </span>
             </>
           )}
@@ -426,7 +428,7 @@ function TrayComboBox({
                 </CustomValueButton>
               )}
               <ChoiceListBox
-                aria-label={i18n.t("components:comboBox.suggestions")}
+                aria-label={t("components:comboBox.suggestions")}
                 items={items}
                 selectionMode="single"
                 selectedKeys={value === null ? [] : [value]}

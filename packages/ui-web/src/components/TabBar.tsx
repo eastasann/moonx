@@ -1,9 +1,9 @@
-import { i18n } from "@moonx/i18n";
 import { Menu as MenuIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button as AriaButton, Link as AriaLink } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { IconSlot } from "../internal/IconSlot";
-import { NavBadge, navItemName } from "../internal/NavBadge";
+import { NavBadge, useNavItemName } from "../internal/NavBadge";
 import { Menu, MenuTrigger } from "./Menu";
 import type { NavItem } from "./SideNav";
 import * as styles from "./TabBar.css";
@@ -28,10 +28,12 @@ export interface TabBarProps {
  * the rest in a tray. Tablet and wider show the SideNav instead.
  */
 export function TabBar({ items, currentId, more }: TabBarProps) {
+  const { t } = useTranslation(["components"]);
+  const navItemName = useNavItemName();
   const isMoreCurrent =
     currentId !== undefined && !items.some((item) => item.id === currentId);
   return (
-    <nav aria-label={i18n.t("components:nav.label")} className={styles.tabBar}>
+    <nav aria-label={t("components:nav.label")} className={styles.tabBar}>
       {items.map((item) => {
         const hasBadge = item.badge !== undefined && item.badge > 0;
         return (
@@ -63,7 +65,7 @@ export function TabBar({ items, currentId, more }: TabBarProps) {
           <IconSlot size="L">
             <MenuIcon />
           </IconSlot>
-          <span className={styles.label}>{i18n.t("components:nav.more")}</span>
+          <span className={styles.label}>{t("components:nav.more")}</span>
         </AriaButton>
         <Menu>{more}</Menu>
       </MenuTrigger>

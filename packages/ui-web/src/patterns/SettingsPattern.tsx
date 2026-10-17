@@ -1,5 +1,6 @@
 import { type ReactNode, useId } from "react";
 import { Heading } from "../components/Heading";
+import { Density } from "../internal/Density";
 import { FieldWidthContext } from "../internal/size";
 import { PageHeader } from "./PageHeader";
 import * as styles from "./patterns.css";
@@ -53,16 +54,18 @@ export function SettingsPattern({
   groups,
 }: SettingsPatternProps) {
   return (
-    <div className={styles.root}>
-      <div className={styles.settingsPage}>
-        <div className={styles.settingsHeader}>
-          <PageHeader header={header} primaryAction={primaryAction} />
+    <Density density="spacious">
+      <div className={styles.root}>
+        <div className={styles.settingsPage}>
+          <div className={styles.settingsHeader}>
+            <PageHeader header={header} primaryAction={primaryAction} />
+          </div>
+          {groups.map((group) => (
+            <Group key={group.id} group={group} />
+          ))}
         </div>
-        {groups.map((group) => (
-          <Group key={group.id} group={group} />
-        ))}
       </div>
-    </div>
+    </Density>
   );
 }
 

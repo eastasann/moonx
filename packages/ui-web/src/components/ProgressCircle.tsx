@@ -27,18 +27,24 @@ function Circle({
   isIndeterminate: boolean;
   inherit: boolean;
 }) {
-  const shown = isIndeterminate ? 25 : (percentage ?? 0);
   return (
     <svg
       aria-hidden="true"
       className={`${styles.svg} ${isIndeterminate ? styles.indeterminate : ""}`}
     >
       <circle className={`${styles.track} ${inherit ? styles.noTrack : ""}`} />
-      <circle
-        pathLength={100}
-        strokeDasharray={`${shown} 100`}
-        className={styles.fill}
-      />
+      {isIndeterminate ? (
+        <circle
+          pathLength={100}
+          className={`${styles.fill} ${styles.indeterminateFill}`}
+        />
+      ) : (
+        <circle
+          pathLength={100}
+          strokeDasharray={`${percentage ?? 0} 100`}
+          className={styles.fill}
+        />
+      )}
     </svg>
   );
 }

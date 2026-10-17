@@ -81,7 +81,7 @@ export {
   type FauLabelOptions,
   FauPicker,
   type FauPickerProps,
-  fauLabel,
+  useFauLabel,
 } from "./components/FauPicker";
 export { FileTrigger, type FileTriggerProps } from "./components/FileTrigger";
 export { Form, type FormProps } from "./components/Form";

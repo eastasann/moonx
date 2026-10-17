@@ -37,7 +37,7 @@ export interface DiffTextAreaProps
   /** The text being edited: the imported answer. */
   value: string;
   onChange: (value: string) => void;
-  /** TextArea's steps. @default "M", or "L" inside a spacious `Form` */
+  /** TextArea's steps. @default "M"; "L" in a spacious pattern, dialog or `Form` */
   size?: Size;
 }
 

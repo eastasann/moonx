@@ -1,57 +1,17 @@
 import {
   bulletGap,
   bulletTypography,
-  figureColumns,
-  type MeasureText,
-  type PitchFont,
+  fittedFigureColumns,
   pitchSizes,
 } from "@moonx/domain";
-import { i18n } from "@moonx/i18n";
 import type { PitchSlide } from "@moonx/schemas";
 import { print } from "@moonx/ui-tokens/print";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId } from "react";
+import { useTranslation } from "react-i18next";
 import { slideUnits } from "../internal/slideUnits";
 import * as styles from "./Slide.css";
 
 const { typography } = print;
-
-const family = (name: PitchFont["family"]) =>
-  print.font[name === "mono" ? "mono" : "body"]
-    .map((face) => `"${face}"`)
-    .join(", ");
-
-/**
- * Measures text as the PDF's fit does (packages/domain pitch-fit), with the same faces the
- * page loaded (IBM Plex, ADR-018): the figures then share the slide's width as they do in
- * the PDF. Measured again once the faces have loaded.
- */
-function useMeasure(): MeasureText {
-  const [fontsLoaded, setFontsLoaded] = useState(0);
-  useEffect(() => {
-    const fonts = document.fonts;
-    let live = true;
-    const loaded = () => {
-      if (live) setFontsLoaded((count) => count + 1);
-    };
-    fonts.ready.then(loaded);
-    fonts.addEventListener("loadingdone", loaded);
-    return () => {
-      live = false;
-      fonts.removeEventListener("loadingdone", loaded);
-    };
-  }, []);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a face that loaded changes the widths, so the measure is made again then.
-  return useMemo(() => {
-    const context = document.createElement("canvas").getContext("2d");
-    if (context === null) {
-      throw new Error("Slide: the browser gave no 2D canvas to measure text");
-    }
-    return (text, font) => {
-      context.font = `${font.weight} ${font.size}px ${family(font.family)}`;
-      return context.measureText(text).width;
-    };
-  }, [fontsLoaded]);
-}
 
 export interface SlideProps {
   /** A slide of P12's deck, already fitted to the page (SDD 5.9 `PitchDeck`). */
@@ -86,10 +46,12 @@ export function Slide({
   headingLevel = 3,
   isThumbnail = false,
 }: SlideProps) {
+  const { t } = useTranslation(["pitch"]);
   const headingId = useId();
-  const measure = useMeasure();
   const sizes = pitchSizes(slide.type, slide.shrink, print);
-  const figures = figureColumns(slide, sizes, { print, measure, currency });
+  // The columns the API measured with the PDF's fonts: the browser's fonts and measure
+  // could set them otherwise (ADR-012).
+  const figures = fittedFigureColumns(slide, { print, currency });
   const Heading = `h${headingLevel}` as const;
   const u = slideUnits;
   const bulletType = bulletTypography(slide.type, print);
@@ -116,12 +78,12 @@ export function Slide({
           >
             {slide.type !== "title" && (
               <span aria-hidden="true" className={styles.mark}>
-                {i18n.t("pitch:bullet")}
+                {t("pitch:bullet")}
               </span>
             )}
             <span className={styles.bulletText}>
               <span className={styles.label}>
-                {i18n.t("pitch:label", { label: bullet.label })}
+                {t("pitch:label", { label: bullet.label })}
               </span>
               <span className={bullet.empty ? styles.placeholder : undefined}>
                 {bullet.text}
@@ -252,6 +214,7 @@ function SlideTable({
   table: NonNullable<PitchSlide["table"]>;
   size: number;
 }) {
+  const { t } = useTranslation(["pitch"]);
   const u = slideUnits;
   const font = { fontSize: u(size), lineHeight: typography.cell.lineHeight };
   return (
@@ -283,7 +246,7 @@ function SlideTable({
               className={`${styles.cell} ${styles.placeholder}`}
               style={font}
             >
-              {i18n.t("pitch:notWrittenYet")}
+              {t("pitch:notWrittenYet")}
             </td>
           </tr>
         ) : (

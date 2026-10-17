@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import type { TagSize } from "@moonx/ui-tokens";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
@@ -11,6 +10,7 @@ import {
   TagList,
   Text,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { FixedLocale } from "../internal/FixedLocale";
 import * as field from "../internal/field.css";
 import { IconSlot } from "../internal/IconSlot";
@@ -49,6 +49,7 @@ export function TagGroup({
   size = "M",
   ...props
 }: TagGroupProps) {
+  const { t } = useTranslation(["components"]);
   return (
     <FixedLocale>
       <AriaTagGroup
@@ -77,7 +78,7 @@ export function TagGroup({
                   {allowsRemoving && (
                     <Button
                       slot="remove"
-                      aria-label={i18n.t("components:tagGroup.remove")}
+                      aria-label={t("components:tagGroup.remove")}
                       className={styles.remove}
                     >
                       <IconSlot size={size}>

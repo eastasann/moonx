@@ -5,7 +5,14 @@ import {
   sizes,
   sizesWithXS,
 } from "@moonx/ui-tokens";
-import { Copy, FileDown, FileUp, History, MessageSquare } from "lucide-react";
+import {
+  Copy,
+  FileDown,
+  FileUp,
+  History,
+  Info,
+  MessageSquare,
+} from "lucide-react";
 import { useState } from "react";
 import { ActionButton } from "../components/ActionButton";
 import { Button, ButtonGroup } from "../components/Button";
@@ -71,7 +78,7 @@ export function DialogSection() {
           </Dialog>
         </DialogTrigger>
       </Specimen>
-      <Specimen name='AlertDialog variant="destructive" / "error" / "warning" (Escape does not close)'>
+      <Specimen name='AlertDialog variant="destructive" / "error" / "warning" (Escape is its Cancel; without one it waits)'>
         <Flex gap="space-200" wrap alignItems="center">
           <DialogTrigger>
             <Button variant="secondary">Delete row</Button>
@@ -253,6 +260,15 @@ export function TooltipSection() {
               <History />
             </ActionButton>
             <Tooltip placement="bottom">History</Tooltip>
+          </TooltipTrigger>
+          <TooltipTrigger>
+            <ActionButton isQuiet aria-label="Template version">
+              <Info />
+            </ActionButton>
+            <Tooltip placement="bottom">
+              A newer template version is out: update to get its new questions
+              and examples
+            </Tooltip>
           </TooltipTrigger>
           <Text tone="secondary">{`Comments pressed: ${pressed}`}</Text>
         </Flex>

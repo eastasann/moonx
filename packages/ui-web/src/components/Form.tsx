@@ -1,14 +1,15 @@
 import type { ScreenDensity, Size } from "@moonx/ui-tokens";
-import type { FormEvent, ReactNode } from "react";
+import { type FormEvent, type ReactNode, useContext } from "react";
 import { Form as AriaForm } from "react-aria-components";
+import { Density, DensityContext } from "../internal/Density";
 import { SizeContext } from "../internal/size";
 import * as styles from "./Form.css";
 
 export interface FormProps {
   /**
    * The screen's density (design-spec 4.4): spacing between the fields, and their size
-   * (regular M, spacious L, as 06 semantic.density says).
-   * @default "regular"
+   * (regular M, spacious L, as 06 semantic.density says). Without it, the density of the
+   * pattern or the dialog around (regular outside them).
    */
   density?: ScreenDensity;
   /** The size of the fields and Buttons inside, in place of the density's. */
@@ -30,12 +31,14 @@ export interface FormProps {
  * screen checks with Zod and passes the reasons (design-spec 4.5).
  */
 export function Form({
-  density = "regular",
+  density: givenDensity,
   size,
   onSubmit,
   children,
   ...props
 }: FormProps) {
+  const around = useContext(DensityContext);
+  const density = givenDensity ?? around;
   return (
     <AriaForm
       {...props}
@@ -47,11 +50,13 @@ export function Form({
       }}
       className={styles.form({ density })}
     >
-      <SizeContext.Provider
-        value={size ?? (density === "spacious" ? "L" : "M")}
-      >
-        {children}
-      </SizeContext.Provider>
+      <Density density={density}>
+        {size === undefined ? (
+          children
+        ) : (
+          <SizeContext.Provider value={size}>{children}</SizeContext.Provider>
+        )}
+      </Density>
     </AriaForm>
   );
 }

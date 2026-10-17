@@ -1,4 +1,4 @@
-import { formatCount, i18n } from "@moonx/i18n";
+import { formatCount } from "@moonx/i18n";
 import type { QuestionCardMode } from "@moonx/ui-tokens";
 import { MessageSquare } from "lucide-react";
 import {
@@ -9,6 +9,7 @@ import {
   useRef,
 } from "react";
 import { Button, VisuallyHidden } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { AnswerFieldContext } from "../internal/answerField";
 import { IconSlot } from "../internal/IconSlot";
 import type { MoonState } from "../internal/MoonMark";
@@ -57,7 +58,7 @@ export interface QuestionCardProps {
   mode: QuestionCardMode;
   /**
    * The answer's F/A/U (validation only; self-analysis has none): its mark at the start of
-   * a quiet card, and its label (`fauLabel`).
+   * a quiet card, and its label (`useFauLabel`).
    */
   status?: { state: MoonState; label: string };
   /** A quiet card's excerpt: the answer's start, or null for "Empty". */
@@ -95,6 +96,7 @@ export function QuestionCard({
   headingLevel = 2,
   id,
 }: QuestionCardProps) {
+  const { t } = useTranslation(["components"]);
   const titleId = useId();
   const metaId = useId();
   const excerptId = useId();
@@ -152,7 +154,7 @@ export function QuestionCard({
             id={excerptId}
             className={excerpt === null ? styles.emptyExcerpt : styles.excerpt}
           >
-            {excerpt ?? i18n.t("components:questionCard.empty")}
+            {excerpt ?? t("components:questionCard.empty")}
           </p>
         </div>
         <span id={metaId} className={styles.meta}>
@@ -169,7 +171,7 @@ export function QuestionCard({
               </IconSlot>
               <span aria-hidden="true">{formatCount(commentCount)}</span>
               <VisuallyHidden>
-                {i18n.t("components:questionCard.comments", {
+                {t("components:questionCard.comments", {
                   count: commentCount,
                   formatted: formatCount(commentCount),
                 })}

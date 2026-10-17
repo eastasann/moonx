@@ -100,7 +100,7 @@ export const previewCaption = style({
 });
 
 /**
- * The three parts on a line (.route): across; below `split-min-width`, down. Each part
+ * The three parts on a line (.route): across; at `stack-max-width` and narrower, down. Each part
  * but the last draws the light line from its moon to the next one's.
  */
 export const route = style({

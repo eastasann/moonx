@@ -109,7 +109,7 @@ export const row = recipe({
         vars: { [columnGap]: measures.numberGap },
         paddingBlock: measures.orderedPaddingY,
         "::before": {
-          ...typography("number"),
+          ...typography("numberEmphasis"),
           fontSize: vars.typography.caption.fontSize,
           content: `counter(${counter})`,
           display: "inline-flex",

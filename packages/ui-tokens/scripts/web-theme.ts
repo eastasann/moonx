@@ -358,10 +358,10 @@ export const twoColumnMinWidth = ${pixels("semantic.layout.two-column-min-width"
 export const presentationTwoColumnMinWidth = ${pixels("semantic.layout.presentation.two-column-min-width")};
 
 /**
- * \`semantic.layout.public.split-min-width\` in px, for the media query below which the
- * public page's two-column sections stack.
+ * \`semantic.layout.public.stack-max-width\` in px, for the media query at and below which
+ * the public page's two-column sections stack.
  */
-export const publicSplitMinWidth = ${pixels("semantic.layout.public.split-min-width")};
+export const publicStackMaxWidth = ${pixels("semantic.layout.public.stack-max-width")};
 `;
 }
 

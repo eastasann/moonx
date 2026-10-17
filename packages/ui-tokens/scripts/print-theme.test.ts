@@ -28,7 +28,7 @@ test("holds every semantic.print token", () => {
 
 test("takes the light colours, as hex", () => {
   expect(at("color.page")).toBe("#ffffff");
-  expect(at("color.text")).toBe("#151a2c");
+  expect(at("color.text")).toBe("#191c2a");
   expect(at("color.textSecondary")).toBe("#555d72");
 });
 

@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import type { Size } from "@moonx/ui-tokens";
 import {
   type KeyboardEvent,
@@ -19,6 +18,7 @@ import {
   TextField,
   useFilter,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { ChoiceListBox } from "../internal/ChoiceListBox";
 import {
   FieldHelp,
@@ -49,7 +49,7 @@ export interface MentionTextAreaProps extends FieldTextProps {
   onMentionsChange: (mentions: MentionCandidate[]) => void;
   /** Who can be mentioned, from W8 (design-spec 6.0.4). */
   candidates: readonly MentionCandidate[];
-  /** @default "M", or "L" inside a spacious `Form` */
+  /** @default "M"; "L" in a spacious pattern, dialog or `Form` (06 semantic.density) */
   size?: Size;
   /** `full` fills the line; otherwise the size's default width. @default "full" */
   width?: "default" | "full";
@@ -113,6 +113,7 @@ export function MentionTextArea({
   placeholder,
   ...props
 }: MentionTextAreaProps) {
+  const { t } = useTranslation(["components"]);
   const resolved = useSize(size);
   const isNarrow = useIsNarrow();
   const { contains, startsWith } = useFilter({ sensitivity: "base" });
@@ -275,7 +276,7 @@ export function MentionTextArea({
         <div
           id={listId}
           role="listbox"
-          aria-label={i18n.t("components:mentionTextArea.members")}
+          aria-label={t("components:mentionTextArea.members")}
           className={styles.list}
         >
           {matches.map((candidate, index) => (
@@ -306,7 +307,7 @@ export function MentionTextArea({
       >
         <Modal className={overlay.tray}>
           <Dialog
-            aria-label={i18n.t("components:mentionTextArea.members")}
+            aria-label={t("components:mentionTextArea.members")}
             className={`${overlay.trayDialog} ${field.trayBody}`}
           >
             <Autocomplete
@@ -316,7 +317,7 @@ export function MentionTextArea({
             >
               <TextField
                 autoFocus
-                aria-label={i18n.t("components:mentionTextArea.search")}
+                aria-label={t("components:mentionTextArea.search")}
                 className={field.trayField}
               >
                 <div className={field.frame({ size: resolved })}>
@@ -324,7 +325,7 @@ export function MentionTextArea({
                 </div>
               </TextField>
               <ChoiceListBox
-                aria-label={i18n.t("components:mentionTextArea.members")}
+                aria-label={t("components:mentionTextArea.members")}
                 items={candidates.map((candidate) => ({
                   id: candidate.id,
                   label: candidate.name,

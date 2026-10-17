@@ -34,7 +34,7 @@ export interface ButtonProps
   variant?: ButtonVariant;
   /** Supporting actions: no fill and no border. */
   isQuiet?: boolean;
-  /** @default "M", or "L" inside a spacious `Form` */
+  /** @default "M"; "L" in a spacious pattern, dialog or `Form` (06 semantic.density) */
   size?: Size;
   /** Text, optionally with a Lucide icon before it. */
   children: ReactNode;
@@ -82,7 +82,7 @@ export interface ButtonGroupProps {
   orientation?: "horizontal" | "vertical";
   /**
    * The size of the Buttons that do not set their own.
-   * @default the surrounding `Form`'s, otherwise "M"
+   * @default the density around (L in a spacious pattern, dialog or `Form`), otherwise "M"
    */
   size?: Size;
   "aria-label"?: string;

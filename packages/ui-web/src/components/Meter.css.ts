@@ -2,6 +2,9 @@ import { type Size, sizes, vars } from "@moonx/ui-tokens";
 import { style, styleVariants } from "@vanilla-extract/css";
 import { typography } from "../styles/helpers";
 
+/** Unknown's stripes (06 component.meter.hatch-*, d1-moon.html .fau-u). */
+const hatch = vars.scale.component.meter;
+
 const sized = Object.fromEntries(sizes.map((size) => [size, size])) as Record<
   Size,
   Size
@@ -50,7 +53,7 @@ export const shade = styleVariants({
   fact: { background: vars.color.fau.fact.strong },
   assumption: { background: vars.color.fau.assumption.strong },
   unknown: {
-    background: `repeating-linear-gradient(135deg, ${vars.color.fau.unknown.strong} 0 ${vars.borderWidth.focusRing}, transparent ${vars.borderWidth.focusRing} ${vars.space["75"]})`,
+    background: `repeating-linear-gradient(calc(${hatch.hatchAngle} * 1deg), ${vars.color.fau.unknown.strong} 0 ${hatch.hatchLine}, transparent ${hatch.hatchLine} ${hatch.hatchPeriod})`,
     boxShadow: `inset 0 0 0 ${vars.borderWidth.hairline} ${vars.color.fau.unknown.strong}`,
   },
   unclassified: { background: vars.color.fau.unclassified.strong },
@@ -98,7 +101,7 @@ export const swatch = style({
 /** The count in monospaced ink; inside Unclassified's entry, its amber. */
 export const count = style({
   fontFamily: vars.font.family.mono,
-  fontWeight: vars.typography.number.fontWeight,
+  fontWeight: vars.typography.numberEmphasis.fontWeight,
   fontVariantNumeric: "tabular-nums",
   color: vars.color.text.primary,
   selectors: { [`${entry.unclassified} &`]: { color: "inherit" } },

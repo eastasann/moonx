@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import type { Density } from "@moonx/ui-tokens";
 import { vars } from "@moonx/ui-tokens";
 import { ChevronRight } from "lucide-react";
@@ -17,6 +16,7 @@ import {
   type Selection,
   TreeItemContent,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { IconSlot } from "../internal/IconSlot";
 import * as styles from "./Tree.css";
 
@@ -105,6 +105,7 @@ export interface TreeItemProps
 
 /** An item of a Tree; its children are the branch under it. */
 export function TreeItem({ title, children, ...props }: TreeItemProps) {
+  const { t } = useTranslation(["components"]);
   const opens = useContext(OpensContext) || props.href !== undefined;
   return (
     <AriaTreeItem {...props} className={styles.item}>
@@ -120,7 +121,7 @@ export function TreeItem({ title, children, ...props }: TreeItemProps) {
             {hasChildItems ? (
               <Button
                 slot="chevron"
-                aria-label={i18n.t(
+                aria-label={t(
                   isExpanded
                     ? "components:tree.collapse"
                     : "components:tree.expand",

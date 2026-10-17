@@ -153,6 +153,7 @@ const frameQuestions = [
 export function FrameSection() {
   const [moved, setMoved] = useState("nothing yet");
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [backLabel, setBackLabel] = useState("Validation");
   const [panel, setPanel] = useState<"comments" | "history" | null>(null);
   const [current, setCurrent] = useState<string | null>("WHO");
   const toggle = (name: "comments" | "history") =>
@@ -160,7 +161,7 @@ export function FrameSection() {
 
   return (
     <Section title="SideNav, TabBar, AppFrame and RouterProvider">
-      <Specimen name="the save state in the header">
+      <Specimen name="the save state in the header, beside a short or long ←">
         <SegmentedControl
           aria-label="Save state"
           selectedKey={saveState}
@@ -169,6 +170,16 @@ export function FrameSection() {
           <SegmentedControlItem id="saving">Saving</SegmentedControlItem>
           <SegmentedControlItem id="saved">Saved</SegmentedControlItem>
           <SegmentedControlItem id="save-failed">Failed</SegmentedControlItem>
+        </SegmentedControl>
+        <SegmentedControl
+          aria-label="Back label"
+          selectedKey={backLabel}
+          onSelectionChange={(key) => setBackLabel(String(key))}
+        >
+          <SegmentedControlItem id="Validation">Short</SegmentedControlItem>
+          <SegmentedControlItem id="Piaya Gift Box Delivery for offices">
+            Long
+          </SegmentedControlItem>
         </SegmentedControl>
       </Specimen>
       <Text elementType="p" tone="secondary">
@@ -188,7 +199,7 @@ export function FrameSection() {
                 <Breadcrumb>01 Customer & Problem</Breadcrumb>
               </Breadcrumbs>
             }
-            back={{ href: `${base}/ideas/piaya`, label: "Validation" }}
+            back={{ href: `${base}/ideas/piaya`, label: backLabel }}
             saveState={saveState}
             onRetrySave={() => setSaveState("saving")}
             comments={{

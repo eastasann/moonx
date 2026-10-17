@@ -133,12 +133,28 @@
             "hex": "#1b2135"
           }
         },
+        "875": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.098, 0.11, 0.165],
+            "hex": "#191c2a"
+          },
+          "$description": "ライトの文字とインクの塗り（docs/mockups の moon-base.css の --ink）"
+        },
         "900": {
           "$value": {
             "colorSpace": "srgb",
             "components": [0.082, 0.102, 0.173],
             "hex": "#151a2c"
           }
+        },
+        "925": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.067, 0.082, 0.165],
+            "hex": "#11152a"
+          },
+          "$description": "ダークのインクの塗りの上の文字と、モックアップの影の色（moon-base.css の --on-ink、docs/mockups の影の rgba(17, 21, 42, …)）"
         },
         "950": {
           "$value": {
@@ -248,14 +264,6 @@
             "hex": "#000000"
           }
         },
-        "night-950-04": {
-          "$value": {
-            "colorSpace": "srgb",
-            "components": [0.055, 0.067, 0.125],
-            "alpha": 0.04,
-            "hex": "#0e1120"
-          }
-        },
         "night-950-08": {
           "$value": {
             "colorSpace": "srgb",
@@ -264,27 +272,11 @@
             "hex": "#0e1120"
           }
         },
-        "night-950-12": {
-          "$value": {
-            "colorSpace": "srgb",
-            "components": [0.055, 0.067, 0.125],
-            "alpha": 0.12,
-            "hex": "#0e1120"
-          }
-        },
         "night-950-16": {
           "$value": {
             "colorSpace": "srgb",
             "components": [0.055, 0.067, 0.125],
             "alpha": 0.16,
-            "hex": "#0e1120"
-          }
-        },
-        "night-950-35": {
-          "$value": {
-            "colorSpace": "srgb",
-            "components": [0.055, 0.067, 0.125],
-            "alpha": 0.35,
             "hex": "#0e1120"
           }
         },
@@ -302,6 +294,46 @@
             "components": [0.055, 0.067, 0.125],
             "alpha": 0.72,
             "hex": "#0e1120"
+          }
+        },
+        "night-925-04": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.067, 0.082, 0.165],
+            "alpha": 0.04,
+            "hex": "#11152a"
+          }
+        },
+        "night-925-08": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.067, 0.082, 0.165],
+            "alpha": 0.08,
+            "hex": "#11152a"
+          }
+        },
+        "night-925-12": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.067, 0.082, 0.165],
+            "alpha": 0.12,
+            "hex": "#11152a"
+          }
+        },
+        "night-925-35": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.067, 0.082, 0.165],
+            "alpha": 0.35,
+            "hex": "#11152a"
+          }
+        },
+        "night-925-40": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [0.067, 0.082, 0.165],
+            "alpha": 0.4,
+            "hex": "#11152a"
           }
         },
         "black-55": {
@@ -400,7 +432,8 @@
         "1-3": { "$value": 1.3 },
         "1-4": { "$value": 1.4 },
         "1-55": { "$value": 1.55 },
-        "$description": "行の高さ（文字の大きさに対する割合）。名前の付いた段（tight・snug・normal）は Pitch Deck（semantic.print）、relaxed は長文の回答が使う。数字の名前の値は画面の文字（docs/mockups の値）"
+        "1-6": { "$value": 1.6 },
+        "$description": "行の高さ（文字の大きさに対する割合）。名前の付いた段（tight・snug・normal）は Pitch Deck（semantic.print）と、tight は画面の指標の数字（typography の metric-column・preview-metric）も使う。relaxed は設問の回答の欄（typography の answer）が使う。数字の名前の値は画面の文字（docs/mockups の値）"
       },
       "letter-spacing": {
         "$type": "dimension",
@@ -482,6 +515,7 @@
       "60": { "$value": { "value": 60, "unit": "px" } },
       "64": { "$value": { "value": 64, "unit": "px" } },
       "68": { "$value": { "value": 68, "unit": "px" } },
+      "69": { "$value": { "value": 69, "unit": "px" } },
       "70": { "$value": { "value": 70, "unit": "px" } },
       "72": { "$value": { "value": 72, "unit": "px" } },
       "80": { "$value": { "value": 80, "unit": "px" } },
@@ -558,9 +592,16 @@
     "ratio": {
       "$type": "number",
       "half": { "$value": 0.5 },
+      "25": { "$value": 0.25 },
       "40": { "$value": 0.4 },
+      "70": { "$value": 0.7 },
       "52": { "$value": 0.52 },
       "85": { "$value": 0.85 }
+    },
+    "angle": {
+      "$type": "number",
+      "$description": "角度（度）",
+      "135": { "$value": 135 }
     },
     "fr": {
       "$type": "number",
@@ -621,7 +662,7 @@
       },
       "slide-edge": {
         "$value": {
-          "color": "{primitive.color.alpha.night-950-08}",
+          "color": "{primitive.color.alpha.night-925-08}",
           "offsetX": { "value": 0, "unit": "px" },
           "offsetY": { "value": 0, "unit": "px" },
           "blur": { "value": 0, "unit": "px" },
@@ -630,7 +671,7 @@
       },
       "slide": {
         "$value": {
-          "color": "{primitive.color.alpha.night-950-35}",
+          "color": "{primitive.color.alpha.night-925-35}",
           "offsetX": { "value": 0, "unit": "px" },
           "offsetY": { "value": 18, "unit": "px" },
           "blur": { "value": 40, "unit": "px" },
@@ -639,7 +680,7 @@
       },
       "question-card-edge": {
         "$value": {
-          "color": "{primitive.color.alpha.night-950-04}",
+          "color": "{primitive.color.alpha.night-925-04}",
           "offsetX": { "value": 0, "unit": "px" },
           "offsetY": { "value": 1, "unit": "px" },
           "blur": { "value": 2, "unit": "px" },
@@ -648,7 +689,7 @@
       },
       "question-card": {
         "$value": {
-          "color": "{primitive.color.alpha.night-950-12}",
+          "color": "{primitive.color.alpha.night-925-12}",
           "offsetX": { "value": 0, "unit": "px" },
           "offsetY": { "value": 8, "unit": "px" },
           "blur": { "value": 24, "unit": "px" },
@@ -657,7 +698,7 @@
       },
       "floating-action": {
         "$value": {
-          "color": "{primitive.color.alpha.night-950-40}",
+          "color": "{primitive.color.alpha.night-925-40}",
           "offsetX": { "value": 0, "unit": "px" },
           "offsetY": { "value": 8, "unit": "px" },
           "blur": { "value": 24, "unit": "px" },
@@ -666,7 +707,7 @@
       },
       "preview": {
         "$value": {
-          "color": "{primitive.color.alpha.night-950-35}",
+          "color": "{primitive.color.alpha.night-925-35}",
           "offsetX": { "value": 0, "unit": "px" },
           "offsetY": { "value": 30, "unit": "px" },
           "blur": { "value": 60, "unit": "px" },
@@ -732,7 +773,10 @@
           }
         },
         "text": {
-          "primary": { "$value": "{primitive.color.night.900}" },
+          "primary": {
+            "$value": "{primitive.color.night.875}",
+            "$description": "本文とインク（docs/mockups の --ink）"
+          },
           "secondary": {
             "$value": "{primitive.color.night.700}",
             "$description": "補足・メタ情報・F/A/U のラベル"
@@ -750,7 +794,7 @@
             "$description": "無効（コントラスト基準の対象外）"
           },
           "link": {
-            "$value": "{primitive.color.night.900}",
+            "$value": "{primitive.color.night.875}",
             "$description": "Link。文字は本文と同じ色で、下線で示す"
           }
         },
@@ -761,20 +805,20 @@
           },
           "default": {
             "$value": "{primitive.color.night.300}",
-            "$description": "文字で何の部品か分かるもの（Badge・文字のある Button・ActionButton・SegmentedControl の溝・カードで選ぶ RadioGroup の肢・RowList の強調した行・区切りの線（Divider L・数字の帯の上・表の見出しの下・スマホの表の行の上）・単独のリンクの下線）の枠（docs/mockups の --line-strong。2026-10-17 のユーザーの決定）。WCAG 1.4.11 は文字で分かる部品の枠に 3:1 を求めない。枠で場所を示す部品（入力欄・Checkbox・Radio の丸・Switch・Picker）は strong"
+            "$description": "文字で何の部品か分かるもの（Badge・文字のある Button・ActionButton・SegmentedControl の溝・カードで選ぶ RadioGroup の肢・RowList の強調した行・区切りの線（Divider L・数字の帯の上・表の見出しの下・スマホの表の行の上）・単独のリンクの下線）の枠と、docs/mockups が --line-strong で描くほかの枠（入力中の QuestionCard・F の結果のカード・Popover と Toast・追加のタイルの点線・今のスライドのサムネイルの輪。s11 の .q・s17 の .totals と .pop・s15 の .addcard・s23 の .thumbs）（docs/mockups の --line-strong。2026-10-17 のユーザーの決定）。WCAG 1.4.11 は文字で分かる部品の枠に 3:1 を求めない。枠で場所を示す部品（入力欄・Checkbox・Radio の丸・Switch・Picker）は strong"
           },
           "strong": {
             "$value": "{primitive.color.night.550}",
             "$description": "入力欄・コントロールの枠（3:1 以上）"
           },
           "focus": {
-            "$value": "{primitive.color.night.900}",
+            "$value": "{primitive.color.night.875}",
             "$description": "フォーカスの表示（Spectrum の focus-indicator）"
           }
         },
         "control": {
           "primary": {
-            "$value": "{primitive.color.night.900}",
+            "$value": "{primitive.color.night.875}",
             "$description": "Button variant=primary の地・選択した Checkbox / Radio / Switch・SegmentedControl の選択"
           },
           "primary-hover": { "$value": "{primitive.color.night.750}" },
@@ -789,7 +833,7 @@
           },
           "secondary-hover": { "$value": "{primitive.color.night.100}" },
           "secondary-pressed": { "$value": "{primitive.color.night.150}" },
-          "on-secondary": { "$value": "{primitive.color.night.900}" },
+          "on-secondary": { "$value": "{primitive.color.night.875}" },
           "disabled": {
             "$value": "{primitive.color.night.100}",
             "$description": "無効なコントロールの地（文字は text.disabled）"
@@ -799,7 +843,7 @@
             "$description": "Meter・ProgressBar の地"
           },
           "track-fill": {
-            "$value": "{primitive.color.night.900}",
+            "$value": "{primitive.color.night.875}",
             "$description": "ProgressBar の進み"
           }
         },
@@ -860,8 +904,8 @@
           "$description": "F/A/U のラベルの文字（fg）と Meter の帯（strong）（design-spec 6.0.3）。確認項目の Done / Partial / Not started も fact / assumption / unknown と同じ値を使う。区別は形（月の満ち欠け）とラベルで、帯の色は濃淡だけ。MoonGlyph の印は状態によらず text.primary で描き（2026-10-17 のユーザーの決定。docs/mockups の .fau .g）、Unclassified の菱形だけ unclassified.strong、Empty の点線の丸は empty.fg",
           "fact": {
             "$description": "Fact（満月 ●）",
-            "fg": { "$value": "{primitive.color.night.900}" },
-            "strong": { "$value": "{primitive.color.night.900}" }
+            "fg": { "$value": "{primitive.color.night.875}" },
+            "strong": { "$value": "{primitive.color.night.875}" }
           },
           "assumption": {
             "$description": "Assumption（半月 ◐）",
@@ -898,7 +942,7 @@
           },
           "sunken": {
             "$value": "{primitive.color.night.850}",
-            "$description": "画面上部の帯・Avatar の地・DiffText の差分の地・FauPicker のボタンを開いている間の地・Pitch Deck の表の見出し行（print.color.table-header）"
+            "$description": "画面上部の帯・Avatar の地・DiffText の差分の地・FauPicker のボタンを開いている間の地（Pitch Deck の表の見出し行 print.color.table-header はダークでもライトの値）"
           },
           "overlay": {
             "$value": "{primitive.color.night.850}",
@@ -945,7 +989,10 @@
             "$value": "{primitive.color.night.825}",
             "$description": "区切り線（装飾）"
           },
-          "default": { "$value": "{primitive.color.night.750}" },
+          "default": {
+            "$value": "{primitive.color.night.750}",
+            "$description": "ライトの border.default と同じ部品の枠（docs/mockups のダークの --line-strong）"
+          },
           "strong": {
             "$value": "{primitive.color.night.600}",
             "$description": "入力欄・コントロールの枠（3:1 以上）"
@@ -963,8 +1010,8 @@
           "primary-hover": { "$value": "{primitive.color.night.0}" },
           "primary-pressed": { "$value": "{primitive.color.night.300}" },
           "on-primary": {
-            "$value": "{primitive.color.night.950}",
-            "$description": "primary の上の文字・チェック"
+            "$value": "{primitive.color.night.925}",
+            "$description": "primary の上の文字・チェック（docs/mockups のダークの --on-ink）"
           },
           "secondary": {
             "$value": "{primitive.color.night.900}",
@@ -1075,9 +1122,9 @@
       "medium": {
         "$description": "デスクトップ（Spectrum の desktop）",
         "component": {
-          "$description": "Spectrum の component 層（部品の寸法）。XS / S / M / L / XL は部品の size。既定は M（部品ごとの段と既定は design-spec 4.5）",
+          "$description": "Spectrum の component 層（部品の寸法）。XS / S / M / L / XL は部品の size。既定が M の部品は M（部品ごとの段と既定は design-spec 4.5。Spectrum 2 のその部品の既定にそろえ、Badge と Avatar は S、ContextualHelp は XS、Popover は大きさを指定しなければ中身に合わせる。2026-10-17 のユーザーの決定）",
           "button": {
-            "$description": "Button。値は docs/mockups（2026-10-17 のユーザーの決定）: M は moon-base.css の .btn（36px・14px・角丸 8・左右 14、quiet は左右 8）、S は s06-ideas.html の絞り込みのボタン（30px・13px・角丸 7・左右 10）、L は spacious の画面（s09・s11・s19・s25）の Button が M と同じ見た目のため M と同じ値、XL は s01-landing.html の Log in と d1-moon.html のスマホの下部の操作（48px・16px・角丸 10・左右 22）。XL の quiet の左右は L と XL の比から決めた。large は高さだけを target-min（44）以上にする（moon-base.css のスマホの .btn は 44）",
+            "$description": "Button。値は docs/mockups（2026-10-17 のユーザーの決定）: M は moon-base.css の .btn（36px・14px・角丸 8・左右 14、quiet は左右 8）、S は s06-ideas.html の絞り込みのボタン（30px・13px・角丸 7・左右 10）、L は spacious の画面（s09・s11・s19・s25）の Button が M と同じ見た目のため M と同じ値、XL は s01-landing.html の Log in（.btn.lg の 48px・16px・角丸 10・左右 22）。d1-moon.html のスマホの下部の操作も 48px・16px（角丸と左右は .btn の 8・14 のまま）で、XL の1つの段に s01 の値を使う。XL の quiet の左右は、quiet の M の 8 を L と XL の左右の比（14 : 22）で広げた 12.6 の小数を切り捨てた 12。large は高さだけを target-min（44）以上にする（moon-base.css のスマホの .btn は 44）",
             "height": {
               "S": { "$value": "{primitive.dimension.30}" },
               "M": { "$value": "{primitive.dimension.36}" },
@@ -1112,7 +1159,7 @@
             }
           },
           "action-button": {
-            "$description": "ActionButton・ActionGroup・ToggleButtonGroup（F/A/U のボタン）・ActionMenu・SegmentedControl。XS を使うのは、design-spec 4.5 で段が XS から始まる部品のボタン（ToggleButtonGroup・ActionMenu・ContextualHelp）。ActionButton・ActionGroup・SegmentedControl は S〜XL。S〜XL は Button と同じ値（docs/mockups。ヘッダーのアイコンのボタンは moon-base.css の .iconbtn の 36×36・アイコン 18px）で、padding-icon-only は高さからアイコン（component.icon.size）と上下の枠（1px ずつ）を引いた残りの半分。XS は Spectrum 2 のトークンの component-height-50・component-edge-to-text-50・component-edge-to-visual-only-50・font-size-50。large は高さだけを target-min（44）以上にする",
+            "$description": "ActionButton・ActionGroup・ToggleButtonGroup（F/A/U のボタン）・ActionMenu・SegmentedControl。XS を使うのは、design-spec 4.5 で段が XS から始まる部品のボタン（ToggleButtonGroup・ActionMenu・ContextualHelp）。ActionButton・ActionGroup・SegmentedControl は S〜XL。S〜XL は Button と同じ値（docs/mockups。ヘッダーのアイコンのボタンは moon-base.css の .iconbtn の 36×36・アイコン 18px）で、padding-icon-only は高さからアイコン（component.icon.size）と上下の枠（1px ずつ）を引いた残りの半分。XS は Spectrum 2 のトークンの component-height-50・component-edge-to-text-50・font-size-50 で、padding-icon-only の XS は component-edge-to-visual-only-50（枠の外側から 3）から枠の 1px を引いた 2（S〜XL と同じく枠の内側から測る）。large は高さだけを target-min（44）以上にする（アイコンだけのボタンは幅も target-min 以上にするので、padding-icon-only は large でも medium と同じ）",
             "height": {
               "XS": { "$value": "{primitive.dimension.20}" },
               "S": { "$value": "{primitive.dimension.30}" },
@@ -1151,24 +1198,24 @@
             }
           },
           "segmented-control": {
-            "$description": "SegmentedControl と F/A/U の ToggleButtonGroup の溝の中の項目（S〜XL。ToggleButtonGroup の XS は action-button の XS）。docs/mockups の .seg: S は s09-settings.html（28px・13px・左右 10）、M は s15-competitors.html と s23-deck.html（30px・13.5px・左右 12）、L は s11-form.html と s17-costs.html の F/A/U（32px・14px・左右 12）、XL は Button の XL に合わせた。溝の外側は、項目に上下の余白 2px と枠 1px を足した高さ。large は高さを target-min（44）にする",
+            "$description": "SegmentedControl と F/A/U の ToggleButtonGroup の溝の中の項目（S〜XL。ToggleButtonGroup の XS は action-button の XS）。docs/mockups の溝: S は s25-import.html の .seg（28px・13px・左右 10）、M は s15-competitors.html と s23-deck.html（30px・13.5px・左右 12）、L は s11-form.html の F/A/U の .seg（32px・14px・左右 12。s17-costs.html の F/A/U の溝は FauPicker の Popover の中の大きさで fau-picker が持つ）。XL はモックアップに無いので、@react-spectrum/s2 の SegmentedControl の項目の大きさ（control の XL: Spectrum 2 のトークンの component-height-300 の 48・component-edge-to-text-300 の 18・font-size-300 の 18）。溝の外側は、項目に上下の余白 2px と枠 1px を足した高さ。large は高さを target-min（44）にする",
             "item-height": {
               "S": { "$value": "{primitive.dimension.28}" },
               "M": { "$value": "{primitive.dimension.30}" },
               "L": { "$value": "{primitive.dimension.32}" },
-              "XL": { "$value": "{primitive.dimension.40}" }
+              "XL": { "$value": "{primitive.dimension.48}" }
             },
             "padding-x": {
               "S": { "$value": "{primitive.dimension.10}" },
               "M": { "$value": "{primitive.dimension.12}" },
               "L": { "$value": "{primitive.dimension.12}" },
-              "XL": { "$value": "{primitive.dimension.14}" }
+              "XL": { "$value": "{primitive.dimension.18}" }
             },
             "font-size": {
               "S": { "$value": "{primitive.font.size.13}" },
               "M": { "$value": "{primitive.font.size.13-5}" },
               "L": { "$value": "{primitive.font.size.14}" },
-              "XL": { "$value": "{primitive.font.size.16}" }
+              "XL": { "$value": "{primitive.font.size.18}" }
             }
           },
           "tag": {
@@ -1247,7 +1294,7 @@
             }
           },
           "field": {
-            "$description": "TextField・TextArea・NumberField・SearchField・Picker・ComboBox・DatePicker。値は docs/mockups（2026-10-17 のユーザーの決定）: S は s06-ideas.html の検索（30px・角丸 7・左右 10）、M は s23-deck.html の Picker（36px・角丸 8・左右 12）、L は s09-settings.html の入力欄（38px・角丸 8・左右 12。spacious の画面の入力欄）、XL は Button の XL にそろえた。文字の大きさは semantic.font-size の field（スマホの幅ではどの段も 16px）。枠の色は border.strong（3:1。design-spec 4.4）。large は高さだけを target-min（44）以上にする（s09-settings.html のスマホの入力欄は 44）。font-size-min は入力欄の文字の下限で、タッチの端末（large）は 16px（横向きのスマホは tablet の幅を超えて wide の文字になるが、iOS は 16px より小さい入力欄にフォーカスすると画面を拡大するため。2026-10-17 に Claude が決めた。target-min と同じく押す端末の下限）、medium は下限なし",
+            "$description": "TextField・TextArea・NumberField・SearchField・Picker・ComboBox・DatePicker。値は docs/mockups（2026-10-17 のユーザーの決定）: S は s06-ideas.html の検索（30px・角丸 7・左右 10）、M は s23-deck.html の Picker（36px・角丸 8・左右 12）、L は s09-settings.html の入力欄（38px・角丸 8・左右 12。spacious の画面の入力欄）。XL はモックアップに無いので Spectrum 2 のトークン（component-height-300 の 48、component-edge-to-text-300 の 18、corner-radius-medium-size-extra-large の 10）。文字の大きさは semantic.font-size の field（スマホの幅ではどの段も 16px）。枠の色は border.strong（3:1。design-spec 4.4）。large は高さだけを target-min（44）以上にする（s09-settings.html のスマホの入力欄は 44）。font-size-min は入力欄の文字の下限で、タッチの端末（large）は 16px（横向きのスマホは tablet の幅を超えて wide の文字になるが、iOS は 16px より小さい入力欄にフォーカスすると画面を拡大するため。2026-10-17 に Claude が決めた。target-min と同じく押す端末の下限）、medium は下限なし",
             "height": {
               "S": { "$value": "{primitive.dimension.30}" },
               "M": { "$value": "{primitive.dimension.36}" },
@@ -1258,7 +1305,7 @@
               "S": { "$value": "{primitive.dimension.10}" },
               "M": { "$value": "{primitive.dimension.12}" },
               "L": { "$value": "{primitive.dimension.12}" },
-              "XL": { "$value": "{primitive.dimension.14}" }
+              "XL": { "$value": "{primitive.dimension.18}" }
             },
             "font-size": {
               "S": { "$value": "{semantic.font-size.wide.field.S}" },
@@ -1286,6 +1333,13 @@
               "M": { "$value": "{primitive.dimension.8}" },
               "L": { "$value": "{primitive.dimension.8}" },
               "XL": { "$value": "{primitive.dimension.10}" }
+            },
+            "button-edge": {
+              "$description": "入力欄の中のボタン（クリア・一覧・カレンダー）の外側から枠の内側の端までの間。モックアップに無いので Spectrum 2 のトークンの accessory-gap-small〜extra-large（廃止された in-field-button-edge-to-fill-* の後継。desktop と mobile で同じ値）",
+              "S": { "$value": "{primitive.dimension.4}" },
+              "M": { "$value": "{primitive.dimension.6}" },
+              "L": { "$value": "{primitive.dimension.7}" },
+              "XL": { "$value": "{primitive.dimension.8}" }
             },
             "font-size-min": { "$value": "{primitive.dimension.0}" }
           },
@@ -1397,7 +1451,7 @@
             }
           },
           "meter": {
-            "$description": "Meter（F/A/U の内訳の帯）と ProgressBar（S〜XL）。thickness は帯の太さで、M は d1-moon.html の 10px（S は 6、L と XL は 2px ずつ大きくした）。font-size はラベルと値の文字で、M は d1-moon.html の凡例の 13px、ほかは Spectrum 2 の ProgressBar・Meter と同じく font-size-75・200・300。radius・gap・swatch は Meter の帯の角丸・区間の間・凡例の見本（d1-moon.html の 3px・2px・10px 角丸 2）、legend の gap は凡例の項目の間（18px）と行の間（6px）",
+            "$description": "Meter（F/A/U の内訳の帯）と ProgressBar（S〜XL）。thickness は帯の太さで、M は d1-moon.html の 10px（S は 6、L と XL は 2px ずつ大きくした）。font-size はラベルと値の文字で、M は d1-moon.html の凡例の 13px、ほかは Spectrum 2 の ProgressBar・Meter と同じく font-size-75・200・300。radius・gap・swatch は Meter の帯の角丸・区間の間・凡例の見本（d1-moon.html の 3px・2px・10px 角丸 2）、legend の gap は凡例の項目の間（18px）と行の間（6px）。hatch- は Unknown の区間の斜線（d1-moon.html の .fau-u: 135deg、線 2px、間隔 5px）。indeterminate-length は値の無い ProgressBar が流す帯の長さ（帯の幅に対する割合。モックアップに無いので @react-spectrum/s2 の ProgressBar の scaleX(0.7)）",
             "thickness": {
               "S": { "$value": "{primitive.dimension.6}" },
               "M": { "$value": "{primitive.dimension.10}" },
@@ -1415,10 +1469,20 @@
             "swatch-size": { "$value": "{primitive.dimension.10}" },
             "swatch-radius": { "$value": "{primitive.dimension.2}" },
             "legend-column-gap": { "$value": "{primitive.dimension.18}" },
-            "legend-row-gap": { "$value": "{primitive.dimension.6}" }
+            "legend-row-gap": { "$value": "{primitive.dimension.6}" },
+            "hatch-angle": {
+              "$type": "number",
+              "$value": "{primitive.angle.135}"
+            },
+            "hatch-line": { "$value": "{primitive.dimension.2}" },
+            "hatch-period": { "$value": "{primitive.dimension.5}" },
+            "indeterminate-length": {
+              "$type": "number",
+              "$value": "{primitive.ratio.70}"
+            }
           },
           "progress-circle": {
-            "$description": "ProgressCircle の直径と輪の太さ（Spectrum の progress-circle-size・progress-circle-thickness。S / M / L だけ。design-spec 4.5）。Button の送信中は S",
+            "$description": "ProgressCircle の直径と輪の太さ（Spectrum の progress-circle-size・progress-circle-thickness。S / M / L だけ。design-spec 4.5）。Button の送信中は S。indeterminate-arc は値の無いときに回す弧の長さ（輪に対する割合）で、@react-spectrum/s2 の ProgressCircle が伸び縮みさせる弧の短いときの長さ（stroke-dashoffset 75 の 25%）。moonx は弧を伸び縮みさせずに回す",
             "size": {
               "S": { "$value": "{primitive.dimension.16}" },
               "M": { "$value": "{primitive.dimension.32}" },
@@ -1428,6 +1492,10 @@
               "S": { "$value": "{primitive.border-width.2}" },
               "M": { "$value": "{primitive.border-width.3}" },
               "L": { "$value": "{primitive.border-width.4}" }
+            },
+            "indeterminate-arc": {
+              "$type": "number",
+              "$value": "{primitive.ratio.25}"
             }
           },
           "tabs": {
@@ -1440,7 +1508,7 @@
             }
           },
           "disclosure": {
-            "$description": "Disclosure / Accordion（S〜XL。design-spec 4.5）。見出しの最小の高さ（component-height-75〜300。regular の密度）と見出しの文字（title-size-s〜xl）は Spectrum 2 の Disclosure と同じ。見出しの左右は Spectrum 2 のトークンの accordion-edge-to-content-area-small〜extra-large（S2 の Disclosure は高さから計算する）、中身の左右は accordion-content-area-edge-to-content-small〜extra-large。title-font-size は docs/mockups（s11-form.html の「Related research」の 14px。S は 13、L と XL は Spectrum 2 の段の差で大きくした）",
+            "$description": "Disclosure / Accordion（S〜XL。design-spec 4.5）。見出しの最小の高さ（component-height-75〜300。regular の密度）は Spectrum 2 の Disclosure と同じ。見出しの左右は Spectrum 2 のトークンの accordion-edge-to-content-area-small〜extra-large（S2 の Disclosure は高さから計算する）、中身の左右は accordion-content-area-edge-to-content-small〜extra-large。title-font-size は docs/mockups（s11-form.html の「Related research」の 14px。S は 13、L と XL は Spectrum 2 の段の差で大きくした）",
             "title-height": {
               "S": { "$value": "{primitive.dimension.24}" },
               "M": { "$value": "{primitive.dimension.32}" },
@@ -1482,7 +1550,7 @@
             }
           },
           "illustrated-message": {
-            "$description": "IllustratedMessage（S / M / L。design-spec 4.5）。絵の代わりに置く Lucide のアイコンの大きさは、Spectrum 2 の IllustratedMessage が描く絵の大きさ（S と M は絵の M の 96、L は絵の L の 160。トークンが無いので @react-spectrum/s2 の値）。見出しの文字は Spectrum 2 のトークンの illustrated-message-small・medium・large-title-font-size、説明の文字は illustrated-message-small・medium・large-body-font-size",
+            "$description": "IllustratedMessage（S / M / L。design-spec 4.5）。絵の代わりに置く Lucide のアイコンの大きさは、Spectrum 2 の IllustratedMessage が描く絵の大きさ（S と M は絵の M の 96、L は絵の L の 160。トークンが無いので @react-spectrum/s2 の値）。見出しの文字は Spectrum 2 のトークンの illustrated-message-small・medium・large-title-font-size、説明の文字は illustrated-message-small・medium・large-body-font-size（どれも desktop の値。large も同じ値で、mobile の値（題 17・22・24、説明 15）は使わない: large は文字を大きくしない）",
             "icon-size": {
               "S": { "$value": "{primitive.dimension.96}" },
               "M": { "$value": "{primitive.dimension.96}" },
@@ -1576,8 +1644,13 @@
             }
           },
           "toast": {
-            "$description": "Toast の高さ（最小）",
-            "min-height": { "$value": "{primitive.dimension.52}" }
+            "$description": "Toast の高さ（最小）と幅（最大）。Spectrum 2 のトークンの toast-height と toast-maximum-width（desktop の 52 と 336）。幅は窓の幅も超えない",
+            "min-height": { "$value": "{primitive.dimension.52}" },
+            "max-width": { "$value": "{primitive.dimension.336}" }
+          },
+          "tooltip": {
+            "$description": "Tooltip の幅（最大）。Spectrum 2 のトークンの tooltip-maximum-width（desktop の 160）。長い文は折り返す。窓の幅も超えない",
+            "max-width": { "$value": "{primitive.dimension.160}" }
           },
           "target-min": {
             "$value": "{primitive.dimension.24}",
@@ -1655,7 +1728,7 @@
             "groove-item-padding-x": { "$value": "{primitive.dimension.8}" }
           },
           "metric-group": {
-            "$description": "MetricGroup（d1-moon.html の .numbers と .metric、s19-decision.html の .kn）。padding-top・padding-bottom・padding-inline は帯の中の指標の上・下・指標の間の左右（d1 の 16・18・20）。narrow- はスマホの幅の 2×2（d1 の 390px: 上下 14、線の右 12・左 14。デスクトップでパネルが本文の領域を layout.two-column-min-width より狭めている間の帯の 2×2 も同じ値。design-spec 4.1 の A）。compact-column-gap は詰めた形の指標の間（s19 の 22）、compact-row-gap はそのラベルと数字の間（s19 の行の間 4）、column-padding-y は結果の列の合計の上下（s17-costs.html の .tot の 12）、pair- はどの幅でも 2×2 の形（s06-ideas.html の .nums の上下 12、線の後の左 18）",
+            "$description": "MetricGroup（d1-moon.html の .numbers と .metric、s19-decision.html の .kn）。padding-top・padding-bottom・padding-inline は帯の中の指標の上・下・指標の間の左右（d1 の 16・18・20）。narrow- はスマホの幅の 2×2（d1 の 390px の .metric: 上下 14、各指標の右の内側 12、縦の線の右の指標の左の内側 14。デスクトップでパネルが本文の領域を layout.two-column-min-width より狭めている間の帯の 2×2 も同じ値。design-spec 4.1 の A）。compact-column-gap は詰めた形の指標の間（s19 の 22）、compact-row-gap はそのラベルと数字の間（s19 の行の間 4）、column-padding-y は結果の列の合計の上下（s17-costs.html の .tot の 12）、pair- はどの幅でも 2×2 の形（s06-ideas.html の .nums の上下 12、線の後の左 18）",
             "padding-top": { "$value": "{primitive.dimension.16}" },
             "padding-bottom": { "$value": "{primitive.dimension.18}" },
             "padding-inline": { "$value": "{primitive.dimension.20}" },
@@ -1717,9 +1790,9 @@
         }
       },
       "large": {
-        "$description": "タッチの端末（スマホ・タブレット。Spectrum の mobile）。medium と違うのは、押せる部品の高さと target-min と入力欄の文字の下限（field.font-size-min）だけ。高さは button・action-button・field・segmented-control が target-min（44）以上で、ほかは Spectrum 2 の mobile の値。各部品の説明は medium",
+        "$description": "タッチの端末（スマホ・タブレット。Spectrum の mobile）。medium と違うのは、押せる部品の高さと target-min と入力欄の文字の下限（field.font-size-min）だけ。高さは button・action-button・field・segmented-control が target-min（44）以上で、ほかの押せる部品（tag・menu・tabs・disclosure・breadcrumbs・table・table-view など）は Spectrum 2 の mobile の値。押せない部品（Badge など）の高さと、文字・余白・印・アイコンの大きさは medium と同じで、medium が Spectrum 2 のトークンから引いた値も desktop の値のまま（mobile の値にしない）。各部品の説明は medium",
         "component": {
-          "$description": "Spectrum の component 層（部品の寸法）。XS / S / M / L / XL は部品の size。既定は M（部品ごとの段と既定は design-spec 4.5）",
+          "$description": "Spectrum の component 層（部品の寸法）。XS / S / M / L / XL は部品の size。既定が M の部品は M（部品ごとの段と既定は design-spec 4.5。Spectrum 2 のその部品の既定にそろえ、Badge と Avatar は S、ContextualHelp は XS、Popover は大きさを指定しなければ中身に合わせる。2026-10-17 のユーザーの決定）",
           "button": {
             "height": {
               "S": { "$value": "{primitive.dimension.44}" },
@@ -1794,19 +1867,19 @@
               "S": { "$value": "{primitive.dimension.44}" },
               "M": { "$value": "{primitive.dimension.44}" },
               "L": { "$value": "{primitive.dimension.44}" },
-              "XL": { "$value": "{primitive.dimension.44}" }
+              "XL": { "$value": "{primitive.dimension.48}" }
             },
             "padding-x": {
               "S": { "$value": "{primitive.dimension.10}" },
               "M": { "$value": "{primitive.dimension.12}" },
               "L": { "$value": "{primitive.dimension.12}" },
-              "XL": { "$value": "{primitive.dimension.14}" }
+              "XL": { "$value": "{primitive.dimension.18}" }
             },
             "font-size": {
               "S": { "$value": "{primitive.font.size.13}" },
               "M": { "$value": "{primitive.font.size.13-5}" },
               "L": { "$value": "{primitive.font.size.14}" },
-              "XL": { "$value": "{primitive.font.size.16}" }
+              "XL": { "$value": "{primitive.font.size.18}" }
             }
           },
           "tag": {
@@ -1890,7 +1963,7 @@
               "S": { "$value": "{primitive.dimension.10}" },
               "M": { "$value": "{primitive.dimension.12}" },
               "L": { "$value": "{primitive.dimension.12}" },
-              "XL": { "$value": "{primitive.dimension.14}" }
+              "XL": { "$value": "{primitive.dimension.18}" }
             },
             "font-size": {
               "S": { "$value": "{semantic.font-size.wide.field.S}" },
@@ -1916,6 +1989,13 @@
               "M": { "$value": "{primitive.dimension.8}" },
               "L": { "$value": "{primitive.dimension.8}" },
               "XL": { "$value": "{primitive.dimension.10}" }
+            },
+            "button-edge": {
+              "$description": "入力欄の中のボタン（クリア・一覧・カレンダー）の外側から枠の内側の端までの間。モックアップに無いので Spectrum 2 のトークンの accessory-gap-small〜extra-large（廃止された in-field-button-edge-to-fill-* の後継。desktop と mobile で同じ値）",
+              "S": { "$value": "{primitive.dimension.4}" },
+              "M": { "$value": "{primitive.dimension.6}" },
+              "L": { "$value": "{primitive.dimension.7}" },
+              "XL": { "$value": "{primitive.dimension.8}" }
             },
             "font-size-min": { "$value": "{primitive.font.size.16}" }
           },
@@ -2036,7 +2116,17 @@
             "swatch-size": { "$value": "{primitive.dimension.10}" },
             "swatch-radius": { "$value": "{primitive.dimension.2}" },
             "legend-column-gap": { "$value": "{primitive.dimension.18}" },
-            "legend-row-gap": { "$value": "{primitive.dimension.6}" }
+            "legend-row-gap": { "$value": "{primitive.dimension.6}" },
+            "hatch-angle": {
+              "$type": "number",
+              "$value": "{primitive.angle.135}"
+            },
+            "hatch-line": { "$value": "{primitive.dimension.2}" },
+            "hatch-period": { "$value": "{primitive.dimension.5}" },
+            "indeterminate-length": {
+              "$type": "number",
+              "$value": "{primitive.ratio.70}"
+            }
           },
           "progress-circle": {
             "size": {
@@ -2048,6 +2138,10 @@
               "S": { "$value": "{primitive.border-width.2}" },
               "M": { "$value": "{primitive.border-width.3}" },
               "L": { "$value": "{primitive.border-width.4}" }
+            },
+            "indeterminate-arc": {
+              "$type": "number",
+              "$value": "{primitive.ratio.25}"
             }
           },
           "tabs": {
@@ -2188,7 +2282,15 @@
               "XL": { "$value": "{primitive.dimension.24}" }
             }
           },
-          "toast": { "min-height": { "$value": "{primitive.dimension.52}" } },
+          "toast": {
+            "$description": "medium と同じ値。Spectrum 2 の mobile の値（toast-height 60・toast-maximum-width 420）は文字の大きい mobile のスケールのもので、large は文字を大きくしない（semantic.scale の $description）ので使わない",
+            "min-height": { "$value": "{primitive.dimension.52}" },
+            "max-width": { "$value": "{primitive.dimension.336}" }
+          },
+          "tooltip": {
+            "$description": "medium と同じ値。Spectrum 2 の mobile の値（tooltip-maximum-width 200）は文字の大きい mobile のスケールのもので、large は文字を大きくしない（semantic.scale の $description）ので使わない",
+            "max-width": { "$value": "{primitive.dimension.160}" }
+          },
           "target-min": {
             "$value": "{primitive.dimension.44}",
             "$description": "当たり判定の最小。タッチの端末は 44px（WCAG 2.5.5 と Apple HIG の 44pt。Android の指針は 48dp）。デスクトップ（scale.medium）は 24px（WCAG 2.2 の 2.5.8）。小さい部品は余白で広げる"
@@ -2333,7 +2435,7 @@
         "field-gap": { "$value": "{primitive.dimension.12}" }
       },
       "regular": {
-        "$description": "表と数字と一覧の画面（design-spec 4.4）。部品の size は M",
+        "$description": "表と数字と一覧の画面（design-spec 4.4）。既定が M の部品は M（部品ごとの既定は design-spec 4.5）",
         "row-height": {
           "$value": "{semantic.scale.medium.component.table.row-height.regular}",
           "$description": "行の高さ（スケールで変わる）"
@@ -2372,7 +2474,7 @@
         }
       },
       "spacious": {
-        "$description": "書く・読む・手順を進める画面（考えるための余白。design-spec 4.4）。入力欄と主要なボタンは L。キーの意味は regular と同じ",
+        "$description": "書く・読む・手順を進める画面（考えるための余白。design-spec 4.4）。入力欄と主要なボタン（Button）は L で、spacious のパターンとダイアログと Form が渡す（design-spec 4.5）。キーの意味は regular と同じ",
         "row-height": {
           "$value": "{semantic.scale.medium.component.table.row-height.spacious}"
         },
@@ -2429,7 +2531,7 @@
         },
         "body-long": {
           "$value": "{primitive.font.size.15}",
-          "$description": "長文の回答（s19-decision.html の理由の欄）"
+          "$description": "長文（s19-decision.html の理由の欄の 15px）"
         },
         "lead": {
           "$value": "{primitive.font.size.19}",
@@ -2468,11 +2570,11 @@
           "$description": "主要指標の単位（d1-moon.html の .metric .value small）"
         },
         "field": {
-          "$description": "入力欄の文字（TextField・TextArea・NumberField・SearchField・Picker・ComboBox・DatePicker の S〜XL）。S は s06-ideas.html の検索、M は s23-deck.html の Picker、L は s09-settings.html の入力欄。narrow はどの段も 16（moon-base.css のスマホの本文。iOS は 16px より小さい入力欄にフォーカスすると画面を拡大するため）",
+          "$description": "入力欄の文字（TextField・TextArea・NumberField・SearchField・Picker・ComboBox・DatePicker の S〜XL）。wide の S は s06-ideas.html の検索、M は s23-deck.html の Picker、L は s09-settings.html の入力欄の大きさ。XL はモックアップに無いので Spectrum 2 のトークンの font-size-300。narrow はどの段も 16（モックアップの値ではなく design-spec 4.3 の決まり: iOS は 16px より小さい入力欄にフォーカスすると画面を拡大する。s23-deck.html の Picker はスマホでも 14px のままだが採らない）",
           "S": { "$value": "{primitive.font.size.13}" },
           "M": { "$value": "{primitive.font.size.14}" },
           "L": { "$value": "{primitive.font.size.15}" },
-          "XL": { "$value": "{primitive.font.size.16}" }
+          "XL": { "$value": "{primitive.font.size.18}" }
         }
       },
       "narrow": {
@@ -2694,9 +2796,9 @@
           "fontSize": "{semantic.font-size.wide.body-long}",
           "fontWeight": "{primitive.font.weight.regular}",
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
-          "lineHeight": "{primitive.font.line-height.relaxed}"
+          "lineHeight": "{primitive.font.line-height.1-6}"
         },
-        "$description": "長文の回答。多言語が混ざっても詰まらない行間（s11-form.html の回答の 1.65）"
+        "$description": "長文（TextArea・DiffText・Text の body-long）。大きさと行の高さは s19-decision.html の理由の欄（15px・1.6）。設問の回答の欄は answer"
       },
       "answer": {
         "$value": {
@@ -2834,9 +2936,9 @@
           "fontSize": "{primitive.font.size.12}",
           "fontWeight": "{primitive.font.weight.regular}",
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
-          "lineHeight": "{primitive.font.line-height.1-55}"
+          "lineHeight": "{primitive.font.line-height.1-3}"
         },
-        "$description": "値の下の短い注記（s15-competitors.html の価格の下の per bowl）"
+        "$description": "値の下の短い注記（s15-competitors.html の価格の下の per bowl）。行の高さは、モックアップの font の省略形の normal（IBM Plex で約 1.3）を 1.3 にした"
       },
       "eyebrow": {
         "$value": {
@@ -2844,9 +2946,9 @@
           "fontSize": "{primitive.font.size.11-5}",
           "fontWeight": "{primitive.font.weight.medium}",
           "letterSpacing": "{primitive.font.letter-spacing.0-35}",
-          "lineHeight": "{primitive.font.line-height.1-55}"
+          "lineHeight": "{primitive.font.line-height.1-3}"
         },
-        "$description": "題の上の種類の名前（s15-competitors.html の .type。大文字にしない）。色は text.secondary"
+        "$description": "題の上の種類の名前（s15-competitors.html の .type。大文字にしない）。色は text.secondary。行の高さは、モックアップの font の省略形の normal（IBM Plex で約 1.3）を 1.3 にした"
       },
       "step-label": {
         "$value": {
@@ -2892,11 +2994,21 @@
         "$value": {
           "fontFamily": "{primitive.font.family.mono}",
           "fontSize": "{semantic.font-size.wide.number}",
+          "fontWeight": "{primitive.font.weight.regular}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.1-55}"
+        },
+        "$description": "金額・件数（本文の中。moon-base.css の .num。太さは本文の regular のまま）"
+      },
+      "number-emphasis": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.mono}",
+          "fontSize": "{semantic.font-size.wide.number}",
           "fontWeight": "{primitive.font.weight.medium}",
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
           "lineHeight": "{primitive.font.line-height.1-55}"
         },
-        "$description": "金額・件数（本文の中。moon-base.css の .num）"
+        "$description": "medium の太さの数字: Meter の凡例の件数（d1-moon.html の .legend b の 500）と、RowList の番号（design-spec 4.5。13px にして使う）"
       },
       "count": {
         "$value": {
@@ -2904,9 +3016,9 @@
           "fontSize": "{primitive.font.size.12}",
           "fontWeight": "{primitive.font.weight.medium}",
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
-          "lineHeight": "{primitive.font.line-height.1-55}"
+          "lineHeight": "{primitive.font.line-height.1-3}"
         },
-        "$description": "SideNav の未読数（moon-base.css の .nav .count。数字だけ、色は text.secondary）"
+        "$description": "SideNav の未読数（moon-base.css の .nav .count。数字だけ、色は text.secondary）。行の高さは、モックアップの font の省略形の normal（IBM Plex で約 1.3）を 1.3 にした"
       },
       "metric": {
         "$value": {
@@ -3469,10 +3581,10 @@
         "row-menu-width": { "$value": "{primitive.dimension.32}" }
       },
       "presentation": {
-        "$description": "パターン I（s23-deck.html）。thumbnail- はサムネイルの列（.thumbs の幅 200・内側の上下 16・左右 12・間 8、各項目の内側 6・番号の列 22・番号との間 6、小さなスライドの角丸 .mini の 4）、bar- は上の道具の行（.bar の上下 14・左右 28・間 10・題の後ろ 12。スマホは上下 12・左右 16）、stage- はスライドの列の内側（.stage の上 28・左右 36・下 48。スマホは上と左右 16）、slide-max はスライドとメモの幅の上限（.slide・.notes の 960）、tools- はスライドの上のリンクの行（.slide-tools の間 4・下 8）、tool-padding- はそのリンクの内側（.slide-tools a の上下 4・左右 8）、notes-gap はスライドとメモの間（.notes の上 22）、notes-measure はメモの文の幅の上限（.notes p の 72 字）、nav-gap は前後の移動の行とスライドの間（スマホと、デスクトップでパネルが本文の領域を presentation.two-column-min-width より狭めている間）",
+        "$description": "パターン I（s23-deck.html）。thumbnail- はサムネイルの列（.thumbs の幅 200。右の区切りの hairline を含む。内側の上下 16・左右 12・間 8、各項目の内側 6・番号の列 22・番号との間 6、小さなスライドの角丸 .mini の 4）、bar- は上の道具の行（.bar の上下 14・左右 28・間 10・題の後ろ 12。スマホは上下 12・左右 16）、stage- はスライドの列の内側（.stage の上 28・左右 36・下 48。スマホは上と左右 16）、slide-max はスライドとメモの幅の上限（.slide・.notes の 960）、tools- はスライドの上のリンクの行（.slide-tools の間 4・下 8）、tool-padding- はそのリンクの内側（.slide-tools a の上下 4・左右 8）、notes-gap はスライドとメモの間（.notes の上 22）、notes-measure はメモの文の幅の上限（.notes p の 72 字）、nav-gap は前後の移動の行とスライドの間（スマホと、デスクトップでパネルが本文の領域を presentation.two-column-min-width より狭めている間）",
         "two-column-min-width": {
           "$value": "{primitive.dimension.704}",
-          "$description": "デスクトップでパネル（PNL-1・PNL-2）を開いている間に、パターン I がサムネイルの列とスライドの2列で並ぶのに要る本文の領域の幅（design-spec 4.1・4.3）。本文の領域がこれより狭い間は、I をスマホの並び（サムネイルの列を出さず、今のスライドだけを本文の幅で出し、その下に前後の移動）にする。I はタブレットでもデスクトップと同じ2列を描くので（4.1）、layout.two-column-min-width と同じ決め方（スライドの最小の幅を新しく決めず、4.1・4.3 が2列を描く本文の領域のうち、スクロールバーが幅を取らないときにいちばん狭いもの）で、タブレットの幅の下限の本文の領域にする: breakpoint.tablet 768 − sidebar-width-collapsed 64 = 704。そのときスライドの列は 704 − thumbnail-column-width 200 − 区切りの hairline 1 = 503、スライドは stage-padding-x 36 × 2 を引いた 431 の幅。タブレットのパネルは右の引き出し（モーダル）で本文を狭めないので、切り替えはデスクトップでパネルを開いている間だけ。スクロールバーが幅を取る環境のタブレットでは本文の領域が 704 より狭くなるが、パネルを開いていなければ2列で描く"
+          "$description": "デスクトップでパネル（PNL-1・PNL-2）を開いている間に、パターン I がサムネイルの列とスライドの2列で並ぶのに要る本文の領域の幅（design-spec 4.1・4.3）。本文の領域がこれより狭い間は、I をスマホの並び（サムネイルの列を出さず、今のスライドだけを本文の幅で出し、その下に前後の移動）にする。I はタブレットでもデスクトップと同じ2列を描くので（4.1）、layout.two-column-min-width と同じ決め方（スライドの最小の幅を新しく決めず、4.1・4.3 が2列を描く本文の領域のうち、スクロールバーが幅を取らないときにいちばん狭いもの）で、タブレットの幅の下限の本文の領域にする: breakpoint.tablet 768 − sidebar-width-collapsed 64 = 704。そのときスライドの列は 704 − thumbnail-column-width 200（区切りの hairline を含む）= 504、スライドは stage-padding-x 36 × 2 を引いた 432 の幅。タブレットのパネルは右の引き出し（モーダル）で本文を狭めないので、切り替えはデスクトップでパネルを開いている間だけ。スクロールバーが幅を取る環境のタブレットでは本文の領域が 704 より狭くなるが、パネルを開いていなければ2列で描く"
         },
         "thumbnail-column-width": { "$value": "{primitive.dimension.200}" },
         "thumbnail-padding-y": { "$value": "{primitive.dimension.16}" },
@@ -3503,7 +3615,7 @@
         }
       },
       "public": {
-        "$description": "パターン J とランディングの見本（s01-landing.html）。列の幅は public-max。body-font-size は公開ページの本文（s01 の body の 16。幅によらない）、bar-height は上のバー（.lnav の 68。スマホは 60）、brand- は三日月の印と moonx（.lnav .brand の間 10・印 24）、footer- はフッター（高さ 64・間 24・右のリンクの間 20。スマホは上下 18・間 10）、hero- はヒーロー（2列の比 6fr / 5fr・間 56・上下の内側 24・48、最小の高さは 100dvh からバーの高さと hero-min-height-offset 40 を引いた値で hero-max-height 760 まで。モックアップの max-height は min-height に負けて効かないが、「760 まで」の意図に合わせて最小の高さの上限にする）、pair- は文と見本の節（5fr / 6fr・間 56）、stack-padding-top は 900px 未満で1カラムにした2列の節の上（.hero・.pair の 16。スマホの .pair は section-padding-y-mobile）、section- は節の上下の内側（縦に積む節 .stages の 72・80、2列の節 .pair の 72、最後の節 .close の 72・88。スマホは 56）、close-gap は最後の節の文とボタンの間（32）、split-min-width は2列の節を1カラムにする幅（@media の 900。これより狭いと1カラムにして間を stack-gap の 36 にする）、route- は3段階の月の道（.route の月の枠 30・月 28・名前の上 18・節の右 32・縦に並べたときの間 28 と月と文の間 16、説明の文の幅の上限 32 字）、preview- は浮いた見本のカード（.preview の角丸 16、内側の上 22・左右 24・下 18、頭の行の下 12・間 10、数字の帯の下 12、数字の上下 10・2つ目の数字の左 16、行の上下 8、月 15、注記の上 12）、sheet- は費用の見本（.sheet の角丸 16、行の内側の上下 11・左右 18、印の列 34、月 14、合計の帯の内側の上下 12・左右 18）",
+        "$description": "パターン J とランディングの見本（s01-landing.html）。列の幅は public-max。body-font-size は公開ページの本文（s01 の body の 16。幅によらない）、bar-height は上のバー（.lnav の 68。スマホは 60）、brand- は三日月の印と moonx（.lnav .brand の間 10・印 24）、footer- はフッター（高さ 64・間 24・右のリンクの間 20。スマホは上下 18・間 10）、hero- はヒーロー（2列の比 6fr / 5fr・間 56・上下の内側 24・48、最小の高さは 100dvh からバーの高さと hero-min-height-offset 40 を引いた値で hero-max-height 760 まで。モックアップの max-height は min-height に負けて効かないが、「760 まで」の意図に合わせて最小の高さの上限にする）、pair- は文と見本の節（5fr / 6fr・間 56）、stack-padding-top は 900px 以下で1カラムにした2列の節の上（.hero・.pair の 16。スマホの .pair は section-padding-y-mobile）、section- は節の上下の内側（縦に積む節 .stages の 72・80、2列の節 .pair の 72、最後の節 .close の 72・88。スマホは 56）、close-gap は最後の節の文とボタンの間（32）、stack-max-width は2列の節を1カラムにする幅（@media (max-width: 900px)。この幅以下で1カラムにして間を stack-gap の 36 にする）、route- は3段階の月の道（.route の月の枠 30・月 28・名前の上 18・節の右 32・縦に並べたときの間 28 と月と文の間 16、説明の文の幅の上限 32 字）、preview- は浮いた見本のカード（.preview の角丸 16、内側の上 22・左右 24・下 18、頭の行の下 12・間 10、数字の帯の下 12、数字の上下 10・2つ目の数字の左 16、行の上下 8、月 15、注記の上 12）、sheet- は費用の見本（.sheet の角丸 16、行の内側の上下 11・左右 18、印の列 34、月 14、合計の帯の内側の上下 12・左右 18）",
         "body-font-size": { "$value": "{primitive.font.size.16}" },
         "bar-height": { "$value": "{primitive.dimension.68}" },
         "bar-height-mobile": { "$value": "{primitive.dimension.60}" },
@@ -3520,7 +3632,7 @@
         "pair-end-ratio": { "$type": "number", "$value": "{primitive.fr.6}" },
         "split-gap": { "$value": "{primitive.dimension.56}" },
         "stack-gap": { "$value": "{primitive.dimension.36}" },
-        "split-min-width": { "$value": "{primitive.dimension.900}" },
+        "stack-max-width": { "$value": "{primitive.dimension.900}" },
         "hero-padding-top": { "$value": "{primitive.dimension.24}" },
         "stack-padding-top": { "$value": "{primitive.dimension.16}" },
         "hero-padding-bottom": { "$value": "{primitive.dimension.48}" },
@@ -3571,8 +3683,8 @@
         "$description": "Popover の高さの上限（画面の可視領域のほうが低ければそちら）"
       },
       "bottom-action-height": {
-        "$value": "{primitive.dimension.68}",
-        "$description": "スマホで下部に固定する主要な操作の行（d1-moon.html の .actionbar・s19-decision.html の .formbar: 上下の内側 bottom-bar-padding-y 10 × 2 と XL のボタンの 48）"
+        "$value": "{primitive.dimension.69}",
+        "$description": "スマホで下部に固定する主要な操作の行（d1-moon.html の .actionbar・s19-decision.html の .formbar: 上の線 1 と、上下の内側 bottom-bar-padding-y 10 × 2 と XL のボタンの 48）"
       },
       "bottom-nav-height": {
         "$value": "{primitive.dimension.60}",

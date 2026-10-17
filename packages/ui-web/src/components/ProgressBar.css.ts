@@ -66,20 +66,30 @@ export const fill = style({
   background: vars.color.control.trackFill,
 });
 
+const length = vars.scale.component.meter.indeterminateLength;
+
+// From just out of the track's start to just out of its end: the fill's own width times
+// the track's share of it.
 const sweep = keyframes({
   from: { transform: "translateX(-100%)" },
-  to: { transform: "translateX(250%)" },
+  to: { transform: `translateX(calc(100% / ${length}))` },
 });
 
-/** An indeterminate bar: a short fill that sweeps across; still when motion is reduced. */
+/**
+ * An indeterminate bar: a fill of 06 meter.indeterminate-length that sweeps across; still
+ * and centred when motion is reduced.
+ */
 export const indeterminate = style({
   position: "absolute",
   insetBlock: 0,
-  width: "40%",
+  width: `calc(${length} * 100%)`,
   borderRadius: vars.radius.pill,
   background: vars.color.control.trackFill,
   animation: `${sweep} ${vars.motion.loop.indeterminate} ease-in-out infinite`,
   "@media": {
-    [reducedMotion]: { animation: "none", transform: "translateX(75%)" },
+    [reducedMotion]: {
+      animation: "none",
+      transform: `translateX(calc((1 - ${length}) / (2 * ${length}) * 100%))`,
+    },
   },
 });

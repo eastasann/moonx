@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import type { BreadcrumbsSize } from "@moonx/ui-tokens";
 import { createContext, type ReactNode, useContext } from "react";
 import {
@@ -7,6 +6,7 @@ import {
   Breadcrumbs as AriaBreadcrumbs,
   Link,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import * as styles from "./Breadcrumbs.css";
 
 const BreadcrumbsSizeContext = createContext<BreadcrumbsSize>("M");
@@ -29,10 +29,11 @@ export function Breadcrumbs({
   "aria-label": label,
   children,
 }: BreadcrumbsProps) {
+  const { t } = useTranslation(["components"]);
   return (
     <BreadcrumbsSizeContext.Provider value={size}>
       <AriaBreadcrumbs
-        aria-label={label ?? i18n.t("components:breadcrumbs.label")}
+        aria-label={label ?? t("components:breadcrumbs.label")}
         className={styles.list[size]}
       >
         {children}
@@ -52,6 +53,7 @@ export interface BreadcrumbProps extends Pick<AriaBreadcrumbProps, "id"> {
  * last crumb is the current page, as text.
  */
 export function Breadcrumb({ href, children, ...props }: BreadcrumbProps) {
+  const { t } = useTranslation(["components"]);
   const size = useContext(BreadcrumbsSizeContext);
   return (
     <AriaBreadcrumb {...props} className={styles.item[size]}>
@@ -73,7 +75,7 @@ export function Breadcrumb({ href, children, ...props }: BreadcrumbProps) {
               {children}
             </Link>
             <span className={styles.separator} aria-hidden="true">
-              {i18n.t("components:breadcrumbs.separator")}
+              {t("components:breadcrumbs.separator")}
             </span>
           </>
         )

@@ -1,7 +1,8 @@
-import { formatCount, i18n } from "@moonx/i18n";
+import { formatCount } from "@moonx/i18n";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type ReactNode, useCallback, useLayoutEffect, useRef } from "react";
 import { ListBox, ListBoxItem } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { ActionButton } from "../components/ActionButton";
 import { useThumbnailColumn } from "../internal/frame";
 import * as deck from "./PresentationPattern.css";
@@ -52,6 +53,7 @@ export function PresentationPattern({
   slideTools,
   notes,
 }: PresentationPatternProps) {
+  const { t } = useTranslation(["components"]);
   const hasThumbnails = useThumbnailColumn();
   const index = Math.max(
     0,
@@ -132,7 +134,7 @@ export function PresentationPattern({
           <>
             <div ref={thumbnailsRef} className={styles.thumbnails}>
               <ListBox
-                aria-label={i18n.t("components:presentationPattern.slides")}
+                aria-label={t("components:presentationPattern.slides")}
                 items={slides.map((item, position) => ({ ...item, position }))}
                 selectionMode="single"
                 disallowEmptySelection
@@ -176,20 +178,20 @@ export function PresentationPattern({
             {!hasThumbnails && (
               <div ref={navRef} className={styles.slideNav}>
                 <ActionButton
-                  aria-label={i18n.t("components:presentationPattern.previous")}
+                  aria-label={t("components:presentationPattern.previous")}
                   isDisabled={previous === undefined}
                   onPress={() => previous && move(previous, "last")}
                 >
                   <ChevronLeft />
                 </ActionButton>
                 <span aria-live="polite" className={styles.slidePosition}>
-                  {i18n.t("components:presentationPattern.position", {
+                  {t("components:presentationPattern.position", {
                     number: formatCount(index + 1),
                     total: formatCount(slides.length),
                   })}
                 </span>
                 <ActionButton
-                  aria-label={i18n.t("components:presentationPattern.next")}
+                  aria-label={t("components:presentationPattern.next")}
                   isDisabled={next === undefined}
                   onPress={() => next && move(next, "first")}
                 >

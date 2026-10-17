@@ -1,4 +1,4 @@
-import { formatCount, i18n } from "@moonx/i18n";
+import { formatCount } from "@moonx/i18n";
 import {
   presentationTwoColumnMinWidth,
   type SaveState,
@@ -15,6 +15,7 @@ import {
 } from "react";
 import { Button as AriaButton, Link as AriaLink } from "react-aria-components";
 import { flushSync } from "react-dom";
+import { useTranslation } from "react-i18next";
 import {
   BackOverrideContext,
   type BackTarget,
@@ -27,12 +28,14 @@ import {
 } from "../internal/frame";
 import * as frame from "../internal/frame.css";
 import { IconSlot } from "../internal/IconSlot";
+import { useIsNarrow } from "../internal/useIsNarrow";
 import { cssVarName } from "../styles/helpers";
 import { ActionButton } from "./ActionButton";
 import * as styles from "./AppFrame.css";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
 import { StatusLight } from "./StatusLight";
+import * as statusLight from "./StatusLight.css";
 import { Tooltip, TooltipTrigger } from "./Tooltip";
 
 const topInsetName = cssVarName(frame.topInset);
@@ -101,9 +104,14 @@ export function AppFrame({
   panel,
   children,
 }: AppFrameProps) {
+  const { t } = useTranslation(["components"]);
+  const isNarrow = useIsNarrow();
   const mainId = useId();
   const mainRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const headerStartRef = useRef<HTMLDivElement>(null);
+  const saveProbeRef = useRef<HTMLSpanElement>(null);
+  const [saveLabelFits, setSaveLabelFits] = useState(true);
   const bodyWidthRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [room, setRoom] = useState<BodyRoom>(fullBodyRoom);
@@ -144,6 +152,86 @@ export function AppFrame({
       root.style.removeProperty("scroll-padding-top");
     };
   }, [hasHeader]);
+
+  // On a phone "Saving…" and "Saved" show when the header has room for them beside ← and
+  // its label (or the title) without cutting those; otherwise the mark alone (4.3・6.0.1).
+  // Measured before the header is first painted and whenever what its start holds
+  // changes; then again when the header, its start or the label change size, or a face
+  // loads. A change seen by the observer is applied in the next frame: applied within
+  // the observer's round, the label resizes the observed start after the label's copy,
+  // which lies deeper, and the browser ends the round with an error.
+  const measuresSaveLabel = isNarrow && saveState !== undefined;
+  const headerStartShape = [
+    backOverride !== null ? "list" : back !== undefined ? "back" : "title",
+    title?.onPress !== undefined ? "button" : "text",
+    backOverride?.label ?? back?.label ?? title?.label ?? "",
+  ].join(":");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: what the start of the header holds changes the widths to measure.
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    const start = headerStartRef.current;
+    const probe = saveProbeRef.current;
+    if (
+      !measuresSaveLabel ||
+      !header ||
+      !start ||
+      !probe ||
+      typeof ResizeObserver === "undefined"
+    ) {
+      return;
+    }
+    const measure = () => {
+      const startBox = start.getBoundingClientRect();
+      // Where ← and its label (or the title) end, and how much of them "…" cuts.
+      let end = startBox.left;
+      for (const child of start.children) {
+        const box = child.getBoundingClientRect();
+        if (box.width > 0) end = Math.max(end, box.right);
+      }
+      let cut = 0;
+      for (const text of start.querySelectorAll<HTMLElement>(
+        `.${styles.backLabel}, .${styles.title}`,
+      )) {
+        // The laid-out contents past the box "…" cuts them to, exactly: scrollWidth
+        // rounds a cut of under a pixel away, though "…" is drawn.
+        const contents = document.createRange();
+        contents.selectNodeContents(text);
+        const style = getComputedStyle(text);
+        const inner =
+          text.getBoundingClientRect().width -
+          Number.parseFloat(style.paddingInlineStart) -
+          Number.parseFloat(style.paddingInlineEnd);
+        cut += Math.max(0, contents.getBoundingClientRect().width - inner);
+      }
+      const free = startBox.right - end;
+      const overflow = header.scrollWidth - header.clientWidth;
+      const room = probe.getBoundingClientRect().width;
+      // The label shows only where its whole width is free; showing it then leaves the
+      // start as much room as it needs, so it does not flip back.
+      return (shown: boolean) =>
+        cut < 0.01 && overflow < 1 && free >= (shown ? 0 : room);
+    };
+    const apply = () => flushSync(() => setSaveLabelFits(measure()));
+    let frame = 0;
+    const nextFrame = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(apply);
+    };
+    // A state set here is rendered before the header is painted.
+    setSaveLabelFits(measure());
+    const observer = new ResizeObserver(nextFrame);
+    observer.observe(header);
+    observer.observe(start);
+    observer.observe(probe);
+    document.fonts?.addEventListener("loadingdone", apply);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      document.fonts?.removeEventListener("loadingdone", apply);
+    };
+  }, [measuresSaveLabel, saveState, headerStartShape]);
+  const showsSaveLabel =
+    !measuresSaveLabel || saveState === "save-failed" || saveLabelFits;
 
   // A docked panel narrows the body (4.3). Measured where the window and the panel set
   // the body's width, and rendered at once, so the squeezed two columns are never painted.
@@ -204,16 +292,16 @@ export function AppFrame({
         onClick={skipToContent}
         className={styles.skipLink}
       >
-        {i18n.t("components:appFrame.skipToContent")}
+        {t("components:appFrame.skipToContent")}
       </a>
       {sideNav}
       <div className={styles.column}>
         {hasHeader && (
           <header ref={headerRef} className={styles.header}>
-            <div className={styles.headerStart}>
+            <div ref={headerStartRef} className={styles.headerStart}>
               {backOverride !== null ? (
                 <AriaButton
-                  aria-label={i18n.t("components:appFrame.back", {
+                  aria-label={t("components:appFrame.back", {
                     label: backOverride.label,
                   })}
                   onPress={backOverride.onPress}
@@ -228,7 +316,7 @@ export function AppFrame({
                 back !== undefined && (
                   <AriaLink
                     href={back.href}
-                    aria-label={i18n.t("components:appFrame.back", {
+                    aria-label={t("components:appFrame.back", {
                       label: back.label,
                     })}
                     className={styles.back}
@@ -247,7 +335,7 @@ export function AppFrame({
                   <span className={styles.title}>{title.label}</span>
                 ) : (
                   <AriaButton
-                    aria-label={i18n.t("components:nav.workspace", {
+                    aria-label={t("components:nav.workspace", {
                       name: title.label,
                     })}
                     onPress={title.onPress}
@@ -268,17 +356,26 @@ export function AppFrame({
                   <StatusLight variant={saveState} role="status">
                     <span
                       className={
-                        saveState === "save-failed"
-                          ? undefined
-                          : styles.saveLabelPhone
+                        showsSaveLabel ? undefined : styles.saveLabelHidden
                       }
                     >
-                      {i18n.t(saveLabels[saveState])}
+                      {t(saveLabels[saveState])}
                     </span>
                   </StatusLight>
+                  {measuresSaveLabel && saveState !== "save-failed" && (
+                    <span className={styles.saveProbeBox}>
+                      <span
+                        ref={saveProbeRef}
+                        aria-hidden="true"
+                        className={`${statusLight.root.M} ${styles.saveProbe}`}
+                      >
+                        {t(saveLabels[saveState])}
+                      </span>
+                    </span>
+                  )}
                   {saveState === "save-failed" && onRetrySave && (
                     <Button variant="secondary" size="S" onPress={onRetrySave}>
-                      {i18n.t("components:appFrame.retry")}
+                      {t("components:appFrame.retry")}
                     </Button>
                   )}
                 </div>
@@ -290,11 +387,11 @@ export function AppFrame({
                       isQuiet
                       aria-label={
                         comments.count > 0
-                          ? i18n.t("components:appFrame.commentsUnresolved", {
+                          ? t("components:appFrame.commentsUnresolved", {
                               count: comments.count,
                               formatted: formatCount(comments.count),
                             })
-                          : i18n.t("components:appFrame.comments")
+                          : t("components:appFrame.comments")
                       }
                       aria-expanded={comments.isOpen}
                       onPress={comments.onPress}
@@ -302,7 +399,7 @@ export function AppFrame({
                       <MessageSquare />
                     </ActionButton>
                     <Tooltip placement="bottom">
-                      {i18n.t("components:appFrame.comments")}
+                      {t("components:appFrame.comments")}
                     </Tooltip>
                   </TooltipTrigger>
                   {comments.count > 0 && (
@@ -320,14 +417,14 @@ export function AppFrame({
                 <TooltipTrigger>
                   <ActionButton
                     isQuiet
-                    aria-label={i18n.t("components:appFrame.history")}
+                    aria-label={t("components:appFrame.history")}
                     aria-expanded={history.isOpen}
                     onPress={history.onPress}
                   >
                     <History />
                   </ActionButton>
                   <Tooltip placement="bottom">
-                    {i18n.t("components:appFrame.history")}
+                    {t("components:appFrame.history")}
                   </Tooltip>
                 </TooltipTrigger>
               )}

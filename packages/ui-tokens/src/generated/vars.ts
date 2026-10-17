@@ -296,6 +296,12 @@ export const vars = createGlobalThemeContract({
           L: "scale-component-field-radius-L",
           XL: "scale-component-field-radius-XL",
         },
+        buttonEdge: {
+          S: "scale-component-field-button-edge-S",
+          M: "scale-component-field-button-edge-M",
+          L: "scale-component-field-button-edge-L",
+          XL: "scale-component-field-button-edge-XL",
+        },
         fontSizeMin: "scale-component-field-font-size-min",
       },
       checkbox: {
@@ -416,6 +422,10 @@ export const vars = createGlobalThemeContract({
         swatchRadius: "scale-component-meter-swatch-radius",
         legendColumnGap: "scale-component-meter-legend-column-gap",
         legendRowGap: "scale-component-meter-legend-row-gap",
+        hatchAngle: "scale-component-meter-hatch-angle",
+        hatchLine: "scale-component-meter-hatch-line",
+        hatchPeriod: "scale-component-meter-hatch-period",
+        indeterminateLength: "scale-component-meter-indeterminate-length",
       },
       progressCircle: {
         size: {
@@ -428,6 +438,7 @@ export const vars = createGlobalThemeContract({
           M: "scale-component-progress-circle-thickness-M",
           L: "scale-component-progress-circle-thickness-L",
         },
+        indeterminateArc: "scale-component-progress-circle-indeterminate-arc",
       },
       tabs: {
         itemHeight: {
@@ -568,6 +579,10 @@ export const vars = createGlobalThemeContract({
       },
       toast: {
         minHeight: "scale-component-toast-min-height",
+        maxWidth: "scale-component-toast-max-width",
+      },
+      tooltip: {
+        maxWidth: "scale-component-tooltip-max-width",
       },
       targetMin: "scale-component-target-min",
       moonGlyph: {
@@ -1040,6 +1055,13 @@ export const vars = createGlobalThemeContract({
       letterSpacing: "typography-number-letter-spacing",
       lineHeight: "typography-number-line-height",
     },
+    numberEmphasis: {
+      fontFamily: "typography-number-emphasis-font-family",
+      fontSize: "typography-number-emphasis-font-size",
+      fontWeight: "typography-number-emphasis-font-weight",
+      letterSpacing: "typography-number-emphasis-letter-spacing",
+      lineHeight: "typography-number-emphasis-line-height",
+    },
     count: {
       fontFamily: "typography-count-font-family",
       fontSize: "typography-count-font-size",
@@ -1440,7 +1462,7 @@ export const vars = createGlobalThemeContract({
       pairEndRatio: "layout-public-pair-end-ratio",
       splitGap: "layout-public-split-gap",
       stackGap: "layout-public-stack-gap",
-      splitMinWidth: "layout-public-split-min-width",
+      stackMaxWidth: "layout-public-stack-max-width",
       heroPaddingTop: "layout-public-hero-padding-top",
       stackPaddingTop: "layout-public-stack-padding-top",
       heroPaddingBottom: "layout-public-hero-padding-bottom",
@@ -1657,7 +1679,7 @@ export const twoColumnMinWidth = 788;
 export const presentationTwoColumnMinWidth = 704;
 
 /**
- * `semantic.layout.public.split-min-width` in px, for the media query below which the
- * public page's two-column sections stack.
+ * `semantic.layout.public.stack-max-width` in px, for the media query at and below which
+ * the public page's two-column sections stack.
  */
-export const publicSplitMinWidth = 900;
+export const publicStackMaxWidth = 900;

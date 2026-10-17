@@ -509,6 +509,43 @@ export interface PitchFigure {
   width: number;
 }
 
+/** The figures of a slide side by side, and whether they fit without breaking. */
+export type PitchFigureColumns = PitchFigure[] & { fits: boolean };
+
+/** The figures of `slide` at `sizes`: their texts and fonts, before their columns' widths. */
+function figureCells(
+  slide: PitchSlide,
+  sizes: PitchSizes,
+  { print, currency }: Pick<FitOptions, "print" | "currency">,
+): Omit<PitchFigure, "width">[] {
+  const { typography } = print;
+  const labelFont: PitchFont = {
+    family: "body",
+    weight: typography.figureLabel.fontWeight,
+    size: sizes.figureLabel,
+  };
+  return slide.numbers.map((number) => {
+    const empty = number.value.value === null;
+    return {
+      label: number.label,
+      text: formatMetric(number.metricKey, number.value, currency),
+      wraps: empty,
+      // Without a value, the reason is set in the label's font (design-spec 6.4).
+      valueFont: empty
+        ? labelFont
+        : {
+            family: "mono",
+            weight: typography.figure.fontWeight,
+            size: sizes.figure,
+          },
+      valueLineHeight: empty
+        ? sizes.figureLabel * typography.figureLabel.lineHeight
+        : sizes.figure * typography.figure.lineHeight,
+      labelFont,
+    };
+  });
+}
+
 /**
  * The figures of `slide` side by side at `sizes`. A value never breaks, so each column
  * is as wide as its value or its label on one line, and the room left over is shared out
@@ -519,49 +556,22 @@ export function figureColumns(
   slide: PitchSlide,
   sizes: PitchSizes,
   options: FitOptions,
-): PitchFigure[] & { fits: boolean } {
-  const { print, measure, currency } = options;
-  const { typography } = print;
+): PitchFigureColumns {
+  const { print, measure } = options;
   const { contentWidth } = pitchFrame(print);
-  const labelFont: PitchFont = {
-    family: "body",
-    weight: typography.figureLabel.fontWeight,
-    size: sizes.figureLabel,
-  };
-  const natural = slide.numbers.map((number) => {
-    const text = formatMetric(number.metricKey, number.value, currency);
-    // Without a value, the reason is set in the label's font (design-spec 6.4).
-    const valueFont: PitchFont =
-      number.value.value === null
-        ? labelFont
-        : {
-            family: "mono",
-            weight: typography.figure.fontWeight,
-            size: sizes.figure,
-          };
-    const valueLineHeight =
-      number.value.value === null
-        ? sizes.figureLabel * typography.figureLabel.lineHeight
-        : sizes.figure * typography.figure.lineHeight;
-    const wraps = number.value.value === null;
-    const width = Math.max(
-      wraps
+  const natural = figureCells(slide, sizes, options).map((cell) => ({
+    ...cell,
+    width: Math.max(
+      cell.wraps
         ? Math.max(
-            ...text.split(/\s+/u).map((word) => measure(word, labelFont)),
+            ...cell.text
+              .split(/\s+/u)
+              .map((word) => measure(word, cell.labelFont)),
           )
-        : measure(text, valueFont),
-      measure(number.label, labelFont),
-    );
-    return {
-      label: number.label,
-      text,
-      wraps,
-      valueFont,
-      valueLineHeight,
-      labelFont,
-      width,
-    };
-  });
+        : measure(cell.text, cell.valueFont),
+      measure(cell.label, cell.labelFont),
+    ),
+  }));
   const gaps = Math.max(0, natural.length - 1) * print.slide.gap;
   const total = natural.reduce((sum, figure) => sum + figure.width, 0);
   const room = contentWidth - gaps;
@@ -573,6 +583,31 @@ export function figureColumns(
       : (room * figure.width) / total,
   }));
   return Object.assign(columns, { fits });
+}
+
+/**
+ * The figures of a fitted slide in the columns the fit measured for it
+ * (`slide.figureColumns`, which P12 returns): {@link figureColumns} for a screen, which
+ * cannot measure with the PDF's font files (ADR-012).
+ */
+export function fittedFigureColumns(
+  slide: PitchSlide,
+  options: Pick<FitOptions, "print" | "currency">,
+): PitchFigureColumns {
+  const sizes = pitchSizes(slide.type, slide.shrink, options.print);
+  const cells = figureCells(slide, sizes, options);
+  if (cells.length === 0) return Object.assign([], { fits: true });
+  const columns = slide.figureColumns;
+  if (columns === null || columns.widths.length !== cells.length) {
+    throw new Error("A slide's figures without the columns the fit set");
+  }
+  return Object.assign(
+    cells.map((cell, index) => ({
+      ...cell,
+      width: columns.widths[index] as number,
+    })),
+    { fits: columns.fits },
+  );
 }
 
 // ---- Slide layout ----
@@ -922,12 +957,28 @@ function fit(slide: PitchSlide, given: FitOptions): Fitted {
 /**
  * Fits one slide (design-spec 6.14): the first shrink level at which it fits; or, at the
  * smallest sizes, the texts cut from the one taking the most lines (the later one on a
- * tie) until it fits, each keeping at least one line and its whole label.
+ * tie) until it fits, each keeping at least one line and its whole label. Its figures'
+ * columns are set at the sizes it ends at.
  */
 export const fitPitchSlide = (
   slide: PitchSlide,
   options: FitOptions,
-): PitchSlide => fit(slide, options).slide;
+): PitchSlide => {
+  const fitted = fit(slide, options).slide;
+  if (fitted.numbers.length === 0) return { ...fitted, figureColumns: null };
+  const columns = figureColumns(
+    fitted,
+    pitchSizes(fitted.type, fitted.shrink, options.print),
+    options,
+  );
+  return {
+    ...fitted,
+    figureColumns: {
+      widths: columns.map((column) => column.width),
+      fits: columns.fits,
+    },
+  };
+};
 
 /**
  * Whether `slide`, fitted as {@link fitPitchSlide} fits it, still runs past the bottom of

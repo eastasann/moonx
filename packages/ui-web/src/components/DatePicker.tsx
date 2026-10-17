@@ -8,7 +8,6 @@ import {
   formatCalendarMonth,
   formatDayOfMonth,
   formatWeekdayInitial,
-  i18n,
 } from "@moonx/i18n";
 import type { Size } from "@moonx/ui-tokens";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
@@ -30,6 +29,7 @@ import {
   Heading,
   useLocale,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import {
   FieldHelp,
   FieldLabel,
@@ -65,7 +65,7 @@ export interface DatePickerProps
   defaultValue?: string | null;
   /** Called with the date once all of it is entered, or null when it is cleared. */
   onChange?: (value: string | null) => void;
-  /** @default "M", or "L" inside a spacious `Form` */
+  /** @default "M"; "L" in a spacious pattern, dialog or `Form` (06 semantic.density) */
   size?: Size;
   /** @default "default" */
   width?: "default" | "full";
@@ -83,19 +83,6 @@ const placeholderKeys = {
   day: "components:dateField.placeholder.day",
   year: "components:dateField.placeholder.year",
 } as const;
-
-const segmentText = ({
-  type,
-  text,
-  isPlaceholder,
-}: {
-  type: string;
-  text: string;
-  isPlaceholder: boolean;
-}) =>
-  isPlaceholder && type in placeholderKeys
-    ? i18n.t(placeholderKeys[type as keyof typeof placeholderKeys])
-    : text;
 
 // The calendar's visible text comes from the shared formatters (SDD 9章「書式」), not
 // from React Aria's own formatting; only its read-outs stay React Aria's (SDD 9章「React
@@ -151,6 +138,7 @@ export function DatePicker({
   width: givenWidth,
   ...props
 }: DatePickerProps) {
+  const { t } = useTranslation(["components"]);
   const resolved = useSize(size);
   const width = useFieldWidth(givenWidth);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -177,12 +165,16 @@ export function DatePicker({
           <DateInput className={calendar.dateInput}>
             {(segment) => (
               <DateSegment segment={segment} className={calendar.segment}>
-                {segmentText}
+                {({ type, text, isPlaceholder }) =>
+                  isPlaceholder && type in placeholderKeys
+                    ? t(placeholderKeys[type as keyof typeof placeholderKeys])
+                    : text
+                }
               </DateSegment>
             )}
           </DateInput>
           <Button
-            aria-label={i18n.t("components:datePicker.calendar")}
+            aria-label={t("components:datePicker.calendar")}
             className={styles.fieldButton({ size: resolved })}
           >
             <IconSlot size={resolved}>
@@ -201,7 +193,7 @@ export function DatePicker({
               <header className={calendar.header}>
                 <Button
                   slot="previous"
-                  aria-label={i18n.t("components:calendar.previous")}
+                  aria-label={t("components:calendar.previous")}
                   className={calendar.navButton}
                 >
                   <IconSlot size="M">
@@ -211,7 +203,7 @@ export function DatePicker({
                 <CalendarMonth />
                 <Button
                   slot="next"
-                  aria-label={i18n.t("components:calendar.next")}
+                  aria-label={t("components:calendar.next")}
                   className={calendar.navButton}
                 >
                   <IconSlot size="M">

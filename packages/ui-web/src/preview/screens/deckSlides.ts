@@ -29,6 +29,7 @@ const slide = (
   subtitle: null,
   bullets: [],
   numbers: [],
+  figureColumns: null,
   table: null,
   emptySources: [],
   shrink: 0,
@@ -124,6 +125,10 @@ export const deckSlides: PitchSlide[] = [
       { label: "Payback", metricKey: "payback_months", value: exact(9) },
       { label: "ROI", metricKey: "simple_roi", value: exact(1.2) },
     ],
+    // What P12 returns for this content, measured with the PDF's fonts: the figures stand
+    // side by side one step smaller.
+    figureColumns: { widths: [225.97, 114.09, 281.17, 170.77], fits: true },
+    shrink: 1,
     table: {
       columns: [
         { label: "Scenario", numeric: false, width: 0.28 },

@@ -1,6 +1,6 @@
-import { i18n } from "@moonx/i18n";
 import type { CompareView } from "@moonx/ui-tokens";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
   SegmentedControl,
   SegmentedControlItem,
@@ -47,6 +47,7 @@ export function CardComparePattern({
   table,
   children,
 }: CardComparePatternProps) {
+  const { t } = useTranslation(["components"]);
   const isNarrow = useIsNarrow();
   return (
     <div className={styles.root}>
@@ -60,15 +61,15 @@ export function CardComparePattern({
             <div className={styles.compareTools}>
               {!isNarrow && (
                 <SegmentedControl
-                  aria-label={i18n.t("components:cardComparePattern.view")}
+                  aria-label={t("components:cardComparePattern.view")}
                   selectedKey={view}
                   onSelectionChange={(key) => onViewChange(key as CompareView)}
                 >
                   <SegmentedControlItem id="cards">
-                    {i18n.t("components:cardComparePattern.cards")}
+                    {t("components:cardComparePattern.cards")}
                   </SegmentedControlItem>
                   <SegmentedControlItem id="table">
-                    {i18n.t("components:cardComparePattern.table")}
+                    {t("components:cardComparePattern.table")}
                   </SegmentedControlItem>
                 </SegmentedControl>
               )}

@@ -1,7 +1,7 @@
-import { i18n } from "@moonx/i18n";
 import { CircleAlert, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { FieldError, Label, Text } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import * as styles from "./field.css";
 import { IconSlot } from "./IconSlot";
 
@@ -84,6 +84,7 @@ export function FieldLabel({
   label: ReactNode;
   isRequired?: boolean;
 }) {
+  const { t } = useTranslation(["components"]);
   return (
     <Label className={styles.label}>
       {label}
@@ -91,7 +92,7 @@ export function FieldLabel({
         <>
           {" "}
           <span className={styles.necessity}>
-            {i18n.t("components:field.required")}
+            {t("components:field.required")}
           </span>
         </>
       )}

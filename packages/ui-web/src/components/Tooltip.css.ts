@@ -7,11 +7,12 @@ const fadeOut = keyframes({ from: { opacity: 1 }, to: { opacity: 0 } });
 
 /**
  * The label in ink with the canvas colour on it, the pair a primary Button uses
- * (06 control.primary / on-primary). It wraps inside the window rather than past it.
+ * (06 control.primary / on-primary). It wraps at Spectrum 2's width (06
+ * component.tooltip.max-width), and inside the window rather than past it.
  */
 export const tooltip = style({
   ...typography("caption"),
-  maxWidth: `calc(100vw - 2 * ${vars.layout.pageGutterMobile})`,
+  maxWidth: `min(${vars.scale.component.tooltip.maxWidth}, calc(100vw - 2 * ${vars.layout.pageGutterMobile}))`,
   paddingBlock: vars.space["75"],
   paddingInline: vars.space["100"],
   borderRadius: vars.radius.control,

@@ -9,7 +9,7 @@ import {
 } from "../components/DescriptionList";
 import { DiffText } from "../components/DiffText";
 import { Disclosure } from "../components/Disclosure";
-import { fauLabel } from "../components/FauPicker";
+import { useFauLabel } from "../components/FauPicker";
 import {
   type MentionCandidate,
   MentionTextArea,
@@ -143,6 +143,7 @@ const questions = [
 ];
 
 export function QuestionCardSection() {
+  const fauLabel = useFauLabel();
   const [focused, setFocused] = useState("WHO");
   const [answer, setAnswer] = useState(
     "Office workers in Bacolod who buy pasalubong for family.",
@@ -304,6 +305,7 @@ export const slides: PitchSlide[] = [
       { label: "Version", text: "Draft", empty: false },
     ],
     numbers: [],
+    figureColumns: null,
     table: null,
     emptySources: [],
     shrink: 0,
@@ -326,6 +328,7 @@ export const slides: PitchSlide[] = [
       { label: "Frequency", text: "Not written yet", empty: true },
     ],
     numbers: [],
+    figureColumns: null,
     table: null,
     emptySources: ["Frequency"],
     shrink: 0,
@@ -353,6 +356,8 @@ export const slides: PitchSlide[] = [
         value: { value: null, bound: "exact", reason: "needs_price" },
       },
     ],
+    // The columns P12 returns for these figures, measured with the PDF's fonts.
+    figureColumns: { widths: [240.11, 326.51, 249.39], fits: true },
     table: null,
     emptySources: [],
     shrink: 0,
@@ -374,6 +379,7 @@ export const slides: PitchSlide[] = [
       },
     ],
     numbers: [],
+    figureColumns: null,
     table: {
       columns: [
         { label: "Name", numeric: false, width: 0.25 },

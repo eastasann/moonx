@@ -1,14 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { mockTextMeasure } from "../test/helpers";
+import { expect, test } from "vitest";
 import { ComponentGallery } from "./ComponentGallery";
-
-// The gallery's slides measure their figures with a canvas happy-dom does not have.
-beforeEach(mockTextMeasure);
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 test("the gallery renders every section", () => {
   render(<ComponentGallery />);

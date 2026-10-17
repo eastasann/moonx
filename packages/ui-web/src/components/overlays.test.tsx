@@ -3,14 +3,18 @@ import userEvent from "@testing-library/user-event";
 import { MessageSquare } from "lucide-react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import * as overlay from "../internal/overlay.css";
+import { FocusPattern } from "../patterns/FocusPattern";
 import { setPhoneWidth, settle } from "../test/helpers";
 import { ActionButton } from "./ActionButton";
 import { Button } from "./Button";
 import * as buttonStyles from "./Button.css";
+import { ComboBox } from "./ComboBox";
 import { ContextualHelp } from "./ContextualHelp";
 import { AlertDialog, Dialog, DialogTrigger } from "./Dialog";
 import { ActionMenu, Menu, MenuItem, MenuTrigger } from "./Menu";
+import { Picker } from "./Picker";
 import { Popover } from "./Popover";
+import { TextField } from "./TextField";
 import { Tooltip, TooltipTrigger } from "./Tooltip";
 import { Tray } from "./Tray";
 
@@ -159,6 +163,61 @@ describe("Dialog", () => {
   });
 });
 
+describe("the density of a dialog (design-spec 4.4・4.5)", () => {
+  test("M1〜M9 pass spacious: fields and Buttons L; another Dialog stays M, even over a spacious screen", () => {
+    render(
+      <>
+        <Dialog
+          isOpen
+          density="spacious"
+          title="New idea"
+          buttons={<Button>Create idea</Button>}
+        >
+          <TextField label="Idea name" />
+        </Dialog>
+        <FocusPattern header={<h1>Decide</h1>}>
+          <Dialog isOpen title="Edit competitor">
+            <TextField label="Competitor name" />
+          </Dialog>
+        </FocusPattern>
+        <TextField label="L field" size="L" />
+        <TextField label="M field" size="M" />
+        <Button size="L">L button</Button>
+      </>,
+    );
+    const frameOf = (name: string) =>
+      screen.getByRole("textbox", { name }).parentElement?.className;
+    expect(frameOf("Idea name")).toBe(frameOf("L field"));
+    expect(screen.getByRole("button", { name: "Create idea" }).className).toBe(
+      screen.getByRole("button", { name: "L button" }).className,
+    );
+    expect(frameOf("Competitor name")).toBe(frameOf("M field"));
+  });
+
+  test("an AlertDialog opened from a spacious pattern keeps its buttons M", () => {
+    render(
+      <>
+        <FocusPattern header={<h1>Decide</h1>}>
+          <AlertDialog
+            isOpen
+            title="Discard the reason?"
+            primaryActionLabel="Discard"
+            cancelLabel="Keep"
+          >
+            The reason you wrote goes.
+          </AlertDialog>
+        </FocusPattern>
+        <Button size="M" variant="secondary">
+          M secondary
+        </Button>
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "Keep" }).className).toBe(
+      screen.getByRole("button", { name: "M secondary" }).className,
+    );
+  });
+});
+
 describe("AlertDialog", () => {
   const renderAlert = (
     props: Partial<Parameters<typeof AlertDialog>[0]> = {},
@@ -177,27 +236,121 @@ describe("AlertDialog", () => {
       </DialogTrigger>,
     );
 
-  test("an alertdialog that Escape does not close", async () => {
+  test("Escape is its Cancel: it closes, reports the cancel and returns focus", async () => {
     const user = userEvent.setup();
-    renderAlert();
-    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const onCancel = vi.fn();
+    const onPrimaryAction = vi.fn();
+    renderAlert({ onCancel, onPrimaryAction });
+    const trigger = screen.getByRole("button", { name: "Delete" });
+    await user.click(trigger);
     const alert = screen.getByRole("alertdialog", { name: "Delete this row?" });
     expect(frameOf(alert)).toBe("centered");
     await user.keyboard("{Escape}");
     await settle();
-    expect(screen.getByRole("alertdialog")).toBeTruthy();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onPrimaryAction).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(trigger);
   });
 
-  test("on a phone it is a tray that Escape does not close (design-spec 4.5)", async () => {
-    setPhoneWidth();
+  test("without a cancel button Escape does nothing; a press outside never closes it", async () => {
     const user = userEvent.setup();
-    renderAlert();
+    const onPrimaryAction = vi.fn();
+    renderAlert({ cancelLabel: undefined, onPrimaryAction });
     await user.click(screen.getByRole("button", { name: "Delete" }));
-    const alert = screen.getByRole("alertdialog");
-    expect(frameOf(alert)).toBe("tray");
     await user.keyboard("{Escape}");
     await settle();
     expect(screen.getByRole("alertdialog")).toBeTruthy();
+    expect(onPrimaryAction).not.toHaveBeenCalled();
+    await user.click(document.body);
+    await settle();
+    expect(screen.getByRole("alertdialog")).toBeTruthy();
+  });
+
+  test("Escape a part inside takes (an open Picker's list) does not cancel it", async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    render(
+      <AlertDialog
+        isOpen
+        title="Change the role?"
+        primaryActionLabel="Change"
+        cancelLabel="Cancel"
+        onCancel={onCancel}
+      >
+        <Picker
+          label="Role"
+          items={[
+            { id: "member", label: "Member" },
+            { id: "viewer", label: "Viewer" },
+          ]}
+        />
+      </AlertDialog>,
+    );
+    await user.click(screen.getByRole("button", { name: /Role/ }));
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    await user.keyboard("{Escape}");
+    await settle();
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByRole("alertdialog")).toBeTruthy();
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  test("Escape that closes a ComboBox's open list, is held down or ends a composition does not cancel it", async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    render(
+      <AlertDialog
+        isOpen
+        title="Reassign the task?"
+        primaryActionLabel="Reassign"
+        cancelLabel="Cancel"
+        onCancel={onCancel}
+      >
+        <ComboBox
+          label="Assignee"
+          defaultValue="u1"
+          items={[
+            { id: "u1", label: "Ana Reyes" },
+            { id: "u2", label: "Carla Santos" },
+          ]}
+        />
+      </AlertDialog>,
+    );
+    // With a chosen item, React Aria lets Escape go on after closing the list.
+    const field = screen.getByRole("combobox", { name: "Assignee" });
+    await user.click(field);
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    await user.keyboard("{Escape}");
+    await settle();
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByRole("alertdialog")).toBeTruthy();
+    expect(onCancel).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(field, { key: "Escape", repeat: true });
+    // The Escape that ends an IME composition, as Safari reports it.
+    fireEvent.keyDown(field, { key: "Escape", keyCode: 229 });
+    await settle();
+    expect(screen.getByRole("alertdialog")).toBeTruthy();
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  test("on a phone it is a tray a press outside does not close, and Escape is its Cancel (design-spec 4.5)", async () => {
+    setPhoneWidth();
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    renderAlert({ onCancel });
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const alert = screen.getByRole("alertdialog");
+    expect(frameOf(alert)).toBe("tray");
+    await user.click(document.body);
+    await settle();
+    expect(screen.getByRole("alertdialog")).toBeTruthy();
+    await user.keyboard("{Escape}");
+    await settle();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   test("each button closes it and reports itself", async () => {

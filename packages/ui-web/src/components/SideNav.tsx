@@ -1,10 +1,10 @@
-import { i18n } from "@moonx/i18n";
 import { ChevronDown } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { Button as AriaButton, Link as AriaLink } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { BrandMark } from "../internal/BrandMark";
 import { IconSlot } from "../internal/IconSlot";
-import { NavBadge, navItemName } from "../internal/NavBadge";
+import { NavBadge, useNavItemName } from "../internal/NavBadge";
 import { useIsDesktop } from "../internal/useIsDesktop";
 import { Avatar } from "./Avatar";
 import { Menu, MenuTrigger } from "./Menu";
@@ -54,17 +54,19 @@ export function SideNav({
   user,
   userMenu,
 }: SideNavProps) {
+  const { t } = useTranslation(["components"]);
+  const navItemName = useNavItemName();
   // On a desktop the names are on screen; a tooltip would repeat them.
   const hasTooltips = !useIsDesktop();
   return (
-    <nav aria-label={i18n.t("components:nav.label")} className={styles.sideNav}>
+    <nav aria-label={t("components:nav.label")} className={styles.sideNav}>
       <div className={styles.brand}>
         <BrandMark className={styles.brandMark} />
-        <span className={styles.label}>{i18n.t("components:nav.brand")}</span>
+        <span className={styles.label}>{t("components:nav.brand")}</span>
       </div>
       <TooltipTrigger isDisabled={!hasTooltips}>
         <AriaButton
-          aria-label={i18n.t("components:nav.workspace", {
+          aria-label={t("components:nav.workspace", {
             name: workspaceName,
           })}
           onPress={onWorkspacePress}

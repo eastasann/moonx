@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Density } from "../internal/Density";
 import { BottomBar } from "../internal/frame";
 import * as styles from "./patterns.css";
 
@@ -24,16 +25,18 @@ export interface FocusPatternProps {
  */
 export function FocusPattern({ header, children, actions }: FocusPatternProps) {
   return (
-    <div className={styles.root}>
-      <div className={styles.focusPage({ hasActionRow: actions != null })}>
-        <div className={styles.focusHeader}>{header}</div>
-        <div className={styles.focusContent}>{children}</div>
+    <Density density="spacious">
+      <div className={styles.root}>
+        <div className={styles.focusPage({ hasActionRow: actions != null })}>
+          <div className={styles.focusHeader}>{header}</div>
+          <div className={styles.focusContent}>{children}</div>
+        </div>
+        {actions != null && (
+          <BottomBar isPhoneOnly column="form">
+            {actions}
+          </BottomBar>
+        )}
       </div>
-      {actions != null && (
-        <BottomBar isPhoneOnly column="form">
-          {actions}
-        </BottomBar>
-      )}
-    </div>
+    </Density>
   );
 }

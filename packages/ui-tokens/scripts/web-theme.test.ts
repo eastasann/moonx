@@ -261,7 +261,7 @@ test("vars.ts gives the sizes code reads as numbers in px", () => {
   expect(source).toContain("export const popoverMaxHeight = 384;");
   expect(source).toContain("export const twoColumnMinWidth = 788;");
   expect(source).toContain("export const presentationTwoColumnMinWidth = 704;");
-  expect(source).toContain("export const publicSplitMinWidth = 900;");
+  expect(source).toContain("export const publicStackMaxWidth = 900;");
   expect(value("layout-popover-max-height")?.lightMedium).toBe("384px");
 });
 

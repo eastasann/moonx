@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import type { Size } from "@moonx/ui-tokens";
 import { Search, X } from "lucide-react";
 import { useRef } from "react";
@@ -8,6 +7,7 @@ import {
   Button,
   Input,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import {
   FieldHelp,
   FieldLabel,
@@ -36,7 +36,7 @@ export interface SearchFieldProps
       | "aria-label"
       | "aria-labelledby"
     > {
-  /** @default "M", or "L" inside a spacious `Form` */
+  /** @default "M"; "L" in a spacious pattern, dialog or `Form` (06 semantic.density) */
   size?: Size;
   /**
    * `full` fills the line, `fill` grows into the rest of a line of filters (pattern D);
@@ -62,6 +62,7 @@ export function SearchField({
   placeholder,
   ...props
 }: SearchFieldProps) {
+  const { t } = useTranslation(["components"]);
   const resolved = useSize(size);
   const width = useFieldWidth(givenWidth);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -89,7 +90,7 @@ export function SearchField({
               />
               {!isEmpty && (
                 <Button
-                  aria-label={i18n.t("components:searchField.clear")}
+                  aria-label={t("components:searchField.clear")}
                   className={styles.fieldButton({ size: resolved })}
                 >
                   <IconSlot size={resolved}>

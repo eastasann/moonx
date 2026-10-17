@@ -4,7 +4,7 @@ export {
   breakpoints,
   popoverMaxHeight,
   presentationTwoColumnMinWidth,
-  publicSplitMinWidth,
+  publicStackMaxWidth,
   twoColumnMinWidth,
   vars,
 } from "./generated/vars";

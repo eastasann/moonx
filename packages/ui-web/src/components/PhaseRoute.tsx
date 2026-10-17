@@ -10,8 +10,8 @@ export interface PhaseRouteProps {
 
 /**
  * The landing's three parts on a line of moons (1, design-spec 6.16, s01-landing.html
- * .route): new, half and full, joined by a line; across on a desktop, down below
- * `layout.public.split-min-width`.
+ * .route): new, half and full, joined by a line; across on a desktop, down at
+ * `layout.public.stack-max-width` and narrower.
  */
 export function PhaseRoute({ phases, headingLevel = 3 }: PhaseRouteProps) {
   const Heading = `h${headingLevel}` as const;

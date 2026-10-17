@@ -1,10 +1,10 @@
-import { i18n } from "@moonx/i18n";
 import type { Confidence, Fau, FauState } from "@moonx/schemas";
 import { confidenceSchema } from "@moonx/schemas";
 import type { Size } from "@moonx/ui-tokens";
 import { ChevronDown, TriangleAlert } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { Button } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { IconSlot } from "../internal/IconSlot";
 import type { MoonState } from "../internal/MoonMark";
 import * as moonStyles from "../internal/moon.css";
@@ -45,23 +45,26 @@ export interface FauLabelOptions {
 }
 
 /**
- * A state's label as design-spec 6.0.3 writes it: "Fact · 2 sources", "Fact · No evidence",
+ * Labels a state as design-spec 6.0.3 writes it: "Fact · 2 sources", "Fact · No evidence",
  * "Assumption · Medium", "Unknown", "Unclassified", "Empty". For a StatusLight beside an
  * answer as much as for FauPicker.
  */
-export function fauLabel(
+export function useFauLabel(): (
   state: FauState,
-  { confidence = null, evidenceCount = 0 }: FauLabelOptions = {},
-): string {
-  if (state === "fact") {
-    return i18n.t("common:fauLabel.fact", { count: evidenceCount });
-  }
-  if (state === "assumption" && confidence !== null) {
-    return i18n.t("common:fauLabel.assumption", {
-      confidence: i18n.t(`common:confidence.${confidence}`),
-    });
-  }
-  return i18n.t(`common:fauState.${state}`);
+  options?: FauLabelOptions,
+) => string {
+  const { t } = useTranslation(["components", "common"]);
+  return (state, { confidence = null, evidenceCount = 0 } = {}) => {
+    if (state === "fact") {
+      return t("common:fauLabel.fact", { count: evidenceCount });
+    }
+    if (state === "assumption" && confidence !== null) {
+      return t("common:fauLabel.assumption", {
+        confidence: t(`common:confidence.${confidence}`),
+      });
+    }
+    return t(`common:fauState.${state}`);
+  };
 }
 
 /** What FauPicker reports: the classification to save (`ClassificationInput`). */
@@ -113,6 +116,7 @@ export function FauPicker({
   size = "M",
   ...props
 }: FauPickerProps) {
+  const { t } = useTranslation(["components", "common"]);
   const isNarrow = useIsNarrow();
   const cell = useTableCell();
   const [isOpen, setOpen] = useState(false);
@@ -122,6 +126,7 @@ export function FauPicker({
     setOpen(false);
     focusBack();
   };
+  const fauLabel = useFauLabel();
   const label = fauLabel(props.state, props);
   const state = moonOf[props.state];
   const summary = (withMoon: boolean) => (
@@ -165,7 +170,7 @@ export function FauPicker({
         // A press focuses the button where the browser does not (Safari), so the popover
         // has a button to give focus back to.
         onPressStart={() => triggerRef.current?.focus()}
-        aria-label={i18n.t("components:fauPicker.trigger", {
+        aria-label={t("components:fauPicker.trigger", {
           name: props["aria-label"],
           state: label,
         })}
@@ -210,6 +215,7 @@ function FauControls({
   /** The choice is made: the popover closes. */
   onDone?: () => void;
 }) {
+  const { t } = useTranslation(["components", "common"]);
   const current = fauOf(fauState);
   const state = moonOf[fauState];
   const confidenceId = useId();
@@ -254,7 +260,7 @@ function FauControls({
     <div className={styles.controls}>
       <div className={styles.group}>
         <p className={styles.groupLabel}>
-          {i18n.t("components:fauPicker.question")}
+          {t("components:fauPicker.question")}
         </p>
         <ToggleButtonGroup
           aria-label={name}
@@ -270,7 +276,7 @@ function FauControls({
             <span className={styles.toggleGlyph}>
               <MoonGlyphAt state="fact" size={glyphSize} />
             </span>
-            {i18n.t("common:fau.fact")}
+            {t("common:fau.fact")}
           </ToggleButton>
           <ToggleButton
             id="assumption"
@@ -279,20 +285,20 @@ function FauControls({
             <span className={styles.toggleGlyph}>
               <MoonGlyphAt state="assumption" size={glyphSize} />
             </span>
-            {i18n.t("common:fau.assumption")}
+            {t("common:fau.assumption")}
           </ToggleButton>
           <ToggleButton id="unknown">
             <span className={styles.toggleGlyph}>
               <MoonGlyphAt state="unknown" size={glyphSize} />
             </span>
-            {i18n.t("common:fau.unknown")}
+            {t("common:fau.unknown")}
           </ToggleButton>
         </ToggleButtonGroup>
       </div>
       {shown === "assumption" && (
         <div className={styles.group}>
           <p id={confidenceId} className={styles.groupLabel}>
-            {i18n.t("components:fauPicker.confidence")}
+            {t("components:fauPicker.confidence")}
           </p>
           <SegmentedControl
             aria-labelledby={confidenceId}
@@ -308,7 +314,7 @@ function FauControls({
           >
             {confidenceSchema.options.map((option) => (
               <SegmentedControlItem key={option} id={option}>
-                {i18n.t(`common:confidence.${option}`)}
+                {t(`common:confidence.${option}`)}
               </SegmentedControlItem>
             ))}
           </SegmentedControl>
@@ -317,24 +323,22 @@ function FauControls({
       {hasValue && (
         // Evidence makes a number a Fact (6.0.3): the way to M2, also for a Fact that lost it.
         <div className={styles.evidence}>
-          {!isFact && (
-            <span>{i18n.t("components:fauPicker.evidenceHint")}</span>
-          )}
+          {!isFact && <span>{t("components:fauPicker.evidenceHint")}</span>}
           <Link onPress={addEvidence}>
-            {i18n.t("components:fauPicker.addEvidence")}
+            {t("components:fauPicker.addEvidence")}
           </Link>
         </div>
       )}
       <AlertDialog
         isOpen={isAsking}
         onOpenChange={setAsking}
-        title={i18n.t("components:fauPicker.unknownTitle")}
-        primaryActionLabel={i18n.t("components:fauPicker.markUnknown")}
-        cancelLabel={i18n.t("components:fauPicker.cancel")}
+        title={t("components:fauPicker.unknownTitle")}
+        primaryActionLabel={t("components:fauPicker.markUnknown")}
+        cancelLabel={t("components:fauPicker.cancel")}
         onPrimaryAction={() => change({ fau: "unknown", confidence: null })}
         autoFocusButton="cancel"
       >
-        {i18n.t("components:fauPicker.unknownBody")}
+        {t("components:fauPicker.unknownBody")}
       </AlertDialog>
     </div>
   );

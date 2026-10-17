@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import type { ContextualHelpSize } from "@moonx/ui-tokens";
 import { CircleHelp, Info } from "lucide-react";
 import type { ReactNode } from "react";
@@ -6,6 +5,7 @@ import {
   type PopoverProps as AriaPopoverProps,
   Dialog,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { FixedLocale } from "../internal/FixedLocale";
 import { ResponsivePopover } from "../internal/ResponsivePopover";
 import { ActionButtonBase } from "./ActionButton";
@@ -46,6 +46,7 @@ export function ContextualHelp({
   placement,
   "aria-label": ariaLabel,
 }: ContextualHelpProps) {
+  const { t } = useTranslation(["components"]);
   return (
     <DialogTrigger>
       <ActionButtonBase
@@ -53,7 +54,7 @@ export function ContextualHelp({
         size={size}
         aria-label={
           label === undefined
-            ? (ariaLabel ?? i18n.t(`components:contextualHelp.${variant}`))
+            ? (ariaLabel ?? t(`components:contextualHelp.${variant}`))
             : ariaLabel
         }
       >

@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import { ArrowLeft, Plus } from "lucide-react";
 import {
   type FocusEvent,
@@ -10,6 +9,7 @@ import {
   useState,
 } from "react";
 import { Button as AriaButton } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { Button } from "../components/Button";
 import {
   BackOverrideContext,
@@ -93,6 +93,7 @@ function selectedRows(pane: HTMLElement | null): string {
  * the list (in the header on a phone, inside AppFrame).
  */
 export function ListDetailPattern(props: ListDetailPatternProps) {
+  const { t } = useTranslation(["components"]);
   const { header, filters, list, listNote, newItem } = props;
   const hasDetail = props.hasDetail !== false;
   const detail = props.hasDetail === false ? null : props.detail;
@@ -258,7 +259,7 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
           >
             {!isTwoColumns && !usesFrameBack && (
               <AriaButton
-                aria-label={i18n.t("components:listDetailPattern.back", {
+                aria-label={t("components:listDetailPattern.back", {
                   label: listLabel,
                 })}
                 onPress={onBack}

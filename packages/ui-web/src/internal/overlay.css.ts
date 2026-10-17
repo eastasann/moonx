@@ -33,7 +33,8 @@ export const popover = style({
   minWidth: "var(--trigger-width)",
   overflow: "auto",
   background: vars.color.surface.overlay,
-  border: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
+  // The light frame of s17-costs.html's .pop (06 border.default).
+  border: `${vars.borderWidth.hairline} solid ${vars.color.border.default}`,
   borderRadius: vars.radius.card,
   boxShadow: vars.shadow.overlay,
   color: vars.color.text.primary,

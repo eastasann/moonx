@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import { X } from "lucide-react";
 import {
   type KeyboardEvent,
@@ -9,6 +8,7 @@ import {
   useRef,
 } from "react";
 import { Dialog, Modal, ModalOverlay } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { FixedLocale } from "../internal/FixedLocale";
 import { OverlayContexts } from "../internal/OverlayContexts";
 import * as overlay from "../internal/overlay.css";
@@ -104,6 +104,7 @@ function PanelContent({
   headingId?: string;
   children: ReactNode;
 }) {
+  const { t } = useTranslation(["components"]);
   return (
     <>
       <div className={styles.header}>
@@ -113,7 +114,7 @@ function PanelContent({
         <ActionButton
           isQuiet
           size="S"
-          aria-label={i18n.t("components:panel.close")}
+          aria-label={t("components:panel.close")}
           onPress={onClose}
         >
           <X />

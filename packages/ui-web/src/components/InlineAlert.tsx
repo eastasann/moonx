@@ -1,7 +1,7 @@
-import { i18n } from "@moonx/i18n";
 import type { StatusVariant } from "@moonx/ui-tokens";
 import { CircleAlert, Info, TriangleAlert, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { IconSlot } from "../internal/IconSlot";
 import { ActionButton } from "./ActionButton";
 import * as styles from "./InlineAlert.css";
@@ -38,13 +38,14 @@ export function InlineAlert({
   children,
   onDismiss,
 }: InlineAlertProps) {
+  const { t } = useTranslation(["components"]);
   return (
     <div role="alert" className={styles.alert[variant]}>
       {variant !== "neutral" && (
         // Named, as Spectrum 2 names it, so the kind of alert is not told by colour alone.
         <span
           role="img"
-          aria-label={i18n.t(`components:inlineAlert.${variant}`)}
+          aria-label={t(`components:inlineAlert.${variant}`)}
           className={styles.icon[variant]}
         >
           <IconSlot size="M">{icons[variant]}</IconSlot>
@@ -58,7 +59,7 @@ export function InlineAlert({
         <span className={styles.close}>
           <ActionButton
             isQuiet
-            aria-label={i18n.t("components:inlineAlert.close")}
+            aria-label={t("components:inlineAlert.close")}
             onPress={onDismiss}
           >
             <X />

@@ -860,7 +860,7 @@ test.describe("dialogs, popovers and menus follow the width (design-spec 3.8・4
   });
 
   for (const width of ["mobile", "desktop"] as const) {
-    test(`AlertDialog at ${width}: focus on Cancel, Escape does not close, an answer does`, async ({
+    test(`AlertDialog at ${width}: focus on Cancel, Escape is the Cancel, an answer closes it`, async ({
       page,
     }) => {
       await openGallery(page, width);
@@ -872,7 +872,14 @@ test.describe("dialogs, popovers and menus follow the width (design-spec 3.8・4
         width === "mobile" ? "tray" : "floating",
       );
       await expect(alert.getByRole("button", { name: "Cancel" })).toBeFocused();
+      // A press outside leaves it open; Escape answers Cancel (design-spec 4.5).
+      await page.mouse.click(2, 2);
+      await expect(alert).toBeVisible();
       await page.keyboard.press("Escape");
+      await expect(alert).toBeHidden();
+      await expect(page.getByText("Last answer: Cancel")).toBeVisible();
+      await expect(trigger).toBeFocused();
+      await trigger.click();
       await expect(alert).toBeVisible();
       await alert.getByRole("button", { name: "Delete" }).click();
       await expect(alert).toBeHidden();
@@ -880,6 +887,22 @@ test.describe("dialogs, popovers and menus follow the width (design-spec 3.8・4
       await expect(trigger).toBeFocused();
     });
   }
+
+  test("AlertDialog without a cancel button: Escape does nothing, it waits for an answer", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    await page.getByRole("button", { name: "Show conflict" }).click();
+    const alert = page.getByRole("alertdialog", {
+      name: "Paolo updated this answer 3m ago",
+    });
+    await expect(alert).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(alert).toBeVisible();
+    await alert.getByRole("button", { name: "Load theirs" }).click();
+    await expect(alert).toBeHidden();
+    await expect(page.getByText("Last answer: Load theirs")).toBeVisible();
+  });
 });
 
 test.describe("keyboard in a real browser: menus, tabs and tooltips", () => {
@@ -917,6 +940,24 @@ test.describe("keyboard in a real browser: menus, tabs and tooltips", () => {
     await expect(milestones).toHaveAttribute("aria-selected", "true");
     await page.keyboard.press("ArrowLeft");
     await expect(list.getByRole("tab", { name: "Tasks" })).toBeFocused();
+  });
+
+  test("Tooltip: a long one wraps at Spectrum 2's width (06 component.tooltip.max-width)", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    await tooltipButton(page, "History").focus();
+    await page.keyboard.press("Tab");
+    await expect(tooltipButton(page, "Template version")).toBeFocused();
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toContainText("A newer template version is out");
+    const box = await boxOf(tooltip);
+    expect(box.width).toBeLessThanOrEqual(160);
+    // Several lines, not one line past the window.
+    const lineHeight = await tooltip.evaluate((node) =>
+      Number.parseFloat(getComputedStyle(node).lineHeight),
+    );
+    expect(box.height).toBeGreaterThan(2 * lineHeight);
   });
 
   test("Tooltip: keyboard focus shows it, Escape hides it", async ({
@@ -991,6 +1032,8 @@ test.describe("Toast and Breadcrumbs", () => {
       await expect(toast).toBeVisible();
       await settled(toast);
       const box = await toast.boundingBox();
+      // At most Spectrum 2's width (06 component.toast.max-width).
+      expect(box?.width ?? 0).toBeLessThanOrEqual(336);
       // 06 layout.page-gutter-mobile from the bottom edge (the gallery has no TabBar).
       expect(widths[width].height - ((box?.y ?? 0) + (box?.height ?? 0))).toBe(
         16,
@@ -1403,9 +1446,26 @@ test.describe("data and moonx's own components in a real browser (design-spec 4.
       expect((await price.boundingBox())?.height ?? 0).toBeLessThan(
         lineHeight * 1.5,
       );
+      // The figures stand in the columns P12 measured with the PDF's fonts (the
+      // specimen's `figureColumns`, in pt), not in widths the browser measures.
+      await expect(slide.getByRole("term")).toHaveText([
+        "Price",
+        "Contribution / sale",
+        "Break-even / day",
+      ]);
+      const columns = await slide
+        .getByRole("term")
+        .evaluateAll((terms) =>
+          terms.map(
+            (term) => term.parentElement?.getBoundingClientRect().width ?? 0,
+          ),
+        );
+      expect(columns.map((column) => column / scale)).toEqual(
+        [240.11, 326.51, 249.39].map((pt) => expect.closeTo(pt, 0)),
+      );
       // The page's white at every theme (06 semantic.print.color.page, s23-deck.html).
       await expect(slide).toHaveCSS("background-color", "rgb(255, 255, 255)");
-      await expect(heading).toHaveCSS("color", "rgb(21, 26, 44)");
+      await expect(heading).toHaveCSS("color", "rgb(25, 28, 42)");
     });
   }
 
@@ -1630,10 +1690,10 @@ test.describe("the frame follows the width (design-spec 4.3・6.0.1)", () => {
     await expect(
       frame.getByRole("list", { name: "Frame breadcrumbs" }),
     ).toBeHidden();
-    // Saved keeps its mark and gives up its word on a phone (4.3).
+    // Saved keeps its word where the header has room for it beside ← (4.3).
     const status = frame.locator("header").getByRole("status");
     await expect(status).toHaveText("Saved");
-    expect((await boxOf(status)).width).toBeLessThan(40);
+    expect((await boxOf(status)).width).toBeGreaterThan(40);
     await expect(frame.getByRole("switch", { name: "Focus" })).toBeHidden();
 
     // The frame fills the window: the TabBar on its bottom edge, the question form's bar
@@ -1656,6 +1716,71 @@ test.describe("the frame follows the width (design-spec 4.3・6.0.1)", () => {
     await expect(
       frame.getByText("RouterProvider moved to: /w/demo/decisions"),
     ).toBeVisible();
+  });
+
+  test("phone: Saving… and Saved give up their words only where the header has no room (4.3)", async ({
+    page,
+  }) => {
+    // Measuring the header raises no error on the window (a ResizeObserver round left
+    // with undelivered notifications reaches error reporting).
+    await page.addInitScript(() => {
+      const errors: string[] = [];
+      Object.assign(window, { windowErrors: errors });
+      window.addEventListener("error", (event) => errors.push(event.message));
+    });
+    await openGallery(page, "mobile");
+    const frame = region(page, frameSection);
+    const pick = (group: string, name: string) =>
+      frame
+        .getByRole("radiogroup", { name: group })
+        .getByRole("radio", { name })
+        .click();
+    await showSection(page, frameSection);
+    const header = frame.locator("header");
+    const status = header.getByRole("status");
+    const back = header.getByRole("link", { name: /^Back to / });
+    const cut = () =>
+      back.evaluate((link) =>
+        [...link.querySelectorAll("span")].some(
+          (text) => text.scrollWidth > text.clientWidth,
+        ),
+      );
+    // Room beside a short ←: the word shows and ← is whole.
+    await expect(status).toHaveText("Saved");
+    expect((await boxOf(status)).width).toBeGreaterThan(40);
+    expect(await cut()).toBe(false);
+
+    // A long ← takes the room: the mark alone, still read as "Saved".
+    await pick("Back label", "Long");
+    await expect(back).toHaveAccessibleName(
+      "Back to Piaya Gift Box Delivery for offices",
+    );
+    await expect(async () => {
+      expect((await boxOf(status)).width).toBeLessThan(40);
+    }).toPass();
+    await expect(status).toHaveText("Saved");
+    await pick("Save state", "Saving");
+    await expect(status).toHaveText("Saving…");
+    expect((await boxOf(status)).width).toBeLessThan(40);
+    // Couldn't save keeps its words even so.
+    await pick("Save state", "Failed");
+    await expect(header.getByText("Couldn't save")).toBeVisible();
+    expect(
+      (await boxOf(header.getByText("Couldn't save"))).width,
+    ).toBeGreaterThan(40);
+
+    // Room again: the word comes back.
+    await pick("Save state", "Saved");
+    await pick("Back label", "Short");
+    await expect(async () => {
+      expect((await boxOf(status)).width).toBeGreaterThan(40);
+    }).toPass();
+    expect(await cut()).toBe(false);
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { windowErrors: string[] }).windowErrors,
+      ),
+    ).toEqual([]);
   });
 
   test("phone: Couldn't save keeps its words, with Retry (4.3)", async ({
@@ -2064,8 +2189,11 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
       const [left, right] = [await boxOf(thumbnails), await boxOf(slide)];
       expect(right.x).toBeGreaterThan(left.x + left.width);
       expect(Math.round(right.y - left.y)).toBe(12);
-      // 06 layout.presentation.thumbnail-column-width, less its insets (12 each side).
-      expect(Math.round((await boxOf(thumbnails)).width)).toBe(200 - 2 * 12);
+      // 06 layout.presentation.thumbnail-column-width, less the rule it holds and its
+      // insets (12 each side).
+      expect(Math.round((await boxOf(thumbnails)).width)).toBe(
+        200 - 1 - 2 * 12,
+      );
       expect((await boxOf(pattern.getByText(/^Say:/))).y).toBeGreaterThan(
         (await boxOf(slide)).y + (await boxOf(slide)).height,
       );
@@ -2906,6 +3034,79 @@ test.describe("the parts match docs/mockups (Step 22c, design-spec 4.4・4.5)", 
   });
 });
 
+test.describe("values from 06, not written in the parts (Step 22g)", () => {
+  test("ProgressCircle without a value turns a quarter of its ring (06 progress-circle.indeterminate-arc)", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const spinner = page.getByRole("progressbar", { name: "Preparing PDF" });
+    const dash = await spinner
+      .locator("circle")
+      .nth(1)
+      .evaluate((circle) => getComputedStyle(circle).strokeDasharray);
+    // Chrome keeps the calc() of a number it resolved: "calc(25), 100".
+    expect(dash.match(/\d+(\.\d+)?/g)?.map(Number)).toEqual([25, 100]);
+  });
+
+  test("ProgressBar without a value sweeps a fill 0.7 of its track (06 meter.indeterminate-length)", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const bar = page.getByRole("progressbar", {
+      name: "Preparing PDF…",
+      exact: true,
+    });
+    const shares = await bar.evaluate((node) => {
+      const fill = [...node.querySelectorAll<HTMLElement>("*")].find(
+        (element) => getComputedStyle(element).position === "absolute",
+      );
+      const track = fill?.parentElement;
+      return (
+        (fill?.getBoundingClientRect().width ?? 0) /
+        (track?.getBoundingClientRect().width ?? 1)
+      );
+    });
+    expect(shares).toBeCloseTo(0.7, 2);
+  });
+
+  test("Meter's Unknown is hatched as d1-moon.html .fau-u (06 meter.hatch-*)", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const swatch = page
+      .getByRole("listitem")
+      .filter({ hasText: /^Unknown/ })
+      .first()
+      .locator("span")
+      .first();
+    const image = await swatch.evaluate(
+      (node) => getComputedStyle(node).backgroundImage,
+    );
+    expect(image).toContain("repeating-linear-gradient(135deg");
+    // The line 0 to 2px, then clear to 5px.
+    expect(image).toMatch(/ 0px, .+ 2px, .+ 2px, .+ 5px\)$/);
+  });
+
+  test("a button inside a field sits 06 field.button-edge from its edge", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const frame = page
+      .getByRole("searchbox", { name: "Search research log M" })
+      .locator("xpath=..");
+    const clear = frame.getByRole("button", { name: "Clear search" });
+    const [button, box] = await Promise.all([boxOf(clear), boxOf(frame)]);
+    const border = await frame.evaluate((node) =>
+      Number.parseFloat(getComputedStyle(node).borderRightWidth),
+    );
+    // M: 6px between the button and the frame's inside edge.
+    expect(box.x + box.width - border - (button.x + button.width)).toBeCloseTo(
+      6,
+      0,
+    );
+  });
+});
+
 test.describe("data parts match docs/mockups (Step 22d, design-spec 4.4・4.5)", () => {
   const mockups = "Mockup parts: tables, cards, metrics, rows and steps";
   /** 06 border.default (the mockups' --line-strong) and border.hairline (--line). */
@@ -2913,7 +3114,7 @@ test.describe("data parts match docs/mockups (Step 22d, design-spec 4.4・4.5)",
     light: { default: "rgb(198, 203, 216)", hairline: "rgb(225, 228, 235)" },
     dark: { default: "rgb(58, 66, 99)", hairline: "rgb(38, 44, 68)" },
   };
-  const ink = { light: "rgb(21, 26, 44)", dark: "rgb(230, 232, 241)" };
+  const ink = { light: "rgb(25, 28, 42)", dark: "rgb(230, 232, 241)" };
   const box = async (locator: Locator) => {
     const rect = await locator.boundingBox();
     if (rect === null) throw new Error("not on screen");

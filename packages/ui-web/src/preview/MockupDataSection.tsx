@@ -348,6 +348,8 @@ export const businessModel: PitchSlide = {
       value: exact(0.514),
     },
   ],
+  // The columns P12 returns for these figures, measured with the PDF's fonts.
+  figureColumns: { widths: [147.01, 233.41, 233.41, 178.16], fits: true },
   table: null,
   emptySources: [],
   shrink: 0,

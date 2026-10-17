@@ -1,6 +1,7 @@
-import { i18n } from "@moonx/i18n";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { BrandMark } from "../internal/BrandMark";
+import { Density } from "../internal/Density";
 import * as styles from "./patterns.css";
 
 export interface PublicPatternProps {
@@ -22,28 +23,31 @@ export function PublicPattern({
   children,
   footerLinks,
 }: PublicPatternProps) {
-  const name = i18n.t("components:nav.brand");
+  const { t } = useTranslation(["components"]);
+  const name = t("components:nav.brand");
   return (
-    <div className={`${styles.root} ${styles.publicRoot}`}>
-      <header className={styles.publicBar}>
-        <span className={styles.publicBrand}>
-          <BrandMark className={styles.publicBrandMark} />
-          {name}
-        </span>
-        {action != null && (
-          <div className={styles.publicBarAction}>{action}</div>
-        )}
-      </header>
-      <div className={styles.publicMain}>{children}</div>
-      <footer className={styles.publicFooter}>
-        <div className={styles.publicFooterInner}>
-          <span>{name}</span>
-          {footerLinks != null && (
-            <div className={styles.publicFooterLinks}>{footerLinks}</div>
+    <Density density="spacious">
+      <div className={`${styles.root} ${styles.publicRoot}`}>
+        <header className={styles.publicBar}>
+          <span className={styles.publicBrand}>
+            <BrandMark className={styles.publicBrandMark} />
+            {name}
+          </span>
+          {action != null && (
+            <div className={styles.publicBarAction}>{action}</div>
           )}
-        </div>
-      </footer>
-    </div>
+        </header>
+        <div className={styles.publicMain}>{children}</div>
+        <footer className={styles.publicFooter}>
+          <div className={styles.publicFooterInner}>
+            <span>{name}</span>
+            {footerLinks != null && (
+              <div className={styles.publicFooterLinks}>{footerLinks}</div>
+            )}
+          </div>
+        </footer>
+      </div>
+    </Density>
   );
 }
 
@@ -51,7 +55,7 @@ export interface PublicSectionProps {
   /**
    * `hero`: two columns (6 : 5) in the middle of a window's height; `pair`: text beside an
    * example (5 : 6); `stack`: one under another; `close`: the last words and the action at
-   * the end of the line. Two columns stack below `layout.public.split-min-width`.
+   * the end of the line. Two columns stack at `layout.public.stack-max-width` and narrower.
    * @default "stack"
    */
   layout?: "hero" | "pair" | "stack" | "close";

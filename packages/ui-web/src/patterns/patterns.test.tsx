@@ -8,9 +8,15 @@ import {
   useState,
 } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { ActionButton } from "../components/ActionButton";
 import { AppFrame } from "../components/AppFrame";
+import { Button } from "../components/Button";
+import { Checkbox } from "../components/Checkbox";
+import { Form } from "../components/Form";
 import { QuestionCard } from "../components/QuestionCard";
-import { TextArea } from "../components/TextField";
+import { Radio, RadioGroup } from "../components/RadioGroup";
+import { Switch } from "../components/Switch";
+import { TextArea, TextField } from "../components/TextField";
 import { BodyRoomContext } from "../internal/frame";
 import { setPhoneWidth, setTabletWidth, settle } from "../test/helpers";
 import { CardComparePattern } from "./CardComparePattern";
@@ -248,6 +254,135 @@ describe("FocusPattern (B)", () => {
     expect(
       follows(fields, screen.getByRole("button", { name: "Record decision" })),
     ).toBe(true);
+  });
+});
+
+describe("the density a pattern gives what is inside (design-spec 4.4・4.5)", () => {
+  const frameOf = (name: string) =>
+    screen.getByRole("textbox", { name }).parentElement?.className;
+  const buttonOf = (name: string) =>
+    screen.getByRole("button", { name }).className;
+
+  test("a spacious pattern makes fields and Buttons L, in a Form or not; a regular one M; ActionButton stays M", () => {
+    render(
+      <>
+        <SettingsPattern
+          header={<h1>Account</h1>}
+          groups={[
+            {
+              id: "profile",
+              title: "Profile",
+              content: (
+                <>
+                  <TextField label="Name" />
+                  <Button>Save name</Button>
+                  <ActionButton aria-label="Profile actions">
+                    <span>⋯</span>
+                  </ActionButton>
+                  <Form aria-label="Password form">
+                    <TextField label="Password" />
+                  </Form>
+                </>
+              ),
+            },
+          ]}
+        />
+        <HubPattern
+          header={<h1>Home</h1>}
+          blocks={[
+            {
+              id: "note",
+              column: "main",
+              content: (
+                <>
+                  <TextField label="Hub field" />
+                  <Button>Hub button</Button>
+                </>
+              ),
+            },
+          ]}
+        />
+        <TextField label="L field" size="L" />
+        <TextField label="M field" size="M" />
+        <Button size="L">L button</Button>
+        <Button size="M">M button</Button>
+        <ActionButton aria-label="M action">
+          <span>⋯</span>
+        </ActionButton>
+        <Form density="spacious" aria-label="Spacious form">
+          <TextField label="Spacious form field" />
+        </Form>
+      </>,
+    );
+    expect(frameOf("Name")).toBe(frameOf("L field"));
+    expect(buttonOf("Save name")).toBe(buttonOf("L button"));
+    expect(buttonOf("Profile actions")).toBe(buttonOf("M action"));
+    // A Form without a density takes the pattern's, spacing and all.
+    expect(frameOf("Password")).toBe(frameOf("L field"));
+    expect(screen.getByRole("form", { name: "Password form" }).className).toBe(
+      screen.getByRole("form", { name: "Spacious form" }).className,
+    );
+    expect(frameOf("Hub field")).toBe(frameOf("M field"));
+    expect(buttonOf("Hub button")).toBe(buttonOf("M button"));
+  });
+
+  test("C, G and J are spacious too; Checkbox, Radio and Switch stay M in every pattern", () => {
+    render(
+      <>
+        <QuestionFormPattern
+          header={<h1>Section</h1>}
+          questionIds={["WHO"]}
+          currentId="WHO"
+          onCurrentChange={() => {}}
+          renderQuestion={() => <TextField label="In C" />}
+        />
+        <StepsPattern
+          header={<h1>Import</h1>}
+          steps={<ol aria-label="Steps" />}
+        >
+          <TextField label="In G" />
+        </StepsPattern>
+        <PublicPattern action={<span />} footerLinks={<span />}>
+          <TextField label="In J" />
+        </PublicPattern>
+        <FocusPattern header={<h1>Decide</h1>}>
+          <Checkbox>Box in B</Checkbox>
+          <RadioGroup label="Radios in B">
+            <Radio value="proceed">Proceed</Radio>
+          </RadioGroup>
+          <Switch>Switch in B</Switch>
+        </FocusPattern>
+        <TextField label="L field" size="L" />
+        <Checkbox>M box</Checkbox>
+        <RadioGroup label="M radios">
+          <Radio value="hold">Hold</Radio>
+        </RadioGroup>
+        <Switch>M switch</Switch>
+      </>,
+    );
+    for (const name of ["In C", "In G", "In J"]) {
+      expect({ name, frame: frameOf(name) }).toEqual({
+        name,
+        frame: frameOf("L field"),
+      });
+    }
+    const rowOf = (role: "checkbox" | "radio" | "switch", name: string) =>
+      screen.getByRole(role, { name }).closest("label")?.className;
+    expect(rowOf("checkbox", "Box in B")).toBe(rowOf("checkbox", "M box"));
+    expect(rowOf("radio", "Proceed")).toBe(rowOf("radio", "Hold"));
+    expect(rowOf("switch", "Switch in B")).toBe(rowOf("switch", "M switch"));
+  });
+
+  test("a size given to a part wins over the pattern's", () => {
+    render(
+      <>
+        <FocusPattern header={<h1>Decide</h1>}>
+          <TextField label="Small in B" size="S" />
+        </FocusPattern>
+        <TextField label="S field" size="S" />
+      </>,
+    );
+    expect(frameOf("Small in B")).toBe(frameOf("S field"));
   });
 });
 

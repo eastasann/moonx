@@ -5,6 +5,6 @@
     <circle cx="300" cy="215" r="132" fill="#000"/>
   </mask>
   <rect width="512" height="512" fill="#f4f5f8"/>
-  <circle cx="246" cy="266" r="150" fill="#151a2c" mask="url(#crescent)"/>
-  <circle cx="378" cy="150" r="28" fill="#151a2c"/>
+  <circle cx="246" cy="266" r="150" fill="#191c2a" mask="url(#crescent)"/>
+  <circle cx="378" cy="150" r="28" fill="#191c2a"/>
 </svg>

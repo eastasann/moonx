@@ -57,6 +57,14 @@ export const fill = style({
   strokeLinecap: "round",
 });
 
+/**
+ * The arc that turns without a value (06 progress-circle.indeterminate-arc), in the
+ * hundredths of the ring its `pathLength` sets.
+ */
+export const indeterminateFill = style({
+  strokeDasharray: `calc(${vars.scale.component.progressCircle.indeterminateArc} * 100) 100`,
+});
+
 export const indeterminate = style({
   animation: `${spin} ${vars.motion.loop.spin} linear infinite`,
   // Movement stops (06 motion.reduced): the arc stays still; React Aria still tells

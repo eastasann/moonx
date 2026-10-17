@@ -331,7 +331,8 @@ export const fieldButton = recipe({
       sizes.map((size) => [
         size,
         {
-          marginInlineEnd: `calc(-0.5 * ${vars.scale.component.field.paddingX[size]})`,
+          // From the frame's padding to 06 field.button-edge from its edge.
+          marginInlineEnd: `calc(${vars.scale.component.field.buttonEdge[size]} - ${vars.scale.component.field.paddingX[size]})`,
         },
       ]),
     ) as Record<(typeof sizes)[number], { marginInlineEnd: string }>,

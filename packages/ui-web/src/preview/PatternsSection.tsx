@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../components/Button";
 import { Card, CardView } from "../components/Card";
-import { fauLabel } from "../components/FauPicker";
+import { useFauLabel } from "../components/FauPicker";
 import { Heading } from "../components/Heading";
 import { Link } from "../components/Link";
 import { ListView, ListViewItem } from "../components/ListView";
@@ -196,6 +196,7 @@ const formQuestions = [
 ];
 
 export function QuestionFormPatternSection() {
+  const fauLabel = useFauLabel();
   const [current, setCurrent] = useState<string | null>("WHO");
   return (
     <Section title="QuestionFormPattern">

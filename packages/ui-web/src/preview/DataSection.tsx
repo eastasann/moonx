@@ -11,7 +11,7 @@ import { Avatar } from "../components/Avatar";
 import { Badge } from "../components/Badge";
 import { Card, CardView } from "../components/Card";
 import { CheckDots } from "../components/CheckDots";
-import { FauPicker, fauLabel } from "../components/FauPicker";
+import { FauPicker, useFauLabel } from "../components/FauPicker";
 import { ListView, ListViewItem } from "../components/ListView";
 import { Meter } from "../components/Meter";
 import { MoonGlyph, type MoonState } from "../components/MoonGlyph";
@@ -413,6 +413,7 @@ const competitors = [
 ];
 
 export function CardSection() {
+  const fauLabel = useFauLabel();
   const [slide, setSlide] = useState<Set<string | number>>(new Set(["s1"]));
   return (
     <Section title="Card and CardView">

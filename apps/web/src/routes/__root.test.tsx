@@ -1,9 +1,10 @@
+import { i18n } from "@moonx/i18n";
 import {
   createMemoryHistory,
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
 import { routeTree } from "../routeTree.gen";
 
@@ -34,3 +35,19 @@ test("the root route renders the English document shell", async () => {
     document.querySelector('meta[name="viewport"]')?.getAttribute("content"),
   ).toBe("width=device-width, initial-scale=1");
 });
+
+test("the root hands the shared catalogs to react-i18next, which the parts read", async () => {
+  renderApp("/dev/components?screen=s05-dashboard");
+
+  // Without the root's instance react-i18next has none, and the parts show their keys.
+  // The SideNav and the TabBar.
+  expect(
+    await screen.findAllByRole(
+      "navigation",
+      { name: i18n.t("components:nav.label") },
+      { timeout: 30_000 },
+    ),
+  ).toHaveLength(2);
+  expect(document.body.textContent).not.toContain("components:");
+  // The gallery compiles its styles on first load.
+}, 40_000);

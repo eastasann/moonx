@@ -192,21 +192,38 @@ export const patternTools = style({
 });
 
 /**
- * "Saving…" and "Saved" give up their words on a phone, keeping the mark (4.3);
+ * "Saving…" and "Saved" on a phone without the room for them: read out, not shown (4.3).
  * "Couldn't save" keeps its words everywhere.
  */
-export const saveLabelPhone = style({
-  "@media": {
-    [narrowQuery]: {
-      position: "absolute",
-      width: "1px",
-      height: "1px",
-      margin: "-1px",
-      overflow: "hidden",
-      clip: "rect(0 0 0 0)",
-      whiteSpace: "nowrap",
-    },
-  },
+export const saveLabelHidden = style({
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+});
+
+/**
+ * Holds the copy of the label AppFrame measures its room with (in StatusLight's M font,
+ * outside the status so it is not read twice): out of the row and of no size, clipping
+ * the copy, so it never moves the header's items or widens the page.
+ */
+export const saveProbeBox = style({
+  position: "absolute",
+  width: 0,
+  height: 0,
+  overflow: "hidden",
+});
+
+/** The label at its own width, unseen and unread. */
+export const saveProbe = style({
+  position: "absolute",
+  insetBlockStart: 0,
+  insetInlineStart: 0,
+  whiteSpace: "nowrap",
+  visibility: "hidden",
 });
 
 export const saveState = style({

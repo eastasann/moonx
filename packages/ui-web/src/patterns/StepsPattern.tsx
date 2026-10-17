@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Density } from "../internal/Density";
 import { BottomBar } from "../internal/frame";
 import { useIsNarrow } from "../internal/useIsNarrow";
 import * as styles from "./patterns.css";
@@ -63,43 +64,48 @@ export function StepsPattern({
   const isNarrow = useIsNarrow();
   const isComparison = comparisons !== undefined;
   return (
-    <div className={styles.root}>
-      <div className={styles.stepsPage({ isComparison })}>
-        {header != null && <div className={styles.stepsHeader}>{header}</div>}
-        <div className={styles.stepsBar}>{steps}</div>
-        <div className={styles.stepsContent}>
-          {children}
-          {comparisons?.map((item) => (
-            <section
-              key={item.id}
-              aria-label={`${item.code} ${item.question}`}
-              className={styles.comparisonItem}
-            >
-              <div className={styles.comparisonHead}>
-                {item.select}
-                <span className={styles.comparisonCode}>{item.code}</span>
-                <p className={styles.comparisonQuestion}>{item.question}</p>
-                {item.meta !== undefined && (
-                  <span className={styles.comparisonMeta}>{item.meta}</span>
-                )}
-              </div>
-              <div className={styles.comparison}>
-                <div className={styles.comparisonSide}>{item.before}</div>
-                <div className={styles.comparisonSide}>{item.after}</div>
-              </div>
-            </section>
-          ))}
-          {footer}
-          {note != null && isNarrow && (
-            <p className={styles.stepsNote}>{note}</p>
-          )}
+    <Density density="spacious">
+      <div className={styles.root}>
+        <div className={styles.stepsPage({ isComparison })}>
+          {header != null && <div className={styles.stepsHeader}>{header}</div>}
+          <div className={styles.stepsBar}>{steps}</div>
+          <div className={styles.stepsContent}>
+            {children}
+            {comparisons?.map((item) => (
+              <section
+                key={item.id}
+                aria-label={`${item.code} ${item.question}`}
+                className={styles.comparisonItem}
+              >
+                <div className={styles.comparisonHead}>
+                  {item.select}
+                  <span className={styles.comparisonCode}>{item.code}</span>
+                  <p className={styles.comparisonQuestion}>{item.question}</p>
+                  {item.meta !== undefined && (
+                    <span className={styles.comparisonMeta}>{item.meta}</span>
+                  )}
+                </div>
+                <div className={styles.comparison}>
+                  <div className={styles.comparisonSide}>{item.before}</div>
+                  <div className={styles.comparisonSide}>{item.after}</div>
+                </div>
+              </section>
+            ))}
+            {footer}
+            {note != null && isNarrow && (
+              <p className={styles.stepsNote}>{note}</p>
+            )}
+          </div>
         </div>
+        {actions != null && (
+          <BottomBar
+            column={isComparison ? "comparison" : "reading"}
+            note={note}
+          >
+            {actions}
+          </BottomBar>
+        )}
       </div>
-      {actions != null && (
-        <BottomBar column={isComparison ? "comparison" : "reading"} note={note}>
-          {actions}
-        </BottomBar>
-      )}
-    </div>
+    </Density>
   );
 }

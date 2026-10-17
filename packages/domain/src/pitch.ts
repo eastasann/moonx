@@ -750,6 +750,7 @@ class DeckBuilder {
         metricKey,
         value: keyMetricOf(input.keyMetrics, metricKey),
       })),
+      figureColumns: null,
       table,
       emptySources,
       shrink: 0,
@@ -795,7 +796,8 @@ export const pitchSlideKeys = (variant: PitchVariant): PitchSlideKey[] =>
 /**
  * The slides of the one- or five-minute deck (design-spec 6.14) with every source in
  * place: blank sources show "Not written yet" and are named in `emptySources`, and
- * nothing is cut yet (`fitPitchDeck` shrinks and cuts for the slide's size).
+ * nothing is cut or laid out yet (`fitPitchDeck` shrinks and cuts for the slide's size,
+ * and sets the figures' columns).
  */
 export const buildPitchDeck = (input: PitchDeckInput): PitchDeck =>
   new DeckBuilder(input).build();

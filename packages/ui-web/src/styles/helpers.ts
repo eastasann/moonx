@@ -1,4 +1,4 @@
-import { breakpoints, publicSplitMinWidth, vars } from "@moonx/ui-tokens";
+import { breakpoints, publicStackMaxWidth, vars } from "@moonx/ui-tokens";
 
 // Style fragments the components' *.css.ts files share. Plain values and functions live
 // here rather than in a .css.ts file, which may only export what vanilla-extract can
@@ -64,7 +64,7 @@ export const hoverTransition = {
 } as const;
 
 /**
- * Narrower than `semantic.layout.public.split-min-width`: the public page's two-column
- * sections stack (s01-landing.html's 900px).
+ * At `semantic.layout.public.stack-max-width` and narrower, the public page's two-column
+ * sections stack (s01-landing.html's `max-width: 900px`).
  */
-export const publicStackQuery = `not all and (min-width: ${publicSplitMinWidth}px)`;
+export const publicStackQuery = `(max-width: ${publicStackMaxWidth}px)`;

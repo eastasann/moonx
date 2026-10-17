@@ -16,7 +16,7 @@ const light = {
   hairline: "rgb(225, 228, 235)",
   default: "rgb(198, 203, 216)",
   strong: "rgb(122, 129, 151)",
-  primary: "rgb(21, 26, 44)",
+  primary: "rgb(25, 28, 42)",
   secondary: "rgb(85, 93, 114)",
   notice: "rgb(154, 86, 0)",
   transparent: "rgba(0, 0, 0, 0)",
@@ -739,7 +739,8 @@ test.describe("the patterns are the mockups' (design-spec 4.1, 06 semantic.layou
     const slides = page.getByRole("listbox", { name: "Slides" });
     const column = slides.locator("xpath=..");
     const columnBox = await boxOf(column);
-    expect(Math.round(columnBox.width)).toBe(200);
+    // 200 with the rule after it, as s23-deck.html's .thumbs and its border-right.
+    expect(Math.round(columnBox.width)).toBe(199);
     // Down the whole body: as tall as the deck's area under the tools.
     const area = await boxOf(column.locator("xpath=.."));
     expect(Math.round(columnBox.height)).toBe(Math.round(area.height));
@@ -767,6 +768,21 @@ test.describe("the patterns are the mockups' (design-spec 4.1, 06 semantic.layou
     expect((await boxOf(previous)).y).toBeGreaterThan(download.y);
     await previous.click();
     await expect(page.getByText("6 / 14")).toBeVisible();
+  });
+
+  test("J: the hero stacks at 900px and stands in two columns from 901px (s01's max-width: 900px)", async ({
+    page,
+  }) => {
+    for (const [width, isStacked] of [
+      [900, true],
+      [901, false],
+    ] as const) {
+      await open(page, "s01-landing", { width, height: 900 });
+      const title = await boxOf(page.getByRole("heading", { level: 1 }));
+      const example = await boxOf(page.getByRole("figure"));
+      if (isStacked) expect(example.y).toBeGreaterThan(title.y + title.height);
+      else expect(example.x).toBeGreaterThan(title.x + title.width);
+    }
   });
 
   test("J: the bar 68px, the hero 6 : 5, the floating example, the foot 64px", async ({

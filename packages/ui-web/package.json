@@ -19,7 +19,8 @@
     "@vanilla-extract/recipes": "^0.5.7",
     "@vanilla-extract/sprinkles": "^1.7.1",
     "lucide-react": "^1.58.0",
-    "react-aria-components": "^1.22.1"
+    "react-aria-components": "^1.22.1",
+    "react-i18next": "^17.0.20"
   },
   "devDependencies": {
     "@react-aria/test-utils": "1.0.0-rc.1",

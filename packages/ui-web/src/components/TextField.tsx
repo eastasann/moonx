@@ -39,7 +39,7 @@ export interface TextFieldBaseProps
       | "aria-labelledby"
       | "aria-describedby"
     > {
-  /** @default "M", or "L" inside a spacious `Form` */
+  /** @default "M"; "L" in a spacious pattern, dialog or `Form` (06 semantic.density) */
   size?: Size;
   /**
    * `full` fills the line, `fill` grows into the rest of a line (9's invitation, beside

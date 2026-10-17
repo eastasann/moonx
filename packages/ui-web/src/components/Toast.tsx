@@ -1,4 +1,3 @@
-import { i18n } from "@moonx/i18n";
 import { X } from "lucide-react";
 import { useContext, useSyncExternalStore } from "react";
 import {
@@ -9,6 +8,7 @@ import {
   UNSTABLE_ToastStateContext as AriaToastStateContext,
   type QueuedToast,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { FixedLocale } from "../internal/FixedLocale";
 import { ActionButton } from "./ActionButton";
 import { Button } from "./Button";
@@ -64,6 +64,7 @@ export const ToastQueue = {
 };
 
 function ToastBody({ toast }: { toast: QueuedToast<ToastContent> }) {
+  const { t } = useTranslation(["components"]);
   const state = useContext(AriaToastStateContext);
   if (state === null)
     throw new Error("A toast renders only in a ToastContainer.");
@@ -88,7 +89,7 @@ function ToastBody({ toast }: { toast: QueuedToast<ToastContent> }) {
         )}
         <ActionButton
           isQuiet
-          aria-label={i18n.t("components:toast.close")}
+          aria-label={t("components:toast.close")}
           onPress={() => state.close(toast.key)}
         >
           <X />
@@ -109,6 +110,7 @@ export interface ToastContainerProps {
 
 /** Where the toasts appear: put one in the app's root. */
 export function ToastContainer({ aboveTabBar = false }: ToastContainerProps) {
+  const { t } = useTranslation(["components"]);
   const count = useSyncExternalStore(
     (onChange) => queue.subscribe(onChange),
     () => queue.visibleToasts.length,
@@ -118,7 +120,7 @@ export function ToastContainer({ aboveTabBar = false }: ToastContainerProps) {
     <FixedLocale>
       <AriaToastRegion
         queue={queue}
-        aria-label={i18n.t("components:toast.region", { count })}
+        aria-label={t("components:toast.region", { count })}
         className={styles.region({ aboveTabBar })}
       >
         {({ toast }) => <ToastBody toast={toast} />}

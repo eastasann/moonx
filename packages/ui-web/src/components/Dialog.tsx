@@ -1,13 +1,15 @@
-import { i18n } from "@moonx/i18n";
-import type { DialogSize, DialogWidth } from "@moonx/ui-tokens";
+import type { DialogSize, DialogWidth, ScreenDensity } from "@moonx/ui-tokens";
 import { CircleAlert, TriangleAlert, X } from "lucide-react";
-import { type ReactNode, useId } from "react";
+import { type KeyboardEvent, type ReactNode, useContext, useId } from "react";
 import {
   Dialog as AriaDialog,
   DialogTrigger as AriaDialogTrigger,
   Modal,
   ModalOverlay,
+  OverlayTriggerStateContext,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
+import { Density } from "../internal/Density";
 import { FixedLocale } from "../internal/FixedLocale";
 import { IconSlot } from "../internal/IconSlot";
 import { OverlayContexts } from "../internal/OverlayContexts";
@@ -43,8 +45,11 @@ interface FrameProps {
   title: ReactNode;
   size: DialogSize;
   role: "dialog" | "alertdialog";
+  density: ScreenDensity;
   isDismissable: boolean;
   isKeyboardDismissDisabled: boolean;
+  /** Escape answers it this way, after closing it; without it, Escape is left to React Aria. */
+  onEscape?: () => void;
   isOpen?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (isOpen: boolean) => void;
@@ -63,14 +68,17 @@ function DialogFrame({
   title,
   size,
   role,
+  density,
   isDismissable,
   isKeyboardDismissDisabled,
+  onEscape,
   titleIcon,
   children,
   buttons,
   "aria-describedby": describedBy,
   ...state
 }: FrameProps) {
+  const { t } = useTranslation(["components"]);
   const isNarrow = useIsNarrow();
   const bodyId = useId();
   // An AlertDialog is a tray on a phone at any size: it waits for an answer (4.5).
@@ -102,50 +110,97 @@ function DialogFrame({
       >
         <Modal className={frame.modal}>
           <OverlayContexts>
-            <AriaDialog
-              role={role}
-              // An alert's body is what it asks, so it describes the dialog by default.
-              aria-describedby={
-                describedBy ?? (role === "alertdialog" ? bodyId : undefined)
-              }
-              className={styles.dialog}
-            >
-              {({ close }) => (
-                <>
-                  <div className={styles.header}>
-                    <Heading level={2} slot="title">
-                      <span className={styles.title}>
-                        {titleIcon}
-                        {title}
-                      </span>
-                    </Heading>
-                    {isDismissable && (
-                      <span className={styles.close}>
-                        <ActionButton
-                          isQuiet
-                          aria-label={i18n.t("components:dialog.close")}
-                          onPress={close}
-                        >
-                          <X />
-                        </ActionButton>
-                      </span>
-                    )}
-                  </div>
-                  <div id={bodyId} className={styles.body}>
-                    {render(children, close)}
-                  </div>
-                  {buttons !== undefined && (
-                    <div className={styles.footer}>
-                      {render(buttons, close)}
-                    </div>
+            <Density density={density}>
+              <EscapeAnswer onEscape={onEscape}>
+                <AriaDialog
+                  role={role}
+                  // An alert's body is what it asks, so it describes the dialog by default.
+                  aria-describedby={
+                    describedBy ?? (role === "alertdialog" ? bodyId : undefined)
+                  }
+                  className={styles.dialog}
+                >
+                  {({ close }) => (
+                    <>
+                      <div className={styles.header}>
+                        <Heading level={2} slot="title">
+                          <span className={styles.title}>
+                            {titleIcon}
+                            {title}
+                          </span>
+                        </Heading>
+                        {isDismissable && (
+                          <span className={styles.close}>
+                            <ActionButton
+                              isQuiet
+                              aria-label={t("components:dialog.close")}
+                              onPress={close}
+                            >
+                              <X />
+                            </ActionButton>
+                          </span>
+                        )}
+                      </div>
+                      <div id={bodyId} className={styles.body}>
+                        {render(children, close)}
+                      </div>
+                      {buttons !== undefined && (
+                        <div className={styles.footer}>
+                          {render(buttons, close)}
+                        </div>
+                      )}
+                    </>
                   )}
-                </>
-              )}
-            </AriaDialog>
+                </AriaDialog>
+              </EscapeAnswer>
+            </Density>
           </OverlayContexts>
         </Modal>
       </ModalOverlay>
     </FixedLocale>
+  );
+}
+
+/**
+ * With `onEscape`, Escape inside the dialog closes the modal around and answers so. A
+ * wrapper without a box of its own: React Aria's Dialog takes no keyboard handlers.
+ */
+function EscapeAnswer({
+  onEscape,
+  children,
+}: {
+  onEscape?: () => void;
+  children: ReactNode;
+}) {
+  const state = useContext(OverlayTriggerStateContext);
+  if (onEscape === undefined) return children;
+  const onKeyDown = (event: KeyboardEvent) => {
+    // The key is a part's when the part takes it: an overlay opened from the dialog (a
+    // portal, outside this element), a ComboBox whose list is open (it lets Escape go on
+    // after closing the list), a key held down past the first press, or the Escape that
+    // ends an IME composition (Safari reports it as 229).
+    const target = event.target as Element;
+    if (
+      event.key !== "Escape" ||
+      event.repeat ||
+      event.nativeEvent.isComposing ||
+      event.nativeEvent.keyCode === 229 ||
+      !event.currentTarget.contains(target) ||
+      (target.getAttribute("role") === "combobox" &&
+        target.getAttribute("aria-expanded") === "true")
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    state?.close();
+    onEscape();
+  };
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: it only hears keys pressed in the dialog inside, which has the role.
+    <div onKeyDown={onKeyDown} className={styles.escapeAnswer}>
+      {children}
+    </div>
   );
 }
 
@@ -157,6 +212,12 @@ export interface DialogProps {
    * @default "M"
    */
   size?: DialogSize;
+  /**
+   * The density of what is inside (design-spec 4.4): M1〜M9 are spacious, so their fields
+   * and Buttons are L, inside a `Form` or not; 15's competitor editor is regular.
+   * @default "regular"
+   */
+  density?: ScreenDensity;
   /**
    * Shows a close button and lets a press outside close it. Escape closes any Dialog
    * unless `isKeyboardDismissDisabled`.
@@ -182,6 +243,7 @@ export interface DialogProps {
 /** A modal dialog (M1〜M9, 15's competitor editor; design-spec 3.8). */
 export function Dialog({
   size = "M",
+  density = "regular",
   isDismissable = false,
   isKeyboardDismissDisabled = false,
   ...props
@@ -191,6 +253,7 @@ export function Dialog({
       {...props}
       role="dialog"
       size={size}
+      density={density}
       isDismissable={isDismissable}
       isKeyboardDismissDisabled={isKeyboardDismissDisabled}
     />
@@ -218,10 +281,11 @@ export interface AlertDialogProps {
   size?: DialogWidth;
   primaryActionLabel: string;
   secondaryActionLabel?: string;
-  /** Without it there is no cancel button. */
+  /** Without it there is no cancel button, and Escape does nothing. */
   cancelLabel?: string;
   onPrimaryAction?: () => void;
   onSecondaryAction?: () => void;
+  /** The cancel button, or Escape, was pressed: nothing is to change. */
   onCancel?: () => void;
   isPrimaryActionDisabled?: boolean;
   isSecondaryActionDisabled?: boolean;
@@ -235,9 +299,10 @@ export interface AlertDialogProps {
 
 /**
  * A question to answer before going on: deleting, the save conflict (design-spec 6.0.2),
- * the error of a modal (6.0.6). It stays until a button is pressed: neither Escape nor a
- * press outside closes it, at any width (on a phone it is a tray that cannot be
- * dismissed, design-spec 4.5).
+ * the error of a modal (6.0.6). It stays until it is answered: a press outside does not
+ * close it at any width (on a phone it is a tray that cannot be dismissed). Escape is the
+ * cancel button's answer, as WAI-ARIA's dialog has it; without a cancel button it does
+ * nothing (design-spec 4.5).
  */
 export function AlertDialog({
   variant = "confirmation",
@@ -254,12 +319,13 @@ export function AlertDialog({
   children,
   ...props
 }: AlertDialogProps) {
+  const { t } = useTranslation(["components"]);
   // Named, as Spectrum 2 names it: the sign says more than the title's colour.
   const titleIcon =
     variant === "error" || variant === "warning" ? (
       <span
         role="img"
-        aria-label={i18n.t("components:alertDialog.alert")}
+        aria-label={t("components:alertDialog.alert")}
         className={styles.alertIcon[variant]}
       >
         <IconSlot size="L">
@@ -272,8 +338,10 @@ export function AlertDialog({
       {...props}
       role="alertdialog"
       size={size}
+      density="regular"
       isDismissable={false}
       isKeyboardDismissDisabled
+      onEscape={cancelLabel === undefined ? undefined : () => onCancel?.()}
       titleIcon={titleIcon}
       buttons={({ close }) => (
         <ButtonGroup align="end">

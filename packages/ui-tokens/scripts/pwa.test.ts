@@ -16,7 +16,7 @@ const tree = await loadTokens();
 const colors = iconColors(tree);
 
 test("takes the icon colours from the light semantic values (design-spec 4.4)", () => {
-  expect(colors).toEqual({ background: "#f4f5f8", foreground: "#151a2c" });
+  expect(colors).toEqual({ background: "#f4f5f8", foreground: "#191c2a" });
 });
 
 test("keeps the moon and the dot inside the maskable safe zone", () => {

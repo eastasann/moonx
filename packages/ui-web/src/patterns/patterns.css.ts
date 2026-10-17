@@ -985,7 +985,8 @@ export const thumbnails = style({
   top: frame.top,
   alignSelf: "flex-start",
   flexShrink: 0,
-  width: deck.thumbnailColumnWidth,
+  // The column's width holds the rule after it (s23-deck.html .thumbs' border-right).
+  width: `calc(${deck.thumbnailColumnWidth} - ${vars.borderWidth.hairline})`,
   maxHeight: `calc(100dvh - ${frame.top})`,
   overflowY: "auto",
   paddingBlock: deck.thumbnailPaddingY,

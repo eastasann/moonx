@@ -1101,29 +1101,107 @@ make test-web・make typecheck・make lint が通る状態をゴールとする�
 
 ---
 
-## Step 22b: デスクトップでパネルと2列のパターンが並ぶ幅と、macOS の設問の移動のキー
+## Step 22b: 狭いデスクトップのパネルと D・F の並び、Mac の設問の移動のキー
 
-Status: blocked 2026-10-17
-ユーザーの決定が要る: 06 の幅では 1024px のデスクトップでパネルを開くと D の詳細と F の入力表の幅が無くなり、4.1 と 4.3 のどちらかの決まりを変える必要がある。macOS では 4.1 C の Ctrl+↓ / Ctrl+↑ を OS が先に取る
+Status:
 
 ```
-Step 22 の独立レビューで見つかった design-spec の決まり同士の食い違いを、ユーザーの決定に沿って直してください。
+Step 22 の独立レビューで見つかった design-spec の決まり同士の食い違い2つを、2026-10-17 のユーザーの決定どおりに docs と部品に入れてください。
 
-決めること（1つずつ）:
-1. デスクトップの幅でパネル（PNL-1・PNL-2）を開いたとき、パターン D・F の2列が入らない
-   - 事実: 4.3 はデスクトップでパネルを本文の右の列に出し（本文の入力を閉じずに読める）、4.1 は D を左の一覧（06 layout.list-pane-width 352px）と
-     右の詳細に、F を左の入力と右の結果（06 layout.side-panel-width 360px）にする。サイドバーは 240px、パネルは 360px。1024px では本文が 424px
-     （左右の余白を除くと 360px）になり、D の詳細と F の入力表の幅が無くなって横にスクロールする。パネルを持つ D・F の画面は 12・14・16・17・18・22
-   - 選択肢: (a) パネルを開いている間に本文の幅が足りなければ、D・F はタブレットの並び（1ペインずつ・要約バー）にする（2列を一時的にやめる）
-     ／(b) 本文の幅が足りないときは、パネルをタブレットと同じ右の引き出しにする（本文を閉じずに読める決まりを一時的にやめる）
-     ／(c) パネルを開いている間はサイドバーをアイコンだけにする（176px 空くが 1024px では足りないので、(a) か (b) と組み合わせる）
-2. macOS は既定の設定で Ctrl+↓ / Ctrl+↑ を Mission Control と App Exposé に使うので、4.1 C の設問の移動のキーがブラウザに届かない
-   - 選択肢: (a) ほかのキー（例: Ctrl+Option+↓ / ↑）も受け、4.1 C に書く ／(b) 今のまま（Mac では Tab / Shift+Tab で移る）とし、4.1 C にそう書く
+参照:
+- docs/design-spec.md 4.1（パターン C・D・F）・4.3（デスクトップのパネル）・4.5（Panel・AppFrame）
+- docs/06_design-tokens.json（semantic.layout・semantic.breakpoint）
 
-決まったら design-spec（4.1・4.3）を直し、AppFrame・ListDetailPattern・WorksheetPattern・QuestionFormPattern を直す。
-/dev/components と make test-e2e に、1024px でパネルを開いた D・F の並びの確認と、設問の移動のキーの確認を足す。
+決まったこと（ユーザー）:
+1. デスクトップでパネル（PNL-1・PNL-2）を開いていて、本文の領域の幅が D・F の2列に足りない間は、D・F をタブレットの並びにする
+   （D は1ペインずつ全幅、F は入力の表を全幅にして結果は下部の要約バーと右の引き出し）。パネルは本文の右の列のまま
+   （本文の入力を閉じずに読める 4.3 の決まりを保つ）。切り替えは画面の幅ではなく本文の領域の幅で決める。2列に要る幅は
+   06 の list-pane-width・side-panel-width と本文の最小の幅から決め、06 の semantic.layout に名前を付けて足す（出典と計算を $description に書く）。
+   パネルを閉じるか、幅が足りれば2列に戻す。選んでいた項目と入力中の欄は、並びが変わっても保つ
+2. 4.1 C の設問の移動のキーは、Ctrl+↓ / Ctrl+↑ に加えて、macOS では Ctrl+Option+↓ / ↑ も受ける（macOS は既定で Ctrl+↓ / ↑ を
+   Mission Control と App Exposé に使うため）。Windows と Linux では Ctrl+Alt+↓ / ↑ を受けない（画面を回すドライバーがあるため）。
+   VoiceOver を使っている間は VoiceOver がこのキーを取るが、VoiceOver の操作で移れるので、それ以上は扱わない。4.1 C にこの3点を書く
 
-make test-e2e・make test-web・make typecheck・make lint が通る状態をゴールとする。
+やること:
+- design-spec 4.1・4.3（必要なら 4.5 の Panel・AppFrame の補足）と 06 を直し、AppFrame・ListDetailPattern・WorksheetPattern・QuestionFormPattern を直す
+- /dev/components と make test-e2e に、1024px でパネルを開いた D・F がタブレットの並びになり、閉じると2列に戻ること、1440px ではパネルを開いても
+  2列のままであること、設問の移動のキー（macOS の Ctrl+Option+↓ / ↑ を含む。Playwright でプラットフォームを macOS にして確かめる）の確認を足す
+
+make test-e2e・make test-web・make typecheck・make lint・make doc-lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 22c: 部品の段階の終わりの点検の直し
+
+Status:
+
+```
+Step 19〜22 の docs の変更を、段階の終わりに独立した点検で読み直しました。見つかった点を、下の決まりどおりにすべて直してください。
+ユーザーの決定（2026-10-17）が要った点は「決まったこと」、直し方が docs の文から決まる点は「直すこと」に書きました。
+
+参照:
+- docs/design-spec.md 1.2・4.1・4.3・4.4・4.5・6.0.1・6.2・6.8・6.14
+- docs/02-01_system-design-doc.md ADR-012・ADR-026・5章 P12・9章
+- docs/06_design-tokens.json（semantic.density・semantic.layout・semantic.scale.*.component）
+- packages/ui-web/README.md
+
+決まったこと（ユーザー）:
+1. タッチの端末の Tooltip は、今の実装どおり、長押し（0.5 秒）でツールチップだけを開き、子のボタンは押さない。design-spec 4.5 の
+   「子の押す操作は邪魔しない」を「短く押せば子が押される。長押しはボタンの意味を確かめる操作なので、子を押さない（Android の長押しの
+   ツールチップと同じ）」の意味に書き直し、決めた日付とユーザーの決定であることを書く
+2. 部品の既定の大きさは、今の実装どおり Spectrum 2 のその部品の既定（Badge と Avatar は S、ContextualHelp は XS、Popover は
+   大きさを指定しなければ中身に合わせる。ほかは M）。06 の semantic.scale.*.component の $description と semantic.density.regular の
+   「部品の size は M」を、「既定が M の部品は M（部品ごとの既定は design-spec 4.5）」の意味に書き直す
+
+直すこと（docs の文から決まる。弱めない向きに直す）:
+3. 保存状態のラベル（AppFrame）: 4.3 と 6.0.1 は「スマホでは幅が足りなければラベルを省いて印だけ」とする。今はスマホの幅なら常に
+   「Saving…」「Saved」を隠している。ヘッダーにラベルの入る幅があれば出し、入らないときだけ印にする（ResizeObserver などで測る）。
+   「Couldn't save」は今どおり必ず文字を出す。E2E に、ラベルが入る幅と入らない幅の両方を足す
+4. spacious の密度の「入力欄と主要なボタンは L」（06 semantic.density.spacious）: 今は Form の中だけが L になる。spacious の画面のパターン
+   （B・C・G・H・J）と、4.4 が spacious とする M1〜M9 のダイアログが、Form の外の入力欄と Button にも L を渡す
+   （自動保存の 11・21 の回答欄、4 の設定など）。design-spec 4.5 の補足の
+   「spacious の Form の中の」を、spacious のパターンと Form の両方が L を渡す形に書き直す。「主要なボタン」を Button（ActionButton を除く）と
+   読むのは 4.5 の表（Button は主要な操作、ActionButton はツールバーの操作）に合うので、そのまま残す
+5. AlertDialog と Esc: 4.4 が採る WAI-ARIA の dialog の決まりでは Esc で閉じる。AlertDialog は、どの幅でも Esc をキャンセルの操作
+   （「Cancel」など、何も変えない側のボタン）として受ける。キャンセルの操作が無い AlertDialog では Esc で何もしない。背景のタップでは今どおり
+   閉じない（答えるまで残す）。design-spec 4.5 の該当の補足を直し、make test-web と E2E で確かめる
+6. 入力欄のフォーカスの外周線（4.3）: 入力欄（文字を打つ欄）はどの幅でもマウスのフォーカスでも出し、ボタン・Picker・選択の部品は
+   キーボードで移ったときだけ出す、という今の実装は残す。これはブラウザの :focus-visible の決まり（文字を打つ欄はどう移っても出す）と
+   同じなので、4.4 の「Spectrum のフォーカスの出し方」と食い違わないことを、4.3 にその理由として書く
+7. Pitch Deck の数字の列の幅（ADR-012）: 今は画面の Slide がブラウザのキャンバスで文字の幅を測っている。ADR-012 の「P12 はその結果を
+   返すので、画面のスライドも同じ大きさと同じ切り方で出せる」を守るため、P12 の応答に、API が fontkit で測った数字の列の組み方
+   （figureColumns の結果か、それに要る文字の幅）を足し、Slide はそれを使う。キャンバスで測る道は消す。応答への追加は項目を足すだけにし、
+   SDD 5章の P12 の行と ADR-012 を直し、make openapi で apps/api/openapi.json を作り直す。API の結合テストで、P12 の組み方が PDF と同じであることを確かめる
+8. Step 22 が決めた見た目と振る舞いを、所有するソースの docs に書く（今は packages/ui-web/README.md とコミットの本文にしか無い）。
+   design-spec 4.1・4.5・6.0.1 に書くもの: ページ全体がスクロールし、ヘッダー・サイドバー・TabBar が上下に留まる。ヘッダーは出すものが無ければ
+   出さない。タブレットの SideNav はアイコンとツールチップ。件数を含むリンクの読み上げの名前（例:「Notifications, 3 unread」）。
+   TabBar の名前はハイフンで折り返し「…」で切らない。Focus スイッチの置き場所とスマホで出さないこと。Ctrl+矢印が控えめなカードでは題へ移り、
+   Ctrl+Shift と重ねた部品の中のキーには反応しないこと。スマホでセクションのフッター（AI ▼）をカードの下に残すこと。
+   ListDetailPattern のヘッダーを両ペインに渡すこと・スマホの ← の引き継ぎ・詳細へのフォーカスの移動。WorksheetPattern の結果を Panel の
+   引き出しで開くこと。PresentationPattern がスマホでスライドの後にメモを出すこと。StepsPattern が比較の工程で広がること。
+   パターンごとの密度。主要な操作の置き場所
+9. パターン D のヘッダーと絞り込み: 4.1 は「左に絞り込みとリスト」、6.8 の図はヘッダーと絞り込みを両ペインの上に渡す。画面の節に図があれば
+   その図に従い、無ければ 4.1 に従う、と 4.1 に書く（ListDetailPattern は両方の置き場所を持つ）
+10. 値の直書き: patterns.css.ts のハブの列の比（3fr:2fr）と設定のラベルと欄の比（1fr:2fr）を 06 の semantic.layout に名前を付けて移し、
+    テーマから参照する。ほかに 06 を通らない寸法・比・色が packages/ui-web に無いかを grep で確かめ、あれば同じく移す
+11. Tooltip の最大の幅: 今は画面の幅から余白を引いた幅まで広がる。Spectrum 2 のトークン（@adobe/spectrum-tokens の tooltip の最大の幅）を
+    06 に足して使う。Toast にも Spectrum 2 のトークンに幅があれば同じく足す
+12. 06 の値の確かめ: illustrated-message の文字の大きさ（medium 12/14/14・large 15/15/15、題 16/20/22・17/22/24）は、ほかの文字の大きさと
+    段の上がり方が違う。@adobe/spectrum-tokens と突き合わせ、合わなければトークンの値に直す。Step 19〜22 が足したほかの 06 の値も、
+    出典の $description どおりの値かを同じく突き合わせる
+13. 部品の文言（ADR-026・SDD 9章）: packages/ui-web の部品は共有の i18next を直接読み、言語の切り替えを受けない。Web は react-i18next を使う
+    という ADR-026 に合わせ、部品も useTranslation で文言を引く
+14. 記録: Step 20 のコミットの本文は「どれも決まりを狭めていない」としたが、Tooltip の長押しは決まりの読み替えだった（上の1でユーザーが決めた）。
+    Step 22 の本文は保存状態のラベルと D のヘッダーを「docs に無い」としたが、docs に決まりがあった（上の3・9）。Step 20 の本文に無い 4.5 の変更
+    （Tabs はどの幅でも横にスクロールする、Dialog の題とボタンは本文がスクロールしても見える、fullscreen はどの幅でも全画面、Disclosure の
+    isQuiet の並び、Toast はアニメーションせずに閉じる）は残す。このステップのコミットの本文に、これらの訂正を書く
+
+make test・make test-web・make test-e2e・make typecheck・make lint・make doc-lint・make openapi（差分が無いこと）が通る状態をゴールとする。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。

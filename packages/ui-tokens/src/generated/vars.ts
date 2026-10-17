@@ -6,8 +6,9 @@ import { createGlobalThemeContract } from "@vanilla-extract/css";
 /**
  * The semantic tokens as CSS variables (`var(--color-surface-canvas)`). The light and
  * dark modes share the names under `color` and `shadow`, the medium and large scales
- * those under `scale` (and the font sizes and row heights that follow the scale);
- * theme.css.ts assigns the values.
+ * those under `scale` (and the row heights that follow the scale), the wide and narrow
+ * widths those under `fontSize` (and the typography that follows them); theme.css.ts
+ * assigns the values.
  */
 export const vars = createGlobalThemeContract({
   color: {
@@ -30,6 +31,7 @@ export const vars = createGlobalThemeContract({
     },
     border: {
       hairline: "color-border-hairline",
+      default: "color-border-default",
       strong: "color-border-strong",
       focus: "color-border-focus",
     },
@@ -96,23 +98,6 @@ export const vars = createGlobalThemeContract({
     },
   },
   scale: {
-    fontSize: {
-      "50": "scale-font-size-50",
-      "75": "scale-font-size-75",
-      "100": "scale-font-size-100",
-      "200": "scale-font-size-200",
-      "300": "scale-font-size-300",
-      "400": "scale-font-size-400",
-      "500": "scale-font-size-500",
-      "600": "scale-font-size-600",
-      "700": "scale-font-size-700",
-      "800": "scale-font-size-800",
-      "900": "scale-font-size-900",
-      "1000": "scale-font-size-1000",
-      "1100": "scale-font-size-1100",
-      "1200": "scale-font-size-1200",
-      "1300": "scale-font-size-1300",
-    },
     component: {
       button: {
         height: {
@@ -127,11 +112,23 @@ export const vars = createGlobalThemeContract({
           L: "scale-component-button-padding-x-L",
           XL: "scale-component-button-padding-x-XL",
         },
+        paddingXQuiet: {
+          S: "scale-component-button-padding-x-quiet-S",
+          M: "scale-component-button-padding-x-quiet-M",
+          L: "scale-component-button-padding-x-quiet-L",
+          XL: "scale-component-button-padding-x-quiet-XL",
+        },
         fontSize: {
           S: "scale-component-button-font-size-S",
           M: "scale-component-button-font-size-M",
           L: "scale-component-button-font-size-L",
           XL: "scale-component-button-font-size-XL",
+        },
+        radius: {
+          S: "scale-component-button-radius-S",
+          M: "scale-component-button-radius-M",
+          L: "scale-component-button-radius-L",
+          XL: "scale-component-button-radius-XL",
         },
       },
       actionButton: {
@@ -162,6 +159,33 @@ export const vars = createGlobalThemeContract({
           M: "scale-component-action-button-font-size-M",
           L: "scale-component-action-button-font-size-L",
           XL: "scale-component-action-button-font-size-XL",
+        },
+        radius: {
+          XS: "scale-component-action-button-radius-XS",
+          S: "scale-component-action-button-radius-S",
+          M: "scale-component-action-button-radius-M",
+          L: "scale-component-action-button-radius-L",
+          XL: "scale-component-action-button-radius-XL",
+        },
+      },
+      segmentedControl: {
+        itemHeight: {
+          S: "scale-component-segmented-control-item-height-S",
+          M: "scale-component-segmented-control-item-height-M",
+          L: "scale-component-segmented-control-item-height-L",
+          XL: "scale-component-segmented-control-item-height-XL",
+        },
+        paddingX: {
+          S: "scale-component-segmented-control-padding-x-S",
+          M: "scale-component-segmented-control-padding-x-M",
+          L: "scale-component-segmented-control-padding-x-L",
+          XL: "scale-component-segmented-control-padding-x-XL",
+        },
+        fontSize: {
+          S: "scale-component-segmented-control-font-size-S",
+          M: "scale-component-segmented-control-font-size-M",
+          L: "scale-component-segmented-control-font-size-L",
+          XL: "scale-component-segmented-control-font-size-XL",
         },
       },
       tag: {
@@ -220,6 +244,12 @@ export const vars = createGlobalThemeContract({
           L: "scale-component-badge-font-size-L",
           XL: "scale-component-badge-font-size-XL",
         },
+        count: {
+          height: "scale-component-badge-count-height",
+          paddingX: "scale-component-badge-count-padding-x",
+          radius: "scale-component-badge-count-radius",
+          fontSize: "scale-component-badge-count-font-size",
+        },
       },
       popover: {
         width: {
@@ -260,6 +290,13 @@ export const vars = createGlobalThemeContract({
           XL: "scale-component-field-label-gap-XL",
         },
         textAreaMinHeight: "scale-component-field-text-area-min-height",
+        radius: {
+          S: "scale-component-field-radius-S",
+          M: "scale-component-field-radius-M",
+          L: "scale-component-field-radius-L",
+          XL: "scale-component-field-radius-XL",
+        },
+        fontSizeMin: "scale-component-field-font-size-min",
       },
       checkbox: {
         controlSize: {
@@ -268,6 +305,13 @@ export const vars = createGlobalThemeContract({
           L: "scale-component-checkbox-control-size-L",
           XL: "scale-component-checkbox-control-size-XL",
         },
+        radius: {
+          S: "scale-component-checkbox-radius-S",
+          M: "scale-component-checkbox-radius-M",
+          L: "scale-component-checkbox-radius-L",
+          XL: "scale-component-checkbox-radius-XL",
+        },
+        borderWidth: "scale-component-checkbox-border-width",
       },
       radioButton: {
         controlSize: {
@@ -276,6 +320,13 @@ export const vars = createGlobalThemeContract({
           L: "scale-component-radio-button-control-size-L",
           XL: "scale-component-radio-button-control-size-XL",
         },
+        dotSize: {
+          S: "scale-component-radio-button-dot-size-S",
+          M: "scale-component-radio-button-dot-size-M",
+          L: "scale-component-radio-button-dot-size-L",
+          XL: "scale-component-radio-button-dot-size-XL",
+        },
+        borderWidth: "scale-component-radio-button-border-width",
       },
       switch: {
         controlWidth: {
@@ -337,6 +388,14 @@ export const vars = createGlobalThemeContract({
           S: "scale-component-avatar-size-S",
           M: "scale-component-avatar-size-M",
         },
+        radius: {
+          S: "scale-component-avatar-radius-S",
+          M: "scale-component-avatar-radius-M",
+        },
+        fontSize: {
+          S: "scale-component-avatar-font-size-S",
+          M: "scale-component-avatar-font-size-M",
+        },
       },
       meter: {
         thickness: {
@@ -351,6 +410,12 @@ export const vars = createGlobalThemeContract({
           L: "scale-component-meter-font-size-L",
           XL: "scale-component-meter-font-size-XL",
         },
+        radius: "scale-component-meter-radius",
+        gap: "scale-component-meter-gap",
+        swatchSize: "scale-component-meter-swatch-size",
+        swatchRadius: "scale-component-meter-swatch-radius",
+        legendColumnGap: "scale-component-meter-legend-column-gap",
+        legendRowGap: "scale-component-meter-legend-row-gap",
       },
       progressCircle: {
         size: {
@@ -486,6 +551,36 @@ export const vars = createGlobalThemeContract({
         minHeight: "scale-component-toast-min-height",
       },
       targetMin: "scale-component-target-min",
+      moonGlyph: {
+        size: {
+          S: "scale-component-moon-glyph-size-S",
+          M: "scale-component-moon-glyph-size-M",
+        },
+      },
+      checkDots: {
+        gap: {
+          S: "scale-component-check-dots-gap-S",
+          M: "scale-component-check-dots-gap-M",
+        },
+      },
+      well: {
+        paddingX: "scale-component-well-padding-x",
+        paddingTop: "scale-component-well-padding-top",
+        paddingBottom: "scale-component-well-padding-bottom",
+        paddingXNarrow: "scale-component-well-padding-x-narrow",
+        paddingTopNarrow: "scale-component-well-padding-top-narrow",
+        paddingBottomNarrow: "scale-component-well-padding-bottom-narrow",
+      },
+      inlineAlert: {
+        paddingX: "scale-component-inline-alert-padding-x",
+        paddingY: "scale-component-inline-alert-padding-y",
+        gap: "scale-component-inline-alert-gap",
+      },
+      diffText: {
+        removedThickness: "scale-component-diff-text-removed-thickness",
+        addedThickness: "scale-component-diff-text-added-thickness",
+        addedOffset: "scale-component-diff-text-added-offset",
+      },
     },
   },
   density: {
@@ -546,6 +641,39 @@ export const vars = createGlobalThemeContract({
       mono: "font-family-mono",
     },
   },
+  fontSize: {
+    body: "font-size-body",
+    bodyLong: "font-size-body-long",
+    lead: "font-size-lead",
+    label: "font-size-label",
+    number: "font-size-number",
+    heading1: "font-size-heading-1",
+    heading1Hub: "font-size-heading-1-hub",
+    heading1Steps: "font-size-heading-1-steps",
+    headingQuestion: "font-size-heading-question",
+    metric: "font-size-metric",
+    metricUnit: "font-size-metric-unit",
+    field: {
+      S: "font-size-field-S",
+      M: "font-size-field-M",
+      L: "font-size-field-L",
+      XL: "font-size-field-XL",
+    },
+  },
+  fluidType: {
+    display: {
+      min: "fluid-type-display-min",
+      max: "fluid-type-display-max",
+      viewport: "fluid-type-display-viewport",
+      tracking: "fluid-type-display-tracking",
+    },
+    display2: {
+      min: "fluid-type-display-2-min",
+      max: "fluid-type-display-2-max",
+      viewport: "fluid-type-display-2-viewport",
+      tracking: "fluid-type-display-2-tracking",
+    },
+  },
   typography: {
     display: {
       fontFamily: "typography-display-font-family",
@@ -554,12 +682,54 @@ export const vars = createGlobalThemeContract({
       letterSpacing: "typography-display-letter-spacing",
       lineHeight: "typography-display-line-height",
     },
+    display2: {
+      fontFamily: "typography-display-2-font-family",
+      fontSize: "typography-display-2-font-size",
+      fontWeight: "typography-display-2-font-weight",
+      letterSpacing: "typography-display-2-letter-spacing",
+      lineHeight: "typography-display-2-line-height",
+    },
     heading1: {
       fontFamily: "typography-heading-1-font-family",
       fontSize: "typography-heading-1-font-size",
       fontWeight: "typography-heading-1-font-weight",
       letterSpacing: "typography-heading-1-letter-spacing",
       lineHeight: "typography-heading-1-line-height",
+    },
+    heading1Hub: {
+      fontFamily: "typography-heading-1-hub-font-family",
+      fontSize: "typography-heading-1-hub-font-size",
+      fontWeight: "typography-heading-1-hub-font-weight",
+      letterSpacing: "typography-heading-1-hub-letter-spacing",
+      lineHeight: "typography-heading-1-hub-line-height",
+    },
+    heading1List: {
+      fontFamily: "typography-heading-1-list-font-family",
+      fontSize: "typography-heading-1-list-font-size",
+      fontWeight: "typography-heading-1-list-font-weight",
+      letterSpacing: "typography-heading-1-list-letter-spacing",
+      lineHeight: "typography-heading-1-list-line-height",
+    },
+    heading1Steps: {
+      fontFamily: "typography-heading-1-steps-font-family",
+      fontSize: "typography-heading-1-steps-font-size",
+      fontWeight: "typography-heading-1-steps-font-weight",
+      letterSpacing: "typography-heading-1-steps-letter-spacing",
+      lineHeight: "typography-heading-1-steps-line-height",
+    },
+    heading1Settings: {
+      fontFamily: "typography-heading-1-settings-font-family",
+      fontSize: "typography-heading-1-settings-font-size",
+      fontWeight: "typography-heading-1-settings-font-weight",
+      letterSpacing: "typography-heading-1-settings-letter-spacing",
+      lineHeight: "typography-heading-1-settings-line-height",
+    },
+    heading1Toolbar: {
+      fontFamily: "typography-heading-1-toolbar-font-family",
+      fontSize: "typography-heading-1-toolbar-font-size",
+      fontWeight: "typography-heading-1-toolbar-font-weight",
+      letterSpacing: "typography-heading-1-toolbar-letter-spacing",
+      lineHeight: "typography-heading-1-toolbar-line-height",
     },
     heading2: {
       fontFamily: "typography-heading-2-font-family",
@@ -581,6 +751,13 @@ export const vars = createGlobalThemeContract({
       fontWeight: "typography-heading-4-font-weight",
       letterSpacing: "typography-heading-4-letter-spacing",
       lineHeight: "typography-heading-4-line-height",
+    },
+    headingQuestion: {
+      fontFamily: "typography-heading-question-font-family",
+      fontSize: "typography-heading-question-font-size",
+      fontWeight: "typography-heading-question-font-weight",
+      letterSpacing: "typography-heading-question-letter-spacing",
+      lineHeight: "typography-heading-question-line-height",
     },
     headingLabel: {
       fontFamily: "typography-heading-label-font-family",
@@ -610,12 +787,40 @@ export const vars = createGlobalThemeContract({
       letterSpacing: "typography-body-sm-letter-spacing",
       lineHeight: "typography-body-sm-line-height",
     },
+    callout: {
+      fontFamily: "typography-callout-font-family",
+      fontSize: "typography-callout-font-size",
+      fontWeight: "typography-callout-font-weight",
+      letterSpacing: "typography-callout-letter-spacing",
+      lineHeight: "typography-callout-line-height",
+    },
+    lead: {
+      fontFamily: "typography-lead-font-family",
+      fontSize: "typography-lead-font-size",
+      fontWeight: "typography-lead-font-weight",
+      letterSpacing: "typography-lead-letter-spacing",
+      lineHeight: "typography-lead-line-height",
+    },
     label: {
       fontFamily: "typography-label-font-family",
       fontSize: "typography-label-font-size",
       fontWeight: "typography-label-font-weight",
       letterSpacing: "typography-label-letter-spacing",
       lineHeight: "typography-label-line-height",
+    },
+    link: {
+      fontFamily: "typography-link-font-family",
+      fontSize: "typography-link-font-size",
+      fontWeight: "typography-link-font-weight",
+      letterSpacing: "typography-link-letter-spacing",
+      lineHeight: "typography-link-line-height",
+    },
+    fieldLabel: {
+      fontFamily: "typography-field-label-font-family",
+      fontSize: "typography-field-label-font-size",
+      fontWeight: "typography-field-label-font-weight",
+      letterSpacing: "typography-field-label-letter-spacing",
+      lineHeight: "typography-field-label-line-height",
     },
     labelSm: {
       fontFamily: "typography-label-sm-font-family",
@@ -652,12 +857,26 @@ export const vars = createGlobalThemeContract({
       letterSpacing: "typography-number-letter-spacing",
       lineHeight: "typography-number-line-height",
     },
+    count: {
+      fontFamily: "typography-count-font-family",
+      fontSize: "typography-count-font-size",
+      fontWeight: "typography-count-font-weight",
+      letterSpacing: "typography-count-letter-spacing",
+      lineHeight: "typography-count-line-height",
+    },
     metric: {
       fontFamily: "typography-metric-font-family",
       fontSize: "typography-metric-font-size",
       fontWeight: "typography-metric-font-weight",
       letterSpacing: "typography-metric-letter-spacing",
       lineHeight: "typography-metric-line-height",
+    },
+    metricUnit: {
+      fontFamily: "typography-metric-unit-font-family",
+      fontSize: "typography-metric-unit-font-size",
+      fontWeight: "typography-metric-unit-font-weight",
+      letterSpacing: "typography-metric-unit-letter-spacing",
+      lineHeight: "typography-metric-unit-line-height",
     },
     table: {
       fontFamily: "typography-table-font-family",
@@ -694,6 +913,9 @@ export const vars = createGlobalThemeContract({
     card: "radius-card",
     sheet: "radius-sheet",
     pill: "radius-pill",
+    callout: "radius-callout",
+    groove: "radius-groove",
+    grooveItem: "radius-groove-item",
   },
   borderWidth: {
     hairline: "border-width-hairline",
@@ -784,6 +1006,7 @@ export const vars = createGlobalThemeContract({
       overlay: "layout-z-index-overlay",
       toast: "layout-z-index-toast",
     },
+    leadMeasure: "layout-lead-measure",
   },
   icon: {
     strokeWidth: "icon-stroke-width",

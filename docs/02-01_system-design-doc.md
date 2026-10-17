@@ -492,23 +492,24 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 ### ADR-018: デザインシステムは Adobe Spectrum の仕組み、見た目は月相（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテーマの生成を外し、PWA のアイコンとマニフェストの生成を足した。2026-10-12 に見た目を Hermes Teal から月相に替え、06 からネイティブ向けの値を外し、書体の読み込みを決めた）
+**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテーマの生成を外し、PWA のアイコンとマニフェストの生成を足した。2026-10-12 に見た目を Hermes Teal から月相に替え、06 からネイティブ向けの値を外し、書体の読み込みを決めた。2026-10-17 に値を `docs/mockups` に合わせ、文字の大きさを画面の幅で切り替えるようにした）
 
 **決定:**
 
 - **参考にするもの**: Adobe Spectrum（Spectrum 2）の仕組みを取り入れ（ユーザーと合意、2026-10-01）、見た目は design-spec 4.4 の月相にする（2026-10-12 にユーザーと決めた）。取り入れる範囲は design-spec 4.4「デザインシステムの参考」、部品の一覧は design-spec 4.5 が正。この ADR は、それを実装する方法（トークンの階層・生成・ライト / ダーク）を決める。
-- **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.scale.{medium,large}.component`。実装が参照してよいのは `semantic` だけ。`semantic` の値はエイリアスだけで、たどると必ず `primitive` に着く（書体のスタイルや密度は `semantic.scale.medium` を参照し、生成のときに large へ差し替える）。
+- **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.scale.{medium,large}.component`。実装が参照してよいのは `semantic` だけ。`semantic` の値はエイリアスだけで、たどると必ず `primitive` に着く（密度は `semantic.scale.medium` を参照し、生成のときに large へ差し替える。書体のスタイルと入力欄の文字は `semantic.font-size.wide` を参照し、生成のときに narrow へ差し替える）。値は、`docs/mockups`（2026-10-11 にユーザーと合意した見た目）が示すものはモックアップの値、示さないものは Spectrum 2 の値（design-spec 4.5）。
 - **生成**: `make tokens` が `packages/ui-tokens` に次を生成する（変換は自前の小さなスクリプト。Style Dictionary は使わない）。
-  - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク × medium / large の値。CSS 変数として出る）。画面のスライド表示（Slide）は `semantic.print`（ライト固定）を参照する
+  - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク・medium / large・wide / narrow の値。CSS 変数として出る。1つの変数はこの3つの切り替えのうち1つでだけ値が変わる）。画面のスライド表示（Slide）は `semantic.print`（ライト固定）を参照する
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
   - PWA: アイコン（SVG と PNG）とマニフェスト（ADR-031）
   - 06 はネイティブ向けの値を持たない（2026-10-12 に外した。ネイティブの feature で要るものを足す）
 - **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は 4 アカウント設定の System / Light / Dark に従い、Light と Dark は `<html data-theme="light|dark">` で固定し、System は属性を置かずに `prefers-color-scheme` に従う。
-- **スケール（Web）**: 既定は `medium`。タッチ操作が主の端末（`@media (pointer: coarse)`）は `large` にする。`<html data-scale="medium|large">` で固定でき、固定が優先される。タッチパネル付きのノート PC も `pointer: coarse` に当たるときは `large` になる。
+- **スケール（Web）**: 既定は `medium`。タッチ操作が主の端末（`@media (pointer: coarse)`）は `large` にする。`<html data-scale="medium|large">` で固定でき、固定が優先される。タッチパネル付きのノート PC も `pointer: coarse` に当たるときは `large` になる。large が変えるのは押せる部品の高さと target-min だけで、文字の大きさは変えない（2026-10-17 のユーザーの決定）。
+- **文字の幅（Web）**: 文字の大きさは画面の幅で切り替える。既定は `wide`、`semantic.breakpoint.tablet` より狭い幅（`@media not all and (min-width: …)`）は `narrow`（`semantic.font-size.narrow`。design-spec 4.3）。ランディングの題は `semantic.fluid-type` の clamp() で幅に合わせて滑らかに変える。
 - **書体**: 書体の名前の正は 06 の `primitive.font.family`（self-host する書体はどれも SIL OFL 1.1。並びの残りは配らない OS の書体）。Web は npm の `@fontsource/ibm-plex-sans`・`@fontsource/ibm-plex-mono`・`@fontsource/ibm-plex-sans-jp` を依存に入れて self-host する（外部の CDN からは読まない）。読み込むのは 06 の `primitive.font.weight` の太さだけで、ファイルは woff2 だけを使う。日本語の書体は字の範囲（`unicode-range`）ごとに分かれたファイルのまま使い、画面に出た字のファイルだけをブラウザが読む。Service Worker でのキャッシュの仕方は ADR-031、PDF の書体は ADR-012。
 - **アイコン**: Lucide（`lucide-react`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。
 
-**理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は moonx 独自のもの（2026-10-12 に月相に決めた）にすることを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、のちのネイティブでも同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは一段ゆったり」をそのまま表せる。Lucide はネイティブ（`lucide-react-native`）にも同じ絵柄の版があり、線の太さと大きさを props で変えられる。変換を自前のスクリプトにするのは、出力が限られ（vanilla-extract・react-pdf・PWA のアイコン）、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため。
+**理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は moonx 独自のもの（2026-10-12 に月相に決めた）にすることを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、のちのネイティブでも同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは押せる部品を一段高く」をそのまま表せる。文字の大きさをスケールでなく幅で切り替えるのは、合意したモックアップがスマホの幅で本文を 15px から 16px にするだけで、タッチの端末のタブレットでは文字を大きくしないため（2026-10-17）。Lucide はネイティブ（`lucide-react-native`）にも同じ絵柄の版があり、線の太さと大きさを props で変えられる。変換を自前のスクリプトにするのは、出力が限られ（vanilla-extract・react-pdf・PWA のアイコン）、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため。
 
 **捨てた案:** Spectrum の部品をそのまま使う（React Spectrum S2。配色と書体をほぼ変えられず、月相の見た目にできない）、Spectrum の Workflow アイコン（使わないとユーザーと合意した）、Style Dictionary（設定と拡張の方が大きくなる）。
 

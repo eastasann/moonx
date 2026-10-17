@@ -25,6 +25,11 @@ export interface LinkProps
    * @default "primary"
    */
   variant?: LinkVariant;
+  /**
+   * Without the underline until hovered (Spectrum 2's quiet link): the footer's Privacy
+   * Policy and Support (s01-landing.html), where the row says they are links.
+   */
+  isQuiet?: boolean;
   children: ReactNode;
 }
 
@@ -32,9 +37,14 @@ export interface LinkProps
  * A link. An `href` inside the app moves through the app's router (`RouterProvider`,
  * design-spec 4.5).
  */
-export function Link({ variant = "primary", children, ...props }: LinkProps) {
+export function Link({
+  variant = "primary",
+  isQuiet = false,
+  children,
+  ...props
+}: LinkProps) {
   return (
-    <AriaLink {...props} className={styles.link({ variant })}>
+    <AriaLink {...props} className={styles.link({ variant, isQuiet })}>
       {children}
     </AriaLink>
   );

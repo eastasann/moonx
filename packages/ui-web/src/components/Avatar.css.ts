@@ -5,7 +5,7 @@ const sized = Object.fromEntries(
   avatarSizes.map((size) => [size, size]),
 ) as Record<AvatarSize, AvatarSize>;
 
-/** A circle of 06 component.avatar.size; a photo fills it. */
+/** A rounded square of 06 component.avatar; a photo fills it. */
 export const avatar = styleVariants(sized, (size) => ({
   display: "inline-flex",
   flexShrink: 0,
@@ -13,25 +13,21 @@ export const avatar = styleVariants(sized, (size) => ({
   justifyContent: "center",
   width: vars.scale.component.avatar.size[size],
   height: vars.scale.component.avatar.size[size],
-  borderRadius: vars.radius.pill,
+  borderRadius: vars.scale.component.avatar.radius[size],
   objectFit: "cover",
   verticalAlign: "middle",
 }));
 
 /**
- * The initials in the sunken surface, without colour (design-spec 4.4: no accent): two
- * letters fit S at font-size-50 and M at font-size-100.
+ * The initials in monospace on the sunken surface, without a frame or colour (design-spec
+ * 4.4: no accent).
  */
-export const initials = styleVariants(
-  { S: "50", M: "100" } as const satisfies Record<AvatarSize, string>,
-  (step) => ({
-    overflow: "hidden",
-    background: vars.color.surface.sunken,
-    border: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
-    color: vars.color.text.secondary,
-    fontFamily: vars.font.family.body,
-    fontWeight: vars.typography.labelSm.fontWeight,
-    fontSize: vars.scale.fontSize[step],
-    userSelect: "none",
-  }),
-);
+export const initials = styleVariants(sized, (size) => ({
+  overflow: "hidden",
+  background: vars.color.surface.sunken,
+  color: vars.color.text.secondary,
+  fontFamily: vars.font.family.mono,
+  fontWeight: vars.typography.heading4.fontWeight,
+  fontSize: vars.scale.component.avatar.fontSize[size],
+  userSelect: "none",
+}));

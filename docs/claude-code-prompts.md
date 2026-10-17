@@ -1138,7 +1138,7 @@ make test-e2e・make test-web・make typecheck・make lint・make doc-lint が�
 
 ## Step 22c: モックアップに合わせる（1）: トークン・文字・枠・印と基本の部品
 
-Status:
+Status: done 2026-10-17
 
 ```
 docs/mockups/ のモックアップ（2026-10-11 にユーザーと合意した見た目。PR #4）と packages/ui-web の部品を、2026-10-17 に画面ごとに突き合わせました。

@@ -3,6 +3,7 @@ import { History, MessageSquare, MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
 import { ActionButton, ActionGroup } from "../components/ActionButton";
 import { Button, ButtonGroup } from "../components/Button";
+import { MoonGlyphAt } from "../components/MoonGlyph";
 import {
   SegmentedControl,
   SegmentedControlItem,
@@ -13,6 +14,7 @@ import {
 } from "../components/ToggleButtonGroup";
 import { Flex, Stack } from "../layout/Flex";
 import { Section, Specimen } from "./parts";
+import * as styles from "./preview.css";
 
 const variants = ["primary", "secondary", "negative"] as const;
 
@@ -173,10 +175,37 @@ export function ToggleSection() {
           selectedKeys={fau}
           onSelectionChange={setFau}
         >
-          <ToggleButton id="fact">Fact</ToggleButton>
-          <ToggleButton id="assumption">Assumption</ToggleButton>
-          <ToggleButton id="unknown">Unknown</ToggleButton>
+          <ToggleButton id="fact">
+            <MoonGlyphAt state="fact" size="M" />
+            Fact
+          </ToggleButton>
+          <ToggleButton id="assumption">
+            <MoonGlyphAt state="assumption" size="M" />
+            Assumption
+          </ToggleButton>
+          <ToggleButton id="unknown">
+            <MoonGlyphAt state="unknown" size="M" />
+            Unknown
+          </ToggleButton>
         </ToggleButtonGroup>
+      </Specimen>
+      <Specimen name="ToggleButtonGroup isJustified (as wide as FauPicker's popover)">
+        <div className={styles.popoverWidth}>
+          <ToggleButtonGroup aria-label="F/A/U justified" isJustified>
+            <ToggleButton id="fact">
+              <MoonGlyphAt state="fact" size="M" />
+              Fact
+            </ToggleButton>
+            <ToggleButton id="assumption">
+              <MoonGlyphAt state="assumption" size="M" />
+              Assumption
+            </ToggleButton>
+            <ToggleButton id="unknown">
+              <MoonGlyphAt state="unknown" size="M" />
+              Unknown
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </div>
       </Specimen>
       <Specimen name="ToggleButtonGroup without a value: Fact and Assumption disabled">
         <ToggleButtonGroup aria-label="F/A/U for an empty answer" size="S">

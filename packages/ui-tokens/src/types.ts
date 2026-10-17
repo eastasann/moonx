@@ -47,8 +47,8 @@ export const iconSizes = ["XS", "S", "M", "L", "XL"] as const;
 export type IconSize = (typeof iconSizes)[number];
 
 /**
- * MoonGlyph and CheckDots sizes (design-spec 4.5): the S and M steps of 06
- * component.status-light.dot-size, which StatusLight uses at every step.
+ * MoonGlyph and CheckDots sizes (design-spec 4.5): 06 component.moon-glyph.size and
+ * component.check-dots.gap.
  */
 export const moonGlyphSizes = ["S", "M"] as const;
 export type MoonGlyphSize = (typeof moonGlyphSizes)[number];
@@ -220,8 +220,22 @@ export type ButtonVariant = (typeof buttonVariants)[number];
 export const linkVariants = ["primary", "secondary"] as const;
 export type LinkVariant = (typeof linkVariants)[number];
 
-/** Heading's `variant`, when its look differs from its level's (design-spec 4.5). */
-export const headingVariants = ["display", "label"] as const;
+/**
+ * Heading's `variant`, when its look differs from its level's (design-spec 4.5): the
+ * landing's titles (`display`, `display-2`), the screen titles of the patterns whose
+ * title is not `heading-1` (06 semantic.typography), the question and a block's label.
+ */
+export const headingVariants = [
+  "display",
+  "display-2",
+  "heading-1-hub",
+  "heading-1-list",
+  "heading-1-steps",
+  "heading-1-settings",
+  "heading-1-toolbar",
+  "heading-question",
+  "label",
+] as const;
 export type HeadingVariant = (typeof headingVariants)[number];
 
 /** Text's `variant` (design-spec 4.5). */
@@ -229,6 +243,7 @@ export const textVariants = [
   "body",
   "body-long",
   "body-sm",
+  "lead",
   "caption",
   "label",
   "number",
@@ -240,6 +255,7 @@ export const textTones = [
   "primary",
   "secondary",
   "tertiary",
+  "notice",
   "negative",
 ] as const;
 export type TextTone = (typeof textTones)[number];

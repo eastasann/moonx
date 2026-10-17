@@ -11,6 +11,7 @@ import {
 import { Button, VisuallyHidden } from "react-aria-components";
 import { IconSlot } from "../internal/IconSlot";
 import type { MoonState } from "../internal/MoonMark";
+import * as moonStyles from "../internal/moon.css";
 import { scrollToFocusAnchor } from "../internal/scrollToFocusAnchor";
 import { MoonGlyph } from "./MoonGlyph";
 import * as styles from "./QuestionCard.css";
@@ -147,7 +148,11 @@ export function QuestionCard({
             </Button>
           </Heading>
           <span id={metaId} className={styles.meta}>
-            {status !== undefined && <span>{status.label}</span>}
+            {status !== undefined && (
+              <span className={moonStyles.labelColor[status.state]}>
+                {status.label}
+              </span>
+            )}
             {commentCount > 0 && (
               <span className={styles.comments}>
                 <IconSlot size="XS">
@@ -189,7 +194,9 @@ export function QuestionCard({
         {status !== undefined && (
           <span className={styles.status}>
             <MoonGlyph state={status.state} />
-            <span>{status.label}</span>
+            <span className={moonStyles.labelColor[status.state]}>
+              {status.label}
+            </span>
           </span>
         )}
         {actions != null && <div className={styles.actions}>{actions}</div>}

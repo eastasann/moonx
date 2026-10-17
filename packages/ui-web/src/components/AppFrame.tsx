@@ -264,10 +264,12 @@ export function AppFrame({
                     </Tooltip>
                   </TooltipTrigger>
                   {comments.count > 0 && (
-                    // The count of unresolved threads: the frame, not the ink fill,
-                    // which 4.5 keeps for unread counts. The button's name reads it.
-                    <span aria-hidden="true">
-                      <Badge>{formatCount(comments.count)}</Badge>
+                    // The count of unresolved threads: the small ink tag over the
+                    // icon (moon-base.css .iconbtn .badge). The button's name reads it.
+                    <span aria-hidden="true" className={styles.commentsCount}>
+                      <Badge fillStyle="bold">
+                        {formatCount(comments.count)}
+                      </Badge>
                     </span>
                   )}
                 </span>

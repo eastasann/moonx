@@ -1,5 +1,5 @@
 import { type Size, sizes, vars } from "@moonx/ui-tokens";
-import { globalStyle, style, styleVariants } from "@vanilla-extract/css";
+import { style, styleVariants } from "@vanilla-extract/css";
 
 const sized = Object.fromEntries(sizes.map((size) => [size, size])) as Record<
   Size,
@@ -45,20 +45,12 @@ export const inline = style({
   border: "none",
 });
 
+/** The F/A/U buttons and the confidence, each as wide as the popover or the sheet (6.0.3). */
 export const controls = style({
   display: "flex",
   flexDirection: "column",
-  alignItems: "flex-start",
+  alignItems: "stretch",
   gap: vars.space["200"],
 });
 
 export const toggleGlyph = style({ display: "inline-flex" });
-
-/**
- * A chosen button takes the ink fill (ActionButton.css): its moon takes the button's text
- * colour, or a full moon would vanish into the fill.
- */
-globalStyle(`[data-selected] ${toggleGlyph} svg`, { color: "inherit" });
-
-/** A disabled button's moon greys out with its label. */
-globalStyle(`[data-disabled] ${toggleGlyph} svg`, { color: "inherit" });

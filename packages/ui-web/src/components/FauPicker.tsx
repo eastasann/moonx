@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { IconSlot } from "../internal/IconSlot";
 import type { MoonState } from "../internal/MoonMark";
+import * as moonStyles from "../internal/moon.css";
 import { useIsNarrow } from "../internal/useIsNarrow";
 import { actionButton } from "./ActionButton.css";
 import { AlertDialog, DialogTrigger } from "./Dialog";
@@ -152,7 +153,9 @@ export function FauPicker({
   const summary = (
     <span className={styles.summary}>
       <MoonGlyphAt state={moonOf[props.state]} size={size} />
-      <span>{label}</span>
+      <span className={moonStyles.labelColor[moonOf[props.state]]}>
+        {label}
+      </span>
       {props.state === "fact_no_evidence" && (
         <span className={styles.warning}>
           <IconSlot size={size}>
@@ -254,6 +257,7 @@ function FauControls({
       <ToggleButtonGroup
         aria-label={name}
         size={size}
+        isJustified
         selectedKeys={shown === null ? [] : [shown]}
         onSelectionChange={(keys) => {
           const [key] = keys;
@@ -286,6 +290,7 @@ function FauControls({
         <SegmentedControl
           aria-label={i18n.t("components:fauPicker.confidence")}
           size={size}
+          isJustified
           selectedKey={pending ? null : confidence}
           onSelectionChange={(key) =>
             change({

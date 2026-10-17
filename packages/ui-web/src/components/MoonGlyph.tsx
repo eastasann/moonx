@@ -29,28 +29,30 @@ interface ValueProps {
 
 export type MoonGlyphProps = MoonGlyphBaseProps & (StateProps | ValueProps);
 
+const shapeOf = (props: StateProps | ValueProps): MoonShape =>
+  props.state !== undefined ? { state: props.state } : { value: props.value };
+
 /**
- * A state's or a share's moon at any StatusLight step. Not exported from the package:
- * StatusLight's L and XL marks are larger than a MoonGlyph of its own (S and M).
+ * A state's or a share's moon at a StatusLight step (06 status-light.dot-size): in
+ * StatusLight and in the F/A/U buttons, beside text of that step. Not exported from the
+ * package.
  */
-export function MoonGlyphAt(
-  props: (StateProps | ValueProps) & { size: Size; isCurrent?: boolean },
-) {
-  const shape: MoonShape =
-    props.state !== undefined ? { state: props.state } : { value: props.value };
-  const mark = <MoonMark shape={shape} className={styles.dot[props.size]} />;
-  return props.isCurrent ? (
-    <span className={styles.current}>{mark}</span>
-  ) : (
-    mark
-  );
+export function MoonGlyphAt(props: (StateProps | ValueProps) & { size: Size }) {
+  return <MoonMark shape={shapeOf(props)} className={styles.dot[props.size]} />;
 }
 
 /**
- * The mark of a state (design-spec 4.4・4.5): in CheckDots, StatusLight, the F/A/U
- * breakdown, a section's progress and 11's question dots. Decorative: the label beside it
- * names the state, since a shape alone does not.
+ * The mark of a state (design-spec 4.4・4.5): in CheckDots, the F/A/U breakdown, a row's
+ * state, a section's progress and 11's question dots, at its own S and M (06
+ * moon-glyph.size). Decorative: the label beside it names the state, since a shape alone
+ * does not.
  */
-export function MoonGlyph({ size = "M", ...props }: MoonGlyphProps) {
-  return <MoonGlyphAt size={size} {...props} />;
+export function MoonGlyph({ size = "M", isCurrent, ...props }: MoonGlyphProps) {
+  const mark = (
+    <MoonMark
+      shape={shapeOf(props as StateProps | ValueProps)}
+      className={styles.glyph[size]}
+    />
+  );
+  return isCurrent ? <span className={styles.current}>{mark}</span> : mark;
 }

@@ -91,8 +91,16 @@ export const MODE_PAIRS: readonly ContrastPair[] = [
     backgrounds: SURFACES,
     minimum: 4.5 as const,
   })),
+  // InlineAlert's text is ink on its status fill (s19-decision.html .alert), and its
+  // close button a quiet ActionButton in secondary.
+  ...["text.primary", "text.secondary"].map((foreground) => ({
+    foreground,
+    backgrounds: ["informative.bg", "notice.bg", "negative.bg", "neutral.bg"],
+    minimum: 4.5 as const,
+  })),
   { foreground: "border.strong", backgrounds: SURFACES, minimum: 3 },
-  // A secondary Button's edge is its border on its own fill.
+  // A field's and a Picker's edge is its border on the control fill; a secondary
+  // Button's darkens to it on hover.
   {
     foreground: "border.strong",
     backgrounds: [
@@ -152,12 +160,12 @@ export const MODE_PAIRS: readonly ContrastPair[] = [
 /** The mode fills checked as backgrounds only (see ContrastScope). */
 export const MODE_BACKGROUNDS: readonly string[] = [
   ...SURFACES,
-  // A secondary Button's edge is border.strong, checked on these fills.
+  // A field's edge is border.strong, checked on these fills.
   "control.secondary",
   "control.secondary-hover",
   "control.secondary-pressed",
   "control.track",
-  // InlineAlert and the notice/negative bands: their text and icon carry the meaning.
+  // InlineAlert and the notice/negative bands: their ink text and icon carry the meaning.
   "informative.bg",
   "notice.bg",
   "negative.bg",
@@ -169,6 +177,8 @@ export const MODE_EXEMPT: Exemptions = {
   "text.disabled": "an inactive control (WCAG 1.4.3 and 1.4.11 exempt it)",
   "control.disabled": "an inactive control (WCAG 1.4.11 exempts it)",
   "border.hairline": "a decorative divider; content is grouped by space too",
+  "border.default":
+    "the edge of a component its text already identifies (Badge, Button and ActionButton, SegmentedControl's groove, Divider L, the underline of a lone Link): WCAG 1.4.11 asks 3:1 only of what is needed to identify a component (design-spec 4.4)",
   "surface.scrim":
     "the translucent backdrop of a Dialog or Tray, not information",
   "fau.empty.strong":

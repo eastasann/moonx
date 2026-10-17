@@ -1,5 +1,5 @@
 import { vars } from "@moonx/ui-tokens";
-import { style } from "@vanilla-extract/css";
+import { createVar, style } from "@vanilla-extract/css";
 import { recipe } from "@vanilla-extract/recipes";
 import {
   atLeastTarget,
@@ -57,8 +57,7 @@ export const box = recipe({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    border: `${vars.borderWidth.strong} solid ${vars.color.border.strong}`,
-    borderRadius: vars.radius.chip,
+    border: `${vars.scale.component.checkbox.borderWidth} solid ${vars.color.border.strong}`,
     background: vars.color.control.secondary,
     color: vars.color.control.onPrimary,
     selectors: {
@@ -87,23 +86,41 @@ export const box = recipe({
     size: sized((size) => ({
       width: vars.scale.component.checkbox.controlSize[size],
       height: vars.scale.component.checkbox.controlSize[size],
+      borderRadius: vars.scale.component.checkbox.radius[size],
     })),
   },
   defaultVariants: { size: "M" },
 });
 
-/** The circle of a Radio: chosen, a thick ink ring around the field colour. */
+const radioDot = createVar();
+
+/**
+ * The circle of a Radio: chosen, an ink ring with an ink dot inside (s19-decision.html,
+ * design-spec 4.5).
+ */
 export const circle = recipe({
   base: {
     ...hoverTransition,
+    display: "inline-grid",
+    placeItems: "center",
     flexShrink: 0,
-    border: `${vars.borderWidth.strong} solid ${vars.color.border.strong}`,
+    border: `${vars.scale.component.radioButton.borderWidth} solid ${vars.color.border.strong}`,
     borderRadius: vars.radius.pill,
     background: vars.color.control.secondary,
     selectors: {
-      "[data-selected] > &": {
-        borderColor: vars.color.control.primary,
-        borderWidth: vars.borderWidth.selectedIndicator,
+      "[data-selected] > &": { borderColor: vars.color.control.primary },
+      "[data-selected] > &::after": {
+        content: '""',
+        width: radioDot,
+        height: radioDot,
+        borderRadius: vars.radius.pill,
+        background: vars.color.control.primary,
+      },
+      "[data-invalid][data-selected] > &::after": {
+        background: vars.color.negative.fg,
+      },
+      "[data-disabled][data-selected] > &::after": {
+        background: vars.color.text.disabled,
       },
       "[data-focus-visible] > &": focusRing,
       "[data-invalid] > &": { borderColor: vars.color.negative.fg },
@@ -117,6 +134,7 @@ export const circle = recipe({
     size: sized((size) => ({
       width: vars.scale.component.radioButton.controlSize[size],
       height: vars.scale.component.radioButton.controlSize[size],
+      vars: { [radioDot]: vars.scale.component.radioButton.dotSize[size] },
     })),
   },
   defaultVariants: { size: "M" },
@@ -203,7 +221,7 @@ export const group = style({
 });
 
 export const groupLabel = style({
-  ...typography("label"),
+  ...typography("fieldLabel"),
   color: vars.color.text.primary,
 });
 

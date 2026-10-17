@@ -13,15 +13,16 @@ interface NeutralBadgeProps extends BadgeBaseProps {
   /** @default "neutral" */
   variant?: Extract<BadgeVariant, "neutral">;
   /**
-   * `outline`: the uncoloured frame (Proceed / Hold / Drop, stages, "Lump sum").
-   * `dashed`: Undecided. `bold`: the ink fill of an unread count (formatCount).
+   * `outline`: the light frame (Proceed / Hold / Drop, stages, "Lump sum").
+   * `dashed`: Undecided, in secondary text. `bold`: the small ink tag of an unread count
+   * laid over an icon (formatCount), the same size at every `size`.
    * @default "outline"
    */
   fillStyle?: BadgeFillStyle;
 }
 
 interface NoticeBadgeProps extends BadgeBaseProps {
-  /** The amber text of "Overdue" and "overdue 3d" (design-spec 4.5), in the outline frame. */
+  /** The amber monospaced text of "Overdue" and "overdue 3d" (design-spec 4.5), without a frame. */
   variant: Extract<BadgeVariant, "notice">;
   fillStyle?: "outline";
 }

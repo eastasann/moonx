@@ -99,7 +99,10 @@ export function SideNav({
                         {hasBadge && " "}
                         {hasBadge && (
                           <span className={styles.badge}>
-                            <NavBadge count={item.badge ?? 0} />
+                            <NavBadge
+                              count={item.badge ?? 0}
+                              appearance="text"
+                            />
                           </span>
                         )}
                       </AriaLink>

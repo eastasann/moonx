@@ -49,7 +49,7 @@ export function TabBar({ items, currentId, more }: TabBarProps) {
             {hasBadge && " "}
             {hasBadge && (
               <span className={styles.badge}>
-                <NavBadge count={item.badge ?? 0} />
+                <NavBadge count={item.badge ?? 0} appearance="tag" />
               </span>
             )}
           </AriaLink>

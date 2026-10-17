@@ -3,9 +3,10 @@ import { style } from "@vanilla-extract/css";
 import { recipe } from "@vanilla-extract/recipes";
 
 /**
- * A label in a frame without colour (design-spec 4.4・4.5): Undecided has a dashed frame,
- * an unread count the ink fill, Overdue amber text in the same frame. Not interactive, so
- * it does not grow to the minimum target.
+ * A label in a light frame without colour (design-spec 4.4・4.5, docs/mockups .tag):
+ * Undecided has a dashed frame and secondary text, an unread count is a small ink tag,
+ * Overdue is amber monospaced text without a frame. Not interactive, so it does not grow
+ * to the minimum target.
  */
 export const badge = recipe({
   base: {
@@ -25,23 +26,32 @@ export const badge = recipe({
   variants: {
     variant: {
       neutral: { color: vars.color.text.primary },
-      notice: { color: vars.color.notice.fg },
+      notice: {
+        color: vars.color.notice.fg,
+        fontFamily: vars.font.family.mono,
+        fontVariantNumeric: "tabular-nums",
+      },
     },
     fillStyle: {
+      // Its text names it, so its frame is the light one (06 border.default).
       outline: {
         background: "transparent",
-        borderColor: vars.color.border.strong,
+        borderColor: vars.color.border.default,
       },
       dashed: {
         background: "transparent",
-        borderColor: vars.color.border.strong,
+        borderColor: vars.color.border.default,
         borderStyle: "dashed",
+        color: vars.color.text.secondary,
       },
+      // The unread count laid over an icon: one size whatever the badge's (06 badge.count).
       bold: {
         background: vars.color.control.primary,
-        borderColor: vars.color.control.primary,
+        borderWidth: 0,
+        borderRadius: vars.scale.component.badge.count.radius,
         color: vars.color.control.onPrimary,
-        borderRadius: vars.radius.pill,
+        fontFamily: vars.font.family.mono,
+        lineHeight: vars.scale.component.badge.count.height,
         fontVariantNumeric: "tabular-nums",
       },
     },
@@ -65,6 +75,27 @@ export const badge = recipe({
       }
     >,
   },
+  compoundVariants: [
+    // Overdue is the text alone: no frame, so no sides either.
+    {
+      variants: { variant: "notice" },
+      style: {
+        borderColor: "transparent",
+        borderWidth: 0,
+        minWidth: 0,
+        paddingInline: 0,
+      },
+    },
+    ...sizes.map((size) => ({
+      variants: { fillStyle: "bold" as const, size },
+      style: {
+        minHeight: vars.scale.component.badge.count.height,
+        minWidth: vars.scale.component.badge.count.height,
+        paddingInline: vars.scale.component.badge.count.paddingX,
+        fontSize: vars.scale.component.badge.count.fontSize,
+      },
+    })),
+  ],
   defaultVariants: { variant: "neutral", fillStyle: "outline", size: "S" },
 });
 

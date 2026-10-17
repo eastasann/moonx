@@ -2,19 +2,15 @@ import { type SizeWithXS, sizesWithXS, vars } from "@moonx/ui-tokens";
 import { recipe } from "@vanilla-extract/recipes";
 import { atLeastTarget, focusRing, hoverTransition } from "../styles/helpers";
 
-// XS is for the components whose steps start at XS (ToggleButtonGroup); ActionButton's
-// own prop starts at S (design-spec 4.5).
+// XS is for the components whose steps start at XS (ActionMenu, ContextualHelp);
+// ActionButton's own prop starts at S (design-spec 4.5).
 const sized = <T>(make: (size: SizeWithXS) => T) =>
   Object.fromEntries(sizesWithXS.map((size) => [size, make(size)])) as Record<
     SizeWithXS,
     T
   >;
 
-/**
- * ActionButton, and the buttons of ToggleButtonGroup: tools that act on the screen, not
- * its main action. Selected toggles take the ink fill, as SegmentedControl's choice does
- * (06 color.control.primary).
- */
+/** ActionButton: tools that act on the screen, not its main action. */
 export const actionButton = recipe({
   base: {
     ...hoverTransition,
@@ -23,8 +19,8 @@ export const actionButton = recipe({
     justifyContent: "center",
     gap: vars.space["100"],
     margin: 0,
-    border: `${vars.borderWidth.strong} solid ${vars.color.border.strong}`,
-    borderRadius: vars.radius.control,
+    // Its text or its tooltip names it, so its frame is the light one (06 border.default).
+    border: `${vars.borderWidth.strong} solid ${vars.color.border.default}`,
     background: vars.color.control.secondary,
     color: vars.color.control.onSecondary,
     fontFamily: vars.typography.button.fontFamily,
@@ -38,17 +34,6 @@ export const actionButton = recipe({
     selectors: {
       "&[data-hovered]": { background: vars.color.control.secondaryHover },
       "&[data-pressed]": { background: vars.color.control.secondaryPressed },
-      "&[data-selected]": {
-        background: vars.color.control.primary,
-        borderColor: vars.color.control.primary,
-        color: vars.color.control.onPrimary,
-      },
-      "&[data-selected][data-hovered]": {
-        background: vars.color.control.primaryHover,
-      },
-      "&[data-selected][data-pressed]": {
-        background: vars.color.control.primaryPressed,
-      },
       "&[data-focus-visible]": focusRing,
       "&[data-disabled]": {
         background: vars.color.control.disabled,
@@ -59,13 +44,17 @@ export const actionButton = recipe({
     },
   },
   variants: {
+    // The header's tools (💬・🕘・⋯): secondary until hovered (moon-base.css .iconbtn).
     isQuiet: {
       true: {
         background: "transparent",
         borderColor: "transparent",
-        color: vars.color.text.primary,
+        color: vars.color.text.secondary,
         selectors: {
-          "&[data-hovered]": { background: vars.color.surface.hover },
+          "&[data-hovered]": {
+            background: vars.color.surface.hover,
+            color: vars.color.text.primary,
+          },
         },
       },
       false: {},
@@ -75,6 +64,7 @@ export const actionButton = recipe({
       minWidth: atLeastTarget(vars.scale.component.actionButton.height[size]),
       paddingInline: vars.scale.component.actionButton.paddingX[size],
       fontSize: vars.scale.component.actionButton.fontSize[size],
+      borderRadius: vars.scale.component.actionButton.radius[size],
     })),
     iconOnly: {
       true: {},

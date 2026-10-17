@@ -8,8 +8,8 @@ const sized = Object.fromEntries(
 ) as Record<CardSize, CardSize>;
 
 /**
- * A card: framed and raised, as 4.4 keeps cards for things compared side by side.
- * Spacing and type follow the size (06 component.card).
+ * A card: framed, without a shadow (s15-competitors.html .card), as 4.4 keeps cards for
+ * things compared side by side. Spacing and type follow the size (06 component.card).
  */
 export const card = recipe({
   base: {
@@ -22,7 +22,6 @@ export const card = recipe({
     border: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
     borderRadius: vars.radius.card,
     background: vars.color.surface.raised,
-    boxShadow: vars.shadow.raised,
     color: vars.color.text.primary,
     fontFamily: vars.font.family.body,
     outline: "none",

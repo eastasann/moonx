@@ -6,6 +6,14 @@ import { atLeastTarget, focusRing, typography } from "../styles/helpers";
 const sizes = ["S", "M", "L", "XL"] as const;
 
 /**
+ * The text of a field: its step's size, never below 06 field.font-size-min on touch
+ * screens (16px: iOS zooms into smaller fields on focus, and a phone held sideways is
+ * wider than the tablet breakpoint, where the narrow 16px stops; design-spec 4.3).
+ */
+const fieldFont = (size: (typeof sizes)[number]) =>
+  `max(${vars.scale.component.field.fontSize[size]}, ${vars.scale.component.field.fontSizeMin})`;
+
+/**
  * The outer element of every field (TextField・TextArea・NumberField・SearchField・Picker・
  * ComboBox・DatePicker): label, frame and help text stacked. Fields keep the default
  * width of their size unless told to fill the line.
@@ -44,7 +52,7 @@ export const fieldRoot = recipe({
 });
 
 export const label = style({
-  ...typography("label"),
+  ...typography("fieldLabel"),
   color: vars.color.text.primary,
   cursor: "default",
 });
@@ -61,7 +69,6 @@ export const frame = recipe({
     minWidth: 0,
     background: vars.color.control.secondary,
     border: `${vars.borderWidth.strong} solid ${vars.color.border.strong}`,
-    borderRadius: vars.radius.control,
     color: vars.color.text.primary,
     selectors: {
       // Fields show the ring whenever they are focused, with a mouse too: on a phone the
@@ -86,12 +93,18 @@ export const frame = recipe({
         {
           minHeight: atLeastTarget(vars.scale.component.field.height[size]),
           paddingInline: vars.scale.component.field.paddingX[size],
-          fontSize: vars.scale.component.field.fontSize[size],
+          fontSize: fieldFont(size),
+          borderRadius: vars.scale.component.field.radius[size],
         },
       ]),
     ) as Record<
       (typeof sizes)[number],
-      { minHeight: string; paddingInline: string; fontSize: string }
+      {
+        minHeight: string;
+        paddingInline: string;
+        fontSize: string;
+        borderRadius: string;
+      }
     >,
   },
   defaultVariants: { size: "M" },
@@ -157,12 +170,13 @@ export const areaFrame = recipe({
         size,
         {
           paddingInline: vars.scale.component.field.paddingX[size],
-          fontSize: vars.scale.component.field.fontSize[size],
+          fontSize: fieldFont(size),
+          borderRadius: vars.scale.component.field.radius[size],
         },
       ]),
     ) as Record<
       (typeof sizes)[number],
-      { paddingInline: string; fontSize: string }
+      { paddingInline: string; fontSize: string; borderRadius: string }
     >,
   },
   defaultVariants: { size: "M" },

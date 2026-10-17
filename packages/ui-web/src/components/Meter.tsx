@@ -44,10 +44,17 @@ export function Meter({ label, segments, size = "M" }: MeterProps) {
       </div>
       <ul className={styles.legend}>
         {segments.map((segment) => (
-          <li key={segment.state} className={styles.entry}>
+          <li
+            key={segment.state}
+            className={
+              styles.entry[
+                segment.state === "unclassified" ? "unclassified" : "other"
+              ]
+            }
+          >
             <span
               aria-hidden="true"
-              className={`${styles.swatch[size]} ${styles.shade[segment.state]} ${
+              className={`${styles.swatch} ${styles.shade[segment.state]} ${
                 segment.state === "empty" ? styles.swatchEdge : ""
               }`}
             />

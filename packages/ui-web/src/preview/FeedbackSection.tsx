@@ -249,7 +249,7 @@ export function BadgeSection() {
           ))}
         </Flex>
       </Specimen>
-      <Specimen name='variant="neutral" / "notice" (notice: amber text in the outline frame)'>
+      <Specimen name='variant="neutral" / "notice" (notice: amber monospaced text without a frame)'>
         <Flex gap="space-200" wrap alignItems="center">
           {badgeVariants.map((variant) => (
             <Badge key={variant} variant={variant}>

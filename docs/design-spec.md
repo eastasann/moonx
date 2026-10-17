@@ -354,7 +354,8 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - スマホでは結合セルのような大きな表を出さない。行はカードにし、1行の編集はシートで行う（原本の「スマホで埋めにくい」を解消する）。
 - 保存状態はどの幅でもヘッダーに出す（6.0.1）。スマホでは幅が足りなければラベルを省いて印（Saved は ✓）だけにするが、保存できなかったときは「Couldn't save」の文字を必ず出す。保存できなかった項目の横にも同じ失敗を出す（6.0.2）。
 - スマホのキーボード表示中も、入力欄が隠れないようにする。キーボードが画面に重なる高さを測り、下部に固定した操作をその分だけ持ち上げ、フォーカス中の入力欄をキーボードの上までスクロールする。
-- スマホの TabBar の名前は省略しない（Dashboard / Ideas / Self Analysis / Notifications / More）。文字の大きさは `semantic.typography.tab-label` で、スケールでは変えない。入らない幅では2行にし、「…」で切らない。
+- 文字の大きさは画面の幅で決め、スケールでは変えない（2026-10-17 のユーザーの決定）。スマホの幅（`semantic.breakpoint.tablet` 未満）では、本文・行の名前・画面の題・設問の問い・主要指標などを `semantic.font-size.narrow` の大きさ（`docs/mockups` の 390px の値。本文は 16px）にし、入力欄の文字はどの大きさの段でも 16px にする（iOS は 16px より小さい入力欄にフォーカスすると画面を拡大するため）。端末の文字の大きさの設定には rem で従う。large のスケールは、押せる部品の高さと target-min だけを大きくする。ただしタッチの端末（large）では、入力欄の文字を幅によらず 16px 以上にする（横向きのスマホは `semantic.breakpoint.tablet` より広く、narrow の 16px が効かないため。06 `component.field.font-size-min`。target-min と同じく、タッチの端末の下限）。
+- スマホの TabBar の名前は省略しない（Dashboard / Ideas / Self Analysis / Notifications / More）。文字の大きさは `semantic.typography.tab-label` で、幅でもスケールでも変えない。入らない幅では2行にし、「…」で切らない。
 - スマホの TabBar は本文の下に並んで高さを取る（本文に重ねない）。下部に固定した操作は本文の領域の下端に付き、タブの下端の安全領域は TabBar が持つ。TabBar の無い画面（ログイン・公開ページ）は固定した操作が安全領域を自分で空ける。
 - スマホの入力欄のフォーカスは、枠の外周線（`semantic.border-width.focus-ring`・`semantic.color.{light,dark}.border.focus`）で示す。入力欄（TextField・TextArea・NumberField・SearchField・ComboBox・DatePicker）は、ほかの幅でも、マウスで押したときも同じ外周線を出す（入力中の欄をどの端末でも同じ形で示すため）。ボタン・Picker・選択の部品は、キーボードで移ったときだけ出す。
 
@@ -365,16 +366,16 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 項目 | 方針 |
 |---|---|
 | トーン&ムード | **月相: 夜に少しずつ考えるための静かな道具**。夜のインク1色の濃淡で組み、飾りや演出で煽らない。点数や派手な達成表現は使わない。2026-10-12 にユーザーとプロトタイプの画面と3つの案を見比べて決めた（プロトタイプの Hermes Teal から作り直した） |
-| カラーの方向性 | **夜のインク1色と、注意の琥珀色だけ。差し色は持たない**（2026-10-12 のユーザーの決定）。ライト: 明るい灰の地に夜のインクの文字。ダーク: 夜の紺の地に月明かりの文字で、主要な操作のボタンも月明かりの色にする。琥珀色は注意が要るもの（未分類・期限切れ・粗利のマイナス・Capacity の超過など）だけ、赤はエラーと削除の確認だけに使う。F/A/U・確認項目・判定に色の種類を割り当てず、状態は下の「状態の形」で示す。判定（Proceed / Hold / Drop）は色を付けない枠の札にし、Drop を赤にしない。色だけで意味を伝えず、必ず形かラベルを添える（WCAG AA のコントラスト。文字 4.5:1、枠・印 3:1） |
-| 状態の形 | **月の満ち欠けで「分かっている度合い」を示す**。○ 新月 = Not started / Unknown、◐ 半月 = Partial / Assumption、● 満月 = Done / Fact。セクションの埋まり具合（回答の数 / 問いの数）は、その割合だけ満ちた月で示す。未分類は琥珀色の菱形、未入力は点線の丸（この文書の図では ◌）。形の横には必ずラベルを出す。部品は MoonGlyph（4.5） |
-| タイポグラフィの方向性 | **1つの書体の太さと字間で階層を作る**。見出しも本文も同じサンセリフにし、見出しは太くして字間を詰める（全部大文字の見出しは使わない）。金額・指標・表の数字と、設問の名前（WHO など。テンプレートの表記のまま）は等幅の書体にして桁をそろえる。回答にタガログ語・Hiligaynon・日本語が混ざるため、日本語を含む多言語を表示できる代替フォントを必ず用意する。金額は通貨記号と桁区切りを付ける。長文の回答は行間を広めにする。背景の粒子・グロー・グラデーションなどの質感は使わない。書体の名前は `docs/06_design-tokens.json` |
-| 画面の組み方 | **箱で囲まず、区切り線と余白でまとめる**。カードの枠と影は、重なりや今の焦点を示すとき（入力中の設問・13 の Next steps の1件目・Popover・Dialog・合計）、並べて見比べるもの（15 の競合のカード・23 のサムネイル）、まとめて読む材料（19 の判断材料・24 のプレビューの Well）だけに使う。押せる行は行全体を押せるようにして右端に › を置き、本文に下線のリンクを並べない。表の行は値だけを見せ、触った行だけを入力欄にする。数字は等幅の書体で右にそろえる |
+| カラーの方向性 | **夜のインク1色と、注意の琥珀色だけ。差し色は持たない**（2026-10-12 のユーザーの決定）。ライト: 明るい灰の地に夜のインクの文字。ダーク: 夜の紺の地に月明かりの文字で、主要な操作のボタンも月明かりの色にする。琥珀色は注意が要るもの（未分類・期限切れ・粗利のマイナス・Capacity の超過など）だけ、赤はエラーと削除の確認だけに使う。F/A/U・確認項目・判定に色の種類を割り当てず、状態は下の「状態の形」で示す。判定（Proceed / Hold / Drop）は色を付けない枠の札にし、Drop を赤にしない。色だけで意味を伝えず、必ず形かラベルを添える（WCAG AA のコントラスト。文字 4.5:1。枠で場所を示す部品（入力欄・Checkbox・Radio・Switch・Picker）の枠は 3:1（`border.strong`）、状態の印（インクの色）も 3:1 以上。文字で何の部品か分かるもの（Badge・文字のある Button・ActionButton・SegmentedControl の溝・区切りの線（Divider L・数字の帯の上・表の見出しの下）・単独のリンクの下線）の枠は、`docs/mockups` の薄い線（`border.default`）にする。行の間の区切りは hairline のまま。WCAG 1.4.11 は文字で分かる部品の枠に 3:1 を求めない。2026-10-17 のユーザーの決定） |
+| 状態の形 | **月の満ち欠けで「分かっている度合い」を示す**。○ 新月 = Not started / Unknown、◐ 半月 = Partial / Assumption、● 満月 = Done / Fact。セクションの埋まり具合（回答の数 / 問いの数）は、その割合だけ満ちた月で示す。未分類は琥珀色の菱形、未入力は点線の丸（この文書の図では ◌）。形の横には必ずラベルを出す。印は状態によらず夜のインクの色で描き、形で区別する（Assumption と Unknown を灰色にしない。琥珀色は未分類の菱形だけ。2026-10-17 のユーザーの決定。`docs/mockups`）。部品は MoonGlyph（4.5） |
+| タイポグラフィの方向性 | **1つの書体の太さと字間で階層を作る**。見出しも本文も同じサンセリフにし、見出しは太くして字間を詰める（全部大文字の見出しは使わない。`docs/mockups` の全部大文字の小見出しも、大文字にせずに同じ大きさ・太さ・字間で出す）。大きさは `docs/mockups` に合わせる（本文 15px。2026-10-17 のユーザーの決定）。画面の題はパターンごとに大きさが違う（A のハブは 30px、B・C・E・F は 28px、D の左のペインは 26px など。`docs/06_design-tokens.json` の `heading-1` の系統）。ランディングの題と節の題は画面の幅で大きさが変わる。金額・指標・表の数字と、設問の名前（WHO など。テンプレートの表記のまま）は等幅の書体にして桁をそろえる。回答にタガログ語・Hiligaynon・日本語が混ざるため、日本語を含む多言語を表示できる代替フォントを必ず用意する。金額は通貨記号と桁区切りを付ける。長文の回答は行間を広めにする。背景の粒子・グロー・グラデーションなどの質感は使わない。書体の名前は `docs/06_design-tokens.json` |
+| 画面の組み方 | **箱で囲まず、区切り線と余白でまとめる**。カードの枠は、今の焦点を示すとき（入力中の設問・13 の Next steps の1件目・合計）、並べて見比べるもの（15 の競合のカード・23 のサムネイル）、まとめて読む材料（19 の判断材料・24 のプレビューの Well）だけに使う。影は、重なっているもの・浮いているもの（Popover・Dialog・Tray・パネルの引き出し・Toast・フォーカスで出るスキップリンク・6 のスマホの新規作成のボタン・1 の浮いた見本のカード・23 のスライド）と入力中の設問のカードだけに付け、ほかのカードは枠だけにする（2026-10-17。`docs/mockups`）。押せる行は行全体を押せるようにして右端に › を置き、本文に下線のリンクを並べない。表の行は値だけを見せ、触った行だけを入力欄にする。数字は等幅の書体で右にそろえる |
 | ライト/ダークモード | **両対応（OS 追従＋手動切替）**。既定は OS の設定に従い、4 アカウント設定で System / Light / Dark を選んで固定できる（夜にスマホで少しずつ進める使い方に合わせる）。選んだ値はアカウントに保存し、どの端末でも同じにする。ログイン前の画面（1・2・29・30）と、選んだ値を読み込むまでは OS に従う（11 の Focus の切替は端末に保存する点が違う。4.1）。状態の形と注意の色はどちらのモードでも区別できるように両方の値を用意する。**Pitch Deck の PDF は常にライト** |
 | アイコン | 線のアイコンの1つのセットにそろえる（Phase 3 で Lucide に決定）。この文書の ASCII 図の絵文字は位置を示す仮置き |
 | アプリのアイコン | 三日月と小さな丸（2026-10-11 にユーザーが選んだ案 B）。512 の正方形に、中心 (246, 266) 半径 150 の円から中心 (300, 215) 半径 132 の円を抜いた三日月と、中心 (378, 150) 半径 28 の丸を置く。地は `surface.canvas`、三日月と丸は `text.primary`（どちらも semantic のライトの値。差し色を持たないので丸も同じ色。2026-10-12）。maskable の安全域（中心から半径 40%）に収まる。形と色の正はこの行で、作り方は SDD ADR-031 |
-| 情報密度 | **画面で使い分け**。設問フォーム・判定・プラン項目など書く画面はゆったり（考えるための余白）。費用・損益・調査ログ・一覧・ダッシュボードなど表と数字の画面は中密度（比べて読むため）。スマホは全体を一段ゆったりにする |
-| デザインシステムの参考 | **Adobe Spectrum の仕組みを取り入れ、見た目は上の月相にする**（Phase 3 で決定。見た目は 2026-10-12 に作り直した）。取り入れるもの: 部品の種類と名前（4.5）、部品の大きさの段階（XS / S / M / L / XL。部品ごとの段は 4.5）、端末で切り替える2つのスケール（デスクトップは medium、タッチの端末は large）、表とリストの密度（compact / regular / spacious）、状態の色の名前（informative / notice / negative / neutral。Spectrum の accent と positive は、差し色を持たないので使わない）、スマホではポップオーバーを下からのトレイ（ボトムシート）にする振る舞い、キーボード操作とフォーカスの表示の決まり。Spectrum の配色・書体（Adobe Clean）・アイコン（Workflow）は使わない |
-| 密度とスケールの対応 | 書く・読む・手順を進める画面（1〜4・9・11・19・21・24・25・29・30・M1〜M9）は spacious、表と数字と一覧の画面（5〜8・10・12〜18・20・22・23・26〜28）は regular。スマホとタブレットは large のスケール（部品が一段大きくなる）、デスクトップは medium。具体的な値は `docs/06_design-tokens.json` |
+| 情報密度 | **画面で使い分け**。設問フォーム・判定・プラン項目など書く画面はゆったり（考えるための余白）。費用・損益・調査ログ・一覧・ダッシュボードなど表と数字の画面は中密度（比べて読むため）。スマホとタブレットは押せる部品を一段高くし、スマホの幅では本文を一段大きくする（4.3） |
+| デザインシステムの参考 | **Adobe Spectrum の仕組みを取り入れ、見た目は上の月相にする**（Phase 3 で決定。見た目は 2026-10-12 に作り直した）。取り入れるもの: 部品の種類と名前（4.5）、部品の大きさの段階（XS / S / M / L / XL。部品ごとの段は 4.5。各段の値は `docs/mockups` が示すものはモックアップの値）、端末で切り替える2つのスケール（デスクトップは medium、タッチの端末は large。large は押せる部品の高さと target-min だけを大きくし、文字は大きくしない）、表とリストの密度（compact / regular / spacious）、状態の色の名前（informative / notice / negative / neutral。Spectrum の accent と positive は、差し色を持たないので使わない）、スマホではポップオーバーを下からのトレイ（ボトムシート）にする振る舞い、キーボード操作とフォーカスの表示の決まり。Spectrum の配色・書体（Adobe Clean）・アイコン（Workflow）は使わない |
+| 密度とスケールの対応 | 書く・読む・手順を進める画面（1〜4・9・11・19・21・24・25・29・30・M1〜M9）は spacious、表と数字と一覧の画面（5〜8・10・12〜18・20・22・23・26〜28）は regular。スマホとタブレットは large のスケール（押せる部品の高さと target-min だけが一段大きくなる。文字・余白・印・アイコンの大きさは変えない）、デスクトップは medium。文字の大きさは画面の幅で決め、スマホの幅では `docs/mockups` の 390px の値にする（4.3。2026-10-17 のユーザーの決定）。具体的な値は `docs/06_design-tokens.json` |
 | 状態の形の共有 | F/A/U と確認項目は同じ月の形を使う（Fact と Done は満月、Assumption と Partial は半月、Unknown と Not started は新月）。同じ帯に並ぶとき（13・19）は、ラベルで区別する（形だけで伝えない） |
 
 ### 4.5 部品（Spectrum を参考にした一覧）
@@ -383,45 +384,45 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 
 | 部品（Spectrum の名前） | moonx での使いどころ | 種類・大きさ | スマホでの振る舞い |
 |---|---|---|---|
-| Button / ButtonGroup | 主要な操作（Record decision・Apply n changes・Save version など） | primary（主要な操作。1画面に1つまで。インクの塗り）/ secondary（枠）/ negative（削除の確認だけ）。補助の操作は quiet（枠なし）。S / M / L / XL。送信中（isPending）は ProgressCircle を出し、押せなくする | 主要な操作は下部に固定（4.1） |
-| ActionButton / ActionGroup | ツールバーの操作（💬・🕘・⋯） | quiet あり。S / M / L / XL | 同じ |
+| Button / ButtonGroup | 主要な操作（Record decision・Apply n changes・Save version など） | primary（主要な操作。1画面に1つまで。インクの塗り）/ secondary（薄い枠 `border.default`）/ negative（削除の確認だけ）。補助の操作は quiet（枠なし）。secondary と quiet の文字は medium の太さ。S / M / L / XL（ランディングの Log in とスマホの下部の操作は XL）。送信中（isPending）は ProgressCircle を出し、押せなくする | 主要な操作は下部に固定（4.1） |
+| ActionButton / ActionGroup | ツールバーの操作（💬・🕘・⋯） | quiet あり（文字とアイコンは secondary、ホバーで primary）。枠は薄い線（`border.default`）。S / M / L / XL | 同じ |
 | ActionMenu / Menu | 行の ⋯、アイデアの ⋯（複製・アーカイブ・移行）、AI ▼ | — | トレイで開く |
-| Link | 「Edit in validation」・「See all decisions」など単独のリンクと、読み物の中の文中のリンク | — | 同じ |
+| Link | 「Edit in validation」・「See all decisions」など単独のリンクと、読み物の中の文中のリンク | 単独のリンク（primary）の下線は薄い線（`border.default`。ホバーで文字の色）。`isQuiet` は下線を付けず、ホバーで下線を出す（公開ページのフッターのリンク） | 同じ |
 | TextField / TextArea | 短文・長文の回答、名前、理由 | TextArea は入力に合わせて広がる | キーボードで隠れない（4.3） |
 | NumberField | 金額（通貨記号・桁区切り）、%、日数、販売数 | 書式は en-PH（1.2） | 数字のキーボード |
 | SearchField | 一覧の検索、M2 の調査ログの検索 | — | 同じ |
 | Picker | 通貨・出典の種類・ロール・15 の Type・16 の Risks の Probability / Impact・22 の Status・4 の表示モード（System / Light / Dark） | — | トレイで選ぶ |
 | ComboBox | 担当（メンバーか自由記述）、25 の「Choose question」、4 のタイムゾーン（メンションは MentionTextArea） | — | 入力欄を押すとトレイが開き、トレイの中の入力欄で絞り込んで選ぶ |
-| RadioGroup | 判定（Proceed / Hold / Drop）、Go / No-Go、02 OCEAN | — | 同じ |
-| Checkbox / CheckboxGroup | 24 の範囲、25 の「反映する」、M6 の共有先 | — | 同じ |
+| RadioGroup | 判定（Proceed / Hold / Drop）、Go / No-Go、02 OCEAN | 選んだ状態はインクの輪と点 | 同じ |
+| Checkbox / CheckboxGroup | 24 の範囲、25 の「反映する」、M6 の共有先 | 選んでいない四角の枠は 1.5px の `border.strong` | 同じ |
 | Switch | 11 の Focus の切替、22 の「Overdue のみ」の絞り込み | — | 同じ |
-| ToggleButtonGroup | F/A/U の3つのボタン（もう一度押すと外れる。6.0.3） | — | 同じ |
-| SegmentedControl | 確信度（Low / Medium / High。6.0.3 の Assumption・FauPicker の中・16 の Assumptions の Confidence）、1分版 / 5分版、Markdown / JSON、Cards / Table、9 の招待の Pending / All | — | 同じ |
+| ToggleButtonGroup | F/A/U の3つのボタン（もう一度押すと外れる。6.0.3） | SegmentedControl と同じ溝。F/A/U の各ボタンに MoonGlyph（● Fact・◐ Assumption・○ Unknown）を付ける。`isJustified` で幅いっぱいにし、ボタンが幅を分け合う（どのボタンも文字より狭くしない。FauPicker の中。6.0.3） | 同じ（折り返さない。幅に入らないときは、Tabs と同じく溝の中で横にスクロールする） |
+| SegmentedControl | 確信度（Low / Medium / High。6.0.3 の Assumption・FauPicker の中・16 の Assumptions の Confidence）、1分版 / 5分版、Markdown / JSON、Cards / Table、9 の招待の Pending / All | 1本の溝（地は canvas、薄い枠 `border.default`、角丸の外 9px・中 7px、内側の余白と間 2px）。選んでいない項目の文字は secondary、選んだ項目はインクの塗り。`isJustified` は ToggleButtonGroup と同じ | 同じ（折り返さない。幅に入らないときは、Tabs と同じく溝の中で横にスクロールする） |
 | TagGroup | 調査ログの「裏付ける確認項目」、絞り込みの条件 | 削除できるタグ | 同じ |
 | DatePicker | 期限（Deadline / Target Date）、調査ログの日付 | — | トレイで選ぶ |
 | Dialog / AlertDialog | M1〜M9、15 の競合の追加・編集、削除の確認、衝突の確認（6.0.2） | small / medium / large / fullscreen。どれをどの大きさにするかは 3.8 | トレイ（ボトムシート）か全画面シート（3.8） |
 | Popover / Tray | ポップオーバーはデスクトップ、トレイはスマホ（自動で切り替える） | — | — |
 | Tooltip / ContextualHelp | アイコンだけのボタンの説明 / 設問のヒント（▸ Hint） | — | ContextualHelp はトレイ |
-| Disclosure / Accordion | EXAMPLE・関連する調査ログの開閉、解決済みのスレッド | — | 同じ |
+| Disclosure / Accordion | EXAMPLE・関連する調査ログの開閉、解決済みのスレッド | 題は secondary の medium の太さ | 同じ |
 | Tabs | 16 の Assumptions / Risks、22 の5つのタブ、26 と 28 の切り替え、28 の3つのタブ | — | 横にスクロールできるタブ |
 | Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | 区切りは「/」。今の画面はリンクにせず文字で出す（`aria-current`） | 出さない（部品が幅で隠す。画面は ← 戻る を出す） |
 | CheckDots | 5・6 の一覧の行の、確認項目6つの状態の点列（MoonGlyph の ●達成 ◐途中 ○未着手）。形で状態を伝え、読み上げは全項目の名前と状態を1つの画像として読む | S / M | 同じ |
 | StatusLight | F/A/U（Fact / Assumption / Unknown / Unclassified / Empty）、確認項目の状態（Not started / Partial / Done）、保存状態 | MoonGlyph の印＋ラベル（4.4「状態の形」。形だけ・色だけで伝えない）。保存状態は印の代わりにアイコン（Saving… は回る読み込みの印、Saved は ✓、Couldn't save は警告。Couldn't save は文字とアイコンを negative の赤にする） | 同じ |
-| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、ヘッダーの 💬 の未解決のスレッドの数（6.0.1）、「Overdue」「Lump sum」「(former member)」 | 色を付けない枠の札（Undecided は点線の枠）。未読数だけインクの塗り。「Overdue」と期限切れの日数（「overdue 3d」）は注意の琥珀色の文字。Drop を negative にしない。props は `fillStyle`（Spectrum 2 の outline = 枠と bold = 塗りに、moonx の dashed = 点線の枠を足したもの。既定は outline で、Spectrum 2 の既定の bold と違う）と `variant`（neutral / notice。notice は outline の枠の中の琥珀色の文字だけ） | 同じ |
-| InlineAlert | 粗利のマイナス・Capacity 超過・費用の下限の注意・「Latest decision is Hold」・アーカイブ中・新しいテンプレートの案内（6.0.7）・画面上部の帯（オフライン・新しい版・ホーム画面への追加の案内。6.0.6） | informative / notice / negative / neutral | 同じ |
+| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、ヘッダーの 💬 の未解決のスレッドの数（6.0.1）、「Overdue」「Lump sum」「(former member)」 | 色を付けない薄い枠（`border.default`）の札（Undecided は点線の枠で、文字は secondary）。TabBar の未読数とヘッダーの 💬 の数は、アイコンの右上に重ねるインクの小さな札（大きさの段によらず同じ大きさ）。SideNav の未読数は札にせず、行の右端の等幅の数字（secondary）だけ。「Overdue」と期限切れの日数（「overdue 3d」）は、枠を付けない琥珀色の等幅の文字。Drop を negative にしない。props は `fillStyle`（Spectrum 2 の outline = 枠と bold = 塗りに、moonx の dashed = 点線の枠を足したもの。bold は未読数の札。既定は outline で、Spectrum 2 の既定の bold と違う）と `variant`（neutral / notice。notice は枠の無い琥珀色の等幅の文字） | 同じ |
+| InlineAlert | 粗利のマイナス・Capacity 超過・費用の下限の注意・「Latest decision is Hold」・アーカイブ中・新しいテンプレートの案内（6.0.7）・画面上部の帯（オフライン・新しい版・ホーム画面への追加の案内。6.0.6） | informative / notice / negative / neutral。地は種類の淡い色、文字はインク、アイコンだけ種類の色。左の色の帯は付けない。角丸 10px | 同じ |
 | Toast | 「Decision recorded」「2 answers updated · 1 needs F/A/U」「Duplicated from …」と「Undo」（6.8） | 文と、任意の操作のボタン1つと、閉じるボタン。デスクトップとタブレットは下の中央 | 下部（タブの上） |
 | ProgressBar / ProgressCircle | 「Preparing PDF…」、送信中のボタン | — | 同じ |
-| Meter（積み上げ） | F/A/U の内訳の帯（13）。Spectrum の Meter を内訳の数だけ積み上げる moonx 独自の拡張。帯の濃さは `semantic.color.{light,dark}.fau.*.strong`（Unknown は斜線、Empty は地のまま）。凡例には、帯の区間と同じ見本・ラベル・件数を並べる | — | 同じ |
+| Meter（積み上げ） | F/A/U の内訳の帯（13）。Spectrum の Meter を内訳の数だけ積み上げる moonx 独自の拡張。帯の濃さは `semantic.color.{light,dark}.fau.*.strong`（Unknown は斜線、Empty は地のまま）。帯の区間の間は少し空け、角は少し丸める。凡例には、帯の区間と同じ見本（小さな四角）・ラベル・件数を並べる。ラベルは secondary、件数は等幅のインク、Unclassified の項目はラベルも件数も琥珀色。帯の上の名前はブロックの小さな見出しの形 | — | 同じ |
 | Skeleton | ローディングの骨組み（6.0.6） | — | 同じ |
 | IllustratedMessage | 空の状態・0件・権限がない・見つからない（6.0.6）。絵は使わず、Lucide のアイコンと見出しと説明 | — | 同じ |
-| Avatar | 提案者・記録者・コメントの書き手・4 のプロフィール写真。写真が無い・読めないときは頭文字 | S / M | 同じ |
+| Avatar | 提案者・記録者・コメントの書き手・4 のプロフィール写真。写真が無い・読めないときは頭文字 | S / M。角の丸い四角（地は sunken、頭文字は等幅の semibold、枠なし） | 同じ |
 | TableView | 17 費用・18 シナリオ表・7 決定ログ・28 の一覧・15 の「表で比較」・21 の表の小項目（§11 など） | 密度 compact / regular / spacious。layout は auto（幅で切り替え。既定）/ table / cards。編集できる表は、行の値を文字として見せ、触った行（フォーカスか編集中）のセルだけを入力欄にする。数字の列は等幅で右にそろえる | 行ごとのカード（4.3） |
 | ListView | 6 アイデア一覧・14 調査ログ・8 通知・22 の各リスト・9 のメンバーと招待・12 のメンバー・26 のテンプレート | 同上 | 全画面のリスト |
-| Card / CardView | 15 競合・代替のカード、23 のサムネイル | — | 1列 |
-| Well | 判断材料の要約（19）、AI 書き出しのプレビュー（24） | — | 同じ |
-| Divider | 区切り | S / M / L | 同じ |
+| Card / CardView | 15 競合・代替のカード、23 のサムネイル | 枠だけで影を付けない（4.4） | 1列 |
+| Well | 判断材料の要約（19）、AI 書き出しのプレビュー（24） | 白い面（`surface.raised`）を hairline の枠で囲む。角丸は Card と同じ | 同じ |
+| Divider | 区切り | S / M / L。S と M は hairline の色、L は薄い線（`border.default`） | 同じ |
 | Tree | 27 のセクションと設問のツリー | — | 全画面のリスト |
-| Heading / Text | 画面の見出しと本文。Heading は本文と同じ書体の太字で level 1〜4（ランディングの題名だけ variant の display、ブロックの小さな見出しは variant の label）、Text は body / body-long / body-sm / caption / label / number（等幅の数字）と tone（primary / secondary / tertiary / negative） | — | 同じ |
+| Heading / Text | 画面の見出しと本文。Heading は本文と同じ書体の太字で level 1〜4。見た目が level と違うときは variant: ランディングの題名は display、ランディングの節の題は display-2、画面の題がパターンで違う大きさのときは heading-1-hub（A）・heading-1-list（D の左のペイン）・heading-1-steps（G）・heading-1-settings（H）・heading-1-toolbar（I の道具の行）、設問の問いは heading-question、ブロックの小さな見出しは label。Text は body / body-long / body-sm / lead（ランディングのリード。既定の tone は secondary、幅は 40 字まで）/ caption / label / number（等幅の数字）と tone（primary / secondary / tertiary / notice（琥珀色。6.2 の「Not classified yet」・19 の「Unknown 5」）/ negative） | — | 同じ |
 | Form | 入力欄と送信ボタンを縦に並べる。ブラウザの検査は切り、画面が Zod で検査して各欄に理由を渡す | — | 同じ |
 | FileTrigger（Spectrum の名前） | 4 のプロフィール写真の選択、25 の `.md` / `.json` の選択。包んだボタンでファイルの選択を開く | — | 同じ |
 | Steps（Spectrum の名前） | パターン G のステップ表示（1 → 2 → 3）。済み・今・これから | — | 同じ |
@@ -430,10 +431,10 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 独自: PageFrame | 枠の無い画面（1 ランディング・2 ログイン系・3 オンボーディング・29・30）の main ランドマーク。見た目は持たず、中のレイアウトパターンが並びを決める。画面上部の帯（オフライン・新しい版。6.0.6）は main の先頭に出す | — | 同じ |
 | 独自: RouterProvider | `href` を持つ部品（Link・MenuItem・Breadcrumb）をアプリのルーターで移動させる。アプリのルートに1つ置く | — | 同じ |
 | 独自: Panel | コメント・変更履歴のパネル（PNL-1・PNL-2） | — | トレイ |
-| 独自: DiffText | 変更履歴（PNL-2）の変更前・変更後の文章。変わった文字を追加（下線）・削除（取り消し線）で強調し、色だけで伝えない | before / after | 同じ |
+| 独自: DiffText | 変更履歴（PNL-2）の変更前・変更後の文章。変わった文字を追加（下線）・削除（取り消し線）で強調し、色だけで伝えない | before / after。削除は secondary の文字と取り消し線、追加はインクの文字と文字から少し離した下線。どちらも sunken の地 | 同じ |
 | 独自: MentionTextArea | コメントの入力欄（PNL-1）。本文に `@` と文字を打つと候補（メンバー）の一覧を出し、選ぶと `@名前` を本文に入れる。候補は画面が渡す | 一覧は入力欄の下に開く（↑↓で選び、Enter か Tab で決め、Esc で閉じる） | トレイで選ぶ（`semantic.breakpoint.tablet` より狭い幅。トレイの中の入力欄で絞り込み、入力欄の初期値は `@` の後に打った文字） |
 | 独自: QuestionCard | 設問フォームの1問（4.1 パターン C のフォーカスの表示と控えめな表示） | — | 1問ずつのカード |
-| 独自: MoonGlyph | 状態の印（4.4「状態の形」）。CheckDots・StatusLight・19 の F/A/U の内訳・セクションの埋まり具合・F/A/U の印・11 のスマホの問いの点（回答済みは満月、未回答は点線の丸、今の問いは輪で囲む）に使う | `value`（0〜1。満ちる割合。0 は新月の輪郭、1 は満月）か `state`（not-started / partial / done / fact / assumption / unknown / unclassified / empty。unclassified は琥珀色の菱形、empty は点線の丸）。S / M。`isCurrent` で輪を重ねる（11 のスマホの今の問い）。印は飾りとして読み上げず、隣のラベルで伝える | 同じ |
+| 独自: MoonGlyph | 状態の印（4.4「状態の形」）。印は状態によらずインクの色（unclassified の菱形は琥珀色、empty の点線の丸は Empty のラベルの色）。CheckDots・StatusLight・19 の F/A/U の内訳・セクションの埋まり具合・F/A/U の印・11 のスマホの問いの点（回答済みは満月、未回答は点線の丸、今の問いは輪で囲む）に使う | `value`（0〜1。満ちる割合。0 は新月の輪郭、1 は満月）か `state`（not-started / partial / done / fact / assumption / unknown / unclassified / empty。unclassified は琥珀色の菱形、empty は点線の丸）。S / M。`isCurrent` で輪を重ねる（11 のスマホの今の問い）。印は飾りとして読み上げず、隣のラベルで伝える | 同じ |
 | 独自: FauPicker | 表の行（17 の金額・18 の数字）の F/A/U の欄。今の状態を MoonGlyph とラベル（「Assumption · Medium」）で出し、押すと Popover で F/A/U と確信度を選ぶ。決まりは 6.0.3 | — | 行の編集シートの中にボタンで並べる（6.0.3） |
 | 独自: MetricTile | 主要指標の1つ（13・19 の損益分岐・初期費用など）。ラベル・大きな数字・補足（理由や警告）を縦に並べる | 補足は任意 | 2×2 に並べる |
 | 独自: RowList / RowListItem | 区切り線つきの静的な行の並び（10・13・20 のセクションの一覧、13 の確認項目・Next steps・Summary・Decisions・Plans）。`ordered` で番号付き。押せる行は行全体が移動先で、右端に › を置く（下線のリンクにしない。4.4） | ordered | 同じ |
@@ -442,10 +443,10 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 
 部品の補足:
 
-- size（大きさ）は、Spectrum 2（`@react-spectrum/s2`）の同じ名前の部品が size を持つ部品（Button・ButtonGroup・ActionButton・ActionGroup・ToggleButtonGroup・ActionMenu・Menu・Form・TextField / TextArea・NumberField・SearchField・Picker・ComboBox・RadioGroup・Checkbox / CheckboxGroup・Switch・DatePicker・TagGroup・Disclosure / Accordion・Breadcrumbs・IllustratedMessage・Badge・StatusLight・ProgressBar / ProgressCircle・Meter・Divider・Card / CardView・Avatar・Popover・ContextualHelp・Dialog / AlertDialog）と、06 に size ごとの値が既にある部品（Tabs の `item-height`、SegmentedControl が使う `action-button` の値）が受ける。独自の部品は、いちばん近い Spectrum 2 の部品に合わせる（MentionTextArea は TextArea、FauPicker は ActionButton、CheckDots と MoonGlyph は表の S / M）（2026-10-16 のユーザーの決定）。
-- 大きさの段は、表の「種類・大きさ」の列に段があればそれ、無ければ Spectrum 2 のその部品の段にする。表に段の無い部品の段: ToggleButtonGroup・ActionMenu・Card / CardView は XS / S / M / L / XL、TagGroup・IllustratedMessage・ProgressCircle・Popover は S / M / L、Breadcrumbs は M / L、ContextualHelp は XS / S、SegmentedControl と Tabs は S / M / L / XL（06 に元からある段。06 の `action-button` の XS は使わない）、ほかは S / M / L / XL。MentionTextArea は TextArea と同じ S / M / L / XL、FauPicker は表の ActionButton と同じ S / M / L / XL。
+- size（大きさ）は、Spectrum 2（`@react-spectrum/s2`）の同じ名前の部品が size を持つ部品（Button・ButtonGroup・ActionButton・ActionGroup・ToggleButtonGroup・ActionMenu・Menu・Form・TextField / TextArea・NumberField・SearchField・Picker・ComboBox・RadioGroup・Checkbox / CheckboxGroup・Switch・DatePicker・TagGroup・Disclosure / Accordion・Breadcrumbs・IllustratedMessage・Badge・StatusLight・ProgressBar / ProgressCircle・Meter・Divider・Card / CardView・Avatar・Popover・ContextualHelp・Dialog / AlertDialog）と、06 に size ごとの値が既にある部品（Tabs の `item-height`、SegmentedControl の `segmented-control`）が受ける。独自の部品は、いちばん近い Spectrum 2 の部品に合わせる（MentionTextArea は TextArea、FauPicker は ActionButton、CheckDots と MoonGlyph は表の S / M）（2026-10-16 のユーザーの決定）。
+- 大きさの段は、表の「種類・大きさ」の列に段があればそれ、無ければ Spectrum 2 のその部品の段にする。表に段の無い部品の段: ToggleButtonGroup・ActionMenu・Card / CardView は XS / S / M / L / XL、TagGroup・IllustratedMessage・ProgressCircle・Popover は S / M / L、Breadcrumbs は M / L、ContextualHelp は XS / S、SegmentedControl と Tabs は S / M / L / XL（06 の `segmented-control` と `tabs` の段。F/A/U の ToggleButtonGroup の XS は `action-button` の XS）、ほかは S / M / L / XL。MentionTextArea は TextArea と同じ S / M / L / XL、FauPicker は表の ActionButton と同じ S / M / L / XL。
 - 既定の大きさは、Spectrum 2 のその部品の既定にそろえる。M が既定で、Badge は S、Avatar は S（Spectrum 2 の既定の 24px が 06 の S）、ContextualHelp は XS、Popover は大きさを指定しなければ中身に合わせる。
-- size を受ける部品で 06 に値の無い段は、Spectrum 2 のトークン（`@adobe/spectrum-tokens`）の値を 06 に足し、出典を `$description` に書く。トークンに無い値（Popover・IllustratedMessage・Card / CardView の寸法など）は `@react-spectrum/s2` のコードの値を使い、同じく出典を書く。06 に値を足すのは size を受ける部品だけ。
+- 各段の値は、`docs/mockups` が示すものはモックアップの値にする（2026-10-17 のユーザーの決定。この基準は「どの部品がどの段を受けるか」を決めるだけ。たとえば spacious の画面の Button は L を受け、L の値は spacious の画面のモックアップの Button と同じなので M と同じになる）。モックアップが示さない段で 06 に値の無いものは、Spectrum 2 のトークン（`@adobe/spectrum-tokens`）の値を 06 に足し、出典を `$description` に書く。トークンに無い値（Popover・IllustratedMessage・Card / CardView の寸法など）は `@react-spectrum/s2` のコードの値を使い、同じく出典を書く。06 に値を足すのは size を受ける部品だけ。
 - size を受けない部品: Spectrum 2 の部品が size を持たず、06 にも値の無いもの（Heading / Text・Link・Well・FileTrigger・Flex / Stack / Grid / Container・Tray・Tooltip・Toast・Skeleton・InlineAlert・TableView / ListView / Tree（密度で変える）・Steps）と、枠・パネル・表示だけの独自の部品（SideNav / TabBar・AppFrame・PageFrame・RouterProvider・Panel・DiffText・QuestionCard・MetricTile・RowList・Slide・パターンの枠）。
 - タップ領域は、どの大きさでも `semantic.scale.{medium,large}.component.target-min` 以上にする（4.3）。見た目の高さが小さい部品は、最小の高さで広げる。
 - Link は、単独の行・リストに置く primary がタップ領域の下限を守る。文中に置く secondary は折り返すため、WCAG 2.5.5 / 2.5.8 の Inline の例外として下限を求めない。文中のリンクは読み物（29・30・ヒント・EXAMPLE）だけに置き、ほかの画面では単独の行にする（4.4「画面の組み方」。2026-10-12 のユーザーの決定）。
@@ -481,7 +482,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - Panel はデスクトップでは、開くとパネルへフォーカスを移し、パネルの中での Esc と閉じるボタン（「Close」）で閉じる（モーダルにしない）。閉じたときにフォーカスがパネルの中にあれば、開いたボタンへ戻す（💬 をもう一度押して閉じたときは、そのボタンのまま）。開いたまま別のパネル（💬 から 🕘）に替えると、新しいパネルへフォーカスを移す。本文の右の列には AppFrame が置き、AppFrame は本文の領域の幅とパネルの有無から、中のパターン D・F が2列で並べられるかを渡す（4.1）。タブレットの幅の右の引き出しとスマホのトレイはモーダルで、外側のタップと Esc でも閉じる。
 - Slide は 06 `semantic.print` の寸法を、置かれた幅に対する割合で描く（PDF のページを拡大・縮小したのと同じ見た目。サムネイルも同じ部品を小さく置く）。文字の大きさと文の切り方は P12 の `shrink` と文（API の `fitPitchDeck()` が決めたもの）に従い、数字のスライドの列の幅は `packages/domain` の `figureColumns()` で PDF と同じに分ける（文字の幅は、ブラウザが画面の書体で測る）。各ページのフッターは `pitchFooterText()` の文（PDF と同じ）を画面が渡す。「Too long for this slide. Shorten it in the plan.」の注意と「Edit source」「Edit in validation」は、スライドの外に画面が出す。
 - Avatar の頭文字は、表示名の最初の語と最後の語の1文字目を大文字にして並べる（1語なら1文字。「Ana Reyes」は AR）。文字は見た目の1文字（絵文字や日本語の1字）で数える。
-- MoonGlyph の `value` の月は、満ちる割合にかかわらずインクの色（Fact の満月と同じ）で描く（状態ではなく、埋まった量を示すため）。CheckDots は、「{確認項目の名前}: {状態}」を並べた文を、1つの画像の名前として読み上げる（例: 「Competitors (3–5): Done, Permits: Not started, …」）。Meter の凡例の件数は書式関数（`formatUnits()`）で出す。MetricTile は1つの指標だけを持ち、横一列や 2×2 の並びは画面がレイアウトの部品で作る。
+- MoonGlyph の `value` の月も、満ちる割合にかかわらずインクの色で描く。CheckDots は、「{確認項目の名前}: {状態}」を並べた文を、1つの画像の名前として読み上げる（例: 「Competitors (3–5): Done, Permits: Not started, …」）。Meter の凡例の件数は書式関数（`formatUnits()`）で出す。MetricTile は1つの指標だけを持ち、横一列や 2×2 の並びは画面がレイアウトの部品で作る。
 - DiffText の差分は、見た目の1文字（絵文字や日本語の1字）ごとの最小の差分にする。長い回答を書き直した変更は計算に時間がかかるので、計算は画面のすべての DiffText を合わせて1フレームの半分の時間ずつ進め、その間は変更前・変更後の文だけを出し、計算し終えたら印を付ける（画面を止めないため）。
 - MentionTextArea は、`@` を打ったとき（行の先頭か空白の後）と、その後に文字を打っているあいだだけ候補を出す。打った文字が、どのメンバーの名前の先頭にも、名前の中の語の先頭にも当たらなくなったら閉じる（名前を選んだ後に続けて打っても開かない）。カーソルを書いてある `@名前` へ動かしただけでは開かない。`@` の直後が空白なら、メンションにしない。メンションは本文に `@名前` が残っているあいだだけ数え（C1・C2 の `mentionUserIds`）、`@名前` を消すとメンションも外す。読み取り専用・無効の欄では開かない。
 - 開発専用の確認用ページ（`/dev/components`）に全部品を並べる。
@@ -573,7 +574,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | Unknown | 分からないと分かっている。文章の回答は、何が分からないかを書いてもよい。**数字は値を持たない** | 新月と「Unknown」 |
 | Fact（根拠なし） | Fact だが、根拠の調査ログが削除されて根拠が0件になった。利用者がこの状態を作ることはできず、調査ログの削除でだけ起きる | 「Fact · No evidence」と警告。F/A/U の内訳では Fact に数え、警告の件数を添える。13 の Next steps の「Add evidence」に出る |
 
-入力欄の下に3つのボタン `[Fact] [Assumption] [Unknown]` を並べる。値がないときは Fact と Assumption を押せない（Unknown だけ押せる）。表の行（17 の金額・18 の数字）では、行ごとにボタンを並べず、F/A/U の欄（FauPicker。4.5）に今の状態を出し、押すと開く Popover に同じ3つのボタンと確信度を出す（2026-10-12 のユーザーの決定。表をごちゃつかせないため）。スマホでは行をボトムシートで編集するので、シートの中にボタンで並べる。図では幅のため「Assm·H」「Fact·1 src」のように縮めて書くことがあるが、画面の表記は上の表のとおり。下の決まりはどちらも同じ。
+入力欄の下に3つのボタン `[Fact] [Assumption] [Unknown]` を並べる。値がないときは Fact と Assumption を押せない（Unknown だけ押せる）。表の行（17 の金額・18 の数字）では、行ごとにボタンを並べず、F/A/U の欄（FauPicker。4.5）に今の状態を出し、押すと開く Popover に同じ3つのボタンと確信度を出す（2026-10-12 のユーザーの決定。表をごちゃつかせないため）。スマホでは行をボトムシートで編集するので、シートの中にボタンで並べる。Popover とシートの中の3つのボタンと確信度は、どちらも幅いっぱいに広げ、ボタンが幅を分け合う（どのボタンも文字より狭くしない。`docs/mockups` の s17-costs.html。4.5 の ToggleButtonGroup・SegmentedControl の `isJustified`）。図では幅のため「Assm·H」「Fact·1 src」のように縮めて書くことがあるが、画面の表記は上の表のとおり。下の決まりはどちらも同じ。
 
 - **Fact** を押すと M2 を開く。根拠を1件以上付けると Fact になる。根拠を付けずに閉じたら、元の状態に戻す（根拠のない Fact を作らない）。
 - **Assumption** を押すと、その場に確信度の選択（Low / Medium / High）を出す。選ぶまでは確定しない。
@@ -1976,7 +1977,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 期限の通知（実行管理の期限が近い・過ぎた）は作らない（2026-10-03 のユーザーの決定。プランは北極星として使い、進捗の管理には使わないため）。期限は 5 の Due soon と 22 の Overdue で見る。
 
 - 各行: 誰が・何をしたか・どこで（アイデア名と項目）・日時。コメントとメンションは本文の冒頭、判定・Go / No-Go は理由の冒頭を1〜2行添え、移らずに要点が読めるようにする（2026-10-12 のユーザーの決定。4.1）。
-- 未読は太字。タブ（サイドバー）に未読数のバッジ。「Mark all as read」。絞り込み: All / Unread。
+- 未読は太字。ナビの Notifications に未読数（サイドバーは数字、TabBar はインクの札。4.5 Badge）。「Mark all as read」。絞り込み: All / Unread。
 - 自己分析へのコメントの通知は、その自己分析を読める人（本人と共有先の Owner / Member）にだけ送る。
 - ワークスペースから外れた人の通知は、押すと「You no longer have access」と出す。停止されたユーザーには通知を作らない。
 - 通知はワークスペースをまたいで1つの一覧に出し、各行にワークスペース名を添える。押すとそのワークスペースに切り替えて開く。

@@ -1,5 +1,6 @@
 import { type Size, sizes, vars } from "@moonx/ui-tokens";
 import { style, styleVariants } from "@vanilla-extract/css";
+import { typography } from "../styles/helpers";
 
 const sized = Object.fromEntries(sizes.map((size) => [size, size])) as Record<
   Size,
@@ -22,18 +23,22 @@ export const size = styleVariants(sized, (step) => ({
   fontSize: vars.scale.component.meter.fontSize[step],
 }));
 
-export const label = style({ fontWeight: vars.typography.label.fontWeight });
+/** The block's small heading above the band (d1-moon.html: "Fact / Assumption / Unknown"). */
+export const label = style({
+  ...typography("headingLabel"),
+  color: vars.color.text.secondary,
+});
 
 /**
- * The band: its segments side by side, a hairline apart so two shades never run into
- * each other. Without any count it is the empty track.
+ * The band: its segments side by side, a little apart so two shades never run into each
+ * other (d1-moon.html .fau-bar). Without any count it is the empty track.
  */
 export const band = styleVariants(sized, (step) => ({
   display: "flex",
-  gap: vars.borderWidth.hairline,
+  gap: vars.scale.component.meter.gap,
   height: vars.scale.component.meter.thickness[step],
   overflow: "hidden",
-  borderRadius: vars.radius.pill,
+  borderRadius: vars.scale.component.meter.radius,
   background: vars.color.control.track,
 }));
 
@@ -63,34 +68,43 @@ export const swatchEdge = style({
 export const legend = style({
   display: "flex",
   flexWrap: "wrap",
-  columnGap: vars.space["300"],
-  rowGap: vars.space["75"],
+  columnGap: vars.scale.component.meter.legendColumnGap,
+  rowGap: vars.scale.component.meter.legendRowGap,
   margin: 0,
   padding: 0,
   listStyle: "none",
 });
 
-export const entry = style({
-  display: "inline-flex",
-  alignItems: "center",
-  gap: vars.space["75"],
-});
+/** A name in secondary text; Unclassified's whole entry in the amber of attention. */
+export const entry = styleVariants(
+  { other: vars.color.text.secondary, unclassified: vars.color.notice.fg },
+  (color) => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: vars.space["85"],
+    color,
+  }),
+);
 
-/**
- * The swatch is the band's segment in small, the size of the marks beside labels at the
- * meter's step (06 component.status-light.dot-size).
- */
-export const swatch = styleVariants(sized, (step) => ({
+/** The band's segment in small (d1-moon.html .legend i). */
+export const swatch = style({
   display: "inline-block",
   flexShrink: 0,
-  width: vars.scale.component.statusLight.dotSize[step],
-  height: vars.scale.component.statusLight.dotSize[step],
-  borderRadius: vars.radius.chip,
-}));
-
-export const count = style({
-  fontFamily: vars.font.family.mono,
-  fontVariantNumeric: "tabular-nums",
+  width: vars.scale.component.meter.swatchSize,
+  height: vars.scale.component.meter.swatchSize,
+  borderRadius: vars.scale.component.meter.swatchRadius,
 });
 
-export const detail = style({ color: vars.color.text.secondary });
+/** The count in monospaced ink; inside Unclassified's entry, its amber. */
+export const count = style({
+  fontFamily: vars.font.family.mono,
+  fontWeight: vars.typography.number.fontWeight,
+  fontVariantNumeric: "tabular-nums",
+  color: vars.color.text.primary,
+  selectors: { [`${entry.unclassified} &`]: { color: "inherit" } },
+});
+
+export const detail = style({
+  color: vars.color.text.secondary,
+  selectors: { [`${entry.unclassified} &`]: { color: "inherit" } },
+});

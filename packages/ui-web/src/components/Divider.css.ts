@@ -17,8 +17,9 @@ export const divider = recipe({
     size: {
       S: {},
       M: {},
-      // The heavy rule under a section, as Spectrum's large divider (dark, not decorative).
-      L: { background: vars.color.border.strong },
+      // The heavy rule under a section, as Spectrum's large divider, in the light line of
+      // the mockups' rules (design-spec 4.4, 06 border.default).
+      L: { background: vars.color.border.default },
     },
   },
   compoundVariants: (["S", "M", "L"] as const).flatMap((size) => [

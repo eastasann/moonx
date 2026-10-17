@@ -29,7 +29,6 @@ export const item = recipe({
         border: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
         borderRadius: vars.radius.card,
         background: vars.color.surface.raised,
-        boxShadow: vars.shadow.raised,
       },
       false: {},
     },

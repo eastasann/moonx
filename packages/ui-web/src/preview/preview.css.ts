@@ -82,6 +82,12 @@ export const slidePlace = style({
   maxWidth: vars.layout.readingColumnMax,
 });
 
+/** As wide as a small Popover, for what fills a popover's width (FauPicker's buttons). */
+export const popoverWidth = style({
+  width: "100%",
+  maxWidth: vars.scale.component.popover.width.S,
+});
+
 export const thumbnailPlace = style({
   width: vars.layout.thumbnailColumnWidth,
 });

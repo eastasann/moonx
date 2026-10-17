@@ -37,7 +37,7 @@ export interface CardProps {
 
 /**
  * Something to look at beside others (15's competitors, 23's thumbnails; design-spec
- * 4.4・4.5): framed and raised, its content stacked. Inside a CardView it is one of the
+ * 4.4・4.5): framed without a shadow, its content stacked. Inside a CardView it is one of the
  * view's items and presses or is chosen as a whole, so it holds no buttons of its own:
  * actions sit outside it.
  */

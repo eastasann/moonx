@@ -3,8 +3,9 @@ import { style, styleVariants } from "@vanilla-extract/css";
 import { typography } from "../styles/helpers";
 
 /**
- * The alert's fill and text in its status colours (06 color.*.bg / fg); the edge and the
- * icon in the stronger one, which keeps 3:1 on the fill.
+ * The alert's fill in its status colour (06 color.*.bg) with ink text and no edge
+ * (s19-decision.html .alert); only the icon takes the status colour (06 *.fg), which keeps
+ * 4.5:1 on the fill.
  */
 export const alert = styleVariants(
   Object.fromEntries(statusVariants.map((v) => [v, v])) as Record<
@@ -14,12 +15,12 @@ export const alert = styleVariants(
   (variant) => ({
     display: "flex",
     alignItems: "flex-start",
-    gap: vars.space["200"],
-    padding: vars.density.regular.panelPadding,
+    gap: vars.scale.component.inlineAlert.gap,
+    paddingBlock: vars.scale.component.inlineAlert.paddingY,
+    paddingInline: vars.scale.component.inlineAlert.paddingX,
     background: vars.color[variant].bg,
-    borderInlineStart: `${vars.borderWidth.selectedIndicator} solid ${vars.color[variant].strong}`,
-    borderRadius: vars.radius.control,
-    color: vars.color[variant].fg,
+    borderRadius: vars.radius.callout,
+    color: vars.color.text.primary,
   }),
 );
 
@@ -31,7 +32,7 @@ export const icon = styleVariants(
   (variant) => ({
     display: "inline-flex",
     flexShrink: 0,
-    color: vars.color[variant].strong,
+    color: vars.color[variant].fg,
   }),
 );
 
@@ -41,11 +42,12 @@ export const content = style({
   gap: vars.space["75"],
   flex: "1 1 auto",
   minWidth: 0,
-  ...typography("bodySm"),
+  ...typography("callout"),
 });
 
 export const heading = style({
-  ...typography("label"),
+  ...typography("callout"),
+  fontWeight: vars.typography.heading4.fontWeight,
   margin: 0,
 });
 

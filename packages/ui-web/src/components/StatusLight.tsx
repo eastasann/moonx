@@ -2,22 +2,23 @@ import type { Size, StatusLightVariant } from "@moonx/ui-tokens";
 import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { IconSlot } from "../internal/IconSlot";
+import * as moonStyles from "../internal/moon.css";
 import { MoonGlyphAt } from "./MoonGlyph";
 import * as styles from "./StatusLight.css";
 
 const labelColour = {
-  fact: "fact",
-  done: "fact",
-  assumption: "assumption",
-  partial: "assumption",
-  unknown: "unknown",
-  "not-started": "unknown",
-  unclassified: "unclassified",
-  empty: "empty",
-  saving: "quiet",
-  saved: "quiet",
-  "save-failed": "failed",
-} as const satisfies Record<StatusLightVariant, keyof typeof styles.label>;
+  fact: moonStyles.labelColor.fact,
+  done: moonStyles.labelColor.done,
+  assumption: moonStyles.labelColor.assumption,
+  partial: moonStyles.labelColor.partial,
+  unknown: moonStyles.labelColor.unknown,
+  "not-started": moonStyles.labelColor["not-started"],
+  unclassified: moonStyles.labelColor.unclassified,
+  empty: moonStyles.labelColor.empty,
+  saving: styles.label.quiet,
+  saved: styles.label.quiet,
+  "save-failed": styles.label.failed,
+} as const satisfies Record<StatusLightVariant, string>;
 
 const saveIcons = {
   saving: <LoaderCircle />,
@@ -63,7 +64,7 @@ export function StatusLight({
   return (
     <span
       role={role}
-      className={`${styles.root[size]} ${styles.label[labelColour[variant]]}`}
+      className={`${styles.root[size]} ${labelColour[variant]}`}
     >
       {mark}
       <span>{children}</span>

@@ -39,7 +39,7 @@ export function CheckDots({ checks, size = "M" }: CheckDotsProps) {
     ),
   );
   return (
-    <span role="img" aria-label={label} className={styles.dots}>
+    <span role="img" aria-label={label} className={styles.dots[size]}>
       {checks.map(({ name, state }) => (
         <MoonGlyph key={name} state={state} size={size} />
       ))}

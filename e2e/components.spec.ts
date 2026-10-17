@@ -17,8 +17,8 @@ const scales = ["medium", "large"] as const;
 
 /** 06 semantic.color.{light,dark}.surface.canvas */
 const canvas = { light: "rgb(244, 245, 248)", dark: "rgb(14, 17, 32)" };
-/** A size M Button: 06 component.button.height.M, grown to target-min on large. */
-const buttonHeightM = { medium: 32, large: 44 };
+/** A size M Button: 06 component.button.height.M (docs/mockups), target-min on large. */
+const buttonHeightM = { medium: 36, large: 44 };
 /** 06 component.target-min: 24px with a mouse, 44px on touch (design-spec 4.3). */
 const targetMin = { medium: 24, large: 44 };
 
@@ -1651,8 +1651,8 @@ test.describe("the frame follows the width (design-spec 4.3・6.0.1)", () => {
         ),
       );
     }
-    // 06 typography.tab-label: 11px.
-    expect(sizes).toEqual(["11px", "11px"]);
+    // 06 typography.tab-label: 10.5px (moon-base.css .tabbar a).
+    expect(sizes).toEqual(["10.5px", "10.5px"]);
   });
 
   test("phone, large scale: the tab names fit without being cut short", async ({
@@ -2341,4 +2341,253 @@ test.describe("the keys between questions on each platform (design-spec 4.1 C)",
       await expect(answer("WHO")).toBeFocused();
     });
   }
+});
+
+/** The computed style of an element, by property (getComputedStyle). */
+const css = (locator: Locator, ...names: string[]) =>
+  locator.evaluate((node, list) => {
+    const style = getComputedStyle(node);
+    return Object.fromEntries(
+      list.map((name) => [name, style.getPropertyValue(name)]),
+    );
+  }, names);
+
+test.describe("the parts match docs/mockups (Step 22c, design-spec 4.4・4.5)", () => {
+  const mockups = "Mockup parts: type, frames, marks and basic parts";
+  /** 06 border.default: the mockups' --line-strong. */
+  const borderDefault = {
+    light: "rgb(198, 203, 216)",
+    dark: "rgb(58, 66, 99)",
+  };
+
+  for (const theme of themes) {
+    test(`desktop, ${theme}: type, frames, marks and sizes are the mockups'`, async ({
+      page,
+    }) => {
+      await openGallery(page, "desktop");
+      await choose(page, "Theme", theme);
+      await choose(page, "Scale", "medium");
+      const section = region(page, mockups);
+      await section.scrollIntoViewIfNeeded();
+
+      // Type (06 semantic.typography): body 15/1.55, the hub's title 30/600.
+      expect(
+        await css(
+          section.getByText("Ideas, self analyses and what is due"),
+          "font-size",
+          "line-height",
+        ),
+      ).toEqual({ "font-size": "15px", "line-height": "23.25px" });
+      expect(
+        await css(
+          section.getByRole("heading", { name: "BCDX" }),
+          "font-size",
+          "font-weight",
+        ),
+      ).toEqual({ "font-size": "30px", "font-weight": "600" });
+      expect(
+        await css(
+          section.getByRole("heading", { name: /^How painful/ }),
+          "font-size",
+        ),
+      ).toEqual({ "font-size": "21px" });
+
+      // Buttons: M 36px with corner 8; secondary and quiet in the medium weight; the
+      // secondary frame is the light line.
+      const send = section.getByRole("button", { name: "Send invitation" });
+      expect((await send.boundingBox())?.height).toBe(36);
+      expect(await css(send, "border-top-left-radius", "font-weight")).toEqual({
+        "border-top-left-radius": "8px",
+        "font-weight": "600",
+      });
+      expect(
+        await css(
+          section.getByRole("button", { name: "Resend" }),
+          "font-weight",
+        ),
+      ).toEqual({ "font-weight": "500" });
+      expect(
+        await css(
+          section.getByRole("button", { name: "Edit summary" }),
+          "border-top-color",
+          "font-weight",
+        ),
+      ).toEqual({
+        "border-top-color": borderDefault[theme],
+        "font-weight": "500",
+      });
+      const logIn = section.getByRole("button", { name: "Log in" });
+      expect((await logIn.boundingBox())?.height).toBe(48);
+      expect(await css(logIn, "font-size", "border-top-left-radius")).toEqual({
+        "font-size": "16px",
+        "border-top-left-radius": "10px",
+      });
+      const comments = section.getByRole("button", {
+        name: "Comments on this answer",
+      });
+      const box = await comments.boundingBox();
+      expect([box?.width, box?.height]).toEqual([36, 36]);
+      expect((await comments.locator("svg").boundingBox())?.width).toBe(18);
+
+      // A field L is 38px high in 15px type.
+      const name = section.getByRole("textbox", { name: "Name" });
+      expect(await css(name, "font-size")).toEqual({ "font-size": "15px" });
+      expect((await name.locator("xpath=..").boundingBox())?.height).toBe(38);
+
+      // Badges: the light frame; Overdue without one, monospaced; the count's ink tag.
+      expect(
+        await css(
+          // The badge comes before the radio of the same name.
+          section
+            .getByText("Proceed", { exact: true })
+            .first()
+            .locator("xpath=.."),
+          "border-top-color",
+        ),
+      ).toEqual({ "border-top-color": borderDefault[theme] });
+      const overdue = section
+        .getByText("overdue 3d", { exact: true })
+        .locator("xpath=..");
+      expect(
+        await css(overdue, "border-top-width", "font-family"),
+      ).toMatchObject({ "border-top-width": "0px" });
+      expect((await css(overdue, "font-family"))["font-family"]).toContain(
+        "IBM Plex Mono",
+      );
+      // The specimen's tag comes before the Meter, whose counts read "3" too.
+      const count = section
+        .getByText("3", { exact: true })
+        .first()
+        .locator("xpath=..");
+      expect((await count.boundingBox())?.height).toBe(15);
+
+      // Avatar: a rounded square of 28px, corner 8.
+      const avatar = section.getByText("AV", { exact: true });
+      expect((await avatar.boundingBox())?.width).toBe(28);
+      expect(await css(avatar, "border-top-left-radius")).toEqual({
+        "border-top-left-radius": "8px",
+      });
+
+      // CheckDots S: 12px moons, 3px apart.
+      const dots = section.getByRole("img", { name: /^Competitors/ });
+      expect(await css(dots, "column-gap")).toEqual({ "column-gap": "3px" });
+      expect((await dots.locator("svg").first().boundingBox())?.width).toBe(12);
+
+      // The groove: canvas inside the light frame, corner 9; the chosen one in ink.
+      const groove = section.getByRole("radiogroup", { name: "Invitations" });
+      expect(
+        await css(groove, "border-top-color", "border-top-left-radius"),
+      ).toEqual({
+        "border-top-color": borderDefault[theme],
+        "border-top-left-radius": "9px",
+      });
+
+      // Checkbox 18px, corner 5.
+      const checkbox = section
+        .getByText("Apply this change")
+        .locator("xpath=preceding-sibling::span[1]");
+      const checkboxBox = await checkbox.boundingBox();
+      expect([checkboxBox?.width, checkboxBox?.height]).toEqual([18, 18]);
+      expect(await css(checkbox, "border-top-left-radius")).toEqual({
+        "border-top-left-radius": "5px",
+      });
+
+      // InlineAlert: no edge band, ink text, corner 10.
+      const alert = section.getByRole("alert");
+      expect(
+        await css(alert, "border-left-width", "border-top-left-radius"),
+      ).toEqual({
+        "border-left-width": "0px",
+        "border-top-left-radius": "10px",
+      });
+
+      // Meter: the band 10px high with corner 3.
+      const band = section
+        .getByRole("figure", { name: "Fact / Assumption / Unknown" })
+        .locator("[aria-hidden='true']")
+        .first();
+      expect((await band.boundingBox())?.height).toBe(10);
+      expect(await css(band, "border-top-left-radius")).toEqual({
+        "border-top-left-radius": "3px",
+      });
+
+      // A card has no shadow; a lone link's underline is the light line.
+      expect(
+        await css(
+          section.getByText("Salad Station").locator("xpath=.."),
+          "box-shadow",
+        ),
+      ).toEqual({ "box-shadow": "none" });
+      expect(
+        await css(
+          section.getByRole("link", { name: "See all decisions" }),
+          "text-decoration-color",
+        ),
+      ).toEqual({ "text-decoration-color": borderDefault[theme] });
+    });
+  }
+
+  test("a justified groove fills the line, no segment narrower than its label (FauPicker, 6.0.3)", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const groove = region(
+      page,
+      "ToggleButtonGroup and SegmentedControl",
+    ).getByRole("radiogroup", { name: "F/A/U justified" });
+    await groove.scrollIntoViewIfNeeded();
+    const segments = await groove.getByRole("radio").evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        width: node.getBoundingClientRect().width,
+        clipped: node.scrollWidth > node.clientWidth,
+      })),
+    );
+    expect(segments).toHaveLength(3);
+    expect(segments.some(({ clipped }) => clipped)).toBe(false);
+    const inner = await groove.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return (
+        node.clientWidth -
+        Number.parseFloat(style.paddingLeft) -
+        Number.parseFloat(style.paddingRight)
+      );
+    });
+    // Three segments and the two 2px gaps between them fill the groove.
+    const sum = segments.reduce((total, { width }) => total + width, 0);
+    expect(Math.abs(sum + 4 - inner)).toBeLessThanOrEqual(1);
+  });
+
+  test("tablet: field text is 16px on touch, the mockups' 15px with a mouse (4.3)", async ({
+    page,
+  }) => {
+    await openGallery(page, "tablet");
+    const field = region(page, mockups).getByRole("textbox", { name: "Name" });
+    await choose(page, "Scale", "large");
+    expect(await css(field, "font-size")).toEqual({ "font-size": "16px" });
+    await choose(page, "Scale", "medium");
+    expect(await css(field, "font-size")).toEqual({ "font-size": "15px" });
+  });
+
+  test("phone: the mockups' 390px type; large raises only what is pressed", async ({
+    page,
+  }) => {
+    await openGallery(page, "mobile");
+    await choose(page, "Theme", "light");
+    const section = region(page, mockups);
+    const body = section.getByText("Ideas, self analyses and what is due");
+    const field = section.getByRole("textbox", { name: "Name" });
+    const send = section.getByRole("button", { name: "Send invitation" });
+    for (const scale of scales) {
+      await choose(page, "Scale", scale);
+      await section.scrollIntoViewIfNeeded();
+      // Text follows the width, not the scale (design-spec 4.3).
+      expect(await css(body, "font-size")).toEqual({ "font-size": "16px" });
+      expect(await css(field, "font-size")).toEqual({ "font-size": "16px" });
+      expect(
+        await css(section.getByRole("heading", { name: "BCDX" }), "font-size"),
+      ).toEqual({ "font-size": "26px" });
+      expect(await css(send, "font-size")).toEqual({ "font-size": "14px" });
+      expect((await send.boundingBox())?.height).toBe(buttonHeightM[scale]);
+    }
+  });
 });

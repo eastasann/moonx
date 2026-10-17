@@ -682,7 +682,7 @@ describe("other variants", () => {
     expect(list("Column")).not.toBe(list("Row"));
   });
 
-  test("ToggleButtonGroup: quiet looks different; multiple selection keeps several", async () => {
+  test("ToggleButtonGroup: quiet drops the groove, isJustified fills the line; multiple selection keeps several", async () => {
     const user = userEvent.setup();
     render(
       <div>
@@ -692,15 +692,19 @@ describe("other variants", () => {
         <ToggleButtonGroup aria-label="quiet" isQuiet>
           <ToggleButton id="q">Quiet</ToggleButton>
         </ToggleButtonGroup>
+        <ToggleButtonGroup aria-label="justified" isJustified>
+          <ToggleButton id="j">Justified</ToggleButton>
+        </ToggleButtonGroup>
         <ToggleButtonGroup aria-label="Filters" selectionMode="multiple">
           <ToggleButton id="open">Open</ToggleButton>
           <ToggleButton id="mine">Mine</ToggleButton>
         </ToggleButtonGroup>
       </div>,
     );
-    expect(screen.getByRole("radio", { name: "Plain" }).className).not.toBe(
-      screen.getByRole("radio", { name: "Quiet" }).className,
-    );
+    const groove = (name: string) =>
+      screen.getByRole("radiogroup", { name }).className;
+    expect(groove("plain")).not.toBe(groove("quiet"));
+    expect(groove("plain")).not.toBe(groove("justified"));
     const open = screen.getByRole("button", { name: "Open" });
     const mine = screen.getByRole("button", { name: "Mine" });
     await user.click(open);

@@ -6,12 +6,16 @@ import * as styles from "./typography.css";
 
 export interface TextProps {
   /**
-   * `body-long` keeps typed line breaks and opens the leading for long answers; `number`
-   * is the monospaced face for amounts and counts (design-spec 4.4).
+   * `body-long` keeps typed line breaks and opens the leading for long answers; `lead` is
+   * the landing's opening sentence; `number` is the monospaced face for amounts and counts
+   * (design-spec 4.4).
    * @default "body"
    */
   variant?: TextVariant;
-  /** @default "primary" */
+  /**
+   * `notice` is the amber of attention ("Not classified yet", 6.2).
+   * @default "secondary" for `lead` (06 semantic.typography.lead), "primary" otherwise
+   */
   tone?: TextTone;
   /** @default "span" */
   elementType?: "span" | "p" | "div";
@@ -24,7 +28,7 @@ export interface TextProps {
 /** Body text in one of the 06 typography styles; inside a loading `Skeleton`, its bar. */
 export function Text({
   variant = "body",
-  tone = "primary",
+  tone = variant === "lead" ? "secondary" : "primary",
   elementType = "span",
   children,
   ...props

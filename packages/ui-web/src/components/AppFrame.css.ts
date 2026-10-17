@@ -173,11 +173,19 @@ export const saveState = style({
   gap: vars.space["100"],
 });
 
-/** 💬 and, beside it, the count of unresolved threads. */
+/** 💬, holding the count of unresolved threads over its corner. */
 export const comments = style({
+  position: "relative",
   display: "flex",
-  alignItems: "center",
-  gap: vars.space["50"],
+});
+
+/** Over the top right corner of 💬, letting presses through to the button. */
+export const commentsCount = style({
+  position: "absolute",
+  insetBlockStart: vars.space["50"],
+  insetInlineEnd: vars.space["50"],
+  display: "flex",
+  pointerEvents: "none",
 });
 
 /** The body and, on a desktop, the open panel in the column at its right. */

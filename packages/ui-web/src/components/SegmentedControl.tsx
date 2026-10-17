@@ -21,7 +21,7 @@ export interface SegmentedControlProps {
   isDisabled?: boolean;
   /** @default "M" */
   size?: Size;
-  /** Fills the line, the segments sharing it equally. */
+  /** Fills the line, the segments sharing it, none narrower than its label. */
   isJustified?: boolean;
   id?: string;
   "aria-label"?: string;

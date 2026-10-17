@@ -61,6 +61,7 @@ import {
   FrameSection,
   PageFrameSection,
 } from "./FrameSection";
+import { MockupBasicsSection } from "./MockupSection";
 import {
   BreadcrumbsSection,
   DisclosureSection,
@@ -221,6 +222,7 @@ export function ComponentGallery() {
           <SettingsPatternSection />
           <PresentationPatternSection />
           <PublicPatternSection />
+          <MockupBasicsSection />
         </Stack>
       </Container>
       <FramePanelSection />

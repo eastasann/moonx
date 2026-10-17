@@ -9,20 +9,21 @@ export const text = style({
   overflowWrap: "break-word",
 });
 
-const changed = {
-  background: vars.color.surface.sunken,
-  color: vars.color.text.primary,
-  textDecorationThickness: vars.borderWidth.focusRing,
-  textDecorationColor: vars.color.text.primary,
-} as const;
-
+/** Removed text struck through in secondary, on the sunken surface (s25-import.html del). */
 export const removed = style({
-  ...changed,
+  background: vars.color.surface.sunken,
+  color: vars.color.text.secondary,
   textDecorationLine: "line-through",
+  textDecorationThickness: vars.scale.component.diffText.removedThickness,
+  textDecorationColor: vars.color.text.secondary,
 });
 
+/** Added text underlined a little below the letters, on the sunken surface (ins). */
 export const added = style({
-  ...changed,
+  background: vars.color.surface.sunken,
+  color: vars.color.text.primary,
   textDecorationLine: "underline",
-  textUnderlineOffset: vars.space["50"],
+  textDecorationThickness: vars.scale.component.diffText.addedThickness,
+  textDecorationColor: vars.color.text.primary,
+  textUnderlineOffset: vars.scale.component.diffText.addedOffset,
 });

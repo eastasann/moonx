@@ -21,15 +21,10 @@ export const root = styleVariants(sized, (size) => ({
 }));
 
 /**
- * Label colours (06 color.fau.*.fg): F/A/U and the check states read in their ink, the
- * unclassified one in amber; Couldn't save in the red of errors (4.4).
+ * The save states' label colours: Couldn't save in the red of errors (4.4). F/A/U and the
+ * check states take their marks' label colours (internal/moon.css `labelColor`).
  */
 export const label = styleVariants({
-  fact: { color: vars.color.fau.fact.fg },
-  assumption: { color: vars.color.fau.assumption.fg },
-  unknown: { color: vars.color.fau.unknown.fg },
-  unclassified: { color: vars.color.fau.unclassified.fg },
-  empty: { color: vars.color.fau.empty.fg },
   quiet: { color: vars.color.text.secondary },
   failed: { color: vars.color.negative.fg },
 });

@@ -11,6 +11,7 @@ import {
 export const link = recipe({
   base: {
     ...hoverTransition,
+    transitionProperty: "color, text-decoration-color",
     color: vars.color.text.link,
     textDecorationLine: "underline",
     textDecorationThickness: vars.borderWidth.hairline,
@@ -28,17 +29,33 @@ export const link = recipe({
   variants: {
     variant: {
       // Standalone on a row or in a list: keeps the minimum target (design-spec 4.5).
+      // Its text names it, so the underline is the light line (d1-moon.html .textlink),
+      // darkening on hover.
       primary: {
-        ...typography("label"),
+        ...typography("link"),
         display: "inline-flex",
         alignItems: "center",
         minHeight: atLeastTarget("0px"),
         minWidth: vars.scale.component.targetMin,
+        textDecorationColor: vars.color.border.default,
+        textUnderlineOffset: vars.space["75"],
+        selectors: {
+          "&[data-hovered]": { textDecorationColor: vars.color.text.link },
+        },
       },
       // Inside running text: wraps with it, so it takes the inline exception of WCAG
       // 2.5.5 / 2.5.8 and inherits the text's font.
       secondary: { font: "inherit" },
     },
+    isQuiet: {
+      true: {
+        textDecorationLine: "none",
+        selectors: {
+          "&[data-hovered]": { textDecorationLine: "underline" },
+        },
+      },
+      false: {},
+    },
   },
-  defaultVariants: { variant: "primary" },
+  defaultVariants: { variant: "primary", isQuiet: false },
 });

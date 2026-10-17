@@ -116,12 +116,11 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
     expect([...dialogSizes]).toEqual([...dialogWidths, "fullscreen"]);
   });
 
-  test("MoonGlyph sizes are steps of status-light.dot-size, which draws its mark", () => {
-    const dotSizes = keysAfter(
-      "semantic.scale.medium.component.status-light.dot-size",
-    );
-    for (const size of moonGlyphSizes) {
-      expect(dotSizes).toContain(size);
+  test("MoonGlyph sizes are the keys of moon-glyph.size and check-dots.gap", () => {
+    for (const group of ["moon-glyph.size", "check-dots.gap"]) {
+      expect(keysAfter(`semantic.scale.medium.component.${group}`)).toEqual([
+        ...moonGlyphSizes,
+      ]);
     }
   });
 
@@ -139,8 +138,8 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
 
   test("sizes are the keys of every component dimension sized S to XL", () => {
     // Groups such as icon.size (XS–XL), action-button, card and card-view (XS–XL),
-    // avatar.size (S–M), tag, progress-circle, popover and illustrated-message (S–L) and
-    // breadcrumbs (M–L) have their own lists.
+    // avatar and moon-glyph (S–M), tag, progress-circle, popover and illustrated-message
+    // (S–L) and breadcrumbs (M–L) have their own lists.
     const groups = paths
       .filter((path) =>
         /^semantic\.scale\.medium\.component\.[^.]+\.[^.]+\.(S|M|L|XL)$/.test(
@@ -151,7 +150,9 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
     const sized = [...new Set(groups)].filter(
       (group) =>
         !group.endsWith(".icon.size") &&
-        !group.endsWith(".avatar.size") &&
+        !group.includes(".avatar.") &&
+        !group.includes(".moon-glyph.") &&
+        !group.includes(".check-dots.") &&
         !group.includes(".action-button.") &&
         !group.includes(".tag.") &&
         !group.includes(".progress-circle.") &&

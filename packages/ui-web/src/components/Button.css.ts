@@ -15,7 +15,6 @@ export const button = recipe({
     gap: vars.space["100"],
     margin: 0,
     border: `${vars.borderWidth.strong} solid transparent`,
-    borderRadius: vars.radius.control,
     fontFamily: vars.typography.button.fontFamily,
     fontWeight: vars.typography.button.fontWeight,
     letterSpacing: vars.typography.button.letterSpacing,
@@ -48,12 +47,15 @@ export const button = recipe({
           "&[data-pressed]": { background: vars.color.control.primaryPressed },
         },
       },
+      // Its text names it, so its frame is the light one (06 border.default).
       secondary: {
         background: vars.color.control.secondary,
-        borderColor: vars.color.border.strong,
+        borderColor: vars.color.border.default,
         color: vars.color.control.onSecondary,
+        fontWeight: vars.typography.label.fontWeight,
         selectors: {
-          "&[data-hovered]": { background: vars.color.control.secondaryHover },
+          // The frame darkens, not the fill (moon-base.css .btn:hover).
+          "&[data-hovered]": { borderColor: vars.color.border.strong },
           "&[data-pressed]": {
             background: vars.color.control.secondaryPressed,
           },
@@ -69,13 +71,18 @@ export const button = recipe({
         },
       },
     },
-    // Supporting actions: no fill, no border.
+    // Supporting actions (moon-base.css .btn.quiet).
     isQuiet: {
       true: {
         background: "transparent",
         borderColor: "transparent",
+        fontWeight: vars.typography.label.fontWeight,
         selectors: {
-          "&[data-hovered]": { background: vars.color.surface.hover },
+          // No frame on hover either: secondary's darker frame is for its framed look.
+          "&[data-hovered]": {
+            background: vars.color.surface.hover,
+            borderColor: "transparent",
+          },
           "&[data-pressed]": {
             background: vars.color.control.secondaryPressed,
           },
@@ -91,6 +98,7 @@ export const button = recipe({
           minWidth: vars.scale.component.targetMin,
           paddingInline: vars.scale.component.button.paddingX[size],
           fontSize: vars.scale.component.button.fontSize[size],
+          borderRadius: vars.scale.component.button.radius[size],
         },
       ]),
     ) as Record<
@@ -100,10 +108,17 @@ export const button = recipe({
         minWidth: string;
         paddingInline: string;
         fontSize: string;
+        borderRadius: string;
       }
     >,
   },
   compoundVariants: [
+    ...sizes.map((size) => ({
+      variants: { isQuiet: true, size },
+      style: {
+        paddingInline: vars.scale.component.button.paddingXQuiet[size],
+      },
+    })),
     {
       variants: { variant: "primary", isQuiet: true },
       style: { color: vars.color.text.primary },

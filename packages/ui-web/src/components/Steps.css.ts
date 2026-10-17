@@ -48,7 +48,7 @@ const markerBase = {
   boxSizing: "border-box",
   borderRadius: vars.radius.pill,
   border: `${vars.borderWidth.strong} solid ${vars.color.border.strong}`,
-  fontSize: vars.scale.fontSize["75"],
+  fontSize: vars.typography.caption.fontSize,
   fontVariantNumeric: "tabular-nums",
 } as const;
 

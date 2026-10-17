@@ -70,10 +70,13 @@ export function LayoutSection() {
 export function TypographySection() {
   return (
     <Section title="Typography">
-      <Specimen name="Heading level 1–4, display, label">
+      <Specimen name="Heading level 1–4, display, display-2, label">
         <Stack gap="space-200">
           <Heading level={3} variant="display">
-            Think it through at night
+            From idea to a plan you can show.
+          </Heading>
+          <Heading level={3} variant="display-2">
+            Three parts, in the order founders need them.
           </Heading>
           <Heading level={1}>Heading 1: the screen title</Heading>
           <Heading level={2}>Heading 2</Heading>
@@ -81,6 +84,28 @@ export function TypographySection() {
           <Heading level={4}>Heading 4</Heading>
           <Heading level={3} variant="label">
             Next steps
+          </Heading>
+        </Stack>
+      </Specimen>
+      <Specimen name="Heading variant: the screen titles of the patterns, the question">
+        <Stack gap="space-200">
+          <Heading level={3} variant="heading-1-hub">
+            BCDX
+          </Heading>
+          <Heading level={3} variant="heading-1-list">
+            Ideas
+          </Heading>
+          <Heading level={3} variant="heading-1-steps">
+            Import from AI
+          </Heading>
+          <Heading level={3} variant="heading-1-settings">
+            Workspace settings
+          </Heading>
+          <Heading level={3} variant="heading-1-toolbar">
+            Pitch Deck
+          </Heading>
+          <Heading level={3} variant="heading-question">
+            How painful or costly is this problem for them today?
           </Heading>
         </Stack>
       </Specimen>
@@ -93,6 +118,10 @@ export function TypographySection() {
             }
           </Text>
           <Text variant="body-sm">Body small for supporting text.</Text>
+          <Text variant="lead" elementType="p">
+            Know yourself, test a local business idea, and write a plan you can
+            show to a partner or a bank.
+          </Text>
           <Text variant="caption">Caption · 2h ago</Text>
           <Text variant="label">Label</Text>
           <Text variant="number">₱1,234,567.89</Text>
@@ -103,6 +132,7 @@ export function TypographySection() {
           <Text tone="primary">Primary</Text>
           <Text tone="secondary">Secondary</Text>
           <Text tone="tertiary">Tertiary</Text>
+          <Text tone="notice">Notice</Text>
           <Text tone="negative">Negative</Text>
         </Flex>
       </Specimen>
@@ -155,6 +185,16 @@ export function LinkSection() {
           </Link>{" "}
           before you start.
         </Text>
+      </Specimen>
+      <Specimen name="isQuiet (the footer's links: no underline until hovered)">
+        <Flex gap="space-400" wrap>
+          <Link isQuiet href="#privacy">
+            Privacy Policy
+          </Link>
+          <Link isQuiet href="#support">
+            Support
+          </Link>
+        </Flex>
       </Specimen>
       <Specimen name="isDisabled">
         <Link isDisabled>See all decisions</Link>

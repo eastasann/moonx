@@ -43,9 +43,10 @@ export const trigger = recipe({
     border: "none",
     borderRadius: vars.radius.control,
     background: "transparent",
-    color: vars.color.text.primary,
-    fontFamily: vars.typography.heading4.fontFamily,
-    fontWeight: vars.typography.heading4.fontWeight,
+    // The title in secondary at the medium weight (s11-form.html .discl summary).
+    color: vars.color.text.secondary,
+    fontFamily: vars.typography.label.fontFamily,
+    fontWeight: vars.typography.label.fontWeight,
     lineHeight: vars.typography.label.lineHeight,
     textAlign: "start",
     cursor: "pointer",

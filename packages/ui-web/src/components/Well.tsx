@@ -13,7 +13,7 @@ export interface WellProps {
 }
 
 /**
- * A recessed block of material read together: the summary on 19, the preview on 24
+ * A framed block of material read together: the summary on 19, the preview on 24
  * (design-spec 4.4「画面の組み方」).
  */
 export function Well({ density = "regular", children, ...props }: WellProps) {

@@ -9,16 +9,53 @@ export interface DiffPart {
 const segmenter = new Intl.Segmenter(LOCALE, { granularity: "word" });
 
 const space = /\s/u;
-/** Scripts written without spaces between words: their words are the segmenter's. */
+/**
+ * Scripts written without spaces between words: their words are the segmenter's. Korean
+ * is written with spaces, so it is not one of them.
+ */
 const unspaced =
-  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/u;
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u;
+
+const punctuation = /\p{P}/u;
+/** Marks and joiners, which belong to the character before them ("‼️", "#️⃣"). */
+const attached = /[\p{M}\u200D]/u;
+
+/**
+ * A word with the punctuation at its ends split off ("meals." is "meals" and "."), so a
+ * word whose punctuation alone changed stays unmarked (s25-import.html). A punctuation
+ * character goes with the marks after it ("‼️"); punctuation inside the word stays
+ * ("25–40"), as does a run that is all punctuation ("#️⃣"), and words in scripts written
+ * without spaces keep the punctuation after them. Scanned from each end rather than by one
+ * pattern, which would backtrack across a long run of punctuation.
+ */
+function splitEdges(token: string): string[] {
+  if (space.test(token[0] ?? " ") || unspaced.test(token)) return [token];
+  let start = 0;
+  while (start < token.length && punctuation.test(token[start] ?? "")) {
+    start++;
+    while (start < token.length && attached.test(token[start] ?? "")) start++;
+  }
+  let end = token.length;
+  while (end > start) {
+    let mark = end;
+    while (mark > start && attached.test(token[mark - 1] ?? "")) mark--;
+    if (mark > start && punctuation.test(token[mark - 1] ?? "")) end = mark - 1;
+    else break;
+  }
+  if (start === end) return [token];
+  return [
+    token.slice(0, start),
+    token.slice(start, end),
+    token.slice(end),
+  ].filter((part) => part !== "");
+}
 
 /**
  * The words of `text` as the diff compares them (design-spec 4.5 DiffText): each run of
- * letters and figures with the punctuation in and around it ("25–40", "meals.",
- * "(L9)"), each run of spaces, and in scripts written without spaces (Japanese) each word
- * the segmenter finds, with the punctuation after it ("です。"). Joined again, they are
- * the text.
+ * letters and figures with the punctuation inside it ("25–40"), the punctuation at its
+ * ends as words of their own ("meals" and "."; "(", "L9" and ")"), each run of spaces,
+ * and in scripts written without spaces (Japanese) each word the segmenter finds, with
+ * the punctuation after it ("です。"). Joined again, they are the text.
  */
 export function words(text: string): string[] {
   const out: string[] = [];
@@ -44,7 +81,7 @@ export function words(text: string): string[] {
       isUnspaced = segmentIsUnspaced;
     }
   }
-  return out;
+  return out.flatMap(splitEdges);
 }
 
 /**
@@ -241,12 +278,64 @@ let resetPending = false;
 const keyOf = (before: string, after: string) =>
   `${before.length}:${before}${after}`;
 
+/** A word that is only punctuation, with the marks that belong to it. */
+const punctuationWord = /^\p{P}[\p{P}\p{M}\u200D]*$/u;
+
+/**
+ * The runs with each rewrite marked whole: a run of changes, with the punctuation both
+ * sides share between them ("Rice, eggs" to "Fish, milk, bread" share ","), becomes one
+ * change when it both deletes and inserts, so a shared comma does not cut the rewritten
+ * phrase's mark in two (design-spec 4.5). Punctuation between changes that only insert
+ * (or only delete) stays unmarked, as the other side has it unchanged. Done on the words,
+ * before the spaces are put back, so the space both sides share before a change still
+ * stays unmarked.
+ */
+function joinRewrites(runs: Run[]): Run[] {
+  const out: Run[] = [];
+  let chain: Run[] = [];
+  let deletes = false;
+  let inserts = false;
+  const close = () => {
+    // Punctuation after the chain's last change is not between changes.
+    let last = chain.length;
+    while (last > 0 && chain[last - 1]?.kind === "equal") last--;
+    chain.forEach((run, index) => {
+      if (run.kind === "equal" && index < last && deletes && inserts) {
+        out.push({ kind: "delete", words: run.words });
+        out.push({ kind: "insert", words: run.words });
+      } else {
+        out.push(run);
+      }
+    });
+    chain = [];
+    deletes = false;
+    inserts = false;
+  };
+  for (const run of runs) {
+    if (run.kind === "delete") deletes = true;
+    if (run.kind === "insert") inserts = true;
+    if (run.kind !== "equal") {
+      chain.push(run);
+    } else if (
+      chain.length > 0 &&
+      run.words.every((word) => punctuationWord.test(word))
+    ) {
+      chain.push(run);
+    } else {
+      close();
+      out.push(run);
+    }
+  }
+  close();
+  return out;
+}
+
 /**
  * The parts of a diff of words, with each side's spaces put back: an equal word keeps
  * the space before it as equal where both sides have the same, a changed word takes its
  * own. A change is one deletion and then one insertion, so a rewritten phrase is marked
- * whole ("meals, mostly in BPO…" in s25-import.html), and the space the two sides share
- * before it stays unmarked.
+ * whole ("Rice, eggs" to "Fish, milk, bread", with `joinRewrites`), and the space the
+ * two sides share before it stays unmarked.
  */
 function assemble(runs: Run[], before: Side, after: Side): DiffPart[] {
   const parts: DiffPart[] = [];
@@ -285,7 +374,7 @@ function assemble(runs: Run[], before: Side, after: Side): DiffPart[] {
   };
   let i = 0;
   let j = 0;
-  for (const run of runs) {
+  for (const run of joinRewrites(runs)) {
     for (const word of run.words) {
       if (run.kind === "equal") {
         gaps(before.gaps[i] ?? "", after.gaps[j] ?? "");
@@ -474,8 +563,9 @@ export function waitForDiff(
 
 /**
  * What changed from `before` to `after`, word by word (`words`; PNL-2 and 25 ③,
- * design-spec 4.5), worked out to the end: the fewest words changed, in reading order,
- * a change's deletion before its insertion (`assemble`).
+ * design-spec 4.5), worked out to the end: the fewest words changed, except the shared
+ * punctuation a rewrite takes in (`joinRewrites`), in reading order, a change's deletion
+ * before its insertion (`assemble`).
  */
 export function diffText(before: string, after: string): DiffPart[] {
   const key = keyOf(before, after);

@@ -741,9 +741,9 @@ describe("DiffText", () => {
     );
     const before = document.querySelector("del")?.parentElement?.textContent;
     const after = document.querySelector("ins")?.parentElement?.textContent;
-    // Word by word, the punctuation with its word (design-spec 4.5).
-    expect(removed).toEqual(["workers."]);
-    expect(added).toEqual(["staff in Bacolod."]);
+    // Word by word; the full stop both sides end with is not a change (design-spec 4.5).
+    expect(removed).toEqual(["workers"]);
+    expect(added).toEqual(["staff in Bacolod"]);
     expect(before).toBe("Office workers.");
     expect(after).toBe("Office staff in Bacolod.");
   });

@@ -1262,10 +1262,10 @@ test.describe("what the mockups show at a glance (Step 22i, design-spec 4.5)", (
     const item = page.getByRole("region", {
       name: "01 · WHO Who is the primary paying customer?",
     });
-    await expect(item.locator("del")).toHaveText(["25–40", "meals."]);
+    await expect(item.locator("del")).toHaveText(["25–40"]);
     await expect(item.locator("ins")).toHaveText([
       "25–45",
-      "meals, mostly in BPO offices on Lacson St.",
+      ", mostly in BPO offices on Lacson St",
     ]);
     const unchanged = page.getByRole("button", { name: "3 unchanged answers" });
     const row = unchanged.locator("xpath=ancestor::div[1]");

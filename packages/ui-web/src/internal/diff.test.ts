@@ -86,21 +86,39 @@ describe("diffText", () => {
     );
   });
 
-  test("a changed word is marked whole, with its punctuation (s25-import.html)", () => {
+  test("a changed word is marked whole; punctuation at its ends is not part of it (s25-import.html)", () => {
     const parts = diffText(
       "Working professionals aged 25–40 in Bacolod who pay for convenient meals.",
       "Working professionals aged 25–45 in Bacolod who pay for convenient meals, mostly in BPO offices on Lacson St.",
     );
-    const changed = parts.filter((part) => part.kind !== "equal");
-    expect(changed).toEqual(
-      expect.arrayContaining([
-        { kind: "delete", text: "25–40" },
-        { kind: "insert", text: "25–45" },
-        { kind: "delete", text: "meals." },
-        { kind: "insert", text: "meals, mostly in BPO offices on Lacson St." },
-      ]),
-    );
-    expect(changed).toHaveLength(4);
+    expect(parts.filter((part) => part.kind !== "equal")).toEqual([
+      { kind: "delete", text: "25–40" },
+      { kind: "insert", text: "25–45" },
+      { kind: "insert", text: ", mostly in BPO offices on Lacson St" },
+    ]);
+  });
+
+  test("punctuation inside a word stays with it; at its ends it is a word of its own", () => {
+    expect(words("aged 25–40 (L9) meals. ₱150 14.4+ ... です。")).toEqual([
+      "aged",
+      " ",
+      "25–40",
+      " ",
+      "(",
+      "L9",
+      ")",
+      " ",
+      "meals",
+      ".",
+      " ",
+      "₱150",
+      " ",
+      "14.4+",
+      " ",
+      "...",
+      " ",
+      "です。",
+    ]);
   });
 
   test("a space never stands in for a word the two sides share; a changed space is marked", () => {
@@ -113,15 +131,18 @@ describe("diffText", () => {
     ]);
   });
 
-  test("words: spaces apart, punctuation kept with its word, Japanese by its words", () => {
+  test("words: spaces apart, punctuation at a word's ends apart, Japanese by its words", () => {
     expect(words("aged (25–40) in Bacolod.")).toEqual([
       "aged",
       " ",
-      "(25–40)",
+      "(",
+      "25–40",
+      ")",
       " ",
       "in",
       " ",
-      "Bacolod.",
+      "Bacolod",
+      ".",
     ]);
     const japanese = words("毎日の昼食を作るのは大変です。");
     expect(japanese.join("")).toBe("毎日の昼食を作るのは大変です。");
@@ -138,8 +159,13 @@ describe("diffText", () => {
     // (joined one by one, a quadratic split takes most of a second here).
     const long = "a,".repeat(80_000);
     const started = performance.now();
-    expect(words(long)).toEqual([long]);
+    expect(words(long)).toEqual([long.slice(0, -1), ","]);
     expect(performance.now() - started).toBeLessThan(200);
+    // Punctuation at a word's end is split off in time linear in its length too.
+    const trailing = `a${",".repeat(160_000)}`;
+    const startedTrailing = performance.now();
+    expect(words(trailing)).toEqual(["a", ",".repeat(160_000)]);
+    expect(performance.now() - startedTrailing).toBeLessThan(200);
   });
 
   test("on random texts each side is rebuilt and the diff is minimal", () => {
@@ -159,6 +185,132 @@ describe("diffText", () => {
       expect(changedWords(parts)).toBe(minimal(before, after));
       expectChangesWhole(parts);
     }
+  });
+
+  test("a rewritten phrase is marked whole across the punctuation both sides share", () => {
+    expect(diffText("Rice, eggs.", "Fish, milk, bread.")).toEqual([
+      { kind: "delete", text: "Rice, eggs" },
+      { kind: "insert", text: "Fish, milk, bread" },
+      { kind: "equal", text: "." },
+    ]);
+    // Between two insertions the shared comma is the old text's, so it stays unmarked.
+    expect(diffText("a, b", "x a, b y")).toEqual([
+      { kind: "insert", text: "x " },
+      { kind: "equal", text: "a, b" },
+      { kind: "insert", text: " y" },
+    ]);
+  });
+
+  test("a rewrite keeps the space both sides share before it unmarked", () => {
+    expect(diffText("We sell rice — and fish", "We sell — fresh fish")).toEqual(
+      [
+        { kind: "equal", text: "We sell " },
+        { kind: "delete", text: "rice — and" },
+        { kind: "insert", text: "— fresh" },
+        { kind: "equal", text: " fish" },
+      ],
+    );
+  });
+
+  test("punctuation between changes that only insert stays unmarked; punctuation before the first change stays", () => {
+    expect(diffText("Rice: eggs", "Rice, fish: bread, eggs")).toEqual([
+      { kind: "equal", text: "Rice" },
+      { kind: "insert", text: ", fish" },
+      { kind: "equal", text: ":" },
+      { kind: "insert", text: " bread," },
+      { kind: "equal", text: " eggs" },
+    ]);
+    expect(diffText("(rice, eggs)", "(fish, milk)")).toEqual([
+      { kind: "equal", text: "(" },
+      { kind: "delete", text: "rice, eggs" },
+      { kind: "insert", text: "fish, milk" },
+      { kind: "equal", text: ")" },
+    ]);
+  });
+
+  test("punctuation with its marks joins a rewrite like other punctuation; Korean words keep their spaces", () => {
+    expect(diffText("Wow‼️ great", "Yay‼️ fine")).toEqual([
+      { kind: "delete", text: "Wow‼️ great" },
+      { kind: "insert", text: "Yay‼️ fine" },
+    ]);
+    expect(words("ok‼\u200D")).toEqual(["ok", "‼\u200D"]);
+    expect(diffText("회사원.", "회사원,")).toEqual([
+      { kind: "equal", text: "회사원" },
+      { kind: "delete", text: "." },
+      { kind: "insert", text: "," },
+    ]);
+  });
+
+  test("on random texts with punctuation each side is rebuilt and no shared punctuation cuts a rewrite", () => {
+    const alphabet = ["a", "b", "c", " ", ",", ".", "(", ")"];
+    const isPunctuation = (part: DiffPart | undefined) =>
+      part?.kind === "equal" && /^[\p{P}\s]+$/u.test(part.text);
+    for (let seed = 1; seed <= 30; seed++) {
+      const next = random(seed);
+      const text = () =>
+        Array.from(
+          { length: Math.floor(next() * 16) },
+          () => alphabet[Math.floor(next() * alphabet.length)],
+        ).join("");
+      for (let round = 0; round < 300; round++) {
+        const before = text();
+        const after = text();
+        const parts = diffText(before, after);
+        expect(side(parts, "delete")).toBe(before);
+        expect(side(parts, "insert")).toBe(after);
+        expectChangesWhole(parts);
+        // A chain of changes joined by shared punctuation that both deletes and inserts
+        // is one change: no punctuation-only equal part is left inside it.
+        parts.forEach((part, index) => {
+          const changed = (other: DiffPart | undefined) =>
+            other !== undefined &&
+            other.kind !== "equal" &&
+            /\S/u.test(other.text);
+          if (
+            !isPunctuation(part) ||
+            !changed(parts[index - 1]) ||
+            !changed(parts[index + 1])
+          ) {
+            return;
+          }
+          let first = index;
+          while (changed(parts[first - 1]) || isPunctuation(parts[first - 1]))
+            first--;
+          let last = index;
+          while (changed(parts[last + 1]) || isPunctuation(parts[last + 1]))
+            last++;
+          const chain = parts.slice(first, last + 1);
+          const rewrites =
+            chain.some(
+              (other) => other.kind === "delete" && /\S/u.test(other.text),
+            ) &&
+            chain.some(
+              (other) => other.kind === "insert" && /\S/u.test(other.text),
+            );
+          expect({ seed, round, before, after, rewrites }).toEqual({
+            seed,
+            round,
+            before,
+            after,
+            rewrites: false,
+          });
+        });
+      }
+    }
+  });
+
+  test("punctuation goes with the marks after it; a symbol of punctuation and marks stays whole", () => {
+    expect(words("#️⃣ ok ‼️wow Great‼️")).toEqual([
+      "#️⃣",
+      " ",
+      "ok",
+      " ",
+      "‼️",
+      "wow",
+      " ",
+      "Great",
+      "‼️",
+    ]);
   });
 
   test("long work is carried on a task at a time, shared by its waiters, and exact", async () => {

@@ -35,7 +35,7 @@ export const frameRoot = style({
 });
 
 // A classic scrollbar coming and going would change the body's width, and with it the
-// arrangement of D and F beside a docked panel (4.1), which changes the page's height and
+// arrangement of A, D, F and I beside a docked panel (4.1), which changes the page's height and
 // so the scrollbar again. On a desktop, its gutter is kept whether the page scrolls or
 // not.
 globalStyle(`html:has(${frameRoot})`, {

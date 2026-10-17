@@ -1330,7 +1330,7 @@ make test-web・make test-e2e・make typecheck・make lint・make doc-lint が�
 
 ## Step 22f: 狭いデスクトップのパネルと A・I の並び
 
-Status:
+Status: done 2026-10-17
 
 ```
 Step 22b の独立レビューで、パネル（PNL-1・PNL-2）を開いたデスクトップで、D・F と同じ狭さがパターン A と I にも起きることが分かりました。

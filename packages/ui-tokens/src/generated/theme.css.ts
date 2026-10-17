@@ -1151,6 +1151,7 @@ globalStyle(":root", {
     [vars.layout.settings.rowGap]: "12px",
     [vars.layout.settings.rowAvatarWidth]: "30px",
     [vars.layout.settings.rowMenuWidth]: "32px",
+    [vars.layout.presentation.twoColumnMinWidth]: "704px",
     [vars.layout.presentation.thumbnailColumnWidth]: "200px",
     [vars.layout.presentation.thumbnailPaddingY]: "16px",
     [vars.layout.presentation.thumbnailPaddingX]: "12px",

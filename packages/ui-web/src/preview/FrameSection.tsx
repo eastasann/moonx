@@ -1,3 +1,4 @@
+import type { PitchSlide } from "@moonx/schemas";
 import type { SaveState } from "@moonx/ui-tokens";
 import {
   Bell,
@@ -8,7 +9,7 @@ import {
   Settings,
   Shield,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { AlertBanner } from "../components/AlertBanner";
 import { AppFrame } from "../components/AppFrame";
 import { Breadcrumb, Breadcrumbs } from "../components/Breadcrumbs";
@@ -16,17 +17,20 @@ import { Button } from "../components/Button";
 import { Heading } from "../components/Heading";
 import { ListView, ListViewItem } from "../components/ListView";
 import { MenuItem } from "../components/Menu";
-import { MetricTile } from "../components/MetricTile";
+import { MetricGroup, MetricTile } from "../components/MetricTile";
+import { MoonGlyph } from "../components/MoonGlyph";
 import { PageFrame } from "../components/PageFrame";
 import { Panel } from "../components/Panel";
 import { QuestionCard } from "../components/QuestionCard";
 import { RouterProvider } from "../components/RouterProvider";
+import { RowList, RowListItem } from "../components/RowList";
 import { SearchField } from "../components/SearchField";
 import {
   SegmentedControl,
   SegmentedControlItem,
 } from "../components/SegmentedControl";
 import { type NavItem, SideNav } from "../components/SideNav";
+import { Slide } from "../components/Slide";
 import { TabBar } from "../components/TabBar";
 import { TableView } from "../components/TableView";
 import { Text } from "../components/Text";
@@ -34,9 +38,12 @@ import { TextArea, TextField } from "../components/TextField";
 import { Container } from "../layout/Container";
 import { Stack } from "../layout/Flex";
 import { FocusPattern } from "../patterns/FocusPattern";
+import { HubPattern } from "../patterns/HubPattern";
 import { ListDetailPattern } from "../patterns/ListDetailPattern";
+import { PresentationPattern } from "../patterns/PresentationPattern";
 import { QuestionFormPattern } from "../patterns/QuestionFormPattern";
 import { WorksheetPattern } from "../patterns/WorksheetPattern";
+import { footer, slides } from "./CustomSection";
 import { Section, Specimen } from "./parts";
 import * as styles from "./preview.css";
 
@@ -280,16 +287,104 @@ const panelCosts = [
 ];
 
 /**
- * A frame as wide as the window, holding pattern D or F, whose 💬 docks the comments
- * panel beside the body: while the body is narrower than `layout.two-column-min-width`,
- * D and F take their tablet arrangement (design-spec 4.1). E2E opens it at 1024px and
- * 1440px. The gallery puts it after its column, so it is not a `Section` in it.
+ * Pattern A beside the panel: 13's numbers and its blocks in their two columns, the
+ * phone's order listing a side block between two main ones. A button in a block opens the
+ * panel too, as an item's 💬 does (6.0.4), so E2E sees focus come back to it.
+ */
+function PanelHub({ onOpenComments }: { onOpenComments: () => void }) {
+  const block = (title: string, children: ReactNode) => (
+    <Stack gap="space-100">
+      <Heading level={4} variant="label">
+        {title}
+      </Heading>
+      {children}
+    </Stack>
+  );
+  return (
+    <HubPattern
+      header={<Heading level={3}>Piaya Gift Box Delivery</Heading>}
+      primaryAction={<Button variant="primary">Record decision</Button>}
+      metrics={
+        <MetricGroup aria-label="Panel frame key numbers">
+          <MetricTile label="Startup costs" value="₱169,500" />
+          <MetricTile label="Break-even" value="6.9" unit="/ day" />
+          <MetricTile label="Expected profit" value="₱18,490" unit="/ mo" />
+          <MetricTile label="Payback" value="9.2" unit="months" />
+        </MetricGroup>
+      }
+      blocks={[
+        {
+          id: "next",
+          column: "main",
+          content: block(
+            "Next steps",
+            <RowList ordered aria-label="Panel frame next steps">
+              <RowListItem href="#panel-next-1" isEmphasized>
+                Classify answers (3)
+              </RowListItem>
+              <RowListItem href="#panel-next-2">Check permits</RowListItem>
+            </RowList>,
+          ),
+        },
+        {
+          id: "sections",
+          column: "aside",
+          content: block(
+            "Sections",
+            <>
+              <RowList aria-label="Panel frame sections">
+                <RowListItem
+                  href="#panel-s01"
+                  start={<MoonGlyph value={0.8} />}
+                  end={<Text variant="number">8/10</Text>}
+                >
+                  01 Customer & Problem
+                </RowListItem>
+              </RowList>
+              <Button variant="secondary" isQuiet onPress={onOpenComments}>
+                Comments on Sections
+              </Button>
+            </>,
+          ),
+        },
+        {
+          id: "summary",
+          column: "main",
+          content: block(
+            "Summary",
+            <Text>Customer / Problem / Solution / Market type</Text>,
+          ),
+        },
+      ]}
+    />
+  );
+}
+
+type PanelPattern = "hub" | "list" | "worksheet" | "presentation";
+
+const panelBreadcrumbs: Record<PanelPattern, string> = {
+  hub: "Piaya Gift Box Delivery",
+  list: "All ideas",
+  worksheet: "05 Costs",
+  presentation: "Pitch Deck",
+};
+
+/**
+ * A frame as wide as the window, holding pattern A, D, F or I, whose 💬 docks the
+ * comments panel beside the body: while the body is narrower than
+ * `layout.two-column-min-width`, A, D and F take their tablet arrangement, and narrower
+ * than `layout.presentation.two-column-min-width`, I its phone arrangement (design-spec
+ * 4.1). E2E opens it at 1024px and wider. The gallery puts it after its column, so it is
+ * not a `Section` in it.
  */
 export function FramePanelSection() {
-  const [pattern, setPattern] = useState<"list" | "worksheet">("list");
+  const [pattern, setPattern] = useState<PanelPattern>("list");
   const [isPanelOpen, setPanelOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>("piaya");
+  const [slideKey, setSlideKey] = useState("business_model");
   const idea = panelIdeas.find((item) => item.id === selected);
+  const slide =
+    slides.find((item) => item.key === slideKey) ?? (slides[0] as PitchSlide);
   const ignore = () => {};
   const titleId = useId();
   return (
@@ -297,15 +392,17 @@ export function FramePanelSection() {
       <Container>
         <Stack gap="space-400">
           <Heading level={2} id={titleId}>
-            AppFrame with a panel beside D and F
+            AppFrame with a panel beside A, D, F and I
           </Heading>
           <SegmentedControl
-            aria-label="Pattern D or F beside the panel"
+            aria-label="Pattern beside the panel"
             selectedKey={pattern}
-            onSelectionChange={(key) => setPattern(key as "list" | "worksheet")}
+            onSelectionChange={(key) => setPattern(key as PanelPattern)}
           >
+            <SegmentedControlItem id="hub">A</SegmentedControlItem>
             <SegmentedControlItem id="list">D</SegmentedControlItem>
             <SegmentedControlItem id="worksheet">F</SegmentedControlItem>
+            <SegmentedControlItem id="presentation">I</SegmentedControlItem>
           </SegmentedControl>
         </Stack>
       </Container>
@@ -317,9 +414,7 @@ export function FramePanelSection() {
             breadcrumbs={
               <Breadcrumbs aria-label="Panel frame breadcrumbs">
                 <Breadcrumb href={`${base}/ideas`}>Ideas</Breadcrumb>
-                <Breadcrumb>
-                  {pattern === "list" ? "All ideas" : "05 Costs"}
-                </Breadcrumb>
+                <Breadcrumb>{panelBreadcrumbs[pattern]}</Breadcrumb>
               </Breadcrumbs>
             }
             back={{ href: `${base}/ideas`, label: "Ideas" }}
@@ -340,7 +435,40 @@ export function FramePanelSection() {
               </Panel>
             }
           >
-            {pattern === "list" ? (
+            {pattern === "hub" && (
+              <PanelHub onOpenComments={() => setPanelOpen(true)} />
+            )}
+            {pattern === "presentation" && (
+              <PresentationPattern
+                header={
+                  <Heading level={3} variant="heading-1-toolbar">
+                    Pitch Deck
+                  </Heading>
+                }
+                primaryAction={<Button variant="primary">Download PDF</Button>}
+                slides={slides.map((item) => ({
+                  id: item.key,
+                  title: item.title.text,
+                  thumbnail: (
+                    <Slide
+                      slide={item}
+                      footer={footer}
+                      currency="PHP"
+                      isThumbnail
+                    />
+                  ),
+                }))}
+                currentId={slide.key}
+                onCurrentChange={setSlideKey}
+                slide={<Slide slide={slide} footer={footer} currency="PHP" />}
+                notes={
+                  <Text variant="body-long" tone="secondary">
+                    Say: one box sells for ₱450 and leaves ₱210.
+                  </Text>
+                }
+              />
+            )}
+            {pattern === "list" && (
               <ListDetailPattern
                 header={<Heading level={3}>Ideas</Heading>}
                 filters={
@@ -381,7 +509,8 @@ export function FramePanelSection() {
                 listLabel="Ideas"
                 onBack={() => setSelected(null)}
               />
-            ) : (
+            )}
+            {pattern === "worksheet" && (
               <WorksheetPattern
                 header={<Heading level={3}>05 Costs</Heading>}
                 inputs={

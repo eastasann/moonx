@@ -260,6 +260,7 @@ test("vars.ts gives the sizes code reads as numbers in px", () => {
   expect(source).toContain(`"tablet": 768,`);
   expect(source).toContain("export const popoverMaxHeight = 384;");
   expect(source).toContain("export const twoColumnMinWidth = 788;");
+  expect(source).toContain("export const presentationTwoColumnMinWidth = 704;");
   expect(source).toContain("export const publicSplitMinWidth = 900;");
   expect(value("layout-popover-max-height")?.lightMedium).toBe("384px");
 });
@@ -297,6 +298,16 @@ test("two-column-min-width stays the body of a desktop at its breakpoint (06 $de
   const detail = Number(value("layout-list-detail-detail-ratio")?.lightMedium);
   expect((body * list) / (list + detail)).toBeLessThan(
     px("layout-list-detail-list-min-width"),
+  );
+});
+
+test("I's two-column-min-width stays the body of a tablet at its breakpoint (06 $description)", () => {
+  const px = (name: string) =>
+    Number.parseFloat(value(name)?.lightMedium ?? "");
+  // I draws its thumbnails beside the slide on a tablet too (design-spec 4.1), so its
+  // narrowest two columns are a tablet's at its breakpoint, with the icons-only SideNav.
+  expect(px("layout-presentation-two-column-min-width")).toBe(
+    px("breakpoint-tablet") - px("layout-sidebar-width-collapsed"),
   );
 });
 

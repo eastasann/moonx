@@ -1,5 +1,9 @@
 import { formatCount, i18n } from "@moonx/i18n";
-import { type SaveState, twoColumnMinWidth } from "@moonx/ui-tokens";
+import {
+  presentationTwoColumnMinWidth,
+  type SaveState,
+  twoColumnMinWidth,
+} from "@moonx/ui-tokens";
 import { ArrowLeft, ChevronDown, History, MessageSquare } from "lucide-react";
 import {
   type MouseEvent,
@@ -15,9 +19,11 @@ import {
   BackOverrideContext,
   type BackTarget,
   Banners,
+  type BodyRoom,
+  BodyRoomContext,
   type FrameBanners,
+  fullBodyRoom,
   HeaderToolsContext,
-  TwoColumnRoomContext,
 } from "../internal/frame";
 import * as frame from "../internal/frame.css";
 import { IconSlot } from "../internal/IconSlot";
@@ -67,8 +73,9 @@ export interface AppFrameProps {
   banners?: FrameBanners;
   /**
    * The open `Panel`: in the column at the body's right on a desktop. While it leaves the
-   * body narrower than `layout.two-column-min-width`, patterns D and F inside take their
-   * tablet arrangement (design-spec 4.1).
+   * body narrower than `layout.two-column-min-width`, patterns A, D and F inside take their
+   * tablet arrangement, and narrower than `layout.presentation.two-column-min-width`,
+   * pattern I its phone arrangement (design-spec 4.1).
    */
   panel?: ReactNode;
   /** The screen: its layout pattern. */
@@ -99,7 +106,7 @@ export function AppFrame({
   const headerRef = useRef<HTMLElement>(null);
   const bodyWidthRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [hasTwoColumnRoom, setTwoColumnRoom] = useState(true);
+  const [room, setRoom] = useState<BodyRoom>(fullBodyRoom);
   const [tools, setTools] = useState<HTMLElement | null>(null);
   const [headerHeight, setHeaderHeight] = useState<number | null>(null);
   // A pattern's ← on a phone (a list's detail), in place of the screen's `back`.
@@ -155,10 +162,18 @@ export function AppFrame({
         ? 0
         : window.innerWidth - document.documentElement.clientWidth;
       // The column is empty, and 0 wide, unless a panel is docked in it.
-      const isNarrowed =
-        column.getBoundingClientRect().width > 0 &&
-        body.getBoundingClientRect().width + scrollbar < twoColumnMinWidth;
-      flushSync(() => setTwoColumnRoom(!isNarrowed));
+      const isDocked = column.getBoundingClientRect().width > 0;
+      const width = body.getBoundingClientRect().width + scrollbar;
+      const hasTwoColumns = !isDocked || width >= twoColumnMinWidth;
+      const hasThumbnails = !isDocked || width >= presentationTwoColumnMinWidth;
+      flushSync(() =>
+        setRoom((current) =>
+          current.hasTwoColumns === hasTwoColumns &&
+          current.hasThumbnails === hasThumbnails
+            ? current
+            : { hasTwoColumns, hasThumbnails },
+        ),
+      );
     });
     observer.observe(body);
     observer.observe(column);
@@ -325,9 +340,9 @@ export function AppFrame({
             <div ref={bodyWidthRef} className={styles.bodyWidth} />
             <HeaderToolsContext.Provider value={tools}>
               <BackOverrideContext.Provider value={setBackOverride}>
-                <TwoColumnRoomContext.Provider value={hasTwoColumnRoom}>
+                <BodyRoomContext.Provider value={room}>
                   {children}
-                </TwoColumnRoomContext.Provider>
+                </BodyRoomContext.Provider>
               </BackOverrideContext.Provider>
             </HeaderToolsContext.Provider>
           </main>

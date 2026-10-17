@@ -3,6 +3,7 @@ export { print } from "./generated/print";
 export {
   breakpoints,
   popoverMaxHeight,
+  presentationTwoColumnMinWidth,
   publicSplitMinWidth,
   twoColumnMinWidth,
   vars,

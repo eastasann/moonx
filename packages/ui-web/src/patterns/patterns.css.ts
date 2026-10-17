@@ -117,14 +117,23 @@ export const hubMetrics = style({
   "@media": { [tabletUp]: { marginBlockEnd: hub.metricsGap } },
 });
 
-/** The hub's two columns on a desktop: the main column, then the side column (7 : 5). */
-export const hubColumns = style({
-  display: "flex",
-  alignItems: "flex-start",
-  gap: hub.columnGap,
+/**
+ * The hub's columns: on a desktop with room for two, the main column, then the side column
+ * (7 : 5); otherwise the main column's element alone holds every block.
+ */
+export const hubColumns = recipe({
+  variants: {
+    isTwoColumns: {
+      true: { display: "flex", alignItems: "flex-start", gap: hub.columnGap },
+      false: {},
+    },
+  },
 });
 
-/** A column of blocks; below the desktop breakpoint, the only one. */
+/**
+ * A column of blocks; below the desktop breakpoint, and beside a docked panel that leaves
+ * the body too narrow, the only one, the side column's element empty and out of the way.
+ */
 export const hubColumn = recipe({
   base: {
     display: "flex",
@@ -138,6 +147,7 @@ export const hubColumn = recipe({
       main: { flex: `${hub.mainRatio} 1 0%` },
       aside: { flex: `${hub.asideRatio} 1 0%` },
       only: {},
+      unused: { display: "none" },
     },
   },
 });
@@ -1007,12 +1017,18 @@ export const stage = style({
   },
 });
 
+/**
+ * The links over the slide, the slide and the notes. Focus is put here when the
+ * arrangement takes the thumbnails away and neither the previous nor the next can be
+ * pressed; the column draws no ring.
+ */
 export const stageColumn = style({
   display: "flex",
   flexDirection: "column",
   width: "100%",
   maxWidth: deck.slideMax,
   minWidth: 0,
+  outline: "none",
 });
 
 /** The quiet links over the slide, at its end (s23-deck.html .slide-tools). */
@@ -1051,7 +1067,10 @@ export const notes = style({
   marginBlockStart: deck.notesGap,
 });
 
-/** A phone's previous and next slide, under the slide. */
+/**
+ * The previous and next slide under the slide: on a phone, and beside a docked panel that
+ * leaves the body too narrow for the thumbnails.
+ */
 export const slideNav = style({
   display: "flex",
   alignItems: "center",

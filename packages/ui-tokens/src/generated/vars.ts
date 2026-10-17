@@ -1397,6 +1397,7 @@ export const vars = createGlobalThemeContract({
       rowMenuWidth: "layout-settings-row-menu-width",
     },
     presentation: {
+      twoColumnMinWidth: "layout-presentation-two-column-min-width",
       thumbnailColumnWidth: "layout-presentation-thumbnail-column-width",
       thumbnailPaddingY: "layout-presentation-thumbnail-padding-y",
       thumbnailPaddingX: "layout-presentation-thumbnail-padding-x",
@@ -1645,9 +1646,15 @@ export const popoverMaxHeight = 384;
 
 /**
  * `semantic.layout.two-column-min-width` in px: the body's width, measured in code, below
- * which a docked panel turns patterns D and F to their tablet arrangement.
+ * which a docked panel turns patterns A, D and F to their tablet arrangement.
  */
 export const twoColumnMinWidth = 788;
+
+/**
+ * `semantic.layout.presentation.two-column-min-width` in px: the body's width, measured in
+ * code, below which a docked panel turns pattern I to its phone arrangement.
+ */
+export const presentationTwoColumnMinWidth = 704;
 
 /**
  * `semantic.layout.public.split-min-width` in px, for the media query below which the

@@ -2155,8 +2155,8 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
   });
 });
 
-test.describe("D and F beside a docked panel (design-spec 4.1・4.3)", () => {
-  const section = "AppFrame with a panel beside D and F";
+test.describe("A, D, F and I beside a docked panel (design-spec 4.1・4.3)", () => {
+  const section = "AppFrame with a panel beside A, D, F and I";
 
   // Switching arrangements raises no error on the window, such as a ResizeObserver round
   // left with undelivered notifications, which reaches error reporting.
@@ -2175,18 +2175,25 @@ test.describe("D and F beside a docked panel (design-spec 4.1・4.3)", () => {
     ).toEqual([]);
   });
 
+  const patternKeys = {
+    HubPattern: "A",
+    ListDetailPattern: "D",
+    WorksheetPattern: "F",
+    PresentationPattern: "I",
+  } as const;
+
   /** The window-wide frame of the gallery at `width`, holding `pattern`. */
   async function openPanelFrame(
     page: Page,
     width: number,
-    pattern: "ListDetailPattern" | "WorksheetPattern",
+    pattern: keyof typeof patternKeys,
   ) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/dev/components");
     const frame = region(page, section);
     await frame
-      .getByRole("radiogroup", { name: "Pattern D or F beside the panel" })
-      .getByRole("radio", { name: pattern === "ListDetailPattern" ? "D" : "F" })
+      .getByRole("radiogroup", { name: "Pattern beside the panel" })
+      .getByRole("radio", { name: patternKeys[pattern], exact: true })
       .click();
     await showSection(page, section);
     return frame;
@@ -2387,6 +2394,217 @@ test.describe("D and F beside a docked panel (design-spec 4.1・4.3)", () => {
     await expect(results).toBeVisible();
     await expect(field).toBeFocused();
     await expect(field).toHaveValue("Oven is second-hand");
+  });
+
+  /** A hub's blocks, by their headings. */
+  const hubBlock = (frame: Locator, name: string) =>
+    frame.getByRole("heading", { name, exact: true });
+
+  /**
+   * The hub's numbers: in one row, or 2×2 (the third tile under the first, the second
+   * beside it), each number on one line.
+   */
+  async function hubNumbers(frame: Locator, form: "row" | "2×2") {
+    const band = frame.getByRole("group", { name: "Panel frame key numbers" });
+    const tiles = await Promise.all(
+      [0, 1, 2, 3].map((index) => boxOf(band.locator("dl").nth(index))),
+    );
+    const [first, second, third, fourth] = tiles as [Box, Box, Box, Box];
+    expect(Math.abs(second.y - first.y)).toBeLessThanOrEqual(1);
+    expect(second.x).toBeGreaterThanOrEqual(first.x + first.width - 1);
+    if (form === "row") {
+      expect(Math.abs(fourth.y - first.y)).toBeLessThanOrEqual(1);
+    } else {
+      expect(third.y).toBeGreaterThanOrEqual(first.y + first.height - 1);
+      expect(Math.abs(third.x - first.x)).toBeLessThanOrEqual(1);
+    }
+    for (const value of ["₱169,500", "₱18,490", "9.2"]) {
+      const number = band.getByText(value, { exact: true });
+      const lineHeight = await number.evaluate((node) =>
+        Number.parseFloat(getComputedStyle(node).lineHeight),
+      );
+      expect((await boxOf(number)).height, value).toBeLessThan(
+        lineHeight * 1.5,
+      );
+    }
+  }
+
+  test("A at 1024px: one column in the phone's order, the numbers 2×2, while the panel is open; two columns once it closes", async ({
+    page,
+  }) => {
+    const frame = await openPanelFrame(page, 1024, "HubPattern");
+    // Without the panel, the desktop's two columns at the breakpoint (7 : 5).
+    await sideBySide(
+      hubBlock(frame, "Next steps"),
+      hubBlock(frame, "Sections"),
+    );
+    await hubNumbers(frame, "row");
+
+    const panel = await openPanel(frame);
+    // The listed order, a side block between two main ones: the tablet's one column.
+    await stacked(
+      hubBlock(frame, "Next steps"),
+      hubBlock(frame, "Sections"),
+      hubBlock(frame, "Summary"),
+    );
+    await hubNumbers(frame, "2×2");
+    // The main action stays at the title, as on a tablet: nothing is fixed to the bottom.
+    const decide = await boxOf(
+      frame.getByRole("button", { name: "Record decision" }),
+    );
+    expect(decide.y + decide.height).toBeLessThan(
+      (await boxOf(hubBlock(frame, "Next steps"))).y,
+    );
+
+    await panel.getByRole("button", { name: "Close" }).click();
+    await expect(panel).toBeHidden();
+    await sideBySide(
+      hubBlock(frame, "Next steps"),
+      hubBlock(frame, "Sections"),
+    );
+    await hubNumbers(frame, "row");
+  });
+
+  test("A at 1440px: two columns beside the panel; narrowing keeps focus on the link it was on", async ({
+    page,
+  }) => {
+    const frame = await openPanelFrame(page, 1440, "HubPattern");
+    await openPanel(frame);
+    // The body is wider than 06 layout.two-column-min-width.
+    expect(
+      Math.round((await boxOf(frame.getByRole("main"))).width),
+    ).toBeGreaterThanOrEqual(788);
+    await sideBySide(
+      hubBlock(frame, "Next steps"),
+      hubBlock(frame, "Sections"),
+    );
+    await hubNumbers(frame, "row");
+
+    const link = frame.getByRole("link", { name: /Check permits/ });
+    await link.focus();
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await stacked(hubBlock(frame, "Next steps"), hubBlock(frame, "Sections"));
+    await expect(link).toBeFocused();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await sideBySide(
+      hubBlock(frame, "Next steps"),
+      hubBlock(frame, "Sections"),
+    );
+    await expect(link).toBeFocused();
+  });
+
+  /**
+   * The slide at the thumbnails' right, its column's inset 12px lower than theirs (06
+   * layout.presentation: 28 against 16).
+   */
+  async function besideThumbnails(thumbnails: Locator, slide: Locator) {
+    const [left, right] = [await boxOf(thumbnails), await boxOf(slide)];
+    expect(right.x).toBeGreaterThan(left.x + left.width);
+    expect(Math.round(right.y - left.y)).toBe(12);
+  }
+
+  test("A at 1024px: a panel opened from a block gives focus back to it once it closes", async ({
+    page,
+  }) => {
+    const frame = await openPanelFrame(page, 1024, "HubPattern");
+    const opener = frame.getByRole("button", { name: "Comments on Sections" });
+    await opener.click();
+    const panel = frame.getByRole("complementary", { name: "Comments" });
+    await expect(panel).toBeFocused();
+    // The blocks moved to one column; the button is the same one, not drawn again.
+    await stacked(
+      hubBlock(frame, "Next steps"),
+      hubBlock(frame, "Sections"),
+      hubBlock(frame, "Summary"),
+    );
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await sideBySide(
+      hubBlock(frame, "Next steps"),
+      hubBlock(frame, "Sections"),
+    );
+    await expect(opener).toBeFocused();
+  });
+
+  test("I at 1024px: the slide alone with the previous and next while the panel is open; the thumbnails once it closes", async ({
+    page,
+  }) => {
+    const frame = await openPanelFrame(page, 1024, "PresentationPattern");
+    const thumbnails = frame.getByRole("listbox", { name: "Slides" });
+    const previous = frame.getByRole("button", { name: "Previous slide" });
+    const next = frame.getByRole("button", { name: "Next slide" });
+    const slide = (name: string) => frame.getByRole("region", { name });
+    await besideThumbnails(thumbnails, slide("Business model"));
+    await expect(next).toHaveCount(0);
+
+    const panel = await openPanel(frame);
+    await expect(thumbnails).toHaveCount(0);
+    // The slide across the body, less the stage's insets (06 layout.presentation).
+    const main = await boxOf(frame.getByRole("main"));
+    expect(Math.round((await boxOf(slide("Business model"))).width)).toBe(
+      Math.round(main.width) - 2 * 36,
+    );
+    expect((await boxOf(previous)).y).toBeGreaterThan(
+      (await boxOf(slide("Business model"))).y,
+    );
+    await expect(frame.getByText("3 / 4")).toBeVisible();
+    await next.click();
+    await expect(slide("Competition")).toBeVisible();
+    await expect(frame.getByText("4 / 4")).toBeVisible();
+
+    await panel.getByRole("button", { name: "Close" }).click();
+    await expect(panel).toBeHidden();
+    await expect(next).toHaveCount(0);
+    // The slide moved to stays the one on screen.
+    await expect(
+      thumbnails.getByRole("option", { name: "4 Competition" }),
+    ).toHaveAttribute("aria-selected", "true");
+    await besideThumbnails(thumbnails, slide("Competition"));
+  });
+
+  test("I beside the panel at 1340px: the thumbnails while A has one column", async ({
+    page,
+  }) => {
+    // The body is 744px: under layout.two-column-min-width (788), over
+    // layout.presentation.two-column-min-width (704).
+    const frame = await openPanelFrame(page, 1340, "PresentationPattern");
+    await openPanel(frame);
+    expect(Math.round((await boxOf(frame.getByRole("main"))).width)).toBe(744);
+    const thumbnails = frame.getByRole("listbox", { name: "Slides" });
+    await besideThumbnails(
+      thumbnails,
+      frame.getByRole("region", { name: "Business model" }),
+    );
+    await expect(frame.getByRole("button", { name: "Next slide" })).toHaveCount(
+      0,
+    );
+
+    await frame
+      .getByRole("radiogroup", { name: "Pattern beside the panel" })
+      .getByRole("radio", { name: "A", exact: true })
+      .click();
+    await stacked(
+      hubBlock(frame, "Next steps"),
+      hubBlock(frame, "Sections"),
+      hubBlock(frame, "Summary"),
+    );
+  });
+
+  test("I: narrowing with focus on a thumbnail moves it to the previous and next, and back", async ({
+    page,
+  }) => {
+    const frame = await openPanelFrame(page, 1440, "PresentationPattern");
+    await openPanel(frame);
+    const option = frame.getByRole("option", { name: "2 Problem" });
+    await option.click();
+    await expect(option).toBeFocused();
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await expect(option).toHaveCount(0);
+    await expect(
+      frame.getByRole("button", { name: "Previous slide" }),
+    ).toBeFocused();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(option).toBeFocused();
   });
 });
 

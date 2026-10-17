@@ -105,7 +105,7 @@ export const patternBox = style({
 
 /**
  * A frame as wide as the window, outside the gallery's column: AppFrame measures its body
- * to arrange D and F beside a docked panel, and the column would make it narrower than
+ * to arrange A, D, F and I beside a docked panel, and the column would make it narrower than
  * the window under test.
  */
 export const windowBox = style([

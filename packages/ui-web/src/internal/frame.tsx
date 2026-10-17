@@ -43,21 +43,47 @@ export const BackOverrideContext = createContext<
 >(null);
 
 /**
- * Whether AppFrame's body leaves patterns D and F room for their two columns (design-spec
- * 4.1・4.3): false while a desktop's docked panel narrows the body below
- * `layout.two-column-min-width`. True outside AppFrame, where no panel docks.
+ * What AppFrame's body leaves room for beside a desktop's docked panel (design-spec
+ * 4.1・4.3). Both true outside AppFrame and with no panel docked: only a docked panel
+ * narrows the body.
  */
-export const TwoColumnRoomContext = createContext(true);
+export interface BodyRoom {
+  /** Patterns A, D and F's two columns: the body at least `layout.two-column-min-width`. */
+  hasTwoColumns: boolean;
+  /**
+   * Pattern I's thumbnails beside the slide: the body at least
+   * `layout.presentation.two-column-min-width`.
+   */
+  hasThumbnails: boolean;
+}
+
+export const fullBodyRoom: BodyRoom = {
+  hasTwoColumns: true,
+  hasThumbnails: true,
+};
+
+export const BodyRoomContext = createContext<BodyRoom>(fullBodyRoom);
 
 /**
- * Whether patterns D and F stand in their two columns: on a desktop whose body has room
- * for them. Otherwise they take the tablet's arrangement, a docked panel staying beside
- * the body (4.1).
+ * Whether patterns A, D and F stand in their two columns: on a desktop whose body has
+ * room for them. Otherwise they take the tablet's arrangement, a docked panel staying
+ * beside the body (4.1).
  */
 export function useTwoColumns(): boolean {
   const isDesktop = useIsDesktop();
-  const hasRoom = useContext(TwoColumnRoomContext);
-  return isDesktop && hasRoom;
+  const { hasTwoColumns } = useContext(BodyRoomContext);
+  return isDesktop && hasTwoColumns;
+}
+
+/**
+ * Whether pattern I shows its thumbnails beside the slide: from the tablet breakpoint up,
+ * on a body with room for them. Otherwise it takes the phone's arrangement, the slide on
+ * screen alone with the previous and next under it (4.1).
+ */
+export function useThumbnailColumn(): boolean {
+  const isNarrow = useIsNarrow();
+  const { hasThumbnails } = useContext(BodyRoomContext);
+  return !isNarrow && hasThumbnails;
 }
 
 /**

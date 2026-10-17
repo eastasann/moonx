@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { BodyRoomContext } from "../internal/frame";
 import { mockTextMeasure, setPhoneWidth, settle } from "../test/helpers";
 import { DescriptionList, DescriptionListItem } from "./DescriptionList";
 import { Dialog } from "./Dialog";
@@ -11,6 +12,7 @@ import { DiffText } from "./DiffText";
 import { type FauChange, FauPicker, fauLabel } from "./FauPicker";
 import { type MentionCandidate, MentionTextArea } from "./MentionTextArea";
 import { MetricGroup, MetricTile } from "./MetricTile";
+import * as metricStyles from "./MetricTile.css";
 import { Panel } from "./Panel";
 import { QuestionCard } from "./QuestionCard";
 import { Radio, RadioGroup } from "./RadioGroup";
@@ -417,6 +419,41 @@ describe("MetricGroup", () => {
     expect(within(compact).getByRole("term").className).not.toBe(
       within(band).getAllByRole("term")[0]?.className,
     );
+  });
+
+  test("a band beside a docked panel that leaves the body too narrow is 2×2 (4.1 A)", () => {
+    const tiles = (
+      <>
+        <MetricTile label="Startup costs" value="₱169,500" />
+        <MetricTile label="Payback" value="9.2" unit="months" />
+      </>
+    );
+    render(
+      <>
+        <MetricGroup aria-label="Row band">{tiles}</MetricGroup>
+        <BodyRoomContext.Provider
+          value={{ hasTwoColumns: false, hasThumbnails: false }}
+        >
+          <MetricGroup aria-label="Square band">{tiles}</MetricGroup>
+          <MetricGroup aria-label="Pair" variant="pair">
+            {tiles}
+          </MetricGroup>
+        </BodyRoomContext.Provider>
+      </>,
+    );
+    const row = screen.getByRole("group", { name: "Row band" });
+    const square = screen.getByRole("group", { name: "Square band" });
+    expect(row.classList.contains(metricStyles.squareBand)).toBe(false);
+    expect(square.classList.contains(metricStyles.squareBand)).toBe(true);
+    expect(square.firstElementChild?.className).not.toBe(
+      row.firstElementChild?.className,
+    );
+    // Only a band changes: the pair is 2×2 at every width already.
+    expect(
+      screen
+        .getByRole("group", { name: "Pair" })
+        .classList.contains(metricStyles.squareBand),
+    ).toBe(false);
   });
 });
 

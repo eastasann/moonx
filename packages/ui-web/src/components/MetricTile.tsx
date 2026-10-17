@@ -1,15 +1,22 @@
 import type { MetricGroupVariant, MetricTileTone } from "@moonx/ui-tokens";
 import { TriangleAlert } from "lucide-react";
-import { createContext, type ReactNode, useContext } from "react";
+import { createContext, type ReactNode, useContext, useMemo } from "react";
+import { BodyRoomContext } from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
 import * as styles from "./MetricTile.css";
 
-const GroupContext = createContext<MetricGroupVariant | null>(null);
+/** The group's variant, and whether a band is drawn 2×2 where a phone would not. */
+const GroupContext = createContext<{
+  variant: MetricGroupVariant;
+  isSquare: boolean;
+} | null>(null);
 
 export interface MetricGroupProps {
   /**
    * `band`: the key numbers across the top of a hub (13), between a line above and a
-   * hairline below, a hairline between the tiles; 2×2 on a phone (d1-moon.html).
+   * hairline below, a hairline between the tiles; 2×2 on a phone, and beside a desktop's
+   * docked panel that leaves the body narrower than `layout.two-column-min-width`
+   * (d1-moon.html, design-spec 4.1 A).
    * `compact`: the key numbers inside 19's Well, smaller and without lines, as many
    * columns as tiles; two on a phone (s19-decision.html). `column`: the totals of a
    * worksheet's results, one under another (s17-costs.html). `pair`: the key numbers of a
@@ -30,10 +37,15 @@ export function MetricGroup({
   children,
   ...props
 }: MetricGroupProps) {
+  const { hasTwoColumns } = useContext(BodyRoomContext);
+  const isSquare = variant === "band" && !hasTwoColumns;
+  const group = useMemo(() => ({ variant, isSquare }), [variant, isSquare]);
+  const classes = [styles.group[variant]];
+  if (isSquare) classes.push(styles.squareBand);
   return (
     // biome-ignore lint/a11y/useSemanticElements: a group of related numbers, not of form controls, which fieldset is for.
-    <div {...props} role="group" className={styles.group[variant]}>
-      <GroupContext.Provider value={variant}>{children}</GroupContext.Provider>
+    <div {...props} role="group" className={classes.join(" ")}>
+      <GroupContext.Provider value={group}>{children}</GroupContext.Provider>
     </div>
   );
 }
@@ -74,9 +86,12 @@ export function MetricTile({
   supplement,
   supplementTone = "neutral",
 }: MetricTileProps) {
-  const variant = useContext(GroupContext) ?? "none";
+  const group = useContext(GroupContext);
+  const variant = group?.variant ?? "none";
   return (
-    <dl className={styles.tile({ variant })}>
+    <dl
+      className={styles.tile({ variant, isSquare: group?.isSquare ?? false })}
+    >
       <dt className={styles.label({ variant })}>{label}</dt>
       {isPlaceholder ? (
         <dd className={styles.placeholder}>{value}</dd>

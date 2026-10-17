@@ -1,11 +1,17 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import {
+  type ReactNode,
+  StrictMode,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { AppFrame } from "../components/AppFrame";
 import { QuestionCard } from "../components/QuestionCard";
 import { TextArea } from "../components/TextField";
-import { TwoColumnRoomContext } from "../internal/frame";
+import { BodyRoomContext } from "../internal/frame";
 import { setPhoneWidth, setTabletWidth, settle } from "../test/helpers";
 import { CardComparePattern } from "./CardComparePattern";
 import { FocusPattern } from "./FocusPattern";
@@ -25,6 +31,9 @@ const follows = (first: Element, second: Element) =>
   Boolean(
     first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
   );
+
+/** A desktop's body beside a docked panel at 1024px: room for neither A, D, F nor I. */
+const narrowBody = { hasTwoColumns: false, hasThumbnails: false };
 
 describe("HubPattern (A)", () => {
   const hub = () =>
@@ -73,6 +82,114 @@ describe("HubPattern (A)", () => {
     expect(decide.parentElement).toBe(
       screen.getByRole("button", { name: "Edit summary" }).parentElement,
     );
+  });
+
+  test("desktop beside a docked panel without room: one column, as on a tablet (4.1)", () => {
+    render(
+      <BodyRoomContext.Provider value={narrowBody}>
+        <HubPattern
+          header={<h1>Piaya Gift Box</h1>}
+          primaryAction={<button type="button">Record decision</button>}
+          blocks={[
+            { id: "next", column: "main", content: <p>Next steps</p> },
+            { id: "sections", column: "aside", content: <p>Sections</p> },
+            { id: "summary", column: "main", content: <p>Summary</p> },
+          ]}
+        />
+      </BodyRoomContext.Provider>,
+    );
+    expect(follows(block("Next steps"), block("Sections"))).toBe(true);
+    expect(follows(block("Sections"), block("Summary"))).toBe(true);
+    expect(block("Next steps").parentElement).toBe(
+      block("Sections").parentElement,
+    );
+    // The main action stays in the header, as on a tablet.
+    expect(
+      follows(
+        screen.getByRole("button", { name: "Record decision" }),
+        screen.getByText("Next steps"),
+      ),
+    ).toBe(true);
+  });
+
+  test("changing arrangement moves the blocks, keeping their state and the focus in them", () => {
+    function Counter() {
+      const [count, setCount] = useState(0);
+      return (
+        <button type="button" onClick={() => setCount(count + 1)}>
+          Pressed {count}
+        </button>
+      );
+    }
+    function Hub() {
+      const [room, setRoom] = useState(true);
+      return (
+        <BodyRoomContext.Provider
+          value={{ hasTwoColumns: room, hasThumbnails: room }}
+        >
+          <button type="button" onClick={() => setRoom(!room)}>
+            Toggle room
+          </button>
+          <HubPattern
+            header={<h1>Piaya Gift Box</h1>}
+            blocks={[
+              { id: "next", column: "main", content: <Counter /> },
+              {
+                id: "sections",
+                column: "aside",
+                content: <a href="#market">02 Market</a>,
+              },
+              { id: "summary", column: "main", content: <p>Summary</p> },
+            ]}
+          />
+        </BodyRoomContext.Provider>
+      );
+    }
+    render(<Hub />);
+    const toggle = screen.getByRole("button", { name: "Toggle room" });
+    const counter = screen.getByRole("button", { name: "Pressed 0" });
+    act(() => counter.click());
+    const link = screen.getByRole("link", { name: "02 Market" });
+    link.focus();
+    act(() => toggle.click());
+    // One column in the listed order: the side block between the two main ones.
+    expect(follows(block("Pressed 1"), link)).toBe(true);
+    expect(follows(link, block("Summary"))).toBe(true);
+    expect(block("Pressed 1").parentElement).toBe(
+      link.parentElement?.parentElement,
+    );
+    // The same elements, the counter's state and the focus kept.
+    expect(screen.getByRole("button", { name: "Pressed 1" })).toBe(counter);
+    expect(screen.getByRole("link", { name: "02 Market" })).toBe(link);
+    expect(document.activeElement).toBe(link);
+    act(() => toggle.click());
+    expect(block("Pressed 1").parentElement).not.toBe(
+      link.parentElement?.parentElement,
+    );
+    expect(document.activeElement).toBe(link);
+  });
+
+  test("a block's content is in the page when its own effects first run", () => {
+    const seen: boolean[] = [];
+    function Measured() {
+      const ref = useRef<HTMLParagraphElement>(null);
+      useLayoutEffect(() => {
+        seen.push(ref.current?.isConnected ?? false);
+      }, []);
+      return <p ref={ref}>Measured</p>;
+    }
+    render(
+      <StrictMode>
+        <HubPattern
+          header={<h1>Piaya Gift Box</h1>}
+          blocks={[{ id: "measured", column: "aside", content: <Measured /> }]}
+        />
+      </StrictMode>,
+    );
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every(Boolean)).toBe(true);
+    // One element per block, even with Strict Mode's second run.
+    expect(screen.getAllByText("Measured")).toHaveLength(1);
   });
 
   test("phone: the main action fixed under the content", () => {
@@ -515,9 +632,9 @@ describe("ListDetailPattern (D)", () => {
   test("desktop beside a docked panel without room: one pane, as on a tablet (4.1)", async () => {
     const user = userEvent.setup();
     render(
-      <TwoColumnRoomContext.Provider value={false}>
+      <BodyRoomContext.Provider value={narrowBody}>
         <List />
-      </TwoColumnRoomContext.Provider>,
+      </BodyRoomContext.Provider>,
     );
     expect(screen.queryByRole("button", { name: "Piaya" })).toBeNull();
     expect(screen.getByText("Detail of piaya")).toBeTruthy();
@@ -635,14 +752,14 @@ describe("WorksheetPattern (F)", () => {
 test("WorksheetPattern: on a desktop beside a docked panel without room, the summary bar opens a drawer", async () => {
   const user = userEvent.setup();
   render(
-    <TwoColumnRoomContext.Provider value={false}>
+    <BodyRoomContext.Provider value={narrowBody}>
       <WorksheetPattern
         inputs={<p>Inputs</p>}
         results={<p>Totals in full</p>}
         resultsTitle="Totals"
         summary={<span>Startup ₱19,500</span>}
       />
-    </TwoColumnRoomContext.Provider>,
+    </BodyRoomContext.Provider>,
   );
   expect(screen.queryByRole("complementary", { name: "Totals" })).toBeNull();
   await user.click(screen.getByRole("button", { name: /Startup/ }));
@@ -808,6 +925,110 @@ describe("PresentationPattern (I)", () => {
       within(list).getByRole("option", { name: "3 Business model" }),
     );
     expect(screen.getByText("Slide model")).toBeTruthy();
+  });
+
+  test("desktop beside a docked panel without room: the slide alone, as on a phone (4.1)", async () => {
+    const user = userEvent.setup();
+    render(
+      <BodyRoomContext.Provider value={narrowBody}>
+        <Deck />
+      </BodyRoomContext.Provider>,
+    );
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByText("2 / 3")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Next slide" }));
+    expect(screen.getByText("Slide model")).toBeTruthy();
+  });
+
+  test("a body with room for I but not for two columns keeps the thumbnails", () => {
+    render(
+      <BodyRoomContext.Provider
+        value={{ hasTwoColumns: false, hasThumbnails: true }}
+      >
+        <Deck />
+      </BodyRoomContext.Provider>,
+    );
+    expect(screen.getByRole("listbox", { name: "Slides" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Next slide" })).toBeNull();
+  });
+
+  test("changing arrangement moves focus from the thumbnails to the previous and next, and back", async () => {
+    const user = userEvent.setup();
+    function Narrowing({ deck }: { deck: ReactNode }) {
+      const [room, setRoom] = useState(true);
+      return (
+        <BodyRoomContext.Provider
+          value={{ hasTwoColumns: room, hasThumbnails: room }}
+        >
+          <button type="button" onClick={() => setRoom(!room)}>
+            Toggle room
+          </button>
+          {deck}
+        </BodyRoomContext.Provider>
+      );
+    }
+    const { unmount } = render(
+      <StrictMode>
+        <Narrowing deck={<Deck />} />
+      </StrictMode>,
+    );
+    const toggle = () =>
+      act(async () => {
+        screen.getByRole("button", { name: "Toggle room" }).click();
+      });
+    await user.click(screen.getByRole("option", { name: "1 Title" }));
+    await toggle();
+    // On the first slide only Next can be pressed.
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Next slide" }),
+    );
+    await toggle();
+    expect(document.activeElement).toBe(
+      screen.getByRole("option", { name: "1 Title" }),
+    );
+    // Focus outside what goes is left where it is.
+    screen.getByRole("button", { name: "Toggle room" }).focus();
+    await toggle();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Toggle room" }),
+    );
+    // Focus lost for another reason earlier is not taken back by a later change: from the
+    // thumbnails, and from the previous and next.
+    await toggle();
+    screen.getByRole("option", { name: "2 Problem" }).focus();
+    (document.activeElement as HTMLElement).blur();
+    await toggle();
+    expect(document.activeElement).toBe(document.body);
+    await toggle();
+    screen.getByRole("option", { name: "1 Title" }).focus();
+    await toggle();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Next slide" }),
+    );
+    (document.activeElement as HTMLElement).blur();
+    await toggle();
+    expect(document.activeElement).toBe(document.body);
+    unmount();
+
+    // A deck of one slide: neither button can be pressed, so the slide's column takes it.
+    render(
+      <Narrowing
+        deck={
+          <PresentationPattern
+            header={<h1>Pitch Deck</h1>}
+            slides={[slideList[0] as (typeof slideList)[number]]}
+            currentId="title"
+            onCurrentChange={() => {}}
+            slide={<p>Only slide</p>}
+          />
+        }
+      />,
+    );
+    await user.click(screen.getByRole("option", { name: "1 Title" }));
+    await toggle();
+    expect(document.activeElement).toBe(
+      screen.getByText("Only slide").parentElement,
+    );
   });
 
   test("phone: the slide on screen alone, with the previous and next under it", async () => {

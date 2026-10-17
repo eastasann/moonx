@@ -1,9 +1,9 @@
 import { formatCount, i18n } from "@moonx/i18n";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useCallback, useLayoutEffect, useRef } from "react";
 import { ListBox, ListBoxItem } from "react-aria-components";
 import { ActionButton } from "../components/ActionButton";
-import { useIsNarrow } from "../internal/useIsNarrow";
+import { useThumbnailColumn } from "../internal/frame";
 import * as deck from "./PresentationPattern.css";
 import * as styles from "./patterns.css";
 
@@ -37,8 +37,9 @@ export interface PresentationPatternProps {
 /**
  * Pattern I, presentation (design-spec 4.1, s23-deck.html): slides to show and export
  * (23). The tools' line across the top. Desktop and tablet: the thumbnails down the left,
- * numbered, the slide on the right with the notes under it. Phone: the slide on screen
- * alone, the previous and next under it, then the notes.
+ * numbered, the slide on the right with the notes under it. Phone, and a desktop whose
+ * docked panel leaves the body too narrow: the slide on screen alone, the previous and
+ * next under it, then the notes.
  */
 export function PresentationPattern({
   header,
@@ -51,14 +52,14 @@ export function PresentationPattern({
   slideTools,
   notes,
 }: PresentationPatternProps) {
-  const isNarrow = useIsNarrow();
+  const hasThumbnails = useThumbnailColumn();
   const index = Math.max(
     0,
     slides.findIndex((item) => item.id === currentId),
   );
   const previous = slides[index - 1];
   const next = slides[index + 1];
-  const nav = useRef<HTMLDivElement>(null);
+  const nav = useRef<HTMLDivElement | null>(null);
   // Reaching the first or the last slide disables the button just pressed: focus goes to
   // the other one instead of falling to the page.
   const move = (to: PresentationSlide, other: "first" | "last") => {
@@ -68,6 +69,55 @@ export function PresentationPattern({
     const buttons = nav.current?.querySelectorAll("button");
     buttons?.[other === "first" ? 0 : buttons.length - 1]?.focus();
   };
+
+  // Changing arrangement takes away the thumbnails or the previous and next, and focus in
+  // them goes to what replaces them: the first of the previous and next that can be
+  // pressed (the slide's column when neither can, in a deck of one slide), or the slide on
+  // screen's thumbnail. Whether the part held focus is noted as it leaves the page, while
+  // focus is still in it, and the note is used or dropped once the page is drawn. Each
+  // leaving writes the note, as Strict Mode also detaches and attaches a new part's ref.
+  const thumbnails = useRef<HTMLDivElement | null>(null);
+  const stageColumn = useRef<HTMLDivElement>(null);
+  const leaving = useRef<"thumbnails" | "nav" | null>(null);
+  const thumbnailsRef = useCallback((element: HTMLDivElement) => {
+    thumbnails.current = element;
+    return () => {
+      leaving.current = element.contains(document.activeElement)
+        ? "thumbnails"
+        : null;
+      thumbnails.current = null;
+    };
+  }, []);
+  const navRef = useCallback((element: HTMLDivElement) => {
+    nav.current = element;
+    return () => {
+      leaving.current = element.contains(document.activeElement) ? "nav" : null;
+      nav.current = null;
+    };
+  }, []);
+  useLayoutEffect(() => {
+    const part = leaving.current;
+    leaving.current = null;
+    const isLost = () =>
+      document.activeElement === null ||
+      document.activeElement === document.body;
+    if (part === "thumbnails" && isLost()) {
+      (
+        nav.current?.querySelector<HTMLElement>("button:not(:disabled)") ??
+        stageColumn.current
+      )?.focus();
+    }
+    if (part === "nav") {
+      // React Aria draws a new ListBox's options a render later, in the same task.
+      queueMicrotask(() => {
+        if (!isLost()) return;
+        thumbnails.current
+          ?.querySelector<HTMLElement>('[aria-selected="true"]')
+          ?.focus();
+      });
+    }
+  });
+
   return (
     <div className={styles.root}>
       <div className={styles.deckBar}>
@@ -78,9 +128,9 @@ export function PresentationPattern({
         )}
       </div>
       <div className={styles.presentation}>
-        {!isNarrow && (
+        {hasThumbnails && (
           <>
-            <div className={styles.thumbnails}>
+            <div ref={thumbnailsRef} className={styles.thumbnails}>
               <ListBox
                 aria-label={i18n.t("components:presentationPattern.slides")}
                 items={slides.map((item, position) => ({ ...item, position }))}
@@ -118,13 +168,13 @@ export function PresentationPattern({
           </>
         )}
         <div className={styles.stage}>
-          <div className={styles.stageColumn}>
+          <div ref={stageColumn} tabIndex={-1} className={styles.stageColumn}>
             {slideTools != null && (
               <div className={styles.slideTools}>{slideTools}</div>
             )}
             {slide}
-            {isNarrow && (
-              <div ref={nav} className={styles.slideNav}>
+            {!hasThumbnails && (
+              <div ref={navRef} className={styles.slideNav}>
                 <ActionButton
                   aria-label={i18n.t("components:presentationPattern.previous")}
                   isDisabled={previous === undefined}

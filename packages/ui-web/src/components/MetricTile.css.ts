@@ -6,9 +6,15 @@ import { narrowQuery, typography } from "../styles/helpers";
 const measures = vars.scale.component.metricGroup;
 const hairline = `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`;
 
+/** A band's tiles 2×2, as a phone draws them (d1-moon.html at 390px). */
+const bandSquare = {
+  gridAutoFlow: "row",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+} as const;
+
 /**
  * `band`: one row of equal columns between a line (border.default) and a hairline; 2×2 on
- * a phone (d1-moon.html .numbers). `compact`: columns as wide as their tiles, no lines
+ * a phone and in a `squareBand` (d1-moon.html .numbers). `compact`: columns as wide as their tiles, no lines
  * (s19-decision.html .kn). `column`: one under another, a hairline between them
  * (s17-costs.html .tot). `pair`: 2×2 at every width, smaller, for a detail beside a list
  * (s06-ideas.html .nums).
@@ -20,12 +26,7 @@ export const group = styleVariants({
     gridAutoColumns: "minmax(0, 1fr)",
     borderTop: `${vars.borderWidth.hairline} solid ${vars.color.border.default}`,
     borderBottom: hairline,
-    "@media": {
-      [narrowQuery]: {
-        gridAutoFlow: "row",
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-      },
-    },
+    "@media": { [narrowQuery]: bandSquare },
   },
   compact: {
     display: "grid",
@@ -53,7 +54,30 @@ export const group = styleVariants({
   },
 });
 
-/** The tiles of a band are set apart by hairlines, a cross of them on a phone. */
+/**
+ * A band 2×2 at any width: beside a desktop's docked panel that leaves the body too narrow
+ * for the row, where a phone's 2×2 keeps the numbers whole (design-spec 4.1 A).
+ */
+export const squareBand = style(bandSquare);
+
+/** A band's tiles in its 2×2: a cross of hairlines (d1-moon.html at 390px). */
+const squareTile = {
+  paddingBlock: measures.narrowPaddingY,
+  paddingInlineEnd: measures.narrowPaddingEnd,
+  selectors: {
+    "& + &": { paddingInlineStart: 0, borderInlineStart: "none" },
+    "&:nth-child(even)": {
+      paddingInlineStart: measures.narrowPaddingStart,
+      borderInlineStart: hairline,
+    },
+    "&:nth-child(n + 3)": { borderBlockStart: hairline },
+  },
+} as const;
+
+/**
+ * The tiles of a band are set apart by hairlines, a cross of them on a phone and in a
+ * `squareBand`.
+ */
 export const tile = recipe({
   base: {
     display: "flex",
@@ -75,20 +99,7 @@ export const tile = recipe({
             borderInlineStart: hairline,
           },
         },
-        "@media": {
-          [narrowQuery]: {
-            paddingBlock: measures.narrowPaddingY,
-            paddingInlineEnd: measures.narrowPaddingEnd,
-            selectors: {
-              "& + &": { paddingInlineStart: 0, borderInlineStart: "none" },
-              "&:nth-child(even)": {
-                paddingInlineStart: measures.narrowPaddingStart,
-                borderInlineStart: hairline,
-              },
-              "&:nth-child(n + 3)": { borderBlockStart: hairline },
-            },
-          },
-        },
+        "@media": { [narrowQuery]: squareTile },
       },
       compact: { gap: measures.compactRowGap },
       column: {
@@ -110,7 +121,12 @@ export const tile = recipe({
         },
       },
     },
+    /** In a `squareBand`. */
+    isSquare: { true: {}, false: {} },
   },
+  compoundVariants: [
+    { variants: { variant: "band", isSquare: true }, style: squareTile },
+  ],
 });
 
 export const label = recipe({

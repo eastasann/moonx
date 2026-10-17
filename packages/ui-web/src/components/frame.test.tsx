@@ -4,7 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { Bell, Lightbulb, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { HubPattern } from "../patterns/HubPattern";
 import { ListDetailPattern } from "../patterns/ListDetailPattern";
+import { PresentationPattern } from "../patterns/PresentationPattern";
 import { QuestionFormPattern } from "../patterns/QuestionFormPattern";
 import { setPhoneWidth, settle } from "../test/helpers";
 import { AppFrame, type AppFrameProps } from "./AppFrame";
@@ -564,6 +566,54 @@ describe("AppFrame: a docked panel and the body's width (design-spec 4.1)", () =
       name: "Summary of piaya",
     }).parentElement;
     expect(document.activeElement).toBe(detail);
+  });
+
+  test("A takes one column below two-column-min-width, I the slide alone below its own", () => {
+    stubLayout();
+    render(
+      <AppFrame
+        sideNav={null}
+        tabBar={null}
+        panel={<aside data-docked aria-label="Comments" />}
+      >
+        <HubPattern
+          header={<h1>Piaya</h1>}
+          blocks={[
+            { id: "next", column: "main", content: <p>Next steps</p> },
+            { id: "sections", column: "aside", content: <p>Sections</p> },
+          ]}
+        />
+        <PresentationPattern
+          header={<h1>Pitch Deck</h1>}
+          slides={[{ id: "title", title: "Title", thumbnail: null }]}
+          currentId="title"
+          onCurrentChange={() => {}}
+          slide={<p>Slide</p>}
+        />
+      </AppFrame>,
+    );
+    const isOneColumn = () =>
+      screen.getByText("Next steps").parentElement?.parentElement ===
+      screen.getByText("Sections").parentElement?.parentElement;
+    const thumbnails = () => screen.queryByRole("listbox", { name: "Slides" });
+    // 1440px: the body has room for both.
+    resized(844);
+    expect(isOneColumn()).toBe(false);
+    expect(thumbnails()).toBeTruthy();
+    // 1340px: under 788, over 704.
+    resized(744);
+    expect(isOneColumn()).toBe(true);
+    expect(thumbnails()).toBeTruthy();
+    // 1024px.
+    resized(428);
+    expect(isOneColumn()).toBe(true);
+    expect(thumbnails()).toBeNull();
+    expect(screen.getByRole("button", { name: "Next slide" })).toBeTruthy();
+    // The thresholds themselves have room.
+    resized(704);
+    expect(thumbnails()).toBeTruthy();
+    resized(788);
+    expect(isOneColumn()).toBe(false);
   });
 
   test("a narrow body without a panel keeps two columns", () => {

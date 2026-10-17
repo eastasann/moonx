@@ -19,6 +19,7 @@
 | [concept.md](concept.md) | Phase 0 のコンセプトメモ（アーカイブ） |
 | [brainstorm-notes.md](brainstorm-notes.md) | Phase 1 の壁打ちメモと、現行の Drive のテンプレートの構成（アーカイブ） |
 | [drive-templates/README.md](drive-templates/README.md) | Drive のテンプレートの原本の写し（アーカイブ。BCDX のテンプレートのファイル `data/templates/bcdx/` の転記元） |
+| [mockups/README.md](mockups/README.md) | 2026-10-11 に合意した見た目のモックアップ（アーカイブ。パターンごとに1画面の HTML。design-spec と 06 の見た目の書き写し元で、画面の見た目を並べて確かめるのに使う） |
 | [design-spec.md](design-spec.md) | 設計仕様書。画面一覧・画面ごとの仕様・ロールと権限・デザインの方針と部品の一覧・デモデータ |
 | [screen_flow.mermaid](screen_flow.mermaid) | 画面遷移図 |
 | [01_prd.md](01_prd.md) | PRD。目的・対象ユーザー・ユーザーストーリーと優先度・KPI・スコープ外 |
@@ -38,7 +39,7 @@
 |---|---|---|
 | ソース（正） | `design-spec.md`・`screen_flow.mermaid`・`01_prd.md`・`02-01_system-design-doc.md`・`03_dev-setup.md`・`04_deployment-procedure.md`・`05_operation-runbook.md`・`06_design-tokens.json` | 事実ごとに正は1つ（下の所有権マップ）。変更のたびに更新する生きた文書 |
 | 派生 | ソースから生成・要約するもの（06 から `make tokens` で作るテーマと PWA のアイコン・マニフェスト `packages/ui-tokens`（vanilla-extract・react-pdf 用）、`make openapi` の書き出し、Phase 4 の実装準備で作る `CLAUDE.md`（リポジトリの直下。`AGENTS.md` はそのリンク）と `claude-code-prompts.md`） | 直接直さない。ソースを直してから作り直す（`claude-code-prompts.md` の `Status:` 行と、分けて足すステップは `/draft:implement` が書く） |
-| アーカイブ | `concept.md`・`brainstorm-notes.md`・`drive-templates/` | 決めた経緯の記録と、Drive の原本の写し。更新しない。今の正はソースを読む |
+| アーカイブ | `concept.md`・`brainstorm-notes.md`・`drive-templates/`・`mockups/` | 決めた経緯の記録と、Drive の原本の写しと、合意した見た目のモックアップ。更新しない。今の正はソースを読む |
 
 ### 事実の所有権マップ
 

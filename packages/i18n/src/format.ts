@@ -1,4 +1,9 @@
-import type { CheckKey, DateOnly, MetricBound } from "@moonx/schemas";
+import {
+  type CheckKey,
+  type DateOnly,
+  groupedNumberPattern,
+  type MetricBound,
+} from "@moonx/schemas";
 import { i18n } from "./i18n";
 
 // The display formats of design-spec 1.2 (locale and dates) and 6.4 (rounding, lower and
@@ -107,6 +112,59 @@ export const formatPercent = (rate: number, options: BoundOption = {}) =>
 export const formatInputPercent = (rate: number) =>
   signed(rate, { style: "percent", maximumFractionDigits: 2 });
 
+/**
+ * A number as typed into a field, its whole part regrouped by thousands: "1500.5" becomes
+ * "1,500.5". Only separators move: the digits, the decimals and any leading zero stay as
+ * typed, so the field never rewrites what the form's check reads. Text the check would
+ * refuse ("1,5", "12.") comes back unchanged, so the field keeps what the user typed next
+ * to the reason (design-spec 6.0.8).
+ */
+export const formatNumberText = (text: string) => {
+  const trimmed = text.trim();
+  if (!groupedNumberPattern.test(trimmed)) return text;
+  const [whole = "", decimals] = trimmed.split(".");
+  const digits = whole.replaceAll(",", "");
+  // "007" stays "007": grouping it would make a new text, not regroup the typed one.
+  if (digits.length > 1 && digits.startsWith("0")) return trimmed;
+  const separator =
+    numberFormat({})
+      .formatToParts(1000)
+      .find((part) => part.type === "group")?.value ?? ",";
+  const grouped = digits.replace(/\B(?=(\d{3})+$)/g, separator);
+  return decimals === undefined ? grouped : `${grouped}.${decimals}`;
+};
+
+/**
+ * What a number field shows around the typed number: the currency symbol of an amount
+ * (ISO 4217, as `formatMoney` writes it: "₱") or the percent sign of a percent, each on
+ * the side the locale puts it.
+ */
+export const formatNumberAffixes = (
+  unit: { currency: string } | { percent: true },
+) => {
+  const parts = numberFormat(
+    "currency" in unit
+      ? {
+          style: "currency",
+          currency: unit.currency,
+          currencyDisplay: "narrowSymbol",
+        }
+      : { style: "percent" },
+  ).formatToParts(1);
+  const digits = new Set(["integer", "group", "decimal", "fraction"]);
+  const number = parts.findIndex((part) => digits.has(part.type));
+  const text = (side: Intl.NumberFormatPart[]) =>
+    side
+      .filter((part) => !digits.has(part.type))
+      .map((part) => part.value)
+      .join("")
+      .trim();
+  return {
+    prefix: text(parts.slice(0, number)),
+    suffix: text(parts.slice(number)),
+  };
+};
+
 /** The payback period: one decimal, keeping ".0" ("9.2 months", "9.2+ months"). */
 export const formatMonths = (months: number, options: BoundOption = {}) =>
   i18n.t("format:months", {
@@ -121,6 +179,13 @@ export const formatCount = (count: number) =>
   count > 99
     ? `${numberFormat({}).format(99)}+`
     : numberFormat({}).format(count);
+
+/**
+ * How far a ProgressCircle or ProgressBar has got, read out as a whole percent ("40%").
+ * Not a calculated rate, so it has no decimal (formatPercent has one).
+ */
+export const formatProgress = (fraction: number) =>
+  numberFormat({ style: "percent", maximumFractionDigits: 0 }).format(fraction);
 
 /** A Date, a UTC ISO 8601 date-time, or a date-only "2026-10-01". */
 export type DateInput = Date | string;
@@ -248,6 +313,28 @@ export const formatTime = (value: DateInput, { timeZone }: ZoneOptions) =>
     hour: "numeric",
     minute: "2-digit",
   }).format(toInstant(value, timeZone).date);
+
+// A DatePicker's calendar works in date-only values ("2026-10-16"), shown in UTC like
+// every calendar day (toInstant).
+const calendarFormat = (options: Intl.DateTimeFormatOptions) => {
+  const format = new Intl.DateTimeFormat(LOCALE, {
+    timeZone: "UTC",
+    ...options,
+  });
+  return (date: string) => format.format(toInstant(date, "UTC").date);
+};
+
+/** The month a DatePicker's calendar shows, from any day in it ("October 2026"). */
+export const formatCalendarMonth = calendarFormat({
+  month: "long",
+  year: "numeric",
+});
+
+/** The initial of a calendar column's weekday ("S" for Sunday). */
+export const formatWeekdayInitial = calendarFormat({ weekday: "narrow" });
+
+/** A calendar day's number ("16"). */
+export const formatDayOfMonth = calendarFormat({ day: "numeric" });
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;

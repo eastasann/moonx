@@ -1,5 +1,7 @@
+import { i18n } from "@moonx/i18n";
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { I18nextProvider } from "react-i18next";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -18,7 +20,8 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        {/* The screens and the parts take their words from the shared catalogs (ADR-026). */}
+        <I18nextProvider i18n={i18n}>{children}</I18nextProvider>
         <Scripts />
       </body>
     </html>

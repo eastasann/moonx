@@ -1,4 +1,7 @@
 {
+  "costs": {
+    "emptyRowHint": "Tap to fill or mark Unknown"
+  },
   "sections": {
     "03": "03 Research Log",
     "04": "04 Competitors",

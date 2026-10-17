@@ -7,6 +7,7 @@ import {
   type ThemeVariable,
   themeOverrides,
   themeVariables,
+  varsSource,
 } from "./web-theme";
 
 const tree = await loadTokens();
@@ -39,7 +40,8 @@ describe("themeVariables", () => {
       ({ path }) =>
         path.startsWith("semantic.") &&
         !/^semantic\.(color|shadow)\.dark\./.test(path) &&
-        !path.startsWith("semantic.scale.large."),
+        !path.startsWith("semantic.scale.large.") &&
+        !path.startsWith("semantic.font-size.narrow."),
     );
     const fields = { typography: 5, transition: 3 } as Record<string, number>;
     const expected = tokens.reduce(
@@ -50,32 +52,55 @@ describe("themeVariables", () => {
   });
 
   test("writes font sizes in rem, print sizes and other dimensions in px", () => {
-    expect(value("scale-font-size-100")).toMatchObject({
-      lightMedium: "0.875rem",
-      lightLarge: "1.0625rem",
+    expect(value("font-size-body")).toMatchObject({
+      lightMedium: "0.9375rem",
+      lightNarrow: "1rem",
     });
-    expect(value("typography-body-font-size")).toMatchObject({
-      lightMedium: "1rem",
-      lightLarge: "1.1875rem",
-    });
+    expect(value("scale-component-button-font-size-M")?.lightMedium).toBe(
+      "0.875rem",
+    );
     expect(value("print-font-size-footer")?.lightMedium).toBe("10px");
     expect(value("print-typography-title-font-size")?.lightMedium).toBe("44px");
     expect(value("space-300")?.lightMedium).toBe("16px");
     expect(value("typography-display-letter-spacing")?.lightMedium).toBe(
-      "-0.75px",
+      "-1.62px",
     );
+    expect(value("fluid-type-display-viewport")?.lightMedium).toBe("4.2");
   });
 
-  test("swaps the medium scale for large in typography and density", () => {
+  test("swaps the medium scale for large in density, and the wide sizes for narrow in typography", () => {
     expect(value("density-regular-row-height")).toMatchObject({
       lightMedium: "40px",
       lightLarge: "50px",
+      lightNarrow: "40px",
     });
-    // tab-label names a primitive size, so it keeps it on every scale.
+    expect(value("typography-body-font-size")).toMatchObject({
+      lightMedium: "0.9375rem",
+      lightLarge: "0.9375rem",
+      lightNarrow: "1rem",
+    });
+    expect(value("scale-component-field-font-size-M")).toMatchObject({
+      lightMedium: "0.875rem",
+      lightLarge: "0.875rem",
+      lightNarrow: "1rem",
+    });
+    // tab-label names a primitive size, so it keeps it on every scale and width.
     expect(value("typography-tab-label-font-size")).toMatchObject({
-      lightMedium: "0.6875rem",
-      lightLarge: "0.6875rem",
+      lightMedium: "0.65625rem",
+      lightLarge: "0.65625rem",
+      lightNarrow: "0.65625rem",
     });
+  });
+
+  test("the large scale changes only the target, the heights of what is pressed and the fields' text floor (design-spec 4.3・4.4)", () => {
+    const heights =
+      /^scale-component-(button-height|action-button-height|segmented-control-item-height|tag-height|menu-item-height|field-height|field-font-size-min|tabs-item-height|disclosure-title-height|breadcrumbs-height|table-row-height|table-view-row-height|target-min)/;
+    const scaled = variables
+      .filter((v) => v.key[0] === "scale")
+      .filter((v) => v.values.lightLarge !== v.values.lightMedium)
+      .map((v) => v.name);
+    expect(scaled.length).toBeGreaterThan(0);
+    expect(scaled.filter((name) => !heights.test(name))).toEqual([]);
   });
 
   test("writes the other types as CSS", () => {
@@ -86,7 +111,7 @@ describe("themeVariables", () => {
       '"IBM Plex Mono", "IBM Plex Sans JP", ui-monospace, "Menlo", "Consolas", monospace',
     );
     expect(value("typography-heading-1-font-weight")?.lightMedium).toBe("600");
-    expect(value("typography-body-line-height")?.lightMedium).toBe("1.65");
+    expect(value("typography-body-line-height")?.lightMedium).toBe("1.55");
     expect(value("shadow-overlay")).toMatchObject({
       lightMedium: "0px 12px 32px -12px rgb(14 17 32 / 0.16)",
       darkMedium: "0px 12px 32px -8px rgb(0 0 0 / 0.55)",
@@ -102,12 +127,12 @@ describe("themeVariables", () => {
 
   test("keeps the print colours light in the dark mode", () => {
     expect(value("print-color-page")).toMatchObject({
-      lightMedium: "#f4f5f8",
-      darkMedium: "#f4f5f8",
+      lightMedium: "#ffffff",
+      darkMedium: "#ffffff",
     });
   });
 
-  test("rejects a token that changes with both the mode and the scale", () => {
+  test("rejects a token that changes with more than one of the mode, the scale and the width", () => {
     const px = (n: number) => ({ $value: { value: n, unit: "px" } });
     const broken: TokenTree = {
       primitive: { size: { $type: "dimension", a: px(1), b: px(2) } },
@@ -126,7 +151,25 @@ describe("themeVariables", () => {
       },
     };
     expect(() => themeVariables(broken)).toThrow(
-      "--color-gap changes with both the mode and the scale",
+      "--color-gap changes with more than one of the mode, the scale and the width",
+    );
+    const byWidth: TokenTree = {
+      primitive: { size: { $type: "dimension", a: px(1), b: px(2) } },
+      semantic: {
+        "font-size": {
+          $type: "dimension",
+          wide: { gap: { $value: "{primitive.size.a}" } },
+          narrow: { gap: { $value: "{primitive.size.b}" } },
+        },
+        scale: {
+          $type: "dimension",
+          medium: { gap: { $value: "{semantic.font-size.wide.gap}" } },
+          large: { gap: { $value: "{primitive.size.b}" } },
+        },
+      },
+    };
+    expect(() => themeVariables(byWidth)).toThrow(
+      "--scale-gap changes with more than one of the mode, the scale and the width",
     );
   });
 
@@ -187,18 +230,85 @@ describe("themeVariables", () => {
 });
 
 describe("themeOverrides", () => {
-  const { dark, large } = themeOverrides(variables);
+  const { dark, large, narrow } = themeOverrides(variables);
   const keys = (list: ThemeVariable[]) => list.map((v) => v.key[0]);
 
   test("switches only the colours and shadows with the mode", () => {
     expect(new Set(keys(dark))).toEqual(new Set(["color", "shadow"]));
   });
 
-  test("switches the scale, and the sizes that follow it, with the scale", () => {
-    expect(new Set(keys(large))).toEqual(
-      new Set(["scale", "density", "typography"]),
-    );
+  test("switches the scale, and the row heights that follow it, with the scale", () => {
+    expect(new Set(keys(large))).toEqual(new Set(["scale", "density"]));
   });
+
+  test("switches the font sizes, and the styles and fields that follow them, with the width", () => {
+    expect(new Set(keys(narrow))).toEqual(
+      new Set(["fontSize", "typography", "scale"]),
+    );
+    expect(
+      narrow
+        .filter((v) => v.key[0] === "scale")
+        .every((v) =>
+          v.key.join(".").startsWith("scale.component.field.fontSize"),
+        ),
+    ).toBe(true);
+  });
+});
+
+test("vars.ts gives the sizes code reads as numbers in px", () => {
+  const source = varsSource(tree);
+  expect(source).toContain(`"tablet": 768,`);
+  expect(source).toContain("export const popoverMaxHeight = 384;");
+  expect(source).toContain("export const twoColumnMinWidth = 788;");
+  expect(source).toContain("export const presentationTwoColumnMinWidth = 704;");
+  expect(source).toContain("export const publicStackMaxWidth = 900;");
+  expect(value("layout-popover-max-height")?.lightMedium).toBe("384px");
+});
+
+test("the landing's fluid titles still reach 200% with browser zoom (WCAG 1.4.4)", () => {
+  // Zoom shrinks the viewport, so the vw term stops growing; the rem bounds keep growing.
+  // With max at most 2.5 × min, zooming to 500% (every browser's limit or less) lifts the
+  // minimum to at least twice the largest size (Adrian Roselli, "Responsive Type and Zoom").
+  for (const name of ["display", "display-2"]) {
+    const rem = (field: string) =>
+      Number.parseFloat(
+        value(`fluid-type-${name}-${field}`)?.lightMedium ?? "",
+      );
+    expect(value(`fluid-type-${name}-min`)?.lightMedium).toMatch(/rem$/);
+    expect(value(`fluid-type-${name}-max`)?.lightMedium).toMatch(/rem$/);
+    expect(rem("max")).toBeLessThanOrEqual(2.5 * rem("min"));
+  }
+});
+
+test("on touch, field text is 16px at least: iOS zooms into smaller fields (design-spec 4.3)", () => {
+  expect(value("scale-component-field-font-size-min")).toMatchObject({
+    lightMedium: "0px",
+    lightLarge: "1rem",
+  });
+});
+
+test("two-column-min-width stays the body of a desktop at its breakpoint (06 $description)", () => {
+  const px = (name: string) =>
+    Number.parseFloat(value(name)?.lightMedium ?? "");
+  const body = px("layout-two-column-min-width");
+  expect(body).toBe(px("breakpoint-desktop") - px("layout-sidebar-width"));
+  // At that width D's list takes its minimum, not its 5 : 6 share, as the $description
+  // counts it.
+  const list = Number(value("layout-list-detail-list-ratio")?.lightMedium);
+  const detail = Number(value("layout-list-detail-detail-ratio")?.lightMedium);
+  expect((body * list) / (list + detail)).toBeLessThan(
+    px("layout-list-detail-list-min-width"),
+  );
+});
+
+test("I's two-column-min-width stays the body of a tablet at its breakpoint (06 $description)", () => {
+  const px = (name: string) =>
+    Number.parseFloat(value(name)?.lightMedium ?? "");
+  // I draws its thumbnails beside the slide on a tablet too (design-spec 4.1), so its
+  // narrowest two columns are a tablet's at its breakpoint, with the icons-only SideNav.
+  expect(px("layout-presentation-two-column-min-width")).toBe(
+    px("breakpoint-tablet") - px("layout-sidebar-width-collapsed"),
+  );
 });
 
 test("camelCase", () => {
@@ -257,7 +367,7 @@ describe("the generated theme compiles with vanilla-extract", () => {
   ) => new Map(list.map((v) => [`--${v.name}`, v.values[context]]));
   const rule = (selector: string, media?: string) =>
     rules.find((r) => r.selector === selector && r.media === media)?.decls;
-  const { dark, large } = themeOverrides(variables);
+  const { dark, large, narrow } = themeOverrides(variables);
 
   test(":root holds every variable at light and medium", () => {
     expect(rule(":root")).toEqual(
@@ -290,7 +400,13 @@ describe("the generated theme compiles with vanilla-extract", () => {
     expect(rule(':root[data-scale="large"]')).toEqual(expected);
   });
 
+  test("the narrow font sizes follow the width below the tablet breakpoint", () => {
+    expect(rule(":root", "@media not all and (min-width: 768px)")).toEqual(
+      declarations(narrow, "lightNarrow"),
+    );
+  });
+
   test("has no other rules", () => {
-    expect(rules).toHaveLength(5);
+    expect(rules).toHaveLength(6);
   });
 });

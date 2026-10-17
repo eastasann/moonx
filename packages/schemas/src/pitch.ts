@@ -89,6 +89,19 @@ export const pitchSlideSchema = z.object({
       value: metricValueSchema,
     }),
   ),
+  /**
+   * How the fit set the figures side by side (`figureColumns` of packages/domain), measured
+   * with the PDF's font files, so 23 lays them out as the PDF does (ADR-012): each
+   * column's width in pt of `semantic.print.slide`, in the order of `numbers`, and
+   * whether they fit unbroken (false: they share the width by their widths, and long
+   * values break). Null on a slide without figures, and before the fit.
+   */
+  figureColumns: z
+    .object({
+      widths: z.array(z.number().positive()),
+      fits: z.boolean(),
+    })
+    .nullable(),
   /** Formatted cells; null is a blank cell. No rows: the table's source is empty. */
   table: z
     .object({

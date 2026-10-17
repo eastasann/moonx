@@ -213,7 +213,18 @@ describe("validateTokens", () => {
         }),
       ),
     ).toContain(
-      "semantic.scale.large.body (large): semantic.scale.large.body: reference cycle",
+      "semantic.scale.large.body (large, wide): semantic.scale.large.body: reference cycle",
+    );
+  });
+
+  test("reports a cycle that only the swap to the narrow width makes", () => {
+    const tree = withValue("semantic.font-size", {
+      $type: "dimension",
+      wide: { body: { $value: "{primitive.size.14}" } },
+      narrow: { body: { $value: "{semantic.font-size.wide.body}" } },
+    });
+    expect(validateTokens(tree)).toContain(
+      "semantic.font-size.narrow.body (medium, narrow): semantic.font-size.narrow.body: reference cycle",
     );
   });
 
@@ -336,6 +347,30 @@ describe("resolveToken", () => {
       value: { value: 17 },
       source: "primitive.size.17",
     });
+  });
+
+  test("reads references into the wide font sizes in the width it builds for", () => {
+    const tokens = flattenTokens(
+      withValue("semantic.font-size", {
+        $type: "dimension",
+        wide: { body: { $value: "{primitive.size.14}" } },
+        narrow: { body: { $value: "{primitive.size.17}" } },
+      }),
+    );
+    const resolve = (width: "wide" | "narrow") =>
+      resolveToken(tokens, "semantic.font-size.wide.body", "medium", width);
+    expect(resolve("wide")).toMatchObject({ source: "primitive.size.14" });
+    // The token itself is the wide one; only references to it are swapped.
+    expect(resolve("narrow")).toMatchObject({ source: "primitive.size.14" });
+    // A token outside the group that names the wide one is read in the width built for.
+    tokens.set("semantic.x", {
+      path: "semantic.x",
+      type: "dimension",
+      value: "{semantic.font-size.wide.body}",
+    });
+    expect(resolveToken(tokens, "semantic.x", "large", "narrow")).toMatchObject(
+      { source: "primitive.size.17" },
+    );
   });
 
   test("throws on a missing token or a cycle, which validateTokens reports first", () => {

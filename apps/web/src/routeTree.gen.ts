@@ -9,27 +9,51 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as DevComponentsRouteImport } from './routes/dev.components'
 
-export interface FileRoutesByFullPath {}
-export interface FileRoutesByTo {}
+const DevComponentsRoute = DevComponentsRouteImport.update({
+  id: '/dev/components',
+  path: '/dev/components',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
+export interface FileRoutesByFullPath {
+  '/dev/components': typeof DevComponentsRoute
+}
+export interface FileRoutesByTo {
+  '/dev/components': typeof DevComponentsRoute
+}
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/dev/components': typeof DevComponentsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: never
+  fullPaths: '/dev/components'
   fileRoutesByTo: FileRoutesByTo
-  to: never
-  id: '__root__'
+  to: '/dev/components'
+  id: '__root__' | '/dev/components'
   fileRoutesById: FileRoutesById
 }
-export interface RootRouteChildren {}
-
-declare module '@tanstack/react-router' {
-  interface FileRoutesByPath {}
+export interface RootRouteChildren {
+  DevComponentsRoute: typeof DevComponentsRoute
 }
 
-const rootRouteChildren: RootRouteChildren = {}
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/dev/components': {
+      id: '/dev/components'
+      path: '/dev/components'
+      fullPath: '/dev/components'
+      preLoaderRoute: typeof DevComponentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+  }
+}
+
+const rootRouteChildren: RootRouteChildren = {
+  DevComponentsRoute: DevComponentsRoute,
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()

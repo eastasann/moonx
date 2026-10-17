@@ -18,7 +18,7 @@ BCDX は「自己分析 → アイデア検証 → ビジネスプラン」の�
 |---|---|
 | 工程間の転記と全体把握（検証の数字や顧客・課題をプランへ手で写す。複数アイデア・複数メンバーの進み具合を一覧できない） | 検証で Proceed にしたアイデアは、主要な数字・顧客・課題がプランの下書きに引き継がれる。数字の正は検証に置き、プランは常に検証を参照する。ダッシュボードでアイデアとメンバーの状況を一覧する |
 | 検証の抜け漏れ（最低限の確認項目と Fact / Assumption / Unknown の区別がどこまで済んだか分からない） | 必須の確認項目6つを入力内容から自動で判定し、F/A/U の内訳と一緒に「足りないもの」を状態として示す。点数は付けない |
-| スマホでの入力（結合セルの多い表や長いドキュメントをモバイルから埋めにくい） | スマホでは自己分析も検証も1問ずつカードで答える。表は行ごとのカードにする。スマホで少しずつ進め、続きは Web の大きな画面で開ける |
+| スマホでの入力（結合セルの多い表や長いドキュメントをモバイルから埋めにくい） | スマホでは自己分析も検証も1問ずつカードで答える。表は1行ずつ線で区切った行にし、行を押してシートで編集する。スマホで少しずつ進め、続きは Web の大きな画面で開ける |
 
 提供する体験の柱:
 
@@ -41,7 +41,7 @@ BCDX は「自己分析 → アイデア検証 → ビジネスプラン」の�
 | 対応言語（UI） | **英語のみ**。ただし多言語化できる作りは残す（UI の文言はすべてコードから分けて管理し、日付・数値・通貨は書式を切り替えられるようにする） |
 | 対応言語（回答） | 自由（英語・タガログ語・Hiligaynon・日本語・混在など）。アプリは回答を翻訳しない。日本語を含む多言語の文字を表示できること |
 | 通貨 | ワークスペースごとに設定し、既定は PHP。換算はしない（PRD 6章）。自己分析の金額は自己分析ごとの通貨 |
-| 書式 | 初期リリースは en-PH に固定（日付は「Sep 30, 2026」、時刻は12時間制。細則は下）。書き出しの日付は ISO 8601。金額の入力は桁区切りのカンマを受け付ける。テンプレートの中身（設問・EXAMPLE）は1言語で持ち、UI の多言語化とは別に扱う |
+| 書式 | 初期リリースは en-PH に固定（日付は「Sep 30, 2026」（日付の入力欄だけは「9/30/2026」）、時刻は12時間制。細則は下）。書き出しの日付は ISO 8601。金額の入力は桁区切りのカンマを受け付ける。テンプレートの中身（設問・EXAMPLE）は1言語で持ち、UI の多言語化とは別に扱う |
 | AI | アプリに組み込まない（PRD 6章）。外部の AI（ChatGPT・Claude など）との往復（書き出し・取り込み）だけを支える |
 | 通知 | アプリ内のみ（メール通知とプッシュ通知はスコープ外。PRD 6章）。招待とパスワード再設定のメールは送る（認証に必要な連絡で、通知とは別） |
 | 既存データ | Google Drive の既存データ（自己分析1件、記入済みの検証1件）は手で入れ直す。Drive との取り込み・同期・書き出しは作らない（PRD 6章） |
@@ -53,6 +53,8 @@ BCDX は「自己分析 → アイデア検証 → ビジネスプラン」の�
 - 24時間以内の日時は相対で出す（1分未満は「just now」、それ以降は「5m ago」「2h ago」）。それより前は日付で出す。
 - 今年の日付は年を省く（「Oct 1」）。去年以前の日付は年を付ける（「Sep 30, 2025」）。
 - 期限（Deadline・Target Date・ローンチの Date）は相対にせず日付で出す。期限を過ぎたものは日数を添える（「overdue 2d」）。
+- 日付の入力欄（DatePicker）は例外で、en-PH の数字の並び（「9/30/2026」。空の欄は「mm/dd/yyyy」）で出す。月・日・年の欄にキーボードで数字を打てるようにするため（React Aria と Spectrum 2 の DatePicker と同じ形）。入力欄の外に出す日付は、上の細則どおり「Sep 30, 2026」で出す（2026-10-16 のユーザーの決定）。
+- DatePicker が開くカレンダーは、見出しを月と年（「October 2026」）、曜日を頭文字（「S」「M」）、日を数字（「16」）で出す。カレンダーの読み上げ（日・選んだ日付・表示中の月）は、React Aria が作る形のままにする（SDD 9章「React Aria の文言」）。
 - 負の金額は、符号を通貨記号の前に置く（「−₱5,586」）。
 - 通貨記号は短い形で出す（「$1,234」「¥1,234」。「US$」のように国を書き分けない）。通貨はワークスペース（自己分析は自己分析）に1つなので、書き分けなくても区別できる。
 - 待ち時間（回数の上限の案内など）は、分に切り上げて「1 minute」「45 minutes」と出す。切り上げた分が60分以上なら、時間に切り上げて「1 hour」「2 hours」と出す（59分30秒は「1 hour」）。
@@ -278,27 +280,38 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 
 | 記号 | パターン | 使う目的 | デスクトップ | タブレット | スマホ |
 |---|---|---|---|---|---|
-| A | ハブ | 1つの対象の全体像を見て、次に行く場所を決める | 13 検証ホームは主要な数字を上に横一列で出す（6.1）。その下を2カラムにし、主列に次のおすすめ・状態（確認項目・内訳）・補足、副列に入口の一覧（セクションなど）・履歴・関連するもの。どのブロックをどちらの列に置くかは各画面が決める | 1カラム。順番はスマホと同じ | 縦に積む。順番は各画面が決める（既定は 数字 → 主列 → 副列）。主要な操作（判定するなど）は下部に固定 |
-| B | 中央集中 | 1つの決定・1つのフォームに集中させる | 中央の1カラム（読みやすい幅）。判断材料を上、入力を下 | デスクトップと同じ | 1カラム。主要な操作は下部に固定 |
-| C | 設問フォーム | セクション（またはプランの1項目）の問いに答える | セクションの全設問を縦に並べたフォーム。**入力中の設問が画面の縦の中央に来るようにスクロールし**、その設問だけ EXAMPLE・ヒント・F/A/U の操作を開く。他の設問はタイトル・回答の冒頭・F/A/U の印とラベルだけを控えめに出す（押せばそこへ移る） | デスクトップと同じ縦並び | 1画面に1問のカード。前後の移動は下部に固定 |
-| D | リスト＋詳細 | 多くの対象から探して開く、並べて管理する | 左に絞り込みとリスト、右に選んだ項目の詳細（マスター / ディテール）。ツリー構造（27）はリストの代わりにツリー | 1ペインずつ全幅で出す（リスト → 詳細。スマホと同じ） | リストを全画面で出し、項目を開くと詳細を全画面で出す。編集はボトムシート。新規作成の操作は右下に浮かぶボタン（ListDetailPattern の `floatingAction`） |
-| E | カード比較 | 対象を並べて見比べる | 2〜3列のカードグリッド。「表で比較」に切り替えると、項目を行・対象を列にした表 | デスクトップと同じ（列の数は幅で決まる） | カードを1列に並べる。比較表は出さない |
-| F | ワークシート | 数字を入れて、結果をその場で見る | 左に入力の表、右に計算結果（スクロールしても見える位置に固定） | 入力の表を全幅で出す（行ごとのカードにしない）。結果は下部に固定した要約バーで出し、押すと右の引き出し（ドロワー）で全体を開く | 入力を行ごとのカードにする。下部に結果の要約バーを固定し、タップで結果の全体を開く |
-| G | ステップ | 決まった手順を順に進める | 上にステップ表示（1 → 2 → 3）、中央のカラムに各ステップの内容。差分確認だけは左右2列 | デスクトップと同じ | 上にステップ表示、1カラム。差分は上下に並べる |
-| H | 設定フォーム | 設定値を項目ごとに直す | 中央のカラムに設定のまとまりを縦に並べる（左にまとまりの名前、右に項目） | デスクトップと同じ | 同じ。1カラム |
-| I | プレゼン | スライドを見せる・書き出す | 左にサムネイル列、右に横長のスライド（寸法は `semantic.print.slide`）、下に話す内容（§30） | デスクトップと同じ | スライドを幅に合わせて縦に並べる |
-| J | 公開ページ | アプリを紹介する | 1カラムの縦長ページ（ヒーローなど一部は2列） | 2列の部分は幅が足りなければ1カラムにする | 同じ |
+| A | ハブ | 1つの対象の全体像を見て、次に行く場所を決める | 題のまとまりの下端に操作をそろえ、13 検証ホームは主要な数字を上に横一列で出す（6.1）。その下を2カラム（主列と副列の比は 06 `layout.hub.main-ratio`・`aside-ratio`、間は `layout.hub.column-gap`。`docs/mockups` の s05-dashboard.html）にし、主列に次のおすすめ・状態（確認項目・内訳）・補足、副列に入口の一覧（セクションなど）・履歴・関連するもの。どのブロックをどちらの列に置くかは各画面が決める。ページは左にそろえる | 1カラム。順番はスマホと同じ | 縦に積む。順番は各画面が決める（既定は 数字 → 主列 → 副列）。主要な操作（判定するなど）は下部に固定 |
+| B | 中央集中 | 1つの決定・1つのフォームに集中させる | 中央の1カラム（中身の幅は 06 `layout.form-column-max`。s19-decision.html）。判断材料を上、入力を下。操作は入力の下の右端に、上のもの（19 の注意）から 06 `layout.focus.actions-gap` 空けて並べる | デスクトップと同じ | 1カラム。主要な操作と Cancel は下部に固定し、幅を等分する（4.3） |
+| C | 設問フォーム | セクション（またはプランの1項目）の問いに答える | セクションの全設問を、hairline で区切った一覧として縦に並べたフォーム（中身の幅は 06 `layout.reading-column-max`。s11-form.html）。**入力中の設問が画面の縦の中央に来るようにスクロールし**、その設問だけを枠と影のカード（列から左右に 06 `layout.question-form.card-outset` だけはみ出す）にして、EXAMPLE・ヒント・F/A/U の操作を開く。他の設問は印・名前・回答の冒頭・F/A/U のラベルだけの控えめな行にする（押せばそこへ移る）。前後のセクションと AI ▼ の行は下に留める | デスクトップと同じ縦並び | 1画面に1問のカード。前後の移動は下部に固定 |
+| D | リスト＋詳細 | 多くの対象から探して開く、並べて管理する | 左のペインに題・新規作成・絞り込み・検索とリスト、右に選んだ項目の詳細（マスター / ディテール）。2つのペインは枠の端まで広げ、左と右の比は 06 `layout.list-detail.list-ratio`・`detail-ratio`（左は `list-min-width` 以上）、間に全高の hairline（s06-ideas.html）。ツリー構造（27）はリストの代わりにツリー | 1ペインずつ全幅で出す（リスト → 詳細。スマホと同じ） | リストを全画面で出し、項目を開くと詳細を全画面で出す。編集はボトムシート。新規作成の操作は右下に浮かぶ「+」（06 `layout.list-detail.floating-action-*`。ListDetailPattern の `newItem`）。絞り込みと検索は1行のまま横にスクロールする（s06-ideas.html のスマホは検索を省いているが、件数の多い一覧で探す手段が減るので残す） |
+| E | カード比較 | 対象を並べて見比べる | 題の行に件数と目安・Cards / Table の切り替え・追加のボタン。2〜3列のカードグリッドの最後に点線の枠の追加のタイル。「表で比較」に切り替えると、項目を行・対象を列にした表（s15-competitors.html）。ページは左にそろえる | デスクトップと同じ（列の数は幅で決まる） | カードを1列に並べる。比較表と切り替えは出さない。追加のボタンは題の下のその場に置く |
+| F | ワークシート | 数字を入れて、結果をその場で見る | 左に入力の表、右に計算結果のカード（幅は 06 `layout.worksheet.results-width`、表との間は `column-gap`。スクロールしても見える位置に固定。s17-costs.html）。ページは左にそろえる | 入力の表を全幅で出す（スマホの行の形にしない）。列はデスクトップと同じものを出す（s17-costs.html の 1023px 以下は Why Needed・Notes の列を省いているが、表の中で読めて直せる項目が減るので残す）。結果は下部に固定した要約バーで出し、押すと右の引き出し（ドロワー）で全体を開く | 入力の表を線で区切った行にする。下部に結果の要約バーを固定し、タップで結果の全体を開く |
+| G | ステップ | 決まった手順を順に進める | 上にステップ表示（1 → 2 → 3）、中央のカラムに各ステップの内容。差分確認は設問ごとの枠の中を左右2列にし、ページを広げる（中身の幅は 06 `layout.comparison-max`。s25-import.html）。操作の行は下に留め、左に注記 | デスクトップと同じ | 上にステップ表示、1カラム。差分は上下に並べる。操作は下部に固定し、注記は内容の最後に置く（s25-import.html のスマホは注記を省いているが、反映が変更履歴に残ることを伝える文が減るので残す） |
+| H | 設定フォーム | 設定値を項目ごとに直す | 中央のカラムに設定のまとまりを縦に並べる（左の列（06 `layout.settings.label-width`）にまとまりの名前、右に項目を列いっぱいに。まとまりの間は hairline。s09-settings.html） | デスクトップと同じ | 同じ。1カラム（名前を項目の上に） |
+| I | プレゼン | スライドを見せる・書き出す | 上に道具の行（題・長さ・版・書き出し）。左に番号付きのサムネイル列（06 `layout.presentation.thumbnail-column-width`。右の区切りの線を含む。全高。列はページの流れに置き、ページだけがスクロールする（列を別にスクロールさせない。s23-deck.html））、右に横長のスライド（寸法は `semantic.print.slide`）、下に話す内容（§30）（s23-deck.html） | デスクトップと同じ（s23-deck.html の 1023px 以下はサムネイルの列を省いているが、スライドを見渡す一覧と、好きなスライドへ直に移る手段が減るので残す） | 今のスライドだけを幅に合わせて出し、その下の前後の移動（「‹ 7 / 14 ›」）で切り替える（s23-deck.html のスマホは前後の移動を描いていないが、サムネイルの列の無いスマホではほかにスライドを移る手段が無いので残す）。話す内容はその下 |
+| J | 公開ページ | アプリを紹介する | 1カラムの縦長ページ（中身の幅は 06 `layout.public-max`。中央に置く）。上に三日月の印と moonx・Log in のバー、節の間は hairline、下にフッター。ヒーローと、見本と文の節は2列（比は 06 `layout.public.hero-*-ratio`・`pair-*-ratio`。s01-landing.html） | 2列の部分は幅が足りなければ（06 `layout.public.stack-max-width` 以下。s01-landing.html）1カラムにする | 同じ |
 
-タブレットの列の A・D・F は 2026-10-12 のユーザーの決定（表で数字を入れる F だけをデスクトップに近い形にし、A と D はスマホと同じ並びにする）。ほかのパターンはデスクトップと同じ並びを幅に合わせて使う。
+タブレットの列の A・D・F は 2026-10-12 のユーザーの決定（表で数字を入れる F だけをデスクトップに近い形にし、A と D はスマホと同じ並びにする）。ほかのパターンはデスクトップと同じ並びを幅に合わせて使う。各パターンの列の幅・余白・比は `docs/mockups` の値で、`docs/06_design-tokens.json` の `semantic.layout` が持つ（2026-10-17 のユーザーの決定。列の幅の上限は中身の幅で、ページの左右の余白を含まない）。
+
+スマホで下部に固定する操作は、A・B・G の主要な操作、C の前後の移動、F の要約バーだけにする。E・H・I の主要な操作（15 の「Add competitor」、23 の「Download PDF」など）は、スマホでもその場に置く（`docs/mockups` の s15-competitors.html・s23-deck.html）。
+
+デスクトップでパネル（PNL-1・PNL-2）を開いていて、本文の領域の幅が 06 `semantic.layout.two-column-min-width` より狭い間は、D と F をタブレットの列の並びにする（D は1ペインずつ全幅、F は入力の表を全幅にして、結果は下部の要約バーと右の引き出しで開く）。パネルは本文の右の列のまま置き、本文の入力を閉じずに読める 4.3 の決まりを保つ。切り替えは画面の幅ではなく本文の領域の幅で決め、パネルを閉じるか幅が足りれば2列に戻す。選んでいた項目と入力中の欄は、並びが変わっても保つ（2026-10-17 のユーザーの決定）。
+
+同じ決まりを A と I にも当てる（2026-10-17。上のユーザーの決定を同じ考え方で広げた）:
+
+- A: 本文の領域の幅が `semantic.layout.two-column-min-width` より狭い間は、タブレットの列の並び（1カラム。順番はスマホと同じ）にする。主要な操作はタブレットと同じく題の横に置く。数字の帯（13）は、この間はスマホと同じ 2×2 にする。タブレットの並びの横一列のままでは、パネルを開いた 1024px の本文で指標が 91px の幅になり、数字が途中で折れるため。帯は A の並びと同じ幅で切り替え、A の切り替えの幅を1つにする（4.5 の MetricGroup。この帯の形は、上の決定が残した隙間を閉じるために足した）。
+- I: タブレットの並びはデスクトップと同じなので、本文の領域の幅が 06 `semantic.layout.presentation.two-column-min-width` より狭い間は、スマホの並び（サムネイルの列を出さず、今のスライドだけを本文の幅に合わせて出し、その下の前後の移動で切り替える。話す内容はその下）にする。今のスライドは並びが変わっても保つ。並びが変わるときのフォーカスの移し方は 4.5 の補足に書く。
+- 切り替える幅は、A と I が2列を描ける最小の幅（パネルを閉じた状態で 4.1・4.3 が2列を描く本文の領域のうち、いちばん狭いもの）にする。A は D・F と同じくデスクトップでだけ2列を描くので、D・F と同じ `two-column-min-width`。I はタブレットでも2列を描くので、タブレットの幅の下限の本文の領域（`presentation.two-column-min-width`）にする。計算は 06 の各トークンの `$description` に書く。
 
 パターン D の補足: 通知（8）は押すと該当の画面へ移るので、右の詳細は置かず、リストを1カラム（読みやすい幅）で出す。行には、移らずに要点が読めるよう、コメントや判定の理由などの冒頭を1〜2行添える（2026-10-12 のユーザーの決定）。
 
 パターン C の補足（設問フォームのフォーカス）:
 
 - 設問の入力欄に入る（クリック・タップ・Tab）と、その設問が画面の中央へなめらかにスクロールする。
-- フォーカス中の設問だけ、EXAMPLE・ヒント・F/A/U の操作・関連する調査ログを開く。他の設問はタイトル・回答の冒頭1〜2行（または「Empty」）・F/A/U のラベル・コメント数を少し薄く出す。読めない薄さにはしない。
-- キーボードで次の設問・前の設問へ移れる（Tab / Shift+Tab、加えて Ctrl+↓ / Ctrl+↑）。
-- ヘッダーの「Focus」スイッチで、全設問を開いた状態にも切り替えられる（既定はフォーカスあり。選択は端末に覚えておく）。
+- フォーカス中の設問だけ、EXAMPLE・ヒント・F/A/U の操作・関連する調査ログを開く。他の設問は、印・名前（小さな等幅の文字）・その下の回答の冒頭1〜2行（または「Empty」）・右端の F/A/U のラベルとコメント数だけの控えめな行にし、行の間を hairline で区切る（s11-form.html。回答の冒頭は本文の色のまま読める。読めない薄さにはしない）。回答が空の設問は「Empty」を冒頭の位置にだけ出し、ラベルには重ねない。
+- キーボードで次の設問・前の設問へ移れる（Tab / Shift+Tab、加えて Ctrl+↓ / Ctrl+↑）。Ctrl+↓ / ↑ は、Tab で入ったときと同じ所（回答の欄、無ければ最初の操作）へフォーカスを移す。控えめなカードでは題へ移り、カードが開いて回答の欄にフォーカスが移る。Shift・Command と重ねたときと、設問から開いた部品（F/A/U の Popover・ヒントなど）の中で押したときは反応しない。macOS では Ctrl+Option+↓ / ↑ も受ける（macOS は既定で Ctrl+↓ / ↑ を Mission Control と App Exposé に使うため）。Windows と Linux では Ctrl+Alt+↓ / ↑ を受けない（画面を回すドライバーがあるため）。VoiceOver を使っている間は VoiceOver が Ctrl+Option+↓ / ↑ を取るが、VoiceOver の操作で設問へ移れるので、それ以上は扱わない（2026-10-17 のユーザーの決定）。ほかの OS（Mac と名乗る iPadOS・ChromeOS・Android など）は、Windows と Linux と同じく Ctrl+↓ / ↑ だけを受ける（Ctrl+Option を足す理由の Mission Control は macOS だけにある）。
+- ヘッダーの「Focus」スイッチで、全設問を開いた状態にも切り替えられる（既定はフォーカスあり。選択は端末に覚えておく）。スイッチはタブレットの幅から上のヘッダーの保存状態の前に置き、スマホ（1問ずつのカード）と Viewer の読み取り表示（全設問を開いた表示）には出さない。
+- スマホでは、セクションのフッター（AI ▼。前後のセクションの移動はタブレットの幅から上だけ。6.2）を下に留めず、1問のカードの下に置く（下に固定するのは前後の問いの移動）。s11-form.html のスマホはフッターを出さないが、AI ▼ はスマホでも使う（6.2 の操作）ので残す。前後のセクションの移動は、スマホでは題の ▼（セクションの切替）と最後の問いの後のセクションの完了カード（6.2）で移れるので出さない（QuestionFormPattern の `previousSection`・`nextSection` はタブレットの幅から上だけに出る）。
 - 動きを減らす OS 設定のときは、スクロールのアニメーションを省く。
 
 ### 4.2 画面 × レイアウト マッピング
@@ -340,19 +353,21 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 
 | 幅の段 | 幅（トークン） | 対応 |
 |---|---|---|
-| デスクトップ | `semantic.breakpoint.desktop` 以上 | 左にサイドバー（ワークスペース切替・ナビ・ユーザーメニュー）を常に出す。パターン A・D・F は2カラム（4.1）。コメント / 変更履歴パネルは右のパネルで、本文の入力を閉じずに読める |
+| デスクトップ | `semantic.breakpoint.desktop` 以上 | 左にサイドバー（ワークスペース切替・ナビ・ユーザーメニュー）を常に出す。パターン A・D・F は2カラム（4.1）。コメント / 変更履歴パネルは右のパネルで、本文の入力を閉じずに読める。パネルを開いて本文の領域が A・D・F の2列に足りない間は、A・D・F をタブレットの並びに、I のサムネイルの列とスライドに足りない間は、I をスマホの並びにする（4.1） |
 | タブレット | `semantic.breakpoint.tablet` 以上、`semantic.breakpoint.desktop` 未満 | サイドバーはアイコンだけに縮める。パターンの並びは 4.1 のタブレットの列（A は1カラム、D は1ペインずつ全幅、F は表を全幅にして結果を右の引き出しで開く）。パネルは右の引き出し（モーダル）。設問フォームはデスクトップと同じ縦並び |
-| モバイル | `semantic.breakpoint.tablet` 未満 | 下のタブ（Dashboard / Ideas / Self Analysis / Notifications）と「More」メニュー。1カラム。設問は1問ずつのカード。表は行ごとのカードにし、横スクロールさせない。編集・パネル・モーダルは下からのボトムシートか全画面シート（3.8）。主要な操作は下部に固定する |
+| モバイル | `semantic.breakpoint.tablet` 未満 | 下のタブ（Dashboard / Ideas / Self Analysis / Notifications）と「More」メニュー。1カラム。設問は1問ずつのカード。表は線で区切った1行ずつの行にし（箱のカードにしない）、横スクロールさせない。編集・パネル・モーダルは下からのボトムシートか全画面シート（3.8）。主要な操作は 4.1 のとおり下部に固定する（A・B・G。E・H・I はその場に置く）。固定した操作の行は、ボタンを XL（高さは 06 `component.button.height.XL`）にする。B は quiet の Cancel も含めてボタンが行の幅を等分する（s19-decision.html の 390px の .formbar）。G は quiet でないボタンが行の幅を分け合い、quiet の Cancel はその横に自分の幅で置く（s25-import.html の 390px の .fixbar）。A は主要な操作が1つで、行の幅いっぱいにする（d1-moon.html の .actionbar）。モックアップどうしが分かれるので、パターンごとにその画面のモックアップに合わせた |
 
 共通の決まり:
 
 - タップ領域は、タッチの端末（スマホ・タブレット。large のスケール）で `semantic.scale.large.component.target-min` 以上（WCAG 2.5.5 と Apple HIG の 44pt。Android の指針は 48dp）。デスクトップのマウス操作では `semantic.scale.medium.component.target-min` 以上（WCAG 2.5.8）。
-- スマホでは結合セルのような大きな表を出さない。行はカードにし、1行の編集はシートで行う（原本の「スマホで埋めにくい」を解消する）。
-- 保存状態はどの幅でもヘッダーに出す（6.0.1）。スマホでは幅が足りなければラベルを省いて印（Saved は ✓）だけにするが、保存できなかったときは「Couldn't save」の文字を必ず出す。保存できなかった項目の横にも同じ失敗を出す（6.0.2）。
+- スマホでは結合セルのような大きな表を出さない。表は1行ずつの行にし、1行の編集はシートで行う（原本の「スマホで埋めにくい」を解消する）。
+- 保存状態はどの幅でもヘッダーに出す（6.0.1）。スマホでは幅が足りなければラベルを省いて印（Saved は ✓）だけにするが、保存できなかったときは「Couldn't save」の文字を必ず出す。幅が足りるかは、← と戻り先の名前（または画面の題）を「…」で切らずにラベルが入るかで決め、AppFrame がヘッダーの幅を測って切り替える（ラベルを省いても、読み上げではラベルを読む）。s11-form.html のスマホはラベルを省いているが、幅が足りるときは保存したことを文字で伝えられるので残す。保存できなかった項目の横にも同じ失敗を出す（6.0.2）。
 - スマホのキーボード表示中も、入力欄が隠れないようにする。キーボードが画面に重なる高さを測り、下部に固定した操作をその分だけ持ち上げ、フォーカス中の入力欄をキーボードの上までスクロールする。
-- スマホの TabBar の名前は省略しない（Dashboard / Ideas / Self Analysis / Notifications / More）。文字の大きさは `semantic.typography.tab-label` で、スケールでは変えない。入らない幅では2行にし、「…」で切らない。
+- 文字の大きさは画面の幅で決め、スケールでは変えない（2026-10-17 のユーザーの決定）。スマホの幅（`semantic.breakpoint.tablet` 未満）では、本文・行の名前・画面の題・設問の問い・主要指標などを `semantic.font-size.narrow` の大きさ（`docs/mockups` の 390px の幅の値）にし、入力欄の文字はどの大きさの段でも `semantic.font-size.narrow.field` にする（iOS は 16px より小さい入力欄にフォーカスすると画面を拡大するため、どの段も 16px）。端末の文字の大きさの設定には rem で従う。large のスケールは、押せる部品の高さと target-min だけを大きくする。
+- タッチの端末（large）では、入力欄の文字を幅によらず 06 `component.field.font-size-min` 以上にする（2026-10-18 のユーザーの決定）。iOS は 16px より小さい入力欄を押すと画面を拡大し、入力のあとも拡大したままになるので、下限はその 16px にする。横向きのスマホは `semantic.breakpoint.tablet` より広く、narrow の入力欄の文字が効かない。モックアップの入力欄（`semantic.font-size.wide.field`）より大きくなる（M と L は 1〜2px、S は 3px）。この下限は、large が文字の大きさを変えない決まり（上の行と 4.4）の唯一の例外で、target-min と同じくタッチの端末の下限として働く。
+- スマホの TabBar の名前は省略しない（Dashboard / Ideas / Self Analysis / Notifications / More）。文字の大きさは `semantic.typography.tab-label` で、幅でもスケールでも変えない。入らない幅では2行にし（語の中で折り返すときはハイフンを入れる）、「…」で切らない。
 - スマホの TabBar は本文の下に並んで高さを取る（本文に重ねない）。下部に固定した操作は本文の領域の下端に付き、タブの下端の安全領域は TabBar が持つ。TabBar の無い画面（ログイン・公開ページ）は固定した操作が安全領域を自分で空ける。
-- スマホの入力欄のフォーカスは、枠の外周線（`semantic.border-width.focus-ring`・`semantic.color.{light,dark}.border.focus`）で示す。
+- スマホの入力欄のフォーカスは、枠の外周線（`semantic.border-width.focus-ring`・`semantic.color.{light,dark}.border.focus`）で示す。入力欄（TextField・TextArea・NumberField・SearchField・ComboBox・DatePicker）は、ほかの幅でも、マウスで押したときも同じ外周線を出す（入力中の欄をどの端末でも同じ形で示すため）。ボタン・Picker・選択の部品は、キーボードで移ったときだけ出す。この分け方はブラウザの `:focus-visible` の決まり（文字を打つ欄はどう移っても出し、ボタンなどはキーボードで移ったときだけ出す）と同じなので、4.4 の「デザインシステムの参考」が取り入れる Spectrum のフォーカスの表示の決まり（キーボードで移ったときに出す）と食い違わない。
 
 ### 4.4 ビジュアルデザイン方針
 
@@ -361,16 +376,16 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 項目 | 方針 |
 |---|---|
 | トーン&ムード | **月相: 夜に少しずつ考えるための静かな道具**。夜のインク1色の濃淡で組み、飾りや演出で煽らない。点数や派手な達成表現は使わない。2026-10-12 にユーザーとプロトタイプの画面と3つの案を見比べて決めた（プロトタイプの Hermes Teal から作り直した） |
-| カラーの方向性 | **夜のインク1色と、注意の琥珀色だけ。差し色は持たない**（2026-10-12 のユーザーの決定）。ライト: 明るい灰の地に夜のインクの文字。ダーク: 夜の紺の地に月明かりの文字で、主要な操作のボタンも月明かりの色にする。琥珀色は注意が要るもの（未分類・期限切れ・粗利のマイナス・Capacity の超過など）だけ、赤はエラーと削除の確認だけに使う。F/A/U・確認項目・判定に色の種類を割り当てず、状態は下の「状態の形」で示す。判定（Proceed / Hold / Drop）は色を付けない枠の札にし、Drop を赤にしない。色だけで意味を伝えず、必ず形かラベルを添える（WCAG AA のコントラスト。文字 4.5:1、枠・印 3:1） |
-| 状態の形 | **月の満ち欠けで「分かっている度合い」を示す**。○ 新月 = Not started / Unknown、◐ 半月 = Partial / Assumption、● 満月 = Done / Fact。セクションの埋まり具合（回答の数 / 問いの数）は、その割合だけ満ちた月で示す。未分類は琥珀色の菱形、未入力は点線の丸（この文書の図では ◌）。形の横には必ずラベルを出す。部品は MoonGlyph（4.5） |
-| タイポグラフィの方向性 | **1つの書体の太さと字間で階層を作る**。見出しも本文も同じサンセリフにし、見出しは太くして字間を詰める（全部大文字の見出しは使わない）。金額・指標・表の数字と、設問の名前（WHO など。テンプレートの表記のまま）は等幅の書体にして桁をそろえる。回答にタガログ語・Hiligaynon・日本語が混ざるため、日本語を含む多言語を表示できる代替フォントを必ず用意する。金額は通貨記号と桁区切りを付ける。長文の回答は行間を広めにする。背景の粒子・グロー・グラデーションなどの質感は使わない。書体の名前は `docs/06_design-tokens.json` |
-| 画面の組み方 | **箱で囲まず、区切り線と余白でまとめる**。カードの枠と影は、重なりや今の焦点を示すとき（入力中の設問・13 の Next steps の1件目・Popover・Dialog・合計）、並べて見比べるもの（15 の競合のカード・23 のサムネイル）、まとめて読む材料（19 の判断材料・24 のプレビューの Well）だけに使う。押せる行は行全体を押せるようにして右端に › を置き、本文に下線のリンクを並べない。表の行は値だけを見せ、触った行だけを入力欄にする。数字は等幅の書体で右にそろえる |
+| カラーの方向性 | **夜のインク1色と、注意の琥珀色だけ。差し色は持たない**（2026-10-12 のユーザーの決定）。ライト: 明るい灰の地に夜のインクの文字。ダーク: 夜の紺の地に月明かりの文字で、主要な操作のボタンも月明かりの色にする。琥珀色は注意が要るもの（未分類・期限切れ・粗利のマイナス・Capacity の超過など）だけ、赤はエラーと削除の確認だけに使う。F/A/U・確認項目・判定に色の種類を割り当てず、状態は下の「状態の形」で示す。判定（Proceed / Hold / Drop）は色を付けない枠の札にし、Drop を赤にしない。色だけで意味を伝えず、必ず形かラベルを添える（WCAG AA のコントラスト。文字 4.5:1。枠で場所を示す部品（入力欄（Picker を含む）と、選ぶ部品の Checkbox・Radio・Switch）の枠は 3:1（`border.strong`）、状態の印（インクの色）も 3:1 以上。文字で何の部品か分かるもの（Badge・文字のある Button・ActionButton・SegmentedControl の溝・カードで選ぶ RadioGroup の肢（中の丸は 3:1 のまま）・RowList の強調した行・区切りの線（Divider L・数字の帯の上・表の見出しの下・スマホの表の行の上）・単独のリンクの下線）の枠は、`docs/mockups` の薄い線（`border.default`）にする。行の間の区切りは hairline のまま。WCAG 1.4.11 は文字で分かる部品の枠に 3:1 を求めない。2026-10-17 のユーザーの決定） |
+| 状態の形 | **月の満ち欠けで「分かっている度合い」を示す**。○ 新月 = Not started / Unknown、◐ 半月 = Partial / Assumption、● 満月 = Done / Fact。セクションの埋まり具合（回答の数 / 問いの数）は、その割合だけ満ちた月で示す。未分類は琥珀色の菱形、未入力は点線の丸（この文書の図では ◌）。形の横には必ずラベルを出す。印は夜のインクの色で描き、形で区別する（Assumption と Unknown を灰色にしない。2026-10-17 のユーザーの決定。`docs/mockups`）。インクでない印は2つだけで、未分類の菱形は琥珀色（`fau.unclassified.fg`。角を丸めた四角を 45° 回した形。moon-base.css の .dot-attn）、未入力の点線の丸は Empty のラベルと同じ色（`fau.empty.fg`。短い線を並べた丸。moon-base.css の .dot-empty）。部品は MoonGlyph（4.5） |
+| タイポグラフィの方向性 | **1つの書体の太さと字間で階層を作る**。見出しも本文も同じサンセリフにし、見出しは太くして字間を詰める（全部大文字の見出しは使わない。`docs/mockups` の全部大文字の小見出しも、大文字にせずに同じ大きさ・太さ・字間で出す）。大きさは `docs/mockups` に合わせ、06 `semantic.font-size`・`semantic.typography` が持つ（2026-10-17 のユーザーの決定）。画面の題はパターンごとに大きさが違う（A のハブ・D の左のペイン・G・H・I の道具の行は、B・C・E・F の `heading-1` と別の大きさ。06 の `heading-1` の系統）。ランディングの題と節の題は画面の幅で大きさが変わる。金額・指標・表の数字と、設問の名前（WHO など。テンプレートの表記のまま）は等幅の書体にして桁をそろえる。文の中の件数と日付（13 の「62 items」と確信度の内訳「L9 M17 H3」、5 の Due soon の期限、17 の「· ₱77.00」と要約バーの値、19 の F/A/U の件数）も等幅にする（`docs/mockups` の .num）。文の中の強調（5 の Recent activity の人の名前など）は semibold にする（`docs/mockups` の b）。回答にタガログ語・Hiligaynon・日本語が混ざるため、日本語を含む多言語を表示できる代替フォントを必ず用意する。金額は通貨記号と桁区切りを付ける。長文の回答は行間を広めにする。背景の粒子・グロー・グラデーションなどの質感は使わない。書体の名前は `docs/06_design-tokens.json` |
+| 画面の組み方 | **箱で囲まず、区切り線と余白でまとめる**。画面の中のカードの枠は、今の焦点を示すとき（入力中の設問・13 の Next steps の1件目・合計）、並べて見比べるもの（15 の競合のカード・23 のサムネイル・19 の判定と M4 の Go / No-Go の肢・25 ③ の設問ごとの今と取り込む内容）、まとめて読む材料（19 の判断材料・24 のプレビューの Well）、1 の見本（浮いた見本のカード・費用の表の見本）だけに使う。足すためのタイル（15 の最後の「+ Add competitor」）は点線の枠にする。影は、重なっているもの・浮いているもの（Popover・Dialog・Tray・パネルの引き出し・Toast・フォーカスで出るスキップリンク・6 のスマホの新規作成のボタン・1 の浮いた見本のカード・23 のスライド）と入力中の設問のカードだけに付け、ほかのカードは枠だけにする（2026-10-17。`docs/mockups`）。重ねて出す部品のうち、Popover・Toast・画面の中央に出す Dialog は、薄い線（`border.default`）の枠と影（`shadow.overlay`）のカードにする（s17-costs.html の .pop。Toast と Dialog はモックアップに無いので、同じく重ねて出す Popover にそろえる）。下から出すトレイとパネルの引き出しは、画面の端に付くので枠を付けず影だけにする。押せる行は行全体を押せるようにして右端に › を置き、本文に下線のリンクを並べない。表には地の色を付けず、見出しの行は帯にせずに下に薄い線（`border.default`）を引き、行の間は hairline にする。表の行は値だけを見せ、触った行だけを入力欄にする。数字は等幅の書体で右にそろえる（2026-10-17。`docs/mockups` の s17-costs.html） |
 | ライト/ダークモード | **両対応（OS 追従＋手動切替）**。既定は OS の設定に従い、4 アカウント設定で System / Light / Dark を選んで固定できる（夜にスマホで少しずつ進める使い方に合わせる）。選んだ値はアカウントに保存し、どの端末でも同じにする。ログイン前の画面（1・2・29・30）と、選んだ値を読み込むまでは OS に従う（11 の Focus の切替は端末に保存する点が違う。4.1）。状態の形と注意の色はどちらのモードでも区別できるように両方の値を用意する。**Pitch Deck の PDF は常にライト** |
 | アイコン | 線のアイコンの1つのセットにそろえる（Phase 3 で Lucide に決定）。この文書の ASCII 図の絵文字は位置を示す仮置き |
 | アプリのアイコン | 三日月と小さな丸（2026-10-11 にユーザーが選んだ案 B）。512 の正方形に、中心 (246, 266) 半径 150 の円から中心 (300, 215) 半径 132 の円を抜いた三日月と、中心 (378, 150) 半径 28 の丸を置く。地は `surface.canvas`、三日月と丸は `text.primary`（どちらも semantic のライトの値。差し色を持たないので丸も同じ色。2026-10-12）。maskable の安全域（中心から半径 40%）に収まる。形と色の正はこの行で、作り方は SDD ADR-031 |
-| 情報密度 | **画面で使い分け**。設問フォーム・判定・プラン項目など書く画面はゆったり（考えるための余白）。費用・損益・調査ログ・一覧・ダッシュボードなど表と数字の画面は中密度（比べて読むため）。スマホは全体を一段ゆったりにする |
-| デザインシステムの参考 | **Adobe Spectrum の仕組みを取り入れ、見た目は上の月相にする**（Phase 3 で決定。見た目は 2026-10-12 に作り直した）。取り入れるもの: 部品の種類と名前（4.5）、部品の大きさの段階（S / M / L / XL）、端末で切り替える2つのスケール（デスクトップは medium、タッチの端末は large）、表とリストの密度（compact / regular / spacious）、状態の色の名前（informative / notice / negative / neutral。Spectrum の accent と positive は、差し色を持たないので使わない）、スマホではポップオーバーを下からのトレイ（ボトムシート）にする振る舞い、キーボード操作とフォーカスの表示の決まり。Spectrum の配色・書体（Adobe Clean）・アイコン（Workflow）は使わない |
-| 密度とスケールの対応 | 書く・読む・手順を進める画面（1〜4・9・11・19・21・24・25・29・30・M1〜M9）は spacious、表と数字と一覧の画面（5〜8・10・12〜18・20・22・23・26〜28）は regular。スマホとタブレットは large のスケール（部品が一段大きくなる）、デスクトップは medium。具体的な値は `docs/06_design-tokens.json` |
+| 情報密度 | **画面で使い分け**。設問フォーム・判定・プラン項目など書く画面はゆったり（考えるための余白）。費用・損益・調査ログ・一覧・ダッシュボードなど表と数字の画面は中密度（比べて読むため）。スマホとタブレットは押せる部品を一段高くし、スマホの幅では本文を一段大きくする（4.3） |
+| デザインシステムの参考 | **Adobe Spectrum の仕組みを取り入れ、見た目は上の月相にする**（Phase 3 で決定。見た目は 2026-10-12 に作り直した）。取り入れるもの: 部品の種類と名前（4.5）、部品の大きさの段階（XS / S / M / L / XL。部品ごとの段は 4.5。各段の値は 06 が持ち、取り方は 4.5）、端末で切り替える2つのスケール（デスクトップは medium、タッチの端末は large。large は押せる部品の高さと target-min だけを大きくし、文字は大きくしない。唯一の例外は入力欄の文字の下限（4.3。2026-10-18 のユーザーの決定））、表とリストの密度（compact / regular / spacious）、状態の色の名前（informative / notice / negative / neutral。Spectrum の accent と positive は、差し色を持たないので使わない）、スマホではポップオーバーを下からのトレイ（ボトムシート）にする振る舞い、キーボード操作とフォーカスの表示の決まり。Spectrum の配色・書体（Adobe Clean）・アイコン（Workflow）は使わない |
+| 密度とスケールの対応 | 書く・読む・手順を進める画面（1〜4・9・11・19・21・24・25・29・30・M1〜M9）は spacious、表と数字と一覧の画面（5〜8・10・12〜18・20・22・23・26〜28）は regular。スマホとタブレットは large のスケール（押せる部品の高さと target-min だけが一段大きくなる。文字・余白・印・アイコンの大きさは変えない。唯一の例外は、入力欄の文字の下限（06 `component.field.font-size-min`。4.3。2026-10-18 のユーザーの決定））、デスクトップは medium。文字の大きさは画面の幅で決め、スマホの幅では `docs/mockups` の 390px の値にする（4.3。2026-10-17 のユーザーの決定）。具体的な値は `docs/06_design-tokens.json` |
 | 状態の形の共有 | F/A/U と確認項目は同じ月の形を使う（Fact と Done は満月、Assumption と Partial は半月、Unknown と Not started は新月）。同じ帯に並ぶとき（13・19）は、ラベルで区別する（形だけで伝えない） |
 
 ### 4.5 部品（Spectrum を参考にした一覧）
@@ -379,76 +394,118 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 
 | 部品（Spectrum の名前） | moonx での使いどころ | 種類・大きさ | スマホでの振る舞い |
 |---|---|---|---|
-| Button / ButtonGroup | 主要な操作（Record decision・Apply n changes・Save version など） | primary（主要な操作。1画面に1つまで。インクの塗り）/ secondary（枠）/ negative（削除の確認だけ）。補助の操作は quiet（枠なし）。S / M / L / XL。送信中（isPending）は ProgressCircle を出し、押せなくする | 主要な操作は下部に固定（4.1） |
-| ActionButton / ActionGroup | ツールバーの操作（💬・🕘・⋯） | quiet あり。S / M / L / XL | 同じ |
+| Button / ButtonGroup | 主要な操作（Record decision・Apply n changes・Save version など） | primary（主要な操作。1画面に1つまで。インクの塗り）/ secondary（薄い枠 `border.default`）/ negative（削除の確認だけ）。補助の操作は quiet（枠なし）。secondary と quiet の文字は medium の太さ。S / M / L / XL（ランディングの見出しの下と最後の Log in、スマホの下部の操作は XL。上の行の Log in は M）。送信中（isPending）は ProgressCircle を出し、押せなくする | 主要な操作は 4.1 のとおり下部に固定する。固定した行では XL になり、B では quiet の Cancel も含めてボタンが行の幅を等分し、A・G では quiet でないボタンが行の幅を分け合う（G の quiet の Cancel は自分の幅。4.3） |
+| ActionButton / ActionGroup | ツールバーの操作（💬・🕘・⋯） | quiet あり（文字とアイコンは secondary、ホバーで primary。押せないときも地を付けない）。枠は薄い線（`border.default`）。S / M / L / XL | 同じ |
 | ActionMenu / Menu | 行の ⋯、アイデアの ⋯（複製・アーカイブ・移行）、AI ▼ | — | トレイで開く |
-| Link | 「Edit in validation」・「See all decisions」など単独のリンクと、読み物の中の文中のリンク | — | 同じ |
-| TextField / TextArea | 短文・長文の回答、名前、理由 | TextArea は入力に合わせて広がる | キーボードで隠れない（4.3） |
-| NumberField | 金額（通貨記号・桁区切り）、%、日数、販売数 | 書式は en-PH（1.2） | 数字のキーボード |
-| SearchField | 一覧の検索、M2 の調査ログの検索 | — | 同じ |
-| Picker | 通貨・出典の種類・ロール・15 の Type・16 の Risks の Probability / Impact・22 の Status・4 の表示モード（System / Light / Dark） | — | トレイで選ぶ |
+| Link | 「Edit in validation」・「See all decisions」など単独のリンクと、読み物の中の文中のリンク | 単独のリンク（primary）の下線は薄い線（`border.default`。ホバーで文字の色）。`isQuiet` は下線を付けず、ホバーで下線を出す（公開ページのフッターのリンク）。23 のスライドの上の「Edit source」などは PresentationPattern の `slideTools` が secondary の文字にし、ホバーで下線の代わりに地の色（`surface.hover`）を付ける | 同じ |
+| TextField / TextArea | 短文・長文の回答、名前、理由 | TextArea は入力に合わせて広がる（Web フォントを読み込み終えたときにも高さを測り直す）。理由を書く欄（`isReason`。19 の「Why?」と、同じ形の M4 の理由）は 06 `field.text-area-reason-min-height` の高さから広がる（s19-decision.html の textarea）。欄の最小の高さは中の入力の場所が持ち、欄のどこを押しても入力が始まる。必須の欄（`isRequired`）はラベルの後ろに secondary の「Required」を出す（s19-decision.html の「Why? Required」。Spectrum 2 の `necessityIndicator="label"` と同じ。NumberField・SearchField・Picker・ComboBox・DatePicker・MentionTextArea・DiffTextArea も同じ）。補足（`description`）は `descriptionTone="notice"` で琥珀色の文字と印にする（9 の通貨の警告。ほかの入力欄も同じ）。設問の回答の欄（QuestionCard の中）は、文字が 06 `typography.answer`、最小の高さと内側が `layout.question-form.answer-*`、角丸が `radius.callout`、地が canvas（s11-form.html の .answer）。枠はほかの入力欄と同じ `border.strong`（枠で位置を示す入力欄は 3:1。s11 の薄い線は採らない）。フォーカスで raised の地にする（s11 の .answer:focus） | キーボードで隠れない（4.3） |
+| NumberField | 金額（通貨記号・桁区切り）、%、日数、販売数 | 書式は en-PH（1.2）。表の数字の列の中では、数字を右にそろえて通貨記号と % を数字に付けて並べ、行の編集に入っても数字の位置を変えない（s17-costs.html） | 数字のキーボード |
+| SearchField | 一覧の検索、M2 の調査ログの検索 | `width="fill"` は並んだ行の残りの幅に広げる（6 の絞り込みの行。s06-ideas.html） | 同じ |
+| Picker | 通貨・出典の種類・ロール・15 の Type・16 の Risks の Probability / Impact・22 の Status・4 の表示モード（System / Light / Dark）・6 などの絞り込み・23 の生成元 | `labelPosition="inside"` はラベルを枠の中の値の前に置き（「Stage All ▾」。ラベルは secondary、値は medium の太さ）、幅を中身に合わせる（s06-ideas.html の絞り込み・s23-deck.html の生成元）。`width="fit"` は外のラベルのままで幅を中身に合わせる（9 のメンバーの役割。SettingsListItem の中では既定。s09-settings.html）。枠はほかの Picker と同じ `border.strong`（枠で位置を示す部品は 3:1。s06・s23 の薄い線は採らない）。変えられない（`isDisabled`）ときは、どの Picker も点線の薄い枠（`border.default`）と tertiary の文字（s09-settings.html の最後の Owner の役割。使えない部品はコントラストの基準の対象外） | トレイで選ぶ |
 | ComboBox | 担当（メンバーか自由記述）、25 の「Choose question」、4 のタイムゾーン（メンションは MentionTextArea） | — | 入力欄を押すとトレイが開き、トレイの中の入力欄で絞り込んで選ぶ |
-| RadioGroup | 判定（Proceed / Hold / Drop）、Go / No-Go、02 OCEAN | — | 同じ |
-| Checkbox / CheckboxGroup | 24 の範囲、25 の「反映する」、M6 の共有先 | — | 同じ |
-| Switch | 11 の Focus の切替、22 の「Overdue のみ」の絞り込み | — | 同じ |
-| ToggleButtonGroup | F/A/U の3つのボタン（もう一度押すと外れる。6.0.3） | — | 同じ |
-| SegmentedControl | 確信度（Low / Medium / High。6.0.3 の Assumption・FauPicker の中・16 の Assumptions の Confidence）、1分版 / 5分版、Markdown / JSON、Cards / Table、9 の招待の Pending / All | — | 同じ |
+| RadioGroup | 判定（Proceed / Hold / Drop）、Go / No-Go、02 OCEAN | 選んだ状態はインクの輪と点。`variant="cards"` は肢を題と説明のカードで並べる（19 の判定・M4 の Go / No-Go。s19-decision.html）: 肢の数だけの列、カードの枠は薄い線（`border.default`）、選んだカードはインクの枠と内側の線（`border-width.hairline`）、問いは `typography.heading-choice` | 同じ（`cards` は1列） |
+| Checkbox / CheckboxGroup | 24 の範囲、25 の「反映する」、M6 の共有先 | 選んでいない四角の枠は `border.strong`（太さは 06 `component.checkbox.border-width`） | 同じ |
+| Switch | 11 の Focus の切替、22 の「Overdue のみ」の絞り込み | `labelPosition="start"` はラベルを切替の前に置く（11 のヘッダーの「Focus ●」。s11-form.html）。11 のヘッダーの Focus のラベルは、保存状態と並ぶ `typography.caption` の大きさの secondary の文字（s11-form.html の .switch。QuestionFormPattern が付ける） | 同じ |
+| ToggleButtonGroup | F/A/U の3つのボタン（もう一度押すと外れる。6.0.3） | SegmentedControl と同じ溝。F/A/U の各ボタンに MoonGlyph（● Fact・◐ Assumption・○ Unknown）を付ける。`isJustified` で幅いっぱいにし、ボタンが幅を分け合う（どのボタンも文字より狭くしない。FauPicker の中。6.0.3） | 同じ（折り返さない。幅に入らないときは、Tabs と同じく溝の中で横にスクロールする） |
+| SegmentedControl | 確信度（Low / Medium / High。6.0.3 の Assumption・FauPicker の中・16 の Assumptions の Confidence）、1分版 / 5分版、Markdown / JSON、Cards / Table、9 の招待の Pending / All | 1本の溝（地は canvas、薄い枠 `border.default`、角丸の外は 06 `radius.groove`・中は `radius.groove-item`、内側の余白と間は `space.50`）。選んでいない項目の文字は secondary、選んだ項目はインクの塗り。`isJustified` は ToggleButtonGroup と同じ | 同じ（折り返さない。幅に入らないときは、Tabs と同じく溝の中で横にスクロールする） |
 | TagGroup | 調査ログの「裏付ける確認項目」、絞り込みの条件 | 削除できるタグ | 同じ |
 | DatePicker | 期限（Deadline / Target Date）、調査ログの日付 | — | トレイで選ぶ |
 | Dialog / AlertDialog | M1〜M9、15 の競合の追加・編集、削除の確認、衝突の確認（6.0.2） | small / medium / large / fullscreen。どれをどの大きさにするかは 3.8 | トレイ（ボトムシート）か全画面シート（3.8） |
 | Popover / Tray | ポップオーバーはデスクトップ、トレイはスマホ（自動で切り替える） | — | — |
 | Tooltip / ContextualHelp | アイコンだけのボタンの説明 / 設問のヒント（▸ Hint） | — | ContextualHelp はトレイ |
-| Disclosure / Accordion | EXAMPLE・関連する調査ログの開閉、解決済みのスレッド | — | 同じ |
+| Disclosure / Accordion | EXAMPLE・関連する調査ログの開閉、解決済みのスレッド、25 ③ の「{n} unchanged answers」 | 題は secondary の medium の太さ。中身は題の文字の頭から始める（印の分だけ下げる。s11-form.html の .discl .body） | 同じ |
 | Tabs | 16 の Assumptions / Risks、22 の5つのタブ、26 と 28 の切り替え、28 の3つのタブ | — | 横にスクロールできるタブ |
-| Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | — | 出さない（部品が幅で隠す。画面は ← 戻る を出す） |
+| Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | 区切りは「/」の文字（secondary。文字と区切りの間は 06 `component.breadcrumbs.gap`。M は moon-base.css の .crumbs）。今の画面はリンクにせず文字で出す（`aria-current`） | 出さない（部品が幅で隠す。画面は ← 戻る を出す） |
 | CheckDots | 5・6 の一覧の行の、確認項目6つの状態の点列（MoonGlyph の ●達成 ◐途中 ○未着手）。形で状態を伝え、読み上げは全項目の名前と状態を1つの画像として読む | S / M | 同じ |
-| StatusLight | F/A/U（Fact / Assumption / Unknown / Unclassified / Empty）、確認項目の状態（Not started / Partial / Done）、保存状態 | MoonGlyph の印＋ラベル（4.4「状態の形」。形だけ・色だけで伝えない）。保存状態は印の代わりにアイコン（Saved は ✓、Couldn't save は警告） | 同じ |
-| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、「Overdue」「Lump sum」「(former member)」 | 色を付けない枠の札（Undecided は点線の枠）。未読数だけインクの塗り。「Overdue」と期限切れの日数（「overdue 3d」）は注意の琥珀色の文字。Drop を negative にしない | 同じ |
-| InlineAlert | 粗利のマイナス・Capacity 超過・費用の下限の注意・「Latest decision is Hold」・アーカイブ中・新しいテンプレートの案内（6.0.7）・画面上部の帯（オフライン・新しい版・ホーム画面への追加の案内。6.0.6） | informative / notice / negative / neutral | 同じ |
-| Toast | 「Decision recorded」「2 answers updated · 1 needs F/A/U」 | — | 下部（タブの上） |
+| StatusLight | F/A/U（Fact / Assumption / Unknown / Unclassified / Empty）、確認項目の状態（Not started / Partial / Done）、保存状態 | MoonGlyph の印＋ラベル（4.4「状態の形」。形だけ・色だけで伝えない）。保存状態は印の代わりにアイコン（Saving… は回る読み込みの印、Saved は ✓、Couldn't save は警告。Couldn't save は文字とアイコンを negative の赤にする） | 同じ |
+| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、ヘッダーの 💬 の未解決のスレッドの数（6.0.1）、「Overdue」「Lump sum」「(former member)」 | 色を付けない薄い枠（`border.default`）の札（Undecided は点線の枠で、文字は secondary）。TabBar の未読数とヘッダーの 💬 の数は、アイコンの右上に重ねるインクの小さな札（大きさの段によらず同じ大きさ）。SideNav の未読数は札にせず、行の右端の等幅の数字（secondary）だけ。「Overdue」と期限切れの日数（「overdue 3d」）は、枠を付けない琥珀色の等幅の文字。Drop を negative にしない。props は `fillStyle`（Spectrum 2 の outline = 枠と bold = 塗りに、moonx の dashed = 点線の枠を足したもの。bold は未読数の札。既定は outline で、Spectrum 2 の既定の bold と違う）と `variant`（neutral / notice。notice は枠の無い琥珀色の等幅の文字） | 同じ |
+| InlineAlert | 粗利のマイナス・Capacity 超過・費用の下限の注意・「Latest decision is Hold」・アーカイブ中（画面上部の帯は AlertBanner） | informative / notice / negative / neutral。地は種類の淡い色、文字はインク、アイコンだけ種類の色。左の色の帯は付けない。角丸は 06 `radius.callout` | 同じ |
+| Toast | 「Decision recorded」「2 answers updated · 1 needs F/A/U」「Duplicated from …」と「Undo」（6.8） | 文と、任意の操作のボタン1つと、閉じるボタン。デスクトップとタブレットは下の中央 | 下部（タブの上） |
 | ProgressBar / ProgressCircle | 「Preparing PDF…」、送信中のボタン | — | 同じ |
-| Meter（積み上げ） | F/A/U の内訳の帯（13）。Spectrum の Meter を内訳の数だけ積み上げる moonx 独自の拡張。帯の濃さは `semantic.color.{light,dark}.fau.*.strong`（Unknown は斜線、Empty は地のまま）。凡例には、帯の区間と同じ見本・ラベル・件数を並べる | — | 同じ |
+| Meter（積み上げ） | F/A/U の内訳の帯（13）。Spectrum の Meter を内訳の数だけ積み上げる moonx 独自の拡張。帯の濃さは `semantic.color.{light,dark}.fau.*.strong`（Unknown は斜線、Empty は地のまま）。帯の区間の間は少し空け、角は少し丸める。凡例には、帯の区間と同じ見本（小さな四角）・ラベル・件数を並べる。ラベルは secondary、件数は等幅のインク、Unclassified の項目はラベルも件数も琥珀色、確信度の内訳（「L9 M17 H3」）は等幅の secondary。帯の上の名前（`label`）はブロックの小さな見出しの形。ブロックの見出しが帯の名前を兼ねるとき（13 の「Fact / Assumption / Unknown」。d1-moon.html は帯の上に名前を出さない）は `label` を出さず、`aria-label` で読み上げの名前だけを付ける | — | 同じ |
 | Skeleton | ローディングの骨組み（6.0.6） | — | 同じ |
 | IllustratedMessage | 空の状態・0件・権限がない・見つからない（6.0.6）。絵は使わず、Lucide のアイコンと見出しと説明 | — | 同じ |
-| Avatar | 提案者・記録者・コメントの書き手・4 のプロフィール写真。写真が無い・読めないときは頭文字 | S / M | 同じ |
-| TableView | 17 費用・18 シナリオ表・7 決定ログ・28 の一覧・15 の「表で比較」・21 の表の小項目（§11 など） | 密度 compact / regular / spacious。layout は auto（幅で切り替え。既定）/ table / cards。編集できる表は、行の値を文字として見せ、触った行（フォーカスか編集中）のセルだけを入力欄にする。数字の列は等幅で右にそろえる | 行ごとのカード（4.3） |
-| ListView | 6 アイデア一覧・14 調査ログ・8 通知・22 の各リスト・9 のメンバーと招待・12 のメンバー・26 のテンプレート | 同上 | 全画面のリスト |
-| Card / CardView | 15 競合・代替のカード、23 のサムネイル | — | 1列 |
-| Well | 判断材料の要約（19）、AI 書き出しのプレビュー（24） | — | 同じ |
-| Divider | 区切り | S / M / L | 同じ |
+| Avatar | 提案者・記録者・コメントの書き手・4 のプロフィール写真。写真が無い・読めないときは頭文字 | S / M。角の丸い四角（地は sunken、頭文字は等幅の semibold、枠なし） | 同じ |
+| TableView | 17 費用・18 シナリオ表・7 決定ログ・28 の一覧・15 の「表で比較」・21 の表の小項目（§11 など） | 密度 compact / regular / spacious。layout は auto（幅で切り替え。既定）/ table / cards（`cards` はスマホの行の形をどの幅でも出す）。地の色を付けず、見出しは 06 `typography.table-header` の文字と下の薄い線（`border.default`）、行は hairline の区切り（行の高さは `component.table-view.row-height`。s17-costs.html）。列は幅（px か %）を持てる固定の組み方で、行を入力欄にしても表の幅と列が動かない。編集できる表は、行の値を文字として見せ、触った行（フォーカスか編集中）のセルだけを入力欄にする。数字の列は等幅で右にそろえる。行の名前の列は medium の太さ。表の下の行（s17-costs.html の tfoot）は、左に `footerAction`（「+ Add row」の quiet の Button）、右に `footerTotal`（「Subtotal ₱145,000+ · 3 Unknown, 1 Empty」） | 線で区切った行（4.3。下の補足）。表の下は `footerAction` だけを全幅の行（高さは 06 `table-view.narrow-footer-min-height` 以上、下に hairline。s17-costs.html の .cards .add）にし、`footerTotal` は出さない（合計は F の要約バーと結果のトレイにある。6.3）。`footerTotal` を使う表は、スマホでも合計をほかの所に出す |
+| ListView | 6 アイデア一覧・14 調査ログ・8 通知・22 の各リスト・12 のメンバー・26 のテンプレート（9 のメンバーと招待は SettingsList） | 密度 compact / regular / spacious。layout は auto / table / cards。押すと開く行と選ぶと横に詳細を出す行は末尾に ›（4.4。s06-ideas.html の行に › は無いが、画面をまたいでそろえるために置く。2026-10-17 のユーザーの決定）。D の一覧の選んだ行は地と線で示し、スマホでは一覧と詳細が入れ替わるので選んだ行を示さない | 全画面のリスト |
+| Card / CardView | 15 競合・代替のカード | 枠だけで影を付けない（4.4）。CardView の `addItem` は最後に点線の枠の追加のタイル（「+ Add competitor」。s15-competitors.html の .addcard）を置き、押すとカードを開く代わりに追加する。15 のカードの形（s15-competitors.html）: 題の上に種類（`eyebrow`。等幅の小さな文字で、大文字にしない）、右上に `figure`（価格。等幅）とその下の注記（per bowl）、無いときは「No price」を薄く、その下にラベルと値の行（`details`。hairline で区切り、ラベルの列を取る）、最後の行に注記（根拠の件数・💬 の数）とカードの ⋯（`actions`） | 1列（`details` はラベルを値の上に置く） |
+| Well | 判断材料の要約（19）、AI 書き出しのプレビュー（24） | 白い面（`surface.raised`）を hairline の枠で囲む。角丸は Card と同じ | 同じ |
+| Divider | 区切り | S / M / L。S と M は hairline の色、L は薄い線（`border.default`） | 同じ |
 | Tree | 27 のセクションと設問のツリー | — | 全画面のリスト |
-| Heading / Text | 画面の見出しと本文。Heading は本文と同じ書体の太字で level 1〜4（ランディングの題名だけ variant の display、ブロックの小さな見出しは variant の label）、Text は body / body-long / body-sm / caption / label / number（等幅の数字）と tone（primary / secondary / tertiary / negative） | — | 同じ |
+| Heading / Text | 画面の見出しと本文。Heading は本文と同じ書体の太字で level 1〜4。見た目が level と違うときは variant: ランディングの題名は display、ランディングの節の題は display-2、画面の題がパターンで違う大きさのときは heading-1-hub（A）・heading-1-list（D の左のペイン）・heading-1-steps（G）・heading-1-settings（H）・heading-1-toolbar（I の道具の行）、設問の問いは heading-question、level 2 や 3 で level 4 の見た目にするときは heading-4（H のまとまりの名前・F の表の題）、ブロックの小さな見出しは label。display-2 の幅は 06 `layout.public.heading-measure` まで（s01-landing.html の h2）。Text は body / body-long / body-sm / lead（ランディングのリード。既定の tone は secondary、幅は 06 `layout.lead-measure` まで）/ caption / label / number（等幅の数字）/ number-sm（注記の大きさの等幅の数字。13 の「62 items」・17 の「· ₱77.00」と要約バーの値。RowList の `isEndNumeric` も同じ文字）/ body-compact（行の中の1文。幅によらない大きさ。5 の Recent activity）と tone（primary / secondary / tertiary / notice（琥珀色。6.2 の「Not classified yet」・19 の「Unknown 5」）/ negative） | — | 同じ |
 | Form | 入力欄と送信ボタンを縦に並べる。ブラウザの検査は切り、画面が Zod で検査して各欄に理由を渡す | — | 同じ |
 | FileTrigger（Spectrum の名前） | 4 のプロフィール写真の選択、25 の `.md` / `.json` の選択。包んだボタンでファイルの選択を開く | — | 同じ |
-| Steps（Spectrum の名前） | パターン G のステップ表示（1 → 2 → 3）。済み・今・これから | — | 同じ |
-| 独自: SideNav / TabBar | 共通ナビ（6.0.1）。デスクトップは左のサイドバー、スマホは下のタブ | — | 下のタブ |
-| 独自: AppFrame | ログイン後の全画面の枠（6.0.1）。SideNav・TabBar・ヘッダー（パンくず・保存状態・パネルの入口）・本文・パネル（デスクトップは本文の右の列）・スキップリンクを並べる | — | 下のタブとヘッダーの戻る |
-| 独自: PageFrame | 枠の無い画面（1 ランディング・2 ログイン系・3 オンボーディング）の main ランドマーク。見た目は持たず、中のレイアウトパターンが並びを決める | — | 同じ |
+| Steps（Spectrum の名前） | パターン G のステップ表示（1 → 2 → 3）。済み・今・これから | 済みは secondary の塗りの丸にチェック、今は輪のインクの丸に番号で、名前を semibold にして下にインクの線（06 `component.steps.current-rule-width`）、これからは tertiary。つなぎの線を引かず、並びの下に hairline を引く（タブに似た形。s25-import.html） | 印だけと今のステップの名前を1行に出す（ほかの名前は読み上げだけ） |
+| 独自: SideNav / TabBar | 共通ナビ（6.0.1）。デスクトップは左のサイドバー、スマホは下のタブ | SideNav（moon-base.css）: 上に三日月の印（06 `layout.side-nav.brand-mark-size`）と「moonx」、hairline の枠の箱のワークスペースの切り替え（▾ はアイコンの S）、今のページは `surface.selected` の地（ライトで白）と内側の hairline の枠（左の線なし）と semibold の名前（moon-base.css は medium。地の違いだけに頼らないため太さも変える）、下に利用者の Avatar（M）と名前。TabBar: raised の地、今のタブは塗らずに上にインクの線（幅はタブの 06 `layout.tab-bar.indicator-ratio`、太さは `border-width.tab-indicator`）と semibold の名前、アイコンは L | 下のタブ |
+| 独自: AppFrame | ログイン後の全画面の枠（6.0.1）。SideNav・TabBar・ヘッダー（パンくず・保存状態・パネルの入口）・画面上部の帯（AlertBanner）・本文・パネル（デスクトップは本文の右の列）・スキップリンクを並べる | ヘッダーの高さは 06 `layout.header-height`（タブレットから上）と `header-height-mobile`（スマホ）。`back` はスマホのヘッダーの ← と戻り先の名前で、リンク（`href`）か、押すと動く操作（`onPress`）を受ける。More のメニューで開く画面（7・4・9・26）の「← More」は押すと More のメニューを開き直す操作で、TabBar の `useMoreMenu` が作る（6.0.1）。`title` は TabBar で開く画面のスマホのヘッダーの題（5 は `onPress` でワークスペースの切り替え「BCDX ▾」） | 下のタブとヘッダーの戻るか題 |
+| 独自: AlertBanner（Spectrum の Alert banner） | 画面上部の帯（オフライン・新しい版・ホーム画面への追加の案内（6.0.6）・テンプレートの新しい版の案内（6.0.7）） | informative / notice / negative / neutral（neutral は印なし）。端から端まで、sunken の地・下に hairline・06 `typography.callout` の secondary の文字（`title` は太いインク）・アイコンの S の状態の色の印・右端に操作（`action`）と閉じるボタン（`onDismiss`）。InlineAlert のカードにしない（d1-moon.html の .banner） | 同じ（左右の余白はスマホの余白）。幅が足りないときは操作のリンクも折り返し、文だけを細く折り返して帯を高くしない（d1-moon.html の 390px） |
+| 独自: PageFrame | 枠の無い画面（1 ランディング・2 ログイン系・3 オンボーディング・29・30）の main ランドマーク。見た目は持たず、中のレイアウトパターンが並びを決める。画面上部の帯（オフライン・新しい版。6.0.6）は main の先頭に出す | — | 同じ |
 | 独自: RouterProvider | `href` を持つ部品（Link・MenuItem・Breadcrumb）をアプリのルーターで移動させる。アプリのルートに1つ置く | — | 同じ |
 | 独自: Panel | コメント・変更履歴のパネル（PNL-1・PNL-2） | — | トレイ |
-| 独自: DiffText | 変更履歴（PNL-2）の変更前・変更後の文章。変わった文字を追加（下線）・削除（取り消し線）で強調し、色だけで伝えない | before / after | 同じ |
+| 独自: DiffText | 変更履歴（PNL-2）と 25 ③ の変更前・変更後の文章。変わった語を追加（下線）・削除（取り消し線）で強調し、色だけで伝えない（語の単位は下の補足） | before / after。削除は secondary の文字と取り消し線、追加はインクの文字と文字から少し離した下線。どちらも sunken の地 | 同じ |
 | 独自: MentionTextArea | コメントの入力欄（PNL-1）。本文に `@` と文字を打つと候補（メンバー）の一覧を出し、選ぶと `@名前` を本文に入れる。候補は画面が渡す | 一覧は入力欄の下に開く（↑↓で選び、Enter か Tab で決め、Esc で閉じる） | トレイで選ぶ（`semantic.breakpoint.tablet` より狭い幅。トレイの中の入力欄で絞り込み、入力欄の初期値は `@` の後に打った文字） |
-| 独自: QuestionCard | 設問フォームの1問（4.1 パターン C のフォーカスの表示と控えめな表示） | — | 1問ずつのカード |
-| 独自: MoonGlyph | 状態の印（4.4「状態の形」）。CheckDots・StatusLight・19 の F/A/U の内訳・セクションの埋まり具合・F/A/U の印・11 のスマホの問いの点（回答済みは満月、未回答は点線の丸、今の問いは輪で囲む）に使う | `value`（0〜1。満ちる割合。0 は新月の輪郭、1 は満月）か `state`（not-started / partial / done / fact / assumption / unknown / unclassified / empty。unclassified は琥珀色の菱形、empty は点線の丸）。S / M。`isCurrent` で輪を重ねる（11 のスマホの今の問い）。印は飾りとして読み上げず、隣のラベルで伝える | 同じ |
-| 独自: FauPicker | 表の行（17 の金額・18 の数字）の F/A/U の欄。今の状態を MoonGlyph とラベル（「Assumption · Medium」）で出し、押すと Popover で F/A/U と確信度を選ぶ。決まりは 6.0.3 | — | 行の編集シートの中にボタンで並べる（6.0.3） |
-| 独自: MetricTile | 主要指標の1つ（13・19 の損益分岐・初期費用など）。ラベル・大きな数字・補足（理由や警告）を縦に並べる | 補足は任意 | 2×2 に並べる |
-| 独自: RowList / RowListItem | 区切り線つきの静的な行の並び（10・13・20 のセクションの一覧、13 の確認項目・Next steps・Summary・Decisions・Plans）。`ordered` で番号付き。押せる行は行全体が移動先で、右端に › を置く（下線のリンクにしない。4.4） | ordered | 同じ |
-| 独自: Slide | Pitch Deck のスライドの4つの型（6.14） | `headingLevel`（2 か 3、既定 3）: スライドの題が画面の見出しの階層で占める位置。h1 の直下にスライドが続く画面だけ 2 にする | 幅に合わせる |
-| 独自: Flex / Stack / Grid / Container と、パターン A〜J の枠（HubPattern・FocusPattern・QuestionFormPattern・ListDetailPattern・CardComparePattern・WorksheetPattern・StepsPattern・SettingsPattern・PresentationPattern・PublicPattern） | 画面の並び。間隔はトークンの名前だけを受け取る。パターンの枠は 4.1 の並び（デスクトップ・タブレット・モバイル）を持つ | — | 同じ |
+| 独自: QuestionCard | 設問フォームの1問（4.1 パターン C のフォーカスの表示と控えめな表示） | `focused` は薄い線（`border.default`）の枠・角丸（06 `radius.card`）・2つの影（`shadow.question-card-edge`・`question-card`）のカードで、列から左右に `layout.question-form.card-outset` だけはみ出す。問いは `typography.heading-question`。`quiet` は hairline で区切った一覧の行（印の列（`layout.question-form.row-mark-width`）｜等幅の名前とその下の回答の冒頭｜右に F/A/U のラベルとコメント数）。s11-form.html | 1問ずつのカード（はみ出さない） |
+| 独自: DiffTextArea | 25 ③ の取り込む内容の欄。直している間も、今の回答（`before`）と比べて足した語に下線を引き続ける | `border.strong` の枠（入力欄なので 3:1。s25-import.html の .edit の薄い線は採らない）・角丸（06 `radius.groove`）・canvas の地（.edit）。大きさは TextArea と同じ `size`（S〜XL、既定 M）。下線と地は DiffText の追加と同じ。印は文字の下に重ねた層で描き、欄はふつうの文字の入力欄のまま（印は読み上げない） | 同じ |
+| 独自: MoonGlyph | 状態の印（4.4「状態の形」）。印は状態によらずインクの色（unclassified の菱形は琥珀色、empty の点線の丸は Empty のラベルの色）。CheckDots・StatusLight・19 の F/A/U の内訳・セクションの埋まり具合・F/A/U の印・11 のスマホの問いの点（回答済みは満月、未回答は点線の丸、今の問いは輪で囲む）に使う | `value`（0〜1。満ちる割合。0 は新月の輪郭、1 は満月）か `state`（not-started / partial / done / fact / assumption / unknown / unclassified / empty。unclassified は琥珀色の、角を丸めた四角を 45° 回した菱形（moon-base.css の .dot-attn）、empty は短い線を12個並べた点線の丸（.dot-empty））。S / M。`isCurrent` で輪を重ねる（11 のスマホの今の問い）。印は飾りとして読み上げず、隣のラベルで伝える | 同じ |
+| 独自: FauPicker | 表の行（17 の金額・18 の数字）の F/A/U の欄。今の状態をラベル（「Assumption · Medium」。06 `typography.body-sm` の secondary の文字で、ポインタの下と開いている間はインク。未分類は琥珀色、Empty は `fau.empty` の文字色で、表の中ではラベルの代わりに U+2014 のダッシュ1文字（s17-costs.html。読み上げは「Empty」））だけで出し、印は表の行頭の列に出す（印を二重に出さない。FauPicker を置く表は、行頭の印の列（`isMark`）に状態の MoonGlyph を置く）。編集中の行はラベルに ▾ を付ける（「Assumption · Medium ▾」）。押すと Popover で F/A/U と確信度を選ぶ（中身は下の補足と 6.0.3）。表の外に置いたときは印とラベルを出す | — | 行の編集シートの中に、印とラベルの下にボタンで並べる（6.0.3） |
+| 独自: MetricTile / MetricGroup | 主要指標の1つ（13・19 の損益分岐・初期費用など）。ラベル・大きな数字と単位（`unit`。「/ day」「months」）・補足（理由や警告）を縦に並べる。MetricGroup が並べる: `band`（13 の数字の帯。上に薄い線（`border.default`）、下に hairline、指標の間に縦の hairline の横一列。デスクトップでパネルが本文の領域を `semantic.layout.two-column-min-width` より狭くしている間は、スマホと同じ 2×2（4.1 の A）。d1-moon.html）と `compact`（19 の判断材料の中の詰めた形。ラベルは 06 `typography.caption-sm`、数字は `metric-sm`、線なしで指標の数だけの列。s19-decision.html）と `column`（F の結果のカードの縦の並び。数字は `metric-column` と小さな等幅の単位、合計の間に hairline。s17-costs.html の .tot）と `pair`（D の詳細の 2×2。上に薄い線、下と十字に hairline、ラベルは `caption-sm`、数字と単位は `metric-pair`。s06-ideas.html の .nums） | 補足は任意。数字は途中で折り返さない（単位は数字の前で次の行へ送る。タイルの幅より広い数字だけ折り返し、横にはみ出させない。4.3） | `band` は 2×2 で十字の hairline、`compact` は2列、`column`・`pair` は同じ |
+| 独自: RowList / RowListItem | 区切り線つきの静的な行の並び（10・13・20 のセクションの一覧、13 の確認項目・Next steps・Decisions・Plans、6 の詳細と 19 の確認項目）。`ordered` で番号付き。押せる行は行全体が移動先で、右端に › を置く（下線のリンクにしない。4.4。ホバーで名前に下線を出す）。一覧の上と最後の行の下にも hairline を引く。印（`start`）は 06 `component.row-list.mark-width` の列に置き、印のある行がある一覧では印の無い行もその列を空けて名前の頭をそろえる。番号は `row-list.number-width` の列の tertiary の等幅（`typography.number-emphasis` の太さで、大きさは `caption`）、名前は `typography.label`、右端の文字（`end`）は `caption`（件数と日付（「7/10」「5 entries」「Oct 14」）は `isEndNumeric` で等幅の `typography.number-sm`）、› は tertiary。2行目（`description`）のある行は、印・右端の文字・› を1行目に並べる（d1-moon.html）。5 の Ideas のように行に印の並び（`marks`。CheckDots）と札（`badge`。Badge）を持つ行は、名前の後ろに `marks`、その後ろに `badge` を、どの行でも同じ幅の列（06 `row-list.badge-width`。札は列の右端にそろえる。列の間は `row-list.status-gap`）に置き、行の高さの中央にそろえて、印の位置を行ごとにそろえる（s05-dashboard.html の .ideas）。まだ終わっていない実行管理の項目の行頭には `TaskMark`（☐。大きさ・角丸・線の太さは 06 `row-list.task-mark-*` の、tertiary の線の飾り。5 の Due soon。s05-dashboard.html の .due .box）を置く | ordered。`isEmphasized`（13 の Next steps の1件目: 薄い線（`border.default`）の枠と左のインクの線（`border-width.selected-indicator`）、角丸は `radius.callout`、影なし、番号はインクの semibold、名前は `typography.label-emphasis`、理由の行は `caption`） | 行の高さは 06 `row-list.narrow-min-height` 以上。`badge` は名前の行の右端、`marks` は2行目の下の行に置く（s05-dashboard.html の 390px） |
+| 独自: DescriptionList / DescriptionListItem | ラベルと値の並び（13 の Summary・19 の判断材料の Summary）。ラベルは 06 `component.description-list.label-width` の列（spacious の密度では `label-width-spacious`。s19-decision.html の .sum）の `typography.caption` の secondary、値は `body-compact`、行を hairline で区切る（d1-moon.html・s19-decision.html） | — | ラベルを値の上に置く |
+| 独自: Slide | Pitch Deck のスライドの4つの型（6.14） | `headingLevel`（2 か 3、既定 3）: スライドの題が画面の見出しの階層で占める位置。h1 の直下にスライドが続く画面だけ 2 にする。地は白（PDF と同じ）、角丸（06 `radius.slide`）、柔らかい影（`semantic.shadow.*.slide-edge`・`slide`。s23-deck.html）。サムネイル（`isThumbnail`）は白の地だけ同じで、角丸と影を付けない（枠は置く側の PresentationPattern が持つ。PDF のページと同じ hairline と角丸（`layout.presentation.thumbnail-radius`）。s23-deck.html の .mini） | 幅に合わせる |
+| 独自: Flex / Stack / Grid / Container と、パターン A〜J の枠（HubPattern・FocusPattern・QuestionFormPattern・ListDetailPattern・CardComparePattern・WorksheetPattern・StepsPattern・SettingsPattern・PresentationPattern・PublicPattern と PublicSection） | 画面の並び。間隔はトークンの名前だけを受け取る。パターンの枠は 4.1 の並び（デスクトップ・タブレット・モバイル）と、`docs/mockups` の列の幅・余白・比（06 `semantic.layout`）を持つ | PublicSection の `layout`: hero・pair（2列の比は 06 `layout.public.hero-*-ratio`・`pair-*-ratio`）・stack・close。`isFullBleed` は節の上の線を端から端まで引く。節の中の Text の幅は、stack が 06 `layout.public.stack-measure`、pair の文の列が `pair-measure`、close が `close-measure` まで（s01-landing.html の .stages .lead・.pair p・.close p。ヒーローのリードは lead の幅） | 同じ |
+| 独自: SettingsList / SettingsListItem | 9 のメンバーと招待の行（パターン H のまとまりの中） | Avatar の列（06 `layout.settings.row-avatar-width`）｜名前と「(you)」とその下のメール｜役割（中身の幅の Picker）｜⋯ の列（`row-menu-width`）を列の端にそろえ、理由（`note`）をメールの下に出す。招待は Avatar なしでメールと補足｜右端に操作（役割の列を持たないので、その列と間を空けない）。行の間は hairline（s09-settings.html）。題のメールは、入らないときは「@」と「.」の後ろで折り返し、そこで折り返しても入らない部分だけを語の途中で折り返す | 同じ |
+| 独自: SettingsFieldRow | 9 の招待の行（メールの欄・役割の Picker・Send invitation） | 1つ目の欄が残りの幅、2つ目が 06 `layout.settings.field-row-control-width` の列、残り（ボタン）が自分の幅で、1行に並べる（間は `field-row-gap`。s09-settings.html の .invite） | 縦に並べ、どれも全幅 |
+| 独自: QuestionList / QuestionListItem | パターン C 以外の画面に置く設問（15 のカードの下の Survivor Patterns と Failure Patterns） | QuestionCard を hairline で区切って並べる（パターン C と同じ行。どの幅でも区切る）。幅は 06 `layout.compare.questions-max` まで（s15-competitors.html の .qs） | 同じ |
+| 独自: IdeaPreview / PhaseRoute / CostPreview | 1 ランディングの見本（6.16） | IdeaPreview: 浮いたカード（角丸は 06 `layout.public.preview-radius`・hairline・`shadow.preview`）に題と工程・2つの数字（`typography.preview-metric`）・確認項目の行・注記。PhaseRoute: 月（`layout.public.route-mark-size`）を線でつないだ3段階（`layout.public.stack-max-width` 以下は縦）。CostPreview: 費用の行と sunken の合計の帯のカード（角丸は `preview-radius`。1つの画像として読む）。s01-landing.html | 縦に積む |
 
 部品の補足:
 
-- 種類・大きさの列に値の無い部品も、size（S / M / L / XL）を受ける。Avatar は S / M、Divider と ProgressCircle は S / M / L。
+- size（大きさ）は、Spectrum 2（`@react-spectrum/s2`）の同じ名前の部品が size を持つ部品（Button・ButtonGroup・ActionButton・ActionGroup・ToggleButtonGroup・ActionMenu・Menu・Form・TextField / TextArea・NumberField・SearchField・Picker・ComboBox・RadioGroup・Checkbox / CheckboxGroup・Switch・DatePicker・TagGroup・Disclosure / Accordion・Breadcrumbs・IllustratedMessage・Badge・StatusLight・ProgressBar / ProgressCircle・Meter・Divider・Card / CardView・Avatar・Popover・ContextualHelp・Dialog / AlertDialog）と、06 に size ごとの値が既にある部品（Tabs の `item-height`、SegmentedControl の `segmented-control`）が受ける。独自の部品は、いちばん近い Spectrum 2 の部品に合わせる（MentionTextArea と DiffTextArea は TextArea、FauPicker は ActionButton、CheckDots と MoonGlyph は表の S / M）（2026-10-16 のユーザーの決定）。
+- 大きさの段は、表の「種類・大きさ」の列に段があればそれ、無ければ Spectrum 2 のその部品の段にする。表に段の無い部品の段: ToggleButtonGroup・ActionMenu・Card / CardView は XS / S / M / L / XL、TagGroup・IllustratedMessage・ProgressCircle・Popover は S / M / L、Breadcrumbs は M / L、ContextualHelp は XS / S、SegmentedControl と Tabs は S / M / L / XL（06 の `segmented-control` と `tabs` の段。F/A/U の ToggleButtonGroup の XS は `action-button` の XS）、ほかは S / M / L / XL。MentionTextArea と DiffTextArea は TextArea と同じ S / M / L / XL、FauPicker は表の ActionButton と同じ S / M / L / XL（スマホのシートのボタンと確信度の大きさ。表の欄と Popover の中は size によらない）。
+- 既定の大きさは、Spectrum 2 のその部品の既定にそろえる。M が既定で、Badge は S、Avatar は S（Spectrum 2 の既定の大きさが 06 の S と同じ）、ContextualHelp は XS、Popover は大きさを指定しなければ中身に合わせる（2026-10-17 のユーザーの決定。06 の density と scale の「M」は、既定が M の部品のこと）。
+- 各段の値は 06 が持つ。06 は、`docs/mockups` が示す値はモックアップから取り（2026-10-17 のユーザーの決定。上の基準は「どの部品がどの段を受けるか」を決めるだけ。たとえば spacious の画面の Button は L を受け、L の値は spacious の画面のモックアップの Button と同じなので M と同じになる）、示さない段は Spectrum 2 のトークン（`@adobe/spectrum-tokens`）の値を取り、出典を `$description` に書く。トークンに無い値（Popover・IllustratedMessage・Card / CardView の寸法など）は `@react-spectrum/s2` のコードの値を取り、同じく出典を書く。Spectrum 2 の値が段の並び（S ≤ M ≤ L ≤ XL）を崩すとき（モックアップの値と並べて小さくなるなど）は、隣の段の値で止める（Button の L を M と同じにしたのと同じ）。2px ずつ足すなどの外挿はしない。モックアップにも Spectrum 2（トークンとコード）にも値の無い段は、隣の段の値のままにする（CheckDots の M の間など）。画面を作るときと直すときは、06 から作った画面をモックアップと並べて確かめる（`docs/mockups/README.md`。範囲は次の項目）。06 に段ごとの値（XS〜XL）を足すのは size を受ける部品だけ（段を持たない値は、Tooltip と Toast の幅のように段に分けずに持つ）。
+- モックアップと並べて確かめる範囲（2026-10-18 のユーザーの決定。部品と画面を作るときも直すときも同じ）: モックアップは見た目のイメージで、ピクセル単位で合わせることは目的にせず、公開して使ってもらうことを優先する。ただし、並べて見れば測らなくても分かる違いは残さない。合わせるのは、並び（何がどこに来るか）・色・文字の階層（題・本文・補足の段の違い）・部品の形・文の幅と折り返しと、崩れ（読みにくい折り返し、要素どうしがくっつく・重なる、余計なスクロール、1行に伸びすぎる文）。追わないのは、数 px の余白や高さ、0.5〜1px の文字の大きさ、アイコンの 2px、太さの 500 と 600 のような違い。モックアップの値を取るとき（上の項目）と、モックアップをブラウザで描かれた見た目のまま正にするときも、この範囲で読む。
+- size を受けない部品: Spectrum 2 の部品が size を持たず、06 にも段ごとの値の無いもの（Heading / Text・Link・Well・FileTrigger・Flex / Stack / Grid / Container・Tray・Tooltip・Toast・Skeleton・InlineAlert・TableView / ListView / Tree（密度で変える）・Steps）と、枠・パネル・表示だけの独自の部品（SideNav / TabBar・AppFrame・AlertBanner・PageFrame・RouterProvider・Panel・DiffText・QuestionCard・QuestionList・SettingsList / SettingsFieldRow・IdeaPreview / PhaseRoute / CostPreview・MetricTile / MetricGroup（MetricGroup は `variant` で変える）・RowList・DescriptionList・Slide・パターンの枠）。
 - タップ領域は、どの大きさでも `semantic.scale.{medium,large}.component.target-min` 以上にする（4.3）。見た目の高さが小さい部品は、最小の高さで広げる。
 - Link は、単独の行・リストに置く primary がタップ領域の下限を守る。文中に置く secondary は折り返すため、WCAG 2.5.5 / 2.5.8 の Inline の例外として下限を求めない。文中のリンクは読み物（29・30・ヒント・EXAMPLE）だけに置き、ほかの画面では単独の行にする（4.4「画面の組み方」。2026-10-12 のユーザーの決定）。
 - Menu・Picker・ComboBox・DatePicker・ContextualHelp・Panel は、幅が `semantic.breakpoint.tablet` より狭いときトレイで開く。Dialog は 3.8 の大きさに従い、small と medium はトレイ、large は全画面のシートで開く。Panel はタブレットの幅では右のドロワー（モーダル）、デスクトップでは右の固定パネル（モーダルにしない）。
 - ComboBox の狭い幅は、閉じているときは入力欄と同じ見た目で、押すとトレイが開き、トレイの中の入力欄で絞り込む。自由記述を許すときは、入力した文字列を確定する操作（Enter か customValueLabel のボタン）を出す。
-- パターン D（リスト＋詳細）は、デスクトップ未満では1ペインずつ全幅で出す（4.1 のタブレットの列）。パターン C はスマホの幅で、フォーカス中の設問のカードだけを出す。
-- スマホの TableView は常に行ごとのカードで出す（`layout` は受けるが全部カード）。
-- タッチの端末の Tooltip は長押しで開き、指を離してしばらくしたら閉じる（ホバーが無いため）。子の押す操作は邪魔しない。
+- NumberField は打った文字列をそのまま持ち、数にするのは画面の検査（6.0.8 の規則。`packages/schemas` の `numberTextSchema`）。通貨記号と % は入力欄の枠の中、数字の横に出す。フォーカスが外れたとき、6.0.8 の形の数字だけ整数の部分の桁区切りを付け直し、小数の桁は打ったままにする。「1,5」など 6.0.8 が受け付けない文字列は、打ったまま残して欄の下に理由を出す。値を丸める・上限や下限に寄せる・増減のボタンで変えることはしない（利用者が選んでいない値に黙って変えないため）。先頭の 0 も打ったまま残す。編集できない欄（読み取り専用・無効）は、フォーカスが外れても文字列を変えない。画面は保存した値を `formatInputNumber()` の文字列にして渡す（% の欄は `rateToPercent` で百分率にしてから）。
+- ComboBox で絞り込んだ結果が無いときは、一覧を空にする（自由記述を許すときは、確定のボタンだけを出す）。自由記述を許さない欄は、文字を消して確定すると選択を外す。選んでいない文字を残したまま欄を離れると、選んである項目の名前に戻す。
+- DatePicker の月・日・年の欄は、それぞれがタップ領域なので、どれも target-min 以上にする。入力欄は中身の幅に合わせて広がり、大きさの既定の幅より狭くはならない（large のスケールでは既定の幅より広くなる）。
+- Checkbox の誤り（入力値の検査）は、CheckboxGroup の欄の下に理由として出す。単独の Checkbox は誤りの状態を持たない（理由を出す場所が無く、赤い枠だけでは色だけで伝えることになるため）。
+- SegmentedControl は、何も選んでいない状態から始められる（6.0.3 の確信度は選ぶまで決まらない）。一度選んだ後は、同じものを押しても外れない。
+- spacious の密度のパターン（B・C・G・H・J。4.4「密度とスケールの対応」）と、M1〜M9 のダイアログ（Dialog の `density="spacious"`。4.4）は、中の入力欄（TextField・TextArea・NumberField・SearchField・Picker・ComboBox・DatePicker・MentionTextArea・DiffTextArea）と、選ぶ部品（Checkbox / CheckboxGroup・RadioGroup・Switch）と、Button（variant と quiet を問わない。ActionButton は含めない）を L にする（06 `semantic.density.spacious`。選ぶ部品も、spacious の画面のモックアップ（s19-decision.html の Radio・s25-import.html の Checkbox・s11-form.html の Switch）の大きさを L として受ける）。Form の中でも外でも同じで、Form は `density` を渡さなければ周りのパターンかダイアログの密度を取る（Form の外にも、自動保存の 11・21 の回答の欄や 4 の設定のような入力欄があるため）。regular のパターン（A・D・E・F・I）と、ほかの Dialog（15 の競合の追加・編集）と AlertDialog は M。部品に size を渡したときは、それを使う。「主要なボタン」は 4.5 の表の Button（主要な操作）で、ActionButton（ツールバーの操作）は含めない。
+- パターン A（ハブ）・D（リスト＋詳細）・F（ワークシート）は、タブレットの幅と、デスクトップでパネルが本文の領域を `semantic.layout.two-column-min-width` より狭くしている間は、4.1 のタブレットの列の並びにする（A は1カラム、D は1ペインずつ全幅、F の結果は下部の要約バーから右の引き出しで開く。スマホの幅は 4.1 のスマホの列）。F の結果の引き出しは、デスクトップでもモーダルの引き出しにする（右の列はパネルが使っているため。タブレットの Panel と同じ右の引き出し）。パターン I（プレゼン）は、スマホの幅と、デスクトップでパネルが本文の領域を `semantic.layout.presentation.two-column-min-width` より狭くしている間は、スマホの並び（今のスライドと前後の移動）にする。パターン C はスマホの幅で、フォーカス中の設問のカードだけを出す。
+- 幅で並びを変えるパターンは、画面の見た目の順と文書の順（読み上げと Tab の順）をそろえる。
+- 並びが変わっても、入力欄は作り直さず、打った文字とフォーカスを保つ（4.1）。D が2列から1ペインに変わるとき、フォーカスがリストかその上の見出しの行（絞り込みの欄・行など）にあれば、リストを出したままにし、選んでいた項目も選んだままにする。リストで別の項目を選ぶと、その詳細をリストの代わりに出す（ツリーの開閉や絞り込みなど、選ぶ項目を変えない操作ではリストのまま）。フォーカスがほかにあれば、選んでいた項目の詳細を出す。並びが変わって消える部品にあったフォーカスは、代わりに出る部品へ移す（F の結果の列から要約バーへ、要約バーから結果の列へ、D の1ペインの詳細の ← から2列に戻った詳細へ、I のサムネイルから前後の移動の押せる最初のボタンへ（1枚だけのデッキでどちらも押せないときはスライドの列へ）、前後の移動から今のスライドのサムネイルへ）。A は並びが変わってもブロックを作り直さずに列の間で動かし、ブロックの中の状態とフォーカス（パネルを開いたボタンを含む）を保つ。
+- ListDetailPattern は、スマホの AppFrame の中で詳細を開いている間、ヘッダーの ←（6.0.1）をリストへ戻る ← にする（← を2つ並べない。戻り先の名前はリストの名前）。タブレットの1ペインの並びと AppFrame の外では、詳細の上に ← を置く。1ペインの並びで詳細を開くと詳細へ、← でリストへ戻るとリストの選んでいる行（無ければ最初の操作）へフォーカスを移す。
+- スマホの TableView は常に線で区切った行で出す（`layout` は受けるが全部この形。s17-costs.html の 390px）。一覧の上に薄い線（`border.default`）、行の間と最後の行の下に hairline を引き、箱のカードにしない。1行は、行頭の印｜名前とその下の値（`isBelowName` の列。06 `typography.caption` の secondary）｜右端の値（ほかに出す列が1つだけのとき。その列の名前は出さない。数字は `typography.row-number`）。出す列が2つ以上残る行は、名前の下にラベルと値の行で並べる。
+- TableView の列（`columns`）は次の指定を持てる: `width`（px か %。指定の無い列は残りを分け合う）、`isMark`（行頭の印の列。見出しの文字は読み上げだけ）、`isRowActions`（行の ⋯ の列。見出しの文字は読み上げだけ。マウスの端末ではポインタの下の行・フォーカスのある行・メニューを開いている行だけで見せ、タッチの端末では常に見せる。メニューを閉じたら ⋯ にフォーカスを戻す。押すと開く行の › は ⋯ の列の前のセルの右端に置く。スマホの行の形（スマホの幅と `layout="cards"`）には出さず、その操作は行を押して開くシートに画面が置く）、`isHiddenOnPhone`（スマホの幅の行に出さない。その値は行を押して開くシートで見て直す）、`isBelowName`（スマホの幅の行で名前の下に出す）。
+- タッチの端末の Tooltip は長押しで開き、指を離してしばらくしたら閉じる（ホバーが無いため）。短く押せば子が押される。長押しはボタンの意味を確かめる操作なので、ツールチップだけを開いて子を押さない（Android の長押しのツールチップと同じ。React Aria の長押しと同じく子の押す操作を取り消す。2026-10-17 のユーザーの決定）。長押しは 0.5 秒（React Aria の長押しと同じ）、閉じるのは指を離して 1.5 秒後（Android の長押しのツールチップと同じ）。Tooltip の文は Spectrum 2 の幅（06 `component.tooltip.max-width`。窓の幅も超えない）で折り返す。
 - Steps は済みのステップの名前の後ろに、画面が渡す `doneLabel`（「completed」）を読み上げる（チェックの印は読み上げの対象外のため）。
-- 押せる Card の中にボタンを置かない（押せる要素の入れ子になり、読み上げで中のボタンに届かない）。操作は Card の外に並べる。
-- Tray は中身がスクロールでき、`isDismissable` を false にすると背景のタップや Esc で閉じなくなる。AlertDialog は閉じられない Tray で開く（答えるまで残す）。
+- 押せる Card の中にボタンを置かない（押せる要素の入れ子になり、読み上げで中のボタンに届かない）。操作は Card の外に並べる。例外は CardView の中のカードの ⋯（`actions` の ActionMenu。6.10 の「カードの ⋯」）: React Aria の GridList の項目の中のボタンとして置き、カードから Tab で移れ、押してもカードを押したことにならない（カード全体を押すと編集を開く）。
+- Tray は中身がスクロールでき、`isDismissable` を false にすると背景のタップや Esc で閉じなくなる。AlertDialog は閉じられない Tray で開く（答えるまで残す）。AlertDialog はスマホの幅ではどの大きさでもこのトレイで開き、どの幅でも背景のタップでは閉じない（答えるまで残す）。Esc は、4.4 が取り入れる Spectrum のキーボード操作の決まり（WAI-ARIA の dialog のパターンどおり Esc で閉じる）に合わせ、キャンセルの操作（`cancelLabel` のボタン。「Cancel」など、何も変えない側）として受け、閉じてキャンセルを伝える（Spectrum 2 の AlertDialog も Esc で閉じる）。キャンセルの操作が無い AlertDialog（6.0.2 の衝突の確認など）では Esc で何もしない。中の部品が Esc を受けたとき（開いた一覧を閉じるなど）は、その部品の操作にする。`isDismissable` は React Aria の綴りで、Tray と Dialog の両方がこの名前で受ける（Spectrum 2 の Dialog は `isDismissible`）。
+- Dialog は Esc で閉じる（`isKeyboardDismissDisabled` で止められる）。背景のタップで閉じるのと、題の右の閉じるボタン（「Close」）は `isDismissable` のときだけ（振る舞いは Spectrum 2 と同じ）。題と下のボタンは、本文がスクロールしても見えたままにする。画面の中央に出す Dialog の高さは、見えている高さに 06 `semantic.layout.sheet-max-height-ratio` を掛けた高さまで。fullscreen はどの幅でも画面いっぱいのシートで開く。AlertDialog の error と warning は題の前の印に「Alert」と名前を付け、本文を dialog の説明として読み上げる。
+- Popover はタブレットの幅から上でも開くとフォーカスを中へ移し、Esc と外側のタップで閉じて、開いたボタンへフォーカスを戻す（React Aria と Spectrum 2 と同じ）。Menu・Dialog・ContextualHelp も閉じたら開いたボタンへ戻す。
+- Toast は `ToastQueue` から出し、アプリのルートに1つ置く `ToastContainer` に、下の中央から新しいものほど下に積む。出したものは閉じるまですべて出す（Spectrum 2 の queue と同じ。Spectrum 2 の、重ねて畳む見せ方は使わない）。スマホで TabBar のある画面では TabBar の上に出す（`aboveTabBar`）。自動で閉じるのは `timeout` を渡したときだけで、5 秒より短くしない。操作のボタン（「Undo」）を持つものは自動で閉じない（この2つは Spectrum 2 と同じ。押す前に消えないため）。幅は Spectrum 2 のトークンの幅（06 `component.toast.max-width`）まで。見た目は Spectrum 2 の塗りの札にせず、Popover と同じカードの枠と影にする（4.4「画面の組み方」の、重ねて出す部品の枠と影）。閉じたトーストは動きを付けずに消える（React Aria のトーストは閉じる途中の状態を持たない）。
+- InlineAlert と AlertBanner は出たときに読み上げる（`role="alert"`。Spectrum 2 と同じ）。閉じられる帯（新しい版・ホーム画面への追加の案内。6.0.6）は AlertBanner の `onDismiss` で閉じるボタン（「Close」）を出す。neutral はアイコンを持たない。ほかのアイコンには、Spectrum 2 と同じく種類の名前（informative は「Information」、notice は「Warning」、negative は「Error」）を付ける。
+- Skeleton は画面の並びのまま、中の Text と Heading を文字の幅の帯にする（Spectrum 2 と同じ）。読み込みの間は中身を読み上げとフォーカスの対象から外す（`inert`）。読み込み中であることは画面が伝える。
+- ContextualHelp はアイコンだけのボタン（help は ?、info は i）。設問の「Hint」（6.2）のように文字を添えるときは `label` を渡す。中身は Spectrum のトークンの ContextualHelp の幅（06 `semantic.layout.contextual-help-width`。トークンはスケールで変わらない。S2 のコードはタッチの端末で 1.25 倍に描くが、トークンがあるものはトークンの値を使う）で開き、見出しは Spectrum 2 の ContextualHelp の見出しの大きさ（Spectrum 2 のトークンの contextual-help-title-font-size。06 `typography.heading-help`。モックアップに ContextualHelp は無い）。
+- Disclosure の `isQuiet` は区切り線の無い見出しにする（6.2 の「▸ EXAMPLE  ▸ Hint」のように横に並べる）。isQuiet でない Disclosure と Accordion は、区切り線の間の行にする（4.4）。
+- Tabs は幅に入らないとき、どの幅でも横にスクロールする（Spectrum 2 のように Picker に畳まない）。タブはどれもタップ領域の下限より狭くしない。
+- Dialog・AlertDialog・IllustratedMessage・ContextualHelp・InlineAlert・Disclosure・Card・TableView・Tree は、Spectrum 2 が子の部品（Heading・Content・ButtonGroup・Image、TableHeader・Column・Row・Cell、TreeItemContent）で受けるものを props（`title`・`buttons`・`heading`・`actions`・`label`・`preview`・`description`・`columns`・`renderCell` など）で受ける。中の並びは部品が決め、画面に並べ方を書かせないため（画面にスタイルを書かない。SDD ADR-025）。名前と props のほかの部分は Spectrum 2 にそろえる。
+- TableView の編集できる行（`isRowEditable`）は、フォーカスのある行（行そのもの・セル・その中の入力欄）と編集中の行だけ、セルを入力欄にする。矢印キーで行やセルへ移ったときはフォーカスを行かセルに置いたままにし、← → も ↑ ↓ もセルからセルへ移る（入力欄の中には入らない）。Enter か行を押すと、そのセル（行なら最初のセル）の入力欄にフォーカスを移して編集を始める。セルから Tab で行の入力欄やボタンに入ったときも編集にする。編集中は表の矢印キーの移動と文字での行の検索を止め、キーは入力欄が受ける（← → で入力欄の中のカーソルが動く。Tab で行の入力欄を順に移る）。Esc で編集を終えて、最後にフォーカスのあったセルへフォーカスを戻す。見出しの行や表の外へフォーカスが移ると、行は値の表示に戻る（行の中から開いた Popover・トレイ・AlertDialog の中は行の中と数え、そこでの Esc はその部品のもの）。値の表示の行を押したとき、押し終えるまで行の表示を変えない（押した先が動かないように）。セルの中のボタン（FauPicker など）は、値の表示のときも1回押せば動く（FauPicker の Popover が開く。6.3）。スマホの幅では行を押すと画面の `onRowAction` を呼び、画面が行の編集のシートを開く（4.3）。スマホの行のセルは値だけを出し、ボタンを置かない（`renderCell` の `isCard`。押せる Card の中にボタンを置かない決まりと同じ）。押すと開く行・選ぶと横に詳細を出す行（編集できない行の `onRowAction` と `selectionMode`）は、最後のセル（行の ⋯ の列があればその前のセル）の右端に › を置く（4.4）。スマホの行は、押すと開く（`onRowAction`）か選べる（`selectionMode`）とき、右端に › を置く。行の高さは、どの密度でもタップ領域の下限より低くしない（4.3）。編集できる行の値の表示のセルは1行で、入らない文字は「…」で切る（行を編集すると入力欄に全部出る）。編集しない行のセルは折り返して全部出す。編集中の行のセルの入力欄は、セルの文字の大きさと太さで出し（タッチの端末では入力欄の文字の下限（06 `component.field.font-size-min`）を守る）、地はポインタの下でも白のまま。
+- ListView の `layout` は TableView と同じ値を受け、`auto` と `table` は区切り線の行（スマホの幅でも行のまま。「全画面のリスト」）、`cards` は項目ごとのカードにする。押すと開く項目・選ぶと横に詳細を出す項目（`onAction` と `selectionMode`）は、ListView でも Tree でも右端に › を置く（4.4）。
+- CardView は、size ごとの最小の幅（06 `component.card-view.min-width`）のカードが入るだけの列に、3列までで並べ（4.1 E の2〜3列）、スマホの幅では1列にする。
+- FauPicker はタブレットの幅から上では、今の状態のボタンを押すと Popover（幅は 06 `component.fau-picker.popover-width`。s17-costs.html の .pop）を開き、小見出し「How do you know this amount?」の下に3つのボタン（ToggleButtonGroup）と、Assumption のときだけ小見出し「Confidence」の下に確信度（SegmentedControl）を出して、選び終えたら閉じる。値があるときは、その下に hairline を引いて根拠の案内（Fact でないときは「Have a quote? Mark it Fact.」）と「Add evidence」のリンクを出し、リンクは Fact と同じく M2 を開く呼び出しだけをして閉じる（根拠を失った Fact に根拠を付け直す入口でもある）。Popover の中の2つの溝は、FauPicker の size によらずモックアップの大きさ（ボタンの高さと左右は 06 `component.fau-picker.groove-item-*`、文字は `typography.body-sm`、印は S）にする（Popover の幅に3つのボタンが収まるため）。スマホのシートのボタンの大きさは size で決める。閉じたら、表の中でも開いたボタンへフォーカスを戻す（Fact で開いた M2 を閉じたときと、Unknown の確認で「Mark Unknown」を選んだときも、そのダイアログがフォーカスを返した後にボタンへ戻す。「Cancel」なら Popover に戻る）。Fact は M2 を開く呼び出しだけをして閉じる（根拠が付くまで状態を変えない。6.0.3）。値のある数字で Unknown を押すと AlertDialog で「Clear the value and mark it Unknown?」「An Unknown number has no value. To keep the value, choose Assumption with Low confidence.」と確かめ、「Mark Unknown」と「Cancel」を出す（6.0.3）。「Fact · No evidence」には警告の印を添える（6.0.3）。Viewer とアーカイブ中は、状態だけを出す（`isReadOnly`。表の中ではラベル、表の外では印とラベル）。
+- QuestionCard の `mode` には `focused`（入力中。カードの枠と影を付け、回答の入力欄・F/A/U の操作・EXAMPLE・ヒントを画面が中に置く）・`open`（全設問を開いた表示と Viewer。枠を付けない）・`quiet`（控えめな表示）がある。`quiet` のカードは全体を押せて、押すか Tab で入ると、画面が `focused` に変え、カードが回答の入力欄にフォーカスを移す。`focused` と `open` のカードは、回答の入力欄（打てる欄と選択肢。読み取り専用と無効のものを除く）にフォーカスが入ると、カードの中央を 06 `semantic.layout.focus-anchor` の高さへスクロールする（4.1 C。動きを減らす設定ではアニメーションしない）。カードが見えている高さより高いときは、カードの中央の代わりに、フォーカスのある入力欄をその高さへ送る（カードの中央を合わせると、入力欄が見えなくなるため）。入力欄そのものが見えている高さより高いときは動かさない（カーソルの位置はブラウザが見える所に保つ）。読み取りの回答（Viewer）とボタン（💬 や F/A/U の操作など）にフォーカスが入っても動かさない（6.2 の Viewer は「フォーカスの動きはなく」）。コメント数は `formatCount()` で出す。設問を移るキー（Ctrl+↓ / Ctrl+↑ と、macOS の Ctrl+Option+↓ / ↑）と Focus の切り替え（4.1 C）は QuestionFormPattern が持つ。
+- Panel はデスクトップでは、開くとパネルへフォーカスを移し、パネルの中での Esc と閉じるボタン（「Close」）で閉じる（モーダルにしない）。閉じたときにフォーカスがパネルの中にあれば、開いたボタンへ戻す（💬 をもう一度押して閉じたときは、そのボタンのまま）。開いたまま別のパネル（💬 から 🕘）に替えると、新しいパネルへフォーカスを移す。本文の右の列には AppFrame が置き、AppFrame は本文の領域の幅とパネルの有無から、中のパターン A・D・F が2列で並べられるかと、I がサムネイルの列を出せるかを渡す（4.1）。タブレットの幅の右の引き出しとスマホのトレイはモーダルで、外側のタップと Esc でも閉じる。
+- Slide は 06 `semantic.print` の寸法を、置かれた幅に対する割合で描く（PDF のページを拡大・縮小したのと同じ見た目。サムネイルも同じ部品を小さく置く）。文字の大きさと文の切り方は P12 の `shrink` と文（API の `fitPitchDeck()` が決めたもの）に従い、数字の列は P12 の `figureColumns`（API が PDF と同じフォントで測った列の幅。SDD 5.9・ADR-012）のまま並べる（画面では文字の幅を測らない）。各ページのフッターは `pitchFooterText()` の文（PDF と同じ）を画面が渡す。「Too long for this slide. Shorten it in the plan.」の注意と「Edit source」「Edit in validation」は、スライドの外に画面が出す。
+- Avatar の頭文字は、表示名の最初の語と最後の語の1文字目を大文字にして並べる（1語なら1文字。「Ana Reyes」は AR）。文字は見た目の1文字（絵文字や日本語の1字）で数える。
+- MoonGlyph の `value` の月も、満ちる割合にかかわらずインクの色で描く。CheckDots は、「{確認項目の名前}: {状態}」を並べた文を、1つの画像の名前として読み上げる（例: 「Competitors (3–5): Done, Permits: Not started, …」）。Meter の凡例の件数は書式関数（`formatUnits()`）で出す。MetricTile は1つの指標だけを持ち、横一列や 2×2 の並びは MetricGroup が作る（画面はレイアウトの部品で並べない）。
+- DiffText と DiffTextArea の差分は、語の単位の最小の差分にする（s25-import.html の「25–40」を丸ごと取り消し線、「25–45」を丸ごと下線）。語は空白で区切った文字の並びで、語の中の約物（「25–40」の「–」）は語に含め、語の頭と終わりの約物はそれだけで1つの語にする（「meals.」が「meals,」になっても「meals」には印を付けない。s25-import.html）。約物は Unicode の句読点の区分（P。句読点・括弧・引用符・ダッシュ・% など。基本多言語面の文字）で、₱・+ などの記号（S）は含めない。約物は後ろに結合する文字（異体字セレクタなど）と1つにして扱い（「Great‼️」は「Great」と「‼️」）、約物と結合する文字だけの並び（「#️⃣」）は1つの語にする。空白を入れずに書く文字（日本語・中国語・タイ語）は、ブラウザの語の区切り（`Intl.Segmenter`）の語を単位にし、句読点は前の語に含める。語だけを比べ、空白は前後の語に合わせて出す（空白が同じ語を変えたことにしない。空白だけが変わったところは空白に印を付ける）。続けて変わった語は1つの削除と1つの追加にまとめ、間の空白も含める。変更と変更の間にある、約物（と空白）だけの変わらない部分は（空白だけが変わった所は変更に数えない）、そこでつながる変更が全体として削除と追加の両方を持つとき、変更に含める（言い換えた句の下線を「,」などで途中で切らない。追加だけ、削除だけがつながるときは、もう一方の文にそのまま残る約物なので印を付けない）。変更の前の、両方にある空白には印を付けない。長い回答を書き直した変更は計算に時間がかかるので、計算は画面のすべての DiffText を合わせて1フレームの半分の時間ずつ進め、その間は変更前・変更後の文だけを出し、計算し終えたら印を付ける（画面を止めないため）。
+- MentionTextArea は、`@` を打ったとき（行の先頭か空白の後）と、その後に文字を打っているあいだだけ候補を出す。打った文字が、どのメンバーの名前の先頭にも、名前の中の語の先頭にも当たらなくなったら閉じる（名前を選んだ後に続けて打っても開かない）。カーソルを書いてある `@名前` へ動かしただけでは開かない。`@` の直後が空白なら、メンションにしない。メンションは本文に `@名前` が残っているあいだだけ数え（C1・C2 の `mentionUserIds`）、`@名前` を消すとメンションも外す。読み取り専用・無効の欄では開かない。
 - 開発専用の確認用ページ（`/dev/components`）に全部品を並べる。
 
 ---
@@ -493,8 +550,8 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 ```
 デスクトップ                                        スマホ
 ┌───────────┬──────────────────────────────────┐  ┌───────────────────────┐
-│ [BCDX ▼]  │ パンくず: Ideas / Piaya Gift Box   │  │ ← 戻り先   ✓ 💬 🕘   │
-│           │ / 05 Costs        ✓ Saved  💬 🕘  │  ├───────────────────────┤
+│ ☾ moonx   │ パンくず: Ideas / Piaya Gift Box   │  │ ← 戻り先   ✓ 💬 🕘   │
+│ [BCDX ▾]  │ / 05 Costs        ✓ Saved  💬 🕘  │  ├───────────────────────┤
 │ Dashboard │──────────────────────────────────│  │                       │
 │ Ideas     │                                  │  │        本文            │
 │ Self      │              本文                 │  │                       │
@@ -510,10 +567,16 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 └───────────┴──────────────────────────────────┘
 ```
 
-- サイドバーの先頭に今のワークスペース名。押すと M7。
+- サイドバーの先頭に三日月の印（4.4 のアプリのアイコンと同じ形）と「moonx」、その下に今のワークスペース名を hairline の枠の箱に「▾」を添えて出す。押すと M7。タブレットのアイコンだけのサイドバーでは、印と「▾」の箱だけを出す（moon-base.css）。
+- ページ全体が縦にスクロールし、ヘッダー・サイドバー・スマホの TabBar は画面の上と下に留まる。下部に固定する操作（4.1）は TabBar の上（TabBar の無い画面は窓の下端）に付き、キーボードが出ている間はその上に付く（4.3）。
+- ヘッダーは、出すもの（パンくず・← か題・保存状態・💬・🕘）が1つも無い画面では出さない。
+- タブレットのアイコンだけのサイドバーは、ワークスペースの切り替え・各ページ・利用者のメニュー（Avatar）の名前をツールチップで出す（デスクトップは名前が見えているので出さない）。
+- 未読数を持つナビの項目（SideNav と TabBar の Notifications）は、件数を名前に含めて読み上げる（「Notifications, 3 unread」）。見た目の数（SideNav の数字・TabBar の札）は読み上げない。
+- サイドバーのナビの今のページは、`surface.selected` の地（ライトで白）と内側の hairline の枠と semibold の名前で示し、左の線は付けない。いちばん下に利用者の Avatar（M）と名前を置く。スマホの TabBar は raised の地で、今のタブは塗らず、上にインクの線（4.5 の TabBar）を引いて名前を太くする（moon-base.css）。
+- スマホのヘッダーの高さは 06 `layout.header-height-mobile` にする。下の階層の画面は「← 戻り先」、TabBar で開く上の階層の画面（5・6・8・10 など）は画面の題を出す。More のメニューで開く画面（7・4・9・26）は「← More」を出す（s09-settings.html）。押すと More のメニューを開き直す（More は画面ではなくメニューのままで、← はページへ移らずにメニューを開く。2026-10-18 のユーザーの決定）。フォーカスは、TabBar の More を同じ操作で押したときと同じ所に入り（キーボードの Enter・Space・↓ と読み上げの操作では最初の項目、↑ では最後の項目、タップとクリックではメニュー）、メニューを閉じると ← More に戻る。← More はメニューのボタンとして読み上げる（開くのがメニューであることと、開いているか）。5 の題はワークスペースの切り替えにする（「BCDX ▾」。押すと M7）。タブレットから上のヘッダーは `layout.header-height` にし、パンくずの区切りは「/」の文字にする（moon-base.css）。
 - ヘッダー右に保存状態、コメント（💬、件数バッジ）、変更履歴（🕘）。変更履歴は、画面全体の履歴と、項目ごとの履歴の両方を開ける。保存状態はスマホでもヘッダーに出す（幅が足りなければ印だけ。4.3）。
-- パンくず（デスクトップとタブレット）は「Ideas / {アイデア名} / {画面名}」の3段。13 はアイデアの段そのもので、「Validation」の段は置かない。プランの中は「Ideas / {アイデア名} / {案名} / {画面名}」、自己分析は「Self Analysis / {画面名}」、運営者の画面は「Admin / {画面名}」。画面名はセクションの番号付きの名前（例: 「05 Costs」）。スマホはパンくずを出さず、← の横に戻り先の短い名前を出す（13 へ戻るときは「Validation」、20 へは「Plan」、10 へは「Self Analysis」、6 へは「Ideas」）。
-- 画面上部の帯（オフライン・新しい版・ホーム画面への追加の案内。6.0.6）は、ヘッダーの下、本文の上に出す。複数あるときはオフラインを先にする。
+- パンくず（デスクトップとタブレット）は「Ideas / {アイデア名} / {画面名}」の3段。13 はアイデアの段そのもので、「Validation」の段は置かない。プランの中は「Ideas / {アイデア名} / {案名} / {画面名}」、自己分析は「Self Analysis / {画面名}」、運営者の画面は「Admin / {画面名}」。画面名はセクションの番号付きの名前（例: 「05 Costs」）。スマホはパンくずを出さず、← の横に戻り先の短い名前を出す（13 へ戻るときは「Validation」、20 へは「Plan」、10 へは「Self Analysis」、6 へは「Ideas」）。s25-import.html のスマホは「← Back」と描いているが、ほかのモックアップは戻り先の名前を出し、名前が無いとどこへ戻るかが分からなくなるので、25 も戻り先の名前（「← Validation」など）にする。
+- 画面上部の帯（オフライン・新しい版・ホーム画面への追加の案内（6.0.6）と、テンプレートの新しい版の案内（6.0.7））は、ヘッダーの下、本文の上に、端から端まで出す（AlertBanner。sunken の地・下に hairline・secondary の文字・状態の色の印・右端に操作。InlineAlert のカードにしない。d1-moon.html の .banner）。複数あるときは上から、オフライン → アプリの新しい版 → ホーム画面への追加の案内 → テンプレートの新しい版の案内の順に重ねる。
 - ヘッダーの 💬 は、今の画面にある項目のスレッドと、アイデアの中の画面（13〜23）ではそのアイデアへのコメントを、まとめた一覧でコメントパネルに開く。件数バッジは未解決のスレッドの数。コメントの対象が無い画面（1〜9・19・24〜30）には 💬 を出さない。項目ごとのスレッドは、項目の横のバッジからも開ける（6.0.4）。
 
 #### 6.0.2 自動保存と同時編集
@@ -538,7 +601,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | Unknown | 分からないと分かっている。文章の回答は、何が分からないかを書いてもよい。**数字は値を持たない** | 新月と「Unknown」 |
 | Fact（根拠なし） | Fact だが、根拠の調査ログが削除されて根拠が0件になった。利用者がこの状態を作ることはできず、調査ログの削除でだけ起きる | 「Fact · No evidence」と警告。F/A/U の内訳では Fact に数え、警告の件数を添える。13 の Next steps の「Add evidence」に出る |
 
-入力欄の下に3つのボタン `[Fact] [Assumption] [Unknown]` を並べる。値がないときは Fact と Assumption を押せない（Unknown だけ押せる）。表の行（17 の金額・18 の数字）では、行ごとにボタンを並べず、F/A/U の欄（FauPicker。4.5）に今の状態を出し、押すと開く Popover に同じ3つのボタンと確信度を出す（2026-10-12 のユーザーの決定。表をごちゃつかせないため）。スマホでは行をボトムシートで編集するので、シートの中にボタンで並べる。図では幅のため「Assm·H」「Fact·1 src」のように縮めて書くことがあるが、画面の表記は上の表のとおり。下の決まりはどちらも同じ。
+入力欄の下に3つのボタン `[Fact] [Assumption] [Unknown]` を並べる。値がないときは Fact と Assumption を押せない（Unknown だけ押せる）。表の行（17 の金額・18 の数字）では、行ごとにボタンを並べず、F/A/U の欄（FauPicker。4.5）に今の状態を出し、押すと開く Popover に同じ3つのボタンと確信度を出す（2026-10-12 のユーザーの決定。表をごちゃつかせないため）。スマホでは行をボトムシートで編集するので、シートの中にボタンで並べる。Popover とシートの中の3つのボタンと確信度は、どちらも幅いっぱいに広げ、ボタンが幅を分け合う（どのボタンも文字より狭くしない。`docs/mockups` の s17-costs.html。4.5 の ToggleButtonGroup・SegmentedControl の `isJustified`）。3つのボタンの上に「How do you know this amount?」（17 の金額にも 18 の日数・販売数・% にも同じ文言を使う）、確信度の上に「Confidence」の小見出しを置き、値があるときは下に「Have a quote? Mark it Fact.」（Fact のときは出さない）と「Add evidence」（M2 を開く）を出す（4.5 の FauPicker）。図では幅のため「Assm·H」「Fact·1 src」のように縮めて書くことがあるが、画面の表記は上の表のとおり。下の決まりはどちらも同じ。
 
 - **Fact** を押すと M2 を開く。根拠を1件以上付けると Fact になる。根拠を付けずに閉じたら、元の状態に戻す（根拠のない Fact を作らない）。
 - **Assumption** を押すと、その場に確信度の選択（Low / Medium / High）を出す。選ぶまでは確定しない。
@@ -586,7 +649,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 
 - 対象: 10・11・13〜18・20〜22 の各項目と、画面全体（その画面の全項目の履歴をまとめて表示）。出し方はコメントパネルと同じ（Web は右のパネル、スマホはボトムシート）。
 - 記録する変更: 回答の本文・数字・F/A/U・確信度・根拠の付け外し・行の追加と削除・アイデアの概要・プランのヘッダ・実行管理の項目。コメント・設定・テンプレートの編集は対象外（テンプレートは版で管理する）。ただしテンプレートの移行は、自己分析・プランの履歴と、13 ではアイデアの履歴に1行（版の更新）で出す。
-- 1件ごとに、誰が・いつ・どの項目・変更前と変更後の差分（文字単位の強調）・変更の種類（手入力 / AI 取り込み / 元に戻す / テンプレートの移行 / 複製 / 下書き作成 / 作成の取り消し）を出す。
+- 1件ごとに、誰が・いつ・どの項目・変更前と変更後の差分（語の単位の強調。4.5 の DiffText）・変更の種類（手入力 / AI 取り込み / 元に戻す / テンプレートの移行 / 複製 / 下書き作成 / 作成の取り消し）を出す。
 - 行には、変更の種類（手入力など）の隣に、操作の種類のラベル（Added / Changed / Deleted / Restored）を出す。
 - 「この時点に戻す」で、その項目の本文・数字・F/A/U・確信度・根拠の紐づけをその時点の状態に戻す。戻すこと自体も新しい変更として履歴に残る。削除した行は「削除を取り消す」で戻せる。AI 取り込み・テンプレートの移行・元に戻すの一括の操作は、その操作の先頭の行に「Undo the whole operation」を出し、操作全体を1回で取り消せる（SDD 5.11 の H3）。複製（6.8）とプラン下書きの作成（M5）の先頭の行にも同じボタンを出す。これは戻すのではなく作ったものを消す「作成の取り消し」で、確認のダイアログ（複製は「Delete the copied idea?」、下書きは「Delete this plan draft?」。消えるものと、元に戻せないことを書く）を挟む。作ったあとに変更・コメント・判定・プランなどが足されていると取り消せず、「Something was added after this was created, so it cannot be undone」と出す。すでに取り消した操作をもう一度取り消そうとしたとき（別の画面で先に取り消したときなど）は「This was already undone」と出して履歴を読み直す。対象をほかの保存が書き込んでいる最中で取り消せないときは「Something is being changed right now. Try again.」と出す（SDD 8.1 の `ALREADY_REVERTED`・`UNDO_BLOCKED`・`BUSY`）。
 - 作成の取り消しは、作ったアイデア（またはプラン）を論理削除する。一覧・検索・ダッシュボード・工程の集計・通知のどこにも出さず、URL で開くと 6.0.6 の「見つからない」を出す。作ったものの中の変更履歴は消さずに残す。取り消したことは、元の側の履歴に1行（「Duplicate undone」「Plan draft undone」）で残す。元の側は、複製ならコピー元のアイデア、プラン下書きならそのアイデアで、どちらも 13 の履歴に出る。この行には「この時点に戻す」も「Undo the whole operation」も出さず、取り消したものは戻せない。取り消すと、複製はアイデア一覧（6）へ、下書きはそのアイデアの 13 へ移る。
@@ -627,7 +690,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 #### 6.0.7 テンプレートの版と移行（M8）
 
 - 自己分析・検証・プランは、作った時点で公開されている最新の版を参照する。運営者が新しい版を公開しても、既存の回答は変わらない。
-- 新しい版があるとき、10 / 13 / 20 のヘッダーに「A newer template is available」を出す（Owner / Member、自己分析は本人だけ）。
+- 新しい版があるとき、10 / 13 / 20 のヘッダーの下の帯（6.0.1）に「A newer template is available.」と「Update template」（M8 を開く）を出す（Owner / Member、自己分析は本人だけ。d1-moon.html の .banner）。
 - M8 で移行すると、設問 ID が一致する回答を引き継ぐ。移行の前に、引き継げない回答（新しい版にない設問）の一覧を出す。引き継げない回答は消さずに残すが、画面には出さない。M8 を開いたときに、ほかの人が先に移行していて新しい版が無ければ「You're already on the latest template」と閉じるボタンを出す。
 - 移行で変わるもの・変わらないもの:
 
@@ -791,10 +854,10 @@ Web（パターン A ハブ: 上に主要指標、その下の左に状態、右
 | ブロック | 内容 | 出どころ |
 |---|---|---|
 | ヘッダー | アイデア名、最新の判定（未判定 / Proceed / Hold / Drop）、工程、一行コンセプト、提案者、複製元（複製したアイデアだけ「Duplicated from {元のアイデア名}」） | アイデア、決定ログ |
-| 主要指標（上の横一列） | 初期費用の合計、損益分岐（件/日）、Expected の月次営業利益、回収期間。計算できないときは「Empty」か理由（例: 「Needs price」。どちらを出すかは 6.4「主要指標」）。初期費用に未入力・Unknown の行があれば「₱450,000+」のように下限として出す | 18 の計算（6.4） |
+| 主要指標（上の横一列。スマホとデスクトップでパネルが本文の領域を狭めている間は 2×2。4.1） | 初期費用の合計、損益分岐（件/日）、Expected の月次営業利益、回収期間。計算できないときは「Empty」か理由（例: 「Needs price」。どちらを出すかは 6.4「主要指標」）。初期費用に未入力・Unknown の行があれば「₱450,000+」のように下限として出す | 18 の計算（6.4） |
 | Next steps（左） | 次に埋めると良いもの（最大3件）。1件目だけ枠で強調し、理由を1行添える | 下の優先順 |
 | 確認項目（左） | 6つの状態（未着手 / 途中 / 達成。MoonGlyph とラベル）、件数、不足の理由、埋める画面へのリンク。合計数や達成率は出さない | 下の判定ルール |
-| F/A/U（左） | Fact / Assumption（確信度の内訳）/ Unknown / 未分類 / 未入力 の件数。1本の帯（Meter）と凡例（帯と同じ見本・ラベル・件数）で示す | 6.0.3 の対象項目 |
+| F/A/U（左） | Fact / Assumption（確信度の内訳）/ Unknown / 未分類 / 未入力 の件数。1本の帯（Meter）と凡例（帯と同じ見本・ラベル・件数）で示す。見出し「Fact / Assumption / Unknown」の右端に項目の総数（「62 items」。等幅の数字）を出し、帯の上には名前を出さない（見出しが兼ねる。読み上げの名前は残す。d1-moon.html） | 6.0.3 の対象項目 |
 | Summary（左） | Customer / Problem / Solution / Market type。未入力なら「Empty」と、入力する画面へのリンク | 01 WHO、01 PROBLEM、アイデアの「提案する解決策」、02 OCEAN |
 | セクション（右） | 名前は番号付き。設問のセクション（01・02・10）は検証のテンプレートの版の題（27 で直すと 11 と同じく変わる）、画面のセクション（03〜09）はアプリの固定の名前（2026-10-12 のユーザーの決定）。01〜10 の進み具合（入力済みの数 / 全体）。分母のあるセクションは、その割合だけ満ちた MoonGlyph を添える。セクションごとの F/A/U の帯は出さない（内訳は左の F/A/U で見る。2026-10-12） | 各セクション |
 | Decisions（右） | 判定の履歴（新しい順、最大5件 + 「See all」で 7 へ） | 決定ログ |
@@ -919,6 +982,7 @@ Web（パターン C 設問フォーム）
 │ │ [○ Unknown]           │ │
 │ │ ▸ EXAMPLE  ▸ Hint     │ │
 │ └───────────────────────┘ │
+│ [AI ▼ Export / Import]    │
 ├───────────────────────────┤
 │ [←]   ● ● ◉ ◌ ◌ ◌ ◌   [→] │
 └───────────────────────────┘
@@ -928,7 +992,7 @@ Web（パターン C 設問フォーム）
 
 - ヘッダー: パンくず（スマホは戻り先の 10 / 13。6.0.1）、Focus スイッチ（Web）、保存状態、コメント数、履歴。
 - 本文の見出し: セクション名（▼ を押すとセクション切替）、回答済みの数 / セクションの問い数と、その割合だけ満ちた MoonGlyph。
-- セクションの小見出し（テンプレートのセクションが持つときだけ。自己分析の「Why do I want this?」など）を見出しの下に出し、その下にガイダンス（1行）。
+- セクションの小見出し（テンプレートのセクションが持つときだけ。自己分析の「Why do I want this?」など）を見出しの下に出し、その下にガイダンス（1行。文の幅は 06 `layout.question-form.guidance-measure` まで。s11-form.html の .guidance）。
 - 各設問: タイトル（例: BEHAVIOR）・問いの本文・回答欄。回答の型はテンプレートの設問ごとに決まる。タイトルはテンプレートの表記のまま等幅の小さな文字で出し、問いの本文を大きく出す。検証の控えめな表示の設問は、左端に F/A/U の MoonGlyph を置く（自己分析は F/A/U を持たないので印を置かない）
 
 | 回答の型 | 入力欄 | 使う設問の例 |
@@ -939,8 +1003,8 @@ Web（パターン C 設問フォーム）
 | 金額＋理由 | 金額（通貨記号付き）と「Why this amount?」の2欄 | 自己分析 Q15〜17（PERSONAL INCOME） |
 
 - 検証のときだけ、各回答に F/A/U（6.0.3）。自己分析には出さない。
-- フォーカス中の設問だけに出すもの: EXAMPLE（テンプレートの例。最初は開いた状態）、ヒント、検証のときは「関連する調査ログ」（この設問の根拠に付いているもの）。
-- スマホの問いのドット（MoonGlyph）: 回答済み（●）・未回答（点線の丸 ◌）・今の問い（輪で囲む ◉）。押すとその問いへ移る。
+- フォーカス中の設問だけに出すもの: EXAMPLE（テンプレートの例。最初は開いた状態）、ヒント、検証のときは「関連する調査ログ」（この設問の根拠に付いているもの。Disclosure の「Related research」）。関連する調査ログが無いときは、中に「No research linked to this answer. Mark it Fact to attach a source.」と、その下の単独の行に「Log research」のリンクを出す。押すと 14 を開いて新しい調査ログの入力を開く（SDD のルーティングの `new=1`。14 の「+ Add entry」と同じ。根拠に付けるのは、Fact を選んで開く M2）。s11-form.html はこのリンクを文の中に置くが、文中のリンクは読み物だけに置く決まり（4.5 の Link）に合わせて単独の行にする。Viewer とアーカイブ中のアイデアでは、新しい調査ログも F/A/U の変更も入れられないので、空のときは「No research linked to this answer.」だけを出す（6.1 の Next steps と同じく、入れない行き先をリンクにしない）。
+- スマホの問いのドット（MoonGlyph）: 回答済み（●）・未回答（点線の丸 ◌）・今の問い（輪で囲む ◉）。押すとその問いへ移る。各ドットはボタンで、名前は「Question {n} of {N}」、回答済みは「Question {n} of {N}, answered」（印は読み上げない。今の問いは `aria-current` で伝える）。押せるドットはどれもタップ領域の下限（4.3）を持つ。← と → の間に入らないとき（検証の 02 は15問）は、ドットの列だけを横にスクロールし、今の問いのドットを見える所に保つ（ページは横にスクロールさせない。4.5 の Tabs と同じ）。
 
 #### 操作と状態遷移
 
@@ -1006,9 +1070,18 @@ Web（パターン F ワークシート）
 └───────────────────────────────────────────────────────────────┴───────────────────────┘
 行は値だけを見せ、触った行（例の Renovation / Fit-out）だけ入力欄にする。F/A/U の欄を押すと
 Popover で F/A/U と確信度を選ぶ（6.0.3・4.5 の FauPicker）。金額は等幅で右にそろえる。
+Empty の行の F/A/U の欄は U+2014 のダッシュ1文字にする（読み上げは Empty。s17-costs.html）。
 
-スマホ: 3つの表をセクションの見出しで分け、各行をカード（項目名・金額・F/A/U）にする。
-行を押すとボトムシートで全項目を編集する（F/A/U と確信度はシートの中にボタンで並べ、FauPicker の Tray を重ねない）。下部に「Startup ₱450,000+ · Monthly ₱49,000 · BE 13+/day」の要約バーを固定し、押すと Totals を開く。
+表の欄の F/A/U はラベルだけを出し、印は行頭の列に出す（4.5 の FauPicker）。行の ⋯ はマウスでは
+ポインタの下の行とフォーカスのある行で出す。スマホでは Why Needed・Can Reduce?・Notes を行に出さず
+（行を押して開くシートで直す）、行の ⋯ の操作も行に置かず、そのシートの中に置く。
+スマホ: 3つの表をセクションの見出しで分け、各行を線で区切った行（印｜項目名と、その下に F/A/U の
+ラベル｜右に金額）にする（s17-costs.html。4.5 の TableView）。表の下は全幅の「+ Add row」の行だけにし、
+小計は出さない（合計は要約バーと Totals にある）。スマホの Empty の行は、F/A/U のラベルの代わりに
+「Tap to fill or mark Unknown」を tertiary の文字で出す（s17-costs.html。押すと開くシートで金額か Unknown を選ぶ）。
+タブレットは表をデスクトップと同じ列で出す（4.1 F。s17-costs.html の 1023px 以下は Why Needed・Notes の
+列を省くが、表の中で読めて直せる項目が減るので残す）。
+行を押すとボトムシートで全項目を編集する（F/A/U と確信度はシートの中にボタンで並べ、FauPicker の Tray を重ねない）。下部に「Startup ₱450,000+ · Monthly ₱49,000 · BE 13+/day」の要約バーを1行で固定し（名前と値の組は折り返さない。組が入らない狭い幅だけ、組の間で折り返す）、押すと Totals を開く。
 ```
 
 #### 表と列
@@ -1085,10 +1158,10 @@ Web（パターン F ワークシート）
 │ and effort?  (長文・F/A/U)          │                                         │
 └───────────────────────────────────┴────────────────────────────────────────┘
 
-スマホ: 入力をカードで縦に並べる。結果は下部の要約バー（「BE 6.9/day · Exp ₱18,490/mo」）に固定し、押すと全体を開く。
+スマホ: 入力を線で区切った行で縦に並べる。結果は下部の要約バー（「BE 6.9/day · Exp ₱18,490/mo」）に固定し、押すと全体を開く。
 シナリオ表は列が多いので、スマホでは行と列を入れ替え、シナリオ（Break-even・Conservative・Expected・Strong・Capacity Limit）
-ごとのカード5枚を縦に並べる（各カードに件数/日・件数/月・売上・営業利益・利益率。4.3 の「表は行ごとのカード」の
-決まりに合わせる。2026-10-12 のユーザーの決定）。F/A/U はカードを押して開く行の編集シートの中のボタンで付ける（6.0.3）。
+ごとの行5つを縦に並べる（各行に件数/日・件数/月・売上・営業利益・利益率をラベルと値で並べる。4.3 の「表は1行ずつの行」の
+決まりに合わせる。2026-10-12 のユーザーの決定）。F/A/U は行を押して開く行の編集シートの中のボタンで付ける（6.0.3）。
 ```
 
 #### 入力
@@ -1194,25 +1267,31 @@ Proceed / Hold / Drop と理由を記録する。判断材料（概要・不足�
 #### レイアウト構造
 
 ```
-Web（パターン B 中央集中。スマホはパンくずの代わりに ← Validation を出し、縦に積む）
+Web（パターン B 中央集中。スマホはパンくずの代わりに ← Validation を出し、縦に積む。判断材料は Well、主要指標は MetricGroup の compact、
+Summary は DescriptionList、判定は RadioGroup の cards。s19-decision.html）
 ┌──────────────────────────────────────────────────────────────┐
 │ Ideas / Piaya Gift Box Delivery / Decision                     │
 ├──────────────────────────────────────────────────────────────┤
 │ Summary                                                      │
-│  Customer · Problem · Solution · Market type: Mixed           │
-│  Biggest opportunity / risk / unknown (10 の回答)               │
+│  Concept            Corporate gift boxes of Bacolod piaya…    │
+│  Customer           HR teams of BPO companies…                │
+│  …（Problem・Solution・Market type: Mixed・                    │
+│     Biggest opportunity / unknown / risk。10 の回答）          │
 │ Key numbers                                                  │
-│  Startup ₱169,500 · BE 6.9/day · Expected ₱18,490/mo ·        │
-│  Payback 9.2 mo · ROI 130.9%                                  │
+│  Startup    Break-even  Expected profit  Payback   ROI        │
+│  ₱169,500   6.9 / day   ₱18,490 / mo     9.2 mo    130.9%     │
 │ Checks: 2 missing                                            │
 │  ○ Permits: Not started                                       │
 │  ◐ Startup & monthly costs: Partial (2 rows are Empty)        │
 │ ● Fact 12 ◐ Assumption 9 ○ Unknown 2 ◆ Unclassified 3 ◌ Empty 18│
 ├──────────────────────────────────────────────────────────────┤
 │ Should we develop this into a full Business Plan?            │
-│  ( ) Proceed   ( ) Hold   ( ) Drop                            │
+│ ┌──────────────────┐┌──────────────────┐┌──────────────────┐ │
+│ │( ) Proceed       ││(•) Hold          ││( ) Drop          │ │
+│ │ Worth planning   ││ Come back later  ││ Hide from lists  │ │
+│ └──────────────────┘└──────────────────┘└──────────────────┘ │
 │  Proceed means it is worth planning, not approval to launch.  │
-│ Why? (必須)                                                   │
+│ Why? Required（必須の印。secondary の文字）                     │
 │ ┌──────────────────────────────────────────────────────────┐ │
 │ └──────────────────────────────────────────────────────────┘ │
 │ ⚠ 2 checks are missing. They will be recorded with this decision.│
@@ -1222,11 +1301,12 @@ Web（パターン B 中央集中。スマホはパンくずの代わりに ← 
 
 #### 表示内容
 
-- Summary: 一行コンセプト、Customer（01 WHO）、Problem（01 PROBLEM）、Solution（提案する解決策）、Market type（02 OCEAN）、Biggest opportunity / risk / unknown（10 の回答）。未入力は「Empty」。
+- Summary: 一行コンセプト、Customer（01 WHO）、Problem（01 PROBLEM）、Solution（提案する解決策）、Market type（02 OCEAN）、Biggest opportunity / unknown / risk（10 の回答。s19-decision.html の順）。未入力は「Empty」。
 - Key numbers: 6.4 の主要指標のうち、初期費用・損益分岐（件/日）・Expected の月次営業利益・回収期間・ROI。
 - Checks: 達成していない確認項目だけを出す（すべて達成なら「All 6 checks done」）。
 - F/A/U の内訳（未分類と Unknown を強調）。帯は使わず、MoonGlyph・ラベル・件数を1行に並べる（Empty も含む）。
 - 直前の判定（あれば「Last: Hold · Sep 30 · Ana」）。
+- 判定は、題と説明のカードで並べる（4.5 の RadioGroup の `cards`。スマホは1列。s19-decision.html）: Proceed「Worth planning」、Hold「Come back later」、Drop「Hide from lists」。Summary はラベルと値の並び（4.5 の DescriptionList）、Key numbers は MetricGroup の `compact`。
 
 #### 操作と状態遷移
 
@@ -1474,21 +1554,31 @@ Web（パターン G ステップ。差分確認だけ左右2列）
 │  ? Unmatched block "Customer segments…"  [Choose question ▼] [Discard]  │
 │  ✕ [P.11.1] not importable (tables and numbers can't be imported) [Discard]│
 │ ③ Review                                                               │
-│  ☑ WHO                                                                 │
-│   Current                         │ Imported (editable)                 │
-│   HR teams of BPO companies…      │ HR and admin teams of BPO …          │
-│   ◐ Assumption · Medium           │ F/A/U: Unclassified  [Fact][Assm][Unk]│
-│  ☑ PROBLEM  …                                                          │
-│  ─ 3 unchanged (collapsed)                                             │
-│                                   [Cancel]  [Apply 2 changes]          │
+│  2 changes to apply. Changed answers go back to Unclassified so you     │
+│  can check them.                                                        │
+│  ┌ ☑ 01 · WHO  Who is the primary paying customer?  Updated by Kenji just now ┐│
+│  │ Current ◐ Assumption · Medium   │ Imported · you can edit            ││
+│  │ HR teams of BPO companies…      │ ┌ HR and admin teams of BPO …    ┐ ││
+│  │ （消した語に取り消し線）          │ └（足した語に下線。打ちながら直る）  ┘ ││
+│  │                                 │ ◆ Unclassified [Fact][Assm][Unk]   ││
+│  └────────────────────────────────────────────────────────────────┘│
+│  ☑ 01 · PROBLEM  …                                                     │
+│  › 3 unchanged answers                                                  │
+│ ─────────────────────────────────────────────────────────────────────── │
+│ Each change is saved in history as an AI import.  Cancel [Apply 2 changes]│
 └────────────────────────────────────────────────────────────────────────┘
 
-スマホ: 差分は「Current」と「Imported」を上下に並べる。下部に [Apply n changes] を固定。
+スマホ: 差分は「Current」と「Imported」を上下に並べる。下部に Cancel と [Apply n changes] を固定し、
+注記（Each change is saved…）は内容の最後に出す。「Updated by …」は頭の行の下に出す。s25-import.html の
+スマホは注記と「Updated by …」を省いているが、反映が履歴に残ることと、開いた後に他の人が回答を変えた
+ことが伝わらなくなるので残す。ヘッダーの ← は戻り先の名前（「← Validation」など。6.0.1）。
 ```
 
 #### 取り込み先
 
 取り込み先は、入ってきた画面で決まる（自分の自己分析 / ある検証 / あるプラン）。24 の ③ から入ったときは、書き出したときの範囲を範囲にする。書き出し元と同じ画面（10 / 11 / 13 / 20 / 21）の「Import from AI」から直接入ったときは、その種類の全体（自己分析全体 / 検証の設問型の全セクション / プラン全体）を範囲にする。
+
+題「Import from AI」の上に、取り込み先を secondary の小さな文字で出す（s25-import.html の .eyebrow）: 検証は「{アイデア名} · validation questions」、プランは「{アイデア名} · {案名}」、自己分析は「Self analysis」。
 
 #### ① 貼り付け
 
@@ -1517,8 +1607,12 @@ Web（パターン G ステップ。差分確認だけ左右2列）
 
 #### ③ 差分確認
 
-- 設問ごとに、今の回答と取り込む内容を並べ、変わった部分を強調する。
-- 取り込む内容はその場で直せる。
+- 上に「{n} changes to apply. Changed answers go back to Unclassified so you can check them.」を出す（F/A/U の無い自己分析とプランの取り込みでは、F/A/U の文を除いた「{n} changes to apply.」）。
+- 設問ごとに枠を分け（s25-import.html の .item）、頭の行に「反映する」のチェック・「{セクションの番号} · {設問の名前}」・問い・右端に「Updated by …」を並べ、その下を縦の線で分けた2列にする。スマホでも番号の横に問いを置き（問いは番号の横で折り返す）、「Updated by …」はその下の行に出す。左は「Current」と今の F/A/U（検証のとき）、右は「Imported · you can edit」。
+- 変わった部分を語の単位で強調する（4.5 の DiffText の補足）。今の回答は消した語に取り消し線（DiffText）、取り込む内容は足した語に下線を引く。
+- 取り込む内容はその場で直せる。直している間も、今の回答と比べて足した語の下線を出し続ける（DiffTextArea）。
+- 内容が同じ設問は「{n} unchanged answers」の1行にまとめる。この行は上下に hairline のある Disclosure（s25-import.html の .unchanged）で、開くと設問の番号と名前・今の回答を出す。
+- 下に留める操作の行の左に「Each change is saved in history as an AI import.」を出し、右に Cancel と [Apply {n} changes] を並べる。
 - 設問ごとに「反映する」のチェック（初期値はオン）。内容が同じ設問は「unchanged」として折りたたみ、反映しない。
 - **検証の回答で内容が変わったものは、F/A/U を「未分類」に戻す。** 差分確認の画面でその場で付け直せる。Fact を選ぶと、根拠の紐づけが残っている設問はそのまま Fact になり、残っていない設問は M2 を開いてその場で根拠を付ける。M2 は根拠を付けた時点で保存済みの回答を Fact にする（6.0.3。キャンセルしてもこの Fact と根拠は残る）ので、反映は `classification: fact` を付けて送り、取り込みの API（SDD 5.10 の X3）は根拠が残っているのでそのまま受け付ける。根拠を付けずに M2 を閉じたら選択は変わらない。回答が今は空の設問は、根拠を付ける API（SDD 5.7 の V4）が値の無い対象への Fact を拒むので M2 を開かず「Apply first, then attach evidence in the question」と出し、反映の後に設問の画面の M2 で足す。付け直さなければ未分類のまま反映する。
 - 自己分析の金額の設問は、金額を数値として読む（通貨記号・桁区切りを取り除く）。読めなければ「Couldn't read the amount」と出し、直すまで反映できない。
@@ -1549,12 +1643,13 @@ Web（パターン G ステップ。差分確認だけ左右2列）
 ### 6.8 6 アイデア一覧と M1 新しいアイデア
 
 ```
-Web（パターン D）
-┌──────────────────────────────────────────────────────────────────────┐
-│ Ideas                                                  [+ New idea]   │
-│ Stage [All ▼]  Decision [Not dropped ▼]  Proposer [All ▼]  Sort [Updated ▼] 🔍 │
-├────────────────────────────────────────┬─────────────────────────────┤
-│ Piaya Gift Box Delivery        Proceed  │ (選んだアイデアの要約)          │
+Web（パターン D。題・新規作成・絞り込み・検索は左のペインの中。ペインは枠の端まで。s06-ideas.html）
+┌────────────────────────────────────────┬─────────────────────────────┐
+│ Ideas                    [+ New idea]   │ (選んだアイデアの要約)          │
+│ Stage All ▾  Decision Not dropped ▾     │                             │
+│ Proposer All ▾  Sort Updated ▾ [Search…]│                             │
+├────────────────────────────────────────┤                             │
+│ Piaya Gift Box Delivery        Proceed  │                             │
 │  Planning · Ana · updated 2h ago        │ 一行コンセプト・主要指標・      │
 │  ●●●●●● Checks                           │ 確認項目・プラン・最新の判定     │
 │ Bacolod Health Bowl            Hold     │ [Open validation]            │
@@ -1563,9 +1658,13 @@ Web（パターン D）
 │ …                                       │                             │
 │ 1 dropped idea hidden · [Show]          │                             │
 └────────────────────────────────────────┴─────────────────────────────┘
-スマホ: リストだけ。押すと 13 へ。右下に [+]。
+スマホ: リストだけ。押すと 13 へ。右下に浮かぶ [+]（アイコンだけ。4.1 D）。絞り込みと検索は1行のまま横にスクロールする
+（s06-ideas.html のスマホは検索を省くが、探す手段が減るので残す。4.1 D）。
 ```
 
+- 絞り込みは、ラベルを枠の中に入れた小さな Picker（「Stage All ▾」。ラベルは secondary、値は太く。`labelPosition="inside"`）で並べ、検索はその行の残りの幅に広げる（SearchField の `width="fill"`）。
+
+- 右の詳細（s06-ideas.html の .detail）: 判定の札と「Latest decision {日付} · Stage: {工程} · {提案者}」、アイデア名（見出し）、一行コンセプト、主要指標の4つ（MetricGroup の `pair`）、確認項目の6行（RowList）、「Plans: …」と最新の判定の理由の一文、「Open validation →」。未判定のアイデアは札を「Undecided」（点線の枠）にし、「Latest decision {日付} · 」と判定の理由の文を出さない。
 - 行の内容: アイデア名・判定・工程・提案者・更新日時・確認項目の6つの状態の点（●達成 ◐途中 ○未着手）と、不足の名前。合計数や点数は出さない。競合の確認項目の名前は 6.1 と同じく「Competitors (3–5)」と基準値の幅を付けて出す。
 - **工程**（自動で決まる。アーカイブした案は数えない）: 検証（プランがない）→ プラン（プランが1つ以上）→ 立ち上げ準備（どれかの案の最新の Go / No-Go が Launch）。判定（未判定 / Proceed / Hold / Drop）とは別の属性として並べて表示する。
 - **Drop**: 判定の絞り込みの既定は「Not dropped」で、Drop のアイデアは隠す。リストの末尾に「n dropped ideas hidden · Show」を出す。Drop のアイデアも編集と再判定はいつでもできる（「勝者を早く決めない」原則）。
@@ -1613,6 +1712,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | Due soon | このワークスペースの全プランの実行管理の項目のうち、期限（ローンチは任意の Date）があり、Done / Resolved でなく、期限切れか7日以内のもの（期限順）。自分の担当を先に出す。アーカイブしたアイデア・プランの項目は除く。押すと 22 の該当項目 | 全ロール |
 | Recent activity | 直近20件の動き（変更・コメント・判定・Go / No-Go・版の保存）。同じ人が同じ項目を続けて変えたときは、前の変更から10分以内なら1件にまとめ、最後の時刻で出す（自動保存は入力が止まるたびに履歴を残すため）。AI 取り込みなどの一括の操作も1件にまとめる。自己分析に関わる動き（変更もコメントも）は出さない。押すと該当の項目（コメントならパネルを開いた状態） | 全ロール |
 
+- 形（s05-dashboard.html）: Ideas の行は、名前とその下の工程・更新・不足の後ろに CheckDots と判定の札を並べ、札はどの行でも同じ幅の列の右端にそろえて印の位置を行ごとにそろえる（4.5 の RowList の `marks`・`badge`）。スマホでは札を名前の行の右端、CheckDots をその下の行に置く。Due soon の期限は等幅の数字。Recent activity の行は1文で、動いた人の名前を semibold、動きを本文の太さで出す（.activity .t b）。
 - 空の状態（ワークスペースを作ったばかり。アーカイブしていないアイデアが0件で、隠れている Drop も0件）: Ideas ブロックの場所に「Getting started」の案内を出し、他のブロックは通常どおり出す。案内は次の3つ: ① 自己分析を始める（10）② メンバーを招待する（9、Owner）③ 最初のアイデアを書く（M1）。Viewer には説明の1行だけを出す。
 - ローディング / エラー: 6.0.6。ブロックごとに読み込み、1つが失敗しても他は出す。
 
@@ -1641,10 +1741,11 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 #### 15 競合・代替（パターン E）
 
 - カードの項目: Name（必須）/ Type（Direct Competitor / Indirect Competitor / Substitute）/ Target Customer / Offering / Typical Price（金額）＋ Price note（例: per box）/ Strength / Weakness / Why Customers Choose Them / Why They Survive / 根拠（M2。6.0.3 の F/A/U を持たない行の決まり）。入力の規則は 6.0.8。
-- 見出しに「4 competitors · aim for 3–5」（目安の幅は 6.1 の確認項目1と同じ）。
+- 題の行に、確認項目1の状態の印（MoonGlyph）と「4 competitors · aim for 3–5」（目安の幅は 6.1 の確認項目1と同じ）、右端に Cards / Table の切り替えと枠の [+ Add competitor]（スマホでは切り替えを出さず、[+ Add competitor] は題の下のその場に置く）。カードの並びの最後に、点線の枠の「+ Add competitor」のタイルを置く（CardView の `addItem`。押すと追加の Dialog を開く。s15-competitors.html）。カードは CardView の M にする（15 は regular の画面）。
+- カードの形（s15-competitors.html。4.5 の Card）: Type を題の上の小さな文字、Name を題、右上に Typical Price と Price note（価格が無ければ「No price」）、その下に Target Customer・Offering・Strength・Weakness・Why Customers Choose Them・Why They Survive をラベルと値の行で並べ、最後の行に根拠の件数（「1 source」「No sources」）・未解決のコメントの数（💬 1。0件なら出さない）・カードの ⋯ を置く。空の項目は「Empty」を薄く出す。カード全体を押すと編集（下の 14〜16 共通の Dialog）を開く。
 - カードは並べ替えられる（カードの ⋯ の「並べ替え」。17 の費用行と同じ）。並べた順は Pitch Deck の Competition の競合（上から最大5件）と、版のスナップショットの競合にも使う。
 - Web は「Cards / Table」を切り替えられる。表は項目を行、競合を列にして見比べる。
-- カードの下に Survivor Patterns と Failure Patterns の2つの設問（`V.04.SURVIVOR_PATTERNS` / `V.04.FAILURE_PATTERNS`、長文・F/A/U 付き）。
+- カードの下に小見出し「Patterns」と、Survivor Patterns と Failure Patterns の2つの設問（`V.04.SURVIVOR_PATTERNS` / `V.04.FAILURE_PATTERNS`、長文・F/A/U 付き）。設問は 11 と同じ控えめな行で、hairline で区切って並べる（4.5 の QuestionList。s15-competitors.html）。
 - 空の状態: 「List 3–5 competitors or substitutes. Include what people do today instead.」と + Add competitor。
 - Survivor Patterns と Failure Patterns の見出し（入力欄のラベルも同じ）は、検証のテンプレートの版にある設問 `V.04.SURVIVOR_PATTERNS` / `V.04.FAILURE_PATTERNS` のタイトルを出す（27 で編集した内容が反映される。UI の固定文言は持たない）。設問の問い・EXAMPLE・ヒントも、11 と同じ QuestionCard でこの画面に出す（入力中の設問だけ EXAMPLE とヒントを開く。4.1 パターン C の補足）。
 
@@ -1759,7 +1860,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 #### M4 Go / No-Go の記録
 
 - 表示: §24 の3つの条件（We proceed to launch if / We delay if / We stop / abandon if）の回答、主要指標、今の版（「+ changes」なら「Save a version first?」と M3 への案内。保存しなくても記録できる）。
-- 入力: Launch / Delay / Stop と理由（必須。規則は 6.0.8）。
+- 入力: Launch / Delay / Stop と理由（必須。規則は 6.0.8）。Launch / Delay / Stop は 4.5 の RadioGroup の `cards`（19 の判定と同じ形。題だけで説明の行は持たない）で並べる。
 - 決定ログに「Go / No-Go」として残し、対象の版・主要指標・§24 の3つの条件の文章を記録する。対象の版は最新の保存済みの版（「+ changes」でも直前の版。版が無ければ空）。ワークスペースに通知する。
 - 何度でも記録し直せる（最新が有効）。どれかの案の最新の Go / No-Go が Launch なら、アイデアの工程が「立ち上げ準備」になる。
 
@@ -1851,8 +1952,9 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - スライドへのコメントは「版の種類 + スライドのキー」で指す（例: `five.market`）。
 - 上部で **1分版（One-minute）/ 5分版（Five-minute）** を切り替える（原本 §30 の流れどおり。ただし5分版は、原本の Economics を Economics と Funding plan の2枚に、Execution plan を Execution plan と Launch plan の2枚に分ける）。
 - 上部で生成元を選ぶ: 「Latest」（今の内容）か、保存済みの版。
-- スライドの下に「話す内容」として §30 の One-minute / Five-minute explanation を出す（アプリの表示だけ。PDF には入れない）。
-- 画面のスライドも PDF と同じ見た目にするため、ダークモードでもライトの配色で出す（スライドの外側の画面はモードに従う）。
+- スライドの下に「話す内容」として、小見出し「What to say」と §30 の One-minute / Five-minute explanation を出す（アプリの表示だけ。PDF には入れない。幅は 06 `layout.presentation.notes-measure` まで）。
+- 並び（パターン I。s23-deck.html）: 上の道具の行に題「Pitch Deck」・1分版 / 5分版の切り替え・生成元の Picker（ラベルを枠の中に入れ「From v1 For advisors ▾」）・右端に「Download PDF」。左に番号付きのサムネイルの列（番号はサムネイルの外、題はサムネイルの下。今のスライドは raised の地と控えめな hairline の枠と semibold の題）。スライドの上の右端に「Edit source」「Edit in validation」と 💬 を下線のない quiet のリンクで並べる。スマホ（とデスクトップでパネルが本文の領域を狭めている間。4.1）は今のスライドだけを幅に合わせて出し、その下の「‹ 7 / 14 ›」で前後へ移る（s23-deck.html のスマホは前後の移動を描いていないが、サムネイルの列の無い並びではほかにスライドを移る手段が無いので残す。4.1 I）。「Download PDF」はスマホでも道具の行のその場に置く。
+- 画面のスライドも PDF と同じ見た目にするため、ダークモードでもライトの配色で出す（スライドの外側の画面はモードに従う）。地は白（`semantic.print.color.page`。PDF のページも同じ）。
 - 「Download PDF」: 横長のページ（寸法は `semantic.print.slide`）。**表示モードにかかわらず常にライト**。各ページの下に Business Name・版の名前（または「Draft」）・日付。回答の言語（日本語など）を表示できるよう、代替フォントを PDF に埋め込む。
 
 1分版（8枚）:
@@ -1941,7 +2043,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 期限の通知（実行管理の期限が近い・過ぎた）は作らない（2026-10-03 のユーザーの決定。プランは北極星として使い、進捗の管理には使わないため）。期限は 5 の Due soon と 22 の Overdue で見る。
 
 - 各行: 誰が・何をしたか・どこで（アイデア名と項目）・日時。コメントとメンションは本文の冒頭、判定・Go / No-Go は理由の冒頭を1〜2行添え、移らずに要点が読めるようにする（2026-10-12 のユーザーの決定。4.1）。
-- 未読は太字。タブ（サイドバー）に未読数のバッジ。「Mark all as read」。絞り込み: All / Unread。
+- 未読は太字。ナビの Notifications に未読数（サイドバーは数字、TabBar はインクの札。4.5 Badge）。「Mark all as read」。絞り込み: All / Unread。
 - 自己分析へのコメントの通知は、その自己分析を読める人（本人と共有先の Owner / Member）にだけ送る。
 - ワークスペースから外れた人の通知は、押すと「You no longer have access」と出す。停止されたユーザーには通知を作らない。
 - 通知はワークスペースをまたいで1つの一覧に出し、各行にワークスペース名を添える。押すとそのワークスペースに切り替えて開く。
@@ -1953,11 +2055,11 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 
 | 画面 | 内容 | 状態とエラー |
 |---|---|---|
-| 1 ランディング | 何ができるか（自己分析 → 検証 → プランの3段階と、その場の計算・足りないものの見える化）、招待制であること、[Log in]。新規登録の入口は出さない。フッターに 29・30 へのリンク。並びは、ヒーロー（2行までの見出し・短い説明・[Log in]。横に確認項目と主要な数字の実物の部品で作った見本）→ 3段階（月が満ちていく並び）→ その場の計算の見本（費用の行と合計）→ 招待制の説明と [Log in]。見本は例のアイデアで、実在の地名などの固有名は入れない（2026-10-12 のユーザーの決定）。作り物の画面の画像やストック写真は使わない | — |
+| 1 ランディング | 何ができるか（自己分析 → 検証 → プランの3段階と、その場の計算・足りないものの見える化）、招待制であること、[Log in]。新規登録の入口は出さない。フッターに 29・30 へのリンク。並びは、ヒーロー（2行までの見出し・短い説明・[Log in]。横に確認項目と主要な数字の実物の部品で作った見本）→ 3段階（月が満ちていく並び）→ その場の計算の見本（費用の行と合計）→ 招待制の説明と [Log in]。見本は例のアイデアで、実在の地名などの固有名は入れない（2026-10-12 のユーザーの決定）。作り物の画面の画像やストック写真は使わない。形（s01-landing.html。PublicPattern と PublicSection）: 上のバーは左に三日月の印と「moonx」、右に枠の [Log in]（Button の secondary）。ヒーローの見出しは display で、行の長さをそろえて折り返し、リードは lead、[Log in] は primary の XL。ヒーローの見本は浮いたカード（IdeaPreview: 角丸・hairline の枠・大きく柔らかい影（4.5 の IdeaPreview）。題と工程、2つの主要な数字、確認項目の行、注記「An example idea in validation.」）。3段階は端から端の線の下の節で、月（新月 → 半月 → 満月）を線でつないだ道（PhaseRoute。デスクトップは横、06 `layout.public.stack-max-width` 以下は縦）と各段階の題と説明。その場の計算の見本は、文の横に費用の行と sunken の合計の帯を並べたカード（CostPreview。1つの画像として読み上げる）。最後の節は文と右端の [Log in]。節の題は display-2、本文は 06 `layout.public.body-font-size`（幅によらない）。フッターは左に「moonx」、右に下線なしのリンク「Privacy Policy」「Support」 | — |
 | 2 ログイン / 新規登録 | ログイン: メールとパスワード、または「Continue with Google」。「Forgot password?」（再設定のメールを送る。リンクの期限は1時間。リンクを開くとこの画面で新しいパスワードを決め、ログインした状態で 5 へ）。新規登録: 招待リンクからだけ開く。メール（招待のメールで固定）・表示名・パスワード、または「Continue with Google」（招待のメールと同じメールの Google アカウントだけ）。入力の規則は 6.0.8。フッターに 29・30 へのリンク | 再設定のメールを送った後: 「If an account exists for {email}, we sent a link to reset your password.」（登録の有無を明かさない）。再設定のリンクが期限切れ・使用済み・無効: 理由を分けずに「This link has expired or was already used.」と、再設定のメールを送り直す入口（理由を分けると、リンクの状態が外から分かるため）。認証の失敗: 「Email or password is incorrect」。招待のメールと違う Google アカウント、または招待なしに Google で新規登録しようとした: 「This invitation is invalid or expired. Ask the person who invited you for a new one.」。招待リンクが無効・期限切れ: 「This invitation is invalid or expired. Ask the person who invited you for a new one.」。停止されたユーザー: 「This account is suspended」 |
 | 3 オンボーディング | ① 招待の内容（ワークスペース名・招待した人・ロール）と [Join] ② プロフィール（表示名は必須で、登録で入れた値を初期値にする。写真は任意。タイムゾーンは端末から取る）③ 完了 → 招待元のワークスペースの 5。ワークスペースなしの招待（`make admin-create` の招待は運営者になり、画面 28 の招待の発行から出した招待は一般の利用者）なら ① を飛ばし、個人用ワークスペースへ（登録の時点で受諾済みになる）。すでにアカウントがある人が招待リンクを開いたら、ログインの後に ① だけを出し、[Join] で②③を通らずに招待元のワークスペースの 5 へ移る。ステップ表示は、その流れにあるステップだけを並べる（新規は3つ、ワークスペースなしの招待は ② ③ の2つ、すでにアカウントがある人は ① の1つ） | 招待がすでに使われている: 「Already accepted」と 5 へ。ログイン中のアカウントのメールが招待のメールと違う: 「This invitation was sent to {email}. Log in with that email.」。すでにそのワークスペースのメンバー: 「You're already a member」と 5 へ（ロールは変えない） |
 | 4 アカウント設定 | プロフィール（表示名は入力が止まるか欄を離れたときに自動で保存し、保存ボタンは置かない。規則（6.0.8）に合わない名前は送らず、欄に理由を出す。写真）、メールの表示、パスワード変更（今のパスワードが必要。Google だけで登録した人には「Set password」を出し、メールとパスワードでもログインできるようにする）、タイムゾーン、表示モード（System / Light / Dark）、所属ワークスペースの一覧（ロール。自分の個人用ワークスペース以外は「Leave」）、29・30 へのリンク、ログアウト（1 へ移る。未保存の入力があるときの確認は5章「共通ナビ」）、Delete account（下の「アカウントの削除」） | 最後の Owner は Leave できない（「Make someone else Owner first」）。今開いているワークスペースから Leave したら、個人用ワークスペースの 5 へ。写真が 5MB を超える: 「This photo is too large. Use one under 5 MB.」。写真の形式が違う・画像でない: 「Use a JPEG, PNG or WebP image.」。Set password のとき、直近10分以内にログインし直していない: 「Log in again to set a password」と、ログインし直しへの案内 |
-| 9 ワークスペース設定 | 名前、通貨（ISO 4217 の一覧から。変えても金額は換算しないと警告）、メンバー（ロールの変更・削除）、招待（メール・ロールを入れて送る。再送・取り消し。期限7日。状態: 送信済み / 受諾 / 期限切れ / 取り消し。再送のたびにトークンを作り直し、前のリンクは無効にする。招待のリンクは招待されたメールにだけ届き、送った人には見せない。リンクのコピーは無い） | 最後の Owner は降格・削除できない（その行の降格・削除のメニューは無効にして、理由「This workspace needs at least one Owner」を出す。1.3 の状態で止める操作）。個人用ワークスペースの持ち主（そのワークスペースを登録時に作られた本人）は、ほかの Owner も降格・削除できない（その行のメニューは無効にして、理由「Owner of this personal workspace」を出す。API は `PERSONAL_OWNER`）。招待の送信の失敗は再試行。招待のメールの人がすでにメンバー: 「{email} is already a member of this workspace」。同じメールへの有効な招待がある: 「An invitation to {email} is already pending」と [Resend]（期限切れの招待の再送でも、この2つは同じ）。招待の一覧は既定で送信済み（未受諾）だけを出し、Pending / All の切り替えで受諾・期限切れ・取り消しも出せる（2026-10-12 にユーザーが確かめた）。送信済みが0件なら「No pending invitations」 |
+| 9 ワークスペース設定 | 名前、通貨（ISO 4217 の一覧から。変えても金額は換算しないと警告）、メンバー（ロールの変更・削除）、招待（メール・ロールを入れて送る。再送・取り消し。期限7日。状態: 送信済み / 受諾 / 期限切れ / 取り消し。再送のたびにトークンを作り直し、前のリンクは無効にする。招待のリンクは招待されたメールにだけ届き、送った人には見せない。リンクのコピーは無い）。形（s09-settings.html。SettingsPattern）: Workspace・Members・Invitations の3つのまとまり。通貨の換算しない警告は Picker の下の琥珀色の文字と印（入力欄の補足の notice）。メンバーは1行ずつ（SettingsList）: Avatar・名前と自分なら「(you)」・その下にメール・小さな役割の Picker（S）・⋯。変えられない役割（最後の Owner など）は点線の枠の Picker にし、理由をメールの下に出す。招待は、メールの欄・役割・[Send invitation] を1行に並べ（SettingsFieldRow。スマホでは縦に全幅）、その下に Pending / All の切り替えと、招待の行（メールとその下に「Member · sent Oct 9 · expires Oct 16」・右端に quiet の Resend と Cancel） | 最後の Owner は降格・削除できない（その行の降格・削除のメニューは無効にして、理由「This workspace needs at least one Owner」を出す。1.3 の状態で止める操作）。個人用ワークスペースの持ち主（そのワークスペースを登録時に作られた本人）は、ほかの Owner も降格・削除できない（その行のメニューは無効にして、理由「Owner of this personal workspace」を出す。API は `PERSONAL_OWNER`）。招待の送信の失敗は再試行。招待のメールの人がすでにメンバー: 「{email} is already a member of this workspace」。同じメールへの有効な招待がある: 「An invitation to {email} is already pending」と [Resend]（期限切れの招待の再送でも、この2つは同じ）。招待の一覧は既定で送信済み（未受諾）だけを出し、Pending / All の切り替えで受諾・期限切れ・取り消しも出せる（2026-10-12 にユーザーが確かめた）。送信済みが0件なら「No pending invitations」 |
 
 **パスワード再設定のメール**（2 の「Forgot password?」）: テキストだけのメール。件名「Reset your moonx password」。本文は「Someone asked to reset the password of your moonx account.」、空行、「Open this link within 1 hour to choose a new password:」とリンク、空行、「If it wasn't you, ignore this email. Your password stays the same.」。
 

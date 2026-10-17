@@ -1,0 +1,131 @@
+{
+  "field": {
+    "required": "Required"
+  },
+  "picker": {
+    "placeholder": "Select an item"
+  },
+  "dateField": {
+    "placeholder": {
+      "month": "mm",
+      "day": "dd",
+      "year": "yyyy"
+    }
+  },
+  "searchField": {
+    "clear": "Clear search"
+  },
+  "comboBox": {
+    "showSuggestions": "Show suggestions",
+    "suggestions": "Suggestions"
+  },
+  "datePicker": {
+    "calendar": "Calendar"
+  },
+  "calendar": {
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "tagGroup": {
+    "remove": "Remove"
+  },
+  "dialog": {
+    "close": "Close"
+  },
+  "actionMenu": {
+    "label": "More actions"
+  },
+  "contextualHelp": {
+    "help": "Help",
+    "info": "Information"
+  },
+  "alertDialog": {
+    "alert": "Alert"
+  },
+  "inlineAlert": {
+    "close": "Close",
+    "informative": "Information",
+    "notice": "Warning",
+    "negative": "Error"
+  },
+  "toast": {
+    "close": "Close",
+    "region_one": "{{count}} notification.",
+    "region_other": "{{count}} notifications."
+  },
+  "breadcrumbs": {
+    "label": "Breadcrumbs",
+    "separator": "/"
+  },
+  "checkDots": {
+    "check": "{{name}}: {{state}}"
+  },
+  "fauPicker": {
+    "trigger": "{{name}}: {{state}}",
+    "question": "How do you know this amount?",
+    "confidence": "Confidence",
+    "evidenceHint": "Have a quote? Mark it Fact.",
+    "addEvidence": "Add evidence",
+    "unknownTitle": "Clear the value and mark it Unknown?",
+    "unknownBody": "An Unknown number has no value. To keep the value, choose Assumption with Low confidence.",
+    "markUnknown": "Mark Unknown",
+    "cancel": "Cancel"
+  },
+  "tree": {
+    "expand": "Expand",
+    "collapse": "Collapse"
+  },
+  "questionCard": {
+    "empty": "Empty",
+    "comments_one": "{{formatted}} comment",
+    "comments_other": "{{formatted}} comments"
+  },
+  "panel": {
+    "close": "Close"
+  },
+  "mentionTextArea": {
+    "members": "Members",
+    "search": "Search members"
+  },
+  "appFrame": {
+    "skipToContent": "Skip to content",
+    "back": "Back to {{label}}",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "saveFailed": "Couldn't save",
+    "retry": "Retry",
+    "comments": "Comments",
+    "commentsUnresolved_one": "Comments, {{formatted}} unresolved thread",
+    "commentsUnresolved_other": "Comments, {{formatted}} unresolved threads",
+    "history": "History"
+  },
+  "nav": {
+    "label": "Main",
+    "brand": "moonx",
+    "workspace": "{{name}}, switch workspace",
+    "itemUnread_one": "{{label}}, {{formatted}} unread",
+    "itemUnread_other": "{{label}}, {{formatted}} unread",
+    "more": "More"
+  },
+  "questionFormPattern": {
+    "focus": "Focus",
+    "previous": "Previous question",
+    "next": "Next question",
+    "dot": "Question {{number}} of {{total}}",
+    "dotAnswered": "Question {{number}} of {{total}}, answered"
+  },
+  "listDetailPattern": {
+    "back": "Back to {{label}}"
+  },
+  "presentationPattern": {
+    "slides": "Slides",
+    "position": "{{number}} / {{total}}",
+    "previous": "Previous slide",
+    "next": "Next slide"
+  },
+  "cardComparePattern": {
+    "view": "View",
+    "cards": "Cards",
+    "table": "Table"
+  }
+}

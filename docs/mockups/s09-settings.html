@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>9 ワークスペース設定 — 案1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="moon-base.css?v=2">
+<script src="moon-frame.js?v=1"></script>
+<script src="shared.js?v=3"></script>
+<style>
+.page { width: 100%; max-width: 760px; margin: 0 auto; padding: 32px 32px 96px; }
+h1 { margin: 0 0 28px; font-size: 28px; font-weight: 600; letter-spacing: -0.015em; }
+.group { display: grid; grid-template-columns: 200px 1fr; gap: 24px; padding: 24px 0; border-top: 1px solid var(--line); }
+.group h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.group .desc { margin: 4px 0 0; font-size: 13.5px; color: var(--ink-2); }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.field label { font-size: 13.5px; font-weight: 500; }
+.input, .picker { height: 38px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 12px; background: var(--surface); display: flex; align-items: center; justify-content: space-between; }
+.help { font-size: 13px; color: var(--ink-2); }
+.help.warn { color: var(--notice); display: flex; gap: 6px; align-items: flex-start; }
+.members { list-style: none; margin: 0; padding: 0; }
+.members li { display: grid; grid-template-columns: 30px 1fr auto 32px; gap: 0 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.members li:first-child { border-top: 1px solid var(--line); }
+.members .n { font-weight: 500; }
+.members .e { grid-column: 2; font-size: 13px; color: var(--ink-2); }
+.members .role { grid-row: 1 / 3; grid-column: 3; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); font-size: 13.5px; }
+.members .role[aria-disabled="true"] { color: var(--ink-3); border-style: dashed; }
+.members .menu { grid-row: 1 / 3; grid-column: 4; }
+.members .why { grid-column: 2 / 4; font-size: 12.5px; color: var(--ink-3); }
+.invite { display: grid; grid-template-columns: 1fr 140px auto; gap: 8px; margin-bottom: 14px; }
+.tabs { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 9px; padding: 2px; gap: 2px; margin-bottom: 10px; }
+.tabs button { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: none; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.tabs button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.inv { list-style: none; margin: 0; padding: 0; }
+.inv li { display: grid; grid-template-columns: 1fr auto auto; gap: 0 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.inv .m { grid-column: 1; font-size: 13px; color: var(--ink-2); }
+.inv .acts { grid-row: 1 / 3; grid-column: 3; display: flex; gap: 4px; }
+@media (max-width: 767px) {
+  .page { padding: 20px 16px 96px; }
+  .group { grid-template-columns: 1fr; gap: 12px; }
+  .invite { grid-template-columns: 1fr; }
+  .input, .picker { height: 44px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Workspace" data-sidebar="settings"></aside>
+  <div class="main">
+    <header class="top">
+      <a class="back" href="#"><span data-icon="arrow-left" data-size="20"></span>More</a>
+      <nav class="crumbs" aria-label="Breadcrumb"><span aria-current="page">Workspace Settings</span></nav>
+      <div class="tools"><span class="saved"><span data-icon="check" data-size="14"></span>Saved</span></div>
+    </header>
+    <main class="page" id="main">
+      <h1>Workspace settings</h1>
+
+      <section class="group">
+        <div><h2>Workspace</h2><p class="desc">Changes save on their own.</p></div>
+        <div>
+          <div class="field"><label for="ws-name">Name</label><div class="input" id="ws-name">BCDX</div></div>
+          <div class="field"><label>Currency</label><div class="picker">PHP · Philippine peso <span data-icon="chevron-down" data-size="16"></span></div>
+            <div class="help warn"><span data-icon="alert" data-size="15"></span>Changing the currency does not convert amounts you already entered.</div></div>
+        </div>
+      </section>
+
+      <section class="group">
+        <div><h2>Members</h2><p class="desc">4 people. Owners can invite and change roles.</p></div>
+        <ul class="members">
+          <li><span class="avatar">AV</span><span class="n">Ana Villanueva <span style="color:var(--ink-3);font-weight:400">(you)</span></span><span class="e">ana@bcdx.example</span><span class="role" aria-disabled="true">Owner</span><button class="iconbtn menu" aria-label="Member actions" disabled><span data-icon="ellipsis" data-size="16"></span></button><span class="why">This workspace needs at least one Owner</span></li>
+          <li><span class="avatar">KM</span><span class="n">Kenji Mori</span><span class="e">kenji@bcdx.example</span><span class="role">Member <span data-icon="chevron-down" data-size="14"></span></span><button class="iconbtn menu" aria-label="Member actions"><span data-icon="ellipsis" data-size="16"></span></button></li>
+          <li><span class="avatar">PG</span><span class="n">Paolo Gonzaga</span><span class="e">paolo@bcdx.example</span><span class="role">Member <span data-icon="chevron-down" data-size="14"></span></span><button class="iconbtn menu" aria-label="Member actions"><span data-icon="ellipsis" data-size="16"></span></button></li>
+          <li><span class="avatar">GT</span><span class="n">Grace Tan</span><span class="e">grace@advisor.example</span><span class="role">Viewer <span data-icon="chevron-down" data-size="14"></span></span><button class="iconbtn menu" aria-label="Member actions"><span data-icon="ellipsis" data-size="16"></span></button></li>
+        </ul>
+      </section>
+
+      <section class="group">
+        <div><h2>Invitations</h2><p class="desc">Links expire after 7 days and go only to the invited email.</p></div>
+        <div>
+          <div class="invite"><div class="input" style="color:var(--ink-3)">name@example.com</div><div class="picker">Member <span data-icon="chevron-down" data-size="16"></span></div><button class="btn primary">Send invitation</button></div>
+          <div class="tabs" role="group" aria-label="Show"><button aria-pressed="true">Pending</button><button aria-pressed="false">All</button></div>
+          <ul class="inv">
+            <li><span>new.member@bcdx.example</span><span class="m">Member · sent Oct 9 · expires Oct 16</span><span class="acts"><button class="btn quiet">Resend</button><button class="btn quiet">Cancel</button></span></li>
+          </ul>
+        </div>
+      </section>
+    </main>
+    <nav class="tabbar" aria-label="Main" data-tabbar="more"></nav>
+  </div>
+</div>
+</body>
+</html>

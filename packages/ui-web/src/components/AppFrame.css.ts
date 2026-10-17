@@ -1,5 +1,5 @@
 import { vars } from "@moonx/ui-tokens";
-import { style } from "@vanilla-extract/css";
+import { globalStyle, style } from "@vanilla-extract/css";
 import * as frame from "../internal/frame.css";
 import {
   desktopUp,
@@ -31,6 +31,14 @@ export const frameRoot = style({
     },
     [tabletUp]: { flexDirection: "row" },
   },
+});
+
+// A classic scrollbar coming and going would change the body's width, and with it the
+// arrangement of D and F beside a docked panel (4.1), which changes the page's height and
+// so the scrollbar again. On a desktop, its gutter is kept whether the page scrolls or
+// not.
+globalStyle(`html:has(${frameRoot})`, {
+  "@media": { [desktopUp]: { scrollbarGutter: "stable" } },
 });
 
 /** Without a header, nothing covers the top of the body. */
@@ -89,7 +97,11 @@ export const headerStart = style({
   minWidth: 0,
 });
 
-/** ← and where it leads, on a phone only: wider screens have the breadcrumbs. */
+/**
+ * ← and where it leads, on a phone only: wider screens have the breadcrumbs. A link, or a
+ * button when ListDetailPattern points it at its list, which must not keep the
+ * browser's own button face.
+ */
 export const back = style({
   ...typography("label"),
   display: "inline-flex",
@@ -97,6 +109,10 @@ export const back = style({
   gap: vars.space["75"],
   minWidth: 0,
   minHeight: vars.scale.component.targetMin,
+  padding: 0,
+  border: "none",
+  background: "none",
+  cursor: "pointer",
   color: vars.color.text.primary,
   textDecoration: "none",
   outline: "none",
@@ -178,6 +194,12 @@ export const main = style({
   flex: 1,
   minWidth: 0,
   outline: "none",
+});
+
+/** As wide as the body and no height: what AppFrame measures the body's width by. */
+export const bodyWidth = style({
+  flexShrink: 0,
+  height: 0,
 });
 
 /**

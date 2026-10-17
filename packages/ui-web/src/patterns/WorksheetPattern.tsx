@@ -1,10 +1,15 @@
 import { ChevronUp } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button as AriaButton } from "react-aria-components";
-import { Panel } from "../components/Panel";
-import { BottomBar } from "../internal/frame";
+import { ModalPanel } from "../components/Panel";
+import { BottomBar, useTwoColumns } from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
-import { useIsDesktop } from "../internal/useIsDesktop";
 import * as styles from "./patterns.css";
 
 export interface WorksheetPatternProps {
@@ -17,8 +22,9 @@ export interface WorksheetPatternProps {
   /** The results' name: the side column's and the drawer's ("Totals", "Results"). */
   resultsTitle: string;
   /**
-   * The summary bar's few numbers, on a tablet and a phone ("Startup ₱450,000+ · Monthly
-   * ₱49,000 · BE 13+/day"). Pressing the bar opens the results.
+   * The summary bar's few numbers, wherever the results have no column of their own (a
+   * tablet, a phone, a desktop beside a docked panel): "Startup ₱450,000+ · Monthly
+   * ₱49,000 · BE 13+/day". Pressing the bar opens the results.
    */
   summary: ReactNode;
 }
@@ -26,9 +32,10 @@ export interface WorksheetPatternProps {
 /**
  * Pattern F, worksheet (design-spec 4.1): numbers put in, results seen at once (17, 18).
  * Desktop: the inputs on the left, the results on the right, in view while the inputs
- * scroll. Tablet: the inputs across the whole width (a table), a summary bar fixed to the
- * bottom that opens the results in a drawer from the right. Phone: the same, the inputs
- * as a card per row and the results in a tray.
+ * scroll. Tablet, and a desktop whose docked panel leaves the body too narrow: the inputs
+ * across the whole width (a table), a summary bar fixed to the bottom that opens the
+ * results in a drawer from the right. Phone: the same, the inputs as a card per row and
+ * the results in a tray.
  */
 export function WorksheetPattern({
   header,
@@ -37,32 +44,69 @@ export function WorksheetPattern({
   resultsTitle,
   summary,
 }: WorksheetPatternProps) {
-  const isDesktop = useIsDesktop();
+  const isTwoColumns = useTwoColumns();
   const [isOpen, setOpen] = useState(false);
-  // On a desktop the results are on screen; a drawer left open would come back when the
-  // window narrows again.
+  // In two columns the results are on screen; a drawer left open would come back when
+  // the body narrows again.
   useEffect(() => {
-    if (isDesktop) setOpen(false);
-  }, [isDesktop]);
+    if (isTwoColumns) setOpen(false);
+  }, [isTwoColumns]);
 
-  // The inputs keep their place in the tree at every width, so a row being edited is
-  // not drawn again when a tablet turns.
+  // Changing arrangement takes away the results' column or the summary bar, and focus
+  // in it: the summary bar that now opens the results, or the results' column that now
+  // shows them, takes it. Only focus lost from inside the pattern is moved: React reports
+  // no blur from an element taken out of the page, so `hasFocus` still says focus was
+  // here.
+  const summaryButton = useRef<HTMLButtonElement>(null);
+  const resultsColumn = useRef<HTMLElement>(null);
+  const hasFocus = useRef(false);
+  const wasTwoColumns = useRef(isTwoColumns);
+  useLayoutEffect(() => {
+    if (wasTwoColumns.current === isTwoColumns) return;
+    wasTwoColumns.current = isTwoColumns;
+    if (
+      !hasFocus.current ||
+      (document.activeElement !== null &&
+        document.activeElement !== document.body)
+    ) {
+      return;
+    }
+    (isTwoColumns ? resultsColumn : summaryButton).current?.focus();
+  }, [isTwoColumns]);
+
+  // The inputs keep their place in the tree in both arrangements, so a row being edited
+  // is not drawn again when a tablet turns or a panel opens beside them.
   return (
-    <div className={styles.root}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: it only follows focus among its children
+    <div
+      className={styles.root}
+      onFocus={() => {
+        hasFocus.current = true;
+      }}
+      onBlur={(event) => {
+        hasFocus.current = event.currentTarget.contains(event.relatedTarget);
+      }}
+    >
       <div className={styles.page({ width: "content", density: "regular" })}>
         {header}
         <div className={styles.worksheet}>
           <div className={styles.inputs}>{inputs}</div>
-          {isDesktop && (
-            <aside aria-label={resultsTitle} className={styles.results}>
+          {isTwoColumns && (
+            <aside
+              ref={resultsColumn}
+              tabIndex={-1}
+              aria-label={resultsTitle}
+              className={styles.results}
+            >
               {results}
             </aside>
           )}
         </div>
       </div>
-      {!isDesktop && (
+      {!isTwoColumns && (
         <BottomBar>
           <AriaButton
+            ref={summaryButton}
             aria-haspopup="dialog"
             aria-expanded={isOpen}
             onPress={() => setOpen(true)}
@@ -75,10 +119,11 @@ export function WorksheetPattern({
           </AriaButton>
         </BottomBar>
       )}
-      {!isDesktop && (
-        <Panel title={resultsTitle} isOpen={isOpen} onOpenChange={setOpen}>
+      {!isTwoColumns && (
+        // Modal on a desktop too: the docked panel holds the column at the right.
+        <ModalPanel title={resultsTitle} isOpen={isOpen} onOpenChange={setOpen}>
           {results}
-        </Panel>
+        </ModalPanel>
       )}
     </div>
   );

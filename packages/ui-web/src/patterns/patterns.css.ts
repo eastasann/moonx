@@ -165,7 +165,11 @@ export const listDetailRoot = style({
   minWidth: 0,
 });
 
-/** On a desktop, the list on the left and the detail on the right; narrower, one pane. */
+/**
+ * In two columns, the list on the left and the detail on the right; otherwise one pane.
+ * Which one the pattern decides (a desktop, and room beside a docked panel), so the
+ * panes take their two-column look from `isBeside`, not from the window's width.
+ */
 export const listDetail = style({
   display: "flex",
   flex: 1,
@@ -173,53 +177,57 @@ export const listDetail = style({
   gap: vars.density.regular.sectionGap,
 });
 
-export const listPane = style({
-  display: "flex",
-  flexDirection: "column",
-  gap: vars.density.regular.blockGap,
-  flex: 1,
-  minWidth: 0,
-  "@media": {
-    [desktopUp]: {
-      flex: "none",
-      width: vars.layout.listPaneWidth,
-    },
+/**
+ * The list: `layout.list-pane-width` beside the detail. Alone (one pane, or 8
+ * Notifications without a detail), as wide as the page's column.
+ */
+export const listPane = recipe({
+  base: {
+    display: "flex",
+    flexDirection: "column",
+    gap: vars.density.regular.blockGap,
+    flex: 1,
+    minWidth: 0,
   },
-});
-
-/** Without a detail (8 Notifications): the list alone, as wide as the reading column. */
-export const listOnly = style({
-  "@media": {
-    [desktopUp]: { flex: 1, width: "auto" },
+  variants: {
+    isBeside: {
+      true: { flex: "none", width: vars.layout.listPaneWidth },
+      false: {},
+    },
   },
 });
 
 /**
- * The selected item. On a desktop it stays in view under the header while the list
+ * The selected item. Beside the list it stays in view under the header while the list
  * scrolls, scrolling on its own when taller than the window.
  */
-export const detailPane = style({
-  display: "flex",
-  flexDirection: "column",
-  gap: vars.density.regular.blockGap,
-  flex: 1,
-  minWidth: 0,
-  // Focus is put here when it opens in place of the list; the pane draws no ring.
-  outline: "none",
-  "@media": {
-    [desktopUp]: {
-      position: "sticky",
-      top: `calc(${frame.top} + ${vars.space["500"]})`,
-      alignSelf: "flex-start",
-      maxHeight: `calc(100dvh - ${frame.top} - 2 * ${vars.space["500"]})`,
-      overflowY: "auto",
-      paddingInlineStart: vars.density.regular.sectionGap,
-      borderInlineStart: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
+export const detailPane = recipe({
+  base: {
+    display: "flex",
+    flexDirection: "column",
+    gap: vars.density.regular.blockGap,
+    flex: 1,
+    minWidth: 0,
+    // Focus is put here when it opens in place of the list; the pane draws no ring.
+    outline: "none",
+  },
+  variants: {
+    isBeside: {
+      true: {
+        position: "sticky",
+        top: `calc(${frame.top} + ${vars.space["500"]})`,
+        alignSelf: "flex-start",
+        maxHeight: `calc(100dvh - ${frame.top} - 2 * ${vars.space["500"]})`,
+        overflowY: "auto",
+        paddingInlineStart: vars.density.regular.sectionGap,
+        borderInlineStart: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
+      },
+      false: {},
     },
   },
 });
 
-/** ← back to the list, above the detail on a tablet and a phone. */
+/** ← back to the list, above the detail in one pane. */
 export const backButton = style({
   ...hoverTransition,
   ...typography("label"),
@@ -246,7 +254,7 @@ export const backButton = style({
 
 // F: worksheet.
 
-/** On a desktop, the inputs on the left and the results on the right. */
+/** In two columns, the inputs on the left and the results on the right. */
 export const worksheet = style({
   display: "flex",
   alignItems: "flex-start",
@@ -272,6 +280,8 @@ export const results = style({
   width: vars.layout.sidePanelWidth,
   maxHeight: `calc(100dvh - ${frame.top} - 2 * ${vars.space["500"]})`,
   overflowY: "auto",
+  // Focus is put here when it takes the summary bar's place; the column draws no ring.
+  outline: "none",
 });
 
 /** The summary bar's button: the whole bar opens the results. */

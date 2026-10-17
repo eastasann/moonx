@@ -65,7 +65,10 @@ const exit = (name: string) =>
 const reducedFade = (name: string) =>
   `${name} ${vars.motion.reduced.fade} linear`;
 
-/** The tablet's scrim; the drawer stands at its right edge (design-spec 4.3). */
+/**
+ * The modal drawer's scrim (a tablet's panel, and F's results wherever they have no
+ * column); the drawer stands at its right edge (design-spec 4.3).
+ */
 export const drawerOverlay = style({
   position: "fixed",
   inset: 0,
@@ -87,7 +90,7 @@ export const drawerOverlay = style({
   },
 });
 
-/** The tablet's drawer: the panel's width, the window's height, sliding in from the right. */
+/** The modal drawer: the panel's width, the window's height, sliding in from the right. */
 export const drawer = style({
   display: "flex",
   flexDirection: "column",

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { AppFrame } from "../components/AppFrame";
 import { QuestionCard } from "../components/QuestionCard";
 import { TextArea } from "../components/TextField";
+import { TwoColumnRoomContext } from "../internal/frame";
 import { setPhoneWidth, setTabletWidth, settle } from "../test/helpers";
 import { CardComparePattern } from "./CardComparePattern";
 import { FocusPattern } from "./FocusPattern";
@@ -313,6 +314,71 @@ describe("QuestionFormPattern (C)", () => {
     ).toBe("About WHY");
   });
 
+  describe("Ctrl+Alt+↓ and Ctrl+Alt+↑ (4.1 C)", () => {
+    const onPlatform = (platform: string) =>
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        get: () => platform,
+      });
+    afterEach(() => {
+      Reflect.deleteProperty(window.navigator, "platform");
+      Reflect.deleteProperty(window.navigator, "maxTouchPoints");
+    });
+
+    test("iPadOS, which reports a Mac: Ctrl+Option is left alone", async () => {
+      onPlatform("MacIntel");
+      Object.defineProperty(window.navigator, "maxTouchPoints", {
+        configurable: true,
+        get: () => 5,
+      });
+      const user = userEvent.setup();
+      render(<Form />);
+      const who = screen.getByRole("textbox", { name: "Answer WHO" });
+      await user.click(who);
+      await user.keyboard("{Control>}{Alt>}{ArrowDown}{/Alt}{/Control}");
+      await settle();
+      expect(document.activeElement).toBe(who);
+    });
+
+    test("macOS: Ctrl+Option moves too, as Mission Control takes Ctrl+arrows", async () => {
+      onPlatform("MacIntel");
+      const user = userEvent.setup();
+      render(<Form />);
+      await user.click(screen.getByRole("textbox", { name: "Answer WHO" }));
+      await user.keyboard("{Control>}{Alt>}{ArrowDown}{/Alt}{/Control}");
+      await settle();
+      expect(document.activeElement).toBe(
+        screen.getByRole("textbox", { name: "Answer WHY" }),
+      );
+      await user.keyboard("{Control>}{Alt>}{ArrowUp}{/Alt}{/Control}");
+      await settle();
+      expect(document.activeElement).toBe(
+        screen.getByRole("textbox", { name: "Answer WHO" }),
+      );
+    });
+
+    for (const platform of ["Win32", "Linux x86_64"]) {
+      test(`${platform}: Ctrl+Alt is left alone, Ctrl moves`, async () => {
+        onPlatform(platform);
+        const user = userEvent.setup();
+        render(<Form />);
+        const who = screen.getByRole("textbox", { name: "Answer WHO" });
+        await user.click(who);
+        await user.keyboard("{Control>}{Alt>}{ArrowDown}{/Alt}{/Control}");
+        await settle();
+        expect(document.activeElement).toBe(who);
+        await user.keyboard("{Control>}{ArrowDown}{/Control}");
+        await settle();
+        const why = screen.getByRole("textbox", { name: "Answer WHY" });
+        expect(document.activeElement).toBe(why);
+        // From the second question there is a previous one to move to, and it stays.
+        await user.keyboard("{Control>}{Alt>}{ArrowUp}{/Alt}{/Control}");
+        await settle();
+        expect(document.activeElement).toBe(why);
+      });
+    }
+  });
+
   test("Ctrl+Shift+↓ is left to the field (selecting to the paragraph's end)", async () => {
     const user = userEvent.setup();
     render(<Form />);
@@ -430,6 +496,22 @@ describe("ListDetailPattern (D)", () => {
     expect(follows(screen.getByRole("list"), action)).toBe(true);
   });
 
+  test("desktop beside a docked panel without room: one pane, as on a tablet (4.1)", async () => {
+    const user = userEvent.setup();
+    render(
+      <TwoColumnRoomContext.Provider value={false}>
+        <List />
+      </TwoColumnRoomContext.Provider>,
+    );
+    expect(screen.queryByRole("button", { name: "Piaya" })).toBeNull();
+    expect(screen.getByText("Detail of piaya")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Back to Ideas" }));
+    expect(screen.getByRole("button", { name: "Piaya" })).toBeTruthy();
+    expect(screen.queryByText(/Detail of/)).toBeNull();
+    // The new item stays at the end of the header, where a tablet has it.
+    expect(screen.getByRole("button", { name: "New idea" })).toBeTruthy();
+  });
+
   test("no detail area (8): the list alone", () => {
     render(
       <ListDetailPattern
@@ -528,6 +610,26 @@ describe("WorksheetPattern (F)", () => {
       expect(within(dialog).getByText("Totals in full")).toBeTruthy();
     });
   }
+});
+
+test("WorksheetPattern: on a desktop beside a docked panel without room, the summary bar opens a drawer", async () => {
+  const user = userEvent.setup();
+  render(
+    <TwoColumnRoomContext.Provider value={false}>
+      <WorksheetPattern
+        inputs={<p>Inputs</p>}
+        results={<p>Totals in full</p>}
+        resultsTitle="Totals"
+        summary={<span>Startup ₱19,500</span>}
+      />
+    </TwoColumnRoomContext.Provider>,
+  );
+  expect(screen.queryByRole("complementary", { name: "Totals" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: /Startup/ }));
+  await settle();
+  // Modal, as on a tablet: the docked panel holds the column at the right.
+  const dialog = await screen.findByRole("dialog", { name: "Totals" });
+  expect(within(dialog).getByText("Totals in full")).toBeTruthy();
 });
 
 test("WorksheetPattern: a drawer left open closes on a desktop and stays closed", async () => {

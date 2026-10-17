@@ -34,7 +34,6 @@ export interface PanelProps {
  */
 export function Panel({ title, isOpen, onOpenChange, children }: PanelProps) {
   const isDesktop = useIsDesktop();
-  const isNarrow = useIsNarrow();
   if (isDesktop) {
     return isOpen ? (
       // A new title is another panel (💬 then 🕘): it takes focus from the button that
@@ -48,6 +47,25 @@ export function Panel({ title, isOpen, onOpenChange, children }: PanelProps) {
       </DockedPanel>
     ) : null;
   }
+  return (
+    <ModalPanel title={title} isOpen={isOpen} onOpenChange={onOpenChange}>
+      {children}
+    </ModalPanel>
+  );
+}
+
+/**
+ * The panel over the screen, modal: the drawer from the right from the tablet breakpoint
+ * up, a tray on a phone. WorksheetPattern opens its results in it on a desktop too, once
+ * a docked panel has taken their column (design-spec 4.1 F).
+ */
+export function ModalPanel({
+  title,
+  isOpen,
+  onOpenChange,
+  children,
+}: PanelProps) {
+  const isNarrow = useIsNarrow();
   return (
     <FixedLocale>
       <ModalOverlay

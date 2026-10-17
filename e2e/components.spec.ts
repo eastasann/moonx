@@ -2070,3 +2070,275 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
     ).toEqual([]);
   });
 });
+
+test.describe("D and F beside a docked panel (design-spec 4.1・4.3)", () => {
+  const section = "AppFrame with a panel beside D and F";
+
+  // Switching arrangements raises no error on the window, such as a ResizeObserver round
+  // left with undelivered notifications, which reaches error reporting.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const errors: string[] = [];
+      Object.assign(window, { windowErrors: errors });
+      window.addEventListener("error", (event) => errors.push(event.message));
+    });
+  });
+  test.afterEach(async ({ page }) => {
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { windowErrors: string[] }).windowErrors,
+      ),
+    ).toEqual([]);
+  });
+
+  /** The window-wide frame of the gallery at `width`, holding `pattern`. */
+  async function openPanelFrame(
+    page: Page,
+    width: number,
+    pattern: "ListDetailPattern" | "WorksheetPattern",
+  ) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/dev/components");
+    const frame = region(page, section);
+    await frame
+      .getByRole("radiogroup", { name: "Pattern D or F beside the panel" })
+      .getByRole("radio", { name: pattern === "ListDetailPattern" ? "D" : "F" })
+      .click();
+    await showSection(page, section);
+    return frame;
+  }
+
+  /** The detail at the list's right (the list sits under the filter, lower). */
+  async function besideList(list: Locator, detail: Locator) {
+    const [left, right] = [await boxOf(list), await boxOf(detail)];
+    expect(right.x).toBeGreaterThan(left.x + left.width);
+  }
+
+  const commentsButton = (frame: Locator) =>
+    frame.locator("header").getByRole("button", { name: /^Comments/ });
+
+  /** 💬 docks the panel at the body's right; nothing scrolls sideways (4.3). */
+  async function openPanel(frame: Locator) {
+    await commentsButton(frame).click();
+    const panel = frame.getByRole("complementary", { name: "Comments" });
+    await expect(panel).toBeVisible();
+    await sideBySide(frame.getByRole("main"), panel);
+    expect(
+      await frame
+        .page()
+        .evaluate(
+          () => document.documentElement.scrollWidth - window.innerWidth,
+        ),
+    ).toBeLessThanOrEqual(0);
+    return panel;
+  }
+
+  test("D at 1024px: one pane while the panel is open; two columns once it closes", async ({
+    page,
+  }) => {
+    const frame = await openPanelFrame(page, 1024, "ListDetailPattern");
+    const list = frame.getByRole("grid", { name: "Panel frame ideas" });
+    const detail = frame.getByRole("heading", {
+      name: "Piaya Gift Box Delivery",
+    });
+    const back = frame.getByRole("button", { name: "Back to Ideas" });
+    // Without the panel, the desktop's two columns at the breakpoint.
+    expect(Math.round((await boxOf(list)).width)).toBe(352);
+    await besideList(list, detail);
+    await expect(back).toHaveCount(0);
+
+    const panel = await openPanel(frame);
+    // The body is 424px: the selected item's detail alone, across the body.
+    await expect(list).toHaveCount(0);
+    await expect(detail).toBeVisible();
+    await expect(back).toBeVisible();
+    // The field's frame, as wide as the detail: the body less the page's gutters.
+    const field = await boxOf(
+      frame
+        .getByRole("textbox", { name: "Panel frame summary" })
+        .locator("xpath=.."),
+    );
+    const main = await boxOf(frame.getByRole("main"));
+    expect(Math.round(field.width)).toBe(Math.round(main.width) - 2 * 32);
+
+    await panel.getByRole("button", { name: "Close" }).click();
+    await expect(panel).toBeHidden();
+    await expect(commentsButton(frame)).toBeFocused();
+    expect(Math.round((await boxOf(list)).width)).toBe(352);
+    await besideList(list, detail);
+    await expect(back).toHaveCount(0);
+    // The item chosen before the panel opened is still the one selected.
+    await expect(
+      list.getByRole("row", { name: "Piaya Gift Box Delivery" }),
+    ).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("D at 1440px: two columns beside the panel; narrowing keeps the field being typed in", async ({
+    page,
+  }) => {
+    const frame = await openPanelFrame(page, 1440, "ListDetailPattern");
+    const list = frame.getByRole("grid", { name: "Panel frame ideas" });
+    const detail = frame.getByRole("heading", {
+      name: "Piaya Gift Box Delivery",
+    });
+    await openPanel(frame);
+    // The body is 840px, wider than 06 layout.two-column-min-width.
+    expect(Math.round((await boxOf(list)).width)).toBe(352);
+    await besideList(list, detail);
+
+    const field = frame.getByRole("textbox", { name: "Panel frame summary" });
+    await field.click();
+    await page.keyboard.type("Same-day boxes");
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await expect(list).toHaveCount(0);
+    await expect(field).toBeFocused();
+    await expect(field).toHaveValue("Same-day boxes");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(list).toBeVisible();
+    await expect(field).toBeFocused();
+    await expect(field).toHaveValue("Same-day boxes");
+  });
+
+  test("D: narrowing while the filter is typed in keeps the list and the field; selecting another item opens it", async ({
+    page,
+  }) => {
+    const frame = await openPanelFrame(page, 1440, "ListDetailPattern");
+    const list = frame.getByRole("grid", { name: "Panel frame ideas" });
+    const heading = (name: string) => frame.getByRole("heading", { name });
+    await openPanel(frame);
+    const search = frame.getByRole("searchbox", { name: "Panel frame search" });
+    await search.click();
+    await page.keyboard.type("bowl");
+    await page.setViewportSize({ width: 1024, height: 900 });
+    // One pane: the list, where focus was, with the chosen item still selected.
+    await expect(heading("Piaya Gift Box Delivery")).toHaveCount(0);
+    await expect(list).toBeVisible();
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue("bowl");
+    await expect(
+      list.getByRole("row", { name: "Piaya Gift Box Delivery" }),
+    ).toHaveAttribute("aria-selected", "true");
+    await list.getByRole("row", { name: "Bacolod Health Bowl" }).click();
+    await expect(heading("Bacolod Health Bowl")).toBeVisible();
+    await expect(list).toHaveCount(0);
+    await expect(
+      frame.getByRole("button", { name: "Back to Ideas" }),
+    ).toBeVisible();
+  });
+
+  test("F at 1024px: the summary bar and the drawer while the panel is open; the results column once it closes", async ({
+    page,
+  }) => {
+    const frame = await openPanelFrame(page, 1024, "WorksheetPattern");
+    const inputs = frame.getByRole("grid", { name: "Panel frame costs" });
+    const results = frame.getByRole("complementary", {
+      name: "Panel frame totals",
+    });
+    const summary = frame.getByRole("button", {
+      name: /Startup total ₱19,500/,
+    });
+    await sideBySide(inputs, results);
+    expect(Math.round((await boxOf(results)).width)).toBe(360);
+    await expect(summary).toHaveCount(0);
+
+    const panel = await openPanel(frame);
+    await expect(results).toHaveCount(0);
+    const inputsBox = await boxOf(inputs);
+    const main = await boxOf(frame.getByRole("main"));
+    expect(inputsBox.width).toBeGreaterThan(main.width * 0.8);
+    // The bar fixed to the bottom of the window, under the inputs.
+    const bar = await boxOf(summary.locator("xpath=.."));
+    expect(bar.y).toBeGreaterThan(inputsBox.y + inputsBox.height);
+    expect(Math.round(bar.y + bar.height)).toBe(900);
+    await summary.click();
+    const dialog = page.getByRole("dialog", { name: "Panel frame totals" });
+    await expect(dialog).toBeVisible();
+    await settled(dialog.locator("xpath=.."));
+    // The drawer from the right (4.1 F), over the docked panel.
+    const drawer = await boxOf(dialog.locator("xpath=.."));
+    expect(Math.round(drawer.x + drawer.width)).toBe(1024);
+    expect(Math.round(drawer.width)).toBe(360);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(panel).toBeVisible();
+
+    await panel.getByRole("button", { name: "Close" }).click();
+    await expect(panel).toBeHidden();
+    await sideBySide(inputs, results);
+    await expect(summary).toHaveCount(0);
+  });
+
+  test("F at 1440px: the results column beside the panel; narrowing keeps the field being typed in", async ({
+    page,
+  }) => {
+    const frame = await openPanelFrame(page, 1440, "WorksheetPattern");
+    const inputs = frame.getByRole("grid", { name: "Panel frame costs" });
+    const results = frame.getByRole("complementary", {
+      name: "Panel frame totals",
+    });
+    await openPanel(frame);
+    await sideBySide(inputs, results);
+    expect(Math.round((await boxOf(results)).width)).toBe(360);
+
+    const field = frame.getByRole("textbox", { name: "Panel frame cost note" });
+    await field.click();
+    await page.keyboard.type("Oven is second-hand");
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await expect(results).toHaveCount(0);
+    await expect(field).toBeFocused();
+    await expect(field).toHaveValue("Oven is second-hand");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(results).toBeVisible();
+    await expect(field).toBeFocused();
+    await expect(field).toHaveValue("Oven is second-hand");
+  });
+});
+
+test.describe("the keys between questions on each platform (design-spec 4.1 C)", () => {
+  // The platform the page reports, as React Aria reads it: userAgentData, then platform.
+  const platforms = [
+    ["macOS", "MacIntel", "macOS"],
+    ["Windows", "Win32", "Windows"],
+    ["Linux", "Linux x86_64", "Linux"],
+  ] as const;
+  for (const [name, platform, uaPlatform] of platforms) {
+    test(`${name}: Ctrl+arrows move${name === "macOS" ? ", and so do Ctrl+Option+arrows" : "; Ctrl+Alt+arrows do not"}`, async ({
+      page,
+    }) => {
+      await page.addInitScript(
+        ([reported, data]) => {
+          Object.defineProperty(Navigator.prototype, "platform", {
+            get: () => reported,
+          });
+          Object.defineProperty(Navigator.prototype, "userAgentData", {
+            get: () => ({ platform: data, brands: [], mobile: false }),
+          });
+        },
+        [platform, uaPlatform],
+      );
+      await openGallery(page, "desktop");
+      const form = region(page, "QuestionFormPattern");
+      await showSection(page, "QuestionFormPattern");
+      const answer = (id: string) =>
+        form.getByRole("textbox", { name: `Form answer ${id}` });
+      await answer("WHO").click();
+      await page.keyboard.press("Control+Alt+ArrowDown");
+      if (name === "macOS") {
+        await expect(answer("WHY THEM")).toBeFocused();
+        await page.keyboard.press("Control+Alt+ArrowUp");
+        await expect(answer("WHO")).toBeFocused();
+      } else {
+        await expect(answer("WHO")).toBeFocused();
+      }
+      await page.keyboard.press("Control+ArrowDown");
+      await expect(answer("WHY THEM")).toBeFocused();
+      if (name !== "macOS") {
+        // From the second question there is a previous one to move to, and it stays.
+        await page.keyboard.press("Control+Alt+ArrowUp");
+        await expect(answer("WHY THEM")).toBeFocused();
+      }
+      await page.keyboard.press("Control+ArrowUp");
+      await expect(answer("WHO")).toBeFocused();
+    });
+  }
+});

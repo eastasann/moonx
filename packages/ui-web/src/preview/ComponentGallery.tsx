@@ -56,7 +56,11 @@ import {
   SurfacesSection,
   TypographySection,
 } from "./FoundationSection";
-import { FrameSection, PageFrameSection } from "./FrameSection";
+import {
+  FramePanelSection,
+  FrameSection,
+  PageFrameSection,
+} from "./FrameSection";
 import {
   BreadcrumbsSection,
   DisclosureSection,
@@ -219,6 +223,7 @@ export function ComponentGallery() {
           <PublicPatternSection />
         </Stack>
       </Container>
+      <FramePanelSection />
       <ToastContainer aboveTabBar={aboveTabBar} />
     </div>
   );

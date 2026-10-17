@@ -60,6 +60,8 @@ export const bottomBar = style({
   borderBlockStart: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
   "@media": {
     [tabletUp]: { paddingInline: vars.layout.pageGutterTablet },
+    // F's summary bar beside a docked panel, in line with the page's gutters.
+    [desktopUp]: { paddingInline: vars.layout.pageGutterDesktop },
   },
 });
 

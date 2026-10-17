@@ -323,6 +323,12 @@ export const breakpoints = ${nestedSource(breakpoints)} as const;
  * height cap as a number and lowers it to the space the window has.
  */
 export const popoverMaxHeight = ${pixels("semantic.layout.popover-max-height")};
+
+/**
+ * \`semantic.layout.two-column-min-width\` in px: the body's width, measured in code, below
+ * which a docked panel turns patterns D and F to their tablet arrangement.
+ */
+export const twoColumnMinWidth = ${pixels("semantic.layout.two-column-min-width")};
 `;
 }
 

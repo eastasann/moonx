@@ -1,5 +1,5 @@
 import { formatCount, i18n } from "@moonx/i18n";
-import type { SaveState } from "@moonx/ui-tokens";
+import { type SaveState, twoColumnMinWidth } from "@moonx/ui-tokens";
 import { ArrowLeft, History, MessageSquare } from "lucide-react";
 import {
   type MouseEvent,
@@ -10,12 +10,14 @@ import {
   useState,
 } from "react";
 import { Button as AriaButton, Link as AriaLink } from "react-aria-components";
+import { flushSync } from "react-dom";
 import {
   BackOverrideContext,
   type BackTarget,
   Banners,
   type FrameBanners,
   HeaderToolsContext,
+  TwoColumnRoomContext,
 } from "../internal/frame";
 import * as frame from "../internal/frame.css";
 import { IconSlot } from "../internal/IconSlot";
@@ -57,7 +59,11 @@ export interface AppFrameProps {
   history?: { isOpen: boolean; onPress: () => void };
   /** The bands under the header (6.0.6), drawn in their order: offline first. */
   banners?: FrameBanners;
-  /** The open `Panel`: in the column at the body's right on a desktop. */
+  /**
+   * The open `Panel`: in the column at the body's right on a desktop. While it leaves the
+   * body narrower than `layout.two-column-min-width`, patterns D and F inside take their
+   * tablet arrangement (design-spec 4.1).
+   */
   panel?: ReactNode;
   /** The screen: its layout pattern. */
   children: ReactNode;
@@ -84,6 +90,9 @@ export function AppFrame({
   const mainId = useId();
   const mainRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const bodyWidthRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [hasTwoColumnRoom, setTwoColumnRoom] = useState(true);
   const [tools, setTools] = useState<HTMLElement | null>(null);
   const [headerHeight, setHeaderHeight] = useState<number | null>(null);
   // A pattern's ← on a phone (a list's detail), in place of the screen's `back`.
@@ -120,6 +129,33 @@ export function AppFrame({
       root.style.removeProperty("scroll-padding-top");
     };
   }, [hasHeader]);
+
+  // A docked panel narrows the body (4.3). Measured where the window and the panel set
+  // the body's width, and rendered at once, so the squeezed two columns are never painted.
+  // The body is measured through a probe of no height: the switch changes the body's
+  // height, which, observed, would end the browser's round of observations with an error.
+  useLayoutEffect(() => {
+    const body = bodyWidthRef.current;
+    const column = panelRef.current;
+    if (!body || !column || typeof ResizeObserver === "undefined") return;
+    // Where the stable scrollbar gutter (AppFrame.css.ts) is not supported, a scrollbar
+    // coming and going would flip the arrangement on and on: the body is measured as if
+    // the scrollbar took no width.
+    const hasStableGutter = CSS.supports("scrollbar-gutter", "stable");
+    const observer = new ResizeObserver(() => {
+      const scrollbar = hasStableGutter
+        ? 0
+        : window.innerWidth - document.documentElement.clientWidth;
+      // The column is empty, and 0 wide, unless a panel is docked in it.
+      const isNarrowed =
+        column.getBoundingClientRect().width > 0 &&
+        body.getBoundingClientRect().width + scrollbar < twoColumnMinWidth;
+      flushSync(() => setTwoColumnRoom(!isNarrowed));
+    });
+    observer.observe(body);
+    observer.observe(column);
+    return () => observer.disconnect();
+  }, []);
 
   // The link goes to the content without changing the URL, which the router owns.
   const skipToContent = (event: MouseEvent) => {
@@ -257,13 +293,18 @@ export function AppFrame({
         <Banners banners={banners} />
         <div className={styles.body}>
           <main ref={mainRef} id={mainId} tabIndex={-1} className={styles.main}>
+            <div ref={bodyWidthRef} className={styles.bodyWidth} />
             <HeaderToolsContext.Provider value={tools}>
               <BackOverrideContext.Provider value={setBackOverride}>
-                {children}
+                <TwoColumnRoomContext.Provider value={hasTwoColumnRoom}>
+                  {children}
+                </TwoColumnRoomContext.Provider>
               </BackOverrideContext.Provider>
             </HeaderToolsContext.Provider>
           </main>
-          <div className={styles.panel}>{panel}</div>
+          <div ref={panelRef} className={styles.panel}>
+            {panel}
+          </div>
         </div>
       </div>
       {tabBar}

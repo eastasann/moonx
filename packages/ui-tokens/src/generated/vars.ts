@@ -763,6 +763,7 @@ export const vars = createGlobalThemeContract({
     headerHeight: "layout-header-height",
     tabBarHeight: "layout-tab-bar-height",
     listPaneWidth: "layout-list-pane-width",
+    twoColumnMinWidth: "layout-two-column-min-width",
     thumbnailColumnWidth: "layout-thumbnail-column-width",
     contextualHelpWidth: "layout-contextual-help-width",
     popoverMaxHeight: "layout-popover-max-height",
@@ -929,3 +930,9 @@ export const breakpoints = {
  * height cap as a number and lowers it to the space the window has.
  */
 export const popoverMaxHeight = 384;
+
+/**
+ * `semantic.layout.two-column-min-width` in px: the body's width, measured in code, below
+ * which a docked panel turns patterns D and F to their tablet arrangement.
+ */
+export const twoColumnMinWidth = 784;

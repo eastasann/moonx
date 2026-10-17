@@ -1,13 +1,16 @@
 import { i18n } from "@moonx/i18n";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Bell, Lightbulb, ScrollText } from "lucide-react";
-import { describe, expect, test, vi } from "vitest";
+import { useState } from "react";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { ListDetailPattern } from "../patterns/ListDetailPattern";
 import { QuestionFormPattern } from "../patterns/QuestionFormPattern";
 import { setPhoneWidth, settle } from "../test/helpers";
 import { AppFrame, type AppFrameProps } from "./AppFrame";
 import { Breadcrumb, Breadcrumbs } from "./Breadcrumbs";
 import { Link } from "./Link";
+import { ListView, ListViewItem } from "./ListView";
 import { MenuItem } from "./Menu";
 import { PageFrame } from "./PageFrame";
 import { RouterProvider } from "./RouterProvider";
@@ -361,6 +364,215 @@ describe("AppFrame", () => {
     const header = document.querySelector("header") as HTMLElement;
     expect(within(header).getByRole("switch", { name: "Focus" })).toBeTruthy();
     expect(within(screen.getByRole("main")).queryByRole("switch")).toBeNull();
+  });
+});
+
+describe("AppFrame: a docked panel and the body's width (design-spec 4.1)", () => {
+  // happy-dom lays nothing out: the body's and the panel column's widths are given here,
+  // and the observers run when the test says the sizes changed.
+  const observers: (() => void)[] = [];
+  let bodyWidth = 784;
+  afterEach(() => {
+    observers.length = 0;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function stubLayout() {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          observers.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        // The body's probe: the empty first child of main.
+        const isBodyProbe =
+          this.parentElement?.tagName === "MAIN" &&
+          this === this.parentElement.firstElementChild &&
+          this.childElementCount === 0;
+        const width = isBodyProbe
+          ? bodyWidth
+          : this.querySelector(":scope > [data-docked]")
+            ? 360
+            : 0;
+        return new DOMRect(0, 0, width, 0);
+      },
+    );
+  }
+
+  const resized = (width: number) =>
+    act(() => {
+      bodyWidth = width;
+      for (const observer of observers) observer();
+    });
+
+  const ideas = [
+    { id: "piaya", name: "Piaya" },
+    { id: "bowl", name: "Bowl" },
+  ];
+  const list = () => screen.queryByRole("grid", { name: "Ideas list" });
+
+  function Screen() {
+    const [isOpen, setOpen] = useState(false);
+    const [selected, setSelected] = useState<string | null>("piaya");
+    return (
+      <AppFrame
+        sideNav={null}
+        tabBar={null}
+        comments={{ count: 0, isOpen, onPress: () => setOpen(!isOpen) }}
+        panel={
+          isOpen ? (
+            <aside data-docked aria-label="Comments">
+              Threads
+            </aside>
+          ) : null
+        }
+      >
+        <ListDetailPattern
+          list={
+            <>
+              <input aria-label="Search ideas" />
+              <button type="button">Sort ideas</button>
+              <ListView
+                aria-label="Ideas list"
+                items={ideas}
+                selectionMode="single"
+                selectedKeys={selected === null ? [] : [selected]}
+                onSelectionChange={(keys) =>
+                  setSelected(([...keys][0] as string | undefined) ?? null)
+                }
+              >
+                {(idea) => (
+                  <ListViewItem id={idea.id} textValue={idea.name}>
+                    {idea.name}
+                  </ListViewItem>
+                )}
+              </ListView>
+            </>
+          }
+          detail={
+            selected === null ? null : (
+              <input key={selected} aria-label={`Summary of ${selected}`} />
+            )
+          }
+          listLabel="Ideas"
+          onBack={() => setSelected(null)}
+        />
+      </AppFrame>
+    );
+  }
+
+  test("too narrow beside the panel: one pane; the field keeps its focus and text", async () => {
+    stubLayout();
+    const user = userEvent.setup();
+    render(<Screen />);
+    resized(784);
+    expect(list()).toBeTruthy();
+    const field = screen.getByRole("textbox", { name: "Summary of piaya" });
+    await user.type(field, "Same-day boxes");
+
+    await user.click(screen.getByRole("button", { name: "Comments" }));
+    // 1024px: the panel leaves the body 424px.
+    resized(424);
+    expect(list()).toBeNull();
+    expect(screen.getByRole("button", { name: "Back to Ideas" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Summary of piaya" })).toBe(
+      field,
+    );
+
+    field.focus();
+    // The window widens to 1440px: 840px beside the panel is room enough.
+    resized(840);
+    expect(list()).toBeTruthy();
+    expect(document.activeElement).toBe(field);
+    resized(424);
+    expect(document.activeElement).toBe(field);
+    expect((field as HTMLInputElement).value).toBe("Same-day boxes");
+
+    // Closed, the panel gives the two columns back, the same detail beside the list.
+    await user.click(screen.getByRole("button", { name: "Comments" }));
+    resized(784);
+    expect(list()).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Summary of piaya" })).toBe(
+      field,
+    );
+  });
+
+  test("focus on the list's side keeps the list, until another item is selected", async () => {
+    stubLayout();
+    const user = userEvent.setup();
+    render(<Screen />);
+    resized(840);
+    await user.click(screen.getByRole("button", { name: "Comments" }));
+    resized(840);
+    const search = screen.getByRole("textbox", { name: "Search ideas" });
+    await user.type(search, "piaya");
+    // The window narrows to 1024px while the filter is being typed in.
+    resized(424);
+    expect(document.activeElement).toBe(search);
+    expect((search as HTMLInputElement).value).toBe("piaya");
+    expect(
+      screen.queryByRole("textbox", { name: "Summary of piaya" }),
+    ).toBeNull();
+    // A press that selects nothing (a sort, a tree's chevron, a filter's option) keeps it.
+    await user.click(screen.getByRole("button", { name: "Sort ideas" }));
+    expect(list()).toBeTruthy();
+    // The chosen item is still selected; choosing another opens its detail in place of
+    // the list.
+    expect(
+      screen.getByRole("row", { name: "Piaya" }).getAttribute("aria-selected"),
+    ).toBe("true");
+    await user.click(screen.getByRole("row", { name: "Bowl" }));
+    expect(list()).toBeNull();
+    expect(
+      screen.getByRole("textbox", { name: "Summary of bowl" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to Ideas" })).toBeTruthy();
+  });
+
+  test("focus elsewhere: the detail takes the width; focus stays where it is", async () => {
+    stubLayout();
+    const user = userEvent.setup();
+    render(<Screen />);
+    resized(784);
+    await user.click(screen.getByRole("button", { name: "Comments" }));
+    // On the 💬 that opened the panel, focus stays.
+    resized(424);
+    expect(list()).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Comments" }),
+    );
+  });
+
+  test("two columns coming back take the detail's ←; focus on it goes to the detail", async () => {
+    stubLayout();
+    const user = userEvent.setup();
+    render(<Screen />);
+    resized(784);
+    await user.click(screen.getByRole("button", { name: "Comments" }));
+    resized(424);
+    screen.getByRole("button", { name: "Back to Ideas" }).focus();
+    resized(840);
+    expect(screen.queryByRole("button", { name: "Back to Ideas" })).toBeNull();
+    const detail = screen.getByRole("textbox", {
+      name: "Summary of piaya",
+    }).parentElement;
+    expect(document.activeElement).toBe(detail);
+  });
+
+  test("a narrow body without a panel keeps two columns", () => {
+    stubLayout();
+    render(<Screen />);
+    // A desktop at its breakpoint less a classic scrollbar: no panel, no change.
+    resized(767);
+    expect(list()).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back to Ideas" })).toBeNull();
   });
 });
 

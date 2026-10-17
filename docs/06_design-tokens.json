@@ -458,6 +458,7 @@
       "576": { "$value": { "value": 576, "unit": "px" } },
       "640": { "$value": { "value": 640, "unit": "px" } },
       "720": { "$value": { "value": 720, "unit": "px" } },
+      "784": { "$value": { "value": 784, "unit": "px" } },
       "960": { "$value": { "value": 960, "unit": "px" } },
       "1280": { "$value": { "value": 1280, "unit": "px" } }
     },
@@ -2244,6 +2245,10 @@
       "list-pane-width": {
         "$value": "{primitive.dimension.352}",
         "$description": "一覧と詳細の左ペイン（一覧側）の幅。結果ペインは side-panel-width を使う"
+      },
+      "two-column-min-width": {
+        "$value": "{primitive.dimension.784}",
+        "$description": "デスクトップでパネル（PNL-1・PNL-2）を開いている間に、パターン D・F が2列で並ぶのに要る本文の領域の幅（design-spec 4.1・4.3）。本文の領域がこれより狭い間は、D・F をタブレットの並びにする。D の詳細と F の入力の表の最小の幅は新しく決めず、パネルを閉じたデスクトップで 4.1・4.3 が2列を描く本文の領域のうち、スクロールバーが幅を取らないときにいちばん狭いもの（breakpoint.desktop 1024 − sidebar-width 240 = 784）で、その列が取る幅にする: D の詳細は 784 − page-gutter-desktop 32 × 2 − list-pane-width 352 − density.regular.section-gap 32 − 詳細の左の区切り線（border-width.hairline 1）− 区切り線の内側の余白（section-gap 32）= 303、F の入力の表は 784 − 32 × 2 − side-panel-width 360 − section-gap 32 = 328。2列に要る幅は、D が 32 × 2 + 352 + 32 + 1 + 32 + 303 = 784、F が 32 × 2 + 328 + 32 + 360 = 784 で、どちらも breakpoint.desktop − sidebar-width と同じ値になる。スクロールバーが幅を取る環境（Windows など）では、breakpoint.desktop の幅にスクロールバーが含まれるので、パネルを閉じたデスクトップの本文の領域はスクロールバーの幅だけ 784 より狭くなるが、切り替えはパネルを開いている間だけなので、パネルを閉じていればその幅でも2列で描く"
       },
       "thumbnail-column-width": {
         "$value": "{primitive.dimension.160}",

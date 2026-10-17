@@ -795,6 +795,7 @@ globalStyle(":root", {
     [vars.layout.headerHeight]: "56px",
     [vars.layout.tabBarHeight]: "64px",
     [vars.layout.listPaneWidth]: "352px",
+    [vars.layout.twoColumnMinWidth]: "784px",
     [vars.layout.thumbnailColumnWidth]: "160px",
     [vars.layout.contextualHelpWidth]: "268px",
     [vars.layout.popoverMaxHeight]: "384px",

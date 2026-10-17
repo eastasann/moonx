@@ -96,3 +96,13 @@ export const patternBox = style({
   border: `${vars.borderWidth.hairline} dashed ${vars.color.border.strong}`,
   borderRadius: vars.radius.chip,
 });
+
+/**
+ * A frame as wide as the window, outside the gallery's column: AppFrame measures its body
+ * to arrange D and F beside a docked panel, and the column would make it narrower than
+ * the window under test.
+ */
+export const windowBox = style([
+  patternBox,
+  { borderInline: "none", borderRadius: 0 },
+]);

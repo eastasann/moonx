@@ -7,6 +7,7 @@ import {
 } from "react";
 import { cssVarName } from "../styles/helpers";
 import * as styles from "./frame.css";
+import { useIsDesktop } from "./useIsDesktop";
 
 const keyboardInsetName = cssVarName(styles.keyboardInset);
 
@@ -35,6 +36,24 @@ export interface BackTarget {
 export const BackOverrideContext = createContext<
   ((target: BackTarget | null) => void) | null
 >(null);
+
+/**
+ * Whether AppFrame's body leaves patterns D and F room for their two columns (design-spec
+ * 4.1・4.3): false while a desktop's docked panel narrows the body below
+ * `layout.two-column-min-width`. True outside AppFrame, where no panel docks.
+ */
+export const TwoColumnRoomContext = createContext(true);
+
+/**
+ * Whether patterns D and F stand in their two columns: on a desktop whose body has room
+ * for them. Otherwise they take the tablet's arrangement, a docked panel staying beside
+ * the body (4.1).
+ */
+export function useTwoColumns(): boolean {
+  const isDesktop = useIsDesktop();
+  const hasRoom = useContext(TwoColumnRoomContext);
+  return isDesktop && hasRoom;
+}
 
 /**
  * How much of the layout viewport's bottom the on-screen keyboard covers: the keyboard

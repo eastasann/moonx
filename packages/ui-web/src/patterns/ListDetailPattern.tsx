@@ -1,16 +1,21 @@
 import { i18n } from "@moonx/i18n";
 import { ArrowLeft } from "lucide-react";
 import {
+  type FocusEvent,
   type ReactNode,
   useContext,
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
 } from "react";
 import { Button as AriaButton } from "react-aria-components";
-import { BackOverrideContext, FloatingAction } from "../internal/frame";
+import {
+  BackOverrideContext,
+  FloatingAction,
+  useTwoColumns,
+} from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
-import { useIsDesktop } from "../internal/useIsDesktop";
 import { useIsNarrow } from "../internal/useIsNarrow";
 import * as styles from "./patterns.css";
 
@@ -33,11 +38,12 @@ interface WithDetail extends ListDetailBase {
   /** @default true */
   hasDetail?: true;
   /**
-   * The selected item's detail, or null while none is selected. Below the desktop
-   * breakpoint it takes the whole width in place of the list.
+   * The selected item's detail, or null while none is selected. In one pane (below the
+   * desktop breakpoint, or beside a docked panel that leaves no room) it takes the whole
+   * width in place of the list.
    */
   detail: ReactNode;
-  /** The list's name, for ← back to it from a detail below the desktop breakpoint. */
+  /** The list's name, for ← back to it from a detail in one pane. */
   listLabel: string;
   /** ← pressed: the screen clears the selection. */
   onBack: () => void;
@@ -54,10 +60,23 @@ interface ListOnly extends ListDetailBase {
 export type ListDetailPatternProps = WithDetail | ListOnly;
 
 /**
+ * The selected rows of the list's collection (ListView, TableView, Tree), by the key
+ * React Aria writes on each: in the list pane itself, not its popovers, tabs or tags.
+ */
+function selectedRows(pane: HTMLElement | null): string {
+  return [
+    ...(pane?.querySelectorAll('[role="row"][aria-selected="true"]') ?? []),
+  ]
+    .map((row) => row.getAttribute("data-key"))
+    .join(" ");
+}
+
+/**
  * Pattern D, list and detail (design-spec 4.1): many things to find, open and manage (6,
  * 7, 8, 12, 14, 16, 22, 26–28). Desktop: the list on the left, the selected item on the
- * right. Tablet and phone: one pane at a time across the whole width, the list, then the
- * detail with ← back to the list (in the header on a phone, inside AppFrame).
+ * right. Tablet and phone, and a desktop whose docked panel leaves the body too narrow:
+ * one pane at a time across the whole width, the list, then the detail with ← back to
+ * the list (in the header on a phone, inside AppFrame).
  */
 export function ListDetailPattern(props: ListDetailPatternProps) {
   const { header, list, floatingAction } = props;
@@ -66,59 +85,128 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
   const listLabel = props.hasDetail === false ? "" : props.listLabel;
   const onBack = props.hasDetail === false ? undefined : props.onBack;
 
-  const isDesktop = useIsDesktop();
+  const isTwoColumns = useTwoColumns();
   const isNarrow = useIsNarrow();
   const setFrameBack = useContext(BackOverrideContext);
   const showsDetail = hasDetail && detail != null;
-  const showsList = isDesktop || !showsDetail;
+  const headerRow = useRef<HTMLDivElement>(null);
+  const listPane = useRef<HTMLDivElement>(null);
+  const detailPane = useRef<HTMLDivElement>(null);
+
+  // Two columns turning into one pane keep the side that has focus (4.1: the field being
+  // typed in is kept). With focus on the list's side (a filter, a row), the list stays,
+  // its item still selected, until another item is selected there; elsewhere the detail
+  // takes the width. Focus on the list's side is followed through its events; React
+  // reports none from a list taken out of the page, so it is cleared once the list goes.
+  const [isFocusOnList, setFocusOnList] = useState(false);
+  const [isListHeld, setListHeld] = useState(false);
+  const [wasTwoColumns, setWasTwoColumns] = useState(isTwoColumns);
+  if (wasTwoColumns !== isTwoColumns) {
+    setWasTwoColumns(isTwoColumns);
+    setListHeld(!isTwoColumns && showsDetail && isFocusOnList);
+  }
+  if (isListHeld && !showsDetail) setListHeld(false);
+  // In one pane, whether the detail is the pane shown.
+  const opensDetail = showsDetail && !isListHeld;
+  const showsList = isTwoColumns || !opensDetail;
+  useEffect(() => {
+    if (!showsList) setFocusOnList(false);
+  }, [showsList]);
+  const listSide = {
+    onFocus: () => setFocusOnList(true),
+    onBlur: (event: FocusEvent) => {
+      const next = event.relatedTarget;
+      if (
+        !(next instanceof Node) ||
+        !(headerRow.current?.contains(next) || listPane.current?.contains(next))
+      ) {
+        setFocusOnList(false);
+      }
+    },
+  };
+  // The selection when the list was held: the detail follows once it changes. Read
+  // from the rows, as the pattern is given the detail, not which item it belongs to.
+  const heldSelection = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!isListHeld) {
+      heldSelection.current = null;
+      return;
+    }
+    const selection = selectedRows(listPane.current);
+    if (heldSelection.current === null) heldSelection.current = selection;
+    else if (selection !== heldSelection.current) setListHeld(false);
+  });
+
   // On a phone inside AppFrame, the header's ← goes back to the list (6.0.1): one ←.
   const usesFrameBack = isNarrow && setFrameBack !== null;
 
   const latestOnBack = useRef(onBack);
   latestOnBack.current = onBack;
   useEffect(() => {
-    if (!usesFrameBack || !showsDetail || setFrameBack === null) return;
+    if (!usesFrameBack || !opensDetail || setFrameBack === null) return;
     setFrameBack({
       label: listLabel,
       onPress: () => latestOnBack.current?.(),
     });
     return () => setFrameBack(null);
-  }, [usesFrameBack, showsDetail, listLabel, setFrameBack]);
+  }, [usesFrameBack, opensDetail, listLabel, setFrameBack]);
 
-  // Below the desktop breakpoint one pane replaces the other, taking the focused element
-  // with it: focus moves to the detail that opened, or back to the list. The header's ←
-  // that closed a detail goes too, once this pattern stops taking it over.
-  const listPane = useRef<HTMLDivElement>(null);
-  const detailPane = useRef<HTMLDivElement>(null);
-  const shown = useRef(showsDetail);
+  // A pane that goes takes the focused element with it: in one pane, one replaces the
+  // other; two columns coming back take the detail's ←. Focus then moves to the detail,
+  // or to the list. Only focus lost from inside the pattern is moved: React reports no
+  // blur from an element taken out of the page, so `hasFocus` still says focus was here.
+  // On a phone,
+  // the header's ← that closed a detail goes too, once this pattern stops taking it over.
+  const hasFocus = useRef(false);
+  const shown = useRef({ opensDetail, isTwoColumns });
   useLayoutEffect(() => {
-    if (shown.current === showsDetail) return;
-    shown.current = showsDetail;
-    if (isDesktop) return;
+    const before = shown.current;
+    if (
+      before.opensDetail === opensDetail &&
+      before.isTwoColumns === isTwoColumns
+    ) {
+      return;
+    }
+    shown.current = { opensDetail, isTwoColumns };
     const lost =
-      document.activeElement === null ||
-      document.activeElement === document.body ||
-      (!showsDetail && usesFrameBack);
-    if (!lost) return;
-    if (showsDetail) {
+      hasFocus.current &&
+      (document.activeElement === null ||
+        document.activeElement === document.body);
+    const closedFromHeader =
+      !isTwoColumns &&
+      !before.isTwoColumns &&
+      before.opensDetail &&
+      !opensDetail &&
+      usesFrameBack;
+    if (!lost && !closedFromHeader) return;
+    if (isTwoColumns ? hasDetail : opensDetail) {
       detailPane.current?.focus();
-    } else {
-      // The row a collection keeps in the Tab order, or the list's first control.
-      for (const selector of [
-        '[tabindex="0"]',
-        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      ]) {
-        const element = listPane.current?.querySelector<HTMLElement>(selector);
-        if (element) {
-          element.focus();
-          break;
-        }
+      return;
+    }
+    // The row a collection keeps in the Tab order, or the list's first control.
+    for (const selector of [
+      '[tabindex="0"]',
+      'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ]) {
+      const element = listPane.current?.querySelector<HTMLElement>(selector);
+      if (element) {
+        element.focus();
+        break;
       }
     }
-  }, [showsDetail, isDesktop, usesFrameBack]);
+  }, [opensDetail, isTwoColumns, usesFrameBack, hasDetail]);
 
   return (
-    <div className={styles.root}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: it only follows focus among its children
+    <div
+      className={styles.root}
+      onFocus={() => {
+        hasFocus.current = true;
+      }}
+      onBlur={(event) => {
+        hasFocus.current = event.currentTarget.contains(event.relatedTarget);
+      }}
+    >
       <div
         className={styles.page({
           width: hasDetail ? "content" : "reading",
@@ -128,7 +216,7 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
         <div className={styles.listDetailRoot}>
           {showsList &&
             (header != null || (!isNarrow && floatingAction != null)) && (
-              <div className={styles.headerRow}>
+              <div ref={headerRow} className={styles.headerRow} {...listSide}>
                 <div className={styles.headerTitle}>{header}</div>
                 {!isNarrow && floatingAction}
               </div>
@@ -137,14 +225,21 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
             {showsList && (
               <div
                 ref={listPane}
-                className={`${styles.listPane}${hasDetail ? "" : ` ${styles.listOnly}`}`}
+                className={styles.listPane({
+                  isBeside: hasDetail && isTwoColumns,
+                })}
+                {...listSide}
               >
                 {list}
               </div>
             )}
-            {hasDetail && (isDesktop || showsDetail) && (
-              <div ref={detailPane} tabIndex={-1} className={styles.detailPane}>
-                {!isDesktop && !usesFrameBack && (
+            {hasDetail && (isTwoColumns || opensDetail) && (
+              <div
+                ref={detailPane}
+                tabIndex={-1}
+                className={styles.detailPane({ isBeside: isTwoColumns })}
+              >
+                {!isTwoColumns && !usesFrameBack && (
                   <AriaButton
                     aria-label={i18n.t("components:listDetailPattern.back", {
                       label: listLabel,

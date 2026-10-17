@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { ActionButton } from "../components/ActionButton";
 import { Switch } from "../components/Switch";
 import { BottomBar, useHeaderTools } from "../internal/frame";
+import { isMacOS } from "../internal/platform";
 import { useIsNarrow } from "../internal/useIsNarrow";
 import * as styles from "./patterns.css";
 
@@ -93,8 +94,8 @@ export interface QuestionFormPatternProps {
  * Pattern C, question form (design-spec 4.1 C): a section's questions (11, 21). Tablet and
  * wider: all the questions in one column, the one being answered open and framed in the
  * middle of the view, the others quiet; the header's Focus switch opens them all, and
- * Ctrl+↓ / Ctrl+↑ move to the next and previous question. Phone: the current question
- * alone, with ← and → fixed to the bottom.
+ * Ctrl+↓ / Ctrl+↑ (on macOS also Ctrl+Option+↓ / ↑) move to the next and previous
+ * question. Phone: the current question alone, with ← and → fixed to the bottom.
  */
 export function QuestionFormPattern({
   header,
@@ -141,11 +142,14 @@ export function QuestionFormPattern({
 
   // Ctrl+↓ / Ctrl+↑ (4.1 C): the next or previous question takes focus as Tab would
   // bring it there, so a quiet card opens with its answer focused and moves to the middle.
+  // macOS keeps Ctrl+arrows for Mission Control and App Exposé, so there Ctrl+Option+
+  // arrows move too; elsewhere Ctrl+Alt+arrows are left alone, as graphics drivers turn
+  // the screen with them.
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (
       isNarrow ||
       !event.ctrlKey ||
-      event.altKey ||
+      (event.altKey && !isMacOS()) ||
       event.metaKey ||
       event.shiftKey ||
       (event.key !== "ArrowDown" && event.key !== "ArrowUp") ||

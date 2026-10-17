@@ -206,7 +206,16 @@ test("vars.ts gives the sizes code reads as numbers in px", () => {
   const source = varsSource(tree);
   expect(source).toContain(`"tablet": 768,`);
   expect(source).toContain("export const popoverMaxHeight = 384;");
+  expect(source).toContain("export const twoColumnMinWidth = 784;");
   expect(value("layout-popover-max-height")?.lightMedium).toBe("384px");
+});
+
+test("two-column-min-width stays the body of a desktop at its breakpoint (06 $description)", () => {
+  const px = (name: string) =>
+    Number.parseFloat(value(name)?.lightMedium ?? "");
+  expect(px("layout-two-column-min-width")).toBe(
+    px("breakpoint-desktop") - px("layout-sidebar-width"),
+  );
 });
 
 test("camelCase", () => {

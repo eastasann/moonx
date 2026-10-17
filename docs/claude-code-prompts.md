@@ -1441,6 +1441,210 @@ make test・make test-web・make test-e2e・make typecheck・make lint・make do
 
 ---
 
+## Step 22h: 2回目の点検の直しとユーザーの決定（docs と枠）
+
+Status:
+
+```
+Step 22b〜22g が終わったあと、2026-10-17 に docs の差分を点検し、11画面をモックアップと並べて測り直しました。
+見つかったことを Step 22h〜22j で直します。このステップは docs の直しと、ユーザーが決めた2点と、値の出典の直しです。
+
+2026-10-18 のユーザーの決定:
+1. タッチの端末で入力欄の文字を 16px より小さくしない下限（06 component.field.font-size-min）は残す（iOS は 16px より小さい入力欄を
+   押すと画面を拡大し、入力のあとも拡大したままになるため）。モックアップの 14〜15px の入力欄より 1〜2px 大きくなる。
+   ADR-018 と 4.4「密度とスケールの対応」「デザインシステムの参考」の「large は文字の大きさを変えない」に、この下限を唯一の例外として書く。
+   4.3 の文の「2026-10-17 のユーザーの決定」は文字を幅で決めることにかかり、この下限は 2026-10-18 の決定として分けて書く
+2. More のメニューで開く画面（7・4・9・26）は、スマホのヘッダーに「← More」を出す（s09-settings.html）。押すと More のメニューを開き直す。
+   More はメニューのまま（6.0.1）。AppFrame の戻るは、リンクのほかに押すと動く操作も受けられるようにする
+
+Step 22h〜22j に共通の決まり（2026-10-17 のユーザーの決定（Step 22c の冒頭）から導いたもの）:
+- モックアップは、ブラウザで描かれた見た目を正にする（CSS の書き方の意図を推し量って変えない。たとえば s01 のヒーローは min-height が
+  max-height に勝って 900px の窓で 792px になり、スマホでは上下の余白が無い。描かれたとおりにする）。ただし中身が崩れているもの
+  （s19 のスマホの Key numbers でラベルと値が入れ違う）は除く
+- モックアップが示さない段は Spectrum 2 の値にする（4.5）。ただし段の並び（S ≤ M ≤ L ≤ XL）を崩す値は、隣の段の値で止める
+  （Button の L を M と同じにしたのと同じ）。2px ずつ足すなどの外挿はしない
+- モックアップが省いていても、省くと機能か情報が減るものは docs のまま残し、該当する節に「モックアップは省いているが残す」と理由を書く:
+  D のスマホの検索、G のスマホの注記、25 のスマホの「Updated by …」、タブレットの s17 の列、s23 のスマホの「‹ 7 / 14 ›」、
+  スマホの保存状態のラベル（4.3）、s25 のスマホの「← Validation」（ほかのモックアップは戻り先の名前を出す）
+- モックアップどうしが食い違い、共通の moon-base.css と moon-frame.js がどちらも決めないときは、その画面のモックアップの値を
+  その画面の型（パターンや密度）の値にする。型で分けられないときは、どちらかに決めて理由を docs に書く
+
+比べ方（Step 22h〜22j に共通。Step 22c の比べ方に足す）:
+- スマホは Playwright の hasTouch と isMobile を付けて撮る（large のスケールは pointer: coarse で効くため）
+- docs/mockups/ のモックアップと /dev/components?screen= の画面を、1440×900 と 390×844、ライトとダーク、計算されたスタイルと位置で比べる
+
+参照:
+- docs/mockups/（README.md）、docs/design-spec.md 4.1・4.3・4.4・4.5・6.0.1・6.2・6.3・6.8、docs/06_design-tokens.json
+- docs/02-01_system-design-doc.md ADR-018、docs/README.md（所有権マップ）
+- @adobe/spectrum-tokens と @react-spectrum/s2（手元に無ければ npm pack で取る）
+
+やること:
+1. 上の決定1: ADR-018・4.4・4.3 を書き直す
+2. 上の決定2: AppFrame の戻るに押す操作を足し、7・4・9・26 のスマホのヘッダーを「← More」にする（押すと More のメニューが開く。
+   フォーカスは TabBar から開いたときと同じ）。6.0.1 の「s09-settings.html の ← More は採らない」の文と 4.5 の AppFrame の行を直し、E2E で確かめる
+3. 06 の値の出典: 次の値は、モックアップにも Spectrum 2 にも出典が無い外挿か、Spectrum 2 と違う値になっている。上の決まりで直す:
+   checkbox の L・XL、radio-button の S・L・XL と点の大きさ、status-light の点の L・XL、meter の太さの S・L・XL、disclosure の題の S・L・XL。
+   ほかにも、$description に出典（モックアップのファイルか Spectrum のトークン名かコードの場所）の無い段の値が無いかを、06 の全体で確かめて直す
+4. Checkbox・Radio・Switch の段: spacious のパターンと spacious の Dialog では、4.5 の基準どおり L を受ける（Step 22g の前の割り当てに戻す）。
+   L の値は spacious のモックアップ（s19・s25）の 18px、M は regular の画面のモックアップが示せばその値、示さなければ上の決まり。
+   4.5 の「Checkbox・Radio・Switch は入力欄に数えず、どの密度でも M」と 4.4 の一覧を直す
+5. タブレットのページの左右の余白: モックアップは 768px から上で 32px（各画面の .page の padding。767px 以下だけが上書きする）。
+   06 の page-gutter-tablet を 32 にし、これを使う幅の計算（two-column-min-width、D・F・A・I の切り替え、Step 22b・22f の和）を確かめ直す
+6. s17 のスマホの Empty の行の「Tap to fill or mark Unknown」（s17-costs.html）を出す。6.3 に書き、文言はカタログに置く
+7. docs の食い違いと書き漏れ:
+   - 4.4「状態の形」: 印はインクで、Unclassified の菱形は琥珀色、Empty の点線の丸は empty.fg（moon-base.css の .dot-empty）と書く（4.5・06 と合わせる）
+   - 4.5 の ContextualHelp の題: 「heading-4 の大きさ（Spectrum 2 の heading-xs と同じ）」は heading-4 が 15px になって成り立たない。
+     モックアップに ContextualHelp は無いので Spectrum 2 の値にし、要るならトークンを分ける
+   - 4.5 の Toast の行が引く 4.4 の「重なっているものはカードの枠と影で示す」は今の 4.4 に無い。4.4 に、重ねて出す部品（Popover・Toast・Dialog）の
+     枠（border.default）と影を書き、引く先を直す
+   - 6.0.1: 画面上部の帯が重なったときの並び（オフライン → 新しい版 → ホーム画面への追加 → テンプレートの新しい版）を書く
+   - 6.2: スマホの設問の点の名前（「Question n of N」、答えたものは「, answered」）、関連する調査の Disclosure が空のときの文言、
+     「Log research」を独りの行に置くことを書く
+   - 4.1 D と 6.8: スマホでも検索を出す。ほかの「残すもの」（上の決まり）もそれぞれの節に書く
+   - 4.1 A: パネルで本文が狭いときの数字の帯を 2×2 にすることを書く（Step 22f の決め）
+8. 値の持ち主を1つにする: docs/README.md の所有権マップでは、色・書体・余白・角丸・影などの具体値は 06 が持つ。Step 22c〜22g で
+   design-spec 4.1・4.4・4.5・6.x に 06 と同じ数値（px・角丸・太さなど）が多く入った。06 にある値は 06 のトークン名で書き、数値を重ねて書かない
+   （形の説明と出典のモックアップのファイル名は残す）。06 に無い値は、先に 06 に足す。ADR-018 と 4.5 の「値はモックアップ」の文は、
+   「06 がモックアップ（示さないものは Spectrum 2）から取った値を持つ。画面を作るときはモックアップと並べて確かめる」の形に直し、
+   mockups/README.md の「更新しない。値と形の正は design-spec と 06」と食い違わないようにする
+
+make test・make test-e2e・make typecheck・make lint・make doc-lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 22i: モックアップに合わせる（4）: 部品に残った違い
+
+Status:
+
+```
+Step 22h の決まりと比べ方で、2026-10-17 の測り直しで見つかった違いのうち、部品と 06 にあたるものを直してください。
+値は計算されたスタイルで測り直してから入れる（下の数字は測り直しのときの値）。直したら 11画面を比べ直し、ここに無い違いも同じ決まりで閉じる。
+
+参照: Step 22h と同じ。packages/ui-web/src/preview/screens/（11画面の見本）
+
+やること:
+1. 部品の中のアイコン: モックアップはボタンの中のアイコンを M で 16px（間 6px）、S で 14px に描く。今は 18px（間 8px）。
+   Button・ActionButton（s11 の設問のカードの道具、s15 の ⋯、s09 の ⋯）・Picker の ▾（L と M は 16px、S は 14px。今は L で 22px）・
+   Disclosure の ▸・下部の固定バーのボタン（今は 22px）を合わせる
+2. ヘッダーの保存状態（moon-base.css の .saved）: 13px・太さ 400・secondary、✓ は 14px、間 6px、右に 8px。今は 14px・500・18px
+3. RowList:
+   - 行の左右に 4px の余白（モックアップの4つの一覧の padding 12px 4px など）、上下は s05 の 12px（今は 11px）
+   - 名前の太さと大きさは一覧ごとにモックアップに合わせる: s05 の Ideas と s06 の一覧は 600、d1 の Next steps の2件目からは 400、
+     s05 の Recent activity は 14.5px・400 で人の名前だけ 600（今は 15px・500 と 700）。一覧の種類で違うので、表し方（variant など）を決める
+   - 右端の数字（s05 の Due soon の日付）は等幅 13px・500（isEndNumeric）
+   - s05 の Ideas の行: デスクトップは印の列とバッジの列を決まった幅にして行の上下の中央に置き（印の始まりがそろう。バッジの列は最小 92px で右寄せ）、
+     2行目は印の列の手前で折り返す。スマホはバッジを右上、印を3行目に置く（.ideas .dots { grid-row: 3 }）
+   - d1 のスマホの確認項目の説明は、状態の列の下まで使う（.sub { grid-column: 2/4 }）
+   - s05 の Self analyses と Recent activity の Avatar は 28px（M）
+4. 文中の太字（<strong>）は 600（今は 700。d1 の Decisions、s05 の Recent activity）
+5. 文字の型の当てはめ: モックアップが 14px の所に 13.5px（body-sm）を当てている所が多い（s05 の「1 dropped idea hidden」、s06 の事実の段落、
+   s19 のヒント、s25 のリード、s17 の小計、s15 の Empty、s11 の Disclosure の中身など）。06 の型と見本の当てはめを、モックアップの値で見直す。
+   等幅にする数字: d1 の「62 items」と「L9 M17 H3」（12px）、s17 の「· ₱77.00」、s05 の日付
+6. F/A/U の文字と印（moon-base.css）:
+   - Unclassified のラベルは太さ 500（.fau.unclassified）。QuestionCard の行と頭、「Not classified yet」、s25、s19 の F/A/U の行
+   - ラベルの文字は secondary（.fau は ink-2）。s11 の「Fact · 2 sources」がインクになっている
+   - Unclassified の菱形は角丸 3 の 10px の四角を 45° 回したもの（約 14px、角が丸い）。Empty は 14px の丸に 1.25px の点線（.dot-attn・.dot-empty）。
+     今は角の尖った形と 16px の8本の破線
+   - 設問の行の月は 14px（s11・s15 の行と s15 の件数）。今は 16px
+   - QuestionCard の F/A/U のボタン（s11）: 文字 14px、高さ 32px、間 7px、月は文字と同じ secondary
+   - Meter（d1）: ライトの Empty の帯は night.200（#DCE0E8。今は night.150）。Unknown の斜線の色はモックアップ（ライト #868DA1・ダーク #6F7690）に
+     合わせる。変えたのが 3:1 のためなら残し、$description に書く。見えるラベル「Answers by F/A/U」はモックアップに無いので、読み上げの名前だけにする
+7. DescriptionList: regular（d1）はラベルの列 120px・行 10px・値 15px（スマホ 16px）・値の幅は 60ch まで。spacious（s19）はラベルの列 132px・
+   行 7px・値 14.5px。最後の行の下に線を引かない（上の線だけ）
+8. 札（Badge）: s05 の「Yours」（11.5px・600・角丸 4・左右 5px・高さ 17px）、s17 の「Lump sum」（等幅 11px・500・secondary・角丸 4・左右 5px・高さ 16px）、
+   d1 の Hold（13px・600・高さ 22px）、「overdue 3d」（枠の無い琥珀色の等幅 13px。今は 12.5px）。段と variant のどれに当たるかを決める
+9. TextArea（s19 の Why?、spacious）: 最小の高さ 120px、角丸 10、内側の余白 12px 14px。s19 の「Why?」のラベル（15px・600、スマホ 16px）を
+   欄のラベルとして作るか問いとして作るかは、ほかの spacious のモックアップ（s09・s25）の欄のラベルと比べて決め、理由を書く
+10. Disclosure（s11 の Related research）: 上の線だけ、題の行の高さ 36px（上下 12px・2px）、左に寄せず、中身 14px を題の下にそろえる
+11. Switch（s11 のヘッダーの Focus）: 30×18、つまみ 14px、ラベル 13px secondary
+12. Link: s23 の「Edit source」は 13.5px、s01 のフッターのリンクは太さ 400
+13. Picker: 中にラベルを置く Picker（s23）の値は太さ 400。無効の Picker（s09 の Owner）は ▾ を出さない
+14. SearchField（s06）: モックアップは虫眼鏡を描かない。描かないようにする（名前は欄のラベルで伝わる）
+15. 補足の注意（descriptionTone notice。s09 の通貨の警告）: アイコン 15px、間 6px
+16. StatusLight の文字（s05 の「Shared · Done」）は 13.5px
+17. 下部の固定バー（s19 の .formbar）: ボタンは quiet の Cancel も含めて幅を等分し、高さ 48px・文字 14px・角丸 8。d1-moon.html は共通の枠を
+    使わないので、moon-base.css を使う s19 を正にする。4.3 の「quiet の Cancel はその横に自分の幅で置く」を直す
+
+make test・make test-e2e・make typecheck・make lint・make doc-lint が通り、11画面の比べ直しで、Step 22h の「残すもの」と docs に理由を書いた違いの
+ほかに違いが無い状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 22j: モックアップに合わせる（5）: 画面ごとの並びに残った違い
+
+Status:
+
+```
+Step 22h の決まりと比べ方で、2026-10-17 の測り直しで見つかった違いのうち、パターンと画面の並びにあたるものを直してください。
+見本（/dev/components?screen=）の並びが違うものは、パターンが受けられるようにしてから見本を直す（画面の段階は見本とパターンを読んで作る）。
+design-spec の画面の節の図や文が食い違うときは、その節も直す。直したら 11画面を比べ直し、ここに無い違いも同じ決まりで閉じる。
+
+参照: Step 22h と同じ。packages/ui-web/src/patterns/、packages/ui-web/src/preview/screens/
+
+やること:
+1. 画面の題: モックアップの題は行の高さ 1.55 を受け継ぐ（Step 22c）。s15 の h1 が 1.2 になっている。全画面の題を確かめる。s15 の題と件数の間 16px
+2. s05: 「1 dropped idea hidden · Show」を一覧の 12px 下に置き、Show の前は 8px の間
+3. d1: 概念の行 16px、状態の行は項目ごとに 14px の間（「Latest decision Oct 2」「·」「Stage: Validation」）、Decisions のブロックは上下の線の内側に 12px。
+   スマホのテンプレートの帯は操作も縮んで折り返し（「Update template」が2行）、帯の高さ 65px。帯のリンクは太さ 600。
+   題の大きさは s05 の 30px（共通の枠を使う s05 が正。Step 22c の決め）のまま
+4. s06: 詳細の間（題 → 概念 4px、概念 → 数字 20px、数字 → Checks 24px、Checks → 一覧 6px、事実 → ボタン 24px）、一覧の行の中の行間 3px、
+   印 → 「Missing…」10px、状態の行の Hold の文字は secondary
+5. s19: デスクトップで Cancel と Record decision の上に 22px（今は警告に付いている。frame.css.ts の phoneOnlyBar がタブレットから上で上の余白を 0 にする）。
+   F/A/U の行（ラベル 14px、件数は等幅 14px・500）。「Empty」（Biggest risk）は値と同じ大きさ。ヒントとカードの間 10px。
+   選ぶカードの高さ（デスクトップ 76.5px、スマホ 80px）とスマホの題 16px
+6. s09: 招待の行はデスクトップで1行（メール 1fr・ロールの Picker 140px・Send invitation、間 8px）、スマホは3つを縦に全幅。
+   招待の行のメールは太さ 400 で、語の途中で折り返さない。最後の招待の下に線を引かない。メンバーの行は Avatar を1行目に置く（Owner の行 89px、
+   ほかの行 69px）。グループの最後の欄の下に 14px、グループの説明は題の 4px 下、Pending / All の下 10px、⋯ のアイコン 16px。
+   Owner の ⋯ は、Owner に使える操作が無いなら無効のまま、ダークでも見える無効の色にする（今の rgb(58,66,99) はほとんど見えない。
+   Spectrum 2 の無効の色を確かめる）
+7. s23: サムネイルの説明の行の高さ 1.55、行の間 6px。サムネイルの列はページの流れに置く（モックアップはページと一緒に動き、列だけでは
+   スクロールしない。今は列が sticky で、下の道具の行の 65px を数えずに、ページも列もスクロールする）。メモの行の高さ 1.7、見出しの下 6px、
+   コメントのアイコンと件数の間 4px
+8. s01: 文の幅（節の題 22ch、3段階のリード 56ch、最後の節の文 46ch、2つ並びの文 44ch）、ヒーローの高さ（900px の窓で 792px）、
+   スマホのヒーローの上下の余白（無し）、題 → リード 22px、リード → Log in 30px、2つ並びの文の間 14px、見本のカードの確認の行の月は文字の並びの線に置く。
+   見本の「14.4+ / day」は数字と単位の間で折り返してよい（数字の中では折り返さない）。「(3–5)」の範囲の – は文言のカタログのまま
+9. s11: スマホではカードの下の「Previous section / AI ▼ / Next: 02 Market」を出さない（モックアップの .footer と 6.2 のスマホの図）。ただし、
+   スマホで次のセクションへ移る手段がほかに無いなら残し、6.2 に理由を書く（機能を減らさない）。案内の文は 62ch まで、「7/10 answered」は 14px で
+   題との間 4px、スマホの案内の文 15px
+10. s15: カードの題の上 2px、追加のタイルのアイコンと文字の間 6px。Patterns の行の印は s15 では行の上下の中央、s11 では上（モックアップどうしが
+    食い違う。Step 22h の決まりで決める）
+11. s17:
+    - Empty の行の F/A/U の列は U+2014 のダッシュ1文字（読み上げは「Empty」）
+    - 表の下の行: 「Add row」14px secondary、小計 14px、金額 500、ラベルとの間 8px、右の余白 10px
+    - 節の題 16px（今は heading-4 の 15px）
+    - スマホの要約のバーは1行（Startup ₱145,000+ Monthly ₱50,000 BE 14.4+/day。値は等幅 14px・700）
+    - スマホでは「Add row」の横の小計を出さず、「Add row」は全幅 48px・16px・secondary の行
+    - Unknown と Empty の金額は等幅 500（デスクトップ 14.5px、スマホ 15px）
+    - 題の下の説明（デスクトップ 2px・ActionButton 26px）、合計のパネルの「Unit Economics & Scenarios →」の上の余白、「/ sale」「/ day」は 500
+    - 編集中の行の入力欄は、入らない文字を「…」で切る（「Counter and signage」）
+12. s25:
+    - 差分は語の単位で示す（「25–40」を丸ごと取り消し線、「25–45」を丸ごと下線。句読点も語に含める）。6.x と 4.5 の「最小の文字の差分」を直す
+    - 「3 unchanged answers」は上下の hairline と上下 12px の行（48px）・14px
+    - 「2 changes」はインクの 14px、リードは 14px
+    - スマホのカードの頭は、番号（「01 · WHO」）を問いの横に置く
+    - スマホの Imported の欄に空の行を残さない
+    - 「Current」「Imported」のラベル 12.5px、「Imported」と「· you can edit」の間 8px、下の注記 13.5px
+
+make test・make test-e2e・make typecheck・make lint・make doc-lint が通り、11画面の比べ直しで、Step 22h の「残すもの」と docs に理由を書いた違いの
+ほかに違いが無い状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
 ## Step 23: Web の土台・アプリの枠・5 ダッシュボードと E2E の土台
 
 Status:

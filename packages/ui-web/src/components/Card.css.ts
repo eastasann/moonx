@@ -1,7 +1,14 @@
 import { type CardSize, cardSizes, vars } from "@moonx/ui-tokens";
 import { style, styleVariants } from "@vanilla-extract/css";
 import { recipe } from "@vanilla-extract/recipes";
-import { focusRing, hoverTransition, narrowQuery } from "../styles/helpers";
+import {
+  focusRing,
+  hoverTransition,
+  narrowQuery,
+  typography,
+} from "../styles/helpers";
+
+const measures = vars.scale.component.card;
 
 const sized = Object.fromEntries(
   cardSizes.map((size) => [size, size]),
@@ -38,11 +45,21 @@ export const card = recipe({
       cardSizes.map((size) => [
         size,
         {
-          gap: vars.scale.component.card.gap[size],
-          padding: vars.scale.component.card.padding[size],
+          gap: measures.gap[size],
+          paddingInline: measures.paddingX[size],
+          paddingBlockStart: measures.paddingTop[size],
+          paddingBlockEnd: measures.paddingBottom[size],
         },
       ]),
-    ) as Record<CardSize, { gap: string; padding: string }>,
+    ) as Record<
+      CardSize,
+      {
+        gap: string;
+        paddingInline: string;
+        paddingBlockStart: string;
+        paddingBlockEnd: string;
+      }
+    >,
     isActionable: {
       true: {
         cursor: "pointer",
@@ -58,22 +75,126 @@ export const card = recipe({
 
 /** The preview runs to the card's edges, above its text. */
 export const preview = styleVariants(sized, (size) => ({
-  marginInline: `calc(-1 * ${vars.scale.component.card.padding[size]})`,
-  marginBlockStart: `calc(-1 * ${vars.scale.component.card.padding[size]})`,
+  marginInline: `calc(-1 * ${measures.paddingX[size]})`,
+  marginBlockStart: `calc(-1 * ${measures.paddingTop[size]})`,
   borderBottom: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
 }));
+
+/** The eyebrow and the title on the left, the figure on the right (s15-competitors.html). */
+export const head = style({
+  display: "flex",
+  alignItems: "flex-start",
+  gap: vars.space["100"],
+});
+
+export const headText = style({
+  display: "flex",
+  flexDirection: "column",
+  flex: 1,
+  minWidth: 0,
+});
+
+export const eyebrow = style({
+  ...typography("eyebrow"),
+  color: vars.color.text.secondary,
+  overflowWrap: "break-word",
+});
 
 export const title = styleVariants(sized, (size) => ({
   fontWeight: vars.typography.heading4.fontWeight,
   letterSpacing: vars.typography.heading4.letterSpacing,
   lineHeight: vars.typography.heading4.lineHeight,
-  fontSize: vars.scale.component.card.titleFontSize[size],
+  fontSize: measures.titleFontSize[size],
   overflowWrap: "break-word",
 }));
 
+/** A price on one line in the monospaced face; its note in the body face. */
+export const figure = recipe({
+  base: {
+    ...typography("cardValue"),
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    flexShrink: 0,
+    marginInlineStart: "auto",
+    textAlign: "end",
+    whiteSpace: "nowrap",
+  },
+  variants: {
+    // "No price" in the figure's face, smaller (s15-competitors.html .price.none).
+    isPlaceholder: {
+      true: {
+        fontSize: vars.typography.callout.fontSize,
+        color: vars.color.text.tertiary,
+      },
+      false: {},
+    },
+  },
+});
+
+export const figureDescription = style({
+  ...typography("captionXs"),
+  color: vars.color.text.secondary,
+  whiteSpace: "normal",
+});
+
+/** Label and value lines, a hairline above each; a phone puts the label above (s15). */
+export const details = style({
+  display: "grid",
+  gridTemplateColumns: `${measures.detailsLabelWidth} minmax(0, 1fr)`,
+  margin: 0,
+  "@media": { [narrowQuery]: { gridTemplateColumns: "minmax(0, 1fr)" } },
+});
+
+export const detail = style({ display: "contents" });
+
+const detailCell = {
+  margin: 0,
+  paddingBlock: measures.detailsPaddingY,
+  borderTop: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
+  overflowWrap: "break-word",
+} as const;
+
+export const detailLabel = style({
+  ...detailCell,
+  ...typography("captionSm"),
+  paddingBlockStart: measures.detailsLabelPaddingTop,
+  color: vars.color.text.secondary,
+});
+
+export const detailValue = style({
+  ...detailCell,
+  ...typography("callout"),
+  "@media": {
+    [narrowQuery]: { borderTop: "none", paddingBlockStart: 0 },
+  },
+});
+
+/** The last line: the card's notes, then its ⋯ at the end. */
+export const footer = style({
+  ...typography("caption"),
+  display: "flex",
+  alignItems: "center",
+  gap: measures.footerGap,
+  color: vars.color.text.secondary,
+});
+
+export const footerText = style({
+  display: "inline-flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: measures.footerGap,
+  minWidth: 0,
+});
+
+export const actions = style({
+  display: "inline-flex",
+  marginInlineStart: "auto",
+});
+
 export const description = styleVariants(sized, (size) => ({
   lineHeight: vars.typography.bodyLong.lineHeight,
-  fontSize: vars.scale.component.card.descriptionFontSize[size],
+  fontSize: measures.descriptionFontSize[size],
   color: vars.color.text.secondary,
   overflowWrap: "break-word",
 }));

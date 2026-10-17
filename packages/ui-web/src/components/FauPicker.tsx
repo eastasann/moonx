@@ -2,16 +2,18 @@ import { i18n } from "@moonx/i18n";
 import type { Confidence, Fau, FauState } from "@moonx/schemas";
 import { confidenceSchema } from "@moonx/schemas";
 import type { Size } from "@moonx/ui-tokens";
-import { TriangleAlert } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ChevronDown, TriangleAlert } from "lucide-react";
+import { useId, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { IconSlot } from "../internal/IconSlot";
 import type { MoonState } from "../internal/MoonMark";
 import * as moonStyles from "../internal/moon.css";
+import { useTableCell } from "../internal/tableCell";
+import { useFocusBackToTrigger } from "../internal/useFocusBackToTrigger";
 import { useIsNarrow } from "../internal/useIsNarrow";
-import { actionButton } from "./ActionButton.css";
 import { AlertDialog, DialogTrigger } from "./Dialog";
 import * as styles from "./FauPicker.css";
+import { Link } from "./Link";
 import { MoonGlyphAt } from "./MoonGlyph";
 import { Popover } from "./Popover";
 import { SegmentedControl, SegmentedControlItem } from "./SegmentedControl";
@@ -89,16 +91,22 @@ export interface FauPickerProps {
   onFactPress: () => void;
   /** Shows the state alone, for a Viewer or an archived idea. */
   isReadOnly?: boolean;
-  /** @default "M" */
+  /**
+   * The size of the buttons and the confidence in the phone's sheet; the popover's are
+   * s17-costs.html's whatever the size (design-spec 4.5). @default "M"
+   */
   size?: Size;
   /** The number it classifies ("Rent"): names the button and the choices. */
   "aria-label": string;
 }
 
 /**
- * The F/A/U cell of 17's and 18's table rows (design-spec 4.5・6.0.3): the state as its
- * moon and label; pressing it opens a popover with Fact / Assumption / Unknown and the
- * confidence. On a phone the row is edited in a sheet, so the buttons sit in it directly.
+ * The F/A/U cell of 17's and 18's table rows (design-spec 4.5・6.0.3): the state's label
+ * (the row's mark sits in its own column at the start of the row), and ▾ once the row is
+ * edited; pressing it opens a popover with Fact / Assumption / Unknown and the
+ * confidence. On a phone the row is edited in a sheet, so the buttons sit in it directly,
+ * under the state with its moon. Outside a table the state also shows its moon. A table
+ * that holds one gives its rows a mark column (`isMark`) with the state's MoonGlyph.
  */
 export function FauPicker({
   isReadOnly = false,
@@ -106,59 +114,29 @@ export function FauPicker({
   ...props
 }: FauPickerProps) {
   const isNarrow = useIsNarrow();
+  const cell = useTableCell();
   const [isOpen, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  // Closed, the popover gives focus back to its button (design-spec 4.5). In a table,
-  // React Aria's grid sends focus that comes back to it to a cell instead (the one it
-  // remembers), so the button takes it from there: the next time focus comes back to the
-  // button's collection. Focus a dialog takes first (M2, opened by Fact; the Unknown
-  // question) waits for that dialog to give it back. Focus or a press anywhere else on
-  // the page ends the wait, as does the picker going away.
-  const stopWaiting = useRef<(() => void) | null>(null);
-  useEffect(() => () => stopWaiting.current?.(), []);
+  const focusBack = useFocusBackToTrigger(triggerRef);
   const close = () => {
     setOpen(false);
-    stopWaiting.current?.();
-    const trigger = triggerRef.current;
-    const collection = trigger?.closest('[role="grid"], [role="treegrid"]');
-    const inDialog = (target: EventTarget | null) =>
-      target instanceof Element &&
-      target.closest('[role="dialog"], [role="alertdialog"]') !== null;
-    const onFocusIn = (event: FocusEvent) => {
-      const target = event.target;
-      if (inDialog(target)) return;
-      stop();
-      if (
-        trigger?.isConnected &&
-        target instanceof Element &&
-        target !== trigger &&
-        (target.contains(trigger) || collection?.contains(target))
-      ) {
-        trigger.focus();
-      }
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      if (!inDialog(event.target)) stop();
-    };
-    const stop = () => {
-      document.removeEventListener("focusin", onFocusIn, true);
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      stopWaiting.current = null;
-    };
-    document.addEventListener("focusin", onFocusIn, true);
-    document.addEventListener("pointerdown", onPointerDown, true);
-    stopWaiting.current = stop;
+    focusBack();
   };
   const label = fauLabel(props.state, props);
-  const summary = (
+  const state = moonOf[props.state];
+  const summary = (withMoon: boolean) => (
     <span className={styles.summary}>
-      <MoonGlyphAt state={moonOf[props.state]} size={size} />
-      <span className={moonStyles.labelColor[moonOf[props.state]]}>
+      {withMoon && <MoonGlyphAt state={state} size={size} />}
+      <span
+        className={
+          cell === null ? moonStyles.labelColor[state] : styles.cellLabel[state]
+        }
+      >
         {label}
       </span>
       {props.state === "fact_no_evidence" && (
         <span className={styles.warning}>
-          <IconSlot size={size}>
+          <IconSlot size="XS">
             <TriangleAlert />
           </IconSlot>
         </span>
@@ -167,12 +145,12 @@ export function FauPicker({
   );
 
   if (isReadOnly) {
-    return <span className={styles.readOnly[size]}>{summary}</span>;
+    return <span className={styles.readOnly}>{summary(cell === null)}</span>;
   }
   if (isNarrow) {
     return (
       <fieldset aria-label={props["aria-label"]} className={styles.inline}>
-        <span className={styles.readOnly[size]}>{summary}</span>
+        <span className={styles.readOnly}>{summary(true)}</span>
         <FauControls {...props} size={size} />
       </fieldset>
     );
@@ -191,12 +169,20 @@ export function FauPicker({
           name: props["aria-label"],
           state: label,
         })}
-        className={`${actionButton({ size, isQuiet: true, iconOnly: false })} ${styles.trigger}`}
+        className={styles.trigger}
       >
-        {summary}
+        {summary(cell === null)}
+        {cell?.isEditing && (
+          <IconSlot size="XS">
+            <ChevronDown />
+          </IconSlot>
+        )}
       </Button>
       <Popover aria-label={props["aria-label"]}>
-        <FauControls {...props} size={size} onDone={close} />
+        <div className={styles.popoverBody}>
+          {/* s17's grooves (FauPicker.css) whatever the size; S moons fit them. */}
+          <FauControls {...props} size="M" glyphSize="S" onDone={close} />
+        </div>
       </Popover>
     </DialogTrigger>
   );
@@ -208,20 +194,25 @@ export function FauPicker({
  * asks first, as it clears the value.
  */
 function FauControls({
-  state,
+  state: fauState,
   confidence,
   hasValue,
   onChange,
   onFactPress,
   size,
+  glyphSize = size,
   onDone,
   "aria-label": name,
 }: Omit<FauPickerProps, "isReadOnly" | "size"> & {
   size: Size;
+  /** The buttons' moons: S in the popover (s17-costs.html), the size's own in the sheet. */
+  glyphSize?: Size;
   /** The choice is made: the popover closes. */
   onDone?: () => void;
 }) {
-  const current = fauOf(state);
+  const current = fauOf(fauState);
+  const state = moonOf[fauState];
+  const confidenceId = useId();
   // Assumption pressed but no confidence chosen yet: nothing is saved until one is.
   const [pending, setPending] = useState(false);
   const [isAsking, setAsking] = useState(false);
@@ -252,59 +243,87 @@ function FauControls({
     }
   };
 
+  const isFact = state === "fact";
+  const addEvidence = () => {
+    setPending(false);
+    onDone?.();
+    onFactPress();
+  };
+
   return (
     <div className={styles.controls}>
-      <ToggleButtonGroup
-        aria-label={name}
-        size={size}
-        isJustified
-        selectedKeys={shown === null ? [] : [shown]}
-        onSelectionChange={(keys) => {
-          const [key] = keys;
-          press(key === undefined ? null : (String(key) as Fau));
-        }}
-      >
-        <ToggleButton id="fact" isDisabled={!hasValue && current !== "fact"}>
-          <span className={styles.toggleGlyph}>
-            <MoonGlyphAt state="fact" size={size} />
-          </span>
-          {i18n.t("common:fau.fact")}
-        </ToggleButton>
-        <ToggleButton
-          id="assumption"
-          isDisabled={!hasValue && current !== "assumption"}
-        >
-          <span className={styles.toggleGlyph}>
-            <MoonGlyphAt state="assumption" size={size} />
-          </span>
-          {i18n.t("common:fau.assumption")}
-        </ToggleButton>
-        <ToggleButton id="unknown">
-          <span className={styles.toggleGlyph}>
-            <MoonGlyphAt state="unknown" size={size} />
-          </span>
-          {i18n.t("common:fau.unknown")}
-        </ToggleButton>
-      </ToggleButtonGroup>
-      {shown === "assumption" && (
-        <SegmentedControl
-          aria-label={i18n.t("components:fauPicker.confidence")}
+      <div className={styles.group}>
+        <p className={styles.groupLabel}>
+          {i18n.t("components:fauPicker.question")}
+        </p>
+        <ToggleButtonGroup
+          aria-label={name}
           size={size}
           isJustified
-          selectedKey={pending ? null : confidence}
-          onSelectionChange={(key) =>
-            change({
-              fau: "assumption",
-              confidence: confidenceSchema.parse(key),
-            })
-          }
+          selectedKeys={shown === null ? [] : [shown]}
+          onSelectionChange={(keys) => {
+            const [key] = keys;
+            press(key === undefined ? null : (String(key) as Fau));
+          }}
         >
-          {confidenceSchema.options.map((option) => (
-            <SegmentedControlItem key={option} id={option}>
-              {i18n.t(`common:confidence.${option}`)}
-            </SegmentedControlItem>
-          ))}
-        </SegmentedControl>
+          <ToggleButton id="fact" isDisabled={!hasValue && current !== "fact"}>
+            <span className={styles.toggleGlyph}>
+              <MoonGlyphAt state="fact" size={glyphSize} />
+            </span>
+            {i18n.t("common:fau.fact")}
+          </ToggleButton>
+          <ToggleButton
+            id="assumption"
+            isDisabled={!hasValue && current !== "assumption"}
+          >
+            <span className={styles.toggleGlyph}>
+              <MoonGlyphAt state="assumption" size={glyphSize} />
+            </span>
+            {i18n.t("common:fau.assumption")}
+          </ToggleButton>
+          <ToggleButton id="unknown">
+            <span className={styles.toggleGlyph}>
+              <MoonGlyphAt state="unknown" size={glyphSize} />
+            </span>
+            {i18n.t("common:fau.unknown")}
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </div>
+      {shown === "assumption" && (
+        <div className={styles.group}>
+          <p id={confidenceId} className={styles.groupLabel}>
+            {i18n.t("components:fauPicker.confidence")}
+          </p>
+          <SegmentedControl
+            aria-labelledby={confidenceId}
+            size={size}
+            isJustified
+            selectedKey={pending ? null : confidence}
+            onSelectionChange={(key) =>
+              change({
+                fau: "assumption",
+                confidence: confidenceSchema.parse(key),
+              })
+            }
+          >
+            {confidenceSchema.options.map((option) => (
+              <SegmentedControlItem key={option} id={option}>
+                {i18n.t(`common:confidence.${option}`)}
+              </SegmentedControlItem>
+            ))}
+          </SegmentedControl>
+        </div>
+      )}
+      {hasValue && (
+        // Evidence makes a number a Fact (6.0.3): the way to M2, also for a Fact that lost it.
+        <div className={styles.evidence}>
+          {!isFact && (
+            <span>{i18n.t("components:fauPicker.evidenceHint")}</span>
+          )}
+          <Link onPress={addEvidence}>
+            {i18n.t("components:fauPicker.addEvidence")}
+          </Link>
+        </div>
       )}
       <AlertDialog
         isOpen={isAsking}

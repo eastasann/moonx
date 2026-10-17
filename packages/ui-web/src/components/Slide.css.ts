@@ -8,7 +8,8 @@ const color = vars.print.color;
 
 /**
  * The slide's box: the page's proportions at the width of its place, in the light colours
- * of the PDF at every theme (design-spec 6.14). Its lengths are shares of its width.
+ * of the PDF at every theme (design-spec 6.14), white with a soft shadow (s23-deck.html
+ * .slide). Its lengths are shares of its width.
  */
 export const slide = style({
   containerType: "inline-size",
@@ -16,14 +17,14 @@ export const slide = style({
   width: "100%",
   aspectRatio: `${frame.width} / ${frame.height}`,
   overflow: "hidden",
-  borderRadius: vars.radius.card,
-  // The page's colour is the light canvas's: a hairline drawn inside keeps its edge in
-  // sight without taking any of its width.
-  boxShadow: `inset 0 0 0 ${vars.borderWidth.hairline} ${color.borderStrong}`,
+  borderRadius: vars.radius.slide,
+  boxShadow: `${vars.shadow.slideEdge}, ${vars.shadow.slide}`,
   background: color.page,
   color: color.text,
   fontFamily: vars.print.font.body,
 });
+
+export const thumbnail = style({ borderRadius: 0, boxShadow: "none" });
 
 export const page = style({
   position: "absolute",

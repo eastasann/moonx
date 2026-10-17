@@ -49,8 +49,9 @@ test("the gallery renders every section", () => {
     "MoonGlyph and CheckDots",
     "Avatar",
     "FauPicker",
-    "MetricTile",
+    "MetricTile and MetricGroup",
     "RowList",
+    "DescriptionList",
     "QuestionCard",
     "DiffText",
     "MentionTextArea",
@@ -69,6 +70,8 @@ test("the gallery renders every section", () => {
     "SettingsPattern",
     "PresentationPattern",
     "PublicPattern",
+    "Mockup parts: type, frames, marks and basic parts",
+    "Mockup parts: tables, cards, metrics, rows and steps",
   ]) {
     expect(screen.getByRole("region", { name: title })).toBeTruthy();
   }

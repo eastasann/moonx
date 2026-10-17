@@ -404,8 +404,7 @@ const sized: SizeCase[] = [
     "Card",
     cardSizes,
     (size) => <Card size={size} title={`card-${size}`} />,
-    () =>
-      cardSizes.map((size) => screen.getByText(`card-${size}`).parentElement),
+    () => cardSizes.map((size) => screen.getByText(`card-${size}`)),
   ),
   sizeCase(
     "CardView",
@@ -438,22 +437,6 @@ const sized: SizeCase[] = [
     () => [...document.querySelectorAll("svg")],
   ),
   sizeCase(
-    "FauPicker",
-    sizes,
-    (size) => (
-      <FauPicker
-        aria-label={size}
-        size={size}
-        state="unclassified"
-        confidence={null}
-        hasValue
-        onChange={() => {}}
-        onFactPress={() => {}}
-      />
-    ),
-    () => screen.getAllByRole("button"),
-  ),
-  sizeCase(
     "MentionTextArea",
     sizes,
     (size) => (
@@ -478,6 +461,31 @@ describe.each(sized)("$name sizes", ({ steps, render: make, targets }) => {
     expect(classes).toHaveLength(steps.length);
     expect(new Set(classes).size).toBe(steps.length);
   });
+});
+
+test("FauPicker: S, M, L and XL size the buttons of the phone's sheet (6.0.3)", () => {
+  setPhoneWidth();
+  render(
+    sizes.map((size) => (
+      <FauPicker
+        key={size}
+        aria-label={size}
+        size={size}
+        state="assumption"
+        confidence="medium"
+        hasValue
+        onChange={() => {}}
+        onFactPress={() => {}}
+      />
+    )),
+  );
+  const buttons = sizes.map(
+    (size) =>
+      within(screen.getByRole("radiogroup", { name: size })).getAllByRole(
+        "radio",
+      )[0]?.className,
+  );
+  expect(new Set(buttons).size).toBe(sizes.length);
 });
 
 test("components Spectrum 2 gives no size take none (design-spec 4.5)", () => {

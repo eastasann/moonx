@@ -20,7 +20,8 @@ export interface StepsProps {
 
 /**
  * Where a fixed procedure stands, 1 → 2 → 3 (pattern G, design-spec 4.1・4.5): the steps
- * done carry a check, the current one is marked for screen readers as the current step.
+ * done carry a check, the current one is underlined and marked for screen readers as the
+ * current step. On a phone only the current step shows its name.
  */
 export function Steps({ steps, currentId, doneLabel, ...props }: StepsProps) {
   const current = steps.findIndex((step) => step.id === currentId);

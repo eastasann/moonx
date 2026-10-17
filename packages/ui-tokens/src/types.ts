@@ -78,9 +78,23 @@ export type DiffTextVariant = (typeof diffTextVariants)[number];
 export const questionCardModes = ["focused", "open", "quiet"] as const;
 export type QuestionCardMode = (typeof questionCardModes)[number];
 
+/**
+ * MetricGroup's `variant` (design-spec 4.5): `band` across a hub's top (13), `compact`
+ * inside 19's Well.
+ */
+export const metricGroupVariants = ["band", "compact"] as const;
+export type MetricGroupVariant = (typeof metricGroupVariants)[number];
+
 /** MetricTile's supplement: plain, or the amber of a warning (design-spec 4.4). */
 export const metricTileTones = ["neutral", "notice"] as const;
 export type MetricTileTone = (typeof metricTileTones)[number];
+
+/**
+ * RadioGroup's `variant` (design-spec 4.5): the circles in a list, or each choice as a card
+ * with its title and description (19's Proceed / Hold / Drop, M4's Go / No-Go).
+ */
+export const radioGroupVariants = ["default", "cards"] as const;
+export type RadioGroupVariant = (typeof radioGroupVariants)[number];
 
 /** Avatar sizes (design-spec 4.5). */
 export const avatarSizes = ["S", "M"] as const;

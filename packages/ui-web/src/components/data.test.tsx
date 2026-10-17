@@ -3,13 +3,14 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, test, vi } from "vitest";
-import { setPhoneWidth, settle } from "../test/helpers";
+import { setPhoneWidth, setTabletWidth, settle } from "../test/helpers";
 import { Avatar, initialsOf } from "./Avatar";
 import { Card, CardView } from "./Card";
 import { CheckDots } from "./CheckDots";
 import { ListView, ListViewItem } from "./ListView";
 import { Meter } from "./Meter";
 import { MoonGlyph } from "./MoonGlyph";
+import { NumberField } from "./NumberField";
 import { type TableColumn, TableView } from "./TableView";
 import { TextField } from "./TextField";
 import { Tree, TreeItem } from "./Tree";
@@ -279,22 +280,178 @@ describe("TableView", () => {
     expect(first?.querySelectorAll("svg")).toHaveLength(1);
   });
 
-  test("on a phone every layout is a card per row; pressing one calls the row action", async () => {
+  test("on a phone each row is a line: its name, then its one other value at the end; pressing one calls the row action", async () => {
     setPhoneWidth();
     const user = userEvent.setup();
     const onRowAction = vi.fn();
     render(<EditableTable onRowAction={onRowAction} />);
     expect(screen.queryByRole("table")).toBeNull();
-    const cards = screen.getAllByRole("row");
-    expect(cards).toHaveLength(2);
-    // The header cell is the title; the rest are label and value.
-    expect(within(cards[0] as HTMLElement).getByText("Amount")).toBeTruthy();
+    const lines = screen.getAllByRole("row");
+    expect(lines).toHaveLength(2);
+    // The one value beside the name goes without its label (s17-costs.html).
+    const first = within(lines[0] as HTMLElement);
+    expect(first.getByText("₱15,000")).toBeTruthy();
+    expect(first.queryByText("Amount")).toBeNull();
     await user.click(screen.getByText("Rent"));
     expect(onRowAction).toHaveBeenCalledWith("rent");
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
-  test('layout="cards" shows cards on a desktop too; the empty state replaces the rows', () => {
+  test("on a phone the mark leads, values marked isBelowName go under the name, and hidden and ⋯ columns are left out", () => {
+    setPhoneWidth();
+    render(
+      <TableView
+        aria-label="Startup costs"
+        columns={[
+          { id: "mark", name: "State", isMark: true },
+          { id: "name", name: "Item", isRowHeader: true },
+          { id: "amount", name: "Amount", numeric: true },
+          { id: "fau", name: "F/A/U", isBelowName: true },
+          { id: "note", name: "Why needed", isHiddenOnPhone: true },
+          { id: "reduce", name: "Can reduce?", isHiddenOnPhone: true },
+          { id: "more", name: "Actions", isRowActions: true },
+        ]}
+        items={[{ id: "rent", name: "Rent" }]}
+        onRowAction={() => {}}
+        renderCell={(_, column) => `${column} value`}
+      />,
+    );
+    const line = within(screen.getByRole("row"));
+    const texts = ["mark value", "name value", "fau value", "amount value"].map(
+      (text) => line.getByText(text),
+    );
+    // In this order: the mark, the name, under it the F/A/U label, the amount at the end.
+    for (const [before, after] of texts
+      .slice(0, -1)
+      .map((text, index) => [text, texts[index + 1] as HTMLElement])) {
+      expect(
+        (before as HTMLElement).compareDocumentPosition(after as HTMLElement) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    for (const text of ["note value", "reduce value", "more value", "Amount"]) {
+      expect(line.queryByText(text)).toBeNull();
+    }
+  });
+
+  test("on a phone a row with more values than one lists them with their labels", () => {
+    setPhoneWidth();
+    render(
+      <TableView
+        aria-label="Scenarios"
+        columns={[
+          { id: "scenario", name: "Scenario", isRowHeader: true },
+          { id: "units", name: "Units / day", numeric: true },
+          { id: "profit", name: "Operating profit", numeric: true },
+        ]}
+        items={[
+          { id: "e", scenario: "Expected", units: "15", profit: "₱18,490" },
+        ]}
+        renderCell={(row, column) => row[column as "scenario"]}
+      />,
+    );
+    const line = within(screen.getByRole("row"));
+    expect(line.getByText("Units / day")).toBeTruthy();
+    expect(line.getByText("Operating profit")).toBeTruthy();
+  });
+
+  test("columns: widths on the header, mark and ⋯ named for screen readers only; a tablet keeps the phone's hidden columns", () => {
+    setTabletWidth();
+    render(
+      <TableView
+        aria-label="Startup costs"
+        columns={[
+          { id: "mark", name: "State", isMark: true },
+          { id: "name", name: "Item", isRowHeader: true, width: "31%" },
+          { id: "amount", name: "Amount", numeric: true, width: 120 },
+          { id: "note", name: "Why needed", isHiddenOnPhone: true },
+          { id: "more", name: "Actions", isRowActions: true },
+        ]}
+        items={[{ id: "rent", name: "Rent" }]}
+        renderCell={(_, column) => `${column} value`}
+      />,
+    );
+    const headers = screen.getAllByRole("columnheader");
+    expect(headers.map((header) => header.textContent)).toEqual([
+      "State",
+      "Item",
+      "Amount",
+      "Why needed",
+      "Actions",
+    ]);
+    expect(headers[1]?.style.width).toBe("31%");
+    expect(headers[2]?.style.width).toBe("120px");
+    expect(screen.getByText("note value")).toBeTruthy();
+    expect(screen.getByText("more value")).toBeTruthy();
+  });
+
+  test("a row that opens ends in › before its ⋯, which keeps its own cell", () => {
+    render(
+      <TableView
+        aria-label="Decisions"
+        columns={[
+          { id: "name", name: "Item", isRowHeader: true },
+          { id: "more", name: "Actions", isRowActions: true },
+        ]}
+        items={[{ id: "rent", name: "Rent" }]}
+        onRowAction={() => {}}
+        renderCell={(row, column) =>
+          column === "name" ? row.name : <button type="button">More</button>
+        }
+      />,
+    );
+    const name = screen.getByRole("rowheader");
+    expect(name.querySelector("svg")).not.toBeNull();
+    const more = screen.getByRole("button", { name: "More" }).closest("td");
+    expect(more?.querySelector("svg")).toBeNull();
+  });
+
+  test("a NumberField in a number column holds its digits at the end; elsewhere it does not", async () => {
+    const user = userEvent.setup();
+    function Table() {
+      const [amount, setAmount] = useState("15,000");
+      return (
+        <TableView
+          aria-label="Costs"
+          columns={columns}
+          items={[{ id: "rent", name: "Rent", amount }]}
+          isRowEditable={() => true}
+          renderCell={(row, column, { isEditing }) =>
+            column === "amount" && isEditing ? (
+              <NumberField
+                aria-label="Amount of rent"
+                currency="PHP"
+                value={amount}
+                onChange={setAmount}
+              />
+            ) : (
+              row[column as "name" | "amount"]
+            )
+          }
+        />
+      );
+    }
+    render(
+      <>
+        <Table />
+        <NumberField aria-label="Price" currency="PHP" defaultValue="450" />
+      </>,
+    );
+    await user.click(screen.getByText("15,000"));
+    await settle();
+    const amount = screen.getByRole("textbox", { name: "Amount of rent" });
+    // The input sits in a sizer as wide as its text, beside the symbol.
+    expect(amount.parentElement?.getAttribute("data-value")).toBe("15,000");
+    await user.keyboard("{End}0");
+    expect(amount.parentElement?.getAttribute("data-value")).toBe("15,0000");
+    expect(
+      screen
+        .getByRole("textbox", { name: "Price" })
+        .parentElement?.hasAttribute("data-value"),
+    ).toBe(false);
+  });
+
+  test('layout="cards" shows the phone\'s rows on a desktop too; the empty state replaces the rows', () => {
     render(
       <>
         <TableView
@@ -495,6 +652,67 @@ describe("Card and CardView", () => {
     expect(onSelectionChange).toHaveBeenCalledWith(new Set(["s2"]));
     await user.keyboard("{ArrowLeft}");
     expect(document.activeElement?.textContent).toBe("Slide 1");
+  });
+
+  test("a Card's eyebrow, figure with its note, details, footer and actions", () => {
+    render(
+      <Card
+        eyebrow="Direct competitor"
+        title="Salad Station"
+        figure="₱240"
+        figureDescription="per bowl"
+        details={[
+          { id: "target", label: "Target customer", value: "Office workers" },
+          { id: "offer", label: "Offering", value: "Salad bowls" },
+        ]}
+        footer="1 source"
+        actions={<button type="button">Card actions</button>}
+      />,
+    );
+    for (const text of [
+      "Direct competitor",
+      "Salad Station",
+      "₱240",
+      "per bowl",
+      "1 source",
+    ]) {
+      expect(screen.getByText(text)).toBeTruthy();
+    }
+    expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(
+      ["Target customer", "Offering"],
+    );
+    expect(screen.getByRole("button", { name: "Card actions" })).toBeTruthy();
+  });
+
+  test("in a CardView a card's ⋯ is its one button: Tab reaches it, and pressing it does not open the card", async () => {
+    const user = userEvent.setup();
+    const onAction = vi.fn();
+    const onMore = vi.fn();
+    render(
+      <CardView aria-label="Competitors" onAction={onAction}>
+        <Card
+          id="a"
+          textValue="Salad Station"
+          title="Salad Station"
+          actions={
+            <button type="button" onClick={onMore}>
+              Card actions
+            </button>
+          }
+        />
+      </CardView>,
+    );
+    await user.tab();
+    expect(document.activeElement?.getAttribute("role")).toBe("row");
+    await user.tab();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Card actions" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Card actions" }));
+    expect(onMore).toHaveBeenCalledTimes(1);
+    expect(onAction).not.toHaveBeenCalled();
+    await user.click(screen.getByText("Salad Station"));
+    expect(onAction).toHaveBeenCalledWith("a");
   });
 
   test("a Card in a CardView needs its key and text", () => {

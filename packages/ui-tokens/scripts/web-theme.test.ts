@@ -94,7 +94,7 @@ describe("themeVariables", () => {
 
   test("the large scale changes only the target, the heights of what is pressed and the fields' text floor (design-spec 4.3・4.4)", () => {
     const heights =
-      /^scale-component-(button-height|action-button-height|segmented-control-item-height|tag-height|menu-item-height|field-height|field-font-size-min|tabs-item-height|disclosure-title-height|breadcrumbs-height|table-row-height|target-min)/;
+      /^scale-component-(button-height|action-button-height|segmented-control-item-height|tag-height|menu-item-height|field-height|field-font-size-min|tabs-item-height|disclosure-title-height|breadcrumbs-height|table-row-height|table-view-row-height|target-min)/;
     const scaled = variables
       .filter((v) => v.key[0] === "scale")
       .filter((v) => v.values.lightLarge !== v.values.lightMedium)
@@ -127,8 +127,8 @@ describe("themeVariables", () => {
 
   test("keeps the print colours light in the dark mode", () => {
     expect(value("print-color-page")).toMatchObject({
-      lightMedium: "#f4f5f8",
-      darkMedium: "#f4f5f8",
+      lightMedium: "#ffffff",
+      darkMedium: "#ffffff",
     });
   });
 

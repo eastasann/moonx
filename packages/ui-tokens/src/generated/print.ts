@@ -7,14 +7,13 @@
  */
 export const print = {
   color: {
-    page: "#f4f5f8",
+    page: "#ffffff",
     panel: "#ffffff",
     tableHeader: "#eceef3",
     text: "#151a2c",
     textSecondary: "#555d72",
     textPlaceholder: "#555d72",
     border: "#e1e4eb",
-    borderStrong: "#7a8197",
     rule: "#151a2c",
   },
   font: {

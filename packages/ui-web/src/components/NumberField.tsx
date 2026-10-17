@@ -13,6 +13,7 @@ import {
 } from "../internal/FieldHelp";
 import * as styles from "../internal/field.css";
 import { useSize } from "../internal/size";
+import { useTableCell } from "../internal/tableCell";
 import { useControlledState } from "../internal/useControlledState";
 import { useKeepAboveKeyboard } from "../internal/useKeepAboveKeyboard";
 
@@ -76,6 +77,7 @@ export function NumberField({
     onChange,
   );
   const frameRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   useKeepAboveKeyboard(frameRef);
   const affixId = useId();
   const { prefix, suffix } = currency
@@ -84,6 +86,16 @@ export function NumberField({
       ? formatNumberAffixes({ percent: true })
       : { prefix: "", suffix: "" };
   const hasAffix = prefix !== "" || suffix !== "";
+  // In a table's number column the digits stay where the cell's value was: at the end.
+  const alignsEnd = useTableCell()?.isNumeric ?? false;
+  const input = (
+    <Input
+      ref={inputRef}
+      className={`${styles.input} ${styles.numberInput}${alignsEnd ? ` ${styles.endInput}` : ""}`}
+      inputMode={isInteger ? "numeric" : "decimal"}
+      autoComplete="off"
+    />
+  );
   return (
     <AriaTextField
       {...props}
@@ -104,17 +116,33 @@ export function NumberField({
       className={styles.fieldRoot({ size: resolved, width })}
     >
       {label != null && <Label className={styles.label}>{label}</Label>}
-      <div ref={frameRef} className={styles.frame({ size: resolved })}>
+      <div
+        ref={frameRef}
+        className={`${styles.frame({ size: resolved })}${alignsEnd ? ` ${styles.endFrame}` : ""}`}
+        // A press on the frame around an end-aligned input (its empty start, the symbol)
+        // types in the input, as a press on the input would.
+        onPointerDown={
+          alignsEnd
+            ? (event) => {
+                if (event.target === inputRef.current) return;
+                event.preventDefault();
+                inputRef.current?.focus();
+              }
+            : undefined
+        }
+      >
         {prefix !== "" && (
           <span id={affixId} className={styles.affix}>
             {prefix}
           </span>
         )}
-        <Input
-          className={`${styles.input} ${styles.numberInput}`}
-          inputMode={isInteger ? "numeric" : "decimal"}
-          autoComplete="off"
-        />
+        {alignsEnd ? (
+          <span className={styles.endSizer} data-value={text}>
+            {input}
+          </span>
+        ) : (
+          input
+        )}
         {suffix !== "" && (
           <span
             id={prefix === "" ? affixId : undefined}

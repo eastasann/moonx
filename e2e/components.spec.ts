@@ -233,7 +233,7 @@ const components: [string, string, (section: Locator) => Locator][] = [
   ],
   ["Tabs", "Tabs", (s) => s.getByRole("tablist", { name: "Execution" })],
   [
-    // A table on tablet and wider; a card per row on a phone (a grid either way).
+    // A table on tablet and wider; lined rows on a phone (a grid either way).
     "TableView",
     "TableView",
     (s) => s.getByRole("grid", { name: "Startup costs" }),
@@ -283,8 +283,19 @@ const components: [string, string, (section: Locator) => Locator][] = [
         .getByRole("button", { name: "F/A/U of Rent: Unclassified" })
         .or(s.getByRole("group", { name: "F/A/U of Rent" })),
   ],
-  ["MetricTile", "MetricTile", (s) => s.getByText("₱169,500+")],
+  ["MetricTile", "MetricTile and MetricGroup", (s) => s.getByText("₱169,500+")],
+  [
+    "MetricGroup",
+    "MetricTile and MetricGroup",
+    (s) => s.getByRole("group", { name: "Key numbers band" }),
+  ],
   ["RowList", "RowList", (s) => s.getByRole("list", { name: "Next steps" })],
+  [
+    "DescriptionList",
+    "DescriptionList",
+    (s) =>
+      s.getByText("Office workers in Bacolod who buy pasalubong for family."),
+  ],
   [
     "QuestionCard",
     "QuestionCard",
@@ -1157,7 +1168,7 @@ test.describe("data and moonx's own components in a real browser (design-spec 4.
     await expect(trigger).toBeFocused();
   });
 
-  test("TableView on a phone: a card per row, no table", async ({ page }) => {
+  test("TableView on a phone: a line per row, no table", async ({ page }) => {
     await openGallery(page, "mobile");
     const costs = page.getByRole("grid", { name: "Startup costs" });
     await expect(costs.locator("table")).toHaveCount(0);
@@ -1362,8 +1373,8 @@ test.describe("data and moonx's own components in a real browser (design-spec 4.
       expect((await price.boundingBox())?.height ?? 0).toBeLessThan(
         lineHeight * 1.5,
       );
-      // The page's light colour at every theme (06 semantic.print.color.page).
-      await expect(slide).toHaveCSS("background-color", "rgb(244, 245, 248)");
+      // The page's white at every theme (06 semantic.print.color.page, s23-deck.html).
+      await expect(slide).toHaveCSS("background-color", "rgb(255, 255, 255)");
       await expect(heading).toHaveCSS("color", "rgb(21, 26, 44)");
     });
   }
@@ -2589,5 +2600,500 @@ test.describe("the parts match docs/mockups (Step 22c, design-spec 4.4・4.5)", 
       expect(await css(send, "font-size")).toEqual({ "font-size": "14px" });
       expect((await send.boundingBox())?.height).toBe(buttonHeightM[scale]);
     }
+  });
+});
+
+test.describe("data parts match docs/mockups (Step 22d, design-spec 4.4・4.5)", () => {
+  const mockups = "Mockup parts: tables, cards, metrics, rows and steps";
+  /** 06 border.default (the mockups' --line-strong) and border.hairline (--line). */
+  const lines = {
+    light: { default: "rgb(198, 203, 216)", hairline: "rgb(225, 228, 235)" },
+    dark: { default: "rgb(58, 66, 99)", hairline: "rgb(38, 44, 68)" },
+  };
+  const ink = { light: "rgb(21, 26, 44)", dark: "rgb(230, 232, 241)" };
+  const box = async (locator: Locator) => {
+    const rect = await locator.boundingBox();
+    if (rect === null) throw new Error("not on screen");
+    return rect;
+  };
+  /** Whether a text sits on one line: its box is lower than one and a half lines. */
+  const oneLine = (locator: Locator) =>
+    locator.evaluate((node) => {
+      const lineHeight = Number.parseFloat(getComputedStyle(node).lineHeight);
+      return node.getBoundingClientRect().height < lineHeight * 1.5;
+    });
+
+  for (const theme of themes) {
+    test(`desktop, ${theme}: the table has no ground, a line under its header and 46px rows`, async ({
+      page,
+    }) => {
+      await openGallery(page, "desktop");
+      await choose(page, "Theme", theme);
+      await choose(page, "Scale", "medium");
+      const table = region(page, mockups).getByRole("grid", {
+        name: "Costs to open (s17)",
+      });
+      await table.scrollIntoViewIfNeeded();
+      expect(await css(table, "background-color", "table-layout")).toEqual({
+        "background-color": "rgba(0, 0, 0, 0)",
+        "table-layout": "fixed",
+      });
+      const header = table.getByRole("columnheader", { name: "Amount" });
+      expect(
+        await css(
+          header,
+          "font-size",
+          "font-weight",
+          "border-bottom-color",
+          "background-color",
+        ),
+      ).toEqual({
+        "font-size": "12.5px",
+        "font-weight": "500",
+        "border-bottom-color": lines[theme].default,
+        "background-color": "rgba(0, 0, 0, 0)",
+      });
+      const row = table.getByRole("row", { name: "Lease Deposit" });
+      expect((await box(row)).height).toBe(46);
+      expect(await css(row, "border-bottom-color")).toEqual({
+        "border-bottom-color": lines[theme].hairline,
+      });
+      // The mark has its own column; the F/A/U cell shows the label alone, 13.5px.
+      const fau = row.getByRole("button", {
+        name: /^F\/A\/U of Lease Deposit/,
+      });
+      expect(await fau.locator("svg").count()).toBe(0);
+      expect(await css(fau, "font-size")).toEqual({ "font-size": "13.5px" });
+      await expect(
+        row.getByRole("gridcell").first().locator("svg"),
+      ).toHaveCount(1);
+    });
+  }
+
+  test("an edited row moves neither the columns nor the amount's digits; it shows ▾ and the ⋯", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    await choose(page, "Scale", "medium");
+    const table = region(page, mockups).getByRole("grid", {
+      name: "Costs to open (s17)",
+    });
+    await table.scrollIntoViewIfNeeded();
+    const row = table.getByRole("row", { name: "Renovation" });
+    // Where the value's text ends: its box also covers the cell's padding.
+    const valueEnd = await row
+      .getByText("₱30,000", { exact: true })
+      .evaluate((node) => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return range.getBoundingClientRect().right;
+      });
+    const headers = await table
+      .getByRole("columnheader")
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getBoundingClientRect().x),
+      );
+    const width = (await box(table)).width;
+    // With a mouse the ⋯ is out of sight until the row is under the pointer.
+    const more = row
+      .getByRole("button", { name: "Row actions of Renovation" })
+      .locator("xpath=..");
+    await page.mouse.move(0, 0);
+    await expect(more).toHaveCSS("opacity", "0");
+    await row.getByText("Renovation", { exact: true }).click();
+    const input = row.getByRole("textbox", { name: "Amount of Renovation" });
+    await expect(input).toBeVisible();
+    expect((await box(row)).height).toBe(46);
+    expect((await box(table)).width).toBe(width);
+    expect(
+      await table
+        .getByRole("columnheader")
+        .evaluateAll((nodes) =>
+          nodes.map((node) => node.getBoundingClientRect().x),
+        ),
+    ).toEqual(headers);
+    // The digits end where the value ended, the symbol beside them.
+    const digits = await input.evaluate((node) => {
+      const field = node as HTMLInputElement;
+      const rect = field.getBoundingClientRect();
+      const style = getComputedStyle(field);
+      return {
+        end: rect.right - Number.parseFloat(style.paddingRight),
+        start: rect.left,
+      };
+    });
+    expect(Math.abs(digits.end - valueEnd)).toBeLessThanOrEqual(1);
+    const symbol = await box(row.getByText("₱", { exact: true }));
+    expect(
+      Math.abs(symbol.x + symbol.width - digits.start),
+    ).toBeLessThanOrEqual(1);
+    await expect(more).toHaveCSS("opacity", "1");
+    await expect(
+      row
+        .getByRole("button", { name: /^F\/A\/U of Renovation/ })
+        .locator("svg"),
+    ).toHaveCount(1);
+  });
+
+  test("a row's ⋯ gives focus back to itself when its menu closes (design-spec 4.5)", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const table = region(page, mockups).getByRole("grid", {
+      name: "Costs to open (s17)",
+    });
+    await table.scrollIntoViewIfNeeded();
+    const more = table.getByRole("button", {
+      name: "Row actions of Equipment",
+    });
+    await more.click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(more).toBeFocused();
+  });
+
+  test("the large scale shows every row's ⋯", async ({ page }) => {
+    await openGallery(page, "desktop");
+    await choose(page, "Scale", "large");
+    const table = region(page, mockups).getByRole("grid", {
+      name: "Costs to open (s17)",
+    });
+    await table.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    await expect(
+      table
+        .getByRole("button", { name: "Row actions of Equipment" })
+        .locator("xpath=.."),
+    ).toHaveCSS("opacity", "1");
+  });
+
+  test("the F/A/U popover is s17's: 300px, its two headings, the way to evidence", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    await choose(page, "Scale", "medium");
+    const table = region(page, mockups).getByRole("grid", {
+      name: "Costs to open (s17)",
+    });
+    await table.scrollIntoViewIfNeeded();
+    await table.getByRole("button", { name: /^F\/A\/U of Renovation/ }).click();
+    const dialog = page.getByRole("dialog", { name: "F/A/U of Renovation" });
+    await expect(
+      dialog.getByText("How do you know this amount?"),
+    ).toBeVisible();
+    expect(Math.round((await box(dialog)).width)).toBe(300);
+    const groove = dialog.getByRole("radiogroup", {
+      name: "F/A/U of Renovation",
+    });
+    // The three buttons fit the popover: nothing scrolls.
+    expect(
+      await groove.evaluate((node) => node.scrollWidth <= node.clientWidth),
+    ).toBe(true);
+    expect((await box(groove.getByRole("radio").first())).height).toBe(32);
+    await expect(
+      dialog.getByRole("radiogroup", { name: "Confidence" }),
+    ).toBeVisible();
+    await expect(dialog.getByText("Have a quote? Mark it Fact.")).toBeVisible();
+    await dialog.getByRole("link", { name: "Add evidence" }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test("a phone: lines under a line, the mark, the name with its F/A/U under it, the amount at the end", async ({
+    page,
+  }) => {
+    await openGallery(page, "mobile");
+    await choose(page, "Theme", "light");
+    const rows = region(page, mockups).getByRole("grid", {
+      name: "Costs to open (s17)",
+    });
+    await rows.scrollIntoViewIfNeeded();
+    await expect(rows.locator("table")).toHaveCount(0);
+    expect(await css(rows, "border-top-color")).toEqual({
+      "border-top-color": lines.light.default,
+    });
+    const equipment = rows.getByRole("row", { name: "Equipment" });
+    await expect(equipment.getByText("Fact · 1 source")).toBeVisible();
+    const amount = equipment.getByText("₱60,000", { exact: true });
+    expect(await css(amount, "font-size", "font-weight")).toEqual({
+      "font-size": "15px",
+      "font-weight": "500",
+    });
+    const name = await box(equipment.getByText("Equipment", { exact: true }));
+    expect((await box(amount)).x).toBeGreaterThan(name.x + name.width);
+    // Notes, Can reduce? and the ⋯ stay off a phone's row.
+    for (const text of ["Blast chiller and prep tables", "Partly"]) {
+      await expect(equipment.getByText(text)).toHaveCount(0);
+    }
+    await expect(
+      equipment.getByRole("button", { name: /Row actions/ }),
+    ).toHaveCount(0);
+  });
+
+  for (const theme of themes) {
+    test(`desktop, ${theme}: numbers, rows, the summary, cards, choices and steps are the mockups'`, async ({
+      page,
+    }) => {
+      await openGallery(page, "desktop");
+      await choose(page, "Theme", theme);
+      await choose(page, "Scale", "medium");
+      const section = region(page, mockups);
+
+      // d1's band: a line above, a hairline below and between; 30px numbers on one line.
+      const band = section.getByRole("group", {
+        name: "d1 numbers",
+        exact: true,
+      });
+      await band.scrollIntoViewIfNeeded();
+      expect(
+        await css(band, "border-top-color", "border-bottom-color"),
+      ).toEqual({
+        "border-top-color": lines[theme].default,
+        "border-bottom-color": lines[theme].hairline,
+      });
+      const tiles = band.locator("dl");
+      expect(await css(tiles.nth(1), "border-left-color")).toEqual({
+        "border-left-color": lines[theme].hairline,
+      });
+      const startup = band.getByText("₱145,000+", { exact: true });
+      expect(await css(startup, "font-size")).toEqual({ "font-size": "30px" });
+      expect(await oneLine(startup)).toBe(true);
+      const top = await Promise.all(
+        [0, 1, 2, 3].map(async (index) => (await box(tiles.nth(index))).y),
+      );
+      expect(new Set(top).size).toBe(1);
+      // s19's: 12.5px labels, 17px numbers, five across.
+      const compact = section.getByRole("group", {
+        name: "s19 numbers",
+        exact: true,
+      });
+      expect(
+        await css(compact.getByText("ROI", { exact: true }), "font-size"),
+      ).toEqual({ "font-size": "12.5px" });
+      expect(
+        await css(
+          compact.getByText("≤ 306.2%", { exact: true }).locator("xpath=.."),
+          "font-size",
+          "font-weight",
+        ),
+      ).toEqual({ "font-size": "17px", "font-weight": "500" });
+
+      // d1's rows: a hairline above the first; names line up past the marks' column.
+      const sections = section.getByRole("list", {
+        name: "d1 section list",
+        exact: true,
+      });
+      const first = sections.getByRole("listitem").first();
+      expect(await css(first, "border-top-color")).toEqual({
+        "border-top-color": lines[theme].hairline,
+      });
+      const marked = await box(
+        sections.getByText("01 Customer & Problem", { exact: true }),
+      );
+      const unmarked = await box(
+        sections.getByText("03 Research Log", { exact: true }),
+      );
+      expect(unmarked.x).toBe(marked.x);
+      // The first of the Next steps: a light frame, a 3px ink line, corner 10, 16/600.
+      const next = section.getByRole("list", {
+        name: "d1 next list",
+        exact: true,
+      });
+      const emphasized = next.getByRole("listitem").first();
+      expect(
+        await css(
+          emphasized,
+          "border-top-color",
+          "border-left-width",
+          "border-left-color",
+          "border-top-left-radius",
+          "box-shadow",
+        ),
+      ).toEqual({
+        "border-top-color": lines[theme].default,
+        "border-left-width": "3px",
+        "border-left-color": ink[theme],
+        "border-top-left-radius": "10px",
+        "box-shadow": "none",
+      });
+      expect(
+        await css(
+          next.getByText("Add evidence (1)", { exact: true }),
+          "font-size",
+          "font-weight",
+        ),
+      ).toEqual({ "font-size": "16px", "font-weight": "600" });
+
+      // The summary: a 120px column of 13px labels, 14.5px values.
+      const summary = section.locator("dl").filter({ hasText: "Biggest risk" });
+      const label = summary.getByText("Customer", { exact: true });
+      expect((await box(label)).width).toBe(120);
+      expect(await css(label, "font-size")).toEqual({ "font-size": "13px" });
+      expect(
+        await css(summary.getByText("Red", { exact: true }), "font-size"),
+      ).toEqual({ "font-size": "14.5px" });
+
+      // s15's card: its type above the name, not upper-cased; the price; 112px labels.
+      const cards = section.getByRole("grid", {
+        name: "s15 cards",
+        exact: true,
+      });
+      const card = cards.getByRole("row", { name: "Salad Station" });
+      expect(
+        await css(
+          card.getByText("Direct competitor", { exact: true }),
+          "text-transform",
+          "font-size",
+        ),
+      ).toEqual({ "text-transform": "none", "font-size": "11.5px" });
+      expect(
+        await css(
+          card.getByText("Salad Station", { exact: true }),
+          "font-size",
+          "font-weight",
+        ),
+      ).toEqual({ "font-size": "18px", "font-weight": "600" });
+      expect(
+        (await box(card.getByText("Target customer", { exact: true }))).width,
+      ).toBe(112);
+      expect(await css(card, "box-shadow")).toEqual({ "box-shadow": "none" });
+
+      // s19's choices: three cards in a row; the chosen one framed in ink.
+      const choices = section.getByRole("radiogroup", {
+        name: "Should we develop this into a full Business Plan?",
+      });
+      const cardOf = (name: string) =>
+        choices
+          .getByText(name, { exact: true })
+          .locator("xpath=ancestor::label[1]");
+      const [proceed, hold] = [cardOf("Proceed"), cardOf("Hold")];
+      expect((await box(proceed)).y).toBe((await box(hold)).y);
+      expect(await css(hold, "border-top-color")).toEqual({
+        "border-top-color": ink[theme],
+      });
+      expect(await css(proceed, "border-top-color")).toEqual({
+        "border-top-color": lines[theme].default,
+      });
+
+      // s23's slide: white with corner 6 and its two shadows; the thumbnail without.
+      const slide = section.getByRole("region", {
+        name: "Business model",
+        exact: true,
+      });
+      expect(
+        await css(slide, "background-color", "border-top-left-radius"),
+      ).toEqual({
+        "background-color": "rgb(255, 255, 255)",
+        "border-top-left-radius": "6px",
+      });
+      expect(
+        (await css(slide, "box-shadow"))["box-shadow"]?.split("px,").length,
+      ).toBeGreaterThan(1);
+      expect(
+        await css(
+          section.getByRole("region", {
+            name: "Business model (thumbnail)",
+            exact: true,
+          }),
+          "box-shadow",
+        ),
+      ).toEqual({ "box-shadow": "none" });
+
+      // s25's steps: a hairline under the row, the current one underlined, no connectors.
+      const steps = section.getByRole("list", {
+        name: "s25 steps",
+        exact: true,
+      });
+      expect(await css(steps, "border-bottom-color")).toEqual({
+        "border-bottom-color": lines[theme].hairline,
+      });
+      const current = steps.locator('[aria-current="step"]');
+      expect((await css(current, "box-shadow"))["box-shadow"]).toContain(
+        "-2px",
+      );
+      expect(
+        await steps
+          .getByRole("listitem")
+          .nth(1)
+          .evaluate((node) => getComputedStyle(node, "::before").content),
+      ).toBe("none");
+    });
+  }
+
+  test("phone: the band is 2×2 with its numbers on one line; choices stack; only the current step is named", async ({
+    page,
+  }) => {
+    await openGallery(page, "mobile");
+    await choose(page, "Theme", "light");
+    const section = region(page, mockups);
+    const band = section.getByRole("group", {
+      name: "d1 numbers",
+      exact: true,
+    });
+    await band.scrollIntoViewIfNeeded();
+    const tiles = band.locator("dl");
+    const [a, b, c] = await Promise.all(
+      [0, 1, 2].map((i) => box(tiles.nth(i))),
+    );
+    expect(a?.y).toBe(b?.y);
+    expect(c?.y).toBeGreaterThan(a?.y ?? 0);
+    for (const value of ["₱145,000+", "≤ ₱37,000"]) {
+      const number = band.getByText(value, { exact: true });
+      expect(await css(number, "font-size")).toEqual({ "font-size": "20px" });
+      expect(await oneLine(number)).toBe(true);
+    }
+    const compact = section.getByRole("group", {
+      name: "s19 numbers",
+      exact: true,
+    });
+    for (const value of ["₱145,000+", "≤ ₱37,000 / mo"]) {
+      expect(await oneLine(compact.getByText(value, { exact: true }))).toBe(
+        true,
+      );
+    }
+    const choices = section.getByRole("radiogroup", {
+      name: "Should we develop this into a full Business Plan?",
+    });
+    const proceed = await box(choices.getByText("Proceed", { exact: true }));
+    const hold = await box(choices.getByText("Hold", { exact: true }));
+    expect(hold.y).toBeGreaterThan(proceed.y);
+    const steps = section.getByRole("list", { name: "s25 steps", exact: true });
+    // Each step's name: the second of its spans, after the mark.
+    const width = (index: number) =>
+      steps
+        .getByRole("listitem")
+        .nth(index)
+        .locator(":scope > span")
+        .nth(1)
+        .evaluate((node) => node.getBoundingClientRect().width);
+    expect(await width(0)).toBeLessThanOrEqual(1);
+    expect(await width(2)).toBeGreaterThan(1);
+    // The names stay for screen readers.
+    expect(await steps.ariaSnapshot()).toContain("Paste completed");
+  });
+
+  test("a card's ⋯ takes Tab from the card and opens its menu, not the card", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const section = region(page, mockups);
+    const cards = section.getByRole("grid", { name: "s15 cards", exact: true });
+    await cards.scrollIntoViewIfNeeded();
+    await cards.getByText("Bowl & Co", { exact: true }).click();
+    await expect(section.getByText("Card opened: bowl")).toBeVisible();
+    await page.keyboard.press("Tab");
+    const more = cards.getByRole("button", {
+      name: "Card actions of Bowl & Co",
+    });
+    await expect(more).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(more).toBeFocused();
+    await cards
+      .getByRole("button", { name: "Card actions of Salad Station" })
+      .click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await expect(section.getByText("Card opened: bowl")).toBeVisible();
   });
 });

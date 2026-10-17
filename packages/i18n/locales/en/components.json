@@ -58,7 +58,10 @@
   },
   "fauPicker": {
     "trigger": "{{name}}: {{state}}",
+    "question": "How do you know this amount?",
     "confidence": "Confidence",
+    "evidenceHint": "Have a quote? Mark it Fact.",
+    "addEvidence": "Add evidence",
     "unknownTitle": "Clear the value and mark it Unknown?",
     "unknownBody": "An Unknown number has no value. To keep the value, choose Assumption with Low confidence.",
     "markUnknown": "Mark Unknown",

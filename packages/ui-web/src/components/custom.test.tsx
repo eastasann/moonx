@@ -5,11 +5,12 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { mockTextMeasure, setPhoneWidth, settle } from "../test/helpers";
+import { DescriptionList, DescriptionListItem } from "./DescriptionList";
 import { Dialog } from "./Dialog";
 import { DiffText } from "./DiffText";
 import { type FauChange, FauPicker, fauLabel } from "./FauPicker";
 import { type MentionCandidate, MentionTextArea } from "./MentionTextArea";
-import { MetricTile } from "./MetricTile";
+import { MetricGroup, MetricTile } from "./MetricTile";
 import { Panel } from "./Panel";
 import { QuestionCard } from "./QuestionCard";
 import { Radio, RadioGroup } from "./RadioGroup";
@@ -256,6 +257,101 @@ describe("FauPicker", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  test("in a table cell the label stands alone (the mark has its own column), with ▾ once the row is edited", async () => {
+    const user = userEvent.setup();
+    render(
+      <TableView
+        aria-label="Costs"
+        columns={[
+          { id: "name", name: "Item", isRowHeader: true },
+          { id: "fau", name: "F/A/U" },
+        ]}
+        items={[{ id: "rent", name: "Rent" }]}
+        isRowEditable={() => true}
+        renderCell={(row, column) =>
+          column === "name" ? (
+            row.name
+          ) : (
+            <FauPicker
+              aria-label="Rent"
+              state="assumption"
+              confidence="medium"
+              hasValue
+              onChange={() => {}}
+              onFactPress={() => {}}
+            />
+          )
+        }
+      />,
+    );
+    const trigger = () =>
+      screen.getByRole("button", { name: "Rent: Assumption · Medium" });
+    expect(trigger().querySelectorAll("svg")).toHaveLength(0);
+    await user.click(screen.getByText("Rent"));
+    await settle();
+    // The one icon is the ▾.
+    expect(trigger().querySelectorAll("svg")).toHaveLength(1);
+  });
+
+  test("the popover asks how the amount is known; the confidence is named by its heading", async () => {
+    const user = userEvent.setup();
+    picker({ state: "assumption", confidence: "medium" });
+    const dialog = await open(user);
+    expect(
+      within(dialog).getByText(i18n.t("components:fauPicker.question")),
+    ).toBeTruthy();
+    expect(
+      within(dialog).getByRole("radiogroup", {
+        name: i18n.t("components:fauPicker.confidence"),
+      }),
+    ).toBeTruthy();
+  });
+
+  test("Add evidence opens M2 and closes the popover; a Fact keeps the link without the hint", async () => {
+    const user = userEvent.setup();
+    const { onFactPress } = picker({ state: "unclassified" });
+    let dialog = await open(user);
+    expect(
+      within(dialog).getByText(i18n.t("components:fauPicker.evidenceHint")),
+    ).toBeTruthy();
+    await user.click(
+      within(dialog).getByRole("link", {
+        name: i18n.t("components:fauPicker.addEvidence"),
+      }),
+    );
+    expect(onFactPress).toHaveBeenCalledTimes(1);
+    await settle();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // A Fact that lost its evidence finds the way to M2 here.
+    render(
+      <FauPicker
+        aria-label="Price"
+        state="fact_no_evidence"
+        confidence={null}
+        hasValue
+        onChange={() => {}}
+        onFactPress={() => {}}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /^Price: / }));
+    dialog = screen.getByRole("dialog", { name: "Price" });
+    expect(
+      within(dialog).queryByText(i18n.t("components:fauPicker.evidenceHint")),
+    ).toBeNull();
+    expect(
+      within(dialog).getByRole("link", {
+        name: i18n.t("components:fauPicker.addEvidence"),
+      }),
+    ).toBeTruthy();
+  });
+
+  test("without a value there is no way to evidence (Fact needs a value)", async () => {
+    const user = userEvent.setup();
+    picker({ state: "empty", hasValue: false });
+    const dialog = await open(user);
+    expect(within(dialog).queryByRole("link")).toBeNull();
+  });
+
   test("on a phone the buttons sit in the sheet, without a popover", async () => {
     setPhoneWidth();
     const user = userEvent.setup();
@@ -294,6 +390,58 @@ describe("MetricTile", () => {
     expect(value?.textContent).toBe("₱169,500+");
     expect(placeholder?.className).not.toBe(value?.className);
     expect(supplement?.querySelector("svg")).not.toBeNull();
+  });
+});
+
+describe("MetricGroup", () => {
+  test("a group of tiles; a unit follows its number in the same value", () => {
+    render(
+      <>
+        <MetricGroup aria-label="Key numbers">
+          <MetricTile label="Break-even" value="14.4+" unit="/ day" />
+          <MetricTile label="Payback" value="3.9+" unit="months" />
+        </MetricGroup>
+        <MetricGroup aria-label="Key numbers compact" variant="compact">
+          <MetricTile label="ROI" value="≤ 306.2%" />
+        </MetricGroup>
+      </>,
+    );
+    const band = screen.getByRole("group", { name: "Key numbers" });
+    const compact = screen.getByRole("group", { name: "Key numbers compact" });
+    expect(band.className).not.toBe(compact.className);
+    const [breakEven] = within(band).getAllByRole("definition");
+    expect(breakEven?.textContent).toBe("14.4+ / day");
+    // The number and its unit are apart, so the unit can move to the next line alone.
+    expect(within(band).getByText("14.4+").tagName).toBe("SPAN");
+    expect(within(band).getByText("/ day").tagName).toBe("SPAN");
+    expect(within(compact).getByRole("term").className).not.toBe(
+      within(band).getAllByRole("term")[0]?.className,
+    );
+  });
+});
+
+describe("DescriptionList", () => {
+  test("labels as terms and the values as their definitions, in order", () => {
+    render(
+      <DescriptionList>
+        <DescriptionListItem label="Customer">
+          Office workers
+        </DescriptionListItem>
+        <DescriptionListItem label="Market type">Red</DescriptionListItem>
+      </DescriptionList>,
+    );
+    const list = screen.getByText("Customer").closest("dl") as HTMLElement;
+    expect(list).not.toBeNull();
+    expect(
+      within(list)
+        .getAllByRole("term")
+        .map((term) => term.textContent),
+    ).toEqual(["Customer", "Market type"]);
+    expect(
+      within(list)
+        .getAllByRole("definition")
+        .map((definition) => definition.textContent),
+    ).toEqual(["Office workers", "Red"]);
   });
 });
 

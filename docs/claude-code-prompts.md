@@ -1210,7 +1210,7 @@ make test-web・make test-e2e・make typecheck・make lint・make doc-lint が�
 
 ## Step 22d: モックアップに合わせる（2）: 表・カード・指標・行・手順の部品
 
-Status:
+Status: done 2026-10-17
 
 ```
 Step 22c に続けて、docs/mockups/ と部品の違いのうち、データを見せる部品と独自の部品を直してください。

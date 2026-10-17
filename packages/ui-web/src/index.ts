@@ -26,6 +26,7 @@ export {
 } from "./components/Button";
 export {
   Card,
+  type CardDetail,
   type CardProps,
   CardView,
   type CardViewProps,
@@ -47,6 +48,12 @@ export {
   type ContextualHelpProps,
 } from "./components/ContextualHelp";
 export { DatePicker, type DatePickerProps } from "./components/DatePicker";
+export {
+  DescriptionList,
+  DescriptionListItem,
+  type DescriptionListItemProps,
+  type DescriptionListProps,
+} from "./components/DescriptionList";
 export {
   AlertDialog,
   type AlertDialogProps,
@@ -105,7 +112,12 @@ export {
   type MeterProps,
   type MeterSegment,
 } from "./components/Meter";
-export { MetricTile, type MetricTileProps } from "./components/MetricTile";
+export {
+  MetricGroup,
+  type MetricGroupProps,
+  MetricTile,
+  type MetricTileProps,
+} from "./components/MetricTile";
 export {
   MoonGlyph,
   type MoonGlyphProps,

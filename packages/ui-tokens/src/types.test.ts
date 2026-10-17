@@ -85,7 +85,14 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
           `semantic.scale.medium.component.illustrated-message.${dimension}`,
         ] as const,
     ),
-    ...["padding", "gap", "title-font-size", "description-font-size"].map(
+    ...[
+      "padding-x",
+      "padding-top",
+      "padding-bottom",
+      "gap",
+      "title-font-size",
+      "description-font-size",
+    ].map(
       (dimension) =>
         [
           "cardSizes",

@@ -6,6 +6,7 @@ import {
   type ReactNode,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -21,19 +22,47 @@ import {
   TableBody,
   TableHeader,
   TableStateContext,
+  VisuallyHidden,
 } from "react-aria-components";
 import { IconSlot } from "../internal/IconSlot";
+import { TableCellContext } from "../internal/tableCell";
 import { useIsNarrow } from "../internal/useIsNarrow";
 import * as styles from "./TableView.css";
 
 export interface TableColumn {
   id: string;
-  /** The header's text; on a phone, each value's label in the row's card. */
+  /**
+   * The header's text; on a phone, each value's label in the row when the row shows more
+   * than one value beside its name. The mark and ⋯ columns keep it for screen readers only.
+   */
   name: string;
-  /** The column that names the row: its value is the card's title on a phone. */
+  /** The column that names the row: its value is the row's name on a phone, in the label's weight. */
   isRowHeader?: boolean;
   /** Amounts and counts: the monospaced face, aligned right (design-spec 4.4). */
   numeric?: boolean;
+  /**
+   * The column's width, in px or as a share of the table ("31%"). Columns without one
+   * share what is left. The table's layout is fixed, so editing a row never moves them.
+   */
+  width?: number | `${number}%`;
+  /**
+   * The row's mark (a MoonGlyph) at the start of the row, in a narrow column with no
+   * header text; on a phone, at the start of the line (17, design-spec 4.5).
+   */
+  isMark?: boolean;
+  /**
+   * The row's ⋯ (an ActionMenu), in a narrow column at the end: with a mouse it shows on
+   * the row under the pointer or with focus, on touch always. A phone's row leaves it out,
+   * as the row presses as a whole and holds no buttons.
+   */
+  isRowActions?: boolean;
+  /**
+   * Leaves the column out of a phone's rows (17's notes and Can reduce?): the sheet the
+   * row's press opens edits it there (design-spec 4.5).
+   */
+  isHiddenOnPhone?: boolean;
+  /** On a phone, under the row's name in the caption's size (17's F/A/U label). */
+  isBelowName?: boolean;
 }
 
 export interface TableViewProps<T extends { id: Key }> {
@@ -49,7 +78,7 @@ export interface TableViewProps<T extends { id: Key }> {
     state: {
       isEditing: boolean;
       /**
-       * A phone's card, which presses as a whole: the cell shows its value only, with no
+       * A phone's row, which presses as a whole: the cell shows its value only, with no
        * button of its own (design-spec 4.5).
        */
       isCard: boolean;
@@ -60,7 +89,7 @@ export interface TableViewProps<T extends { id: Key }> {
   /**
    * Rows whose values can be edited in place. Pressing such a row, or Enter on one of its
    * cells, turns its cells into inputs; Escape, or moving out of the row, turns them back.
-   * On a phone the row is a card that calls `onRowAction`, for the screen's sheet.
+   * On a phone the row calls `onRowAction`, for the screen's sheet.
    */
   isRowEditable?: (item: T) => boolean;
   /** Pressing a row (that is not edited in place): open it, or its sheet on a phone. */
@@ -74,8 +103,8 @@ export interface TableViewProps<T extends { id: Key }> {
   /** @default "regular" */
   density?: Density;
   /**
-   * `auto`: a table on tablet and wider, a card per row on a phone. A phone always shows
-   * cards (design-spec 4.5).
+   * `auto`: a table on tablet and wider, lined rows on a phone. `cards` shows the phone's
+   * rows at every width. A phone always shows its rows (design-spec 4.5).
    * @default "auto"
    */
   layout?: TableLayout;
@@ -91,21 +120,47 @@ const toSet = (selection: Selection): Set<Key> =>
 
 /**
  * Rows of values in columns (17・18・7・28・15・21, design-spec 4.5): arrow keys move from
- * cell to cell. Editable rows show their values as text until touched.
+ * cell to cell. Editable rows show their values as text until touched. The table has no
+ * ground of its own: a line under the header and hairlines between the rows.
  */
 export function TableView<T extends { id: Key }>({
   density = "regular",
   layout = "auto",
+  columns,
   ...props
 }: TableViewProps<T>) {
   const isNarrow = useIsNarrow();
-  const { isRowEditable: _, ...cardProps } = props;
-  return isNarrow || layout === "cards" ? (
-    <CardRows {...cardProps} density={density} />
+  const lines = isNarrow || layout === "cards";
+  // The columns at this width; the rows keep their cache while the list holds.
+  const shown = useMemo(
+    () =>
+      columns.filter(
+        (column) =>
+          !(isNarrow && (column.isHiddenOnPhone ?? false)) &&
+          // A line presses as a whole and holds no buttons: no ⋯ there.
+          !(lines && (column.isRowActions ?? false)),
+      ),
+    [columns, isNarrow, lines],
+  );
+  const { isRowEditable: _, ...rowProps } = props;
+  return lines ? (
+    <LineRows {...rowProps} columns={shown} density={density} />
   ) : (
-    <GridTable {...props} density={density} />
+    <GridTable {...props} columns={shown} density={density} />
   );
 }
+
+/** A column's role in the row, which sets its cell's look. */
+const kindOf = (column: TableColumn) =>
+  column.isMark
+    ? "mark"
+    : column.isRowActions
+      ? "actions"
+      : column.isRowHeader
+        ? "header"
+        : column.numeric
+          ? "numeric"
+          : "text";
 
 function rowTextOf<T extends { id: Key }>(
   props: Pick<TableViewProps<T>, "columns" | "renderCell" | "textValue">,
@@ -356,16 +411,22 @@ function GridTable<T extends { id: Key }>({
         }
         className={`${styles.table} ${styles.density[density]}`}
       >
-        <TableHeader columns={columns} className={styles.headerRow}>
+        <TableHeader columns={columns}>
           {(column) => (
             <Column
               id={column.id}
               isRowHeader={column.isRowHeader}
-              className={styles.headerCell({
-                numeric: column.numeric ?? false,
-              })}
+              // The fixed layout takes the columns' widths from the header's cells.
+              style={
+                column.width === undefined ? undefined : { width: column.width }
+              }
+              className={styles.headerCell({ kind: kindOf(column) })}
             >
-              {column.name}
+              {column.isMark || column.isRowActions ? (
+                <VisuallyHidden>{column.name}</VisuallyHidden>
+              ) : (
+                column.name
+              )}
             </Column>
           )}
         </TableHeader>
@@ -389,6 +450,9 @@ function GridTable<T extends { id: Key }>({
         >
           {(item) => {
             const isEditable = isRowEditable?.(item) ?? false;
+            const chevronColumn = columns.findLast(
+              (column) => !column.isRowActions && !column.isMark,
+            );
             const showsInputs =
               isEditable && (activeKey === item.id || editingKey === item.id);
             const isTyping = isEditable && editingKey === item.id;
@@ -426,53 +490,76 @@ function GridTable<T extends { id: Key }>({
                     // An editable row's arrows land on its cells, not in their inputs:
                     // Enter or a press starts typing.
                     focusMode={isEditable ? "cell" : undefined}
-                    className={styles.cell({
-                      numeric: column.numeric ?? false,
-                    })}
+                    className={styles.cell({ kind: kindOf(column) })}
                   >
-                    {isEditable ? (
-                      // One element whether the row shows its values or its inputs, so
-                      // what a cell renders in both (a FauPicker) keeps its state.
-                      // biome-ignore lint/a11y/noStaticElementInteractions: the cell's inputs take the keys; this ends typing on Escape and keeps the keys and presses from the table.
-                      <div
-                        className={showsInputs ? styles.editing : undefined}
-                        onPointerDown={
-                          showsInputs
-                            ? (event) => event.stopPropagation()
-                            : undefined
-                        }
-                        onKeyDown={isTyping ? onEditKeyDown : undefined}
-                      >
-                        {isTyping && <KeyboardNavigationOff />}
-                        {renderCell(item, column.id, {
-                          isEditing: showsInputs,
-                          isCard: false,
-                        })}
-                      </div>
-                    ) : (onRowAction !== undefined ||
-                        selectionMode !== "none") &&
-                      column === columns[columns.length - 1] ? (
-                      // A row pressed to open something or show it beside the table ends
-                      // in › (design-spec 4.4).
-                      <span className={styles.withChevron}>
-                        <span className={styles.chevronContent}>
+                    <TableCellContext.Provider
+                      value={{
+                        isNumeric: column.numeric ?? false,
+                        isEditing: showsInputs,
+                      }}
+                    >
+                      {isEditable ? (
+                        // One element whether the row shows its values or its inputs, so
+                        // what a cell renders in both (a FauPicker) keeps its state.
+                        // biome-ignore lint/a11y/noStaticElementInteractions: the cell's inputs take the keys; this ends typing on Escape and keeps the keys and presses from the table.
+                        <div
+                          className={
+                            kindOf(column) === "mark"
+                              ? styles.mark
+                              : kindOf(column) === "actions"
+                                ? styles.actions
+                                : showsInputs
+                                  ? styles.editing
+                                  : styles.value
+                          }
+                          onPointerDown={
+                            showsInputs
+                              ? (event) => event.stopPropagation()
+                              : undefined
+                          }
+                          onKeyDown={isTyping ? onEditKeyDown : undefined}
+                        >
+                          {isTyping && <KeyboardNavigationOff />}
+                          {renderCell(item, column.id, {
+                            isEditing: showsInputs,
+                            isCard: false,
+                          })}
+                        </div>
+                      ) : (onRowAction !== undefined ||
+                          selectionMode !== "none") &&
+                        column === chevronColumn ? (
+                        // A row pressed to open something or show it beside the table
+                        // ends in › (design-spec 4.4), before its ⋯.
+                        <span className={styles.withChevron}>
+                          <span className={styles.chevronContent}>
+                            {renderCell(item, column.id, {
+                              isEditing: false,
+                              isCard: false,
+                            })}
+                          </span>
+                          <span className={styles.chevron}>
+                            <IconSlot size="S">
+                              <ChevronRight />
+                            </IconSlot>
+                          </span>
+                        </span>
+                      ) : (
+                        <div
+                          className={
+                            kindOf(column) === "mark"
+                              ? styles.mark
+                              : kindOf(column) === "actions"
+                                ? styles.actions
+                                : styles.wrapped
+                          }
+                        >
                           {renderCell(item, column.id, {
                             isEditing: false,
                             isCard: false,
                           })}
-                        </span>
-                        <span className={styles.chevron}>
-                          <IconSlot size="S">
-                            <ChevronRight />
-                          </IconSlot>
-                        </span>
-                      </span>
-                    ) : (
-                      renderCell(item, column.id, {
-                        isEditing: false,
-                        isCard: false,
-                      })
-                    )}
+                        </div>
+                      )}
+                    </TableCellContext.Provider>
                   </Cell>
                 )}
               </Row>
@@ -498,8 +585,13 @@ function KeyboardNavigationOff() {
   return null;
 }
 
-/** A phone's table: a card per row, its header cell as the title and the rest as label and value. */
-function CardRows<T extends { id: Key }>({
+/**
+ * A phone's table (and `layout="cards"`): one line per row, divided by hairlines under a
+ * line, not boxed (design-spec 4.3・4.5; s17-costs.html). The mark at the start, the name
+ * and under it the values marked `isBelowName`, and at the end the one other value; a row
+ * with more values lists them under its name with their labels.
+ */
+function LineRows<T extends { id: Key }>({
   columns,
   items,
   renderCell,
@@ -512,8 +604,22 @@ function CardRows<T extends { id: Key }>({
   density = "regular",
   ...labels
 }: Omit<TableViewProps<T>, "layout" | "isRowEditable">) {
+  const mark = columns.find((column) => column.isMark);
   const header = columns.find((column) => column.isRowHeader);
-  const rest = columns.filter((column) => column !== header);
+  const below = columns.filter(
+    (column) => column.isBelowName && column !== header,
+  );
+  const rest = columns.filter(
+    (column) => column !== mark && column !== header && !below.includes(column),
+  );
+  const [end] = rest.length === 1 ? rest : [];
+  const cell = (item: T, column: TableColumn) => (
+    <TableCellContext.Provider
+      value={{ isNumeric: column.numeric ?? false, isEditing: false }}
+    >
+      {renderCell(item, column.id, { isEditing: false, isCard: true })}
+    </TableCellContext.Provider>
+  );
   return (
     <GridList
       {...labels}
@@ -533,10 +639,10 @@ function CardRows<T extends { id: Key }>({
           : undefined
       }
       renderEmptyState={renderEmptyState}
-      className={`${styles.cards} ${styles.density[density]}`}
+      className={`${styles.lines} ${styles.density[density]}`}
     >
       {(item) => {
-        // A card pressed to open something or to choose it ends in › (design-spec 4.4).
+        // A row pressed to open something or to choose it ends in › (design-spec 4.4).
         const isPressable =
           onRowAction !== undefined || selectionMode !== "none";
         return (
@@ -544,35 +650,44 @@ function CardRows<T extends { id: Key }>({
             id={item.id}
             textValue={rowTextOf({ columns, renderCell, textValue }, item)}
             onAction={onRowAction ? () => onRowAction(item.id) : undefined}
-            className={styles.card({ isActionable: isPressable })}
+            className={styles.line({ isActionable: isPressable })}
           >
-            <div className={styles.cardBody}>
+            {mark !== undefined && (
+              <span className={styles.lineMark}>{cell(item, mark)}</span>
+            )}
+            <div className={styles.lineBody}>
               {header !== undefined && (
-                <span className={styles.cardTitle}>
-                  {renderCell(item, header.id, {
-                    isEditing: false,
-                    isCard: true,
-                  })}
-                </span>
+                <span className={styles.lineTitle}>{cell(item, header)}</span>
               )}
-              <dl className={styles.cardValues}>
-                {rest.map((column) => (
-                  <div key={column.id} className={styles.cardValue}>
-                    <dt className={styles.cardLabel}>{column.name}</dt>
-                    <dd
-                      className={styles.cardData({
-                        numeric: column.numeric ?? false,
-                      })}
-                    >
-                      {renderCell(item, column.id, {
-                        isEditing: false,
-                        isCard: true,
-                      })}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+              {below.map((column) => (
+                <span key={column.id} className={styles.lineBelow}>
+                  {cell(item, column)}
+                </span>
+              ))}
+              {end === undefined && rest.length > 0 && (
+                <dl className={styles.lineValues}>
+                  {rest.map((column) => (
+                    <div key={column.id} className={styles.lineValue}>
+                      <dt className={styles.lineLabel}>{column.name}</dt>
+                      <dd
+                        className={styles.lineData({
+                          numeric: column.numeric ?? false,
+                        })}
+                      >
+                        {cell(item, column)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
             </div>
+            {end !== undefined && (
+              <span
+                className={styles.lineEnd({ numeric: end.numeric ?? false })}
+              >
+                {cell(item, end)}
+              </span>
+            )}
             {isPressable && (
               <span className={styles.chevron}>
                 <IconSlot size="S">

@@ -52,7 +52,8 @@ export function ActionButtonBase({
   size: ownSize,
   children,
   ...props
-}: Omit<ActionButtonProps, "size"> & { size?: SizeWithXS }) {
+}: Omit<ActionButtonProps, "size"> &
+  Pick<AriaButtonProps, "onFocus" | "onPressStart"> & { size?: SizeWithXS }) {
   const defaults = useContext(ActionGroupContext);
   const size = ownSize ?? defaults.size ?? "M";
   const isQuiet = ownQuiet ?? defaults.isQuiet ?? false;

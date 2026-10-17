@@ -15,6 +15,7 @@ import {
 } from "./ActionsSection";
 import { ChoiceSection, FileAndTagSection } from "./ChoicesSection";
 import {
+  DescriptionListSection,
   DiffTextSection,
   MentionTextAreaSection,
   MetricTileSection,
@@ -61,6 +62,7 @@ import {
   FrameSection,
   PageFrameSection,
 } from "./FrameSection";
+import { MockupDataSection } from "./MockupDataSection";
 import { MockupBasicsSection } from "./MockupSection";
 import {
   BreadcrumbsSection,
@@ -204,6 +206,7 @@ export function ComponentGallery() {
           <FauPickerSection />
           <MetricTileSection />
           <RowListSection />
+          <DescriptionListSection />
           <QuestionCardSection />
           <DiffTextSection />
           <MentionTextAreaSection />
@@ -223,6 +226,7 @@ export function ComponentGallery() {
           <PresentationPatternSection />
           <PublicPatternSection />
           <MockupBasicsSection />
+          <MockupDataSection />
         </Stack>
       </Container>
       <FramePanelSection />

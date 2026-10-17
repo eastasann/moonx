@@ -66,6 +66,11 @@ export interface SlideProps {
    * @default 3
    */
   headingLevel?: 2 | 3;
+  /**
+   * A thumbnail (23's list of slides): the white page without its own corners and shadow,
+   * as the card around it frames it (design-spec 4.4・4.5).
+   */
+  isThumbnail?: boolean;
 }
 
 /**
@@ -79,6 +84,7 @@ export function Slide({
   footer,
   currency,
   headingLevel = 3,
+  isThumbnail = false,
 }: SlideProps) {
   const headingId = useId();
   const measure = useMeasure();
@@ -127,7 +133,10 @@ export function Slide({
     );
 
   return (
-    <section aria-labelledby={headingId} className={styles.slide}>
+    <section
+      aria-labelledby={headingId}
+      className={`${styles.slide}${isThumbnail ? ` ${styles.thumbnail}` : ""}`}
+    >
       <div className={styles.page}>
         <div
           className={slide.type === "title" ? styles.titleBody : styles.body}

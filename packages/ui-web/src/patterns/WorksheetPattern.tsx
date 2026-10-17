@@ -15,7 +15,7 @@ import * as styles from "./patterns.css";
 export interface WorksheetPatternProps {
   /** The title and what goes under it (the tabs of 17's three tables). */
   header?: ReactNode;
-  /** The input table (a TableView; a card per row on a phone). */
+  /** The input table (a TableView; lined rows on a phone). */
   inputs: ReactNode;
   /** The results: totals and indicators. */
   results: ReactNode;
@@ -34,7 +34,7 @@ export interface WorksheetPatternProps {
  * Desktop: the inputs on the left, the results on the right, in view while the inputs
  * scroll. Tablet, and a desktop whose docked panel leaves the body too narrow: the inputs
  * across the whole width (a table), a summary bar fixed to the bottom that opens the
- * results in a drawer from the right. Phone: the same, the inputs as a card per row and
+ * results in a drawer from the right. Phone: the same, the inputs as lined rows and
  * the results in a tray.
  */
 export function WorksheetPattern({

@@ -1,6 +1,6 @@
 import { sizes } from "@moonx/ui-tokens";
 import { User } from "@react-aria/test-utils";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, test, vi } from "vitest";
@@ -81,6 +81,43 @@ describe("RadioGroup", () => {
         screen.getByText(`Radio ${size}`).closest("label")?.className ?? "",
     );
     expect(new Set(looks).size).toBe(4);
+  });
+});
+
+describe("RadioGroup cards", () => {
+  test("each choice is a radio named by its title and its line; arrows choose", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <RadioGroup
+        label="Should we develop this into a full Business Plan?"
+        variant="cards"
+        onChange={onChange}
+      >
+        <Radio value="proceed" description="Worth planning">
+          Proceed
+        </Radio>
+        <Radio value="hold" description="Come back later">
+          Hold
+        </Radio>
+        <Radio value="drop" description="Hide from lists">
+          Drop
+        </Radio>
+      </RadioGroup>,
+    );
+    const group = screen.getByRole("radiogroup", {
+      name: "Should we develop this into a full Business Plan?",
+    });
+    const radios = within(group).getAllByRole("radio");
+    expect(radios).toHaveLength(3);
+    // The line sits in the radio's label, so it is read with the title.
+    expect(
+      within(group).getByRole("radio", { name: "Hold Come back later" }),
+    ).toBeTruthy();
+    await user.click(screen.getByText("Hold"));
+    expect(onChange).toHaveBeenLastCalledWith("hold");
+    await user.keyboard("{ArrowRight}");
+    expect(onChange).toHaveBeenLastCalledWith("drop");
   });
 });
 

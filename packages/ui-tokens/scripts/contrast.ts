@@ -178,7 +178,7 @@ export const MODE_EXEMPT: Exemptions = {
   "control.disabled": "an inactive control (WCAG 1.4.11 exempts it)",
   "border.hairline": "a decorative divider; content is grouped by space too",
   "border.default":
-    "the edge of a component its text already identifies (Badge, Button and ActionButton, SegmentedControl's groove, Divider L, the underline of a lone Link): WCAG 1.4.11 asks 3:1 only of what is needed to identify a component (design-spec 4.4)",
+    "the edge of a component its text already identifies (Badge, Button and ActionButton, SegmentedControl's groove, a choice card, an emphasised RowList row, Divider L and the lines over and under tables, the underline of a lone Link): WCAG 1.4.11 asks 3:1 only of what is needed to identify a component (design-spec 4.4)",
   "surface.scrim":
     "the translucent backdrop of a Dialog or Tray, not information",
   "fau.empty.strong":
@@ -192,11 +192,6 @@ export const PRINT_PAIRS: readonly ContrastPair[] = [
     backgrounds: ["page", "panel", "table-header"],
     minimum: 4.5 as const,
   })),
-  {
-    foreground: "border-strong",
-    backgrounds: ["page", "panel", "table-header"],
-    minimum: 3,
-  },
   { foreground: "rule", backgrounds: ["page", "panel"], minimum: 3 },
 ];
 

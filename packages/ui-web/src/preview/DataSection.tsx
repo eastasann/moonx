@@ -156,6 +156,7 @@ interface CostRow {
 }
 
 const costColumns: TableColumn[] = [
+  { id: "mark", name: "State", isMark: true },
   { id: "name", name: "Item", isRowHeader: true },
   { id: "amount", name: "Amount", numeric: true },
   { id: "fau", name: "F/A/U" },
@@ -203,6 +204,15 @@ export function TableViewSection() {
           isRowEditable={() => true}
           onRowAction={setOpened}
           renderCell={(row, column, { isEditing, isCard }) => {
+            if (column === "mark") {
+              // A FauPicker's cell shows its label; the row's moon is here.
+              return (
+                <MoonGlyph
+                  state={row.state === "fact_no_evidence" ? "fact" : row.state}
+                  size="S"
+                />
+              );
+            }
             if (column === "name") {
               return isEditing ? (
                 <TextField
@@ -238,7 +248,7 @@ export function TableViewSection() {
                   confidence={row.state === "assumption" ? "medium" : null}
                   evidenceCount={row.state === "fact" ? 1 : 0}
                   hasValue={row.amount !== ""}
-                  // A phone's card presses as a whole: its F/A/U is shown, and set in
+                  // A phone's row presses as a whole: its F/A/U is shown, and set in
                   // the row's sheet.
                   isReadOnly={isCard}
                   size="S"
@@ -420,10 +430,9 @@ export function CardSection() {
           ))}
         </Flex>
       </Specimen>
-      <Specimen name='CardView size="L", onAction (15)'>
+      <Specimen name='CardView size="M", onAction (15)'>
         <CardView
           aria-label="Competitors"
-          size="L"
           items={competitors}
           onAction={() => {}}
         >

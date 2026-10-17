@@ -1,7 +1,7 @@
 import { i18n } from "@moonx/i18n";
 import type { Size, SizeWithXS } from "@moonx/ui-tokens";
 import { Ellipsis } from "lucide-react";
-import { createContext, type ReactNode, useContext } from "react";
+import { createContext, type ReactNode, useContext, useRef } from "react";
 import {
   Menu as AriaMenu,
   MenuItem as AriaMenuItem,
@@ -14,6 +14,7 @@ import {
 import { FixedLocale } from "../internal/FixedLocale";
 import { IconSlot } from "../internal/IconSlot";
 import { ResponsivePopover } from "../internal/ResponsivePopover";
+import { useFocusBackToTrigger } from "../internal/useFocusBackToTrigger";
 import { ActionButtonBase } from "./ActionButton";
 import * as styles from "./Menu.css";
 
@@ -137,15 +138,36 @@ export function ActionMenu({
   onAction,
   disabledKeys,
   children,
+  onOpenChange,
   ...state
 }: ActionMenuProps) {
+  // A row's or a card's ⋯ sits in a collection, which would take the focus the closed
+  // menu gives back (design-spec 4.5).
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const focusBack = useFocusBackToTrigger(triggerRef);
+  const keepTrigger = (target: EventTarget) => {
+    if (target instanceof HTMLElement) triggerRef.current = target;
+  };
   return (
-    <MenuTrigger {...state}>
+    <MenuTrigger
+      {...state}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) focusBack();
+        onOpenChange?.(isOpen);
+      }}
+    >
       <ActionButtonBase
         size={size}
         isQuiet={isQuiet}
         isDisabled={isDisabled}
         aria-label={label ?? i18n.t("components:actionMenu.label")}
+        onFocus={(event) => keepTrigger(event.target)}
+        onPressStart={(event) => {
+          keepTrigger(event.target);
+          // A press focuses the button where the browser does not (Safari), so the
+          // menu has a button to give focus back to.
+          triggerRef.current?.focus();
+        }}
       >
         <Ellipsis />
       </ActionButtonBase>

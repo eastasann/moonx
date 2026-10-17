@@ -3,6 +3,10 @@ import { History, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { ActionButton } from "../components/ActionButton";
 import { Button } from "../components/Button";
+import {
+  DescriptionList,
+  DescriptionListItem,
+} from "../components/DescriptionList";
 import { DiffText } from "../components/DiffText";
 import { Disclosure } from "../components/Disclosure";
 import { fauLabel } from "../components/FauPicker";
@@ -10,7 +14,7 @@ import {
   type MentionCandidate,
   MentionTextArea,
 } from "../components/MentionTextArea";
-import { MetricTile } from "../components/MetricTile";
+import { MetricGroup, MetricTile } from "../components/MetricTile";
 import { MoonGlyph } from "../components/MoonGlyph";
 import { Panel } from "../components/Panel";
 import { QuestionCard } from "../components/QuestionCard";
@@ -20,17 +24,16 @@ import { Steps } from "../components/Steps";
 import { Text } from "../components/Text";
 import { TextArea } from "../components/TextField";
 import { Flex, Stack } from "../layout/Flex";
-import { Grid } from "../layout/Grid";
 import { Section, Specimen } from "./parts";
 import * as styles from "./preview.css";
 
 export function MetricTileSection() {
   return (
-    <Section title="MetricTile">
-      <Specimen name="a value, a placeholder, a notice supplement">
-        <Grid columns={{ mobile: 2, tablet: 4 }} gap="space-400">
+    <Section title="MetricTile and MetricGroup">
+      <Specimen name='MetricGroup variant="band": a value, a unit, a placeholder, a notice supplement'>
+        <MetricGroup aria-label="Key numbers band">
           <MetricTile label="Startup cost" value="₱169,500+" />
-          <MetricTile label="Break-even" value="6.9 / day" />
+          <MetricTile label="Break-even" value="6.9" unit="/ day" />
           <MetricTile
             label="Expected profit"
             value="Needs price"
@@ -38,11 +41,40 @@ export function MetricTileSection() {
           />
           <MetricTile
             label="Payback"
-            value="9.2 months"
+            value="9.2"
+            unit="months"
             supplement="Contribution margin is zero or negative"
             supplementTone="notice"
           />
-        </Grid>
+        </MetricGroup>
+      </Specimen>
+      <Specimen name='MetricGroup variant="compact" (19)'>
+        <MetricGroup
+          aria-label="Key numbers compact specimen"
+          variant="compact"
+        >
+          <MetricTile label="Startup" value="₱169,500" />
+          <MetricTile label="Break-even" value="6.9 / day" />
+          <MetricTile label="ROI" value="130.9%" />
+        </MetricGroup>
+      </Specimen>
+    </Section>
+  );
+}
+
+export function DescriptionListSection() {
+  return (
+    <Section title="DescriptionList">
+      <Specimen name="labels and values (13・19's Summary)">
+        <DescriptionList>
+          <DescriptionListItem label="Customer">
+            Office workers in Bacolod who buy pasalubong for family.
+          </DescriptionListItem>
+          <DescriptionListItem label="Solution">
+            <Text tone="tertiary">Empty</Text>
+          </DescriptionListItem>
+          <DescriptionListItem label="Market type">Mixed</DescriptionListItem>
+        </DescriptionList>
       </Specimen>
     </Section>
   );
@@ -379,6 +411,7 @@ export function SlideSection() {
             slide={slides[2] as PitchSlide}
             footer={footer}
             currency="PHP"
+            isThumbnail
           />
         </div>
       </Specimen>

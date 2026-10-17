@@ -20,6 +20,13 @@ interface CardViewContextValue {
 
 const CardViewContext = createContext<CardViewContextValue | null>(null);
 
+/** A line of a Card's details: a label and its value (15's Target customer, Offering…). */
+export interface CardDetail {
+  id: string;
+  label: ReactNode;
+  value: ReactNode;
+}
+
 export interface CardProps {
   /** Inside a CardView: the card's key. */
   id?: Key;
@@ -29,37 +36,109 @@ export interface CardProps {
   size?: CardSize;
   /** Above the text, edge to edge: a slide's thumbnail (23). */
   preview?: ReactNode;
+  /** Above the title, in the small monospaced type (15's Direct competitor). Not upper-cased. */
+  eyebrow?: ReactNode;
   title?: ReactNode;
+  /**
+   * At the top right, beside the title, in the monospaced face (15's price). Not named
+   * `value`: React Aria passes a collection's item to its elements as `value`.
+   */
+  figure?: ReactNode;
+  /** Under the figure (15's "per bowl"). */
+  figureDescription?: ReactNode;
+  /** The figure is a placeholder ("No price"): smaller and quieter. */
+  isFigurePlaceholder?: boolean;
   description?: ReactNode;
-  /** The card's content under its title: values, StatusLights, chips. No buttons (4.5). */
+  /**
+   * Label and value lines divided by hairlines, the labels in a column (15). On a phone
+   * each label sits above its value.
+   */
+  details?: readonly CardDetail[];
+  /** The card's content under its details: values, StatusLights, chips. No buttons (4.5). */
   children?: ReactNode;
+  /** The last line, in the small secondary type (15's "1 source · 💬 1"). */
+  footer?: ReactNode;
+  /**
+   * At the end of the last line: the card's ⋯ (an ActionMenu), the one button a card in a
+   * CardView may hold (design-spec 4.5). Tab moves from the card to it.
+   */
+  actions?: ReactNode;
 }
 
 /**
  * Something to look at beside others (15's competitors, 23's thumbnails; design-spec
  * 4.4・4.5): framed without a shadow, its content stacked. Inside a CardView it is one of the
- * view's items and presses or is chosen as a whole, so it holds no buttons of its own:
- * actions sit outside it.
+ * view's items and presses or is chosen as a whole; its ⋯ (`actions`) is the only button
+ * it holds, and the other actions sit outside it.
  */
 export function Card({
   id,
   textValue,
   size: ownSize,
   preview,
+  eyebrow,
   title,
+  figure,
+  figureDescription,
+  isFigurePlaceholder = false,
   description,
+  details,
   children,
+  footer,
+  actions,
 }: CardProps) {
   const view = useContext(CardViewContext);
   const size = ownSize ?? view?.size ?? "M";
+  const hasHead = eyebrow != null || title != null || figure != null;
   const content = (
     <>
       {preview != null && <div className={styles.preview[size]}>{preview}</div>}
-      {title != null && <span className={styles.title[size]}>{title}</span>}
+      {hasHead && (
+        <div className={styles.head}>
+          <div className={styles.headText}>
+            {eyebrow != null && (
+              <span className={styles.eyebrow}>{eyebrow}</span>
+            )}
+            {title != null && (
+              <span className={styles.title[size]}>{title}</span>
+            )}
+          </div>
+          {figure != null && (
+            <span
+              className={styles.figure({ isPlaceholder: isFigurePlaceholder })}
+            >
+              {figure}
+              {figureDescription != null && (
+                <span className={styles.figureDescription}>
+                  {figureDescription}
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      )}
       {description != null && (
         <span className={styles.description[size]}>{description}</span>
       )}
+      {details !== undefined && details.length > 0 && (
+        <dl className={styles.details}>
+          {details.map((detail) => (
+            <div key={detail.id} className={styles.detail}>
+              <dt className={styles.detailLabel}>{detail.label}</dt>
+              <dd className={styles.detailValue}>{detail.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       {children != null && <div className={styles.content}>{children}</div>}
+      {(footer != null || actions != null) && (
+        <div className={styles.footer}>
+          {footer != null && (
+            <span className={styles.footerText}>{footer}</span>
+          )}
+          {actions != null && <span className={styles.actions}>{actions}</span>}
+        </div>
+      )}
     </>
   );
   if (view === null) {
@@ -104,8 +183,8 @@ export interface CardViewProps<T extends object> {
 
 /**
  * Cards in columns as many as the width holds, each at least the size's width (2〜3 on a
- * desktop for 15 at L); one column on a phone (design-spec 4.1 E・4.5). The arrow keys move
- * between the cards in both directions.
+ * desktop for 15); one column on a phone (design-spec 4.1 E・4.5). The arrow keys move
+ * between the cards in both directions, and Tab from a card to its ⋯.
  */
 export function CardView<T extends object>({
   size = "M",

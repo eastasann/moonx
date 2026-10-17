@@ -2,6 +2,7 @@ import { vars } from "@moonx/ui-tokens";
 import { style } from "@vanilla-extract/css";
 import { recipe } from "@vanilla-extract/recipes";
 import { atLeastTarget, focusRing, typography } from "../styles/helpers";
+import { cellPaddingX } from "./tableCell.css";
 
 const sizes = ["S", "M", "L", "XL"] as const;
 
@@ -140,6 +141,53 @@ export const affix = style({
   flexShrink: 0,
   color: vars.color.text.secondary,
   fontFamily: vars.font.family.mono,
+});
+
+/**
+ * A number in a table's number column: the symbol, the digits and the "%" packed at the
+ * end of the frame, as the column's values are (design-spec 4.4・4.5). The frame's end
+ * reaches the cell's edge and keeps the cell's padding less its border inside, so the
+ * digits stay where the value was.
+ */
+export const endFrame = style({
+  justifyContent: "flex-end",
+  // The symbol touches the digits, as in the value it replaces ("₱30,000").
+  gap: 0,
+  marginInlineEnd: `calc(-1 * ${cellPaddingX})`,
+  paddingInlineEnd: `calc(${cellPaddingX} - ${vars.borderWidth.strong})`,
+  cursor: "text",
+});
+
+/**
+ * Grows with the text it holds (`data-value`), so the input is as wide as its digits and
+ * the symbol before it stays beside them; a text wider than the frame scrolls inside the
+ * input.
+ */
+export const endSizer = style({
+  display: "inline-grid",
+  gridTemplateColumns: "minmax(0, max-content)",
+  minWidth: "1ch",
+  flexShrink: 1,
+  selectors: {
+    "&::after": {
+      content: "attr(data-value)",
+      gridArea: "1 / 1",
+      visibility: "hidden",
+      whiteSpace: "pre",
+      overflow: "hidden",
+      fontFamily: vars.font.family.mono,
+      fontVariantNumeric: "tabular-nums",
+    },
+  },
+});
+
+// Without an intrinsic width of its own (an input's is about 20 characters), the input
+// leaves the sizer the text's width and then fills it.
+export const endInput = style({
+  gridArea: "1 / 1",
+  width: 0,
+  minWidth: "100%",
+  textAlign: "end",
 });
 
 export const description = style({

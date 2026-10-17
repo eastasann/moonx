@@ -7,7 +7,7 @@ import { fauLabel } from "../components/FauPicker";
 import { Heading } from "../components/Heading";
 import { Link } from "../components/Link";
 import { ListView, ListViewItem } from "../components/ListView";
-import { MetricTile } from "../components/MetricTile";
+import { MetricGroup, MetricTile } from "../components/MetricTile";
 import { MoonGlyph } from "../components/MoonGlyph";
 import { QuestionCard } from "../components/QuestionCard";
 import { Radio, RadioGroup } from "../components/RadioGroup";
@@ -58,12 +58,12 @@ export function HubPatternSection() {
           actions={<Button variant="secondary">Edit summary</Button>}
           primaryAction={<Button variant="primary">Decide</Button>}
           metrics={
-            <Grid columns={{ mobile: 2, desktop: 4 }} gap="space-400">
+            <MetricGroup aria-label="Key numbers of the hub">
               <MetricTile label="Startup costs" value="₱169,500" />
-              <MetricTile label="Break-even" value="6.9 / day" />
-              <MetricTile label="Expected profit" value="₱18,490 / mo" />
-              <MetricTile label="Payback" value="9.2 months" />
-            </Grid>
+              <MetricTile label="Break-even" value="6.9" unit="/ day" />
+              <MetricTile label="Expected profit" value="₱18,490" unit="/ mo" />
+              <MetricTile label="Payback" value="9.2" unit="months" />
+            </MetricGroup>
           }
           blocks={[
             {

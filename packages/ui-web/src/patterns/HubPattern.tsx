@@ -22,7 +22,7 @@ export interface HubPatternProps {
    * fixed to the bottom on a phone (4.1 A).
    */
   primaryAction?: ReactNode;
-  /** The key numbers across the top (13): a row on a desktop, 2×2 on a phone (the screen's Grid). */
+  /** The key numbers across the top (13): a `MetricGroup`, a row on a desktop and 2×2 on a phone. */
   metrics?: ReactNode;
   /**
    * The blocks, in the order a phone and a tablet stack them (4.1 A: "the screen

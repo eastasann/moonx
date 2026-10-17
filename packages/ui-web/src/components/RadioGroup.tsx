@@ -1,4 +1,4 @@
-import type { Size } from "@moonx/ui-tokens";
+import type { RadioGroupVariant, Size } from "@moonx/ui-tokens";
 import { createContext, type ReactNode, useContext } from "react";
 import {
   Radio as AriaRadio,
@@ -15,7 +15,10 @@ import {
 import { useSize } from "../internal/size";
 import * as styles from "./choice.css";
 
-const GroupSize = createContext<Size>("M");
+const GroupContext = createContext<{
+  size: Size;
+  variant: RadioGroupVariant;
+}>({ size: "M", variant: "default" });
 
 export interface RadioGroupProps
   extends FieldTextProps,
@@ -34,6 +37,13 @@ export interface RadioGroupProps
     > {
   /** @default "vertical" */
   orientation?: "vertical" | "horizontal";
+  /**
+   * `cards`: each choice is a card with its title and `description`, side by side (one
+   * column on a phone), under the question in a larger type (s19-decision.html). The
+   * orientation then has no effect.
+   * @default "default"
+   */
+  variant?: RadioGroupVariant;
   /** @default "M", or "L" inside a spacious `Form` */
   size?: Size;
   /** `Radio`s. */
@@ -47,22 +57,34 @@ export function RadioGroup({
   errorMessage,
   isInvalid,
   orientation = "vertical",
+  variant = "default",
   size,
   children,
   ...props
 }: RadioGroupProps) {
   const resolved = useSize(size);
+  const isCards = variant === "cards";
   return (
     <AriaRadioGroup
       {...props}
       orientation={orientation}
       isInvalid={invalidOf({ errorMessage, isInvalid })}
       validationBehavior="aria"
-      className={styles.group}
+      className={isCards ? styles.cardGroup : styles.group}
     >
-      {label != null && <Label className={styles.groupLabel}>{label}</Label>}
-      <div className={styles.options({ orientation })}>
-        <GroupSize.Provider value={resolved}>{children}</GroupSize.Provider>
+      {label != null && (
+        <Label className={isCards ? styles.cardQuestion : styles.groupLabel}>
+          {label}
+        </Label>
+      )}
+      <div
+        className={
+          isCards ? styles.cardOptions : styles.options({ orientation })
+        }
+      >
+        <GroupContext.Provider value={{ size: resolved, variant }}>
+          {children}
+        </GroupContext.Provider>
       </div>
       <FieldHelp description={description} errorMessage={errorMessage} />
     </AriaRadioGroup>
@@ -72,15 +94,41 @@ export function RadioGroup({
 export interface RadioProps
   extends Pick<AriaRadioProps, "value" | "isDisabled" | "id" | "aria-label"> {
   children?: ReactNode;
+  /** A line under the choice's name ("Worth planning"); a card's second line in `cards`. */
+  description?: ReactNode;
 }
 
 /** One choice of a RadioGroup. */
-export function Radio({ children, ...props }: RadioProps) {
-  const size = useContext(GroupSize);
+export function Radio({ children, description, ...props }: RadioProps) {
+  const { size, variant } = useContext(GroupContext);
+  if (variant === "cards") {
+    return (
+      <AriaRadio {...props} className={styles.card}>
+        <span className={`${styles.circle({ size })} ${styles.cardCircle}`} />
+        <span className={styles.cardText}>
+          {children != null && (
+            <span className={styles.cardTitle}>{children}</span>
+          )}
+          {description != null && (
+            <span className={styles.cardDescription}>{description}</span>
+          )}
+        </span>
+      </AriaRadio>
+    );
+  }
   return (
     <AriaRadio {...props} className={styles.row({ size })}>
       <span className={styles.circle({ size })} />
-      {children != null && <span className={styles.rowLabel}>{children}</span>}
+      {description == null ? (
+        children != null && <span className={styles.rowLabel}>{children}</span>
+      ) : (
+        <span className={styles.cardText}>
+          {children != null && (
+            <span className={styles.rowLabel}>{children}</span>
+          )}
+          <span className={styles.cardDescription}>{description}</span>
+        </span>
+      )}
     </AriaRadio>
   );
 }

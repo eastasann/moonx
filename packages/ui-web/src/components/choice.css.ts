@@ -5,6 +5,7 @@ import {
   atLeastTarget,
   focusRing,
   hoverTransition,
+  narrowQuery,
   reducedMotion,
   typography,
 } from "../styles/helpers";
@@ -238,4 +239,83 @@ export const options = recipe({
     },
   },
   defaultVariants: { orientation: "vertical" },
+});
+
+// RadioGroup's cards (s19-decision.html .choices).
+
+const radioCard = vars.scale.component.radioCard;
+
+export const cardGroup = style([group, { gap: radioCard.questionGap }]);
+
+/** The question over the cards, larger than a field's label. */
+export const cardQuestion = style({
+  ...typography("headingChoice"),
+  color: vars.color.text.primary,
+});
+
+/** As many columns as choices; one on a phone. */
+export const cardOptions = style({
+  display: "grid",
+  gridAutoFlow: "column",
+  gridAutoColumns: "minmax(0, 1fr)",
+  gap: radioCard.gap,
+  "@media": {
+    [narrowQuery]: {
+      gridAutoFlow: "row",
+      gridTemplateColumns: "minmax(0, 1fr)",
+    },
+  },
+});
+
+/** A choice: framed in the light line; chosen, the ink frame and an inner line of ink. */
+export const card = style({
+  ...hoverTransition,
+  display: "flex",
+  alignItems: "flex-start",
+  gap: radioCard.gap,
+  minHeight: atLeastTarget("0px"),
+  padding: radioCard.padding,
+  border: `${vars.borderWidth.hairline} solid ${vars.color.border.default}`,
+  borderRadius: vars.radius.callout,
+  background: vars.color.surface.raised,
+  color: vars.color.text.primary,
+  cursor: "pointer",
+  WebkitTapHighlightColor: "transparent",
+  selectors: {
+    "&[data-selected]": {
+      borderColor: vars.color.control.primary,
+      boxShadow: `inset 0 0 0 ${vars.borderWidth.hairline} ${vars.color.control.primary}`,
+    },
+    "&[data-focus-visible]": focusRing,
+    "&[data-invalid]": { borderColor: vars.color.negative.fg },
+    "&[data-disabled]": {
+      borderColor: vars.color.border.hairline,
+      color: vars.color.text.disabled,
+      cursor: "not-allowed",
+    },
+  },
+});
+
+/** The circle beside the title's first line; the card, not the circle, shows the focus. */
+export const cardCircle = style({
+  marginBlockStart: radioCard.circleOffset,
+  selectors: { "[data-focus-visible] > &": { outline: "none" } },
+});
+
+export const cardText = style({
+  display: "flex",
+  flexDirection: "column",
+  minWidth: 0,
+});
+
+export const cardTitle = style({
+  ...typography("heading4"),
+  overflowWrap: "break-word",
+});
+
+export const cardDescription = style({
+  ...typography("caption"),
+  color: vars.color.text.secondary,
+  overflowWrap: "break-word",
+  selectors: { "[data-disabled] &": { color: vars.color.text.disabled } },
 });

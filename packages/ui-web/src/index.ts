@@ -9,6 +9,7 @@ export {
   ActionGroup,
   type ActionGroupProps,
 } from "./components/ActionButton";
+export { AlertBanner, type AlertBannerProps } from "./components/AlertBanner";
 export { AppFrame, type AppFrameProps } from "./components/AppFrame";
 export { Avatar, type AvatarProps } from "./components/Avatar";
 export { Badge, type BadgeProps } from "./components/Badge";
@@ -47,6 +48,7 @@ export {
   ContextualHelp,
   type ContextualHelpProps,
 } from "./components/ContextualHelp";
+export { CostPreview, type CostPreviewProps } from "./components/CostPreview";
 export { DatePicker, type DatePickerProps } from "./components/DatePicker";
 export {
   DescriptionList,
@@ -64,6 +66,10 @@ export {
 } from "./components/Dialog";
 export { DiffText, type DiffTextProps } from "./components/DiffText";
 export {
+  DiffTextArea,
+  type DiffTextAreaProps,
+} from "./components/DiffTextArea";
+export {
   Accordion,
   type AccordionProps,
   Disclosure,
@@ -80,6 +86,7 @@ export {
 export { FileTrigger, type FileTriggerProps } from "./components/FileTrigger";
 export { Form, type FormProps } from "./components/Form";
 export { Heading, type HeadingProps } from "./components/Heading";
+export { IdeaPreview, type IdeaPreviewProps } from "./components/IdeaPreview";
 export {
   IllustratedMessage,
   type IllustratedMessageProps,
@@ -126,6 +133,7 @@ export {
 export { NumberField, type NumberFieldProps } from "./components/NumberField";
 export { PageFrame, type PageFrameProps } from "./components/PageFrame";
 export { Panel, type PanelProps } from "./components/Panel";
+export { PhaseRoute, type PhaseRouteProps } from "./components/PhaseRoute";
 export { Picker, type PickerProps } from "./components/Picker";
 export { Popover, type PopoverProps } from "./components/Popover";
 export { ProgressBar, type ProgressBarProps } from "./components/ProgressBar";
@@ -152,6 +160,7 @@ export {
   RowListItem,
   type RowListItemProps,
   type RowListProps,
+  TaskMark,
 } from "./components/RowList";
 export { SearchField, type SearchFieldProps } from "./components/SearchField";
 export {
@@ -246,17 +255,30 @@ export {
 export {
   PresentationPattern,
   type PresentationPatternProps,
+  type PresentationSlide,
 } from "./patterns/PresentationPattern";
 export {
   PublicPattern,
   type PublicPatternProps,
+  PublicSection,
+  type PublicSectionProps,
 } from "./patterns/PublicPattern";
 export {
   QuestionFormPattern,
   type QuestionFormPatternProps,
 } from "./patterns/QuestionFormPattern";
 export {
+  QuestionList,
+  QuestionListItem,
+  type QuestionListItemProps,
+  type QuestionListProps,
+} from "./patterns/QuestionList";
+export {
   type SettingsGroup,
+  SettingsList,
+  SettingsListItem,
+  type SettingsListItemProps,
+  type SettingsListProps,
   SettingsPattern,
   type SettingsPatternProps,
 } from "./patterns/SettingsPattern";

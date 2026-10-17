@@ -12,7 +12,7 @@ import { FocusPattern } from "./FocusPattern";
 import { HubPattern } from "./HubPattern";
 import { ListDetailPattern } from "./ListDetailPattern";
 import { PresentationPattern } from "./PresentationPattern";
-import { PublicPattern } from "./PublicPattern";
+import { PublicPattern, PublicSection } from "./PublicPattern";
 import { QuestionFormPattern } from "./QuestionFormPattern";
 import { SettingsPattern } from "./SettingsPattern";
 import { StepsPattern } from "./StepsPattern";
@@ -97,8 +97,9 @@ describe("HubPattern (A)", () => {
     });
     try {
       hub();
-      const bar = screen.getByRole("button", { name: "Record decision" })
-        .parentElement as HTMLElement;
+      const bar = screen
+        .getByRole("button", { name: "Record decision" })
+        .closest("[style]") as HTMLElement;
       // The inset is the one variable the bar's style attribute sets.
       const inset = () =>
         /:\s*(\d+px)/.exec(bar.getAttribute("style") ?? "")?.[1];
@@ -119,7 +120,7 @@ describe("FocusPattern (B)", () => {
     render(
       <FocusPattern
         header={<h1>Decide</h1>}
-        primaryAction={<button type="button">Record decision</button>}
+        actions={<button type="button">Record decision</button>}
       >
         <p>Material</p>
         <p>Fields</p>
@@ -155,7 +156,7 @@ describe("QuestionFormPattern (C)", () => {
         isReadOnly={isReadOnly}
         onEnd={onEnd}
         footer={<button type="button">Next: 02 Market</button>}
-        progress={<span>dots</span>}
+        isAnswered={(id) => id === "WHO"}
         renderQuestion={(id, mode) => (
           <QuestionCard
             title={id}
@@ -246,7 +247,20 @@ describe("QuestionFormPattern (C)", () => {
     expect(
       screen.getByRole("button", { name: "Next: 02 Market" }),
     ).toBeTruthy();
-    expect(screen.getByText("dots")).toBeTruthy();
+    // A dot per question, named by its place and whether it is answered; pressing one
+    // moves there (6.2).
+    expect(
+      screen
+        .getByRole("button", { name: "Question 1 of 3, answered" })
+        .getAttribute("aria-current"),
+    ).toBe("step");
+    await user.click(screen.getByRole("button", { name: "Question 3 of 3" }));
+    expect(
+      screen.getByRole("textbox", { name: "Answer PROBLEM" }),
+    ).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", { name: "Question 1 of 3, answered" }),
+    );
     const previous = screen.getByRole("button", { name: "Previous question" });
     const next = screen.getByRole("button", { name: "Next question" });
     expect(previous.hasAttribute("disabled")).toBe(true);
@@ -426,12 +440,12 @@ describe("ListDetailPattern (D)", () => {
         detail={selected === null ? null : <p>Detail of {selected}</p>}
         listLabel="Ideas"
         onBack={() => setSelected(null)}
-        floatingAction={<button type="button">New idea</button>}
+        newItem={{ label: "New idea", onPress: () => {} }}
       />
     );
   }
 
-  test("desktop: the header over both panes, the new item at its end", () => {
+  test("desktop: the title and the new item at the top of the list's pane (s06)", () => {
     render(<List />);
     expect(screen.getByRole("button", { name: "Piaya" })).toBeTruthy();
     expect(screen.getByText("Detail of piaya")).toBeTruthy();
@@ -440,10 +454,12 @@ describe("ListDetailPattern (D)", () => {
     expect(row?.contains(screen.getByRole("heading", { name: "Ideas" }))).toBe(
       true,
     );
-    // Above the panes, not inside the list's.
-    expect(row?.contains(screen.getByRole("button", { name: "Piaya" }))).toBe(
-      false,
+    // In the list's pane, over the list, not over the detail.
+    const pane = row?.parentElement;
+    expect(pane?.contains(screen.getByRole("button", { name: "Piaya" }))).toBe(
+      true,
     );
+    expect(pane?.contains(screen.getByText("Detail of piaya"))).toBe(false);
   });
 
   test("tablet: one pane; ← goes back to the list; focus follows the pane", async () => {
@@ -562,11 +578,11 @@ describe("CardComparePattern (E)", () => {
       />,
     );
     expect(screen.queryByRole("radiogroup")).toBeNull();
-    // The main action under the cards, fixed to the bottom.
+    // The new item stays in place under the title, not fixed to the bottom (4.3).
     expect(
       follows(
-        screen.getByText("Cards"),
         screen.getByRole("button", { name: "Add competitor" }),
+        screen.getByText("Cards"),
       ),
     ).toBe(true);
     expect(screen.getByText("Cards")).toBeTruthy();
@@ -589,7 +605,11 @@ describe("WorksheetPattern (F)", () => {
   test("desktop: the results beside the inputs, no summary bar", () => {
     worksheet();
     const results = screen.getByRole("complementary", { name: "Totals" });
-    expect(results.textContent).toBe("Totals in full");
+    // The card's small heading names it, then the results.
+    expect(
+      within(results).getByRole("heading", { level: 2, name: "Totals" }),
+    ).toBeTruthy();
+    expect(within(results).getByText("Totals in full")).toBeTruthy();
     expect(screen.queryByText("Startup ₱19,500")).toBeNull();
   });
 
@@ -659,26 +679,72 @@ test("WorksheetPattern: a drawer left open closes on a desktop and stays closed"
 });
 
 describe("StepsPattern (G)", () => {
-  test("steps, content, the diff's two sides, then the step's buttons", () => {
+  test("steps, content, each question's frame with its two sides, then the step's buttons", () => {
     render(
       <StepsPattern
         header={<h1>Import from AI</h1>}
         steps={<ol aria-label="Steps" />}
-        comparison={{ before: <p>Current</p>, after: <p>From AI</p> }}
+        comparisons={[
+          {
+            id: "who",
+            code: "01 · WHO",
+            question: "Who pays?",
+            meta: "Updated by Kenji just now",
+            before: <p>Current</p>,
+            after: <p>From AI</p>,
+          },
+          {
+            id: "why",
+            code: "01 · WHY",
+            question: "Why them?",
+            before: <p>Current why</p>,
+            after: <p>From AI why</p>,
+          },
+        ]}
         actions={<button type="button">Apply</button>}
+        note="Each change is saved in history as an AI import."
       >
         <p>Review</p>
       </StepsPattern>,
     );
     const steps = screen.getByRole("list", { name: "Steps" });
-    const before = screen.getByText("Current");
     expect(follows(steps, screen.getByText("Review"))).toBe(true);
-    expect(follows(before, screen.getByText("From AI"))).toBe(true);
+    const who = screen.getByRole("region", { name: "01 · WHO Who pays?" });
+    expect(within(who).getByText("Updated by Kenji just now")).toBeTruthy();
     expect(
       follows(
-        screen.getByText("From AI"),
-        screen.getByRole("button", { name: "Apply" }),
+        within(who).getByText("Current"),
+        within(who).getByText("From AI"),
       ),
+    ).toBe(true);
+    expect(
+      follows(who, screen.getByRole("region", { name: "01 · WHY Why them?" })),
+    ).toBe(true);
+    // The note leads the bar, before its buttons.
+    const note = screen.getByText(
+      "Each change is saved in history as an AI import.",
+    );
+    expect(follows(screen.getByText("From AI why"), note)).toBe(true);
+    expect(follows(note, screen.getByRole("button", { name: "Apply" }))).toBe(
+      true,
+    );
+  });
+
+  test("phone: the note at the end of the content, not in the bar", () => {
+    setPhoneWidth();
+    render(
+      <StepsPattern
+        steps={<ol aria-label="Steps" />}
+        actions={<button type="button">Apply</button>}
+        note="Saved in history."
+      >
+        <p>Review</p>
+      </StepsPattern>,
+    );
+    const note = screen.getByText("Saved in history.");
+    expect(follows(screen.getByText("Review"), note)).toBe(true);
+    expect(
+      note.closest("p")?.parentElement?.contains(screen.getByText("Review")),
     ).toBe(true);
   });
 });
@@ -704,61 +770,106 @@ describe("SettingsPattern (H)", () => {
 });
 
 describe("PresentationPattern (I)", () => {
-  const deck = () =>
-    render(
+  const slideList = [
+    { id: "title", title: "Title", thumbnail: <p>Mini title</p> },
+    { id: "problem", title: "Problem", thumbnail: <p>Mini problem</p> },
+    { id: "model", title: "Business model", thumbnail: <p>Mini model</p> },
+  ];
+  function Deck() {
+    const [current, setCurrent] = useState("problem");
+    return (
       <PresentationPattern
         header={<h1>Pitch Deck</h1>}
         primaryAction={<button type="button">Download PDF</button>}
-        thumbnails={<p>Thumbnails</p>}
-        slide={<p>Slide 3</p>}
+        slides={slideList}
+        currentId={current}
+        onCurrentChange={setCurrent}
+        slide={<p>Slide {current}</p>}
         notes={<p>Notes</p>}
-        slides={<p>Every slide</p>}
-      />,
+      />
     );
+  }
 
-  test("desktop and tablet: thumbnails, the slide and its notes", () => {
+  test("desktop and tablet: the numbered thumbnails, the slide and its notes", async () => {
+    const user = userEvent.setup();
     setTabletWidth();
-    deck();
-    expect(screen.getByText("Thumbnails")).toBeTruthy();
+    render(<Deck />);
+    const list = screen.getByRole("listbox", { name: "Slides" });
+    const option = within(list).getByRole("option", { name: "2 Problem" });
+    expect(option.getAttribute("aria-selected")).toBe("true");
     expect(
-      follows(screen.getByText("Slide 3"), screen.getByText("Notes")),
+      follows(screen.getByText("Slide problem"), screen.getByText("Notes")),
     ).toBe(true);
-    expect(screen.queryByText("Every slide")).toBeNull();
-    // The main action beside the title, before the slides.
+    // The main action on the tools' line, before the slides.
     expect(
-      follows(
-        screen.getByRole("button", { name: "Download PDF" }),
-        screen.getByText("Thumbnails"),
-      ),
+      follows(screen.getByRole("button", { name: "Download PDF" }), list),
     ).toBe(true);
+    await user.click(
+      within(list).getByRole("option", { name: "3 Business model" }),
+    );
+    expect(screen.getByText("Slide model")).toBeTruthy();
   });
 
-  test("phone: every slide, one under another, then the notes", () => {
+  test("phone: the slide on screen alone, with the previous and next under it", async () => {
+    const user = userEvent.setup();
     setPhoneWidth();
-    deck();
-    expect(screen.getByText("Every slide")).toBeTruthy();
-    expect(screen.queryByText("Thumbnails")).toBeNull();
+    render(<Deck />);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByText("2 / 3")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Next slide" }));
+    expect(screen.getByText("Slide model")).toBeTruthy();
     expect(
-      follows(screen.getByText("Every slide"), screen.getByText("Notes")),
+      screen
+        .getByRole("button", { name: "Next slide" })
+        .hasAttribute("disabled"),
     ).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Previous slide" }));
+    expect(screen.getByText("Slide problem")).toBeTruthy();
+    expect(
+      follows(screen.getByText("Slide problem"), screen.getByText("Notes")),
+    ).toBe(true);
+    // In place, beside the tools: not fixed to the bottom (4.3).
     expect(
       follows(
-        screen.getByText("Notes"),
         screen.getByRole("button", { name: "Download PDF" }),
+        screen.getByText("Slide problem"),
       ),
     ).toBe(true);
   });
 });
 
 describe("PublicPattern (J)", () => {
-  test("the top bar, the sections, the foot", () => {
+  test("the crescent and moonx with Log in, the sections, the foot with its links", () => {
     render(
-      <PublicPattern header={<p>moonx</p>} footer={<p>Privacy</p>}>
-        <h1>Start a local business</h1>
+      <PublicPattern
+        action={<a href="/login">Log in</a>}
+        footerLinks={<a href="/privacy">Privacy</a>}
+      >
+        <PublicSection layout="hero" aside={<p>Example</p>}>
+          <h1>Start a local business</h1>
+        </PublicSection>
+        <PublicSection layout="close" action={<a href="/login">Log in now</a>}>
+          <p>By invitation</p>
+        </PublicSection>
       </PublicPattern>,
     );
     const heading = screen.getByRole("heading", { level: 1 });
-    expect(follows(screen.getByText("moonx"), heading)).toBe(true);
-    expect(follows(heading, screen.getByText("Privacy"))).toBe(true);
+    expect(follows(screen.getByRole("link", { name: "Log in" }), heading)).toBe(
+      true,
+    );
+    expect(follows(heading, screen.getByText("Example"))).toBe(true);
+    expect(
+      follows(
+        screen.getByText("By invitation"),
+        screen.getByRole("link", { name: "Log in now" }),
+      ),
+    ).toBe(true);
+    expect(
+      follows(
+        screen.getByRole("link", { name: "Log in now" }),
+        screen.getByRole("link", { name: "Privacy" }),
+      ),
+    ).toBe(true);
+    expect(screen.getAllByText("moonx")).toHaveLength(2);
   });
 });

@@ -11,7 +11,10 @@ export interface MetricGroupProps {
    * `band`: the key numbers across the top of a hub (13), between a line above and a
    * hairline below, a hairline between the tiles; 2×2 on a phone (d1-moon.html).
    * `compact`: the key numbers inside 19's Well, smaller and without lines, as many
-   * columns as tiles; two on a phone (s19-decision.html).
+   * columns as tiles; two on a phone (s19-decision.html). `column`: the totals of a
+   * worksheet's results, one under another (s17-costs.html). `pair`: the key numbers of a
+   * detail beside a list, 2×2 at every width, smaller, the units the numbers' size
+   * (s06-ideas.html).
    * @default "band"
    */
   variant?: MetricGroupVariant;

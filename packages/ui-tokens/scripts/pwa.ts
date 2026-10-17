@@ -2,6 +2,7 @@
 // アイコン」; its colours are the light semantic values it names.
 
 import sharp from "sharp";
+import { ICON_SHAPES } from "../src/appIcon";
 import {
   flattenTokens,
   isObject,
@@ -9,13 +10,7 @@ import {
   type TokenTree,
 } from "./tokens";
 
-/** design-spec 4.4: the canvas, the crescent (a disc minus a disc) and the small dot. */
-export const ICON_SHAPES = {
-  size: 512,
-  moon: { cx: 246, cy: 266, r: 150 },
-  bite: { cx: 300, cy: 215, r: 132 },
-  dot: { cx: 378, cy: 150, r: 28 },
-} as const;
+export { ICON_SHAPES } from "../src/appIcon";
 
 /** The radius of the maskable safe zone: 40% of the icon's width (W3C manifest). */
 export const MASKABLE_SAFE_RADIUS = 0.4;

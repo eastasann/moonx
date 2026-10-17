@@ -6,18 +6,25 @@ import {
   SegmentedControlItem,
 } from "../components/SegmentedControl";
 import { useIsNarrow } from "../internal/useIsNarrow";
-import { MainActionBar, PageHeader } from "./PageHeader";
 import * as styles from "./patterns.css";
 
 export interface CardComparePatternProps {
-  /** The title and the line under it (15: "4 competitors · aim for 3–5"). */
+  /** The title: its level 1 Heading ("04 Competitors"). */
   header: ReactNode;
-  /** The screen's main action ("+ Add competitor"): fixed to the bottom on a phone. */
+  /**
+   * Beside the title, on its baseline: the count and the aim ("● 4 competitors · aim for
+   * 3–5", s15-competitors.html .count). A MoonGlyph and Text.
+   */
+  count?: ReactNode;
+  /**
+   * The new item ("+ Add competitor"): a secondary Button at the end of the title's line,
+   * in place on a phone too (4.3). The last tile of the CardView adds as well.
+   */
   primaryAction?: ReactNode;
   /** Cards or the table (15's `?view=`). */
   view: CompareView;
   onViewChange: (view: CompareView) => void;
-  /** The cards: a CardView, 2 to 3 across as the width allows (4.5). */
+  /** The cards: a CardView, 2 to 3 across as the width allows (4.5), its `addItem` last. */
   cards: ReactNode;
   /** "Compare in a table": the items as columns, their fields as rows. */
   table: ReactNode;
@@ -26,12 +33,13 @@ export interface CardComparePatternProps {
 }
 
 /**
- * Pattern E, card comparison (design-spec 4.1): things set side by side to compare (15).
- * Desktop and tablet: the cards in 2 to 3 columns, or the table, by the Cards / Table
- * switch. Phone: the cards in one column and no table.
+ * Pattern E, card comparison (design-spec 4.1, s15-competitors.html): things set side by
+ * side to compare (15). Desktop and tablet: the cards in 2 to 3 columns, or the table, by
+ * the Cards / Table switch. Phone: the cards in one column and no table.
  */
 export function CardComparePattern({
   header,
+  count,
   primaryAction,
   view,
   onViewChange,
@@ -42,32 +50,37 @@ export function CardComparePattern({
   const isNarrow = useIsNarrow();
   return (
     <div className={styles.root}>
-      <div className={styles.page({ width: "content", density: "regular" })}>
-        <PageHeader
-          header={header}
-          actions={
-            isNarrow ? undefined : (
-              <SegmentedControl
-                aria-label={i18n.t("components:cardComparePattern.view")}
-                selectedKey={view}
-                onSelectionChange={(key) => onViewChange(key as CompareView)}
-              >
-                <SegmentedControlItem id="cards">
-                  {i18n.t("components:cardComparePattern.cards")}
-                </SegmentedControlItem>
-                <SegmentedControlItem id="table">
-                  {i18n.t("components:cardComparePattern.table")}
-                </SegmentedControlItem>
-              </SegmentedControl>
-            )
-          }
-          primaryAction={primaryAction}
-          isNarrow={isNarrow}
-        />
-        {isNarrow || view === "cards" ? cards : table}
-        {children}
+      <div className={styles.comparePage}>
+        <div className={styles.compareHeader}>
+          {header}
+          {count != null && (
+            <span className={styles.compareCount}>{count}</span>
+          )}
+          {(!isNarrow || primaryAction != null) && (
+            <div className={styles.compareTools}>
+              {!isNarrow && (
+                <SegmentedControl
+                  aria-label={i18n.t("components:cardComparePattern.view")}
+                  selectedKey={view}
+                  onSelectionChange={(key) => onViewChange(key as CompareView)}
+                >
+                  <SegmentedControlItem id="cards">
+                    {i18n.t("components:cardComparePattern.cards")}
+                  </SegmentedControlItem>
+                  <SegmentedControlItem id="table">
+                    {i18n.t("components:cardComparePattern.table")}
+                  </SegmentedControlItem>
+                </SegmentedControl>
+              )}
+              {primaryAction}
+            </div>
+          )}
+        </div>
+        <div className={styles.compareContent}>
+          {isNarrow || view === "cards" ? cards : table}
+          {children}
+        </div>
       </div>
-      <MainActionBar primaryAction={primaryAction} isNarrow={isNarrow} />
     </div>
   );
 }

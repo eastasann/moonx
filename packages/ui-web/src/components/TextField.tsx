@@ -1,19 +1,20 @@
 import type { Size } from "@moonx/ui-tokens";
-import { useRef } from "react";
+import { useContext, useRef } from "react";
 import {
   TextArea as AriaTextArea,
   TextField as AriaTextField,
   type TextFieldProps as AriaTextFieldProps,
   Input,
-  Label,
 } from "react-aria-components";
+import { AnswerFieldContext } from "../internal/answerField";
 import {
   FieldHelp,
+  FieldLabel,
   type FieldTextProps,
   invalidOf,
 } from "../internal/FieldHelp";
 import * as styles from "../internal/field.css";
-import { useSize } from "../internal/size";
+import { useFieldWidth, useSize } from "../internal/size";
 import { useAutoGrow } from "../internal/useAutoGrow";
 import { useKeepAboveKeyboard } from "../internal/useKeepAboveKeyboard";
 
@@ -40,8 +41,12 @@ export interface TextFieldBaseProps
     > {
   /** @default "M", or "L" inside a spacious `Form` */
   size?: Size;
-  /** `full` fills the line; otherwise the size's default width. @default "default" */
-  width?: "default" | "full";
+  /**
+   * `full` fills the line, `fill` grows into the rest of a line (9's invitation, beside
+   * its role); otherwise the size's default width.
+   * @default "default"
+   */
+  width?: "default" | "full" | "fill";
   placeholder?: string;
 }
 
@@ -55,15 +60,17 @@ export interface TextFieldProps extends TextFieldBaseProps {
 export function TextField({
   label,
   description,
+  descriptionTone,
   errorMessage,
   isInvalid,
   size,
-  width = "default",
+  width: givenWidth,
   placeholder,
   inputMode,
   ...props
 }: TextFieldProps) {
   const resolved = useSize(size);
+  const width = useFieldWidth(givenWidth);
   const frameRef = useRef<HTMLDivElement>(null);
   useKeepAboveKeyboard(frameRef);
   return (
@@ -73,7 +80,9 @@ export function TextField({
       validationBehavior="aria"
       className={styles.fieldRoot({ size: resolved, width })}
     >
-      {label != null && <Label className={styles.label}>{label}</Label>}
+      {label != null && (
+        <FieldLabel label={label} isRequired={props.isRequired} />
+      )}
       <div ref={frameRef} className={styles.frame({ size: resolved })}>
         <Input
           className={styles.input}
@@ -81,7 +90,11 @@ export function TextField({
           inputMode={inputMode}
         />
       </div>
-      <FieldHelp description={description} errorMessage={errorMessage} />
+      <FieldHelp
+        description={description}
+        descriptionTone={descriptionTone}
+        errorMessage={errorMessage}
+      />
     </AriaTextField>
   );
 }
@@ -95,14 +108,17 @@ export interface TextAreaProps extends TextFieldBaseProps {}
 export function TextArea({
   label,
   description,
+  descriptionTone,
   errorMessage,
   isInvalid,
   size,
-  width = "default",
+  width: givenWidth,
   placeholder,
   ...props
 }: TextAreaProps) {
   const resolved = useSize(size);
+  const width = useFieldWidth(givenWidth);
+  const isAnswer = useContext(AnswerFieldContext);
   const frameRef = useRef<HTMLDivElement>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   useKeepAboveKeyboard(frameRef);
@@ -114,16 +130,31 @@ export function TextArea({
       validationBehavior="aria"
       className={styles.fieldRoot({ size: resolved, width })}
     >
-      {label != null && <Label className={styles.label}>{label}</Label>}
-      <div ref={frameRef} className={styles.areaFrame({ size: resolved })}>
+      {label != null && (
+        <FieldLabel label={label} isRequired={props.isRequired} />
+      )}
+      <div
+        ref={frameRef}
+        className={`${styles.areaFrame({ size: resolved })}${
+          isAnswer ? ` ${styles.answerFrame}` : ""
+        }`}
+      >
         <AriaTextArea
           ref={areaRef}
-          className={styles.textArea}
+          className={
+            isAnswer
+              ? `${styles.textArea} ${styles.answerArea}`
+              : styles.textArea
+          }
           placeholder={placeholder}
           rows={1}
         />
       </div>
-      <FieldHelp description={description} errorMessage={errorMessage} />
+      <FieldHelp
+        description={description}
+        descriptionTone={descriptionTone}
+        errorMessage={errorMessage}
+      />
     </AriaTextField>
   );
 }

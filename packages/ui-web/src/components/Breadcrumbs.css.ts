@@ -19,6 +19,9 @@ export const list = styleVariants(sized, (size) => ({
   display: "flex",
   alignItems: "center",
   gap: vars.scale.component.breadcrumbs.gap[size],
+  // The line's width, not the crumbs': the current crumb's half (`item`) is of the room
+  // the header gives, so a short trail is never cut ("Dashboard" alone).
+  flex: "1 1 auto",
   minWidth: 0,
   margin: 0,
   padding: 0,
@@ -77,5 +80,5 @@ export const current = style({
 export const separator = style({
   display: "inline-flex",
   flexShrink: 0,
-  color: vars.color.text.tertiary,
+  color: vars.color.text.secondary,
 });

@@ -9,11 +9,11 @@ import {
   Shield,
 } from "lucide-react";
 import { useId, useState } from "react";
+import { AlertBanner } from "../components/AlertBanner";
 import { AppFrame } from "../components/AppFrame";
 import { Breadcrumb, Breadcrumbs } from "../components/Breadcrumbs";
 import { Button } from "../components/Button";
 import { Heading } from "../components/Heading";
-import { InlineAlert } from "../components/InlineAlert";
 import { ListView, ListViewItem } from "../components/ListView";
 import { MenuItem } from "../components/Menu";
 import { MetricTile } from "../components/MetricTile";
@@ -195,9 +195,9 @@ export function FrameSection() {
             }}
             banners={{
               offline: (
-                <InlineAlert variant="notice">
+                <AlertBanner variant="notice">
                   You're offline. Changes can't be saved until you reconnect.
-                </InlineAlert>
+                </AlertBanner>
               ),
             }}
             panel={
@@ -343,30 +343,28 @@ export function FramePanelSection() {
             {pattern === "list" ? (
               <ListDetailPattern
                 header={<Heading level={3}>Ideas</Heading>}
+                filters={
+                  <SearchField label="Panel frame search" width="fill" />
+                }
                 list={
-                  <Stack gap="space-200">
-                    <SearchField label="Panel frame search" width="full" />
-                    <ListView
-                      aria-label="Panel frame ideas"
-                      items={panelIdeas}
-                      selectionMode="single"
-                      selectedKeys={selected === null ? [] : [selected]}
-                      onSelectionChange={(keys) =>
-                        setSelected(
-                          ([...keys][0] as string | undefined) ?? null,
-                        )
-                      }
-                    >
-                      {(item) => (
-                        <ListViewItem id={item.id} textValue={item.name}>
-                          <Text variant="label">{item.name}</Text>
-                          <Text variant="caption" tone="secondary">
-                            {item.meta}
-                          </Text>
-                        </ListViewItem>
-                      )}
-                    </ListView>
-                  </Stack>
+                  <ListView
+                    aria-label="Panel frame ideas"
+                    items={panelIdeas}
+                    selectionMode="single"
+                    selectedKeys={selected === null ? [] : [selected]}
+                    onSelectionChange={(keys) =>
+                      setSelected(([...keys][0] as string | undefined) ?? null)
+                    }
+                  >
+                    {(item) => (
+                      <ListViewItem id={item.id} textValue={item.name}>
+                        <Text variant="label">{item.name}</Text>
+                        <Text variant="caption" tone="secondary">
+                          {item.meta}
+                        </Text>
+                      </ListViewItem>
+                    )}
+                  </ListView>
                 }
                 detail={
                   idea === undefined ? null : (
@@ -420,8 +418,8 @@ export function PageFrameSection() {
       <div className={styles.patternBox}>
         <PageFrame>
           <FocusPattern
-            header={<Heading level={3}>Sign in to moonx</Heading>}
-            primaryAction={<Button variant="primary">Continue</Button>}
+            header={<Heading level={3}>Log in to moonx</Heading>}
+            actions={<Button variant="primary">Continue</Button>}
           >
             <Stack gap="space-300">
               <TextField label="Email" type="email" />

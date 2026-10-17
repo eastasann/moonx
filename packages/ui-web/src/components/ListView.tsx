@@ -13,6 +13,7 @@ import {
   type Key,
   type Selection,
 } from "react-aria-components";
+import { ListPaneContext } from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
 import * as styles from "./ListView.css";
 
@@ -58,6 +59,7 @@ export function ListView<T extends object>({
   ...props
 }: ListViewProps<T>) {
   const isCard = layout === "cards";
+  const inPane = useContext(ListPaneContext);
   return (
     <ItemContext.Provider
       value={{
@@ -81,7 +83,9 @@ export function ListView<T extends object>({
             ? () => <div className={styles.empty}>{renderEmptyState()}</div>
             : undefined
         }
-        className={`${styles.list({ isCard })} ${styles.density[density]}`}
+        className={`${styles.list({ isCard })} ${styles.density[density]}${
+          inPane ? ` ${styles.inPane}` : ""
+        }`}
       />
     </ItemContext.Provider>
   );

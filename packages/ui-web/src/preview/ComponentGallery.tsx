@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Heading } from "../components/Heading";
 import {
   SegmentedControl,
@@ -57,12 +57,14 @@ import {
   SurfacesSection,
   TypographySection,
 } from "./FoundationSection";
+import { AlertBannerSection, LandingExamplesSection } from "./FrameKitSection";
 import {
   FramePanelSection,
   FrameSection,
   PageFrameSection,
 } from "./FrameSection";
 import { MockupDataSection } from "./MockupDataSection";
+import { MockupScreensSection, mockupScreens } from "./MockupScreens";
 import { MockupBasicsSection } from "./MockupSection";
 import {
   BreadcrumbsSection,
@@ -110,7 +112,58 @@ function useDocumentAttribute(name: string, value: string | null) {
  * /dev/components (docs/03_dev-setup.md 3.3). Development only: the route does not load
  * it in a production build.
  */
-export function ComponentGallery() {
+export function ComponentGallery({
+  screen,
+  theme: screenTheme,
+}: {
+  /** A screen of docs/mockups to draw alone across the window (`?screen=s05-dashboard`). */
+  screen?: string;
+  /** With `screen`, its theme, as the mockups take it (`?theme=dark`). */
+  theme?: "light" | "dark";
+}) {
+  const mockup =
+    screen !== undefined && Object.hasOwn(mockupScreens, screen)
+      ? mockupScreens[screen]
+      : undefined;
+  if (mockup !== undefined) {
+    return (
+      <MockupScreen
+        name={mockup.name}
+        render={mockup.render}
+        theme={screenTheme}
+      />
+    );
+  }
+  return <Gallery />;
+}
+
+/** One screen of docs/mockups across the window, in the theme the URL names. */
+function MockupScreen({
+  name,
+  render,
+  theme,
+}: {
+  name: string;
+  render: () => ReactNode;
+  theme?: "light" | "dark";
+}) {
+  useDocumentAttribute("data-theme", theme ?? null);
+  useEffect(() => {
+    const previous = document.title;
+    document.title = name;
+    return () => {
+      document.title = previous;
+    };
+  }, [name]);
+  return (
+    <>
+      {render()}
+      <ToastContainer />
+    </>
+  );
+}
+
+function Gallery() {
   useEffect(() => {
     const previous = document.title;
     document.title = "Components";
@@ -213,6 +266,8 @@ export function ComponentGallery() {
           <PanelSection />
           <SlideSection />
           <StepsSection />
+          <AlertBannerSection />
+          <LandingExamplesSection />
           <FrameSection />
           <PageFrameSection />
           <HubPatternSection />
@@ -227,6 +282,7 @@ export function ComponentGallery() {
           <PublicPatternSection />
           <MockupBasicsSection />
           <MockupDataSection />
+          <MockupScreensSection />
         </Stack>
       </Container>
       <FramePanelSection />

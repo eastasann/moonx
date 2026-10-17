@@ -1,18 +1,15 @@
 import { formatNumberAffixes, formatNumberText } from "@moonx/i18n";
 import type { Size } from "@moonx/ui-tokens";
 import { useId, useRef } from "react";
-import {
-  TextField as AriaTextField,
-  Input,
-  Label,
-} from "react-aria-components";
+import { TextField as AriaTextField, Input } from "react-aria-components";
 import {
   FieldHelp,
+  FieldLabel,
   type FieldTextProps,
   invalidOf,
 } from "../internal/FieldHelp";
 import * as styles from "../internal/field.css";
-import { useSize } from "../internal/size";
+import { useFieldWidth, useSize } from "../internal/size";
 import { useTableCell } from "../internal/tableCell";
 import { useControlledState } from "../internal/useControlledState";
 import { useKeepAboveKeyboard } from "../internal/useKeepAboveKeyboard";
@@ -57,6 +54,7 @@ export interface NumberFieldProps extends FieldTextProps {
 export function NumberField({
   label,
   description,
+  descriptionTone,
   errorMessage,
   isInvalid,
   value,
@@ -67,10 +65,11 @@ export function NumberField({
   isPercent = false,
   isInteger = false,
   size,
-  width = "default",
+  width: givenWidth,
   ...props
 }: NumberFieldProps) {
   const resolved = useSize(size);
+  const width = useFieldWidth(givenWidth);
   const [text, setText] = useControlledState(
     value,
     defaultValue ?? "",
@@ -115,7 +114,9 @@ export function NumberField({
       aria-describedby={hasAffix ? affixId : undefined}
       className={styles.fieldRoot({ size: resolved, width })}
     >
-      {label != null && <Label className={styles.label}>{label}</Label>}
+      {label != null && (
+        <FieldLabel label={label} isRequired={props.isRequired} />
+      )}
       <div
         ref={frameRef}
         className={`${styles.frame({ size: resolved })}${alignsEnd ? ` ${styles.endFrame}` : ""}`}
@@ -152,7 +153,11 @@ export function NumberField({
           </span>
         )}
       </div>
-      <FieldHelp description={description} errorMessage={errorMessage} />
+      <FieldHelp
+        description={description}
+        descriptionTone={descriptionTone}
+        errorMessage={errorMessage}
+      />
     </AriaTextField>
   );
 }

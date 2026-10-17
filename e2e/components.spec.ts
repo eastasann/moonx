@@ -322,7 +322,7 @@ const components: [string, string, (section: Locator) => Locator][] = [
   [
     "PageFrame",
     "PageFrame",
-    (s) => s.getByRole("heading", { name: "Sign in to moonx" }),
+    (s) => s.getByRole("heading", { name: "Log in to moonx" }),
   ],
   [
     "HubPattern",
@@ -372,7 +372,37 @@ const components: [string, string, (section: Locator) => Locator][] = [
   [
     "PublicPattern",
     "PublicPattern",
-    (s) => s.getByRole("link", { name: "Sign in" }),
+    (s) => s.getByRole("button", { name: "Log in" }),
+  ],
+  [
+    "AlertBanner",
+    "AlertBanner, DiffTextArea and SettingsList",
+    (s) => s.getByRole("link", { name: "Update template" }),
+  ],
+  [
+    "DiffTextArea",
+    "AlertBanner, DiffTextArea and SettingsList",
+    (s) => s.getByRole("textbox", { name: "Imported · you can edit" }),
+  ],
+  [
+    "SettingsList",
+    "AlertBanner, DiffTextArea and SettingsList",
+    (s) => s.getByRole("list", { name: "Gallery members" }),
+  ],
+  [
+    "IdeaPreview",
+    "IdeaPreview, PhaseRoute and CostPreview",
+    (s) => s.getByText("An example idea in validation."),
+  ],
+  [
+    "PhaseRoute",
+    "IdeaPreview, PhaseRoute and CostPreview",
+    (s) => s.getByRole("heading", { name: "Self Analysis" }),
+  ],
+  [
+    "CostPreview",
+    "IdeaPreview, PhaseRoute and CostPreview",
+    (s) => s.getByRole("img", { name: "Example startup costs" }),
   ],
 ];
 
@@ -494,7 +524,7 @@ test.describe("overlays follow the width (design-spec 4.5)", () => {
     test(`Picker opens a ${expected} at ${width}`, async ({ page }) => {
       await openGallery(page, width);
       await page.getByRole("button", { name: /Currency/ }).click();
-      const listbox = page.getByRole("listbox");
+      const listbox = page.getByRole("listbox", { name: "Currency" });
       await expect(listbox).toBeVisible();
       const box = await listbox.boundingBox();
       const viewport = widths[width];
@@ -1463,7 +1493,8 @@ async function showSection(page: Page, name: string) {
  */
 async function inPhoneBar(button: Locator, box: Locator) {
   const [bar, outer] = [
-    await boxOf(button.locator("xpath=..")),
+    // The bar is the button's nearest box that sets the keyboard's inset.
+    await boxOf(button.locator("xpath=ancestor::div[@style][1]")),
     await boxOf(box),
   ];
   expect(Math.abs(bar.width - outer.width)).toBeLessThanOrEqual(2);
@@ -1495,8 +1526,8 @@ test.describe("the frame follows the width (design-spec 4.3・6.0.1)", () => {
     const frame = region(page, frameSection);
     await showSection(page, frameSection);
     const nav = frame.getByRole("navigation", { name: "Main" });
-    // 06 layout.sidebar-width.
-    expect(Math.round((await boxOf(nav)).width)).toBe(240);
+    // 06 layout.sidebar-width (moon-base.css .app).
+    expect(Math.round((await boxOf(nav)).width)).toBe(236);
     await expect(nav.getByText("Ideas", { exact: true })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Ideas" })).toHaveAttribute(
       "aria-current",
@@ -1612,7 +1643,7 @@ test.describe("the frame follows the width (design-spec 4.3・6.0.1)", () => {
     // 06 layout.tab-bar-height.
     expect(Math.round(tabBox.height)).toBe(64);
     const next = frame.getByRole("button", { name: "Next question" });
-    const bar = next.locator("xpath=..");
+    const bar = next.locator("xpath=ancestor::div[@style][1]");
     const barBox = await boxOf(bar);
     expect(Math.round(barBox.y + barBox.height)).toBe(Math.round(tabBox.y));
 
@@ -1760,17 +1791,14 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
       const save = await boxOf(
         focus.getByRole("button", { name: "Save decision" }),
       );
-      // One reading column (06 layout.reading-column-max), the action under it.
-      expect(material.width).toBeLessThanOrEqual(720);
+      // One form column (06 layout.form-column-max), the action under it.
+      expect(material.width).toBeLessThanOrEqual(696);
       expect(save.y).toBeGreaterThan(material.y + material.height);
       if (isPhone) {
-        const bar = await boxOf(
-          focus
-            .getByRole("button", { name: "Save decision" })
-            .locator("xpath=.."),
+        await inPhoneBar(
+          focus.getByRole("button", { name: "Save decision" }),
+          focus.locator("xpath=div").first(),
         );
-        const box = await boxOf(focus.locator("xpath=div").first());
-        expect(Math.abs(bar.width - box.width)).toBeLessThanOrEqual(2);
       } else {
         // At the end of the column.
         expect(
@@ -1795,11 +1823,16 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
         await expect(card("Form WHY THEM")).toBeVisible();
         await expect(card("Form WHO")).toHaveCount(0);
       } else {
-        await stacked(
-          card("Form WHO"),
-          card("Form WHY THEM"),
-          card("Form PROBLEM"),
-        );
+        // The question being answered is a card wider than the column by 16px each
+        // side (06 layout.question-form.card-outset); the quiet rows line up under it.
+        const focused = await boxOf(card("Form WHO"));
+        const quiet = await boxOf(card("Form WHY THEM"));
+        const last = await boxOf(card("Form PROBLEM"));
+        expect(quiet.y).toBeGreaterThanOrEqual(focused.y + focused.height);
+        expect(Math.round(quiet.x - focused.x)).toBe(16);
+        expect(Math.round(focused.width - quiet.width)).toBe(32);
+        await stacked(card("Form WHY THEM"), card("Form PROBLEM"));
+        expect(last.y).toBeGreaterThan(quiet.y);
         await expect(form.getByRole("switch", { name: "Focus" })).toBeVisible();
         // Ctrl+↓ opens the next question with its answer focused, in the middle.
         await form.getByRole("textbox", { name: "Form answer WHO" }).click();
@@ -1827,12 +1860,20 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
       });
       const create = pattern.getByRole("button", { name: "New idea" });
       if (isDesktop) {
-        // 06 layout.list-pane-width, the detail at its right.
-        expect(Math.round((await boxOf(list)).width)).toBe(352);
-        expect((await boxOf(detail)).x).toBeGreaterThan(
-          (await boxOf(list)).x + 352,
+        // The list's pane takes 5 of 5 + 6 of the panes' width, 380px at least
+        // (06 layout.list-detail), the title and New idea at its top; the detail at
+        // its right.
+        const pane = await boxOf(list.locator("xpath=../.."));
+        const panes = await boxOf(list.locator("xpath=../../.."));
+        expect(
+          Math.abs(pane.width - Math.max(380, (panes.width * 5) / 11)),
+        ).toBeLessThanOrEqual(1);
+        expect((await boxOf(detail)).x).toBeGreaterThan(pane.x + pane.width);
+        const action = await boxOf(create);
+        expect(action.x + action.width).toBeLessThanOrEqual(
+          pane.x + pane.width,
         );
-        await expect(create).toBeVisible();
+        expect(action.y).toBeLessThan((await boxOf(list)).y);
         return;
       }
       // One pane at a time across the width: the detail, then ← back to the list.
@@ -1845,11 +1886,14 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
       expect(listBox.width).toBeGreaterThan(patternBox.width * 0.85);
       const action = await boxOf(create);
       if (isPhone) {
-        // Floating at the bottom right, after the list.
-        expect(action.y).toBeGreaterThan(listBox.y + listBox.height);
+        // Floating at the bottom right, after the list, 16px in from the right edge
+        // (06 layout.list-detail.floating-action-offset), 56px square.
+        expect(action.y).toBeGreaterThanOrEqual(listBox.y + listBox.height);
         expect(
-          Math.abs(action.x + action.width - (listBox.x + listBox.width)),
-        ).toBeLessThanOrEqual(2);
+          Math.round(listBox.x + listBox.width - (action.x + action.width)),
+        ).toBe(16);
+        expect(Math.round(action.width)).toBe(56);
+        expect(Math.round(action.height)).toBe(56);
       } else {
         expect(action.y).toBeLessThan(listBox.y);
       }
@@ -1867,11 +1911,16 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
         await expect(
           pattern.getByRole("radiogroup", { name: "View" }),
         ).toHaveCount(0);
-        // The main action under the cards, in the bar across the bottom.
-        expect((await boxOf(add)).y).toBeGreaterThan(
-          (await boxOf(card("Home bakers"))).y,
+        // The new item stays in place under the title, not fixed to the bottom (4.1).
+        expect((await boxOf(add)).y).toBeLessThan(
+          (await boxOf(card("Airport kiosk"))).y,
         );
-        await inPhoneBar(add, box);
+        expect(
+          await add.evaluate(
+            (node) => node.closest("[style]")?.getAttribute("style") ?? "",
+          ),
+        ).not.toContain("--");
+        await expect(box).toBeVisible();
         return;
       }
       // The main action beside the title, above the cards.
@@ -1899,7 +1948,16 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
       if (isDesktop) {
         const results = pattern.getByRole("complementary", { name: "Totals" });
         await sideBySide(inputs, results);
-        expect(Math.round((await boxOf(results)).width)).toBe(360);
+        // A card of the light frame, 288px wide, 40px from the table
+        // (06 layout.worksheet, s17-costs.html .totals).
+        const [table, card] = [await boxOf(inputs), await boxOf(results)];
+        expect(Math.round(card.width)).toBe(288);
+        expect(Math.round(card.x - (table.x + table.width))).toBe(40);
+        await expect(results).toHaveCSS(
+          "border-top-color",
+          "rgb(198, 203, 216)",
+        );
+        await expect(results).toHaveCSS("border-top-left-radius", "12px");
         return;
       }
       // The table across the width; the summary bar opens the results.
@@ -1972,35 +2030,46 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
       await openPattern(page, width, scale);
       const pattern = region(page, "PresentationPattern");
       await showSection(page, "PresentationPattern");
-      const thumbnails = pattern.getByRole("grid", { name: "Pattern slides" });
+      const thumbnails = pattern.getByRole("listbox", { name: "Slides" });
       const download = pattern.getByRole("button", { name: "Download PDF" });
+      const slide = pattern.getByRole("region", { name: "Business model" });
       if (isPhone) {
+        // The slide on screen alone, the previous and next under it; Download PDF in
+        // place on the tools' line, not fixed to the bottom (4.1 I).
         await expect(thumbnails).toHaveCount(0);
-        await stacked(
-          pattern.getByRole("region", { name: "Piaya Gift Box Co." }),
+        await expect(
           pattern.getByRole("region", { name: "Problem" }),
+        ).toHaveCount(0);
+        expect((await boxOf(download)).y).toBeLessThan((await boxOf(slide)).y);
+        const previous = pattern.getByRole("button", {
+          name: "Previous slide",
+        });
+        expect((await boxOf(previous)).y).toBeGreaterThan(
+          (await boxOf(slide)).y,
         );
-        // The slides are taller than the window: the bar holds to its bottom edge.
-        const button = await boxOf(download);
-        expect(button.y + button.height).toBeLessThanOrEqual(
-          widths.mobile.height,
-        );
-        expect(button.y).toBeGreaterThan(widths.mobile.height - 64);
-        await inPhoneBar(download, pattern.locator("xpath=div").first());
+        await expect(pattern.getByText("3 / 4")).toBeVisible();
+        await previous.click();
+        await expect(
+          pattern.getByRole("region", { name: "Problem" }),
+        ).toBeVisible();
+        await expect(pattern.getByText("2 / 4")).toBeVisible();
         await expect(pattern.getByText(/^Say:/)).toBeAttached();
         return;
       }
       expect((await boxOf(download)).y).toBeLessThan(
         (await boxOf(thumbnails)).y,
       );
-      const slide = pattern.getByRole("region", { name: "Business model" });
-      await sideBySide(thumbnails, slide);
-      // 06 layout.thumbnail-column-width.
-      expect(Math.round((await boxOf(thumbnails)).width)).toBe(160);
+      // The slide at the thumbnails' right, its column's inset 12px lower than theirs
+      // (06 layout.presentation: 28 against 16).
+      const [left, right] = [await boxOf(thumbnails), await boxOf(slide)];
+      expect(right.x).toBeGreaterThan(left.x + left.width);
+      expect(Math.round(right.y - left.y)).toBe(12);
+      // 06 layout.presentation.thumbnail-column-width, less its insets (12 each side).
+      expect(Math.round((await boxOf(thumbnails)).width)).toBe(200 - 2 * 12);
       expect((await boxOf(pattern.getByText(/^Say:/))).y).toBeGreaterThan(
         (await boxOf(slide)).y + (await boxOf(slide)).height,
       );
-      await thumbnails.getByText("2 Problem").click();
+      await thumbnails.getByRole("option", { name: "2 Problem" }).click();
       await expect(
         pattern.getByRole("region", { name: "Problem" }),
       ).toBeVisible();
@@ -2010,7 +2079,7 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
       await openPattern(page, width, scale);
       const pattern = region(page, "PublicPattern");
       await showSection(page, "PublicPattern");
-      const signIn = pattern.getByRole("link", { name: "Sign in" });
+      const logIn = pattern.getByRole("button", { name: "Log in" });
       const title = pattern.getByRole("heading", {
         name: "Start a local business, one step at a time",
       });
@@ -2018,13 +2087,16 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
         .getByText("Validate an idea before you spend on it.")
         .locator("xpath=ancestor::div[1]");
       const privacy = pattern.getByRole("link", { name: "Privacy" });
-      expect((await boxOf(signIn)).y).toBeLessThan((await boxOf(title)).y);
+      expect((await boxOf(logIn)).y).toBeLessThan((await boxOf(title)).y);
       expect((await boxOf(privacy)).y).toBeGreaterThan(
         (await boxOf(example)).y + (await boxOf(example)).height,
       );
-      // The hero's two columns, one where the width runs out.
-      if (isPhone) await stacked(title, example);
-      else await sideBySide(title, example);
+      // The hero's two columns (6 : 5), one below 900px (06 layout.public); its
+      // columns are centred on each other.
+      if (width === "desktop") {
+        const [left, right] = [await boxOf(title), await boxOf(example)];
+        expect(right.x).toBeGreaterThan(left.x + left.width);
+      } else await stacked(title, example);
     });
   }
 
@@ -2035,8 +2107,9 @@ test.describe("the patterns follow the width (design-spec 4.1)", () => {
     const pattern = region(page, "ListDetailPattern");
     const list = pattern.getByRole("grid", { name: "Pattern notifications" });
     await list.scrollIntoViewIfNeeded();
-    // 06 layout.reading-column-max, less the page's gutters.
-    expect((await boxOf(list)).width).toBeLessThanOrEqual(720);
+    // 06 layout.reading-column-max, with the pane's insets on both sides (its rows
+    // reach the pane's edges).
+    expect((await boxOf(list)).width).toBeLessThanOrEqual(756 + 2 * 24);
     await expect(
       pattern.getByRole("button", { name: "Back to Ideas" }),
     ).toHaveCount(0);
@@ -2153,8 +2226,11 @@ test.describe("D and F beside a docked panel (design-spec 4.1・4.3)", () => {
       name: "Piaya Gift Box Delivery",
     });
     const back = frame.getByRole("button", { name: "Back to Ideas" });
-    // Without the panel, the desktop's two columns at the breakpoint.
-    expect(Math.round((await boxOf(list)).width)).toBe(352);
+    // Without the panel, the desktop's two columns at the breakpoint: the list's pane
+    // at its minimum (06 layout.list-detail.list-min-width).
+    expect(Math.round((await boxOf(list.locator("xpath=../.."))).width)).toBe(
+      380,
+    );
     await besideList(list, detail);
     await expect(back).toHaveCount(0);
 
@@ -2175,7 +2251,9 @@ test.describe("D and F beside a docked panel (design-spec 4.1・4.3)", () => {
     await panel.getByRole("button", { name: "Close" }).click();
     await expect(panel).toBeHidden();
     await expect(commentsButton(frame)).toBeFocused();
-    expect(Math.round((await boxOf(list)).width)).toBe(352);
+    expect(Math.round((await boxOf(list.locator("xpath=../.."))).width)).toBe(
+      380,
+    );
     await besideList(list, detail);
     await expect(back).toHaveCount(0);
     // The item chosen before the panel opened is still the one selected.
@@ -2193,8 +2271,14 @@ test.describe("D and F beside a docked panel (design-spec 4.1・4.3)", () => {
       name: "Piaya Gift Box Delivery",
     });
     await openPanel(frame);
-    // The body is 840px, wider than 06 layout.two-column-min-width.
-    expect(Math.round((await boxOf(list)).width)).toBe(352);
+    // The body is wider than 06 layout.two-column-min-width: the list's pane takes its
+    // 5 of 5 + 6 of it, at least 380px.
+    const body = await boxOf(frame.getByRole("main"));
+    expect(Math.round(body.width)).toBeGreaterThanOrEqual(788);
+    const pane = await boxOf(list.locator("xpath=../.."));
+    expect(
+      Math.abs(pane.width - Math.max(380, (body.width * 5) / 11)),
+    ).toBeLessThanOrEqual(1);
     await besideList(list, detail);
 
     const field = frame.getByRole("textbox", { name: "Panel frame summary" });
@@ -2249,7 +2333,8 @@ test.describe("D and F beside a docked panel (design-spec 4.1・4.3)", () => {
       name: /Startup total ₱19,500/,
     });
     await sideBySide(inputs, results);
-    expect(Math.round((await boxOf(results)).width)).toBe(360);
+    // 06 layout.worksheet.results-width.
+    expect(Math.round((await boxOf(results)).width)).toBe(288);
     await expect(summary).toHaveCount(0);
 
     const panel = await openPanel(frame);
@@ -2258,7 +2343,7 @@ test.describe("D and F beside a docked panel (design-spec 4.1・4.3)", () => {
     const main = await boxOf(frame.getByRole("main"));
     expect(inputsBox.width).toBeGreaterThan(main.width * 0.8);
     // The bar fixed to the bottom of the window, under the inputs.
-    const bar = await boxOf(summary.locator("xpath=.."));
+    const bar = await boxOf(summary.locator("xpath=ancestor::div[@style][1]"));
     expect(bar.y).toBeGreaterThan(inputsBox.y + inputsBox.height);
     expect(Math.round(bar.y + bar.height)).toBe(900);
     await summary.click();
@@ -2289,7 +2374,7 @@ test.describe("D and F beside a docked panel (design-spec 4.1・4.3)", () => {
     });
     await openPanel(frame);
     await sideBySide(inputs, results);
-    expect(Math.round((await boxOf(results)).width)).toBe(360);
+    expect(Math.round((await boxOf(results)).width)).toBe(288);
 
     const field = frame.getByRole("textbox", { name: "Panel frame cost note" });
     await field.click();
@@ -2790,7 +2875,9 @@ test.describe("data parts match docs/mockups (Step 22d, design-spec 4.4・4.5)",
     expect(
       await groove.evaluate((node) => node.scrollWidth <= node.clientWidth),
     ).toBe(true);
-    expect((await box(groove.getByRole("radio").first())).height).toBe(32);
+    expect(
+      Math.round((await box(groove.getByRole("radio").first())).height),
+    ).toBe(32);
     await expect(
       dialog.getByRole("radiogroup", { name: "Confidence" }),
     ).toBeVisible();

@@ -1,6 +1,6 @@
 import { i18n } from "@moonx/i18n";
 import { popoverMaxHeight, type Size } from "@moonx/ui-tokens";
-import { ChevronDown, CircleAlert } from "lucide-react";
+import { ChevronDown, CircleAlert, TriangleAlert } from "lucide-react";
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -17,7 +17,6 @@ import {
   Dialog,
   FormValidationContext,
   Input,
-  Label,
   Modal,
   ModalOverlay,
   Popover,
@@ -27,6 +26,7 @@ import {
 import { type ChoiceItem, ChoiceListBox } from "../internal/ChoiceListBox";
 import {
   FieldHelp,
+  FieldLabel,
   type FieldTextProps,
   invalidOf,
 } from "../internal/FieldHelp";
@@ -34,7 +34,7 @@ import { FixedLocale } from "../internal/FixedLocale";
 import * as styles from "../internal/field.css";
 import { IconSlot } from "../internal/IconSlot";
 import * as overlay from "../internal/overlay.css";
-import { useSize } from "../internal/size";
+import { useFieldWidth, useSize } from "../internal/size";
 import { useControlledState } from "../internal/useControlledState";
 import { useIsNarrow } from "../internal/useIsNarrow";
 import { useKeepAboveKeyboard } from "../internal/useKeepAboveKeyboard";
@@ -155,6 +155,7 @@ interface SharedState {
 function PopoverComboBox({
   label,
   description,
+  descriptionTone,
   errorMessage,
   isInvalid,
   items,
@@ -166,7 +167,7 @@ function PopoverComboBox({
   isTextControlled,
   placeholder,
   size,
-  width = "default",
+  width: givenWidth,
   allowsCustomValue,
   name,
   isDisabled,
@@ -175,6 +176,7 @@ function PopoverComboBox({
   "aria-label": ariaLabel,
 }: ComboBoxProps & SharedState & { isTextControlled: boolean }) {
   const resolved = useSize(size);
+  const width = useFieldWidth(givenWidth);
   const frameRef = useRef<HTMLDivElement>(null);
   useKeepAboveKeyboard(frameRef);
   return (
@@ -211,7 +213,7 @@ function PopoverComboBox({
       validationBehavior="aria"
       className={styles.fieldRoot({ size: resolved, width })}
     >
-      {label != null && <Label className={styles.label}>{label}</Label>}
+      {label != null && <FieldLabel label={label} isRequired={isRequired} />}
       <div ref={frameRef} className={styles.frame({ size: resolved })}>
         <Input className={styles.input} placeholder={placeholder} />
         <Button
@@ -223,7 +225,11 @@ function PopoverComboBox({
           </IconSlot>
         </Button>
       </div>
-      <FieldHelp description={description} errorMessage={errorMessage} />
+      <FieldHelp
+        description={description}
+        descriptionTone={descriptionTone}
+        errorMessage={errorMessage}
+      />
       <Popover maxHeight={popoverMaxHeight} className={overlay.popover}>
         <ChoiceListBox aria-label={i18n.t("components:comboBox.suggestions")} />
       </Popover>
@@ -234,6 +240,7 @@ function PopoverComboBox({
 function TrayComboBox({
   label,
   description,
+  descriptionTone,
   errorMessage,
   isInvalid,
   items,
@@ -243,7 +250,7 @@ function TrayComboBox({
   setInputValue,
   placeholder,
   size,
-  width = "default",
+  width: givenWidth,
   allowsCustomValue,
   customValueLabel,
   name,
@@ -253,6 +260,7 @@ function TrayComboBox({
   "aria-label": ariaLabel,
 }: ComboBoxProps & SharedState) {
   const resolved = useSize(size);
+  const width = useFieldWidth(givenWidth);
   const { contains } = useFilter({ sensitivity: "base" });
   const [isOpen, setOpen] = useState(false);
   // The tray edits a draft; the field changes only when an item or the text is chosen.
@@ -327,6 +335,14 @@ function TrayComboBox({
       {label != null && (
         <span id={labelId} className={styles.label}>
           {label}
+          {isRequired && (
+            <>
+              {" "}
+              <span className={styles.necessity}>
+                {i18n.t("components:field.required")}
+              </span>
+            </>
+          )}
         </span>
       )}
       <Button
@@ -350,11 +366,22 @@ function TrayComboBox({
           <ChevronDown />
         </IconSlot>
       </Button>
-      {description != null && (
-        <span id={descriptionId} className={styles.description}>
-          {description}
-        </span>
-      )}
+      {description != null &&
+        (descriptionTone === "notice" ? (
+          <span
+            id={descriptionId}
+            className={`${styles.description} ${styles.noticeDescription}`}
+          >
+            <IconSlot size="XS">
+              <TriangleAlert />
+            </IconSlot>
+            <span>{description}</span>
+          </span>
+        ) : (
+          <span id={descriptionId} className={styles.description}>
+            {description}
+          </span>
+        ))}
       {invalid && shownError != null && (
         <span id={errorId} className={styles.error}>
           <IconSlot size="XS">

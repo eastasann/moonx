@@ -212,7 +212,7 @@ function StartupCosts() {
   );
 }
 
-const competitors = [
+export const competitors = [
   {
     id: "salad",
     type: "Direct competitor",
@@ -264,6 +264,23 @@ const competitors = [
       ["Why they survive", "Scale"],
     ],
   },
+  {
+    id: "homeprep",
+    type: "Substitute",
+    name: "Home meal prep",
+    price: null,
+    note: null,
+    sources: "No sources",
+    comments: 0,
+    details: [
+      ["Target customer", "People who cook on Sundays"],
+      ["Offering", "Packed lunches from home"],
+      ["Strength", "Cheap"],
+      ["Weakness", "Takes planning"],
+      ["Why chosen", "Control over ingredients"],
+      ["Why they survive", null],
+    ],
+  },
 ];
 
 const decisionChecks = [
@@ -296,7 +313,7 @@ const exact = (value: number) => ({
 });
 
 /** s23-deck.html's slide: the five-minute Business model with its notes. */
-const businessModel: PitchSlide = {
+export const businessModel: PitchSlide = {
   key: "business_model",
   type: "number",
   title: { text: "Business model", empty: false },
@@ -340,7 +357,7 @@ const businessModel: PitchSlide = {
   commentCount: 0,
 };
 
-const importSteps = [
+export const importSteps = [
   { id: "paste", label: "Paste" },
   { id: "match", label: "Match" },
   { id: "review", label: "Review" },
@@ -474,7 +491,11 @@ export function MockupDataSection() {
                 details={competitor.details.map(([label, value]) => ({
                   id: String(label),
                   label,
-                  value,
+                  value: value ?? (
+                    <Text variant="body-sm" tone="tertiary">
+                      Empty
+                    </Text>
+                  ),
                 }))}
                 footer={
                   <>

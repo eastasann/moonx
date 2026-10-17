@@ -1,66 +1,104 @@
 import { vars } from "@moonx/ui-tokens";
 import { style } from "@vanilla-extract/css";
-import { focusRing, hoverTransition, typography } from "../styles/helpers";
+import {
+  focusRing,
+  hoverTransition,
+  narrowQuery,
+  tabletUp,
+  typography,
+} from "../styles/helpers";
 
-/** The focused question: the card's frame and shadow mark where the answer goes (4.4). */
+const form = vars.layout.questionForm;
+
+/**
+ * The question being answered (s11-form.html .card): the light frame and the card's two
+ * shadows mark where the answer goes (4.4), wider than the column by 16px each side.
+ */
 export const focused = style({
   display: "flex",
   flexDirection: "column",
-  gap: vars.density.spacious.gap,
-  padding: vars.density.spacious.panelPadding,
-  border: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
+  paddingBlock: form.cardPaddingYMobile,
+  paddingInline: form.cardPaddingXMobile,
+  border: `${vars.borderWidth.hairline} solid ${vars.color.border.default}`,
   borderRadius: vars.radius.card,
   background: vars.color.surface.raised,
-  boxShadow: vars.shadow.raised,
+  boxShadow: `${vars.shadow.questionCardEdge}, ${vars.shadow.questionCard}`,
   color: vars.color.text.primary,
   scrollMarginBlock: vars.space["400"],
+  "@media": {
+    [tabletUp]: {
+      marginBlock: form.cardMarginY,
+      marginInline: `calc(-1 * ${form.cardOutset})`,
+      paddingBlockStart: form.cardPaddingTop,
+      paddingBlockEnd: form.cardPaddingBottom,
+      paddingInline: form.cardPaddingX,
+    },
+  },
 });
 
-/** Open without the focus: the same content, set apart by space alone. */
+/** Open without the focus: the same content, set apart by the lines between questions. */
 export const open = style({
   display: "flex",
   flexDirection: "column",
-  gap: vars.density.spacious.gap,
-  paddingBlock: vars.density.spacious.panelPadding,
-  paddingInline: vars.density.spacious.panelPadding,
+  paddingBlock: form.rowPaddingY,
+  paddingInline: form.rowPaddingX,
   color: vars.color.text.primary,
 });
 
 /**
- * A quiet question: quieter text, still readable (4.1 C), the whole card pressing through
- * its title's button.
+ * A quiet question (s11-form.html .row): its mark, its name and the start of its answer
+ * under it, its F/A/U and comments at the end; the whole row presses through its title's
+ * button.
  */
 export const quiet = style({
   ...hoverTransition,
   position: "relative",
-  display: "flex",
-  flexDirection: "column",
-  gap: vars.space["75"],
-  paddingBlock: vars.space["200"],
-  paddingInline: vars.density.spacious.panelPadding,
-  borderRadius: vars.radius.card,
-  color: vars.color.text.secondary,
+  display: "grid",
+  gridTemplateColumns: `${form.rowMarkWidth} minmax(0, 1fr) auto`,
+  alignItems: "start",
+  columnGap: form.rowColumnGap,
+  rowGap: form.rowGap,
+  paddingBlock: form.rowPaddingY,
+  paddingInline: form.rowPaddingX,
+  borderRadius: vars.radius.control,
+  color: vars.color.text.primary,
   selectors: {
     "&:hover": { background: vars.color.surface.hover },
   },
 });
 
-export const quietHeader = style({
+/** The F/A/U moon, down the rows' left edge so the states line up (.row .g). */
+export const glyph = style({
+  gridColumn: "1",
+  gridRow: "1 / 3",
+  display: "grid",
+  placeItems: "center",
+  paddingBlockStart: vars.space["50"],
+});
+
+export const quietText = style({
+  gridColumn: "2",
+  gridRow: "1 / 3",
   display: "flex",
-  alignItems: "center",
-  gap: vars.space["100"],
+  flexDirection: "column",
   minWidth: 0,
 });
 
-/** The F/A/U moon at the quiet card's start: down the left edge, the states line up. */
-export const glyph = style({ display: "inline-flex", flexShrink: 0 });
+/**
+ * The quiet row's name takes a line of the body's height, as the mockup's inline name in
+ * the body's line does (s11-form.html .row .code), so the rows keep their rhythm.
+ */
+export const quietTitle = style({
+  display: "flex",
+  alignItems: "center",
+  minHeight: `calc(${vars.typography.body.fontSize} * ${vars.typography.body.lineHeight})`,
+});
 
 export const header = style({
   display: "flex",
   flexWrap: "wrap",
   alignItems: "center",
-  columnGap: vars.space["200"],
-  rowGap: vars.space["75"],
+  gap: form.cardHeadGap,
   minWidth: 0,
 });
 
@@ -72,7 +110,7 @@ export const title = style({
   overflowWrap: "anywhere",
 });
 
-/** The title's button covers the quiet card, so the card presses as a whole. */
+/** The title's button covers the quiet row, so the row presses as a whole. */
 export const press = style({
   padding: 0,
   border: "none",
@@ -87,7 +125,7 @@ export const press = style({
     content: '""',
     position: "absolute",
     inset: 0,
-    borderRadius: vars.radius.card,
+    borderRadius: vars.radius.control,
   },
   selectors: {
     "&[data-focus-visible]::after": {
@@ -97,26 +135,33 @@ export const press = style({
   },
 });
 
+/** The F/A/U label and the comments at the end of the quiet row (.meta). */
 export const meta = style({
-  ...typography("labelSm"),
+  ...typography("caption"),
+  gridColumn: "3",
+  gridRow: "1 / 3",
   display: "inline-flex",
   alignItems: "center",
   gap: vars.space["200"],
-  marginInlineStart: "auto",
-  flexShrink: 0,
+  paddingBlockStart: vars.space["25"],
+  color: vars.color.text.secondary,
+  whiteSpace: "nowrap",
 });
 
 export const comments = style({
+  ...typography("count"),
   display: "inline-flex",
   alignItems: "center",
-  gap: vars.space["50"],
+  gap: vars.space["75"],
   fontVariantNumeric: "tabular-nums",
 });
 
-/** The answer's first lines: two at most (4.1 C). */
+/** The answer's first lines: two at most (4.1 C), in the text's ink (.excerpt). */
 export const excerpt = style({
-  ...typography("bodySm"),
+  ...typography("body"),
   margin: 0,
+  marginBlockStart: form.rowGap,
+  maxWidth: `calc(${form.excerptMeasure} * 1ch)`,
   display: "-webkit-box",
   overflow: "hidden",
   WebkitBoxOrient: "vertical",
@@ -125,31 +170,33 @@ export const excerpt = style({
 });
 
 export const emptyExcerpt = style({
-  ...typography("bodySm"),
+  ...typography("body"),
   margin: 0,
+  marginBlockStart: form.rowGap,
   color: vars.color.text.tertiary,
 });
 
 export const status = style({
-  ...typography("labelSm"),
+  ...typography("caption"),
   display: "inline-flex",
   alignItems: "center",
-  gap: vars.space["75"],
+  gap: vars.space["85"],
   color: vars.color.text.secondary,
 });
 
 export const actions = style({
   display: "inline-flex",
   alignItems: "center",
-  gap: vars.space["50"],
+  gap: vars.space["25"],
   marginInlineStart: "auto",
 });
 
-/** The question, larger than everything around it (design-spec 6.2). */
+/** The question, larger than everything around it (design-spec 6.2, .card h2). */
 export const question = style({
-  ...typography("heading4"),
+  ...typography("headingQuestion"),
   margin: 0,
-  fontWeight: vars.typography.body.fontWeight,
+  marginBlockStart: form.questionMarginTop,
+  marginBlockEnd: form.questionMarginBottom,
   overflowWrap: "break-word",
 });
 
@@ -158,4 +205,7 @@ export const body = style({
   flexDirection: "column",
   gap: vars.density.spacious.gap,
   minWidth: 0,
+  "@media": {
+    [narrowQuery]: { gap: vars.density.regular.gap },
+  },
 });

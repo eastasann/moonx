@@ -25,6 +25,7 @@ export const frameRoot = style({
   "@media": {
     [narrowQuery]: {
       vars: {
+        [frame.topInset]: vars.layout.headerHeightMobile,
         [frame.bottomInset]: `calc(${vars.layout.tabBarHeight} + env(safe-area-inset-bottom))`,
         [frame.barSafeArea]: "0px",
       },
@@ -44,6 +45,8 @@ globalStyle(`html:has(${frameRoot})`, {
 /** Without a header, nothing covers the top of the body. */
 export const headerless = style({
   vars: { [frame.topInset]: "0px" },
+  // Media rules come after plain ones: the phone's header height must not win here.
+  "@media": { [narrowQuery]: { vars: { [frame.topInset]: "0px" } } },
 });
 
 export const column = style({
@@ -80,12 +83,16 @@ export const header = style({
   display: "flex",
   alignItems: "center",
   gap: vars.space["200"],
-  minHeight: vars.layout.headerHeight,
-  paddingInline: vars.layout.pageGutterMobile,
+  minHeight: vars.layout.headerHeightMobile,
+  // On a phone ←, the title and the icon buttons carry their own inline padding.
+  paddingInline: vars.layout.headerPaddingMobile,
   background: vars.color.surface.canvas,
   borderBlockEnd: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
   "@media": {
-    [tabletUp]: { paddingInline: vars.layout.pageGutterTablet },
+    [tabletUp]: {
+      minHeight: vars.layout.headerHeight,
+      paddingInline: vars.layout.pageGutterTablet,
+    },
     [desktopUp]: { paddingInline: vars.layout.pageGutterDesktop },
   },
 });
@@ -103,13 +110,14 @@ export const headerStart = style({
  * browser's own button face.
  */
 export const back = style({
-  ...typography("label"),
+  ...typography("labelEmphasis"),
   display: "inline-flex",
   alignItems: "center",
-  gap: vars.space["75"],
+  gap: vars.space["50"],
   minWidth: 0,
   minHeight: vars.scale.component.targetMin,
-  padding: 0,
+  paddingBlock: 0,
+  paddingInline: vars.space["100"],
   border: "none",
   background: "none",
   cursor: "pointer",
@@ -128,6 +136,40 @@ export const back = style({
   },
 });
 
+/**
+ * The title of a screen the TabBar opens, on a phone only (moon-base.css .top .ttl): the
+ * tablet and wider have the breadcrumbs.
+ */
+export const title = style({
+  ...typography("labelEmphasis"),
+  display: "inline-flex",
+  alignItems: "center",
+  gap: vars.space["50"],
+  minWidth: 0,
+  paddingInline: vars.space["100"],
+  color: vars.color.text.primary,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  "@media": {
+    [tabletUp]: { display: "none" },
+  },
+});
+
+/** 5's workspace in the title: a button that opens M7, a full target. */
+export const titleButton = style({
+  minHeight: vars.scale.component.targetMin,
+  border: "none",
+  borderRadius: vars.radius.control,
+  background: "none",
+  cursor: "pointer",
+  outline: "none",
+  WebkitTapHighlightColor: "transparent",
+  selectors: {
+    "&[data-focus-visible]": focusRing,
+  },
+});
+
 export const backLabel = style({
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -137,7 +179,7 @@ export const backLabel = style({
 export const tools = style({
   display: "flex",
   alignItems: "center",
-  gap: vars.space["100"],
+  gap: vars.layout.headerToolsGap,
   flexShrink: 0,
 });
 

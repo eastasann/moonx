@@ -9,6 +9,7 @@ import {
   useRef,
 } from "react";
 import { Button, VisuallyHidden } from "react-aria-components";
+import { AnswerFieldContext } from "../internal/answerField";
 import { IconSlot } from "../internal/IconSlot";
 import type { MoonState } from "../internal/MoonMark";
 import * as moonStyles from "../internal/moon.css";
@@ -130,13 +131,13 @@ export function QuestionCard({
         aria-labelledby={titleId}
         className={styles.quiet}
       >
-        <div className={styles.quietHeader}>
-          {status !== undefined && (
-            <span className={styles.glyph}>
-              <MoonGlyph state={status.state} />
-            </span>
-          )}
-          <Heading className={styles.title}>
+        {status !== undefined && (
+          <span className={styles.glyph}>
+            <MoonGlyph state={status.state} />
+          </span>
+        )}
+        <div className={styles.quietText}>
+          <Heading className={`${styles.title} ${styles.quietTitle}`}>
             <Button
               id={titleId}
               aria-describedby={`${metaId} ${excerptId}`}
@@ -147,34 +148,35 @@ export function QuestionCard({
               {title}
             </Button>
           </Heading>
-          <span id={metaId} className={styles.meta}>
-            {status !== undefined && (
-              <span className={moonStyles.labelColor[status.state]}>
-                {status.label}
-              </span>
-            )}
-            {commentCount > 0 && (
-              <span className={styles.comments}>
-                <IconSlot size="XS">
-                  <MessageSquare />
-                </IconSlot>
-                <span aria-hidden="true">{formatCount(commentCount)}</span>
-                <VisuallyHidden>
-                  {i18n.t("components:questionCard.comments", {
-                    count: commentCount,
-                    formatted: formatCount(commentCount),
-                  })}
-                </VisuallyHidden>
-              </span>
-            )}
-          </span>
+          <p
+            id={excerptId}
+            className={excerpt === null ? styles.emptyExcerpt : styles.excerpt}
+          >
+            {excerpt ?? i18n.t("components:questionCard.empty")}
+          </p>
         </div>
-        <p
-          id={excerptId}
-          className={excerpt === null ? styles.emptyExcerpt : styles.excerpt}
-        >
-          {excerpt ?? i18n.t("components:questionCard.empty")}
-        </p>
+        <span id={metaId} className={styles.meta}>
+          {/* An empty answer says "Empty" once, where its text would be. */}
+          {status !== undefined && status.state !== "empty" && (
+            <span className={moonStyles.labelColor[status.state]}>
+              {status.label}
+            </span>
+          )}
+          {commentCount > 0 && (
+            <span className={styles.comments}>
+              <IconSlot size="XS">
+                <MessageSquare />
+              </IconSlot>
+              <span aria-hidden="true">{formatCount(commentCount)}</span>
+              <VisuallyHidden>
+                {i18n.t("components:questionCard.comments", {
+                  count: commentCount,
+                  formatted: formatCount(commentCount),
+                })}
+              </VisuallyHidden>
+            </span>
+          )}
+        </span>
       </section>
     );
   }
@@ -193,7 +195,7 @@ export function QuestionCard({
         </Heading>
         {status !== undefined && (
           <span className={styles.status}>
-            <MoonGlyph state={status.state} />
+            <MoonGlyph state={status.state} size="S" />
             <span className={moonStyles.labelColor[status.state]}>
               {status.label}
             </span>
@@ -202,7 +204,13 @@ export function QuestionCard({
         {actions != null && <div className={styles.actions}>{actions}</div>}
       </div>
       <p className={styles.question}>{question}</p>
-      {children != null && <div className={styles.body}>{children}</div>}
+      {children != null && (
+        <div className={styles.body}>
+          <AnswerFieldContext.Provider value={true}>
+            {children}
+          </AnswerFieldContext.Provider>
+        </div>
+      )}
     </section>
   );
 }

@@ -90,6 +90,11 @@ export const button = recipe({
       },
       false: {},
     },
+    // In a phone's bottom bar, the main buttons share its width (4.5 Button).
+    fills: {
+      true: { flex: "1 1 0" },
+      false: {},
+    },
     size: Object.fromEntries(
       sizes.map((size) => [
         size,
@@ -132,7 +137,12 @@ export const button = recipe({
       style: { color: vars.color.negative.fg },
     },
   ],
-  defaultVariants: { variant: "primary", isQuiet: false, size: "M" },
+  defaultVariants: {
+    variant: "primary",
+    isQuiet: false,
+    fills: false,
+    size: "M",
+  },
 });
 
 /**

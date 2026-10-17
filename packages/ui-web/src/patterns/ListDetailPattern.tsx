@@ -1,5 +1,5 @@
 import { i18n } from "@moonx/i18n";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import {
   type FocusEvent,
   type ReactNode,
@@ -10,9 +10,11 @@ import {
   useState,
 } from "react";
 import { Button as AriaButton } from "react-aria-components";
+import { Button } from "../components/Button";
 import {
   BackOverrideContext,
   FloatingAction,
+  ListPaneContext,
   useTwoColumns,
 } from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
@@ -21,17 +23,28 @@ import * as styles from "./patterns.css";
 
 interface ListDetailBase {
   /**
-   * Over the panes: the list's title, and the filters and search when they go across
-   * (6.8). Filters in the left pane (4.1 D) go in `list` instead. Shown with the list.
+   * The title at the top of the list's pane (s06-ideas.html .lhead): its level 1 Heading,
+   * `heading-1-list`. Shown with the list.
    */
   header?: ReactNode;
-  /** The list pane: a ListView, a Tree (27), a TableView (28), with its own filters. */
+  /**
+   * Under the title, with a hairline under them (s06-ideas.html .filters): the filters
+   * (Pickers with their label inside) and the search. On a phone they stay on one line,
+   * which scrolls sideways.
+   */
+  filters?: ReactNode;
+  /** The list: a ListView, a Tree (27), a TableView (28). Its rows reach the pane's edges. */
   list: ReactNode;
   /**
-   * The new-item action: floating at the bottom right on a phone (4.1 D), at the end of
-   * the header on tablet and wider.
+   * Under the list, at its rows' insets (s06-ideas.html .hidden-note): what the filters
+   * leave out and the link to show it ("1 dropped idea hidden · Show").
    */
-  floatingAction?: ReactNode;
+  listNote?: ReactNode;
+  /**
+   * The new item ("New idea"): a primary Button at the end of the title's line from the
+   * tablet breakpoint up, a floating "+" at the bottom right on a phone (4.1 D).
+   */
+  newItem?: { label: string; onPress: () => void };
 }
 
 interface WithDetail extends ListDetailBase {
@@ -72,14 +85,15 @@ function selectedRows(pane: HTMLElement | null): string {
 }
 
 /**
- * Pattern D, list and detail (design-spec 4.1): many things to find, open and manage (6,
- * 7, 8, 12, 14, 16, 22, 26–28). Desktop: the list on the left, the selected item on the
- * right. Tablet and phone, and a desktop whose docked panel leaves the body too narrow:
+ * Pattern D, list and detail (design-spec 4.1, s06-ideas.html): many things to find, open
+ * and manage (6, 7, 8, 12, 14, 16, 22, 26–28). Desktop: the list's pane on the left (its
+ * title, new item, filters and list) and the selected item on the right, to the frame's
+ * edges. Tablet and phone, and a desktop whose docked panel leaves the body too narrow:
  * one pane at a time across the whole width, the list, then the detail with ← back to
  * the list (in the header on a phone, inside AppFrame).
  */
 export function ListDetailPattern(props: ListDetailPatternProps) {
-  const { header, list, floatingAction } = props;
+  const { header, filters, list, listNote, newItem } = props;
   const hasDetail = props.hasDetail !== false;
   const detail = props.hasDetail === false ? null : props.detail;
   const listLabel = props.hasDetail === false ? "" : props.listLabel;
@@ -89,8 +103,8 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
   const isNarrow = useIsNarrow();
   const setFrameBack = useContext(BackOverrideContext);
   const showsDetail = hasDetail && detail != null;
-  const headerRow = useRef<HTMLDivElement>(null);
   const listPane = useRef<HTMLDivElement>(null);
+  const listBody = useRef<HTMLDivElement>(null);
   const detailPane = useRef<HTMLDivElement>(null);
 
   // Two columns turning into one pane keep the side that has focus (4.1: the field being
@@ -116,10 +130,7 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
     onFocus: () => setFocusOnList(true),
     onBlur: (event: FocusEvent) => {
       const next = event.relatedTarget;
-      if (
-        !(next instanceof Node) ||
-        !(headerRow.current?.contains(next) || listPane.current?.contains(next))
-      ) {
+      if (!(next instanceof Node) || !listPane.current?.contains(next)) {
         setFocusOnList(false);
       }
     },
@@ -188,7 +199,7 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
       '[tabindex="0"]',
       'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
     ]) {
-      const element = listPane.current?.querySelector<HTMLElement>(selector);
+      const element = listBody.current?.querySelector<HTMLElement>(selector);
       if (element) {
         element.focus();
         break;
@@ -196,6 +207,7 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
     }
   }, [opensDetail, isTwoColumns, usesFrameBack, hasDetail]);
 
+  const isBeside = hasDetail && isTwoColumns;
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: it only follows focus among its children
     <div
@@ -207,60 +219,63 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
         hasFocus.current = event.currentTarget.contains(event.relatedTarget);
       }}
     >
-      <div
-        className={styles.page({
-          width: hasDetail ? "content" : "reading",
-          density: "regular",
-        })}
-      >
-        <div className={styles.listDetailRoot}>
-          {showsList &&
-            (header != null || (!isNarrow && floatingAction != null)) && (
-              <div ref={headerRow} className={styles.headerRow} {...listSide}>
-                <div className={styles.headerTitle}>{header}</div>
-                {!isNarrow && floatingAction}
-              </div>
-            )}
-          <div className={styles.listDetail}>
-            {showsList && (
-              <div
-                ref={listPane}
-                className={styles.listPane({
-                  isBeside: hasDetail && isTwoColumns,
-                })}
-                {...listSide}
-              >
-                {list}
-              </div>
-            )}
-            {hasDetail && (isTwoColumns || opensDetail) && (
-              <div
-                ref={detailPane}
-                tabIndex={-1}
-                className={styles.detailPane({ isBeside: isTwoColumns })}
-              >
-                {!isTwoColumns && !usesFrameBack && (
-                  <AriaButton
-                    aria-label={i18n.t("components:listDetailPattern.back", {
-                      label: listLabel,
-                    })}
-                    onPress={onBack}
-                    className={styles.backButton}
-                  >
-                    <IconSlot size="M">
-                      <ArrowLeft />
-                    </IconSlot>
-                    {listLabel}
-                  </AriaButton>
+      <div className={styles.listDetail({ isBeside, isListOnly: !hasDetail })}>
+        {showsList && (
+          <div
+            ref={listPane}
+            className={styles.listPane({ isBeside })}
+            {...listSide}
+          >
+            {(header != null || (!isNarrow && newItem !== undefined)) && (
+              <div className={styles.listHead}>
+                <div className={styles.listTitle}>{header}</div>
+                {!isNarrow && newItem !== undefined && (
+                  <Button variant="primary" onPress={newItem.onPress}>
+                    <Plus />
+                    {newItem.label}
+                  </Button>
                 )}
-                {detail}
               </div>
+            )}
+            {filters != null && (
+              <div className={styles.listFilters}>{filters}</div>
+            )}
+            <div ref={listBody}>
+              <ListPaneContext.Provider value={true}>
+                {list}
+              </ListPaneContext.Provider>
+            </div>
+            {listNote != null && (
+              <div className={styles.listNote}>{listNote}</div>
             )}
           </div>
-        </div>
+        )}
+        {hasDetail && (isTwoColumns || opensDetail) && (
+          <div
+            ref={detailPane}
+            tabIndex={-1}
+            className={styles.detailPane({ isBeside: isTwoColumns })}
+          >
+            {!isTwoColumns && !usesFrameBack && (
+              <AriaButton
+                aria-label={i18n.t("components:listDetailPattern.back", {
+                  label: listLabel,
+                })}
+                onPress={onBack}
+                className={styles.backButton}
+              >
+                <IconSlot size="M">
+                  <ArrowLeft />
+                </IconSlot>
+                {listLabel}
+              </AriaButton>
+            )}
+            {detail}
+          </div>
+        )}
       </div>
-      {isNarrow && showsList && floatingAction != null && (
-        <FloatingAction>{floatingAction}</FloatingAction>
+      {isNarrow && showsList && newItem !== undefined && (
+        <FloatingAction label={newItem.label} onPress={newItem.onPress} />
       )}
     </div>
   );

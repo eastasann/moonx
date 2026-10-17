@@ -42,7 +42,7 @@ export function TabBar({ items, currentId, more }: TabBarProps) {
             aria-current={item.id === currentId ? "page" : undefined}
             className={styles.tab}
           >
-            <IconSlot size="M">{item.icon}</IconSlot>
+            <IconSlot size="L">{item.icon}</IconSlot>
             <span className={styles.label}>{item.label}</span>
             {/* After the name, apart from it: the link's visible text reads
                 "Notifications 3", which its name contains (WCAG 2.5.3). */}
@@ -60,7 +60,7 @@ export function TabBar({ items, currentId, more }: TabBarProps) {
           aria-current={isMoreCurrent ? "true" : undefined}
           className={styles.tab}
         >
-          <IconSlot size="M">
+          <IconSlot size="L">
             <MenuIcon />
           </IconSlot>
           <span className={styles.label}>{i18n.t("components:nav.more")}</span>

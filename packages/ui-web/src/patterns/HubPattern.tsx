@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { useIsDesktop } from "../internal/useIsDesktop";
-import { useIsNarrow } from "../internal/useIsNarrow";
 import { MainActionBar, PageHeader } from "./PageHeader";
 import * as styles from "./patterns.css";
 
@@ -32,10 +31,10 @@ export interface HubPatternProps {
 }
 
 /**
- * Pattern A, hub (design-spec 4.1): the whole of one thing, to choose where to go next
- * (5, 10, 13, 20). Desktop: the numbers across the top, then the main column and the side
- * column. Tablet: one column, in the phone's order. Phone: one column, the main action
- * fixed to the bottom.
+ * Pattern A, hub (design-spec 4.1, s05-dashboard.html, d1-moon.html): the whole of one
+ * thing, to choose where to go next (5, 10, 13, 20). Desktop: the numbers across the top,
+ * then the main column and the side column (7 : 5). Tablet: one column, in the phone's
+ * order. Phone: one column, the main action fixed to the bottom.
  */
 export function HubPattern({
   header,
@@ -45,27 +44,28 @@ export function HubPattern({
   blocks,
 }: HubPatternProps) {
   const isDesktop = useIsDesktop();
-  const isNarrow = useIsNarrow();
   const block = (item: HubBlock) => (
     <div key={item.id} className={styles.hubBlock}>
       {item.content}
     </div>
   );
   const column = (name: HubBlock["column"]) => (
-    <div className={styles.hubColumn}>
+    <div className={styles.hubColumn({ side: name })}>
       {blocks.filter((item) => item.column === name).map(block)}
     </div>
   );
   return (
     <div className={styles.root}>
-      <div className={styles.page({ width: "content", density: "regular" })}>
-        <PageHeader
-          header={header}
-          actions={actions}
-          primaryAction={primaryAction}
-          isNarrow={isNarrow}
-        />
-        {metrics}
+      <div className={styles.hubPage}>
+        <div className={styles.hubHeader}>
+          <PageHeader
+            header={header}
+            actions={actions}
+            primaryAction={primaryAction}
+            isActionFixed
+          />
+        </div>
+        {metrics != null && <div className={styles.hubMetrics}>{metrics}</div>}
         {isDesktop ? (
           <div className={styles.hubColumns}>
             {column("main")}
@@ -73,10 +73,12 @@ export function HubPattern({
           </div>
         ) : (
           // One column in the listed order, which is also the reading and Tab order.
-          <div className={styles.hubColumn}>{blocks.map(block)}</div>
+          <div className={styles.hubColumn({ side: "only" })}>
+            {blocks.map(block)}
+          </div>
         )}
       </div>
-      <MainActionBar primaryAction={primaryAction} isNarrow={isNarrow} />
+      <MainActionBar primaryAction={primaryAction} />
     </div>
   );
 }

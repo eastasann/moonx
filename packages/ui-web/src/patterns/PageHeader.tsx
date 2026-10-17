@@ -1,24 +1,27 @@
 import type { ReactNode } from "react";
 import { BottomBar } from "../internal/frame";
+import { useIsNarrow } from "../internal/useIsNarrow";
 import * as styles from "./patterns.css";
 
 /**
- * A page's title and actions (patterns A, E, H, I): the tools beside the title, and the
- * screen's main action at their end on tablet and wider. On a phone the main action is
- * fixed to the bottom instead (4.3, 4.5 Button), by `MainActionBar`.
+ * A page's title and actions (patterns A and H): the tools beside the title, at the bottom
+ * of its block, and the screen's main action at their end. A hub (`isActionFixed`) fixes
+ * its main action to the bottom on a phone instead (4.1 A), by `MainActionBar`; the other
+ * patterns keep it in place (4.3).
  */
 export function PageHeader({
   header,
   actions,
   primaryAction,
-  isNarrow,
+  isActionFixed = false,
 }: {
   header: ReactNode;
   actions?: ReactNode;
   primaryAction?: ReactNode;
-  isNarrow: boolean;
+  isActionFixed?: boolean;
 }) {
-  const inHeader = isNarrow ? undefined : primaryAction;
+  const isNarrow = useIsNarrow();
+  const inHeader = isActionFixed && isNarrow ? undefined : primaryAction;
   return (
     <div className={styles.headerRow}>
       <div className={styles.headerTitle}>{header}</div>
@@ -32,14 +35,13 @@ export function PageHeader({
   );
 }
 
-/** The phone's place for the main action `PageHeader` leaves out: fixed to the bottom. */
+/** The phone's place for the hub's main action `PageHeader` leaves out: fixed to the bottom. */
 export function MainActionBar({
   primaryAction,
-  isNarrow,
 }: {
   primaryAction?: ReactNode;
-  isNarrow: boolean;
 }) {
+  const isNarrow = useIsNarrow();
   return isNarrow && primaryAction != null ? (
     <BottomBar>{primaryAction}</BottomBar>
   ) : null;

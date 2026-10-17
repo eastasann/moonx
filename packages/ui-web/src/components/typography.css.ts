@@ -36,7 +36,12 @@ export const heading = recipe({
       2: typography("heading2"),
       3: typography("heading3"),
       4: typography("heading4"),
-      display: { ...typography("display"), ...fluid("display") },
+      // The landing's title wraps into lines of even length (s01-landing.html .hero h1).
+      display: {
+        ...typography("display"),
+        ...fluid("display"),
+        textWrap: "balance",
+      },
       "display-2": { ...typography("display2"), ...fluid("display2") },
       "heading-1-hub": typography("heading1Hub"),
       "heading-1-list": typography("heading1List"),
@@ -44,6 +49,8 @@ export const heading = recipe({
       "heading-1-settings": typography("heading1Settings"),
       "heading-1-toolbar": typography("heading1Toolbar"),
       "heading-question": typography("headingQuestion"),
+      // A heading of level 2 or 3 with level 4's look: 9's group names (s09-settings.html).
+      "heading-4": typography("heading4"),
       label: {
         ...typography("headingLabel"),
         color: vars.color.text.secondary,

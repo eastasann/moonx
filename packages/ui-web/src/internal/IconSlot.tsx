@@ -12,7 +12,7 @@ export function IconSlot({
   size,
   children,
 }: {
-  size: IconSize;
+  size: IconSize | "nav";
   children: ReactNode;
 }) {
   return <LucideProvider className={iconSize[size]}>{children}</LucideProvider>;

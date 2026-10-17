@@ -1,6 +1,5 @@
 import type { DiffTextVariant } from "@moonx/ui-tokens";
-import { useEffect, useState } from "react";
-import { type DiffPart, diffNow, waitForDiff } from "../internal/diff";
+import { useDiff } from "../internal/useDiff";
 import * as styles from "./DiffText.css";
 
 export interface DiffTextProps {
@@ -20,24 +19,8 @@ export interface DiffTextProps {
  * by a line, not by colour alone: struck through when removed, underlined when added.
  */
 export function DiffText({ before, after, variant }: DiffTextProps) {
-  // A diff of a few changes is done at once; a long rewrite shows its text first and its
-  // marks once the rest of the work, a frame at a time, is done. The parts it waited for
-  // are kept here: the shared cache may have let them go by the next render.
-  const [waited, setWaited] = useState<{
-    before: string;
-    after: string;
-    parts: DiffPart[];
-  } | null>(null);
-  const parts =
-    waited?.before === before && waited.after === after
-      ? waited.parts
-      : diffNow(before, after);
-  useEffect(() => {
-    if (parts !== null) return;
-    return waitForDiff(before, after, (done) =>
-      setWaited({ before, after, parts: done }),
-    );
-  }, [before, after, parts]);
+  // A long rewrite shows its text first and its marks once the work is done.
+  const parts = useDiff(before, after);
   if (parts === null) {
     return (
       <span className={styles.text}>

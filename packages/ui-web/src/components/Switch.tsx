@@ -26,17 +26,31 @@ export interface SwitchProps
   size?: Size;
   /** The label beside the switch. */
   children?: ReactNode;
+  /**
+   * `start` puts the label before the switch: 11's header reads "Focus ●" (s11-form.html).
+   * @default "end"
+   */
+  labelPosition?: "start" | "end";
 }
 
 /** An on / off setting that applies at once (11's Focus, 22's "Overdue only"). */
-export function Switch({ size, children, ...props }: SwitchProps) {
+export function Switch({
+  size,
+  children,
+  labelPosition = "end",
+  ...props
+}: SwitchProps) {
   const resolved = useSize(size);
+  const label = children != null && (
+    <span className={styles.rowLabel}>{children}</span>
+  );
   return (
     <AriaSwitch {...props} className={styles.row({ size: resolved })}>
+      {labelPosition === "start" && label}
       <span className={styles.track({ size: resolved })}>
         <span className={styles.handle({ size: resolved })} />
       </span>
-      {children != null && <span className={styles.rowLabel}>{children}</span>}
+      {labelPosition === "end" && label}
     </AriaSwitch>
   );
 }

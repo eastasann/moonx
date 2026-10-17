@@ -46,6 +46,8 @@ export interface RowListItemProps
   start?: ReactNode;
   /** At the end, before ›: a count or a state ("8/10", "Done (4)"). */
   end?: ReactNode;
+  /** The end is a count ("7/10", "5 entries"): set in the monospaced face. */
+  isEndNumeric?: boolean;
   /** Moves without a URL; prefer `href` for a place. The whole row presses. */
   onPress?: () => void;
   /**
@@ -65,6 +67,7 @@ export function RowListItem({
   description,
   start,
   end,
+  isEndNumeric = false,
   href,
   routerOptions,
   onPress,
@@ -90,7 +93,11 @@ export function RowListItem({
           <span className={styles.description}>{description}</span>
         )}
       </span>
-      {end != null && <span className={styles.end(side)}>{end}</span>}
+      {end != null && (
+        <span className={styles.end({ ...side, isNumeric: isEndNumeric })}>
+          {end}
+        </span>
+      )}
       {isPressable && (
         <span className={styles.chevron(side)}>
           <IconSlot size="S">
@@ -120,4 +127,12 @@ export function RowListItem({
       )}
     </li>
   );
+}
+
+/**
+ * The mark at a row's start for a task not done yet (5's Due soon: ☐, design-spec 6.9).
+ * Only drawn: the row's name says what the task is.
+ */
+export function TaskMark() {
+  return <span aria-hidden="true" className={styles.taskMark} />;
 }

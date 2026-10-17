@@ -55,6 +55,8 @@ export const actionButton = recipe({
             background: vars.color.surface.hover,
             color: vars.color.text.primary,
           },
+          // A quiet button stays unfilled when it cannot be pressed (s09's last Owner's ⋯).
+          "&[data-disabled]": { background: "transparent" },
         },
       },
       false: {},

@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Dialog, Modal, ModalOverlay } from "react-aria-components";
 import { FixedLocale } from "../internal/FixedLocale";
+import { OverlayContexts } from "../internal/OverlayContexts";
 import * as overlay from "../internal/overlay.css";
 import { useIsDesktop } from "../internal/useIsDesktop";
 import { useIsNarrow } from "../internal/useIsNarrow";
@@ -75,13 +76,15 @@ export function ModalPanel({
         className={isNarrow ? overlay.trayOverlay : styles.drawerOverlay}
       >
         <Modal className={isNarrow ? overlay.tray : styles.drawer}>
-          <Dialog className={styles.dialog}>
-            {({ close }) => (
-              <PanelContent title={title} onClose={close} isDialog>
-                {children}
-              </PanelContent>
-            )}
-          </Dialog>
+          <OverlayContexts>
+            <Dialog className={styles.dialog}>
+              {({ close }) => (
+                <PanelContent title={title} onClose={close} isDialog>
+                  {children}
+                </PanelContent>
+              )}
+            </Dialog>
+          </OverlayContexts>
         </Modal>
       </ModalOverlay>
     </FixedLocale>

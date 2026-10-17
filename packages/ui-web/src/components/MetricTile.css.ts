@@ -9,7 +9,9 @@ const hairline = `${vars.borderWidth.hairline} solid ${vars.color.border.hairlin
 /**
  * `band`: one row of equal columns between a line (border.default) and a hairline; 2×2 on
  * a phone (d1-moon.html .numbers). `compact`: columns as wide as their tiles, no lines
- * (s19-decision.html .kn).
+ * (s19-decision.html .kn). `column`: one under another, a hairline between them
+ * (s17-costs.html .tot). `pair`: 2×2 at every width, smaller, for a detail beside a list
+ * (s06-ideas.html .nums).
  */
 export const group = styleVariants({
   band: {
@@ -38,6 +40,16 @@ export const group = styleVariants({
         gridTemplateColumns: "repeat(2, minmax(0, max-content))",
       },
     },
+  },
+  column: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  pair: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    borderTop: `${vars.borderWidth.hairline} solid ${vars.color.border.default}`,
+    borderBottom: hairline,
   },
 });
 
@@ -79,6 +91,24 @@ export const tile = recipe({
         },
       },
       compact: { gap: measures.compactRowGap },
+      column: {
+        gap: 0,
+        paddingBlock: measures.columnPaddingY,
+        selectors: {
+          "&:not(:last-child)": { borderBlockEnd: hairline },
+        },
+      },
+      pair: {
+        gap: 0,
+        paddingBlock: measures.pairPaddingY,
+        selectors: {
+          "&:nth-child(even)": {
+            paddingInlineStart: measures.pairPaddingStart,
+            borderInlineStart: hairline,
+          },
+          "&:nth-child(n + 3)": { borderBlockStart: hairline },
+        },
+      },
     },
   },
 });
@@ -90,6 +120,8 @@ export const label = recipe({
       none: typography("caption"),
       band: typography("caption"),
       compact: typography("captionSm"),
+      column: typography("caption"),
+      pair: typography("captionSm"),
     },
   },
 });
@@ -105,6 +137,8 @@ export const value = recipe({
       none: typography("metric"),
       band: typography("metric"),
       compact: typography("metricSm"),
+      column: typography("metricColumn"),
+      pair: typography("metricPair"),
     },
   },
 });
@@ -121,8 +155,15 @@ export const unit = recipe({
     variant: {
       none: { ...typography("metricUnit"), color: vars.color.text.secondary },
       band: { ...typography("metricUnit"), color: vars.color.text.secondary },
-      // s19's units are the numbers' size and colour ("14.4+ / day").
+      // s19's and s06's units are the numbers' size and colour ("14.4+ / day").
       compact: {},
+      pair: {},
+      // s17's are small and monospaced beside the total ("₱104.00+ / sale").
+      column: {
+        ...typography("caption"),
+        fontFamily: vars.font.family.mono,
+        color: vars.color.text.secondary,
+      },
     },
   },
 });

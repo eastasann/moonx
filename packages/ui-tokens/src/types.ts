@@ -80,9 +80,15 @@ export type QuestionCardMode = (typeof questionCardModes)[number];
 
 /**
  * MetricGroup's `variant` (design-spec 4.5): `band` across a hub's top (13), `compact`
- * inside 19's Well.
+ * inside 19's Well, `column` down a worksheet's results (17, 18), `pair` 2×2 in a
+ * detail beside a list (6).
  */
-export const metricGroupVariants = ["band", "compact"] as const;
+export const metricGroupVariants = [
+  "band",
+  "compact",
+  "column",
+  "pair",
+] as const;
 export type MetricGroupVariant = (typeof metricGroupVariants)[number];
 
 /** MetricTile's supplement: plain, or the amber of a warning (design-spec 4.4). */
@@ -248,6 +254,7 @@ export const headingVariants = [
   "heading-1-settings",
   "heading-1-toolbar",
   "heading-question",
+  "heading-4",
   "label",
 ] as const;
 export type HeadingVariant = (typeof headingVariants)[number];

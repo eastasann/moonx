@@ -1,6 +1,6 @@
 import { formatCount, i18n } from "@moonx/i18n";
 import { type SaveState, twoColumnMinWidth } from "@moonx/ui-tokens";
-import { ArrowLeft, History, MessageSquare } from "lucide-react";
+import { ArrowLeft, ChevronDown, History, MessageSquare } from "lucide-react";
 import {
   type MouseEvent,
   type ReactNode,
@@ -46,6 +46,12 @@ export interface AppFrameProps {
   breadcrumbs?: ReactNode;
   /** On a phone, ← and where it leads: "Validation", "Plan", "Self Analysis", "Ideas". */
   back?: { href: string; label: string };
+  /**
+   * On a phone, the title of a screen the TabBar or its More menu opens, which has no ←: "Ideas",
+   * "Notifications". With `onPress`, it is a button with ▾: 5's workspace, which opens M7
+   * (6.0.1).
+   */
+  title?: { label: string; onPress?: () => void };
   /** The save state of the screen's fields; none on screens that save nothing. */
   saveState?: SaveState;
   /** Sends the failed saves again (the header's Retry, 6.0.2). */
@@ -79,6 +85,7 @@ export function AppFrame({
   tabBar,
   breadcrumbs,
   back,
+  title,
   saveState,
   onRetrySave,
   comments,
@@ -100,6 +107,7 @@ export function AppFrame({
   const hasHeader =
     breadcrumbs !== undefined ||
     back !== undefined ||
+    title !== undefined ||
     backOverride !== null ||
     saveState !== undefined ||
     comments !== undefined ||
@@ -196,7 +204,7 @@ export function AppFrame({
                   onPress={backOverride.onPress}
                   className={styles.back}
                 >
-                  <IconSlot size="M">
+                  <IconSlot size="nav">
                     <ArrowLeft />
                   </IconSlot>
                   <span className={styles.backLabel}>{backOverride.label}</span>
@@ -210,13 +218,32 @@ export function AppFrame({
                     })}
                     className={styles.back}
                   >
-                    <IconSlot size="M">
+                    <IconSlot size="nav">
                       <ArrowLeft />
                     </IconSlot>
                     <span className={styles.backLabel}>{back.label}</span>
                   </AriaLink>
                 )
               )}
+              {backOverride === null &&
+                back === undefined &&
+                title !== undefined &&
+                (title.onPress === undefined ? (
+                  <span className={styles.title}>{title.label}</span>
+                ) : (
+                  <AriaButton
+                    aria-label={i18n.t("components:nav.workspace", {
+                      name: title.label,
+                    })}
+                    onPress={title.onPress}
+                    className={`${styles.title} ${styles.titleButton}`}
+                  >
+                    {title.label}
+                    <IconSlot size="XS">
+                      <ChevronDown />
+                    </IconSlot>
+                  </AriaButton>
+                ))}
               {breadcrumbs}
             </div>
             <div className={styles.tools}>

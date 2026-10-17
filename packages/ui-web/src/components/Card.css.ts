@@ -218,3 +218,34 @@ export const view = styleVariants(sized, (size) => ({
   outline: "none",
   "@media": { [narrowQuery]: { gridTemplateColumns: "minmax(0, 1fr)" } },
 }));
+
+/**
+ * CardView's last tile (s15-competitors.html .addcard): a dashed light frame, the label in
+ * the middle, at least `layout.compare.add-tile-min-height` tall.
+ */
+export const addTile = style({
+  ...hoverTransition,
+  ...typography("label"),
+  display: "grid",
+  placeItems: "center",
+  minHeight: vars.layout.compare.addTileMinHeight,
+  border: `${vars.layout.compare.addTileBorder} dashed ${vars.color.border.default}`,
+  borderRadius: vars.radius.card,
+  color: vars.color.text.secondary,
+  cursor: "pointer",
+  outline: "none",
+  WebkitTapHighlightColor: "transparent",
+  selectors: {
+    "&[data-hovered]": {
+      background: vars.color.surface.hover,
+      color: vars.color.text.primary,
+    },
+    "&[data-focus-visible]": focusRing,
+  },
+});
+
+export const addTileLabel = style({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: vars.space["75"],
+});

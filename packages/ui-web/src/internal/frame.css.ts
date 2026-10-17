@@ -4,8 +4,16 @@ import {
   fallbackVar,
   globalStyle,
   style,
+  styleVariants,
 } from "@vanilla-extract/css";
-import { desktopUp, narrowQuery, tabletUp } from "../styles/helpers";
+import { recipe } from "@vanilla-extract/recipes";
+import {
+  desktopUp,
+  focusRing,
+  narrowQuery,
+  tabletUp,
+  typography,
+} from "../styles/helpers";
 
 // What a frame tells the patterns inside it, as CSS variables on its root: where its
 // sticky header ends and where its TabBar begins. Outside a frame both are 0, so a
@@ -37,25 +45,17 @@ export const withTabBar = style({});
 /** AppFrame's root while its sticky header covers the top of the window. */
 export const withHeader = style({});
 
-/**
- * A bar fixed to the bottom of the body (design-spec 4.1 A・B・C・F・G, 4.3): it rests on
- * the TabBar, or on the window's edge where there is none, and rises above the on-screen
- * keyboard by the height the keyboard covers.
- */
-export const bottomBar = style({
+/** Every bottom bar, whatever its variant: what the scroll padding below looks for. */
+export const bar = style({});
+
+const barBase = {
   position: "sticky",
   // At the end of a short page too: the pattern fills the body's height.
   marginBlockStart: "auto",
   bottom: `max(${bottom}, ${keyboard})`,
   zIndex: vars.layout.zIndex.bottomAction,
   display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-end",
-  gap: vars.space["200"],
-  minHeight: `calc(${vars.layout.bottomActionHeight} + ${safeArea})`,
   paddingInline: vars.layout.pageGutterMobile,
-  paddingBlockStart: vars.space["100"],
-  paddingBlockEnd: `calc(${vars.space["100"]} + ${safeArea})`,
   background: vars.color.surface.canvas,
   borderBlockStart: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
   "@media": {
@@ -63,77 +63,182 @@ export const bottomBar = style({
     // F's summary bar beside a docked panel, in line with the page's gutters.
     [desktopUp]: { paddingInline: vars.layout.pageGutterDesktop },
   },
+} as const;
+
+/**
+ * A bar fixed to the bottom of the body (design-spec 4.1 A・B・C・F・G, 4.3): it rests on
+ * the TabBar, or on the window's edge where there is none, and rises above the on-screen
+ * keyboard by the height the keyboard covers.
+ * - `actions`: the main actions (d1-moon.html .actionbar, s19-decision.html .formbar,
+ *   s25-import.html .fixbar), 10px above and under the XL buttons on a phone.
+ * - `footer`: a question form's previous section, AI ▼ and next (s11-form.html .footer).
+ * - `navigation`: a phone's previous and next question (s11-form.html .mnav).
+ * - `summary`: a worksheet's results in brief (s17-costs.html .sumbar), on the raised
+ *   ground under the light frame.
+ */
+export const bottomBar = styleVariants({
+  actions: {
+    ...barBase,
+    minHeight: `calc(${vars.layout.bottomActionHeight} + ${safeArea})`,
+    paddingBlockStart: vars.layout.bottomBarPaddingY,
+    paddingBlockEnd: `calc(${vars.layout.bottomBarPaddingY} + ${safeArea})`,
+    "@media": {
+      ...barBase["@media"],
+      [tabletUp]: {
+        ...barBase["@media"][tabletUp],
+        minHeight: 0,
+        paddingBlock: vars.layout.steps.barPaddingY,
+      },
+    },
+  },
+  footer: {
+    ...barBase,
+    paddingBlock: vars.layout.questionForm.footerPaddingY,
+  },
+  navigation: {
+    ...barBase,
+    minHeight: `calc(${vars.layout.bottomNavHeight} + ${safeArea})`,
+    paddingInline: vars.layout.questionForm.bottomNavPaddingX,
+    paddingBlockEnd: safeArea,
+  },
+  summary: {
+    ...barBase,
+    minHeight: `calc(${vars.layout.summaryBarHeight} + ${safeArea})`,
+    paddingBlockEnd: safeArea,
+    background: vars.color.surface.raised,
+    borderBlockStart: `${vars.borderWidth.hairline} solid ${vars.color.border.default}`,
+  },
+});
+
+const columns = {
+  reading: vars.layout.readingColumnMax,
+  form: vars.layout.formColumnMax,
+  comparison: vars.layout.comparisonMax,
+  worksheet: vars.layout.worksheetMax,
+} as const;
+
+/**
+ * What the bar holds: at the end of the line, its buttons side by side. From the tablet
+ * breakpoint up a bar lines up with the page's column (the gutters are the bar's).
+ */
+export const barInner = recipe({
+  base: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: vars.layout.steps.barGap,
+    flex: 1,
+    minWidth: 0,
+    marginInline: "auto",
+  },
+  variants: {
+    variant: {
+      actions: {},
+      footer: {
+        justifyContent: "space-between",
+        gap: vars.layout.questionForm.footerGap,
+      },
+      navigation: {
+        display: "grid",
+        gridTemplateColumns: `${vars.layout.questionForm.bottomNavColumn} minmax(0, 1fr) ${vars.layout.questionForm.bottomNavColumn}`,
+        justifyItems: "center",
+        gap: 0,
+      },
+      summary: {
+        justifyContent: "flex-start",
+        gap: vars.layout.worksheet.summaryGap,
+      },
+    },
+    column: Object.fromEntries(
+      Object.entries(columns).map(([name, max]) => [
+        name,
+        { "@media": { [tabletUp]: { maxWidth: max } } },
+      ]),
+    ) as Record<keyof typeof columns, { "@media": Record<string, object> }>,
+  },
+});
+
+/** G's note at the start of its bar (s25-import.html .fixbar .note). */
+export const barNote = style({
+  ...typography("caption"),
+  marginInlineEnd: "auto",
+  color: vars.color.text.secondary,
 });
 
 /**
- * A bottom bar on a phone only (4.1 B, 6.7): from the tablet breakpoint up it is an
- * ordinary row at the end of the page's column, under the form.
+ * A bottom bar on a phone only (4.1 B): from the tablet breakpoint up it is an ordinary
+ * row right under the form, in the page's column, with the page's space under it.
  */
 export const phoneOnlyBar = style({
   "@media": {
     [tabletUp]: {
       position: "static",
-      width: "100%",
-      maxWidth: vars.layout.readingColumnMax,
       minHeight: 0,
-      // Right under the content, however tall the body.
       marginBlockStart: 0,
-      marginInline: "auto",
       paddingBlockStart: 0,
-      paddingBlockEnd: vars.space["500"],
+      paddingBlockEnd: vars.layout.focus.paddingBottom,
       background: "none",
       borderBlockStart: "none",
     },
-    [desktopUp]: { paddingInline: vars.layout.pageGutterDesktop },
-  },
-});
-
-/** A phone-only bar under a page of the content's width (G's diff step). */
-export const phoneOnlyContent = style({
-  "@media": {
-    [tabletUp]: { maxWidth: vars.layout.contentMax },
   },
 });
 
 /**
- * The phone's new-item button at the bottom right of a list (4.1 D `floatingAction`): it
- * floats over the list as it scrolls, rests on the TabBar and rises above the keyboard;
- * the space it takes at the end keeps the last row clear of it.
+ * The phone's new-item button at the bottom right of a list (4.1 D, s06-ideas.html .fab):
+ * it floats over the list as it scrolls, 16px above the TabBar or the keyboard and from
+ * the right edge; the space it takes at the end keeps the last row clear of it.
  */
 export const floatingAction = style({
   position: "sticky",
-  bottom: `calc(max(${bottom}, ${keyboard}) + ${vars.layout.pageGutterMobile})`,
+  bottom: `max(${bottom}, ${keyboard})`,
   zIndex: vars.layout.zIndex.bottomAction,
   alignSelf: "flex-end",
   marginBlockStart: "auto",
-  paddingInline: vars.layout.pageGutterMobile,
-  paddingBlockEnd: vars.layout.pageGutterMobile,
+  paddingInlineEnd: vars.layout.listDetail.floatingActionOffset,
+  paddingBlockEnd: vars.layout.listDetail.floatingActionOffset,
+  pointerEvents: "none",
+});
+
+/** 56×56, the ink fill, a soft shadow (06 shadow.floating-action). */
+export const floatingButton = style({
+  display: "grid",
+  placeItems: "center",
+  width: vars.layout.listDetail.floatingActionSize,
+  height: vars.layout.listDetail.floatingActionSize,
+  padding: 0,
+  border: "none",
+  borderRadius: vars.layout.listDetail.floatingActionRadius,
+  background: vars.color.control.primary,
+  boxShadow: vars.shadow.floatingAction,
+  color: vars.color.control.onPrimary,
+  cursor: "pointer",
+  outline: "none",
+  pointerEvents: "auto",
+  WebkitTapHighlightColor: "transparent",
+  selectors: {
+    "&[data-pressed]": { background: vars.color.control.primaryPressed },
+    "&[data-focus-visible]": focusRing,
+  },
 });
 
 /**
  * The bands across the top of the body (6.0.6): under AppFrame's header, or at the top of
- * a PageFrame screen.
+ * a PageFrame screen, from edge to edge, each with its own rule under it.
  */
 export const bands = style({
   display: "flex",
   flexDirection: "column",
-  gap: vars.space["100"],
-  paddingBlockStart: vars.space["200"],
-  paddingInline: vars.layout.pageGutterMobile,
-  "@media": {
-    [tabletUp]: { paddingInline: vars.layout.pageGutterTablet },
-    [desktopUp]: { paddingInline: vars.layout.pageGutterDesktop },
-  },
 });
 
 // A field brought into view (useKeepAboveKeyboard, the browser's own focus scrolling)
 // stops clear of what covers the window's edges. The variables above live on the frame,
-// not on html, so these rules spell the heights out. Without a frame, a bar alone:
+// not on html, so these rules spell the heights out, each bar as tall as the tallest
+// (`actions` on a phone). Without a frame, a bar alone:
 const barHeight = `calc(${vars.layout.bottomActionHeight} + env(safe-area-inset-bottom))`;
-globalStyle(`html:where(:has(${bottomBar}:not(${phoneOnlyBar})))`, {
+globalStyle(`html:where(:has(${bar}:not(${phoneOnlyBar})))`, {
   scrollPaddingBottom: barHeight,
 });
-globalStyle(`html:where(:has(${bottomBar}${phoneOnlyBar}))`, {
+globalStyle(`html:where(:has(${bar}${phoneOnlyBar}))`, {
   "@media": { [narrowQuery]: { scrollPaddingBottom: barHeight } },
 });
 // In AppFrame on a phone, the TabBar, and a bar on top of it:
@@ -141,7 +246,7 @@ const tabBarHeight = `calc(${vars.layout.tabBarHeight} + env(safe-area-inset-bot
 globalStyle(`html:has(${withTabBar})`, {
   "@media": { [narrowQuery]: { scrollPaddingBottom: tabBarHeight } },
 });
-globalStyle(`html:has(${withTabBar}):has(${bottomBar})`, {
+globalStyle(`html:has(${withTabBar}):has(${bar})`, {
   "@media": {
     [narrowQuery]: {
       scrollPaddingBottom: `calc(${vars.layout.bottomActionHeight} + ${tabBarHeight})`,

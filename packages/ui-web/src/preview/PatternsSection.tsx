@@ -18,14 +18,13 @@ import { TableView } from "../components/TableView";
 import { Text } from "../components/Text";
 import { TextArea, TextField } from "../components/TextField";
 import { Well } from "../components/Well";
-import { Flex, Stack } from "../layout/Flex";
-import { Grid } from "../layout/Grid";
+import { Stack } from "../layout/Flex";
 import { CardComparePattern } from "../patterns/CardComparePattern";
 import { FocusPattern } from "../patterns/FocusPattern";
 import { HubPattern } from "../patterns/HubPattern";
 import { ListDetailPattern } from "../patterns/ListDetailPattern";
 import { PresentationPattern } from "../patterns/PresentationPattern";
-import { PublicPattern } from "../patterns/PublicPattern";
+import { PublicPattern, PublicSection } from "../patterns/PublicPattern";
 import { QuestionFormPattern } from "../patterns/QuestionFormPattern";
 import { SettingsPattern } from "../patterns/SettingsPattern";
 import { StepsPattern } from "../patterns/StepsPattern";
@@ -152,7 +151,14 @@ export function FocusPatternSection() {
       <PatternBox>
         <FocusPattern
           header={<Heading level={3}>Decide on Piaya Gift Box</Heading>}
-          primaryAction={<Button variant="primary">Save decision</Button>}
+          actions={
+            <>
+              <Button variant="secondary" isQuiet>
+                Cancel
+              </Button>
+              <Button variant="primary">Save decision</Button>
+            </>
+          }
         >
           <Well aria-label="Focus material">
             <Text>Break-even 6.9 / day · 4 of 6 checks done</Text>
@@ -238,22 +244,8 @@ export function QuestionFormPatternSection() {
               <Button variant="secondary">Next: 02 Market</Button>
             </>
           }
-          progress={
-            <Flex gap="space-100" alignItems="center">
-              {formQuestions.map((item) => (
-                <span
-                  key={item.id}
-                  aria-current={
-                    item.id === (current ?? "WHO") ? "step" : undefined
-                  }
-                >
-                  <MoonGlyph
-                    state={item.answer === "" ? "empty" : "done"}
-                    isCurrent={item.id === (current ?? "WHO")}
-                  />
-                </span>
-              ))}
-            </Flex>
+          isAnswered={(id) =>
+            formQuestions.find((item) => item.id === id)?.answer !== ""
           }
         />
       </PatternBox>
@@ -305,12 +297,7 @@ export function ListDetailPatternSection() {
           }
           listLabel="Ideas"
           onBack={() => setSelected(null)}
-          floatingAction={
-            <Button variant="primary">
-              <Plus />
-              New idea
-            </Button>
-          }
+          newItem={{ label: "New idea", onPress: () => {} }}
         />
       </PatternBox>
       <Specimen name="hasDetail={false}: 8 Notifications, the list alone">
@@ -353,8 +340,14 @@ export function CardComparePatternSection() {
       <PatternBox>
         <CardComparePattern
           header={<Heading level={3}>Competitors & alternatives</Heading>}
+          count={
+            <>
+              <MoonGlyph state="fact" />
+              <Text tone="secondary">3 competitors · aim for 3–5</Text>
+            </>
+          }
           primaryAction={
-            <Button variant="primary">
+            <Button variant="secondary">
               <Plus />
               Add competitor
             </Button>
@@ -453,24 +446,29 @@ export function StepsPatternSection() {
               doneLabel="completed"
             />
           }
-          comparison={{
-            before: (
-              <Stack gap="space-100">
-                <Heading level={4} variant="label">
-                  Current
-                </Heading>
-                <Text>Office workers who buy pasalubong.</Text>
-              </Stack>
-            ),
-            after: (
-              <Stack gap="space-100">
-                <Heading level={4} variant="label">
-                  From AI
-                </Heading>
-                <Text>Office workers in Bacolod who buy pasalubong.</Text>
-              </Stack>
-            ),
-          }}
+          comparisons={[
+            {
+              id: "who",
+              code: "01 · WHO",
+              question: "Who is the primary paying customer?",
+              before: (
+                <Stack gap="space-100">
+                  <Heading level={4} variant="label">
+                    Current
+                  </Heading>
+                  <Text>Office workers who buy pasalubong.</Text>
+                </Stack>
+              ),
+              after: (
+                <Stack gap="space-100">
+                  <Heading level={4} variant="label">
+                    From AI
+                  </Heading>
+                  <Text>Office workers in Bacolod who buy pasalubong.</Text>
+                </Stack>
+              ),
+            },
+          ]}
           actions={
             <>
               <Button variant="secondary">Back</Button>
@@ -521,48 +519,34 @@ export function SettingsPatternSection() {
 }
 
 export function PresentationPatternSection() {
-  const [chosen, setChosen] = useState<Set<string | number>>(
-    new Set(["business_model"]),
-  );
-  const current =
-    slides.find((slide) => chosen.has(slide.key)) ?? (slides[0] as PitchSlide);
+  const [current, setCurrent] = useState("business_model");
+  const slide =
+    slides.find((item) => item.key === current) ?? (slides[0] as PitchSlide);
   return (
     <Section title="PresentationPattern">
       <PatternBox>
         <PresentationPattern
-          header={<Heading level={3}>Pitch Deck</Heading>}
-          primaryAction={<Button variant="primary">Download PDF</Button>}
-          thumbnails={
-            <CardView
-              aria-label="Pattern slides"
-              size="XS"
-              selectionMode="single"
-              selectedKeys={chosen}
-              onSelectionChange={setChosen}
-              items={slides.map((slide, index) => ({
-                id: slide.key,
-                title: `${index + 1} ${slide.title.text}`,
-              }))}
-            >
-              {(item) => (
-                <Card id={item.id} textValue={item.title} title={item.title} />
-              )}
-            </CardView>
+          header={
+            <Heading level={3} variant="heading-1-toolbar">
+              Pitch Deck
+            </Heading>
           }
-          slide={<Slide slide={current} footer={footer} currency="PHP" />}
+          primaryAction={<Button variant="primary">Download PDF</Button>}
+          slides={slides.map((item) => ({
+            id: item.key,
+            title: item.title.text,
+            thumbnail: (
+              <Slide slide={item} footer={footer} currency="PHP" isThumbnail />
+            ),
+          }))}
+          currentId={slide.key}
+          onCurrentChange={setCurrent}
+          slide={<Slide slide={slide} footer={footer} currency="PHP" />}
           notes={
             <Text variant="body-long" tone="secondary">
               Say: one box sells for ₱450 and leaves ₱210.
             </Text>
           }
-          slides={slides.map((slide) => (
-            <Slide
-              key={slide.key}
-              slide={slide}
-              footer={footer}
-              currency="PHP"
-            />
-          ))}
         />
       </PatternBox>
     </Section>
@@ -574,20 +558,26 @@ export function PublicPatternSection() {
     <Section title="PublicPattern">
       <PatternBox>
         <PublicPattern
-          header={
-            <Flex justifyContent="space-between" alignItems="center">
-              <Text variant="label">moonx</Text>
-              <Link href="#public-sign-in">Sign in</Link>
-            </Flex>
-          }
-          footer={
-            <Flex gap="space-300">
-              <Link href="#public-privacy">Privacy</Link>
-              <Link href="#public-support">Support</Link>
-            </Flex>
+          action={<Button variant="secondary">Log in</Button>}
+          footerLinks={
+            <>
+              <Link href="#public-privacy" isQuiet>
+                Privacy
+              </Link>
+              <Link href="#public-support" isQuiet>
+                Support
+              </Link>
+            </>
           }
         >
-          <Grid columns={{ mobile: 1, tablet: 2 }} gap="space-500">
+          <PublicSection
+            layout="hero"
+            aside={
+              <Well aria-label="Public example">
+                <Text>Validate an idea before you spend on it.</Text>
+              </Well>
+            }
+          >
             <Stack gap="space-200">
               <Heading level={3} variant="display">
                 Start a local business, one step at a time
@@ -596,10 +586,7 @@ export function PublicPatternSection() {
                 From knowing yourself to a plan you can show.
               </Text>
             </Stack>
-            <Well aria-label="Public example">
-              <Text>Validate an idea before you spend on it.</Text>
-            </Well>
-          </Grid>
+          </PublicSection>
         </PublicPattern>
       </PatternBox>
     </Section>

@@ -12,3 +12,27 @@ export function useSize(size: Size | undefined): Size {
   const fromContext = useContext(SizeContext);
   return size ?? fromContext;
 }
+
+/**
+ * Inside a phone's bottom bar (design-spec 4.3・4.5 Button): Buttons not given a size are
+ * XL, and the ones that are not quiet share the bar's width, the quiet ones (Cancel)
+ * keeping their own.
+ */
+export const BottomBarContext = createContext(false);
+
+/**
+ * The width fields take when they are not given one: `full` in the fields' column of a
+ * settings group (pattern H, s09-settings.html: the fields fill the column), `fit` for a
+ * member's role at the end of its row.
+ */
+export const FieldWidthContext = createContext<"default" | "full" | "fit">(
+  "default",
+);
+
+/** The given width, or the one the surrounding settings group sets. */
+export function useFieldWidth<W extends string>(
+  width: W | undefined,
+): W | "default" | "full" | "fit" {
+  const fromContext = useContext(FieldWidthContext);
+  return width ?? fromContext;
+}

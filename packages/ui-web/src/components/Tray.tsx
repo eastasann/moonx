@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Dialog, Modal, ModalOverlay } from "react-aria-components";
 import { FixedLocale } from "../internal/FixedLocale";
+import { OverlayContexts } from "../internal/OverlayContexts";
 import * as styles from "../internal/overlay.css";
 
 interface SheetProps {
@@ -27,7 +28,9 @@ export function TraySheet({
       isKeyboardDismissDisabled={!isDismissable}
       className={styles.trayOverlay}
     >
-      <Modal className={styles.tray}>{children}</Modal>
+      <Modal className={styles.tray}>
+        <OverlayContexts>{children}</OverlayContexts>
+      </Modal>
     </ModalOverlay>
   );
 }

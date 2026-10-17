@@ -1,7 +1,12 @@
 import { vars } from "@moonx/ui-tokens";
 import { style } from "@vanilla-extract/css";
 import { recipe } from "@vanilla-extract/recipes";
-import { atLeastTarget, focusRing, typography } from "../styles/helpers";
+import {
+  atLeastTarget,
+  focusRing,
+  tabletUp,
+  typography,
+} from "../styles/helpers";
 import { cellPaddingX } from "./tableCell.css";
 
 const sizes = ["S", "M", "L", "XL"] as const;
@@ -25,6 +30,10 @@ export const fieldRoot = recipe({
     flexDirection: "column",
     maxWidth: "100%",
     minWidth: 0,
+    // Holds React Aria's visually hidden parts (an inside Picker's label, a hidden
+    // select): absolutely placed, they would otherwise widen the page from inside a row
+    // that scrolls sideways (4.3).
+    position: "relative",
   },
   variants: {
     size: Object.fromEntries(
@@ -43,6 +52,11 @@ export const fieldRoot = recipe({
       // segments keep their minimum target each, which the default width cannot hold on
       // the large scale.
       content: { width: "fit-content" },
+      // As wide as what it shows: a Picker with its label inside (D's filters, I's
+      // version).
+      fit: { width: "fit-content" },
+      // Grows into the rest of a line (D's search beside its filters, s06-ideas.html).
+      fill: { flex: "1 1 auto" },
     },
   },
   compoundVariants: sizes.map((size) => ({
@@ -190,9 +204,22 @@ export const endInput = style({
   textAlign: "end",
 });
 
+export const necessity = style({
+  ...typography("caption"),
+  color: vars.color.text.secondary,
+});
+
 export const description = style({
   ...typography("caption"),
   color: vars.color.text.secondary,
+});
+
+/** A warning under a field: amber, its icon before it (06 notice.fg). */
+export const noticeDescription = style({
+  display: "flex",
+  alignItems: "flex-start",
+  gap: vars.space["75"],
+  color: vars.color.notice.fg,
 });
 
 export const error = style({
@@ -241,6 +268,29 @@ export const textArea = style([
     lineHeight: vars.typography.bodyLong.lineHeight,
   },
 ]);
+
+/**
+ * The answer of a question being answered (QuestionCard, s11-form.html .answer): 16px with
+ * room to write, on the canvas until it takes focus. Its frame stays the fields' 3:1 one
+ * (design-spec 4.4), though the mockup draws it light.
+ */
+export const answerFrame = style({
+  minHeight: vars.layout.questionForm.answerMinHeightMobile,
+  paddingInline: vars.layout.questionForm.answerPaddingX,
+  borderRadius: vars.radius.callout,
+  background: vars.color.surface.canvas,
+  selectors: {
+    "&:focus-within": { background: vars.color.surface.raised },
+  },
+  "@media": {
+    [tabletUp]: { minHeight: vars.layout.questionForm.answerMinHeight },
+  },
+});
+
+export const answerArea = style({
+  ...typography("answer"),
+  paddingBlock: vars.layout.questionForm.answerPaddingY,
+});
 
 /** The native clear button would duplicate SearchField's own. */
 export const searchInput = style({
@@ -302,6 +352,42 @@ export const pickerButton = style({
     "&:focus-within": { outline: "none" },
     "&[data-focus-visible]": focusRing,
     "&[data-disabled]": { cursor: "not-allowed" },
+  },
+});
+
+/**
+ * A Picker with its label inside the frame (s06-ideas.html .fbtn, s23-deck.html .picker):
+ * "Stage All ▾". Its frame stays the fields' 3:1 one (design-spec 4.4: a Picker is placed
+ * by its frame), though the mockups draw it light.
+ */
+export const pickerInside = style({
+  width: "auto",
+  gap: vars.space["75"],
+});
+
+export const insideLabel = style({
+  flexShrink: 0,
+  color: vars.color.text.secondary,
+  cursor: "inherit",
+});
+
+export const insideValue = style({
+  fontWeight: vars.typography.label.fontWeight,
+});
+
+/**
+ * A Picker that cannot be changed: the dashed light frame and tertiary text
+ * (s09-settings.html, the last Owner's role). A disabled control needs no 3:1 frame
+ * (WCAG 1.4.11).
+ */
+export const pickerDisabled = style({
+  selectors: {
+    "[data-disabled] > &": {
+      background: vars.color.control.secondary,
+      borderStyle: "dashed",
+      borderColor: vars.color.border.default,
+      color: vars.color.text.tertiary,
+    },
   },
 });
 

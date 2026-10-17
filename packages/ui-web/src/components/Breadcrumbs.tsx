@@ -1,6 +1,5 @@
 import { i18n } from "@moonx/i18n";
 import type { BreadcrumbsSize } from "@moonx/ui-tokens";
-import { Slash } from "lucide-react";
 import { createContext, type ReactNode, useContext } from "react";
 import {
   Breadcrumb as AriaBreadcrumb,
@@ -8,7 +7,6 @@ import {
   Breadcrumbs as AriaBreadcrumbs,
   Link,
 } from "react-aria-components";
-import { IconSlot } from "../internal/IconSlot";
 import * as styles from "./Breadcrumbs.css";
 
 const BreadcrumbsSizeContext = createContext<BreadcrumbsSize>("M");
@@ -75,9 +73,7 @@ export function Breadcrumb({ href, children, ...props }: BreadcrumbProps) {
               {children}
             </Link>
             <span className={styles.separator} aria-hidden="true">
-              <IconSlot size="S">
-                <Slash />
-              </IconSlot>
+              {i18n.t("components:breadcrumbs.separator")}
             </span>
           </>
         )

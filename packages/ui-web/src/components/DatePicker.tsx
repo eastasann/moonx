@@ -28,11 +28,11 @@ import {
   Dialog,
   Group,
   Heading,
-  Label,
   useLocale,
 } from "react-aria-components";
 import {
   FieldHelp,
+  FieldLabel,
   type FieldTextProps,
   invalidOf,
 } from "../internal/FieldHelp";
@@ -40,7 +40,7 @@ import { FixedLocale } from "../internal/FixedLocale";
 import * as styles from "../internal/field.css";
 import { IconSlot } from "../internal/IconSlot";
 import { ResponsivePopover } from "../internal/ResponsivePopover";
-import { useSize } from "../internal/size";
+import { useFieldWidth, useSize } from "../internal/size";
 import { useKeepAboveKeyboard } from "../internal/useKeepAboveKeyboard";
 import * as calendar from "./DatePicker.css";
 
@@ -141,16 +141,18 @@ function WeekdayHeader() {
 export function DatePicker({
   label,
   description,
+  descriptionTone,
   errorMessage,
   isInvalid,
   value,
   defaultValue,
   onChange,
   size,
-  width = "default",
+  width: givenWidth,
   ...props
 }: DatePickerProps) {
   const resolved = useSize(size);
+  const width = useFieldWidth(givenWidth);
   const frameRef = useRef<HTMLDivElement>(null);
   useKeepAboveKeyboard(frameRef);
   return (
@@ -168,7 +170,9 @@ export function DatePicker({
           width: width === "full" ? "full" : "content",
         })}
       >
-        {label != null && <Label className={styles.label}>{label}</Label>}
+        {label != null && (
+          <FieldLabel label={label} isRequired={props.isRequired} />
+        )}
         <Group ref={frameRef} className={styles.frame({ size: resolved })}>
           <DateInput className={calendar.dateInput}>
             {(segment) => (
@@ -186,7 +190,11 @@ export function DatePicker({
             </IconSlot>
           </Button>
         </Group>
-        <FieldHelp description={description} errorMessage={errorMessage} />
+        <FieldHelp
+          description={description}
+          descriptionTone={descriptionTone}
+          errorMessage={errorMessage}
+        />
         <ResponsivePopover>
           <Dialog className={calendar.dialog}>
             <Calendar className={calendar.calendar}>

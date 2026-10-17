@@ -13,7 +13,6 @@ import {
   Autocomplete,
   Dialog,
   Input,
-  Label,
   Modal,
   ModalOverlay,
   Popover,
@@ -23,6 +22,7 @@ import {
 import { ChoiceListBox } from "../internal/ChoiceListBox";
 import {
   FieldHelp,
+  FieldLabel,
   type FieldTextProps,
   invalidOf,
 } from "../internal/FieldHelp";
@@ -100,6 +100,7 @@ function queryAt(text: string, caret: number): Query | null {
 export function MentionTextArea({
   label,
   description,
+  descriptionTone,
   errorMessage,
   isInvalid,
   value,
@@ -235,7 +236,7 @@ export function MentionTextArea({
         validationBehavior="aria"
         className={field.fieldRoot({ size: resolved, width })}
       >
-        {label != null && <Label className={field.label}>{label}</Label>}
+        {label != null && <FieldLabel label={label} />}
         <div ref={frameRef} className={field.areaFrame({ size: resolved })}>
           <AriaTextArea
             ref={areaRef}
@@ -258,7 +259,11 @@ export function MentionTextArea({
             className={field.textArea}
           />
         </div>
-        <FieldHelp description={description} errorMessage={errorMessage} />
+        <FieldHelp
+          description={description}
+          descriptionTone={descriptionTone}
+          errorMessage={errorMessage}
+        />
       </AriaTextField>
       <Popover
         triggerRef={frameRef}

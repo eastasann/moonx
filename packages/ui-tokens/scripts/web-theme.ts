@@ -350,6 +350,12 @@ export const popoverMaxHeight = ${pixels("semantic.layout.popover-max-height")};
  * which a docked panel turns patterns D and F to their tablet arrangement.
  */
 export const twoColumnMinWidth = ${pixels("semantic.layout.two-column-min-width")};
+
+/**
+ * \`semantic.layout.public.split-min-width\` in px, for the media query below which the
+ * public page's two-column sections stack.
+ */
+export const publicSplitMinWidth = ${pixels("semantic.layout.public.split-min-width")};
 `;
 }
 

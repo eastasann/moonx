@@ -259,7 +259,8 @@ test("vars.ts gives the sizes code reads as numbers in px", () => {
   const source = varsSource(tree);
   expect(source).toContain(`"tablet": 768,`);
   expect(source).toContain("export const popoverMaxHeight = 384;");
-  expect(source).toContain("export const twoColumnMinWidth = 784;");
+  expect(source).toContain("export const twoColumnMinWidth = 788;");
+  expect(source).toContain("export const publicSplitMinWidth = 900;");
   expect(value("layout-popover-max-height")?.lightMedium).toBe("384px");
 });
 
@@ -288,8 +289,14 @@ test("on touch, field text is 16px at least: iOS zooms into smaller fields (desi
 test("two-column-min-width stays the body of a desktop at its breakpoint (06 $description)", () => {
   const px = (name: string) =>
     Number.parseFloat(value(name)?.lightMedium ?? "");
-  expect(px("layout-two-column-min-width")).toBe(
-    px("breakpoint-desktop") - px("layout-sidebar-width"),
+  const body = px("layout-two-column-min-width");
+  expect(body).toBe(px("breakpoint-desktop") - px("layout-sidebar-width"));
+  // At that width D's list takes its minimum, not its 5 : 6 share, as the $description
+  // counts it.
+  const list = Number(value("layout-list-detail-list-ratio")?.lightMedium);
+  const detail = Number(value("layout-list-detail-detail-ratio")?.lightMedium);
+  expect((body * list) / (list + detail)).toBeLessThan(
+    px("layout-list-detail-list-min-width"),
   );
 });
 

@@ -206,7 +206,11 @@ export const end = recipe({
     fontVariantNumeric: "tabular-nums",
     textAlign: "end",
   },
-  variants: { hasDescription: besideFirstLine },
+  variants: {
+    hasDescription: besideFirstLine,
+    // A count ("7/10", "5 entries") in the monospaced face (d1-moon.html .rows .num).
+    isNumeric: { true: { fontFamily: vars.font.family.mono }, false: {} },
+  },
 });
 
 export const chevron = recipe({
@@ -217,4 +221,14 @@ export const chevron = recipe({
     color: vars.color.text.tertiary,
   },
   variants: { hasDescription: besideFirstLine },
+});
+
+/** An open task's ☐ at a row's start (s05-dashboard.html .due .box). */
+export const taskMark = style({
+  display: "block",
+  boxSizing: "border-box",
+  width: vars.scale.component.rowList.taskMarkSize,
+  height: vars.scale.component.rowList.taskMarkSize,
+  border: `${vars.scale.component.rowList.taskMarkBorder} solid ${vars.color.text.tertiary}`,
+  borderRadius: vars.scale.component.rowList.taskMarkRadius,
 });

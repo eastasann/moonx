@@ -6,7 +6,9 @@ import { styleVariants } from "@vanilla-extract/css";
  * stroke-width attributes Lucide writes, so the scale tokens decide.
  */
 export const iconSize = styleVariants(
-  vars.scale.component.icon.size,
+  // `nav`: the arrows of the phone's header and of the phone's previous and next
+  // (06 layout.nav-icon-size).
+  { ...vars.scale.component.icon.size, nav: vars.layout.navIconSize },
   (size) => ({
     width: size,
     height: size,

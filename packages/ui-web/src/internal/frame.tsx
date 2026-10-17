@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import {
   createContext,
   type ReactNode,
@@ -5,9 +6,13 @@ import {
   useEffect,
   useState,
 } from "react";
+import { Button as AriaButton } from "react-aria-components";
 import { cssVarName } from "../styles/helpers";
 import * as styles from "./frame.css";
+import { IconSlot } from "./IconSlot";
+import { BottomBarContext } from "./size";
 import { useIsDesktop } from "./useIsDesktop";
+import { useIsNarrow } from "./useIsNarrow";
 
 const keyboardInsetName = cssVarName(styles.keyboardInset);
 
@@ -89,38 +94,60 @@ export function useKeyboardInset(): number {
   return inset;
 }
 
+/** The column a bottom bar lines its content up with, from the tablet breakpoint up. */
+export type BarColumn = "reading" | "form" | "comparison" | "worksheet";
+
 /**
  * The bar fixed to the bottom of the body (design-spec 4.1, 4.3): the main action of a
- * hub, a form or a step, a question form's previous and next, a worksheet's results.
- * With `isPhoneOnly`, it is an ordinary row at the end of the page from the tablet
- * breakpoint up, as wide as the page's column (`width`).
+ * hub, a focused form or a step, a question form's previous and next, a worksheet's
+ * summary. `actions` on a phone makes its Buttons XL, the ones that are not quiet sharing
+ * the width (4.5 Button). With `isPhoneOnly` it is an ordinary row at the end of the
+ * page from the tablet breakpoint up (B). `note` stands at its start from the tablet
+ * breakpoint up (G).
  */
 export function BottomBar({
+  variant = "actions",
   isPhoneOnly = false,
-  width = "reading",
+  column = "reading",
+  note,
   children,
 }: {
+  variant?: "actions" | "footer" | "navigation" | "summary";
   isPhoneOnly?: boolean;
-  width?: "reading" | "content";
+  column?: BarColumn;
+  note?: ReactNode;
   children: ReactNode;
 }) {
   const inset = useKeyboardInset();
-  const classes = [styles.bottomBar];
+  const isNarrow = useIsNarrow();
+  const classes = [styles.bar, styles.bottomBar[variant]];
   if (isPhoneOnly) classes.push(styles.phoneOnlyBar);
-  if (isPhoneOnly && width === "content") classes.push(styles.phoneOnlyContent);
+  const content =
+    variant === "actions" && isNarrow ? (
+      <BottomBarContext.Provider value={true}>
+        {children}
+      </BottomBarContext.Provider>
+    ) : (
+      children
+    );
   return (
     <div
       className={classes.join(" ")}
       style={{ [keyboardInsetName]: `${inset}px` }}
     >
-      {children}
+      <div className={styles.barInner({ variant, column })}>
+        {note != null && !isNarrow && (
+          <span className={styles.barNote}>{note}</span>
+        )}
+        {content}
+      </div>
     </div>
   );
 }
 
 /**
- * The bands across the top of the body (design-spec 6.0.6), each an `InlineAlert`.
- * Several at once stand in this order, offline first (6.0.1).
+ * The bands across the top of the body (design-spec 6.0.1・6.0.6・6.0.7), each an
+ * `AlertBanner`. Several at once stand in this order, offline first.
  */
 export interface FrameBanners {
   /** "You're offline. Changes can't be saved until you reconnect." */
@@ -129,6 +156,8 @@ export interface FrameBanners {
   newVersion?: ReactNode;
   /** iPhone Safari's "Add moonx to your Home Screen…" (signed in only). */
   addToHomeScreen?: ReactNode;
+  /** 10, 13 and 20: "A newer template is available." with Update template (6.0.7). */
+  template?: ReactNode;
 }
 
 /** The bands of `FrameBanners`, in their order; nothing when there are none. */
@@ -137,7 +166,8 @@ export function Banners({ banners }: { banners?: FrameBanners }) {
     banners === undefined ||
     (banners.offline == null &&
       banners.newVersion == null &&
-      banners.addToHomeScreen == null)
+      banners.addToHomeScreen == null &&
+      banners.template == null)
   ) {
     return null;
   }
@@ -146,19 +176,43 @@ export function Banners({ banners }: { banners?: FrameBanners }) {
       {banners.offline}
       {banners.newVersion}
       {banners.addToHomeScreen}
+      {banners.template}
     </div>
   );
 }
 
-/** The phone's floating new-item button of a list (4.1 D), above the keyboard too. */
-export function FloatingAction({ children }: { children: ReactNode }) {
+/**
+ * Inside the list pane of pattern D (s06-ideas.html): a ListView's rows reach the pane's
+ * edges, inset by the pane's padding.
+ */
+export const ListPaneContext = createContext(false);
+
+/**
+ * The phone's floating new-item button of a list (4.1 D, s06-ideas.html .fab): "+" alone,
+ * named by `label`, above the TabBar and the keyboard.
+ */
+export function FloatingAction({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
   const inset = useKeyboardInset();
   return (
     <div
       className={styles.floatingAction}
       style={{ [keyboardInsetName]: `${inset}px` }}
     >
-      {children}
+      <AriaButton
+        aria-label={label}
+        onPress={onPress}
+        className={styles.floatingButton}
+      >
+        <IconSlot size="L">
+          <Plus />
+        </IconSlot>
+      </AriaButton>
     </div>
   );
 }

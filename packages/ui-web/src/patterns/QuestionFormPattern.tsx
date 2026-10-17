@@ -1,6 +1,6 @@
-import { i18n } from "@moonx/i18n";
+import { formatCount, i18n } from "@moonx/i18n";
 import type { QuestionCardMode } from "@moonx/ui-tokens";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -8,10 +8,12 @@ import {
   useRef,
   useState,
 } from "react";
+import { Button as AriaButton } from "react-aria-components";
 import { createPortal } from "react-dom";
-import { ActionButton } from "../components/ActionButton";
+import { MoonGlyph } from "../components/MoonGlyph";
 import { Switch } from "../components/Switch";
 import { BottomBar, useHeaderTools } from "../internal/frame";
+import { IconSlot } from "../internal/IconSlot";
 import { isMacOS } from "../internal/platform";
 import { useIsNarrow } from "../internal/useIsNarrow";
 import * as styles from "./patterns.css";
@@ -76,26 +78,28 @@ export interface QuestionFormPatternProps {
   /** A Viewer's read-only form: every question open, no Focus switch (6.2). */
   isReadOnly?: boolean;
   /**
-   * Under the questions: the previous and next sections and AI ▼ (6.2). A phone keeps it
-   * too, under its one question; the screen leaves out what a phone does not have.
+   * The previous and next sections and AI ▼ (6.2): from the tablet breakpoint up, in a bar
+   * kept at the bottom with a line above it (s11-form.html .footer); on a phone, under its
+   * one question. The screen leaves out what a phone does not have.
    */
   footer?: ReactNode;
   /**
-   * On a phone, between ← and →: where the current question sits among them (6.2's dots).
-   * Mark the current one with `aria-current`: when they do not fit the bar they scroll
-   * sideways, and the current one is kept in view.
+   * On a phone, a dot per question between ← and → (6.2): answered ●, not answered ◌, the
+   * current one ringed; pressing one moves to it. Dots that do not fit the bar scroll
+   * sideways, the current one kept in view. Without it, no dots.
    */
-  progress?: ReactNode;
+  isAnswered?: (id: string) => boolean;
   /** → pressed on the last question, on a phone (6.2: the section's completion card). */
   onEnd?: () => void;
 }
 
 /**
- * Pattern C, question form (design-spec 4.1 C): a section's questions (11, 21). Tablet and
- * wider: all the questions in one column, the one being answered open and framed in the
- * middle of the view, the others quiet; the header's Focus switch opens them all, and
- * Ctrl+↓ / Ctrl+↑ (on macOS also Ctrl+Option+↓ / ↑) move to the next and previous
- * question. Phone: the current question alone, with ← and → fixed to the bottom.
+ * Pattern C, question form (design-spec 4.1 C, s11-form.html): a section's questions (11,
+ * 21). Tablet and wider: all the questions in one column between hairlines, the one being
+ * answered open and framed in the middle of the view, the others quiet rows; the header's
+ * Focus switch opens them all, and Ctrl+↓ / Ctrl+↑ (on macOS also Ctrl+Option+↓ / ↑) move
+ * to the next and previous question; the sections' footer stays at the bottom. Phone: the
+ * current question alone, with ← and → fixed to the bottom.
  */
 export function QuestionFormPattern({
   header,
@@ -105,7 +109,7 @@ export function QuestionFormPattern({
   renderQuestion,
   isReadOnly = false,
   footer,
-  progress,
+  isAnswered,
   onEnd,
 }: QuestionFormPatternProps) {
   const isNarrow = useIsNarrow();
@@ -135,7 +139,7 @@ export function QuestionFormPattern({
   // question at a time either way.
   const focusSwitch =
     isReadOnly || isNarrow ? null : (
-      <Switch isSelected={isFocusMode} onChange={toggle}>
+      <Switch isSelected={isFocusMode} onChange={toggle} labelPosition="start">
         {i18n.t("components:questionFormPattern.focus")}
       </Switch>
     );
@@ -197,43 +201,81 @@ export function QuestionFormPattern({
       {focusSwitch !== null &&
         tools !== null &&
         createPortal(focusSwitch, tools)}
-      <div className={styles.page({ width: "reading", density: "spacious" })}>
-        <div className={styles.headerRow}>
+      <div className={styles.questionPage}>
+        <div className={`${styles.headerRow} ${styles.questionHeader}`}>
           <div className={styles.headerTitle}>{header}</div>
           {focusSwitch !== null && tools === null && (
             <div className={styles.inlineTools}>{focusSwitch}</div>
           )}
         </div>
-        <div className={styles.questions}>
+        <ol className={styles.questions}>
           {shown.map((id) => (
-            <div key={id} data-question={id}>
+            <li key={id} data-question={id} className={styles.question}>
               {renderQuestion(id, modeOf(id))}
-            </div>
+            </li>
           ))}
-        </div>
-        {footer != null && <div className={styles.sectionFooter}>{footer}</div>}
+        </ol>
+        {footer != null && isNarrow && (
+          <div className={styles.sectionFooter}>{footer}</div>
+        )}
       </div>
+      {footer != null && !isNarrow && (
+        <BottomBar variant="footer">{footer}</BottomBar>
+      )}
       {isNarrow && (
-        <BottomBar>
-          <ActionButton
-            isQuiet
+        <BottomBar variant="navigation">
+          <AriaButton
             aria-label={i18n.t("components:questionFormPattern.previous")}
             isDisabled={previous === undefined}
             onPress={() => previous && onCurrentChange(previous)}
+            className={styles.questionArrow}
           >
-            <ChevronLeft />
-          </ActionButton>
+            <IconSlot size="nav">
+              <ArrowLeft />
+            </IconSlot>
+          </AriaButton>
           <div ref={strip} className={styles.barMiddle}>
-            <div className={styles.barStrip}>{progress}</div>
+            {isAnswered !== undefined && (
+              <div className={styles.barStrip}>
+                {questionIds.map((id, index) => {
+                  const answered = isAnswered(id);
+                  return (
+                    <AriaButton
+                      key={id}
+                      aria-label={i18n.t(
+                        answered
+                          ? "components:questionFormPattern.dotAnswered"
+                          : "components:questionFormPattern.dot",
+                        {
+                          number: formatCount(index + 1),
+                          total: formatCount(questionIds.length),
+                        },
+                      )}
+                      aria-current={id === currentId ? "step" : undefined}
+                      onPress={() => onCurrentChange(id)}
+                      className={styles.questionDot}
+                    >
+                      <MoonGlyph
+                        state={answered ? "done" : "empty"}
+                        size="S"
+                        isCurrent={id === currentId}
+                      />
+                    </AriaButton>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <ActionButton
-            isQuiet
+          <AriaButton
             aria-label={i18n.t("components:questionFormPattern.next")}
             isDisabled={next === undefined && onEnd === undefined}
             onPress={() => (next ? onCurrentChange(next) : onEnd?.())}
+            className={styles.questionArrow}
           >
-            <ChevronRight />
-          </ActionButton>
+            <IconSlot size="nav">
+              <ArrowRight />
+            </IconSlot>
+          </AriaButton>
         </BottomBar>
       )}
     </div>

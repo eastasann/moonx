@@ -9,8 +9,14 @@ export const grid = style({ display: "grid", minWidth: 0 });
 
 /**
  * A centred column with the page gutters of each breakpoint (06 layout.page-gutter-*):
- * `content` for the body of a screen, `reading` for forms and long text.
+ * `content` for the body of a screen, `reading` for forms and long text. The widths
+ * (06 layout.content-max, reading-column-max) are the content's: the gutters come on top.
  */
+const widths = {
+  content: vars.layout.contentMax,
+  reading: vars.layout.readingColumnMax,
+} as const;
+
 export const container = recipe({
   base: {
     width: "100%",
@@ -18,8 +24,8 @@ export const container = recipe({
   },
   variants: {
     width: {
-      content: { maxWidth: vars.layout.contentMax },
-      reading: { maxWidth: vars.layout.readingColumnMax },
+      content: { maxWidth: widths.content },
+      reading: { maxWidth: widths.reading },
     },
     gutters: {
       true: {
@@ -32,5 +38,19 @@ export const container = recipe({
       false: {},
     },
   },
+  compoundVariants: (["content", "reading"] as const).map((width) => ({
+    variants: { width, gutters: true },
+    style: {
+      maxWidth: `calc(${widths[width]} + 2 * ${vars.layout.pageGutterMobile})`,
+      "@media": {
+        [tabletUp]: {
+          maxWidth: `calc(${widths[width]} + 2 * ${vars.layout.pageGutterTablet})`,
+        },
+        [desktopUp]: {
+          maxWidth: `calc(${widths[width]} + 2 * ${vars.layout.pageGutterDesktop})`,
+        },
+      },
+    },
+  })),
   defaultVariants: { width: "content", gutters: true },
 });

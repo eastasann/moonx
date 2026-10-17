@@ -1,12 +1,12 @@
 import type { ButtonVariant, Size } from "@moonx/ui-tokens";
-import type { ReactNode } from "react";
+import { type ReactNode, useContext } from "react";
 import {
   Button as AriaButton,
   type ButtonProps as AriaButtonProps,
   Group,
 } from "react-aria-components";
 import { IconSlot } from "../internal/IconSlot";
-import { SizeContext, useSize } from "../internal/size";
+import { BottomBarContext, SizeContext, useSize } from "../internal/size";
 import * as styles from "./Button.css";
 import { PendingCircle } from "./ProgressCircle";
 
@@ -51,11 +51,13 @@ export function Button({
   children,
   ...props
 }: ButtonProps) {
-  const resolved = useSize(size);
+  const inBottomBar = useContext(BottomBarContext);
+  const resolved = useSize(size ?? (inBottomBar ? "XL" : undefined));
+  const fills = inBottomBar && !isQuiet;
   return (
     <AriaButton
       {...props}
-      className={styles.button({ variant, isQuiet, size: resolved })}
+      className={styles.button({ variant, isQuiet, size: resolved, fills })}
     >
       {({ isPending }) => (
         <>

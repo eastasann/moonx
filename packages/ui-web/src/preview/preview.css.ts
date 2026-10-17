@@ -89,7 +89,7 @@ export const popoverWidth = style({
 });
 
 export const thumbnailPlace = style({
-  width: vars.layout.thumbnailColumnWidth,
+  width: vars.layout.presentation.thumbnailColumnWidth,
 });
 
 /**

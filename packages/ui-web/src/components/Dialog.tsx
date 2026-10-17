@@ -10,6 +10,7 @@ import {
 } from "react-aria-components";
 import { FixedLocale } from "../internal/FixedLocale";
 import { IconSlot } from "../internal/IconSlot";
+import { OverlayContexts } from "../internal/OverlayContexts";
 import * as overlay from "../internal/overlay.css";
 import { useIsNarrow } from "../internal/useIsNarrow";
 import { ActionButton } from "./ActionButton";
@@ -100,44 +101,48 @@ function DialogFrame({
         className={frame.overlay}
       >
         <Modal className={frame.modal}>
-          <AriaDialog
-            role={role}
-            // An alert's body is what it asks, so it describes the dialog by default.
-            aria-describedby={
-              describedBy ?? (role === "alertdialog" ? bodyId : undefined)
-            }
-            className={styles.dialog}
-          >
-            {({ close }) => (
-              <>
-                <div className={styles.header}>
-                  <Heading level={2} slot="title">
-                    <span className={styles.title}>
-                      {titleIcon}
-                      {title}
-                    </span>
-                  </Heading>
-                  {isDismissable && (
-                    <span className={styles.close}>
-                      <ActionButton
-                        isQuiet
-                        aria-label={i18n.t("components:dialog.close")}
-                        onPress={close}
-                      >
-                        <X />
-                      </ActionButton>
-                    </span>
+          <OverlayContexts>
+            <AriaDialog
+              role={role}
+              // An alert's body is what it asks, so it describes the dialog by default.
+              aria-describedby={
+                describedBy ?? (role === "alertdialog" ? bodyId : undefined)
+              }
+              className={styles.dialog}
+            >
+              {({ close }) => (
+                <>
+                  <div className={styles.header}>
+                    <Heading level={2} slot="title">
+                      <span className={styles.title}>
+                        {titleIcon}
+                        {title}
+                      </span>
+                    </Heading>
+                    {isDismissable && (
+                      <span className={styles.close}>
+                        <ActionButton
+                          isQuiet
+                          aria-label={i18n.t("components:dialog.close")}
+                          onPress={close}
+                        >
+                          <X />
+                        </ActionButton>
+                      </span>
+                    )}
+                  </div>
+                  <div id={bodyId} className={styles.body}>
+                    {render(children, close)}
+                  </div>
+                  {buttons !== undefined && (
+                    <div className={styles.footer}>
+                      {render(buttons, close)}
+                    </div>
                   )}
-                </div>
-                <div id={bodyId} className={styles.body}>
-                  {render(children, close)}
-                </div>
-                {buttons !== undefined && (
-                  <div className={styles.footer}>{render(buttons, close)}</div>
-                )}
-              </>
-            )}
-          </AriaDialog>
+                </>
+              )}
+            </AriaDialog>
+          </OverlayContexts>
         </Modal>
       </ModalOverlay>
     </FixedLocale>

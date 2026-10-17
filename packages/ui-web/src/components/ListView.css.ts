@@ -5,6 +5,8 @@ import {
   atLeastTarget,
   focusRing,
   hoverTransition,
+  narrowQuery,
+  tabletUp,
   typography,
 } from "../styles/helpers";
 
@@ -28,6 +30,23 @@ export const density = styleVariants(
     },
   }),
 );
+
+/**
+ * In pattern D's list pane (s06-ideas.html .ideas a): rows to the pane's edges, inset by
+ * the pane's padding. On a phone, where an item opens over the list, a selected row is
+ * not marked.
+ */
+export const inPane = style({
+  vars: {
+    [padX]: vars.layout.listDetail.panePaddingXMobile,
+    [padY]: vars.layout.listDetail.rowPaddingY,
+  },
+  "@media": {
+    [tabletUp]: {
+      vars: { [padX]: vars.layout.listDetail.panePaddingX },
+    },
+  },
+});
 
 export const list = recipe({
   base: {
@@ -63,6 +82,11 @@ export const item = recipe({
       "&[data-selected]": {
         background: vars.color.surface.selected,
         boxShadow: `inset ${vars.borderWidth.selectedIndicator} 0 0 ${vars.color.control.primary}`,
+      },
+      [`${inPane} &[data-selected]`]: {
+        "@media": {
+          [narrowQuery]: { background: "none", boxShadow: "none" },
+        },
       },
       "&[data-focus-visible]": {
         ...focusRing,

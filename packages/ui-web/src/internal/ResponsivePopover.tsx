@@ -7,6 +7,7 @@ import {
   useSlottedContext,
 } from "react-aria-components";
 import { TraySheet } from "../components/Tray";
+import { OverlayContexts } from "./OverlayContexts";
 import * as styles from "./overlay.css";
 import { useIsNarrow } from "./useIsNarrow";
 
@@ -37,13 +38,13 @@ export function ResponsivePopover({
         maxHeight={popoverMaxHeight}
         className={`${styles.popover} ${size === undefined ? "" : styles.popoverWidth[size]}`}
       >
-        {children}
+        <OverlayContexts>{children}</OverlayContexts>
       </Popover>
     );
   }
   // The tray is not a Popover, so it clears the parent's contexts the way Popover does:
   // otherwise a Button inside would take the trigger's props.
-  let content = children;
+  let content = <OverlayContexts>{children}</OverlayContexts>;
   for (const Context of context?.clearContexts ?? []) {
     content = <Context.Provider value={null}>{content}</Context.Provider>;
   }

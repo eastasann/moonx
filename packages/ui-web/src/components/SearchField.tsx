@@ -7,17 +7,17 @@ import {
   type SearchFieldProps as AriaSearchFieldProps,
   Button,
   Input,
-  Label,
 } from "react-aria-components";
 import {
   FieldHelp,
+  FieldLabel,
   type FieldTextProps,
   invalidOf,
 } from "../internal/FieldHelp";
 import { FixedLocale } from "../internal/FixedLocale";
 import * as styles from "../internal/field.css";
 import { IconSlot } from "../internal/IconSlot";
-import { useSize } from "../internal/size";
+import { useFieldWidth, useSize } from "../internal/size";
 import { useKeepAboveKeyboard } from "../internal/useKeepAboveKeyboard";
 
 export interface SearchFieldProps
@@ -38,8 +38,12 @@ export interface SearchFieldProps
     > {
   /** @default "M", or "L" inside a spacious `Form` */
   size?: Size;
-  /** @default "default" */
-  width?: "default" | "full";
+  /**
+   * `full` fills the line, `fill` grows into the rest of a line of filters (pattern D);
+   * otherwise the size's default width.
+   * @default "default"
+   */
+  width?: "default" | "full" | "fill";
   placeholder?: string;
 }
 
@@ -50,14 +54,16 @@ export interface SearchFieldProps
 export function SearchField({
   label,
   description,
+  descriptionTone,
   errorMessage,
   isInvalid,
   size,
-  width = "default",
+  width: givenWidth,
   placeholder,
   ...props
 }: SearchFieldProps) {
   const resolved = useSize(size);
+  const width = useFieldWidth(givenWidth);
   const frameRef = useRef<HTMLDivElement>(null);
   useKeepAboveKeyboard(frameRef);
   return (
@@ -70,7 +76,7 @@ export function SearchField({
       >
         {({ isEmpty }) => (
           <>
-            {label != null && <Label className={styles.label}>{label}</Label>}
+            {label != null && <FieldLabel label={label} />}
             <div ref={frameRef} className={styles.frame({ size: resolved })}>
               <span className={styles.affix}>
                 <IconSlot size={resolved}>
@@ -92,7 +98,11 @@ export function SearchField({
                 </Button>
               )}
             </div>
-            <FieldHelp description={description} errorMessage={errorMessage} />
+            <FieldHelp
+              description={description}
+              descriptionTone={descriptionTone}
+              errorMessage={errorMessage}
+            />
           </>
         )}
       </AriaSearchField>

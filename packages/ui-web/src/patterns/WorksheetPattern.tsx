@@ -2,11 +2,13 @@ import { ChevronUp } from "lucide-react";
 import {
   type ReactNode,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
 import { Button as AriaButton } from "react-aria-components";
+import { Heading } from "../components/Heading";
 import { ModalPanel } from "../components/Panel";
 import { BottomBar, useTwoColumns } from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
@@ -17,9 +19,12 @@ export interface WorksheetPatternProps {
   header?: ReactNode;
   /** The input table (a TableView; lined rows on a phone). */
   inputs: ReactNode;
-  /** The results: totals and indicators. */
+  /** The results: totals and indicators (a MetricGroup `column`), and a link onward. */
   results: ReactNode;
-  /** The results' name: the side column's and the drawer's ("Totals", "Results"). */
+  /**
+   * The results' name: the small heading of their card (a level 2 heading) and the
+   * drawer's title ("Totals", "Results").
+   */
   resultsTitle: string;
   /**
    * The summary bar's few numbers, wherever the results have no column of their own (a
@@ -30,9 +35,9 @@ export interface WorksheetPatternProps {
 }
 
 /**
- * Pattern F, worksheet (design-spec 4.1): numbers put in, results seen at once (17, 18).
- * Desktop: the inputs on the left, the results on the right, in view while the inputs
- * scroll. Tablet, and a desktop whose docked panel leaves the body too narrow: the inputs
+ * Pattern F, worksheet (design-spec 4.1, s17-costs.html): numbers put in, results seen at
+ * once (17, 18). Desktop: the inputs on the left, the results in a card on the right, in
+ * view while the inputs scroll. Tablet, and a desktop whose docked panel leaves the body too narrow: the inputs
  * across the whole width (a table), a summary bar fixed to the bottom that opens the
  * results in a drawer from the right. Phone: the same, the inputs as lined rows and
  * the results in a tray.
@@ -45,6 +50,7 @@ export function WorksheetPattern({
   summary,
 }: WorksheetPatternProps) {
   const isTwoColumns = useTwoColumns();
+  const resultsTitleId = useId();
   const [isOpen, setOpen] = useState(false);
   // In two columns the results are on screen; a drawer left open would come back when
   // the body narrows again.
@@ -87,24 +93,31 @@ export function WorksheetPattern({
         hasFocus.current = event.currentTarget.contains(event.relatedTarget);
       }}
     >
-      <div className={styles.page({ width: "content", density: "regular" })}>
-        {header}
+      <div className={styles.worksheetPage}>
+        {header != null && (
+          <div className={styles.worksheetHeader}>{header}</div>
+        )}
         <div className={styles.worksheet}>
           <div className={styles.inputs}>{inputs}</div>
           {isTwoColumns && (
             <aside
               ref={resultsColumn}
               tabIndex={-1}
-              aria-label={resultsTitle}
+              aria-labelledby={resultsTitleId}
               className={styles.results}
             >
+              <div className={styles.resultsTitle}>
+                <Heading level={2} variant="label" id={resultsTitleId}>
+                  {resultsTitle}
+                </Heading>
+              </div>
               {results}
             </aside>
           )}
         </div>
       </div>
       {!isTwoColumns && (
-        <BottomBar>
+        <BottomBar variant="summary" column="worksheet">
           <AriaButton
             ref={summaryButton}
             aria-haspopup="dialog"
@@ -112,7 +125,7 @@ export function WorksheetPattern({
             onPress={() => setOpen(true)}
             className={styles.summaryButton}
           >
-            {summary}
+            <span className={styles.summaryContent}>{summary}</span>
             <IconSlot size="M">
               <ChevronUp />
             </IconSlot>

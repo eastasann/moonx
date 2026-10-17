@@ -1,6 +1,7 @@
-import { CircleAlert } from "lucide-react";
+import { i18n } from "@moonx/i18n";
+import { CircleAlert, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
-import { FieldError, Text } from "react-aria-components";
+import { FieldError, Label, Text } from "react-aria-components";
 import * as styles from "./field.css";
 import { IconSlot } from "./IconSlot";
 
@@ -10,6 +11,12 @@ export interface FieldTextProps {
   label?: ReactNode;
   /** Help text under the field. */
   description?: ReactNode;
+  /**
+   * `notice`: the help text is a warning, in amber with its icon (9's "Changing the
+   * currency does not convert amounts you already entered.", s09-settings.html).
+   * @default "neutral"
+   */
+  descriptionTone?: "neutral" | "notice";
   /**
    * Why the value is refused (design-spec 6.0.6「入力値が範囲外」), from the screen's Zod
    * check. Giving one marks the field invalid. Without one, an invalid field shows the
@@ -31,15 +38,27 @@ export const invalidOf = ({ errorMessage, isInvalid }: FieldTextProps) =>
  */
 export function FieldHelp({
   description,
+  descriptionTone = "neutral",
   errorMessage,
-}: Pick<FieldTextProps, "description" | "errorMessage">) {
+}: Pick<FieldTextProps, "description" | "descriptionTone" | "errorMessage">) {
   return (
     <>
-      {description != null && (
-        <Text slot="description" className={styles.description}>
-          {description}
-        </Text>
-      )}
+      {description != null &&
+        (descriptionTone === "notice" ? (
+          <Text
+            slot="description"
+            className={`${styles.description} ${styles.noticeDescription}`}
+          >
+            <IconSlot size="XS">
+              <TriangleAlert />
+            </IconSlot>
+            <span>{description}</span>
+          </Text>
+        ) : (
+          <Text slot="description" className={styles.description}>
+            {description}
+          </Text>
+        ))}
       <FieldError className={styles.error}>
         {({ validationErrors }) => (
           <>
@@ -51,5 +70,31 @@ export function FieldHelp({
         )}
       </FieldError>
     </>
+  );
+}
+
+/**
+ * A field's label; a required field adds "Required" after it in the secondary colour
+ * (s19-decision.html "Why? Required"), as Spectrum 2's `necessityIndicator="label"` does.
+ */
+export function FieldLabel({
+  label,
+  isRequired = false,
+}: {
+  label: ReactNode;
+  isRequired?: boolean;
+}) {
+  return (
+    <Label className={styles.label}>
+      {label}
+      {isRequired && (
+        <>
+          {" "}
+          <span className={styles.necessity}>
+            {i18n.t("components:field.required")}
+          </span>
+        </>
+      )}
+    </Label>
   );
 }

@@ -1,17 +1,24 @@
 import type { CardSize } from "@moonx/ui-tokens";
+import { Plus } from "lucide-react";
 import {
+  Children,
   createContext,
   type ReactElement,
   type ReactNode,
   useContext,
 } from "react";
 import {
+  Collection,
   GridList,
   GridListItem,
   type Key,
   type Selection,
 } from "react-aria-components";
+import { IconSlot } from "../internal/IconSlot";
 import * as styles from "./Card.css";
+
+/** The key of CardView's last tile, which adds instead of opening. */
+const ADD_KEY = "moonx:card-view:add";
 
 interface CardViewContextValue {
   size: CardSize;
@@ -34,7 +41,7 @@ export interface CardProps {
   textValue?: string;
   /** @default "M", or the CardView's size */
   size?: CardSize;
-  /** Above the text, edge to edge: a slide's thumbnail (23). */
+  /** Above the text, edge to edge: a picture of what the card is. */
   preview?: ReactNode;
   /** Above the title, in the small monospaced type (15's Direct competitor). Not upper-cased. */
   eyebrow?: ReactNode;
@@ -66,7 +73,7 @@ export interface CardProps {
 }
 
 /**
- * Something to look at beside others (15's competitors, 23's thumbnails; design-spec
+ * Something to look at beside others (15's competitors; design-spec
  * 4.4・4.5): framed without a shadow, its content stacked. Inside a CardView it is one of the
  * view's items and presses or is chosen as a whole; its ⋯ (`actions`) is the only button
  * it holds, and the other actions sit outside it.
@@ -172,11 +179,16 @@ export interface CardViewProps<T extends object> {
   size?: CardSize;
   /** Pressing a card: open it (15's edit). */
   onAction?: (key: Key) => void;
-  /** `single` keeps one card chosen (23's slide on screen). */
+  /** `single` keeps one card chosen. */
   selectionMode?: "none" | "single";
   selectedKeys?: Iterable<Key>;
   onSelectionChange?: (keys: Set<Key>) => void;
   renderEmptyState?: () => ReactNode;
+  /**
+   * The last tile, in a dashed frame: "+ Add competitor" (15, s15-competitors.html
+   * .addcard). Pressing it adds instead of opening a card.
+   */
+  addItem?: { label: string; onAction: () => void };
   "aria-label"?: string;
   "aria-labelledby"?: string;
 }
@@ -190,19 +202,52 @@ export function CardView<T extends object>({
   size = "M",
   selectionMode = "none",
   onSelectionChange,
+  addItem,
+  items,
+  children,
+  dependencies,
+  onAction,
   ...props
 }: CardViewProps<T>) {
+  const cards =
+    items === undefined ? (
+      (children as ReactNode)
+    ) : (
+      <Collection items={items} dependencies={dependencies}>
+        {children as (item: T) => ReactElement}
+      </Collection>
+    );
+  // Without cards the empty state speaks (15's "List 3–5 competitors…" with its own add).
+  const isEmpty =
+    items === undefined
+      ? Children.count(children as ReactNode) === 0
+      : [...items].length === 0;
+  const showsAdd =
+    addItem !== undefined && !(isEmpty && props.renderEmptyState !== undefined);
   return (
     <CardViewContext.Provider
       value={{
         size,
-        isActionable: props.onAction !== undefined || selectionMode !== "none",
+        isActionable: onAction !== undefined || selectionMode !== "none",
       }}
     >
       <GridList
         {...props}
         layout="grid"
+        // The add tile's own action runs alone: the cards' action skips its key.
+        onAction={
+          onAction === undefined
+            ? undefined
+            : (key) => {
+                if (key !== ADD_KEY) onAction(key);
+              }
+        }
         selectionMode={selectionMode}
+        // The add tile is an action, never a choice: it stays pressable.
+        disabledKeys={
+          showsAdd && selectionMode !== "none" ? [ADD_KEY] : undefined
+        }
+        disabledBehavior="selection"
         onSelectionChange={
           onSelectionChange
             ? (selection: Selection) =>
@@ -212,7 +257,24 @@ export function CardView<T extends object>({
             : undefined
         }
         className={styles.view[size]}
-      />
+      >
+        {cards}
+        {showsAdd && (
+          <GridListItem
+            id={ADD_KEY}
+            textValue={addItem.label}
+            onAction={addItem.onAction}
+            className={styles.addTile}
+          >
+            <span className={styles.addTileLabel}>
+              <IconSlot size="S">
+                <Plus />
+              </IconSlot>
+              {addItem.label}
+            </span>
+          </GridListItem>
+        )}
+      </GridList>
     </CardViewContext.Provider>
   );
 }

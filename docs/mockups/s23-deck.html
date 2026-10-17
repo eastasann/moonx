@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>23 Pitch Deck — 案1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="moon-base.css?v=2">
+<script src="moon-frame.js?v=1"></script>
+<script src="shared.js?v=3"></script>
+<style>
+.bar { display: flex; align-items: center; gap: 10px; padding: 14px 28px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.bar h1 { margin: 0 12px 0 0; font-size: 20px; font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 9px; padding: 2px; gap: 2px; background: var(--page); }
+.seg button { height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: none; font-size: 13.5px; font-weight: 500; color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.picker { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); font-size: 14px; }
+.picker span.k { color: var(--ink-2); }
+.bar .dl { margin-left: auto; }
+
+.deck { display: grid; grid-template-columns: 200px minmax(0, 1fr); flex: 1; min-height: 0; }
+.thumbs { list-style: none; margin: 0; padding: 16px 12px; border-right: 1px solid var(--line); overflow: auto; display: flex; flex-direction: column; gap: 8px; counter-reset: s; }
+.thumbs li a { display: grid; grid-template-columns: 22px 1fr; gap: 6px; align-items: start; padding: 6px; border-radius: 8px; counter-increment: s; }
+.thumbs li a::before { content: counter(s); font: 500 12px var(--mono); color: var(--ink-3); padding-top: 2px; }
+.thumbs li a[aria-current] { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.thumbs .mini { aspect-ratio: 16 / 9; background: #FFFFFF; border: 1px solid #E1E4EB; border-radius: 4px; padding: 6px; display: flex; flex-direction: column; gap: 3px; }
+.thumbs .mini i { display: block; height: 3px; background: #DCE0E8; border-radius: 2px; }
+.thumbs .mini i:first-child { width: 60%; height: 4px; background: #191C2A; }
+.thumbs .cap { grid-column: 2; font-size: 12px; color: var(--ink-2); }
+
+.stage { padding: 28px 36px 48px; overflow: auto; min-width: 0; }
+.slide-tools { display: flex; justify-content: flex-end; gap: 4px; margin-bottom: 8px; max-width: 960px; }
+.slide-tools a { font-size: 13.5px; font-weight: 500; padding: 4px 8px; border-radius: 6px; color: var(--ink-2); }
+.slide-tools a:hover { background: var(--sunken); color: var(--ink); }
+
+/* The slide is always light (same as the PDF). */
+.slide { --s-ink: #191C2A; --s-ink2: #555D72; --s-line: #E1E4EB; max-width: 960px; aspect-ratio: 16 / 9; background: #FFFFFF; color: var(--s-ink); border-radius: 6px; box-shadow: 0 0 0 1px rgba(17,21,42,.08), 0 18px 40px -24px rgba(17,21,42,.35); padding: 5.2% 6% 4%; display: flex; flex-direction: column; container-type: inline-size; }
+.slide .kicker { font: 500 1.35cqw var(--mono); letter-spacing: .06em; color: var(--s-ink2); text-transform: uppercase; }
+.slide h2 { margin: .8cqw 0 3.2cqw; font-size: 4cqw; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+.slide .nums { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1.5px solid var(--s-ink); }
+.slide .nums > div { padding: 1.6cqw 1.6cqw 0 0; }
+.slide .nums > div + div { padding-left: 1.6cqw; border-left: 1px solid var(--s-line); }
+.slide .nums .k { font-size: 1.45cqw; color: var(--s-ink2); }
+.slide .nums .v { font: 500 3.6cqw/1.2 var(--mono); letter-spacing: -0.02em; margin-top: .4cqw; }
+.slide ul { margin: 3cqw 0 0; padding-left: 2cqw; font-size: 1.75cqw; line-height: 1.5; color: var(--s-ink); }
+.slide ul li + li { margin-top: .6cqw; }
+.slide .foot { margin-top: auto; display: flex; justify-content: space-between; font-size: 1.2cqw; color: var(--s-ink2); border-top: 1px solid var(--s-line); padding-top: 1.2cqw; }
+
+.notes { max-width: 960px; margin-top: 22px; }
+.notes h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.notes p { margin: 0; line-height: 1.7; max-width: 72ch; }
+@media (max-width: 1023px) { .deck { grid-template-columns: 1fr; } .thumbs { display: none; } }
+@media (max-width: 767px) {
+  .bar { padding: 12px 16px; }
+  .bar h1 { width: 100%; }
+  .bar .dl { margin-left: 0; }
+  .stage { padding: 16px 16px 96px; }
+  .slide-tools { justify-content: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Workspace" data-sidebar="ideas"></aside>
+  <div class="main">
+    <header class="top">
+      <a class="back" href="#"><span data-icon="arrow-left" data-size="20"></span>Plan A</a>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="#">Ideas</a><span>/</span><a href="#">Piaya Gift Box Delivery</a><span>/</span><a href="#">Plan A</a><span>/</span><span aria-current="page">Pitch Deck</span></nav>
+      <div class="tools"><button class="iconbtn" aria-label="Comments"><span data-icon="message"></span></button></div>
+    </header>
+    <div class="bar">
+      <h1>Pitch Deck</h1>
+      <div class="seg" role="group" aria-label="Length"><button aria-pressed="false">One-minute</button><button aria-pressed="true">Five-minute</button></div>
+      <span class="picker"><span class="k">From</span> v1 For advisors <span data-icon="chevron-down" data-size="16"></span></span>
+      <button class="btn primary dl">Download PDF</button>
+    </div>
+    <div class="deck">
+      <ol class="thumbs" aria-label="Slides">
+        <li><a href="#"><span class="mini"><i></i><i></i></span><span class="cap">Title</span></a></li>
+        <li><a href="#"><span class="mini"><i></i><i></i><i></i></span><span class="cap">Problem</span></a></li>
+        <li><a href="#"><span class="mini"><i></i><i></i><i></i></span><span class="cap">Customer</span></a></li>
+        <li><a href="#"><span class="mini"><i></i><i></i><i></i></span><span class="cap">Solution</span></a></li>
+        <li><a href="#"><span class="mini"><i></i><i></i><i></i></span><span class="cap">Market</span></a></li>
+        <li><a href="#"><span class="mini"><i></i><i></i><i></i></span><span class="cap">Competition</span></a></li>
+        <li><a href="#" aria-current="true"><span class="mini"><i></i><i></i><i></i></span><span class="cap">Business model</span></a></li>
+        <li><a href="#"><span class="mini"><i></i><i></i><i></i></span><span class="cap">Economics</span></a></li>
+      </ol>
+      <div class="stage">
+        <div class="slide-tools"><a href="#">Edit source</a><a href="#">Edit in validation</a><a href="#" aria-label="Comments on this slide" style="display:inline-flex;align-items:center;gap:4px"><span data-icon="message" data-size="14"></span>1</a></div>
+        <article class="slide" aria-label="Slide 7 of 12, Business model">
+          <div class="kicker">07</div>
+          <h2>Business model</h2>
+          <div class="nums">
+            <div><div class="k">Price</div><div class="v">₱450</div></div>
+            <div><div class="k">Variable cost / sale</div><div class="v">₱218.50</div></div>
+            <div><div class="k">Contribution / sale</div><div class="v">₱231.50</div></div>
+            <div><div class="k">Contribution margin</div><div class="v">51.4%</div></div>
+          </div>
+          <ul>
+            <li>Corporate gift boxes of Bacolod piaya, ordered online and delivered the same day.</li>
+            <li>Offices order for client visits and holidays; repeat orders come from HR teams.</li>
+          </ul>
+          <div class="foot"><span>Piaya Gift Box Delivery</span><span>v1 For advisors · Oct 12, 2026</span></div>
+        </article>
+        <section class="notes"><h3>What to say</h3><p>Every box we sell at ₱450 costs about ₱218 to make, pack and deliver, so each one leaves ₱231 toward rent and salaries. We need about seven boxes a day to cover the month.</p></section>
+      </div>
+    </div>
+    <nav class="tabbar" aria-label="Main" data-tabbar="ideas"></nav>
+  </div>
+</div>
+</body>
+</html>

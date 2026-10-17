@@ -1,0 +1,39 @@
+# 見た目のモックアップ（アーカイブ）
+
+2026-10-11 にユーザーと見比べて合意した見た目（design-spec 4.4 の月相）のモックアップ。レイアウトのパターンごとに1画面ずつ、11画面ある。PR #4 で、この見た目を design-spec と `06_design-tokens.json` に書き写した。
+
+元のファイルは使い捨ての HTML で、手元から消えていた。2026-10-17 に、作ったセッションの記録から、書いた操作と直した操作を時刻の順に当て直して復元した。
+
+## 扱い
+
+- 更新しない。値と形の正は `design-spec.md` と `06_design-tokens.json`。
+- 2026-10-17 に、部品（`packages/ui-web`）がこのモックアップと違うことが分かった。ユーザーの決定で、モックアップと docs が食い違うところはモックアップを正にして、docs と部品を合わせ直す（`claude-code-prompts.md` の Step 22c〜22e。docs を残す例外もそこに書いた）。
+- 画面を作るときと直すときは、該当の画面をこのモックアップと並べて見た目を確かめる。
+
+## 開き方
+
+静的なサーバーで配って開く（書体は Google Fonts から読むので、ネットが要る）。
+
+```sh
+python3 -m http.server 5391 --bind 127.0.0.1 -d docs/mockups
+```
+
+`http://localhost:5391/screens.html` で11画面を切り替えられる。各画面のファイルは `?theme=light` か `?theme=dark` を付けて開く。幅は 1440 と 390 で確かめた。
+
+## 画面とファイル
+
+| 画面 | パターン | ファイル |
+|---|---|---|
+| 13 検証ホーム | A ハブ | `d1-moon.html` |
+| 5 ダッシュボード | A ハブ | `s05-dashboard.html` |
+| 19 判定 | B 中央集中 | `s19-decision.html` |
+| 11 設問フォーム | C 設問フォーム | `s11-form.html` |
+| 6 アイデア一覧 | D リスト＋詳細 | `s06-ideas.html` |
+| 15 競合・代替 | E カード比較 | `s15-competitors.html` |
+| 17 費用 | F ワークシート | `s17-costs.html` |
+| 25 AI 取り込み | G ステップ | `s25-import.html` |
+| 9 ワークスペース設定 | H 設定フォーム | `s09-settings.html` |
+| 23 Pitch Deck | I プレゼン | `s23-deck.html` |
+| 1 ランディング | J 公開ページ | `s01-landing.html` |
+
+`moon-base.css` と `moon-frame.js` は、10画面が共通に使う地と枠。`d1-moon.html` だけは、方向を見比べたときのファイルで、自分の中に地と枠を持つ。モックアップどうしが食い違うときは、後から作った共通の `moon-base.css` と `moon-frame.js` を正にする。`shared.js` はライトとダークの切り替え。

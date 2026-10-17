@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>案1 月相 — Bacolod Health Bowl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="shared.js?v=3"></script>
+<style>
+:root {
+  --page: #F4F5F8; --surface: #FFFFFF; --sunken: #ECEEF3;
+  --ink: #191C2A; --ink-2: #555D72; --ink-3: #868DA1;
+  --line: #E1E4EB; --line-strong: #C6CBD8;
+  --fau-a: #7A8197; --fau-empty: #DCE0E8;
+  --notice: #9A5600; --notice-bg: #FFF3DC;
+  --on-ink: #FFFFFF;
+  --font: "IBM Plex Sans", "Noto Sans JP", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #0E1120; --surface: #151A2C; --sunken: #1B2135;
+    --ink: #E6E8F1; --ink-2: #A2A8BD; --ink-3: #6F7690;
+    --line: #262C44; --line-strong: #3A4263;
+    --fau-a: #8F96AE; --fau-empty: #2B3150;
+    --notice: #F2B65C; --notice-bg: #2A2213;
+    --on-ink: #11152A; color-scheme: dark;
+  }
+}
+:root { --accent: var(--ink); --on-accent: var(--on-ink); --attn: var(--notice); }
+:root[data-accent] { --attn: var(--accent); }
+:root[data-accent="shu"] { --accent: #C2381B; --on-accent: #FFFFFF; }
+:root[data-accent="beni"] { --accent: #B42245; --on-accent: #FFFFFF; }
+:root[data-accent="akane"] { --accent: #A4303A; --on-accent: #FFFFFF; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"])[data-accent="shu"] { --accent: #FF8466; --on-accent: #11152A; }
+  :root:not([data-theme="light"])[data-accent="beni"] { --accent: #FF7A93; --on-accent: #11152A; }
+  :root:not([data-theme="light"])[data-accent="akane"] { --accent: #F2878B; --on-accent: #11152A; }
+}
+:root[data-theme="dark"][data-accent="shu"] { --accent: #FF8466; --on-accent: #11152A; }
+:root[data-theme="dark"][data-accent="beni"] { --accent: #FF7A93; --on-accent: #11152A; }
+:root[data-theme="dark"][data-accent="akane"] { --accent: #F2878B; --on-accent: #11152A; }
+:root[data-theme="dark"] {
+  --page: #0E1120; --surface: #151A2C; --sunken: #1B2135;
+  --ink: #E6E8F1; --ink-2: #A2A8BD; --ink-3: #6F7690;
+  --line: #262C44; --line-strong: #3A4263;
+  --fau-a: #8F96AE; --fau-empty: #2B3150;
+  --notice: #F2B65C; --notice-bg: #2A2213;
+  --on-ink: #11152A; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--page); color: var(--ink); font: 400 15px/1.55 var(--font); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+.icon { display: block; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Frame */
+.app { display: grid; grid-template-columns: 236px 1fr; min-height: 100dvh; }
+.side { border-right: 1px solid var(--line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100dvh; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; }
+.logo { width: 22px; height: 22px; }
+.ws { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-weight: 600; cursor: pointer; }
+.nav { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--ink-2); font-weight: 500; }
+.nav a:hover { background: var(--sunken); color: var(--ink); }
+.nav a[aria-current] { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line), inset 3px 0 0 var(--accent); }
+.nav .count { margin-left: auto; font: 500 12px var(--mono); color: var(--ink-2); }
+.nav hr { border: 0; border-top: 1px solid var(--line); margin: 10px 4px; }
+.user { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 8px 10px; font-weight: 500; }
+.avatar { width: 28px; height: 28px; border-radius: 8px; background: var(--sunken); display: grid; place-items: center; font: 600 11px var(--mono); color: var(--ink-2); }
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 32px; border-bottom: 1px solid var(--line); background: var(--page); position: sticky; top: 0; z-index: 2; }
+.crumbs { display: flex; gap: 8px; color: var(--ink-2); font-size: 14px; }
+.crumbs span[aria-current] { color: var(--ink); font-weight: 500; }
+.top .tools { margin-left: auto; display: flex; gap: 4px; }
+.iconbtn { position: relative; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px; border: 0; background: none; color: var(--ink-2); cursor: pointer; }
+.iconbtn:hover { background: var(--sunken); color: var(--ink); }
+.iconbtn .badge { position: absolute; top: 3px; right: 2px; font: 500 10px var(--mono); background: var(--accent); color: var(--on-accent); border-radius: 6px; padding: 0 4px; line-height: 15px; }
+.back { display: none; }
+
+.banner { display: flex; align-items: center; gap: 10px; padding: 10px 32px; background: var(--sunken); border-bottom: 1px solid var(--line); font-size: 14px; color: var(--ink-2); }
+.banner b { color: var(--ink); font-weight: 600; }
+.banner .link { margin-left: auto; font-weight: 600; color: var(--ink); border-bottom: 1px solid var(--line-strong); }
+
+.page { width: 100%; max-width: 1180px; padding: 36px 32px 64px; }
+
+/* Header block */
+.hero { display: grid; grid-template-columns: 1fr auto; gap: 8px 24px; align-items: end; padding-bottom: 28px; }
+.status-line { grid-column: 1 / -1; display: flex; gap: 14px; align-items: center; font-size: 13px; color: var(--ink-2); }
+.status-line .moonstate { display: inline-flex; gap: 6px; align-items: center; color: var(--ink); font-weight: 600; }
+h1 { margin: 0; font-size: 34px; line-height: 1.15; font-weight: 600; letter-spacing: -0.02em; }
+.concept { margin: 6px 0 0; color: var(--ink-2); font-size: 16px; max-width: 60ch; }
+.concept .by { color: var(--ink-3); }
+.actions { display: flex; gap: 8px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); font-weight: 500; font-size: 14px; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+:root[data-scope="marks"] .btn.primary { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.btn.quiet { border-color: transparent; background: none; padding: 0 8px; }
+
+/* Key numbers */
+.numbers { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line); margin-bottom: 36px; }
+.metric { padding: 16px 20px 18px 0; }
+.metric + .metric { padding-left: 20px; border-left: 1px solid var(--line); }
+.metric .label { font-size: 13px; color: var(--ink-2); }
+.metric .value { font: 500 30px/1.2 var(--mono); letter-spacing: -0.02em; margin-top: 4px; white-space: nowrap; }
+.metric .value small { font-size: 15px; color: var(--ink-2); letter-spacing: 0; }
+.metric .note { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+
+/* Columns */
+.cols { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 48px; }
+.col { display: flex; flex-direction: column; gap: 36px; }
+h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.01em; display: flex; align-items: baseline; gap: 8px; }
+h2 .aside { margin-left: auto; font-weight: 400; color: var(--ink-3); }
+
+.next { list-style: none; margin: 0; padding: 0; counter-reset: n; }
+.next li a { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--line); counter-increment: n; }
+.next li a::before { content: counter(n); font: 500 13px var(--mono); color: var(--ink-3); }
+.next li:first-child a { padding: 16px 16px 16px 14px; border: 1px solid var(--line-strong); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--surface); margin-bottom: 4px; }
+.next li:first-child a::before { color: var(--accent); font-weight: 600; }
+.next li:first-child .t { font-weight: 600; font-size: 16px; }
+.next .why { display: block; font-size: 13px; color: var(--ink-2); font-weight: 400; }
+.next .go { color: var(--ink-3); }
+
+.rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.rows li { border-bottom: 1px solid var(--line); }
+.rows a, .rows .static { display: grid; grid-template-columns: 24px 1fr auto 18px; gap: 4px 10px; align-items: center; padding: 11px 0; }
+.rows a:hover .t { text-decoration: underline; text-underline-offset: 3px; }
+.rows .t { font-weight: 500; }
+.rows .sub { grid-column: 2 / 4; font-size: 13px; color: var(--ink-2); margin-top: -2px; }
+.rows .state { font-size: 13px; color: var(--ink-2); text-align: right; }
+.rows .go { color: var(--ink-3); }
+.rows .moon { color: var(--ink); display: grid; place-items: center; }
+.rows .moon.empty { color: var(--ink-3); }
+.rows .num { font-size: 13px; color: var(--ink-2); }
+
+.fau-bar { display: flex; height: 10px; border-radius: 3px; overflow: hidden; gap: 2px; margin: 4px 0 12px; }
+.fau-bar span { display: block; }
+.fau-f { background: var(--ink); }
+.fau-a { background: var(--fau-a); }
+.fau-u { background: repeating-linear-gradient(135deg, var(--ink-3) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--ink-3); }
+.fau-x { background: var(--attn); }
+.fau-e { background: var(--fau-empty); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.legend b { color: var(--ink); font-weight: 500; font-family: var(--mono); }
+.legend .attn { color: var(--attn); }
+
+.summary { display: grid; grid-template-columns: 120px 1fr; margin: 0; border-top: 1px solid var(--line); }
+.summary dt, .summary dd { padding: 10px 0; border-bottom: 1px solid var(--line); margin: 0; }
+.summary dt { font-size: 13px; color: var(--ink-2); }
+.summary dd { max-width: 60ch; }
+
+.decision { padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.decision .who { font-size: 13px; color: var(--ink-2); }
+.decision q { display: block; margin-top: 4px; }
+.textlink { display: inline-block; margin-top: 10px; font-size: 14px; font-weight: 500; border-bottom: 1px solid var(--line-strong); }
+.muted { color: var(--ink-2); margin: 0; }
+
+.actionbar, .tabbar { display: none; }
+
+/* Tablet */
+@media (max-width: 1023px) {
+  .app { grid-template-columns: 64px 1fr; }
+  .nav a span:not(.count):not([data-icon]), .ws span, .user span:last-child, .brand span { display: none; }
+  .cols { grid-template-columns: 1fr; }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  body { font-size: 16px; }
+  .app { display: block; }
+  .side { display: none; }
+  .top { padding: 0 8px; height: 52px; }
+  .crumbs { display: none; }
+  .back { display: flex; align-items: center; gap: 2px; font-weight: 600; min-height: 44px; padding: 0 8px; }
+  .iconbtn { width: 44px; height: 44px; }
+  .banner { padding: 10px 16px; }
+  .page { padding: 20px 16px 140px; }
+  .hero { grid-template-columns: 1fr; padding-bottom: 20px; }
+  h1 { font-size: 28px; }
+  .hero .actions .btn.primary { display: none; }
+  .hero .actions { margin-top: 8px; }
+  .btn { height: 44px; }
+  .numbers { grid-template-columns: 1fr 1fr; margin-bottom: 28px; }
+  .metric, .metric + .metric { padding: 14px 12px 14px 0; border-left: 0; }
+  .metric:nth-child(even) { padding-left: 14px; border-left: 1px solid var(--line); }
+  .metric:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .metric .value { font-size: 20px; }
+  .metric .value small { font-size: 13px; }
+  .cols { display: flex; flex-direction: column; gap: 32px; }
+  .col { display: contents; }
+  .b-next { order: 1; } .b-checks { order: 2; } .b-fau { order: 3; } .b-sections { order: 4; }
+  .b-summary { order: 5; } .b-decisions { order: 6; } .b-plans { order: 7; }
+  .rows a, .rows .static { min-height: 48px; }
+  .summary { grid-template-columns: 1fr; }
+  .summary dt { border-bottom: 0; padding-bottom: 0; }
+  .actionbar { display: block; position: fixed; left: 0; right: 0; bottom: 64px; padding: 10px 16px; background: var(--page); border-top: 1px solid var(--line); }
+  .actionbar .btn { width: 100%; justify-content: center; height: 48px; font-size: 16px; }
+  .tabbar { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; height: 64px; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  .tabbar a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap; position: relative; }
+  .tabbar a[aria-current] { color: var(--ink); font-weight: 600; }
+  .tabbar a[aria-current]::before { content: ""; position: absolute; top: 0; left: 30%; right: 30%; height: 2px; background: var(--accent); border-radius: 0 0 2px 2px; }
+  .tabbar .badge { position: absolute; top: 8px; left: 52%; font: 500 10px var(--mono); background: var(--accent); color: var(--on-accent); border-radius: 6px; padding: 0 4px; line-height: 15px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Workspace">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 512 512" aria-hidden="true"><mask id="crescent"><rect width="512" height="512" fill="#fff"/><circle cx="300" cy="215" r="132" fill="#000"/></mask><circle cx="246" cy="266" r="150" fill="currentColor" mask="url(#crescent)"/><circle cx="378" cy="150" r="28" fill="var(--accent)"/></svg>
+      <span style="font-weight:600">moonx</span>
+    </div>
+    <button class="ws"><span>BCDX</span><span data-icon="chevron-down" data-size="16"></span></button>
+    <nav class="nav" aria-label="Main">
+      <a href="#"><span data-icon="house"></span><span>Dashboard</span></a>
+      <a href="#" aria-current="page"><span data-icon="lightbulb"></span><span>Ideas</span></a>
+      <a href="#"><span data-icon="compass"></span><span>Self Analysis</span></a>
+      <a href="#"><span data-icon="bell"></span><span>Notifications</span><span class="count">3</span></a>
+      <a href="#"><span data-icon="scroll"></span><span>Decision Log</span></a>
+      <hr>
+      <a href="#"><span data-icon="settings"></span><span>Workspace Settings</span></a>
+    </nav>
+    <div class="user"><span class="avatar">AV</span><span>Ana Villanueva</span></div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <a class="back" href="#"><span data-icon="arrow-left" data-size="20"></span>Ideas</a>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="#">Ideas</a><span>/</span><span aria-current="page">Bacolod Health Bowl</span></nav>
+      <div class="tools">
+        <button class="iconbtn" aria-label="Comments, 2 open"><span data-icon="message"></span><span class="badge">2</span></button>
+        <button class="iconbtn" aria-label="History"><span data-icon="history"></span></button>
+      </div>
+    </header>
+    <div class="banner"><span data-icon="info" data-size="16"></span><span><b>A newer template is available.</b> Your answers stay on v3 until you update.</span><a class="link" href="#">Update template</a></div>
+
+    <main class="page" id="main">
+      <section class="hero">
+        <div class="status-line">
+          <span class="moonstate" style="border:1px solid var(--line-strong);border-radius:6px;padding:0 8px">Hold</span>
+          <span>Latest decision Oct 2</span><span>·</span><span>Stage: Validation</span>
+        </div>
+        <div>
+          <h1>Bacolod Health Bowl</h1>
+          <p class="concept">Healthy fast-casual bowls with standardized nutrition in Bacolod. <span class="by">— Kenji Mori</span></p>
+        </div>
+        <div class="actions">
+          <button class="btn quiet">Edit summary</button>
+          <button class="btn">AI <span data-icon="chevron-down" data-size="16"></span></button>
+          <button class="btn quiet" aria-label="More"><span data-icon="ellipsis"></span></button>
+          <button class="btn primary">Record decision</button>
+        </div>
+      </section>
+
+      <section class="numbers" aria-label="Key numbers">
+        <div class="metric"><div class="label">Startup costs</div><div class="value">₱145,000+</div><div class="note">Lower bound · 3 Unknown, 1 Empty</div></div>
+        <div class="metric"><div class="label">Break-even</div><div class="value">14.4+ <small>/ day</small></div><div class="note">Lower bound</div></div>
+        <div class="metric"><div class="label">Expected profit</div><div class="value">≤ ₱37,000 <small>/ mo</small></div><div class="note">Upper bound</div></div>
+        <div class="metric"><div class="label">Payback</div><div class="value">3.9+ <small>months</small></div><div class="note">Lower bound</div></div>
+      </section>
+
+      <div class="cols">
+        <div class="col">
+          <section class="b-next">
+            <h2>Next steps</h2>
+            <ol class="next">
+              <li><a href="#"><span class="t">Add evidence (1)<span class="why">A Fact in 01 Customer &amp; Problem lost its research log.</span></span><span class="go" data-icon="chevron-right"></span></a></li>
+              <li><a href="#"><span class="t">Classify answers (3)</span><span class="go" data-icon="chevron-right"></span></a></li>
+              <li><a href="#"><span class="t">Fill or mark 1 empty cost row</span><span class="go" data-icon="chevron-right"></span></a></li>
+            </ol>
+          </section>
+
+          <section class="b-checks">
+            <h2>Checks <span class="aside">● done · ◐ partial · ○ not started</span></h2>
+            <ul class="rows">
+              <li><a href="#"><span class="moon" data-moon="1"></span><span class="t">Competitors (3–5)</span><span class="state">Done (4)</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+              <li><a href="#"><span class="moon" data-moon="1"></span><span class="t">Local price range</span><span class="state">Done</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+              <li><a href="#"><span class="moon" data-moon="0.5"></span><span class="t">Startup &amp; monthly costs</span><span class="state">Partial</span><span class="go" data-icon="chevron-right" data-size="16"></span><span class="sub">1 row is Empty</span></a></li>
+              <li><a href="#"><span class="moon" data-moon="1"></span><span class="t">Break-even volume</span><span class="state">Done</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+              <li><a href="#"><span class="moon empty" data-moon="0"></span><span class="t">Permits</span><span class="state">Not started</span><span class="go" data-icon="chevron-right" data-size="16"></span><span class="sub">Fill the Permits cost row, or log what you found</span></a></li>
+              <li><a href="#"><span class="moon" data-moon="1"></span><span class="t">Demand or problem signal</span><span class="state">Done (2)</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+            </ul>
+          </section>
+
+          <section class="b-fau">
+            <h2>Fact / Assumption / Unknown <span class="aside num">62 items</span></h2>
+            <div class="fau-bar" role="img" aria-label="Fact 3, Assumption 29, Unknown 5, Unclassified 3, Empty 22">
+              <span class="fau-f" style="flex:3"></span><span class="fau-a" style="flex:29"></span><span class="fau-u" style="flex:5"></span><span class="fau-x" style="flex:3"></span><span class="fau-e" style="flex:22"></span>
+            </div>
+            <div class="legend">
+              <span><i class="fau-f"></i>Fact <b>3</b></span>
+              <span><i class="fau-a"></i>Assumption <b>29</b>&nbsp;<span class="num" style="font-size:12px">L9 M17 H3</span></span>
+              <span><i class="fau-u"></i>Unknown <b>5</b></span>
+              <span class="attn"><i class="fau-x"></i>Unclassified <b style="color:inherit">3</b></span>
+              <span><i class="fau-e"></i>Empty <b>22</b></span>
+            </div>
+          </section>
+
+          <section class="b-summary">
+            <h2>Summary</h2>
+            <dl class="summary">
+              <dt>Customer</dt><dd>Working professionals aged 25–40 in Bacolod who pay for convenient meals.</dd>
+              <dt>Problem</dt><dd>Healthy eating is hard to sustain because planning, cooking and portion control take time.</dd>
+              <dt>Solution</dt><dd>A focused menu with consistent portions and clearly communicated nutrition.</dd>
+              <dt>Market type</dt><dd>Red</dd>
+            </dl>
+          </section>
+        </div>
+
+        <div class="col">
+          <section class="b-sections">
+            <h2>Sections</h2>
+            <ul class="rows">
+              <li><a href="#"><span class="moon" data-moon="0.7"></span><span class="t">01 Customer &amp; Problem</span><span class="num">7/10</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+              <li><a href="#"><span class="moon" data-moon="0.5"></span><span class="t">02 Market</span><span class="num">6/12</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+              <li><a href="#"><span class="moon empty"></span><span class="t">03 Research Log</span><span class="num">5 entries</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+              <li><a href="#"><span class="moon empty"></span><span class="t">04 Competitors</span><span class="num">4 (3–5)</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+              <li><a href="#"><span class="moon" data-moon="0.833"></span><span class="t">05 Costs</span><span class="num">20/24 rows</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+              <li><a href="#"><span class="moon" data-moon="0.714"></span><span class="t">06–08 Unit Economics</span><span class="num">5/7 inputs</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+              <li><a href="#"><span class="moon empty"></span><span class="t">09 Assumptions &amp; Risks</span><span class="num">2 · 2</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+              <li><a href="#"><span class="moon" data-moon="0.333"></span><span class="t">10 Final Assessment</span><span class="num">2/6</span><span class="go" data-icon="chevron-right" data-size="16"></span></a></li>
+            </ul>
+          </section>
+
+          <section class="b-decisions">
+            <h2>Decisions</h2>
+            <div class="decision"><div class="who"><b style="color:var(--ink);font-weight:600">Hold</b> · Oct 2 · Kenji Mori</div><q>Startup and monthly costs and permits are still missing.</q></div>
+            <a class="textlink" href="#">See all decisions</a>
+          </section>
+
+          <section class="b-plans">
+            <h2>Plans</h2>
+            <p class="muted">No plans yet. A plan can start after a Proceed decision.</p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <div class="actionbar"><button class="btn primary">Record decision</button></div>
+    <nav class="tabbar" aria-label="Main">
+      <a href="#"><span data-icon="house" data-size="22"></span>Dashboard</a>
+      <a href="#" aria-current="page"><span data-icon="lightbulb" data-size="22"></span>Ideas</a>
+      <a href="#"><span data-icon="compass" data-size="22"></span>Self Analysis</a>
+      <a href="#"><span data-icon="bell" data-size="22"></span><span class="badge">3</span>Notifications</a>
+      <a href="#"><span data-icon="menu" data-size="22"></span>More</a>
+    </nav>
+  </div>
+</div>
+</body>
+</html>

@@ -39,6 +39,7 @@ import { Flex, Stack } from "../../layout/Flex";
 import { FocusPattern } from "../../patterns/FocusPattern";
 import { QuestionFormPattern } from "../../patterns/QuestionFormPattern";
 import {
+  SettingsFieldRow,
   SettingsList,
   SettingsListItem,
   SettingsPattern,
@@ -211,6 +212,7 @@ export function DecisionScreen() {
           <TextArea
             label="Why?"
             isRequired
+            isReason
             width="full"
             defaultValue="Permit costs are still unknown and one startup row is empty. Revisit after the City Hall visit."
           />
@@ -423,21 +425,23 @@ export function QuestionFormScreen() {
             </QuestionCard>
           );
         }}
+        previousSection={
+          <Button variant="secondary" isQuiet>
+            <ArrowLeft />
+            Previous section
+          </Button>
+        }
         footer={
-          <>
-            <Button variant="secondary" isQuiet>
-              <ArrowLeft />
-              Previous section
-            </Button>
-            <Button variant="secondary">
-              AI
-              <ChevronDown />
-            </Button>
-            <Button variant="secondary">
-              Next: 02 Market
-              <ArrowRight />
-            </Button>
-          </>
+          <Button variant="secondary">
+            AI
+            <ChevronDown />
+          </Button>
+        }
+        nextSection={
+          <Button variant="secondary">
+            Next: 02 Market
+            <ArrowRight />
+          </Button>
         }
         isAnswered={(id) => (answers[id] ?? "").trim() !== ""}
       />
@@ -579,20 +583,18 @@ export function SettingsScreen() {
             ),
             content: (
               <>
-                <Flex gap="space-100" alignItems="end" wrap>
+                <SettingsFieldRow>
                   <TextField
                     aria-label="Email to invite"
                     placeholder="name@example.com"
-                    width="fill"
                   />
                   <Picker
                     aria-label="Role of the invited"
                     items={roles}
                     defaultValue="member"
-                    width="fit"
                   />
                   <Button variant="primary">Send invitation</Button>
-                </Flex>
+                </SettingsFieldRow>
                 <SegmentedControl
                   aria-label="Show"
                   defaultSelectedKey="pending"

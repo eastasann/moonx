@@ -129,10 +129,13 @@ const activity = [
 function Block({
   title,
   aside,
+  isAsideNumeric = false,
   children,
 }: {
   title: string;
   aside?: string;
+  /** The aside is a count ("62 items"): monospaced, as the mockups' .num. */
+  isAsideNumeric?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -146,7 +149,10 @@ function Block({
           {title}
         </Heading>
         {aside !== undefined && (
-          <Text variant="caption" tone="tertiary">
+          <Text
+            variant={isAsideNumeric ? "number-sm" : "caption"}
+            tone="tertiary"
+          >
             {aside}
           </Text>
         )}
@@ -198,15 +204,13 @@ export function DashboardScreen() {
                       key={idea.id}
                       href={`#idea-${idea.id}`}
                       description={idea.meta}
-                      end={
-                        <Flex gap="space-200" alignItems="center">
-                          <CheckDots checks={idea.checks} size="S" />
-                          {idea.decision === null ? (
-                            <Badge fillStyle="dashed">Undecided</Badge>
-                          ) : (
-                            <Badge>{idea.decision}</Badge>
-                          )}
-                        </Flex>
+                      marks={<CheckDots checks={idea.checks} size="S" />}
+                      badge={
+                        idea.decision === null ? (
+                          <Badge fillStyle="dashed">Undecided</Badge>
+                        ) : (
+                          <Badge>{idea.decision}</Badge>
+                        )
                       }
                     >
                       {idea.name}
@@ -239,6 +243,7 @@ export function DashboardScreen() {
                           item.when
                         )
                       }
+                      isEndNumeric={item.when !== null}
                     >
                       {item.name}
                       {item.isYours && (
@@ -297,8 +302,10 @@ export function DashboardScreen() {
                       start={<Avatar name={who} />}
                       description={where}
                     >
-                      <strong>{who}</strong>
-                      {` ${what}`}
+                      <Text variant="body-compact">
+                        <strong>{who}</strong>
+                        {` ${what}`}
+                      </Text>
                     </RowListItem>
                   ))}
                 </RowList>
@@ -486,9 +493,13 @@ export function ValidationHomeScreen() {
             id: "fau",
             column: "main",
             content: (
-              <Block title="Fact / Assumption / Unknown" aside="62 items">
+              <Block
+                title="Fact / Assumption / Unknown"
+                aside="62 items"
+                isAsideNumeric
+              >
                 <Meter
-                  label="Answers by F/A/U"
+                  aria-label="Answers by F/A/U"
                   segments={[
                     { state: "fact", label: "Fact", count: 3 },
                     {

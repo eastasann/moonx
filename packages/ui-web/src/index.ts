@@ -283,6 +283,8 @@ export {
   type QuestionListProps,
 } from "./patterns/QuestionList";
 export {
+  SettingsFieldRow,
+  type SettingsFieldRowProps,
   type SettingsGroup,
   SettingsList,
   SettingsListItem,

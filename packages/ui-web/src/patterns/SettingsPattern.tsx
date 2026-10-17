@@ -1,4 +1,4 @@
-import { type ReactNode, useId } from "react";
+import { Fragment, type ReactNode, useId } from "react";
 import { Heading } from "../components/Heading";
 import { Density } from "../internal/Density";
 import { FieldWidthContext } from "../internal/size";
@@ -69,6 +69,27 @@ export function SettingsPattern({
   );
 }
 
+export interface SettingsFieldRowProps {
+  /**
+   * The fields and the button of one line (9's invitation: the email, its role, "Send
+   * invitation"): the first fills the line, the second takes 06
+   * layout.settings.field-row-control-width, the rest their own width. On a phone one
+   * under another at full width (s09-settings.html .invite).
+   */
+  children: ReactNode;
+}
+
+/** Fields side by side in a settings group, ending in their button (s09-settings.html .invite). */
+export function SettingsFieldRow({ children }: SettingsFieldRowProps) {
+  return (
+    <div className={styles.settingsFieldRow}>
+      <FieldWidthContext.Provider value="full">
+        {children}
+      </FieldWidthContext.Provider>
+    </div>
+  );
+}
+
 export interface SettingsListProps {
   "aria-label": string;
   /** `SettingsListItem`s. */
@@ -102,6 +123,24 @@ export interface SettingsListItemProps {
 }
 
 /**
+ * An email breaks after its "@" and its dots when it must, not inside a word (an
+ * invitation's title on a phone).
+ */
+function breakable(title: string): ReactNode {
+  if (!title.includes("@")) return title;
+  const parts = title.split(/(?<=[@.])/);
+  return parts.length === 1
+    ? title
+    : parts.map((part, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one fixed string
+        <Fragment key={index}>
+          {index > 0 && <wbr />}
+          {part}
+        </Fragment>
+      ));
+}
+
+/**
  * A member or an invitation of 9: what it is on the left, its role and its actions at the
  * end, each in its column so they line up down the list (s09-settings.html .members li,
  * .inv li). Every prop shows with or without an avatar.
@@ -116,12 +155,13 @@ export function SettingsListItem({
   note,
 }: SettingsListItemProps) {
   const hasAvatar = avatar != null;
+  const hasControl = control != null;
   // The note follows the email in the reading order, before the control it explains.
   return (
-    <li className={styles.settingsRow({ hasAvatar })}>
+    <li className={styles.settingsRow({ hasAvatar, hasControl })}>
       {hasAvatar && <span className={styles.settingsRowAvatar}>{avatar}</span>}
       <span className={styles.settingsRowTitle({ hasAvatar })}>
-        {title}
+        {breakable(title)}
         {titleNote !== undefined && (
           <>
             {" "}
@@ -145,7 +185,7 @@ export function SettingsListItem({
         </span>
       )}
       {actions != null && (
-        <span className={styles.settingsRowActions({ hasAvatar })}>
+        <span className={styles.settingsRowActions({ hasAvatar, hasControl })}>
           {actions}
         </span>
       )}

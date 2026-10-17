@@ -24,6 +24,8 @@ const moon = {
 // The glyph is drawn in a 20-unit box, the moon a circle of radius 9 at its centre.
 const C = 10;
 const R = 9;
+/** Empty's ring: the mockup's 14px ring in a 16px box (moon-base.css .dot-empty). */
+const EMPTY_R = 8;
 
 /**
  * The lit part of a moon `lit` full (0 to 1), waxing from the right: the right half of
@@ -62,7 +64,17 @@ export function MoonMark({
         viewBox="0 0 20 20"
         className={`${styles.mark} ${styles.color.unclassified} ${className}`}
       >
-        <path d="M 10 1 L 19 10 L 10 19 L 1 10 Z" className={styles.lit} />
+        {/* moon-base.css .dot-attn: a square with rounded corners turned 45°, its
+            10px and 3px corners scaled from the mockup's 16px box to this 20-unit one. */}
+        <rect
+          x={3.75}
+          y={3.75}
+          width={12.5}
+          height={12.5}
+          rx={3.75}
+          transform="rotate(45 10 10)"
+          className={styles.lit}
+        />
       </svg>
     );
   }
@@ -73,12 +85,13 @@ export function MoonMark({
         viewBox="0 0 20 20"
         className={`${styles.mark} ${styles.color.empty} ${className}`}
       >
-        {/* pathLength makes the dots an even ring of eight at any size. */}
+        {/* moon-base.css .dot-empty: a ring of short dashes inside the box's edge;
+            pathLength makes them an even twelve at any size. */}
         <circle
           cx={C}
           cy={C}
-          r={R}
-          pathLength={16}
+          r={EMPTY_R}
+          pathLength={24}
           strokeDasharray="1 1"
           className={styles.line}
         />

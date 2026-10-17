@@ -127,19 +127,21 @@ export type BarColumn = "reading" | "form" | "comparison" | "worksheet";
  * The bar fixed to the bottom of the body (design-spec 4.1, 4.3): the main action of a
  * hub, a focused form or a step, a question form's previous and next, a worksheet's
  * summary. `actions` on a phone makes its Buttons XL, the ones that are not quiet sharing
- * the width (4.5 Button). With `isPhoneOnly` it is an ordinary row at the end of the
- * page from the tablet breakpoint up (B). `note` stands at its start from the tablet
- * breakpoint up (G).
+ * the width, or with `isShared` every one of them (4.3: B shares it with Cancel). With
+ * `isPhoneOnly` it is an ordinary row at the end of the page from the tablet breakpoint
+ * up (B). `note` stands at its start from the tablet breakpoint up (G).
  */
 export function BottomBar({
   variant = "actions",
   isPhoneOnly = false,
+  isShared = false,
   column = "reading",
   note,
   children,
 }: {
   variant?: "actions" | "footer" | "navigation" | "summary";
   isPhoneOnly?: boolean;
+  isShared?: boolean;
   column?: BarColumn;
   note?: ReactNode;
   children: ReactNode;
@@ -150,7 +152,7 @@ export function BottomBar({
   if (isPhoneOnly) classes.push(styles.phoneOnlyBar);
   const content =
     variant === "actions" && isNarrow ? (
-      <BottomBarContext.Provider value={true}>
+      <BottomBarContext.Provider value={isShared ? "all" : "main"}>
         {children}
       </BottomBarContext.Provider>
     ) : (
@@ -161,7 +163,7 @@ export function BottomBar({
       className={classes.join(" ")}
       style={{ [keyboardInsetName]: `${inset}px` }}
     >
-      <div className={styles.barInner({ variant, column })}>
+      <div className={styles.barInner({ variant, column, isShared })}>
         {note != null && !isNarrow && (
           <span className={styles.barNote}>{note}</span>
         )}

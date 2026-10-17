@@ -219,6 +219,26 @@ export function CostTable({ kind, title, unit, total }: CostTableProps) {
       </Flex>
       <TableView
         aria-label={title}
+        footerAction={
+          <Button variant="secondary" isQuiet>
+            <Plus />
+            Add row
+          </Button>
+        }
+        footerTotal={
+          <Flex
+            columnGap="space-100"
+            alignItems="baseline"
+            justifyContent="end"
+            wrap
+          >
+            {total.label}
+            <Text variant="number" tone="primary">
+              {total.value}
+            </Text>
+            {total.note === undefined ? null : `· ${total.note}`}
+          </Flex>
+        }
         columns={columnsOf[kind]}
         items={rows}
         isRowEditable={() => true}
@@ -271,7 +291,7 @@ export function CostTable({ kind, title, unit, total }: CostTableProps) {
               ) : (
                 <>
                   {row.percent}{" "}
-                  <Text variant="caption" tone="secondary">
+                  <Text variant="number-sm" tone="secondary">
                     {`· ₱${row.amount}`}
                   </Text>
                 </>
@@ -336,19 +356,6 @@ export function CostTable({ kind, title, unit, total }: CostTableProps) {
           }
         }}
       />
-      <Flex justifyContent="space-between" alignItems="center" gap="space-200">
-        <Button variant="secondary" isQuiet size="S">
-          <Plus />
-          Add row
-        </Button>
-        <Text variant="body-sm" tone="secondary">
-          {`${total.label} `}
-          <Text variant="number" tone="primary">
-            {total.value}
-          </Text>
-          {total.note === undefined ? null : ` · ${total.note}`}
-        </Text>
-      </Flex>
     </Stack>
   );
 }

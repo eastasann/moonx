@@ -468,9 +468,14 @@
       "measure": {
         "$type": "number",
         "$description": "文の幅の上限（字数。CSS の ch）",
+        "22": { "$value": 22 },
         "32": { "$value": 32 },
         "40": { "$value": 40 },
+        "44": { "$value": 44 },
+        "46": { "$value": 46 },
+        "56": { "$value": 56 },
         "60": { "$value": 60 },
+        "62": { "$value": 62 },
         "72": { "$value": 72 }
       }
     },
@@ -520,10 +525,13 @@
       "72": { "$value": { "value": 72, "unit": "px" } },
       "80": { "$value": { "value": 80, "unit": "px" } },
       "88": { "$value": { "value": 88, "unit": "px" } },
+      "92": { "$value": { "value": 92, "unit": "px" } },
       "96": { "$value": { "value": 96, "unit": "px" } },
       "100": { "$value": { "value": 100, "unit": "px" } },
       "112": { "$value": { "value": 112, "unit": "px" } },
       "120": { "$value": { "value": 120, "unit": "px" } },
+      "132": { "$value": { "value": 132, "unit": "px" } },
+      "140": { "$value": { "value": 140, "unit": "px" } },
       "150": { "$value": { "value": 150, "unit": "px" } },
       "160": { "$value": { "value": 160, "unit": "px" } },
       "180": { "$value": { "value": 180, "unit": "px" } },
@@ -1331,6 +1339,10 @@
               "$description": "TextArea の最小の高さ（Spectrum 2 のトークンの text-area-minimum-height の desktop の値）",
               "$value": "{primitive.dimension.56}"
             },
+            "text-area-reason-min-height": {
+              "$description": "理由を書く TextArea（TextArea の isReason。19 の「Why?」など）の最小の高さ（s19-decision.html の textarea の min-height 120）",
+              "$value": "{primitive.dimension.120}"
+            },
             "radius": {
               "$description": "角丸（S は s06、M は s23、L は s09、XL は corner-radius-medium-size-extra-large）",
               "S": { "$value": "{primitive.dimension.7}" },
@@ -1512,7 +1524,7 @@
             }
           },
           "disclosure": {
-            "$description": "Disclosure / Accordion（S〜XL。design-spec 4.5）。見出しの最小の高さ（component-height-75〜300。regular の密度）は Spectrum 2 の Disclosure と同じ。見出しの左右は Spectrum 2 のトークンの accordion-edge-to-content-area-small〜extra-large（S2 の Disclosure は高さから計算する）、中身の左右は accordion-content-area-edge-to-content-small〜extra-large。title-font-size は M が docs/mockups（s11-form.html の「Related research」の 14px）、S・L・XL はモックアップに無いので @react-spectrum/s2 の Disclosure の題の大きさ（title-sm・title-lg・title-xl。Spectrum 2 のトークンの title-size-s・l・xl の desktop の 14・18・20）",
+            "$description": "Disclosure / Accordion（S〜XL。design-spec 4.5）。見出しの最小の高さ（component-height-75〜300。regular の密度）は Spectrum 2 の Disclosure と同じ。見出しの左右は Spectrum 2 のトークンの accordion-edge-to-content-area-small〜extra-large（S2 の Disclosure は高さから計算する）、中身の右は accordion-content-area-edge-to-content-small〜extra-large（panel-padding-x）。中身の左は題の文字の頭にそろえる（title-padding-x と icon.size と間の space-100 の和。s11-form.html の .discl .body が印と間の分だけ下げている）。title-font-size は M が docs/mockups（s11-form.html の「Related research」の 14px）、S・L・XL はモックアップに無いので @react-spectrum/s2 の Disclosure の題の大きさ（title-sm・title-lg・title-xl。Spectrum 2 のトークンの title-size-s・l・xl の desktop の 14・18・20）",
             "title-height": {
               "S": { "$value": "{primitive.dimension.24}" },
               "M": { "$value": "{primitive.dimension.32}" },
@@ -1698,7 +1710,7 @@
             "edit-padding-x": { "$value": "{primitive.dimension.12}" }
           },
           "table-view": {
-            "$description": "TableView（design-spec 4.5）。row-height は値の行の高さ（medium の regular は s17-costs.html の 46。モックアップに無い compact と spacious と large は Spectrum 2 の table-row-height の値）、cell-padding-x はセルの左右（regular は s17 の 10。compact と spacious は density.*.cell-padding-x と同じ Spectrum 2 の値）、header-padding-y は見出しの行の上下（s17 の th の 8）、mark-width と mark-padding-start は行頭の印の列の幅とその左の余白（s17 の 30 と 8）、actions-width は行の ⋯ の列の幅（s17 の 40）。narrow- はスマホの幅の行（s17 の 390px の .cards: 行の高さの下限 60、上下 12・左右 2、印の列 20、列の間 12）",
+            "$description": "TableView（design-spec 4.5）。row-height は値の行の高さ（medium の regular は s17-costs.html の 46。モックアップに無い compact と spacious と large は Spectrum 2 の table-row-height の値）、cell-padding-x はセルの左右（regular は s17 の 10。compact と spacious は density.*.cell-padding-x と同じ Spectrum 2 の値）、header-padding-y は見出しの行の上下（s17 の th の 8）、mark-width と mark-padding-start は行頭の印の列の幅とその左の余白（s17 の 30 と 8）、actions-width は行の ⋯ の列の幅（s17 の 40）。narrow- はスマホの幅の行（s17 の 390px の .cards: 行の高さの下限 60、上下 12・左右 2、印の列 20、列の間 12）、footer-padding-y は表の下の「Add row」と小計の行の上下（s17 の tfoot td の 10）、narrow-footer-min-height はスマホの全幅の「Add row」の行の高さの下限（s17 の .cards .add の 48）",
             "row-height": {
               "compact": { "$value": "{primitive.dimension.32}" },
               "regular": { "$value": "{primitive.dimension.46}" },
@@ -1717,7 +1729,9 @@
             "narrow-row-padding-y": { "$value": "{primitive.dimension.12}" },
             "narrow-row-padding-x": { "$value": "{primitive.dimension.2}" },
             "narrow-mark-width": { "$value": "{primitive.dimension.20}" },
-            "narrow-gap": { "$value": "{primitive.dimension.12}" }
+            "narrow-gap": { "$value": "{primitive.dimension.12}" },
+            "footer-padding-y": { "$value": "{primitive.dimension.10}" },
+            "narrow-footer-min-height": { "$value": "{primitive.dimension.48}" }
           },
           "fau-picker": {
             "$description": "FauPicker（s17-costs.html の .faucell と .pop）。trigger-padding-x・trigger-padding-y は表の欄のボタンの内側（6・4）、popover-width・popover-padding は Popover の幅と内側（300・14）、label-gap は小見出しと溝の間（6）、group-gap は F/A/U の溝と確信度の小見出しの間（12）、evidence-padding-top は根拠の案内の線の下（10）、groove-item-height・groove-item-padding-x は Popover の中の溝のボタンの高さと左右（.pop .seg button の 32・8。FauPicker の size によらない。300px に3つのボタンが収まるため）",
@@ -1746,7 +1760,7 @@
             "pair-padding-start": { "$value": "{primitive.dimension.18}" }
           },
           "row-list": {
-            "$description": "RowList（d1-moon.html の .rows と .next）。mark-width は印の列（.rows の 24）、number-width は番号の列（.next の 28）、gap は列の間（.rows の 10、番号の後は number-gap の 4）、padding-y は行の上下（.rows の 11、番号付きは ordered-padding-y の 12）、emphasis- は Next steps の1件目の枠（内側の上下 16・右 16・左 14、下の間 4）、narrow-min-height はスマホの幅の行の高さの下限（d1 の 390px の 48）、underline-offset は押せる行のホバーで名前に引く下線の離れ（.rows a:hover .t の 3）、task-mark- は行頭のまだ終わっていない実行管理の項目の印（s05-dashboard.html の .due .box の 16×16・角丸 4・1.5 の線）",
+            "$description": "RowList（d1-moon.html の .rows と .next）。mark-width は印の列（.rows の 24）、number-width は番号の列（.next の 28）、gap は列の間（.rows の 10、番号の後は number-gap の 4）、padding-y は行の上下（.rows の 11、番号付きは ordered-padding-y の 12）、emphasis- は Next steps の1件目の枠（内側の上下 16・右 16・左 14、下の間 4）、narrow-min-height はスマホの幅の行の高さの下限（d1 の 390px の 48）、underline-offset は押せる行のホバーで名前に引く下線の離れ（.rows a:hover .t の 3）、task-mark- は行頭のまだ終わっていない実行管理の項目の印（s05-dashboard.html の .due .box の 16×16・角丸 4・1.5 の線）、badge-width は行の札（Badge）の列の幅で、札は列の右端にそろえる（s05-dashboard.html の .ideas .dec の 92）、status-gap は名前・印の並び（CheckDots）・札の列の間（.ideas a の列の間 16）",
             "mark-width": { "$value": "{primitive.dimension.24}" },
             "number-width": { "$value": "{primitive.dimension.28}" },
             "gap": { "$value": "{primitive.dimension.10}" },
@@ -1761,11 +1775,14 @@
             "underline-offset": { "$value": "{primitive.dimension.3}" },
             "task-mark-size": { "$value": "{primitive.dimension.16}" },
             "task-mark-radius": { "$value": "{primitive.dimension.4}" },
-            "task-mark-border": { "$value": "{primitive.border-width.1-5}" }
+            "task-mark-border": { "$value": "{primitive.border-width.1-5}" },
+            "badge-width": { "$value": "{primitive.dimension.92}" },
+            "status-gap": { "$value": "{primitive.dimension.16}" }
           },
           "description-list": {
-            "$description": "DescriptionList（d1-moon.html と s19-decision.html の Summary）。label-width はラベルの列（d1 の 120）、padding-y は行の上下（d1 の 10）",
+            "$description": "DescriptionList（d1-moon.html と s19-decision.html の Summary）。label-width はラベルの列で、regular の密度は d1（A ハブ）の 120、spacious の密度は s19（B 中央集中）の .sum の 132（label-width-spacious。モックアップどうしが分かれるので、その画面の密度の値にした）、padding-y は行の上下（d1 の 10）",
             "label-width": { "$value": "{primitive.dimension.120}" },
+            "label-width-spacious": { "$value": "{primitive.dimension.132}" },
             "padding-y": { "$value": "{primitive.dimension.10}" }
           },
           "radio-card": {
@@ -1988,6 +2005,9 @@
               "XL": { "$value": "{primitive.dimension.6}" }
             },
             "text-area-min-height": { "$value": "{primitive.dimension.56}" },
+            "text-area-reason-min-height": {
+              "$value": "{primitive.dimension.120}"
+            },
             "radius": {
               "S": { "$value": "{primitive.dimension.7}" },
               "M": { "$value": "{primitive.dimension.8}" },
@@ -2350,7 +2370,9 @@
             "narrow-row-padding-y": { "$value": "{primitive.dimension.12}" },
             "narrow-row-padding-x": { "$value": "{primitive.dimension.2}" },
             "narrow-mark-width": { "$value": "{primitive.dimension.20}" },
-            "narrow-gap": { "$value": "{primitive.dimension.12}" }
+            "narrow-gap": { "$value": "{primitive.dimension.12}" },
+            "footer-padding-y": { "$value": "{primitive.dimension.10}" },
+            "narrow-footer-min-height": { "$value": "{primitive.dimension.48}" }
           },
           "fau-picker": {
             "trigger-padding-x": { "$value": "{primitive.dimension.6}" },
@@ -2391,10 +2413,13 @@
             "underline-offset": { "$value": "{primitive.dimension.3}" },
             "task-mark-size": { "$value": "{primitive.dimension.16}" },
             "task-mark-radius": { "$value": "{primitive.dimension.4}" },
-            "task-mark-border": { "$value": "{primitive.border-width.1-5}" }
+            "task-mark-border": { "$value": "{primitive.border-width.1-5}" },
+            "badge-width": { "$value": "{primitive.dimension.92}" },
+            "status-gap": { "$value": "{primitive.dimension.16}" }
           },
           "description-list": {
             "label-width": { "$value": "{primitive.dimension.120}" },
+            "label-width-spacious": { "$value": "{primitive.dimension.132}" },
             "padding-y": { "$value": "{primitive.dimension.10}" }
           },
           "radio-card": {
@@ -2842,7 +2867,7 @@
           "letterSpacing": "{primitive.font.letter-spacing.normal}",
           "lineHeight": "{primitive.font.line-height.1-55}"
         },
-        "$description": "ラベルと値を並べた一覧の値（s19-decision.html の .sum。DescriptionList）"
+        "$description": "ラベルと値を並べた一覧の値（s19-decision.html の .sum。DescriptionList）と、行の中の1文（Text の body-compact。s05-dashboard.html の .activity .t）。幅によらない"
       },
       "callout": {
         "$value": {
@@ -3023,6 +3048,16 @@
           "lineHeight": "{primitive.font.line-height.1-55}"
         },
         "$description": "medium の太さの数字: Meter の凡例の件数（d1-moon.html の .legend b の 500）と、RowList の番号（design-spec 4.5。13px にして使う）"
+      },
+      "number-sm": {
+        "$value": {
+          "fontFamily": "{primitive.font.family.mono}",
+          "fontSize": "{primitive.font.size.13}",
+          "fontWeight": "{primitive.font.weight.regular}",
+          "letterSpacing": "{primitive.font.letter-spacing.normal}",
+          "lineHeight": "{primitive.font.line-height.1-55}"
+        },
+        "$description": "注記の大きさの数字（docs/mockups の .num を注記の 13px で使うもの）: 13 の「62 items」、17 の % の行の「· ₱77.00」（s17-costs.html の td.amt .pct）と要約バーの値（.sumbar .num）、5 の Due soon の期限（s05-dashboard.html の .due .when）"
       },
       "count": {
         "$value": {
@@ -3488,7 +3523,7 @@
         "$description": "デスクトップでパネル（PNL-1・PNL-2）を開いている間に、パターン A・D・F が2列で並ぶのに要る本文の領域の幅（design-spec 4.1・4.3）。本文の領域がこれより狭い間は、A・D・F をタブレットの並びにし、A の数字の帯（MetricGroup の band）を 2×2 にする。A の列・D の詳細・F の入力の表の最小の幅は新しく決めず、パネルを閉じたデスクトップで 4.1・4.3 が2列を描く本文の領域のうち、スクロールバーが幅を取らないときにいちばん狭いもの（breakpoint.desktop 1024 − sidebar-width 236 = 788。A・D・F はタブレットでは2列を描かない）で、その列が取る幅にする: A の主列と副列は、788 − page-gutter-desktop 32 × 2 = 724 から hub.column-gap 48 を引いた 676 を hub.main-ratio 7 : hub.aside-ratio 5 で分けた 394.3 と 281.7、D の詳細は、左のペインが list-detail.list-min-width 380（788 × 5 / 11 = 358 より広い）なので 788 − 380 = 408（中身は detail-padding-x 36 × 2 を引いた 336）、F の入力の表は 788 − page-gutter-desktop 32 × 2 − worksheet.results-width 288 − worksheet.column-gap 40 = 396。2列に要る幅は、A が 32 × 2 + 676 + 48 = 788、D が 380 + 408 = 788、F が 32 × 2 + 396 + 40 + 288 = 788 で、どれも breakpoint.desktop − sidebar-width と同じ値になる。スクロールバーが幅を取る環境（Windows など）では、breakpoint.desktop の幅にスクロールバーが含まれるので、パネルを閉じたデスクトップの本文の領域はスクロールバーの幅だけ 788 より狭くなるが、切り替えはパネルを開いている間だけなので、パネルを閉じていればその幅でも2列で描く。パターン I の切り替えの幅は presentation.two-column-min-width"
       },
       "question-form": {
-        "$description": "パターン C と QuestionCard（s11-form.html）。列の幅は reading-column-max。padding- はページの上下の内側（.page の上 32・下 120。スマホの上は 16）、header-gap は題のまとまりから設問まで（.guidance の下 28。スマホは 16）、row- は控えめな設問の行（.row の上下 14・左右 4・印の列 20・列の間 14・行の間 2）、card- は入力中のカード（.card の上下の外 10・左右へのはみ出し 16・内側の上 22・左右 24・下 20。スマホは上下 18・左右 16）、card-head-gap はカードの頭の行の間（.card-head の 8）、question-margin-top・question-margin-bottom は問いの上下（.card h2 の 6・14）、answer- は回答の欄（.answer の最小の高さ 112・スマホ 180、内側の上下 12・左右 14）、footer- は前後の移動と AI ▼ の行（.footer .inner の上下 12・間 8）、bottom-nav- はスマホの前後の移動（.mnav の左右 8・ボタンの列 52）、excerpt-measure は控えめな設問の回答の冒頭の幅の上限（.excerpt の 60 字）",
+        "$description": "パターン C と QuestionCard（s11-form.html）。列の幅は reading-column-max。padding- はページの上下の内側（.page の上 32・下 120。スマホの上は 16）、header-gap は題のまとまりから設問まで（.guidance の下 28。スマホは 16）、row- は控えめな設問の行（.row の上下 14・左右 4・印の列 20・列の間 14・行の間 2）、card- は入力中のカード（.card の上下の外 10・左右へのはみ出し 16・内側の上 22・左右 24・下 20。スマホは上下 18・左右 16）、card-head-gap はカードの頭の行の間（.card-head の 8）、question-margin-top・question-margin-bottom は問いの上下（.card h2 の 6・14）、answer- は回答の欄（.answer の最小の高さ 112・スマホ 180、内側の上下 12・左右 14）、footer- は前後の移動と AI ▼ の行（.footer .inner の上下 12・間 8）、bottom-nav- はスマホの前後の移動（.mnav の左右 8・ボタンの列 52）、excerpt-measure は控えめな設問の回答の冒頭の幅の上限（.excerpt の 60 字）、guidance-measure は題の下のガイダンスの文の幅の上限（.guidance の 62 字）",
         "padding-top": { "$value": "{primitive.dimension.32}" },
         "padding-top-mobile": { "$value": "{primitive.dimension.16}" },
         "padding-bottom": { "$value": "{primitive.dimension.120}" },
@@ -3520,6 +3555,10 @@
         "excerpt-measure": {
           "$type": "number",
           "$value": "{primitive.font.measure.60}"
+        },
+        "guidance-measure": {
+          "$type": "number",
+          "$value": "{primitive.font.measure.62}"
         }
       },
       "worksheet": {
@@ -3540,12 +3579,13 @@
         "summary-gap": { "$value": "{primitive.dimension.10}" }
       },
       "focus": {
-        "$description": "パターン B（s19-decision.html）。列の幅は form-column-max。padding- はページの上下の内側（.page の上 32・下 96。スマホの上は 20）、header-gap は題の下（h1 の 24）、section-gap は判断材料と入力の間（.well の 32）",
+        "$description": "パターン B（s19-decision.html）。列の幅は form-column-max。padding- はページの上下の内側（.page の上 32・下 96。スマホの上は 20）、header-gap は題の下（h1 の 24）、section-gap は判断材料と入力の間（.well の 32）、actions-gap はタブレットの幅から上で入力の下に並べる操作の上（.alert の下の 22）",
         "padding-top": { "$value": "{primitive.dimension.32}" },
         "padding-top-mobile": { "$value": "{primitive.dimension.20}" },
         "padding-bottom": { "$value": "{primitive.dimension.96}" },
         "header-gap": { "$value": "{primitive.dimension.24}" },
-        "section-gap": { "$value": "{primitive.dimension.32}" }
+        "section-gap": { "$value": "{primitive.dimension.32}" },
+        "actions-gap": { "$value": "{primitive.dimension.22}" }
       },
       "compare": {
         "$description": "パターン E（s15-competitors.html）。列の幅は content-max。padding- はページの上下の内側（.page の上 28・下 80。スマホの上は 18）、header-gap は題の行の下（.sechead の 20）、header-count-gap は題と件数の間（.sechead の 16）、count-gap は件数の印と文の間（.count の 8）、section-gap はカードの下（.cards の 40）、add-tile- は最後の「+ Add」のタイル（.addcard の最小の高さ 160、点線の枠の 1.5）、questions-max はカードの下の設問の列の幅（.qs の 820。QuestionList）",
@@ -3579,7 +3619,7 @@
         "bar-gap": { "$value": "{primitive.dimension.8}" }
       },
       "settings": {
-        "$description": "パターン H（s09-settings.html）。列の幅は form-column-max。padding- はページの上下の内側（.page の上 32・下 96。スマホの上は 20）、header-gap は題から最初の線まで（h1 の 28）、label-width はまとまりの名前の列（.group の 200）、column-gap は名前の列と項目の列の間（.group の 24。スマホは名前と項目の間 12）、group-padding-y はまとまりの線の上下（.group の 24）、field-gap は項目の間（.field の下 14）、row- はメンバーと招待の行（.members li・.inv li の上下 10・列の間 12、Avatar の列 30、⋯ の列 32）",
+        "$description": "パターン H（s09-settings.html）。列の幅は form-column-max。padding- はページの上下の内側（.page の上 32・下 96。スマホの上は 20）、header-gap は題から最初の線まで（h1 の 28）、label-width はまとまりの名前の列（.group の 200）、column-gap は名前の列と項目の列の間（.group の 24。スマホは名前と項目の間 12）、group-padding-y はまとまりの線の上下（.group の 24）、field-gap は項目の間（.field の下 14）、row- はメンバーと招待の行（.members li・.inv li の上下 10・列の間 12、Avatar の列 30、⋯ の列 32）、field-row- は入力欄を横に並べる行（SettingsFieldRow。9 の招待の .invite: 2つ目の欄の列 140・間 8。スマホでは1列）",
         "padding-top": { "$value": "{primitive.dimension.32}" },
         "padding-top-mobile": { "$value": "{primitive.dimension.20}" },
         "padding-bottom": { "$value": "{primitive.dimension.96}" },
@@ -3592,7 +3632,9 @@
         "row-padding-y": { "$value": "{primitive.dimension.10}" },
         "row-gap": { "$value": "{primitive.dimension.12}" },
         "row-avatar-width": { "$value": "{primitive.dimension.30}" },
-        "row-menu-width": { "$value": "{primitive.dimension.32}" }
+        "row-menu-width": { "$value": "{primitive.dimension.32}" },
+        "field-row-control-width": { "$value": "{primitive.dimension.140}" },
+        "field-row-gap": { "$value": "{primitive.dimension.8}" }
       },
       "presentation": {
         "$description": "パターン I（s23-deck.html）。thumbnail- はサムネイルの列（.thumbs の幅 200。右の区切りの hairline を含む。内側の上下 16・左右 12・間 8、各項目の内側 6・番号の列 22・番号との間 6、小さなスライドの角丸 .mini の 4）、bar- は上の道具の行（.bar の上下 14・左右 28・間 10・題の後ろ 12。スマホは上下 12・左右 16）、stage- はスライドの列の内側（.stage の上 28・左右 36・下 48。スマホは上と左右 16）、slide-max はスライドとメモの幅の上限（.slide・.notes の 960）、tools- はスライドの上のリンクの行（.slide-tools の間 4・下 8）、tool-padding- はそのリンクの内側（.slide-tools a の上下 4・左右 8）、notes-gap はスライドとメモの間（.notes の上 22）、notes-measure はメモの文の幅の上限（.notes p の 72 字）、nav-gap は前後の移動の行とスライドの間（スマホと、デスクトップでパネルが本文の領域を presentation.two-column-min-width より狭めている間）",
@@ -3629,7 +3671,7 @@
         }
       },
       "public": {
-        "$description": "パターン J とランディングの見本（s01-landing.html）。列の幅は public-max。body-font-size は公開ページの本文（s01 の body の 16。幅によらない）、bar-height は上のバー（.lnav の 68。スマホは 60）、brand- は三日月の印と moonx（.lnav .brand の間 10・印 24）、footer- はフッター（高さ 64・間 24・右のリンクの間 20。スマホは上下 18・間 10）、hero- はヒーロー（2列の比 6fr / 5fr・間 56・上下の内側 24・48、最小の高さは 100dvh からバーの高さと hero-min-height-offset 40 を引いた値で hero-max-height 760 まで。モックアップの max-height は min-height に負けて効かないが、「760 まで」の意図に合わせて最小の高さの上限にする）、pair- は文と見本の節（5fr / 6fr・間 56）、stack-padding-top は 900px 以下で1カラムにした2列の節の上（.hero・.pair の 16。スマホの .pair は section-padding-y-mobile）、section- は節の上下の内側（縦に積む節 .stages の 72・80、2列の節 .pair の 72、最後の節 .close の 72・88。スマホは 56）、close-gap は最後の節の文とボタンの間（32）、stack-max-width は2列の節を1カラムにする幅（@media (max-width: 900px)。この幅以下で1カラムにして間を stack-gap の 36 にする）、route- は3段階の月の道（.route の月の枠 30・月 28・名前の上 18・節の右 32・縦に並べたときの間 28 と月と文の間 16、説明の文の幅の上限 32 字）、preview- は浮いた見本のカード（.preview の角丸 16、内側の上 22・左右 24・下 18、頭の行の下 12・間 10、数字の帯の下 12、数字の上下 10・2つ目の数字の左 16、行の上下 8、月 15、注記の上 12）、sheet- は費用の見本（.sheet の角丸 16、行の内側の上下 11・左右 18、印の列 34、月 14、合計の帯の内側の上下 12・左右 18）",
+        "$description": "パターン J とランディングの見本（s01-landing.html）。列の幅は public-max。body-font-size は公開ページの本文（s01 の body の 16。幅によらない）、bar-height は上のバー（.lnav の 68。スマホは 60）、brand- は三日月の印と moonx（.lnav .brand の間 10・印 24）、footer- はフッター（高さ 64・間 24・右のリンクの間 20。スマホは上下 18・間 10）、hero- はヒーロー（2列の比 6fr / 5fr・間 56・上下の内側 24・48、最小の高さは 100dvh からバーの高さと hero-min-height-offset 40 を引いた値で hero-max-height 760 まで。モックアップの max-height は min-height に負けて効かないが、「760 まで」の意図に合わせて最小の高さの上限にする）、pair- は文と見本の節（5fr / 6fr・間 56）、stack-padding-top は 900px 以下で1カラムにした2列の節の上（.hero・.pair の 16。スマホの .pair は section-padding-y-mobile）、section- は節の上下の内側（縦に積む節 .stages の 72・80、2列の節 .pair の 72、最後の節 .close の 72・88。スマホは 56）、close-gap は最後の節の文とボタンの間（32）、stack-max-width は2列の節を1カラムにする幅（@media (max-width: 900px)。この幅以下で1カラムにして間を stack-gap の 36 にする）、route- は3段階の月の道（.route の月の枠 30・月 28・名前の上 18・節の右 32・縦に並べたときの間 28 と月と文の間 16、説明の文の幅の上限 32 字）、-measure は節の文の幅の上限（字数。節の題 heading-measure は .stages・.pair・.close の h2 の 22、縦に積む節の文 stack-measure は .stages .lead の 56、文と見本の節の文 pair-measure は .pair p の 44、最後の節の文 close-measure は .close p の 46）、preview- は浮いた見本のカード（.preview の角丸 16、内側の上 22・左右 24・下 18、頭の行の下 12・間 10、数字の帯の下 12、数字の上下 10・2つ目の数字の左 16、行の上下 8、月 15、注記の上 12）、sheet- は費用の見本（.sheet の角丸 16、行の内側の上下 11・左右 18、印の列 34、月 14、合計の帯の内側の上下 12・左右 18）",
         "body-font-size": { "$value": "{primitive.font.size.16}" },
         "bar-height": { "$value": "{primitive.dimension.68}" },
         "bar-height-mobile": { "$value": "{primitive.dimension.60}" },
@@ -3671,6 +3713,22 @@
         "route-measure": {
           "$type": "number",
           "$value": "{primitive.font.measure.32}"
+        },
+        "heading-measure": {
+          "$type": "number",
+          "$value": "{primitive.font.measure.22}"
+        },
+        "stack-measure": {
+          "$type": "number",
+          "$value": "{primitive.font.measure.56}"
+        },
+        "pair-measure": {
+          "$type": "number",
+          "$value": "{primitive.font.measure.44}"
+        },
+        "close-measure": {
+          "$type": "number",
+          "$value": "{primitive.font.measure.46}"
         },
         "preview-radius": { "$value": "{primitive.dimension.16}" },
         "preview-padding-top": { "$value": "{primitive.dimension.22}" },

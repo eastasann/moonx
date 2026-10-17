@@ -80,11 +80,18 @@ export interface QuestionFormPatternProps {
   /** A Viewer's read-only form: every question open, no Focus switch (6.2). */
   isReadOnly?: boolean;
   /**
-   * The previous and next sections and AI ▼ (6.2): from the tablet breakpoint up, in a bar
-   * kept at the bottom with a line above it (s11-form.html .footer); on a phone, under its
-   * one question. The screen leaves out what a phone does not have.
+   * AI ▼ (6.2): from the tablet breakpoint up in the middle of a bar kept at the bottom
+   * with a line above it (s11-form.html .footer); on a phone, under its one question.
    */
   footer?: ReactNode;
+  /**
+   * "← Previous section" at the start of the bottom bar, from the tablet breakpoint up
+   * only: a phone moves between sections by the title's ▼ and the section's completion
+   * card (4.1 C, 6.2).
+   */
+  previousSection?: ReactNode;
+  /** "Next: 02 Market →" at the end of the bottom bar, as `previousSection`. */
+  nextSection?: ReactNode;
   /**
    * On a phone, a dot per question between ← and → (6.2): answered ●, not answered ◌, the
    * current one ringed; pressing one moves to it. Dots that do not fit the bar scroll
@@ -101,7 +108,7 @@ export interface QuestionFormPatternProps {
  * answered open and framed in the middle of the view, the others quiet rows; the header's
  * Focus switch opens them all, and Ctrl+↓ / Ctrl+↑ (on macOS also Ctrl+Option+↓ / ↑) move
  * to the next and previous question; the sections' footer stays at the bottom. Phone: the
- * current question alone, with ← and → fixed to the bottom.
+ * current question alone, with ← and → fixed to the bottom and AI ▼ under it.
  */
 export function QuestionFormPattern({
   header,
@@ -111,6 +118,8 @@ export function QuestionFormPattern({
   renderQuestion,
   isReadOnly = false,
   footer,
+  previousSection,
+  nextSection,
   isAnswered,
   onEnd,
 }: QuestionFormPatternProps) {
@@ -142,9 +151,15 @@ export function QuestionFormPattern({
   // question at a time either way.
   const focusSwitch =
     isReadOnly || isNarrow ? null : (
-      <Switch isSelected={isFocusMode} onChange={toggle} labelPosition="start">
-        {t("components:questionFormPattern.focus")}
-      </Switch>
+      <span className={styles.focusTool}>
+        <Switch
+          isSelected={isFocusMode}
+          onChange={toggle}
+          labelPosition="start"
+        >
+          {t("components:questionFormPattern.focus")}
+        </Switch>
+      </span>
     );
 
   // Ctrl+↓ / Ctrl+↑ (4.1 C): the next or previous question takes focus as Tab would
@@ -223,9 +238,17 @@ export function QuestionFormPattern({
             <div className={styles.sectionFooter}>{footer}</div>
           )}
         </div>
-        {footer != null && !isNarrow && (
-          <BottomBar variant="footer">{footer}</BottomBar>
-        )}
+        {!isNarrow &&
+          (footer != null ||
+            previousSection != null ||
+            nextSection != null) && (
+            <BottomBar variant="footer">
+              {/* Empty places keep AI ▼ in the middle and next at the end. */}
+              <span className={styles.sectionStep}>{previousSection}</span>
+              {footer}
+              <span className={styles.sectionStep}>{nextSection}</span>
+            </BottomBar>
+          )}
         {isNarrow && (
           <BottomBar variant="navigation">
             <AriaButton

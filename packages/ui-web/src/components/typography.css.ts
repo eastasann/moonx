@@ -1,6 +1,13 @@
 import { vars } from "@moonx/ui-tokens";
+import { createVar, fallbackVar } from "@vanilla-extract/css";
 import { recipe } from "@vanilla-extract/recipes";
 import { typography } from "../styles/helpers";
+
+/**
+ * The widest a Text runs (a length in ch), set by the block around it: a public page's
+ * section (PublicSection). Unset elsewhere: a Text is as wide as its container.
+ */
+export const textMeasure = createVar();
 
 const tone = {
   primary: { color: vars.color.text.primary },
@@ -42,7 +49,12 @@ export const heading = recipe({
         ...fluid("display"),
         textWrap: "balance",
       },
-      "display-2": { ...typography("display2"), ...fluid("display2") },
+      // The landing's section titles, 22 characters wide at most (s01-landing.html h2).
+      "display-2": {
+        ...typography("display2"),
+        ...fluid("display2"),
+        maxWidth: `calc(${vars.layout.public.headingMeasure} * 1ch)`,
+      },
       "heading-1-hub": typography("heading1Hub"),
       "heading-1-list": typography("heading1List"),
       "heading-1-steps": typography("heading1Steps"),
@@ -60,13 +72,19 @@ export const heading = recipe({
 });
 
 export const text = recipe({
-  base: { margin: 0, overflowWrap: "break-word" },
+  base: {
+    margin: 0,
+    overflowWrap: "break-word",
+    maxWidth: fallbackVar(textMeasure, "none"),
+  },
   variants: {
     variant: {
       body: typography("body"),
       // Long answers keep the line breaks they were typed with.
       "body-long": { ...typography("bodyLong"), whiteSpace: "pre-wrap" },
       "body-sm": typography("bodySm"),
+      // A sentence in a row, the same size at every width (s05's Recent activity).
+      "body-compact": typography("bodyCompact"),
       // The landing's lead, 40 characters wide at most (06 semantic.typography.lead).
       lead: {
         ...typography("lead"),
@@ -76,6 +94,11 @@ export const text = recipe({
       label: typography("label"),
       number: {
         ...typography("number"),
+        fontVariantNumeric: "tabular-nums",
+      },
+      // A figure at the caption's size: "62 items", "· ₱77.00" (06 typography.number-sm).
+      "number-sm": {
+        ...typography("numberSm"),
         fontVariantNumeric: "tabular-nums",
       },
     },

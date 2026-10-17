@@ -13,7 +13,8 @@ export interface FocusPatternProps {
   children: ReactNode;
   /**
    * The main action, and a quiet Cancel before it: at the end under the fields, fixed to
-   * the bottom on a phone, where the main action takes the bar's width (4.5 Button).
+   * the bottom on a phone, where they share the bar's width equally (4.3,
+   * s19-decision.html .formbar).
    */
   actions?: ReactNode;
 }
@@ -32,7 +33,7 @@ export function FocusPattern({ header, children, actions }: FocusPatternProps) {
           <div className={styles.focusContent}>{children}</div>
         </div>
         {actions != null && (
-          <BottomBar isPhoneOnly column="form">
+          <BottomBar isPhoneOnly isShared column="form">
             {actions}
           </BottomBar>
         )}

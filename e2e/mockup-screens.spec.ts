@@ -293,12 +293,13 @@ test.describe("the screens carry the mockups' content", () => {
 
 test.describe("every mockup screen draws, fits and passes axe", () => {
   for (const screen of screens) {
-    // As tall as the screens, so the header, the TabBar and the bars kept at the
-    // bottom cover no part of a target: axe counts a covered target as too small.
+    // As tall as the screens (d1 on a phone is about 2,700px), so the header, the
+    // TabBar and the bars kept at the bottom cover no part of a target: axe counts a
+    // covered target as too small.
     for (const [name, viewport, theme] of [
       ["desktop, light", { ...desktop, height: 2400 }, "light"],
       ["desktop, dark", { ...desktop, height: 2400 }, "dark"],
-      ["phone, light", { ...phone, height: 2400 }, "light"],
+      ["phone, light", { ...phone, height: 3200 }, "light"],
     ] as const) {
       test(`${screen}: ${name}`, async ({ page }) => {
         const errors: string[] = [];
@@ -612,7 +613,7 @@ test.describe("the patterns are the mockups' (design-spec 4.1, 06 semantic.layou
     ).toEqual({ width: 30, height: 18, handle: 14 });
   });
 
-  test("B on a phone: Cancel and the main action XL in the bar, the main one wider", async ({
+  test("B on a phone: Cancel and the main action XL in the bar, sharing its width (s19's .formbar)", async ({
     page,
   }) => {
     await open(page, "s19-decision", phone);
@@ -622,7 +623,7 @@ test.describe("the patterns are the mockups' (design-spec 4.1, 06 semantic.layou
     );
     expect(Math.round(cancel.height)).toBe(48);
     expect(Math.round(record.height)).toBe(48);
-    expect(record.width).toBeGreaterThan(cancel.width * 2);
+    expect(Math.abs(record.width - cancel.width)).toBeLessThanOrEqual(1);
     expect(Math.abs(cancel.y - record.y)).toBeLessThanOrEqual(1);
   });
 
@@ -985,5 +986,300 @@ test.describe("the patterns are the mockups' (design-spec 4.1, 06 semantic.layou
       page.getByRole("heading", { name: "Validation", level: 3 }),
     );
     expect(validation.y).toBeGreaterThan(self.y + self.height);
+  });
+});
+
+/** The width of "0" in the element's own face: CSS's 1ch. */
+const chOf = (locator: Locator) =>
+  locator.evaluate((node) => {
+    const probe = document.createElement("span");
+    probe.textContent = "0";
+    probe.style.font = getComputedStyle(node).font;
+    probe.style.position = "absolute";
+    document.body.append(probe);
+    const width = probe.getBoundingClientRect().width;
+    probe.remove();
+    return width;
+  });
+
+const isMono = async (locator: Locator) =>
+  (await css(locator, "font-family")).includes("IBM Plex Mono");
+
+test.describe("what the mockups show at a glance (Step 22i, design-spec 4.5)", () => {
+  test("s05: each idea's dots and badge in the same place on every row; on a phone the badge at the top, the dots under", async ({
+    page,
+  }) => {
+    await open(page, "s05-dashboard");
+    const ideas = page.getByRole("list", { name: "Ideas" });
+    const dots = ideas.getByRole("img");
+    const badges = ideas.getByText(/^(Proceed|Hold|Undecided)$/);
+    await expect(dots).toHaveCount(5);
+    const dotsX = new Set<number>();
+    const badgeEnds = new Set<number>();
+    for (let index = 0; index < 5; index++) {
+      dotsX.add(Math.round((await boxOf(dots.nth(index))).x));
+      const badge = await boxOf(badges.nth(index));
+      badgeEnds.add(Math.round(badge.x + badge.width));
+    }
+    expect(dotsX.size).toBe(1);
+    expect(badgeEnds.size).toBe(1);
+    // The dates of Due soon are monospaced (s05's .due .when).
+    expect(await isMono(page.getByText("Oct 14", { exact: true }))).toBe(true);
+    // Recent activity: the person in semibold, what they did in the body's weight.
+    const activity = page.getByRole("list", { name: "Recent activity" });
+    const who = activity.getByText("Paolo Gonzaga", { exact: true });
+    expect(await css(who, "font-weight")).toBe("600");
+    expect(await css(who.locator("xpath=.."), "font-weight")).toBe("400");
+
+    await open(page, "s05-dashboard", phone);
+    const row = page.getByRole("link", { name: /^Bacolod Health Bowl/ });
+    const name = await boxOf(row.getByText("Bacolod Health Bowl"));
+    const badge = await boxOf(row.getByText("Hold", { exact: true }));
+    const meta = await boxOf(row.getByText(/^Validation · updated yesterday/));
+    const rowDots = await boxOf(row.getByRole("img"));
+    expect(badge.y).toBeLessThan(name.y + name.height);
+    expect(badge.x).toBeGreaterThan(name.x + name.width);
+    expect(rowDots.y).toBeGreaterThanOrEqual(meta.y + meta.height - 1);
+    expect(Math.round(rowDots.x)).toBe(Math.round(name.x));
+  });
+
+  test("s19: the actions apart from the alert above them, Why? starting 120px tall", async ({
+    page,
+  }) => {
+    await open(page, "s19-decision");
+    const alert = await boxOf(
+      page.getByRole("alert").filter({ hasText: "2 checks are missing." }),
+    );
+    const cancel = await boxOf(page.getByRole("button", { name: "Cancel" }));
+    expect(cancel.y - (alert.y + alert.height)).toBeGreaterThanOrEqual(20);
+    const why = page.getByRole("textbox", { name: /Why\?/ });
+    expect(
+      Math.round((await boxOf(why.locator("xpath=.."))).height),
+    ).toBeGreaterThanOrEqual(120);
+    // A press low in the field puts the caret in it.
+    await why.scrollIntoViewIfNeeded();
+    const field = await boxOf(why.locator("xpath=.."));
+    await page.mouse.click(field.x + 20, field.y + field.height - 6);
+    await expect(why).toBeFocused();
+    // The F/A/U counts are monospaced (s19's .fauline b).
+    const summary = page.getByRole("region", { name: "What you know so far" });
+    expect(await isMono(summary.getByText("29", { exact: true }))).toBe(true);
+  });
+
+  test("s09: the invitation's email, role and Send on one line; on a phone one under another, the email whole", async ({
+    page,
+  }) => {
+    await open(page, "s09-settings");
+    const email = page.getByRole("textbox", { name: "Email to invite" });
+    const role = page.getByRole("button", { name: /Role of the invited/ });
+    const send = page.getByRole("button", { name: "Send invitation" });
+    const [emailBox, roleBox, sendBox] = [
+      await boxOf(email.locator("xpath=..")),
+      await boxOf(role),
+      await boxOf(send),
+    ];
+    const middle = (box: Box) => box.y + box.height / 2;
+    expect(Math.abs(middle(emailBox) - middle(roleBox))).toBeLessThanOrEqual(2);
+    expect(Math.abs(middle(roleBox) - middle(sendBox))).toBeLessThanOrEqual(2);
+    expect(Math.round(roleBox.width)).toBe(140);
+
+    await open(page, "s09-settings", phone);
+    const stacked = [
+      await boxOf(email.locator("xpath=..")),
+      await boxOf(role),
+      await boxOf(send),
+    ];
+    expect(stacked[1]?.y).toBeGreaterThan(
+      (stacked[0]?.y ?? 0) + (stacked[0]?.height ?? 0) - 1,
+    );
+    expect(stacked[2]?.y).toBeGreaterThan(
+      (stacked[1]?.y ?? 0) + (stacked[1]?.height ?? 0) - 1,
+    );
+    expect(Math.round(stacked[2]?.width ?? 0)).toBe(
+      Math.round(stacked[0]?.width ?? 0),
+    );
+    const invitation = page
+      .getByRole("list", { name: "Invitations" })
+      .getByText("new.member@bcdx.example");
+    const line = Number.parseFloat(await css(invitation, "line-height"));
+    expect((await boxOf(invitation)).height).toBeLessThan(line * 1.5);
+  });
+
+  test("s23: the thumbnails in the page's flow, the page alone scrolls", async ({
+    page,
+  }) => {
+    await open(page, "s23-deck");
+    const column = page.getByRole("listbox", { name: "Slides" }).locator("..");
+    expect(
+      await column.evaluate((node) => node.scrollHeight - node.clientHeight),
+    ).toBe(0);
+    expect(await css(column, "overflow-y")).toBe("visible");
+    expect(
+      await page.evaluate(() => document.documentElement.scrollHeight),
+    ).toBeGreaterThan(desktop.height);
+  });
+
+  test("s01: the section titles 22 characters wide at most, their text 56, 44 and 46", async ({
+    page,
+  }) => {
+    await open(page, "s01-landing");
+    const widest = async (locator: Locator, characters: number) => {
+      const ch = await chOf(locator);
+      expect((await boxOf(locator)).width).toBeLessThanOrEqual(
+        ch * characters + 1,
+      );
+    };
+    await widest(
+      page.getByRole("heading", {
+        name: "Three parts, in the order founders need them.",
+      }),
+      22,
+    );
+    await widest(page.getByText(/^Each part asks one question/), 56);
+    await widest(page.getByText(/^Enter costs and a price/), 44);
+    await widest(page.getByText(/^Ask the person who invited you/), 46);
+    // Each title wraps as s01's does, onto two lines.
+    const title = page.getByRole("heading", {
+      name: "The numbers move as you type.",
+    });
+    const line = Number.parseFloat(await css(title, "line-height"));
+    expect((await boxOf(title)).height).toBeGreaterThan(line * 1.5);
+  });
+
+  test("s11: the guidance 62 characters wide at most; Focus in the caption's secondary text; Related research's text under its title's", async ({
+    page,
+  }) => {
+    await open(page, "s11-form");
+    const guidance = page.getByText(/^Define exactly who pays/);
+    expect((await boxOf(guidance)).width).toBeLessThanOrEqual(
+      (await chOf(guidance)) * 62 + 1,
+    );
+    const focus = page.locator("header").getByText("Focus", { exact: true });
+    expect(await css(focus, "font-size")).toBe("13px");
+    expect(await css(focus, "color")).toBe(light.secondary);
+    const card = page.getByRole("region", { name: "SEVERITY" });
+    // Where the title's words start, past its chevron.
+    const titleX = await card
+      .getByRole("button", { name: "Related research" })
+      .evaluate((node) => {
+        const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+        const range = document.createRange();
+        range.selectNodeContents(walker.nextNode() as Text);
+        return range.getBoundingClientRect().x;
+      });
+    const text = card.getByText(/^No research linked to this answer/);
+    expect(Math.abs((await boxOf(text)).x - titleX)).toBeLessThanOrEqual(1);
+  });
+
+  test("s19: the Summary's labels in s19's wider column, apart from their values", async ({
+    page,
+  }) => {
+    await open(page, "s19-decision");
+    const label = page.getByText("Biggest opportunity", { exact: true });
+    const value = page.getByText(/^Few healthy lunch options/);
+    const [labelBox, valueBox] = [await boxOf(label), await boxOf(value)];
+    expect(valueBox.x - labelBox.x).toBe(132);
+    // The words' own end, not the column's.
+    const wordsEnd = await label.evaluate((node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const box = range.getBoundingClientRect();
+      return box.x + box.width;
+    });
+    expect(valueBox.x - wordsEnd).toBeGreaterThanOrEqual(8);
+  });
+
+  test("s11 on a phone: AI ▼ under the card, no previous or next section", async ({
+    page,
+  }) => {
+    await open(page, "s11-form", phone);
+    await expect(page.getByRole("button", { name: "AI" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Next: 02 Market" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Previous section" }),
+    ).toHaveCount(0);
+  });
+
+  test("s17: an Empty row's F/A/U is a dash; on a phone the summary on one line and Add row alone under each table", async ({
+    page,
+  }) => {
+    await open(page, "s17-costs");
+    const empty = page.getByRole("button", {
+      name: "F/A/U of Working Capital Buffer: Empty",
+    });
+    await expect(empty).toHaveText("\u2014Empty");
+    expect(await isMono(page.getByText("· ₱77.00"))).toBe(true);
+    await expect(page.getByText(/^Subtotal/).first()).toBeVisible();
+
+    await open(page, "s17-costs", phone);
+    const summary = page.getByRole("button", { name: /^Startup/ });
+    const label = summary.getByText("Startup", { exact: false }).first();
+    const line = Number.parseFloat(await css(label, "line-height"));
+    expect((await boxOf(label)).height).toBeLessThan(line * 1.5);
+    await expect(page.getByText(/^Subtotal/)).toHaveCount(0);
+    // Narrower than the mockup, the pairs wrap between them rather than overlap.
+    for (const width of [360, 320]) {
+      await page.setViewportSize({ width, height: 800 });
+      const bar = page.getByRole("button", { name: /^Startup/ });
+      expect(
+        await bar.evaluate((node) => node.scrollWidth - node.clientWidth),
+      ).toBeLessThanOrEqual(0);
+    }
+    await page.setViewportSize(phone);
+    const table = page.getByRole("grid", { name: "Startup costs" });
+    const add = page.getByRole("button", { name: "Add row" }).first();
+    expect(Math.round((await boxOf(add)).width)).toBe(
+      Math.round((await boxOf(table)).width),
+    );
+  });
+
+  test("d1: no label over the band, its name for screen readers; the counts monospaced; the phone's band not taller than it needs", async ({
+    page,
+  }) => {
+    await open(page, "d1-moon");
+    await expect(page.getByText("Answers by F/A/U")).toHaveCount(0);
+    await expect(
+      page.getByRole("figure", { name: "Answers by F/A/U" }),
+    ).toBeVisible();
+    expect(await isMono(page.getByText("62 items"))).toBe(true);
+    expect(await isMono(page.getByText("L9 M17 H3"))).toBe(true);
+
+    await open(page, "d1-moon", phone);
+    const band = page
+      .getByRole("alert")
+      .filter({ hasText: "A newer template is available." });
+    const message = band.getByText("Your answers stay on v3", { exact: false });
+    const line = Number.parseFloat(await css(message, "line-height"));
+    expect((await boxOf(message)).height).toBeLessThan(line * 2.5);
+  });
+
+  test("s25: words changed whole, the unchanged answers a row between hairlines, the number beside the question on a phone", async ({
+    page,
+  }) => {
+    await open(page, "s25-import");
+    const item = page.getByRole("region", {
+      name: "01 · WHO Who is the primary paying customer?",
+    });
+    await expect(item.locator("del")).toHaveText(["25–40", "meals."]);
+    await expect(item.locator("ins")).toHaveText([
+      "25–45",
+      "meals, mostly in BPO offices on Lacson St.",
+    ]);
+    const unchanged = page.getByRole("button", { name: "3 unchanged answers" });
+    const row = unchanged.locator("xpath=ancestor::div[1]");
+    expect(await css(row, "border-top-color")).toBe(light.hairline);
+    expect(await css(row, "border-bottom-color")).toBe(light.hairline);
+    await unchanged.click();
+    await expect(page.getByText("01 · WHY THEM")).toBeVisible();
+
+    await open(page, "s25-import", phone);
+    const code = await boxOf(item.getByText("01 · WHO", { exact: true }));
+    const question = await boxOf(
+      item.getByText("Who is the primary paying customer?"),
+    );
+    expect(question.x).toBeGreaterThan(code.x + code.width);
+    expect(question.y).toBeLessThan(code.y + code.height);
   });
 });

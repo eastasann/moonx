@@ -375,3 +375,60 @@ export const chevron = style({
   flexShrink: 0,
   color: vars.color.text.tertiary,
 });
+
+export const withFooter = style({
+  display: "flex",
+  flexDirection: "column",
+  minWidth: 0,
+});
+
+/**
+ * Under the rows: "+ Add row" at the start and the figure at the end (s17-costs.html
+ * tfoot); on a phone the action alone, a row of its own with a hairline under it
+ * (.cards .add).
+ */
+export const footer = recipe({
+  base: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    columnGap: vars.space["200"],
+  },
+  variants: {
+    lines: {
+      true: {
+        borderBottom: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
+      },
+      false: { paddingBlock: measures.footerPaddingY },
+    },
+  },
+});
+
+export const footerAction = recipe({
+  base: { display: "flex" },
+  variants: {
+    lines: {
+      true: {
+        flex: 1,
+        minHeight: atLeastTarget(measures.narrowFooterMinHeight),
+      },
+      false: {},
+    },
+  },
+});
+
+// On a phone the whole row is the action's target, its label at the start. The class
+// twice outweighs the Button's own centring, whichever style sheet comes last.
+const footerActionLines = footerAction.classNames.variants.lines.true;
+globalStyle(`${footerActionLines}${footerActionLines} > *`, {
+  flex: 1,
+  justifyContent: "flex-start",
+});
+
+export const footerTotal = style({
+  ...typography("bodySm"),
+  marginInlineStart: "auto",
+  color: vars.color.text.secondary,
+  textAlign: "end",
+});

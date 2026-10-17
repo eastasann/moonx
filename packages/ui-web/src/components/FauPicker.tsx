@@ -3,7 +3,7 @@ import { confidenceSchema } from "@moonx/schemas";
 import type { Size } from "@moonx/ui-tokens";
 import { ChevronDown, TriangleAlert } from "lucide-react";
 import { useId, useRef, useState } from "react";
-import { Button } from "react-aria-components";
+import { Button, VisuallyHidden } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { IconSlot } from "../internal/IconSlot";
 import type { MoonState } from "../internal/MoonMark";
@@ -28,6 +28,9 @@ const moonOf = {
   unclassified: "unclassified",
   empty: "empty",
 } as const satisfies Record<FauState, MoonState>;
+
+/** An Empty row's F/A/U in a table (U+2014). */
+const EMPTY_DASH = "\u2014";
 
 /** Which of the three buttons a state presses. */
 const fauOf = (state: FauState): Fau | null =>
@@ -137,7 +140,16 @@ export function FauPicker({
           cell === null ? moonStyles.labelColor[state] : styles.cellLabel[state]
         }
       >
-        {label}
+        {/* In a table an Empty row's F/A/U is a dash (s17-costs.html); its name says
+            "Empty" to screen readers. */}
+        {cell !== null && props.state === "empty" ? (
+          <>
+            <span aria-hidden="true">{EMPTY_DASH}</span>
+            <VisuallyHidden>{label}</VisuallyHidden>
+          </>
+        ) : (
+          label
+        )}
       </span>
       {props.state === "fact_no_evidence" && (
         <span className={styles.warning}>

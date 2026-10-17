@@ -290,6 +290,8 @@ export const vars = createGlobalThemeContract({
           XL: "scale-component-field-label-gap-XL",
         },
         textAreaMinHeight: "scale-component-field-text-area-min-height",
+        textAreaReasonMinHeight:
+          "scale-component-field-text-area-reason-min-height",
         radius: {
           S: "scale-component-field-radius-S",
           M: "scale-component-field-radius-M",
@@ -637,6 +639,9 @@ export const vars = createGlobalThemeContract({
         narrowRowPaddingX: "scale-component-table-view-narrow-row-padding-x",
         narrowMarkWidth: "scale-component-table-view-narrow-mark-width",
         narrowGap: "scale-component-table-view-narrow-gap",
+        footerPaddingY: "scale-component-table-view-footer-padding-y",
+        narrowFooterMinHeight:
+          "scale-component-table-view-narrow-footer-min-height",
       },
       fauPicker: {
         triggerPaddingX: "scale-component-fau-picker-trigger-padding-x",
@@ -678,9 +683,13 @@ export const vars = createGlobalThemeContract({
         taskMarkSize: "scale-component-row-list-task-mark-size",
         taskMarkRadius: "scale-component-row-list-task-mark-radius",
         taskMarkBorder: "scale-component-row-list-task-mark-border",
+        badgeWidth: "scale-component-row-list-badge-width",
+        statusGap: "scale-component-row-list-status-gap",
       },
       descriptionList: {
         labelWidth: "scale-component-description-list-label-width",
+        labelWidthSpacious:
+          "scale-component-description-list-label-width-spacious",
         paddingY: "scale-component-description-list-padding-y",
       },
       radioCard: {
@@ -1069,6 +1078,13 @@ export const vars = createGlobalThemeContract({
       letterSpacing: "typography-number-emphasis-letter-spacing",
       lineHeight: "typography-number-emphasis-line-height",
     },
+    numberSm: {
+      fontFamily: "typography-number-sm-font-family",
+      fontSize: "typography-number-sm-font-size",
+      fontWeight: "typography-number-sm-font-weight",
+      letterSpacing: "typography-number-sm-letter-spacing",
+      lineHeight: "typography-number-sm-line-height",
+    },
     count: {
       fontFamily: "typography-count-font-family",
       fontSize: "typography-count-font-size",
@@ -1357,6 +1373,7 @@ export const vars = createGlobalThemeContract({
       bottomNavPaddingX: "layout-question-form-bottom-nav-padding-x",
       bottomNavColumn: "layout-question-form-bottom-nav-column",
       excerptMeasure: "layout-question-form-excerpt-measure",
+      guidanceMeasure: "layout-question-form-guidance-measure",
     },
     worksheet: {
       paddingTop: "layout-worksheet-padding-top",
@@ -1380,6 +1397,7 @@ export const vars = createGlobalThemeContract({
       paddingBottom: "layout-focus-padding-bottom",
       headerGap: "layout-focus-header-gap",
       sectionGap: "layout-focus-section-gap",
+      actionsGap: "layout-focus-actions-gap",
     },
     compare: {
       paddingTop: "layout-compare-padding-top",
@@ -1424,6 +1442,8 @@ export const vars = createGlobalThemeContract({
       rowGap: "layout-settings-row-gap",
       rowAvatarWidth: "layout-settings-row-avatar-width",
       rowMenuWidth: "layout-settings-row-menu-width",
+      fieldRowControlWidth: "layout-settings-field-row-control-width",
+      fieldRowGap: "layout-settings-field-row-gap",
     },
     presentation: {
       twoColumnMinWidth: "layout-presentation-two-column-min-width",
@@ -1488,6 +1508,10 @@ export const vars = createGlobalThemeContract({
       routeStackGap: "layout-public-route-stack-gap",
       routeStackColumnGap: "layout-public-route-stack-column-gap",
       routeMeasure: "layout-public-route-measure",
+      headingMeasure: "layout-public-heading-measure",
+      stackMeasure: "layout-public-stack-measure",
+      pairMeasure: "layout-public-pair-measure",
+      closeMeasure: "layout-public-close-measure",
       previewRadius: "layout-public-preview-radius",
       previewPaddingTop: "layout-public-preview-padding-top",
       previewPaddingX: "layout-public-preview-padding-x",

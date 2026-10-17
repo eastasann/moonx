@@ -166,7 +166,7 @@ export function MockupBasicsSection() {
       <Specimen name="d1: the F/A/U breakdown, a lone link">
         <Stack gap="space-200">
           <Meter
-            label="Fact / Assumption / Unknown"
+            aria-label="Fact / Assumption / Unknown"
             segments={[
               { state: "fact", label: "Fact", count: 3 },
               {

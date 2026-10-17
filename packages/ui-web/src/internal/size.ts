@@ -16,10 +16,11 @@ export function useSize(size: Size | undefined): Size {
 
 /**
  * Inside a phone's bottom bar (design-spec 4.3・4.5 Button): Buttons not given a size are
- * XL, and the ones that are not quiet share the bar's width, the quiet ones (Cancel)
- * keeping their own.
+ * XL. `main`: the ones that are not quiet share the bar's width, the quiet ones (Cancel)
+ * keeping their own (A, G); `all`: every Button shares it, Cancel too (B,
+ * s19-decision.html .formbar). `false` outside a bar.
  */
-export const BottomBarContext = createContext(false);
+export const BottomBarContext = createContext<false | "main" | "all">(false);
 
 /**
  * The width fields take when they are not given one: `full` in the fields' column of a

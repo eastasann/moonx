@@ -146,6 +146,30 @@ describe("TextArea", () => {
     expect(area.style.height).toBe("120px");
   });
 
+  test("measures again once web fonts load: the fallback face wraps differently", () => {
+    const fonts = new EventTarget();
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      value: fonts,
+    });
+    try {
+      render(
+        <TextArea label="Answer" defaultValue="Office workers lose time" />,
+      );
+      const area = screen.getByRole("textbox", { name: "Answer" });
+      Object.defineProperty(area, "scrollHeight", {
+        configurable: true,
+        get: () => 97,
+      });
+      act(() => {
+        fonts.dispatchEvent(new Event("loadingdone"));
+      });
+      expect(area.style.height).toBe("97px");
+    } finally {
+      Reflect.deleteProperty(document, "fonts");
+    }
+  });
+
   test("shows its error like the other fields", () => {
     render(<TextArea label="Reason" errorMessage="Enter a reason." />);
     expect(

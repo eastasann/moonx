@@ -155,6 +155,19 @@ export const barInner = recipe({
         { "@media": { [tabletUp]: { maxWidth: max } } },
       ]),
     ) as Record<keyof typeof columns, { "@media": Record<string, object> }>,
+    // On a phone, columns of one width for every Button, whatever its own padding.
+    isShared: {
+      true: {
+        "@media": {
+          [narrowQuery]: {
+            display: "grid",
+            gridAutoFlow: "column",
+            gridAutoColumns: "minmax(0, 1fr)",
+          },
+        },
+      },
+      false: {},
+    },
   },
 });
 
@@ -167,7 +180,8 @@ export const barNote = style({
 
 /**
  * A bottom bar on a phone only (4.1 B): from the tablet breakpoint up it is an ordinary
- * row right under the form, in the page's column, with the page's space under it.
+ * row under the form, apart from it as s19's actions are from the alert above them, in
+ * the page's column, with the page's space under it.
  */
 export const phoneOnlyBar = style({
   "@media": {
@@ -175,7 +189,7 @@ export const phoneOnlyBar = style({
       position: "static",
       minHeight: 0,
       marginBlockStart: 0,
-      paddingBlockStart: 0,
+      paddingBlockStart: vars.layout.focus.actionsGap,
       paddingBlockEnd: vars.layout.focus.paddingBottom,
       background: "none",
       borderBlockStart: "none",

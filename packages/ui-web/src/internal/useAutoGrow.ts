@@ -2,8 +2,9 @@ import { type RefObject, useLayoutEffect } from "react";
 
 /**
  * Grows the textarea with its content: the height follows the text, never below the
- * frame's minimum. It is measured again when the text changes and when the width does,
- * since a narrower field wraps into more lines.
+ * frame's minimum. It is measured again when the text changes, when the width does,
+ * since a narrower field wraps into more lines, and when web fonts finish loading, since
+ * the fallback face before them wraps differently.
  */
 export function useAutoGrow(
   ref: RefObject<HTMLTextAreaElement | null>,
@@ -30,10 +31,13 @@ export function useAutoGrow(
     });
     observer.observe(element);
     element.addEventListener("input", resize);
+    const fonts = element.ownerDocument.fonts as FontFaceSet | undefined;
+    fonts?.addEventListener("loadingdone", resize);
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
       element.removeEventListener("input", resize);
+      fonts?.removeEventListener("loadingdone", resize);
     };
   }, [ref, value]);
 }

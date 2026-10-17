@@ -521,7 +521,7 @@ export function CostsScreen() {
           </Stack>
         }
         summary={
-          <Flex gap="space-100" alignItems="baseline">
+          <Flex columnGap="space-100" alignItems="baseline" wrap>
             {[
               ["Startup", "₱145,000+", ""],
               ["Monthly", "₱50,000", ""],
@@ -529,8 +529,8 @@ export function CostsScreen() {
             ].map(([label, value, unit]) => (
               <Text key={label} variant="caption" tone="secondary">
                 {`${label} `}
-                <Text variant="number" tone="primary">
-                  {value}
+                <Text variant="number-sm" tone="primary">
+                  <strong>{value}</strong>
                 </Text>
                 {unit}
               </Text>

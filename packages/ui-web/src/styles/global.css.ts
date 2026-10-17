@@ -21,6 +21,12 @@ globalStyle("body", {
   ...typography("body"),
 });
 
+// The bold of running text is 06's semibold: the browser's own "bolder" would ask for a
+// weight the page does not load (06 primitive.font.weight).
+globalStyle("strong, b", {
+  fontWeight: vars.typography.heading4.fontWeight,
+});
+
 globalStyle("button, input, textarea, select", {
   font: "inherit",
   color: "inherit",

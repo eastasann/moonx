@@ -6,6 +6,7 @@ import {
   focusRing,
   hoverTransition,
   narrowQuery,
+  tabletUp,
   typography,
 } from "../styles/helpers";
 
@@ -135,6 +136,11 @@ export const row = recipe({
       true: { "::before": { alignSelf: "flex-start", height: firstLine } },
       false: {},
     },
+    // On a phone the marks take a line of their own under the text.
+    hasMarks: {
+      true: { "@media": { [narrowQuery]: { flexWrap: "wrap" } } },
+      false: {},
+    },
     isEmphasized: {
       true: {
         vars: {
@@ -196,6 +202,55 @@ export const description = style({
   overflowWrap: "break-word",
 });
 
+/** The space a status column keeps from what is before it (.ideas a's gap). */
+const statusOffset = `calc(${measures.statusGap} - ${columnGap})`;
+
+/**
+ * A row's marks (s05-dashboard.html .ideas .dots): beside the text, in the middle of the
+ * row's height; on a phone under the description, in line with the name.
+ */
+export const marks = style({
+  display: "inline-flex",
+  alignItems: "center",
+  flexShrink: 0,
+  marginInlineStart: statusOffset,
+  "@media": {
+    [narrowQuery]: {
+      order: 1,
+      flexBasis: "100%",
+      marginInlineStart: 0,
+      marginBlockStart: vars.space["50"],
+      selectors: {
+        // Under the name: after the row's mark, or the empty place of one (`main`).
+        [`${rowClass}:has(> ${startClass}) > &, ${listClass}:has(${startClass}) ${rowClass}:not(:has(${startClass})) > &`]:
+          {
+            paddingInlineStart: `calc(${measures.markWidth} + ${columnGap})`,
+          },
+      },
+    },
+  },
+});
+
+/**
+ * A row's Badge at the end of a column as wide in every row (.ideas .dec); on a phone at
+ * the top right, beside the name.
+ */
+export const badge = style({
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  flexShrink: 0,
+  minWidth: measures.badgeWidth,
+  marginInlineStart: statusOffset,
+  "@media": {
+    [narrowQuery]: {
+      alignSelf: "flex-start",
+      height: firstLine,
+      minWidth: 0,
+    },
+  },
+});
+
 export const end = recipe({
   base: {
     ...typography("caption"),
@@ -208,8 +263,9 @@ export const end = recipe({
   },
   variants: {
     hasDescription: besideFirstLine,
-    // A count ("7/10", "5 entries") in the monospaced face (d1-moon.html .rows .num).
-    isNumeric: { true: { fontFamily: vars.font.family.mono }, false: {} },
+    // A count or a date ("7/10", "5 entries", "Oct 14") in the monospaced face
+    // (d1-moon.html .rows .num, s05-dashboard.html .due .when).
+    isNumeric: { true: typography("numberSm"), false: {} },
   },
 });
 
@@ -220,7 +276,16 @@ export const chevron = recipe({
     flexShrink: 0,
     color: vars.color.text.tertiary,
   },
-  variants: { hasDescription: besideFirstLine },
+  variants: {
+    hasDescription: besideFirstLine,
+    // From the tablet breakpoint up, in the middle of the row with the marks and badge.
+    hasStatus: {
+      true: {
+        "@media": { [tabletUp]: { alignSelf: "center", height: "auto" } },
+      },
+      false: {},
+    },
+  },
 });
 
 /** An open task's ☐ at a row's start (s05-dashboard.html .due .box). */

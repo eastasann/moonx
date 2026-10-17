@@ -18,6 +18,11 @@ import { Tree, TreeItem } from "./Tree";
 // Data display (design-spec 4.5): TableView, ListView, Card / CardView, Tree, Meter,
 // CheckDots, Avatar and MoonGlyph. Their sizes are in variants.test.tsx.
 
+const follows = (first: Element, second: Element) =>
+  Boolean(
+    first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+
 interface Row {
   id: string;
   name: string;
@@ -70,6 +75,33 @@ function EditableTable({ onRowAction }: { onRowAction?: () => void }) {
 }
 
 describe("TableView", () => {
+  test("under the rows: the action at the start and the figure at the end; a phone's rows keep the action alone (6.3)", () => {
+    const table = (layout: "auto" | "cards") => (
+      <TableView
+        aria-label={`Costs ${layout}`}
+        layout={layout}
+        columns={columns}
+        items={rows}
+        renderCell={(row, column) => row[column as "name" | "amount"]}
+        footerAction={<button type="button">{`Add row ${layout}`}</button>}
+        footerTotal={`Subtotal ${layout}`}
+      />
+    );
+    render(
+      <>
+        {table("auto")}
+        {table("cards")}
+      </>,
+    );
+    const add = screen.getByRole("button", { name: "Add row auto" });
+    expect(follows(screen.getByRole("grid", { name: "Costs auto" }), add)).toBe(
+      true,
+    );
+    expect(follows(add, screen.getByText("Subtotal auto"))).toBe(true);
+    expect(screen.getByRole("button", { name: "Add row cards" })).toBeTruthy();
+    expect(screen.queryByText("Subtotal cards")).toBeNull();
+  });
+
   test("a grid of columns and rows; the row header names the row; numbers align right", () => {
     render(
       <TableView
@@ -769,6 +801,25 @@ describe("Meter", () => {
   });
 });
 
+test("Meter: named for screen readers alone where the block's heading shows the name (13)", () => {
+  render(
+    <Meter
+      aria-label="Answers by F/A/U"
+      segments={[
+        {
+          state: "assumption",
+          label: "Assumption",
+          count: 29,
+          detail: "L9 M17 H3",
+        },
+      ]}
+    />,
+  );
+  const meter = screen.getByRole("figure", { name: "Answers by F/A/U" });
+  expect(meter.querySelector("figcaption")).toBeNull();
+  expect(screen.queryByText("Answers by F/A/U")).toBeNull();
+});
+
 describe("CheckDots", () => {
   test("one image read as every check's name and state", () => {
     render(
@@ -837,12 +888,14 @@ describe("MoonGlyph", () => {
     expect(marks[0]?.querySelectorAll("circle")).toHaveLength(2);
     expect(marks[1]?.querySelector("path")).not.toBeNull();
     expect(marks[2]?.children).toHaveLength(1);
-    expect(marks[3]?.querySelector("path")?.getAttribute("d")).toContain(
-      "L 19 10",
-    );
-    expect(
-      marks[4]?.querySelector("circle")?.getAttribute("stroke-dasharray"),
-    ).toBe("1 1");
+    // Unclassified: a square with rounded corners turned 45° (moon-base.css .dot-attn).
+    const diamond = marks[3]?.querySelector("rect");
+    expect(diamond?.getAttribute("transform")).toBe("rotate(45 10 10)");
+    expect(Number(diamond?.getAttribute("rx"))).toBeGreaterThan(0);
+    // Empty: twelve even dashes round the ring (.dot-empty).
+    const ring = marks[4]?.querySelector("circle");
+    expect(ring?.getAttribute("stroke-dasharray")).toBe("1 1");
+    expect(ring?.getAttribute("pathLength")).toBe("24");
   });
 
   test("a value is the share lit, held to 0–1; isCurrent rings it", () => {

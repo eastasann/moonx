@@ -52,8 +52,8 @@ export function Button({
   ...props
 }: ButtonProps) {
   const inBottomBar = useContext(BottomBarContext);
-  const resolved = useSize(size ?? (inBottomBar ? "XL" : undefined));
-  const fills = inBottomBar && !isQuiet;
+  const resolved = useSize(size ?? (inBottomBar !== false ? "XL" : undefined));
+  const fills = inBottomBar === "all" || (inBottomBar === "main" && !isQuiet);
   return (
     <AriaButton
       {...props}

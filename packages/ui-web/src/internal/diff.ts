@@ -6,19 +6,76 @@ export interface DiffPart {
   text: string;
 }
 
-const segmenter = new Intl.Segmenter(LOCALE, { granularity: "grapheme" });
+const segmenter = new Intl.Segmenter(LOCALE, { granularity: "word" });
 
-/** The characters of `text` as a reader sees them: an emoji of several code points is one. */
-const graphemes = (text: string) =>
-  Array.from(segmenter.segment(text), (part) => part.segment);
+const space = /\s/u;
+/** Scripts written without spaces between words: their words are the segmenter's. */
+const unspaced =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/u;
 
-type Run = { kind: DiffPart["kind"]; chars: string[] };
+/**
+ * The words of `text` as the diff compares them (design-spec 4.5 DiffText): each run of
+ * letters and figures with the punctuation in and around it ("25–40", "meals.",
+ * "(L9)"), each run of spaces, and in scripts written without spaces (Japanese) each word
+ * the segmenter finds, with the punctuation after it ("です。"). Joined again, they are
+ * the text.
+ */
+export function words(text: string): string[] {
+  const out: string[] = [];
+  // What the token being built is, kept as it grows: reading its text back would copy
+  // the whole of it for each segment joined, which is slow on a long run.
+  let isSpace = true;
+  let isUnspaced = false;
+  for (const { segment, isWordLike } of segmenter.segment(text)) {
+    const segmentIsSpace = space.test(segment[0] ?? " ");
+    const segmentIsUnspaced = unspaced.test(segment);
+    const last = out.length - 1;
+    const joins =
+      last >= 0 &&
+      !isSpace &&
+      !segmentIsSpace &&
+      (!isWordLike || !(segmentIsUnspaced || isUnspaced));
+    if (joins) {
+      out[last] += segment;
+      isUnspaced ||= segmentIsUnspaced;
+    } else {
+      out.push(segment);
+      isSpace = segmentIsSpace;
+      isUnspaced = segmentIsUnspaced;
+    }
+  }
+  return out;
+}
+
+/**
+ * A text as the diff compares it: its words, and the spaces before each word and at the
+ * end (`gaps[i]` comes before `words[i]`; the last gap ends the text).
+ */
+interface Side {
+  words: string[];
+  gaps: string[];
+}
+
+function sideOf(text: string): Side {
+  const side: Side = { words: [], gaps: [""] };
+  for (const token of words(text)) {
+    if (space.test(token[0] ?? "")) {
+      side.gaps[side.gaps.length - 1] += token;
+    } else {
+      side.words.push(token);
+      side.gaps.push("");
+    }
+  }
+  return side;
+}
+
+type Run = { kind: DiffPart["kind"]; words: string[] };
 
 /** The diff's work, in steps it can be paused between. */
 type Work = Generator<void, void, void>;
 
 /**
- * Work (diagonals tried and characters compared) between two pauses: about a millisecond,
+ * Work (diagonals tried and words compared) between two pauses: about a millisecond,
  * so a step never takes much of a frame, however long the texts.
  */
 const WORK_PER_STEP = 100_000;
@@ -32,9 +89,10 @@ interface Pace {
  * The middle snake of `a` and `b` (Myers 1986, "An O(ND) difference algorithm", 4b):
  * searching from both ends at once keeps the memory linear in the length, where the
  * one-way search keeps every round and needs the square of the edit distance. The time is
- * the length times the edit distance: a few changes in a long answer take milliseconds; a
- * long answer rewritten whole (20,000 characters, design-spec 6.0.8) takes seconds, so
- * the work pauses every millisecond or so and is carried on a frame at a time.
+ * the length times the edit distance, in words: a few changes in a long answer take
+ * milliseconds; a long answer rewritten whole (20,000 characters, design-spec 6.0.8) takes
+ * far longer, so the work pauses every millisecond or so and is carried on a frame at a
+ * time.
  */
 function* bisect(a: string[], b: string[], out: Run[], pace: Pace): Work {
   const n = a.length;
@@ -111,8 +169,8 @@ function* bisect(a: string[], b: string[], out: Run[], pace: Pace): Work {
       }
     }
   }
-  // No common character at all.
-  out.push({ kind: "delete", chars: a }, { kind: "insert", chars: b });
+  // No common word at all.
+  out.push({ kind: "delete", words: a }, { kind: "insert", words: b });
 }
 
 function* split(
@@ -140,18 +198,18 @@ function* diffRuns(a: string[], b: string[], out: Run[], pace: Pace): Work {
   ) {
     suffix++;
   }
-  if (prefix > 0) out.push({ kind: "equal", chars: a.slice(0, prefix) });
+  if (prefix > 0) out.push({ kind: "equal", words: a.slice(0, prefix) });
   const middleA = a.slice(prefix, a.length - suffix);
   const middleB = b.slice(prefix, b.length - suffix);
   if (middleA.length === 0) {
-    if (middleB.length > 0) out.push({ kind: "insert", chars: middleB });
+    if (middleB.length > 0) out.push({ kind: "insert", words: middleB });
   } else if (middleB.length === 0) {
-    out.push({ kind: "delete", chars: middleA });
+    out.push({ kind: "delete", words: middleA });
   } else {
     yield* bisect(middleA, middleB, out, pace);
   }
   if (suffix > 0)
-    out.push({ kind: "equal", chars: a.slice(a.length - suffix) });
+    out.push({ kind: "equal", words: a.slice(a.length - suffix) });
 }
 
 /** The last few diffs: DiffText's two sides of one change ask for the same one. */
@@ -162,6 +220,8 @@ const RECENT_SIZE = 32;
 interface Job {
   work: Work;
   runs: Run[];
+  /** The two texts split, once the work has done it. */
+  sides: { before?: Side; after?: Side };
   waiting: Set<(parts: DiffPart[]) => void>;
 }
 
@@ -181,14 +241,78 @@ let resetPending = false;
 const keyOf = (before: string, after: string) =>
   `${before.length}:${before}${after}`;
 
-function remember(key: string, runs: Run[]): DiffPart[] {
+/**
+ * The parts of a diff of words, with each side's spaces put back: an equal word keeps
+ * the space before it as equal where both sides have the same, a changed word takes its
+ * own. A change is one deletion and then one insertion, so a rewritten phrase is marked
+ * whole ("meals, mostly in BPO…" in s25-import.html), and the space the two sides share
+ * before it stays unmarked.
+ */
+function assemble(runs: Run[], before: Side, after: Side): DiffPart[] {
   const parts: DiffPart[] = [];
-  for (const run of runs) {
-    if (run.chars.length === 0) continue;
+  let deleted = "";
+  let inserted = "";
+  const equal = (text: string) => {
+    if (text === "") return;
     const last = parts[parts.length - 1];
-    if (last?.kind === run.kind) last.text += run.chars.join("");
-    else parts.push({ kind: run.kind, text: run.chars.join("") });
+    if (last?.kind === "equal") last.text += text;
+    else parts.push({ kind: "equal", text });
+  };
+  const flush = () => {
+    if (deleted !== "" && inserted !== "") {
+      const shared = /^\s*/u.exec(deleted)?.[0] ?? "";
+      let length = 0;
+      while (length < shared.length && shared[length] === inserted[length]) {
+        length++;
+      }
+      equal(deleted.slice(0, length));
+      deleted = deleted.slice(length);
+      inserted = inserted.slice(length);
+    }
+    if (deleted !== "") parts.push({ kind: "delete", text: deleted });
+    if (inserted !== "") parts.push({ kind: "insert", text: inserted });
+    deleted = "";
+    inserted = "";
+  };
+  const gaps = (gapBefore: string, gapAfter: string) => {
+    if (gapBefore === gapAfter) {
+      flush();
+      equal(gapBefore);
+    } else {
+      deleted += gapBefore;
+      inserted += gapAfter;
+    }
+  };
+  let i = 0;
+  let j = 0;
+  for (const run of runs) {
+    for (const word of run.words) {
+      if (run.kind === "equal") {
+        gaps(before.gaps[i] ?? "", after.gaps[j] ?? "");
+        flush();
+        equal(word);
+        i++;
+        j++;
+      } else if (run.kind === "delete") {
+        deleted += (before.gaps[i] ?? "") + word;
+        i++;
+      } else {
+        inserted += (after.gaps[j] ?? "") + word;
+        j++;
+      }
+    }
   }
+  gaps(before.gaps[i] ?? "", after.gaps[j] ?? "");
+  flush();
+  return parts;
+}
+
+function remember(key: string, job: Job): DiffPart[] {
+  const { before, after } = job.sides;
+  if (before === undefined || after === undefined) {
+    throw new Error("diff: the texts were not split");
+  }
+  const parts = assemble(job.runs, before, after);
   recent.set(key, parts);
   if (recent.size > RECENT_SIZE) {
     const oldest = recent.keys().next().value;
@@ -205,23 +329,33 @@ function known(key: string): DiffPart[] | null {
   return parts;
 }
 
-/** The whole diff as work: splitting the texts into characters is its first step too. */
+/**
+ * The whole diff as work: splitting each text into words is a step of its own, as a long
+ * text takes a few milliseconds to split. The words are compared without their spaces,
+ * so a space never stands in for a word the two sides share.
+ */
 function* diffWork(
   before: string,
   after: string,
-  runs: Run[],
+  job: Pick<Job, "runs" | "sides">,
   pace: Pace,
 ): Work {
-  yield* diffRuns(graphemes(before), graphemes(after), runs, pace);
+  const sideBefore = sideOf(before);
+  job.sides.before = sideBefore;
+  yield;
+  const sideAfter = sideOf(after);
+  job.sides.after = sideAfter;
+  yield;
+  yield* diffRuns(sideBefore.words, sideAfter.words, job.runs, pace);
 }
 
 function jobFor(key: string, before: string, after: string): Job {
   let job = running.get(key);
   if (job === undefined) {
-    const runs: Run[] = [];
+    const state: Pick<Job, "runs" | "sides"> = { runs: [], sides: {} };
     job = {
-      work: diffWork(before, after, runs, { work: 0 }),
-      runs,
+      ...state,
+      work: diffWork(before, after, state, { work: 0 }),
       waiting: new Set(),
     };
     running.set(key, job);
@@ -246,7 +380,7 @@ function jobFor(key: string, before: string, after: string): Job {
 function step(key: string, job: Job): DiffPart[] | null {
   if (!job.work.next().done) return null;
   running.delete(key);
-  const parts = remember(key, job.runs);
+  const parts = remember(key, job);
   const waiting = [...job.waiting];
   queueMicrotask(() => {
     for (const notify of waiting) notify(parts);
@@ -339,9 +473,9 @@ export function waitForDiff(
 }
 
 /**
- * What changed from `before` to `after`, character by character (PNL-2, design-spec
- * 6.0.5), worked out to the end: runs in reading order, where a deletion and an
- * insertion at the same place may come in either order.
+ * What changed from `before` to `after`, word by word (`words`; PNL-2 and 25 ③,
+ * design-spec 4.5), worked out to the end: the fewest words changed, in reading order,
+ * a change's deletion before its insertion (`assemble`).
  */
 export function diffText(before: string, after: string): DiffPart[] {
   const key = keyOf(before, after);

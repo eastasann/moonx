@@ -107,7 +107,10 @@ export const count = style({
   selectors: { [`${entry.unclassified} &`]: { color: "inherit" } },
 });
 
+/** The confidences "L9 M17 H3" in monospaced figures (d1-moon.html .legend .num). */
 export const detail = style({
+  fontFamily: vars.font.family.mono,
+  fontVariantNumeric: "tabular-nums",
   color: vars.color.text.secondary,
   selectors: { [`${entry.unclassified} &`]: { color: "inherit" } },
 });

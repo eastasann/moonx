@@ -264,10 +264,12 @@ export const textVariants = [
   "body",
   "body-long",
   "body-sm",
+  "body-compact",
   "lead",
   "caption",
   "label",
   "number",
+  "number-sm",
 ] as const;
 export type TextVariant = (typeof textVariants)[number];
 

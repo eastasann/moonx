@@ -51,6 +51,23 @@ describe("Picker", () => {
     expect(onChange).toHaveBeenCalledWith("member");
   });
 
+  test("crossing the phone breakpoint keeps its value, with no warning about its open state", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      render(<Picker label="Role" items={roles} defaultValue="member" />);
+      setPhoneWidth();
+      await settle();
+      expect(screen.getByRole("button").textContent).toBe("Member");
+      expect(
+        warn.mock.calls.filter((call) =>
+          String(call[0]).includes("uncontrolled"),
+        ),
+      ).toEqual([]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   test("the trigger shows the label alone, not the option's description", async () => {
     render(<Picker label="Role" items={roles} defaultValue="owner" />);
     const trigger = screen.getByRole("button");

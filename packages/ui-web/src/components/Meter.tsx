@@ -13,25 +13,50 @@ export interface MeterSegment {
   detail?: ReactNode;
 }
 
-export interface MeterProps {
-  /** What the band breaks down ("Fact / Assumption / Unknown"). */
-  label: ReactNode;
+interface MeterBaseProps {
   /** The band's segments, left to right; the legend lists them in the same order. */
   segments: readonly MeterSegment[];
   /** @default "M" */
   size?: Size;
 }
 
+interface MeterLabelProps {
+  /** What the band breaks down ("Fact / Assumption / Unknown"), shown above it. */
+  label: ReactNode;
+  "aria-label"?: never;
+}
+
+interface MeterNameProps {
+  label?: never;
+  /**
+   * Its name for screen readers alone, where the block's heading above already says it
+   * (13's "Fact / Assumption / Unknown": d1-moon.html shows no label over the band).
+   */
+  "aria-label": string;
+}
+
+export type MeterProps = MeterBaseProps & (MeterLabelProps | MeterNameProps);
+
 /**
  * The F/A/U breakdown (13, design-spec 4.5): Spectrum's Meter stacked, one segment per
  * state, as wide as its share. The legend repeats each segment's swatch with its name and
  * count, and carries the numbers for screen readers; the band itself is decorative.
  */
-export function Meter({ label, segments, size = "M" }: MeterProps) {
+export function Meter({
+  label,
+  segments,
+  size = "M",
+  "aria-label": name,
+}: MeterProps) {
   const shown = segments.filter((segment) => segment.count > 0);
   return (
-    <figure className={`${styles.meter} ${styles.size[size]}`}>
-      <figcaption className={styles.label}>{label}</figcaption>
+    <figure
+      aria-label={name}
+      className={`${styles.meter} ${styles.size[size]}`}
+    >
+      {label != null && (
+        <figcaption className={styles.label}>{label}</figcaption>
+      )}
       <div aria-hidden="true" className={styles.band[size]}>
         {shown.map((segment) => (
           <span

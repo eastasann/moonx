@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useContext } from "react";
+import { DensityContext } from "../internal/Density";
 import * as styles from "./DescriptionList.css";
 
 export interface DescriptionListProps {
@@ -12,10 +13,15 @@ export interface DescriptionListProps {
 /**
  * Labels and their values side by side, divided by hairlines (13・19's Summary,
  * design-spec 4.5; d1-moon.html and s19-decision.html): the labels in a column of their
- * own; on a phone each label sits above its value.
+ * own, wider in a spacious pattern (19's); on a phone each label sits above its value.
  */
 export function DescriptionList({ children }: DescriptionListProps) {
-  return <dl className={styles.list}>{children}</dl>;
+  const density = useContext(DensityContext);
+  return (
+    <dl className={styles.list({ isSpacious: density === "spacious" })}>
+      {children}
+    </dl>
+  );
 }
 
 export interface DescriptionListItemProps {

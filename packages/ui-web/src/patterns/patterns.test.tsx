@@ -11,6 +11,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { ActionButton } from "../components/ActionButton";
 import { AppFrame } from "../components/AppFrame";
 import { Button } from "../components/Button";
+import * as buttonStyles from "../components/Button.css";
 import { Checkbox } from "../components/Checkbox";
 import { Form } from "../components/Form";
 import { QuestionCard } from "../components/QuestionCard";
@@ -26,7 +27,12 @@ import { ListDetailPattern } from "./ListDetailPattern";
 import { PresentationPattern } from "./PresentationPattern";
 import { PublicPattern, PublicSection } from "./PublicPattern";
 import { QuestionFormPattern } from "./QuestionFormPattern";
-import { SettingsPattern } from "./SettingsPattern";
+import {
+  SettingsFieldRow,
+  SettingsList,
+  SettingsListItem,
+  SettingsPattern,
+} from "./SettingsPattern";
 import { StepsPattern } from "./StepsPattern";
 import { WorksheetPattern } from "./WorksheetPattern";
 
@@ -257,6 +263,48 @@ describe("FocusPattern (B)", () => {
   });
 });
 
+describe("a phone's bar of main actions (design-spec 4.3)", () => {
+  const fills = buttonStyles.button.classNames.variants.fills.true;
+  const actions = (
+    <>
+      <Button variant="secondary" isQuiet>
+        Cancel
+      </Button>
+      <Button variant="primary">Apply</Button>
+    </>
+  );
+
+  test("B: Cancel and the main action share the width (s19-decision.html .formbar)", () => {
+    setPhoneWidth();
+    render(
+      <FocusPattern header={<h1>Decide</h1>} actions={actions}>
+        <p>Fields</p>
+      </FocusPattern>,
+    );
+    expect(screen.getByRole("button", { name: "Cancel" }).className).toContain(
+      fills,
+    );
+    expect(screen.getByRole("button", { name: "Apply" }).className).toContain(
+      fills,
+    );
+  });
+
+  test("G: the main action takes the width, Cancel its own (s25-import.html .fixbar)", () => {
+    setPhoneWidth();
+    render(
+      <StepsPattern steps={<p>Steps</p>} actions={actions}>
+        <p>Content</p>
+      </StepsPattern>,
+    );
+    expect(
+      screen.getByRole("button", { name: "Cancel" }).className,
+    ).not.toContain(fills);
+    expect(screen.getByRole("button", { name: "Apply" }).className).toContain(
+      fills,
+    );
+  });
+});
+
 describe("the density a pattern gives what is inside (design-spec 4.4・4.5)", () => {
   const frameOf = (name: string) =>
     screen.getByRole("textbox", { name }).parentElement?.className;
@@ -434,7 +482,9 @@ describe("QuestionFormPattern (C)", () => {
         onCurrentChange={setCurrent}
         isReadOnly={isReadOnly}
         onEnd={onEnd}
-        footer={<button type="button">Next: 02 Market</button>}
+        previousSection={<button type="button">Previous section</button>}
+        footer={<button type="button">AI</button>}
+        nextSection={<button type="button">Next: 02 Market</button>}
         isAnswered={(id) => id === "WHO"}
         renderQuestion={(id, mode) => (
           <QuestionCard
@@ -457,9 +507,15 @@ describe("QuestionFormPattern (C)", () => {
     expect(screen.queryByRole("textbox", { name: "Answer WHY" })).toBeNull();
     expect(screen.getByRole("button", { name: "WHY" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "Focus" })).toBeTruthy();
+    // The bar: the previous section, AI ▼ and the next section, in that order.
     expect(
-      screen.getByRole("button", { name: "Next: 02 Market" }),
-    ).toBeTruthy();
+      screen
+        .getAllByRole("button")
+        .map((button) => button.textContent)
+        .filter((name) =>
+          ["Previous section", "AI", "Next: 02 Market"].includes(name ?? ""),
+        ),
+    ).toEqual(["Previous section", "AI", "Next: 02 Market"]);
   });
 
   test("Focus off opens every question, and the device keeps the choice", async () => {
@@ -522,10 +578,15 @@ describe("QuestionFormPattern (C)", () => {
     render(<Form onEnd={onEnd} />);
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.queryByRole("switch")).toBeNull();
-    // The footer stays, under the one question (6.2's AI ▼ is on a phone too).
+    // AI ▼ stays, under the one question (6.2's AI ▼ is on a phone too); the sections
+    // are moved between by the title's ▼ and the completion card, not the footer (4.1 C).
+    expect(screen.getByRole("button", { name: "AI" })).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Next: 02 Market" }),
-    ).toBeTruthy();
+      screen.queryByRole("button", { name: "Next: 02 Market" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Previous section" }),
+    ).toBeNull();
     // A dot per question, named by its place and whether it is answered; pressing one
     // moves there (6.2).
     expect(
@@ -1045,6 +1106,41 @@ describe("SettingsPattern (H)", () => {
     ).toBeTruthy();
     expect(within(profile).getByText("Name")).toBeTruthy();
     expect(screen.getByRole("region", { name: "Display" })).toBeTruthy();
+  });
+
+  test("an invitation's email may break only after its @ and dots", () => {
+    render(
+      <SettingsList aria-label="Invitations">
+        <SettingsListItem
+          title="new.member@bcdx.example"
+          description="Member · sent Oct 9"
+          actions={<button type="button">Resend</button>}
+        />
+      </SettingsList>,
+    );
+    const item = screen.getByRole("listitem");
+    const title = within(item).getByText(
+      (_, node) => node?.textContent === "new.member@bcdx.example",
+      { selector: "span" },
+    );
+    expect(title.querySelectorAll("wbr")).toHaveLength(3);
+    expect(item.textContent).toContain("new.member@bcdx.example");
+  });
+
+  test("a field row keeps its fields and button in their order (s09's invitation)", () => {
+    render(
+      <SettingsFieldRow>
+        <TextField aria-label="Email to invite" />
+        <TextField aria-label="Role" />
+        <button type="button">Send invitation</button>
+      </SettingsFieldRow>,
+    );
+    expect(
+      follows(
+        screen.getByRole("textbox", { name: "Email to invite" }),
+        screen.getByRole("button", { name: "Send invitation" }),
+      ),
+    ).toBe(true);
   });
 });
 

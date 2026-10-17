@@ -492,12 +492,12 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 ### ADR-018: デザインシステムは Adobe Spectrum の仕組み、見た目は月相（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテーマの生成を外し、PWA のアイコンとマニフェストの生成を足した。2026-10-12 に見た目を Hermes Teal から月相に替え、06 からネイティブ向けの値を外し、書体の読み込みを決めた。2026-10-17 に値を `docs/mockups` に合わせ、文字の大きさを画面の幅で切り替えるようにした。2026-10-18 にタッチの端末の入力欄の文字の下限を足した）
+**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテーマの生成を外し、PWA のアイコンとマニフェストの生成を足した。2026-10-12 に見た目を Hermes Teal から月相に替え、06 からネイティブ向けの値を外し、書体の読み込みを決めた。2026-10-17 に値を `docs/mockups` に合わせ、文字の大きさを画面の幅で切り替えるようにした。2026-10-18 にタッチの端末の入力欄の文字の下限と、モックアップと並べて確かめる範囲を足した）
 
 **決定:**
 
 - **参考にするもの**: Adobe Spectrum（Spectrum 2）の仕組みを取り入れ（ユーザーと合意、2026-10-01）、見た目は design-spec 4.4 の月相にする（2026-10-12 にユーザーと決めた）。取り入れる範囲は design-spec 4.4「デザインシステムの参考」、部品の一覧は design-spec 4.5 が正。この ADR は、それを実装する方法（トークンの階層・生成・ライト / ダーク）を決める。
-- **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.scale.{medium,large}.component`。実装が参照してよいのは `semantic` だけ。`semantic` の値はエイリアスだけで、たどると必ず `primitive` に着く（密度は `semantic.scale.medium` を参照し、生成のときに large へ差し替える。書体のスタイルと入力欄の文字は `semantic.font-size.wide` を参照し、生成のときに narrow へ差し替える）。06 は、`docs/mockups`（2026-10-11 にユーザーと合意した見た目）から取った値を持ち、モックアップが示さないものは Spectrum 2 の値を持つ（取り方は design-spec 4.5）。画面を作るときと直すときは、06 から作った画面をモックアップと並べて確かめる（`docs/mockups/README.md`）。
+- **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.scale.{medium,large}.component`。実装が参照してよいのは `semantic` だけ。`semantic` の値はエイリアスだけで、たどると必ず `primitive` に着く（密度は `semantic.scale.medium` を参照し、生成のときに large へ差し替える。書体のスタイルと入力欄の文字は `semantic.font-size.wide` を参照し、生成のときに narrow へ差し替える）。06 は、`docs/mockups`（2026-10-11 にユーザーと合意した見た目）から取った値を持ち、モックアップが示さないものは Spectrum 2 の値を持つ（取り方は design-spec 4.5）。画面を作るときと直すときは、06 から作った画面をモックアップと並べて確かめる（`docs/mockups/README.md`）。モックアップは見た目のイメージで、ピクセル単位では合わせず、並べて見れば測らなくても分かる違いを残さない（2026-10-18 のユーザーの決定。合わせるものと追わないものは design-spec 4.5）。
 - **生成**: `make tokens` が `packages/ui-tokens` に次を生成する（変換は自前の小さなスクリプト。Style Dictionary は使わない）。
   - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク・medium / large・wide / narrow の値。CSS 変数として出る。1つの変数はこの3つの切り替えのうち1つでだけ値が変わる）。画面のスライド表示（Slide）は `semantic.print`（ライト固定）を参照する
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）

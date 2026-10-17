@@ -117,10 +117,15 @@ export const panel = style({
   "@media": { [reducedMotion]: { transitionDuration: "0s" } },
 });
 
+/**
+ * The content starts under the title's text, past the chevron (s11-form.html .discl
+ * .body), and keeps Spectrum's end padding.
+ */
 export const panelInner = styleVariants(sized, (size) => ({
   paddingBlockStart: vars.space["100"],
   paddingBlockEnd: vars.space["300"],
-  paddingInline: vars.scale.component.disclosure.panelPaddingX[size],
+  paddingInlineStart: `calc(${vars.scale.component.disclosure.titlePaddingX[size]} + ${vars.scale.component.icon.size[size]} + ${vars.space["100"]})`,
+  paddingInlineEnd: vars.scale.component.disclosure.panelPaddingX[size],
 }));
 
 export const accordion = style({ display: "flex", flexDirection: "column" });

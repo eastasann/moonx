@@ -47,10 +47,14 @@ export const title = style({
   color: vars.color.text.primary,
 });
 
-/** The action at the end of the band (d1-moon.html .banner .link). */
+/**
+ * The action at the end of the band (d1-moon.html .banner .link). Where the band is
+ * narrow a Link wraps too, so the message is not squeezed into more lines than it needs;
+ * it keeps its longest word, so a Button stays whole.
+ */
 export const action = style({
   display: "inline-flex",
-  flexShrink: 0,
+  flexShrink: 1,
   marginInlineStart: "auto",
 });
 

@@ -266,6 +266,38 @@ describe("FauPicker", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  test("in a table an Empty row's F/A/U is a dash, named Empty (s17-costs.html)", () => {
+    render(
+      <TableView
+        aria-label="Costs"
+        columns={[
+          { id: "name", name: "Item", isRowHeader: true },
+          { id: "fau", name: "F/A/U" },
+        ]}
+        items={[{ id: "fee", name: "Payment Fee" }]}
+        renderCell={(row, column) =>
+          column === "name" ? (
+            row.name
+          ) : (
+            <FauPicker
+              aria-label="Payment Fee"
+              state="empty"
+              confidence={null}
+              hasValue={false}
+              onChange={() => {}}
+              onFactPress={() => {}}
+            />
+          )
+        }
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Payment Fee: Empty" });
+    expect(trigger.textContent).toBe("\u2014Empty");
+    expect(
+      within(trigger).getByText("\u2014").getAttribute("aria-hidden"),
+    ).toBe("true");
+  });
+
   test("in a table cell the label stands alone (the mark has its own column), with ▾ once the row is edited", async () => {
     const user = userEvent.setup();
     render(
@@ -524,6 +556,37 @@ describe("RowList", () => {
     );
     expect(screen.getByRole("list").tagName).toBe("UL");
   });
+
+  test("marks then the badge after the text, each in its own place (s05's ideas)", () => {
+    render(
+      <RowList aria-label="Ideas">
+        <RowListItem
+          href="#bowl"
+          description="Validation · updated yesterday"
+          marks={<span>dots</span>}
+          badge={<span>Hold</span>}
+        >
+          Bacolod Health Bowl
+        </RowListItem>
+        <RowListItem
+          href="#bike"
+          marks={<span>dots</span>}
+          badge={<span>Undecided</span>}
+        >
+          Mobile Bike Repair
+        </RowListItem>
+      </RowList>,
+    );
+    const link = screen.getAllByRole("link")[0] as HTMLElement;
+    expect(link.textContent).toBe(
+      "Bacolod Health BowlValidation · updated yesterdaydotsHold",
+    );
+    // The badge's place is the same in every row: its column has a width of its own.
+    const badges = screen
+      .getAllByText(/^(Hold|Undecided)$/)
+      .map((badge) => badge.parentElement?.className);
+    expect(badges[0]).toBe(badges[1]);
+  });
 });
 
 describe("QuestionCard", () => {
@@ -678,23 +741,33 @@ describe("DiffText", () => {
     );
     const before = document.querySelector("del")?.parentElement?.textContent;
     const after = document.querySelector("ins")?.parentElement?.textContent;
-    expect(removed.join("")).not.toBe("");
-    expect(added.join("")).not.toBe("");
+    // Word by word, the punctuation with its word (design-spec 4.5).
+    expect(removed).toEqual(["workers."]);
+    expect(added).toEqual(["staff in Bacolod."]);
     expect(before).toBe("Office workers.");
     expect(after).toBe("Office staff in Bacolod.");
   });
 });
 
+/**
+ * A long answer of random short words (a linear congruential generator, so a failing
+ * case can be found again): rewritten whole, its word diff takes many steps.
+ */
+const rewrite = (seed: number, length: number) => {
+  let state = seed;
+  return Array.from({ length }, () => {
+    state = (state * 1103515245 + 12345) % 2147483648;
+    return "abcdefgh "[Math.floor((state / 2147483648) * 9)];
+  }).join("");
+};
+
 test("DiffText: a long rewrite shows its text at once and its marks once worked out", async () => {
-  const letters = (seed: number) =>
-    Array.from(
-      { length: 3000 },
-      (_, index) => "abcdefgh "[(index * seed) % 9],
-    ).join("");
-  const before = letters(7);
-  const after = letters(5);
-  render(<DiffText before={before} after={after} variant="after" />);
-  expect(screen.getByText(after)).toBeTruthy();
+  const before = rewrite(7, 20000);
+  const after = rewrite(5, 20000);
+  const { container } = render(
+    <DiffText before={before} after={after} variant="after" />,
+  );
+  expect(container.textContent).toBe(after);
   expect(document.querySelector("ins")).toBeNull();
   await waitFor(() => expect(document.querySelector("ins")).not.toBeNull(), {
     timeout: 5000,
@@ -703,11 +776,7 @@ test("DiffText: a long rewrite shows its text at once and its marks once worked 
 });
 
 test("DiffText: many changes on one panel all get their marks", async () => {
-  const letters = (seed: number) =>
-    Array.from(
-      { length: 2500 },
-      (_, index) => "abcdefgh "[(index * seed) % 9],
-    ).join("");
+  const letters = (seed: number) => rewrite(seed, 12000);
   const long = letters(5);
   render(
     <>

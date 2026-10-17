@@ -43,7 +43,7 @@ export interface DiffTextAreaProps
 
 /**
  * A TextArea that keeps marking what it adds to `before` while it is edited (design-spec
- * 4.5・6.7, s25-import.html "Imported · you can edit"): the added characters underlined on
+ * 4.5・6.7, s25-import.html "Imported · you can edit"): the added words underlined on
  * the sunken surface, worked out again as the text changes. The marks are drawn behind
  * the text, which stays an ordinary text area; they are not read out, as DiffText's
  * parts are not.

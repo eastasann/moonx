@@ -31,9 +31,13 @@ export function ResponsivePopover({
 }: ResponsivePopoverProps) {
   const isNarrow = useIsNarrow();
   const context = useSlottedContext(PopoverContext);
+  // The two forms' Popovers have their own keys: React would otherwise keep the one
+  // instance across the breakpoint and turn its open state from the trigger's into a
+  // fixed one, which React Aria warns about.
   if (!isNarrow) {
     return (
       <Popover
+        key="popover"
         {...popoverProps}
         maxHeight={popoverMaxHeight}
         className={`${styles.popover} ${size === undefined ? "" : styles.popoverWidth[size]}`}
@@ -52,7 +56,9 @@ export function ResponsivePopover({
     <>
       {/* React Aria builds a Picker's items in a hidden render that only Popover passes
           through to its children; closed, this one renders nothing on the page. */}
-      <Popover isOpen={false}>{children}</Popover>
+      <Popover key="collection" isOpen={false}>
+        {children}
+      </Popover>
       <TraySheet>{content}</TraySheet>
     </>
   );

@@ -1,6 +1,7 @@
 import { vars } from "@moonx/ui-tokens";
 import { globalStyle, style } from "@vanilla-extract/css";
 import { recipe } from "@vanilla-extract/recipes";
+import { textMeasure } from "../components/typography.css";
 import * as frame from "../internal/frame.css";
 import {
   desktopUp,
@@ -199,7 +200,9 @@ export const questionPage = style(
   }),
 );
 
+/** Above the questions; the guidance runs 62 characters wide at most (s11's .guidance). */
 export const questionHeader = style({
+  vars: { [textMeasure]: `calc(${form.guidanceMeasure} * 1ch)` },
   marginBlockEnd: form.headerGapMobile,
   "@media": { [tabletUp]: { marginBlockEnd: form.headerGap } },
 });
@@ -261,6 +264,20 @@ export const sectionFooter = style({
   gap: form.footerGap,
   marginBlockStart: vars.space["400"],
 });
+
+/**
+ * The header's Focus switch: its label in the caption's secondary text, beside the save
+ * state (s11-form.html .switch).
+ */
+export const focusTool = style({ display: "inline-flex" });
+
+globalStyle(`${focusTool} > label`, {
+  fontSize: vars.typography.caption.fontSize,
+  color: vars.color.text.secondary,
+});
+
+/** The previous or next section's place at an end of the footer's bar. */
+export const sectionStep = style({ display: "flex" });
 
 /** The phone's arrows: 48px with the light frame (s11-form.html .mnav .iconbtn). */
 export const questionArrow = style({
@@ -655,7 +672,12 @@ export const summaryButton = style({
   },
 });
 
-export const summaryContent = style({ flex: 1, minWidth: 0 });
+/** The few numbers, each name and value kept whole (s17-costs.html .sumbar span). */
+export const summaryContent = style({
+  flex: 1,
+  minWidth: 0,
+  whiteSpace: "nowrap",
+});
 
 // G: steps (s25-import.html).
 
@@ -725,9 +747,11 @@ export const comparisonCode = style({
   color: vars.color.text.secondary,
 });
 
+/** Beside the code at every width: on a phone it wraps there (s25-import.html .item-head). */
 export const comparisonQuestion = style({
   ...typography("body"),
   fontWeight: vars.typography.heading4.fontWeight,
+  flex: "1 1 0",
   minWidth: 0,
   margin: 0,
 });
@@ -833,6 +857,25 @@ export const settingsContent = style({
   minWidth: 0,
 });
 
+/**
+ * Fields side by side ending in their button (s09-settings.html .invite): the first fills
+ * the line, the second takes its column, the rest their own width; one under another at
+ * full width on a phone.
+ */
+export const settingsFieldRow = style({
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr)",
+  alignItems: "end",
+  gap: settings.fieldRowGap,
+  "@media": {
+    [tabletUp]: {
+      gridTemplateColumns: `minmax(0, 1fr) ${settings.fieldRowControlWidth}`,
+      gridAutoFlow: "column",
+      gridAutoColumns: "auto",
+    },
+  },
+});
+
 /** The members and the invitations of 9 (s09-settings.html .members, .inv). */
 export const settingsList = style({
   display: "flex",
@@ -845,8 +888,8 @@ export const settingsList = style({
 /**
  * Avatar | name, "(you)" and the email under it | the role | ⋯, lined up down the list,
  * and a note under the email across to the role ("This workspace needs at least one
- * Owner"). Without an avatar (an invitation): the email and what was sent | its control |
- * its actions.
+ * Owner"). Without an avatar (an invitation): the email and what was sent | its actions.
+ * A row without a control keeps no empty column for one.
  */
 export const settingsRow = recipe({
   base: {
@@ -862,13 +905,32 @@ export const settingsRow = recipe({
     },
   },
   variants: {
-    hasAvatar: {
-      true: {
+    hasAvatar: { true: {}, false: {} },
+    hasControl: { true: {}, false: {} },
+  },
+  // Without a control (an invitation), no empty column and its gap take the title's room.
+  compoundVariants: [
+    {
+      variants: { hasAvatar: true, hasControl: true },
+      style: {
         gridTemplateColumns: `${settings.rowAvatarWidth} minmax(0, 1fr) auto ${settings.rowMenuWidth}`,
       },
-      false: { gridTemplateColumns: "minmax(0, 1fr) auto auto" },
     },
-  },
+    {
+      variants: { hasAvatar: true, hasControl: false },
+      style: {
+        gridTemplateColumns: `${settings.rowAvatarWidth} minmax(0, 1fr) ${settings.rowMenuWidth}`,
+      },
+    },
+    {
+      variants: { hasAvatar: false, hasControl: true },
+      style: { gridTemplateColumns: "minmax(0, 1fr) auto auto" },
+    },
+    {
+      variants: { hasAvatar: false, hasControl: false },
+      style: { gridTemplateColumns: "minmax(0, 1fr) auto" },
+    },
+  ],
 });
 
 export const settingsRowAvatar = style({
@@ -936,7 +998,28 @@ export const settingsRowActions = recipe({
     justifySelf: "end",
     gap: vars.space["50"],
   },
-  variants: { hasAvatar: column("4", "3") },
+  variants: {
+    hasAvatar: { true: {}, false: {} },
+    hasControl: { true: {}, false: {} },
+  },
+  compoundVariants: [
+    {
+      variants: { hasAvatar: true, hasControl: true },
+      style: { gridColumn: "4" },
+    },
+    {
+      variants: { hasAvatar: true, hasControl: false },
+      style: { gridColumn: "3" },
+    },
+    {
+      variants: { hasAvatar: false, hasControl: true },
+      style: { gridColumn: "3" },
+    },
+    {
+      variants: { hasAvatar: false, hasControl: false },
+      style: { gridColumn: "2" },
+    },
+  ],
 });
 
 // I: presentation (s23-deck.html).
@@ -979,16 +1062,14 @@ export const presentation = style({
   minWidth: 0,
 });
 
-/** The thumbnails' column (s23-deck.html .thumbs): in view while the slide scrolls. */
+/**
+ * The thumbnails' column (s23-deck.html .thumbs), in the page's flow: the page scrolls,
+ * not the column too.
+ */
 export const thumbnails = style({
-  position: "sticky",
-  top: frame.top,
-  alignSelf: "flex-start",
   flexShrink: 0,
   // The column's width holds the rule after it (s23-deck.html .thumbs' border-right).
   width: `calc(${deck.thumbnailColumnWidth} - ${vars.borderWidth.hairline})`,
-  maxHeight: `calc(100dvh - ${frame.top})`,
-  overflowY: "auto",
   paddingBlock: deck.thumbnailPaddingY,
   paddingInline: deck.thumbnailPaddingX,
 });
@@ -1175,6 +1256,11 @@ export const publicSection = recipe({
   },
 });
 
+/** How wide a section's text runs (s01-landing.html: .stages .lead, .pair p, .close p). */
+const measure = (characters: string) => ({
+  vars: { [textMeasure]: `calc(${characters} * 1ch)` },
+});
+
 /** The space above and under a section (72 to 88; 56 on a phone) and its arrangement. */
 export const publicInner = recipe({
   base: {
@@ -1230,6 +1316,7 @@ export const publicInner = recipe({
       },
       // One under another (.stages; 29 and 30's text).
       stack: {
+        ...measure(pub.stackMeasure),
         "@media": {
           [tabletUp]: {
             paddingBlockStart: pub.sectionPaddingTop,
@@ -1239,6 +1326,7 @@ export const publicInner = recipe({
       },
       // The last word and its action, at the end of the line (.close).
       close: {
+        ...measure(pub.closeMeasure),
         flexDirection: "row",
         flexWrap: "wrap",
         alignItems: "flex-end",
@@ -1260,7 +1348,7 @@ export const publicColumnStart = recipe({
   variants: {
     layout: {
       hero: { flex: `${pub.heroStartRatio} 1 0%` },
-      pair: { flex: `${pub.pairStartRatio} 1 0%` },
+      pair: { flex: `${pub.pairStartRatio} 1 0%`, ...measure(pub.pairMeasure) },
     },
   },
 });

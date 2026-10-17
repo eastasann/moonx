@@ -257,11 +257,17 @@ export const areaFrame = recipe({
   defaultVariants: { size: "M" },
 });
 
+const insideBorder = (height: string) =>
+  `calc(${height} - 2 * ${vars.borderWidth.strong})`;
+
 export const textArea = style([
   input,
   {
     display: "block",
     width: "100%",
+    // The textarea fills its frame's minimum itself, so a press low in the frame puts
+    // the caret in.
+    minHeight: insideBorder(vars.scale.component.field.textAreaMinHeight),
     paddingBlock: vars.space["100"],
     resize: "none",
     overflow: "hidden",
@@ -269,27 +275,33 @@ export const textArea = style([
   },
 ]);
 
+export const reasonArea = style({
+  minHeight: insideBorder(vars.scale.component.field.textAreaReasonMinHeight),
+});
+
 /**
  * The answer of a question being answered (QuestionCard, s11-form.html .answer): 16px with
  * room to write, on the canvas until it takes focus. Its frame stays the fields' 3:1 one
  * (design-spec 4.4), though the mockup draws it light.
  */
 export const answerFrame = style({
-  minHeight: vars.layout.questionForm.answerMinHeightMobile,
   paddingInline: vars.layout.questionForm.answerPaddingX,
   borderRadius: vars.radius.callout,
   background: vars.color.surface.canvas,
   selectors: {
     "&:focus-within": { background: vars.color.surface.raised },
   },
-  "@media": {
-    [tabletUp]: { minHeight: vars.layout.questionForm.answerMinHeight },
-  },
 });
 
 export const answerArea = style({
   ...typography("answer"),
+  minHeight: insideBorder(vars.layout.questionForm.answerMinHeightMobile),
   paddingBlock: vars.layout.questionForm.answerPaddingY,
+  "@media": {
+    [tabletUp]: {
+      minHeight: insideBorder(vars.layout.questionForm.answerMinHeight),
+    },
+  },
 });
 
 /** The native clear button would duplicate SearchField's own. */

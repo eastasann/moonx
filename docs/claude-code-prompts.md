@@ -1519,7 +1519,7 @@ make test・make test-e2e・make typecheck・make lint・make doc-lint が通る
 
 ## Step 22i: モックアップと明らかに違う所の直し
 
-Status:
+Status: done 2026-10-18
 
 ```
 Step 22h のあと、モックアップと明らかに違う所を直してください。部品の段階はこのステップで終わりです。

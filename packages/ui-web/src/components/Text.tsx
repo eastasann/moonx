@@ -8,7 +8,7 @@ export interface TextProps {
   /**
    * `body-long` keeps typed line breaks and opens the leading for long answers; `lead` is
    * the landing's opening sentence; `number` is the monospaced face for amounts and counts
-   * (design-spec 4.4).
+   * (design-spec 4.4), `number-sm` the same at the caption's size ("62 items").
    * @default "body"
    */
   variant?: TextVariant;

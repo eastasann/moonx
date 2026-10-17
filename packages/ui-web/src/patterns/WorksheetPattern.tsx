@@ -29,7 +29,9 @@ export interface WorksheetPatternProps {
   /**
    * The summary bar's few numbers, wherever the results have no column of their own (a
    * tablet, a phone, a desktop beside a docked panel): "Startup ₱450,000+ · Monthly
-   * ₱49,000 · BE 13+/day". Pressing the bar opens the results.
+   * ₱49,000 · BE 13+/day", one line of pairs that do not break, wrapping between pairs
+   * only where the bar is narrower than they are (a Flex with `wrap`). Pressing the bar
+   * opens the results.
    */
   summary: ReactNode;
 }

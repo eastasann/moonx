@@ -1,10 +1,15 @@
-import { ChevronRight, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/Button";
 import { Checkbox } from "../../components/Checkbox";
 import { CostPreview } from "../../components/CostPreview";
+import {
+  DescriptionList,
+  DescriptionListItem,
+} from "../../components/DescriptionList";
 import { DiffText } from "../../components/DiffText";
 import { DiffTextArea } from "../../components/DiffTextArea";
+import { Disclosure } from "../../components/Disclosure";
 import { Heading } from "../../components/Heading";
 import { IdeaPreview } from "../../components/IdeaPreview";
 import { Link } from "../../components/Link";
@@ -57,6 +62,16 @@ const changes = [
       "Office workers lose 30 to 45 minutes on lunch runs. On busy days many skip lunch and snack in the afternoon.",
   },
 ];
+
+/** The answers the import leaves as they are (s25's "3 unchanged answers"). */
+const unchanged = [
+  ["01 · WHY THEM", "They have disposable income and little time to cook."],
+  [
+    "01 · BEHAVIOR",
+    "They order rice meals or fast food at the office and skip lunch on busy days.",
+  ],
+  ["01 · FREQUENCY", "Every working day."],
+] as const;
 
 /** 25 Import from AI (s25-import.html): pattern G at ③ Review. */
 export function ImportScreen() {
@@ -165,14 +180,15 @@ export function ImportScreen() {
           ),
         }))}
         footer={
-          <Flex gap="space-100" alignItems="center">
-            <IconSlot size="S">
-              <ChevronRight />
-            </IconSlot>
-            <Text variant="body-sm" tone="secondary">
-              3 unchanged answers
-            </Text>
-          </Flex>
+          <Disclosure title="3 unchanged answers" headingLevel={2}>
+            <DescriptionList>
+              {unchanged.map(([code, answer]) => (
+                <DescriptionListItem key={code} label={code}>
+                  {answer}
+                </DescriptionListItem>
+              ))}
+            </DescriptionList>
+          </Disclosure>
         }
         note="Each change is saved in history as an AI import."
         actions={

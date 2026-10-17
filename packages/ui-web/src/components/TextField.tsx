@@ -99,7 +99,13 @@ export function TextField({
   );
 }
 
-export interface TextAreaProps extends TextFieldBaseProps {}
+export interface TextAreaProps extends TextFieldBaseProps {
+  /**
+   * A reason to write (19's "Why?" and M4's reason, design-spec 4.5): it starts taller,
+   * with room for a few lines (06 field.text-area-reason-min-height, s19-decision.html).
+   */
+  isReason?: boolean;
+}
 
 /**
  * A multi-line text input that grows with its content (design-spec 4.5), for long
@@ -114,6 +120,7 @@ export function TextArea({
   size,
   width: givenWidth,
   placeholder,
+  isReason = false,
   ...props
 }: TextAreaProps) {
   const resolved = useSize(size);
@@ -144,7 +151,9 @@ export function TextArea({
           className={
             isAnswer
               ? `${styles.textArea} ${styles.answerArea}`
-              : styles.textArea
+              : isReason
+                ? `${styles.textArea} ${styles.reasonArea}`
+                : styles.textArea
           }
           placeholder={placeholder}
           rows={1}

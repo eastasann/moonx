@@ -15,8 +15,9 @@ export interface DiffTextProps {
 }
 
 /**
- * One side of a change in PNL-2 (design-spec 4.5・6.0.5), the changed characters marked
- * by a line, not by colour alone: struck through when removed, underlined when added.
+ * One side of a change in PNL-2 and 25 ③ (design-spec 4.5・6.0.5・6.7), the changed words
+ * marked by a line, not by colour alone: struck through when removed, underlined when
+ * added.
  */
 export function DiffText({ before, after, variant }: DiffTextProps) {
   // A long rewrite shows its text first and its marks once the work is done.

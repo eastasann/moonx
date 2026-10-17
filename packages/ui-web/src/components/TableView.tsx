@@ -108,6 +108,16 @@ export interface TableViewProps<T extends { id: Key }> {
    * @default "auto"
    */
   layout?: TableLayout;
+  /**
+   * Under the rows, at the start: the table's "+ Add row" (a quiet Button). On a phone it
+   * takes a whole row of its own (s17-costs.html .cards .add).
+   */
+  footerAction?: ReactNode;
+  /**
+   * Under the rows, at the end: the table's figure ("Subtotal ₱145,000+ · 3 Unknown, 1
+   * Empty"). Not on a phone, where the worksheet's summary bar holds the totals (6.3).
+   */
+  footerTotal?: ReactNode;
   "aria-label"?: string;
   "aria-labelledby"?: string;
 }
@@ -142,11 +152,25 @@ export function TableView<T extends { id: Key }>({
       ),
     [columns, isNarrow, lines],
   );
-  const { isRowEditable: _, ...rowProps } = props;
-  return lines ? (
+  const { footerAction, footerTotal, ...tableProps } = props;
+  const { isRowEditable: _, ...rowProps } = tableProps;
+  const table = lines ? (
     <LineRows {...rowProps} columns={shown} density={density} />
   ) : (
-    <GridTable {...props} columns={shown} density={density} />
+    <GridTable {...tableProps} columns={shown} density={density} />
+  );
+  const total = lines ? null : footerTotal;
+  if (footerAction == null && total == null) return table;
+  return (
+    <div className={styles.withFooter}>
+      {table}
+      <div className={styles.footer({ lines })}>
+        {footerAction != null && (
+          <div className={styles.footerAction({ lines })}>{footerAction}</div>
+        )}
+        {total != null && <div className={styles.footerTotal}>{total}</div>}
+      </div>
+    </div>
   );
 }
 

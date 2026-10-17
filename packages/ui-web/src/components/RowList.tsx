@@ -46,8 +46,19 @@ export interface RowListItemProps
   start?: ReactNode;
   /** At the end, before ›: a count or a state ("8/10", "Done (4)"). */
   end?: ReactNode;
-  /** The end is a count ("7/10", "5 entries"): set in the monospaced face. */
+  /** The end is a count or a date ("7/10", "5 entries", "Oct 14"): set in the monospaced face. */
   isEndNumeric?: boolean;
+  /**
+   * A row of marks beside the text (5's CheckDots): before the badge on a wide screen; on
+   * a phone on a line of its own under the description (s05-dashboard.html .ideas .dots).
+   */
+  marks?: ReactNode;
+  /**
+   * A Badge (5's decision) at the end of a column as wide in every row (06
+   * row-list.badge-width), so the marks before it line up down the list; on a phone at
+   * the top right, beside the name.
+   */
+  badge?: ReactNode;
   /** Moves without a URL; prefer `href` for a place. The whole row presses. */
   onPress?: () => void;
   /**
@@ -68,6 +79,8 @@ export function RowListItem({
   start,
   end,
   isEndNumeric = false,
+  marks,
+  badge,
   href,
   routerOptions,
   onPress,
@@ -77,11 +90,13 @@ export function RowListItem({
   const isPressable = href !== undefined || onPress !== undefined;
   // With a second line, the mark, the end and › stay beside the first (d1-moon.html).
   const hasDescription = description != null;
+  const hasStatus = marks != null || badge != null;
   const rowClass = styles.row({
     ordered,
     isPressable,
     isEmphasized,
     hasDescription,
+    hasMarks: marks != null,
   });
   const side = { hasDescription };
   const content = (
@@ -93,13 +108,15 @@ export function RowListItem({
           <span className={styles.description}>{description}</span>
         )}
       </span>
+      {marks != null && <span className={styles.marks}>{marks}</span>}
+      {badge != null && <span className={styles.badge}>{badge}</span>}
       {end != null && (
         <span className={styles.end({ ...side, isNumeric: isEndNumeric })}>
           {end}
         </span>
       )}
       {isPressable && (
-        <span className={styles.chevron(side)}>
+        <span className={styles.chevron({ ...side, hasStatus })}>
           <IconSlot size="S">
             <ChevronRight />
           </IconSlot>

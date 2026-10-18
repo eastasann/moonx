@@ -1,6 +1,7 @@
+import { readFile } from "node:fs/promises";
 import type { Me } from "@moonx/schemas";
-import { test as base, expect } from "@playwright/test";
-import { WEB_ORIGIN } from "./env";
+import { request as apiRequest, test as base, expect } from "@playwright/test";
+import { API_LOG, WEB_ORIGIN } from "./env";
 
 /** Every demo user's password (design-spec 8.1). */
 export const DEMO_PASSWORD = "moonx-demo-2026";
@@ -64,4 +65,114 @@ export function workspaceOf(me: Me, name: string) {
   );
   if (membership === undefined) throw new Error(`No workspace ${name}`);
   return membership.workspace;
+}
+
+/** A mail the e2e API sent, as its console transport logs it (SDD 2章 MAIL_TRANSPORT). */
+export interface Mail {
+  to: string;
+  subject: string;
+  text: string;
+}
+
+/** The mails the e2e API has sent to `to`, oldest first (env.ts API_LOG). */
+export async function mailsTo(to: string): Promise<Mail[]> {
+  // Nothing written yet is no mail; any other failure to read is the setup's to report.
+  const log = await readFile(API_LOG, "utf8").catch((error: unknown) => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
+    throw error;
+  });
+  return log.split("\n").flatMap((line): Mail[] => {
+    let entry: Record<string, unknown>;
+    try {
+      entry = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      return [];
+    }
+    const { message, to: recipient, subject, text } = entry;
+    return message === "mail" &&
+      typeof recipient === "string" &&
+      recipient.toLowerCase() === to.toLowerCase() &&
+      typeof subject === "string" &&
+      typeof text === "string"
+      ? [{ to: recipient, subject, text }]
+      : [];
+  });
+}
+
+/**
+ * The link `pattern` finds in the latest mail to `to` that has one, once it is sent.
+ *
+ * @throws {Error} when no such mail comes within 10 seconds.
+ */
+export async function linkMailedTo(to: string, pattern: RegExp): Promise<URL> {
+  let link: string | undefined;
+  await expect
+    .poll(
+      async () => {
+        link = (await mailsTo(to))
+          .map(({ text }) => text.match(pattern)?.[0])
+          .findLast((found) => found !== undefined);
+        return link;
+      },
+      { timeout: 10_000 },
+    )
+    .toBeDefined();
+  return new URL(link ?? "");
+}
+
+/** An address no test used before: each run and each test makes its own accounts. */
+export function uniqueEmail(label: string) {
+  return `${label}-${Date.now()}-${Math.floor(Math.random() * 1e9)}@e2e.example`;
+}
+
+/** A context of its own for the API, as a browser of WEB_ORIGIN would call it. */
+const apiAs = (workerIndex: number) =>
+  apiRequest.newContext({
+    baseURL: WEB_ORIGIN,
+    extraHTTPHeaders: {
+      Origin: WEB_ORIGIN,
+      "X-Forwarded-For": nextAddress(workerIndex),
+    },
+  });
+
+/**
+ * Has BCDX's Owner invite `email` as a Member (W4) and returns the token of the link the
+ * mail carries.
+ */
+export async function inviteToBcdx(email: string, workerIndex: number) {
+  const owner = await apiAs(workerIndex);
+  try {
+    const signedIn = await owner.post("/api/auth/sign-in/email", {
+      data: { email: demo.owner, password: DEMO_PASSWORD },
+    });
+    expect(signedIn.ok(), await signedIn.text()).toBe(true);
+    const me = (await (await owner.get("/api/v1/me")).json()) as Me;
+    const sent = await owner.post(
+      `/api/v1/workspaces/${workspaceOf(me, "BCDX").id}/invitations`,
+      { data: { email, role: "member" } },
+    );
+    expect(sent.status(), await sent.text()).toBe(201);
+  } finally {
+    await owner.dispose();
+  }
+  const link = await linkMailedTo(email, /https?:\/\/\S+\/invite\/[\w-]+/);
+  return link.pathname.replace("/invite/", "");
+}
+
+/** Signs up from the invitation of `token` through U5, outside any page. */
+export async function signUpThroughApi(
+  token: string,
+  account: { displayName: string; password: string },
+  workerIndex: number,
+) {
+  const visitor = await apiAs(workerIndex);
+  try {
+    const signedUp = await visitor.post(
+      `/api/v1/invitations/by-token/${token}/sign-up`,
+      { data: { ...account, timezone: "Asia/Manila" } },
+    );
+    expect(signedUp.status(), await signedUp.text()).toBe(201);
+  } finally {
+    await visitor.dispose();
+  }
 }

@@ -1,11 +1,13 @@
 import i18next, { type i18n as I18n } from "i18next";
 import ai from "../locales/en/ai.json";
 import app from "../locales/en/app.json";
+import auth from "../locales/en/auth.json";
 import common from "../locales/en/common.json";
 import components from "../locales/en/components.json";
 import dashboard from "../locales/en/dashboard.json";
 import errors from "../locales/en/errors.json";
 import format from "../locales/en/format.json";
+import landing from "../locales/en/landing.json";
 import mail from "../locales/en/mail.json";
 import notifications from "../locales/en/notifications.json";
 import pitch from "../locales/en/pitch.json";
@@ -19,11 +21,13 @@ export const resources = {
   en: {
     ai,
     app,
+    auth,
     common,
     components,
     dashboard,
     errors,
     format,
+    landing,
     mail,
     notifications,
     pitch,

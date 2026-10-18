@@ -20,10 +20,10 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, unwrap } from "../lib/api";
-import { useAppForm } from "../lib/form";
+import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
 import { useIsOnline } from "../lib/online";
 import { isTransient } from "../lib/query";
 import { reportOnce } from "./states";
@@ -144,26 +144,24 @@ function NewWorkspaceForm({
       });
     },
   });
-  // One send at a time: after a first attempt TanStack Form lets a submit through while
-  // the last one is still out, and a second W0 would make a second workspace. A second
-  // submit waits for the first, so the form stays submitting (Create keeps its spinner).
-  const sending = useRef<Promise<void> | null>(null);
+  // A second W0 would make a second workspace: a second submit waits for the first, so
+  // the form stays submitting (Create keeps its spinner).
+  const oneAtATime = useOneAtATime();
+  const rejections = useRejectedFields(["name"] as const);
   const form = useAppForm({
     defaultValues: { name: "", currency: DEFAULT_CURRENCY },
-    onSubmit: async ({ value }) => {
-      sending.current ??= create
-        .mutateAsync(value)
-        .then(
-          () => {},
-          () => {
-            // Shown from the mutation's state below; a 401 has left the page already.
-          },
-        )
-        .finally(() => {
-          sending.current = null;
-        });
-      await sending.current;
+    listeners: {
+      onChange: ({ fieldApi }) => rejections.clear(fieldApi.name),
     },
+    onSubmit: ({ value }) =>
+      oneAtATime(async () => {
+        rejections.clear();
+        await create.mutateAsync(value).catch((error: unknown) => {
+          // Shown from the mutation's state below, or under the field the API refused,
+          // which then is the failure's only trace; a 401 has left the page already.
+          if (rejections.reject(error)) create.reset();
+        });
+      }),
   });
   const failure = create.error;
   const isUnexpected =
@@ -200,6 +198,7 @@ function NewWorkspaceForm({
         >
           {(field) => (
             <field.TextField
+              rejection={rejections.rejectionOf("name")}
               label={t("app:newWorkspace.name")}
               isRequired
               isReadOnly={!isOnline}
@@ -223,7 +222,7 @@ function NewWorkspaceForm({
         {failure !== null && !isUnexpected && (
           <InlineAlert variant="negative">
             <Flex gap="space-200" wrap alignItems="center">
-              <Text>{t("app:newWorkspace.couldNotSave")}</Text>
+              <Text>{t("app:state.couldNotSave")}</Text>
               <Button
                 variant="secondary"
                 size="S"

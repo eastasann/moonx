@@ -1621,7 +1621,7 @@ make test-e2e で 5 と M7 の E2E が通り、make test-web・make typecheck・
 
 ## Step 24: 入口の画面: 1・2・3 とログアウト
 
-Status:
+Status: done 2026-10-18
 
 ```
 ログインする前の画面と、ログイン・登録・ログアウトの流れを作ってください（PRD 4章の Must。1 は Could だが、ログアウトの行き先なのでここで作る）。

@@ -84,11 +84,15 @@ export function NoAccessState({
   );
 }
 
-/** "Not found. Check the link." and the way to the dashboard (6.0.6). */
+/**
+ * "Not found. Check the link." and the way to the dashboard (6.0.6); signed out, the way
+ * to 1 instead, which takes a signed-in user on to their dashboard (5章「認証」).
+ */
 export function NotFoundState({
   dashboardHref,
+  isSignedOut = false,
   ...placement
-}: StatePlacement & { dashboardHref?: string }) {
+}: StatePlacement & { dashboardHref?: string; isSignedOut?: boolean }) {
   const { t } = useTranslation(["app"]);
   return (
     <IllustratedMessage
@@ -96,9 +100,11 @@ export function NotFoundState({
       icon={<SearchX />}
       heading={t("app:state.notFound")}
       actions={
-        dashboardHref === undefined ? undefined : (
+        dashboardHref !== undefined ? (
           <Link href={dashboardHref}>{t("app:state.toDashboard")}</Link>
-        )
+        ) : isSignedOut ? (
+          <Link href="/">{t("app:state.toHome")}</Link>
+        ) : undefined
       }
     />
   );

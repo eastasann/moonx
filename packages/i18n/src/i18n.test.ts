@@ -28,11 +28,13 @@ test("the shared instance is ready on import", () => {
   expect(namespaces).toEqual([
     "ai",
     "app",
+    "auth",
     "common",
     "components",
     "dashboard",
     "errors",
     "format",
+    "landing",
     "mail",
     "notifications",
     "pitch",

@@ -27,6 +27,8 @@ export const Route = createFileRoute("/dev/components")({
   beforeLoad: () => {
     if (!import.meta.env.DEV) throw notFound();
   },
+  // The gallery shows its toasts in its own containers, in its own frames.
+  staticData: { hasOwnToasts: true },
   component: DevComponents,
 });
 

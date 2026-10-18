@@ -123,3 +123,10 @@ export async function unwrap<R extends EdenResult>(
   }
   throw apiErrorOf(result.status, result.error.value);
 }
+
+/**
+ * A value from the page's URL as one segment of an API path: Eden joins path parameters
+ * as they are, so a `/` in it would reach another route. A segment of only dots is still
+ * one to the URL (`..` and `%2e%2e` alike): callers refuse such values first.
+ */
+export const inPath = (value: string) => encodeURIComponent(value);

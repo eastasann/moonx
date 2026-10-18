@@ -1,5 +1,4 @@
 import {
-  AlertBanner,
   AppFrame,
   type AppFrameProps,
   MenuItem,
@@ -10,7 +9,8 @@ import {
 import { House } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useIsOnline } from "../lib/online";
+import { useLogOut } from "./logOut";
+import { useOfflineBanner } from "./StandaloneFrame";
 import { useModal, useWorkspace } from "./workspace";
 
 export interface WorkspaceFrameProps
@@ -34,7 +34,8 @@ export function WorkspaceFrame({
   const { t } = useTranslation(["app"]);
   const { me, workspace } = useWorkspace();
   const modal = useModal();
-  const isOnline = useIsOnline();
+  const offline = useOfflineBanner();
+  const logOut = useLogOut();
   const openSwitch = () => modal.open("switch-workspace");
   const pages: NavItem[] = [
     {
@@ -54,6 +55,11 @@ export function WorkspaceFrame({
           items={pages}
           currentId={current}
           user={{ name: me.displayName, avatarSrc: me.avatarUrl }}
+          userMenu={
+            <MenuItem id="log-out" onAction={logOut}>
+              {t("app:nav.logOut")}
+            </MenuItem>
+          }
         />
       }
       tabBar={
@@ -61,23 +67,18 @@ export function WorkspaceFrame({
           items={pages}
           currentId={current}
           more={
-            <MenuItem id="switch-workspace" onAction={openSwitch}>
-              {t("app:nav.switchWorkspace")}
-            </MenuItem>
+            <>
+              <MenuItem id="switch-workspace" onAction={openSwitch}>
+                {t("app:nav.switchWorkspace")}
+              </MenuItem>
+              <MenuItem id="log-out" onAction={logOut}>
+                {t("app:nav.logOut")}
+              </MenuItem>
+            </>
           }
         />
       }
-      banners={
-        isOnline
-          ? undefined
-          : {
-              offline: (
-                <AlertBanner variant="notice">
-                  {t("app:state.offline")}
-                </AlertBanner>
-              ),
-            }
-      }
+      banners={offline === undefined ? undefined : { offline }}
     >
       {children}
     </AppFrame>

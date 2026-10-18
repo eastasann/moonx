@@ -521,7 +521,7 @@ make format
 make typecheck
 ```
 
-`make test-e2e` は `e2e/playwright.config.ts` の `webServer` で、API（ポート 3100）と Web（ポート 5273）を専用に起動する。開発サーバー（3000・5173）は止めなくてよい。実行のたびに `DATABASE_URL_TEST` の DB を作り直してデモデータを入れる（`e2e/global-setup.ts`）。入口のプラグインがログインの回数を IP ごとに数える（SDD ADR-029）ので、テストは `X-Forwarded-For` の値をテストごとに変えて送る（`e2e/fixtures.ts`）。local と e2e には前に立つプロキシが無いので、送った値がそのまま右端の値になる（呼び出し元の IP の決め方は SDD 7.2）。
+`make test-e2e` は `e2e/playwright.config.ts` の `webServer` で、API（ポート 3100）と Web（ポート 5273）を専用に起動する。開発サーバー（3000・5173）は止めなくてよい。実行のたびに `DATABASE_URL_TEST` の DB を作り直してデモデータを入れる（`e2e/global-setup.ts`）。この API はメールを送らずにログ（`.data/e2e/api.log`）に書き、テストは招待とパスワード再設定のリンクをそこから読む。入口のプラグインがログインの回数を IP ごとに数える（SDD ADR-029）ので、テストは `X-Forwarded-For` の値をテストごとに変えて送る（`e2e/fixtures.ts`）。local と e2e には前に立つプロキシが無いので、送った値がそのまま右端の値になる（呼び出し元の IP の決め方は SDD 7.2）。
 
 各ターゲットが何を動かすかは [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)、テスト用の DB（`DATABASE_URL_TEST`）は SDD 2章「環境変数」、ツールの選定は ADR-022、テストの方針は SDD 10章。PR では CI が同じターゲットを動かす（04 2章）。
 

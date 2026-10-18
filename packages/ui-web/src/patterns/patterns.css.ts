@@ -1380,7 +1380,8 @@ export const publicFooterInner = style({
   display: "flex",
   flexDirection: "column",
   alignItems: "flex-start",
-  justifyContent: "center",
+  // "moonx" at the start whether or not the links follow it (they push to the end).
+  justifyContent: "flex-start",
   gap: pub.footerGapMobile,
   paddingBlock: pub.footerPaddingYMobile,
   color: vars.color.text.secondary,

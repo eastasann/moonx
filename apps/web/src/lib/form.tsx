@@ -1,3 +1,4 @@
+import { i18n } from "@moonx/i18n";
 import {
   Button,
   type ButtonProps,
@@ -7,7 +8,10 @@ import {
   type TextFieldProps,
 } from "@moonx/ui-web";
 import { createFormHook, createFormHookContexts } from "@tanstack/react-form";
+import { useCallback, useRef, useState } from "react";
 import type { z } from "zod";
+import { ApiError } from "./api";
+import { AuthError } from "./auth";
 import { inputIssueMessage } from "./input-issues";
 
 const { fieldContext, formContext, useFieldContext, useFormContext } =
@@ -25,15 +29,20 @@ function useFieldError(): string | undefined {
   return inputIssueMessage(issue);
 }
 
-/** A TextField that takes its value from its form field and shows the field's reason. */
-function FormTextField(
-  props: Omit<
-    TextFieldProps,
-    "value" | "onChange" | "onBlur" | "name" | "errorMessage" | "isInvalid"
-  >,
-) {
+/**
+ * A TextField that takes its value from its form field and shows the field's reason, or
+ * else the reason the API gave when it refused what the form let through
+ * (`useRejectedFields`).
+ */
+function FormTextField({
+  rejection,
+  ...props
+}: Omit<
+  TextFieldProps,
+  "value" | "onChange" | "onBlur" | "name" | "errorMessage" | "isInvalid"
+> & { rejection?: string }) {
   const field = useFieldContext<string>();
-  const error = useFieldError();
+  const error = useFieldError() ?? rejection;
   return (
     <TextField
       {...props}
@@ -111,3 +120,66 @@ export const { useAppForm } = createFormHook({
   fieldComponents: { TextField: FormTextField, Picker: FormPicker },
   formComponents: { SubmitButton },
 });
+
+/**
+ * Sends one at a time (design-spec 6.0.6: no second send): a submit while one is out
+ * waits for that one. TanStack Form lets a second submit through once the first attempt
+ * is over its own check, and a form of one text field submits on Enter while its button
+ * is pending.
+ */
+export function useOneAtATime(): (send: () => Promise<void>) => Promise<void> {
+  const current = useRef<Promise<void> | null>(null);
+  return useCallback((send) => {
+    current.current ??= send().finally(() => {
+      current.current = null;
+    });
+    return current.current;
+  }, []);
+}
+
+/**
+ * The fields of a form that a 422 VALIDATION_FAILED names (SDD 8.1 `details`; Better
+ * Auth's carries none, and then names the form's one field). The form checks with the
+ * same schemas before it sends (SDD 7.2), so this is the API's last guard (SDD 8.2): the
+ * reason goes under the field all the same, in the words of a format the details cannot
+ * word more closely (they carry no bounds).
+ */
+export function useRejectedFields<Name extends string>(
+  fields: readonly Name[],
+) {
+  const [rejected, setRejected] = useState<readonly Name[]>([]);
+  /** Takes the failure; false when it names none of the fields. */
+  const reject = (error: unknown): boolean => {
+    let names: Name[] = [];
+    if (error instanceof ApiError && error.code === "VALIDATION_FAILED") {
+      const details = Array.isArray(error.detail.details)
+        ? (error.detail.details as { path?: unknown }[])
+        : [];
+      names = fields.filter((name) =>
+        details.some(({ path }) => path === name),
+      );
+    } else if (
+      error instanceof AuthError &&
+      error.code === "VALIDATION_FAILED" &&
+      fields.length === 1
+    ) {
+      names = [...fields];
+    }
+    setRejected(names);
+    return names.length > 0;
+  };
+  return {
+    reject,
+    /**
+     * Clears the reason of `name`, which changed, or all of them for the next send: the
+     * API is asked again.
+     */
+    clear: (name?: string) =>
+      setRejected((names) =>
+        name === undefined ? [] : names.filter((rejected) => rejected !== name),
+      ),
+    /** The reason under `name`, while the API's refusal stands. */
+    rejectionOf: (name: Name) =>
+      rejected.includes(name) ? i18n.t("errors:input.format") : undefined,
+  };
+}

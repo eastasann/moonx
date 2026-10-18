@@ -35,11 +35,8 @@ export interface SideNavProps {
   currentId?: string;
   /** The signed-in user, at the bottom: their avatar and name open `userMenu`. */
   user: { name: string; avatarSrc?: string | null };
-  /**
-   * `MenuItem`s of the account menu: Account, Log out. Without any, the avatar and the
-   * name are shown, not a button: a button that opens nothing would be a dead control.
-   */
-  userMenu?: ReactNode;
+  /** `MenuItem`s of the account menu: Account, Log out. */
+  userMenu: ReactNode;
 }
 
 /**
@@ -126,24 +123,17 @@ export function SideNav({
             </Fragment>
           ))}
       </div>
-      {userMenu === undefined ? (
-        <div className={styles.accountStatic}>
-          <Avatar name={user.name} src={user.avatarSrc} size="M" />
-          <span className={styles.label}>{user.name}</span>
-        </div>
-      ) : (
-        <MenuTrigger>
-          <TooltipTrigger isDisabled={!hasTooltips}>
-            {/* Named by the user's name; the menu trigger tells it opens a menu. */}
-            <AriaButton className={styles.account}>
-              <Avatar name={user.name} src={user.avatarSrc} size="M" />
-              <span className={styles.label}>{user.name}</span>
-            </AriaButton>
-            <Tooltip placement="end">{user.name}</Tooltip>
-          </TooltipTrigger>
-          <Menu>{userMenu}</Menu>
-        </MenuTrigger>
-      )}
+      <MenuTrigger>
+        <TooltipTrigger isDisabled={!hasTooltips}>
+          {/* Named by the user's name; the menu trigger tells it opens a menu. */}
+          <AriaButton className={styles.account}>
+            <Avatar name={user.name} src={user.avatarSrc} size="M" />
+            <span className={styles.label}>{user.name}</span>
+          </AriaButton>
+          <Tooltip placement="end">{user.name}</Tooltip>
+        </TooltipTrigger>
+        <Menu>{userMenu}</Menu>
+      </MenuTrigger>
     </nav>
   );
 }

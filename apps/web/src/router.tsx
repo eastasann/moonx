@@ -18,6 +18,17 @@ export interface RouterContext {
 /** The sign-in screen (SDD 4章), where a request without a session sends the user. */
 const LOGIN_PATH = "/login";
 
+/**
+ * The screens anyone may open (design-spec 5章「認証」, SDD 4章): no session is lost there,
+ * so a 401 that reaches them (one sent before signing out came back after it) stays put.
+ */
+const isOpenToAll = (pathname: string) =>
+  pathname === "/" ||
+  pathname === LOGIN_PATH ||
+  pathname === "/forgot-password" ||
+  pathname === "/reset-password" ||
+  pathname.startsWith("/invite/");
+
 /** The parts of packages/ui-web move through this router (design-spec 4.5). */
 function AriaRouting({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -38,7 +49,7 @@ function AriaRouting({ children }: { children: ReactNode }) {
 export function createAppRouter({ history }: { history?: RouterHistory } = {}) {
   const queryClient = createQueryClient(() => {
     const { pathname, searchStr } = router.latestLocation;
-    if (pathname === LOGIN_PATH) return;
+    if (isOpenToAll(pathname)) return;
     queryClient.clear();
     const next = new URLSearchParams({ next: `${pathname}${searchStr}` });
     // In place of the screen: Back must not lead into it again, only to leave again.

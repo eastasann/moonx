@@ -48,7 +48,8 @@ function renderApp(path: string) {
 }
 
 test("the root route renders the English document shell", async () => {
-  renderApp("/");
+  // A page that names itself no further: the tab reads the app's name alone (6.0.1).
+  renderApp("/no-such-screen");
 
   await waitFor(() => {
     expect(document.querySelector('meta[name="viewport"]')).not.toBeNull();
@@ -83,7 +84,7 @@ test("the root hands the shared catalogs to react-i18next, which the parts read"
   // The gallery compiles its styles on first load.
 }, 40_000);
 
-test("a path that is no screen: Not found; signed out, no dashboard to offer (6.0.6)", async () => {
+test("a path that is no screen: Not found; signed out, the way to 1 (6.0.6)", async () => {
   renderApp("/no-such-screen");
   expect(
     await screen.findByRole("heading", {
@@ -91,6 +92,36 @@ test("a path that is no screen: Not found; signed out, no dashboard to offer (6.
       name: "Not found. Check the link.",
     }),
   ).toBeTruthy();
-  await waitFor(() => expect(fetch).toHaveBeenCalled());
+  const home = await screen.findByRole("link", { name: "Go to Home" });
+  expect(home.getAttribute("href")).toBe("/");
   expect(screen.queryByRole("link", { name: "Go to Dashboard" })).toBeNull();
+});
+
+test("a path that is no screen: signed in, the way to the dashboard (6.0.6)", async () => {
+  const workspace = {
+    id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    name: "BCDX",
+    isPersonal: false,
+    currency: "PHP",
+  };
+  vi.mocked(fetch).mockImplementation(async () =>
+    Response.json({
+      id: "0f8fad5b-d9cb-469f-a165-70867728950e",
+      email: "ana@bcdx.example",
+      displayName: "Ana Villanueva",
+      avatarUrl: null,
+      timezone: "Asia/Manila",
+      theme: "system",
+      isAdmin: false,
+      hasPassword: true,
+      lastWorkspaceId: workspace.id,
+      memberships: [{ workspace, role: "owner" }],
+    }),
+  );
+  renderApp("/no-such-screen");
+  const dashboard = await screen.findByRole("link", {
+    name: "Go to Dashboard",
+  });
+  expect(dashboard.getAttribute("href")).toBe(`/w/${workspace.id}`);
+  expect(screen.queryByRole("link", { name: "Go to Home" })).toBeNull();
 });

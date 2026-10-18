@@ -9,18 +9,54 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as SignedInRouteImport } from './routes/_signedIn'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SignedInWelcomeRouteImport } from './routes/_signedIn/welcome'
 import { Route as DevComponentsRouteImport } from './routes/dev.components'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as SignedInWWorkspaceIdRouteRouteImport } from './routes/_signedIn/w/$workspaceId/route'
 import { Route as SignedInWWorkspaceIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/index'
 
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignedInRoute = SignedInRouteImport.update({
   id: '/_signedIn',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignedInWelcomeRoute = SignedInWelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => SignedInRoute,
+} as any)
 const DevComponentsRoute = DevComponentsRouteImport.update({
   id: '/dev/components',
   path: '/dev/components',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignedInWWorkspaceIdRouteRoute =
@@ -37,43 +73,94 @@ const SignedInWWorkspaceIdIndexRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof SignedInRouteWithChildren
+  '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
   '/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof SignedInRouteWithChildren
+  '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_signedIn': typeof SignedInRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/_signedIn/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/_signedIn/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
   '/_signedIn/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dev/components' | '/w/$workspaceId' | '/w/$workspaceId/'
+  fullPaths:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/reset-password'
+    | '/welcome'
+    | '/dev/components'
+    | '/invite/$token'
+    | '/w/$workspaceId'
+    | '/w/$workspaceId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dev/components' | '/w/$workspaceId'
+  to:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/reset-password'
+    | '/welcome'
+    | '/dev/components'
+    | '/invite/$token'
+    | '/w/$workspaceId'
   id:
     | '__root__'
+    | '/'
     | '/_signedIn'
+    | '/forgot-password'
+    | '/login'
+    | '/reset-password'
+    | '/_signedIn/welcome'
     | '/dev/components'
+    | '/invite/$token'
     | '/_signedIn/w/$workspaceId'
     | '/_signedIn/w/$workspaceId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   SignedInRoute: typeof SignedInRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
+  LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   DevComponentsRoute: typeof DevComponentsRoute
+  InviteTokenRoute: typeof InviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_signedIn': {
       id: '/_signedIn'
       path: ''
@@ -81,11 +168,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedInRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_signedIn/welcome': {
+      id: '/_signedIn/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof SignedInWelcomeRouteImport
+      parentRoute: typeof SignedInRoute
+    }
     '/dev/components': {
       id: '/dev/components'
       path: '/dev/components'
       fullPath: '/dev/components'
       preLoaderRoute: typeof DevComponentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_signedIn/w/$workspaceId': {
@@ -120,10 +242,12 @@ const SignedInWWorkspaceIdRouteRouteWithChildren =
   )
 
 interface SignedInRouteChildren {
+  SignedInWelcomeRoute: typeof SignedInWelcomeRoute
   SignedInWWorkspaceIdRouteRoute: typeof SignedInWWorkspaceIdRouteRouteWithChildren
 }
 
 const SignedInRouteChildren: SignedInRouteChildren = {
+  SignedInWelcomeRoute: SignedInWelcomeRoute,
   SignedInWWorkspaceIdRouteRoute: SignedInWWorkspaceIdRouteRouteWithChildren,
 }
 
@@ -132,8 +256,13 @@ const SignedInRouteWithChildren = SignedInRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   SignedInRoute: SignedInRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
+  LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   DevComponentsRoute: DevComponentsRoute,
+  InviteTokenRoute: InviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

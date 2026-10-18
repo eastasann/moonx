@@ -1,11 +1,45 @@
 import { queryOptions } from "@tanstack/react-query";
-import { api, unwrap } from "./api";
+import { ApiError, api, inPath, unwrap } from "./api";
 
 /** U1: the signed-in user, their memberships and last workspace (SDD 5.4). */
 export const meQuery = () =>
   queryOptions({
     queryKey: ["me"],
     queryFn: () => unwrap(api().api.v1.me.get()),
+  });
+
+/**
+ * U1 asked from a page that needs no session (1, 2, a path that is no screen): null when
+ * no one is signed in. The 401 is an answer here, not a lost session, so it never leaves
+ * for the sign-in screen.
+ */
+export const signedInQuery = () =>
+  queryOptions({
+    queryKey: ["me", "if-signed-in"],
+    queryFn: () =>
+      unwrap(api().api.v1.me.get()).catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 401) return null;
+        throw error;
+      }),
+    retry: false,
+  });
+
+/**
+ * Whether `token` can be an invitation's: base64url (SDD 5.5), as the seed's are too. Any
+ * other value names no invitation, and as a path segment (`..`) could name another route.
+ */
+export const isInvitationToken = (token: string) => /^[\w-]+$/.test(token);
+
+/** U4: an invitation as its link shows it, whoever opens it (SDD 5.4). */
+export const invitationQuery = (token: string) =>
+  queryOptions({
+    queryKey: ["invitations", token],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.invitations["by-token"]({ token: inPath(token) })
+          .get(),
+      ),
   });
 
 const workspaceKey = (workspaceId: string) => ["workspaces", workspaceId];

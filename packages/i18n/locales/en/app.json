@@ -3,7 +3,8 @@
   "documentTitle": "{{page}} · moonx",
   "nav": {
     "dashboard": "Dashboard",
-    "switchWorkspace": "Switch workspace"
+    "switchWorkspace": "Switch workspace",
+    "logOut": "Log out"
   },
   "separator": " · ",
   "userBadge": {
@@ -20,9 +21,12 @@
     "ref": "Ref: {{ref}}",
     "retry": "Retry",
     "close": "Close",
+    "couldNotSave": "Couldn't save",
     "toDashboard": "Go to Dashboard",
+    "toHome": "Go to Home",
     "offline": "You're offline. Changes can't be saved until you reconnect.",
-    "offlinePage": "You're offline. Connect to the internet to open this page."
+    "offlinePage": "You're offline. Connect to the internet to open this page.",
+    "unexpectedRef": "Something went wrong. Ref: {{ref}}"
   },
   "switchWorkspace": {
     "title": "Switch workspace",
@@ -36,7 +40,6 @@
     "name": "Name",
     "currency": "Currency",
     "create": "Create",
-    "cancel": "Cancel",
-    "couldNotSave": "Couldn't save"
+    "cancel": "Cancel"
   }
 }

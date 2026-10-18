@@ -1,6 +1,7 @@
 import { AppFrame, SideNav, Skeleton, TabBar } from "@moonx/ui-web";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { type ComponentType, useState, useSyncExternalStore } from "react";
+import { StandaloneLoading } from "./StandaloneLoading";
 import { PENDING_MS, SlowLoadingState, useIsSlow } from "./states";
 
 declare module "@tanstack/react-router" {
@@ -10,6 +11,10 @@ declare module "@tanstack/react-router" {
      * drawn in the frame while its route still loads.
      */
     skeleton?: ComponentType;
+    /** A screen drawn without AppFrame (3, design-spec 4.5 PageFrame), and so its skeleton. */
+    isStandalone?: boolean;
+    /** The route shows its toasts itself (the component gallery), not in the root's. */
+    hasOwnToasts?: boolean;
   }
 }
 
@@ -49,13 +54,23 @@ const useIsBrowser = () =>
 export function PendingScreen() {
   const router = useRouter();
   const location = useRouterState({ select: (state) => state.location });
-  const Body = router.matchRoutes(location).at(-1)?.staticData.skeleton;
+  const target = router.matchRoutes(location).at(-1)?.staticData;
+  const Body = target?.skeleton;
   const key = useRouterState({
     select: (state) => state.location.state.__TSR_key ?? state.location.href,
   });
   const [elapsed] = useState(() => loadingFor(key));
   const isSlow = useIsSlow(true, elapsed);
-  if (!useIsBrowser()) return null;
+  const isBrowser = useIsBrowser();
+  if (!isBrowser) return null;
+  const retry = () => void router.invalidate();
+  if (target?.isStandalone === true) {
+    return (
+      <StandaloneLoading since={elapsed} onRetry={retry}>
+        {Body !== undefined && <Body />}
+      </StandaloneLoading>
+    );
+  }
   return (
     <AppFrame
       sideNav={
@@ -65,6 +80,7 @@ export function PendingScreen() {
             onWorkspacePress={nothing}
             items={[]}
             user={{ name: "" }}
+            userMenu={null}
           />
         </Skeleton>
       }
@@ -75,7 +91,7 @@ export function PendingScreen() {
       }
     >
       {isSlow ? (
-        <SlowLoadingState onRetry={() => void router.invalidate()} />
+        <SlowLoadingState onRetry={retry} />
       ) : (
         Body !== undefined && (
           <Skeleton isLoading>

@@ -1,6 +1,7 @@
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
-import { API_ORIGIN, API_PORT, WEB_ORIGIN, WEB_PORT } from "./env";
+import { API_LOG, API_ORIGIN, API_PORT, WEB_ORIGIN, WEB_PORT } from "./env";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -26,7 +27,8 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {
-      command: "bun src/index.ts",
+      // Its log goes to API_LOG, where the tests read the mails it sends (env.ts).
+      command: `mkdir -p "${dirname(API_LOG)}" && exec bun src/index.ts > "${API_LOG}"`,
       cwd: `${root}apps/api`,
       url: `${API_ORIGIN}/api/health`,
       reuseExistingServer: false,
@@ -37,6 +39,9 @@ export default defineConfig({
         BETTER_AUTH_URL: WEB_ORIGIN,
         TRUSTED_ORIGINS: WEB_ORIGIN,
         DATABASE_URL: testDatabase,
+        // The mails go to the log at info, where the tests read them.
+        MAIL_TRANSPORT: "console",
+        LOG_LEVEL: "info",
       },
     },
     {

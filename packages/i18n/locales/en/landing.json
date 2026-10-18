@@ -1,0 +1,49 @@
+{
+  "title": "Home",
+  "logIn": "Log in",
+  "hero": {
+    "title": "From idea to a plan you can show.",
+    "lead": "Know yourself, test a local business idea, then write the plan. moonx does the math and shows what is missing."
+  },
+  "example": {
+    "name": "Office Lunch Bowls",
+    "startupCosts": "Startup costs",
+    "breakEven": "Break-even",
+    "perDay": "{{units}} / day",
+    "doneCount": "Done ({{count}})",
+    "caption": "An example idea in validation."
+  },
+  "phases": {
+    "title": "Three parts, in the order founders need them.",
+    "lead": "Each part asks one question at a time and saves as you write, on your phone or on a bigger screen.",
+    "selfAnalysis": {
+      "title": "Self Analysis",
+      "description": "Your strengths, your values and what you want from a business."
+    },
+    "validation": {
+      "title": "Validation",
+      "description": "Research, competitors and costs, then decide whether to go ahead, wait or drop it."
+    },
+    "plan": {
+      "title": "Business plan",
+      "description": "Milestones, risks and a pitch deck built from what you validated."
+    }
+  },
+  "numbers": {
+    "title": "The numbers move as you type.",
+    "lead": "Enter costs and a price. Break-even, four scenarios and payback update on the spot.",
+    "bounds": "Unknown and empty rows stay in view, and a total that is only a lower bound shows a +.",
+    "costs": {
+      "label": "Example startup costs with two known rows, one Unknown row and one Empty row, and totals",
+      "equipment": "Equipment",
+      "leaseDeposit": "Lease Deposit",
+      "permits": "Permits",
+      "workingCapital": "Working Capital Buffer",
+      "startup": "Startup"
+    }
+  },
+  "invitation": {
+    "title": "moonx is by invitation.",
+    "lead": "Ask the person who invited you for your link. If you already have an account, log in."
+  }
+}

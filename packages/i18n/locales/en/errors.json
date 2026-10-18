@@ -1,4 +1,12 @@
 {
+  "ACCOUNT_SUSPENDED": "This account is suspended",
+  "INVALID_EMAIL_OR_PASSWORD": "Email or password is incorrect",
+  "INVALID_TOKEN": "This link has expired or was already used.",
+  "INVITATION_ALREADY_ACCEPTED": "Already accepted",
+  "INVITATION_EMAIL_MISMATCH": "This invitation was sent to {{email}}. Log in with that email.",
+  "INVITATION_INVALID": "This invitation is invalid or expired. Ask the person who invited you for a new one.",
+  "RATE_LIMITED": "Too many attempts. Try again in {{wait}}.",
+  "RATE_LIMITED_later": "Too many attempts. Try again later.",
   "input": {
     "required": "Can't be empty",
     "tooShort": "Use at least {{minimum}} characters",

@@ -1,17 +1,20 @@
 import { i18n } from "@moonx/i18n";
+import { ToastContainer } from "@moonx/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
   type ErrorComponentProps,
   HeadContent,
+  Outlet,
   Scripts,
   useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { I18nextProvider } from "react-i18next";
 import { FailureState, NotFoundState, StatePage } from "../components/states";
 import { dashboardHref } from "../components/workspace";
-import { ApiError, api, unwrap } from "../lib/api";
+import { signedInQuery } from "../lib/queries";
 import type { RouterContext } from "../router";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
@@ -24,6 +27,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
   }),
   shellComponent: RootDocument,
+  component: RootLayout,
   errorComponent: RootError,
   notFoundComponent: RootNotFound,
 });
@@ -43,21 +47,28 @@ function RootDocument({ children }: { children: ReactNode }) {
   );
 }
 
+/** The screens of a workspace, which show the TabBar on a phone (design-spec 6.0.1). */
+const WORKSPACE_ROUTE = "/_signedIn/w/$workspaceId";
+
 /**
- * The dashboard to offer from a page outside the workspaces, when someone is signed in.
- * Signed out there is none: the 401 is an answer here, not a lost session.
+ * Every screen, and the one place their toasts appear (design-spec 4.5 Toast): above the
+ * TabBar where a workspace's screen shows one.
  */
-function useSignedInDashboard(): string | undefined {
-  const { data } = useQuery({
-    queryKey: ["me", "if-signed-in"],
-    queryFn: () =>
-      unwrap(api().api.v1.me.get()).catch((error: unknown) => {
-        if (error instanceof ApiError && error.status === 401) return null;
-        throw error;
-      }),
-    retry: false,
+function RootLayout() {
+  const hasTabBar = useRouterState({
+    select: (state) =>
+      state.matches.some((match) => match.routeId === WORKSPACE_ROUTE),
   });
-  return data == null ? undefined : dashboardHref(data);
+  const hasOwnToasts = useRouterState({
+    select: (state) =>
+      state.matches.some((match) => match.staticData.hasOwnToasts === true),
+  });
+  return (
+    <>
+      <Outlet />
+      {!hasOwnToasts && <ToastContainer aboveTabBar={hasTabBar} />}
+    </>
+  );
 }
 
 /** A failure no route below handled: the whole page shows its state (6.0.6). */
@@ -76,12 +87,19 @@ function RootError({ error, reset }: ErrorComponentProps) {
   );
 }
 
-/** A path that is no screen (6.0.6「見つからない」). */
+/**
+ * A path that is no screen (6.0.6「見つからない」): the way to the dashboard of whoever is
+ * signed in, and signed out the way to 1. If asking fails, 1 still opens (5章「認証」).
+ */
 function RootNotFound() {
-  const href = useSignedInDashboard();
+  const { data: me, isError } = useQuery(signedInQuery());
+  const href = me == null ? undefined : dashboardHref(me);
   return (
     <StatePage>
-      <NotFoundState dashboardHref={href} />
+      <NotFoundState
+        dashboardHref={href}
+        isSignedOut={me === null || isError}
+      />
     </StatePage>
   );
 }

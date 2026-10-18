@@ -1,0 +1,6 @@
+# Only the public pages may be crawled (SDD 4章): 1 Landing, 29 Privacy Policy, 30 Support.
+User-agent: *
+Allow: /$
+Allow: /privacy$
+Allow: /support$
+Disallow: /

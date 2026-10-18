@@ -212,7 +212,12 @@ export const emailSchema = z
 export const sameEmail = (a: string, b: string) =>
   a.toLowerCase() === b.toLowerCase();
 
-const groupedNumber = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/;
+/**
+ * A typed number: digits with an optional decimal part, and thousands separators only in
+ * groups of three ("1,500.50" yes, "1,5" no). `formatNumberText` in packages/i18n
+ * regroups exactly the text this accepts.
+ */
+export const groupedNumberPattern = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/;
 
 /**
  * A number typed into a form, with optional thousands separators ("1,500.50"), then
@@ -225,7 +230,7 @@ export const numberTextSchema = <T extends z.ZodType<number, number>>(
   z
     .string()
     .trim()
-    .refine((text) => groupedNumber.test(text), {
+    .refine((text) => groupedNumberPattern.test(text), {
       message: "Enter a number",
       ...ruleIssue("number_format"),
     })

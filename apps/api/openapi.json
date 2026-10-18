@@ -25384,6 +25384,21 @@
                               "additionalProperties": false
                             }
                           },
+                          "figureColumns": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "widths": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                }
+                              },
+                              "fits": { "type": "boolean" }
+                            },
+                            "required": ["widths", "fits"],
+                            "additionalProperties": false
+                          },
                           "table": {
                             "type": ["object", "null"],
                             "properties": {
@@ -25454,6 +25469,7 @@
                           "subtitle",
                           "bullets",
                           "numbers",
+                          "figureColumns",
                           "table",
                           "emptySources",
                           "shrink",

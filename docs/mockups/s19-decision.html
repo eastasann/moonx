@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>19 判定 — 案1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="moon-base.css?v=2">
+<script src="moon-frame.js?v=1"></script>
+<script src="shared.js?v=3"></script>
+<style>
+.page { width: 100%; max-width: 760px; margin: 0 auto; padding: 32px 32px 96px; }
+.eyebrow { font-size: 13px; color: var(--ink-2); }
+h1 { margin: 4px 0 24px; font-size: 28px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.2; }
+.well { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 6px 22px 18px; margin-bottom: 32px; }
+.well h2 { margin: 16px 0 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); display: flex; gap: 8px; align-items: baseline; }
+.well h2 .aside { margin-left: auto; font-weight: 400; color: var(--ink-3); }
+.sum { display: grid; grid-template-columns: 132px 1fr; margin: 0; font-size: 14.5px; }
+.sum dt, .sum dd { margin: 0; padding: 7px 0; border-top: 1px solid var(--line); }
+.sum dt { color: var(--ink-2); font-size: 13px; }
+.sum .empty { color: var(--ink-3); }
+.kn { display: grid; grid-template-columns: repeat(5, auto); gap: 4px 22px; justify-content: start; }
+.kn .k { font-size: 12.5px; color: var(--ink-2); }
+.kn .v { font: 500 17px var(--mono); white-space: nowrap; }
+.miss { list-style: none; margin: 0; padding: 0; }
+.miss li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14.5px; }
+.miss .s { font-size: 13px; color: var(--ink-2); }
+.fauline { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--ink-2); }
+.fauline b { color: var(--ink); font: 500 14px var(--mono); }
+.fauline .attn { color: var(--notice); font-weight: 500; }
+.fauline .attn b { color: inherit; }
+.last { font-size: 13.5px; color: var(--ink-2); margin-top: 14px; }
+
+.q { font-size: 20px; font-weight: 600; margin: 0 0 14px; letter-spacing: -0.01em; }
+.choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+.choice { display: flex; gap: 10px; align-items: flex-start; padding: 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); cursor: pointer; }
+.choice .r { width: 18px; height: 18px; border-radius: 999px; border: 1.5px solid var(--ink-3); flex-shrink: 0; margin-top: 1px; display: grid; place-items: center; }
+.choice[aria-checked="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.choice[aria-checked="true"] .r { border-color: var(--ink); }
+.choice[aria-checked="true"] .r::after { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--ink); }
+.choice .t { font-weight: 600; }
+.choice .d { font-size: 13px; color: var(--ink-2); }
+.hint { font-size: 14px; color: var(--ink-2); margin: 0 0 22px; }
+label.l { display: block; font-weight: 600; margin-bottom: 6px; }
+label.l span { font-weight: 400; color: var(--ink-2); font-size: 13px; }
+textarea { width: 100%; min-height: 120px; resize: none; border: 1px solid var(--line-strong); border-radius: 10px; padding: 12px 14px; background: var(--surface); line-height: 1.6; }
+.alert { display: flex; gap: 10px; align-items: flex-start; margin: 16px 0 22px; padding: 12px 14px; border-radius: 10px; background: var(--notice-bg); color: var(--ink); font-size: 14px; }
+.alert .ic { color: var(--notice); }
+.formbar { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 767px) {
+  .page { padding: 20px 16px 160px; }
+  h1 { font-size: 22px; }
+  .well { padding: 4px 16px 16px; }
+  .sum { grid-template-columns: 1fr; }
+  .sum dd { border-top: 0; padding-top: 0; }
+  .kn { grid-template-columns: repeat(2, auto); }
+  .choices { grid-template-columns: 1fr; }
+  .formbar { position: fixed; left: 0; right: 0; bottom: 64px; padding: 10px 16px; background: var(--page); border-top: 1px solid var(--line); }
+  .formbar .btn { flex: 1; justify-content: center; height: 48px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Workspace" data-sidebar="ideas"></aside>
+  <div class="main">
+    <header class="top">
+      <a class="back" href="#"><span data-icon="arrow-left" data-size="20"></span>Validation</a>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="#">Ideas</a><span>/</span><a href="#">Bacolod Health Bowl</a><span>/</span><span aria-current="page">Record decision</span></nav>
+    </header>
+    <main class="page" id="main">
+      <div class="eyebrow">Bacolod Health Bowl</div>
+      <h1>Record a decision</h1>
+
+      <section class="well" aria-label="What you know so far">
+        <h2>Summary</h2>
+        <dl class="sum">
+          <dt>Concept</dt><dd>Healthy fast-casual bowls with standardized nutrition in Bacolod.</dd>
+          <dt>Customer</dt><dd>Working professionals aged 25–40 in Bacolod who pay for convenient meals.</dd>
+          <dt>Problem</dt><dd>Healthy eating is hard to sustain because planning, cooking and portion control take time.</dd>
+          <dt>Market type</dt><dd>Red</dd>
+          <dt>Biggest opportunity</dt><dd>Few healthy lunch options near the Lacson St. offices.</dd>
+          <dt>Biggest unknown</dt><dd>How much more than ₱150 people will pay.</dd>
+          <dt>Biggest risk</dt><dd class="empty">Empty</dd>
+        </dl>
+        <h2>Key numbers</h2>
+        <div class="kn">
+          <span class="k">Startup</span><span class="k">Break-even</span><span class="k">Expected profit</span><span class="k">Payback</span><span class="k">ROI</span>
+          <span class="v">₱145,000+</span><span class="v">14.4+ / day</span><span class="v">≤ ₱37,000 / mo</span><span class="v">3.9+ mo</span><span class="v">≤ 306.2%</span>
+        </div>
+        <h2>Checks <span class="aside">2 missing</span></h2>
+        <ul class="miss">
+          <li><span data-moon="0.5" data-size="14"></span>Startup &amp; monthly costs<span class="s">Partial · 1 row is Empty</span></li>
+          <li><span data-moon="0" data-size="14"></span>Permits<span class="s">Not started</span></li>
+        </ul>
+        <h2>Fact / Assumption / Unknown</h2>
+        <div class="fauline"><span><span data-moon="1" data-size="12" style="display:inline-block;vertical-align:-1px"></span> Fact <b>3</b></span><span><span data-moon="0.5" data-size="12" style="display:inline-block;vertical-align:-1px"></span> Assumption <b>29</b></span><span class="attn"><span data-moon="0" data-size="12" style="display:inline-block;vertical-align:-1px"></span> Unknown <b>5</b></span><span class="attn">Unclassified <b>3</b></span><span>Empty <b>22</b></span></div>
+        <div class="last">Last decision: Hold · Oct 2 · Kenji Mori</div>
+      </section>
+
+      <section aria-labelledby="q">
+        <p class="q" id="q">Should we develop this into a full Business Plan?</p>
+        <div class="choices" role="radiogroup" aria-labelledby="q">
+          <div class="choice" role="radio" aria-checked="false" tabindex="0"><span class="r"></span><span><span class="t">Proceed</span><br><span class="d">Worth planning</span></span></div>
+          <div class="choice" role="radio" aria-checked="true" tabindex="0"><span class="r"></span><span><span class="t">Hold</span><br><span class="d">Come back later</span></span></div>
+          <div class="choice" role="radio" aria-checked="false" tabindex="-1"><span class="r"></span><span><span class="t">Drop</span><br><span class="d">Hide from lists</span></span></div>
+        </div>
+        <p class="hint">You can decide again at any time. Every decision stays in the log.</p>
+        <label class="l" for="why">Why? <span>Required</span></label>
+        <textarea id="why">Permit costs are still unknown and one startup row is empty. Revisit after the City Hall visit.</textarea>
+        <div class="alert" role="note"><span class="ic" data-icon="alert" data-size="18"></span><span>2 checks are missing. They will be recorded with this decision.</span></div>
+        <div class="formbar"><button class="btn quiet">Cancel</button><button class="btn primary">Record decision</button></div>
+      </section>
+    </main>
+    <nav class="tabbar" aria-label="Main" data-tabbar="ideas"></nav>
+  </div>
+</div>
+</body>
+</html>

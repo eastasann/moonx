@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5 ダッシュボード — 案1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="moon-base.css?v=2">
+<script src="shared.js?v=3"></script>
+<style>
+.page { width: 100%; max-width: 1180px; padding: 32px 32px 72px; }
+.head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 32px; }
+.head h1 { margin: 0; font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+.head p { margin: 4px 0 0; color: var(--ink-2); }
+.head .actions { margin-left: auto; }
+.cols { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 48px; }
+.col { display: flex; flex-direction: column; gap: 36px; min-width: 0; }
+h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); display: flex; align-items: baseline; gap: 8px; }
+h2 .aside { margin-left: auto; font-weight: 400; color: var(--ink-3); }
+
+.ideas { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.ideas a { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 2px 16px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+.ideas a:hover { background: var(--sunken); }
+.ideas .t { font-weight: 600; }
+.ideas .m { grid-column: 1; font-size: 13px; color: var(--ink-2); }
+.ideas .dots { grid-row: 1 / 3; grid-column: 2; display: flex; gap: 3px; }
+.ideas .dec { grid-row: 1 / 3; grid-column: 3; min-width: 92px; text-align: right; }
+.tag { display: inline-block; font-size: 12.5px; font-weight: 500; padding: 1px 8px; border: 1px solid var(--line-strong); border-radius: 6px; color: var(--ink); }
+.tag.quiet { color: var(--ink-2); border-style: dashed; }
+.miss { color: var(--ink-2); }
+.hidden-note { display: flex; gap: 8px; align-items: center; padding: 12px 4px; font-size: 14px; color: var(--ink-2); }
+.hidden-note a { color: var(--ink); font-weight: 500; border-bottom: 1px solid var(--line-strong); }
+
+.people { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.people li > * { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--line); }
+.people a:hover { background: var(--sunken); }
+.people .n { font-weight: 500; }
+.people .s { margin-left: auto; font-size: 13.5px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
+
+.due { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.due a { display: grid; grid-template-columns: 18px 1fr auto; gap: 2px 10px; align-items: start; padding: 11px 4px; border-bottom: 1px solid var(--line); }
+.due a:hover { background: var(--sunken); }
+.due .box { width: 16px; height: 16px; border: 1.5px solid var(--ink-3); border-radius: 4px; margin-top: 3px; }
+.due .t { font-weight: 500; }
+.due .m { grid-column: 2; font-size: 13px; color: var(--ink-2); }
+.due .when { font: 500 13px var(--mono); color: var(--ink-2); white-space: nowrap; padding-top: 2px; }
+.due .when.over { color: var(--notice); }
+.mine { font-size: 11.5px; font-weight: 600; color: var(--ink); border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+
+.activity { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.activity a { display: grid; grid-template-columns: 28px 1fr; gap: 0 10px; padding: 10px 4px; border-bottom: 1px solid var(--line); }
+.activity a:hover { background: var(--sunken); }
+.activity .avatar { width: 24px; height: 24px; font-size: 10px; border-radius: 7px; margin-top: 1px; }
+.activity .t { font-size: 14.5px; }
+.activity .t b { font-weight: 600; }
+.activity .m { grid-column: 2; font-size: 13px; color: var(--ink-2); }
+
+@media (max-width: 1023px) { .cols { grid-template-columns: 1fr; } }
+@media (max-width: 767px) {
+  .page { padding: 20px 16px 96px; }
+  .head h1 { font-size: 26px; }
+  .cols { display: flex; flex-direction: column; gap: 32px; }
+  .col { display: contents; }
+  .b-ideas { order: 1; } .b-due { order: 2; } .b-self { order: 3; } .b-activity { order: 4; }
+  .ideas a { grid-template-columns: minmax(0, 1fr) auto; min-height: 64px; }
+  .ideas .dots { grid-row: 3; grid-column: 1; margin-top: 4px; }
+  .ideas .dec { grid-row: 1; grid-column: 2; min-width: 0; }
+  .top .ttl { font-weight: 600; padding-left: 8px; }
+}
+.top .ttl { display: none; }
+@media (max-width: 767px) { .top .ttl { display: block; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Workspace">
+    <div class="brand"><svg class="logo" viewBox="0 0 512 512" aria-hidden="true"><mask id="cr"><rect width="512" height="512" fill="#fff"/><circle cx="300" cy="215" r="132" fill="#000"/></mask><circle cx="246" cy="266" r="150" fill="currentColor" mask="url(#cr)"/><circle cx="378" cy="150" r="28" fill="currentColor"/></svg><span>moonx</span></div>
+    <button class="ws"><span>BCDX</span><span data-icon="chevron-down" data-size="16"></span></button>
+    <nav class="nav" aria-label="Main">
+      <a href="#" aria-current="page"><span data-icon="house"></span><span>Dashboard</span></a>
+      <a href="#"><span data-icon="lightbulb"></span><span>Ideas</span></a>
+      <a href="#"><span data-icon="compass"></span><span>Self Analysis</span></a>
+      <a href="#"><span data-icon="bell"></span><span>Notifications</span><span class="count">3</span></a>
+      <a href="#"><span data-icon="scroll"></span><span>Decision Log</span></a>
+      <hr>
+      <a href="#"><span data-icon="settings"></span><span>Workspace Settings</span></a>
+    </nav>
+    <div class="user"><span class="avatar">AV</span><span>Ana Villanueva</span></div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <span class="ttl">BCDX <span data-icon="chevron-down" data-size="14" style="display:inline-block;vertical-align:middle"></span></span>
+      <nav class="crumbs" aria-label="Breadcrumb"><span aria-current="page">Dashboard</span></nav>
+    </header>
+
+    <main class="page" id="main">
+      <div class="head">
+        <div><h1>BCDX</h1><p>Ideas, self analyses and what is due across the workspace.</p></div>
+      </div>
+
+      <div class="cols">
+        <div class="col">
+          <section class="b-ideas">
+            <h2>Ideas <span class="aside">Checks: ● done · ◐ partial · ○ not started</span></h2>
+            <ul class="ideas">
+              <li><a href="#"><span class="t">Piaya Gift Box Delivery</span><span class="m">Planning · updated 12h ago</span><span class="dots" role="img" aria-label="All 6 checks done"><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span></span><span class="dec"><span class="tag">Proceed</span></span></a></li>
+              <li><a href="#"><span class="t">Bacolod Health Bowl</span><span class="m">Validation · updated yesterday · <span class="miss">Missing: Startup &amp; monthly costs, Permits</span></span><span class="dots" role="img" aria-label="4 done, 1 partial, 1 not started"><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="0.5" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="0" data-size="12"></span><span data-moon="1" data-size="12"></span></span><span class="dec"><span class="tag">Hold</span></span></a></li>
+              <li><a href="#"><span class="t">Piaya Gift Box (Corporate)</span><span class="m">Validation · updated 2 days ago</span><span class="dots" role="img" aria-label="All 6 checks done"><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span></span><span class="dec"><span class="tag quiet">Undecided</span></span></a></li>
+              <li><a href="#"><span class="t">Mobile Bike Repair</span><span class="m">Validation · updated 3 days ago · <span class="miss">Missing: 6 checks</span></span><span class="dots" role="img" aria-label="6 not started"><span data-moon="0" data-size="12"></span><span data-moon="0" data-size="12"></span><span data-moon="0" data-size="12"></span><span data-moon="0" data-size="12"></span><span data-moon="0" data-size="12"></span><span data-moon="0" data-size="12"></span></span><span class="dec"><span class="tag quiet">Undecided</span></span></a></li>
+              <li><a href="#"><span class="t">Student Study Café</span><span class="m">Launch prep · updated 5 days ago</span><span class="dots" role="img" aria-label="All 6 checks done"><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span></span><span class="dec"><span class="tag">Proceed</span></span></a></li>
+            </ul>
+            <div class="hidden-note">1 dropped idea hidden · <a href="#">Show</a></div>
+          </section>
+
+          <section class="b-self">
+            <h2>Self analyses</h2>
+            <ul class="people">
+              <li><a href="#"><span class="avatar">AV</span><span class="n">Ana Villanueva</span><span class="s"><span data-moon="1" data-size="12"></span>Shared · Done</span></a></li>
+              <li><div><span class="avatar">KM</span><span class="n">Kenji Mori</span><span class="s">Not shared</span></div></li>
+              <li><a href="#"><span class="avatar">PG</span><span class="n">Paolo Gonzaga</span><span class="s"><span data-moon="1" data-size="12"></span>Shared · Done</span></a></li>
+            </ul>
+          </section>
+        </div>
+
+        <div class="col">
+          <section class="b-due">
+            <h2>Due soon <span class="aside">next 7 days</span></h2>
+            <ul class="due">
+              <li><a href="#"><span class="box"></span><span class="t">Get the written supply quote from the bakery<span class="mine">Yours</span></span><span class="when over">overdue 3d</span><span class="m">Piaya Gift Box Delivery · Ana Villanueva</span></a></li>
+              <li><a href="#"><span class="box"></span><span class="t">Confirm permit requirements with City Hall</span><span class="when">Oct 14</span><span class="m">Bacolod Night Market Stall · Kenji Mori</span></a></li>
+              <li><a href="#"><span class="box"></span><span class="t">First 30 days</span><span class="when">Oct 16</span><span class="m">Student Study Café · Paolo Gonzaga</span></a></li>
+              <li><a href="#"><span class="box"></span><span class="t">Test delivery slots with five offices</span><span class="when">Oct 19</span><span class="m">Piaya Gift Box Delivery · Paolo Gonzaga</span></a></li>
+            </ul>
+          </section>
+
+          <section class="b-activity">
+            <h2>Recent activity</h2>
+            <ul class="activity">
+              <li><a href="#"><span class="avatar">AV</span><span class="t"><b>Ana Villanueva</b> changed 24.2 Milestones</span><span class="m">Piaya Gift Box Delivery · Plan A · 2 days ago</span></a></li>
+              <li><a href="#"><span class="avatar">PG</span><span class="t"><b>Paolo Gonzaga</b> commented on 24.2 Milestones</span><span class="m">Piaya Gift Box Delivery · Plan A · 3 days ago</span></a></li>
+              <li><a href="#"><span class="avatar">AV</span><span class="t"><b>Ana Villanueva</b> recorded Go / No-Go: Delay</span><span class="m">Piaya Gift Box Delivery · Plan A · 4 days ago</span></a></li>
+              <li><a href="#"><span class="avatar">AV</span><span class="t"><b>Ana Villanueva</b> commented on Costs · Rent</span><span class="m">Piaya Gift Box Delivery · 6 days ago</span></a></li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <nav class="tabbar" aria-label="Main">
+      <a href="#" aria-current="page"><span data-icon="house" data-size="22"></span>Dashboard</a>
+      <a href="#"><span data-icon="lightbulb" data-size="22"></span>Ideas</a>
+      <a href="#"><span data-icon="compass" data-size="22"></span>Self Analysis</a>
+      <a href="#"><span data-icon="bell" data-size="22"></span><span class="badge">3</span>Notifications</a>
+      <a href="#"><span data-icon="menu" data-size="22"></span>More</a>
+    </nav>
+  </div>
+</div>
+</body>
+</html>

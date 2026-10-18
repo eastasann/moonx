@@ -1,20 +1,26 @@
 import { describe, expect, test } from "bun:test";
 import {
+  formatCalendarMonth,
   formatCheckName,
   formatCount,
   formatDate,
+  formatDayOfMonth,
   formatInputNumber,
   formatInputPercent,
   formatIsoDate,
   formatIsoDateTime,
   formatMoney,
   formatMonths,
+  formatNumberAffixes,
+  formatNumberText,
   formatOverdue,
   formatPercent,
+  formatProgress,
   formatRelativeTime,
   formatTime,
   formatUnits,
   formatWaitTime,
+  formatWeekdayInitial,
 } from "./format";
 
 const timeZone = "Asia/Manila";
@@ -90,6 +96,47 @@ describe("counts, rates and months (design-spec 6.4 端数)", () => {
     expect(formatInputNumber(1000)).toBe("1,000");
   });
 
+  test("typed number text is regrouped, its decimals untouched", () => {
+    expect(formatNumberText("1500.5")).toBe("1,500.5");
+    expect(formatNumberText(" 1234567 ")).toBe("1,234,567");
+    expect(formatNumberText("1,500.505")).toBe("1,500.505");
+    expect(formatNumberText("1000000000000.00")).toBe("1,000,000,000,000.00");
+    expect(formatNumberText("12345678901234567890")).toBe(
+      "12,345,678,901,234,567,890",
+    );
+    expect(formatNumberText("0")).toBe("0");
+    expect(formatNumberText("0.75")).toBe("0.75");
+  });
+
+  test("leading zeros stay as typed", () => {
+    expect(formatNumberText("007.50")).toBe("007.50");
+    expect(formatNumberText("0,500")).toBe("0,500");
+  });
+
+  test("number text the form refuses comes back as typed", () => {
+    for (const text of ["1,5", "12.", "₱1,500", "-3", "1e3", "", "abc"]) {
+      expect(formatNumberText(text)).toBe(text);
+    }
+  });
+
+  test("number fields show the narrow currency symbol before, the % after", () => {
+    expect(formatNumberAffixes({ currency: "PHP" })).toEqual({
+      prefix: "₱",
+      suffix: "",
+    });
+    expect(formatNumberAffixes({ currency: "USD" })).toEqual({
+      prefix: "$",
+      suffix: "",
+    });
+    expect(formatMoney(1, "JPY")).toBe(
+      `${formatNumberAffixes({ currency: "JPY" }).prefix}1`,
+    );
+    expect(formatNumberAffixes({ percent: true })).toEqual({
+      prefix: "",
+      suffix: "%",
+    });
+  });
+
   test("rates: one decimal, keeping .0", () => {
     expect(formatPercent(0.51425)).toBe("51.4%");
     expect(formatPercent(0.5)).toBe("50.0%");
@@ -115,6 +162,26 @@ describe("counts, rates and months (design-spec 6.4 端数)", () => {
     expect(formatCount(99)).toBe("99");
     expect(formatCount(100)).toBe("99+");
   });
+});
+
+test("progress is a whole percent", () => {
+  expect(formatProgress(0)).toBe("0%");
+  expect(formatProgress(0.4)).toBe("40%");
+  expect(formatProgress(0.666)).toBe("67%");
+  expect(formatProgress(1)).toBe("100%");
+});
+
+test("a DatePicker's calendar: month, weekday initials and day numbers", () => {
+  expect(formatCalendarMonth("2026-10-16")).toBe("October 2026");
+  expect(formatCalendarMonth("2026-01-01")).toBe("January 2026");
+  // 2026-10-11 is a Sunday.
+  expect(
+    ["11", "12", "13", "14", "15", "16", "17"].map((day) =>
+      formatWeekdayInitial(`2026-10-${day}`),
+    ),
+  ).toEqual(["S", "M", "T", "W", "T", "F", "S"]);
+  expect(formatDayOfMonth("2026-10-01")).toBe("1");
+  expect(formatDayOfMonth("2026-10-31")).toBe("31");
 });
 
 describe("dates and times (design-spec 1.2)", () => {

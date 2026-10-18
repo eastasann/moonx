@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>案1 画面ごと</title>
+<style>
+:root { --bg: #F2F2F2; --fg: #1A1A1A; --mute: #666; --line: #D6D6D6; --card: #FFF; color-scheme: light; }
+:root[data-theme="dark"] { --bg: #161616; --fg: #EEE; --mute: #A0A0A0; --line: #333; --card: #1F1F1F; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.6 system-ui, "Hiragino Sans", sans-serif; }
+header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 1; }
+header h1 { font-size: 15px; margin: 0; }
+.tabs { display: flex; gap: 4px; }
+.accent { display: flex; gap: 4px; }
+.accent i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+.tabs button, .theme button, .accent button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 6px; cursor: pointer; }
+.tabs button[aria-pressed="true"], .theme button[aria-pressed="true"], .accent button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.theme { margin-left: auto; display: flex; gap: 4px; }
+.note { padding: 12px 20px 0; color: var(--mute); max-width: 1100px; }
+.note b { color: var(--fg); }
+.stage { display: flex; gap: 24px; padding: 16px 20px 40px; align-items: flex-start; }
+.frame { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+.frame .cap { padding: 6px 10px; font-size: 12px; color: var(--mute); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+.frame .cap a { color: inherit; }
+.viewport { overflow: hidden; position: relative; }
+.viewport iframe { border: 0; transform-origin: 0 0; position: absolute; top: 0; left: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>案1 月相 — 画面ごと</h1>
+  <div class="tabs" role="group" aria-label="画面">
+    <button data-d="d1-moon.html" aria-pressed="true">13 検証ホーム</button>
+    <button data-d="s11-form.html" aria-pressed="false">11 設問フォーム</button>
+    <button data-d="s17-costs.html" aria-pressed="false">17 費用</button>
+    <button data-d="s05-dashboard.html" aria-pressed="false">5 ダッシュボード</button>
+    <button data-d="s06-ideas.html" aria-pressed="false">6 アイデア一覧</button>
+    <button data-d="s19-decision.html" aria-pressed="false">19 判定</button>
+    <button data-d="s15-competitors.html" aria-pressed="false">15 競合</button>
+    <button data-d="s25-import.html" aria-pressed="false">25 AI 取り込み</button>
+    <button data-d="s09-settings.html" aria-pressed="false">9 設定</button>
+    <button data-d="s23-deck.html" aria-pressed="false">23 Pitch Deck</button>
+    <button data-d="s01-landing.html" aria-pressed="false">1 ランディング</button>
+  </div>
+  <div class="theme" role="group" aria-label="モード">
+    <button data-t="light" aria-pressed="true">ライト</button>
+    <button data-t="dark" aria-pressed="false">ダーク</button>
+  </div>
+</header>
+<p class="note" id="note"></p>
+<div class="stage">
+  <div class="frame"><div class="cap"><span>デスクトップ 1440px（縮小表示）</span><a id="open-d" target="_blank">原寸で開く</a></div><div class="viewport" id="vd"><iframe id="fd" title="デスクトップ"></iframe></div></div>
+  <div class="frame"><div class="cap"><span>スマホ 390px</span><a id="open-m" target="_blank">開く</a></div><div class="viewport" id="vm"><iframe id="fm" title="スマホ"></iframe></div></div>
+</div>
+<script>
+const NOTES = {
+  "d1-moon.html": "<b>13 検証ホーム</b>（パターン A ハブ）。主要な数字を横一列、その下を2列に。差し色なし。",
+  "s05-dashboard.html": "<b>5 ダッシュボード</b>（パターン A）。アイデアは確認項目6つを月の形の点（CheckDots）で並べ、判定は枠だけの控えめな札（Undecided は点線）。期限は日付で出し、期限切れだけ琥珀色。",
+  "s06-ideas.html": "<b>6 アイデア一覧</b>（パターン D）。左にリスト、右に選んだアイデアの要約（主要な数字・確認項目・判定・プラン）。スマホはリストだけで、右下の + で新しいアイデア。",
+  "s19-decision.html": "<b>19 判定</b>（パターン B 中央集中）。上に判断材料（概要・主要な数字・足りない確認項目・F/A/U）を1つの枠にまとめ、下で判定を選んで理由を書く。判定の選択肢に色は付けない（Drop を赤にしない）。",
+  "s15-competitors.html": "<b>15 競合・代替</b>（パターン E カード比較）。カードは種類・名前・価格を上に、項目は区切り線の並びで読む。Cards / Table の切り替えと、下に Survivor / Failure Patterns の設問。",
+  "s25-import.html": "<b>25 AI 取り込み</b>（パターン G ステップ）。③ 差分確認の段階。今の回答と取り込む内容を左右に並べ、追加は下線・削除は取り消し線（色だけに頼らない）。変わった回答は未分類に戻り、その場で付け直せる。",
+  "s09-settings.html": "<b>9 ワークスペース設定</b>（パターン H）。左に設定のまとまりの名前、右に項目。押せない操作は無効にして理由を添える（最後の Owner）。",
+  "s23-deck.html": "<b>23 Pitch Deck</b>（パターン I）。左にスライドの一覧、右にスライドと話す内容。スライドは PDF と同じく常にライト（ダークにしても白いまま）。",
+  "s01-landing.html": "<b>1 ランディング</b>（パターン J）。design-taste-frontend の決まりで作成: ヒーローは見出し2行・説明20語・ボタン1つ、作り物の画面ではなく実物の部品を小さく見せる、3枚の同じカードを使わない。3つの工程は月が満ちていく並び（○ → ◐ → ●）。",
+  "s17-costs.html": "<b>17 費用</b>（パターン F ワークシート）。表は帳簿のように値だけを見せ、触った行だけを入力欄にする。F/A/U と確信度は F/A/U の欄を押すと開く小さなポップオーバーにまとめる（例は Renovation の行）。合計は右の列に固定し、表に重ならない。スマホは行ごとのカードと、下の要約バー。",
+  "s11-form.html": "<b>11 設問フォーム</b>（パターン C）。左端の月の形で、各回答の F/A/U（Fact ● / Assumption ◐ / Unknown ○）を縦に見渡せる。未分類は琥珀色の菱形、未入力は点線の丸。入力中の設問だけをカードにして、回答欄は全幅。スマホは1問ずつで、下の点は回答済み ● / 未回答 ○。",
+};
+let doc = "d1-moon.html", theme = "light";
+const fd = document.getElementById("fd"), fm = document.getElementById("fm");
+function layout() {
+  const avail = window.innerWidth - 40 - 24 - 390 * 0.85 - 4;
+  const s = Math.min(1, Math.max(0.3, avail / 1440));
+  fd.style.width = "1440px"; fd.style.height = "900px"; fd.style.transform = `scale(${s})`;
+  document.getElementById("vd").style.width = 1440 * s + "px"; document.getElementById("vd").style.height = 900 * s + "px";
+  fm.style.width = "390px"; fm.style.height = "844px"; fm.style.transform = "scale(0.85)";
+  document.getElementById("vm").style.width = 390 * 0.85 + "px"; document.getElementById("vm").style.height = 844 * 0.85 + "px";
+}
+function load() {
+  const url = `${doc}?theme=${theme}`;
+  fd.src = url; fm.src = url;
+  document.getElementById("open-d").href = url; document.getElementById("open-m").href = url;
+  document.getElementById("note").innerHTML = NOTES[doc];
+  document.documentElement.dataset.theme = theme;
+}
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  doc = b.dataset.d; document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-pressed", x === b)); load();
+});
+document.querySelectorAll(".theme button").forEach(b => b.onclick = () => {
+  theme = b.dataset.t; document.querySelectorAll(".theme button").forEach(x => x.setAttribute("aria-pressed", x === b)); load();
+});
+window.addEventListener("resize", layout);
+layout(); load();
+</script>
+</body>
+</html>

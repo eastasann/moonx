@@ -9,6 +9,7 @@ import {
   type PitchDeckInput,
   type PitchExecutionItem,
   type PitchSection,
+  pitchFooterText,
   pitchSlideKeys,
 } from "./pitch";
 import {
@@ -17,6 +18,7 @@ import {
   figureColumns,
   fitPitchDeck,
   fitPitchSlide,
+  fittedFigureColumns,
   type MeasureText,
   pitchFrame,
   pitchNumbersBreak,
@@ -777,6 +779,25 @@ describe("buildPitchDeck: the slides", () => {
   });
 });
 
+describe("pitchFooterText", () => {
+  test("the name, the version or Draft and the date (no year in the year it was made); a blank name is left out", () => {
+    const deck = buildPitchDeck(input());
+    const options = { timeZone: "Asia/Manila" };
+    expect(pitchFooterText(deck, options)).toBe(
+      "Piaya Gift Box Co. · Draft · Oct 1",
+    );
+    expect(
+      pitchFooterText(
+        {
+          ...deck,
+          footer: { ...deck.footer, businessName: "  ", versionLabel: "v1" },
+        },
+        options,
+      ),
+    ).toBe("v1 · Oct 1");
+  });
+});
+
 describe("pitchSlideKeys", () => {
   test("names the slides of each deck in order, as their comments' keys use them", () => {
     for (const variant of ["one", "five"] as const) {
@@ -1172,6 +1193,40 @@ describe("fitPitchDeck", () => {
     expect(wide.shrink).toBe(6);
     expect(pitchNumbersBreak(wide, fit)).toBe(true);
     expect(pitchNumbersBreak(fitPitchSlide(model, fit), fit)).toBe(false);
+  });
+
+  test("the fit sets the figures' columns at the sizes it ends at, which a screen lays out as they are", () => {
+    const deck = fitPitchDeck(buildPitchDeck(input()), fit);
+    for (const slide of deck.slides) {
+      if (slide.numbers.length === 0) {
+        expect({ key: slide.key, columns: slide.figureColumns }).toEqual({
+          key: slide.key,
+          columns: null,
+        });
+        continue;
+      }
+      // The economics slide fits one step smaller: its columns are measured there.
+      const measured = figureColumns(
+        slide,
+        pitchSizes(slide.type, slide.shrink, print),
+        fit,
+      );
+      expect(slide.figureColumns).toEqual({
+        widths: measured.map((column) => column.width),
+        fits: measured.fits,
+      });
+      const laidOut = fittedFigureColumns(slide, fit);
+      expect([...laidOut]).toEqual([...measured]);
+      expect(laidOut.fits).toBe(measured.fits);
+    }
+    expect(slideOf(deck, "economics").shrink).toBeGreaterThan(0);
+    // Built but not fitted, the figures have no columns to be laid out in.
+    expect(() =>
+      fittedFigureColumns(
+        slideOf(buildPitchDeck(input()), "business_model"),
+        fit,
+      ),
+    ).toThrow("A slide's figures without the columns the fit set");
   });
 
   test("pitchNumbersBreak: a number cell wider than its column, not a reason in place of a figure", () => {

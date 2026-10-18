@@ -17,6 +17,11 @@
     "assumption": "Assumption",
     "unknown": "Unknown"
   },
+  "fauLabel": {
+    "fact_one": "Fact · {{count}} source",
+    "fact_other": "Fact · {{count}} sources",
+    "assumption": "Assumption · {{confidence}}"
+  },
   "confidence": {
     "low": "Low",
     "medium": "Medium",

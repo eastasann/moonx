@@ -20,17 +20,95 @@ export type Scale = (typeof scales)[number];
 export const densities = ["compact", "regular", "spacious"] as const;
 export type Density = (typeof densities)[number];
 
-/** The `size` every component takes (design-spec 4.5). */
+/** The densities a screen picks: compact is held in reserve (06 semantic.density). */
+export type ScreenDensity = Exclude<Density, "compact">;
+
+/**
+ * The `size` of the components that take one, unless they have their own steps below
+ * (design-spec 4.5). Components Spectrum 2 gives no size, such as Heading or Link, take
+ * none.
+ */
 export const sizes = ["S", "M", "L", "XL"] as const;
 export type Size = (typeof sizes)[number];
+
+/**
+ * The steps of the components whose sizes start at XS, as Spectrum 2's do: ToggleButtonGroup
+ * here (design-spec 4.5 lists the rest). Its values are 06 component.action-button.
+ */
+export const sizesWithXS = ["XS", "S", "M", "L", "XL"] as const;
+export type SizeWithXS = (typeof sizesWithXS)[number];
+
+/** TagGroup's sizes: Spectrum 2's steps (design-spec 4.5, 06 component.tag). */
+export const tagSizes = ["S", "M", "L"] as const;
+export type TagSize = (typeof tagSizes)[number];
 
 /** Lucide icon sizes (`semantic.scale.*.component.icon.size`). */
 export const iconSizes = ["XS", "S", "M", "L", "XL"] as const;
 export type IconSize = (typeof iconSizes)[number];
 
+/**
+ * MoonGlyph and CheckDots sizes (design-spec 4.5): 06 component.moon-glyph.size and
+ * component.check-dots.gap.
+ */
+export const moonGlyphSizes = ["S", "M"] as const;
+export type MoonGlyphSize = (typeof moonGlyphSizes)[number];
+
+/**
+ * Card and CardView sizes: Spectrum 2's steps, XS to XL (design-spec 4.5, 06
+ * component.card and card-view).
+ */
+export const cardSizes = sizesWithXS;
+export type CardSize = SizeWithXS;
+
+/**
+ * TableView's `layout` (design-spec 4.5): `auto` is a table on tablet and wider and cards
+ * on a phone; a phone shows cards whatever the layout.
+ */
+export const tableLayouts = ["auto", "table", "cards"] as const;
+export type TableLayout = (typeof tableLayouts)[number];
+
+/** DiffText's `variant`: the text before a change with what it removed, or after with what it added. */
+export const diffTextVariants = ["before", "after"] as const;
+export type DiffTextVariant = (typeof diffTextVariants)[number];
+
+/**
+ * QuestionCard's `mode` (design-spec 4.1 C): `focused` is the question being answered,
+ * `open` a question shown whole without the focus (Focus off, Viewer), `quiet` the others.
+ */
+export const questionCardModes = ["focused", "open", "quiet"] as const;
+export type QuestionCardMode = (typeof questionCardModes)[number];
+
+/**
+ * MetricGroup's `variant` (design-spec 4.5): `band` across a hub's top (13), `compact`
+ * inside 19's Well, `column` down a worksheet's results (17, 18), `pair` 2×2 in a
+ * detail beside a list (6).
+ */
+export const metricGroupVariants = [
+  "band",
+  "compact",
+  "column",
+  "pair",
+] as const;
+export type MetricGroupVariant = (typeof metricGroupVariants)[number];
+
+/** MetricTile's supplement: plain, or the amber of a warning (design-spec 4.4). */
+export const metricTileTones = ["neutral", "notice"] as const;
+export type MetricTileTone = (typeof metricTileTones)[number];
+
+/**
+ * RadioGroup's `variant` (design-spec 4.5): the circles in a list, or each choice as a card
+ * with its title and description (19's Proceed / Hold / Drop, M4's Go / No-Go).
+ */
+export const radioGroupVariants = ["default", "cards"] as const;
+export type RadioGroupVariant = (typeof radioGroupVariants)[number];
+
 /** Avatar sizes (design-spec 4.5). */
 export const avatarSizes = ["S", "M"] as const;
 export type AvatarSize = (typeof avatarSizes)[number];
+
+/** ProgressCircle sizes (design-spec 4.5, 06 component.progress-circle). */
+export const progressCircleSizes = ["S", "M", "L"] as const;
+export type ProgressCircleSize = (typeof progressCircleSizes)[number];
 
 /** Divider sizes (design-spec 4.5). */
 export const dividerSizes = ["S", "M", "L"] as const;
@@ -43,6 +121,29 @@ export type DividerSize = (typeof dividerSizes)[number];
 export const dialogWidths = ["S", "M", "L"] as const;
 export type DialogWidth = (typeof dialogWidths)[number];
 
+/**
+ * Dialog's `size` (design-spec 4.5): the three widths, and `fullscreen`, which fills the
+ * window at every width. Which modal takes which is design-spec 3.8.
+ */
+export const dialogSizes = [...dialogWidths, "fullscreen"] as const;
+export type DialogSize = (typeof dialogSizes)[number];
+
+/** Popover widths (design-spec 4.5, 06 component.popover.width). Unsized, it fits its content. */
+export const popoverSizes = ["S", "M", "L"] as const;
+export type PopoverSize = (typeof popoverSizes)[number];
+
+/** ContextualHelp sizes: its button's, from 06 component.action-button (design-spec 4.5). */
+export const contextualHelpSizes = ["XS", "S"] as const;
+export type ContextualHelpSize = (typeof contextualHelpSizes)[number];
+
+/** Breadcrumbs sizes (design-spec 4.5, 06 component.breadcrumbs). */
+export const breadcrumbsSizes = ["M", "L"] as const;
+export type BreadcrumbsSize = (typeof breadcrumbsSizes)[number];
+
+/** IllustratedMessage sizes (design-spec 4.5, 06 component.illustrated-message). */
+export const illustratedMessageSizes = ["S", "M", "L"] as const;
+export type IllustratedMessageSize = (typeof illustratedMessageSizes)[number];
+
 /** InlineAlert variants and the status colours (design-spec 4.4・4.5). */
 export const statusVariants = [
   "informative",
@@ -51,6 +152,52 @@ export const statusVariants = [
   "neutral",
 ] as const;
 export type StatusVariant = (typeof statusVariants)[number];
+
+/**
+ * Badge's `variant`: the text in ink, or the amber text of "Overdue" and "overdue 3d"
+ * (design-spec 4.5). Notice only takes the outline frame.
+ */
+export const badgeVariants = ["neutral", "notice"] as const;
+export type BadgeVariant = (typeof badgeVariants)[number];
+
+/**
+ * Badge's `fillStyle`: Spectrum 2's `outline` and `bold` and moonx's `dashed`. `outline`
+ * is the uncoloured frame (Proceed / Hold / Drop, stages), `dashed` the frame of
+ * Undecided, `bold` the ink fill of an unread count (design-spec 4.5).
+ */
+export const badgeFillStyles = ["outline", "dashed", "bold"] as const;
+export type BadgeFillStyle = (typeof badgeFillStyles)[number];
+
+/**
+ * StatusLight's `variant` (design-spec 4.5): the F/A/U states and the check states drawn
+ * as MoonGlyph's moons (4.4「状態の形」), and the save states, which show an icon instead
+ * (6.0.2: Saving…, Saved ✓, Couldn't save with a warning).
+ */
+export const statusLightVariants = [
+  "fact",
+  "assumption",
+  "unknown",
+  "unclassified",
+  "empty",
+  "not-started",
+  "partial",
+  "done",
+  "saving",
+  "saved",
+  "save-failed",
+] as const;
+export type StatusLightVariant = (typeof statusLightVariants)[number];
+
+/**
+ * AppFrame's save state in the header (design-spec 6.0.2): StatusLight's save variants,
+ * "Couldn't save" with Retry.
+ */
+export const saveStates = ["saving", "saved", "save-failed"] as const;
+export type SaveState = (typeof saveStates)[number];
+
+/** CardComparePattern's view (design-spec 4.1 E, 15's `?view=`): the cards or the table. */
+export const compareViews = ["cards", "table"] as const;
+export type CompareView = (typeof compareViews)[number];
 
 /** The F/A/U states that have colours (design-spec 6.0.3). */
 export const fauStates = [
@@ -81,3 +228,57 @@ export const spaces = [
   "space-1000",
 ] as const;
 export type Space = (typeof spaces)[number];
+
+/**
+ * Button's `variant` (design-spec 4.5): primary is the one main action of a screen,
+ * negative only confirms a deletion.
+ */
+export const buttonVariants = ["primary", "secondary", "negative"] as const;
+export type ButtonVariant = (typeof buttonVariants)[number];
+
+/** Link's `variant`: primary on its own line, secondary inside running text. */
+export const linkVariants = ["primary", "secondary"] as const;
+export type LinkVariant = (typeof linkVariants)[number];
+
+/**
+ * Heading's `variant`, when its look differs from its level's (design-spec 4.5): the
+ * landing's titles (`display`, `display-2`), the screen titles of the patterns whose
+ * title is not `heading-1` (06 semantic.typography), the question and a block's label.
+ */
+export const headingVariants = [
+  "display",
+  "display-2",
+  "heading-1-hub",
+  "heading-1-list",
+  "heading-1-steps",
+  "heading-1-settings",
+  "heading-1-toolbar",
+  "heading-question",
+  "heading-4",
+  "label",
+] as const;
+export type HeadingVariant = (typeof headingVariants)[number];
+
+/** Text's `variant` (design-spec 4.5). */
+export const textVariants = [
+  "body",
+  "body-long",
+  "body-sm",
+  "body-compact",
+  "lead",
+  "caption",
+  "label",
+  "number",
+  "number-sm",
+] as const;
+export type TextVariant = (typeof textVariants)[number];
+
+/** Text's `tone` (design-spec 4.5). */
+export const textTones = [
+  "primary",
+  "secondary",
+  "tertiary",
+  "notice",
+  "negative",
+] as const;
+export type TextTone = (typeof textTones)[number];

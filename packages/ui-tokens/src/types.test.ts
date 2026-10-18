@@ -2,16 +2,26 @@ import { describe, expect, test } from "bun:test";
 import { flattenTokens, loadTokens } from "../scripts/tokens";
 import {
   avatarSizes,
+  breadcrumbsSizes,
+  cardSizes,
   colorSchemes,
+  contextualHelpSizes,
   densities,
+  dialogSizes,
   dialogWidths,
   dividerSizes,
   fauStates,
   iconSizes,
+  illustratedMessageSizes,
+  moonGlyphSizes,
+  popoverSizes,
+  progressCircleSizes,
   scales,
   sizes,
+  sizesWithXS,
   spaces,
   statusVariants,
+  tagSizes,
 } from "./types";
 
 const paths = [...flattenTokens(await loadTokens()).keys()];
@@ -32,11 +42,99 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
     ["densities", densities, "semantic.density"],
     ["iconSizes", iconSizes, "semantic.scale.medium.component.icon.size"],
     ["avatarSizes", avatarSizes, "semantic.scale.medium.component.avatar.size"],
+    [
+      "progressCircleSizes",
+      progressCircleSizes,
+      "semantic.scale.medium.component.progress-circle.size",
+    ],
+    [
+      "progressCircleSizes",
+      progressCircleSizes,
+      "semantic.scale.medium.component.progress-circle.thickness",
+    ],
     ["dividerSizes", dividerSizes, "semantic.border-width.divider"],
+    ...["height", "padding-x", "padding-icon-only", "font-size"].map(
+      (dimension) =>
+        [
+          "sizesWithXS",
+          sizesWithXS,
+          `semantic.scale.medium.component.action-button.${dimension}`,
+        ] as const,
+    ),
+    ...["height", "padding-x", "font-size"].map(
+      (dimension) =>
+        [
+          "tagSizes",
+          tagSizes,
+          `semantic.scale.medium.component.tag.${dimension}`,
+        ] as const,
+    ),
+    ...["height", "font-size", "gap"].map(
+      (dimension) =>
+        [
+          "breadcrumbsSizes",
+          breadcrumbsSizes,
+          `semantic.scale.medium.component.breadcrumbs.${dimension}`,
+        ] as const,
+    ),
+    ...["icon-size", "title-font-size", "body-font-size"].map(
+      (dimension) =>
+        [
+          "illustratedMessageSizes",
+          illustratedMessageSizes,
+          `semantic.scale.medium.component.illustrated-message.${dimension}`,
+        ] as const,
+    ),
+    ...[
+      "padding-x",
+      "padding-top",
+      "padding-bottom",
+      "gap",
+      "title-font-size",
+      "description-font-size",
+    ].map(
+      (dimension) =>
+        [
+          "cardSizes",
+          cardSizes,
+          `semantic.scale.medium.component.card.${dimension}`,
+        ] as const,
+    ),
+    ...["min-width", "gap"].map(
+      (dimension) =>
+        [
+          "cardSizes",
+          cardSizes,
+          `semantic.scale.medium.component.card-view.${dimension}`,
+        ] as const,
+    ),
     ["dialogWidths", dialogWidths, "semantic.layout.dialog-max-width"],
+    [
+      "popoverSizes",
+      popoverSizes,
+      "semantic.scale.medium.component.popover.width",
+    ],
     ["fauStates", fauStates, "semantic.color.light.fau"],
   ])("%s", (_, list, prefix) => {
     expect(keysAfter(prefix)).toEqual([...list]);
+  });
+
+  test("Dialog sizes are the widths and fullscreen", () => {
+    expect([...dialogSizes]).toEqual([...dialogWidths, "fullscreen"]);
+  });
+
+  test("MoonGlyph sizes are the keys of moon-glyph.size and check-dots.gap", () => {
+    for (const group of ["moon-glyph.size", "check-dots.gap"]) {
+      expect(keysAfter(`semantic.scale.medium.component.${group}`)).toEqual([
+        ...moonGlyphSizes,
+      ]);
+    }
+  });
+
+  test("ContextualHelp sizes are steps of action-button, which draws its button", () => {
+    for (const size of contextualHelpSizes) {
+      expect(sizesWithXS).toContain(size);
+    }
   });
 
   test("spaces are semantic.space by name", () => {
@@ -46,7 +144,9 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
   });
 
   test("sizes are the keys of every component dimension sized S to XL", () => {
-    // Groups such as icon.size (XS–XL) and avatar.size (S–M) have their own lists.
+    // Groups such as icon.size (XS–XL), action-button, card and card-view (XS–XL),
+    // avatar and moon-glyph (S–M), tag, progress-circle, popover and illustrated-message
+    // (S–L) and breadcrumbs (M–L) have their own lists.
     const groups = paths
       .filter((path) =>
         /^semantic\.scale\.medium\.component\.[^.]+\.[^.]+\.(S|M|L|XL)$/.test(
@@ -56,7 +156,18 @@ describe("types.ts matches docs/06_design-tokens.json", () => {
       .map((path) => path.slice(0, path.lastIndexOf(".")));
     const sized = [...new Set(groups)].filter(
       (group) =>
-        !group.endsWith(".icon.size") && !group.endsWith(".avatar.size"),
+        !group.endsWith(".icon.size") &&
+        !group.includes(".avatar.") &&
+        !group.includes(".moon-glyph.") &&
+        !group.includes(".check-dots.") &&
+        !group.includes(".action-button.") &&
+        !group.includes(".tag.") &&
+        !group.includes(".progress-circle.") &&
+        !group.includes(".breadcrumbs.") &&
+        !group.includes(".popover.") &&
+        !group.includes(".illustrated-message.") &&
+        !group.includes(".card.") &&
+        !group.includes(".card-view."),
     );
     expect(sized.length).toBeGreaterThan(0);
     for (const group of sized) {

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>25 AI 取り込み — 案1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="moon-base.css?v=2">
+<script src="moon-frame.js?v=1"></script>
+<script src="shared.js?v=3"></script>
+<style>
+.page { width: 100%; max-width: 1080px; margin: 0 auto; padding: 28px 32px 120px; }
+.eyebrow { font-size: 13px; color: var(--ink-2); }
+h1 { margin: 4px 0 20px; font-size: 26px; font-weight: 600; letter-spacing: -0.015em; }
+.steps { list-style: none; margin: 0 0 28px; padding: 0; display: flex; gap: 0; border-bottom: 1px solid var(--line); }
+.steps li { display: flex; align-items: center; gap: 8px; padding: 10px 18px 12px 0; margin-right: 18px; font-size: 14px; color: var(--ink-3); }
+.steps .n { width: 22px; height: 22px; border-radius: 999px; border: 1.25px solid currentColor; display: grid; place-items: center; font: 500 12px var(--mono); }
+.steps .done { color: var(--ink-2); }
+.steps .done .n { background: var(--ink-2); border-color: var(--ink-2); color: var(--page); }
+.steps .now { color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--ink); }
+.steps .now .n { border-color: var(--ink); }
+
+.lead { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; color: var(--ink-2); font-size: 14px; }
+.lead b { color: var(--ink); }
+.item { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin-bottom: 14px; overflow: hidden; }
+.item-head { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.cb { width: 18px; height: 18px; border-radius: 5px; background: var(--ink); color: var(--on-ink); display: grid; place-items: center; flex-shrink: 0; }
+.code { font: 500 12px var(--mono); letter-spacing: .04em; color: var(--ink-2); }
+.item-head .q { font-weight: 600; }
+.item-head .who { margin-left: auto; font-size: 13px; color: var(--ink-2); }
+.diff { display: grid; grid-template-columns: 1fr 1fr; }
+.side-col { padding: 14px 18px 16px; }
+.side-col + .side-col { border-left: 1px solid var(--line); }
+.side-col .lbl { font-size: 12.5px; color: var(--ink-2); margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
+.txt { line-height: 1.65; }
+del { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--ink-2); background: var(--sunken); }
+ins { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; background: var(--sunken); }
+.edit { border: 1px solid var(--line-strong); border-radius: 9px; padding: 10px 12px; background: var(--page); }
+.fau-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 13.5px; color: var(--ink-2); flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 9px; padding: 2px; gap: 2px; background: var(--page); }
+.seg button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: none; font-size: 13px; font-weight: 500; color: var(--ink-2); cursor: pointer; }
+.unchanged { display: flex; align-items: center; gap: 8px; padding: 12px 4px; color: var(--ink-2); font-size: 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.fixbar { position: sticky; bottom: 0; border-top: 1px solid var(--line); background: var(--page); }
+.fixbar .inner { max-width: 1080px; margin: 0 auto; padding: 12px 32px; display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+.fixbar .note { margin-right: auto; font-size: 13.5px; color: var(--ink-2); }
+@media (max-width: 767px) {
+  .page { padding: 18px 16px 170px; }
+  h1 { font-size: 22px; }
+  .steps li { padding-right: 0; margin-right: 12px; font-size: 0; gap: 0; }
+  .steps .now { font-size: 14px; gap: 6px; }
+  .diff { grid-template-columns: 1fr; }
+  .side-col + .side-col { border-left: 0; border-top: 1px solid var(--line); }
+  .item-head .who { display: none; }
+  .fixbar { position: fixed; left: 0; right: 0; bottom: 64px; }
+  .fixbar .inner { padding: 10px 16px; }
+  .fixbar .note { display: none; }
+  .fixbar .btn.primary { flex: 1; justify-content: center; height: 48px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Workspace" data-sidebar="ideas"></aside>
+  <div class="main">
+    <header class="top">
+      <a class="back" href="#"><span data-icon="arrow-left" data-size="20"></span>Back</a>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="#">Ideas</a><span>/</span><a href="#">Bacolod Health Bowl</a><span>/</span><span aria-current="page">Import from AI</span></nav>
+    </header>
+    <main class="page" id="main">
+      <div class="eyebrow">Bacolod Health Bowl · validation questions</div>
+      <h1>Import from AI</h1>
+      <ol class="steps" aria-label="Steps">
+        <li class="done"><span class="n"><span data-icon="check" data-size="12"></span></span>Paste</li>
+        <li class="done"><span class="n"><span data-icon="check" data-size="12"></span></span>Match</li>
+        <li class="now" aria-current="step"><span class="n">3</span>Review</li>
+        <li><span class="n">4</span>Apply</li>
+      </ol>
+
+      <div class="lead"><span><b>2 changes</b> to apply. Changed answers go back to Unclassified so you can check them.</span></div>
+
+      <section class="item">
+        <div class="item-head"><span class="cb" data-icon="check" data-size="13"></span><span class="code">01 · WHO</span><span class="q">Who is the primary paying customer?</span><span class="who">Updated by Kenji just now</span></div>
+        <div class="diff">
+          <div class="side-col"><div class="lbl">Current <span class="fau"><span class="g" data-moon="0.5" data-size="12"></span>Assumption · Medium</span></div>
+            <div class="txt">Working professionals aged <del>25–40</del> in Bacolod who pay for convenient meals.</div></div>
+          <div class="side-col"><div class="lbl">Imported <span>· you can edit</span></div>
+            <div class="txt edit">Working professionals aged <ins>25–45</ins> in Bacolod who pay for convenient meals<ins>, mostly in BPO offices on Lacson St.</ins></div>
+            <div class="fau-row"><span class="fau unclassified"><span class="dot-attn"></span>Unclassified</span><div class="seg" role="group" aria-label="Classify"><button><span data-moon="1" data-size="12"></span>Fact</button><button><span data-moon="0.5" data-size="12"></span>Assumption</button><button><span data-moon="0" data-size="12"></span>Unknown</button></div></div></div>
+        </div>
+      </section>
+
+      <section class="item">
+        <div class="item-head"><span class="cb" data-icon="check" data-size="13"></span><span class="code">01 · SEVERITY</span><span class="q">How painful or costly is it?</span></div>
+        <div class="diff">
+          <div class="side-col"><div class="lbl">Current <span class="fau"><span class="g"><span class="dot-empty"></span></span>Empty</span></div>
+            <div class="txt" style="color:var(--ink-3)">Empty</div></div>
+          <div class="side-col"><div class="lbl">Imported <span>· you can edit</span></div>
+            <div class="txt edit"><ins>Office workers lose 30 to 45 minutes on lunch runs. On busy days many skip lunch and snack in the afternoon.</ins></div>
+            <div class="fau-row"><span class="fau unclassified"><span class="dot-attn"></span>Unclassified</span><div class="seg" role="group" aria-label="Classify"><button><span data-moon="1" data-size="12"></span>Fact</button><button><span data-moon="0.5" data-size="12"></span>Assumption</button><button><span data-moon="0" data-size="12"></span>Unknown</button></div></div></div>
+        </div>
+      </section>
+
+      <div class="unchanged"><span data-icon="chevron-right" data-size="16"></span>3 unchanged answers</div>
+    </main>
+    <div class="fixbar"><div class="inner"><span class="note">Each change is saved in history as an AI import.</span><button class="btn quiet">Cancel</button><button class="btn primary">Apply 2 changes</button></div></div>
+    <nav class="tabbar" aria-label="Main" data-tabbar="ideas"></nav>
+  </div>
+</div>
+</body>
+</html>

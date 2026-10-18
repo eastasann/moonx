@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>6 アイデア一覧 — 案1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="moon-base.css?v=2">
+<script src="shared.js?v=3"></script>
+<style>
+.top .ttl { display: none; }
+.split { display: grid; grid-template-columns: minmax(380px, 5fr) minmax(0, 6fr); flex: 1; min-height: 0; }
+.listpane { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; }
+.lhead { padding: 24px 24px 12px; display: flex; align-items: center; gap: 12px; }
+.lhead h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+.lhead .btn { margin-left: auto; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 24px 14px; border-bottom: 1px solid var(--line); }
+.fbtn { white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.fbtn b { color: var(--ink); font-weight: 500; }
+.search { flex: 1 1 140px; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-3); font-size: 13px; }
+
+.ideas { list-style: none; margin: 0; padding: 0; overflow: auto; }
+.ideas a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; padding: 14px 24px; border-bottom: 1px solid var(--line); }
+.ideas a:hover { background: var(--sunken); }
+.ideas a[aria-current] { background: var(--surface); box-shadow: inset 3px 0 0 var(--ink); }
+.ideas .t { font-weight: 600; }
+.ideas .m { font-size: 13px; color: var(--ink-2); grid-column: 1; }
+.ideas .c { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.ideas .dots { display: inline-flex; gap: 3px; }
+.tag { display: inline-block; font-size: 12.5px; font-weight: 500; padding: 1px 8px; border: 1px solid var(--line-strong); border-radius: 6px; }
+.tag.quiet { color: var(--ink-2); border-style: dashed; }
+.hidden-note { padding: 14px 24px; font-size: 14px; color: var(--ink-2); }
+.hidden-note a { color: var(--ink); font-weight: 500; border-bottom: 1px solid var(--line-strong); }
+
+.detail { padding: 28px 36px 48px; min-width: 0; overflow: auto; }
+.detail .status { display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--ink-2); }
+.detail h2 { margin: 8px 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.015em; }
+.detail .concept { margin: 0 0 20px; color: var(--ink-2); max-width: 60ch; }
+.nums { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.nums > div { padding: 12px 0; }
+.nums > div:nth-child(even) { padding-left: 18px; border-left: 1px solid var(--line); }
+.nums > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+.nums .k { font-size: 12.5px; color: var(--ink-2); }
+.nums .v { font: 500 20px/1.3 var(--mono); }
+h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.checks { list-style: none; margin: 0 0 24px; padding: 0; border-top: 1px solid var(--line); }
+.checks li { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+.checks .s { font-size: 13px; color: var(--ink-2); }
+.facts { font-size: 14px; color: var(--ink-2); margin: 0 0 24px; }
+.detail .actions { display: flex; gap: 8px; }
+
+.fab { display: none; }
+@media (max-width: 1023px) {
+  .split { grid-template-columns: 1fr; }
+  .detail { display: none; }
+  .listpane { border-right: 0; }
+}
+@media (max-width: 767px) {
+  .lhead { padding: 18px 16px 10px; }
+  .lhead .btn { display: none; }
+  .filters { padding: 0 16px 12px; flex-wrap: nowrap; overflow-x: auto; }
+  .search { display: none; }
+  .ideas a { padding: 14px 16px; min-height: 72px; }
+  .ideas a[aria-current] { background: none; box-shadow: none; }
+  .hidden-note { padding: 14px 16px 96px; }
+  .fab { display: grid; place-items: center; position: fixed; right: 16px; bottom: 80px; width: 56px; height: 56px; border-radius: 16px; background: var(--ink); color: var(--on-ink); border: 0; box-shadow: 0 8px 24px -8px rgba(17,21,42,.4); }
+  .top .ttl { display: block; font-weight: 600; padding-left: 8px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Workspace">
+    <div class="brand"><svg class="logo" viewBox="0 0 512 512" aria-hidden="true"><mask id="cr"><rect width="512" height="512" fill="#fff"/><circle cx="300" cy="215" r="132" fill="#000"/></mask><circle cx="246" cy="266" r="150" fill="currentColor" mask="url(#cr)"/><circle cx="378" cy="150" r="28" fill="currentColor"/></svg><span>moonx</span></div>
+    <button class="ws"><span>BCDX</span><span data-icon="chevron-down" data-size="16"></span></button>
+    <nav class="nav" aria-label="Main">
+      <a href="#"><span data-icon="house"></span><span>Dashboard</span></a>
+      <a href="#" aria-current="page"><span data-icon="lightbulb"></span><span>Ideas</span></a>
+      <a href="#"><span data-icon="compass"></span><span>Self Analysis</span></a>
+      <a href="#"><span data-icon="bell"></span><span>Notifications</span><span class="count">3</span></a>
+      <a href="#"><span data-icon="scroll"></span><span>Decision Log</span></a>
+      <hr>
+      <a href="#"><span data-icon="settings"></span><span>Workspace Settings</span></a>
+    </nav>
+    <div class="user"><span class="avatar">AV</span><span>Ana Villanueva</span></div>
+  </aside>
+
+  <div class="main">
+    <header class="top"><span class="ttl">Ideas</span><nav class="crumbs" aria-label="Breadcrumb"><span aria-current="page">Ideas</span></nav></header>
+    <div class="split">
+      <div class="listpane">
+        <div class="lhead"><h1>Ideas</h1><button class="btn primary"><span data-icon="plus" data-size="16"></span>New idea</button></div>
+        <div class="filters">
+          <button class="fbtn">Stage <b>All</b><span data-icon="chevron-down" data-size="14"></span></button>
+          <button class="fbtn">Decision <b>Not dropped</b><span data-icon="chevron-down" data-size="14"></span></button>
+          <button class="fbtn">Proposer <b>All</b><span data-icon="chevron-down" data-size="14"></span></button>
+          <button class="fbtn">Sort <b>Updated</b><span data-icon="chevron-down" data-size="14"></span></button>
+          <span class="search">Search ideas</span>
+        </div>
+        <ul class="ideas">
+          <li><a href="#"><span class="t">Piaya Gift Box Delivery</span><span><span class="tag">Proceed</span></span><span class="m">Planning · Ana Villanueva · 12h ago</span><span class="c"><span class="dots" role="img" aria-label="All 6 checks done"><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span></span>All checks done</span></a></li>
+          <li><a href="#" aria-current="true"><span class="t">Bacolod Health Bowl</span><span><span class="tag">Hold</span></span><span class="m">Validation · Kenji Mori · yesterday</span><span class="c"><span class="dots" role="img" aria-label="4 done, 1 partial, 1 not started"><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="0.5" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="0" data-size="12"></span><span data-moon="1" data-size="12"></span></span>Missing: Startup &amp; monthly costs, Permits</span></a></li>
+          <li><a href="#"><span class="t">Piaya Gift Box (Corporate)</span><span><span class="tag quiet">Undecided</span></span><span class="m">Validation · Kenji Mori · 2 days ago</span><span class="c"><span class="dots" role="img" aria-label="All 6 checks done"><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span></span>All checks done</span></a></li>
+          <li><a href="#"><span class="t">Mobile Bike Repair</span><span><span class="tag quiet">Undecided</span></span><span class="m">Validation · Ana Villanueva · 3 days ago</span><span class="c"><span class="dots" role="img" aria-label="6 not started"><span data-moon="0" data-size="12"></span><span data-moon="0" data-size="12"></span><span data-moon="0" data-size="12"></span><span data-moon="0" data-size="12"></span><span data-moon="0" data-size="12"></span><span data-moon="0" data-size="12"></span></span>Missing: 6 checks</span></a></li>
+          <li><a href="#"><span class="t">Student Study Café</span><span><span class="tag">Proceed</span></span><span class="m">Launch prep · Paolo Gonzaga · 5 days ago</span><span class="c"><span class="dots" role="img" aria-label="All 6 checks done"><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span><span data-moon="1" data-size="12"></span></span>All checks done</span></a></li>
+        </ul>
+        <div class="hidden-note">1 dropped idea hidden · <a href="#">Show</a></div>
+      </div>
+
+      <section class="detail" aria-label="Bacolod Health Bowl summary">
+        <div class="status"><span class="tag">Hold</span><span>Latest decision Oct 2 · Stage: Validation · Kenji Mori</span></div>
+        <h2>Bacolod Health Bowl</h2>
+        <p class="concept">Healthy fast-casual bowls with standardized nutrition in Bacolod.</p>
+        <div class="nums">
+          <div><div class="k">Startup costs</div><div class="v">₱145,000+</div></div>
+          <div><div class="k">Break-even</div><div class="v">14.4+ / day</div></div>
+          <div><div class="k">Expected profit</div><div class="v">≤ ₱37,000 / mo</div></div>
+          <div><div class="k">Payback</div><div class="v">3.9+ months</div></div>
+        </div>
+        <h3>Checks</h3>
+        <ul class="checks">
+          <li><span data-moon="1" data-size="14"></span>Competitors (3–5)<span class="s">Done (4)</span></li>
+          <li><span data-moon="1" data-size="14"></span>Local price range<span class="s">Done</span></li>
+          <li><span data-moon="0.5" data-size="14"></span>Startup &amp; monthly costs<span class="s">Partial</span></li>
+          <li><span data-moon="1" data-size="14"></span>Break-even volume<span class="s">Done</span></li>
+          <li><span data-moon="0" data-size="14"></span>Permits<span class="s">Not started</span></li>
+          <li><span data-moon="1" data-size="14"></span>Demand or problem signal<span class="s">Done (2)</span></li>
+        </ul>
+        <p class="facts">Plans: none yet. Latest decision: Hold on Oct 2 — “Startup and monthly costs and permits are still missing.”</p>
+        <div class="actions"><a class="btn primary" href="#">Open validation <span data-icon="arrow-right" data-size="16"></span></a></div>
+      </section>
+    </div>
+
+    <button class="fab" aria-label="New idea"><span data-icon="plus" data-size="24"></span></button>
+    <nav class="tabbar" aria-label="Main">
+      <a href="#"><span data-icon="house" data-size="22"></span>Dashboard</a>
+      <a href="#" aria-current="page"><span data-icon="lightbulb" data-size="22"></span>Ideas</a>
+      <a href="#"><span data-icon="compass" data-size="22"></span>Self Analysis</a>
+      <a href="#"><span data-icon="bell" data-size="22"></span><span class="badge">3</span>Notifications</a>
+      <a href="#"><span data-icon="menu" data-size="22"></span>More</a>
+    </nav>
+  </div>
+</div>
+</body>
+</html>

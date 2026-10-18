@@ -6,10 +6,11 @@ import {
   figureColumns,
   type MeasureText,
   type PitchFigure,
+  pitchFooterText,
   pitchFrame,
   pitchSizes,
 } from "@moonx/domain";
-import { formatDate, i18n } from "@moonx/i18n";
+import { i18n } from "@moonx/i18n";
 import type { PitchBullet, PitchDeck, PitchSlide } from "@moonx/schemas";
 import { print } from "@moonx/ui-tokens/print";
 import {
@@ -398,14 +399,6 @@ function SlideBody({
 }
 
 function Footer({ deck, timeZone }: { deck: PitchDeck; timeZone: string }) {
-  const parts = [
-    deck.footer.businessName.trim(),
-    deck.footer.versionLabel,
-    formatDate(deck.footer.date, {
-      timeZone,
-      now: new Date(deck.generatedAt),
-    }),
-  ].filter((part) => part !== "");
   return (
     <Text
       style={{
@@ -420,7 +413,7 @@ function Footer({ deck, timeZone }: { deck: PitchDeck; timeZone: string }) {
         color: color.textSecondary,
       }}
     >
-      {parts.join(i18n.t("pitch:footerSeparator"))}
+      {pitchFooterText(deck, { timeZone })}
     </Text>
   );
 }

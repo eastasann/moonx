@@ -1,15 +1,17 @@
 // The vanilla-extract theme (ADR-018): every semantic token becomes one CSS variable,
 // named by its path without the variant (`semantic.color.light.surface.canvas` →
-// `--color-surface-canvas`). The light and dark modes and the medium and large scales
-// assign different values to the same variables.
+// `--color-surface-canvas`). The light and dark modes, the medium and large scales and
+// the wide and narrow widths assign different values to the same variables.
 
 import {
   flattenTokens,
   isObject,
   type Resolved,
   resolveToken,
+  type ScaleName,
   type TokenTree,
   VARIANT_GROUPS,
+  type WidthName,
 } from "./tokens";
 
 /** One CSS variable: where it sits in `vars`, its name, and its value in each context. */
@@ -22,14 +24,18 @@ export interface ThemeVariable {
 /** The variant of each variant group a value is generated for. */
 interface Context {
   mode: "light" | "dark";
-  scale: "medium" | "large";
+  scale: ScaleName;
+  width: WidthName;
 }
 
+// The base, each axis switched on its own, and all three switched together: a variable
+// may change with one axis only, so the last must match whichever single switch changed it.
 const CONTEXTS = {
-  lightMedium: { mode: "light", scale: "medium" },
-  darkMedium: { mode: "dark", scale: "medium" },
-  lightLarge: { mode: "light", scale: "large" },
-  darkLarge: { mode: "dark", scale: "large" },
+  lightMedium: { mode: "light", scale: "medium", width: "wide" },
+  darkMedium: { mode: "dark", scale: "medium", width: "wide" },
+  lightLarge: { mode: "light", scale: "large", width: "wide" },
+  lightNarrow: { mode: "light", scale: "medium", width: "narrow" },
+  darkLargeNarrow: { mode: "dark", scale: "large", width: "narrow" },
 } as const satisfies Record<string, Context>;
 type ContextName = keyof typeof CONTEXTS;
 
@@ -150,8 +156,8 @@ function variantGroup(path: string[]) {
 /**
  * The CSS variables of the semantic layer, in 06's order.
  *
- * @throws when a token changes with both the mode and the scale: the theme assigns the
- *   two separately, so such a value has no place.
+ * @throws when a token changes with more than one of the mode, the scale and the width:
+ *   the theme assigns them separately, so such a value has no place.
  */
 export function themeVariables(tree: TokenTree): ThemeVariable[] {
   const tokens = flattenTokens(tree);
@@ -169,14 +175,23 @@ export function themeVariables(tree: TokenTree): ThemeVariable[] {
     const sourceFor = (context: Context) => {
       if (variants === undefined) return path;
       const variant =
-        variants.group === "semantic.scale" ? context.scale : context.mode;
+        variants.group === "semantic.scale"
+          ? context.scale
+          : variants.group === "semantic.font-size"
+            ? context.width
+            : context.mode;
       return [...segments.slice(0, 2), variant, ...segments.slice(3)].join(".");
     };
     const perContext = Object.fromEntries(
       Object.entries(CONTEXTS).map(([name, context]) => [
         name,
         cssEntries(
-          resolveToken(tokens, sourceFor(context), context.scale),
+          resolveToken(
+            tokens,
+            sourceFor(context),
+            context.scale,
+            context.width,
+          ),
           !path.startsWith("semantic.print."),
         ),
       ]),
@@ -200,15 +215,14 @@ export function themeVariables(tree: TokenTree): ThemeVariable[] {
         ]),
       ) as Record<ContextName, string>;
       const name = [...key, ...fieldKey.map(kebabCase)].join("-");
-      const byMode = values.darkMedium !== values.lightMedium;
-      const byScale = values.lightLarge !== values.lightMedium;
-      const expectedDarkLarge = byMode
-        ? values.darkMedium
-        : byScale
-          ? values.lightLarge
-          : values.lightMedium;
-      if ((byMode && byScale) || values.darkLarge !== expectedDarkLarge) {
-        throw new Error(`--${name} changes with both the mode and the scale`);
+      const switched = (
+        ["darkMedium", "lightLarge", "lightNarrow"] as const
+      ).filter((context) => values[context] !== values.lightMedium);
+      const expectedAll = values[switched[0] ?? "lightMedium"];
+      if (switched.length > 1 || values.darkLargeNarrow !== expectedAll) {
+        throw new Error(
+          `--${name} changes with more than one of the mode, the scale and the width`,
+        );
       }
       variables.push({
         key: [...key.map(camelCase), ...fieldKey],
@@ -231,12 +245,18 @@ export function themeVariables(tree: TokenTree): ThemeVariable[] {
   return variables;
 }
 
-/** The variables whose value differs from light medium in the dark mode and the large scale. */
+/**
+ * The variables whose value differs from light medium wide in the dark mode, the large
+ * scale and the narrow width.
+ */
 export function themeOverrides(variables: ThemeVariable[]) {
   return {
     dark: variables.filter((v) => v.values.darkMedium !== v.values.lightMedium),
     large: variables.filter(
       (v) => v.values.lightLarge !== v.values.lightMedium,
+    ),
+    narrow: variables.filter(
+      (v) => v.values.lightNarrow !== v.values.lightMedium,
     ),
   };
 }
@@ -278,22 +298,29 @@ function nestedSource(leaves: [string[], string][]): string {
 export const GENERATED_HEADER = `// Generated by make tokens from docs/06_design-tokens.json. Do not edit: change 06 or
 // packages/ui-tokens/scripts/ and run make tokens (ADR-018, ADR-025).`;
 
-/** `src/generated/vars.ts`: the contract of CSS variables, and the breakpoints. */
+/**
+ * `src/generated/vars.ts`: the contract of CSS variables, and the few sizes that code reads
+ * as numbers.
+ */
 export function varsSource(tree: TokenTree): string {
   const variables = themeVariables(tree);
   const tokens = flattenTokens(tree);
+  const pixels = (path: string) => {
+    const resolved = resolveToken(tokens, path, "medium");
+    if (resolved.type !== "dimension" || resolved.kind !== "literal") {
+      throw new Error(`${path} is not a dimension`);
+    }
+    return String((resolved.value as { value: number }).value);
+  };
   const breakpoints = [...tokens.keys()]
     .filter((path) => path.startsWith("semantic.breakpoint."))
-    .map((path) => {
-      const resolved = resolveToken(tokens, path, "medium");
-      if (resolved.type !== "dimension" || resolved.kind !== "literal") {
-        throw new Error(`${path} is not a dimension`);
-      }
-      return [
-        [camelCase(path.slice("semantic.breakpoint.".length))],
-        String((resolved.value as { value: number }).value),
-      ] as [string[], string];
-    });
+    .map(
+      (path) =>
+        [
+          [camelCase(path.slice("semantic.breakpoint.".length))],
+          pixels(path),
+        ] as [string[], string],
+    );
   return `${GENERATED_HEADER}
 
 import { createGlobalThemeContract } from "@vanilla-extract/css";
@@ -301,8 +328,9 @@ import { createGlobalThemeContract } from "@vanilla-extract/css";
 /**
  * The semantic tokens as CSS variables (\`var(--color-surface-canvas)\`). The light and
  * dark modes share the names under \`color\` and \`shadow\`, the medium and large scales
- * those under \`scale\` (and the font sizes and row heights that follow the scale);
- * theme.css.ts assigns the values.
+ * those under \`scale\` (and the row heights that follow the scale), the wide and narrow
+ * widths those under \`fontSize\` (and the typography that follows them); theme.css.ts
+ * assigns the values.
  */
 export const vars = createGlobalThemeContract(${nestedSource(
     variables.map(({ key, name }) => [key, JSON.stringify(name)]),
@@ -310,6 +338,30 @@ export const vars = createGlobalThemeContract(${nestedSource(
 
 /** \`semantic.breakpoint\` in px, for media queries, which cannot read CSS variables. */
 export const breakpoints = ${nestedSource(breakpoints)} as const;
+
+/**
+ * \`semantic.layout.popover-max-height\` in px, for React Aria's Popover, which takes its
+ * height cap as a number and lowers it to the space the window has.
+ */
+export const popoverMaxHeight = ${pixels("semantic.layout.popover-max-height")};
+
+/**
+ * \`semantic.layout.two-column-min-width\` in px: the body's width, measured in code, below
+ * which a docked panel turns patterns A, D and F to their tablet arrangement.
+ */
+export const twoColumnMinWidth = ${pixels("semantic.layout.two-column-min-width")};
+
+/**
+ * \`semantic.layout.presentation.two-column-min-width\` in px: the body's width, measured in
+ * code, below which a docked panel turns pattern I to its phone arrangement.
+ */
+export const presentationTwoColumnMinWidth = ${pixels("semantic.layout.presentation.two-column-min-width")};
+
+/**
+ * \`semantic.layout.public.stack-max-width\` in px, for the media query at and below which
+ * the public page's two-column sections stack.
+ */
+export const publicStackMaxWidth = ${pixels("semantic.layout.public.stack-max-width")};
 `;
 }
 
@@ -319,14 +371,23 @@ const assignments = (variables: ThemeVariable[], context: ContextName) =>
     .join("\n")}\n}`;
 
 /**
- * `src/generated/theme.css.ts`: light and medium on `:root`; dark from the OS unless
+ * `src/generated/theme.css.ts`: light, medium and wide on `:root`; dark from the OS unless
  * `<html data-theme="light">`, or fixed by `data-theme="dark"`; large on touch screens
  * (`pointer: coarse`) unless `<html data-scale="medium">`, or fixed by
- * `data-scale="large"` (ADR-018).
+ * `data-scale="large"`; narrow below `semantic.breakpoint.tablet` (ADR-018).
  */
 export function themeSource(tree: TokenTree): string {
   const variables = themeVariables(tree);
-  const { dark, large } = themeOverrides(variables);
+  const { dark, large, narrow } = themeOverrides(variables);
+  const tablet = resolveToken(
+    flattenTokens(tree),
+    "semantic.breakpoint.tablet",
+    "medium",
+  );
+  if (tablet.kind !== "literal" || tablet.type !== "dimension") {
+    throw new Error("semantic.breakpoint.tablet is not a dimension");
+  }
+  const tabletPx = (tablet.value as { value: number }).value;
   return `${GENERATED_HEADER}
 
 import { globalStyle } from "@vanilla-extract/css";
@@ -335,6 +396,8 @@ import { vars } from "./vars";
 const dark = ${assignments(dark, "darkMedium")};
 
 const large = ${assignments(large, "lightLarge")};
+
+const narrow = ${assignments(narrow, "lightNarrow")};
 
 globalStyle(":root", {
   colorScheme: "light",
@@ -354,5 +417,9 @@ globalStyle(':root:not([data-scale="medium"])', {
 });
 
 globalStyle(':root[data-scale="large"]', { vars: large });
+
+globalStyle(":root", {
+  "@media": { "not all and (min-width: ${tabletPx}px)": { vars: narrow } },
+});
 `;
 }

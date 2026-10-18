@@ -439,6 +439,60 @@ describe("P13 GET /api/v1/plans/{planId}/pitch-deck.pdf", () => {
     }
   });
 
+  test("P12 returns the figures' columns where the PDF sets them (ADR-012)", async () => {
+    const team = await newTeam();
+    const plan = await draft(team);
+    await db.insert(economicsInputs).values([
+      {
+        validationId: team.validationId,
+        fieldKey: "selling_price",
+        value: 450,
+      },
+      {
+        validationId: team.validationId,
+        fieldKey: "units_expected",
+        value: 10,
+      },
+    ]);
+    const slides = (await deck(plan.id, team.memberCookie, "variant=five"))
+      .slides;
+    const response = await call(
+      "GET",
+      `/api/v1/plans/${plan.id}/pitch-deck.pdf?variant=five`,
+      team.memberCookie,
+    );
+    const pages = await readPdf(await response.arrayBuffer());
+    let checked = 0;
+    slides.forEach((slide, index) => {
+      if (slide.numbers.length === 0) {
+        expect(slide.figureColumns).toBeNull();
+        return;
+      }
+      const columns = slide.figureColumns;
+      if (columns === null) throw new Error(`No columns on ${slide.key}`);
+      expect(columns.widths).toHaveLength(slide.numbers.length);
+      const texts = pages[index]?.texts ?? [];
+      let left = print.slide.marginX;
+      slide.numbers.forEach((number, column) => {
+        // Each label starts its column: where the PDF set the column P12 measured.
+        const label = texts.find((text) => text.str === number.label);
+        expect({ slide: slide.key, label: number.label, x: label?.x }).toEqual({
+          slide: slide.key,
+          label: number.label,
+          x: expect.closeTo(left, 2),
+        });
+        left += (columns.widths[column] ?? 0) + print.slide.gap;
+        checked += 1;
+      });
+      expect(left - print.slide.gap).toBeCloseTo(
+        print.slide.width - print.slide.marginX,
+        2,
+      );
+    });
+    // The business model's four figures and the economics' four.
+    expect(checked).toBe(8);
+  });
+
   test("long and Japanese answers stay on their slide: cut, embedded and above the footer", async () => {
     const team = await newTeam();
     const plan = await draft(team);

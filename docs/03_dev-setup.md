@@ -129,7 +129,7 @@ make dev
 |---|---|
 | API が動いている | `curl http://localhost:3000/api/health` |
 | Web が開く | ブラウザで `http://localhost:5173`（`127.0.0.1` ではなく `localhost` で開く。Cookie のため） |
-| 部品を確かめる | ブラウザで `http://localhost:5173/dev/components`（開発サーバーだけ。本番のビルドには入らず、開くと Not Found）。全部品の種類・大きさ・状態を並べ、ページ上部でテーマ（System / Light / Dark）とスケール（Auto / Medium / Large）を切り替えられる。Popover と Tray はウィンドウの幅を `semantic.breakpoint.tablet` の前後に動かして確かめる |
+| 部品を確かめる | ブラウザで `http://localhost:5173/dev/components`（開発サーバーだけ。本番のビルドには入らず、開くと Not Found）。全部品の種類・大きさ・状態を並べ、ページ上部でテーマ（System / Light / Dark）とスケール（Auto / Medium / Large）を切り替えられる。Popover と Tray はウィンドウの幅を `semantic.breakpoint.tablet` の前後に動かして確かめる。`?screen=`（`s05-dashboard` など `docs/mockups` のファイル名。一覧はページの末尾の「Mockup screens」）を付けると、その画面を部品で組み直したものだけをウィンドウいっぱいに描き、`&theme=dark` でダークにする。`docs/mockups` を静的なサーバーで配り（`docs/mockups/README.md`）、同じ幅で並べて見比べる |
 | デモのユーザーでログインできる | ユーザーとデータは design-spec 8章 |
 | メールの中身 | local ではメールを送らない。招待やパスワード再設定のリンクは `make dev` の出力（API のログ）に出る |
 

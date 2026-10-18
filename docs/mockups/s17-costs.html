@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>17 費用 — 案1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="moon-base.css?v=2">
+<script src="shared.js?v=3"></script>
+<style>
+.page { width: 100%; max-width: 1240px; padding: 28px 32px 80px; }
+.sechead { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 24px; }
+.sechead h1 { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 600; letter-spacing: -0.015em; display: flex; align-items: center; gap: 6px; }
+.sechead h1 button { border: 0; background: none; color: var(--ink-2); cursor: pointer; padding: 4px; border-radius: 6px; }
+.sechead p { margin: 0 0 4px; color: var(--ink-2); }
+
+.sheet { display: grid; grid-template-columns: minmax(0, 1fr) 288px; gap: 40px; align-items: start; }
+.tables { display: flex; flex-direction: column; gap: 40px; min-width: 0; }
+h2 { margin: 0 0 8px; font-size: 16px; font-weight: 600; display: flex; align-items: baseline; gap: 10px; }
+h2 small { font-weight: 400; color: var(--ink-2); font-size: 13px; }
+
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+thead th { text-align: left; font-size: 12.5px; font-weight: 500; color: var(--ink-2); padding: 8px 10px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+thead th.amt, td.amt { text-align: right; }
+tbody td { padding: 0 10px; height: 46px; border-bottom: 1px solid var(--line); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+tbody tr:hover td { background: var(--sunken); }
+td.g { padding: 0 0 0 8px; }
+td.g > span { display: grid; place-items: center; }
+td.name { font-weight: 500; }
+td.amt { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14.5px; }
+td.amt .pct { color: var(--ink-2); font-size: 13px; }
+td.muted, .muted { color: var(--ink-3); }
+td.note { color: var(--ink-2); font-size: 14px; }
+td.more { padding: 0; text-align: center; }
+td.more button { width: 32px; height: 32px; border: 0; background: none; border-radius: 6px; color: var(--ink-3); cursor: pointer; }
+tr:not(:hover) td.more button { opacity: 0; }
+.faucell { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-2); border: 0; background: none; padding: 4px 6px; margin-left: -6px; border-radius: 6px; cursor: pointer; }
+.faucell:hover { background: var(--surface); color: var(--ink); }
+.lump { font: 500 11px var(--mono); color: var(--ink-2); border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+
+tr.editing td { background: var(--surface) !important; }
+tr.editing td.fcell { overflow: visible; position: relative; }
+tr.editing td.name input, tr.editing td.amt input { width: 100%; height: 34px; border: 1px solid var(--ink); border-radius: 7px; padding: 0 10px; background: var(--surface); }
+tr.editing td.amt input { text-align: right; font-family: var(--mono); }
+.pop { position: absolute; z-index: 5; margin-top: 6px; width: 300px; padding: 14px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 12px 32px -12px rgba(17,21,42,.28); white-space: normal; }
+.pop .lbl { font-size: 12.5px; color: var(--ink-2); margin: 0 0 6px; }
+.pop .lbl + .seg { margin-bottom: 12px; }
+.seg { display: flex; border: 1px solid var(--line-strong); border-radius: 9px; padding: 2px; gap: 2px; background: var(--page); }
+.seg button { flex: 1; display: inline-flex; justify-content: center; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border: 0; border-radius: 7px; background: none; font-size: 13.5px; font-weight: 500; color: var(--ink-2); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.pop .evid { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 10px; }
+.pop .evid a { color: var(--ink); font-weight: 500; border-bottom: 1px solid var(--line-strong); }
+
+tfoot td { padding: 10px; font-size: 14px; }
+tfoot .add { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--ink-2); font-weight: 500; cursor: pointer; padding: 6px 8px; margin-left: -8px; border-radius: 6px; }
+tfoot .add:hover { background: var(--sunken); color: var(--ink); }
+tfoot .sub { text-align: right; color: var(--ink-2); }
+tfoot .sub b { font: 500 15px var(--mono); color: var(--ink); margin-left: 8px; }
+
+.totals { position: sticky; top: 80px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); padding: 6px 18px 16px; }
+.totals h2 { padding: 12px 0 4px; margin: 0; font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.tot { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.tot .k { font-size: 13px; color: var(--ink-2); }
+.tot .v { font: 500 24px/1.25 var(--mono); letter-spacing: -0.02em; }
+.tot .v small { font-size: 13px; color: var(--ink-2); letter-spacing: 0; }
+.tot .why { font-size: 12.5px; color: var(--ink-3); }
+.tot.be { border-bottom: 0; }
+.totals .link { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; font-size: 14px; border-bottom: 1px solid var(--line-strong); }
+.banner-note { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: var(--sunken); color: var(--ink-2); font-size: 14px; margin-bottom: 28px; }
+
+.cards { display: none; }
+.sumbar { display: none; }
+
+@media (max-width: 1023px) {
+  .sheet { grid-template-columns: 1fr; }
+  .totals { position: static; }
+  col.c-note, td.note, th.note { display: none; }
+}
+@media (max-width: 767px) {
+  .page { padding: 16px 16px 170px; }
+  .sechead h1 { font-size: 22px; }
+  .sechead { flex-direction: column; align-items: flex-start; gap: 2px; margin-bottom: 16px; }
+  table, .totals, .banner-note { display: none; }
+  .cards { display: block; list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line-strong); }
+  .cards li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 0 12px; align-items: center; padding: 12px 2px; border-bottom: 1px solid var(--line); min-height: 60px; }
+  .cards .n { font-weight: 500; }
+  .cards .f { grid-column: 2; font-size: 13px; color: var(--ink-2); }
+  .cards .a { grid-row: 1 / 3; grid-column: 3; font: 500 15px var(--mono); text-align: right; }
+  .cards .add { display: flex; align-items: center; gap: 6px; min-height: 48px; color: var(--ink-2); font-weight: 500; }
+  .tables { gap: 28px; }
+  .sumbar { display: flex; align-items: center; gap: 10px; position: fixed; left: 0; right: 0; bottom: 64px; height: 56px; padding: 0 16px; background: var(--surface); border-top: 1px solid var(--line-strong); font-size: 13px; z-index: 3; }
+  .sumbar .num { font-size: 14px; color: var(--ink); }
+  .sumbar span { color: var(--ink-2); white-space: nowrap; }
+  .sumbar .up { margin-left: auto; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Workspace">
+    <div class="brand"><svg class="logo" viewBox="0 0 512 512" aria-hidden="true"><mask id="cr"><rect width="512" height="512" fill="#fff"/><circle cx="300" cy="215" r="132" fill="#000"/></mask><circle cx="246" cy="266" r="150" fill="currentColor" mask="url(#cr)"/><circle cx="378" cy="150" r="28" fill="currentColor"/></svg><span>moonx</span></div>
+    <button class="ws"><span>BCDX</span><span data-icon="chevron-down" data-size="16"></span></button>
+    <nav class="nav" aria-label="Main">
+      <a href="#"><span data-icon="house"></span><span>Dashboard</span></a>
+      <a href="#" aria-current="page"><span data-icon="lightbulb"></span><span>Ideas</span></a>
+      <a href="#"><span data-icon="compass"></span><span>Self Analysis</span></a>
+      <a href="#"><span data-icon="bell"></span><span>Notifications</span><span class="count">3</span></a>
+      <a href="#"><span data-icon="scroll"></span><span>Decision Log</span></a>
+      <hr>
+      <a href="#"><span data-icon="settings"></span><span>Workspace Settings</span></a>
+    </nav>
+    <div class="user"><span class="avatar">AV</span><span>Ana Villanueva</span></div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <a class="back" href="#"><span data-icon="arrow-left" data-size="20"></span>Validation</a>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="#">Ideas</a><span>/</span><a href="#">Bacolod Health Bowl</a><span>/</span><span aria-current="page">05 Costs</span></nav>
+      <div class="tools">
+        <span class="saved"><span data-icon="check" data-size="14"></span><span>Saved</span></span>
+        <button class="iconbtn" aria-label="Comments"><span data-icon="message"></span></button>
+        <button class="iconbtn" aria-label="History"><span data-icon="history"></span></button>
+      </div>
+    </header>
+
+    <main class="page" id="main">
+      <div class="sechead">
+        <h1>05 Costs <button aria-label="Switch section"><span data-icon="chevron-down" data-size="18"></span></button></h1>
+        <p>What it takes to open, to run each month, and to make each sale.</p>
+      </div>
+
+      <div class="sheet">
+        <div class="tables">
+          <section>
+            <h2>Startup costs <small>one time</small></h2>
+            <table>
+              <colgroup><col style="width:30px"><col style="width:31%"><col style="width:120px"><col style="width:178px"><col class="c-note"><col style="width:96px"><col style="width:40px"></colgroup>
+              <thead><tr><th></th><th>Item</th><th class="amt">Amount</th><th>F/A/U</th><th class="note">Why needed</th><th>Can reduce?</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="g"><span data-moon="1" data-size="13"></span></td><td class="name">Equipment</td><td class="amt">₱60,000</td><td><button class="faucell">Fact · 1 source</button></td><td class="note">Blast chiller and prep tables</td><td>Partly</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr class="editing"><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name"><input value="Renovation" aria-label="Item"></td><td class="amt"><input value="₱30,000" aria-label="Amount"></td><td class="fcell"><button class="faucell" aria-expanded="true" style="background:var(--sunken);color:var(--ink)">Assumption · Medium <span data-icon="chevron-down" data-size="14"></span></button>
+                  <div class="pop" role="dialog" aria-label="Fact, Assumption or Unknown">
+                    <p class="lbl">How do you know this amount?</p>
+                    <div class="seg"><button aria-pressed="false"><span data-moon="1" data-size="13"></span>Fact</button><button aria-pressed="true"><span data-moon="0.5" data-size="13"></span>Assumption</button><button aria-pressed="false"><span data-moon="0" data-size="13"></span>Unknown</button></div>
+                    <p class="lbl">Confidence</p>
+                    <div class="seg"><button aria-pressed="false">Low</button><button aria-pressed="true">Medium</button><button aria-pressed="false">High</button></div>
+                    <div class="evid"><span>Have a quote? Mark it Fact.</span><a href="#">Add evidence</a></div>
+                  </div></td><td class="note">Counter and signage</td><td>Yes</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Lease Deposit</td><td class="amt">₱30,000</td><td><button class="faucell">Assumption · High</button></td><td class="note"></td><td>No</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0" data-size="13"></span></td><td class="name">Permits</td><td class="amt muted">Unknown</td><td><button class="faucell">Unknown</button></td><td class="note"></td><td class="muted">—</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0" data-size="13"></span></td><td class="name">Initial Inventory</td><td class="amt muted">Unknown</td><td><button class="faucell">Unknown</button></td><td class="note"></td><td class="muted">—</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Branding</td><td class="amt">₱10,000</td><td><button class="faucell">Assumption · Low</button></td><td class="note"></td><td>Yes</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Launch Marketing<span class="lump">Lump sum</span></td><td class="amt">₱15,000</td><td><button class="faucell">Assumption · Medium</button></td><td class="note"></td><td>Partly</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0" data-size="13"></span></td><td class="name">Tech Setup</td><td class="amt muted">Unknown</td><td><button class="faucell">Unknown</button></td><td class="note"></td><td class="muted">—</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span><span class="dot-empty"></span></span></td><td class="name">Working Capital Buffer</td><td class="amt muted">Empty</td><td><button class="faucell muted">—</button></td><td class="note"></td><td class="muted">—</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Other</td><td class="amt">₱0</td><td><button class="faucell">Assumption · Low</button></td><td class="note"></td><td class="muted">—</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+              </tbody>
+              <tfoot><tr><td colspan="3"><button class="add"><span data-icon="plus" data-size="16"></span>Add row</button></td><td colspan="4" class="sub">Subtotal <b>₱145,000+</b> · 3 Unknown, 1 Empty</td></tr></tfoot>
+            </table>
+          <ul class="cards" aria-label="Startup costs">
+            <li><span data-moon="1" data-size="13"></span><span class="n">Equipment</span><span class="a">₱60,000</span><span class="f">Fact · 1 source</span></li>
+            <li><span data-moon="0.5" data-size="13"></span><span class="n">Renovation</span><span class="a">₱30,000</span><span class="f">Assumption · Medium</span></li>
+            <li><span data-moon="0.5" data-size="13"></span><span class="n">Lease Deposit</span><span class="a">₱30,000</span><span class="f">Assumption · High</span></li>
+            <li><span data-moon="0" data-size="13"></span><span class="n">Permits</span><span class="a muted">Unknown</span><span class="f">Unknown</span></li>
+            <li><span data-moon="0" data-size="13"></span><span class="n">Initial Inventory</span><span class="a muted">Unknown</span><span class="f">Unknown</span></li>
+            <li><span><span class="dot-empty"></span></span><span class="n">Working Capital Buffer</span><span class="a muted">Empty</span><span class="f muted">Tap to fill or mark Unknown</span></li>
+            <li style="grid-template-columns:1fr"><span class="add"><span data-icon="plus" data-size="16"></span>Add row</span></li>
+          </ul>
+          </section>
+
+          <section>
+            <h2>Monthly fixed costs <small>every month</small></h2>
+            <table>
+              <colgroup><col style="width:30px"><col style="width:31%"><col style="width:120px"><col style="width:178px"><col class="c-note"><col style="width:40px"></colgroup>
+              <thead><tr><th></th><th>Item</th><th class="amt">Amount</th><th>F/A/U</th><th class="note">Notes</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Rent</td><td class="amt">₱15,000</td><td><button class="faucell">Assumption · Medium</button></td><td class="note">Lacson St. ground floor, 30 m²</td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Salaries</td><td class="amt">₱24,000</td><td><button class="faucell">Assumption · Medium</button></td><td class="note"></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Utilities</td><td class="amt">₱4,500</td><td><button class="faucell">Assumption · Medium</button></td><td class="note"></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Internet-Software</td><td class="amt">₱1,500</td><td><button class="faucell">Assumption · High</button></td><td class="note"></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Accounting</td><td class="amt">₱2,000</td><td><button class="faucell">Assumption · High</button></td><td class="note"></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Base Marketing</td><td class="amt">₱3,000</td><td><button class="faucell">Assumption · Medium</button></td><td class="note"></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+              </tbody>
+              <tfoot><tr><td colspan="3"><button class="add"><span data-icon="plus" data-size="16"></span>Add row</button></td><td colspan="3" class="sub">Subtotal <b>₱50,000</b></td></tr></tfoot>
+            </table>
+            <ul class="cards" aria-label="Monthly fixed costs">
+              <li><span data-moon="0.5" data-size="13"></span><span class="n">Rent</span><span class="a">₱15,000</span><span class="f">Assumption · Medium</span></li>
+              <li><span data-moon="0.5" data-size="13"></span><span class="n">Salaries</span><span class="a">₱24,000</span><span class="f">Assumption · Medium</span></li>
+              <li><span data-moon="0.5" data-size="13"></span><span class="n">Utilities</span><span class="a">₱4,500</span><span class="f">Assumption · Medium</span></li>
+              <li style="grid-template-columns:1fr"><span class="add"><span data-icon="plus" data-size="16"></span>Add row</span></li>
+            </ul>
+          </section>
+
+          <section>
+            <h2>Variable costs <small>per sale</small></h2>
+            <table>
+              <colgroup><col style="width:30px"><col style="width:31%"><col style="width:170px"><col style="width:178px"><col><col style="width:40px"></colgroup>
+              <thead><tr><th></th><th>Item</th><th class="amt">Amount</th><th>F/A/U</th><th></th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Materials</td><td class="amt">35% <span class="pct">· ₱77.00</span></td><td><button class="faucell">Assumption · Medium</button></td><td></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Packaging</td><td class="amt">₱12.00</td><td><button class="faucell">Assumption · Medium</button></td><td></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span><span class="dot-empty"></span></span></td><td class="name">Payment Fee</td><td class="amt muted">Empty</td><td><button class="faucell muted">—</button></td><td></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span data-moon="0.5" data-size="13"></span></td><td class="name">Delivery</td><td class="amt">₱15.00</td><td><button class="faucell">Assumption · Medium</button></td><td></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span><span class="dot-empty"></span></span></td><td class="name">Variable Labor</td><td class="amt muted">Empty</td><td><button class="faucell muted">—</button></td><td></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+                <tr><td class="g"><span><span class="dot-empty"></span></span></td><td class="name">Other</td><td class="amt muted">Empty</td><td><button class="faucell muted">—</button></td><td></td><td class="more"><button aria-label="Row actions"><span data-icon="ellipsis" data-size="16"></span></button></td></tr>
+              </tbody>
+              <tfoot><tr><td colspan="3"><button class="add"><span data-icon="plus" data-size="16"></span>Add row</button></td><td colspan="3" class="sub">Per sale <b>₱104.00+</b> · 3 Empty</td></tr></tfoot>
+            </table>
+            <ul class="cards" aria-label="Variable costs">
+              <li><span data-moon="0.5" data-size="13"></span><span class="n">Materials</span><span class="a">35% · ₱77.00</span><span class="f">Assumption · Medium</span></li>
+              <li><span data-moon="0.5" data-size="13"></span><span class="n">Packaging</span><span class="a">₱12.00</span><span class="f">Assumption · Medium</span></li>
+              <li><span><span class="dot-empty"></span></span><span class="n">Payment Fee</span><span class="a muted">Empty</span><span class="f muted">Tap to fill or mark Unknown</span></li>
+              <li style="grid-template-columns:1fr"><span class="add"><span data-icon="plus" data-size="16"></span>Add row</span></li>
+            </ul>
+          </section>
+
+        </div>
+
+        <aside class="totals" aria-label="Totals">
+          <h2>Totals</h2>
+          <div class="tot"><div class="k">Startup</div><div class="v">₱145,000+</div><div class="why">Lower bound · 3 Unknown, 1 Empty</div></div>
+          <div class="tot"><div class="k">Monthly fixed</div><div class="v">₱50,000</div></div>
+          <div class="tot"><div class="k">Variable</div><div class="v">₱104.00+ <small>/ sale</small></div><div class="why">Lower bound · 3 Empty</div></div>
+          <div class="tot be"><div class="k">Break-even</div><div class="v">14.4+ <small>/ day</small></div><div class="why">At ₱220 a sale</div></div>
+          <a class="link" href="#">Unit Economics &amp; Scenarios <span data-icon="arrow-right" data-size="14"></span></a>
+        </aside>
+      </div>
+    </main>
+
+    <div class="sumbar" role="button" aria-label="Open totals"><span>Startup <b class="num">₱145,000+</b></span><span>Monthly <b class="num">₱50,000</b></span><span>BE <b class="num">14.4+</b>/day</span><span class="up" data-icon="chevron-down" data-size="18" style="transform:rotate(180deg)"></span></div>
+    <nav class="tabbar" aria-label="Main">
+      <a href="#"><span data-icon="house" data-size="22"></span>Dashboard</a>
+      <a href="#" aria-current="page"><span data-icon="lightbulb" data-size="22"></span>Ideas</a>
+      <a href="#"><span data-icon="compass" data-size="22"></span>Self Analysis</a>
+      <a href="#"><span data-icon="bell" data-size="22"></span><span class="badge">3</span>Notifications</a>
+      <a href="#"><span data-icon="menu" data-size="22"></span>More</a>
+    </nav>
+  </div>
+</div>
+</body>
+</html>

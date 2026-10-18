@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@babel/parser": "^8.0.7",
     "@babel/types": "^8.0.6",
     "@biomejs/biome": "^2.5.15",

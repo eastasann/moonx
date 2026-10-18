@@ -258,13 +258,21 @@ function isReferenceOnly(token: Token): boolean {
 
 /**
  * The semantic groups whose children come in variants with the same keys and types: the
- * generator keeps one variant's keys and switches the values by mode or scale (ADR-018).
+ * generator keeps one variant's keys and switches the values by mode, scale or width
+ * (ADR-018).
  */
 export const VARIANT_GROUPS = [
   { group: "semantic.color", variants: ["light", "dark"] },
   { group: "semantic.shadow", variants: ["light", "dark"] },
   { group: "semantic.scale", variants: ["medium", "large"] },
+  { group: "semantic.font-size", variants: ["wide", "narrow"] },
 ] as const;
+
+/** The scale a value is generated for: medium with a mouse, large on touch (ADR-018). */
+export type ScaleName = "medium" | "large";
+
+/** The width a value is generated for: narrow below `semantic.breakpoint.tablet`. */
+export type WidthName = "wide" | "narrow";
 
 function keysUnder(tokens: Map<string, Token>, prefix: string): Set<string> {
   const keys = new Set<string>();
@@ -390,15 +398,24 @@ export function validateTokens(tree: TokenTree): string[] {
   }
 
   // The checks above follow references as written. The generator also reads references
-  // into the medium scale in the large one, which can reach a cycle the written graph
-  // does not have; resolving every token on both scales finds it.
+  // into the medium scale in the large one, and into the wide font sizes in the narrow
+  // ones, which can reach a cycle the written graph does not have; resolving every token
+  // in each of them finds it.
   if (problems.length === 0) {
-    for (const scale of ["medium", "large"] as const) {
+    const contexts: [ScaleName, WidthName][] = [
+      ["medium", "wide"],
+      ["large", "wide"],
+      ["medium", "narrow"],
+      ["large", "narrow"],
+    ];
+    for (const [scale, width] of contexts) {
       for (const path of tokens.keys()) {
         try {
-          resolveToken(tokens, path, scale);
+          resolveToken(tokens, path, scale, width);
         } catch (error) {
-          problems.push(`${path} (${scale}): ${(error as Error).message}`);
+          problems.push(
+            `${path} (${scale}, ${width}): ${(error as Error).message}`,
+          );
         }
       }
     }
@@ -412,34 +429,36 @@ export type Resolved =
   | { kind: "composite"; type: TokenType; fields: Record<string, Resolved> };
 
 const MEDIUM = "semantic.scale.medium.";
+const WIDE = "semantic.font-size.wide.";
 
 /**
  * Follows the references of the token at `path` to literal values. References into
- * `semantic.scale.medium` are read in `scale` instead: typography and density name the
- * medium scale, and the generator swaps in the scale it builds for (ADR-018). The mode
- * is not swapped: the caller picks the light or dark path. Each literal keeps the path
- * of the primitive it came from (`source`).
+ * `semantic.scale.medium` are read in `scale` instead, and references into
+ * `semantic.font-size.wide` in `width`: typography, density and the components' font
+ * sizes name the medium scale and the wide sizes, and the generator swaps in the ones it
+ * builds for (ADR-018). The mode is not swapped: the caller picks the light or dark path.
+ * Each literal keeps the path of the primitive it came from (`source`).
  *
  * @throws on a broken tree; run validateTokens first.
  */
 export function resolveToken(
   tokens: Map<string, Token>,
   path: string,
-  scale: "medium" | "large",
+  scale: ScaleName,
+  width: WidthName = "wide",
   seen: string[] = [],
 ): Resolved {
   const token = tokens.get(path);
   if (token === undefined) throw new Error(`{${path}} does not exist`);
   if (seen.includes(path)) throw new Error(`${path}: reference cycle`);
+  const swap = (target: string) =>
+    target.startsWith(MEDIUM)
+      ? `semantic.scale.${scale}.${target.slice(MEDIUM.length)}`
+      : target.startsWith(WIDE)
+        ? `semantic.font-size.${width}.${target.slice(WIDE.length)}`
+        : target;
   const follow = (target: string) =>
-    resolveToken(
-      tokens,
-      target.startsWith(MEDIUM)
-        ? `semantic.scale.${scale}.${target.slice(MEDIUM.length)}`
-        : target,
-      scale,
-      [...seen, path],
-    );
+    resolveToken(tokens, swap(target), scale, width, [...seen, path]);
   const type = token.type as TokenType;
   const whole = aliasTarget(token.value);
   if (whole !== undefined) return follow(whole);

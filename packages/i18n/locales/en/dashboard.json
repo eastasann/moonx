@@ -1,0 +1,42 @@
+{
+  "lead": "Ideas, self analyses and what is due across the workspace.",
+  "leadViewer": "Ideas and what is due across the workspace.",
+  "ideas": {
+    "title": "Ideas",
+    "legend": "Checks: ● done · ◐ partial · ○ not started",
+    "updated": "{{stage}} · updated {{when}}",
+    "missing": "Missing: {{names}}",
+    "missingCount_one": "Missing: {{count}} check",
+    "missingCount_other": "Missing: {{count}} checks",
+    "dropped_one": "{{count}} dropped idea hidden",
+    "dropped_other": "{{count}} dropped ideas hidden"
+  },
+  "gettingStarted": {
+    "title": "Getting started",
+    "lead": "This workspace has no ideas yet. Begin here:",
+    "leadViewer": "This workspace has no ideas yet. They show up here once the team writes them.",
+    "selfAnalysis": "Start your self analysis",
+    "invite": "Invite your team",
+    "firstIdea": "Write your first idea"
+  },
+  "due": {
+    "title": "Due soon",
+    "window": "next 7 days",
+    "yours": "Yours",
+    "empty": "Nothing is due in the next 7 days."
+  },
+  "selfAnalyses": {
+    "title": "Self analyses",
+    "shared": "Shared · {{status}}",
+    "notShared": "Not shared"
+  },
+  "activity": {
+    "title": "Recent activity",
+    "change": "changed {{summary}}",
+    "comment": "commented on {{summary}}",
+    "decision": "recorded {{value}}",
+    "go_no_go": "recorded Go / No-Go: {{value}}",
+    "version_saved": "saved the version “{{name}}”",
+    "empty": "Nothing has happened in this workspace yet."
+  }
+}

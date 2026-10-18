@@ -15,6 +15,7 @@ import {
   metricReasonSchema,
   roleSchema,
   scenarioKeySchema,
+  selfAnalysisStatusSchema,
   sourceTypeSchema,
   stageSchema,
   supportsCheckSchema,
@@ -26,8 +27,11 @@ test("the shared instance is ready on import", () => {
   expect(i18n.language).toBe("en");
   expect(namespaces).toEqual([
     "ai",
+    "app",
     "common",
     "components",
+    "dashboard",
+    "errors",
     "format",
     "mail",
     "notifications",
@@ -78,6 +82,7 @@ test.each([
   ["goNoGo", goNoGoValueSchema.options],
   ["stage", stageSchema.options],
   ["checkState", checkStateSchema.options],
+  ["selfAnalysisStatus", selfAnalysisStatusSchema.options],
   ["supportsCheck", supportsCheckSchema.options],
   ["economicsField", economicsFieldSchema.options],
   ["metricReason", metricReasonSchema.options],

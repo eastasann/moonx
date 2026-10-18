@@ -185,6 +185,9 @@ export const account = style([
   },
 ]);
 
+/** The account when it has no menu to open: the same place and look, not a control. */
+export const accountStatic = style([account, { cursor: "default" }]);
+
 /** A row's name: beside its icon on a desktop, only read on a tablet. */
 export const label = style({
   ...visuallyHidden,

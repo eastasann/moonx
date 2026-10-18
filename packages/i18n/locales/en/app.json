@@ -1,0 +1,42 @@
+{
+  "name": "moonx",
+  "documentTitle": "{{page}} · moonx",
+  "nav": {
+    "dashboard": "Dashboard",
+    "switchWorkspace": "Switch workspace"
+  },
+  "separator": " · ",
+  "userBadge": {
+    "former_member": "(former member)",
+    "suspended": "(suspended)"
+  },
+  "state": {
+    "loading": "Loading",
+    "slow": "Taking longer than usual",
+    "loadError": "Couldn't load this page",
+    "noAccess": "You don't have access to this",
+    "notFound": "Not found. Check the link.",
+    "unexpected": "Something went wrong",
+    "ref": "Ref: {{ref}}",
+    "retry": "Retry",
+    "close": "Close",
+    "toDashboard": "Go to Dashboard",
+    "offline": "You're offline. Changes can't be saved until you reconnect.",
+    "offlinePage": "You're offline. Connect to the internet to open this page."
+  },
+  "switchWorkspace": {
+    "title": "Switch workspace",
+    "workspaces": "Workspaces",
+    "current": "Current",
+    "personal": "Personal",
+    "newWorkspace": "New workspace"
+  },
+  "newWorkspace": {
+    "title": "New workspace",
+    "name": "Name",
+    "currency": "Currency",
+    "create": "Create",
+    "cancel": "Cancel",
+    "couldNotSave": "Couldn't save"
+  }
+}

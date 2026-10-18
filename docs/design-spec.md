@@ -574,6 +574,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - 未読数を持つナビの項目（SideNav と TabBar の Notifications）は、件数を名前に含めて読み上げる（「Notifications, 3 unread」）。見た目の数（SideNav の数字・TabBar の札）は読み上げない。
 - サイドバーのナビの今のページは、`surface.selected` の地（ライトで白）と内側の hairline の枠と semibold の名前で示し、左の線は付けない。いちばん下に利用者の Avatar（M）と名前を置く。スマホの TabBar は raised の地で、今のタブは塗らず、上にインクの線（4.5 の TabBar）を引いて名前を太くする（moon-base.css）。
 - スマホのヘッダーの高さは 06 `layout.header-height-mobile` にする。下の階層の画面は「← 戻り先」、TabBar で開く上の階層の画面（5・6・8・10 など）は画面の題を出す。More のメニューで開く画面（7・4・9・26）は「← More」を出す（s09-settings.html）。押すと More のメニューを開き直す（More は画面ではなくメニューのままで、← はページへ移らずにメニューを開く。2026-10-18 のユーザーの決定）。フォーカスは、TabBar の More を同じ操作で押したときと同じ所に入り（キーボードの Enter・Space・↓ と読み上げの操作では最初の項目、↑ では最後の項目、タップとクリックではメニュー）、メニューを閉じると ← More に戻る。← More はメニューのボタンとして読み上げる（開くのがメニューであることと、開いているか）。5 の題はワークスペースの切り替えにする（「BCDX ▾」。押すと M7）。タブレットから上のヘッダーは `layout.header-height` にし、パンくずの区切りは「/」の文字にする（moon-base.css）。
+- ブラウザのタブの題（文書の title）は、ワークスペースの画面で「{画面名} · {ワークスペース名} · moonx」（例: 「Dashboard · BCDX · moonx」）、ワークスペースに属さない画面で「{画面名} · moonx」。画面が名前を持たない状態（6.0.6 の見つからない・権限がないなど）は「moonx」。
 - ヘッダー右に保存状態、コメント（💬、件数バッジ）、変更履歴（🕘）。変更履歴は、画面全体の履歴と、項目ごとの履歴の両方を開ける。保存状態はスマホでもヘッダーに出す（幅が足りなければ印だけ。4.3）。
 - パンくず（デスクトップとタブレット）は「Ideas / {アイデア名} / {画面名}」の3段。13 はアイデアの段そのもので、「Validation」の段は置かない。プランの中は「Ideas / {アイデア名} / {案名} / {画面名}」、自己分析は「Self Analysis / {画面名}」、運営者の画面は「Admin / {画面名}」。画面名はセクションの番号付きの名前（例: 「05 Costs」）。スマホはパンくずを出さず、← の横に戻り先の短い名前を出す（13 へ戻るときは「Validation」、20 へは「Plan」、10 へは「Self Analysis」、6 へは「Ideas」）。s25-import.html のスマホは「← Back」と描いているが、ほかのモックアップは戻り先の名前を出し、名前が無いとどこへ戻るかが分からなくなるので、25 も戻り先の名前（「← Validation」など）にする。
 - 画面上部の帯（オフライン・新しい版・ホーム画面への追加の案内（6.0.6）と、テンプレートの新しい版の案内（6.0.7））は、ヘッダーの下、本文の上に、端から端まで出す（AlertBanner。sunken の地・下に hairline・secondary の文字・状態の色の印・右端に操作。InlineAlert のカードにしない。d1-moon.html の .banner）。複数あるときは上から、オフライン → アプリの新しい版 → ホーム画面への追加の案内 → テンプレートの新しい版の案内の順に重ねる。
@@ -666,7 +667,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | ローディング | その画面のレイアウトの形をした骨組み（スケルトン）。10秒を超えたら「Taking longer than usual」と再試行ボタン |
 | 読み込みエラー | 本文の位置に「Couldn't load this page」と再試行ボタン。ナビは使えるままにする |
 | 権限がない | 「You don't have access to this」とダッシュボードへのリンク（他のワークスペースの URL を開いたときなど） |
-| 見つからない | 「Not found. Check the link.」とダッシュボードへのリンク（アーカイブしたものは読み取り専用で開けるので、この表示にはならない） |
+| 見つからない | 「Not found. Check the link.」とダッシュボードへのリンク（アーカイブしたものは読み取り専用で開けるので、この表示にはならない）。ログインしていない人には、ダッシュボードの代わりに 1（`/`。ログインしていれば最後に開いたワークスペースの 5 へ移る。5章）へのリンク |
 | 保存エラー | 6.0.2 のとおり、項目の横とヘッダーに出す |
 | 空（0件） | その画面が何をする場所かを1〜2行で説明し、権限があれば最初の操作のボタンを出す。Viewer には説明だけを出す |
 | 絞り込みで0件 | 「Nothing matches these filters」と絞り込みの解除ボタン |
@@ -1715,6 +1716,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 形（s05-dashboard.html）: Ideas の行は、名前とその下の工程・更新・不足の後ろに CheckDots と判定の札を並べ、札はどの行でも同じ幅の列の右端にそろえて印の位置を行ごとにそろえる（4.5 の RowList の `marks`・`badge`）。スマホでは札を名前の行の右端、CheckDots をその下の行に置く。Due soon の期限は等幅の数字。Recent activity の行は1文で、動いた人の名前を semibold、動きを本文の太さで出す（.activity .t b）。
 - 空の状態（ワークスペースを作ったばかり。アーカイブしていないアイデアが0件で、隠れている Drop も0件）: Ideas ブロックの場所に「Getting started」の案内を出し、他のブロックは通常どおり出す。案内は次の3つ: ① 自己分析を始める（10）② メンバーを招待する（9、Owner）③ 最初のアイデアを書く（M1）。Viewer には説明の1行だけを出す。
 - ローディング / エラー: 6.0.6。ブロックごとに読み込み、1つが失敗しても他は出す。
+- 文言: 題の下の1行は「Ideas, self analyses and what is due across the workspace.」（Viewer は Self analyses が無いので「Ideas and what is due across the workspace.」）。Getting started は1行「This workspace has no ideas yet. Begin here:」の下に ①「Start your self analysis」②「Invite your team」③「Write your first idea」、Viewer の1行は「This workspace has no ideas yet. They show up here once the team writes them.」。Due soon の自分の担当の札は「Yours」、0件なら「Nothing is due in the next 7 days.」。Recent activity の文は、変更「changed {項目}」・コメント「commented on {項目}」・判定「recorded {Proceed / Hold / Drop}」・Go / No-Go「recorded Go / No-Go: {Launch / Delay / Stop}」・版の保存「saved the version “{版の名前}”」（{項目} は SDD 5.6 Activity の summary）、0件なら「Nothing has happened in this workspace yet.」
 
 ---
 

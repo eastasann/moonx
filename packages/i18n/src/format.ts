@@ -181,6 +181,26 @@ export const formatCount = (count: number) =>
     : numberFormat({}).format(count);
 
 /**
+ * A currency as a picker offers it (s09-settings.html): its code and name, "PHP ·
+ * Philippine Peso". The code alone where the runtime has no name for it (codes newer
+ * than its data, such as XCG).
+ */
+export const formatCurrencyOption = (code: string) => {
+  const name = new Intl.DisplayNames(LOCALE, {
+    type: "currency",
+    fallback: "none",
+  }).of(code);
+  return name === undefined ? code : i18n.t("format:currency", { code, name });
+};
+
+/**
+ * Names in a running list, "Startup & monthly costs, Permits": joined without "and",
+ * as a list of labels.
+ */
+export const formatList = (items: readonly string[]) =>
+  new Intl.ListFormat(LOCALE, { style: "short", type: "unit" }).format(items);
+
+/**
  * How far a ProgressCircle or ProgressBar has got, read out as a whole percent ("40%").
  * Not a calculated rate, so it has no decimal (formatPercent has one).
  */

@@ -1,7 +1,10 @@
 import i18next, { type i18n as I18n } from "i18next";
 import ai from "../locales/en/ai.json";
+import app from "../locales/en/app.json";
 import common from "../locales/en/common.json";
 import components from "../locales/en/components.json";
+import dashboard from "../locales/en/dashboard.json";
+import errors from "../locales/en/errors.json";
 import format from "../locales/en/format.json";
 import mail from "../locales/en/mail.json";
 import notifications from "../locales/en/notifications.json";
@@ -15,8 +18,11 @@ import validation from "../locales/en/validation.json";
 export const resources = {
   en: {
     ai,
+    app,
     common,
     components,
+    dashboard,
+    errors,
     format,
     mail,
     notifications,

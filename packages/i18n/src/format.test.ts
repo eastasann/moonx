@@ -3,12 +3,14 @@ import {
   formatCalendarMonth,
   formatCheckName,
   formatCount,
+  formatCurrencyOption,
   formatDate,
   formatDayOfMonth,
   formatInputNumber,
   formatInputPercent,
   formatIsoDate,
   formatIsoDateTime,
+  formatList,
   formatMoney,
   formatMonths,
   formatNumberAffixes,
@@ -161,6 +163,20 @@ describe("counts, rates and months (design-spec 6.4 端数)", () => {
     expect(formatCount(0)).toBe("0");
     expect(formatCount(99)).toBe("99");
     expect(formatCount(100)).toBe("99+");
+  });
+});
+
+describe("labels", () => {
+  test("a currency reads as its code and name, or its code where no name is known", () => {
+    expect(formatCurrencyOption("PHP")).toBe("PHP · Philippine Peso");
+    expect(formatCurrencyOption("ZZZ")).toBe("ZZZ");
+  });
+
+  test("a list of names is joined by commas, without and", () => {
+    expect(formatList(["Startup & monthly costs", "Permits"])).toBe(
+      "Startup & monthly costs, Permits",
+    );
+    expect(formatList(["Permits"])).toBe("Permits");
   });
 });
 

@@ -1,0 +1,27 @@
+{
+  "input": {
+    "required": "Can't be empty",
+    "tooShort": "Use at least {{minimum}} characters",
+    "tooLong": "Too long. Shorten to {{maximum}} characters.",
+    "decimals_one": "Use at most {{count}} decimal place",
+    "decimals_other": "Use at most {{count}} decimal places",
+    "positive": "Enter a number greater than 0",
+    "unsavableCharacter": "Remove the character that can't be saved",
+    "numberFormat": "Enter a number such as 1,500.50",
+    "currency": "Choose a currency from the list",
+    "timeZone": "Choose a time zone from the list",
+    "unique": "Already used. Enter a different value.",
+    "email": "Enter an email address",
+    "url": "Enter a URL that starts with http:// or https://",
+    "choice": "Choose one of the options",
+    "atLeast": "Enter {{minimum}} or more",
+    "atMost": "Enter {{maximum}} or less",
+    "greaterThan": "Enter a number greater than {{minimum}}",
+    "lessThan": "Enter a number less than {{maximum}}",
+    "wholeNumber": "Enter a whole number",
+    "number": "Enter a number",
+    "date": "Enter a date",
+    "dateTime": "Enter a date and time",
+    "format": "Check the format"
+  }
+}

@@ -9,38 +9,78 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SignedInRouteImport } from './routes/_signedIn'
 import { Route as DevComponentsRouteImport } from './routes/dev.components'
+import { Route as SignedInWWorkspaceIdRouteRouteImport } from './routes/_signedIn/w/$workspaceId/route'
+import { Route as SignedInWWorkspaceIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/index'
 
+const SignedInRoute = SignedInRouteImport.update({
+  id: '/_signedIn',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DevComponentsRoute = DevComponentsRouteImport.update({
   id: '/dev/components',
   path: '/dev/components',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignedInWWorkspaceIdRouteRoute =
+  SignedInWWorkspaceIdRouteRouteImport.update({
+    id: '/w/$workspaceId',
+    path: '/w/$workspaceId',
+    getParentRoute: () => SignedInRoute,
+  } as any)
+const SignedInWWorkspaceIdIndexRoute =
+  SignedInWWorkspaceIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof SignedInRouteWithChildren
   '/dev/components': typeof DevComponentsRoute
+  '/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
+  '/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof SignedInRouteWithChildren
   '/dev/components': typeof DevComponentsRoute
+  '/w/$workspaceId': typeof SignedInWWorkspaceIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/_signedIn': typeof SignedInRouteWithChildren
   '/dev/components': typeof DevComponentsRoute
+  '/_signedIn/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
+  '/_signedIn/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/dev/components'
+  fullPaths: '/' | '/dev/components' | '/w/$workspaceId' | '/w/$workspaceId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/dev/components'
-  id: '__root__' | '/dev/components'
+  to: '/' | '/dev/components' | '/w/$workspaceId'
+  id:
+    | '__root__'
+    | '/_signedIn'
+    | '/dev/components'
+    | '/_signedIn/w/$workspaceId'
+    | '/_signedIn/w/$workspaceId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  SignedInRoute: typeof SignedInRouteWithChildren
   DevComponentsRoute: typeof DevComponentsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_signedIn': {
+      id: '/_signedIn'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof SignedInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dev/components': {
       id: '/dev/components'
       path: '/dev/components'
@@ -48,10 +88,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevComponentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_signedIn/w/$workspaceId': {
+      id: '/_signedIn/w/$workspaceId'
+      path: '/w/$workspaceId'
+      fullPath: '/w/$workspaceId'
+      preLoaderRoute: typeof SignedInWWorkspaceIdRouteRouteImport
+      parentRoute: typeof SignedInRoute
+    }
+    '/_signedIn/w/$workspaceId/': {
+      id: '/_signedIn/w/$workspaceId/'
+      path: '/'
+      fullPath: '/w/$workspaceId/'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIndexRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
   }
 }
 
+interface SignedInWWorkspaceIdRouteRouteChildren {
+  SignedInWWorkspaceIdIndexRoute: typeof SignedInWWorkspaceIdIndexRoute
+}
+
+const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChildren =
+  {
+    SignedInWWorkspaceIdIndexRoute: SignedInWWorkspaceIdIndexRoute,
+  }
+
+const SignedInWWorkspaceIdRouteRouteWithChildren =
+  SignedInWWorkspaceIdRouteRoute._addFileChildren(
+    SignedInWWorkspaceIdRouteRouteChildren,
+  )
+
+interface SignedInRouteChildren {
+  SignedInWWorkspaceIdRouteRoute: typeof SignedInWWorkspaceIdRouteRouteWithChildren
+}
+
+const SignedInRouteChildren: SignedInRouteChildren = {
+  SignedInWWorkspaceIdRouteRoute: SignedInWWorkspaceIdRouteRouteWithChildren,
+}
+
+const SignedInRouteWithChildren = SignedInRoute._addFileChildren(
+  SignedInRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
+  SignedInRoute: SignedInRouteWithChildren,
   DevComponentsRoute: DevComponentsRoute,
 }
 export const routeTree = rootRouteImport

@@ -165,6 +165,20 @@ describe("SideNav", () => {
     ).toEqual(["Account", "Log out"]);
   });
 
+  test("without an account menu, the account is shown but is no control", () => {
+    render(
+      <SideNav
+        workspaceName="BCDX"
+        onWorkspacePress={() => {}}
+        items={[decisions]}
+        user={{ name: "Ana Reyes" }}
+      />,
+    );
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByText("Ana Reyes")).toBeTruthy();
+    expect(within(nav).queryByRole("button", { name: "Ana Reyes" })).toBeNull();
+  });
+
   test("no count, no badge", () => {
     const { container } = render(
       <SideNav

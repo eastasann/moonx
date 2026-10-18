@@ -6,6 +6,7 @@
     "@elysiajs/eden": "^1.4.9",
     "@moonx/i18n": "workspace:*",
     "@moonx/schemas": "workspace:*",
+    "@moonx/ui-tokens": "workspace:*",
     "@moonx/ui-web": "workspace:*",
     "@sentry/browser": "^11.8.0",
     "@tanstack/react-form": "^1.33.5",

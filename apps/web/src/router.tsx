@@ -7,6 +7,8 @@ import {
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { PENDING_MS } from "./components/states";
+import { createAutosave } from "./lib/autosave";
+import { AutosaveProvider } from "./lib/autosave-react";
 import { createQueryClient } from "./lib/query";
 import { routeTree } from "./routeTree.gen";
 
@@ -40,16 +42,27 @@ function AriaRouting({ children }: { children: ReactNode }) {
 }
 
 /**
- * The app's router with its query cache. A request that finds the session gone drops the
- * cache, which holds one user's data, and goes to `/login?next=<where it was>` (SDD 4章・
- * 8.2・ADR-011); the many queries a screen may lose at once go there once.
+ * The app's router with its query cache and the page's saves. A request that finds the
+ * session gone opens M9 while input is unsaved, to sign in again without leaving
+ * (design-spec 5章「認証」); otherwise it drops the cache, which holds one user's data, and
+ * goes to `/login?next=<where it was>` (SDD 4章・8.2・ADR-011); the many queries a screen
+ * may lose at once go there once.
  *
  * @param history Tests pass a memory history.
  */
 export function createAppRouter({ history }: { history?: RouterHistory } = {}) {
+  const autosave = createAutosave({
+    // The screen reloads to show why a save was refused: archived, read only (SDD 8.2).
+    onRejected: () => void queryClient.invalidateQueries(),
+  });
   const queryClient = createQueryClient(() => {
     const { pathname, searchStr } = router.latestLocation;
     if (isOpenToAll(pathname)) return;
+    if (autosave.hasUnsaved()) {
+      autosave.requireSignIn();
+      return;
+    }
+    autosave.discardAll();
     queryClient.clear();
     const next = new URLSearchParams({ next: `${pathname}${searchStr}` });
     // In place of the screen: Back must not lead into it again, only to leave again.
@@ -64,7 +77,9 @@ export function createAppRouter({ history }: { history?: RouterHistory } = {}) {
     defaultPendingMs: PENDING_MS,
     InnerWrap: ({ children }) => (
       <QueryClientProvider client={queryClient}>
-        <AriaRouting>{children}</AriaRouting>
+        <AutosaveProvider autosave={autosave}>
+          <AriaRouting>{children}</AriaRouting>
+        </AutosaveProvider>
       </QueryClientProvider>
     ),
   });

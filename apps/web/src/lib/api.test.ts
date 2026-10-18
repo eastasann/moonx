@@ -101,6 +101,23 @@ describe("the client (ADR-006)", () => {
     expect(requests[0]?.headers.has("content-type")).toBe(false);
   });
 
+  test("a save says which client sent it by the window's width (SDD 5.1); a GET does not", async () => {
+    const requests = stubFetch(() => json(200, {}));
+    const narrow = vi.fn((query: string) => ({
+      matches: query.includes("min-width: 768px"),
+    }));
+    vi.stubGlobal("matchMedia", narrow);
+    await unwrap(
+      api().api.v1.ideas({ ideaId: "a" }).patch({ name: "A", lockVersion: 1 }),
+    );
+    expect(requests[0]?.headers.get("x-moonx-client")).toBe("web_mobile");
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    await unwrap(api().api.v1.notifications["read-all"].post());
+    expect(requests[1]?.headers.get("x-moonx-client")).toBe("web");
+    await unwrap(api().api.v1.me.get());
+    expect(requests[2]?.headers.has("x-moonx-client")).toBe(false);
+  });
+
   test("dates stay the strings the API sends", async () => {
     stubFetch(() =>
       json(200, {

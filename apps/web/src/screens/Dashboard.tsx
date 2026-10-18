@@ -1,13 +1,6 @@
-import {
-  formatCheckName,
-  formatDate,
-  formatList,
-  formatOverdue,
-  formatRelativeTime,
-} from "@moonx/i18n";
+import { formatDate, formatOverdue, formatRelativeTime } from "@moonx/i18n";
 import {
   type Activity,
-  type CheckState,
   type DueItem,
   decisionValueSchema,
   goNoGoValueSchema,
@@ -19,24 +12,31 @@ import {
   Badge,
   Breadcrumb,
   Breadcrumbs,
-  type CheckDotState,
   CheckDots,
   Flex,
   Heading,
   type HubBlock,
   HubPattern,
+  Link,
   MoonGlyph,
   RowList,
   RowListItem,
   Skeleton,
-  Stack,
   TaskMark,
   Text,
 } from "@moonx/ui-web";
 import { type UseQueryResult, useQuery } from "@tanstack/react-query";
-import { type ReactNode, useId } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { BlockBoundary } from "../components/ErrorBoundary";
+import { BlockBoundary, ModalBoundary } from "../components/ErrorBoundary";
+import { HubBlock as Block } from "../components/HubBlock";
+import { NewIdeaDialog } from "../components/IdeaDialogs";
+import {
+  checkDots,
+  DecisionBadge,
+  dotState,
+  missingChecks,
+} from "../components/ideaParts";
 import {
   FailureState,
   SlowLoadingState,
@@ -45,6 +45,7 @@ import {
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import { hrefOf, ideaHref, ideasHref } from "../lib/links";
 import {
   dashboardActivityQuery,
   dashboardDueSoonQuery,
@@ -52,54 +53,6 @@ import {
   dashboardSelfAnalysesQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
-
-/** Names the six checks list as missing past this many show as a count (design-spec 6.9). */
-const MISSING_NAMES_MAX = 2;
-
-const dotState = {
-  not_started: "not-started",
-  partial: "partial",
-  done: "done",
-} as const satisfies Record<CheckState, CheckDotState>;
-
-/**
- * A block of the hub: its small heading, a note at its end, and what it holds
- * (s05-dashboard.html h2 and .aside). The section is busy while it loads.
- */
-function Block({
-  title,
-  aside,
-  isBusy = false,
-  children,
-}: {
-  title: string;
-  aside?: string;
-  isBusy?: boolean;
-  children: ReactNode;
-}) {
-  const headingId = useId();
-  return (
-    <section aria-labelledby={headingId} aria-busy={isBusy || undefined}>
-      <Stack gap="space-100">
-        <Flex
-          alignItems="baseline"
-          justifyContent="space-between"
-          gap="space-100"
-        >
-          <Heading level={2} variant="label" id={headingId}>
-            {title}
-          </Heading>
-          {aside !== undefined && (
-            <Text variant="caption" tone="tertiary">
-              {aside}
-            </Text>
-          )}
-        </Flex>
-        {children}
-      </Stack>
-    </section>
-  );
-}
 
 /**
  * What a block shows of its query (6.9: each block loads on its own, and one failing
@@ -150,8 +103,16 @@ function RowsSkeleton({ line, detail }: { line: string; detail: string }) {
   );
 }
 
-function IdeasBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
-  const { t } = useTranslation(["dashboard"]);
+function IdeasBlock({
+  me,
+  workspaceId,
+  onFirstIdea,
+}: {
+  me: Me;
+  workspaceId: string;
+  onFirstIdea: () => void;
+}) {
+  const { t } = useTranslation(["dashboard", "app"]);
   const query = useQuery(dashboardIdeasQuery(workspaceId));
   const data = query.data;
   if (
@@ -159,7 +120,7 @@ function IdeasBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
     data.items.length === 0 &&
     data.droppedCount === 0
   ) {
-    return <GettingStarted />;
+    return <GettingStarted onFirstIdea={onFirstIdea} />;
   }
   return (
     <Block
@@ -186,13 +147,22 @@ function IdeasBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
             {items.length > 0 && (
               <RowList aria-label={t("dashboard:ideas.title")}>
                 {items.map((idea) => (
-                  <IdeaRow key={idea.id} idea={idea} timeZone={me.timezone} />
+                  <IdeaRow
+                    key={idea.id}
+                    idea={idea}
+                    workspaceId={workspaceId}
+                    timeZone={me.timezone}
+                  />
                 ))}
               </RowList>
             )}
             {droppedCount > 0 && (
               <Text variant="body-sm" tone="secondary">
                 {t("dashboard:ideas.dropped", { count: droppedCount })}
+                {t("app:separator")}
+                <Link href={ideasHref(workspaceId, { decision: "drop" })}>
+                  {t("dashboard:ideas.show")}
+                </Link>
               </Text>
             )}
           </>
@@ -204,41 +174,32 @@ function IdeasBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
 
 /**
  * An idea (design-spec 6.9): its stage, when it last moved and what it misses under the
- * name; its checks and its latest decision at the end. Opening 13 joins when 13 is built.
+ * name; its checks and its latest decision at the end. It opens its 13.
  */
-function IdeaRow({ idea, timeZone }: { idea: IdeaSummary; timeZone: string }) {
+function IdeaRow({
+  idea,
+  workspaceId,
+  timeZone,
+}: {
+  idea: IdeaSummary;
+  workspaceId: string;
+  timeZone: string;
+}) {
   const { t } = useTranslation(["dashboard", "common", "app"]);
-  const checks = idea.checks.map(({ key, state, params }) => ({
-    name: formatCheckName(key, params),
-    state: dotState[state],
-  }));
-  const missing = checks.filter(({ state }) => state !== "done");
+  const missing = missingChecks(idea.checks);
   const parts = [
     t("dashboard:ideas.updated", {
       stage: t(`common:stage.${idea.stage}`),
       when: formatRelativeTime(idea.lastActivityAt, { timeZone }),
     }),
+    ...(missing === null ? [] : [missing]),
   ];
-  if (missing.length > MISSING_NAMES_MAX) {
-    parts.push(t("dashboard:ideas.missingCount", { count: missing.length }));
-  } else if (missing.length > 0) {
-    parts.push(
-      t("dashboard:ideas.missing", {
-        names: formatList(missing.map(({ name }) => name)),
-      }),
-    );
-  }
   return (
     <RowListItem
+      href={ideaHref(workspaceId, idea.id)}
       description={parts.join(t("app:separator"))}
-      marks={<CheckDots checks={checks} size="S" />}
-      badge={
-        idea.latestDecision === null ? (
-          <Badge fillStyle="dashed">{t("common:decision.undecided")}</Badge>
-        ) : (
-          <Badge>{t(`common:decision.${idea.latestDecision}`)}</Badge>
-        )
-      }
+      marks={<CheckDots checks={checkDots(idea.checks)} size="S" />}
+      badge={<DecisionBadge decision={idea.latestDecision} />}
     >
       {idea.name}
     </RowListItem>
@@ -248,9 +209,15 @@ function IdeaRow({ idea, timeZone }: { idea: IdeaSummary; timeZone: string }) {
 /**
  * In the Ideas block's place while the workspace has no idea, dropped ones included
  * (design-spec 6.9): the first steps for those who may take them, one line for a Viewer.
- * Each step becomes a way in when its screen is built (10, 9, M1).
+ * The first idea opens M1; the others become ways in when their screens are built (10,
+ * 9).
  */
-export function GettingStarted() {
+export function GettingStarted({
+  onFirstIdea,
+}: {
+  /** Opens M1 (design-spec 6.9 ③). */
+  onFirstIdea: () => void;
+}) {
   const { t } = useTranslation(["dashboard"]);
   const { role } = useWorkspace();
   if (role === "viewer") {
@@ -272,7 +239,9 @@ export function GettingStarted() {
         {role === "owner" && (
           <RowListItem>{t("dashboard:gettingStarted.invite")}</RowListItem>
         )}
-        <RowListItem>{t("dashboard:gettingStarted.firstIdea")}</RowListItem>
+        <RowListItem onPress={onFirstIdea}>
+          {t("dashboard:gettingStarted.firstIdea")}
+        </RowListItem>
       </RowList>
     </Block>
   );
@@ -463,7 +432,7 @@ function ActivityBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
 
 /**
  * One move (design-spec 6.9, s05-dashboard.html .activity): who in semibold and what in
- * a sentence, then where and when. Opening the item joins as its screens are built.
+ * a sentence, then where and when. It opens its item where that screen is built.
  */
 function ActivityRow({
   activity,
@@ -497,6 +466,7 @@ function ActivityRow({
   ].filter((part) => part !== undefined);
   return (
     <RowListItem
+      href={hrefOf(activity.link)}
       start={
         <Avatar
           name={activity.actor.displayName}
@@ -561,7 +531,7 @@ export function DashboardSkeleton() {
  * and Self analyses in the main column, Due soon and Recent activity beside them; on a
  * phone Ideas, Due soon, Self analyses, Recent activity. A Viewer has no Self analyses.
  */
-export function DashboardScreen() {
+export function DashboardScreen({ modal: openModal }: { modal?: string }) {
   const { t } = useTranslation(["dashboard", "app"]);
   const { me, workspace, role } = useWorkspace();
   const modal = useModal();
@@ -573,7 +543,11 @@ export function DashboardScreen() {
       column: "main",
       content: (
         <BlockBoundary>
-          <IdeasBlock me={me} workspaceId={workspace.id} />
+          <IdeasBlock
+            me={me}
+            workspaceId={workspace.id}
+            onFirstIdea={() => modal.open("new-idea")}
+          />
         </BlockBoundary>
       ),
     },
@@ -635,6 +609,11 @@ export function DashboardScreen() {
         }
         blocks={blocks}
       />
+      {openModal === "new-idea" && !isViewer && (
+        <ModalBoundary key={openModal} onClose={modal.close}>
+          <NewIdeaDialog onClose={modal.close} />
+        </ModalBoundary>
+      )}
     </WorkspaceFrame>
   );
 }

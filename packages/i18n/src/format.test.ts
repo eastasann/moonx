@@ -157,6 +157,9 @@ describe("counts, rates and months (design-spec 6.4 端数)", () => {
     expect(formatMonths(9.1671)).toBe("9.2 months");
     expect(formatMonths(9)).toBe("9.0 months");
     expect(formatMonths(9.1671, { bound: "lower" })).toBe("9.2+ months");
+    expect(formatMonths(9.1671, { bound: "lower", withUnit: false })).toBe(
+      "9.2+",
+    );
   });
 
   test("badge counts stop at 99+", () => {

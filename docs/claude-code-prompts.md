@@ -1663,7 +1663,7 @@ make test-e2e で上の流れが通り、make build-web で 1 の HTML ができ
 
 ## Step 25: 共通の入力の仕組み・6 アイデア一覧・M1・13 検証ホーム
 
-Status:
+Status: done 2026-10-18
 
 ```
 入力の共通の仕組みと、コアフローの入口の画面を作ってください（PRD 4章の Must）。

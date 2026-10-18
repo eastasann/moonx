@@ -8,6 +8,7 @@ import { Avatar, initialsOf } from "./Avatar";
 import { Card, CardView } from "./Card";
 import { CheckDots } from "./CheckDots";
 import { ListView, ListViewItem } from "./ListView";
+import { ActionMenu, MenuItem } from "./Menu";
 import { Meter } from "./Meter";
 import { MoonGlyph } from "./MoonGlyph";
 import { NumberField } from "./NumberField";
@@ -531,6 +532,44 @@ describe("ListView", () => {
     await user.tab();
     await user.keyboard("{ArrowDown}{Enter}");
     expect(onAction).toHaveBeenCalledWith("b");
+  });
+
+  test("a row's ⋯ opens its menu without choosing the row; after the ›", async () => {
+    const user = userEvent.setup();
+    const onSelectionChange = vi.fn();
+    const onAction = vi.fn();
+    render(
+      <ListView
+        aria-label="Ideas"
+        items={ideas}
+        selectionMode="single"
+        onSelectionChange={onSelectionChange}
+      >
+        {(idea) => (
+          <ListViewItem
+            id={idea.id}
+            textValue={idea.name}
+            actions={
+              <ActionMenu
+                aria-label={`More for ${idea.name}`}
+                onAction={onAction}
+              >
+                <MenuItem id="duplicate">Duplicate</MenuItem>
+              </ActionMenu>
+            }
+          >
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+    );
+    const more = screen.getByRole("button", { name: "More for Health Bowl" });
+    const chevron = screen.getAllByRole("row")[1]?.querySelector("svg");
+    expect(chevron && follows(chevron, more)).toBe(true);
+    await user.click(more);
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+    expect(onAction.mock.calls[0]?.[0]).toBe("duplicate");
+    expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
   test('layout="cards" frames each item', () => {

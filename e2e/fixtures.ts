@@ -28,8 +28,11 @@ export function nextAddress(workerIndex: number) {
 }
 
 export const test = base.extend<{
-  /** Signs the page in through the API as a demo user and returns them (U1). */
-  signIn: (email: string) => Promise<Me>;
+  /**
+   * Signs the page in through the API, as a demo user unless a password is given, and
+   * returns them (U1).
+   */
+  signIn: (email: string, password?: string) => Promise<Me>;
 }>({
   context: async ({ context }, use, testInfo) => {
     await context.setExtraHTTPHeaders({
@@ -38,10 +41,10 @@ export const test = base.extend<{
     await use(context);
   },
   signIn: async ({ page }, use) => {
-    await use(async (email) => {
+    await use(async (email, password = DEMO_PASSWORD) => {
       // The page's request context shares its cookies, so the page is signed in too.
       const signedIn = await page.request.post("/api/auth/sign-in/email", {
-        data: { email, password: DEMO_PASSWORD },
+        data: { email, password },
         headers: { Origin: WEB_ORIGIN },
       });
       expect(signedIn.ok(), await signedIn.text()).toBe(true);
@@ -175,4 +178,20 @@ export async function signUpThroughApi(
   } finally {
     await visitor.dispose();
   }
+}
+
+/**
+ * A user of their own, signed up from an invitation to BCDX not yet accepted: a Member of
+ * BCDX with a personal workspace no other test writes in.
+ */
+export async function newAccount(workerIndex: number, label: string) {
+  const email = uniqueEmail(label);
+  const password = `${label}-password-2026`;
+  const token = await inviteToBcdx(email, workerIndex);
+  await signUpThroughApi(
+    token,
+    { displayName: "Test Person", password },
+    workerIndex,
+  );
+  return { email, password, token };
 }

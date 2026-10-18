@@ -3,6 +3,7 @@
   "documentTitle": "{{page}} · moonx",
   "nav": {
     "dashboard": "Dashboard",
+    "ideas": "Ideas",
     "switchWorkspace": "Switch workspace",
     "logOut": "Log out"
   },
@@ -40,6 +41,39 @@
     "name": "Name",
     "currency": "Currency",
     "create": "Create",
+    "cancel": "Cancel"
+  },
+  "save": {
+    "reason": {
+      "archived": "It's archived",
+      "noAccess": "You don't have access to this",
+      "gone": "It no longer exists",
+      "format": "Check the format"
+    },
+    "conflict": {
+      "title": "{{name}} updated this {{noun}} {{when}}",
+      "titleSomeone": "Someone updated this {{noun}} {{when}}",
+      "body": "Load theirs to see their version: what you typed is then dropped. Or overwrite it with yours: theirs stays in the history.",
+      "copy": "Copy my input",
+      "copied": "Copied",
+      "copyFailed": "Couldn't copy. Select your input below to copy it.",
+      "yourInput": "Your input",
+      "loadTheirs": "Load theirs",
+      "overwrite": "Overwrite with mine"
+    }
+  },
+  "signInAgain": {
+    "title": "Sign in again",
+    "lead": "Your session ended. Sign in to save your changes.",
+    "googleLead": "Your session ended. You sign in with Google, so sign in on the login page.",
+    "submit": "Sign in",
+    "loginPage": "Sign in on the login page",
+    "wrongPassword": "Password is incorrect"
+  },
+  "unsaved": {
+    "message": "Unsaved changes on this page will be lost.",
+    "logOutTitle": "Log out?",
+    "leaveTitle": "Leave this page?",
     "cancel": "Cancel"
   }
 }

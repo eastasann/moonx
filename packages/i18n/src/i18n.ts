@@ -7,6 +7,7 @@ import components from "../locales/en/components.json";
 import dashboard from "../locales/en/dashboard.json";
 import errors from "../locales/en/errors.json";
 import format from "../locales/en/format.json";
+import ideas from "../locales/en/ideas.json";
 import landing from "../locales/en/landing.json";
 import mail from "../locales/en/mail.json";
 import notifications from "../locales/en/notifications.json";
@@ -27,6 +28,7 @@ export const resources = {
     dashboard,
     errors,
     format,
+    ideas,
     landing,
     mail,
     notifications,

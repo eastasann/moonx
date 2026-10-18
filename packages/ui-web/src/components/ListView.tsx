@@ -98,10 +98,21 @@ export interface ListViewItemProps
   textValue: string;
   /** The row's content: lines of Text, a StatusLight, a Badge, CheckDots. */
   children: ReactNode;
+  /**
+   * The row's ⋯ (an ActionMenu: 6's Duplicate and Archive), after its ›, as TableView's
+   * `isRowActions` column (design-spec 4.5): with a mouse it shows on the row under the
+   * pointer, with focus or with its menu open; on touch always. On a phone its menu opens
+   * in a tray.
+   */
+  actions?: ReactNode;
 }
 
 /** An item of a ListView. With an `href`, or a list that acts, the whole row presses. */
-export function ListViewItem({ children, ...props }: ListViewItemProps) {
+export function ListViewItem({
+  children,
+  actions,
+  ...props
+}: ListViewItemProps) {
   const list = useContext(ItemContext);
   const isActionable = list.isActionable || props.href !== undefined;
   return (
@@ -117,6 +128,7 @@ export function ListViewItem({ children, ...props }: ListViewItemProps) {
           </IconSlot>
         </span>
       )}
+      {actions != null && <span className={styles.actions}>{actions}</span>}
     </GridListItem>
   );
 }

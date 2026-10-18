@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { ModalBoundary } from "../../../../components/ErrorBoundary";
+import { DuplicateUndoProvider } from "../../../../components/ideaActions";
 import { PendingScreen } from "../../../../components/PendingScreen";
 import { SwitchWorkspaceDialog } from "../../../../components/SwitchWorkspaceDialog";
 import {
@@ -137,7 +138,9 @@ function WorkspaceRoutes({
     <WorkspaceContext.Provider
       value={{ me, workspace: membership.workspace, role: membership.role }}
     >
-      <Outlet />
+      <DuplicateUndoProvider>
+        <Outlet />
+      </DuplicateUndoProvider>
       {modal === "switch-workspace" && (
         <ModalBoundary key={modal} onClose={onCloseModal}>
           <SwitchWorkspaceDialog onClose={onCloseModal} />

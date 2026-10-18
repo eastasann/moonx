@@ -1,5 +1,7 @@
 {
   "ACCOUNT_SUSPENDED": "This account is suspended",
+  "ALREADY_REVERTED": "This was already undone",
+  "BUSY": "Something is being changed right now. Try again.",
   "INVALID_EMAIL_OR_PASSWORD": "Email or password is incorrect",
   "INVALID_TOKEN": "This link has expired or was already used.",
   "INVITATION_ALREADY_ACCEPTED": "Already accepted",
@@ -7,6 +9,8 @@
   "INVITATION_INVALID": "This invitation is invalid or expired. Ask the person who invited you for a new one.",
   "RATE_LIMITED": "Too many attempts. Try again in {{wait}}.",
   "RATE_LIMITED_later": "Too many attempts. Try again later.",
+  "TEMPLATE_NOT_PUBLISHED": "Templates aren't ready yet. Ask your administrator.",
+  "UNDO_BLOCKED": "Something was added after this was created, so it cannot be undone",
   "input": {
     "required": "Can't be empty",
     "tooShort": "Use at least {{minimum}} characters",

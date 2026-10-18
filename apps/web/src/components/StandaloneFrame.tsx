@@ -1,13 +1,13 @@
 import { AlertBanner, PageFrame } from "@moonx/ui-web";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useIsOnline } from "../lib/online";
+import { useIsReachable } from "../lib/online";
 
 /** The offline band across the top of a screen (design-spec 6.0.6「オフライン」). */
 export function useOfflineBanner(): ReactNode {
   const { t } = useTranslation(["app"]);
-  const isOnline = useIsOnline();
-  return isOnline ? undefined : (
+  const isReachable = useIsReachable();
+  return isReachable ? undefined : (
     <AlertBanner variant="notice">{t("app:state.offline")}</AlertBanner>
   );
 }

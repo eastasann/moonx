@@ -1,6 +1,7 @@
 import { treaty } from "@elysiajs/eden";
 import type { App } from "@moonx/api";
 import { type ErrorCode, errorCodeSchema } from "@moonx/schemas";
+import { breakpoints } from "@moonx/ui-tokens";
 
 /**
  * A failed call to the API (SDD 8.1). `status` is null when no response came back (the
@@ -60,6 +61,18 @@ export function apiErrorOf(status: number, body: unknown): ApiError {
   });
 }
 
+/**
+ * The `X-Moonx-Client` of a save (SDD 5.1「クライアントの種類」): `web_mobile` while the
+ * window is narrower than `semantic.breakpoint.tablet`, else `web`. The API records it
+ * with the change, for the share of input made on a phone's width (PRD K-08・K-16).
+ */
+function clientKind(): "web" | "web_mobile" {
+  return window.matchMedia(`not all and (min-width: ${breakpoints.tablet}px)`)
+    .matches
+    ? "web_mobile"
+    : "web";
+}
+
 function createClient() {
   return treaty<App>(window.location.origin, {
     // Dates stay the strings the API sends (SDD 5.1): Eden would otherwise turn any
@@ -67,19 +80,21 @@ function createClient() {
     // into a Date.
     parseDate: false,
     onRequest: (_path, init) => {
+      const method = (init.method ?? "GET").toUpperCase();
+      if (method === "GET" || method === "HEAD") return;
+      // Every request that changes something says which client sent it, a save
+      // included: what it is is the API's to tell.
+      const headers: Record<string, string> = {
+        "x-moonx-client": clientKind(),
+      };
       // A body-less POST or DELETE carries the JSON type too: the API refuses a state
       // change of any other type (SDD 7.2 CSRF). Eden asks this before and after it
       // serialises a body; a request with a body gets its type from Eden (JSON, or
       // multipart for a file, whose boundary only the browser can write).
-      const method = (init.method ?? "GET").toUpperCase();
-      if (
-        method !== "GET" &&
-        method !== "HEAD" &&
-        init.body == null &&
-        !new Headers(init.headers).has("content-type")
-      ) {
-        return { headers: { "content-type": "application/json" } };
+      if (init.body == null && !new Headers(init.headers).has("content-type")) {
+        headers["content-type"] = "application/json";
       }
+      return { headers };
     },
   });
 }
@@ -97,7 +112,11 @@ export function api() {
 
 interface EdenResult {
   data: unknown;
-  error: { status: unknown; value: unknown } | null;
+  /**
+   * `{ status, value }`, or null on success. Eden types it `unknown` for a route whose
+   * responses it cannot map to statuses (H3 among them).
+   */
+  error: unknown;
   response: Response | undefined;
   status: number;
 }
@@ -113,15 +132,16 @@ export async function unwrap<R extends EdenResult>(
 ): Promise<Exclude<R["data"], null>> {
   const result = await pending;
   if (result.error === null) return result.data as Exclude<R["data"], null>;
+  const value = record(result.error)?.value;
   if (result.response === undefined) {
     throw new ApiError({
       status: null,
       code: null,
       requestId: null,
-      cause: result.error.value,
+      cause: value,
     });
   }
-  throw apiErrorOf(result.status, result.error.value);
+  throw apiErrorOf(result.status, value);
 }
 
 /**

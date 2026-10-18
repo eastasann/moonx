@@ -1,6 +1,7 @@
 import type { Me, Role } from "@moonx/schemas";
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, test, vi } from "vitest";
 import { WorkspaceContext } from "../components/workspace";
 import { GettingStarted } from "./Dashboard";
 
@@ -24,10 +25,10 @@ const me: Me = {
   memberships: [{ workspace, role: "owner" }],
 };
 
-const renderAs = (role: Role) =>
+const renderAs = (role: Role, onFirstIdea = () => {}) =>
   render(
     <WorkspaceContext.Provider value={{ me, workspace, role }}>
-      <GettingStarted />
+      <GettingStarted onFirstIdea={onFirstIdea} />
     </WorkspaceContext.Provider>,
   );
 
@@ -47,6 +48,13 @@ describe("Getting started (design-spec 6.9)", () => {
       "Invite your team",
       "Write your first idea",
     ]);
+  });
+
+  test("the first idea opens M1", async () => {
+    const onFirstIdea = vi.fn();
+    renderAs("member", onFirstIdea);
+    await userEvent.click(screen.getByText("Write your first idea"));
+    expect(onFirstIdea).toHaveBeenCalledOnce();
   });
 
   test("a Member does not invite", () => {

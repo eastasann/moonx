@@ -37,7 +37,7 @@ export function dashboardHref(me: Me): string | undefined {
 }
 
 /** The modals opened by the search parameter `modal` (SDD 4章) this app has so far. */
-export type ModalName = "switch-workspace";
+export type ModalName = "switch-workspace" | "new-idea";
 
 declare module "@tanstack/react-router" {
   interface HistoryState {

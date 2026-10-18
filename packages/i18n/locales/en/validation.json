@@ -8,5 +8,129 @@
     "05": "05 Costs",
     "06-08": "06–08 Unit Economics",
     "09": "09 Assumptions & Risks"
+  },
+  "home": {
+    "latestDecision": "Latest decision {{date}}",
+    "stage": "Stage: {{stage}}",
+    "by": "— {{name}}",
+    "duplicatedFrom": "Duplicated from {{name}}",
+    "archived": "This idea is archived",
+    "restore": "Restore",
+    "editSummary": "Edit summary",
+    "more": "More for {{name}}",
+    "summaryNoun": "summary",
+    "keyNumbers": "Key numbers",
+    "marginWarning": "Contribution margin is zero or negative",
+    "metric": {
+      "initial_cost_total": "Startup costs",
+      "break_even_units_day": "Break-even",
+      "expected_operating_profit": "Expected profit",
+      "payback_months": "Payback"
+    },
+    "unit": {
+      "perDay": "/ day",
+      "perMonth": "/ mo",
+      "months": "months"
+    },
+    "bound": {
+      "lower": "Lower bound",
+      "upper": "Upper bound",
+      "approximate": "Approximate"
+    },
+    "nextSteps": {
+      "title": "Next steps",
+      "add_evidence": "Add evidence ({{count}})",
+      "add_evidenceWhy_one": "A Fact in {{section}} lost its research log.",
+      "add_evidenceWhy_other": "{{count}} Facts have no evidence.",
+      "classify": "Classify answers ({{count}})",
+      "classifyWhy_one": "{{count}} answer has content but no Fact, Assumption or Unknown.",
+      "classifyWhy_other": "{{count}} answers have content but no Fact, Assumption or Unknown.",
+      "start_customer_problem": "Start with {{section}}",
+      "start_customer_problemWhy": "Nothing is filled in yet.",
+      "check": {
+        "competitors": "Find {{count}} competitors",
+        "local_price": "Add local prices",
+        "costsEmpty_one": "Fill or mark {{count}} empty cost row",
+        "costsEmpty_other": "Fill or mark {{count}} empty cost rows",
+        "costs": "Add startup and monthly costs",
+        "break_even": "Add price and monthly costs",
+        "break_evenMargin": "Review price or variable costs",
+        "permits": "Check permits",
+        "demand_signal": "Find a demand or problem signal"
+      },
+      "start_section": "Start {{section}}",
+      "start_sectionWhy": "{{section}} has no answers yet.",
+      "check_unknowns": "Check unknowns ({{count}})",
+      "check_unknownsWhy_one": "{{count}} item is marked Unknown.",
+      "check_unknownsWhy_other": "{{count}} items are marked Unknown.",
+      "ready_to_decide": "Ready to record a decision",
+      "ready_to_decideWhy": "All checks are done and every item is classified."
+    },
+    "checks": {
+      "title": "Checks",
+      "legend": "● done · ◐ partial · ○ not started",
+      "endCount": "{{state}} ({{count}})",
+      "reason": {
+        "competitorsNone": "None found yet",
+        "competitorsSome": "{{count}} of {{min}} found",
+        "localPrice": "Needs {{priced}} or {{logs}}",
+        "localPricePriced_one": "{{count}} priced competitor",
+        "localPricePriced_other": "{{count}} priced competitors",
+        "localPriceLogs_one": "{{count}} local price log",
+        "localPriceLogs_other": "{{count}} local price logs",
+        "costsEmpty_one": "{{count}} row is Empty",
+        "costsEmpty_other": "{{count}} rows are Empty",
+        "costsNoInitial": "No startup cost amounts yet",
+        "costsNoMonthly": "No monthly cost amounts yet",
+        "costsNone": "No startup or monthly cost amounts yet",
+        "breakEvenNeedsBoth": "Needs price and monthly costs",
+        "breakEvenMargin": "Contribution margin is zero or negative",
+        "permitsRow": "Fill the Permits cost row, or log what you found",
+        "permitsLog": "Log what you found about permits",
+        "demandNone": "None logged yet",
+        "demandSome": "{{count}} of {{min}} logged"
+      }
+    },
+    "fau": {
+      "title": "Fact / Assumption / Unknown",
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items",
+      "meter": "Items by Fact, Assumption and Unknown",
+      "confidences": "L{{low}} M{{medium}} H{{high}}"
+    },
+    "summary": {
+      "title": "Summary",
+      "customer": "Customer",
+      "problem": "Problem",
+      "solution": "Solution",
+      "marketType": "Market type",
+      "empty": "Empty"
+    },
+    "sections": {
+      "title": "Sections",
+      "answered": "{{answered}}/{{total}}",
+      "entries_one": "{{count}} entry",
+      "entries_other": "{{count}} entries",
+      "competitors": "{{count}} ({{range}})",
+      "range": "{{min}}–{{max}}",
+      "rangeAtLeast": "{{min}}+",
+      "rows": "{{answered}}/{{total}} rows",
+      "inputs": "{{answered}}/{{total}} inputs",
+      "assumptionsRisks": "{{assumptions}} · {{risks}}"
+    },
+    "decisions": {
+      "title": "Decisions",
+      "empty": "No decisions yet",
+      "reason": "“{{reason}}”"
+    },
+    "plans": {
+      "title": "Plans",
+      "empty": "No plans yet. A plan can start after a Proceed decision.",
+      "noVersion": "No version saved",
+      "archived_one": "{{count}} archived plan",
+      "archived_other": "{{count}} archived plans",
+      "show": "Show",
+      "archivedBadge": "Archived"
+    }
   }
 }

@@ -165,14 +165,22 @@ export const formatNumberAffixes = (
   };
 };
 
-/** The payback period: one decimal, keeping ".0" ("9.2 months", "9.2+ months"). */
-export const formatMonths = (months: number, options: BoundOption = {}) =>
-  i18n.t("format:months", {
-    value: withBound(
-      signed(months, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-      options.bound,
-    ),
-  });
+/**
+ * The payback period: one decimal, keeping ".0" ("9.2 months", "9.2+ months"). Without
+ * the unit ("9.2+") where a key number sets its unit apart (13's MetricTile `unit`).
+ */
+export const formatMonths = (
+  months: number,
+  options: BoundOption & { withUnit?: boolean } = {},
+) => {
+  const value = withBound(
+    signed(months, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    options.bound,
+  );
+  return options.withUnit === false
+    ? value
+    : i18n.t("format:months", { value });
+};
 
 /** A badge count: above 99 it shows "99+". */
 export const formatCount = (count: number) =>

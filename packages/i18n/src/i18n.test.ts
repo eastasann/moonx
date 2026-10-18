@@ -34,6 +34,7 @@ test("the shared instance is ready on import", () => {
     "dashboard",
     "errors",
     "format",
+    "ideas",
     "landing",
     "mail",
     "notifications",

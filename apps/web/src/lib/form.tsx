@@ -4,6 +4,8 @@ import {
   type ButtonProps,
   Picker,
   type PickerProps,
+  TextArea,
+  type TextAreaProps,
   TextField,
   type TextFieldProps,
 } from "@moonx/ui-web";
@@ -45,6 +47,28 @@ function FormTextField({
   const error = useFieldError() ?? rejection;
   return (
     <TextField
+      {...props}
+      name={field.name}
+      value={field.state.value}
+      onChange={field.handleChange}
+      onBlur={field.handleBlur}
+      isInvalid={error !== undefined}
+      errorMessage={error}
+    />
+  );
+}
+
+/** A TextArea bound to its form field, as FormTextField is. */
+function FormTextArea(
+  props: Omit<
+    TextAreaProps,
+    "value" | "onChange" | "onBlur" | "name" | "errorMessage" | "isInvalid"
+  >,
+) {
+  const field = useFieldContext<string>();
+  const error = useFieldError();
+  return (
+    <TextArea
       {...props}
       name={field.name}
       value={field.state.value}
@@ -112,12 +136,16 @@ function SubmitButton({
 
 /**
  * TanStack Form bound to the components of packages/ui-web: `form.AppField` renders a
- * `TextField` or `Picker`, and `form.AppForm` a `SubmitButton`.
+ * `TextField`, `TextArea` or `Picker`, and `form.AppForm` a `SubmitButton`.
  */
 export const { useAppForm } = createFormHook({
   fieldContext,
   formContext,
-  fieldComponents: { TextField: FormTextField, Picker: FormPicker },
+  fieldComponents: {
+    TextField: FormTextField,
+    TextArea: FormTextArea,
+    Picker: FormPicker,
+  },
   formComponents: { SubmitButton },
 });
 

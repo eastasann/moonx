@@ -1,0 +1,65 @@
+{
+  "title": "Ideas",
+  "newIdea": "New idea",
+  "filter": {
+    "stage": "Stage",
+    "decision": "Decision",
+    "proposer": "Proposer",
+    "sort": "Sort",
+    "archived": "Archived",
+    "all": "All",
+    "notDropped": "Not dropped",
+    "sortBy": {
+      "updated": "Updated",
+      "created": "Created",
+      "name": "Name"
+    },
+    "archivedHidden": "Hidden",
+    "archivedIncluded": "Included",
+    "search": "Search ideas",
+    "clear": "Clear filters"
+  },
+  "row": {
+    "meta": "{{stage}} · {{proposer}} · {{when}}",
+    "allDone": "All checks done",
+    "archived": "Archived",
+    "menu": "More for {{name}}"
+  },
+  "hiddenDropped_one": "{{count}} dropped idea hidden",
+  "hiddenDropped_other": "{{count}} dropped ideas hidden",
+  "show": "Show",
+  "empty": "No ideas yet. Write down the first one. You can have many.",
+  "emptyFiltered": "No ideas match these filters",
+  "detail": {
+    "latestDecision": "Latest decision {{date}}",
+    "meta": "Stage: {{stage}} · {{proposer}}",
+    "keyNumbers": "Key numbers of {{name}}",
+    "checksOf": "Checks of {{name}}",
+    "plans": "Plans: {{names}}.",
+    "plansNone": "Plans: none yet.",
+    "latest": "Latest decision: {{decision}} on {{date}} — “{{reason}}”",
+    "open": "Open validation"
+  },
+  "action": {
+    "duplicate": "Duplicate",
+    "archive": "Archive",
+    "restore": "Restore"
+  },
+  "duplicated": "Duplicated from {{name}}",
+  "undo": {
+    "action": "Undo",
+    "title": "Delete the copied idea?",
+    "body": "{{name}} and everything copied into it will be deleted. This can't be undone.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
+  },
+  "form": {
+    "newTitle": "New idea",
+    "editTitle": "Edit summary",
+    "name": "Name",
+    "concept": "One-line concept",
+    "solution": "Proposed solution",
+    "create": "Create",
+    "cancel": "Cancel"
+  }
+}

@@ -6,5 +6,10 @@ import {
 
 export const Route = createFileRoute("/_signedIn/w/$workspaceId/")({
   staticData: { skeleton: DashboardSkeleton },
-  component: DashboardScreen,
+  component: DashboardRoute,
 });
+
+function DashboardRoute() {
+  const { modal } = Route.useSearch();
+  return <DashboardScreen modal={modal} />;
+}

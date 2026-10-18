@@ -13,6 +13,7 @@ import { Card, CardView } from "../components/Card";
 import { CheckDots } from "../components/CheckDots";
 import { FauPicker, useFauLabel } from "../components/FauPicker";
 import { ListView, ListViewItem } from "../components/ListView";
+import { ActionMenu, MenuItem } from "../components/Menu";
 import { Meter } from "../components/Meter";
 import { MoonGlyph, type MoonState } from "../components/MoonGlyph";
 import { NumberField } from "../components/NumberField";
@@ -387,6 +388,33 @@ export function ListViewSection() {
           </ListView>
         </Specimen>
       ))}
+      <Specimen name="actions: the row's ⋯ after its › (with a mouse, on the row under the pointer or with focus; on touch always)">
+        <ListView
+          aria-label="Ideas with actions"
+          items={ideas}
+          selectionMode="single"
+          selectedKeys={chosen}
+          onSelectionChange={setChosen}
+        >
+          {(idea) => (
+            <ListViewItem
+              id={idea.id}
+              textValue={idea.name}
+              actions={
+                <ActionMenu aria-label={`More for ${idea.name}`}>
+                  <MenuItem id="duplicate">Duplicate</MenuItem>
+                  <MenuItem id="archive">Archive</MenuItem>
+                </ActionMenu>
+              }
+            >
+              <Text variant="label">{idea.name}</Text>
+              <Text variant="caption" tone="secondary">
+                {idea.meta}
+              </Text>
+            </ListViewItem>
+          )}
+        </ListView>
+      </Specimen>
       <Specimen name="onAction: rows end in ›">
         <ListView aria-label="Notifications" onAction={() => {}}>
           <ListViewItem id="n1" textValue="Paolo mentioned you">

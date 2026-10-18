@@ -9,7 +9,8 @@
     "missingCount_one": "Missing: {{count}} check",
     "missingCount_other": "Missing: {{count}} checks",
     "dropped_one": "{{count}} dropped idea hidden",
-    "dropped_other": "{{count}} dropped ideas hidden"
+    "dropped_other": "{{count}} dropped ideas hidden",
+    "show": "Show"
   },
   "gettingStarted": {
     "title": "Getting started",

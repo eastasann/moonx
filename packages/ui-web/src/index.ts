@@ -243,6 +243,12 @@ export {
 } from "./components/Tree";
 export { Well, type WellProps } from "./components/Well";
 export type { ChoiceItem } from "./internal/ChoiceListBox";
+/**
+ * Whether patterns A, D and F stand in their two columns (design-spec 4.1): a screen
+ * whose press differs between them asks (6's row opens 13 where the list has no detail
+ * beside it).
+ */
+export { useTwoColumns } from "./internal/frame";
 export { Container, type ContainerProps } from "./layout/Container";
 export { Flex, type FlexProps, Stack, type StackProps } from "./layout/Flex";
 export { Grid, type GridColumns, type GridProps } from "./layout/Grid";

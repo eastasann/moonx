@@ -266,7 +266,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | M6 | 共有先の選択 | Share | 10 | 自己分析を共有するワークスペースを選ぶ |
 | M7 | ワークスペース切替 | Switch workspace | 共通ナビ | 所属するワークスペースの一覧と切替。「New workspace」で新しいワークスペースを作る（名前・通貨。作った人が Owner） |
 | M8 | テンプレートの移行 | Update template | 10 / 13 / 20 | 新しい版のテンプレートへ移る。引き継げない回答を事前に示す |
-| M9 | ログインし直し | Sign in again | ログイン後のすべての画面（未保存の入力があるときにログインが切れたら開く） | 画面を移らずにログインし直し、未保存の入力を送る。メールは今のアカウントのものから変えられない。パスワードでログインし直すと、未保存の入力を送って閉じる。Google でログインする人と「Sign in on the login page」を選んだ人は、「Unsaved changes on this page will be lost.」と確かめてから 2 へ移る（ログイン後に元の画面へ戻る）。パスワードが違う: 「Password is incorrect」。回数の上限: 6.0.6 の「回数の上限」を M9 の中に出し、開いたままにする。アカウントが停止されている: 未保存の入力を捨てて 2 へ移り、2 の停止されたユーザーの文言を出す（2026-10-11 のユーザーの決定） |
+| M9 | ログインし直し | Sign in again | ログイン後のすべての画面（未保存の入力があるときにログインが切れたら開く） | 画面を移らずにログインし直し、未保存の入力を送る。メールは今のアカウントのものから変えられない。パスワードでログインし直すと、未保存の入力を送って閉じる。Google でログインする人と「Sign in on the login page」を選んだ人は、「Unsaved changes on this page will be lost.」と確かめてから 2 へ移る（ログイン後に元の画面へ戻る）。パスワードが違う: 「Password is incorrect」。回数の上限: 6.0.6 の「回数の上限」を M9 の中に出し、開いたままにする。アカウントが停止されている: 未保存の入力を捨てて 2 へ移り、2 の停止されたユーザーの文言を出す（2026-10-11 のユーザーの決定）。並び: 「Your session ended. Sign in to save your changes.」、読み取り専用の Email、Password、「Sign in」と quiet の「Sign in on the login page」。パスワードを持たない人（Google だけ）には Email・Password・Sign in を出さず、「Your session ended. You sign in with Google, so sign in on the login page.」と「Sign in on the login page」だけを出す。2 へ移る前の確認は AlertDialog の「Leave this page?」と「Unsaved changes on this page will be lost.」、「Sign in on the login page」と「Cancel」。閉じるボタンは置かず、Esc でも閉じない |
 | PNL-1 | コメントパネル | Comments | 10〜18・20〜23 の各項目（12 は共有された自己分析の回答） | 項目ごとのスレッド。返信・メンション・解決 |
 | PNL-2 | 変更履歴パネル | History | 10・11・13〜18・20〜22 の各項目 | 項目ごとの変更（誰が・いつ・差分）と元に戻す |
 
@@ -427,7 +427,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | IllustratedMessage | 空の状態・0件・権限がない・見つからない（6.0.6）。絵は使わず、Lucide のアイコンと見出しと説明 | — | 同じ |
 | Avatar | 提案者・記録者・コメントの書き手・4 のプロフィール写真。写真が無い・読めないときは頭文字 | S / M。角の丸い四角（地は sunken、頭文字は等幅の semibold、枠なし） | 同じ |
 | TableView | 17 費用・18 シナリオ表・7 決定ログ・28 の一覧・15 の「表で比較」・21 の表の小項目（§11 など） | 密度 compact / regular / spacious。layout は auto（幅で切り替え。既定）/ table / cards（`cards` はスマホの行の形をどの幅でも出す）。地の色を付けず、見出しは 06 `typography.table-header` の文字と下の薄い線（`border.default`）、行は hairline の区切り（行の高さは `component.table-view.row-height`。s17-costs.html）。列は幅（px か %）を持てる固定の組み方で、行を入力欄にしても表の幅と列が動かない。編集できる表は、行の値を文字として見せ、触った行（フォーカスか編集中）のセルだけを入力欄にする。数字の列は等幅で右にそろえる。行の名前の列は medium の太さ。表の下の行（s17-costs.html の tfoot）は、左に `footerAction`（「+ Add row」の quiet の Button）、右に `footerTotal`（「Subtotal ₱145,000+ · 3 Unknown, 1 Empty」） | 線で区切った行（4.3。下の補足）。表の下は `footerAction` だけを全幅の行（高さは 06 `table-view.narrow-footer-min-height` 以上、下に hairline。s17-costs.html の .cards .add）にし、`footerTotal` は出さない（合計は F の要約バーと結果のトレイにある。6.3）。`footerTotal` を使う表は、スマホでも合計をほかの所に出す |
-| ListView | 6 アイデア一覧・14 調査ログ・8 通知・22 の各リスト・12 のメンバー・26 のテンプレート（9 のメンバーと招待は SettingsList） | 密度 compact / regular / spacious。layout は auto / table / cards。押すと開く行と選ぶと横に詳細を出す行は末尾に ›（4.4。s06-ideas.html の行に › は無いが、画面をまたいでそろえるために置く。2026-10-17 のユーザーの決定）。D の一覧の選んだ行は地と線で示し、スマホでは一覧と詳細が入れ替わるので選んだ行を示さない | 全画面のリスト |
+| ListView | 6 アイデア一覧・14 調査ログ・8 通知・22 の各リスト・12 のメンバー・26 のテンプレート（9 のメンバーと招待は SettingsList） | 密度 compact / regular / spacious。layout は auto / table / cards。押すと開く行と選ぶと横に詳細を出す行は末尾に ›（4.4。s06-ideas.html の行に › は無いが、画面をまたいでそろえるために置く。2026-10-17 のユーザーの決定）。D の一覧の選んだ行は地と線で示し、スマホでは一覧と詳細が入れ替わるので選んだ行を示さない。行の ⋯（`actions`。6 の Duplicate・Archive）は › の後ろに置き、TableView の `isRowActions` の列と同じく、マウスの端末ではポインタの下の行・フォーカスのある行・メニューを開いている行だけで見せ、タッチの端末では常に見せる | 全画面のリスト。行の ⋯ はトレイで開く |
 | Card / CardView | 15 競合・代替のカード | 枠だけで影を付けない（4.4）。CardView の `addItem` は最後に点線の枠の追加のタイル（「+ Add competitor」。s15-competitors.html の .addcard）を置き、押すとカードを開く代わりに追加する。15 のカードの形（s15-competitors.html）: 題の上に種類（`eyebrow`。等幅の小さな文字で、大文字にしない）、右上に `figure`（価格。等幅）とその下の注記（per bowl）、無いときは「No price」を薄く、その下にラベルと値の行（`details`。hairline で区切り、ラベルの列を取る）、最後の行に注記（根拠の件数・💬 の数）とカードの ⋯（`actions`） | 1列（`details` はラベルを値の上に置く） |
 | Well | 判断材料の要約（19）、AI 書き出しのプレビュー（24） | 白い面（`surface.raised`）を hairline の枠で囲む。角丸は Card と同じ | 同じ |
 | Divider | 区切り | S / M / L。S と M は hairline の色、L は薄い線（`border.default`） | 同じ |
@@ -524,7 +524,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - **ログイン後**: 最後に開いたワークスペースの 5 へ進む。初回は招待元のワークスペース（なければ個人用）。ワークスペースは M7 で切り替える。
 - **共通ナビ**: スマホは下のタブ、Web は左のサイドバー。
   - タブ: 5 Dashboard / 6 Ideas / 10 Self Analysis / 8 Notifications（未読数のバッジ）
-  - メニュー（More）: 7 Decision Log / M7 ワークスペース切替 / 4 Account / 9 Workspace Settings（Owner）/ 26 Admin（Admin）/ ログアウト（1 へ移る。未保存の入力があれば「Unsaved changes on this page will be lost.」と確かめてから。2026-10-11 のユーザーの決定。API がログアウトできなかったときは、セッションが残っていて 1 から 5 へ戻ってしまうので、画面に留まり、6.0.6 の想定外のエラーをトーストで出す（「Something went wrong. Ref: xxxxxxxx」と Retry。Ref は番号があるときだけ。回数の上限なら 6.0.6 の回数の上限の文言。Retry はログアウトをやり直す））
+  - メニュー（More）: 7 Decision Log / M7 ワークスペース切替 / 4 Account / 9 Workspace Settings（Owner）/ 26 Admin（Admin）/ ログアウト（1 へ移る。未保存の入力があれば「Unsaved changes on this page will be lost.」と確かめてから（AlertDialog の題は「Log out?」、操作は「Log out」と「Cancel」）。2026-10-11 のユーザーの決定。API がログアウトできなかったときは、セッションが残っていて 1 から 5 へ戻ってしまうので、画面に留まり、6.0.6 の想定外のエラーをトーストで出す（「Something went wrong. Ref: xxxxxxxx」と Retry。Ref は番号があるときだけ。回数の上限なら 6.0.6 の回数の上限の文言。Retry はログアウトをやり直す））
 - **Viewer**: 編集ボタン、19 判定、M1 / M2 / M3 / M4 / M5 / M8、24 / 25 の AI 往復、自己分析タブ（10）と 12 への入口を出さない。21 の [S] 参照（共有された自己分析）も出さない。10・11 の URL を開いたら、自分の個人用ワークスペースの同じ画面へ移す（自己分析はどのワークスペースから開いても同じ中身のため）。
 - **12 への入口**: 10 のヘッダーの「Team」、5 の Self analyses、通知。読めるのは、今のワークスペースに共有済みの自己分析だけ。
 - **AI 取り込みへの入口**: 24 の ③ の「Import from AI」と、書き出し元と同じ画面（10 / 11 / 13 / 20 / 21）の「Import from AI」。
@@ -588,6 +588,10 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - **保存できなかったとき**: 入力は端末（ブラウザの保存領域）に残さない。ページ（タブ）を開いている間だけ、通信の瞬断などの一時的な失敗を自動で再送する。アプリの中で別の画面へ移っても、保存できていない入力は消えずに再送を続ける。オフラインになったら画面上部の帯（6.0.6）で保存できないことを知らせ、再接続するまで入力欄を読み取り専用にする。オフラインになる前に打って保存できていない入力は画面に残り、再接続したら送る。未保存の入力があるままタブを閉じる・再読み込みする・アプリの外へ移るときは、ブラウザの離脱の確認を出す（アプリの中の移動では出さない）。保存しようとしてログインが切れていたら、入力を画面に残したまま M9 でログインし直させ、ログインし直したら送る。オフラインで開けるのはアプリの外側（PWA がキャッシュした殻）だけで、読み込んでいない画面は開けない（入力には接続が要る。2026-10-11 のユーザーの決定。仕組みは SDD ADR-021・ADR-031）。
 - **同時編集**: 保存の単位は項目（1つの回答・1つの行・1つの数字・アイデアの概要・プランのヘッダ）。各項目は版の番号を持ち、開いた後に他の人が同じ項目を保存していた場合は、保存の前に「Paolo updated this answer 3m ago」と出し、「相手の内容を読み込む」「自分の内容で上書きする」から選ばせる。上書きしても相手の内容は変更履歴に残るので戻せる。読み込みを選ぶと、自分の未保存の入力は捨てる（捨てる前に、自分の入力をコピーできるようにする）。自分の内容が相手の保存した内容と同じなら、この確認は出さずに保存済みにする（SDD 5.1「同時編集」）。
 - **変更履歴**: 保存のたびに、誰が・いつ・どの項目を・変更前 → 変更後を記録する（6.0.5）。
+- **ヘッダーの保存状態の出し方**: 保存できなかった入力と送っている途中の入力は、どの画面で打ったものでも、いま開いている画面のヘッダーに「Couldn't save」（と Retry）・「Saving…」で出す（画面を移っても再送を続け、ヘッダーの Retry がすべてを送り直すため）。保存していない画面には「Saved」を出さない。13 は、Edit summary で保存するまで保存状態を出さず（d1-moon.html のヘッダーに保存状態が無いため）、保存した後に「Saved」を出す。衝突の確認を待っている入力と、ログインが切れて M9 を待っている入力も「Couldn't save」に数える。
+- **一時的な失敗の再送の間隔**: 1・2・4・8・16・30 秒と伸ばし、その後は 30 秒ごと。回数の上限（429）は応答の待ち時間の後に送る。通信の失敗（応答が無い）が続けて 3 回になったら「通信の失敗が続いた」とみなし、オフラインと同じく帯を出して入力欄を読み取り専用にする。API から応答が届くか（断られた応答も含む）、ブラウザが online を知らせたら戻す。online になったら帯はすぐに消し、入力欄は残っていた入力を送り終えてから戻す。
+- **恒久的に断られた保存の理由の文言**: アーカイブ済み「It's archived」、権限がない「You don't have access to this」、対象が無い「It no longer exists」、入力の検査に通らない「Check the format」。ほかのコードは 6.0.6 の想定外のエラーの文（「Something went wrong. Ref: xxxxxxxx」）を理由の位置に出す。入力の検査に通らない 422 が欄を名指ししているとき（`details[].path`）は、その欄の下にも「Check the format」を出す（M1 などのフォームと同じ）。断られた入力は、続けて打っても自動では送らず、Retry で送る。
+- **衝突の確認の文言**: AlertDialog（warning）の題は「{名前} updated this {項目} {相対時刻}」（保存した人が分からなければ「Someone updated this …」。{項目} は 13 の Edit summary なら「summary」）、本文は「Load theirs to see their version: what you typed is then dropped. Or overwrite it with yours: theirs stays in the history.」と「Copy my input」のボタン（押すと自分の未保存の入力をクリップボードに写し、「Copied」と出す。写せなかったときは「Couldn't copy. Select your input below to copy it.」と出し、確認の中に読み取り専用の欄「Your input」で自分の入力を出す。入力の欄は確認の後ろにあって選べないため）。ヘッダーの Retry は、答えを待っている衝突の入力も送り直し、相手の保存に当たればもう一度確かめる。操作は「Overwrite with mine」と「Load theirs」。
 
 #### 6.0.3 F/A/U の付け方と根拠シート（M2）
 
@@ -913,6 +917,16 @@ Viewer にも同じ Next steps を出す。ただし Viewer が入れない行�
 | Record decision | 19 へ | Owner / Member |
 | Add plan | M5（最新の判定が Proceed のときだけ出す） | Owner / Member |
 | ⋯ メニュー | アイデアを複製（6.8）/ アーカイブ / テンプレートの移行（M8） | Owner / Member |
+
+画面の細部:
+
+- 主要指標の補足: 値が下限・上限のときは、値の下に「Lower bound」「Upper bound」を出す（d1-moon.html の .note）。計算できない指標は値の位置に 6.4 の理由を出す。粗利が0以下（V1 の `economicsWarnings` の `margin_not_positive`）の損益分岐は、値の位置の理由（「Contribution margin is zero or negative. Review price or variable costs.」）の下に、注意の印を付けた琥珀色の補足「Contribution margin is zero or negative」を添える（MetricTile の `supplementTone="notice"`。上の「状態」の警告）。
+- ヘッダー: 判定の札の横に「Latest decision {日付} · Stage: {工程}」（未判定は「Stage: {工程}」だけ）。一行コンセプトの後ろに、ダッシュ（U+2014）と空白に続けて提案者の名前（tertiary の文字。d1-moon.html の .by）。複製したアイデアは、その下に単独のリンク「Duplicated from {元のアイデア名}」を置き、元のアイデアの 13 を開く。アーカイブ済みの「This idea is archived」は InlineAlert でヘッダーの先頭に置き、Owner / Member には Restore のボタンを添える。アーカイブ済みでは Edit summary を出さず、⋯ は Duplicate だけにする。
+- Edit summary は M1 と同じ大きさのシート（medium。スマホは下からのトレイ）で、閉じるボタン・外側のタップ・Esc で閉じる。閉じると待っている入力を送る。Summary の Solution が空のとき、Owner / Member には「Empty」の下に Edit summary を開くリンクを置く。
+- 確認項目の行の右端は状態のラベルで、件数を持つもの（競合・需要・課題シグナル）は「Done (4)」のように件数を添える（0 件は添えない）。不足の理由の文言: 競合「None found yet」「{n} of {基準値} found」、地元の価格帯「Needs {基準値} priced competitors or {基準値} local price logs」、費用「{n} rows are Empty」（1 行は「1 row is Empty」）と「No startup or monthly cost amounts yet」「No startup cost amounts yet」「No monthly cost amounts yet」（未入力の行と金額の無い表が両方あるときは「 · 」でつなぐ）、損益分岐「Needs price」「Needs monthly costs」「Needs price and monthly costs」「Contribution margin is zero or negative」、許認可「Fill the Permits cost row, or log what you found」（Permits の初期行が無いときは「Log what you found about permits」）、需要・課題シグナル「None logged yet」「{n} of {基準値} logged」。
+- セクションの行の右端: 01・02・10 は「7/10」、03 は「5 entries」、04 は「4 (3–5)」（確認項目1の目安。基準値が 5 以上なら「4 (7+)」）、05 は「20/24 rows」、06〜08 は「5/7 inputs」、09 は「{前提の数} · {リスクの数}」。
+- Decisions の行は「{判定} · {日付} · {記録者}」と、理由の冒頭（「“…”」）。Plans が無いときは、判定がまだ無ければ下の「状態」のとおり「No decisions yet」、判定があれば「No plans yet. A plan can start after a Proceed decision.」（d1-moon.html）。アーカイブした案は「Show」の後に「Archived」の札を付けて並べる。
+- F/A/U の凡例は件数が 0 の区分を出さない（作ったばかりは「Empty」だけ）。確信度の内訳は「L{n} M{n} H{n}」。
 
 #### 状態
 
@@ -1680,7 +1694,13 @@ Web（パターン D。題・新規作成・絞り込み・検索は左のペイ
 | 検証・プランの閲覧、コメントの閲覧（パネルは注意だけを出し、入力欄は出さない。6.0.4）、変更履歴の閲覧、Pitch Deck の表示と PDF、複製、Restore | できる |
 | 編集・判定・AI 往復・Add plan・版の保存・Go / No-Go・コメントを書く・元に戻す | できない |
 | 5 の Ideas・Due soon、工程の集計 | 対象外 |
-- 空の状態: 「No ideas yet. Write down the first one. You can have many.」と + New idea（Viewer は説明だけ）。絞り込みで0件なら「No ideas match these filters」と解除ボタン。
+- 空の状態: 「No ideas yet. Write down the first one. You can have many.」と + New idea（Viewer は説明だけ）。絞り込みで0件なら「No ideas match these filters」と解除ボタン（「Clear filters」。すべての絞り込みと検索を既定に戻す）。
+- 絞り込みの Picker: 「Stage」（All・Validation・Planning・Launch prep）、「Decision」（Not dropped・All・Undecided・Proceed・Hold・Drop）、「Proposer」（All と、このワークスペースの Owner / Member を表示名の順に）、「Sort」（Updated・Created・Name）、「Archived」（Hidden・Included）。検索は打つのが 0.3 秒止まったら絞り込む。絞り込みを変えても履歴を足さない（戻るで絞り込みを1つずつ戻らず、画面を離れる）。
+- 2列の並び（デスクトップ）では、行を押すとその要約を右に出し、まだ選んでいなければ一覧の最初のアイデアの要約を出す。1ペインの並び（タブレットとスマホ）では、行を押すと 13 を開く（スマホと同じく一覧だけを出す。D のタブレットの列は「スマホと同じ」のため）。
+- 行の ⋯（Owner / Member。4.5 の ListView の `actions`）: Duplicate と、アーカイブしていなければ Archive、アーカイブ済みなら Restore。アーカイブ済みのアイデアの行は、2行目の先頭に「Archived」と出す。確認項目の点の横は、不足があれば 6.9 と同じ不足の名前（3つ以上は件数）、無ければ「All checks done」。
+- 右の詳細の確認項目は状態だけを出し、不足の理由は出さない（s06-ideas.html。理由は 13 で読む）。「Plans: {案名を「, 」でつないだもの}.」（無ければ「Plans: none yet.」）の後に「Latest decision: {判定} on {日付}」、ダッシュ（U+2014）、引用符で囲んだ理由の冒頭を続ける（s06-ideas.html）。
+- 「n dropped ideas hidden · Show」の Show は、判定の絞り込みを All にする。5 の同じ「Show」は、判定の絞り込みを Drop にした 6 を開く。
+- 複製の作成を取り消せなかったときは、6.0.5 の文言（「Something was added after this was created, so it cannot be undone」など）をトーストで出す。「This was already undone」のときは 6 へ移る（複製はもう無いため）。複製・アーカイブ・Restore・取り消しが想定外のエラーや回数の上限で失敗したときは、6.0.6 の文言を Retry 付きのトーストで出す。
 
 ---
 

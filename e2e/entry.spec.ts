@@ -8,7 +8,7 @@ import {
   inviteToBcdx,
   linkMailedTo,
   mailsTo,
-  signUpThroughApi,
+  newAccount,
   test,
   uniqueEmail,
   workspaceOf,
@@ -45,19 +45,6 @@ async function meOf(page: Page) {
   const response = await page.request.get("/api/v1/me");
   expect(response.ok()).toBe(true);
   return (await response.json()) as Me;
-}
-
-/** A user of their own, signed up from an invitation to BCDX not yet accepted. */
-async function newAccount(workerIndex: number, label: string) {
-  const email = uniqueEmail(label);
-  const password = `${label}-password-2026`;
-  const token = await inviteToBcdx(email, workerIndex);
-  await signUpThroughApi(
-    token,
-    { displayName: "Test Person", password },
-    workerIndex,
-  );
-  return { email, password, token };
 }
 
 async function logInWithForm(page: Page, email: string, password: string) {

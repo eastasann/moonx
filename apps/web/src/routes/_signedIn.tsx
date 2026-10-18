@@ -6,9 +6,13 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { ModalBoundary } from "../components/ErrorBoundary";
 import { PendingScreen } from "../components/PendingScreen";
+import { SaveConflictDialog } from "../components/SaveFeedback";
+import { SignInAgainDialog } from "../components/SignInAgain";
 import { FailureState, StatePage } from "../components/states";
 import { ApiError } from "../lib/api";
+import { useAutosave, useAutosaveState } from "../lib/autosave-react";
 import { meQuery } from "../lib/queries";
 import { setReportedUser } from "../lib/sentry";
 import { useDropOtherUsersData } from "../lib/session";
@@ -40,6 +44,8 @@ export const Route = createFileRoute("/_signedIn")({
 });
 
 function SignedIn() {
+  const autosave = useAutosave();
+  const needsSignIn = useAutosaveState()?.needsSignIn === true;
   const { data: me } = useQuery(meQuery());
   const userId = me?.id ?? null;
   useDropOtherUsersData(userId);
@@ -47,7 +53,18 @@ function SignedIn() {
     setReportedUser(userId);
     return () => setReportedUser(null);
   }, [userId]);
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      {/* The saves of any screen ask here (design-spec 6.0.2, M9). */}
+      <SaveConflictDialog />
+      {needsSignIn && (
+        <ModalBoundary key="sign-in-again" onClose={autosave.cancelSignIn}>
+          <SignInAgainDialog />
+        </ModalBoundary>
+      )}
+    </>
+  );
 }
 
 function SignedInError({ error, reset }: ErrorComponentProps) {

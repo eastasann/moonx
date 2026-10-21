@@ -1,12 +1,18 @@
-import type {
-  Assumption,
-  Competitor,
-  Evidence,
-  ResearchLogEntry,
-  Risk,
-  TemplateQuestion,
-  TemplateSection,
-  ValidationAnswer,
+import { computeEconomics } from "@moonx/domain";
+import {
+  type Assumption,
+  type Competitor,
+  type CostItem,
+  type EconomicsField,
+  type EconomicsInput,
+  type EconomicsResult,
+  type Evidence,
+  economicsFieldSchema,
+  type ResearchLogEntry,
+  type Risk,
+  type TemplateQuestion,
+  type TemplateSection,
+  type ValidationAnswer,
 } from "@moonx/schemas";
 import { ana } from "./api";
 import { validationHome } from "./ideas";
@@ -225,3 +231,87 @@ export const risk = (
   updatedBy: anaRef,
   ...extra,
 });
+
+/** A cost row as V12 returns it: Empty unless `extra` gives it a value. */
+export const costItem = (
+  id: string,
+  category: CostItem["category"],
+  name: string,
+  extra: Partial<CostItem> = {},
+): CostItem => ({
+  id,
+  category,
+  templateKey: null,
+  name,
+  inputMode: "amount",
+  amount: null,
+  percent: null,
+  isLumpSum: false,
+  whyNeeded: null,
+  canReduce: null,
+  notes: null,
+  classification: { fau: null, confidence: null, state: "empty", evidence: [] },
+  sortOrder: 0,
+  commentCount: 0,
+  lockVersion: 1,
+  updatedAt: "2026-09-20T01:00:00.000Z",
+  updatedBy: anaRef,
+  ...extra,
+});
+
+/** An Assumption of `confidence`, as a row with a value carries it. */
+export const assumed = (
+  confidence: "low" | "medium" | "high" = "medium",
+): CostItem["classification"] => ({
+  fau: "assumption",
+  confidence,
+  state: "assumption",
+  evidence: [],
+});
+
+/** The seven numbers of 18 as V12 and V15 return them, those in `values` entered. */
+export const economicsInputs = (
+  values: Partial<Record<EconomicsField, number>> = {},
+): EconomicsInput[] =>
+  economicsFieldSchema.options.map((fieldKey) => {
+    const value = values[fieldKey] ?? null;
+    return {
+      fieldKey,
+      value,
+      classification:
+        value === null
+          ? { fau: null, confidence: null, state: "empty", evidence: [] }
+          : {
+              fau: "assumption",
+              confidence: "medium",
+              state: "assumption",
+              evidence: [],
+            },
+      commentCount: 0,
+      lockVersion: value === null ? 0 : 1,
+      updatedAt: value === null ? null : "2026-09-20T01:00:00.000Z",
+      updatedBy: value === null ? null : anaRef,
+    };
+  });
+
+/** What the API calculates for `items` and `inputs` (the screens calculate it again). */
+export const resultOf = (
+  items: readonly CostItem[],
+  inputs: readonly EconomicsInput[],
+): EconomicsResult =>
+  computeEconomics({
+    costRows: items.map((item) => ({
+      category: item.category,
+      templateKey: item.templateKey,
+      inputMode: item.inputMode,
+      amount: item.amount,
+      percent: item.percent,
+      fau: item.classification.fau,
+    })),
+    inputs: Object.fromEntries(
+      inputs.map((input) => [
+        input.fieldKey,
+        { value: input.value, fau: input.classification.fau },
+      ]),
+    ),
+  });

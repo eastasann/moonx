@@ -82,11 +82,26 @@ describe("the routes of the screens the API names (SDD 4章・5.2 LinkTarget)", 
     );
   });
 
-  test("13's sections: 01, 02 and 10 on 11, 03 on 14, 04 on 15, 09 on 16, the others not yet", () => {
+  test("17 on a cost row, 18 on a number or V.08.WORTH, 19", () => {
+    const rowId = "4c1d2e3f-0000-4000-8000-000000000001";
+    expect(hrefOf({ screen: 17, workspaceId, ideaId, rowId })).toBe(
+      `${idea}/costs?row=${rowId}`,
+    );
+    expect(
+      hrefOf({ screen: 18, workspaceId, ideaId, field: "selling_price" }),
+    ).toBe(`${idea}/economics?field=selling_price`);
+    expect(
+      hrefOf({ screen: 18, workspaceId, ideaId, questionKey: "V.08.WORTH" }),
+    ).toBe(`${idea}/economics?q=V.08.WORTH`);
+    expect(hrefOf({ screen: 19, workspaceId, ideaId })).toBe(`${idea}/decide`);
+  });
+
+  test("13's sections: 01, 02 and 10 on 11, 03 on 14, 04 on 15, 05 on 17, 06–08 on 18, 09 on 16", () => {
     expect(sectionHref(workspaceId, ideaId, "10")).toBe(`${idea}/questions/10`);
     expect(sectionHref(workspaceId, ideaId, "03")).toBe(`${idea}/research`);
     expect(sectionHref(workspaceId, ideaId, "04")).toBe(`${idea}/competitors`);
+    expect(sectionHref(workspaceId, ideaId, "05")).toBe(`${idea}/costs`);
+    expect(sectionHref(workspaceId, ideaId, "06-08")).toBe(`${idea}/economics`);
     expect(sectionHref(workspaceId, ideaId, "09")).toBe(`${idea}/assumptions`);
-    expect(sectionHref(workspaceId, ideaId, "05")).toBeUndefined();
   });
 });

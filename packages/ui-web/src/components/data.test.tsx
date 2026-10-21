@@ -473,10 +473,12 @@ describe("TableView", () => {
     await user.click(screen.getByText("15,000"));
     await settle();
     const amount = screen.getByRole("textbox", { name: "Amount of rent" });
-    // The input sits in a sizer as wide as its text, beside the symbol.
-    expect(amount.parentElement?.getAttribute("data-value")).toBe("15,000");
+    // The input sits in a sizer as wide as the symbol and its text; the symbol is drawn
+    // in it, before a copy of the text, so it stays beside the digits.
+    expect(amount.parentElement?.getAttribute("data-value")).toBe("₱15,000");
+    expect(amount.parentElement?.textContent).toBe("₱15,000");
     await user.keyboard("{End}0");
-    expect(amount.parentElement?.getAttribute("data-value")).toBe("15,0000");
+    expect(amount.parentElement?.getAttribute("data-value")).toBe("₱15,0000");
     expect(
       screen
         .getByRole("textbox", { name: "Price" })

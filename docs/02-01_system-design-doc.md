@@ -755,8 +755,8 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 | `/w/$workspaceId/ideas/$ideaId/research` | 14 調査ログ | `?supports=&source=&entry=<research_log_entry の id>&new=1&presetSupports=`（`new=1` で新しい調査ログの入力を開き、`presetSupports` の確認項目のタグを付けておく（`SupportsCheck` をカンマでつなぐ。例: `local_price,permits`）。`supports` は一覧の絞り込み） |
 | `/w/$workspaceId/ideas/$ideaId/competitors` | 15 競合・代替 | `?view=cards|table&q=V.04.SURVIVOR_PATTERNS&row=<competitor の id>`（`q` はその設問を開いてフォーカスし、`row` はその競合の Dialog を開く。design-spec 6.10） |
 | `/w/$workspaceId/ideas/$ideaId/assumptions` | 16 前提・リスク | `?tab=assumptions|risks&row=<assumption か risk の id>&new=1`（`new=1` で今のタブの新しい行の入力を開く。14 と同じ） |
-| `/w/$workspaceId/ideas/$ideaId/costs` | 17 費用 | `?row=<cost_item の id か template_key>&tab=initial|monthly_fixed|variable` |
-| `/w/$workspaceId/ideas/$ideaId/economics` | 18 損益・シナリオ | `?field=` |
+| `/w/$workspaceId/ideas/$ideaId/costs` | 17 費用 | `?row=<cost_item の id か template_key>&tab=initial|monthly_fixed|variable`（`row` はその行を見える位置へ出して金額の欄を開き（スマホは行のシートを開く）、`tab` はその表を見える位置へ出す） |
+| `/w/$workspaceId/ideas/$ideaId/economics` | 18 損益・シナリオ | `?field=<EconomicsField>&q=V.08.WORTH`（`field` はその数字の欄を開き（スマホはその行のシートを開く）、`q` はその設問を開いてフォーカスする。15 と同じ） |
 | `/w/$workspaceId/ideas/$ideaId/decide` | 19 判定 | |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId` | 20 プランホーム | `?version=<plan_version の id>`（版の読み取り専用表示） |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo` | 21 プラン項目の編集 | `$itemNo` は 1〜30。`?q=&version=<plan_version の id>`（P4 の `versionId`。版の読み取り専用表示から項目を開くとき） |

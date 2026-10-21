@@ -4,6 +4,7 @@ import {
   ListBoxItem,
   type ListBoxProps,
   Text,
+  VisuallyHidden,
 } from "react-aria-components";
 import { IconSlot } from "./IconSlot";
 import * as styles from "./listbox.css";
@@ -13,6 +14,11 @@ export interface ChoiceItem {
   id: string;
   /** The text shown, also used to filter and to type-select. */
   label: string;
+  /**
+   * The words read out and typed to find it, where the label shown is a mark: 17's "—"
+   * for a Can Reduce? not answered is "Undecided".
+   */
+  spokenLabel?: string;
   /** A second line under the label. */
   description?: string;
   isDisabled?: boolean;
@@ -34,14 +40,16 @@ export function ChoiceListBox({ items, ...props }: ChoiceListBoxProps) {
       {(item) => (
         <ListBoxItem
           id={item.id}
-          textValue={item.label}
+          textValue={item.spokenLabel ?? item.label}
           isDisabled={item.isDisabled}
           className={styles.option}
         >
           {({ isSelected }) => (
             <>
               <span className={styles.optionText}>
-                <Text slot="label">{item.label}</Text>
+                <Text slot="label">
+                  <ChoiceLabel item={item} />
+                </Text>
                 {item.description != null && (
                   <Text slot="description" className={styles.optionDescription}>
                     {item.description}
@@ -60,5 +68,16 @@ export function ChoiceListBox({ items, ...props }: ChoiceListBoxProps) {
         </ListBoxItem>
       )}
     </ListBox>
+  );
+}
+
+/** A choice's label as shown, read as its spoken label where it has one. */
+export function ChoiceLabel({ item }: { item: ChoiceItem }) {
+  if (item.spokenLabel === undefined) return <>{item.label}</>;
+  return (
+    <>
+      <span aria-hidden="true">{item.label}</span>
+      <VisuallyHidden elementType="span">{item.spokenLabel}</VisuallyHidden>
+    </>
   );
 }

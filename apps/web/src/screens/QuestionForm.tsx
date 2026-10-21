@@ -7,15 +7,11 @@ import type {
   ValidationHome,
 } from "@moonx/schemas";
 import {
-  ActionButton,
   Breadcrumb,
   Breadcrumbs,
   Button,
   Flex,
   Heading,
-  Menu,
-  MenuItem,
-  MenuTrigger,
   MoonGlyph,
   QuestionCard,
   QuestionFormPattern,
@@ -27,7 +23,7 @@ import {
 } from "@moonx/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, ChevronDown } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -41,6 +37,7 @@ import {
 } from "../components/AnswerFields";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import { ModalBoundary } from "../components/ErrorBoundary";
+import { SectionTitle } from "../components/SectionTitle";
 import {
   FailureState,
   NoAccessState,
@@ -70,8 +67,6 @@ export interface QuestionFormSearch {
   /** The question to focus: its ID ("V.01.WHO"). */
   q?: string;
 }
-
-type HomeSection = ValidationHome["sections"][number];
 
 /** The order 11 moves through the sections in (design-spec 6.2「前後のセクション」). */
 const SECTION_ORDER = ["01", "02", "03", "04", "05", "06-08", "09", "10"];
@@ -227,12 +222,6 @@ function SectionForm({
   };
   const previous = neighbour(-1);
   const next = neighbour(1);
-  const switchable = home.sections.flatMap((candidate: HomeSection) => {
-    const href = sectionHref(workspace.id, idea.id, candidate.key);
-    return href === undefined
-      ? []
-      : [{ key: candidate.key, href, title: candidate.title }];
-  });
 
   /** The questions whose answer decides others (02 OCEAN), while unanswered (6.2). */
   const decidesOthers = (view: AnswerView) =>
@@ -269,28 +258,11 @@ function SectionForm({
         gap="space-300"
         wrap
       >
-        <Flex gap="space-50" alignItems="center">
-          <Heading level={1}>{titleOf(sectionKey)}</Heading>
-          <MenuTrigger>
-            <ActionButton
-              isQuiet
-              aria-label={t("validation:questions.switchSection")}
-            >
-              <ChevronDown />
-            </ActionButton>
-            <Menu aria-label={t("validation:home.sections.title")}>
-              {switchable.map((candidate) => (
-                <MenuItem
-                  key={candidate.key}
-                  id={candidate.key}
-                  href={candidate.href}
-                >
-                  {candidate.title}
-                </MenuItem>
-              ))}
-            </Menu>
-          </MenuTrigger>
-        </Flex>
+        <SectionTitle
+          ideaId={idea.id}
+          sections={home.sections}
+          title={titleOf(sectionKey)}
+        />
         <Flex gap="space-100" alignItems="center">
           <MoonGlyph value={shown.length === 0 ? 0 : answered / shown.length} />
           <Text tone="secondary">

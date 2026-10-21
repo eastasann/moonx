@@ -1111,7 +1111,7 @@ Empty の行の F/A/U の欄は U+2014 のダッシュ1文字にする（読み�
 
 | 表 | 初期行（テンプレートの初期値） | 列 |
 |---|---|---|
-| 初期費用 | Equipment・Renovation / Fit-out・Lease Deposit / Advance・Permits / Registration・Initial Inventory・Branding / Signage・Launch Marketing・Technology / Systems Setup・Working Capital Buffer・Other Startup Cost | 項目名・金額・F/A/U・Why Needed・Can Reduce?（Yes / Partly / No） |
+| 初期費用 | Equipment・Renovation / Fit-out・Lease Deposit / Advance・Permits / Registration・Initial Inventory・Branding / Signage・Launch Marketing・Technology / Systems Setup・Working Capital Buffer・Other Startup Cost | 項目名・金額・F/A/U・Why Needed・Can Reduce?（Yes / Partly / No。決めていない行と、選ぶ一覧のその選択肢は U+2014 のダッシュ1文字（読み上げは「Undecided」。「No」と頭の文字が重ならず、一覧で文字を打って選べる）） |
 | 月額固定費 | Rent・Salaries・Utilities - Base・Internet / Software・Accounting / Admin・Base Marketing・Insurance / Compliance・Other Fixed Cost | 項目名・金額・F/A/U・Notes |
 | 変動費（1販売あたり） | Core Product / Materials・Packaging・Payment / Platform Fee・Delivery / Fulfilment・Variable Labor / Commission・Other Variable Cost | 項目名・金額 **または価格の%**・F/A/U |
 
@@ -1127,7 +1127,7 @@ Empty の行の F/A/U の欄は U+2014 のダッシュ1文字にする（読み�
 - 表に未入力か Unknown の行が1行でもあれば、その表の合計を「₱450,000+」と下限で示し、「3 Unknown, 1 Empty」と内訳を添える（原本の実例で「Known Capital Floor」と書き換えていたことへの対応）。月額固定費と変動費も同じ。下限は 18 の計算結果にも伝わる（6.4）。
 - 入力できる値は 6.0.8（金額・%・名前）。規則に合わない値は 6.0.6 のとおり保存しない。
 - 変動費/件 = 金額の行の合計 + %の行 × 価格。
-- Totals には 18 の損益分岐（件/日）も添え、費用を直すとその場で変わる。
+- Totals には 18 の損益分岐（件/日）も添え、費用を直すとその場で変わる。損益分岐の下には計算に使った価格（「At ₱450 a sale」）を添え、Totals の下に 18 へのリンク（「Unit Economics →」）を置く。
 
 #### 操作
 
@@ -1136,16 +1136,16 @@ Empty の行の F/A/U の欄は U+2014 のダッシュ1文字にする（読み�
 | 金額・%・文章を入れる | 自動保存。合計と 18 の計算がその場で変わる | Owner / Member |
 | F/A/U | 6.0.3（数字の Unknown は値を持たない） | Owner / Member |
 | + Add row | その表の末尾に、名前が空で金額が未入力の行を追加し、項目名の入力にフォーカスする（費用行の名前は空でもよい。6.0.8） | Owner / Member |
-| 行の ⋯ | 名前の変更 / 並べ替え / Lump sum / 削除 / コメント / 履歴 | Owner / Member（コメント・履歴は全ロール） |
+| 行の ⋯ | 名前の変更（その行の名前の入力欄へ移る。スマホは行のシートを開き、シートの ⋯ には置かない）/ 入力の切り替え（変動費の行だけ。「Use % of price」「Use amount」。金額か%の入った行は「Enter {名前} as a % of the price?」（金額へは「… as an amount?」）と、前の値とその Fact・Assumption が消えることを確かめる。System Design Doc 5.7 V14）/ 並べ替え / Lump sum（「Mark as lump sum」「Not a lump sum」）/ 削除（「Delete this cost row?」と確かめる。6.10 と同じ）/ コメント / 履歴 | Owner / Member（コメント・履歴は全ロール） |
 | → Unit Economics | 18 へ | 全ロール |
 
 #### 状態
 
 | 状態 | 表示 |
 |---|---|
-| 作ったばかり | テンプレートの初期行がすべて「Empty」で並ぶ。合計は「Empty」。上部に「Fill in what you know. Mark the rest Unknown, or delete rows you don't need.」（確認項目3は未入力の行が残っていると達成しないため） |
+| 作ったばかり | テンプレートの初期行がすべて「Empty」で並ぶ。合計は「Empty」。上部に「Fill in what you know. Mark the rest Unknown, or delete rows you don't need.」（確認項目3は未入力の行が残っていると達成しないため。Owner / Member に、すべての行が Empty のあいだ出す） |
 | 行が0（初期行を全部消した） | 表ごとに「No rows」と + Add row |
-| 価格が未入力で % の行がある | 変動費/件に「Needs price」と 18 へのリンク |
+| 価格が未入力で % の行がある | 変動費/件に「Needs price」と 18 の価格へのリンク（「Add price」）。% の行は「35% · Needs price」 |
 | ローディング / エラー / Viewer | 6.0.6。Viewer は読み取り表示 |
 
 ---
@@ -1163,28 +1163,28 @@ Web（パターン F ワークシート）
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ Ideas / Piaya Gift Box / 06–08 Unit Economics & Scenarios    ✓ Saved  💬 🕘 │
 ├───────────────────────────────────┬────────────────────────────────────────┤
-│ Inputs                            │ Unit economics                          │
+│ Inputs                            │ Results                                 │
 │ ● Selling price  ₱450  Fact·1 src │  Variable cost / sale   ₱218.50         │
 │ ◐ Operating days 26    Assm·H     │  Contribution / sale    ₱231.50 (51.4%) │
-│ ◌ Target margin  15%   (default)  │ Break-even                              │
-│                                   │  180.1 / month · 6.9 / day · ₱81,058    │
-│ Daily sales (units/day)           │  Target margin: 254.3 / month · 9.8 / day│
-│ ◐ Conservative   6     Assm·L     │ Scenarios                               │
-│ ◐ Expected       10    Assm·M     │        BE     Cons   Exp    Strong  Cap │
-│ ◐ Strong         15    Assm·L     │ /day    6.9    6      10     15      25 │
-│ ● Capacity limit 25    Fact·1 src │ /month 180.1  156    260    390     650 │
-│                                   │ Revenue …                                │
-│ Costs from 05: Startup ₱169,500   │ Op. profit  0  −5,586 18,490 …          │
-│  Monthly ₱41,700 → Costs          │ Margin    …                             │
-│                                   │ Investment return                       │
-│ Is the return worth the capital   │  Payback 9.2 months · ROI 130.9% / year │
+│ ◌ Target margin  15%   (default)  │  Break-even  6.9 / day                  │
+│                                   │   180.1 / month · ₱81,058 / month       │
+│ Daily sales (units/day)           │  Units for target margin  9.8 / day     │
+│ ◐ Conservative   6     Assm·L     │  Expected profit  ₱18,490 / mo          │
+│ ◐ Expected       10    Assm·M     │  Payback 9.2 months · ROI 130.9% / year │
+│ ◐ Strong         15    Assm·L     │ Scenarios                               │
+│ ● Capacity limit 25    Fact·1 src │  Break-even   6.9 / day · 180.1 / month │
+│                                   │   Revenue ₱81,058 · Op. profit ₱0 …     │
+│ Costs from 05: Startup ₱169,500   │  Conservative 6 / day · 156 / month     │
+│  Monthly ₱41,700 → Costs          │   Revenue ₱70,200 · Op. profit −₱5,586 …│
+│                                   │  Expected … Strong … Capacity limit …   │
+│ Is the return worth the capital   │                                         │
 │ and effort?  (長文・F/A/U)          │                                         │
 └───────────────────────────────────┴────────────────────────────────────────┘
 
 スマホ: 入力を線で区切った行で縦に並べる。結果は下部の要約バー（「BE 6.9/day · Exp ₱18,490/mo」）に固定し、押すと全体を開く。
-シナリオ表は列が多いので、スマホでは行と列を入れ替え、シナリオ（Break-even・Conservative・Expected・Strong・Capacity Limit）
-ごとの行5つを縦に並べる（各行に件数/日・件数/月・売上・営業利益・利益率をラベルと値で並べる。4.3 の「表は1行ずつの行」の
-決まりに合わせる。2026-10-12 のユーザーの決定）。F/A/U は行を押して開く行の編集シートの中のボタンで付ける（6.0.3）。
+シナリオは表の列が多く、結果のカード（4.1 F）にも入らないので、どの幅でも行と列を入れ替え、シナリオ（Break-even・Conservative・Expected・Strong・Capacity Limit）
+ごとの行5つを縦に並べる（各行に件数/日・件数/月・売上・変動費合計・営業利益・利益率をラベルと値で並べる。4.3 の「表は1行ずつの行」の
+決まりに合わせる。スマホの並びは 2026-10-12 のユーザーの決定）。F/A/U は行を押して開く行の編集シートの中のボタンで付ける（6.0.3）。
 ```
 
 #### 入力
@@ -1201,6 +1201,7 @@ Web（パターン F ワークシート）
 - 「Is the return worth the capital and effort?」の見出し・問い・EXAMPLE・ヒントは、15 の Survivor Patterns / Failure Patterns と同じく、検証のテンプレートの版にある設問 `V.08.WORTH` のものを、11 と同じ QuestionCard で出す（27 で編集した内容が反映される）。
 - 営業日数と目標利益率は、入力欄に既定値を薄く表示し、値が空（未入力、または Unknown）のあいだは既定値で計算する。結果には「using default 30 days」と添える。「既定値のまま」とは値が空のことで、自分で 30 や 15% を入れたら入力済みとして扱う。
 - 費用（17 の合計）はこの画面では直さず、要約と 17 へのリンクを出す。
+- Web の並び（モックアップが無いので、パターン F の s17-costs.html にそろえた）: 題は UI 表示名の「06–08 Unit Economics & Scenarios」（3章。セクションの一覧と ▼ の切替は短い名前）、その横に「What each sale earns, how many sales break even, and what each scenario makes.」。左の列に Inputs の表（価格・営業日数・目標利益率）、Daily sales の表（4シナリオの1日の販売数。表の題の横に「units / day」）、Costs from 05 の要約（「Startup ₱169,500 · Monthly ₱41,700 · Variable ₱218.50 / sale」と「Costs →」）、「Is the return worth the capital and effort?」の設問。右の結果のカード（「Results」。4.1 F）に、警告（下の計算仕様の警告と注意書き。題「Warnings」の琥珀色の InlineAlert にまとめる）、変動費/件、粗利/件（「{粗利率} of the price」を添える）、損益分岐（件/日。「{件/月} / month · {売上/月} / month」を添える）、目標利益率の件数（件/日。「{件/月} / month at {率}」を添える）、Expected の営業利益（/ mo）、回収期間、ROI（/ year）、既定値を使っているときの「using default 30 days」「using default 15%」、シナリオ（小見出し「Scenarios」）。シナリオは、4.1 F の結果のカードの幅に上の図の6列の表が入らないので、どの幅でもスマホと同じく損益分岐と4シナリオの1行ずつ（各行に件数/日・件数/月・売上・変動費合計・営業利益・営業利益率をラベルと値で並べる）にする。結果のカードが窓より高いときは、カードの中がスクロールし、キーボードでもカードへ移ってスクロールできる。要約バーは「BE 6.9/day · Exp ₱18,490/mo」。
 
 #### 計算仕様
 
@@ -1293,7 +1294,7 @@ Proceed / Hold / Drop と理由を記録する。判断材料（概要・不足�
 Web（パターン B 中央集中。スマホはパンくずの代わりに ← Validation を出し、縦に積む。判断材料は Well、主要指標は MetricGroup の compact、
 Summary は DescriptionList、判定は RadioGroup の cards。s19-decision.html）
 ┌──────────────────────────────────────────────────────────────┐
-│ Ideas / Piaya Gift Box Delivery / Decision                     │
+│ Ideas / Piaya Gift Box Delivery / Record decision              │
 ├──────────────────────────────────────────────────────────────┤
 │ Summary                                                      │
 │  Concept            Corporate gift boxes of Bacolod piaya…    │
@@ -1304,8 +1305,10 @@ Summary は DescriptionList、判定は RadioGroup の cards。s19-decision.html
 │  Startup    Break-even  Expected profit  Payback   ROI        │
 │  ₱169,500   6.9 / day   ₱18,490 / mo     9.2 mo    130.9%     │
 │ Checks: 2 missing                                            │
-│  ○ Permits: Not started                                       │
-│  ◐ Startup & monthly costs: Partial (2 rows are Empty)        │
+│  ○ Permits                                        Not started │
+│    Fill the Permits cost row, or log what you found          │
+│  ◐ Startup & monthly costs                            Partial │
+│    2 rows are Empty                                          │
 │ ● Fact 12 ◐ Assumption 9 ○ Unknown 2 ◆ Unclassified 3 ◌ Empty 18│
 ├──────────────────────────────────────────────────────────────┤
 │ Should we develop this into a full Business Plan?            │
@@ -1328,14 +1331,16 @@ Summary は DescriptionList、判定は RadioGroup の cards。s19-decision.html
 - Key numbers: 6.4 の主要指標のうち、初期費用・損益分岐（件/日）・Expected の月次営業利益・回収期間・ROI。
 - Checks: 達成していない確認項目だけを出す（すべて達成なら「All 6 checks done」）。
 - F/A/U の内訳（未分類と Unknown を強調）。帯は使わず、MoonGlyph・ラベル・件数を1行に並べる（Empty も含む）。
-- 直前の判定（あれば「Last: Hold · Sep 30 · Ana」）。
+- 直前の判定（あれば「Last decision: Hold · Sep 30 · Ana Villanueva」。s19-decision.html）。
+- Checks の行は、MoonGlyph・確認項目の名前・右端の状態（「Partial」）と、名前の下に不足の理由（13 の確認項目と同じ文と並び。d1-moon.html の .rows .sub）。s19-decision.html は理由を右端の状態に続けて「Partial · 1 row is Empty」と1行に置いているが、理由は長いことがあり（「18 rows are Empty · No startup or monthly cost amounts yet」）、そうするとスマホで名前が押しつぶされて1文字ずつ折り返すので、13 と同じく名前の下に置く。
+- 題は「Record a decision」、その上に小さくアイデア名、パンくずの最後は「Record decision」（s19-decision.html と、それに合わせた /dev/components の 19 の見本の文言。3.4 の UI 表示名「Decision」はほかの画面からこの画面を呼ぶ名前で、画面の題は記録する操作の名前にする）。
 - 判定は、題と説明のカードで並べる（4.5 の RadioGroup の `cards`。スマホは1列。s19-decision.html）: Proceed「Worth planning」、Hold「Come back later」、Drop「Hide from lists」。Summary はラベルと値の並び（4.5 の DescriptionList）、Key numbers は MetricGroup の `compact`。
 
 #### 操作と状態遷移
 
 | 操作 | 結果 |
 |---|---|
-| 判定を選ぶ | 選んだ値に応じて注意書き。Proceed: 「Proceed means it is worth planning, not approval to launch.」。Drop: 「Dropped ideas are hidden from lists by default. You can decide again later.」。不足があれば「n checks are missing. They will be recorded with this decision.」（不足があっても記録できる） |
+| 判定を選ぶ | 選んだ値に応じて注意書き。Proceed: 「Proceed means it is worth planning, not approval to launch.」。Drop: 「Dropped ideas are hidden from lists by default. You can decide again later.」。Hold と、まだ選んでいないあいだは「You can decide again at any time. Every decision stays in the log.」（s19-decision.html）。不足があれば「n checks are missing. They will be recorded with this decision.」（不足があっても記録できる） |
 | 理由を書く | 必須。空のままでは記録できない（規則は 6.0.8） |
 | Record decision | 決定ログに記録する（判定・理由・記録者・日時・その時点の不足項目・主要指標・F/A/U の内訳のスナップショット）。アイデアの最新の判定が変わる。ワークスペースのメンバーに通知する |
 | 記録の後（Proceed） | 「Create a plan draft?」の確認を出す → [Create draft]（M5）/ [Later]（13 へ） |
@@ -1343,7 +1348,8 @@ Summary は DescriptionList、判定は RadioGroup の cards。s19-decision.html
 | Cancel | 何も記録せず 13 へ |
 
 - 判定は何度でも記録し直せる。決定ログは追記だけで、記録した判定は編集・削除できない。
-- 画面を開いた後に他の人が判定を記録していたら、記録の前に「Kenji recorded Hold 2 minutes ago. Record yours as well?」と確認する。
+- 画面を開いた後に他の人が判定を記録していたら、記録の前に「Kenji recorded Hold 2 minutes ago. Record yours as well?」と確認する（本文「Both decisions stay in the log, and yours becomes the latest.」、[Record mine] / [Cancel]。Cancel では記録せず、判断材料を読み直してその判定を直前の判定として出す）。
+- 判定か理由が無いまま Record decision を押すと、記録せずにそれぞれの欄の下に理由を出す（6.0.8。判定は「Choose one of the options」）。Record decision は判断材料を読み終えるまで押せない（どの判定を元に記録するかを API に送るため。System Design Doc 5.7 V19）。
 - 最新の判定が Proceed 以外に変わっても、既存のプランは消さない。20 に「Latest decision is Hold」と表示する。
 
 #### 状態
@@ -1352,7 +1358,7 @@ Summary は DescriptionList、判定は RadioGroup の cards。s19-decision.html
 |---|---|
 | ローディング | 判断材料の骨組み。判定の入力欄は先に出す |
 | 判断材料が空 | 各欄「Empty」。不足は6件と表示。記録はできる |
-| 記録の失敗 | 入力を残して「Couldn't record」と Retry |
+| 記録の失敗 | 入力を残して「Couldn't record」と Retry（API が理由を返す失敗はその理由（6.0.2 の「It's archived」など）、回数の上限はその待ち時間、想定外の失敗は Ref を添える。6.0.6） |
 | Viewer | この画面に入れない（ボタンを出さない）。URL で開いたら「You don't have access to this」（6.0.6） |
 | アーカイブ済みのアイデア | 判断材料は出し、判定の入力欄は出さない。「This idea is archived」の注意を表示する |
 

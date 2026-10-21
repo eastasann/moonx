@@ -98,6 +98,18 @@ export interface TableViewProps<T extends { id: Key }> {
   selectionMode?: "none" | "single";
   selectedKeys?: Iterable<Key>;
   onSelectionChange?: (keys: Set<Key>) => void;
+  /**
+   * Puts a row in view with focus in it, once the row is listed: in the input of
+   * `columnId` while the row can be edited in place, else on that cell (17's "+ Add row"
+   * and Rename, a link to a row). A new object for each request. A phone's rows are left
+   * to the screen, which opens its sheet.
+   */
+  editRequest?: { key: Key; columnId: string } | null;
+  /**
+   * The request was met: the screen sets `editRequest` back to null, so the table drawn
+   * again (a tablet turned, a window narrowed and widened) does not meet it a second time.
+   */
+  onEditRequestMet?: () => void;
   /** Shown in place of the rows when there are none. */
   renderEmptyState?: () => ReactNode;
   /** @default "regular" */
@@ -153,7 +165,12 @@ export function TableView<T extends { id: Key }>({
     [columns, isNarrow, lines],
   );
   const { footerAction, footerTotal, ...tableProps } = props;
-  const { isRowEditable: _, ...rowProps } = tableProps;
+  const {
+    isRowEditable: _,
+    editRequest: __,
+    onEditRequestMet: ___,
+    ...rowProps
+  } = tableProps;
   const table = lines ? (
     <LineRows {...rowProps} columns={shown} density={density} />
   ) : (
@@ -209,6 +226,8 @@ function GridTable<T extends { id: Key }>({
   selectionMode = "none",
   selectedKeys,
   onSelectionChange,
+  editRequest,
+  onEditRequestMet,
   renderEmptyState,
   density = "regular",
   ...labels
@@ -291,6 +310,22 @@ function GridTable<T extends { id: Key }>({
     setEditingKey(key);
     focusLater(key, "input");
   };
+
+  // Each request is met once, when its row is there: a new row arrives after the request.
+  const metRequest = useRef<TableViewProps<T>["editRequest"]>(null);
+  useEffect(() => {
+    if (editRequest == null || metRequest.current === editRequest) return;
+    if (!items.some((item) => item.id === editRequest.key)) return;
+    metRequest.current = editRequest;
+    focusColumn.current = editRequest.columnId;
+    const item = items.find((each) => each.id === editRequest.key);
+    if (item !== undefined && (isRowEditable?.(item) ?? false)) {
+      startEditing(editRequest.key);
+    } else {
+      focusLater(editRequest.key, "cell");
+    }
+    onEditRequestMet?.();
+  });
 
   /**
    * Brings the rows in line with where focus is: its row shows its inputs, and focus in

@@ -646,8 +646,11 @@ export const results = style({
   border: `${vars.borderWidth.hairline} solid ${vars.color.border.default}`,
   borderRadius: vars.radius.card,
   background: vars.color.surface.raised,
-  // Focus is put here when it takes the summary bar's place; the column draws no ring.
+  // Focus is put here when it takes the summary bar's place; the column draws no ring
+  // then, only when the keyboard reaches it to scroll it (a column taller than the
+  // window).
   outline: "none",
+  selectors: { "&:focus-visible": focusRing },
 });
 
 /** The results' name at the top of their card (.totals h2). */

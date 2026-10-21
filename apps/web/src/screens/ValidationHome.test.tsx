@@ -69,7 +69,7 @@ const concept = (sheet: HTMLElement) =>
 describe("13 Validation home (design-spec 6.1)", () => {
   test("the numbers, next steps with the first one's reason, checks, sections, decisions", async () => {
     homeApi();
-    renderApp(path);
+    const router = renderApp(path);
     expect(
       await screen.findByRole("heading", {
         level: 1,
@@ -106,8 +106,21 @@ describe("13 Validation home (design-spec 6.1)", () => {
     expect(sections.textContent).toContain("2 · 3");
     expect(screen.getByText("“Permits are not checked yet.”")).toBeTruthy();
     expect(screen.getByText("62 items")).toBeTruthy();
-    // No way into screens not built yet (11, 14–19): the rows are not links.
-    expect(within(checks).queryAllByRole("link")).toEqual([]);
+    // Permits opens its cost row on 17; the checks with no link are not links.
+    expect(
+      within(checks)
+        .getAllByRole("link")
+        .map((link) => link.getAttribute("href")),
+    ).toEqual([`/w/${workspaceId}/ideas/${home.idea.id}/costs`]);
+    // Record decision opens 19 (design-spec 6.1「操作」).
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Record decision" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/w/${workspaceId}/ideas/${home.idea.id}/decide`,
+      ),
+    );
   });
 
   test("another workspace's idea under this one's URL: no access, no tools", async () => {
@@ -123,6 +136,9 @@ describe("13 Validation home (design-spec 6.1)", () => {
       }),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit summary" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Record decision" }),
+    ).toBeNull();
     expect(document.title).toBe("moonx");
   });
 
@@ -152,7 +168,7 @@ describe("13 Validation home (design-spec 6.1)", () => {
     ).toBeTruthy();
   });
 
-  test("sections open 11, 14, 15 and 16; an empty summary answer opens its question", async () => {
+  test("sections open 11 and 14〜18; an empty summary answer opens its question", async () => {
     homeApi();
     renderApp(path);
     await screen.findByRole("heading", {
@@ -180,10 +196,16 @@ describe("13 Validation home (design-spec 6.1)", () => {
         .getByRole("link", { name: /09 Assumptions & Risks/ })
         .getAttribute("href"),
     ).toBe(`/w/${workspaceId}/ideas/${home.idea.id}/assumptions`);
-    // 05 opens a screen not built yet.
     expect(
-      within(sections).queryByRole("link", { name: /05 Costs/ }),
-    ).toBeNull();
+      within(sections)
+        .getByRole("link", { name: /05 Costs/ })
+        .getAttribute("href"),
+    ).toBe(`/w/${workspaceId}/ideas/${home.idea.id}/costs`);
+    expect(
+      within(sections)
+        .getByRole("link", { name: /06–08 Unit Economics/ })
+        .getAttribute("href"),
+    ).toBe(`/w/${workspaceId}/ideas/${home.idea.id}/economics`);
     const summary = screen.getByRole("region", { name: "Summary" });
     expect(
       within(summary)
@@ -202,6 +224,9 @@ describe("13 Validation home (design-spec 6.1)", () => {
       name: "Bacolod Health Bowl",
     });
     expect(screen.queryByRole("button", { name: "Edit summary" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Record decision" }),
+    ).toBeNull();
     expect(
       screen.queryByRole("button", { name: "More for Bacolod Health Bowl" }),
     ).toBeNull();
@@ -224,6 +249,9 @@ describe("13 Validation home (design-spec 6.1)", () => {
     renderApp(path);
     expect(await screen.findByText("This idea is archived")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit summary" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Record decision" }),
+    ).toBeNull();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Restore" }));
     await waitFor(() =>

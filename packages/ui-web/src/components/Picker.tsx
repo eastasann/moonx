@@ -10,7 +10,11 @@ import {
   VisuallyHidden,
 } from "react-aria-components";
 import { useTranslation } from "react-i18next";
-import { type ChoiceItem, ChoiceListBox } from "../internal/ChoiceListBox";
+import {
+  type ChoiceItem,
+  ChoiceLabel,
+  ChoiceListBox,
+} from "../internal/ChoiceListBox";
 import {
   FieldHelp,
   FieldLabel,
@@ -126,7 +130,7 @@ export function Picker({
               {/* Keeps the words apart in the button's text, as in its name. */}{" "}
             </>
           )}
-          <SelectValue
+          <SelectValue<ChoiceItem>
             className={
               isInside
                 ? `${styles.pickerValue} ${styles.insideValue}`
@@ -134,11 +138,25 @@ export function Picker({
             }
           >
             {/* The label alone: the option's description and check stay in the list. */}
-            {({ isPlaceholder, selectedText, defaultChildren }) => (
-              <span id={valueTextId}>
-                {isPlaceholder ? defaultChildren : selectedText}
-              </span>
-            )}
+            {({
+              isPlaceholder,
+              selectedText,
+              selectedItems,
+              defaultChildren,
+            }) => {
+              const [selected] = selectedItems;
+              return (
+                <span id={valueTextId}>
+                  {isPlaceholder ? (
+                    defaultChildren
+                  ) : selected == null ? (
+                    selectedText
+                  ) : (
+                    <ChoiceLabel item={selected} />
+                  )}
+                </span>
+              );
+            }}
           </SelectValue>
           <IconSlot size={resolved}>
             <ChevronDown />

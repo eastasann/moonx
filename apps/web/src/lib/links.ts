@@ -1,4 +1,10 @@
-import type { LinkTarget, SourceType, SupportsCheck } from "@moonx/schemas";
+import type {
+  CostCategory,
+  EconomicsField,
+  LinkTarget,
+  SourceType,
+  SupportsCheck,
+} from "@moonx/schemas";
 import type { CompareView } from "@moonx/ui-tokens";
 
 /** An idea's 13 Validation home (SDD 4章). */
@@ -121,10 +127,55 @@ export const assumptionsHref = (
   return `${ideaHref(workspaceId, ideaId)}/assumptions${text === "" ? "" : `?${text}`}`;
 };
 
+/** What 17's URL may open with (SDD 4章). */
+export interface CostsSearch {
+  /** The cost row to bring into view: its id, or its template key ("initial.permits"). */
+  row?: string;
+  /** The table to bring into view. */
+  tab?: CostCategory;
+}
+
+/** 17 Costs (SDD 4章). */
+export const costsHref = (
+  workspaceId: string,
+  ideaId: string,
+  search: CostsSearch = {},
+) => {
+  const query = new URLSearchParams();
+  if (search.row !== undefined) query.set("row", search.row);
+  if (search.tab !== undefined) query.set("tab", search.tab);
+  const text = query.toString();
+  return `${ideaHref(workspaceId, ideaId)}/costs${text === "" ? "" : `?${text}`}`;
+};
+
+/** What 18's URL may open with (SDD 4章). */
+export interface EconomicsSearch {
+  /** The number to bring into view. */
+  field?: EconomicsField;
+  /** The question to open and focus: V.08.WORTH. */
+  q?: string;
+}
+
+/** 18 Unit Economics & Scenarios (SDD 4章). */
+export const economicsHref = (
+  workspaceId: string,
+  ideaId: string,
+  search: EconomicsSearch = {},
+) => {
+  const query = new URLSearchParams();
+  if (search.field !== undefined) query.set("field", search.field);
+  if (search.q !== undefined) query.set("q", search.q);
+  const text = query.toString();
+  return `${ideaHref(workspaceId, ideaId)}/economics${text === "" ? "" : `?${text}`}`;
+};
+
+/** 19 Decision (SDD 4章). */
+export const decideHref = (workspaceId: string, ideaId: string) =>
+  `${ideaHref(workspaceId, ideaId)}/decide`;
+
 /**
- * Where a section of 13 opens (design-spec 6.1「セクションを開く」), while its screen is
- * built (docs/claude-code-prompts.md: no way into a screen before it exists): 01, 02 and
- * 10 on 11, 03 on 14, 04 on 15, 09 on 16. Each screen's step adds its sections here.
+ * Where a section of 13 opens (design-spec 6.1「セクションを開く」): 01, 02 and 10 on
+ * 11, 03 on 14, 04 on 15, 05 on 17, 06–08 on 18, 09 on 16.
  */
 export function sectionHref(
   workspaceId: string,
@@ -134,6 +185,8 @@ export function sectionHref(
   if (isQuestionSection(key)) return questionsHref(workspaceId, ideaId, key);
   if (key === "03") return researchHref(workspaceId, ideaId);
   if (key === "04") return competitorsHref(workspaceId, ideaId);
+  if (key === "05") return costsHref(workspaceId, ideaId);
+  if (key === "06-08") return economicsHref(workspaceId, ideaId);
   if (key === "09") return assumptionsHref(workspaceId, ideaId);
   return undefined;
 }
@@ -185,6 +238,19 @@ export function hrefOf(target: LinkTarget): string | undefined {
             tab: isAssumptionsTab(target.tab) ? target.tab : undefined,
             row: target.rowId,
           });
+    case 17:
+      return ideaId === undefined
+        ? undefined
+        : costsHref(workspaceId, ideaId, { row: target.rowId });
+    case 18:
+      return ideaId === undefined
+        ? undefined
+        : economicsHref(workspaceId, ideaId, {
+            field: target.field,
+            q: target.questionKey,
+          });
+    case 19:
+      return ideaId === undefined ? undefined : decideHref(workspaceId, ideaId);
     default:
       return undefined;
   }

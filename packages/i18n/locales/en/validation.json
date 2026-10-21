@@ -1,6 +1,108 @@
 {
   "costs": {
-    "emptyRowHint": "Tap to fill or mark Unknown"
+    "emptyRowHint": "Tap to fill or mark Unknown",
+    "title": "05 Costs",
+    "lead": "What it takes to open, to run each month, and to make each sale.",
+    "fresh": "Fill in what you know. Mark the rest Unknown, or delete rows you don't need.",
+    "table": {
+      "initial": "Startup costs",
+      "monthly_fixed": "Monthly fixed costs",
+      "variable": "Variable costs"
+    },
+    "unit": {
+      "initial": "one time",
+      "monthly_fixed": "every month",
+      "variable": "per sale"
+    },
+    "column": {
+      "mark": "State",
+      "name": "Item",
+      "amount": "Amount",
+      "fau": "F/A/U",
+      "whyNeeded": "Why needed",
+      "canReduce": "Can reduce?",
+      "notes": "Notes",
+      "more": "Row actions"
+    },
+    "subtotal": "Subtotal",
+    "perSale": "Per sale",
+    "unknownRows": "{{count}} Unknown",
+    "emptyRows": "{{count}} Empty",
+    "gapSeparator": ", ",
+    "gapNote": "· {{gaps}}",
+    "addRow": "Add row",
+    "noRows": "No rows",
+    "percentAmount": "· {{amount}}",
+    "lumpSum": "Lump sum",
+    "canReduce": {
+      "yes": "Yes",
+      "partly": "Partly",
+      "no": "No",
+      "none": "Undecided"
+    },
+    "none": "—",
+    "field": {
+      "name": "Item",
+      "amount": "Amount",
+      "percent": "% of price",
+      "whyNeeded": "Why Needed",
+      "canReduce": "Can Reduce?",
+      "notes": "Notes"
+    },
+    "label": {
+      "name": "Name of {{name}}",
+      "amount": "Amount of {{name}}",
+      "percent": "% of price for {{name}}",
+      "fau": "F/A/U of {{name}}",
+      "whyNeeded": "Why needed for {{name}}",
+      "canReduce": "Can reduce {{name}}?",
+      "notes": "Notes on {{name}}"
+    },
+    "more": "Row actions for {{name}}",
+    "menu": {
+      "rename": "Rename",
+      "usePercent": "Use % of price",
+      "useAmount": "Use amount",
+      "markLumpSum": "Mark as lump sum",
+      "unmarkLumpSum": "Not a lump sum",
+      "reorder": "Reorder",
+      "delete": "Delete"
+    },
+    "reorderTitle": {
+      "initial": "Reorder startup costs",
+      "monthly_fixed": "Reorder monthly fixed costs",
+      "variable": "Reorder variable costs"
+    },
+    "deleteTitle": "Delete this cost row?",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "switchTitle": {
+      "percent_of_price": "Enter {{name}} as a % of the price?",
+      "amount": "Enter {{name}} as an amount?"
+    },
+    "switchBody": "{{value}} is cleared, and with it the row's Fact or Assumption.",
+    "switch": "Switch",
+    "editTitle": "Edit cost row",
+    "noun": "cost row",
+    "totals": "Totals",
+    "total": {
+      "startup": "Startup",
+      "monthly": "Monthly fixed",
+      "variable": "Variable",
+      "breakEven": "Break-even"
+    },
+    "lowerBound": "Lower bound · {{gaps}}",
+    "atPrice": "At {{price}} a sale",
+    "addPrice": "Add price",
+    "toEconomics": "Unit Economics",
+    "summary": {
+      "startup": "Startup",
+      "monthly": "Monthly",
+      "breakEven": "BE",
+      "perDay": "/day"
+    },
+    "perSaleUnit": "/ sale",
+    "perDayUnit": "/ day"
   },
   "sections": {
     "03": "03 Research Log",
@@ -133,7 +235,8 @@
       "archived_other": "{{count}} archived plans",
       "show": "Show",
       "archivedBadge": "Archived"
-    }
+    },
+    "recordDecision": "Record decision"
   },
   "questions": {
     "back": "Validation",
@@ -350,6 +453,129 @@
       "whyMatters": "Why It Matters",
       "mitigation": "Mitigation",
       "howToValidate": "How to Validate"
+    }
+  },
+  "economics": {
+    "title": "06–08 Unit Economics & Scenarios",
+    "lead": "What each sale earns, how many sales break even, and what each scenario makes.",
+    "inputs": "Inputs",
+    "dailySales": "Daily sales",
+    "dailySalesUnit": "units / day",
+    "column": {
+      "mark": "State",
+      "name": "Input",
+      "value": "Value",
+      "fau": "F/A/U"
+    },
+    "label": {
+      "value": "Value of {{name}}",
+      "fau": "F/A/U of {{name}}"
+    },
+    "default": "{{value}} (default)",
+    "usingDefaultDays": "using default {{days}} days",
+    "usingDefaultMargin": "using default {{margin}}",
+    "costs": "Costs from 05",
+    "costsLine": "Startup {{startup}} · Monthly {{monthly}} · Variable {{variable}} / sale",
+    "toCosts": "Costs",
+    "scenarios": "Scenarios",
+    "scenarioColumn": "Scenario",
+    "metric": {
+      "unitsPerDay": "Units / day",
+      "unitsPerMonth": "Units / month",
+      "revenue": "Revenue",
+      "variableCostTotal": "Variable costs",
+      "operatingProfit": "Operating profit",
+      "operatingMargin": "Operating margin"
+    },
+    "results": "Results",
+    "result": {
+      "variableCost": "Variable cost / sale",
+      "contribution": "Contribution / sale",
+      "breakEven": "Break-even",
+      "targetMargin": "Units for target margin",
+      "expectedProfit": "Expected profit",
+      "payback": "Payback",
+      "roi": "ROI"
+    },
+    "contributionRate": "{{rate}} of the price",
+    "breakEvenMore": "{{units}} / month · {{revenue}} / month",
+    "targetMore": "{{units}} / month at {{margin}}",
+    "unit": {
+      "perDay": "/ day",
+      "perMonth": "/ mo",
+      "perYear": "/ year"
+    },
+    "warning": {
+      "costs_incomplete": "Some cost rows are Empty or Unknown, so results may look better than reality.",
+      "break_even_above_capacity": "Break-even is above capacity",
+      "exceeds_capacity": "{{scenario}} exceeds capacity limit"
+    },
+    "warnings": "Warnings",
+    "noun": "number",
+    "editTitle": "Edit {{name}}",
+    "summary": {
+      "breakEven": "BE",
+      "expected": "Exp",
+      "perDay": "/day",
+      "perMonth": "/mo"
+    }
+  },
+  "decision": {
+    "title": "Record a decision",
+    "crumb": "Record decision",
+    "material": "What you know so far",
+    "summary": "Summary",
+    "item": {
+      "concept": "Concept",
+      "customer": "Customer",
+      "problem": "Problem",
+      "solution": "Solution",
+      "marketType": "Market type",
+      "biggestOpportunity": "Biggest opportunity",
+      "biggestUnknown": "Biggest unknown",
+      "biggestRisk": "Biggest risk"
+    },
+    "keyNumbers": "Key numbers",
+    "metric": {
+      "startup": "Startup",
+      "breakEven": "Break-even",
+      "expectedProfit": "Expected profit",
+      "payback": "Payback",
+      "roi": "ROI"
+    },
+    "perDay": "{{value}} / day",
+    "perMonth": "{{value}} / mo",
+    "months": "{{value}} mo",
+    "checks": "Checks",
+    "missing_one": "{{count}} missing",
+    "missing_other": "{{count}} missing",
+    "missingChecks": "Missing checks",
+    "allDone": "All 6 checks done",
+    "fau": "Fact / Assumption / Unknown",
+    "last": "Last decision: {{value}} · {{date}} · {{name}}",
+    "question": "Should we develop this into a full Business Plan?",
+    "choice": {
+      "proceed": "Worth planning",
+      "hold": "Come back later",
+      "drop": "Hide from lists"
+    },
+    "note": {
+      "proceed": "Proceed means it is worth planning, not approval to launch.",
+      "drop": "Dropped ideas are hidden from lists by default. You can decide again later.",
+      "any": "You can decide again at any time. Every decision stays in the log."
+    },
+    "why": "Why?",
+    "missingNote_one": "{{count}} check is missing. It will be recorded with this decision.",
+    "missingNote_other": "{{count}} checks are missing. They will be recorded with this decision.",
+    "cancel": "Cancel",
+    "record": "Record decision",
+    "recorded": "Decision recorded",
+    "couldNotRecord": "Couldn't record",
+    "newer": {
+      "title": "{{name}} recorded {{value}} {{when}}. Record yours as well?",
+      "body": "Both decisions stay in the log, and yours becomes the latest.",
+      "record": "Record mine",
+      "cancel": "Cancel"
     }
   }
 }

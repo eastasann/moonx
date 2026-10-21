@@ -358,7 +358,7 @@ test.describe("11 Question form on a desktop", () => {
     await expect(page).toHaveURL(/\/research$/);
   });
 
-  test("13's links: Summary opens the question, a check opens 14's new entry", async ({
+  test("13's links: Summary opens the question, checks open 17's Permits row and 14's new entry", async ({
     page,
     signIn,
     account,
@@ -371,18 +371,15 @@ test.describe("11 Question form on a desktop", () => {
     await expect(page).toHaveURL(/\/questions\/02\?q=V\.02\.OCEAN/);
     await expect(page.getByRole("radio", { name: "Red" })).toBeFocused();
     await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
-    // A new idea has the Permits cost row, whose check opens 17 (not built yet: no link);
-    // the demand check opens 14's new entry.
+    // A new idea has the Permits cost row, whose check opens it on 17 at its amount; the
+    // demand check opens 14's new entry.
     const checks = block(page, "Checks");
+    await checks.getByRole("link", { name: /Permits/ }).click();
+    await expect(page).toHaveURL(/\/costs\?row=[\w-]+$/);
     await expect(
-      checks.getByRole("listitem").filter({ hasText: "Permits" }),
-    ).toBeVisible();
-    await expect(
-      checks
-        .getByRole("listitem")
-        .filter({ hasText: "Permits" })
-        .getByRole("link"),
-    ).toHaveCount(0);
+      page.getByRole("textbox", { name: "Amount of Permits / Registration" }),
+    ).toBeFocused();
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
     await checks
       .getByRole("link", { name: /Demand or problem signal/ })
       .click();
@@ -1047,5 +1044,347 @@ test.describe("15 and 16 on a phone", () => {
         .getByRole("grid", { name: "Assumptions" })
         .getByRole("row", { name: /Office workers order twice a week/ }),
     ).toBeVisible();
+  });
+});
+
+/** A row of one of 17's or 18's tables, by its name. */
+const tableRow = (page: Page, table: string, name: string) =>
+  page
+    .getByRole("grid", { name: table, exact: true })
+    .getByRole("row")
+    .filter({ hasText: name });
+
+test.describe("17 Costs and 18 Unit Economics on a desktop", () => {
+  test.use(desktop);
+
+  test("Piaya Gift Box Delivery: 17 and 18 show the numbers of design-spec 8.3", async ({
+    page,
+    signIn,
+  }) => {
+    const me = await signIn(demo.member);
+    const { bcdx, ideaId } = await bcdxIdea(
+      page,
+      me,
+      "Piaya Gift Box Delivery",
+    );
+    await page.goto(`/w/${bcdx.id}/ideas/${ideaId}`);
+    await block(page, "Sections")
+      .getByRole("link", { name: /05 Costs/ })
+      .click();
+    await expect(page).toHaveURL(/\/costs$/);
+    await expect(page).toHaveTitle(`05 Costs · BCDX · moonx`);
+    const totals = page.getByRole("group", { name: "Totals" });
+    await expect(totals).toContainText("₱169,500");
+    await expect(totals).toContainText("₱41,700");
+    await expect(totals).toContainText("₱218.50");
+    await expect(totals).toContainText("6.9");
+    await expect(
+      tableRow(page, "Variable costs", "Payment / Platform Fee"),
+    ).toContainText("3% · ₱13.50");
+    await expectNoAxeViolations(page);
+
+    await page.getByRole("link", { name: /Unit Economics/ }).click();
+    await expect(page).toHaveURL(/\/economics$/);
+    await expect(page).toHaveTitle(
+      "06–08 Unit Economics & Scenarios · BCDX · moonx",
+    );
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "06–08 Unit Economics & Scenarios",
+      }),
+    ).toBeVisible();
+    const results = page.getByRole("group", { name: "Results" });
+    for (const value of [
+      "₱218.50",
+      "₱231.50",
+      "6.9",
+      "9.8",
+      "51.4% of the price",
+      "180.1 / month · ₱81,058 / month",
+      "254.3 / month at 15%",
+      "₱18,490",
+      "9.2 months",
+      "130.9%",
+    ]) {
+      await expect(results).toContainText(value);
+    }
+    await expect(page.getByText("using default 15%")).toBeVisible();
+    // The scenarios sit in the results, a line each (design-spec 6.4・4.1 F).
+    const scenarios = page
+      .getByRole("complementary", { name: "Results" })
+      .getByRole("grid", { name: "Scenarios" });
+    await expect(scenarios.getByRole("row")).toHaveCount(5);
+    const expected = scenarios.getByRole("row").filter({ hasText: "Expected" });
+    for (const value of ["260", "₱117,000", "₱56,810", "₱18,490", "15.8%"]) {
+      await expect(expected).toContainText(value);
+    }
+    const conservative = scenarios
+      .getByRole("row")
+      .filter({ hasText: "Conservative" });
+    for (const value of ["156", "₱70,200", "−₱5,586"]) {
+      await expect(conservative).toContainText(value);
+    }
+    await expectNoAxeViolations(page);
+  });
+
+  test("13 → 17 → 18: amounts typed change the totals and results at once; 13 follows", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea } = await ownIdea(page, signIn, account);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
+    await block(page, "Sections")
+      .getByRole("link", { name: /05 Costs/ })
+      .click();
+    await expect(
+      page.getByText(
+        "Fill in what you know. Mark the rest Unknown, or delete rows you don't need.",
+      ),
+    ).toBeVisible();
+    const totals = page.getByRole("group", { name: "Totals" });
+    await expect(totals).toContainText("StartupEmpty");
+
+    // A row pressed takes its amount; the total follows as it is typed.
+    const equipment = tableRow(page, "Startup costs", "Equipment");
+    await equipment.getByText("Empty").first().click();
+    const amount = page.getByRole("textbox", { name: "Amount of Equipment" });
+    await expect(amount).toBeFocused();
+    await amount.fill("35,000");
+    await expect(totals).toContainText("₱35,000+");
+    await expect(page.getByText("Saved")).toBeVisible();
+    await page
+      .getByRole("button", { name: "F/A/U of Equipment: Unclassified" })
+      .click();
+    const picker = page.getByRole("dialog", { name: "F/A/U of Equipment" });
+    await picker.getByRole("radio", { name: "Assumption" }).click();
+    await picker.getByRole("radio", { name: "Medium" }).click();
+    await expect(
+      page.getByRole("button", {
+        name: "F/A/U of Equipment: Assumption · Medium",
+      }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "F/A/U of Permits / Registration: Empty" })
+      .click();
+    await page
+      .getByRole("dialog", { name: "F/A/U of Permits / Registration" })
+      .getByRole("radio", { name: "Unknown" })
+      .click();
+    await expect(
+      tableRow(page, "Startup costs", "Permits / Registration"),
+    ).toContainText("Unknown");
+    await expect(totals).toContainText("1 Unknown");
+
+    // + Add row under the monthly fixed costs (the second table): an Empty row at
+    // the end, its name to type.
+    await page.getByRole("button", { name: "Add row" }).nth(1).click();
+    const newName = page.getByRole("textbox", { name: "Name of Untitled" });
+    await expect(newName).toBeFocused();
+    await newName.fill("Cleaning");
+    await tableRow(page, "Monthly fixed costs", "Rent")
+      .getByText("Empty")
+      .first()
+      .click();
+    await page.getByRole("textbox", { name: "Amount of Rent" }).fill("12,000");
+    await expect(totals).toContainText("₱12,000+");
+
+    // A % of the price waits for 18's price, which the Totals link to.
+    await page
+      .getByRole("button", { name: "Row actions for Core Product / Materials" })
+      .click();
+    await page.getByRole("menuitem", { name: "Use % of price" }).click();
+    await tableRow(page, "Variable costs", "Core Product / Materials")
+      .getByText("Empty")
+      .first()
+      .click();
+    await page
+      .getByRole("textbox", { name: "% of price for Core Product / Materials" })
+      .fill("30");
+    // Left, the row shows its values again.
+    await page.getByRole("heading", { level: 1, name: "05 Costs" }).click();
+    await expect(
+      tableRow(page, "Variable costs", "Core Product / Materials"),
+    ).toContainText("· Needs price");
+    await expect(totals).toContainText("Needs price");
+    await expectNoAxeViolations(page);
+    await page.getByRole("link", { name: "Add price" }).click();
+    await expect(page).toHaveURL(/\/economics\?field=selling_price$/);
+    const price = page.getByRole("textbox", { name: "Value of Price" });
+    await expect(price).toBeFocused();
+    await price.fill("300");
+    const results = page.getByRole("group", { name: "Results" });
+    await expect(results).toContainText("₱90.00+");
+    await tableRow(page, "Daily sales", "Expected")
+      .getByText("Empty")
+      .first()
+      .click();
+    await page.getByRole("textbox", { name: "Value of Expected" }).fill("10");
+    // 300 a month at ₱300, less ₱90 each and ₱12,000: at most ₱51,000.
+    await expect(results).toContainText("≤ ₱51,000");
+    await expect(results).toContainText("1.9+");
+    await expect(page.getByText("using default 30 days")).toBeVisible();
+    await expect(page.getByText("Saved")).toBeVisible();
+    await expectNoAxeViolations(page);
+
+    // 13's key numbers and sections read what was saved.
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
+    const numbers = page.getByRole("group", { name: "Key numbers" });
+    await expect(numbers).toContainText("₱35,000+");
+    await expect(numbers).toContainText("1.9+");
+    await expect(numbers).toContainText("≤ ₱51,000");
+    await expect(
+      block(page, "Sections").getByRole("link", {
+        name: /06–08 Unit Economics/,
+      }),
+    ).toContainText("2/7 inputs");
+  });
+});
+
+test.describe("19 Decision on a desktop", () => {
+  test.use(desktop);
+
+  test("13 → 19: a decision recorded with its reason shows in 13's decisions", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea } = await ownIdea(page, signIn, account);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
+    await page.getByRole("button", { name: "Record decision" }).click();
+    await expect(page).toHaveURL(/\/decide$/);
+    const material = page.getByRole("region", {
+      name: "What you know so far",
+    });
+    await expect(material).toContainText("6 missing");
+    await expect(material).toContainText("Piaya tours, in one line.");
+    await page.getByRole("button", { name: "Record decision" }).click();
+    await expect(page.getByText("Choose one of the options")).toBeVisible();
+    await press(page.getByRole("radio", { name: /Hold/ }));
+    await expect(
+      page.getByText(
+        "6 checks are missing. They will be recorded with this decision.",
+      ),
+    ).toBeVisible();
+    await page
+      .getByRole("textbox", { name: /Why\?/ })
+      .fill("Costs and permits are not known yet.");
+    await expectNoAxeViolations(page);
+    await page.getByRole("button", { name: "Record decision" }).click();
+    await expect(page).toHaveURL(new RegExp(`/ideas/${idea.id}$`));
+    await expect(page.getByText("Decision recorded")).toBeVisible();
+    const decisions = block(page, "Decisions");
+    await expect(decisions).toContainText("Hold");
+    await expect(decisions).toContainText(
+      "“Costs and permits are not known yet.”",
+    );
+  });
+});
+
+test.describe("17, 18 and 19 for a Viewer", () => {
+  test.use(desktop);
+
+  test("17 and 18 read only; no Record decision, and 19 is closed", async ({
+    page,
+    signIn,
+  }) => {
+    const me = await signIn(demo.viewer);
+    const { bcdx, ideaId } = await bcdxIdea(page, me, "Bacolod Health Bowl");
+    await page.goto(`/w/${bcdx.id}/ideas/${ideaId}`);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Bacolod Health Bowl" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Record decision" }),
+    ).toHaveCount(0);
+    await page.goto(`/w/${bcdx.id}/ideas/${ideaId}/costs`);
+    await expect(
+      page.getByRole("grid", { name: "Startup costs" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add row" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^F\/A\/U of/ })).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByRole("button", { name: /^Row actions/ }),
+    ).toHaveCount(0);
+    await page.goto(`/w/${bcdx.id}/ideas/${ideaId}/economics`);
+    await expect(page.getByRole("grid", { name: "Inputs" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^F\/A\/U of/ })).toHaveCount(
+      0,
+    );
+    await page.goto(`/w/${bcdx.id}/ideas/${ideaId}/decide`);
+    await expect(
+      page.getByRole("heading", { name: "You don't have access to this" }),
+    ).toBeVisible();
+  });
+});
+
+test.describe("17, 18 and 19 on a phone", () => {
+  test.use(phone);
+
+  test("17: a row in a sheet; the totals from the summary bar", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea } = await ownIdea(page, signIn, account);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}/costs`);
+    const equipment = tableRow(page, "Startup costs", "Equipment");
+    await expect(equipment).toContainText("Tap to fill or mark Unknown");
+    await equipment.click();
+    const sheet = page.getByRole("dialog", { name: "Edit cost row" });
+    await sheet.getByRole("textbox", { name: "Amount" }).fill("20,000");
+    await expect(
+      sheet.getByRole("group", { name: /F\/A\/U of Equipment/ }),
+    ).toBeVisible();
+    await expectNoAxeViolations(page);
+    await sheet.getByRole("button", { name: /Close/ }).click();
+    await expect(sheet).toHaveCount(0);
+    const summary = page.getByRole("button", { name: /Startup ₱20,000\+/ });
+    await expect(summary).toBeVisible();
+    await summary.click();
+    const drawer = page.getByRole("dialog", { name: "Totals" });
+    await expect(drawer.getByRole("group", { name: "Totals" })).toContainText(
+      "₱20,000+",
+    );
+  });
+
+  test("18: the results from the summary bar, the scenarios a row each", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea } = await ownIdea(page, signIn, account);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}/economics`);
+    await page.getByRole("button", { name: /^BE / }).click();
+    const scenarios = page
+      .getByRole("dialog", { name: "Results" })
+      .getByRole("grid", { name: "Scenarios" });
+    await expect(scenarios.getByRole("row")).toHaveCount(5);
+    await expect(
+      scenarios.getByRole("row").filter({ hasText: "Expected" }),
+    ).toContainText("Empty");
+    await expectNoAxeViolations(page);
+  });
+
+  test("19: Record decision and Cancel fixed at the bottom", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea } = await ownIdea(page, signIn, account);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}/decide`);
+    await expect(
+      page.getByRole("region", { name: "What you know so far" }),
+    ).toContainText("6 missing");
+    const record = page.getByRole("button", { name: "Record decision" });
+    const cancel = page.getByRole("button", { name: "Cancel" });
+    await expect(record).toBeInViewport();
+    await expect(cancel).toBeInViewport();
+    await expectNoAxeViolations(page);
+    await cancel.click();
+    await expect(page).toHaveURL(new RegExp(`/ideas/${idea.id}$`));
   });
 });

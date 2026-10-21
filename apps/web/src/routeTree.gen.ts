@@ -23,6 +23,9 @@ import { Route as SignedInWWorkspaceIdIdeasIndexRouteImport } from './routes/_si
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/index'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/competitors'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdCostsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/costs'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdDecideRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/decide'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdEconomicsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/economics'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdResearchRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/research'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/questions.$sectionKey'
 
@@ -101,6 +104,24 @@ const SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute =
     path: '/ideas/$ideaId/competitors',
     getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
   } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdCostsRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdCostsRouteImport.update({
+    id: '/ideas/$ideaId/costs',
+    path: '/ideas/$ideaId/costs',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdDecideRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdDecideRouteImport.update({
+    id: '/ideas/$ideaId/decide',
+    path: '/ideas/$ideaId/decide',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdEconomicsRouteImport.update({
+    id: '/ideas/$ideaId/economics',
+    path: '/ideas/$ideaId/economics',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
 const SignedInWWorkspaceIdIdeasIdeaIdResearchRoute =
   SignedInWWorkspaceIdIdeasIdeaIdResearchRouteImport.update({
     id: '/ideas/$ideaId/research',
@@ -127,6 +148,9 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
   '/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
+  '/w/$workspaceId/ideas/$ideaId/costs': typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
+  '/w/$workspaceId/ideas/$ideaId/decide': typeof SignedInWWorkspaceIdIdeasIdeaIdDecideRoute
+  '/w/$workspaceId/ideas/$ideaId/economics': typeof SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute
   '/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId/': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
@@ -143,6 +167,9 @@ export interface FileRoutesByTo {
   '/w/$workspaceId/ideas': typeof SignedInWWorkspaceIdIdeasIndexRoute
   '/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
+  '/w/$workspaceId/ideas/$ideaId/costs': typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
+  '/w/$workspaceId/ideas/$ideaId/decide': typeof SignedInWWorkspaceIdIdeasIdeaIdDecideRoute
+  '/w/$workspaceId/ideas/$ideaId/economics': typeof SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute
   '/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
@@ -162,6 +189,9 @@ export interface FileRoutesById {
   '/_signedIn/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/costs': typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/decide': typeof SignedInWWorkspaceIdIdeasIdeaIdDecideRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/economics': typeof SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
@@ -181,6 +211,9 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/ideas/'
     | '/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/w/$workspaceId/ideas/$ideaId/competitors'
+    | '/w/$workspaceId/ideas/$ideaId/costs'
+    | '/w/$workspaceId/ideas/$ideaId/decide'
+    | '/w/$workspaceId/ideas/$ideaId/economics'
     | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId/'
     | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
@@ -197,6 +230,9 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/ideas'
     | '/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/w/$workspaceId/ideas/$ideaId/competitors'
+    | '/w/$workspaceId/ideas/$ideaId/costs'
+    | '/w/$workspaceId/ideas/$ideaId/decide'
+    | '/w/$workspaceId/ideas/$ideaId/economics'
     | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId'
     | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
@@ -215,6 +251,9 @@ export interface FileRouteTypes {
     | '/_signedIn/w/$workspaceId/ideas/'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/competitors'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/costs'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/decide'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/economics'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/research'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
@@ -330,6 +369,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRouteImport
       parentRoute: typeof SignedInWWorkspaceIdRouteRoute
     }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/costs': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/costs'
+      path: '/ideas/$ideaId/costs'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/costs'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/decide': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/decide'
+      path: '/ideas/$ideaId/decide'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/decide'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdDecideRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/economics': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/economics'
+      path: '/ideas/$ideaId/economics'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/economics'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdEconomicsRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
     '/_signedIn/w/$workspaceId/ideas/$ideaId/research': {
       id: '/_signedIn/w/$workspaceId/ideas/$ideaId/research'
       path: '/ideas/$ideaId/research'
@@ -352,6 +412,9 @@ interface SignedInWWorkspaceIdRouteRouteChildren {
   SignedInWWorkspaceIdIdeasIndexRoute: typeof SignedInWWorkspaceIdIdeasIndexRoute
   SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
+  SignedInWWorkspaceIdIdeasIdeaIdCostsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
+  SignedInWWorkspaceIdIdeasIdeaIdDecideRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdDecideRoute
+  SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute
   SignedInWWorkspaceIdIdeasIdeaIdResearchRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   SignedInWWorkspaceIdIdeasIdeaIdIndexRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
@@ -365,6 +428,12 @@ const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChil
       SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute,
     SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute:
       SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdCostsRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdCostsRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdDecideRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdDecideRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute,
     SignedInWWorkspaceIdIdeasIdeaIdResearchRoute:
       SignedInWWorkspaceIdIdeasIdeaIdResearchRoute,
     SignedInWWorkspaceIdIdeasIdeaIdIndexRoute:

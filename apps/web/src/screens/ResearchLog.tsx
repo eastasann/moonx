@@ -60,6 +60,7 @@ import {
   wireValue,
 } from "../components/ResearchLogFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
+import { SectionTitle } from "../components/SectionTitle";
 import { SendFailure } from "../components/SendFailure";
 import {
   FailureState,
@@ -1040,10 +1041,15 @@ function ResearchBody({
         header={
           <Stack gap="space-200">
             {idea.archived && <ArchivedIdeaAlert ideaId={idea.id} />}
-            <Heading level={1} variant="heading-1-list">
-              {home.sections.find(({ key }) => key === "03")?.title ??
-                t("validation:research.title")}
-            </Heading>
+            <SectionTitle
+              ideaId={idea.id}
+              sections={home.sections}
+              title={
+                home.sections.find(({ key }) => key === "03")?.title ??
+                t("validation:research.title")
+              }
+              variant="heading-1-list"
+            />
           </Stack>
         }
         newItem={

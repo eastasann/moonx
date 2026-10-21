@@ -3241,15 +3241,19 @@ test.describe("data parts match docs/mockups (Step 22d, design-spec 4.4・4.5)",
           nodes.map((node) => node.getBoundingClientRect().x),
         ),
     ).toEqual(headers);
-    // The digits end where the value ended, the symbol beside them.
+    // The digits end where the value ended, the symbol beside them. The input may be
+    // wider than its digits (a short number keeps target-min), so where they start is
+    // measured from their width.
     const digits = await input.evaluate((node) => {
       const field = node as HTMLInputElement;
       const rect = field.getBoundingClientRect();
       const style = getComputedStyle(field);
-      return {
-        end: rect.right - Number.parseFloat(style.paddingRight),
-        start: rect.left,
-      };
+      const end = rect.right - Number.parseFloat(style.paddingRight);
+      const context = document.createElement("canvas").getContext("2d");
+      if (context === null) throw new Error("No canvas");
+      // The shorthand can read empty for an input; the longhands always hold the face.
+      context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      return { end, start: end - context.measureText(field.value).width };
     });
     expect(Math.abs(digits.end - valueEnd)).toBeLessThanOrEqual(1);
     const symbol = await box(row.getByText("₱", { exact: true }));

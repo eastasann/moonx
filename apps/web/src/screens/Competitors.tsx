@@ -69,6 +69,7 @@ import { ReorderDialog } from "../components/ReorderDialog";
 import { RowEvidence, RowEvidenceSheet } from "../components/RowEvidence";
 import { isRowValid, useRowFields } from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
+import { SectionTitle } from "../components/SectionTitle";
 import {
   FailureState,
   NoAccessState,
@@ -889,7 +890,13 @@ function CompetitorsBody({
         notice={
           idea.archived ? <ArchivedIdeaAlert ideaId={idea.id} /> : undefined
         }
-        header={<Heading level={1}>{title}</Heading>}
+        header={
+          <SectionTitle
+            ideaId={idea.id}
+            sections={home.sections}
+            title={title}
+          />
+        }
         count={
           <>
             <MoonGlyph

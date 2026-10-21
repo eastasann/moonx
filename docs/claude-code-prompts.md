@@ -1775,7 +1775,7 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 28: 17 費用・18 損益とシナリオ・19 判定
 
-Status:
+Status: done 2026-10-22
 
 ```
 コアフローの後半の画面を作ってください（PRD 4章の Must）。

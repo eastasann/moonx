@@ -67,6 +67,33 @@ export function WorksheetPattern({
   // here.
   const summaryButton = useRef<HTMLButtonElement>(null);
   const resultsColumn = useRef<HTMLElement>(null);
+  // A column taller than the window scrolls on its own: the keyboard must reach it to
+  // scroll it (WCAG 2.1.1), as it does any other scrolling region.
+  const [isScrolling, setScrolling] = useState(false);
+  useLayoutEffect(() => {
+    const column = resultsColumn.current;
+    if (
+      !isTwoColumns ||
+      column === null ||
+      typeof ResizeObserver === "undefined"
+    ) {
+      return;
+    }
+    const measure = () =>
+      setScrolling(column.scrollHeight > column.clientHeight);
+    measure();
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    });
+    observer.observe(column);
+    for (const child of column.children) observer.observe(child);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [isTwoColumns]);
   const hasFocus = useRef(false);
   const wasTwoColumns = useRef(isTwoColumns);
   useLayoutEffect(() => {
@@ -104,7 +131,7 @@ export function WorksheetPattern({
           {isTwoColumns && (
             <aside
               ref={resultsColumn}
-              tabIndex={-1}
+              tabIndex={isScrolling ? 0 : -1}
               aria-labelledby={resultsTitleId}
               className={styles.results}
             >

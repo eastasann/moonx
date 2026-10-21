@@ -297,6 +297,42 @@ export const risksQuery = (ideaId: string, validationId: string) =>
       ),
   });
 
+/** V12 GET: 17's cost rows by table, with the results and 18's numbers (SDD 5.7). */
+export const costsQuery = (ideaId: string, validationId: string) =>
+  queryOptions({
+    queryKey: [...ideaKey(ideaId), "costs"],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.validations({ validationId: inPath(validationId) })
+          .costs.get(),
+      ),
+  });
+
+/** V15 GET: 18's seven numbers, V.08.WORTH, the results and the cost rows (SDD 5.7). */
+export const economicsQuery = (ideaId: string, validationId: string) =>
+  queryOptions({
+    queryKey: [...ideaKey(ideaId), "economics"],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.validations({ validationId: inPath(validationId) })
+          .economics.get(),
+      ),
+  });
+
+/** V18: what 19 shows to decide on (SDD 5.7). */
+export const decisionContextQuery = (ideaId: string) =>
+  queryOptions({
+    queryKey: [...ideaKey(ideaId), "decision-context"],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.ideas({ ideaId: inPath(ideaId) })
+          ["decision-context"].get(),
+      ),
+  });
+
 /**
  * Puts what a save answered in a query's data (ADR-011). A read of it already on its way
  * holds an older version and must not land over this one, so it is dropped; a read that

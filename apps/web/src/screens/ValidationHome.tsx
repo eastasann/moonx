@@ -31,6 +31,7 @@ import {
   Text,
 } from "@moonx/ui-web";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
@@ -54,6 +55,7 @@ import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
 import {
+  decideHref,
   hrefOf,
   ideaHref,
   ideasHref,
@@ -346,7 +348,7 @@ function sectionEnd(section: Section, checks: readonly CheckResult[]): string {
 
 /**
  * The ten sections with how far each is (design-spec 6.1): a moon filled as far for the
- * ones with a whole. A row opens its screen once that is built.
+ * ones with a whole. A row opens its screen.
  */
 function SectionsBlock({ home }: { home: ValidationHome }) {
   const { t } = useTranslation(["validation"]);
@@ -566,7 +568,7 @@ function Header({ home }: { home: ValidationHome }) {
 /**
  * The tools beside the title for the Owners and Members (design-spec 6.1「操作」): Edit
  * summary while the idea is not archived, and ⋯ with Duplicate, and Archive while it is
- * not. AI ▼, Record decision, Add plan and Update template join with their screens.
+ * not. AI ▼, Add plan and Update template join with their screens.
  */
 function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {
   const { t } = useTranslation(["validation", "ideas"]);
@@ -598,6 +600,7 @@ function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {
 function ValidationHub({ home }: { home: ValidationHome }) {
   const { t } = useTranslation(["validation"]);
   const { workspace, role } = useWorkspace();
+  const navigate = useNavigate();
   const [isEditing, setEditing] = useState(false);
   const canWrite = role !== "viewer";
   const canEdit = canWrite && !home.idea.archived;
@@ -645,6 +648,18 @@ function ValidationHub({ home }: { home: ValidationHome }) {
         actions={
           canWrite ? (
             <Tools home={home} onEdit={() => setEditing(true)} />
+          ) : undefined
+        }
+        primaryAction={
+          canEdit ? (
+            <Button
+              variant="primary"
+              onPress={() =>
+                void navigate({ href: decideHref(workspace.id, home.idea.id) })
+              }
+            >
+              {t("validation:home.recordDecision")}
+            </Button>
           ) : undefined
         }
         metrics={

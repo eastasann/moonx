@@ -22,7 +22,7 @@ const empty = {
   reason: "empty" as const,
 };
 
-const checks: CheckResult[] = [
+export const checks: CheckResult[] = [
   {
     key: "competitors",
     state: "done",
@@ -201,6 +201,22 @@ export function validationHome(
         answered: null,
         total: null,
         count: 4,
+        fau: null,
+      },
+      {
+        key: "05",
+        title: "05 Costs",
+        answered: 20,
+        total: 24,
+        count: null,
+        fau: null,
+      },
+      {
+        key: "06-08",
+        title: "06–08 Unit Economics",
+        answered: 5,
+        total: 7,
+        count: null,
         fau: null,
       },
       {

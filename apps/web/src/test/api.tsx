@@ -41,10 +41,13 @@ export interface Call {
 }
 
 /**
- * Stands in for the API: `answer` gets each call and returns the Response, or undefined
- * for a 404. Returns the calls made, in order.
+ * Stands in for the API: `answer` gets each call and returns the Response (a promise of
+ * it holds the answer back while the test acts), or undefined for a 404. Returns the
+ * calls made, in order.
  */
-export function stubApi(answer: (call: Call) => Response | undefined) {
+export function stubApi(
+  answer: (call: Call) => Response | Promise<Response> | undefined,
+) {
   const calls: Call[] = [];
   vi.stubGlobal(
     "fetch",
@@ -63,7 +66,7 @@ export function stubApi(answer: (call: Call) => Response | undefined) {
         body: text === "" ? null : jsonOr(text),
       };
       calls.push(call);
-      return answer(call) ?? new Response(null, { status: 404 });
+      return (await answer(call)) ?? new Response(null, { status: 404 });
     }),
   );
   return calls;

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../lib/api";
 import { AuthError } from "../lib/auth";
+import { rejectionReason } from "../lib/autosave";
 import { reportOnce } from "./states";
 
 /** The code of a failed call to the API or to Better Auth, or null. */
@@ -51,6 +52,11 @@ export interface SendFailureProps {
    * @default "unexpected"
    */
   transient?: "couldNotSave" | "unexpected";
+  /**
+   * A refusal for good that 6.0.2 names (archived, no access, gone, the format) reads as
+   * "Couldn't save" with that reason, as a save's does, instead of as unexpected.
+   */
+  withSaveReasons?: boolean;
   /** Sends again with what is typed, which the failure leaves in place. */
   onRetry: () => void;
   isRetryDisabled?: boolean;
@@ -65,6 +71,7 @@ export function SendFailure({
   error,
   messages = {},
   transient = "unexpected",
+  withSaveReasons = false,
   onRetry,
   isRetryDisabled = false,
 }: SendFailureProps) {
@@ -73,9 +80,14 @@ export function SendFailure({
   const expected = code === null ? undefined : messages[code];
   const rateLimited = rateLimitWords(error);
   const isRateLimited = rateLimited !== null;
+  const reason =
+    withSaveReasons && error instanceof ApiError
+      ? rejectionReason(error)
+      : null;
   const isUnexpected =
     expected === undefined &&
     !isRateLimited &&
+    reason === null &&
     !(transient === "couldNotSave" && isTransient(error));
   // The API's request id, or the Sentry event of the Web's own failure (SDD 8.2).
   const reference = useMemo(
@@ -101,6 +113,9 @@ export function SendFailure({
             ? t("app:state.unexpected")
             : t("app:state.couldNotSave")}
         </Text>
+        {reason !== null && (
+          <Text tone="secondary">{t(`app:save.reason.${reason}`)}</Text>
+        )}
         {reference !== null && (
           <Text variant="caption" tone="secondary">
             {t("app:state.ref", { ref: reference.slice(0, 8) })}

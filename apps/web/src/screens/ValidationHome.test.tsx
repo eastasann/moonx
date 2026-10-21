@@ -152,7 +152,42 @@ describe("13 Validation home (design-spec 6.1)", () => {
     ).toBeTruthy();
   });
 
-  test("a Viewer: no Edit summary, no ⋯", async () => {
+  test("sections open 11 and 14; an empty summary answer opens its question", async () => {
+    homeApi();
+    renderApp(path);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Bacolod Health Bowl",
+    });
+    const sections = screen.getByRole("list", { name: "Sections" });
+    expect(
+      within(sections)
+        .getByRole("link", { name: /01 Customer & Problem/ })
+        .getAttribute("href"),
+    ).toBe(`/w/${workspaceId}/ideas/${home.idea.id}/questions/01`);
+    expect(
+      within(sections)
+        .getByRole("link", { name: /03 Research Log/ })
+        .getAttribute("href"),
+    ).toBe(`/w/${workspaceId}/ideas/${home.idea.id}/research`);
+    // 04 and 09 open screens not built yet.
+    expect(
+      within(sections).queryByRole("link", { name: /04 Competitors/ }),
+    ).toBeNull();
+    expect(
+      within(sections).queryByRole("link", { name: /09 Assumptions & Risks/ }),
+    ).toBeNull();
+    const summary = screen.getByRole("region", { name: "Summary" });
+    expect(
+      within(summary)
+        .getByRole("link", { name: "Answer in 01 Customer & Problem" })
+        .getAttribute("href"),
+    ).toBe(
+      `/w/${workspaceId}/ideas/${home.idea.id}/questions/01?q=V.01.PROBLEM`,
+    );
+  });
+
+  test("a Viewer: no Edit summary, no ⋯; an empty summary answer opens its question to read", async () => {
     homeApi({ me: as("viewer") });
     renderApp(path);
     await screen.findByRole("heading", {
@@ -163,6 +198,16 @@ describe("13 Validation home (design-spec 6.1)", () => {
     expect(
       screen.queryByRole("button", { name: "More for Bacolod Health Bowl" }),
     ).toBeNull();
+    // 11 opens read only: the way stays, worded for one who cannot answer.
+    expect(screen.queryByRole("link", { name: /Answer in/ })).toBeNull();
+    const summary = screen.getByRole("region", { name: "Summary" });
+    expect(
+      within(summary)
+        .getByRole("link", { name: "Open 01 Customer & Problem" })
+        .getAttribute("href"),
+    ).toBe(
+      `/w/${workspaceId}/ideas/${home.idea.id}/questions/01?q=V.01.PROBLEM`,
+    );
   });
 
   test("archived: the notice and Restore for an Owner, and no Edit summary", async () => {

@@ -38,7 +38,7 @@ const UNDO_REFUSALS = new Set(["UNDO_BLOCKED", "ALREADY_REVERTED", "BUSY"]);
  * words, or "Something went wrong" with the Ref someone asking for help quotes. A lost
  * session has its own way (M9 or the sign-in screen) and says nothing here.
  */
-function toastFailure(error: unknown, retry: () => void) {
+export function toastFailure(error: unknown, retry: () => void) {
   if (error instanceof ApiError && error.status === 401) return;
   const reference =
     error instanceof ApiError ? error.requestId : reportOnce(error);

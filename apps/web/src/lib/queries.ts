@@ -1,4 +1,10 @@
-import type { IdeaDecisionFilter, IdeaSort, Stage } from "@moonx/schemas";
+import type {
+  IdeaDecisionFilter,
+  IdeaSort,
+  SourceType,
+  Stage,
+  SupportsCheck,
+} from "@moonx/schemas";
 import { queryOptions } from "@tanstack/react-query";
 import { ApiError, api, inPath, unwrap } from "./api";
 
@@ -166,5 +172,87 @@ export const archivedPlansQuery = (ideaId: string) =>
         api()
           .api.v1.ideas({ ideaId: inPath(ideaId) })
           .plans.get({ query: { includeArchived: true } }),
+      ),
+  });
+
+/** V2: a validation section's questions, one answer per question (SDD 5.7). */
+export const validationQuestionsQuery = (
+  ideaId: string,
+  validationId: string,
+  sectionKey: string,
+) =>
+  queryOptions({
+    queryKey: [...ideaKey(ideaId), "questions", sectionKey],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.validations({ validationId: inPath(validationId) })
+          .questions({ sectionKey: inPath(sectionKey) })
+          .get(),
+      ),
+  });
+
+/** V6 GET's filters, as 14's URL holds them (SDD 4章・5.7). */
+export interface ResearchFilters {
+  supports?: SupportsCheck;
+  sourceType?: SourceType;
+}
+
+/** The most V6 gives at once (SDD 5.1「一覧」). */
+const RESEARCH_PAGE = 200;
+
+/** What is cached of an idea's research log: its lists and its entries. */
+export const researchLogKey = (ideaId: string) => [
+  ...ideaKey(ideaId),
+  "research-log",
+];
+
+/**
+ * V6 GET: the research log under `filters`, every page of it (an idea holds tens of
+ * entries; 14 and M2 list them in one list), newest observation first.
+ */
+export const researchLogQuery = (
+  ideaId: string,
+  validationId: string,
+  filters: ResearchFilters,
+) =>
+  queryOptions({
+    queryKey: [...researchLogKey(ideaId), "list", filters],
+    queryFn: async () => {
+      const query = {
+        ...(filters.supports === undefined
+          ? {}
+          : { supports: filters.supports }),
+        ...(filters.sourceType === undefined
+          ? {}
+          : { sourceType: filters.sourceType }),
+        limit: RESEARCH_PAGE,
+      };
+      const log = api().api.v1.validations({
+        validationId: inPath(validationId),
+      })["research-log"];
+      const first = await unwrap(log.get({ query }));
+      const items = [...first.items];
+      let cursor = first.nextCursor;
+      while (cursor !== null) {
+        const page = await unwrap(
+          log.get({ query: { ...query, cursor: Number(cursor) } }),
+        );
+        items.push(...page.items);
+        cursor = page.nextCursor;
+      }
+      return items;
+    },
+  });
+
+/** V7 GET: one research log entry and the items that cite it (SDD 5.7). */
+export const researchLogEntryQuery = (ideaId: string, entryId: string) =>
+  queryOptions({
+    queryKey: [...researchLogKey(ideaId), "entry", entryId],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1["research-log"]({ entryId: inPath(entryId) })
+          .get(),
       ),
   });

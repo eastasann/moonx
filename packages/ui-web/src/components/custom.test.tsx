@@ -15,6 +15,7 @@ import { setPhoneWidth, settle } from "../test/helpers";
 import { DescriptionList, DescriptionListItem } from "./DescriptionList";
 import { Dialog } from "./Dialog";
 import { DiffText } from "./DiffText";
+import { FauButtons } from "./FauButtons";
 import { type FauChange, FauPicker, useFauLabel } from "./FauPicker";
 import { type MentionCandidate, MentionTextArea } from "./MentionTextArea";
 import { MetricGroup, MetricTile } from "./MetricTile";
@@ -29,8 +30,9 @@ import { TableView } from "./TableView";
 import { TextArea } from "./TextField";
 import { ToggleButton, ToggleButtonGroup } from "./ToggleButtonGroup";
 
-// moonx's own components (design-spec 4.5): FauPicker, MetricTile, RowList, QuestionCard,
-// DiffText, MentionTextArea, Panel, Slide and Steps. Sizes are in variants.test.tsx.
+// moonx's own components (design-spec 4.5): FauPicker, FauButtons, MetricTile, RowList,
+// QuestionCard, DiffText, MentionTextArea, Panel, Slide and Steps. Sizes are in
+// variants.test.tsx.
 
 describe("useFauLabel", () => {
   test("the labels of 6.0.3", () => {
@@ -408,6 +410,103 @@ describe("FauPicker", () => {
   });
 });
 
+describe("FauButtons", () => {
+  function Answer({
+    initial,
+    hasValue = true,
+    onChange = () => {},
+    onFactPress = () => {},
+  }: {
+    initial: FauState;
+    hasValue?: boolean;
+    onChange?: (change: FauChange) => void;
+    onFactPress?: () => void;
+  }) {
+    const [state, setState] = useState<FauState>(initial);
+    const [confidence, setConfidence] = useState<FauChange["confidence"]>(
+      initial === "assumption" ? "medium" : null,
+    );
+    return (
+      <FauButtons
+        aria-label="Fact, Assumption or Unknown for WHO"
+        state={state}
+        confidence={confidence}
+        hasValue={hasValue}
+        onFactPress={onFactPress}
+        onChange={(change) => {
+          onChange(change);
+          setConfidence(change.confidence);
+          setState(
+            change.fau === null
+              ? hasValue
+                ? "unclassified"
+                : "empty"
+              : change.fau,
+          );
+        }}
+      />
+    );
+  }
+
+  test("an answer with content and no F/A/U says so; without content only Unknown can be chosen", () => {
+    const { unmount } = render(<Answer initial="unclassified" />);
+    expect(screen.getByText("Not classified yet")).toBeTruthy();
+    unmount();
+    render(<Answer initial="empty" hasValue={false} />);
+    expect(screen.queryByText("Not classified yet")).toBeNull();
+    expect(
+      screen.getByRole("radio", { name: /Fact/ }).hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole("radio", { name: /Assumption/ })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen.getByRole("radio", { name: /Unknown/ }).hasAttribute("disabled"),
+    ).toBe(false);
+  });
+
+  test("Assumption waits for a confidence; pressing the chosen button again clears it", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Answer initial="unclassified" onChange={onChange} />);
+    await user.click(screen.getByRole("radio", { name: /Assumption/ }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByText("Not classified yet")).toBeNull();
+    await user.click(screen.getByRole("radio", { name: "Low" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      fau: "assumption",
+      confidence: "low",
+    });
+    await user.click(screen.getByRole("radio", { name: /Assumption/ }));
+    expect(onChange).toHaveBeenLastCalledWith({ fau: null, confidence: null });
+    expect(screen.getByText("Not classified yet")).toBeTruthy();
+  });
+
+  test("Fact only asks for evidence; Unknown keeps a text answer and asks nothing", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onFactPress = vi.fn();
+    render(
+      <Answer
+        initial="unclassified"
+        onChange={onChange}
+        onFactPress={onFactPress}
+      />,
+    );
+    await user.click(screen.getByRole("radio", { name: /Fact/ }));
+    expect(onFactPress).toHaveBeenCalledOnce();
+    expect(onChange).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("radio", { name: /Unknown/ }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(onChange).toHaveBeenLastCalledWith({
+      fau: "unknown",
+      confidence: null,
+    });
+  });
+});
+
 describe("MetricTile", () => {
   test("its name and value as a term and its detail; a notice supplement has a sign", () => {
     render(
@@ -634,6 +733,35 @@ describe("QuestionCard", () => {
     expect(described).toContain("Assumption · Medium");
     expect(described).toContain("2 comments");
     expect(described).toContain("Empty");
+  });
+
+  test("a Fact without evidence carries its warning, quiet and focused alike", () => {
+    const status = {
+      state: "fact" as const,
+      label: "Fact · No evidence",
+      isWarning: true,
+    };
+    render(
+      <>
+        <QuestionCard
+          title="WHO"
+          question="Who?"
+          mode="quiet"
+          status={status}
+        />
+        <QuestionCard
+          title="WHY"
+          question="Why?"
+          mode="focused"
+          status={status}
+        />
+      </>,
+    );
+    for (const name of ["WHO", "WHY"]) {
+      const card = screen.getByRole("region", { name });
+      expect(card.textContent).toContain("Fact · No evidence");
+      expect(card.querySelector(".lucide-triangle-alert")).not.toBeNull();
+    }
   });
 
   test("pressing a quiet card focuses it: its answer takes the focus and it scrolls to the middle", async () => {

@@ -613,6 +613,45 @@ describe("QuestionFormPattern (C)", () => {
     expect(screen.getByRole("textbox", { name: "Answer WHY" })).toBeTruthy();
   });
 
+  test("phone: the completion card takes the last question's place and focus", async () => {
+    const user = userEvent.setup();
+    setPhoneWidth();
+    function Ending() {
+      const [current, setCurrent] = useState<string | null>("WHY");
+      const [isAtEnd, setAtEnd] = useState(false);
+      return (
+        <QuestionFormPattern
+          header={<h1>Section</h1>}
+          questionIds={["WHO", "WHY"]}
+          currentId={current}
+          onCurrentChange={(id) => {
+            setAtEnd(false);
+            setCurrent(id);
+          }}
+          onEnd={() => setAtEnd(true)}
+          end={isAtEnd ? <p>01: 1/2 answered</p> : null}
+          isAnswered={(id) => id === "WHO"}
+          renderQuestion={(id) => <TextArea aria-label={`Answer ${id}`} />}
+        />
+      );
+    }
+    render(<Ending />);
+    await user.click(screen.getByRole("button", { name: "Next question" }));
+    const card = screen.getByText("01: 1/2 answered").closest("li");
+    expect(document.activeElement).toBe(card);
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Next question" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    // No dot is the current one while the card shows.
+    expect(document.querySelector("[aria-current]")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Previous question" }));
+    expect(screen.getByRole("textbox", { name: "Answer WHY" })).toBeTruthy();
+    expect(screen.queryByText("01: 1/2 answered")).toBeNull();
+  });
+
   test("phone: the footer stays under the one question", () => {
     setPhoneWidth();
     render(

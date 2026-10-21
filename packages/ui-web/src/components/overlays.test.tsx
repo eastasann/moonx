@@ -486,6 +486,61 @@ describe("Popover and Tray", () => {
     );
   });
 
+  test("on a phone a Picker in an open Dialog keeps its tray closed until pressed", async () => {
+    setPhoneWidth();
+    const user = userEvent.setup();
+    render(
+      <Dialog isOpen title="New entry">
+        <Picker
+          label="Source Type"
+          items={[
+            { id: "web", label: "Website" },
+            { id: "news", label: "News / Report" },
+          ]}
+        />
+      </Dialog>,
+    );
+    await settle();
+    // The items' hidden render, which React Aria makes outside the Picker's own state,
+    // opens no tray of the Dialog's.
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Source Type/ }));
+    const list = await screen.findByRole("listbox");
+    expect(frameOf(list)).toBe("tray");
+    await user.click(within(list).getByRole("option", { name: "Website" }));
+    await settle();
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /Source Type/ }).textContent,
+    ).toContain("Website");
+  });
+
+  test("on a phone a Picker in a Dialog its trigger opened keeps its tray closed until pressed", async () => {
+    setPhoneWidth();
+    const user = userEvent.setup();
+    render(
+      <DialogTrigger>
+        <Button>Edit</Button>
+        <Dialog title="Edit entry">
+          <Picker
+            label="Source Type"
+            items={[
+              { id: "web", label: "Website" },
+              { id: "news", label: "News / Report" },
+            ]}
+          />
+        </Dialog>
+      </DialogTrigger>,
+    );
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await settle();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Source Type/ }));
+    expect(frameOf(await screen.findByRole("listbox"))).toBe("tray");
+  });
+
   test("on a phone the tray also returns focus to its button", async () => {
     setPhoneWidth();
     const user = userEvent.setup();

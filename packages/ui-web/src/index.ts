@@ -80,6 +80,7 @@ export {
   type DisclosureProps,
 } from "./components/Disclosure";
 export { Divider, type DividerProps } from "./components/Divider";
+export { FauButtons, type FauButtonsProps } from "./components/FauButtons";
 export {
   type FauChange,
   type FauLabelOptions,
@@ -249,6 +250,11 @@ export type { ChoiceItem } from "./internal/ChoiceListBox";
  * beside it).
  */
 export { useTwoColumns } from "./internal/frame";
+/**
+ * Whether the window is narrower than a tablet: a phone, where pattern D edits a row in a
+ * sheet instead of the detail (4.1 D「編集はボトムシート」).
+ */
+export { useIsNarrow } from "./internal/useIsNarrow";
 export { Container, type ContainerProps } from "./layout/Container";
 export { Flex, type FlexProps, Stack, type StackProps } from "./layout/Flex";
 export { Grid, type GridColumns, type GridProps } from "./layout/Grid";

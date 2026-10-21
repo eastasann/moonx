@@ -37,13 +37,25 @@ export function dashboardHref(me: Me): string | undefined {
 }
 
 /** The modals opened by the search parameter `modal` (SDD 4章) this app has so far. */
-export type ModalName = "switch-workspace" | "new-idea";
+export type ModalName = "switch-workspace" | "new-idea" | "evidence";
 
 declare module "@tanstack/react-router" {
   interface HistoryState {
     /** The entry was added by opening its modal from the screen under it. */
     openedModal?: boolean;
+    /**
+     * M2 was opened by the Fact button (design-spec 6.0.3): the evidence it attaches
+     * makes the item a Fact. Kept with the entry, so Back and a reload keep it too.
+     */
+    evidenceForFact?: boolean;
   }
+}
+
+/** What a modal opens about (SDD 4章): M2's item, and whether Fact opened it. */
+interface ModalOptions {
+  /** `?about=<targetType>:<targetId>[:<targetKey>]`. */
+  about?: string;
+  forFact?: boolean;
 }
 
 /**
@@ -53,7 +65,7 @@ declare module "@tanstack/react-router" {
  * over, and leaves the parameter in place of the entry instead.
  */
 export function useModal(): {
-  open: (name: ModalName) => void;
+  open: (name: ModalName, options?: ModalOptions) => void;
   close: () => void;
 } {
   const navigate = useNavigate();
@@ -62,11 +74,19 @@ export function useModal(): {
     select: (state) => state.location.state.openedModal === true,
   });
   return {
-    open: (name) =>
+    open: (name, { about, forFact = false } = {}) =>
       void navigate({
         to: ".",
-        search: (previous) => ({ ...previous, modal: name }),
-        state: (previous) => ({ ...previous, openedModal: true }),
+        search: (previous) => ({
+          ...previous,
+          modal: name,
+          ...(about === undefined ? {} : { about }),
+        }),
+        state: (previous) => ({
+          ...previous,
+          openedModal: true,
+          evidenceForFact: forFact,
+        }),
       }),
     close: () => {
       if (openedHere) {
@@ -75,7 +95,7 @@ export function useModal(): {
       }
       void navigate({
         to: ".",
-        search: ({ modal: _, ...rest }) => rest,
+        search: ({ modal: _, about: __, ...rest }) => rest,
         replace: true,
       });
     },

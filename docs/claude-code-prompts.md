@@ -1702,7 +1702,7 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 26: 11 設問フォーム（検証）・M2 根拠シート・14 調査ログ
 
-Status:
+Status: done 2026-10-21
 
 ```
 検証の設問に答えて根拠を残す画面を作ってください（PRD 4章の Must）。

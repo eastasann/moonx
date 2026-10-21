@@ -20,6 +20,11 @@ import * as styles from "./TagGroup.css";
 export interface TagItem {
   id: string;
   label: string;
+  /**
+   * Words after the label that a narrow tag never cuts off, as the label is: "(deleted)"
+   * on a research log's chip (design-spec 6.0.3).
+   */
+  suffix?: string;
 }
 
 export interface TagGroupProps {
@@ -69,12 +74,19 @@ export function TagGroup({
           {(item) => (
             <Tag
               id={item.id}
-              textValue={item.label}
+              textValue={
+                item.suffix === undefined
+                  ? item.label
+                  : `${item.label} ${item.suffix}`
+              }
               className={styles.tag({ size })}
             >
               {({ allowsRemoving }) => (
                 <>
                   <span className={styles.tagLabel}>{item.label}</span>
+                  {item.suffix !== undefined && (
+                    <span className={styles.tagSuffix}>{item.suffix}</span>
+                  )}
                   {allowsRemoving && (
                     <Button
                       slot="remove"

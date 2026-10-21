@@ -15,7 +15,9 @@ const sized = Object.fromEntries(sizes.map((size) => [size, size])) as Record<
 
 /**
  * Regular disclosures are rows between hairlines, as an Accordion's are (4.4: dividers,
- * not boxes). Quiet ones sit inline with no line ("▸ EXAMPLE  ▸ Hint", design-spec 6.2).
+ * not boxes). Quiet ones sit inline with no line ("▸ EXAMPLE  ▸ Hint", design-spec 6.2)
+ * in a wrapping row; one that is open takes the row's width, so its content reads below
+ * its title at the full measure.
  */
 export const disclosure = recipe({
   base: { minWidth: 0 },
@@ -25,7 +27,9 @@ export const disclosure = recipe({
         borderBlock: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
         selectors: { "& + &": { borderBlockStart: "none" } },
       },
-      true: {},
+      true: {
+        selectors: { "&[data-expanded]": { flexBasis: "100%" } },
+      },
     },
   },
   defaultVariants: { isQuiet: false },

@@ -1,5 +1,5 @@
 import { vars } from "@moonx/ui-tokens";
-import { style, styleVariants } from "@vanilla-extract/css";
+import { globalStyle, style, styleVariants } from "@vanilla-extract/css";
 import { typography } from "../styles/helpers";
 
 // Modals are writing screens: spacious padding (design-spec 4.4「密度とスケールの対応」, M1〜M9).
@@ -25,6 +25,15 @@ export const header = style({
   paddingBlockStart: padding,
   paddingInline: padding,
   paddingBlockEnd: vars.density.spacious.gap,
+});
+
+/**
+ * The heading takes the line beside the close button, so the button sits at the end of
+ * the header, not after the title's words.
+ */
+globalStyle(`${header} > h2`, {
+  flex: "1 1 auto",
+  minWidth: 0,
 });
 
 export const title = style({

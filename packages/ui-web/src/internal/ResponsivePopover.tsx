@@ -46,10 +46,21 @@ export function ResponsivePopover({
       </Popover>
     );
   }
+  // React Aria builds a Picker's items in a hidden render of its children, outside the
+  // trigger's providers. A tray there would take the open state of whatever surrounds
+  // the Picker (a Dialog) and open inside the hidden tree, rendering in a loop. With no
+  // trigger's context, this is that render: only the items' Popover belongs in it.
+  if (context == null) {
+    return (
+      <Popover key="collection" isOpen={false}>
+        {children}
+      </Popover>
+    );
+  }
   // The tray is not a Popover, so it clears the parent's contexts the way Popover does:
   // otherwise a Button inside would take the trigger's props.
   let content = <OverlayContexts>{children}</OverlayContexts>;
-  for (const Context of context?.clearContexts ?? []) {
+  for (const Context of context.clearContexts ?? []) {
     content = <Context.Provider value={null}>{content}</Context.Provider>;
   }
   return (

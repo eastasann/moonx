@@ -41,6 +41,8 @@ import { researchLogInputSchema, validationAnswerSchema } from "./validation";
 
 export const researchLogEntrySchema = versionedSchema.extend({
   id: uuidSchema,
+  /** The validation it was recorded in: V7 finds an entry by its id alone. */
+  validationId: uuidSchema,
   observedOn: dateOnlySchema.nullable(),
   topic: z.string(),
   observation: z.string().nullable(),

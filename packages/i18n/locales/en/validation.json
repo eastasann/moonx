@@ -104,7 +104,9 @@
       "problem": "Problem",
       "solution": "Solution",
       "marketType": "Market type",
-      "empty": "Empty"
+      "empty": "Empty",
+      "answerIn": "Answer in {{section}}",
+      "openIn": "Open {{section}}"
     },
     "sections": {
       "title": "Sections",
@@ -131,6 +133,97 @@
       "archived_other": "{{count}} archived plans",
       "show": "Show",
       "archivedBadge": "Archived"
+    }
+  },
+  "questions": {
+    "back": "Validation",
+    "noun": "answer",
+    "switchSection": "Switch section",
+    "progress": "{{answered}}/{{total}}",
+    "progressSuffix": " answered",
+    "answerLabel": "Answer to {{title}}",
+    "placeholder": "Write your answer…",
+    "empty": "Empty",
+    "fau": "Fact, Assumption or Unknown for {{title}}",
+    "revealHint": "Answer {{title}} to see the next questions",
+    "example": "EXAMPLE",
+    "hint": "Hint",
+    "hintFor": "Hint for {{title}}",
+    "related": "Related research",
+    "relatedCount": "Related research ({{count}})",
+    "noResearch": "No research linked to this answer. Mark it Fact to attach a source.",
+    "noResearchReadOnly": "No research linked to this answer.",
+    "logResearch": "Log research",
+    "addEvidence": "Add evidence",
+    "previousSection": "Previous section",
+    "next": "Next: {{section}}",
+    "complete": "{{section}}: {{answered}}/{{total}} answered",
+    "toHome": "Back to Validation"
+  },
+  "evidence": {
+    "title": "Evidence",
+    "done": "Done",
+    "attached": "Attached",
+    "none": "No evidence yet",
+    "deleted": "(deleted)",
+    "sourceLabel": "Add evidence from",
+    "source": {
+      "log": "Research log",
+      "new": "New entry",
+      "url": "URL"
+    },
+    "search": "Search research",
+    "logList": "Research log entries",
+    "noLog": "No research logged yet. Add a new entry to attach it.",
+    "noMatch": "No entries match your search",
+    "addNew": "Add and attach",
+    "url": "URL",
+    "note": "Note",
+    "addUrl": "Attach URL",
+    "lastTitle": "Remove the last evidence?",
+    "lastBody": "This {{noun}} will become Unclassified.",
+    "remove": "Remove",
+    "cancel": "Cancel"
+  },
+  "research": {
+    "field": {
+      "date": "Date",
+      "topic": "Topic",
+      "observation": "Observation",
+      "sourceType": "Source Type",
+      "noSource": "None",
+      "sourceUrl": "Source URL",
+      "supports": "Supports check",
+      "supportsNote": "What It Supports"
+    },
+    "title": "Research Log",
+    "noun": "entry",
+    "add": "Add entry",
+    "newTitle": "New entry",
+    "editTitle": "Edit entry",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "empty": "Record what you observe, with sources. Others can check it later.",
+    "emptyFiltered": "Nothing matches these filters",
+    "noDate": "No date",
+    "usedCount_one": "Evidence for {{count}} item",
+    "usedCount_other": "Evidence for {{count}} items",
+    "recordedBy": "Recorded by ",
+    "more": "More for {{topic}}",
+    "used": "Used as evidence",
+    "notUsed": "Not used as evidence yet",
+    "delete": "Delete",
+    "deleteTitle": "Delete this entry?",
+    "deleteUsages": "It is evidence for:",
+    "onlyEvidence": "{{label}} (its only evidence)",
+    "hiddenUsages_one": "Also evidence for {{count}} answer hidden by a template update.",
+    "hiddenUsages_other": "Also evidence for {{count}} answers hidden by a template update.",
+    "deleteBody": "You can restore it from the history.",
+    "filter": {
+      "all": "All",
+      "supports": "Supports",
+      "source": "Source",
+      "clear": "Clear filters"
     }
   }
 }

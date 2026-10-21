@@ -73,6 +73,11 @@ export const tagLabel = style({
   whiteSpace: "nowrap",
 });
 
+export const tagSuffix = style({
+  flexShrink: 0,
+  whiteSpace: "nowrap",
+});
+
 export const remove = style({
   display: "inline-flex",
   alignItems: "center",

@@ -65,8 +65,14 @@ export function createAppRouter({ history }: { history?: RouterHistory } = {}) {
     autosave.discardAll();
     queryClient.clear();
     const next = new URLSearchParams({ next: `${pathname}${searchStr}` });
-    // In place of the screen: Back must not lead into it again, only to leave again.
-    void router.navigate({ href: `${LOGIN_PATH}?${next}`, replace: true });
+    // In place of the screen: Back must not lead into it again, only to leave again. A
+    // screen that holds the user meanwhile (M2 while it sends) does not hold an ended
+    // session.
+    void router.navigate({
+      href: `${LOGIN_PATH}?${next}`,
+      replace: true,
+      ignoreBlocker: true,
+    });
   });
   const router = createRouter({
     routeTree,

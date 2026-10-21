@@ -20,7 +20,6 @@ import {
   Heading,
   type HubBlock as HubBlockSpec,
   HubPattern,
-  InlineAlert,
   Link,
   MenuItem,
   Meter,
@@ -32,8 +31,9 @@ import {
   Text,
 } from "@moonx/ui-web";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
 import { EditSummaryDialog } from "../components/IdeaDialogs";
@@ -53,7 +53,13 @@ import {
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
-import { hrefOf, ideaHref, ideasHref } from "../lib/links";
+import {
+  hrefOf,
+  ideaHref,
+  ideasHref,
+  questionsHref,
+  sectionHref,
+} from "../lib/links";
 import { archivedPlansQuery, validationHomeQuery } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
 
@@ -222,49 +228,79 @@ function FauBlock({ fau }: { fau: FauBreakdown }) {
   );
 }
 
+/** The answers 13's Summary shows (SDD 5.7 V1 `summary`): the question each comes from. */
+const SUMMARY_QUESTIONS = {
+  customer: { section: "01", key: "V.01.WHO" },
+  problem: { section: "01", key: "V.01.PROBLEM" },
+  marketType: { section: "02", key: "V.02.OCEAN" },
+} as const;
+
 /**
  * Customer, Problem, Solution and Market type (design-spec 6.1): "Empty" where nothing is
- * written. Solution is the idea's own, written in Edit summary; the others open 11 once
- * it is built.
+ * written, and the way to its screen: the question on 11 for everyone (read only for a
+ * Viewer and on an archived idea), Edit summary for the idea's own Solution for the
+ * Owners and Members.
  */
 function SummaryBlock({
   home,
+  canEdit,
   onEdit,
 }: {
   home: ValidationHome;
-  onEdit: (() => void) | undefined;
+  canEdit: boolean;
+  onEdit: () => void;
 }) {
   const { t } = useTranslation(["validation"]);
+  const { workspace } = useWorkspace();
   const empty = (
     <Text tone="secondary">{t("validation:home.summary.empty")}</Text>
   );
-  const value = (text: string | null) => text ?? empty;
+  const emptyWith = (way: ReactNode) =>
+    canEdit ? (
+      <Stack gap="space-50">
+        {empty}
+        <Flex>{way}</Flex>
+      </Stack>
+    ) : (
+      empty
+    );
+  const answer = (field: keyof typeof SUMMARY_QUESTIONS) => {
+    const text = home.summary[field];
+    if (text !== null) return text;
+    const { section, key } = SUMMARY_QUESTIONS[field];
+    const title =
+      home.sections.find((candidate) => candidate.key === section)?.title ??
+      section;
+    return (
+      <Stack gap="space-50">
+        {empty}
+        <Flex>
+          <Link href={questionsHref(workspace.id, home.idea.id, section, key)}>
+            {canEdit
+              ? t("validation:home.summary.answerIn", { section: title })
+              : t("validation:home.summary.openIn", { section: title })}
+          </Link>
+        </Flex>
+      </Stack>
+    );
+  };
   return (
     <HubBlock title={t("validation:home.summary.title")}>
       <DescriptionList>
         <DescriptionListItem label={t("validation:home.summary.customer")}>
-          {value(home.summary.customer)}
+          {answer("customer")}
         </DescriptionListItem>
         <DescriptionListItem label={t("validation:home.summary.problem")}>
-          {value(home.summary.problem)}
+          {answer("problem")}
         </DescriptionListItem>
         <DescriptionListItem label={t("validation:home.summary.solution")}>
           {home.summary.solution ??
-            (onEdit === undefined ? (
-              empty
-            ) : (
-              <Stack gap="space-50">
-                {empty}
-                <Flex>
-                  <Link onPress={onEdit}>
-                    {t("validation:home.editSummary")}
-                  </Link>
-                </Flex>
-              </Stack>
-            ))}
+            emptyWith(
+              <Link onPress={onEdit}>{t("validation:home.editSummary")}</Link>,
+            )}
         </DescriptionListItem>
         <DescriptionListItem label={t("validation:home.summary.marketType")}>
-          {value(home.summary.marketType)}
+          {answer("marketType")}
         </DescriptionListItem>
       </DescriptionList>
     </HubBlock>
@@ -314,12 +350,14 @@ function sectionEnd(section: Section, checks: readonly CheckResult[]): string {
  */
 function SectionsBlock({ home }: { home: ValidationHome }) {
   const { t } = useTranslation(["validation"]);
+  const { workspace } = useWorkspace();
   return (
     <HubBlock title={t("validation:home.sections.title")}>
       <RowList aria-label={t("validation:home.sections.title")}>
         {home.sections.map((section) => (
           <RowListItem
             key={section.key}
+            href={sectionHref(workspace.id, home.idea.id, section.key)}
             start={
               section.total === null ? undefined : (
                 <MoonGlyph
@@ -479,16 +517,9 @@ function PlansBlock({ home }: { home: ValidationHome }) {
  * notice with Restore, the latest decision and the stage, the name, the concept and who
  * proposed it, and the idea it was copied from.
  */
-function Header({
-  home,
-  canWrite,
-}: {
-  home: ValidationHome;
-  canWrite: boolean;
-}) {
+function Header({ home }: { home: ValidationHome }) {
   const { t } = useTranslation(["validation", "common", "app"]);
   const { me, workspace } = useWorkspace();
-  const actions = useIdeaActions();
   const { idea } = home;
   const latest = home.decisions[0];
   const status = [
@@ -503,19 +534,7 @@ function Header({
   ].join(t("app:separator"));
   return (
     <>
-      {idea.archived && (
-        <InlineAlert title={t("validation:home.archived")}>
-          {canWrite && (
-            <Button
-              variant="secondary"
-              size="S"
-              onPress={() => actions.restore(idea.id)}
-            >
-              {t("validation:home.restore")}
-            </Button>
-          )}
-        </InlineAlert>
-      )}
+      {idea.archived && <ArchivedIdeaAlert ideaId={idea.id} />}
       <Flex gap="space-200" alignItems="center" wrap>
         <DecisionBadge decision={idea.latestDecision} />
         <Text variant="caption" tone="secondary">
@@ -582,7 +601,6 @@ function ValidationHub({ home }: { home: ValidationHome }) {
   const [isEditing, setEditing] = useState(false);
   const canWrite = role !== "viewer";
   const canEdit = canWrite && !home.idea.archived;
-  const openEdit = canEdit ? () => setEditing(true) : undefined;
   const blocks: HubBlockSpec[] = [
     { id: "next", column: "main", content: <NextSteps home={home} /> },
     {
@@ -605,7 +623,13 @@ function ValidationHub({ home }: { home: ValidationHome }) {
     {
       id: "summary",
       column: "main",
-      content: <SummaryBlock home={home} onEdit={openEdit} />,
+      content: (
+        <SummaryBlock
+          home={home}
+          canEdit={canEdit}
+          onEdit={() => setEditing(true)}
+        />
+      ),
     },
     {
       id: "decisions",
@@ -617,7 +641,7 @@ function ValidationHub({ home }: { home: ValidationHome }) {
   return (
     <>
       <HubPattern
-        header={<Header home={home} canWrite={canWrite} />}
+        header={<Header home={home} />}
         actions={
           canWrite ? (
             <Tools home={home} onEdit={() => setEditing(true)} />

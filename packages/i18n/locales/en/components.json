@@ -60,6 +60,9 @@
   "checkDots": {
     "check": "{{name}}: {{state}}"
   },
+  "fauButtons": {
+    "notClassified": "Not classified yet"
+  },
   "fauPicker": {
     "trigger": "{{name}}: {{state}}",
     "question": "How do you know this amount?",

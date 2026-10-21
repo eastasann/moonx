@@ -184,6 +184,12 @@ export const status = style({
   color: vars.color.text.secondary,
 });
 
+/** "Fact · No evidence" carries a warning in the amber of attention (06 notice). */
+export const warning = style({
+  display: "inline-flex",
+  color: vars.color.notice.fg,
+});
+
 export const actions = style({
   display: "inline-flex",
   alignItems: "center",

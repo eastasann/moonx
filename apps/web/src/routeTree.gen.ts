@@ -21,6 +21,8 @@ import { Route as SignedInWWorkspaceIdRouteRouteImport } from './routes/_signedI
 import { Route as SignedInWWorkspaceIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/index'
 import { Route as SignedInWWorkspaceIdIdeasIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/index'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/index'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdResearchRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/research'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/questions.$sectionKey'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -85,6 +87,18 @@ const SignedInWWorkspaceIdIdeasIdeaIdIndexRoute =
     path: '/ideas/$ideaId/',
     getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
   } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdResearchRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdResearchRouteImport.update({
+    id: '/ideas/$ideaId/research',
+    path: '/ideas/$ideaId/research',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport.update({
+    id: '/ideas/$ideaId/questions/$sectionKey',
+    path: '/ideas/$ideaId/questions/$sectionKey',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -97,7 +111,9 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
   '/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
   '/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId/': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -109,7 +125,9 @@ export interface FileRoutesByTo {
   '/invite/$token': typeof InviteTokenRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdIndexRoute
   '/w/$workspaceId/ideas': typeof SignedInWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -124,7 +142,9 @@ export interface FileRoutesById {
   '/_signedIn/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
   '/_signedIn/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
   '/_signedIn/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -139,7 +159,9 @@ export interface FileRouteTypes {
     | '/w/$workspaceId'
     | '/w/$workspaceId/'
     | '/w/$workspaceId/ideas/'
+    | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId/'
+    | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -151,7 +173,9 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/w/$workspaceId'
     | '/w/$workspaceId/ideas'
+    | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId'
+    | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
   id:
     | '__root__'
     | '/'
@@ -165,7 +189,9 @@ export interface FileRouteTypes {
     | '/_signedIn/w/$workspaceId'
     | '/_signedIn/w/$workspaceId/'
     | '/_signedIn/w/$workspaceId/ideas/'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/research'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -264,21 +290,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRouteImport
       parentRoute: typeof SignedInWWorkspaceIdRouteRoute
     }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/research': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/research'
+      path: '/ideas/$ideaId/research'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/research'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+      path: '/ideas/$ideaId/questions/$sectionKey'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
   }
 }
 
 interface SignedInWWorkspaceIdRouteRouteChildren {
   SignedInWWorkspaceIdIndexRoute: typeof SignedInWWorkspaceIdIndexRoute
   SignedInWWorkspaceIdIdeasIndexRoute: typeof SignedInWWorkspaceIdIdeasIndexRoute
+  SignedInWWorkspaceIdIdeasIdeaIdResearchRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   SignedInWWorkspaceIdIdeasIdeaIdIndexRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
+  SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
 }
 
 const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChildren =
   {
     SignedInWWorkspaceIdIndexRoute: SignedInWWorkspaceIdIndexRoute,
     SignedInWWorkspaceIdIdeasIndexRoute: SignedInWWorkspaceIdIdeasIndexRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdResearchRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdResearchRoute,
     SignedInWWorkspaceIdIdeasIdeaIdIndexRoute:
       SignedInWWorkspaceIdIdeasIdeaIdIndexRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute,
   }
 
 const SignedInWWorkspaceIdRouteRouteWithChildren =

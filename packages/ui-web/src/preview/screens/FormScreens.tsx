@@ -1,3 +1,4 @@
+import type { FauState } from "@moonx/schemas";
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,12 +15,14 @@ import {
   DescriptionListItem,
 } from "../../components/DescriptionList";
 import { Disclosure } from "../../components/Disclosure";
+import { FauButtons } from "../../components/FauButtons";
+import type { FauChange } from "../../components/FauPicker";
 import { Heading } from "../../components/Heading";
 import { InlineAlert } from "../../components/InlineAlert";
 import { Link } from "../../components/Link";
 import { ActionMenu, MenuItem } from "../../components/Menu";
 import { MetricGroup, MetricTile } from "../../components/MetricTile";
-import { MoonGlyph, MoonGlyphAt } from "../../components/MoonGlyph";
+import { MoonGlyph } from "../../components/MoonGlyph";
 import { Picker } from "../../components/Picker";
 import { QuestionCard } from "../../components/QuestionCard";
 import { Radio, RadioGroup } from "../../components/RadioGroup";
@@ -30,10 +33,6 @@ import {
 } from "../../components/SegmentedControl";
 import { Text } from "../../components/Text";
 import { TextArea, TextField } from "../../components/TextField";
-import {
-  ToggleButton,
-  ToggleButtonGroup,
-} from "../../components/ToggleButtonGroup";
 import { Well } from "../../components/Well";
 import { Flex, Stack } from "../../layout/Flex";
 import { FocusPattern } from "../../patterns/FocusPattern";
@@ -314,6 +313,13 @@ export function QuestionFormScreen() {
   const [answers, setAnswers] = useState<Record<string, string>>(() =>
     Object.fromEntries(questions.map((item) => [item.id, item.excerpt ?? ""])),
   );
+  const [faus, setFaus] = useState<Record<string, FauChange>>({});
+  const stateOf = (item: (typeof questions)[number]): FauState => {
+    const chosen = faus[item.id];
+    if (chosen === undefined) return item.state;
+    if (chosen.fau !== null) return chosen.fau;
+    return (answers[item.id] ?? "") === "" ? "empty" : "unclassified";
+  };
   return (
     <MockupFrame
       current="ideas"
@@ -390,27 +396,22 @@ export function QuestionFormScreen() {
                   setAnswers((current) => ({ ...current, [item.id]: text }))
                 }
               />
-              <Flex gap="space-200" alignItems="center" wrap>
-                <ToggleButtonGroup aria-label={`F/A/U of ${item.id}`}>
-                  <ToggleButton id="fact">
-                    <MoonGlyphAt state="fact" size="M" />
-                    Fact
-                  </ToggleButton>
-                  <ToggleButton id="assumption">
-                    <MoonGlyphAt state="assumption" size="M" />
-                    Assumption
-                  </ToggleButton>
-                  <ToggleButton id="unknown">
-                    <MoonGlyphAt state="unknown" size="M" />
-                    Unknown
-                  </ToggleButton>
-                </ToggleButtonGroup>
-                {item.state === "unclassified" && (
-                  <Text variant="body-sm" tone="notice">
-                    Not classified yet
-                  </Text>
-                )}
-              </Flex>
+              <FauButtons
+                aria-label={`Fact, Assumption or Unknown for ${item.id}`}
+                state={stateOf(item)}
+                confidence={faus[item.id]?.confidence ?? null}
+                hasValue={(answers[item.id] ?? "") !== ""}
+                onChange={(change) =>
+                  setFaus((current) => ({ ...current, [item.id]: change }))
+                }
+                // The sample has no M2: Fact is taken as attached.
+                onFactPress={() =>
+                  setFaus((current) => ({
+                    ...current,
+                    [item.id]: { fau: "fact", confidence: null },
+                  }))
+                }
+              />
               <Disclosure title="Related research" defaultExpanded>
                 <Stack gap="space-100">
                   <Text variant="body-sm" tone="secondary">

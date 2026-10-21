@@ -102,8 +102,39 @@ function ConflictQuestion({
   item: SaveItem;
   current: ConflictCurrent;
 }) {
-  const { t } = useTranslation(["app"]);
   const autosave = useAutosave();
+  return (
+    <ConflictAlert
+      noun={item.noun}
+      current={current}
+      input={unsavedText(item)}
+      onOverwrite={() => autosave.resolveConflict(item.key, "overwrite")}
+      onLoadTheirs={() => autosave.resolveConflict(item.key, "loadTheirs")}
+    />
+  );
+}
+
+/**
+ * The words and choices of design-spec 6.0.2's conflict question: "{name} updated this
+ * {noun} {when}", Overwrite with mine or Load theirs, and Copy my input with the input
+ * Load theirs drops (`input`, as text; null for a send that dropped nothing typed). No
+ * cancel: the save waits for the answer. For a send outside the page's saves too (M2's
+ * evidence, ADR-019).
+ */
+export function ConflictAlert({
+  noun,
+  current,
+  input,
+  onOverwrite,
+  onLoadTheirs,
+}: {
+  noun: string;
+  current: ConflictCurrent;
+  input: string | null;
+  onOverwrite: () => void;
+  onLoadTheirs: () => void;
+}) {
+  const { t } = useTranslation(["app"]);
   const { data: me } = useQuery(meQuery());
   const [copied, setCopied] = useState<"copied" | "failed" | null>(null);
   const when = formatRelativeTime(current.updatedAt, {
@@ -113,7 +144,7 @@ function ConflictQuestion({
     // No clipboard (not offered outside a secure page, or not allowed): the input then
     // shows here to be selected, the field being behind the question.
     Promise.resolve()
-      .then(() => navigator.clipboard.writeText(unsavedText(item)))
+      .then(() => navigator.clipboard.writeText(input ?? ""))
       .then(
         () => setCopied("copied"),
         () => setCopied("failed"),
@@ -126,39 +157,41 @@ function ConflictQuestion({
       size="S"
       title={
         current.updatedBy === null
-          ? t("app:save.conflict.titleSomeone", { noun: item.noun, when })
+          ? t("app:save.conflict.titleSomeone", { noun, when })
           : t("app:save.conflict.title", {
               name: current.updatedBy.displayName,
-              noun: item.noun,
+              noun,
               when,
             })
       }
       primaryActionLabel={t("app:save.conflict.overwrite")}
       secondaryActionLabel={t("app:save.conflict.loadTheirs")}
-      onPrimaryAction={() => autosave.resolveConflict(item.key, "overwrite")}
-      onSecondaryAction={() => autosave.resolveConflict(item.key, "loadTheirs")}
+      onPrimaryAction={onOverwrite}
+      onSecondaryAction={onLoadTheirs}
     >
       <Stack gap="space-200">
         <Text>{t("app:save.conflict.body")}</Text>
-        <Flex gap="space-100" alignItems="center" wrap>
-          <Button variant="secondary" size="S" onPress={copy}>
-            {t("app:save.conflict.copy")}
-          </Button>
-          {/* Read out when the copy is done. */}
-          <output>
-            {copied !== null && (
-              <Text variant="caption" tone="secondary">
-                {copied === "copied"
-                  ? t("app:save.conflict.copied")
-                  : t("app:save.conflict.copyFailed")}
-              </Text>
-            )}
-          </output>
-        </Flex>
-        {copied === "failed" && (
+        {input !== null && (
+          <Flex gap="space-100" alignItems="center" wrap>
+            <Button variant="secondary" size="S" onPress={copy}>
+              {t("app:save.conflict.copy")}
+            </Button>
+            {/* Read out when the copy is done. */}
+            <output>
+              {copied !== null && (
+                <Text variant="caption" tone="secondary">
+                  {copied === "copied"
+                    ? t("app:save.conflict.copied")
+                    : t("app:save.conflict.copyFailed")}
+                </Text>
+              )}
+            </output>
+          </Flex>
+        )}
+        {input !== null && copied === "failed" && (
           <TextArea
             label={t("app:save.conflict.yourInput")}
-            value={unsavedText(item)}
+            value={input}
             isReadOnly
             width="full"
           />

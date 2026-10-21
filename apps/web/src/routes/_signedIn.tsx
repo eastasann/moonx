@@ -19,8 +19,10 @@ import { useDropOtherUsersData } from "../lib/session";
 
 /** The search parameters every signed-in screen takes (SDD 4章). */
 export interface SignedInSearch {
-  /** The modal open over the screen: `switch-workspace` (M7). */
+  /** The modal open over the screen: `switch-workspace` (M7), `evidence` (M2)… */
   modal?: string;
+  /** What the modal is about: M2's item, `<targetType>:<targetId>[:<targetKey>]`. */
+  about?: string;
 }
 
 /**
@@ -29,8 +31,10 @@ export interface SignedInSearch {
  * `/login?next=<this path>` (router.tsx), so this route only waits for it.
  */
 export const Route = createFileRoute("/_signedIn")({
-  validateSearch: (search: Record<string, unknown>): SignedInSearch =>
-    typeof search.modal === "string" ? { modal: search.modal } : {},
+  validateSearch: (search: Record<string, unknown>): SignedInSearch => ({
+    ...(typeof search.modal === "string" ? { modal: search.modal } : {}),
+    ...(typeof search.about === "string" ? { about: search.about } : {}),
+  }),
   beforeLoad: async ({ context }) => {
     // What is cached shows at once and is asked again behind it (ADR-011).
     await context.queryClient.ensureQueryData({

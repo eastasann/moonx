@@ -1,6 +1,6 @@
 import { formatCount } from "@moonx/i18n";
 import type { QuestionCardMode } from "@moonx/ui-tokens";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, TriangleAlert } from "lucide-react";
 import {
   type FocusEvent,
   type ReactNode,
@@ -60,7 +60,12 @@ export interface QuestionCardProps {
    * The answer's F/A/U (validation only; self-analysis has none): its mark at the start of
    * a quiet card, and its label (`useFauLabel`).
    */
-  status?: { state: MoonState; label: string };
+  status?: {
+    state: MoonState;
+    label: string;
+    /** A Fact without evidence: the label carries a warning (design-spec 6.0.3). */
+    isWarning?: boolean;
+  };
   /** A quiet card's excerpt: the answer's start, or null for "Empty". */
   excerpt?: string | null;
   /** A quiet card's number of comments; none shows nothing. @default 0 */
@@ -77,6 +82,17 @@ export interface QuestionCardProps {
   /** The title's level in the page outline. @default 2 */
   headingLevel?: 2 | 3 | 4;
   id?: string;
+}
+
+/** The warning beside "Fact · No evidence", as FauPicker's (its label says why). */
+function Warning() {
+  return (
+    <span className={styles.warning}>
+      <IconSlot size="XS">
+        <TriangleAlert />
+      </IconSlot>
+    </span>
+  );
 }
 
 /**
@@ -164,6 +180,7 @@ export function QuestionCard({
               {status.label}
             </span>
           )}
+          {status?.isWarning === true && <Warning />}
           {commentCount > 0 && (
             <span className={styles.comments}>
               <IconSlot size="XS">
@@ -201,6 +218,7 @@ export function QuestionCard({
             <span className={moonStyles.labelColor[status.state]}>
               {status.label}
             </span>
+            {status.isWarning === true && <Warning />}
           </span>
         )}
         {actions != null && <div className={styles.actions}>{actions}</div>}

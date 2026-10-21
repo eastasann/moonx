@@ -104,4 +104,24 @@ describe("SendFailure: why a send failed (design-spec 6.0.6, SDD 8.2)", () => {
       screen.getByRole("button", { name: "Retry" }).hasAttribute("disabled"),
     ).toBe(true);
   });
+
+  test("a save refused for good, with withSaveReasons: Couldn't save and 6.0.2's reason", () => {
+    render(
+      <SendFailure
+        error={
+          new ApiError({
+            status: 409,
+            code: "ARCHIVED",
+            requestId: "8f14e45f-ea9e-4c5b-9a1f-2c7e1d5a3b6c",
+          })
+        }
+        transient="couldNotSave"
+        withSaveReasons
+        onRetry={() => {}}
+      />,
+    );
+    expect(alertText()).toContain("Couldn't save");
+    expect(alertText()).toContain("It's archived");
+    expect(alertText()).not.toContain("Ref:");
+  });
 });

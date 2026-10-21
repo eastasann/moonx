@@ -11,6 +11,7 @@ import { Form } from "./Form";
 import { Radio, RadioGroup } from "./RadioGroup";
 import { Switch } from "./Switch";
 import { TagGroup, type TagItem } from "./TagGroup";
+import * as styles from "./TagGroup.css";
 
 describe("RadioGroup", () => {
   test("arrows choose; a disabled radio is skipped", async () => {
@@ -299,5 +300,22 @@ describe("TagGroup", () => {
     render(<TagGroup aria-label="Filters" items={items} />);
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getAllByRole("row")).toHaveLength(2);
+  });
+
+  test("a suffix stands outside the label a narrow tag cuts, and is in its name", () => {
+    render(
+      <TagGroup
+        aria-label="Attached"
+        items={[
+          { id: "log", label: "Sep 22 Clinic summary", suffix: "(deleted)" },
+        ]}
+      />,
+    );
+    const tag = screen.getByRole("row", {
+      name: "Sep 22 Clinic summary (deleted)",
+    });
+    const suffix = within(tag).getByText("(deleted)");
+    expect(suffix.closest(`.${styles.tagLabel}`)).toBeNull();
+    expect(suffix.className).toContain(styles.tagSuffix);
   });
 });

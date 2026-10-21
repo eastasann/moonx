@@ -449,7 +449,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 独自: DiffTextArea | 25 ③ の取り込む内容の欄。直している間も、今の回答（`before`）と比べて足した語に下線を引き続ける | `border.strong` の枠（入力欄なので 3:1。s25-import.html の .edit の薄い線は採らない）・角丸（06 `radius.groove`）・canvas の地（.edit）。大きさは TextArea と同じ `size`（S〜XL、既定 M）。下線と地は DiffText の追加と同じ。印は文字の下に重ねた層で描き、欄はふつうの文字の入力欄のまま（印は読み上げない） | 同じ |
 | 独自: MoonGlyph | 状態の印（4.4「状態の形」）。印は状態によらずインクの色（unclassified の菱形は琥珀色、empty の点線の丸は Empty のラベルの色）。CheckDots・StatusLight・19 の F/A/U の内訳・セクションの埋まり具合・F/A/U の印・11 のスマホの問いの点（回答済みは満月、未回答は点線の丸、今の問いは輪で囲む）に使う | `value`（0〜1。満ちる割合。0 は新月の輪郭、1 は満月）か `state`（not-started / partial / done / fact / assumption / unknown / unclassified / empty。unclassified は琥珀色の、角を丸めた四角を 45° 回した菱形（moon-base.css の .dot-attn）、empty は短い線を12個並べた点線の丸（.dot-empty））。S / M。`isCurrent` で輪を重ねる（11 のスマホの今の問い）。印は飾りとして読み上げず、隣のラベルで伝える | 同じ |
 | 独自: FauPicker | 表の行（17 の金額・18 の数字）の F/A/U の欄。今の状態をラベル（「Assumption · Medium」。06 `typography.body-sm` の secondary の文字で、ポインタの下と開いている間はインク。未分類は琥珀色、Empty は `fau.empty` の文字色で、表の中ではラベルの代わりに U+2014 のダッシュ1文字（s17-costs.html。読み上げは「Empty」））だけで出し、印は表の行頭の列に出す（印を二重に出さない。FauPicker を置く表は、行頭の印の列（`isMark`）に状態の MoonGlyph を置く）。編集中の行はラベルに ▾ を付ける（「Assumption · Medium ▾」）。押すと Popover で F/A/U と確信度を選ぶ（中身は下の補足と 6.0.3）。表の外に置いたときは印とラベルを出す | — | 行の編集シートの中に、印とラベルの下にボタンで並べる（6.0.3） |
-| 独自: FauButtons | 検証の設問の回答（11・15・18）の F/A/U。回答の欄の下に3つのボタン（ToggleButtonGroup。各ボタンに MoonGlyph）を並べ、内容があって F/A/U の無い回答は、その横に琥珀色の「Not classified yet」を出す（s11-form.html の .classify と .attn-note）。Assumption を押すか Assumption の回答では、下に小見出し「Confidence」と確信度（SegmentedControl）を出す。決まりは 6.0.3（Fact は M2 を開く呼び出しだけ、Assumption は確信度を選ぶまで決めない、同じボタンをもう一度押すと外れる）。文章の回答は値を残したまま Unknown にできるので、Unknown で確認しない（数字の FauPicker と違う） | — | 同じ |
+| 独自: FauButtons | 検証の設問の回答（11・15・18）と、25 ③ の取り込む内容の F/A/U。回答の欄の下に3つのボタン（ToggleButtonGroup。各ボタンに MoonGlyph）を並べ、内容があって F/A/U の無い回答は、その横に琥珀色の「Not classified yet」を出す（s11-form.html の .classify と .attn-note）。25 ③ では代わりにボタンの前に「◆ Unclassified」（StatusLight。取り込む内容が戻る状態の名前。s25-import.html の .fau-row）を出す（`unclassified="label"`）。Assumption を押すか Assumption の回答では、下に小見出し「Confidence」と確信度（SegmentedControl）を出す。決まりは 6.0.3（Fact は M2 を開く呼び出しだけ、Assumption は確信度を選ぶまで決めない、同じボタンをもう一度押すと外れる）。文章の回答は値を残したまま Unknown にできるので、Unknown で確認しない（数字の FauPicker と違う） | — | 同じ |
 | 独自: MetricTile / MetricGroup | 主要指標の1つ（13・19 の損益分岐・初期費用など）。ラベル・大きな数字と単位（`unit`。「/ day」「months」）・補足（理由や警告）を縦に並べる。MetricGroup が並べる: `band`（13 の数字の帯。上に薄い線（`border.default`）、下に hairline、指標の間に縦の hairline の横一列。デスクトップでパネルが本文の領域を `semantic.layout.two-column-min-width` より狭くしている間は、スマホと同じ 2×2（4.1 の A）。d1-moon.html）と `compact`（19 の判断材料の中の詰めた形。ラベルは 06 `typography.caption-sm`、数字は `metric-sm`、線なしで指標の数だけの列。s19-decision.html）と `column`（F の結果のカードの縦の並び。数字は `metric-column` と小さな等幅の単位、合計の間に hairline。s17-costs.html の .tot）と `pair`（D の詳細の 2×2。上に薄い線、下と十字に hairline、ラベルは `caption-sm`、数字と単位は `metric-pair`。s06-ideas.html の .nums） | 補足は任意。数字は途中で折り返さない（単位は数字の前で次の行へ送る。タイルの幅より広い数字だけ折り返し、横にはみ出させない。4.3） | `band` は 2×2 で十字の hairline、`compact` は2列、`column`・`pair` は同じ |
 | 独自: RowList / RowListItem | 区切り線つきの静的な行の並び（10・13・20 のセクションの一覧、13 の確認項目・Next steps・Decisions・Plans、6 の詳細と 19 の確認項目）。`ordered` で番号付き。押せる行は行全体が移動先で、右端に › を置く（下線のリンクにしない。4.4。ホバーで名前に下線を出す）。一覧の上と最後の行の下にも hairline を引く。印（`start`）は 06 `component.row-list.mark-width` の列に置き、印のある行がある一覧では印の無い行もその列を空けて名前の頭をそろえる。番号は `row-list.number-width` の列の tertiary の等幅（`typography.number-emphasis` の太さで、大きさは `caption`）、名前は `typography.label`、右端の文字（`end`）は `caption`（件数と日付（「7/10」「5 entries」「Oct 14」）は `isEndNumeric` で等幅の `typography.number-sm`）、› は tertiary。2行目（`description`）のある行は、印・右端の文字・› を1行目に並べる（d1-moon.html）。5 の Ideas のように行に印の並び（`marks`。CheckDots）と札（`badge`。Badge）を持つ行は、名前の後ろに `marks`、その後ろに `badge` を、どの行でも同じ幅の列（06 `row-list.badge-width`。札は列の右端にそろえる。列の間は `row-list.status-gap`）に置き、行の高さの中央にそろえて、印の位置を行ごとにそろえる（s05-dashboard.html の .ideas）。まだ終わっていない実行管理の項目の行頭には `TaskMark`（☐。大きさ・角丸・線の太さは 06 `row-list.task-mark-*` の、tertiary の線の飾り。5 の Due soon。s05-dashboard.html の .due .box）を置く | ordered。`isEmphasized`（13 の Next steps の1件目: 薄い線（`border.default`）の枠と左のインクの線（`border-width.selected-indicator`）、角丸は `radius.callout`、影なし、番号はインクの semibold、名前は `typography.label-emphasis`、理由の行は `caption`） | 行の高さは 06 `row-list.narrow-min-height` 以上。`badge` は名前の行の右端、`marks` は2行目の下の行に置く（s05-dashboard.html の 390px） |
 | 独自: DescriptionList / DescriptionListItem | ラベルと値の並び（13 の Summary・19 の判断材料の Summary）。ラベルは 06 `component.description-list.label-width` の列（spacious の密度では `label-width-spacious`。s19-decision.html の .sum）の `typography.caption` の secondary、値は `body-compact`、行を hairline で区切る（d1-moon.html・s19-decision.html） | — | ラベルを値の上に置く |
@@ -486,6 +486,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - TableView の列（`columns`）は次の指定を持てる: `width`（px か %。指定の無い列は残りを分け合う）、`isMark`（行頭の印の列。見出しの文字は読み上げだけ）、`isRowActions`（行の ⋯ の列。見出しの文字は読み上げだけ。マウスの端末ではポインタの下の行・フォーカスのある行・メニューを開いている行だけで見せ、タッチの端末では常に見せる。メニューを閉じたら ⋯ にフォーカスを戻す。押すと開く行の › は ⋯ の列の前のセルの右端に置く。スマホの行の形（スマホの幅と `layout="cards"`）には出さず、その操作は行を押して開くシートに画面が置く）、`isHiddenOnPhone`（スマホの幅の行に出さない。その値は行を押して開くシートで見て直す）、`isBelowName`（スマホの幅の行で名前の下に出す）。
 - タッチの端末の Tooltip は長押しで開き、指を離してしばらくしたら閉じる（ホバーが無いため）。短く押せば子が押される。長押しはボタンの意味を確かめる操作なので、ツールチップだけを開いて子を押さない（Android の長押しのツールチップと同じ。React Aria の長押しと同じく子の押す操作を取り消す。2026-10-17 のユーザーの決定）。長押しは 0.5 秒（React Aria の長押しと同じ）、閉じるのは指を離して 1.5 秒後（Android の長押しのツールチップと同じ）。Tooltip の文は Spectrum 2 の幅（06 `component.tooltip.max-width`。窓の幅も超えない）で折り返す。
 - Steps は済みのステップの名前の後ろに、画面が渡す `doneLabel`（「completed」）を読み上げる（チェックの印は読み上げの対象外のため）。
+- パターン G の画面がステップをその場で切り替えるとき（24・25。StepsPattern の `focusKey`）は、ページを先頭へ戻し、フォーカスを新しいステップの中身の先頭へ移す。前のステップのボタン（Next・Back）が消えてフォーカスの行き場が無くならないようにし、読み上げを新しいステップの頭から始めるため。
 - 押せる Card の中にボタンを置かない（押せる要素の入れ子になり、読み上げで中のボタンに届かない）。操作は Card の外に並べる。例外は CardView の中のカードの ⋯（`actions` の ActionMenu。6.10 の「カードの ⋯」）: React Aria の GridList の項目の中のボタンとして置き、カードから Tab で移れ、押してもカードを押したことにならない（カード全体を押すと編集を開く）。
 - Tray は中身がスクロールでき、`isDismissable` を false にすると背景のタップや Esc で閉じなくなる。AlertDialog は閉じられない Tray で開く（答えるまで残す）。AlertDialog はスマホの幅ではどの大きさでもこのトレイで開き、どの幅でも背景のタップでは閉じない（答えるまで残す）。Esc は、4.4 が取り入れる Spectrum のキーボード操作の決まり（WAI-ARIA の dialog のパターンどおり Esc で閉じる）に合わせ、キャンセルの操作（`cancelLabel` のボタン。「Cancel」など、何も変えない側）として受け、閉じてキャンセルを伝える（Spectrum 2 の AlertDialog も Esc で閉じる）。キャンセルの操作が無い AlertDialog（6.0.2 の衝突の確認など）では Esc で何もしない。中の部品が Esc を受けたとき（開いた一覧を閉じるなど）は、その部品の操作にする。`isDismissable` は React Aria の綴りで、Tray と Dialog の両方がこの名前で受ける（Spectrum 2 の Dialog は `isDismissible`）。
 - Dialog は Esc で閉じる（`isKeyboardDismissDisabled` で止められる）。背景のタップで閉じるのと、題の右の閉じるボタン（「Close」）は `isDismissable` のときだけ（振る舞いは Spectrum 2 と同じ）。題と下のボタンは、本文がスクロールしても見えたままにする。画面の中央に出す Dialog の高さは、見えている高さに 06 `semantic.layout.sheet-max-height-ratio` を掛けた高さまで。fullscreen はどの幅でも画面いっぱいのシートで開く。AlertDialog の error と warning は題の前の印に「Alert」と名前を付け、本文を dialog の説明として読み上げる。
@@ -527,7 +528,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - **共通ナビ**: スマホは下のタブ、Web は左のサイドバー。
   - タブ: 5 Dashboard / 6 Ideas / 10 Self Analysis / 8 Notifications（未読数のバッジ）
   - メニュー（More）: 7 Decision Log / M7 ワークスペース切替 / 4 Account / 9 Workspace Settings（Owner）/ 26 Admin（Admin）/ ログアウト（1 へ移る。未保存の入力があれば「Unsaved changes on this page will be lost.」と確かめてから（AlertDialog の題は「Log out?」、操作は「Log out」と「Cancel」）。2026-10-11 のユーザーの決定。API がログアウトできなかったときは、セッションが残っていて 1 から 5 へ戻ってしまうので、画面に留まり、6.0.6 の想定外のエラーをトーストで出す（「Something went wrong. Ref: xxxxxxxx」と Retry。Ref は番号があるときだけ。回数の上限なら 6.0.6 の回数の上限の文言。Retry はログアウトをやり直す））
-- **Viewer**: 編集ボタン、19 判定、M1 / M2 / M3 / M4 / M5 / M8、24 / 25 の AI 往復、自己分析タブ（10）と 12 への入口を出さない。21 の [S] 参照（共有された自己分析）も出さない。10・11 の URL を開いたら、自分の個人用ワークスペースの同じ画面へ移す（自己分析はどのワークスペースから開いても同じ中身のため）。
+- **Viewer**: 編集ボタン、19 判定、M1 / M2 / M3 / M4 / M5 / M8、24 / 25 の AI 往復、自己分析タブ（10）と 12 への入口を出さない。21 の [S] 参照（共有された自己分析）も出さない。10・11 と自己分析の 24・25 の URL を開いたら、自分の個人用ワークスペースの同じ画面へ移す（自己分析はどのワークスペースから開いても同じ中身のため）。
 - **12 への入口**: 10 のヘッダーの「Team」、5 の Self analyses、通知。読めるのは、今のワークスペースに共有済みの自己分析だけ。
 - **AI 取り込みへの入口**: 24 の ③ の「Import from AI」と、書き出し元と同じ画面（10 / 11 / 13 / 20 / 21）の「Import from AI」。
 - **検証の中の移動**: 14〜18 と 11（検証の設問）の本文の見出しにセクション切替（▼）を置き、13 に戻らずに隣のセクションへ移れる。
@@ -918,7 +919,7 @@ Viewer にも同じ Next steps を出す。ただし Viewer が入れない行�
 | セクションを開く | 01 / 02 / 10 → 11（最初の未回答の設問にフォーカス）。03 → 14、04 → 15、05 → 17、06〜08 → 18、09 → 16 | 全ロール（Viewer は読み取り表示） |
 | 確認項目・Next steps のリンク | 該当の画面へ | 全ロール（Viewer は上の決まりのとおり） |
 | Edit summary | アイデア名・一行コンセプト・提案する解決策をその場で編集（シート）。保存ボタンは置かず、6.0.2 の自動保存で保存する（名前と一行コンセプトは空にできない。規則は 6.0.8。検査に通らない欄は送らず、欄の下に理由を出す）。先に別の人が保存していたときは 6.0.2 の衝突の選択を出し、「Load theirs」の前に自分の入力を「Copy my input」でコピーできる | Owner / Member |
-| AI ▼ Export for AI / Import from AI | 24 へ（範囲の初期値は「この検証の設問型の全セクション」）/ 25 へ（取り込み先はこの検証） | Owner / Member |
+| AI ▼ Export for AI / Import from AI | 24 へ（範囲の初期値は「この検証の設問型の全セクション」）/ 25 へ（取り込み先はこの検証）。どちらも反映や戻る先は 13。アーカイブ済みのアイデアでは出さない（6.8 の表。AI 往復はできない） | Owner / Member |
 | Record decision | 19 へ | Owner / Member |
 | Add plan | M5（最新の判定が Proceed のときだけ出す） | Owner / Member |
 | ⋯ メニュー | アイデアを複製（6.8）/ アーカイブ / テンプレートの移行（M8） | Owner / Member |
@@ -1037,7 +1038,7 @@ Web（パターン C 設問フォーム）
 | F/A/U を付ける | 6.0.3 |
 | Next / Previous（スマホ） | 前後の問いへ。セクションの最後の問いで Next を押すと、セクションの完了カード（見出し「01: 8/10 answered」と、次のセクションへ「Next: 02 Market」/ ホームへ戻る「Back to Validation」）を問いの位置に出し、フォーカスをカードへ移す。完了カードで ← を押すと最後の問いへ戻る |
 | 前後のセクション（Web） | 隣のセクションへ。検証の順番は 01 → 02 → 03（14）→ 04（15）→ 05（17）→ 06〜08（18）→ 09（16）→ 10、自己分析は WHY → … → ONE-SENTENCE |
-| AI ▼ Export for AI / Import from AI | 24 へ（範囲の初期値は今のセクション）/ 25 へ（取り込み先は今の自己分析か検証）。Owner / Member（自己分析は本人）だけ |
+| AI ▼ Export for AI / Import from AI | 24 へ（範囲の初期値は今のセクション）/ 25 へ（取り込み先は今の自己分析か検証）。どちらも反映や戻る先は今の 11 のセクション。Owner / Member（自己分析は本人）だけで、アーカイブ済みのアイデアでは出さない（6.8 の表）。Web は下に留めたフッターの中央、スマホは1問のカードの下（4.1 パターン C の補足） |
 | 02 OCEAN を答える | RED の問い（4問）は Red か Mixed のとき、BLUE の問い（3問）は Blue か Mixed のときに出す。OCEAN が未回答のときはどちらも出さない（「Answer OCEAN to see the next questions」。OCEAN の設問のカードを開いている間、回答の下に出す。文言の OCEAN は設問のタイトルで、出し分けの条件になっている設問ならどれにも同じ形で出す）。選んだ時点で出し分けを変え、進み具合も数え直す。答えを変えて隠れた回答は消さずに残すが、進み具合・F/A/U の内訳・未分類の件数・AI 書き出しのどれにも数えない。AI 取り込みで隠れた設問の ID が来たときの扱いは 6.7 ②の「隠れている」。答えを戻すとまた出る |
 
 #### 状態
@@ -1545,6 +1546,19 @@ Reply in Markdown. For each question you want to update, write one block:
 - 回答が空の設問は、`answer.text` を null にする（金額＋理由の設問は `amount` と `reason` を null）。
 - 自己分析とプランの書き出しには `fau` と `evidence` を入れない。
 
+#### 画面の細部
+
+- 題の上の行: 書き出し元を 25 と同じ secondary の小さな文字で出す（「{アイデア名} · validation questions」「{アイデア名} · {案名}」「Self analysis」。6.7「取り込み先」）。上の図の ① の「Validation: Piaya Gift Box Delivery」の代わりにこの行を出す。
+- ① 範囲: 自己分析と検証は「Sections」の CheckboxGroup（横に並べて折り返す。名前は検証が「{番号} {題}」、自己分析が題）。全部にチェックがあれば全体（ヘッダーの `scope: all`）として書き出す。プランは「Scope」の RadioGroup（Whole plan / Part A / Part B / Choose items）で、Choose items を選ぶと「Items」の CheckboxGroup（「{番号} {題}」）を出す。テンプレートのセクションと項目はすべて出す（表だけの項目（§21・§22 など）も、選べば範囲の表の小項目として Reference に入るため）。
+- ① の Next を押せないとき: 範囲が空なら上の「状態」の文言、選んだ範囲に取り込める型の設問が1つも無い（表・数字・実行管理の項目だけ）なら「Choose at least one section with a question to answer」（プランは「Choose at least one item with a question to answer」）を、範囲の部品（プランで Part を選んだときは Scope）の下に出す。この範囲は X1 が 422 `EMPTY_SCOPE` で断るため、送らない。
+- ① Options: 「Include empty questions」「Include examples」と、検証は「Include reference (key numbers, competitors, research)」、プランは「Include reference (key numbers and tables)」。自己分析は参考情報を持たないので3つ目を出さない。初期値はどれもオン（SDD 5.10 X1 の既定と同じ）。
+- ステップの移り方: 下に留めた操作の行の Next と Back で移る（① は Next、② は Back と Next、③ は Back）。書き出し（X1）は ② に入ったときに送り、範囲と Options が同じあいだは送り直さない（X1 は回数の上限に数えるため。SDD 7.2）。
+- ② 確認: 「Markdown」「JSON」の SegmentedControl と、その下の Well に書き出す文章をそのまま（改行と字下げを保って）出す。JSON は字下げ2で整える。
+- ③ 書き出し: 「Copy Markdown」「Download .md」の行と「Copy JSON」「Download .json」の行。写したらその下に「Copied」を出す（6.0.2 の Copy my input と同じ出し方）。ファイル名はファイル名の元（6.6 規則）に `.md` / `.json` を付ける。その下に「Next: paste into your AI, then」と「Import from AI」（25 へ。書き出した範囲を範囲にし、反映の後に戻る画面は 24 を開いた画面のまま）。
+- 書き出しの失敗: 回数の上限は「Couldn't export」と 6.0.6 の回数の上限の文言と Retry、ほかは 6.0.6 の読み込みの失敗の表示を、プレビューの位置に出す。
+- ヘッダーの ←: 書き出し元のホーム（検証は 13 の「Validation」、プランは 20 の「Plan」、自己分析は 10 の「Self Analysis」）。
+- アーカイブ済みの注意: Restore を添えない（13・20 で戻してから出直す）。
+
 #### 状態
 
 | 状態 | 表示 |
@@ -1554,7 +1568,7 @@ Reply in Markdown. For each question you want to update, write one block:
 | コピーの失敗（ブラウザの制限） | 「Couldn't copy. Use Download instead.」 |
 | アーカイブ済みのアイデア・プラン | 注意（「This idea is archived」、案だけがアーカイブ済みなら「This plan is archived」）を出し、範囲の選択は出さない。書き出した内容は取り込めないため |
 | URL のワークスペースに無い検証・プラン | 「You don't have access to this」（SDD 4） |
-| Viewer | この画面に入れない |
+| Viewer | この画面に入れない（自己分析は、自分の個人用ワークスペースの同じ画面へ移す。5章） |
 | ローディング | プレビューの骨組み |
 
 ---
@@ -1655,6 +1669,27 @@ Web（パターン G ステップ。差分確認だけ左右2列）
 - 各変更は変更履歴に「AI 取り込み」として残る。
 - 反映したら書き出し元の画面（10 / 11 / 13 / 20 / 21）へ戻り、「2 answers updated · 1 needs F/A/U」と出す。未分類が増えたら 13 の Next steps に出る。
 
+#### 画面の細部
+
+- ① 貼り付け: 「Reply from your AI」（必須）の TextArea（プレースホルダ「Paste the reply in Markdown or JSON」）と、その下の「or」と「Upload .md / .json」（FileTrigger）。選んだファイルの中身は欄に入れ、欄で直してから進める。UTF-8 として読めないファイルは「Couldn't read this file. Use a .md or .json file in UTF-8.」。空のまま Next を押すと「Can't be empty」（6.0.6 の入力値が範囲外）。
+- 「No question IDs found」: ① の欄の下に InlineAlert で出し、中に「Write each answer under its question ID, like this:」と例（`## [範囲の最初の設問 ID]` と「<the answer>」の2行）と「Continue without IDs」（貼り付け全体を1つの未振り分けのブロックにして ② へ進む）を置く。
+- ② の行: ブロックを hairline で区切った行で並べ、行ごとに名前と状態の文、右に操作を置く。名前は「[{ID}] {設問の名前}」、取り込み先に無い ID は「[{ID}]」、ID の無いブロックは「Unmatched block “{最初の行}”」（最初の行が 40 文字を超えるときは 40 文字で切って「…」を付ける）。
+- ② の状態の文: 振り分け済み「Matched」、ID が無い「Choose a question, or it is discarded.」、取り込み先に無い ID「No question {ID} here. Choose one, or it is discarded.」、範囲の外「Not in this import. Choose a question, or it is discarded.」、隠れている「This question is hidden」、取り込めない「Tables and numbers can't be imported」、重複「Another block is for this question too. Keep one.」、選んだ設問の型ではブロックから何も読めない（金額の設問に、JSON の `text` だけを持つ項目を選んだときなど）「Nothing in this block for that question」、捨てた「Discarded」。振り分け済み・取り込めない・捨てた以外の文は琥珀色にする。
+- ② の操作: 取り込めない行と捨てた行を除くどの行にも「Choose question」の ComboBox（取り込める型で、隠れていない、範囲の中の設問。名前は「{セクションの番号} · {設問の名前}」、2行目に問い）。振り分け済みの行は今の設問を出し、選び直せば付け替える。重複の行には「Use this one」（同じ設問のほかのブロックを捨て、フォーカスはその行の Discard へ移す）。どの行にも「Discard」を置き、捨てた行は「Undo」で戻せる。
+- ② から ③ へ: 重複が残っている間は Next を押せず、一覧の上に「Keep one block for each question to go on.」を出す。振り分け済みが0件のときは、一覧の上に「Nothing to import」と「Back to Paste」を出して Next を押せなくする。一覧は残し、未振り分けのブロックに設問を選べば進めるようにする。
+- ③ に出す設問: 取り込む内容が今の回答と違う設問。直している間に今の回答と同じ文になっても（今の回答が空の設問で取り込む内容を消したときも）、取り込んだ内容が違えばその場に残す（打っている欄が手の下で消えないため）。「Apply {n} changes」の n は、チェックがあり、直した内容が今の回答と違う設問の数。③ に入ったときに今の回答を読み直す。
+- ③ の今の回答: 「Current」の下に DiffText で出し、空なら tertiary の「Empty」（s25-import.html）。
+- ③ の F/A/U: 検証の F/A/U を持つ設問だけに出す（SDD 5.10 X2 の `hasFau`）。左の「Current」の横に今の F/A/U（MoonGlyph と 6.0.3 の表示名）、右の取り込む内容の下に FauButtons（ボタンの前に「◆ Unclassified」。4.5）。取り込む内容を消すと、付け直した F/A/U も外す（Unknown を除く。6.0.3）。
+- ③ の選択の設問: 選択肢のどれでもない内容の下に「Use one of: {選択肢を「, 」でつなぐ}」を出す。
+- ③ の金額＋理由（自己分析）: 右に「Amount」の TextField と「Why this amount?」の DiffTextArea、左に今の金額（6.6 規則の金額の書式）と理由を DiffText で出す。金額は読めないものを書かれたまま、読めたものを桁区切りで出す（小数第3位以下を持つ金額は丸めずにそのまま出し、6.0.8 で断る）。返答が片方の部分しか持たないときは、その部分だけを出す（無い側は今の値を変えない。6.7 ①）。
+- 「Updated by {名前} {相対時刻}」: 25 を開いたときから版が変わり、最後に保存した人が自分でない回答に出す（自分が ③ の M2 で根拠を付けたときは出さない）。保存した人が分からない回答は「Updated {相対時刻}」。
+- ④ 反映: 「Apply {n} changes」を押すことが ④ で、Steps の ④ を今のステップにする画面は持たない（反映が通れば戻る先へ移るため）。
+- ④ の後のトースト: 「{n} answers updated」（1件は「1 answer updated」）に、未分類が増えたら「 · {n} needs F/A/U」（2件以上は「need」）を足す。内容の変わった回答が0件（ほかの人が同じ内容を先に保存していた）なら「No answers changed」。戻る先は 25 を開いた画面（SDD 4章の `returnTo`。無ければ取り込み先のホーム）で、Cancel と「No changes found」の Close も同じ所へ戻る。
+- 反映が断られたとき: 隠れた設問・テンプレートに無い設問（`NOT_IMPORTABLE`・`QUESTION_NOT_FOUND`。開いた後に 02 OCEAN の回答が変わったときや、テンプレートの移行のとき）は、今の回答を読み直して「Couldn't apply」と「Some questions can no longer be imported. Uncheck them and apply again.」を出す。隠れた設問の変更の下には「This question is hidden now」、テンプレートから無くなった設問の変更（読み直しても一覧に無い設問。直した内容とともに残す）の下には「This question is no longer in the template」を出し、チェックを外すまで反映できない（その変更の F/A/U のボタンも押せない）。ほかの失敗は 6.0.2 の断られた理由、回数の上限の文言、想定外の Ref を「Couldn't apply」に添える。
+- 「No changes found」: IllustratedMessage で、説明「The reply holds the answers as they are now.」と「Close」。下に留めた操作の行には ② へ戻る Back を置く。
+- ヘッダーの ←: 24 と同じく取り込み先のホーム。
+- アーカイブ済みの注意: Restore を添えない（13・20 で戻してから出直す）。
+
 #### 状態
 
 | 状態 | 表示 |
@@ -1665,7 +1700,7 @@ Web（パターン G ステップ。差分確認だけ左右2列）
 | 他の人が先に回答を変えていた（409 `CONFLICT_MULTI`） | ③ に戻り、Current を最新にして「Some answers changed while you were reviewing」を出す。直した内容は残る |
 | アーカイブ済みのアイデア・プラン | 注意（「This idea is archived」、案だけがアーカイブ済みなら「This plan is archived」）を出し、貼り付け欄は出さない |
 | URL のワークスペースに無い検証・プラン | 「You don't have access to this」（SDD 4） |
-| Viewer | この画面に入れない |
+| Viewer | この画面に入れない（自己分析は、自分の個人用ワークスペースの同じ画面へ移す。5章） |
 
 ---
 

@@ -94,7 +94,7 @@ import {
 } from "../components/worksheet";
 import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
 import { api, inPath, unwrap } from "../lib/api";
-import type { SaveFields, SaveTarget } from "../lib/autosave";
+import type { SaveTarget } from "../lib/autosave";
 import { useAutosave } from "../lib/autosave-react";
 import { inputIssueMessage } from "../lib/input-issues";
 import {

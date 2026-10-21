@@ -19,6 +19,8 @@ import { Route as DevComponentsRouteImport } from './routes/dev.components'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as SignedInWWorkspaceIdRouteRouteImport } from './routes/_signedIn/w/$workspaceId/route'
 import { Route as SignedInWWorkspaceIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/index'
+import { Route as SignedInWWorkspaceIdAiExportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/export'
+import { Route as SignedInWWorkspaceIdAiImportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/import'
 import { Route as SignedInWWorkspaceIdIdeasIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/index'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/index'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions'
@@ -78,6 +80,18 @@ const SignedInWWorkspaceIdIndexRoute =
   SignedInWWorkspaceIdIndexRouteImport.update({
     id: '/',
     path: '/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdAiExportRoute =
+  SignedInWWorkspaceIdAiExportRouteImport.update({
+    id: '/ai/export',
+    path: '/ai/export',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdAiImportRoute =
+  SignedInWWorkspaceIdAiImportRouteImport.update({
+    id: '/ai/import',
+    path: '/ai/import',
     getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
   } as any)
 const SignedInWWorkspaceIdIdeasIndexRoute =
@@ -145,6 +159,8 @@ export interface FileRoutesByFullPath {
   '/invite/$token': typeof InviteTokenRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
   '/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
+  '/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
+  '/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
   '/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
   '/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
@@ -164,6 +180,8 @@ export interface FileRoutesByTo {
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdIndexRoute
+  '/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
+  '/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
   '/w/$workspaceId/ideas': typeof SignedInWWorkspaceIdIdeasIndexRoute
   '/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
@@ -186,6 +204,8 @@ export interface FileRoutesById {
   '/invite/$token': typeof InviteTokenRoute
   '/_signedIn/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
   '/_signedIn/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
+  '/_signedIn/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
+  '/_signedIn/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
   '/_signedIn/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
@@ -208,6 +228,8 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/w/$workspaceId'
     | '/w/$workspaceId/'
+    | '/w/$workspaceId/ai/export'
+    | '/w/$workspaceId/ai/import'
     | '/w/$workspaceId/ideas/'
     | '/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/w/$workspaceId/ideas/$ideaId/competitors'
@@ -227,6 +249,8 @@ export interface FileRouteTypes {
     | '/dev/components'
     | '/invite/$token'
     | '/w/$workspaceId'
+    | '/w/$workspaceId/ai/export'
+    | '/w/$workspaceId/ai/import'
     | '/w/$workspaceId/ideas'
     | '/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/w/$workspaceId/ideas/$ideaId/competitors'
@@ -248,6 +272,8 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/_signedIn/w/$workspaceId'
     | '/_signedIn/w/$workspaceId/'
+    | '/_signedIn/w/$workspaceId/ai/export'
+    | '/_signedIn/w/$workspaceId/ai/import'
     | '/_signedIn/w/$workspaceId/ideas/'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/competitors'
@@ -341,6 +367,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedInWWorkspaceIdIndexRouteImport
       parentRoute: typeof SignedInWWorkspaceIdRouteRoute
     }
+    '/_signedIn/w/$workspaceId/ai/export': {
+      id: '/_signedIn/w/$workspaceId/ai/export'
+      path: '/ai/export'
+      fullPath: '/w/$workspaceId/ai/export'
+      preLoaderRoute: typeof SignedInWWorkspaceIdAiExportRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ai/import': {
+      id: '/_signedIn/w/$workspaceId/ai/import'
+      path: '/ai/import'
+      fullPath: '/w/$workspaceId/ai/import'
+      preLoaderRoute: typeof SignedInWWorkspaceIdAiImportRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
     '/_signedIn/w/$workspaceId/ideas/': {
       id: '/_signedIn/w/$workspaceId/ideas/'
       path: '/ideas'
@@ -409,6 +449,8 @@ declare module '@tanstack/react-router' {
 
 interface SignedInWWorkspaceIdRouteRouteChildren {
   SignedInWWorkspaceIdIndexRoute: typeof SignedInWWorkspaceIdIndexRoute
+  SignedInWWorkspaceIdAiExportRoute: typeof SignedInWWorkspaceIdAiExportRoute
+  SignedInWWorkspaceIdAiImportRoute: typeof SignedInWWorkspaceIdAiImportRoute
   SignedInWWorkspaceIdIdeasIndexRoute: typeof SignedInWWorkspaceIdIdeasIndexRoute
   SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
@@ -423,6 +465,8 @@ interface SignedInWWorkspaceIdRouteRouteChildren {
 const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChildren =
   {
     SignedInWWorkspaceIdIndexRoute: SignedInWWorkspaceIdIndexRoute,
+    SignedInWWorkspaceIdAiExportRoute: SignedInWWorkspaceIdAiExportRoute,
+    SignedInWWorkspaceIdAiImportRoute: SignedInWWorkspaceIdAiImportRoute,
     SignedInWWorkspaceIdIdeasIndexRoute: SignedInWWorkspaceIdIdeasIndexRoute,
     SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute:
       SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute,

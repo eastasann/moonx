@@ -462,9 +462,11 @@ describe("X2 GET /api/v1/ai/import/context", () => {
     ]);
     const who = ctx.questions.find((q) => q.questionKey === "V.01.WHO");
     expect(who).toMatchObject({
+      prompt: "Who is the primary paying customer?",
       sectionKey: "01",
       answerType: "long_text",
       importable: true,
+      hasFau: true,
       hidden: false,
       current: {
         text: "HR teams of BPO companies in Bacolod that buy gifts for clients",
@@ -504,6 +506,8 @@ describe("X2 GET /api/v1/ai/import/context", () => {
     const importable = (key: string) =>
       ctx.questions.find((q) => q.questionKey === key)?.importable;
     expect(importable("P.01.1")).toBe(true);
+    // A plan's answers have no F/A/U (design-spec 6.0.3).
+    expect(ctx.questions.some((q) => q.hasFau)).toBe(false);
     expect(importable("P.01.7")).toBe(false);
     expect(importable("P.11.1")).toBe(false);
     expect(importable("P.23.1")).toBe(false);

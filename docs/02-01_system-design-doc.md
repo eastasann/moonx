@@ -762,8 +762,8 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo` | 21 プラン項目の編集 | `$itemNo` は 1〜30。`?q=&version=<plan_version の id>`（P4 の `versionId`。版の読み取り専用表示から項目を開くとき） |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/execution` | 22 実行管理 | `?tab=milestones|launch|kpis|questions|actions&item=&assignee=me|<user の id>&status=` |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch` | 23 Pitch Deck | `?variant=one|five&version=` |
-| `/w/$workspaceId/ai/export` | 24 AI 書き出し | `?source=self_analysis|validation|business_plan&id=&scope=&returnTo=` |
-| `/w/$workspaceId/ai/import` | 25 AI 取り込み | `?target=self_analysis|validation|business_plan&id=&scope=&returnTo=` |
+| `/w/$workspaceId/ai/export` | 24 AI 書き出し | `?source=self_analysis|validation|business_plan&id=&scope=&returnTo=`（`id` は検証かプランの id で、自己分析には付けない。`scope` は範囲の初期値で、書き出しのヘッダーの `scope:` と同じ書き方（`all`・`part:a`・`part:b`、またはセクションのキーを `,` でつなぐ。プランの項目は2桁のキー。design-spec 6.6 規則）。テンプレートに無いキーは捨て、何も残らなければ全体。`returnTo` は 24 を開いた画面のパスで、同じワークスペースの `/w/$workspaceId` の下のパスだけを受け付け、ほかは無いものとして扱う。自己分析の 24・25 を Viewer として開いているワークスペースで開いたら、10・11 と同じく自分の個人用ワークスペースの同じ画面へ移す） |
+| `/w/$workspaceId/ai/import` | 25 AI 取り込み | `?target=self_analysis|validation|business_plan&id=&scope=&returnTo=`（`id`・`scope`・`returnTo` の書き方は 24 と同じ。`scope` は振り分けの範囲（design-spec 6.7「取り込み先」）。`returnTo` は反映の後と Cancel・Close で戻る画面で、無いときは取り込み先のホーム（13・20・10）） |
 | `/admin/templates` | 26 管理: テンプレート一覧 | `?kind=` |
 | `/admin/templates/versions/$versionId` | 27 管理: テンプレート編集 | `?node=<section か question の id>`、または設定のノード `ai-prompt`（自己分析のテンプレートだけ。ほかの版で指定されたら何も選ばない） / `cost-defaults` / `check-rules` / `execution-presets` |
 | `/admin/users` | 28 管理: ユーザーとワークスペース | `?tab=users|workspaces|invitations` |
@@ -1494,9 +1494,10 @@ interface ImportContext {
   target: { type: TemplateKind; id: UUID; name: string; workspaceId: UUID | null; ideaId: UUID | null; currency: string | null; archived: boolean };  // workspaceId は検証・プランのワークスペース（24・25 は URL のワークスペースと食い違えば「You don't have access」を出す。自己分析は null）。ideaId は検証・プランの親のアイデア（取り込み後に開く画面）。currency は金額の表示用。archived はアイデアかプランがアーカイブ中（24・25 は書き出し・取り込みの操作を出さない）
   sections: { key: string; title: string; part: "a" | "b" | null; importable: boolean }[];  // テンプレートの全セクション（順）。importable は取り込める型の設問を1つ以上持つ。24 の範囲の選択肢と 25 の範囲の判定に使う
   questions: {
-    questionKey: string; title: string; sectionKey: string;
+    questionKey: string; title: string; prompt: string; sectionKey: string;   // prompt は設問の問い（25 ③ の頭の行に出す）
     answerType: AnswerType; options: QuestionOptions | null;
     importable: boolean;                   // 表・数字・実行管理は false
+    hasFau: boolean;                       // 検証の F/A/U を持つ設問（25 ③ で付け直せる。自己分析とプランは false）
     hidden: boolean;                       // OCEAN の出し分け・移行で隠れている。移行で隠れた設問は、保存済みの回答がある取り込める型のものだけを、その設問を持っていた版の定義（sectionKey も）で載せる
     current: { text: string | null; amount: number | null; classification: Classification | null } & Versioned;
   }[];

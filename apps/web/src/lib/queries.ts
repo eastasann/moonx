@@ -1,15 +1,18 @@
+import type { AiScope } from "@moonx/domain";
 import type {
   IdeaDecisionFilter,
   IdeaSort,
   SourceType,
   Stage,
   SupportsCheck,
+  TemplateKind,
 } from "@moonx/schemas";
 import {
   type QueryClient,
   type QueryKey,
   queryOptions,
 } from "@tanstack/react-query";
+import { scopeParam } from "./ai";
 import { ApiError, api, inPath, unwrap } from "./api";
 
 /** U1: the signed-in user, their memberships and last workspace (SDD 5.4). */
@@ -332,6 +335,76 @@ export const decisionContextQuery = (ideaId: string) =>
           ["decision-context"].get(),
       ),
   });
+
+/** What is cached of where an AI export or import goes: a self-analysis has no id. */
+export const aiKey = (kind: TemplateKind, id: string | undefined) => [
+  "ai",
+  kind,
+  id ?? "self",
+];
+
+/** X2: an import's target, its sections, and its questions with their answers now (SDD 5.10). */
+export const importContextQuery = (
+  kind: TemplateKind,
+  id: string | undefined,
+) =>
+  queryOptions({
+    queryKey: [...aiKey(kind, id), "context"],
+    queryFn: () =>
+      unwrap(
+        api().api.v1.ai.import.context.get({
+          query: { target: kind, ...(id === undefined ? {} : { id }) },
+        }),
+      ),
+  });
+
+/** What 24 exports (SDD 5.10 X1): the scope and the three options. */
+export interface AiExportOptions {
+  scope: AiScope;
+  includeEmpty: boolean;
+  includeExamples: boolean;
+  includeReference: boolean;
+}
+
+/**
+ * X1: an export. Each one counts against the user's AI round trips (SDD 7.2), so what was
+ * exported is kept for the visit and not read again behind the screen.
+ */
+export const aiExportQuery = (
+  kind: TemplateKind,
+  id: string | undefined,
+  options: AiExportOptions,
+) => {
+  const { scope } = options;
+  return queryOptions({
+    queryKey: [
+      ...aiKey(kind, id),
+      "export",
+      scopeParam(scope),
+      options.includeEmpty,
+      options.includeExamples,
+      options.includeReference,
+    ],
+    queryFn: () =>
+      unwrap(
+        api().api.v1.ai.export.get({
+          query: {
+            source: kind,
+            ...(id === undefined ? {} : { id }),
+            ...(scope.kind === "sections" ? { sections: [...scope.keys] } : {}),
+            ...(scope.kind === "items" ? { items: [...scope.itemNos] } : {}),
+            ...(scope.kind === "part" ? { part: scope.part } : {}),
+            includeEmpty: options.includeEmpty,
+            includeExamples: options.includeExamples,
+            includeReference: options.includeReference,
+          },
+        }),
+      ),
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+};
 
 /**
  * Puts what a save answered in a query's data (ADR-011). A read of it already on its way

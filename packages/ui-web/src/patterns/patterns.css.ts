@@ -733,6 +733,9 @@ export const stepsContent = style({
   flexDirection: "column",
   gap: steps.itemGap,
   minWidth: 0,
+  // Focused only by a step change (StepsPattern focusKey), to start reading there: it
+  // is not a control, and the ring would frame the whole step.
+  outline: "none",
 });
 
 /** A question of the diff check in its frame (s25-import.html .item). */

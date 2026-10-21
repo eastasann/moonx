@@ -34,6 +34,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AiMenu } from "../components/AiMenu";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
@@ -567,11 +568,13 @@ function Header({ home }: { home: ValidationHome }) {
 
 /**
  * The tools beside the title for the Owners and Members (design-spec 6.1「操作」): Edit
- * summary while the idea is not archived, and ⋯ with Duplicate, and Archive while it is
- * not. AI ▼, Add plan and Update template join with their screens.
+ * summary and AI ▼ while the idea is not archived (6.8: no AI round trip then), and ⋯
+ * with Duplicate, and Archive while it is not. Add plan and Update template join with
+ * their screens.
  */
 function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {
   const { t } = useTranslation(["validation", "ideas"]);
+  const { workspace } = useWorkspace();
   const actions = useIdeaActions();
   const { idea } = home;
   return (
@@ -580,6 +583,13 @@ function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {
         <Button variant="secondary" isQuiet onPress={onEdit}>
           {t("validation:home.editSummary")}
         </Button>
+      )}
+      {!idea.archived && (
+        <AiMenu
+          kind="validation"
+          id={home.validationId}
+          returnTo={ideaHref(workspace.id, idea.id)}
+        />
       )}
       <ActionMenu
         aria-label={t("validation:home.more", { name: idea.name })}

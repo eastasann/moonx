@@ -467,6 +467,27 @@ describe("FauButtons", () => {
     ).toBe(false);
   });
 
+  test("on 25 ③ the state reads before the buttons, as the imported answer's: ◆ Unclassified (s25-import.html)", () => {
+    render(
+      <FauButtons
+        aria-label="Fact, Assumption or Unknown for 01 · WHO"
+        unclassified="label"
+        state="unclassified"
+        confidence={null}
+        hasValue
+        onChange={() => {}}
+        onFactPress={() => {}}
+      />,
+    );
+    const label = screen.getByText("Unclassified");
+    expect(screen.queryByText("Not classified yet")).toBeNull();
+    expect(
+      label.compareDocumentPosition(
+        screen.getByRole("radio", { name: /Fact/ }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   test("Assumption waits for a confidence; pressing the chosen button again clears it", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -482,6 +503,35 @@ describe("FauButtons", () => {
     await user.click(screen.getByRole("radio", { name: /Assumption/ }));
     expect(onChange).toHaveBeenLastCalledWith({ fau: null, confidence: null });
     expect(screen.getByText("Not classified yet")).toBeTruthy();
+  });
+
+  test("an Assumption waiting for its confidence goes when the answer is emptied", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <FauButtons
+        aria-label="Fact, Assumption or Unknown for WHO"
+        state="unclassified"
+        confidence={null}
+        hasValue
+        onChange={onChange}
+        onFactPress={() => {}}
+      />,
+    );
+    await user.click(screen.getByRole("radio", { name: /Assumption/ }));
+    expect(screen.getByRole("radio", { name: "High" })).toBeTruthy();
+    rerender(
+      <FauButtons
+        aria-label="Fact, Assumption or Unknown for WHO"
+        state="empty"
+        confidence={null}
+        hasValue={false}
+        onChange={onChange}
+        onFactPress={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("radio", { name: "High" })).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   test("Fact only asks for evidence; Unknown keeps a text answer and asks nothing", async () => {

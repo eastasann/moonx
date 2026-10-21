@@ -610,7 +610,7 @@ export function DecisionScreen({ ideaId }: { ideaId: string }) {
   useDocumentTitle(
     ...(data === undefined
       ? []
-      : [t("validation:decision.crumb"), data.idea.name, workspace.name]),
+      : [t("validation:decision.crumb"), workspace.name]),
   );
 
   let body: ReactNode;

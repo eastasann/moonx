@@ -6,6 +6,7 @@ import * as styles from "./FauButtons.css";
 import type { FauChange } from "./FauPicker";
 import { MoonGlyphAt } from "./MoonGlyph";
 import { SegmentedControl, SegmentedControlItem } from "./SegmentedControl";
+import { StatusLight } from "./StatusLight";
 import { ToggleButton, ToggleButtonGroup } from "./ToggleButtonGroup";
 
 /** Which of the three buttons a state presses. */
@@ -36,6 +37,13 @@ export interface FauButtonsProps {
   onFactPress: () => void;
   /** No choice can be made (offline: the inputs are read only, 6.0.2). */
   isDisabled?: boolean;
+  /**
+   * How an answer with content and no F/A/U says so: `note`, "Not classified yet" after
+   * the buttons (11, s11-form.html); `label`, "◆ Unclassified" before them, the state the
+   * imported answer takes (25 ③, s25-import.html .fau-row).
+   * @default "note"
+   */
+  unclassified?: "note" | "label";
   /** Names the buttons: "Fact, Assumption or Unknown for WHO". */
   "aria-label": string;
 }
@@ -54,6 +62,7 @@ export function FauButtons({
   onChange,
   onFactPress,
   isDisabled = false,
+  unclassified = "note",
   "aria-label": name,
 }: FauButtonsProps) {
   const { t } = useTranslation(["components", "common"]);
@@ -61,6 +70,9 @@ export function FauButtons({
   const confidenceId = useId();
   // Assumption pressed but no confidence chosen yet: nothing is saved until one is.
   const [pending, setPending] = useState(false);
+  // The answer emptied meanwhile: an Assumption needs a value (6.0.3), so the pending
+  // choice goes rather than save one the API refuses.
+  if (pending && !hasValue) setPending(false);
   const shown = pending ? "assumption" : current;
 
   const change = (next: FauChange) => {
@@ -84,6 +96,11 @@ export function FauButtons({
   return (
     <div className={styles.root}>
       <div className={styles.row}>
+        {unclassified === "label" && state === "unclassified" && !pending && (
+          <StatusLight variant="unclassified" size="S">
+            {t("common:fauState.unclassified")}
+          </StatusLight>
+        )}
         <ToggleButtonGroup
           aria-label={name}
           isDisabled={isDisabled}
@@ -115,7 +132,7 @@ export function FauButtons({
             {t("common:fau.unknown")}
           </ToggleButton>
         </ToggleButtonGroup>
-        {state === "unclassified" && !pending && (
+        {unclassified === "note" && state === "unclassified" && !pending && (
           <span className={styles.note}>
             {t("components:fauButtons.notClassified")}
           </span>

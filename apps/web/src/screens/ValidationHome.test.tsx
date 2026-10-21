@@ -216,7 +216,29 @@ describe("13 Validation home (design-spec 6.1)", () => {
     );
   });
 
-  test("a Viewer: no Edit summary, no ⋯; an empty summary answer opens its question to read", async () => {
+  test("AI ▼: Export for AI on every question section, Import from AI into this validation, both back here", async () => {
+    homeApi();
+    renderApp(path);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "AI" }));
+    const back = encodeURIComponent(path);
+    expect(
+      (
+        await screen.findByRole("menuitem", { name: "Export for AI" })
+      ).getAttribute("href"),
+    ).toBe(
+      `/w/${workspaceId}/ai/export?source=validation&id=${home.validationId}&returnTo=${back}`,
+    );
+    expect(
+      screen
+        .getByRole("menuitem", { name: "Import from AI" })
+        .getAttribute("href"),
+    ).toBe(
+      `/w/${workspaceId}/ai/import?target=validation&id=${home.validationId}&returnTo=${back}`,
+    );
+  });
+
+  test("a Viewer: no Edit summary, no AI, no ⋯; an empty summary answer opens its question to read", async () => {
     homeApi({ me: as("viewer") });
     renderApp(path);
     await screen.findByRole("heading", {
@@ -224,6 +246,7 @@ describe("13 Validation home (design-spec 6.1)", () => {
       name: "Bacolod Health Bowl",
     });
     expect(screen.queryByRole("button", { name: "Edit summary" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "AI" })).toBeNull();
     expect(
       screen.queryByRole("button", { name: "Record decision" }),
     ).toBeNull();
@@ -242,13 +265,15 @@ describe("13 Validation home (design-spec 6.1)", () => {
     );
   });
 
-  test("archived: the notice and Restore for an Owner, and no Edit summary", async () => {
+  test("archived: the notice and Restore for an Owner, and no Edit summary or AI", async () => {
     const calls = homeApi({
       data: validationHome({ archived: true }),
     });
     renderApp(path);
     expect(await screen.findByText("This idea is archived")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit summary" })).toBeNull();
+    // No AI round trip on an archived idea (design-spec 6.8).
+    expect(screen.queryByRole("button", { name: "AI" })).toBeNull();
     expect(
       screen.queryByRole("button", { name: "Record decision" }),
     ).toBeNull();

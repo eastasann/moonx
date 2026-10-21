@@ -1185,6 +1185,48 @@ describe("StepsPattern (G)", () => {
   });
 });
 
+describe("StepsPattern (G) moving between steps in place", () => {
+  function Flow() {
+    const [step, setStep] = useState("one");
+    return (
+      <StepsPattern
+        steps={<ol aria-label="Steps" />}
+        focusKey={step}
+        actions={
+          step === "one" ? (
+            <Button variant="primary" onPress={() => setStep("two")}>
+              Next
+            </Button>
+          ) : (
+            <Button variant="secondary" onPress={() => setStep("one")}>
+              Back
+            </Button>
+          )
+        }
+      >
+        <p>{step === "one" ? "First step" : "Second step"}</p>
+      </StepsPattern>
+    );
+  }
+
+  test("a new step takes focus at the start of its content and the page back to its top; opening does not", async () => {
+    const user = userEvent.setup();
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    render(<Flow />);
+    const content = screen.getByText("First step").parentElement;
+    expect(document.activeElement).not.toBe(content);
+    expect(scrollTo).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    // The button that moved on is gone; focus is where the new step starts.
+    expect(document.activeElement).toBe(
+      screen.getByText("Second step").parentElement,
+    );
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("SettingsPattern (H)", () => {
   test("each group a region named by its heading", () => {
     render(

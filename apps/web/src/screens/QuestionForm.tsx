@@ -26,6 +26,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AiMenu } from "../components/AiMenu";
 import {
   AnswerEvidenceSheet,
   AnswerFields,
@@ -53,6 +54,7 @@ import {
   ideasHref,
   isQuestionSection,
   type QuestionSection,
+  questionsHref,
   sectionHref,
 } from "../lib/links";
 import {
@@ -344,6 +346,16 @@ function SectionForm({
             </Well>
           ) : null
         }
+        footer={
+          canEdit ? (
+            <AiMenu
+              kind="validation"
+              id={validationId}
+              scope={sectionKey}
+              returnTo={questionsHref(workspace.id, idea.id, sectionKey)}
+            />
+          ) : undefined
+        }
         previousSection={
           previous === undefined ? undefined : (
             <Button
@@ -527,9 +539,9 @@ function QuestionFormBody({
  * 11 Question form for a validation section, 01, 02 or 10 (design-spec 6.2,
  * s11-form.html): pattern C. The section's title with ▼ to switch sections and how many
  * are answered; each question with its answer, F/A/U (6.0.3), Example, Hint and Related
- * research; the previous and next sections in the bottom bar, or on a phone ← → between
- * the questions and the section's completion card. Viewers and archived ideas read it
- * with every question open.
+ * research; the previous and next sections and AI ▼ in the bottom bar, or on a phone
+ * ← → between the questions, the section's completion card and AI ▼ under the card.
+ * Viewers and archived ideas read it with every question open, without AI ▼.
  */
 export function QuestionFormScreen({
   ideaId,

@@ -339,6 +339,7 @@ describe("11 Question form (design-spec 6.2)", () => {
     });
     expect(screen.queryAllByRole("textbox")).toEqual([]);
     expect(screen.queryByRole("switch", { name: "Focus" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "AI" })).toBeNull();
     expect(screen.queryByRole("radio", { name: /Fact/ })).toBeNull();
     expect(card("WHO").textContent).toContain("Fact · No evidence");
     expect(card("WHO").textContent).toContain(
@@ -1024,6 +1025,30 @@ describe("M2 Evidence (design-spec 6.0.3)", () => {
     });
     expect(screen.getByText("This idea is archived")).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
+    // No AI round trip on an archived idea (design-spec 6.8).
+    expect(screen.queryByRole("button", { name: "AI" })).toBeNull();
+  });
+
+  test("AI ▼ exports this section and imports into this validation, both back to this section", async () => {
+    formApi();
+    renderApp(`${base}/01`);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "AI" }));
+    const back = encodeURIComponent(`${base}/01`);
+    expect(
+      (
+        await screen.findByRole("menuitem", { name: "Export for AI" })
+      ).getAttribute("href"),
+    ).toBe(
+      `/w/${workspaceId}/ai/export?source=validation&id=${validationId}&scope=01&returnTo=${back}`,
+    );
+    expect(
+      screen
+        .getByRole("menuitem", { name: "Import from AI" })
+        .getAttribute("href"),
+    ).toBe(
+      `/w/${workspaceId}/ai/import?target=validation&id=${validationId}&returnTo=${back}`,
+    );
   });
 
   test("M2's URL about an item not on the screen opens nothing", async () => {

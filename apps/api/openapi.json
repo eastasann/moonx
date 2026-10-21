@@ -26233,6 +26233,7 @@
                         "properties": {
                           "questionKey": { "type": "string" },
                           "title": { "type": "string" },
+                          "prompt": { "type": "string" },
                           "sectionKey": { "type": "string" },
                           "answerType": {
                             "type": "string",
@@ -26339,6 +26340,7 @@
                             ]
                           },
                           "importable": { "type": "boolean" },
+                          "hasFau": { "type": "boolean" },
                           "hidden": { "type": "boolean" },
                           "current": {
                             "type": "object",
@@ -26493,10 +26495,12 @@
                         "required": [
                           "questionKey",
                           "title",
+                          "prompt",
                           "sectionKey",
                           "answerType",
                           "options",
                           "importable",
+                          "hasFau",
                           "hidden",
                           "current"
                         ],

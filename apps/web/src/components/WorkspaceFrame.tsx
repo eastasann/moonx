@@ -17,8 +17,8 @@ import { useModal, useWorkspace } from "./workspace";
 
 export interface WorkspaceFrameProps
   extends Pick<AppFrameProps, "breadcrumbs" | "back" | "title"> {
-  /** The navigation item of the screen. */
-  current: "dashboard" | "ideas";
+  /** The navigation item of the screen; none for a screen whose item is not built yet. */
+  current?: "dashboard" | "ideas";
   /**
    * The screen's saved items, by key prefix (`idea:<id>`), or prefixes for a screen of
    * several kinds of item: "Saved" shows once one of them saved on this visit. Failures

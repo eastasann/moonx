@@ -11,6 +11,7 @@ import {
 import { Button as AriaButton } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/Button";
+import { Tab, TabList, TabPanel, Tabs } from "../components/Tabs";
 import {
   BackOverrideContext,
   FloatingAction,
@@ -45,6 +46,20 @@ interface ListDetailBase {
    * tablet breakpoint up, a floating "+" at the bottom right on a phone (4.1 D).
    */
   newItem?: { label: string; onPress: () => void };
+  /**
+   * Lists switched in place under the title (16's Assumptions / Risks; design-spec 4.5
+   * Tabs): the tabs, then the selected one's filters and list in its panel. The detail
+   * stays outside the tabs, as it shows the selected item.
+   */
+  tabs?: ListTabs;
+}
+
+/** The tabs of `ListDetailPattern`: the lists, and the one shown. */
+export interface ListTabs {
+  "aria-label": string;
+  items: readonly { id: string; label: string }[];
+  selectedKey: string;
+  onSelectionChange: (key: string) => void;
 }
 
 interface WithDetail extends ListDetailBase {
@@ -94,7 +109,7 @@ function selectedRows(pane: HTMLElement | null): string {
  */
 export function ListDetailPattern(props: ListDetailPatternProps) {
   const { t } = useTranslation(["components"]);
-  const { header, filters, list, listNote, newItem } = props;
+  const { header, filters, list, listNote, newItem, tabs } = props;
   const hasDetail = props.hasDetail !== false;
   const detail = props.hasDetail === false ? null : props.detail;
   const listLabel = props.hasDetail === false ? "" : props.listLabel;
@@ -209,6 +224,14 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
   }, [opensDetail, isTwoColumns, usesFrameBack, hasDetail]);
 
   const isBeside = hasDetail && isTwoColumns;
+  const listBodyOf = () => (
+    <>
+      {filters != null && <div className={styles.listFilters}>{filters}</div>}
+      <div ref={listBody}>
+        <ListPaneContext.Provider value={true}>{list}</ListPaneContext.Provider>
+      </div>
+    </>
+  );
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: it only follows focus among its children
     <div
@@ -238,14 +261,31 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
                 )}
               </div>
             )}
-            {filters != null && (
-              <div className={styles.listFilters}>{filters}</div>
+            {tabs === undefined ? (
+              listBodyOf()
+            ) : (
+              // Only the tabs and their panel inside Tabs: React Aria renders everything
+              // else inside it a second time, hidden, to find the tabs, and collections
+              // in a detail rendered so loop.
+              <Tabs
+                selectedKey={tabs.selectedKey}
+                onSelectionChange={(key) => tabs.onSelectionChange(String(key))}
+              >
+                <div className={styles.listTabs}>
+                  <TabList aria-label={tabs["aria-label"]}>
+                    {tabs.items.map((item) => (
+                      <Tab key={item.id} id={item.id}>
+                        {item.label}
+                      </Tab>
+                    ))}
+                  </TabList>
+                </div>
+                {/* Its own panel per tab: React Aria names a panel once, by its first id. */}
+                <TabPanel key={tabs.selectedKey} id={tabs.selectedKey}>
+                  {listBodyOf()}
+                </TabPanel>
+              </Tabs>
             )}
-            <div ref={listBody}>
-              <ListPaneContext.Provider value={true}>
-                {list}
-              </ListPaneContext.Provider>
-            </div>
             {listNote != null && (
               <div className={styles.listNote}>{listNote}</div>
             )}

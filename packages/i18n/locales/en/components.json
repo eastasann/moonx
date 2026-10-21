@@ -78,6 +78,10 @@
     "expand": "Expand",
     "collapse": "Collapse"
   },
+  "card": {
+    "openThreads_one": "{{formatted}} open comment thread",
+    "openThreads_other": "{{formatted}} open comment threads"
+  },
   "questionCard": {
     "empty": "Empty",
     "comments_one": "{{formatted}} comment",

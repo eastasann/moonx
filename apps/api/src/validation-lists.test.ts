@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import {
   assumptions,
   changeHistory,
+  comments,
   competitors,
   costItems,
   ideas,
@@ -149,6 +150,7 @@ describe("V8 and V9 competitors", () => {
       lockVersion: 0,
       evidence: [],
       commentCount: 0,
+      unresolvedThreadCount: 0,
       updatedBy: { id: team.owner.id },
     });
     const second = await addCompetitor(team, { name: "Home bakers" });
@@ -181,6 +183,37 @@ describe("V8 and V9 competitors", () => {
       ).json(),
     );
     expect(home.checks[0]).toMatchObject({ key: "competitors", count: 2 });
+  });
+
+  test("a card counts its threads not resolved, as C1 does (design-spec 6.10)", async () => {
+    const team = await newTeam();
+    const card = await addCompetitor(team, { name: "Bongbong's" });
+    const thread = (extra: Partial<typeof comments.$inferInsert> = {}) => ({
+      workspaceId: team.workspace.id,
+      containerType: "validation" as const,
+      containerId: team.validationId,
+      sectionKey: "competitors",
+      targetType: "competitor" as const,
+      targetId: card.id,
+      authorId: team.owner.id,
+      body: "Is this price current?",
+      ...extra,
+    });
+    const [open] = await db.insert(comments).values(thread()).returning();
+    if (open === undefined) throw new Error("no comment");
+    await db.insert(comments).values([
+      // A reply is part of its thread, not a thread of its own.
+      thread({ parentId: open.id, body: "Checked last week." }),
+      thread({ resolvedAt: new Date(), resolvedById: team.owner.id }),
+      // Deleted, but not resolved: still open, as C1's unresolvedCount has it.
+      thread({ deletedAt: new Date() }),
+    ]);
+    const [listed] = (await competitorList(team)).items;
+    expect(listed).toMatchObject({
+      id: card.id,
+      unresolvedThreadCount: 2,
+      commentCount: 3,
+    });
   });
 
   test("GET leaves out the patterns questions the pinned version lacks", async () => {

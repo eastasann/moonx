@@ -1,5 +1,5 @@
 import { breakpoints } from "@moonx/ui-tokens";
-import { ArrowRight, ChevronDown, MessageSquare, Plus } from "lucide-react";
+import { ArrowRight, ChevronDown, Plus } from "lucide-react";
 import { useState } from "react";
 import { ActionButton } from "../../components/ActionButton";
 import { Badge } from "../../components/Badge";
@@ -365,19 +365,8 @@ export function CompetitorsScreen() {
                     </Text>
                   ),
                 }))}
-                footer={
-                  <>
-                    <span>{competitor.sources}</span>
-                    {competitor.comments > 0 && (
-                      <Flex gap="space-50" alignItems="center">
-                        <IconSlot size="XS">
-                          <MessageSquare />
-                        </IconSlot>
-                        <span>{competitor.comments}</span>
-                      </Flex>
-                    )}
-                  </>
-                }
+                footer={competitor.sources}
+                openThreadCount={competitor.comments}
                 actions={
                   <ActionMenu aria-label={`Card actions of ${competitor.name}`}>
                     <MenuItem id="edit">Edit</MenuItem>

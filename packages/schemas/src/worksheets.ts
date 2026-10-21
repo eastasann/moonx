@@ -123,6 +123,8 @@ export const competitorSchema = versionedSchema.extend({
   evidence: z.array(evidenceSchema),
   sortOrder: z.int(),
   commentCount: z.int().nonnegative(),
+  /** The threads on it not resolved, as C1's `unresolvedCount` (15's card, 💬 n). */
+  unresolvedThreadCount: z.int().nonnegative(),
 });
 export type Competitor = z.infer<typeof competitorSchema>;
 

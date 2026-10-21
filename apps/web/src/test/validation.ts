@@ -1,6 +1,9 @@
 import type {
+  Assumption,
+  Competitor,
   Evidence,
   ResearchLogEntry,
+  Risk,
   TemplateQuestion,
   TemplateSection,
   ValidationAnswer,
@@ -18,7 +21,7 @@ const anaRef = {
   badge: null,
 };
 
-const question = (
+export const question = (
   key: string,
   title: string,
   prompt: string,
@@ -150,5 +153,75 @@ export const answer = (
   lockVersion: 0,
   updatedAt: null,
   updatedBy: null,
+  ...extra,
+});
+
+/** A competitor as V8 returns it. */
+export const competitor = (
+  id: string,
+  name: string,
+  extra: Partial<Competitor> = {},
+): Competitor => ({
+  id,
+  name,
+  type: null,
+  targetCustomer: null,
+  offering: null,
+  typicalPrice: null,
+  priceNote: null,
+  strength: null,
+  weakness: null,
+  whyChosen: null,
+  whySurvive: null,
+  evidence: [],
+  sortOrder: 0,
+  commentCount: 0,
+  unresolvedThreadCount: 0,
+  lockVersion: 1,
+  updatedAt: "2026-09-20T01:00:00.000Z",
+  updatedBy: anaRef,
+  ...extra,
+});
+
+/** An assumption as V10 returns it. */
+export const assumption = (
+  id: string,
+  statement: string,
+  extra: Partial<Assumption> = {},
+): Assumption => ({
+  id,
+  statement,
+  whyBelieve: null,
+  evidence: [],
+  evidenceNote: null,
+  confidence: null,
+  disproveCondition: null,
+  nextCheck: null,
+  sortOrder: 0,
+  commentCount: 0,
+  lockVersion: 1,
+  updatedAt: "2026-09-20T01:00:00.000Z",
+  updatedBy: anaRef,
+  ...extra,
+});
+
+/** A risk as V10 returns it. */
+export const risk = (
+  id: string,
+  statement: string,
+  extra: Partial<Risk> = {},
+): Risk => ({
+  id,
+  statement,
+  probability: null,
+  impact: null,
+  whyMatters: null,
+  mitigation: null,
+  howToValidate: null,
+  sortOrder: null,
+  commentCount: 0,
+  lockVersion: 1,
+  updatedAt: "2026-09-20T01:00:00.000Z",
+  updatedBy: anaRef,
   ...extra,
 });

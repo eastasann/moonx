@@ -152,7 +152,7 @@ describe("13 Validation home (design-spec 6.1)", () => {
     ).toBeTruthy();
   });
 
-  test("sections open 11 and 14; an empty summary answer opens its question", async () => {
+  test("sections open 11, 14, 15 and 16; an empty summary answer opens its question", async () => {
     homeApi();
     renderApp(path);
     await screen.findByRole("heading", {
@@ -170,12 +170,19 @@ describe("13 Validation home (design-spec 6.1)", () => {
         .getByRole("link", { name: /03 Research Log/ })
         .getAttribute("href"),
     ).toBe(`/w/${workspaceId}/ideas/${home.idea.id}/research`);
-    // 04 and 09 open screens not built yet.
     expect(
-      within(sections).queryByRole("link", { name: /04 Competitors/ }),
-    ).toBeNull();
+      within(sections)
+        .getByRole("link", { name: /04 Competitors/ })
+        .getAttribute("href"),
+    ).toBe(`/w/${workspaceId}/ideas/${home.idea.id}/competitors`);
     expect(
-      within(sections).queryByRole("link", { name: /09 Assumptions & Risks/ }),
+      within(sections)
+        .getByRole("link", { name: /09 Assumptions & Risks/ })
+        .getAttribute("href"),
+    ).toBe(`/w/${workspaceId}/ideas/${home.idea.id}/assumptions`);
+    // 05 opens a screen not built yet.
+    expect(
+      within(sections).queryByRole("link", { name: /05 Costs/ }),
     ).toBeNull();
     const summary = screen.getByRole("region", { name: "Summary" });
     expect(

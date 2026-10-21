@@ -272,6 +272,7 @@ export {
 export {
   ListDetailPattern,
   type ListDetailPatternProps,
+  type ListTabs,
 } from "./patterns/ListDetailPattern";
 export {
   PresentationPattern,

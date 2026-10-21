@@ -2,11 +2,38 @@ import AxeBuilder from "@axe-core/playwright";
 import type { IdeaDetail, Me } from "@moonx/schemas";
 import type { Page } from "@playwright/test";
 import { WEB_ORIGIN } from "./env";
-import { demo, expect, newAccount, test, workspaceOf } from "./fixtures";
+import {
+  test as base,
+  demo,
+  expect,
+  newAccount,
+  workspaceOf,
+} from "./fixtures";
 
-// 11 Question form for the validation's sections, M2 Evidence and 14 Research log
-// (design-spec 6.2・6.0.3・6.10), against the seeded BCDX (read only) and, for what
-// writes, the personal workspace of an account each test makes.
+// 11 Question form for the validation's sections, M2 Evidence, 14 Research log, 15
+// Competitors and 16 Assumptions & Risks (design-spec 6.2・6.0.3・6.10), against the
+// seeded BCDX (read only) and, for what writes, an idea each test makes in the personal
+// workspace of its worker's own account.
+
+/** An account the tests of one worker share. */
+interface Account {
+  email: string;
+  password: string;
+}
+
+/**
+ * One account per worker: an account each test would spend BCDX's Owner's invitations,
+ * 20 an hour for the whole run (SDD 7.2), and each test writes only in an idea it makes.
+ */
+const test = base.extend<object, { account: Account }>({
+  account: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright reads the fixtures a fixture needs from this pattern, and this one needs none.
+    async ({}, use, workerInfo) => {
+      await use(await newAccount(workerInfo.workerIndex, "validation"));
+    },
+    { scope: "worker" },
+  ],
+});
 
 const phone = {
   viewport: { width: 390, height: 844 },
@@ -35,8 +62,18 @@ async function expectNoAxeViolations(page: Page) {
     page.locator("[data-live-announcer] [aria-labelledby]"),
   ).toHaveCount(0, { timeout: 10_000 });
   // A dialog or popover fading in or out has its words part-transparent, which axe reads
-  // as low contrast: the page is checked once overlays have settled.
+  // as low contrast: the page is checked once overlays have settled, and colours that
+  // change on a press (a SegmentedControl's segments) have finished changing.
   await expect(page.locator("[data-entering], [data-exiting]")).toHaveCount(0);
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          !(animation instanceof CSSTransition) ||
+          animation.playState !== "running",
+      ),
+  );
   const { violations } = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();
@@ -48,13 +85,12 @@ async function expectNoAxeViolations(page: Page) {
   ).toEqual([]);
 }
 
-/** A user of their own, signed in, with an idea in their personal workspace. */
+/** The worker's account, signed in, with a new idea in its personal workspace. */
 async function ownIdea(
   page: Page,
   signIn: (email: string, password?: string) => Promise<Me>,
-  label: string,
+  account: Account,
 ) {
-  const account = await newAccount(test.info().workerIndex, label);
   const me = await signIn(account.email, account.password);
   const personal = me.memberships.find(({ workspace }) => workspace.isPersonal);
   if (personal === undefined) throw new Error("No personal workspace");
@@ -90,8 +126,9 @@ test.describe("11 Question form on a desktop", () => {
   test("13 → 11: answer, mark F/A/U and attach new evidence; 13's checks and Next steps follow", async ({
     page,
     signIn,
+    account,
   }) => {
-    const { workspace, idea } = await ownIdea(page, signIn, "answers");
+    const { workspace, idea } = await ownIdea(page, signIn, account);
     await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
     await expect(
       block(page, "Next steps").getByRole("listitem").first(),
@@ -200,8 +237,9 @@ test.describe("11 Question form on a desktop", () => {
   test("14: an entry added there is chosen in M2, and lists what it is evidence for", async ({
     page,
     signIn,
+    account,
   }) => {
-    const { workspace, idea } = await ownIdea(page, signIn, "research");
+    const { workspace, idea } = await ownIdea(page, signIn, account);
     await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
     await block(page, "Sections")
       .getByRole("link", { name: /03 Research Log/ })
@@ -274,8 +312,9 @@ test.describe("11 Question form on a desktop", () => {
   test("02: OCEAN shows its questions; a URL is attached as evidence; the last one asks before it goes", async ({
     page,
     signIn,
+    account,
   }) => {
-    const { workspace, idea } = await ownIdea(page, signIn, "ocean");
+    const { workspace, idea } = await ownIdea(page, signIn, account);
     await page.goto(`/w/${workspace.id}/ideas/${idea.id}/questions/02`);
     await expect(page.getByText("0/8")).toBeVisible();
     await question(page, "OCEAN")
@@ -322,8 +361,9 @@ test.describe("11 Question form on a desktop", () => {
   test("13's links: Summary opens the question, a check opens 14's new entry", async ({
     page,
     signIn,
+    account,
   }) => {
-    const { workspace, idea } = await ownIdea(page, signIn, "links");
+    const { workspace, idea } = await ownIdea(page, signIn, account);
     await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
     await block(page, "Summary")
       .getByRole("link", { name: "Answer in 02 Market" })
@@ -445,8 +485,9 @@ test.describe("11 on a phone", () => {
   test("14: a new entry in a sheet, its source chosen in a tray; Back returns to the list", async ({
     page,
     signIn,
+    account,
   }) => {
-    const { workspace, idea } = await ownIdea(page, signIn, "phone-log");
+    const { workspace, idea } = await ownIdea(page, signIn, account);
     await page.goto(`/w/${workspace.id}/ideas/${idea.id}/research`);
     await page.getByRole("button", { name: "Add entry" }).first().click();
     const sheet = page.getByRole("dialog", { name: "New entry" });
@@ -485,8 +526,9 @@ test.describe("11 on a phone", () => {
   test("one question at a time, the dots, and the section's completion card", async ({
     page,
     signIn,
+    account,
   }) => {
-    const { workspace, idea } = await ownIdea(page, signIn, "phone-form");
+    const { workspace, idea } = await ownIdea(page, signIn, account);
     await page.goto(`/w/${workspace.id}/ideas/${idea.id}/questions/10`);
     await expect(page.getByRole("textbox")).toHaveCount(1);
     await expect(
@@ -510,5 +552,500 @@ test.describe("11 on a phone", () => {
     await expectNoAxeViolations(page);
     await page.getByRole("button", { name: "Back to Validation" }).click();
     await expect(page).toHaveURL(new RegExp(`/ideas/${idea.id}$`));
+  });
+});
+
+/** Adds a competitor through 15's dialog, its type and price as given. */
+async function addCompetitor(
+  page: Page,
+  name: string,
+  { type, price }: { type?: string; price?: string } = {},
+) {
+  await page.getByRole("button", { name: "Add competitor" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "New competitor" });
+  await dialog.getByRole("textbox", { name: /^Name/ }).fill(name);
+  if (type !== undefined) {
+    await dialog.getByRole("button", { name: /Type/ }).click();
+    await page.getByRole("option", { name: type, exact: true }).click();
+  }
+  if (price !== undefined) {
+    await dialog.getByRole("textbox", { name: "Typical Price" }).fill(price);
+  }
+  await dialog.getByRole("button", { name: "Add competitor" }).click();
+  await expect(dialog).toHaveCount(0);
+  // Made, it opens in its own dialog (design-spec 6.10), closed here to add the next.
+  const made = page.getByRole("dialog", { name: "Edit competitor" });
+  await expect(made.getByRole("textbox", { name: /^Name/ })).toHaveValue(name);
+  await expect(page).toHaveURL(/row=/);
+  await made.getByRole("button", { name: /Close/ }).click();
+  await expect(made).toHaveCount(0);
+  await expect(page).not.toHaveURL(/row=/);
+}
+
+/** The cards of 15, in their order, by their names. */
+const cardNames = (page: Page) =>
+  page
+    .getByRole("grid", { name: "Competitors", exact: true })
+    .getByRole("row")
+    .filter({ hasNotText: "Add competitor" });
+
+test.describe("15 Competitors on a desktop", () => {
+  test.use(desktop);
+
+  test("13 → 15: competitors added, compared in the table, edited, reordered; 13's check follows", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea } = await ownIdea(page, signIn, account);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
+    await block(page, "Sections")
+      .getByRole("link", { name: /04 Competitors/ })
+      .click();
+    await expect(page).toHaveURL(/\/competitors$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "04 Competitors" }),
+    ).toBeVisible();
+    await expect(page).toHaveTitle(
+      `04 Competitors · ${workspace.name} · moonx`,
+    );
+    await expect(page.getByText("0 competitors · aim for 3–5")).toBeVisible();
+    await expect(
+      page.getByText(
+        "List 3–5 competitors or substitutes. Include what people do today instead.",
+      ),
+    ).toBeVisible();
+
+    await addCompetitor(page, "Salad Station", {
+      type: "Direct Competitor",
+      price: "240",
+    });
+    await addCompetitor(page, "Bowl & Co", {
+      type: "Direct Competitor",
+      price: "1,260.50",
+    });
+    await addCompetitor(page, "Home meal prep", { type: "Substitute" });
+    await expect(cardNames(page)).toHaveCount(3);
+    await expect(page.getByText("3 competitors · aim for 3–5")).toBeVisible();
+    const salad = cardNames(page).filter({ hasText: "Salad Station" });
+    await expect(salad).toContainText("Direct Competitor");
+    await expect(salad).toContainText("₱240");
+    await expect(salad).toContainText("No sources");
+    await expect(
+      cardNames(page).filter({ hasText: "Home meal prep" }),
+    ).toContainText("No price");
+    await expectNoAxeViolations(page);
+
+    // A card opens its dialog, which saves as typed; M2 attaches a URL to it.
+    await salad.click();
+    const editor = page.getByRole("dialog", { name: "Edit competitor" });
+    await expect(page).toHaveURL(/row=/);
+    await editor
+      .getByRole("textbox", { name: "Strength" })
+      .fill("Prime location near offices");
+    await expect(page.getByText("Saved")).toBeVisible();
+    await editor.getByRole("link", { name: "Add evidence" }).click();
+    const sheet = page.getByRole("dialog", { name: "Evidence" });
+    await expect(sheet).toContainText("Competitors · Salad Station");
+    await sheet.getByRole("radio", { name: "URL" }).click();
+    await sheet
+      .getByRole("textbox", { name: /^URL/ })
+      .fill("https://example.com/salad-station-menu");
+    await sheet.getByRole("button", { name: "Attach URL" }).click();
+    await expect(
+      sheet.getByRole("row", { name: /salad-station-menu/ }),
+    ).toBeVisible();
+    await sheet.getByRole("button", { name: "Done" }).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(
+      editor.getByRole("row", { name: /salad-station-menu/ }),
+    ).toBeVisible();
+    await expectNoAxeViolations(page);
+    // Back closes the dialog it was opened by.
+    await page.goBack();
+    await expect(editor).toHaveCount(0);
+    await expect(page).toHaveURL(/\/competitors$/);
+    await expect(salad).toContainText("Prime location near offices");
+    await expect(salad).toContainText("1 source");
+
+    // The table: the fields as rows, the competitors as columns.
+    await page.getByRole("radio", { name: "Table" }).click();
+    await expect(page).toHaveURL(/view=table/);
+    const table = page.getByRole("grid", { name: "Competitors in a table" });
+    await expect(table.getByRole("columnheader")).toHaveText([
+      "Field",
+      "Salad Station",
+      "Bowl & Co",
+      "Home meal prep",
+    ]);
+    await expect(
+      table.getByRole("row").filter({ hasText: "Typical price" }),
+    ).toContainText("₱1,260.50");
+    await expectNoAxeViolations(page);
+    await page.getByRole("radio", { name: "Cards" }).click();
+
+    // Reorder: Home meal prep moved to the top; the order is kept on a reload.
+    await page.getByRole("button", { name: "More for Home meal prep" }).click();
+    await page.getByRole("menuitem", { name: "Reorder" }).click();
+    const reorder = page.getByRole("dialog", { name: "Reorder competitors" });
+    await expect(
+      reorder.getByRole("button", { name: "Save order" }),
+    ).toBeDisabled();
+    await reorder
+      .getByRole("button", { name: "Move Home meal prep up" })
+      .click();
+    await reorder
+      .getByRole("button", { name: "Move Home meal prep up" })
+      .click();
+    await expect(
+      reorder.getByRole("button", { name: "Move Home meal prep down" }),
+    ).toBeFocused();
+    await expectNoAxeViolations(page);
+    await reorder.getByRole("button", { name: "Save order" }).click();
+    await expect(reorder).toHaveCount(0);
+    await expect(cardNames(page).first()).toContainText("Home meal prep");
+    await page.reload();
+    await expect(cardNames(page).first()).toContainText("Home meal prep");
+
+    // Delete asks first.
+    await page.getByRole("button", { name: "More for Bowl & Co" }).click();
+    await page.getByRole("menuitem", { name: "Delete" }).click();
+    await page
+      .getByRole("alertdialog", { name: "Delete this competitor?" })
+      .getByRole("button", { name: "Delete" })
+      .click();
+    await expect(cardNames(page)).toHaveCount(2);
+    await expect(page.getByText("2 competitors · aim for 3–5")).toBeVisible();
+
+    // 13: the competitors check counts two of three; the section shows the count.
+    await page
+      .getByRole("list", { name: "Breadcrumbs" })
+      .getByRole("link", { name: "Piaya Tour" })
+      .click();
+    await expect(
+      block(page, "Checks")
+        .getByRole("listitem")
+        .filter({ hasText: "Competitors (3–5)" }),
+    ).toContainText("2 of 3 found");
+    await expect(
+      block(page, "Sections")
+        .getByRole("listitem")
+        .filter({ hasText: "04 Competitors" }),
+    ).toContainText("2 (3–5)");
+  });
+
+  test("Patterns: answered with F/A/U; 13's Classify answers opens the question", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea } = await ownIdea(page, signIn, account);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}/competitors`);
+    const survivor = question(page, "Survivor Patterns");
+    await expect(survivor).toContainText("Empty");
+    await survivor.getByRole("button", { name: "Survivor Patterns" }).click();
+    const answer = page.getByRole("textbox", {
+      name: "Answer to Survivor Patterns",
+    });
+    await expect(answer).toBeFocused();
+    await answer.fill("The busy ones sell lunch sets under ₱200.");
+    await expect(page.getByText("Saved")).toBeVisible();
+    await expect(survivor).toContainText("Not classified yet");
+    await expectNoAxeViolations(page);
+
+    // 13's first Next step classifies it, opening 15 on the question.
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
+    const first = block(page, "Next steps").getByRole("listitem").first();
+    await expect(first).toContainText("Classify answers (1)");
+    await first.getByRole("link").click();
+    await expect(page).toHaveURL(/\/competitors\?q=V\.04\.SURVIVOR_PATTERNS$/);
+    await expect(answer).toBeFocused();
+    await survivor.getByRole("radio", { name: /Unknown/ }).click();
+    await expect(survivor).toContainText("Unknown");
+  });
+});
+
+test.describe("16 Assumptions & Risks on a desktop", () => {
+  test.use(desktop);
+
+  test("13 → 16: assumptions with evidence, risks by impact until reordered", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea } = await ownIdea(page, signIn, account);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
+    await block(page, "Sections")
+      .getByRole("link", { name: /09 Assumptions & Risks/ })
+      .click();
+    await expect(page).toHaveURL(/\/assumptions$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "09 Assumptions & Risks" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("tab", { name: "Assumptions" }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByText(
+        "List what has to be true for this idea to work, and why you believe it.",
+      ),
+    ).toBeVisible();
+
+    // A new assumption in the detail's place; made, it shows there to edit.
+    await page.getByRole("button", { name: "Add assumption" }).first().click();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "New assumption" }),
+    ).toBeVisible();
+    const add = page.getByRole("button", { name: "Add assumption" }).last();
+    await expect(add).toBeDisabled();
+    await page
+      .getByRole("textbox", { name: /^Assumption/ })
+      .fill("Tourists buy piaya as gifts on the way home.");
+    await page.getByRole("radio", { name: "Medium" }).click();
+    await add.click();
+    await expect(
+      page.getByRole("heading", {
+        level: 2,
+        name: "Tourists buy piaya as gifts on the way home.",
+      }),
+    ).toBeVisible();
+    const list = page.getByRole("grid", { name: "Assumptions" });
+    await expect(list.getByRole("row")).toHaveCount(1);
+    await expect(list).toContainText("Medium confidence");
+    await page
+      .getByRole("textbox", { name: "Next Check" })
+      .fill("Count gift buyers at the airport for a day.");
+    await expect(page.getByText("Saved")).toBeVisible();
+    // Confidence can be left unset again.
+    await page.getByRole("button", { name: "Clear" }).click();
+    await expect(list).not.toContainText("Medium confidence");
+    await expectNoAxeViolations(page);
+
+    // M2 attaches a URL to it: no Fact, the row stays as it is.
+    await page.getByRole("link", { name: "Add evidence" }).click();
+    const sheet = page.getByRole("dialog", { name: "Evidence" });
+    await expect(sheet).toContainText(
+      "Assumptions · Tourists buy piaya as gifts on the way home.",
+    );
+    await sheet.getByRole("radio", { name: "URL" }).click();
+    await sheet
+      .getByRole("textbox", { name: /^URL/ })
+      .fill("https://example.com/airport-gifts");
+    await sheet.getByRole("button", { name: "Attach URL" }).click();
+    await expect(
+      sheet.getByRole("row", { name: /airport-gifts/ }),
+    ).toBeVisible();
+    // The last one goes without asking: the row has no Fact to lose.
+    await sheet
+      .getByRole("row", { name: /airport-gifts/ })
+      .getByRole("button")
+      .click();
+    await expect(sheet).toContainText("No evidence yet");
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+    await sheet.getByRole("radio", { name: "URL" }).click();
+    await sheet
+      .getByRole("textbox", { name: /^URL/ })
+      .fill("https://example.com/airport-gifts");
+    await sheet.getByRole("button", { name: "Attach URL" }).click();
+    await sheet.getByRole("button", { name: "Done" }).click();
+    await expect(list).toContainText("1 source");
+
+    // Risks: the highest Impact first, then Probability; a new one takes its place.
+    await page.getByRole("tab", { name: "Risks" }).click();
+    await expect(page).toHaveURL(/tab=risks/);
+    const risks = page.getByRole("grid", { name: "Risks" });
+    const addRisk = async (
+      statement: string,
+      impact: string,
+      probability: string,
+    ) => {
+      await page.getByRole("button", { name: "Add risk" }).first().click();
+      await page.getByRole("textbox", { name: /^Risk/ }).fill(statement);
+      await page.getByRole("button", { name: /Probability/ }).click();
+      await page
+        .getByRole("listbox", { name: "Probability" })
+        .getByRole("option", { name: probability, exact: true })
+        .click();
+      await page.getByRole("button", { name: /Impact/ }).click();
+      await page
+        .getByRole("listbox", { name: "Impact" })
+        .getByRole("option", { name: impact, exact: true })
+        .click();
+      await page.getByRole("button", { name: "Add risk" }).last().click();
+      await expect(
+        page.getByRole("heading", { level: 2, name: statement }),
+      ).toBeVisible();
+    };
+    await addRisk("Typhoons close the shop", "Medium", "High");
+    await addRisk("Flour prices double", "High", "Low");
+    await addRisk("A mall chain copies the boxes", "Low", "Medium");
+    await expect(risks.getByRole("row")).toHaveText([
+      /Flour prices double/,
+      /Typhoons close the shop/,
+      /A mall chain copies the boxes/,
+    ]);
+    await expect(risks.getByRole("row").first()).toContainText(
+      "Impact High · Probability Low",
+    );
+    await expectNoAxeViolations(page);
+
+    // Reordered by hand, the order stays, and a new risk goes last.
+    await risks
+      .getByRole("button", { name: "More for A mall chain copies the boxes" })
+      .click();
+    await page.getByRole("menuitem", { name: "Reorder" }).click();
+    const reorder = page.getByRole("dialog", { name: "Reorder risks" });
+    await reorder
+      .getByRole("button", { name: "Move A mall chain copies the boxes up" })
+      .click();
+    await reorder.getByRole("button", { name: "Save order" }).click();
+    await expect(reorder).toHaveCount(0);
+    await expect(risks.getByRole("row")).toHaveText([
+      /Flour prices double/,
+      /A mall chain copies the boxes/,
+      /Typhoons close the shop/,
+    ]);
+    await addRisk("Staff leave after training", "High", "High");
+    await expect(risks.getByRole("row").last()).toContainText(
+      "Staff leave after training",
+    );
+
+    // Delete asks first.
+    await risks
+      .getByRole("button", { name: "More for Typhoons close the shop" })
+      .click();
+    await page.getByRole("menuitem", { name: "Delete" }).click();
+    await page
+      .getByRole("alertdialog", { name: "Delete this risk?" })
+      .getByRole("button", { name: "Delete" })
+      .click();
+    await expect(risks.getByRole("row")).toHaveCount(3);
+
+    // 13 counts both lists.
+    await page
+      .getByRole("list", { name: "Breadcrumbs" })
+      .getByRole("link", { name: "Piaya Tour" })
+      .click();
+    await expect(
+      block(page, "Sections")
+        .getByRole("listitem")
+        .filter({ hasText: "09 Assumptions & Risks" }),
+    ).toContainText("1 · 3");
+  });
+});
+
+test.describe("15 and 16 for a Viewer", () => {
+  test.use(desktop);
+
+  test("read only: cards open to read, no adding, no ⋯; 16 without fields or M2", async ({
+    page,
+    signIn,
+  }) => {
+    const me = await signIn(demo.viewer);
+    const { bcdx, ideaId } = await bcdxIdea(page, me, "Bacolod Health Bowl");
+    await page.goto(`/w/${bcdx.id}/ideas/${ideaId}/competitors`);
+    await expect(cardNames(page)).toHaveCount(4);
+    await expect(page.getByText("4 competitors · aim for 3–5")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Add competitor" }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /More for/ })).toHaveCount(0);
+    await expect(page.getByRole("textbox")).toHaveCount(0);
+    await cardNames(page).filter({ hasText: "Mall salad bars" }).click();
+    const card = page.getByRole("dialog", { name: "Mall salad bars" });
+    await expect(card).toContainText("Fresh, visible, trusted");
+    await expect(card.getByRole("textbox")).toHaveCount(0);
+    await expect(card.getByRole("link", { name: "Add evidence" })).toHaveCount(
+      0,
+    );
+    await expectNoAxeViolations(page);
+    await card.getByRole("button", { name: /Close/ }).click();
+
+    await page.goto(`/w/${bcdx.id}/ideas/${ideaId}/assumptions?tab=risks`);
+    const risks = page.getByRole("grid", { name: "Risks" });
+    // Impact first: the typhoon-season prices (High) before the rainy days (Medium).
+    await expect(risks.getByRole("row")).toHaveText([
+      /Ingredient prices rise/,
+      /Lunch demand drops/,
+    ]);
+    await expect(page.getByRole("button", { name: "Add risk" })).toHaveCount(0);
+    await expect(page.getByRole("textbox")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /More for/ })).toHaveCount(0);
+    await expectNoAxeViolations(page);
+    // M2's URL opens nothing for a Viewer, though it names a row of this validation.
+    const home = await page.request.get(`/api/v1/ideas/${ideaId}/validation`);
+    const { validationId } = (await home.json()) as { validationId: string };
+    const listed = async (list: string) => {
+      const response = await page.request.get(
+        `/api/v1/validations/${validationId}/${list}`,
+      );
+      const [first] = ((await response.json()) as { items: { id: string }[] })
+        .items;
+      if (first === undefined) throw new Error(`No ${list}`);
+      return first.id;
+    };
+    await page.goto(
+      `/w/${bcdx.id}/ideas/${ideaId}/assumptions?modal=evidence&about=assumption:${await listed("assumptions")}`,
+    );
+    await expect(page.getByRole("grid", { name: "Assumptions" })).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.goto(
+      `/w/${bcdx.id}/ideas/${ideaId}/competitors?modal=evidence&about=competitor:${await listed("competitors")}`,
+    );
+    await expect(cardNames(page)).toHaveCount(4);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+});
+
+test.describe("15 and 16 on a phone", () => {
+  test.use(phone);
+
+  test("15 in one column with Add in place; 16's new assumption in a sheet, Back to the list", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea } = await ownIdea(page, signIn, account);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}/competitors`);
+    await expect(page.getByRole("radio", { name: "Table" })).toHaveCount(0);
+    // No price: a NumberField committed as its dialog closes leaves React Aria's live
+    // announcer a message naming the closed field for a few seconds, which the axe check
+    // below could meet before it is gone.
+    await addCompetitor(page, "Salad Station");
+    await expect(cardNames(page)).toHaveCount(1);
+    await expectNoAxeViolations(page);
+
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}/assumptions`);
+    await page.getByRole("button", { name: "Add assumption" }).first().click();
+    const sheet = page.getByRole("dialog", { name: "New assumption" });
+    await expect(sheet).toBeVisible();
+    await sheet
+      .getByRole("textbox", { name: /^Assumption/ })
+      .fill("Office workers order twice a week.");
+    await expectNoAxeViolations(page);
+    await sheet.getByRole("button", { name: "Add assumption" }).click();
+    await expect(
+      page.getByRole("heading", {
+        level: 2,
+        name: "Office workers order twice a week.",
+      }),
+    ).toBeVisible();
+    // A phone reads the row and edits it in a sheet.
+    await page.getByRole("button", { name: "Edit" }).click();
+    const edit = page.getByRole("dialog", { name: "Edit assumption" });
+    await edit
+      .getByRole("textbox", { name: "Why We Believe It" })
+      .fill("Ten of twelve said so.");
+    await expect(page.getByRole("status").getByText("Saved")).toBeVisible();
+    await edit.getByRole("button", { name: /Close/ }).click();
+    await expect(page.getByText("Ten of twelve said so.")).toBeVisible();
+    // The row replaced the form: Back returns to the list.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/assumptions$/);
+    await expect(
+      page
+        .getByRole("grid", { name: "Assumptions" })
+        .getByRole("row", { name: /Office workers order twice a week/ }),
+    ).toBeVisible();
   });
 });

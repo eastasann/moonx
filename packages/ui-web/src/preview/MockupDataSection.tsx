@@ -1,5 +1,4 @@
 import type { Confidence, FauState, PitchSlide } from "@moonx/schemas";
-import { MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { Card, CardView } from "../components/Card";
 import {
@@ -18,8 +17,7 @@ import { Steps } from "../components/Steps";
 import { type TableColumn, TableView } from "../components/TableView";
 import { Text } from "../components/Text";
 import { TextField } from "../components/TextField";
-import { IconSlot } from "../internal/IconSlot";
-import { Flex, Stack } from "../layout/Flex";
+import { Stack } from "../layout/Flex";
 import { Section, Specimen } from "./parts";
 import * as styles from "./preview.css";
 
@@ -499,19 +497,8 @@ export function MockupDataSection() {
                     </Text>
                   ),
                 }))}
-                footer={
-                  <>
-                    <span>{competitor.sources}</span>
-                    {competitor.comments > 0 && (
-                      <Flex gap="space-50" alignItems="center">
-                        <IconSlot size="XS">
-                          <MessageSquare />
-                        </IconSlot>
-                        <span>{competitor.comments}</span>
-                      </Flex>
-                    )}
-                  </>
-                }
+                footer={competitor.sources}
+                openThreadCount={competitor.comments}
                 actions={
                   <ActionMenu aria-label={`Card actions of ${competitor.name}`}>
                     <MenuItem id="edit">Edit</MenuItem>

@@ -509,11 +509,12 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
  * The header's save state (design-spec 6.0.1・6.0.2): "Couldn't save" while any save of
  * the page failed, wherever it was typed, since the header's Retry sends them all;
  * "Saving…" while any is on its way; "Saved" once an item of `scope` (the screen's items,
- * by key prefix) saved on this visit; else nothing.
+ * by key prefix, or prefixes for a screen of several kinds) saved on this visit; else
+ * nothing.
  */
 export function saveStateOf(
   state: AutosaveState,
-  scope: string | undefined,
+  scope: string | readonly string[] | undefined,
   since: number,
 ): SaveState | undefined {
   const statuses = [...state.items.values()].map(({ status }) => status);
@@ -532,8 +533,11 @@ export function saveStateOf(
     return "saving";
   }
   if (scope === undefined) return undefined;
+  const prefixes = typeof scope === "string" ? [scope] : scope;
   for (const [key, at] of state.savedAt) {
-    if (at >= since && key.startsWith(scope)) return "saved";
+    if (at >= since && prefixes.some((prefix) => key.startsWith(prefix))) {
+      return "saved";
+    }
   }
   return undefined;
 }

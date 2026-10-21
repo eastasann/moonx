@@ -697,6 +697,17 @@ describe("Card and CardView", () => {
     expect(screen.queryByRole("grid")).toBeNull();
   });
 
+  test("open threads: the comments' mark and their count after the footer, none for zero", () => {
+    const { rerender } = render(
+      <Card title="Bowl & Co" footer="No sources" openThreadCount={2} />,
+    );
+    expect(screen.getByText("2 open comment threads")).toBeTruthy();
+    rerender(
+      <Card title="Bowl & Co" footer="No sources" openThreadCount={0} />,
+    );
+    expect(screen.queryByText(/open comment thread/)).toBeNull();
+  });
+
   test("in a CardView the cards are its items: pressed, chosen, moved between by arrows", async () => {
     const user = userEvent.setup();
     const onAction = vi.fn();

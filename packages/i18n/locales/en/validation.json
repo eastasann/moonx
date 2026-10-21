@@ -225,5 +225,131 @@
       "source": "Source",
       "clear": "Clear filters"
     }
+  },
+  "rows": {
+    "evidence": "Evidence",
+    "empty": "Empty",
+    "sources_one": "{{count}} source",
+    "sources_other": "{{count}} sources",
+    "noSources": "No sources",
+    "deleteBody": "You can restore it from the history."
+  },
+  "reorder": {
+    "cancel": "Cancel",
+    "save": "Save order",
+    "up": "Move {{item}} up",
+    "down": "Move {{item}} down",
+    "listChanged": "The list changed while you were ordering it. Check the order and save again."
+  },
+  "competitors": {
+    "title": "Competitors",
+    "noun": "competitor",
+    "count_one": "{{count}} competitor · aim for {{range}}",
+    "count_other": "{{count}} competitors · aim for {{range}}",
+    "add": "Add competitor",
+    "newTitle": "New competitor",
+    "editTitle": "Edit competitor",
+    "cancel": "Cancel",
+    "list": "Competitors",
+    "table": "Competitors in a table",
+    "empty": "List {{range}} competitors or substitutes. Include what people do today instead.",
+    "noPrice": "No price",
+    "more": "More for {{name}}",
+    "edit": "Edit",
+    "reorder": "Reorder",
+    "reorderTitle": "Reorder competitors",
+    "delete": "Delete",
+    "deleteTitle": "Delete this competitor?",
+    "patterns": "Patterns",
+    "card": {
+      "targetCustomer": "Target customer",
+      "offering": "Offering",
+      "strength": "Strength",
+      "weakness": "Weakness",
+      "whyChosen": "Why chosen",
+      "whySurvive": "Why they survive"
+    },
+    "compare": {
+      "field": "Field",
+      "type": "Type",
+      "price": "Typical price",
+      "sources": "Evidence"
+    },
+    "field": {
+      "name": "Name",
+      "type": "Type",
+      "noType": "None",
+      "targetCustomer": "Target Customer",
+      "offering": "Offering",
+      "typicalPrice": "Typical Price",
+      "priceNote": "Price note",
+      "priceNoteExample": "For example, per box",
+      "strength": "Strength",
+      "weakness": "Weakness",
+      "whyChosen": "Why Customers Choose Them",
+      "whySurvive": "Why They Survive"
+    }
+  },
+  "assumptions": {
+    "title": "Assumptions & Risks",
+    "tabs": "Assumptions or risks",
+    "tab": {
+      "assumptions": "Assumptions",
+      "risks": "Risks"
+    },
+    "noun": {
+      "assumptions": "assumption",
+      "risks": "risk"
+    },
+    "add": {
+      "assumptions": "Add assumption",
+      "risks": "Add risk"
+    },
+    "newTitle": {
+      "assumptions": "New assumption",
+      "risks": "New risk"
+    },
+    "editTitle": {
+      "assumptions": "Edit assumption",
+      "risks": "Edit risk"
+    },
+    "empty": {
+      "assumptions": "List what has to be true for this idea to work, and why you believe it.",
+      "risks": "List what could go wrong, how likely it is and how much it would hurt."
+    },
+    "reorderTitle": {
+      "assumptions": "Reorder assumptions",
+      "risks": "Reorder risks"
+    },
+    "deleteTitle": {
+      "assumptions": "Delete this assumption?",
+      "risks": "Delete this risk?"
+    },
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "reorder": "Reorder",
+    "delete": "Delete",
+    "more": "More for {{statement}}",
+    "confidenceLevel": "{{confidence}} confidence",
+    "impactLevel": "Impact {{level}}",
+    "probabilityLevel": "Probability {{level}}",
+    "clearConfidence": "Clear",
+    "field": {
+      "statement": {
+        "assumptions": "Assumption",
+        "risks": "Risk"
+      },
+      "whyBelieve": "Why We Believe It",
+      "evidenceNote": "Evidence note",
+      "confidence": "Confidence",
+      "disproveCondition": "What Would Disprove It",
+      "nextCheck": "Next Check",
+      "probability": "Probability",
+      "impact": "Impact",
+      "notSet": "Not set",
+      "whyMatters": "Why It Matters",
+      "mitigation": "Mitigation",
+      "howToValidate": "How to Validate"
+    }
   }
 }

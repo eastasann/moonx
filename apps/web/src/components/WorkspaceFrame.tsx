@@ -20,11 +20,12 @@ export interface WorkspaceFrameProps
   /** The navigation item of the screen. */
   current: "dashboard" | "ideas";
   /**
-   * The screen's saved items, by key prefix (`idea:<id>`): "Saved" shows once one of them
-   * saved on this visit. Failures and saves on their way show on every screen
-   * (design-spec 6.0.2: they go on wherever the user moves).
+   * The screen's saved items, by key prefix (`idea:<id>`), or prefixes for a screen of
+   * several kinds of item: "Saved" shows once one of them saved on this visit. Failures
+   * and saves on their way show on every screen (design-spec 6.0.2: they go on wherever
+   * the user moves).
    */
-  saveScope?: string;
+  saveScope?: string | readonly string[];
   children: ReactNode;
 }
 

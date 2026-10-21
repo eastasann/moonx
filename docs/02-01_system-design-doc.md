@@ -753,8 +753,8 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 | `/w/$workspaceId/ideas/$ideaId` | 13 検証ホーム | |
 | `/w/$workspaceId/ideas/$ideaId/questions/$sectionKey` | 11 設問フォーム（検証の 01 / 02 / 10） | `?q=` |
 | `/w/$workspaceId/ideas/$ideaId/research` | 14 調査ログ | `?supports=&source=&entry=<research_log_entry の id>&new=1&presetSupports=`（`new=1` で新しい調査ログの入力を開き、`presetSupports` の確認項目のタグを付けておく（`SupportsCheck` をカンマでつなぐ。例: `local_price,permits`）。`supports` は一覧の絞り込み） |
-| `/w/$workspaceId/ideas/$ideaId/competitors` | 15 競合・代替 | `?view=cards|table&q=V.04.SURVIVOR_PATTERNS&row=<competitor の id>` |
-| `/w/$workspaceId/ideas/$ideaId/assumptions` | 16 前提・リスク | `?tab=assumptions|risks&row=<assumption か risk の id>` |
+| `/w/$workspaceId/ideas/$ideaId/competitors` | 15 競合・代替 | `?view=cards|table&q=V.04.SURVIVOR_PATTERNS&row=<competitor の id>`（`q` はその設問を開いてフォーカスし、`row` はその競合の Dialog を開く。design-spec 6.10） |
+| `/w/$workspaceId/ideas/$ideaId/assumptions` | 16 前提・リスク | `?tab=assumptions|risks&row=<assumption か risk の id>&new=1`（`new=1` で今のタブの新しい行の入力を開く。14 と同じ） |
 | `/w/$workspaceId/ideas/$ideaId/costs` | 17 費用 | `?row=<cost_item の id か template_key>&tab=initial|monthly_fixed|variable` |
 | `/w/$workspaceId/ideas/$ideaId/economics` | 18 損益・シナリオ | `?field=` |
 | `/w/$workspaceId/ideas/$ideaId/decide` | 19 判定 | |
@@ -1260,6 +1260,7 @@ interface Competitor extends Versioned {
   strength: string | null; weakness: string | null; whyChosen: string | null; whySurvive: string | null;
   evidence: Evidence[];                              // 付けた順。削除した調査ログを指す根拠は除く（F/A/U を持たない行。design-spec 6.0.3）。Assumption も同じ
   sortOrder: number; commentCount: number;
+  unresolvedThreadCount: number;                     // 解決していないスレッドの数（数え方は C1 の unresolvedCount と同じ）。15 のカードの 💬（design-spec 6.10）
 }
 interface Assumption extends Versioned {
   id: UUID; statement: string; whyBelieve: string | null;

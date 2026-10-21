@@ -674,6 +674,12 @@ test.describe("6 and 13 on a phone", () => {
     const sectionsBox = await block(page, "Sections").boundingBox();
     expect(sectionsBox?.y).toBeGreaterThan(checksBox?.y ?? 0);
     expect(sectionsBox?.x).toBe(checksBox?.x);
+    // Checked at the page's end, which leaves room for the TabBar: at the top, the row
+    // cut by the fold sits half under the fixed TabBar, and axe counts a link row there
+    // (13's checks open 15) as a target too small, wherever the fold happens to fall.
+    await page.evaluate(() =>
+      window.scrollTo(0, document.documentElement.scrollHeight),
+    );
     await expectNoAxeViolations(page);
   });
 });

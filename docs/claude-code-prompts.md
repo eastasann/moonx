@@ -1741,7 +1741,7 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 27: 15 競合と代替・16 前提とリスク
 
-Status:
+Status: done 2026-10-22
 
 ```
 検証の残りのワークシートの画面を作ってください（PRD 4章の Must）。

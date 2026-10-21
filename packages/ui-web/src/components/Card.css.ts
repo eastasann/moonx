@@ -187,6 +187,14 @@ export const footerText = style({
   minWidth: 0,
 });
 
+/** The comments' mark and count after the footer's text (s15-competitors.html .cmt). */
+export const comments = style({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: vars.space["50"],
+  fontVariantNumeric: "tabular-nums",
+});
+
 export const actions = style({
   display: "inline-flex",
   marginInlineStart: "auto",

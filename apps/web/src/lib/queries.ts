@@ -5,7 +5,11 @@ import type {
   Stage,
   SupportsCheck,
 } from "@moonx/schemas";
-import { queryOptions } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  type QueryKey,
+  queryOptions,
+} from "@tanstack/react-query";
 import { ApiError, api, inPath, unwrap } from "./api";
 
 /** U1: the signed-in user, their memberships and last workspace (SDD 5.4). */
@@ -256,3 +260,59 @@ export const researchLogEntryQuery = (ideaId: string, entryId: string) =>
           .get(),
       ),
   });
+
+/** V8 GET: 15's competitors in their order, the pattern questions and the aim (SDD 5.7). */
+export const competitorsQuery = (ideaId: string, validationId: string) =>
+  queryOptions({
+    queryKey: [...ideaKey(ideaId), "competitors"],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.validations({ validationId: inPath(validationId) })
+          .competitors.get(),
+      ),
+  });
+
+/** V10 GET: 16's assumptions in their order (SDD 5.7). */
+export const assumptionsQuery = (ideaId: string, validationId: string) =>
+  queryOptions({
+    queryKey: [...ideaKey(ideaId), "assumptions"],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.validations({ validationId: inPath(validationId) })
+          .assumptions.get(),
+      ),
+  });
+
+/** V10 GET: 16's risks in the order the API sets them (SDD 5.7). */
+export const risksQuery = (ideaId: string, validationId: string) =>
+  queryOptions({
+    queryKey: [...ideaKey(ideaId), "risks"],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.validations({ validationId: inPath(validationId) })
+          .risks.get(),
+      ),
+  });
+
+/**
+ * Puts what a save answered in a query's data (ADR-011). A read of it already on its way
+ * holds an older version and must not land over this one, so it is dropped; a read that
+ * was asked for (a list's order to be read again, someone else's version to load) is then
+ * asked for again, and reads the save too.
+ */
+export function putSaved<TData>(
+  queryClient: QueryClient,
+  queryKey: QueryKey,
+  updater: (data: TData | undefined) => TData | undefined,
+) {
+  const wasReading =
+    queryClient.getQueryState(queryKey)?.fetchStatus === "fetching";
+  void queryClient.cancelQueries({ queryKey, exact: true });
+  queryClient.setQueryData<TData>(queryKey, updater);
+  if (wasReading) {
+    void queryClient.invalidateQueries({ queryKey, exact: true });
+  }
+}

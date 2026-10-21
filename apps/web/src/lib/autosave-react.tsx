@@ -75,10 +75,12 @@ export function useSaveItem(key: string): SaveItem | undefined {
 }
 
 /**
- * The header's save state of a screen whose items' keys start with `scope`
+ * The header's save state of a screen whose items' keys start with `scope` (or one of them)
  * (design-spec 6.0.1・6.0.2). "Saved" counts from when the screen opened.
  */
-export function useSaveState(scope?: string): SaveState | undefined {
+export function useSaveState(
+  scope?: string | readonly string[],
+): SaveState | undefined {
   const state = useAutosaveState();
   const [since] = useState(() => Date.now());
   return state === null ? undefined : saveStateOf(state, scope, since);

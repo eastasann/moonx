@@ -1,4 +1,5 @@
 import type { LinkTarget, SourceType, SupportsCheck } from "@moonx/schemas";
+import type { CompareView } from "@moonx/ui-tokens";
 
 /** An idea's 13 Validation home (SDD 4章). */
 export const ideaHref = (workspaceId: string, ideaId: string) =>
@@ -66,10 +67,64 @@ export const researchHref = (
   return `${ideaHref(workspaceId, ideaId)}/research${text === "" ? "" : `?${text}`}`;
 };
 
+/** What 15's URL may open with (SDD 4章). */
+export interface CompetitorsSearch {
+  /** Cards or the table. */
+  view?: CompareView;
+  /** The pattern question to focus: its ID ("V.04.SURVIVOR_PATTERNS"). */
+  q?: string;
+  /** The competitor whose dialog is open. */
+  row?: string;
+}
+
+/** 15 Competitors (SDD 4章). */
+export const competitorsHref = (
+  workspaceId: string,
+  ideaId: string,
+  search: CompetitorsSearch = {},
+) => {
+  const query = new URLSearchParams();
+  if (search.view !== undefined) query.set("view", search.view);
+  if (search.q !== undefined) query.set("q", search.q);
+  if (search.row !== undefined) query.set("row", search.row);
+  const text = query.toString();
+  return `${ideaHref(workspaceId, ideaId)}/competitors${text === "" ? "" : `?${text}`}`;
+};
+
+/** The two lists of 16. */
+export type AssumptionsTab = "assumptions" | "risks";
+
+/** Whether `tab` names one of 16's lists. */
+export const isAssumptionsTab = (tab: unknown): tab is AssumptionsTab =>
+  tab === "assumptions" || tab === "risks";
+
+/** What 16's URL may open with (SDD 4章): a row, or a new one, of a list. */
+export interface AssumptionsSearch {
+  tab?: AssumptionsTab;
+  /** The assumption or risk shown. */
+  row?: string;
+  /** The new row's input is open (`new=1`, as 14's). */
+  new?: 1;
+}
+
+/** 16 Assumptions & Risks (SDD 4章). */
+export const assumptionsHref = (
+  workspaceId: string,
+  ideaId: string,
+  search: AssumptionsSearch = {},
+) => {
+  const query = new URLSearchParams();
+  if (search.tab !== undefined) query.set("tab", search.tab);
+  if (search.row !== undefined) query.set("row", search.row);
+  if (search.new === 1) query.set("new", "1");
+  const text = query.toString();
+  return `${ideaHref(workspaceId, ideaId)}/assumptions${text === "" ? "" : `?${text}`}`;
+};
+
 /**
  * Where a section of 13 opens (design-spec 6.1「セクションを開く」), while its screen is
  * built (docs/claude-code-prompts.md: no way into a screen before it exists): 01, 02 and
- * 10 on 11, 03 on 14. Each screen's step adds its sections here.
+ * 10 on 11, 03 on 14, 04 on 15, 09 on 16. Each screen's step adds its sections here.
  */
 export function sectionHref(
   workspaceId: string,
@@ -78,6 +133,8 @@ export function sectionHref(
 ): string | undefined {
   if (isQuestionSection(key)) return questionsHref(workspaceId, ideaId, key);
   if (key === "03") return researchHref(workspaceId, ideaId);
+  if (key === "04") return competitorsHref(workspaceId, ideaId);
+  if (key === "09") return assumptionsHref(workspaceId, ideaId);
   return undefined;
 }
 
@@ -113,6 +170,20 @@ export function hrefOf(target: LinkTarget): string | undefined {
             entry: target.rowId,
             new: target.newEntry === true ? 1 : undefined,
             presetSupports: target.presetSupports,
+          });
+    case 15:
+      return ideaId === undefined
+        ? undefined
+        : competitorsHref(workspaceId, ideaId, {
+            q: target.questionKey,
+            row: target.rowId,
+          });
+    case 16:
+      return ideaId === undefined
+        ? undefined
+        : assumptionsHref(workspaceId, ideaId, {
+            tab: isAssumptionsTab(target.tab) ? target.tab : undefined,
+            row: target.rowId,
           });
     default:
       return undefined;

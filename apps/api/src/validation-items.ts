@@ -162,6 +162,44 @@ export async function loadCommentCounts(
 }
 
 /**
+ * How many threads on each item of `refs` are not resolved, as C1's `unresolvedCount`
+ * counts them (a thread whose comments are all deleted still counts): 15's card shows it
+ * beside the competitor (design-spec 6.10).
+ */
+export async function loadUnresolvedThreadCounts(
+  db: Executor,
+  refs: readonly ItemRef[],
+): Promise<(ref: ItemRef) => number> {
+  const ids = [...new Set(refs.map((ref) => ref.id))];
+  const rows =
+    ids.length === 0
+      ? []
+      : await db
+          .select({
+            targetType: comments.targetType,
+            targetId: comments.targetId,
+            targetKey: comments.targetKey,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(comments)
+          .where(
+            and(
+              inArray(comments.targetId, ids),
+              isNull(comments.parentId),
+              isNull(comments.resolvedAt),
+            ),
+          )
+          .groupBy(comments.targetType, comments.targetId, comments.targetKey);
+  const counts = new Map(
+    rows.map((row) => [
+      itemKey({ type: row.targetType, id: row.targetId, key: row.targetKey }),
+      row.count,
+    ]),
+  );
+  return (ref) => counts.get(itemKey(ref)) ?? 0;
+}
+
+/**
  * The ids of the evidence links attached to one item, oldest first: what its history
  * rows keep as `evidenceIds`.
  */

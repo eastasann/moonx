@@ -223,9 +223,10 @@ export interface EvidenceSheetProps {
   onChanged: (result: EvidenceResult) => void;
   /**
    * Done, opened by Fact, on an item that already had evidence: the screen saves it as a
-   * Fact (V3 takes Fact once evidence counts).
+   * Fact (V3 takes Fact once evidence counts). None for a row without F/A/U (15's, 16's),
+   * which Fact never opens M2 for.
    */
-  onMarkFact: () => void;
+  onMarkFact?: () => void;
   /** Someone saved the item first and the user loads theirs: the screen reads it again. */
   onReload: () => void;
   onClose: () => void;
@@ -507,7 +508,7 @@ export function EvidenceSheet({
 
   const done = () => {
     // Fact pressed on an item that had evidence already: nothing new to attach.
-    if (makesFact && counted.length > 0) onMarkFact();
+    if (makesFact && counted.length > 0) onMarkFact?.();
     onClose();
   };
 

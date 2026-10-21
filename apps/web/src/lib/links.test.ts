@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { hrefOf, researchHref, sectionHref } from "./links";
+import {
+  assumptionsHref,
+  competitorsHref,
+  hrefOf,
+  researchHref,
+  sectionHref,
+} from "./links";
 
 const workspaceId = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 const ideaId = "ece58aa6-e77d-4895-b5cf-e8f366bd4e46";
@@ -48,9 +54,39 @@ describe("the routes of the screens the API names (SDD 4章・5.2 LinkTarget)", 
     );
   });
 
-  test("13's sections: 01, 02 and 10 on 11, 03 on 14, the others not yet", () => {
+  test("15 on a pattern question or a competitor; 16 on a list's row", () => {
+    const rowId = "8a1b2c3d-0000-4000-8000-000000000001";
+    expect(
+      hrefOf({
+        screen: 15,
+        workspaceId,
+        ideaId,
+        questionKey: "V.04.SURVIVOR_PATTERNS",
+      }),
+    ).toBe(`${idea}/competitors?q=V.04.SURVIVOR_PATTERNS`);
+    expect(hrefOf({ screen: 15, workspaceId, ideaId, rowId })).toBe(
+      `${idea}/competitors?row=${rowId}`,
+    );
+    expect(
+      hrefOf({ screen: 16, workspaceId, ideaId, tab: "risks", rowId }),
+    ).toBe(`${idea}/assumptions?tab=risks&row=${rowId}`);
+    // A tab 16 does not have is left out.
+    expect(hrefOf({ screen: 16, workspaceId, ideaId, tab: "other" })).toBe(
+      `${idea}/assumptions`,
+    );
+    expect(competitorsHref(workspaceId, ideaId, { view: "table" })).toBe(
+      `${idea}/competitors?view=table`,
+    );
+    expect(assumptionsHref(workspaceId, ideaId, { new: 1 })).toBe(
+      `${idea}/assumptions?new=1`,
+    );
+  });
+
+  test("13's sections: 01, 02 and 10 on 11, 03 on 14, 04 on 15, 09 on 16, the others not yet", () => {
     expect(sectionHref(workspaceId, ideaId, "10")).toBe(`${idea}/questions/10`);
     expect(sectionHref(workspaceId, ideaId, "03")).toBe(`${idea}/research`);
+    expect(sectionHref(workspaceId, ideaId, "04")).toBe(`${idea}/competitors`);
+    expect(sectionHref(workspaceId, ideaId, "09")).toBe(`${idea}/assumptions`);
     expect(sectionHref(workspaceId, ideaId, "05")).toBeUndefined();
   });
 });

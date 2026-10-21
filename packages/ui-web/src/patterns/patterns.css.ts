@@ -453,6 +453,12 @@ export const listFilters = style({
   },
 });
 
+/** The tabs under the title, at the pane's insets (16's Assumptions / Risks). */
+export const listTabs = style({
+  paddingInline: pane.panePaddingXMobile,
+  "@media": { [tabletUp]: { paddingInline: pane.panePaddingX } },
+});
+
 export const listNote = style({
   paddingBlock: pane.rowPaddingY,
   paddingInline: pane.panePaddingXMobile,
@@ -545,6 +551,11 @@ export const comparePage = style(
     bottom: compare.paddingBottom,
   }),
 );
+
+/** Above the title's line: the archived idea's notice. */
+export const compareNotice = style({
+  marginBlockEnd: vars.space["200"],
+});
 
 /** The title, the count beside it, and the tools at the end (s15 .sechead). */
 export const compareHeader = style({

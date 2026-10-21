@@ -254,6 +254,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 
 - 入力欄が少ないもの: M1 は medium、M3・M5・M6・M7・M9 は small。スマホは下からのシート（Tray）
 - 一覧や判断材料を持つもの: M2・M4・M8 と、15 の競合の追加・編集は large。スマホは全画面のシート
+- 行の並べ替え（15・16 の「Reorder」。6.10。17・22 も同じ形）は、一覧を持つので large。スマホは全画面のシート
 - PNL-1・PNL-2: デスクトップは本文の右の固定パネル、タブレットは右の引き出し、スマホは下からのシート（4.5）
 
 | ID | 名前 | UI 表示名 | 出す画面 | 内容 |
@@ -414,7 +415,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | Popover / Tray | ポップオーバーはデスクトップ、トレイはスマホ（自動で切り替える） | — | — |
 | Tooltip / ContextualHelp | アイコンだけのボタンの説明 / 設問のヒント（▸ Hint） | — | ContextualHelp はトレイ |
 | Disclosure / Accordion | EXAMPLE・関連する調査ログの開閉、解決済みのスレッド、25 ③ の「{n} unchanged answers」 | 題は secondary の medium の太さ。中身は題の文字の頭から始める（印の分だけ下げる。s11-form.html の .discl .body） | 同じ |
-| Tabs | 16 の Assumptions / Risks、22 の5つのタブ、26 と 28 の切り替え、28 の3つのタブ | — | 横にスクロールできるタブ |
+| Tabs | 16 の Assumptions / Risks、22 の5つのタブ、26 と 28 の切り替え、28 の3つのタブ | 16 のタブは、一覧のペインの題の下（絞り込みの位置）に置き、その一覧（と絞り込み）をタブのパネルに入れる。詳細のペインはタブの外に置く（ListDetailPattern の `tabs`。6.10） | 横にスクロールできるタブ |
 | Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | 区切りは「/」の文字（secondary。文字と区切りの間は 06 `component.breadcrumbs.gap`。M は moon-base.css の .crumbs）。今の画面はリンクにせず文字で出す（`aria-current`） | 出さない（部品が幅で隠す。画面は ← 戻る を出す） |
 | CheckDots | 5・6 の一覧の行の、確認項目6つの状態の点列（MoonGlyph の ●達成 ◐途中 ○未着手）。形で状態を伝え、読み上げは全項目の名前と状態を1つの画像として読む | S / M | 同じ |
 | StatusLight | F/A/U（Fact / Assumption / Unknown / Unclassified / Empty）、確認項目の状態（Not started / Partial / Done）、保存状態 | MoonGlyph の印＋ラベル（4.4「状態の形」。形だけ・色だけで伝えない）。保存状態は印の代わりにアイコン（Saving… は回る読み込みの印、Saved は ✓、Couldn't save は警告。Couldn't save は文字とアイコンを negative の赤にする） | 同じ |
@@ -428,7 +429,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | Avatar | 提案者・記録者・コメントの書き手・4 のプロフィール写真。写真が無い・読めないときは頭文字 | S / M。角の丸い四角（地は sunken、頭文字は等幅の semibold、枠なし） | 同じ |
 | TableView | 17 費用・18 シナリオ表・7 決定ログ・28 の一覧・15 の「表で比較」・21 の表の小項目（§11 など） | 密度 compact / regular / spacious。layout は auto（幅で切り替え。既定）/ table / cards（`cards` はスマホの行の形をどの幅でも出す）。地の色を付けず、見出しは 06 `typography.table-header` の文字と下の薄い線（`border.default`）、行は hairline の区切り（行の高さは `component.table-view.row-height`。s17-costs.html）。列は幅（px か %）を持てる固定の組み方で、行を入力欄にしても表の幅と列が動かない。編集できる表は、行の値を文字として見せ、触った行（フォーカスか編集中）のセルだけを入力欄にする。数字の列は等幅で右にそろえる。行の名前の列は medium の太さ。表の下の行（s17-costs.html の tfoot）は、左に `footerAction`（「+ Add row」の quiet の Button）、右に `footerTotal`（「Subtotal ₱145,000+ · 3 Unknown, 1 Empty」） | 線で区切った行（4.3。下の補足）。表の下は `footerAction` だけを全幅の行（高さは 06 `table-view.narrow-footer-min-height` 以上、下に hairline。s17-costs.html の .cards .add）にし、`footerTotal` は出さない（合計は F の要約バーと結果のトレイにある。6.3）。`footerTotal` を使う表は、スマホでも合計をほかの所に出す |
 | ListView | 6 アイデア一覧・14 調査ログ・8 通知・22 の各リスト・12 のメンバー・26 のテンプレート（9 のメンバーと招待は SettingsList） | 密度 compact / regular / spacious。layout は auto / table / cards。押すと開く行と選ぶと横に詳細を出す行は末尾に ›（4.4。s06-ideas.html の行に › は無いが、画面をまたいでそろえるために置く。2026-10-17 のユーザーの決定）。D の一覧の選んだ行は地と線で示し、スマホでは一覧と詳細が入れ替わるので選んだ行を示さない。行の ⋯（`actions`。6 の Duplicate・Archive）は › の後ろに置き、TableView の `isRowActions` の列と同じく、マウスの端末ではポインタの下の行・フォーカスのある行・メニューを開いている行だけで見せ、タッチの端末では常に見せる | 全画面のリスト。行の ⋯ はトレイで開く |
-| Card / CardView | 15 競合・代替のカード | 枠だけで影を付けない（4.4）。CardView の `addItem` は最後に点線の枠の追加のタイル（「+ Add competitor」。s15-competitors.html の .addcard）を置き、押すとカードを開く代わりに追加する。15 のカードの形（s15-competitors.html）: 題の上に種類（`eyebrow`。等幅の小さな文字で、大文字にしない）、右上に `figure`（価格。等幅）とその下の注記（per bowl）、無いときは「No price」を薄く、その下にラベルと値の行（`details`。hairline で区切り、ラベルの列を取る）、最後の行に注記（根拠の件数・💬 の数）とカードの ⋯（`actions`） | 1列（`details` はラベルを値の上に置く） |
+| Card / CardView | 15 競合・代替のカード | 枠だけで影を付けない（4.4）。CardView の `addItem` は最後に点線の枠の追加のタイル（「+ Add competitor」。s15-competitors.html の .addcard）を置き、押すとカードを開く代わりに追加する。15 のカードの形（s15-competitors.html）: 題の上に種類（`eyebrow`。等幅の小さな文字で、大文字にしない）、右上に `figure`（価格。等幅）とその下の注記（per bowl）、無いときは「No price」を薄く、その下にラベルと値の行（`details`。hairline で区切り、ラベルの列を取る）、最後の行に注記（根拠の件数）と 💬 の数（`openThreadCount`。解決していないスレッドの数。0 なら出さない）とカードの ⋯（`actions`） | 1列（`details` はラベルを値の上に置く） |
 | Well | 判断材料の要約（19）、AI 書き出しのプレビュー（24） | 白い面（`surface.raised`）を hairline の枠で囲む。角丸は Card と同じ | 同じ |
 | Divider | 区切り | S / M / L。S と M は hairline の色、L は薄い線（`border.default`） | 同じ |
 | Tree | 27 のセクションと設問のツリー | — | 全画面のリスト |
@@ -1115,7 +1116,7 @@ Empty の行の F/A/U の欄は U+2014 のダッシュ1文字にする（読み�
 | 変動費（1販売あたり） | Core Product / Materials・Packaging・Payment / Platform Fee・Delivery / Fulfilment・Variable Labor / Commission・Other Variable Cost | 項目名・金額 **または価格の%**・F/A/U |
 
 - 原本の「Source」列は F/A/U の根拠（M2）に置き換える。
-- 行は追加・削除・名前の変更・並べ替えができる。行数の上限はない。テンプレートの初期行も削除できる（削除は履歴から戻せる）。
+- 行は追加・削除・名前の変更・並べ替えができる。行数の上限はない。テンプレートの初期行も削除できる（削除は履歴から戻せる）。並べ替えは表ごとに、6.10 の並べ替えの Dialog で行う。
 - テンプレートの初期行のキー: 初期費用は `initial.equipment`・`initial.renovation`・`initial.lease_deposit`・`initial.permits`・`initial.inventory`・`initial.branding`・`initial.launch_marketing`・`initial.tech_setup`・`initial.working_capital`・`initial.other`、月額固定費は `monthly.rent`・`monthly.salaries`・`monthly.utilities`・`monthly.internet`・`monthly.accounting`・`monthly.marketing`・`monthly.insurance`・`monthly.other`、変動費は `variable.materials`・`variable.packaging`・`variable.payment_fee`・`variable.delivery`・`variable.labor`・`variable.other`。確認項目5・主要指標の `cost_row:*`・プランの参照がこのキーで行を指す。
 - 変動費の行は「金額」か「価格の%」を切り替えて入れる（例: Core Product / Materials 35%）。% の行は 18 の価格から金額を計算して添える（「35% · ₱77.00」）。価格が未入力なら「Needs price」。
 - 「まとめ額」: 行のメニューから「Lump sum（内訳なし）」の印を付けられる。仮置きのまとめ額であることを示すラベルを出すだけで、計算は通常の行と同じ。
@@ -1778,24 +1779,40 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 
 - カードの項目: Name（必須）/ Type（Direct Competitor / Indirect Competitor / Substitute）/ Target Customer / Offering / Typical Price（金額）＋ Price note（例: per box）/ Strength / Weakness / Why Customers Choose Them / Why They Survive / 根拠（M2。6.0.3 の F/A/U を持たない行の決まり）。入力の規則は 6.0.8。
 - 題の行に、確認項目1の状態の印（MoonGlyph）と「4 competitors · aim for 3–5」（目安の幅は 6.1 の確認項目1と同じ）、右端に Cards / Table の切り替えと枠の [+ Add competitor]（スマホでは切り替えを出さず、[+ Add competitor] は題の下のその場に置く）。カードの並びの最後に、点線の枠の「+ Add competitor」のタイルを置く（CardView の `addItem`。押すと追加の Dialog を開く。s15-competitors.html）。カードは CardView の M にする（15 は regular の画面）。
-- カードの形（s15-competitors.html。4.5 の Card）: Type を題の上の小さな文字、Name を題、右上に Typical Price と Price note（価格が無ければ「No price」）、その下に Target Customer・Offering・Strength・Weakness・Why Customers Choose Them・Why They Survive をラベルと値の行で並べ、最後の行に根拠の件数（「1 source」「No sources」）・未解決のコメントの数（💬 1。0件なら出さない）・カードの ⋯ を置く。空の項目は「Empty」を薄く出す。カード全体を押すと編集（下の 14〜16 共通の Dialog）を開く。
+- カードの形（s15-competitors.html。4.5 の Card）: Type を題の上の小さな文字、Name を題、右上に Typical Price と Price note（価格が無ければ「No price」）、その下に Target Customer・Offering・Strength・Weakness・Why Customers Choose Them・Why They Survive をラベルと値の行で並べ、最後の行に根拠の件数（「1 source」「No sources」）・解決していないスレッドの数（💬 1。0件なら出さない）・カードの ⋯ を置く。空の項目は「Empty」を薄く出す。カード全体を押すと編集（下の 14〜16 共通の Dialog）を開く。
+  - ラベルの行の文言は s15-competitors.html のとおり「Target customer」「Offering」「Strength」「Weakness」「Why chosen」「Why they survive」（ラベルの列の幅に収まる短い形。Dialog の入力欄は上の項目の名前のまま）。Type が無いカードは、題の上の文字を出さない。価格は通貨の書式で、小数を持つ価格だけ小数第2位まで出す（「₱240」「₱1,260.50」）。根拠の件数は数える根拠（6.0.3）の数。
+  - 💬 の数は、そのカードの解決していないスレッドの数（SDD 5.7 の `unresolvedThreadCount`。数え方は C1 の `unresolvedCount` と同じ）。返信はスレッドに含めて数えない。
+  - カードの ⋯ の編集の操作（Owner / Member）: 「Edit」（カードを押したときと同じ Dialog）・「Reorder」（下の「並べ替え」）・「Delete」（AlertDialog「Delete this competitor?」と「You can restore it from the history.」、操作は「Delete」と「Cancel」）。
+  - カードを押して開く Dialog は URL の `row` に持つ（SDD 4章）。開くと履歴を1つ足し、ブラウザの戻る・×・Esc・外側のタップで閉じる（URL から直接開いたときは、今の履歴の項目から `row` を外す）。Owner / Member には題「Edit competitor」で入力欄（6.0.2 の自動保存。競合の1行が保存の単位）と、最後に「Evidence」の根拠のタグ（無ければ「No evidence yet」）と「Add evidence」（M2）を出す。Viewer とアーカイブ中のアイデアには、題を競合の名前にして、各欄と根拠のタグを読み取りで出す（Add evidence は出さない）。`row` がこの検証の競合を指さないとき（削除した行・別のアイデアの行）は、小さな Dialog に「見つからない」（6.0.6）を出す。
+  - Type の Picker は、3つの種類の前に「None」（種類を付けない）を置く（任意の欄を空に戻せるようにするため。14 の Source Type と同じ）。Price note の入力欄の下に「For example, per box」を添える。
+- 「+ Add competitor」（題の行のボタン・最後のタイル・空の状態のボタン）は large の Dialog「New competitor」（スマホは全画面のシート）を開く。入力欄は上の項目と同じで（根拠を除く。M2 は対象の行が要るため）、Name が空のあいだは「Add competitor」を押せない。作るとカードの並びの末尾に足し、作った競合の Dialog（上の「Edit competitor」）に替える（14 が作った調査ログを詳細に出すのと同じ。根拠はそこで付ける）。履歴は1つ足し、戻るで閉じる。送っている間に Cancel を押したときは、競合は作るが、その Dialog は開かない。欄の理由は、その欄を変えてから出す（14 の新しい調査ログと同じ）。送信の失敗は 6.0.6 のモーダルの決まりのとおり（一時的な失敗は「Couldn't save」と Retry、恒久的に断られたら「Couldn't save」に 6.0.2 の理由、欄を名指す 422 は欄の下に「Check the format」、回数の上限は待ち時間、想定外は小さなダイアログと Ref・Retry・Close）。Cancel と Esc で閉じる。
 - カードは並べ替えられる（カードの ⋯ の「並べ替え」。17 の費用行と同じ）。並べた順は Pitch Deck の Competition の競合（上から最大5件）と、版のスナップショットの競合にも使う。
-- Web は「Cards / Table」を切り替えられる。表は項目を行、競合を列にして見比べる。
-- カードの下に小見出し「Patterns」と、Survivor Patterns と Failure Patterns の2つの設問（`V.04.SURVIVOR_PATTERNS` / `V.04.FAILURE_PATTERNS`、長文・F/A/U 付き）。設問は 11 と同じ控えめな行で、hairline で区切って並べる（4.5 の QuestionList。s15-competitors.html）。
-- 空の状態: 「List 3–5 competitors or substitutes. Include what people do today instead.」と + Add competitor。
+- Web は「Cards / Table」を切り替えられる（URL の `view`）。表は項目を行、競合を列にして見比べる。行は Type・Typical price（価格と Price note。価格が無ければ「No price」）・カードと同じ6つの項目・Evidence（根拠の件数）の順。表は読み取りで、直すのはカードから開く Dialog。競合が無いときは表の代わりに空の状態を出す。
+- カードの下に小見出し「Patterns」と、Survivor Patterns と Failure Patterns の2つの設問（`V.04.SURVIVOR_PATTERNS` / `V.04.FAILURE_PATTERNS`、長文・F/A/U 付き）。設問は 11 と同じ控えめな行で、hairline で区切って並べる（4.5 の QuestionList。s15-competitors.html）。開いたときはどちらも控えめな行で、押すか Tab で入った設問だけを開き、回答の欄にフォーカスを移す。URL の `q`（13 の Next steps の「Classify answers」など）はその設問を開いてフォーカスする。回答の保存・F/A/U・M2 は 11 と同じ（6.0.2・6.0.3）。Viewer とアーカイブ中のアイデアは、11 の Viewer と同じく両方を開いた読み取りで出す。固定している版に2つの設問が無ければ「Patterns」ごと出さない。
+- 題の行の印は、競合の数と確認項目1の基準値で決める（基準値以上で満月、1件以上で半月、0件で新月。6.1 の確認項目1と同じ）。
+- 空の状態: 「List 3–5 competitors or substitutes. Include what people do today instead.」と + Add competitor。「3–5」は確認項目1の目安の幅（基準値が5以上なら「7+」のように出す。6.1）で、題の行の「aim for 3–5」も同じ。
 - Survivor Patterns と Failure Patterns の見出し（入力欄のラベルも同じ）は、検証のテンプレートの版にある設問 `V.04.SURVIVOR_PATTERNS` / `V.04.FAILURE_PATTERNS` のタイトルを出す（27 で編集した内容が反映される。UI の固定文言は持たない）。設問の問い・EXAMPLE・ヒントも、11 と同じ QuestionCard でこの画面に出す（入力中の設問だけ EXAMPLE とヒントを開く。4.1 パターン C の補足）。
 
 #### 16 前提・リスク（パターン D）
 
-- 上部のタブで Assumptions / Risks を切り替える。
+- 上部のタブで Assumptions / Risks を切り替える（URL の `tab`）。タブは一覧のペインの上部、題の下（絞り込みの位置）に置き、一覧をタブのパネルに入れる。詳細は選んだ行を出すので、タブの外に置く。タブを切り替えると、選んでいた行と新しい行の入力を閉じる。
+- 題は 13 のセクションの名前（「09 Assumptions & Risks」）。15 の題も同じく「04 Competitors」。
 - Assumptions の項目: Assumption（必須）/ Why We Believe It / Evidence（M2 の根拠＋自由記述。6.0.3 の F/A/U を持たない行の決まり）/ Confidence（Low / Medium / High）/ What Would Disprove It / Next Check。
 - Risks の項目: Risk（必須）/ Probability（Low / Medium / High）/ Impact（Low / Medium / High）/ Why It Matters / Mitigation / How to Validate。
 - 入力の規則は 6.0.8。
 - Assumptions の並び順: 作った順。行の ⋯ の「並べ替え」で並べ替えられる。
 - Risks の並び順: 既定は Impact の高い順、同じなら Probability の高い順で、新しい行もこの順の位置に入る。行の ⋯ の「並べ替え」で一度でも並べ替えたら、その順を保ち、新しい行は末尾に付く。Pitch Deck の Risks はこの画面ではなくプランの §22 から作る（6.14）。
-- 空の状態: タブごとに説明と + Add。
+- 空の状態: タブごとに説明と + Add。説明は Assumptions が「List what has to be true for this idea to work, and why you believe it.」、Risks が「List what could go wrong, how likely it is and how much it would hurt.」。ボタンは「Add assumption」「Add risk」（Viewer には説明だけ）。
+- 一覧の行: 文（Assumption・Risk）を行の題に、その下に Assumptions は「{確信度} confidence」と根拠の件数（「Medium confidence · 1 source」。無いものは出さない）、Risks は「Impact High · Probability Medium」（無いものは出さない）。行の ⋯ の編集の操作（Owner / Member）は「Reorder」と「Delete」。
+- 詳細: 文を見出しに、見出しの横の ⋯ に行の ⋯ と同じ「Reorder」「Delete」（スマホでは詳細が一覧に代わって全画面を占めるため、詳細からも届くようにする）。Owner / Member は、タブレットの幅から上では詳細の中で各欄をそのまま直す（6.0.2 の自動保存。前提・リスクの1行が保存の単位）。スマホは詳細を読み取りで出し、「Edit」で各欄のシート（「Edit assumption」「Edit risk」）を開く。前提の Evidence は Why We Believe It の下に置き、根拠のタグ（無ければ「No evidence yet」）と「Add evidence」（M2）、その下に自由記述の「Evidence note」の欄を並べる。Confidence は SegmentedControl（4.5）で、値があるときは横の「Clear」で未設定に戻す（任意の欄を空に戻せるようにするため。14 の Source Type の None と同じ理由）。Probability と Impact は Picker で、選択肢の前に「Not set」を置く。
+- 削除の確認: AlertDialog「Delete this assumption?」「Delete this risk?」と「You can restore it from the history.」、操作は「Delete」と「Cancel」。
+- 新しい行（+ Add と、リンクの `new=1`）・選んだ行の出し方・履歴の足し方・送信の失敗の出し方・「見つからない」は 14 と同じ（新しい行の見出しは「New assumption」「New risk」、作るボタンは「Add assumption」「Add risk」）。新しい前提の入力には Evidence の根拠のタグと「Add evidence」を出さない（M2 は対象の行が要るため。作った後の詳細で付ける。Evidence note は入力できる）。`row` が今のタブの一覧に無い行（削除した行・もう一方の一覧の行・別のアイデアの行）を指すときは、詳細の位置に「見つからない」を出す。
+- Risks を自動の並びのまま、Impact か Probability を直したときは、一覧を読み直して並びを直す。
+- アーカイブ済みのアイデア: 14 と同じく題の上に「This idea is archived」と Restore（Owner / Member）を出し、Viewer と同じ読み取りにする。
 
-14〜16 共通: 行数の上限なし。行の追加・編集は Web は右の詳細ペイン、スマホはボトムシート（15 はパターン E に詳細ペインが無いため、large の Dialog で開き、スマホは全画面のシートにする。3.8。2026-10-12 のユーザーの決定）。削除は確認のうえで行い、変更履歴から戻せる。Viewer は読み取りだけ。
+14〜16 共通: 行数の上限なし。行の追加・編集は Web は右の詳細ペイン、スマホはボトムシート（15 はパターン E に詳細ペインが無いため、large の Dialog で開き、スマホは全画面のシートにする。3.8。2026-10-12 のユーザーの決定）。削除は確認のうえで行い、変更履歴から戻せる。Viewer は読み取りだけ。15 のアーカイブ済みのアイデアも、題の行の上に「This idea is archived」と Restore（Owner / Member）を出し、Viewer と同じ読み取りにする。
+
+並べ替え（15 のカード・16 の行）: ⋯ の「Reorder」で、large の Dialog（スマホは全画面のシート。3.8）「Reorder competitors」「Reorder assumptions」「Reorder risks」を開く。開いたときの一覧の行を、その順に番号付きで並べ、各行の右に「Move {名前} up」「Move {名前} down」のボタン（矢印のアイコン）を置く。動かした行のボタンにフォーカスを残し、端に着いたら反対向きのボタンへ移す。下に「Cancel」と「Save order」。Save order は並びを変えるまで押せない（変えずに保存すると、16 の Risks が手の並びに切り替わるため）。押すと一覧の全件を新しい順で1回だけ送り（SDD 5.7 V17）、通ったら一覧をその順にして閉じる。送っている間は閉じない。並べている間に別の人が行を足すか消して送信が断られたら（V17 の `ids` の 422）、一覧を読み直し、読み直した順から始め直して「The list changed while you were ordering it. Check the order and save again.」を出す。ほかの失敗は並びを残して、6.0.6 のモーダルの決まりのとおりに出す。17 の費用行と 22 の行の並べ替えも、この Dialog の形と操作を使う（並べる範囲と送る API は、それぞれ 6.3・6.13 と SDD 5.7 V17・5.9 P11 のとおり）。
 
 ---
 
@@ -1973,7 +1990,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 
 - 期限の列（Deadline / Target Date / ローンチの Date）は日付。ローンチの Timing は時期の名前で、Date は任意。Date を入れたローンチの行は、5 の Due soon と Overdue の対象になる。
 - 各列の入力の規則は 6.0.8。
-- マイルストーン、ローンチ（区分の中）、KPI（Area の中）、Open Questions は、行の ⋯ の「並べ替え」で並べ替えられる。Next Actions は期限順に並べるので並べ替えない。
+- マイルストーン、ローンチ（区分の中）、KPI（Area の中）、Open Questions は、行の ⋯ の「並べ替え」で並べ替えられる（6.10 の並べ替えの Dialog）。Next Actions は期限順に並べるので並べ替えない。
 - Next Actions は担当・状態・期限（Overdue のみの切替。URL には入れない）で絞り込み、期限順に並べる。期限切れは警告色とラベル「Overdue」。
 - ローンチは時期の区分（T−30 / T−7 / Launch day / First 30 days / Days 31–90 / Other）ごとにまとめて出す。初期行はそれぞれの区分に入り、追加した行は区分を選ぶ（既定は Other）。Timing の文言は自由に直せ、区分とは別に持つ。KPI は Area ごとにまとめて出す。
 - 初期行は追加・削除・名前の変更ができる。

@@ -907,6 +907,44 @@ describe("ListDetailPattern (D)", () => {
     expect(screen.getByRole("button", { name: "New idea" })).toBeTruthy();
   });
 
+  test("tabs (16): under the title, the selected list in their panel, the detail outside them", async () => {
+    const user = userEvent.setup();
+    function Tabbed() {
+      const [tab, setTab] = useState("assumptions");
+      return (
+        <ListDetailPattern
+          header={<h1>Assumptions & Risks</h1>}
+          tabs={{
+            "aria-label": "Lists",
+            items: [
+              { id: "assumptions", label: "Assumptions" },
+              { id: "risks", label: "Risks" },
+            ],
+            selectedKey: tab,
+            onSelectionChange: setTab,
+          }}
+          list={<p>{`List of ${tab}`}</p>}
+          detail={<p>Detail</p>}
+          listLabel="Lists"
+          onBack={() => {}}
+        />
+      );
+    }
+    render(<Tabbed />);
+    const risks = screen.getByRole("tab", { name: "Risks" });
+    expect(screen.getByRole("tabpanel").textContent).toBe(
+      "List of assumptions",
+    );
+    expect(
+      screen.getByRole("tabpanel").contains(screen.getByText("Detail")),
+    ).toBe(false);
+    await user.click(risks);
+    const panel = screen.getByRole("tabpanel");
+    expect(panel.textContent).toBe("List of risks");
+    // The selected tab names the panel that is there.
+    expect(risks.getAttribute("aria-controls")).toBe(panel.id);
+  });
+
   test("no detail area (8): the list alone", () => {
     render(
       <ListDetailPattern
@@ -933,6 +971,25 @@ describe("CardComparePattern (E)", () => {
       />
     );
   }
+
+  test("the notice sits above the title's line", () => {
+    render(
+      <CardComparePattern
+        notice={<p>This idea is archived</p>}
+        header={<h1>Competitors</h1>}
+        view="cards"
+        onViewChange={() => {}}
+        cards={<p>Cards</p>}
+        table={<p>Table</p>}
+      />,
+    );
+    expect(
+      follows(
+        screen.getByText("This idea is archived"),
+        screen.getByRole("heading", { name: "Competitors" }),
+      ),
+    ).toBe(true);
+  });
 
   test("Cards / Table switches between the cards and the table", async () => {
     const user = userEvent.setup();

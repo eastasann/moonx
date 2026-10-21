@@ -1,4 +1,5 @@
 import i18next, { type i18n as I18n } from "i18next";
+import admin from "../locales/en/admin.json";
 import ai from "../locales/en/ai.json";
 import app from "../locales/en/app.json";
 import auth from "../locales/en/auth.json";
@@ -21,6 +22,7 @@ import validation from "../locales/en/validation.json";
  */
 export const resources = {
   en: {
+    admin,
     ai,
     app,
     auth,

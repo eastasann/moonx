@@ -1,5 +1,6 @@
 import type { AiScope } from "@moonx/domain";
 import type {
+  AdminUserStatus,
   IdeaDecisionFilter,
   IdeaSort,
   SourceType,
@@ -423,6 +424,128 @@ export const aiExportQuery = (
     refetchOnReconnect: false,
   });
 };
+
+/** What is cached of the operator's screens (26–28). */
+export const adminKey = ["admin"];
+
+/** AD1: the three templates and their versions (26). */
+export const adminTemplatesQuery = () =>
+  queryOptions({
+    queryKey: [...adminKey, "templates"],
+    queryFn: () => unwrap(api().api.v1.admin.templates.get()),
+  });
+
+/** What is cached of one template version: its detail and its check. */
+export const templateVersionKey = (versionId: string) => [
+  ...adminKey,
+  "template-versions",
+  versionId,
+];
+
+/** AD3 GET: a version as 27 shows it. */
+export const templateVersionQuery = (versionId: string) =>
+  queryOptions({
+    queryKey: templateVersionKey(versionId),
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.admin["template-versions"]({ versionId: inPath(versionId) })
+          .get(),
+      ),
+  });
+
+/**
+ * AD6 validate: what blocks publishing the version and what only warns (27). It writes
+ * nothing, so it is read as the version is, and again once the version changes.
+ */
+export const templateCheckQuery = (versionId: string) =>
+  queryOptions({
+    queryKey: [...templateVersionKey(versionId), "check"],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.admin["template-versions"]({ versionId: inPath(versionId) })
+          .validate.post(),
+      ),
+  });
+
+/** The most AD7 gives at once (SDD 5.1「一覧」). */
+const ADMIN_PAGE = 200;
+
+/**
+ * Every page of an AD7 list, one after another: 28 shows each list whole, as 6 does its
+ * ideas, and its search narrows it.
+ */
+async function everyPage<T>(
+  read: (cursor: number | undefined) => Promise<{
+    items: T[];
+    nextCursor: string | null;
+  }>,
+): Promise<T[]> {
+  const items: T[] = [];
+  let cursor: number | undefined;
+  for (;;) {
+    const page = await read(cursor);
+    items.push(...page.items);
+    if (page.nextCursor === null) return items;
+    cursor = Number(page.nextCursor);
+  }
+}
+
+/** 28's Users filters (AD7 users). */
+export interface AdminUserFilters {
+  q?: string;
+  status?: AdminUserStatus;
+}
+
+/** AD7 users: the users of the whole service, deleted ones last (28). */
+export const adminUsersQuery = (filters: AdminUserFilters) =>
+  queryOptions({
+    queryKey: [...adminKey, "users", filters],
+    queryFn: () =>
+      everyPage((cursor) =>
+        unwrap(
+          api().api.v1.admin.users.get({
+            query: { ...filters, cursor, limit: ADMIN_PAGE },
+          }),
+        ),
+      ),
+  });
+
+/** AD7 workspaces: every workspace, by name (28, and the invitation's workspace). */
+export const adminWorkspacesQuery = (q?: string) =>
+  queryOptions({
+    queryKey: [...adminKey, "workspaces", q ?? ""],
+    queryFn: () =>
+      everyPage((cursor) =>
+        unwrap(
+          api().api.v1.admin.workspaces.get({
+            query: {
+              ...(q === undefined ? {} : { q }),
+              cursor,
+              limit: ADMIN_PAGE,
+            },
+          }),
+        ),
+      ),
+  });
+
+/**
+ * AD7 invitations: those of every workspace and of none, newest first; `pending` the
+ * ones still open, `all` the accepted, expired and cancelled too (28).
+ */
+export const adminInvitationsQuery = (status: "pending" | "all") =>
+  queryOptions({
+    queryKey: [...adminKey, "invitations", status],
+    queryFn: () =>
+      everyPage((cursor) =>
+        unwrap(
+          api().api.v1.admin.invitations.get({
+            query: { status, cursor, limit: ADMIN_PAGE },
+          }),
+        ),
+      ),
+  });
 
 /**
  * Puts what a save answered in a query's data (ADR-011). A read of it already on its way

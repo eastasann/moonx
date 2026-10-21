@@ -4,6 +4,7 @@ import type {
   LinkTarget,
   SourceType,
   SupportsCheck,
+  TemplateKind,
 } from "@moonx/schemas";
 import type { CompareView } from "@moonx/ui-tokens";
 
@@ -14,6 +15,33 @@ export const ideaHref = (workspaceId: string, ideaId: string) =>
 /** 9 Workspace Settings (SDD 4章), which only an Owner opens. */
 export const settingsHref = (workspaceId: string) =>
   `/w/${workspaceId}/settings`;
+
+/** 26 Admin: Templates (SDD 4章), with the template chosen; the nav's Admin opens it. */
+export const adminTemplatesHref = (kind?: TemplateKind) =>
+  `/admin/templates${kind === undefined ? "" : `?kind=${kind}`}`;
+
+/**
+ * The nodes of 27 that are no section or question (SDD 4章 `?node=`): a kind's settings at
+ * the end of the tree.
+ */
+export const SETTINGS_NODES = [
+  "ai-prompt",
+  "cost-defaults",
+  "check-rules",
+  "execution-presets",
+] as const;
+export type SettingsNode = (typeof SETTINGS_NODES)[number];
+
+/** 27 Admin: Edit Template (SDD 4章), with the node of the tree chosen. */
+export const templateVersionHref = (versionId: string, node?: string) =>
+  `/admin/templates/versions/${versionId}${node === undefined ? "" : `?node=${encodeURIComponent(node)}`}`;
+
+/** The tabs of 28 Admin: Users & Workspaces (SDD 4章 `?tab=`). */
+export type AdminUsersTab = "users" | "workspaces" | "invitations";
+
+/** 28 Admin: Users & Workspaces (SDD 4章), on its tab. */
+export const adminUsersHref = (tab?: AdminUsersTab) =>
+  `/admin/users${tab === undefined ? "" : `?tab=${tab}`}`;
 
 /** 6 Ideas, with the filters given (SDD 4章). */
 export const ideasHref = (

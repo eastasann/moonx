@@ -6,8 +6,9 @@ import { API_LOG, WEB_ORIGIN } from "./env";
 /** Every demo user's password (design-spec 8.1). */
 export const DEMO_PASSWORD = "moonx-demo-2026";
 
-/** The demo users of design-spec 8.1, by their part in BCDX. */
+/** The demo users of design-spec 8.1, by their part in BCDX, and the operator. */
 export const demo = {
+  operator: "admin@moonx.example",
   owner: "ana@bcdx.example",
   member: "kenji@bcdx.example",
   otherMember: "paolo@bcdx.example",

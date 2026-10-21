@@ -81,6 +81,7 @@ import {
 import { ApiError, api, unwrap } from "../lib/api";
 import { rejectionReason } from "../lib/autosave";
 import { countingEvidence } from "../lib/evidence";
+import { readUtf8 } from "../lib/files";
 import { useIsOnline } from "../lib/online";
 import { importContextQuery } from "../lib/queries";
 
@@ -163,20 +164,6 @@ function excerptOf(body: ReplyBody, truncate: (text: string) => string) {
   return chars.length > EXCERPT_CHARS
     ? truncate(chars.slice(0, EXCERPT_CHARS).join("").trimEnd())
     : line;
-}
-
-/**
- * Reads a chosen file as UTF-8 (design-spec 6.7 ①). Null when it is not UTF-8; a byte
- * order mark is dropped.
- */
-async function readUtf8(file: File): Promise<string | null> {
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(
-      await file.arrayBuffer(),
-    );
-  } catch {
-    return null;
-  }
 }
 
 /** One block of the reply in ② (design-spec 6.7 ②): what it is, why, and what to do. */

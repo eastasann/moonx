@@ -503,6 +503,9 @@ export const detailPane = recipe({
         alignSelf: "flex-start",
         maxHeight: `calc(100dvh - ${frame.top})`,
         overflowY: "auto",
+        // The ring shows only when the keyboard reaches a pane taller than the window,
+        // to scroll it (ListDetailPattern), not when focus is put here as it opens.
+        selectors: { "&:focus-visible": focusRing },
         "@media": {
           [tabletUp]: { paddingInline: pane.detailPaddingX },
           [desktopUp]: { paddingInline: pane.detailPaddingX },

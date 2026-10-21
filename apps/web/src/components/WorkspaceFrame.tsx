@@ -7,11 +7,11 @@ import {
   TabBar,
   useMoreMenu,
 } from "@moonx/ui-web";
-import { House, Lightbulb, Settings2 } from "lucide-react";
+import { House, Lightbulb, Settings2, Shield } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useAutosave, useSaveState } from "../lib/autosave-react";
-import { settingsHref } from "../lib/links";
+import { adminTemplatesHref, settingsHref } from "../lib/links";
 import { useLogOutRequest } from "./LogOutRequest";
 import { useOfflineBanner } from "./StandaloneFrame";
 import { useModal, useWorkspace } from "./workspace";
@@ -20,10 +20,11 @@ export interface WorkspaceFrameProps
   extends Pick<AppFrameProps, "breadcrumbs" | "back" | "title"> {
   /**
    * The navigation item of the screen; none for a screen whose item is not built yet.
-   * `account` and `settings` are opened from the More menu, so their phone header reads
-   * "← More" (design-spec 6.0.1).
+   * `account`, `settings` and `admin` are opened from the More menu, so their phone
+   * header reads "← More" (design-spec 6.0.1); a screen under one of them (27) passes its
+   * own `back` instead.
    */
-  current?: "dashboard" | "ideas" | "settings" | "account";
+  current?: "dashboard" | "ideas" | "settings" | "account" | "admin";
   /**
    * The screen's saved items, by key prefix (`idea:<id>`), or prefixes for a screen of
    * several kinds of item: "Saved" shows once one of them saved on this visit. Failures
@@ -37,7 +38,7 @@ export interface WorkspaceFrameProps
 /**
  * AppFrame for the screens of a workspace, and for 4, which stands in the one last
  * opened (design-spec 6.0.1・6.16): the workspace, the pages the user may open (9 for an
- * Owner only), Account and Log out in the sidebar's account menu or in More, the
+ * Owner only, 26 Admin for an operator only), Account and Log out in the sidebar's account menu or in More, the
  * header's save state with its Retry, and the offline band. Logging out with unsaved
  * input asks first (5章「共通ナビ」). The pages appear here as their screens are built
  * (docs/claude-code-prompts.md: no way into a screen before it exists).
@@ -52,7 +53,9 @@ export function WorkspaceFrame({
   const { me, workspace, role } = useWorkspace();
   const modal = useModal();
   const moreMenu = useMoreMenu();
-  const isInMore = current === "account" || current === "settings";
+  const isInMore =
+    header.back === undefined &&
+    (current === "account" || current === "settings" || current === "admin");
   const offline = useOfflineBanner();
   const autosave = useAutosave();
   const saveState = useSaveState(saveScope);
@@ -72,7 +75,8 @@ export function WorkspaceFrame({
       href: `/w/${workspace.id}/ideas`,
     },
   ];
-  // Only an Owner opens 9 (design-spec 2.2); the rest never see the way in (1.3).
+  // Only an Owner opens 9 and only an operator 26 (design-spec 2.2); the rest never see
+  // the way in (1.3).
   const settings: NavItem[] =
     role === "owner"
       ? [
@@ -84,6 +88,16 @@ export function WorkspaceFrame({
           },
         ]
       : [];
+  const admin: NavItem[] = me.isAdmin
+    ? [
+        {
+          id: "admin",
+          label: t("app:nav.admin"),
+          icon: <Shield />,
+          href: adminTemplatesHref(),
+        },
+      ]
+    : [];
   return (
     <AppFrame
       {...header}
@@ -95,7 +109,7 @@ export function WorkspaceFrame({
           workspaceName={workspace.name}
           onWorkspacePress={openSwitch}
           items={pages}
-          secondaryItems={settings}
+          secondaryItems={[...settings, ...admin]}
           currentId={current}
           user={{ name: me.displayName, avatarSrc: me.avatarUrl }}
           userMenu={
@@ -126,6 +140,11 @@ export function WorkspaceFrame({
               {settings.map((item) => (
                 <MenuItem key={item.id} id={item.id} href={item.href}>
                   {t("app:nav.workspaceSettings")}
+                </MenuItem>
+              ))}
+              {admin.map((item) => (
+                <MenuItem key={item.id} id={item.id} href={item.href}>
+                  {item.label}
                 </MenuItem>
               ))}
               <MenuItem id="log-out" onAction={requestLogOut}>

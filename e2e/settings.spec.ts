@@ -343,6 +343,11 @@ test.describe("on a phone", () => {
       page.getByRole("menuitem", { name: "Workspace Settings" }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
+    // The tray closes with an animation: the page is checked once it has gone, not while
+    // its fading text is still drawn over the page.
+    await expect(
+      page.getByRole("menuitem", { name: "Workspace Settings" }),
+    ).toHaveCount(0);
     await expectNoAxeViolations(page);
   });
 });

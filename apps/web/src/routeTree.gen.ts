@@ -18,9 +18,12 @@ import { Route as SignedInAccountRouteImport } from './routes/_signedIn/account'
 import { Route as SignedInWelcomeRouteImport } from './routes/_signedIn/welcome'
 import { Route as DevComponentsRouteImport } from './routes/dev.components'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
+import { Route as SignedInAdminUsersRouteImport } from './routes/_signedIn/admin/users'
 import { Route as SignedInWWorkspaceIdRouteRouteImport } from './routes/_signedIn/w/$workspaceId/route'
+import { Route as SignedInAdminTemplatesIndexRouteImport } from './routes/_signedIn/admin/templates/index'
 import { Route as SignedInWWorkspaceIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/index'
 import { Route as SignedInWWorkspaceIdSettingsRouteImport } from './routes/_signedIn/w/$workspaceId/settings'
+import { Route as SignedInAdminTemplatesVersionsVersionIdRouteImport } from './routes/_signedIn/admin/templates/versions.$versionId'
 import { Route as SignedInWWorkspaceIdAiExportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/export'
 import { Route as SignedInWWorkspaceIdAiImportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/import'
 import { Route as SignedInWWorkspaceIdIdeasIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/index'
@@ -77,10 +80,21 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignedInAdminUsersRoute = SignedInAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => SignedInRoute,
+} as any)
 const SignedInWWorkspaceIdRouteRoute =
   SignedInWWorkspaceIdRouteRouteImport.update({
     id: '/w/$workspaceId',
     path: '/w/$workspaceId',
+    getParentRoute: () => SignedInRoute,
+  } as any)
+const SignedInAdminTemplatesIndexRoute =
+  SignedInAdminTemplatesIndexRouteImport.update({
+    id: '/admin/templates/',
+    path: '/admin/templates/',
     getParentRoute: () => SignedInRoute,
   } as any)
 const SignedInWWorkspaceIdIndexRoute =
@@ -94,6 +108,12 @@ const SignedInWWorkspaceIdSettingsRoute =
     id: '/settings',
     path: '/settings',
     getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInAdminTemplatesVersionsVersionIdRoute =
+  SignedInAdminTemplatesVersionsVersionIdRouteImport.update({
+    id: '/admin/templates/versions/$versionId',
+    path: '/admin/templates/versions/$versionId',
+    getParentRoute: () => SignedInRoute,
   } as any)
 const SignedInWWorkspaceIdAiExportRoute =
   SignedInWWorkspaceIdAiExportRouteImport.update({
@@ -172,8 +192,11 @@ export interface FileRoutesByFullPath {
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
+  '/admin/users': typeof SignedInAdminUsersRoute
   '/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
+  '/admin/templates/': typeof SignedInAdminTemplatesIndexRoute
   '/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
+  '/admin/templates/versions/$versionId': typeof SignedInAdminTemplatesVersionsVersionIdRoute
   '/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
   '/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
@@ -195,8 +218,11 @@ export interface FileRoutesByTo {
   '/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/admin/users': typeof SignedInAdminUsersRoute
   '/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
+  '/admin/templates': typeof SignedInAdminTemplatesIndexRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdIndexRoute
+  '/admin/templates/versions/$versionId': typeof SignedInAdminTemplatesVersionsVersionIdRoute
   '/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
   '/w/$workspaceId/ideas': typeof SignedInWWorkspaceIdIdeasIndexRoute
@@ -221,8 +247,11 @@ export interface FileRoutesById {
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/_signedIn/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
+  '/_signedIn/admin/users': typeof SignedInAdminUsersRoute
   '/_signedIn/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
+  '/_signedIn/admin/templates/': typeof SignedInAdminTemplatesIndexRoute
   '/_signedIn/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
+  '/_signedIn/admin/templates/versions/$versionId': typeof SignedInAdminTemplatesVersionsVersionIdRoute
   '/_signedIn/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
   '/_signedIn/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
   '/_signedIn/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
@@ -247,8 +276,11 @@ export interface FileRouteTypes {
     | '/dev/components'
     | '/invite/$token'
     | '/w/$workspaceId'
+    | '/admin/users'
     | '/w/$workspaceId/settings'
+    | '/admin/templates/'
     | '/w/$workspaceId/'
+    | '/admin/templates/versions/$versionId'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
     | '/w/$workspaceId/ideas/'
@@ -270,8 +302,11 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/dev/components'
     | '/invite/$token'
+    | '/admin/users'
     | '/w/$workspaceId/settings'
+    | '/admin/templates'
     | '/w/$workspaceId'
+    | '/admin/templates/versions/$versionId'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
     | '/w/$workspaceId/ideas'
@@ -295,8 +330,11 @@ export interface FileRouteTypes {
     | '/dev/components'
     | '/invite/$token'
     | '/_signedIn/w/$workspaceId'
+    | '/_signedIn/admin/users'
     | '/_signedIn/w/$workspaceId/settings'
+    | '/_signedIn/admin/templates/'
     | '/_signedIn/w/$workspaceId/'
+    | '/_signedIn/admin/templates/versions/$versionId'
     | '/_signedIn/w/$workspaceId/ai/export'
     | '/_signedIn/w/$workspaceId/ai/import'
     | '/_signedIn/w/$workspaceId/ideas/'
@@ -385,11 +423,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_signedIn/admin/users': {
+      id: '/_signedIn/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof SignedInAdminUsersRouteImport
+      parentRoute: typeof SignedInRoute
+    }
     '/_signedIn/w/$workspaceId': {
       id: '/_signedIn/w/$workspaceId'
       path: '/w/$workspaceId'
       fullPath: '/w/$workspaceId'
       preLoaderRoute: typeof SignedInWWorkspaceIdRouteRouteImport
+      parentRoute: typeof SignedInRoute
+    }
+    '/_signedIn/admin/templates/': {
+      id: '/_signedIn/admin/templates/'
+      path: '/admin/templates'
+      fullPath: '/admin/templates/'
+      preLoaderRoute: typeof SignedInAdminTemplatesIndexRouteImport
       parentRoute: typeof SignedInRoute
     }
     '/_signedIn/w/$workspaceId/': {
@@ -405,6 +457,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/w/$workspaceId/settings'
       preLoaderRoute: typeof SignedInWWorkspaceIdSettingsRouteImport
       parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/admin/templates/versions/$versionId': {
+      id: '/_signedIn/admin/templates/versions/$versionId'
+      path: '/admin/templates/versions/$versionId'
+      fullPath: '/admin/templates/versions/$versionId'
+      preLoaderRoute: typeof SignedInAdminTemplatesVersionsVersionIdRouteImport
+      parentRoute: typeof SignedInRoute
     }
     '/_signedIn/w/$workspaceId/ai/export': {
       id: '/_signedIn/w/$workspaceId/ai/export'
@@ -536,12 +595,19 @@ interface SignedInRouteChildren {
   SignedInAccountRoute: typeof SignedInAccountRoute
   SignedInWelcomeRoute: typeof SignedInWelcomeRoute
   SignedInWWorkspaceIdRouteRoute: typeof SignedInWWorkspaceIdRouteRouteWithChildren
+  SignedInAdminUsersRoute: typeof SignedInAdminUsersRoute
+  SignedInAdminTemplatesIndexRoute: typeof SignedInAdminTemplatesIndexRoute
+  SignedInAdminTemplatesVersionsVersionIdRoute: typeof SignedInAdminTemplatesVersionsVersionIdRoute
 }
 
 const SignedInRouteChildren: SignedInRouteChildren = {
   SignedInAccountRoute: SignedInAccountRoute,
   SignedInWelcomeRoute: SignedInWelcomeRoute,
   SignedInWWorkspaceIdRouteRoute: SignedInWWorkspaceIdRouteRouteWithChildren,
+  SignedInAdminUsersRoute: SignedInAdminUsersRoute,
+  SignedInAdminTemplatesIndexRoute: SignedInAdminTemplatesIndexRoute,
+  SignedInAdminTemplatesVersionsVersionIdRoute:
+    SignedInAdminTemplatesVersionsVersionIdRoute,
 }
 
 const SignedInRouteWithChildren = SignedInRoute._addFileChildren(

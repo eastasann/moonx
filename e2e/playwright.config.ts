@@ -24,7 +24,21 @@ export default defineConfig({
   reporter: [["list"]],
   globalSetup: "./global-setup.ts",
   use: { baseURL: WEB_ORIGIN, trace: "retain-on-failure" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      testIgnore: "admin-publish.spec.ts",
+    },
+    // A published template version is what every new self analysis, idea and plan takes
+    // from then on (design-spec 6.0.7): publishing waits until the others are done.
+    {
+      name: "after-the-others",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: "admin-publish.spec.ts",
+      dependencies: ["chromium"],
+    },
+  ],
   webServer: [
     {
       // Its log goes to API_LOG, where the tests read the mails it sends (env.ts).

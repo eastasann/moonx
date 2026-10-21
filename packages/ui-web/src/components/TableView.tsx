@@ -24,6 +24,7 @@ import {
   TableStateContext,
   VisuallyHidden,
 } from "react-aria-components";
+import { ListPaneContext } from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
 import { TableCellContext } from "../internal/tableCell";
 import { useIsNarrow } from "../internal/useIsNarrow";
@@ -232,6 +233,7 @@ function GridTable<T extends { id: Key }>({
   density = "regular",
   ...labels
 }: Omit<TableViewProps<T>, "layout">) {
+  const inPane = useContext(ListPaneContext);
   // The row focus is in (a cell or one of its inputs): an editable one shows its inputs.
   const [activeKey, setActiveKey] = useState<Key | null>(null);
   // The row being typed in: the table's keys go to its inputs.
@@ -468,7 +470,9 @@ function GridTable<T extends { id: Key }>({
             ? (selection) => onSelectionChange(toSet(selection))
             : undefined
         }
-        className={`${styles.table} ${styles.density[density]}`}
+        className={`${styles.table} ${styles.density[density]}${
+          inPane ? ` ${styles.inPane}` : ""
+        }`}
       >
         <TableHeader columns={columns}>
           {(column) => (
@@ -663,6 +667,7 @@ function LineRows<T extends { id: Key }>({
   density = "regular",
   ...labels
 }: Omit<TableViewProps<T>, "layout" | "isRowEditable">) {
+  const inPane = useContext(ListPaneContext);
   const mark = columns.find((column) => column.isMark);
   const header = columns.find((column) => column.isRowHeader);
   const below = columns.filter(
@@ -698,7 +703,9 @@ function LineRows<T extends { id: Key }>({
           : undefined
       }
       renderEmptyState={renderEmptyState}
-      className={`${styles.lines} ${styles.density[density]}`}
+      className={`${styles.lines} ${styles.density[density]}${
+        inPane ? ` ${styles.inPane}` : ""
+      }`}
     >
       {(item) => {
         // A row pressed to open something or to choose it ends in › (design-spec 4.4).

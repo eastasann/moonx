@@ -20,3 +20,17 @@ export function downloadText(name: string, text: string, type: string) {
  */
 export const copyText = (text: string) =>
   Promise.resolve().then(() => navigator.clipboard.writeText(text));
+
+/**
+ * Reads a chosen file as UTF-8 (25's reply, 26's template file). Null when it is not
+ * UTF-8; a byte order mark is dropped.
+ */
+export async function readUtf8(file: File): Promise<string | null> {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(
+      await file.arrayBuffer(),
+    );
+  } catch {
+    return null;
+  }
+}

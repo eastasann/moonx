@@ -60,6 +60,17 @@ export interface ListTabs {
   items: readonly { id: string; label: string }[];
   selectedKey: string;
   onSelectionChange: (key: string) => void;
+  /**
+   * `manual` for tabs that open another screen (26 and 28's): the arrow keys only move
+   * among them, and Enter or Space opens one.
+   * @default "automatic"
+   */
+  keyboardActivation?: "automatic" | "manual";
+  /**
+   * Focus the selected tab as the list appears: the screen was opened from a tab of the
+   * same row on another screen, and the keyboard stays where it was.
+   */
+  autoFocus?: boolean;
 }
 
 interface WithDetail extends ListDetailBase {
@@ -223,6 +234,51 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
     }
   }, [opensDetail, isTwoColumns, usesFrameBack, hasDetail]);
 
+  const tabsRow = useRef<HTMLDivElement>(null);
+  const focusesTab = tabs?.autoFocus === true;
+  useEffect(() => {
+    if (!focusesTab) return;
+    // React Aria puts the tabs in the page a render after the pattern mounts.
+    const frame = requestAnimationFrame(() =>
+      tabsRow.current
+        ?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+        ?.focus(),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [focusesTab]);
+
+  // Beside the list the detail scrolls on its own once taller than the window: the
+  // keyboard must reach it to scroll it (WCAG 2.1.1), as WorksheetPattern's results.
+  // Text alone, with nothing to focus in it (27's published question), would otherwise
+  // be out of reach. The pane is as tall as its content up to the window's height, so it
+  // starts or stops scrolling only as its own height changes, which is what is watched.
+  const [isDetailScrolling, setDetailScrolling] = useState(false);
+  const showsDetailBeside = hasDetail && isTwoColumns;
+  useLayoutEffect(() => {
+    const pane = detailPane.current;
+    if (
+      !showsDetailBeside ||
+      pane === null ||
+      typeof ResizeObserver === "undefined"
+    ) {
+      setDetailScrolling(false);
+      return;
+    }
+    const measure = () =>
+      setDetailScrolling(pane.scrollHeight > pane.clientHeight);
+    measure();
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    });
+    observer.observe(pane);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [showsDetailBeside]);
+
   const isBeside = hasDetail && isTwoColumns;
   const listBodyOf = () => (
     <>
@@ -270,8 +326,9 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
               <Tabs
                 selectedKey={tabs.selectedKey}
                 onSelectionChange={(key) => tabs.onSelectionChange(String(key))}
+                keyboardActivation={tabs.keyboardActivation}
               >
-                <div className={styles.listTabs}>
+                <div ref={tabsRow} className={styles.listTabs}>
                   <TabList aria-label={tabs["aria-label"]}>
                     {tabs.items.map((item) => (
                       <Tab key={item.id} id={item.id}>
@@ -294,7 +351,7 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
         {hasDetail && (isTwoColumns || opensDetail) && (
           <div
             ref={detailPane}
-            tabIndex={-1}
+            tabIndex={isDetailScrolling ? 0 : -1}
             className={styles.detailPane({ isBeside: isTwoColumns })}
           >
             {!isTwoColumns && !usesFrameBack && (

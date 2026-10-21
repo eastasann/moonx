@@ -45,7 +45,7 @@ import {
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
-import { hrefOf, ideaHref, ideasHref } from "../lib/links";
+import { hrefOf, ideaHref, ideasHref, settingsHref } from "../lib/links";
 import {
   dashboardActivityQuery,
   dashboardDueSoonQuery,
@@ -209,8 +209,8 @@ function IdeaRow({
 /**
  * In the Ideas block's place while the workspace has no idea, dropped ones included
  * (design-spec 6.9): the first steps for those who may take them, one line for a Viewer.
- * The first idea opens M1; the others become ways in when their screens are built (10,
- * 9).
+ * Inviting opens 9 and the first idea M1; the self analysis becomes a way in when 10 is
+ * built.
  */
 export function GettingStarted({
   onFirstIdea,
@@ -219,7 +219,7 @@ export function GettingStarted({
   onFirstIdea: () => void;
 }) {
   const { t } = useTranslation(["dashboard"]);
-  const { role } = useWorkspace();
+  const { workspace, role } = useWorkspace();
   if (role === "viewer") {
     return (
       <Block title={t("dashboard:gettingStarted.title")}>
@@ -237,7 +237,9 @@ export function GettingStarted({
       <RowList ordered aria-label={t("dashboard:gettingStarted.title")}>
         <RowListItem>{t("dashboard:gettingStarted.selfAnalysis")}</RowListItem>
         {role === "owner" && (
-          <RowListItem>{t("dashboard:gettingStarted.invite")}</RowListItem>
+          <RowListItem href={settingsHref(workspace.id)}>
+            {t("dashboard:gettingStarted.invite")}
+          </RowListItem>
         )}
         <RowListItem onPress={onFirstIdea}>
           {t("dashboard:gettingStarted.firstIdea")}

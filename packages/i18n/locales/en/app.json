@@ -4,6 +4,9 @@
   "nav": {
     "dashboard": "Dashboard",
     "ideas": "Ideas",
+    "settings": "Settings",
+    "workspaceSettings": "Workspace Settings",
+    "account": "Account",
     "switchWorkspace": "Switch workspace",
     "logOut": "Log out"
   },

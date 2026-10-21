@@ -2,15 +2,10 @@ import {
   displayNameSchema,
   type InvitationPreview,
   type Me,
-  PHOTO_MAX_BYTES,
-  PHOTO_TYPES,
   sameEmail,
 } from "@moonx/schemas";
 import {
-  Avatar,
   Button,
-  FileTrigger,
-  Flex,
   Form,
   Heading,
   InlineAlert,
@@ -26,6 +21,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { InvalidInvitation } from "../components/InvalidInvitation";
 import { useLogOut } from "../components/logOut";
+import { PhotoField } from "../components/PhotoField";
 import { failureCode, SendFailure } from "../components/SendFailure";
 import { StandaloneFrame } from "../components/StandaloneFrame";
 import { StandaloneLoading } from "../components/StandaloneLoading";
@@ -503,82 +499,6 @@ function ProfileStep({
         />
       )}
     </WelcomePage>
-  );
-}
-
-/**
- * The optional photo (U3): JPEG, PNG or WebP up to 5 MB (design-spec 6.0.8), checked here
- * for its size before it is sent and by the API for what it is.
- */
-function PhotoField({ me }: { me: Me }) {
-  const { t } = useTranslation(["auth", "app"]);
-  const isOnline = useIsOnline();
-  const queryClient = useQueryClient();
-  const [isUploading, setUploading] = useState(false);
-  const [failure, setFailure] = useState<{ error: unknown; file: File } | null>(
-    null,
-  );
-  const [problem, setProblem] = useState<"tooLarge" | "format" | null>(null);
-  const upload = async (file: File) => {
-    setFailure(null);
-    setProblem(null);
-    if (file.size > PHOTO_MAX_BYTES) {
-      setProblem("tooLarge");
-      return;
-    }
-    setUploading(true);
-    try {
-      const { avatarUrl } = await unwrap(api().api.v1.me.avatar.put({ file }));
-      queryClient.setQueryData(
-        meQuery().queryKey,
-        (previous: Me | undefined) =>
-          previous === undefined ? previous : { ...previous, avatarUrl },
-      );
-    } catch (cause) {
-      const code = failureCode(cause);
-      if (code === "PAYLOAD_TOO_LARGE") setProblem("tooLarge");
-      else if (code === "VALIDATION_FAILED") setProblem("format");
-      else setFailure({ error: cause, file });
-    } finally {
-      setUploading(false);
-    }
-  };
-  return (
-    <Stack gap="space-200">
-      <Flex gap="space-300" alignItems="center">
-        <Avatar name={me.displayName} src={me.avatarUrl} size="M" />
-        <FileTrigger
-          acceptedFileTypes={[...PHOTO_TYPES]}
-          onSelect={(files) => {
-            const file = files?.[0];
-            if (file !== undefined) void upload(file);
-          }}
-        >
-          <Button
-            variant="secondary"
-            isPending={isUploading}
-            isDisabled={!isOnline}
-          >
-            {me.avatarUrl === null
-              ? t("auth:welcome.addPhoto")
-              : t("auth:welcome.changePhoto")}
-          </Button>
-        </FileTrigger>
-      </Flex>
-      {problem !== null && (
-        <InlineAlert variant="negative">
-          {t(`auth:photo.${problem}`)}
-        </InlineAlert>
-      )}
-      {failure !== null && (
-        <SendFailure
-          error={failure.error}
-          transient="couldNotSave"
-          onRetry={() => void upload(failure.file)}
-          isRetryDisabled={!isOnline}
-        />
-      )}
-    </Stack>
   );
 }
 

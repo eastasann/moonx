@@ -1,3 +1,4 @@
+import { type Theme, themeSchema } from "@moonx/schemas";
 import { useQuery } from "@tanstack/react-query";
 import {
   createFileRoute,
@@ -11,8 +12,13 @@ import { PendingScreen } from "../components/PendingScreen";
 import { SaveConflictDialog } from "../components/SaveFeedback";
 import { SignInAgainDialog } from "../components/SignInAgain";
 import { FailureState, StatePage } from "../components/states";
+import { PREFERENCES_KEY } from "../lib/account";
 import { ApiError } from "../lib/api";
-import { useAutosave, useAutosaveState } from "../lib/autosave-react";
+import {
+  useAutosave,
+  useAutosaveState,
+  useSaveItem,
+} from "../lib/autosave-react";
 import { meQuery } from "../lib/queries";
 import { setReportedUser } from "../lib/sentry";
 import { useDropOtherUsersData } from "../lib/session";
@@ -53,6 +59,11 @@ function SignedIn() {
   const { data: me } = useQuery(meQuery());
   const userId = me?.id ?? null;
   useDropOtherUsersData(userId);
+  // A display mode chosen on 4 shows as it saves, as the Picker shows it.
+  const chosen = themeSchema.safeParse(
+    useSaveItem(PREFERENCES_KEY)?.unsaved.theme,
+  );
+  useTheme(chosen.success ? chosen.data : me?.theme);
   useEffect(() => {
     setReportedUser(userId);
     return () => setReportedUser(null);
@@ -68,6 +79,26 @@ function SignedIn() {
         </ModalBoundary>
       )}
     </>
+  );
+}
+
+/**
+ * The user's display mode (design-spec 4.4, SDD ADR-018): Light and Dark fix
+ * `<html data-theme>`; System, and the screens before signing in (1, 2, 29, 30), leave it
+ * off for the OS to decide. Until the user is read, the OS decides too.
+ */
+function useTheme(theme: Theme | undefined) {
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "light" || theme === "dark") {
+      root.setAttribute("data-theme", theme);
+    } else {
+      root.removeAttribute("data-theme");
+    }
+  }, [theme]);
+  useEffect(
+    () => () => document.documentElement.removeAttribute("data-theme"),
+    [],
   );
 }
 

@@ -87,3 +87,12 @@ export function inputIssueMessage(issue: z.core.$ZodIssue): string {
     `No message for the input issue ${issue.code} (${JSON.stringify(issue.path)})`,
   );
 }
+
+/** Why `value` breaks the rule `schema` holds (6.0.8), in the field's words, or undefined. */
+export function ruleErrorOf(
+  schema: z.ZodType,
+  value: unknown,
+): string | undefined {
+  const [issue] = schema.safeParse(value).error?.issues ?? [];
+  return issue === undefined ? undefined : inputIssueMessage(issue);
+}

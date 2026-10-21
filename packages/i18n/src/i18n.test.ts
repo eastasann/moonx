@@ -39,6 +39,7 @@ test("the shared instance is ready on import", () => {
     "mail",
     "notifications",
     "pitch",
+    "settings",
     "validation",
   ]);
 });

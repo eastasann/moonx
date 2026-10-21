@@ -50,6 +50,15 @@ describe("Getting started (design-spec 6.9)", () => {
     ]);
   });
 
+  test("inviting the team opens 9", () => {
+    renderAs("owner");
+    expect(
+      screen
+        .getByRole("link", { name: "Invite your team" })
+        .getAttribute("href"),
+    ).toBe(`/w/${workspace.id}/settings`);
+  });
+
   test("the first idea opens M1", async () => {
     const onFirstIdea = vi.fn();
     renderAs("member", onFirstIdea);

@@ -12,6 +12,7 @@ import landing from "../locales/en/landing.json";
 import mail from "../locales/en/mail.json";
 import notifications from "../locales/en/notifications.json";
 import pitch from "../locales/en/pitch.json";
+import settings from "../locales/en/settings.json";
 import validation from "../locales/en/validation.json";
 
 /**
@@ -33,6 +34,7 @@ export const resources = {
     mail,
     notifications,
     pitch,
+    settings,
     validation,
   },
 } as const;

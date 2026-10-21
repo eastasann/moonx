@@ -27,14 +27,32 @@ export function useWorkspace(): WorkspaceScope {
  * opened while they still belong to it, else their personal one.
  */
 export function dashboardHref(me: Me): string | undefined {
-  const ids = me.memberships.map(({ workspace }) => workspace.id);
-  const id =
-    me.lastWorkspaceId !== null && ids.includes(me.lastWorkspaceId)
-      ? me.lastWorkspaceId
-      : (me.memberships.find(({ workspace }) => workspace.isPersonal)?.workspace
-          .id ?? ids[0]);
+  const id = homeMembership(me)?.workspace.id;
   return id === undefined ? undefined : `/w/${id}`;
 }
+
+/**
+ * The membership of that workspace: the one a screen outside any workspace (4 Account)
+ * stands in, for the navigation and for what "the workspace open now" means there
+ * (design-spec 6.16 4).
+ */
+export function homeMembership(me: Me): Me["memberships"][number] | undefined {
+  return (
+    me.memberships.find(
+      ({ workspace }) => workspace.id === me.lastWorkspaceId,
+    ) ??
+    me.memberships.find(({ workspace }) => workspace.isPersonal) ??
+    me.memberships[0]
+  );
+}
+
+/**
+ * The id of the user's own personal workspace: the first personal one of their
+ * memberships, which come in the order joined, the one made at sign-up first (SDD 5.4 U1).
+ * Someone else's personal workspace the user was invited to comes after it.
+ */
+export const ownPersonalId = (me: Me): string | undefined =>
+  me.memberships.find(({ workspace }) => workspace.isPersonal)?.workspace.id;
 
 /** The modals opened by the search parameter `modal` (SDD 4章) this app has so far. */
 export type ModalName = "switch-workspace" | "new-idea" | "evidence";

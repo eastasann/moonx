@@ -14,11 +14,13 @@ import { Route as SignedInRouteImport } from './routes/_signedIn'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SignedInAccountRouteImport } from './routes/_signedIn/account'
 import { Route as SignedInWelcomeRouteImport } from './routes/_signedIn/welcome'
 import { Route as DevComponentsRouteImport } from './routes/dev.components'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as SignedInWWorkspaceIdRouteRouteImport } from './routes/_signedIn/w/$workspaceId/route'
 import { Route as SignedInWWorkspaceIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/index'
+import { Route as SignedInWWorkspaceIdSettingsRouteImport } from './routes/_signedIn/w/$workspaceId/settings'
 import { Route as SignedInWWorkspaceIdAiExportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/export'
 import { Route as SignedInWWorkspaceIdAiImportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/import'
 import { Route as SignedInWWorkspaceIdIdeasIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/index'
@@ -55,6 +57,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignedInAccountRoute = SignedInAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => SignedInRoute,
+} as any)
 const SignedInWelcomeRoute = SignedInWelcomeRouteImport.update({
   id: '/welcome',
   path: '/welcome',
@@ -80,6 +87,12 @@ const SignedInWWorkspaceIdIndexRoute =
   SignedInWWorkspaceIdIndexRouteImport.update({
     id: '/',
     path: '/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdSettingsRoute =
+  SignedInWWorkspaceIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
     getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
   } as any)
 const SignedInWWorkspaceIdAiExportRoute =
@@ -154,10 +167,12 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/account': typeof SignedInAccountRoute
   '/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
+  '/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
   '/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
   '/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
@@ -176,9 +191,11 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/account': typeof SignedInAccountRoute
   '/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdIndexRoute
   '/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
@@ -199,10 +216,12 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/_signedIn/account': typeof SignedInAccountRoute
   '/_signedIn/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/_signedIn/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
+  '/_signedIn/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
   '/_signedIn/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
   '/_signedIn/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
   '/_signedIn/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
@@ -223,10 +242,12 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/account'
     | '/welcome'
     | '/dev/components'
     | '/invite/$token'
     | '/w/$workspaceId'
+    | '/w/$workspaceId/settings'
     | '/w/$workspaceId/'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
@@ -245,9 +266,11 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/account'
     | '/welcome'
     | '/dev/components'
     | '/invite/$token'
+    | '/w/$workspaceId/settings'
     | '/w/$workspaceId'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
@@ -267,10 +290,12 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/_signedIn/account'
     | '/_signedIn/welcome'
     | '/dev/components'
     | '/invite/$token'
     | '/_signedIn/w/$workspaceId'
+    | '/_signedIn/w/$workspaceId/settings'
     | '/_signedIn/w/$workspaceId/'
     | '/_signedIn/w/$workspaceId/ai/export'
     | '/_signedIn/w/$workspaceId/ai/import'
@@ -332,6 +357,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_signedIn/account': {
+      id: '/_signedIn/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof SignedInAccountRouteImport
+      parentRoute: typeof SignedInRoute
+    }
     '/_signedIn/welcome': {
       id: '/_signedIn/welcome'
       path: '/welcome'
@@ -365,6 +397,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/w/$workspaceId/'
       preLoaderRoute: typeof SignedInWWorkspaceIdIndexRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/settings': {
+      id: '/_signedIn/w/$workspaceId/settings'
+      path: '/settings'
+      fullPath: '/w/$workspaceId/settings'
+      preLoaderRoute: typeof SignedInWWorkspaceIdSettingsRouteImport
       parentRoute: typeof SignedInWWorkspaceIdRouteRoute
     }
     '/_signedIn/w/$workspaceId/ai/export': {
@@ -448,6 +487,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface SignedInWWorkspaceIdRouteRouteChildren {
+  SignedInWWorkspaceIdSettingsRoute: typeof SignedInWWorkspaceIdSettingsRoute
   SignedInWWorkspaceIdIndexRoute: typeof SignedInWWorkspaceIdIndexRoute
   SignedInWWorkspaceIdAiExportRoute: typeof SignedInWWorkspaceIdAiExportRoute
   SignedInWWorkspaceIdAiImportRoute: typeof SignedInWWorkspaceIdAiImportRoute
@@ -464,6 +504,7 @@ interface SignedInWWorkspaceIdRouteRouteChildren {
 
 const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChildren =
   {
+    SignedInWWorkspaceIdSettingsRoute: SignedInWWorkspaceIdSettingsRoute,
     SignedInWWorkspaceIdIndexRoute: SignedInWWorkspaceIdIndexRoute,
     SignedInWWorkspaceIdAiExportRoute: SignedInWWorkspaceIdAiExportRoute,
     SignedInWWorkspaceIdAiImportRoute: SignedInWWorkspaceIdAiImportRoute,
@@ -492,11 +533,13 @@ const SignedInWWorkspaceIdRouteRouteWithChildren =
   )
 
 interface SignedInRouteChildren {
+  SignedInAccountRoute: typeof SignedInAccountRoute
   SignedInWelcomeRoute: typeof SignedInWelcomeRoute
   SignedInWWorkspaceIdRouteRoute: typeof SignedInWWorkspaceIdRouteRouteWithChildren
 }
 
 const SignedInRouteChildren: SignedInRouteChildren = {
+  SignedInAccountRoute: SignedInAccountRoute,
   SignedInWelcomeRoute: SignedInWelcomeRoute,
   SignedInWWorkspaceIdRouteRoute: SignedInWWorkspaceIdRouteRouteWithChildren,
 }

@@ -74,8 +74,11 @@ function useRecordLastWorkspace(me: Me, workspaceId: string | null) {
     mutationFn: (lastWorkspaceId: string) =>
       unwrap(api().api.v1.me.patch({ lastWorkspaceId })),
     retry: (failures, error) => failures < 2 && isTransient(error),
-    onSuccess: (updated) =>
-      queryClient.setQueryData(meQuery().queryKey, updated),
+    // Only the workspace: a save of 4 may answer after this, and its fields stay.
+    onSuccess: ({ lastWorkspaceId }) =>
+      queryClient.setQueryData(meQuery().queryKey, (me: Me | undefined) =>
+        me === undefined ? me : { ...me, lastWorkspaceId },
+      ),
     onError: (error) => {
       if (!(error instanceof ApiError)) reportOnce(error);
     },

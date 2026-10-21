@@ -1845,7 +1845,7 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 30: 4 アカウント設定・9 ワークスペース設定
 
-Status:
+Status: done 2026-10-22
 
 ```
 アカウントとワークスペースの設定の画面を作ってください（PRD 4章の Must: アカウントの削除と招待。同じ画面の Should と Could の操作も作る）。

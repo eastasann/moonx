@@ -11,6 +11,10 @@ import type { CompareView } from "@moonx/ui-tokens";
 export const ideaHref = (workspaceId: string, ideaId: string) =>
   `/w/${workspaceId}/ideas/${ideaId}`;
 
+/** 9 Workspace Settings (SDD 4章), which only an Owner opens. */
+export const settingsHref = (workspaceId: string) =>
+  `/w/${workspaceId}/settings`;
+
 /** 6 Ideas, with the filters given (SDD 4章). */
 export const ideasHref = (
   workspaceId: string,

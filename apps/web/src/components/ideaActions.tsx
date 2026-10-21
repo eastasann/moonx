@@ -1,6 +1,6 @@
 import { i18n } from "@moonx/i18n";
 import { AlertDialog, ToastQueue } from "@moonx/ui-web";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
   createContext,
@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { ideaHref, ideasHref } from "../lib/links";
 import { ideaKey, workspaceKey } from "../lib/queries";
+import { useSendThrough } from "../lib/send";
 import { failureCode, rateLimitWords } from "./SendFailure";
 import { reportOnce } from "./states";
 import { useWorkspace } from "./workspace";
@@ -56,18 +57,6 @@ export function toastFailure(error: unknown, retry: () => void) {
 }
 
 /**
- * Sends through the query client's mutations, so a lost session takes the app's way
- * (M9 with unsaved input, else the sign-in screen; router.tsx) before the caller hears of
- * the failure.
- */
-function useSend(): (send: () => Promise<unknown>) => Promise<unknown> {
-  const { mutateAsync } = useMutation({
-    mutationFn: (send: () => Promise<unknown>) => send(),
-  });
-  return mutateAsync;
-}
-
-/**
  * Asks before the creation of a copy is taken back (design-spec 6.0.5「作成の取り消し」):
  * "Delete the copied idea?", what goes, and that it cannot be undone. Deleting it opens
  * 6 Ideas. It lives with the workspace's screens, so the toast's Undo still asks after
@@ -79,7 +68,7 @@ export function DuplicateUndoProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [copy, setCopy] = useState<CopyToUndo | null>(null);
   const [isPending, setPending] = useState(false);
-  const sendThrough = useSend();
+  const sendThrough = useSendThrough();
   const undo = async (target: CopyToUndo) => {
     setPending(true);
     try {
@@ -151,7 +140,7 @@ export function useIdeaActions() {
   const navigate = useNavigate();
   const requestUndo = useContext(UndoContext);
   const pending = useRef(false);
-  const sendThrough = useSend();
+  const sendThrough = useSendThrough();
 
   const refresh = useCallback(
     async (ideaId: string) => {

@@ -155,6 +155,24 @@ export const membersQuery = (workspaceId: string) =>
       unwrap(api().api.v1.workspaces({ workspaceId }).members.get()),
   });
 
+/**
+ * W4 GET: the workspace's invitations, newest first; `pending` those still open, `all`
+ * the accepted, expired and cancelled too (design-spec 6.16 9).
+ */
+export const invitationsQuery = (
+  workspaceId: string,
+  status: "pending" | "all",
+) =>
+  queryOptions({
+    queryKey: [...workspaceKey(workspaceId), "invitations", status],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.workspaces({ workspaceId })
+          .invitations.get({ query: { status } }),
+      ),
+  });
+
 /** What is cached of one idea: its validation home and plans (SDD 5.6・5.7・5.9). */
 export const ideaKey = (ideaId: string) => ["ideas", ideaId];
 

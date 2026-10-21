@@ -880,6 +880,8 @@ export const settingsContent = style({
  * full width on a phone.
  */
 export const settingsFieldRow = style({
+  // The line is the group's, inside a Form too, whose column keeps children at their size.
+  alignSelf: "stretch",
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr)",
   alignItems: "end",

@@ -1,3 +1,5 @@
+import { ApiError } from "./api";
+
 /** Where Better Auth answers (SDD 5.4 A1–A8): mounted on the API, not typed through Eden. */
 const AUTH_PATH = "/api/auth";
 
@@ -157,6 +159,38 @@ export async function requestPasswordReset(email: string) {
 /** A7: sets a new password with the token of the mail's link; it ends signed in. */
 export async function resetPassword(token: string, newPassword: string) {
   await post("/reset-password", { token, newPassword });
+}
+
+/**
+ * A8: changes the password of an account that has one. The API ends every other session
+ * whatever is asked (SDD 5.4「セッション」); this one stays, its cookie renewed.
+ *
+ * @throws {AuthError} `INVALID_PASSWORD` when the current password is wrong.
+ * @throws {ApiError} 401 `UNAUTHENTICATED` without a session (SDD 5.4: A8 answers it
+ * whatever the body), as the API's own paths do, so the query client's handling of a
+ * lost session takes it (lib/query.ts).
+ */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+) {
+  try {
+    await post("/change-password", {
+      currentPassword,
+      newPassword,
+      revokeOtherSessions: true,
+    });
+  } catch (error) {
+    if (error instanceof AuthError && error.status === 401) {
+      throw new ApiError({
+        status: 401,
+        code: "UNAUTHENTICATED",
+        requestId: error.requestId,
+        cause: error,
+      });
+    }
+    throw error;
+  }
 }
 
 /**

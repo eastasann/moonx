@@ -1,24 +1,29 @@
 import {
-  AlertDialog,
   AppFrame,
   type AppFrameProps,
   MenuItem,
   type NavItem,
   SideNav,
   TabBar,
+  useMoreMenu,
 } from "@moonx/ui-web";
-import { House, Lightbulb } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { House, Lightbulb, Settings2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useAutosave, useSaveState } from "../lib/autosave-react";
-import { useLogOut } from "./logOut";
+import { settingsHref } from "../lib/links";
+import { useLogOutRequest } from "./LogOutRequest";
 import { useOfflineBanner } from "./StandaloneFrame";
 import { useModal, useWorkspace } from "./workspace";
 
 export interface WorkspaceFrameProps
   extends Pick<AppFrameProps, "breadcrumbs" | "back" | "title"> {
-  /** The navigation item of the screen; none for a screen whose item is not built yet. */
-  current?: "dashboard" | "ideas";
+  /**
+   * The navigation item of the screen; none for a screen whose item is not built yet.
+   * `account` and `settings` are opened from the More menu, so their phone header reads
+   * "← More" (design-spec 6.0.1).
+   */
+  current?: "dashboard" | "ideas" | "settings" | "account";
   /**
    * The screen's saved items, by key prefix (`idea:<id>`), or prefixes for a screen of
    * several kinds of item: "Saved" shows once one of them saved on this visit. Failures
@@ -30,10 +35,11 @@ export interface WorkspaceFrameProps
 }
 
 /**
- * AppFrame for the screens of a workspace (design-spec 6.0.1): the workspace, the pages
- * the user may open and the account in the sidebar or the TabBar, the header's save state
- * with its Retry, and the offline band. Logging out with unsaved input asks first
- * (5章「共通ナビ」). The pages appear here as their screens are built
+ * AppFrame for the screens of a workspace, and for 4, which stands in the one last
+ * opened (design-spec 6.0.1・6.16): the workspace, the pages the user may open (9 for an
+ * Owner only), Account and Log out in the sidebar's account menu or in More, the
+ * header's save state with its Retry, and the offline band. Logging out with unsaved
+ * input asks first (5章「共通ナビ」). The pages appear here as their screens are built
  * (docs/claude-code-prompts.md: no way into a screen before it exists).
  */
 export function WorkspaceFrame({
@@ -43,17 +49,14 @@ export function WorkspaceFrame({
   ...header
 }: WorkspaceFrameProps) {
   const { t } = useTranslation(["app"]);
-  const { me, workspace } = useWorkspace();
+  const { me, workspace, role } = useWorkspace();
   const modal = useModal();
+  const moreMenu = useMoreMenu();
+  const isInMore = current === "account" || current === "settings";
   const offline = useOfflineBanner();
   const autosave = useAutosave();
   const saveState = useSaveState(saveScope);
-  const logOut = useLogOut();
-  const [isConfirmingLogOut, setConfirmingLogOut] = useState(false);
-  const requestLogOut = () => {
-    if (autosave.hasUnsaved()) setConfirmingLogOut(true);
-    else logOut();
-  };
+  const { requestLogOut, confirmation } = useLogOutRequest();
   const openSwitch = () => modal.open("switch-workspace");
   const pages: NavItem[] = [
     {
@@ -69,9 +72,22 @@ export function WorkspaceFrame({
       href: `/w/${workspace.id}/ideas`,
     },
   ];
+  // Only an Owner opens 9 (design-spec 2.2); the rest never see the way in (1.3).
+  const settings: NavItem[] =
+    role === "owner"
+      ? [
+          {
+            id: "settings",
+            label: t("app:nav.settings"),
+            icon: <Settings2 />,
+            href: settingsHref(workspace.id),
+          },
+        ]
+      : [];
   return (
     <AppFrame
       {...header}
+      back={isInMore ? moreMenu.back : header.back}
       saveState={saveState}
       onRetrySave={() => autosave.retry()}
       sideNav={
@@ -79,12 +95,18 @@ export function WorkspaceFrame({
           workspaceName={workspace.name}
           onWorkspacePress={openSwitch}
           items={pages}
+          secondaryItems={settings}
           currentId={current}
           user={{ name: me.displayName, avatarSrc: me.avatarUrl }}
           userMenu={
-            <MenuItem id="log-out" onAction={requestLogOut}>
-              {t("app:nav.logOut")}
-            </MenuItem>
+            <>
+              <MenuItem id="account" href="/account">
+                {t("app:nav.account")}
+              </MenuItem>
+              <MenuItem id="log-out" onAction={requestLogOut}>
+                {t("app:nav.logOut")}
+              </MenuItem>
+            </>
           }
         />
       }
@@ -92,11 +114,20 @@ export function WorkspaceFrame({
         <TabBar
           items={pages}
           currentId={current}
+          moreMenu={isInMore ? moreMenu.tabBar : undefined}
           more={
             <>
               <MenuItem id="switch-workspace" onAction={openSwitch}>
                 {t("app:nav.switchWorkspace")}
               </MenuItem>
+              <MenuItem id="account" href="/account">
+                {t("app:nav.account")}
+              </MenuItem>
+              {settings.map((item) => (
+                <MenuItem key={item.id} id={item.id} href={item.href}>
+                  {t("app:nav.workspaceSettings")}
+                </MenuItem>
+              ))}
               <MenuItem id="log-out" onAction={requestLogOut}>
                 {t("app:nav.logOut")}
               </MenuItem>
@@ -107,23 +138,7 @@ export function WorkspaceFrame({
       banners={offline === undefined ? undefined : { offline }}
     >
       {children}
-      {isConfirmingLogOut && (
-        <AlertDialog
-          isOpen
-          variant="warning"
-          size="S"
-          title={t("app:unsaved.logOutTitle")}
-          primaryActionLabel={t("app:nav.logOut")}
-          cancelLabel={t("app:unsaved.cancel")}
-          onPrimaryAction={() => {
-            setConfirmingLogOut(false);
-            logOut();
-          }}
-          onCancel={() => setConfirmingLogOut(false)}
-        >
-          {t("app:unsaved.message")}
-        </AlertDialog>
-      )}
+      {confirmation}
     </AppFrame>
   );
 }

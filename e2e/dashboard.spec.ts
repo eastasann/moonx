@@ -157,6 +157,9 @@ test.describe("the Owner's BCDX on a desktop", () => {
     const me = await signIn(demo.owner);
     await page.goto(`/w/${workspaceOf(me, "BCDX").id}`);
     await loaded(page, allBlocks);
+    // The screen's own content, not the route's skeleton (see the test of a workspace
+    // not loaded yet, below).
+    await expect(block(page, "Ideas")).toContainText("Piaya Gift Box Delivery");
     const band = page.getByRole("alert").filter({
       hasText: "You're offline. Changes can't be saved until you reconnect.",
     });
@@ -371,6 +374,10 @@ test("offline, a workspace not loaded yet says it cannot open", async ({
   const personal = workspaceOf(me, "Ana Villanueva's workspace");
   await page.goto(`/w/${workspaceOf(me, "BCDX").id}`);
   await loaded(page, allBlocks);
+  // The route's skeleton has the same blocks, not busy, while the screen's code still
+  // loads: offline before it has, the router could not load it and reloaded the page,
+  // blank. The seed's idea in the list is the screen's own.
+  await expect(block(page, "Ideas")).toContainText("Piaya Gift Box Delivery");
   await context.setOffline(true);
   await page.getByRole("button", { name: "BCDX, switch workspace" }).click();
   await page

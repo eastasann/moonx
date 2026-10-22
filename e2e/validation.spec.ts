@@ -782,10 +782,11 @@ test.describe("16 Assumptions & Risks on a desktop", () => {
     await expect(
       page.getByRole("tab", { name: "Assumptions" }),
     ).toHaveAttribute("aria-selected", "true");
+    // The empty list's heading: the list's skeleton draws the same words while it loads.
     await expect(
-      page.getByText(
-        "List what has to be true for this idea to work, and why you believe it.",
-      ),
+      page.getByRole("heading", {
+        name: "List what has to be true for this idea to work, and why you believe it.",
+      }),
     ).toBeVisible();
 
     // A new assumption in the detail's place; made, it shows there to edit.
@@ -1195,10 +1196,10 @@ test.describe("17 Costs and 18 Unit Economics on a desktop", () => {
       .getByRole("button", { name: "Row actions for Core Product / Materials" })
       .click();
     await page.getByRole("menuitem", { name: "Use % of price" }).click();
-    await tableRow(page, "Variable costs", "Core Product / Materials")
-      .getByText("Empty")
-      .first()
-      .click();
+    // The closing menu gives focus back to the row's ⋯, and a row with focus shows its
+    // inputs (design-spec 4.5 TableView): the % field is there once the menu has gone.
+    // Pressing the row's "Empty" raced that hand-back, which removes the text.
+    await expect(page.getByRole("menuitem")).toHaveCount(0);
     await page
       .getByRole("textbox", { name: "% of price for Core Product / Materials" })
       .fill("30");

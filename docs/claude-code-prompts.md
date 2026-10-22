@@ -2151,10 +2151,6 @@ E2E の受入スイートを仕上げてください。
 2. 10章の E2E の行のほかの項目（招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除）が、
    各画面のステップの E2E にあるかを確かめ、無いものを足す
 3. 主要な画面の axe の検査（@axe-core/playwright）。見つかった違反を直す
-4. Step 31 の時点で一度だけ落ちた E2E の原因を確かめて直す: e2e/validation.spec.ts の「13 → 17 → 18: amounts typed change the totals and results at once; 13 follows」が、
-   「Use % of price」の後に Variable costs の行の「Empty」を押す所で、要素が安定しないまま DOM から外れ続けて 30 秒で時間切れになった（make test-e2e の全体の1回。同時に別の Vitest も動いていた）。
-   その単独・6並列の繰り返し・validation と components の同時の実行では再現せず、トレースは次の実行で消えたので、Step 31 では原因を特定できなかった。
-   全体の実行を繰り返して再現させ、行が描き直され続ける原因（画面か、テストの待ち方か）を特定してから直す
 
 まだ作らないもの: Step 40〜44 の対象（Dockerfile・Terraform・CI/CD・29・30・本物の環境での確認）。
 

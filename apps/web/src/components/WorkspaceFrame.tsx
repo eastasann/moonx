@@ -17,7 +17,7 @@ import {
   Settings2,
   Shield,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAutosave, useSaveState } from "../lib/autosave-react";
 import {
@@ -33,6 +33,11 @@ import {
   screenAccepts,
 } from "./CommentsPanel";
 import { ModalBoundary } from "./ErrorBoundary";
+import {
+  HistoryPanelBody,
+  historyAccepts,
+  type ScreenHistory,
+} from "./HistoryPanel";
 import { useLogOutRequest } from "./LogOutRequest";
 import { useOfflineBanner } from "./StandaloneFrame";
 import { useModal, usePanel, useWorkspace } from "./workspace";
@@ -66,6 +71,12 @@ export interface WorkspaceFrameProps
    * None on a screen with nothing to comment on (design-spec 6.0.1).
    */
   comments?: ScreenComments;
+  /**
+   * The screen's history (PNL-2): the header's 🕘, and the panel that
+   * `?panel=history&target=` opens on it or on one of its items (SDD 4章). None on a
+   * screen without a history (design-spec 6.0.5).
+   */
+  history?: ScreenHistory;
   children: ReactNode;
 }
 
@@ -74,7 +85,7 @@ export interface WorkspaceFrameProps
  * opened (design-spec 6.0.1・6.16): the workspace, the pages the user may open (9 for an
  * Owner only, 26 Admin for an operator only), Notifications with the unread count,
  * Account and Log out in the sidebar's account menu or in More, the header's save state
- * with its Retry, 💬 and the comments panel, and the offline band. Logging out with
+ * with its Retry, 💬 and 🕘 with their panels, and the offline band. Logging out with
  * unsaved input asks first (5章「共通ナビ」). The pages appear here as their screens are
  * built (docs/claude-code-prompts.md: no way into a screen before it exists).
  */
@@ -82,6 +93,7 @@ export function WorkspaceFrame({
   current,
   saveScope,
   comments,
+  history,
   children,
   ...header
 }: WorkspaceFrameProps) {
@@ -164,6 +176,34 @@ export function WorkspaceFrame({
     screenAccepts(comments, panel.open.target)
       ? panel.open.target
       : undefined;
+  const historyTarget =
+    history === undefined
+      ? undefined
+      : ({ kind: "screen", screen: history.screen } as const);
+  const openHistory =
+    history !== undefined &&
+    panel.open !== null &&
+    panel.open.name === "history" &&
+    historyAccepts(history, panel.open.target)
+      ? panel.open.target
+      : undefined;
+  const openPanel =
+    openComments !== undefined && comments !== undefined
+      ? {
+          title: t("panels:comments.title"),
+          key: `comments:${JSON.stringify(openComments)}`,
+          body: <CommentsPanelBody target={openComments} comments={comments} />,
+        }
+      : openHistory !== undefined && history !== undefined
+        ? {
+            title: t("panels:history.title"),
+            key: `history:${JSON.stringify(openHistory)}`,
+            body: <HistoryPanelBody target={openHistory} history={history} />,
+          }
+        : undefined;
+  // A closing drawer or tray keeps the name of the panel it held as it goes.
+  const panelTitle = useRef(t("panels:comments.title"));
+  if (openPanel !== undefined) panelTitle.current = openPanel.title;
   return (
     <AppFrame
       {...header}
@@ -183,21 +223,30 @@ export function WorkspaceFrame({
                   : panel.show("comments", screenTarget),
             }
       }
+      history={
+        historyTarget === undefined
+          ? undefined
+          : {
+              isOpen: openHistory !== undefined,
+              // The screen's changes from an item's; pressed again, it closes.
+              onPress: () =>
+                openHistory?.kind === "screen"
+                  ? panel.close()
+                  : panel.show("history", historyTarget),
+            }
+      }
       panel={
-        comments === undefined ? undefined : (
+        comments === undefined && history === undefined ? undefined : (
           <Panel
-            title={t("panels:comments.title")}
-            isOpen={openComments !== undefined}
+            title={panelTitle.current}
+            isOpen={openPanel !== undefined}
             onOpenChange={(isOpen) => {
               if (!isOpen) panel.close();
             }}
           >
-            {openComments !== undefined && (
-              <ModalBoundary
-                key={JSON.stringify(openComments)}
-                onClose={panel.close}
-              >
-                <CommentsPanelBody target={openComments} comments={comments} />
+            {openPanel !== undefined && (
+              <ModalBoundary key={openPanel.key} onClose={panel.close}>
+                {openPanel.body}
               </ModalBoundary>
             )}
           </Panel>

@@ -18,9 +18,10 @@ import {
   workspaceOf,
 } from "./fixtures";
 
-// 7 Decision Log, 8 Notifications and PNL-1 Comments (design-spec 6.15・6.0.4・5章):
-// the seeded BCDX is read only; what writes does so in a team workspace the test makes,
-// whose two people are accounts of its own.
+// 7 Decision Log, 8 Notifications, PNL-1 Comments and PNL-2 History (design-spec 6.15・
+// 6.0.4・6.0.5・5章): the seeded BCDX is read only; what writes does so in a workspace of
+// the test's own account, or in a team workspace the test makes, whose two people are
+// accounts of its own.
 
 /** An account the tests of one worker share. */
 interface Account {
@@ -257,6 +258,134 @@ test.describe("comments and notifications on a desktop", () => {
     } finally {
       await other.context.close();
     }
+  });
+});
+
+/** An idea of its own in the user's personal workspace (I1), named to be found again. */
+async function personalIdea(page: Page, me: Me, name: string) {
+  const workspace = me.memberships.find(
+    ({ workspace }) => workspace.isPersonal,
+  )?.workspace;
+  if (workspace === undefined) throw new Error("No personal workspace");
+  const created = await page.request.post(
+    `/api/v1/workspaces/${workspace.id}/ideas`,
+    {
+      data: { name, oneLineConcept: "A cart at the plaza every morning." },
+      headers: { Origin: WEB_ORIGIN },
+    },
+  );
+  expect(created.status(), await created.text()).toBe(201);
+  return { workspace, idea: (await created.json()) as IdeaDetail };
+}
+
+test.describe("PNL-2 History on a desktop", () => {
+  test.use(desktop);
+
+  test("an answer goes back to an earlier change from its 🕘, and 11 shows it", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const me = await signIn(account.email, account.password);
+    const { workspace, idea } = await personalIdea(
+      page,
+      me,
+      `Taho Cart ${Date.now() % 1_000_000}`,
+    );
+    await page.goto(
+      `/w/${workspace.id}/ideas/${idea.id}/questions/01?q=V.01.WHO`,
+    );
+    const answer = page.getByRole("textbox", { name: "Answer to WHO" });
+    const saved = () =>
+      page.waitForResponse(
+        (response) =>
+          response.request().method() === "PUT" &&
+          response.url().includes("/answers/V.01.WHO") &&
+          response.ok(),
+      );
+    let save = saved();
+    await answer.fill("Office workers in Bacolod");
+    await save;
+    save = saved();
+    await answer.fill("Office workers in Iloilo");
+    await save;
+
+    const who = page.getByRole("region", { name: "WHO", exact: true });
+    await who.getByRole("button", { name: "History of 01 WHO" }).click();
+    const panel = page.getByRole("complementary", { name: "History" });
+    await expect(panel.getByText("On 01 WHO")).toBeVisible();
+    const reverts = panel.getByRole("button", {
+      name: "Revert to this point, 01 WHO",
+    });
+    await expect(reverts).toHaveCount(2);
+    // Newest first.
+    await expect(panel.locator("del").first()).toHaveText("Bacolod");
+    await expect(panel.locator("ins").first()).toHaveText("Iloilo");
+    await expectNoAxeViolations(page);
+
+    // Back to just after the first change: the answer reads it, and the revert is a
+    // change of its own.
+    await reverts.nth(1).click();
+    await expect(answer).toHaveValue("Office workers in Bacolod");
+    await expect(panel.getByText("Revert · Changed")).toBeVisible();
+    await expect(reverts).toHaveCount(3);
+
+    await page
+      .getByRole("banner")
+      .getByRole("button", { name: "History" })
+      .click();
+    await expect(panel.getByText("On 01 WHO")).toHaveCount(0);
+    await expect(panel.getByText("01 WHO", { exact: true })).toHaveCount(3);
+  });
+
+  test("a copy's creation is undone from its 🕘, and the idea it came from keeps a line of it", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const me = await signIn(account.email, account.password);
+    const name = `Taho Cart ${Date.now() % 1_000_000}`;
+    const { workspace, idea } = await personalIdea(page, me, name);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
+    await page.getByRole("button", { name: `More for ${name}` }).click();
+    await page.getByRole("menuitem", { name: "Duplicate" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: `${name} (copy)` }),
+    ).toBeVisible();
+
+    await page
+      .getByRole("banner")
+      .getByRole("button", { name: "History" })
+      .click();
+    const panel = page.getByRole("complementary", { name: "History" });
+    await expect(panel.getByText("Duplicate · Added")).toBeVisible();
+    await panel
+      .getByRole("button", { name: /^Undo the whole operation/ })
+      .click();
+    const confirm = page.getByRole("alertdialog", {
+      name: "Delete the copied idea?",
+    });
+    await expect(confirm).toContainText(
+      `${name} (copy) and everything copied into it will be deleted.`,
+    );
+    await confirm.getByRole("button", { name: "Delete" }).click();
+    await expect(page).toHaveURL(`${WEB_ORIGIN}/w/${workspace.id}/ideas`);
+    await expect(page.getByText(`${name} (copy)`)).toHaveCount(0);
+
+    // The idea it came from keeps "Duplicate undone", with nothing to press on it: its
+    // own creation is the one change that can be reverted.
+    await page.goto(
+      `/w/${workspace.id}/ideas/${idea.id}?panel=history&target=container:idea:${idea.id}`,
+    );
+    const kept = page.getByRole("complementary", { name: "History" });
+    await expect(kept.getByText("Duplicate undone · Deleted")).toBeVisible();
+    await expect(kept.getByText("Manual · Added")).toBeVisible();
+    await expect(
+      kept.getByRole("button", { name: /^Revert to this point/ }),
+    ).toHaveCount(1);
+    await expect(
+      kept.getByRole("button", { name: /^Undo the whole operation/ }),
+    ).toHaveCount(0);
   });
 });
 

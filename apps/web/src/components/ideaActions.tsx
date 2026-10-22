@@ -13,26 +13,54 @@ import {
 import { useTranslation } from "react-i18next";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { ideaHref, ideasHref } from "../lib/links";
-import { ideaKey, workspaceKey } from "../lib/queries";
+import { historyKey, ideaKey, workspaceKey } from "../lib/queries";
 import { useSendThrough } from "../lib/send";
 import { failureCode, rateLimitWords } from "./SendFailure";
 import { reportOnce } from "./states";
 import { useWorkspace } from "./workspace";
 
-/** A copy whose creation the toast's Undo takes back (design-spec 6.8・6.0.5). */
-interface CopyToUndo {
+/**
+ * A creation that "Undo" takes back (design-spec 6.0.5「作成の取り消し」): a copy, from the
+ * toast after duplicating (6.8) or from its first row in PNL-2, or a plan draft from its
+ * first row in PNL-2.
+ */
+export type CreationToUndo = {
   batchId: string;
-  name: string;
   workspaceId: string;
-}
+  /**
+   * The copy, or the idea the draft is in: read again when the undo is refused, and for
+   * a draft the 13 that opens once it is gone.
+   */
+  ideaId: string;
+} & ({ kind: "duplicate"; name: string } | { kind: "plan_draft" });
 
-const UndoContext = createContext<((copy: CopyToUndo) => void) | null>(null);
+const UndoContext = createContext<((creation: CreationToUndo) => void) | null>(
+  null,
+);
+
+/**
+ * Asks before a creation is taken back, then takes it back (CreationUndoProvider).
+ *
+ * @throws {Error} outside the workspace's screens, which the provider wraps.
+ */
+export function useCreationUndo(): (creation: CreationToUndo) => void {
+  const requestUndo = useContext(UndoContext);
+  if (requestUndo === null) {
+    throw new Error("useCreationUndo outside CreationUndoProvider");
+  }
+  return requestUndo;
+}
 
 /** How long a toast without an action stays: the shortest 4.5 Toast allows. */
 const TOAST_MS = 5000;
 
 /** The codes H3 answers when it cannot take a creation back (6.0.5, SDD 8.1). */
-const UNDO_REFUSALS = new Set(["UNDO_BLOCKED", "ALREADY_REVERTED", "BUSY"]);
+const UNDO_REFUSALS = new Set([
+  "UNDO_BLOCKED",
+  "ALREADY_REVERTED",
+  "BUSY",
+  "ARCHIVED",
+]);
 
 /**
  * Says why a send failed, in a toast with Retry (design-spec 6.0.6): the rate limit's
@@ -57,19 +85,36 @@ export function toastFailure(error: unknown, retry: () => void) {
 }
 
 /**
- * Asks before the creation of a copy is taken back (design-spec 6.0.5「作成の取り消し」):
- * "Delete the copied idea?", what goes, and that it cannot be undone. Deleting it opens
- * 6 Ideas. It lives with the workspace's screens, so the toast's Undo still asks after
- * the user has moved between them.
+ * Asks before a creation is taken back (design-spec 6.0.5「作成の取り消し」): "Delete the
+ * copied idea?" or "Delete this plan draft?", what goes, and that it cannot be undone.
+ * Taking back a copy opens 6 Ideas, a plan draft its idea's 13; so does "This was already
+ * undone", as the copy or draft is gone either way. It lives with the workspace's
+ * screens, so the toast's Undo still asks after the user has moved between them.
  */
-export function DuplicateUndoProvider({ children }: { children: ReactNode }) {
-  const { t } = useTranslation(["ideas", "app", "errors"]);
+export function CreationUndoProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation(["ideas", "panels", "app", "errors"]);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [copy, setCopy] = useState<CopyToUndo | null>(null);
+  const [creation, setCreation] = useState<CreationToUndo | null>(null);
   const [isPending, setPending] = useState(false);
-  const sendThrough = useSendThrough();
-  const undo = async (target: CopyToUndo) => {
+  // What was undone is gone: its panel would find nothing if read before the move.
+  const sendThrough = useSendThrough({ readsHistoryAgain: false });
+  const leave = (target: CreationToUndo) =>
+    navigate({
+      href:
+        target.kind === "duplicate"
+          ? ideasHref(target.workspaceId)
+          : ideaHref(target.workspaceId, target.ideaId),
+    });
+  const refresh = (target: CreationToUndo) =>
+    Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: workspaceKey(target.workspaceId),
+      }),
+      queryClient.invalidateQueries({ queryKey: historyKey }),
+      queryClient.invalidateQueries({ queryKey: ideaKey(target.ideaId) }),
+    ]);
+  const undo = async (target: CreationToUndo) => {
     setPending(true);
     try {
       await sendThrough(() =>
@@ -85,43 +130,48 @@ export function DuplicateUndoProvider({ children }: { children: ReactNode }) {
         toastFailure(error, () => void undo(target));
         return;
       }
+      // Archived since the screen read it: reading it again makes the screen and its
+      // panels read-only (6.8).
       ToastQueue.neutral(
-        t(`errors:${code as "UNDO_BLOCKED" | "ALREADY_REVERTED" | "BUSY"}`),
+        code === "ARCHIVED"
+          ? t("panels:comments.archived.idea")
+          : t(`errors:${code as "UNDO_BLOCKED" | "ALREADY_REVERTED" | "BUSY"}`),
         { timeout: TOAST_MS },
       );
-      await queryClient.invalidateQueries({
-        queryKey: workspaceKey(target.workspaceId),
-      });
-      // Taken back elsewhere first: the copy is gone, as after an undo of one's own.
-      if (code === "ALREADY_REVERTED") {
-        await navigate({ href: ideasHref(target.workspaceId) });
-      }
+      // Taken back elsewhere first: it is gone, as after an undo of one's own.
+      if (code === "ALREADY_REVERTED") await leave(target);
+      await refresh(target);
       return;
     } finally {
       setPending(false);
-      setCopy(null);
+      setCreation(null);
     }
-    await queryClient.invalidateQueries({
-      queryKey: workspaceKey(target.workspaceId),
-    });
-    await navigate({ href: ideasHref(target.workspaceId) });
+    // Away first: the copy's screen and panel, read again, would find it gone.
+    await leave(target);
+    await refresh(target);
   };
   return (
-    <UndoContext.Provider value={setCopy}>
+    <UndoContext.Provider value={setCreation}>
       {children}
-      {copy !== null && (
+      {creation !== null && (
         <AlertDialog
           isOpen
           variant="destructive"
           size="S"
-          title={t("ideas:undo.title")}
+          title={
+            creation.kind === "duplicate"
+              ? t("ideas:undo.title")
+              : t("panels:history.planDraftUndo.title")
+          }
           primaryActionLabel={t("ideas:undo.confirm")}
           cancelLabel={t("ideas:undo.cancel")}
           isPrimaryActionDisabled={isPending}
-          onPrimaryAction={() => void undo(copy)}
-          onCancel={() => setCopy(null)}
+          onPrimaryAction={() => void undo(creation)}
+          onCancel={() => setCreation(null)}
         >
-          {t("ideas:undo.body", { name: copy.name })}
+          {creation.kind === "duplicate"
+            ? t("ideas:undo.body", { name: creation.name })
+            : t("panels:history.planDraftUndo.body")}
         </AlertDialog>
       )}
     </UndoContext.Provider>
@@ -138,7 +188,7 @@ export function useIdeaActions() {
   const { workspace } = useWorkspace();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const requestUndo = useContext(UndoContext);
+  const requestUndo = useCreationUndo();
   const pending = useRef(false);
   const sendThrough = useSendThrough();
 
@@ -183,7 +233,9 @@ export function useIdeaActions() {
         ToastQueue.neutral(t("ideas:duplicated", { name: idea.name }), {
           actionLabel: t("ideas:undo.action"),
           onAction: () =>
-            requestUndo?.({
+            requestUndo({
+              kind: "duplicate",
+              ideaId: copy.id,
               batchId: copy.batchId,
               name: copy.name,
               workspaceId: workspace.id,

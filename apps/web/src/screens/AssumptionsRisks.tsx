@@ -57,6 +57,7 @@ import {
   type ScreenComments,
 } from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
+import { ItemHistoryButton } from "../components/HistoryPanel";
 import { toastFailure } from "../components/ideaActions";
 import { ReorderDialog } from "../components/ReorderDialog";
 import { RowEvidence, RowEvidenceSheet } from "../components/RowEvidence";
@@ -411,6 +412,10 @@ function RowDetail({
   const isPhone = useIsNarrow();
   const [isEditing, setEditing] = useState(false);
   const type = typeOf[tab];
+  const rowItem = {
+    kind: "item",
+    item: { type, id: row.id, key: null },
+  } as const;
   return (
     <Stack gap="space-400">
       <Flex justifyContent="space-between" alignItems="start" gap="space-200">
@@ -419,12 +424,11 @@ function RowDetail({
           <ItemCommentsButton
             label={rowLabel(type, row.statement)}
             count={row.commentCount}
-            onPress={() =>
-              panel.show("comments", {
-                kind: "item",
-                item: { type, id: row.id, key: null },
-              })
-            }
+            onPress={() => panel.show("comments", rowItem)}
+          />
+          <ItemHistoryButton
+            label={rowLabel(type, row.statement)}
+            onPress={() => panel.show("history", rowItem)}
           />
           {canEdit && (
             <ActionMenu
@@ -1242,6 +1246,7 @@ export function AssumptionsScreen({
       current="ideas"
       saveScope={["assumption:", "risk:"]}
       comments={comments}
+      history={comments}
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

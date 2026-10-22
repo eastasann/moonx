@@ -935,7 +935,7 @@ test.describe("16 Assumptions & Risks on a desktop", () => {
 test.describe("15 and 16 for a Viewer", () => {
   test.use(desktop);
 
-  test("read only: cards open to read, no adding, ⋯ for comments only; 16 without fields or M2", async ({
+  test("read only: cards open to read, no adding, ⋯ for comments and history only; 16 without fields or M2", async ({
     page,
     signIn,
   }) => {
@@ -948,11 +948,15 @@ test.describe("15 and 16 for a Viewer", () => {
       page.getByRole("button", { name: "Add competitor" }),
     ).toHaveCount(0);
     await expect(page.getByRole("textbox")).toHaveCount(0);
-    // A Viewer comments too (design-spec 2.2・6.0.4): the card's ⋯ holds Comments alone.
+    // A Viewer comments and reads the history too (design-spec 2.2・6.0.4・6.0.5): the
+    // card's ⋯ holds Comments and History alone.
     await page
       .getByRole("button", { name: "More for Mall salad bars" })
       .click();
-    await expect(page.getByRole("menuitem")).toHaveText(["Comments"]);
+    await expect(page.getByRole("menuitem")).toHaveText([
+      "Comments",
+      "History",
+    ]);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menuitem")).toHaveCount(0);
     await cardNames(page).filter({ hasText: "Mall salad bars" }).click();
@@ -1316,7 +1320,10 @@ test.describe("17, 18 and 19 for a Viewer", () => {
     await page
       .getByRole("button", { name: "Row actions for Equipment" })
       .click();
-    await expect(page.getByRole("menuitem")).toHaveText(["Comments"]);
+    await expect(page.getByRole("menuitem")).toHaveText([
+      "Comments",
+      "History",
+    ]);
     await page.keyboard.press("Escape");
     await page.goto(`/w/${bcdx.id}/ideas/${ideaId}/economics`);
     await expect(page.getByRole("grid", { name: "Inputs" })).toBeVisible();

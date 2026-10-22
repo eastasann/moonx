@@ -107,7 +107,7 @@ describe("the routes of the screens the API names (SDD 4章・5.2 LinkTarget)", 
     expect(sectionHref(workspaceId, ideaId, "09")).toBe(`${idea}/assumptions`);
   });
 
-  test("a link with the comments panel opens it on the item, on the screens that have it", () => {
+  test("a link with a panel opens it on the item, on the screens that have it", () => {
     const rowId = "4c1d2e3f-0000-4000-8000-000000000001";
     expect(
       hrefOf({
@@ -130,16 +130,19 @@ describe("the routes of the screens the API names (SDD 4章・5.2 LinkTarget)", 
         target: { type: "idea", id: ideaId },
       }),
     ).toBe(`${idea}?panel=comments&target=idea%3A${ideaId}`);
-    // History, and the screens whose panels come later, have no way in yet.
     expect(
       hrefOf({
         screen: 17,
         workspaceId,
         ideaId,
+        rowId,
         panel: "history",
         target: { type: "cost_item", id: rowId },
       }),
-    ).toBeUndefined();
+    ).toBe(
+      `${idea}/costs?row=${rowId}&panel=history&target=cost_item%3A${rowId}`,
+    );
+    // The screens whose panels come later have no way in yet.
     expect(
       hrefOf({
         screen: 19,

@@ -521,11 +521,18 @@ function CanReducePicker({
 }
 
 /** The ⋯ of a row (design-spec 6.3「操作」, 6.0.4): its id names the action. */
-type RowAction = "comments" | "rename" | "mode" | "lump" | "reorder" | "delete";
+type RowAction =
+  | "comments"
+  | "history"
+  | "rename"
+  | "mode"
+  | "lump"
+  | "reorder"
+  | "delete";
 
 /**
- * A row's ⋯: Comments for everyone who reads the row (design-spec 6.0.4), then the
- * Owners' and Members' actions.
+ * A row's ⋯: Comments and History for everyone who reads the row (design-spec 6.0.4・
+ * 6.0.5), then the Owners' and Members' actions.
  */
 function RowMenu({
   view,
@@ -560,6 +567,7 @@ function RowMenu({
             })
           : t("panels:comments.menu")}
       </MenuItem>
+      <MenuItem id="history">{t("panels:history.menu")}</MenuItem>
       {canEdit && !isInSheet && (
         <MenuItem id="rename">{t("validation:costs.menu.rename")}</MenuItem>
       )}
@@ -1137,9 +1145,11 @@ function CostsBody({
   const act = (view: CostRowView, action: RowAction) => {
     switch (action) {
       case "comments":
-        // The sheet is modal: the thread opens in the panel once it is closed.
+      case "history":
+        // The sheet is modal: the thread or the changes open in the panel once it is
+        // closed.
         setSheetRowId(null);
-        panel.show("comments", {
+        panel.show(action, {
           kind: "item",
           item: { type: "cost_item", id: view.row.id, key: null },
         });
@@ -1732,6 +1742,7 @@ export function CostsScreen({
       current="ideas"
       saveScope="cost_item:"
       comments={comments}
+      history={comments}
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

@@ -42,6 +42,7 @@ import {
   type ScreenComments,
 } from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
+import { ItemHistoryButton } from "../components/HistoryPanel";
 import { SectionTitle } from "../components/SectionTitle";
 import {
   FailureState,
@@ -117,6 +118,11 @@ function SectionForm({
   });
   const { idea, validationId } = home;
   const canEdit = role !== "viewer" && !idea.archived;
+  const answerItem = (questionKey: string) =>
+    ({
+      kind: "item",
+      item: { type: "validation_answer", id: validationId, key: questionKey },
+    }) as const;
   const questionsKey = validationQuestionsQuery(
     idea.id,
     validationId,
@@ -411,20 +417,21 @@ function SectionForm({
               excerpt={hasText(view.text) ? view.text : null}
               commentCount={view.answer.commentCount}
               actions={
-                <ItemCommentsButton
-                  label={questionLabel(question.key, question.title)}
-                  count={view.answer.commentCount}
-                  onPress={() =>
-                    panel.show("comments", {
-                      kind: "item",
-                      item: {
-                        type: "validation_answer",
-                        id: validationId,
-                        key: question.key,
-                      },
-                    })
-                  }
-                />
+                <>
+                  <ItemCommentsButton
+                    label={questionLabel(question.key, question.title)}
+                    count={view.answer.commentCount}
+                    onPress={() =>
+                      panel.show("comments", answerItem(question.key))
+                    }
+                  />
+                  <ItemHistoryButton
+                    label={questionLabel(question.key, question.title)}
+                    onPress={() =>
+                      panel.show("history", answerItem(question.key))
+                    }
+                  />
+                </>
               }
               onFocusRequest={() => {
                 setAtEnd(false);
@@ -644,6 +651,15 @@ export function QuestionFormScreen({
           : `${answerKey(home.validationId, `V.${sectionKey}.`)}`
       }
       comments={comments}
+      history={
+        comments && {
+          ...comments,
+          hasFau: (key) =>
+            questions.data?.section.questions.find(
+              (question) => question.key === key,
+            )?.hasFau ?? true,
+        }
+      }
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

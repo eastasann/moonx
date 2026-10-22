@@ -437,4 +437,22 @@ describe("14 Research log (design-spec 6.10)", () => {
       }),
     );
   });
+
+  test("an entry's 🕘 opens its changes in the history panel (design-spec 6.0.5)", async () => {
+    const user = userEvent.setup();
+    logApi();
+    const router = renderApp(`${base}?entry=${prices.id}`);
+    await user.click(
+      await screen.findByRole("button", {
+        name: `History of Research Log · ${prices.topic}`,
+      }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        entry: prices.id,
+        panel: "history",
+        target: `research_log_entry:${prices.id}`,
+      }),
+    );
+  });
 });

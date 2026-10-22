@@ -1991,7 +1991,7 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 32b: PNL-2 変更履歴パネル
 
-Status:
+Status: done 2026-10-22
 
 ```
 変更履歴のパネルを作ってください（Step 32 から分けた残り。Step 32 は 7 決定ログ・8 通知・PNL-1 コメントパネルと、パネルを開く仕組みを作った。
@@ -2044,10 +2044,12 @@ Status:
 2. 11 設問フォーム（自己分析）
 3. 12 メンバーの自己分析（共有されたものだけ。コメント）と M6 共有先の選択
 4. 24・25 の入口（10・11。apps/web の AiMenu を 13・11 と同じく置く）、PNL-1（10〜12）と PNL-2（10・11）、ナビと 5 からの入口をつなぐ。
+   PNL-2 は WorkspaceFrame の `history` に渡し、10・11 の項目に 🕘 を付ける（design-spec 6.0.5 の項目の 🕘）。差分の書式（apps/web/src/lib/history-format.ts の fieldsOf）に
+   自己分析の回答（`self_analysis_answer`。本文と金額）を足す。足すまでは、その種類の行を受けると例外にしている（Step 32b で残したもの。10・11 がこのステップの成果物のため）
    24・25 の自己分析のパンくず「Self Analysis」・← の行き先・反映の後の既定の戻り先（今は 10 が無いので 5）は、lib/links.ts の hrefOf に 10 を足すと 10 になる。
    AiTargetScreen が自己分析で WorkspaceFrame に渡す `current` も、ナビの Self Analysis を足したらそれにする（Step 29 で残したもの。10 とナビの項目がこのステップの成果物のため）
    8 の通知と 5 の Recent activity から 10〜12 へのリンク（コメントはパネルを開いた状態）は、lib/links.ts の hrefOf に 10・11（自己分析）・12 を足し、
-   コメントのパネルを持つ画面の一覧 `COMMENTED_SCREENS` に足すとつながる。それまでは押せない行になっている（Step 32 で残したもの。10〜12 がこのステップの成果物のため）
+   パネルを持つ画面の一覧 `PANEL_SCREENS`（comments に 10〜12、history に 10・11）に足すとつながる。それまでは押せない行になっている（Step 32 で残したもの。10〜12 がこのステップの成果物のため）
 5. テスト: Vitest（主要な操作と出し分け）、E2E（自己分析に答えて完了し、共有すると Owner が 12 で読めてコメントできる。
    Viewer として開いたワークスペースから自分の個人用ワークスペースへ移る）
 
@@ -2084,10 +2086,16 @@ Status:
 2. 21 プラン項目の編集（版の読み取り専用の表示を含む）
 3. M3 版の保存、M4 Go / No-Go、M5 プラン下書きの作成（19 の Proceed の後・13・20 からの入口）
 4. 24・25 の入口（21 は apps/web の AiMenu を 11 と同じく置き、20 は ⋯ メニューに入れる。6.12）、PNL-1・PNL-2（20・21）をつなぐ。
+   PNL-2 の差分の書式（apps/web/src/lib/history-format.ts の fieldsOf）に、プランのヘッダ（`business_plan`）・プランの回答（`plan_answer`。文と表の行）・
+   実行管理の項目（`execution_item`。20 の画面全体の履歴に出るため。欄の名前は design-spec 6.13 の 22 の欄の名前にし、カタログに置いて Step 35 の 22 と共有する）を足す。
+   下書きの作成の取り消し（design-spec 6.0.5。確認・取り消した後に 13 へ移る）は HistoryPanel と CreationUndoProvider に作ってあり、20 の履歴から通す。
+   アーカイブ済みの案では、PNL-1・PNL-2 の注意を「This plan is archived. Restore it to make changes.」（6.0.4）にし、PNL-2 の戻すボタンを出さない
+   （パネルに渡す ScreenComments は、今はアイデアのアーカイブだけを持つ）（Step 32b で残したもの。20・21 と M5 がこのステップの成果物のため）
    24・25 のプランのパンくずの案名・← の行き先・反映の後の既定の戻り先（今は 20 が無いので 13）は、lib/links.ts の hrefOf に 20 を足すと 20 になる（Step 29 で残したもの。20 がこのステップの成果物のため）
    7 決定ログの詳細から 20 へのリンク（Go / No-Go は 20、版の保存はその版を読み取り専用で開く 20。design-spec 6.15 の詳細の表）と、8 の通知と 5 の Recent activity から 20・21 へのリンク
-   （コメントはパネルを開いた状態。lib/links.ts の hrefOf と `COMMENTED_SCREENS` に 20・21 を足す）をつなぐ。それまで、その通知は押せない行になっている（Step 32 で残したもの。20・21 がこのステップの成果物のため）
-5. テスト: Vitest（主要な操作と出し分け）、E2E（19 で Proceed → M5 で下書き → 21 で答える → M3 で版を保存 → M4 で Go / No-Go）
+   （コメントはパネルを開いた状態。lib/links.ts の hrefOf と `PANEL_SCREENS` の comments・history に 20・21 を足す）をつなぐ。それまで、その通知は押せない行になっている（Step 32 で残したもの。20・21 がこのステップの成果物のため）
+5. テスト: Vitest（主要な操作と出し分け）、E2E（19 で Proceed → M5 で下書き → 21 で答える → M3 で版を保存 → M4 で Go / No-Go。
+   別の下書きを M5 で作り、20 の 🕘 の先頭の行の「Undo the whole operation」で取り消すと 13 へ移り、13 の履歴に「Plan draft undone」が残る）
 
 まだ作らないもの: 22・23・M8（Step 35）。
 
@@ -2118,13 +2126,14 @@ Status:
 - docs/02-01_system-design-doc.md 4章・5.9（P9〜P13）・5.12（T1・T2）
 
 やること:
-1. 22 実行管理（マイルストーン・ローンチ計画・KPI・Open Questions・Next Actions。担当・期限・状態）
+1. 22 実行管理（マイルストーン・ローンチ計画・KPI・Open Questions・Next Actions。担当・期限・状態）。欄の名前は、Step 34 が PNL-2 の差分の書式のためにカタログに置いた名前を使う
 2. 23 Pitch Deck（1分版と5分版・版の表示・PDF の書き出し）
 3. M8 テンプレートの移行（10・13・20 からの入口）
 4. 20 からの 22・23 の入口、PNL-1（22・23）と PNL-2（22）をつなぐ。8 の通知と 5 の Recent activity・Due soon から 22・23 へのリンク（コメントはパネルを開いた状態。
-   lib/links.ts の hrefOf と `COMMENTED_SCREENS` に 22・23 を足す）もつなぐ（Step 32 で残したもの）
+   lib/links.ts の hrefOf と `PANEL_SCREENS` の comments に 22・23、history に 22 を足す）もつなぐ（Step 32 で残したもの）
 5. テスト: Vitest（主要な操作と出し分け）、E2E（実行管理の項目を足して期限と状態を変える、Pitch Deck を開いて PDF を書き出す、
-   M8 で新しい版へ移り、引き継げない回答の表示を確かめる、Viewer は読み取りだけ。screen_flow.mermaid の全遷移（29・30 を除く）を辿る E2E）
+   M8 で新しい版へ移り、引き継げない回答の表示を確かめ、13 の 🕘 の「Template updated to v{n}」の「Undo the whole operation」で移行を戻す（design-spec 6.0.7。
+   Step 32b が作った行と戻すボタンを、実際の移行で通す）、Viewer は読み取りだけ。screen_flow.mermaid の全遷移（29・30 を除く）を辿る E2E）
 
 まだ作らないもの: PWA（Step 36）。
 

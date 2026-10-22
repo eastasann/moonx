@@ -730,3 +730,38 @@ export const decisionLogEntryQuery = (entryId: string) =>
           .get(),
       ),
   });
+
+/** What is cached of change histories (H1): every item's and every screen's. */
+export const historyKey = ["history"];
+
+/** How many changes PNL-2 lists at once before "Show more", as 8 does notifications. */
+const HISTORY_PAGE = 50;
+
+/**
+ * H1 GET: one page of the changes of an item, or of a screen (design-spec 6.0.5), newest
+ * first, from `cursor` on.
+ */
+export const historyPage = (target: PanelTarget, cursor: number | undefined) =>
+  unwrap(
+    api().api.v1.history.get({
+      query: {
+        ...(target.kind === "item"
+          ? {
+              targetType: target.item.type,
+              targetId: target.item.id,
+              ...(target.item.key == null
+                ? {}
+                : { targetKey: target.item.key }),
+            }
+          : {
+              containerType: target.screen.containerType,
+              containerId: target.screen.containerId,
+              ...(target.screen.sectionKeys.length === 0
+                ? {}
+                : { sectionKeys: [...target.screen.sectionKeys] }),
+            }),
+        limit: HISTORY_PAGE,
+        ...(cursor === undefined ? {} : { cursor }),
+      },
+    }),
+  );

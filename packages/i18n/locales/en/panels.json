@@ -35,5 +35,46 @@
     "itemCount_other": "Comments on {{item}}, {{formatted}} comments",
     "menu": "Comments",
     "menuCount": "Comments ({{formatted}})"
+  },
+  "history": {
+    "title": "History",
+    "onItem": "On {{item}}",
+    "empty": "No changes yet",
+    "more": "Show more",
+    "revert": "Revert to this point",
+    "revertItem": "Revert to this point, {{item}}",
+    "undelete": "Undo delete",
+    "undeleteItem": "Undo delete of {{item}}",
+    "undoOperation": "Undo the whole operation",
+    "undoOperationItem": "Undo the whole operation that changed {{item}}",
+    "item": "History of {{item}}",
+    "menu": "History",
+    "templateUpdated": "Template updated to v{{version}}",
+    "templateBack": "Template set back to v{{version}}",
+    "planDraftUndo": {
+      "title": "Delete this plan draft?",
+      "body": "This plan draft and everything in it will be deleted. This can't be undone."
+    },
+    "source": {
+      "manual": "Manual",
+      "ai_import": "AI import",
+      "revert": "Revert",
+      "template_migration": "Template update",
+      "duplicate": "Duplicate",
+      "plan_draft": "Plan draft",
+      "duplicateUndone": "Duplicate undone",
+      "planDraftUndone": "Plan draft undone"
+    },
+    "action": {
+      "create": "Added",
+      "update": "Changed",
+      "delete": "Deleted",
+      "restore": "Restored"
+    },
+    "field": {
+      "inputMode": "Entered as"
+    },
+    "yes": "Yes",
+    "no": "No"
   }
 }

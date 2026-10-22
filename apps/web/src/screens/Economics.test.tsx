@@ -362,4 +362,21 @@ describe("18 Unit Economics & Scenarios (design-spec 6.4)", () => {
       }),
     );
   });
+
+  test("a number's 🕘 opens its changes in the history panel (design-spec 6.0.5)", async () => {
+    const user = userEvent.setup();
+    economicsApi();
+    const router = renderApp(base);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "History of Unit Economics · Price",
+      }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        panel: "history",
+        target: `economics_input:${validationId}:selling_price`,
+      }),
+    );
+  });
 });

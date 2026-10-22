@@ -266,21 +266,23 @@ export function sectionHref(
   return undefined;
 }
 
-/** The screens whose comments panel is built (PNL-1 on 11 and 13–18). */
-const COMMENTED_SCREENS = new Set([11, 13, 14, 15, 16, 17, 18]);
+/** The screens whose panels are built: PNL-1 and PNL-2 on 11 and 13–18. */
+const PANEL_SCREENS = {
+  comments: new Set([11, 13, 14, 15, 16, 17, 18]),
+  history: new Set([11, 13, 14, 15, 16, 17, 18]),
+};
 
 /**
  * The route of a screen the API names (SDD 5.2 LinkTarget), or undefined while that screen
  * is not built, or the way it opens (a panel) is not: no way into a screen before it
  * exists (docs/claude-code-prompts.md). Each screen's step adds its route here. A link
- * with the comments panel opens it on the item (`?panel=comments&target=`, SDD 4章).
+ * with a panel opens it on the item (`?panel=comments|history&target=`, SDD 4章).
  */
 export function hrefOf(target: LinkTarget): string | undefined {
   if (target.panel === undefined) return screenHrefOf(target);
   if (
-    target.panel !== "comments" ||
     target.target === undefined ||
-    !COMMENTED_SCREENS.has(target.screen)
+    !PANEL_SCREENS[target.panel].has(target.screen)
   ) {
     return undefined;
   }
@@ -288,7 +290,7 @@ export function hrefOf(target: LinkTarget): string | undefined {
   if (base === undefined) return undefined;
   const [path, query = ""] = base.split("?");
   const search = new URLSearchParams(query);
-  search.set("panel", "comments");
+  search.set("panel", target.panel);
   search.set(
     "target",
     formatPanelTarget({ kind: "item", item: target.target }),

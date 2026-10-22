@@ -435,20 +435,21 @@ describe("15 Competitors (design-spec 6.10)", () => {
     );
   });
 
-  test("a Viewer reads: no adding, ⋯ for comments only, a card opens to read, the patterns open", async () => {
+  test("a Viewer reads: no adding, ⋯ for comments and history only, a card opens to read, the patterns open", async () => {
     const user = userEvent.setup();
     competitorsApi({ me: as("viewer") });
     renderApp(base);
     await screen.findByText("2 competitors · aim for 3–5");
     expect(screen.queryByRole("button", { name: "Add competitor" })).toBeNull();
     expect(screen.queryByRole("textbox")).toBeNull();
-    // A Viewer comments too (design-spec 2.2): the card's ⋯ holds Comments alone.
+    // A Viewer comments and reads the history too (design-spec 2.2): the card's ⋯ holds
+    // Comments and History alone.
     await user.click(
       screen.getByRole("button", { name: "More for Salad Station" }),
     );
     expect(
       screen.getAllByRole("menuitem").map((item) => item.textContent),
-    ).toEqual(["Comments"]);
+    ).toEqual(["Comments", "History"]);
     await user.keyboard("{Escape}");
     // Both patterns open, to read.
     for (const title of ["Survivor Patterns", "Failure Patterns"]) {
@@ -487,10 +488,26 @@ describe("15 Competitors (design-spec 6.10)", () => {
     );
     expect(
       screen.getAllByRole("menuitem").map((item) => item.textContent),
-    ).toEqual(["Comments"]);
+    ).toEqual(["Comments", "History"]);
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("textbox")).toBeNull();
     // M2's URL opens nothing on an archived idea.
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("a card's ⋯ History opens its changes in the history panel (design-spec 6.0.5)", async () => {
+    const user = userEvent.setup();
+    competitorsApi();
+    const router = renderApp(base);
+    await user.click(
+      await screen.findByRole("button", { name: "More for Salad Station" }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "History" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        panel: "history",
+        target: expect.stringMatching(/^competitor:/),
+      }),
+    );
   });
 });

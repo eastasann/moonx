@@ -80,6 +80,7 @@ import {
 } from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { EvidenceSheet } from "../components/EvidenceSheet";
+import { ItemHistoryButton } from "../components/HistoryPanel";
 import { type RowFieldsSpec, useRowFields } from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
 import { SectionTitle } from "../components/SectionTitle";
@@ -385,6 +386,7 @@ function NumberSheet({
   onFau,
   onFact,
   onComments,
+  onHistory,
   onClose,
 }: {
   view: NumberView;
@@ -394,6 +396,8 @@ function NumberSheet({
   onFact: () => void;
   /** The number's 💬: the sheet closes and its thread opens in the panel. */
   onComments: () => void;
+  /** The number's 🕘: the sheet closes and its changes open in the panel. */
+  onHistory: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation(["validation", "common"]);
@@ -415,6 +419,10 @@ function NumberSheet({
             label={economicsLabel(view.input.fieldKey)}
             count={view.input.commentCount}
             onPress={onComments}
+          />
+          <ItemHistoryButton
+            label={economicsLabel(view.input.fieldKey)}
+            onPress={onHistory}
           />
         </Flex>
         {canEdit ? (
@@ -921,18 +929,23 @@ function EconomicsBody({
       name: t("validation:economics.column.fau"),
       isBelowName: true,
     },
-    // Each number's 💬 (design-spec 6.0.4); a phone's row opens its sheet, which has it.
+    // Each number's 💬 and 🕘 (design-spec 6.0.4・6.0.5); a phone's row opens its sheet,
+    // which has them.
     {
       id: "more",
       name: t("validation:economics.column.more"),
       isRowActions: true,
     },
   ];
-  const showComments = (field: EconomicsField) =>
-    panel.show("comments", {
+  const numberItem = (field: EconomicsField) =>
+    ({
       kind: "item",
       item: { type: "economics_input", id: validationId, key: field },
-    });
+    }) as const;
+  const showComments = (field: EconomicsField) =>
+    panel.show("comments", numberItem(field));
+  const showHistory = (field: EconomicsField) =>
+    panel.show("history", numberItem(field));
   const table = (
     label: string,
     unit: string | null,
@@ -993,11 +1006,17 @@ function EconomicsBody({
               );
             case "more":
               return (
-                <ItemCommentsButton
-                  label={economicsLabel(id)}
-                  count={view.input.commentCount}
-                  onPress={() => showComments(id)}
-                />
+                <Flex gap="space-25" alignItems="center">
+                  <ItemCommentsButton
+                    label={economicsLabel(id)}
+                    count={view.input.commentCount}
+                    onPress={() => showComments(id)}
+                  />
+                  <ItemHistoryButton
+                    label={economicsLabel(id)}
+                    onPress={() => showHistory(id)}
+                  />
+                </Flex>
               );
             case "value":
               return isEditing ? (
@@ -1030,6 +1049,10 @@ function EconomicsBody({
       ? null
       : answers.viewOf(worthQuestion, worth);
   const worthMode = !canEdit ? "open" : isWorthOpen ? "focused" : "quiet";
+  const worthItem = {
+    kind: "item",
+    item: { type: "validation_answer", id: validationId, key: WORTH },
+  } as const;
   const costs = (
     <Stack gap="space-100">
       <Heading level={2} variant="heading-4">
@@ -1113,23 +1136,23 @@ function EconomicsBody({
                     excerpt={hasText(worthView.text) ? worthView.text : null}
                     commentCount={worth.commentCount}
                     actions={
-                      <ItemCommentsButton
-                        label={questionLabel(
-                          worthQuestion.key,
-                          worthQuestion.title,
-                        )}
-                        count={worth.commentCount}
-                        onPress={() =>
-                          panel.show("comments", {
-                            kind: "item",
-                            item: {
-                              type: "validation_answer",
-                              id: validationId,
-                              key: worthQuestion.key,
-                            },
-                          })
-                        }
-                      />
+                      <>
+                        <ItemCommentsButton
+                          label={questionLabel(
+                            worthQuestion.key,
+                            worthQuestion.title,
+                          )}
+                          count={worth.commentCount}
+                          onPress={() => panel.show("comments", worthItem)}
+                        />
+                        <ItemHistoryButton
+                          label={questionLabel(
+                            worthQuestion.key,
+                            worthQuestion.title,
+                          )}
+                          onPress={() => panel.show("history", worthItem)}
+                        />
+                      </>
                     }
                     onFocusRequest={() => setWorthOpen(true)}
                   >
@@ -1169,6 +1192,10 @@ function EconomicsBody({
           onComments={() => {
             setSheetField(null);
             showComments(sheetView.input.fieldKey);
+          }}
+          onHistory={() => {
+            setSheetField(null);
+            showHistory(sheetView.input.fieldKey);
           }}
           onClose={() => setSheetField(null)}
         />
@@ -1386,6 +1413,15 @@ export function EconomicsScreen({
           : ["economics_input:", answerKey(data.validationId, WORTH)]
       }
       comments={comments}
+      history={
+        comments && {
+          ...comments,
+          hasFau: (key) =>
+            numbers.data?.worthQuestion?.key === key
+              ? numbers.data.worthQuestion.hasFau
+              : true,
+        }
+      }
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

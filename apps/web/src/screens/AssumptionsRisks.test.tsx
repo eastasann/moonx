@@ -390,4 +390,22 @@ describe("16 Assumptions & Risks (design-spec 6.10)", () => {
       }),
     );
   });
+
+  test("a row's 🕘 opens its changes in the history panel (design-spec 6.0.5)", async () => {
+    const user = userEvent.setup();
+    listsApi();
+    const router = renderApp(`${base}?row=${believe.id}`);
+    await user.click(
+      await screen.findByRole("button", {
+        name: `History of Assumptions · ${believe.statement}`,
+      }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        row: believe.id,
+        panel: "history",
+        target: `assumption:${believe.id}`,
+      }),
+    );
+  });
 });

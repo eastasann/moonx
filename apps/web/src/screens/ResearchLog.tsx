@@ -52,6 +52,7 @@ import {
   ItemCommentsButton,
   type ScreenComments,
 } from "../components/CommentsPanel";
+import { ItemHistoryButton } from "../components/HistoryPanel";
 import { toastFailure } from "../components/ideaActions";
 import {
   inputOf,
@@ -519,6 +520,10 @@ function EntryDetail({
     );
   }
   const usages = query.data?.usages ?? [];
+  const entryItem = {
+    kind: "item",
+    item: { type: "research_log_entry", id: entry.id, key: null },
+  } as const;
   return (
     <Stack gap="space-400">
       <Stack gap="space-50">
@@ -528,12 +533,11 @@ function EntryDetail({
             <ItemCommentsButton
               label={rowLabel("research_log_entry", entry.topic)}
               count={entry.commentCount}
-              onPress={() =>
-                panel.show("comments", {
-                  kind: "item",
-                  item: { type: "research_log_entry", id: entry.id, key: null },
-                })
-              }
+              onPress={() => panel.show("comments", entryItem)}
+            />
+            <ItemHistoryButton
+              label={rowLabel("research_log_entry", entry.topic)}
+              onPress={() => panel.show("history", entryItem)}
             />
             {canEdit && (
               <ActionMenu
@@ -1233,6 +1237,7 @@ export function ResearchLogScreen({
       current="ideas"
       saveScope="research_log_entry:"
       comments={comments}
+      history={comments}
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

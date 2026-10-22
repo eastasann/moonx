@@ -793,7 +793,8 @@ export function ValidationHomeScreen({ ideaId }: { ideaId: string }) {
   const idea = data?.idea.workspaceId === workspace.id ? data.idea : undefined;
   const name = idea?.name;
   useDocumentTitle(...(name === undefined ? [] : [name, workspace.name]));
-  // 13's own comments are the idea's (SDD 6.3「画面と節の対応」).
+  // 13's own comments and history are the idea's (SDD 6.3「画面と節の対応」): its
+  // summary, with the template migrations and undone creations in its history.
   const comments: ScreenComments | undefined =
     idea === undefined
       ? undefined
@@ -812,6 +813,7 @@ export function ValidationHomeScreen({ ideaId }: { ideaId: string }) {
       current="ideas"
       saveScope={`idea:${ideaId}`}
       comments={comments}
+      history={comments}
       back={{ label: t("ideas:title"), href: ideasHref(workspace.id) }}
       breadcrumbs={
         <Breadcrumbs>

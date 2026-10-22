@@ -66,6 +66,7 @@ import {
   newCompetitorValues,
 } from "../components/CompetitorFields";
 import { ModalBoundary } from "../components/ErrorBoundary";
+import { ItemHistoryButton } from "../components/HistoryPanel";
 import { toastFailure } from "../components/ideaActions";
 import { dotState } from "../components/ideaParts";
 import { ModalSendFailure } from "../components/ModalFailure";
@@ -550,6 +551,11 @@ function PatternQuestions({
   const panel = usePanel();
   const fauLabel = useFauLabel();
   const { idea, validationId } = home;
+  const answerItem = (questionKey: string) =>
+    ({
+      kind: "item",
+      item: { type: "validation_answer", id: validationId, key: questionKey },
+    }) as const;
   const [current, setCurrent] = useState<string | null>(() =>
     patterns.some(({ question }) => question.key === focusKey)
       ? (focusKey ?? null)
@@ -623,20 +629,21 @@ function PatternQuestions({
                 excerpt={hasText(view.text) ? view.text : null}
                 commentCount={answer.commentCount}
                 actions={
-                  <ItemCommentsButton
-                    label={questionLabel(question.key, question.title)}
-                    count={answer.commentCount}
-                    onPress={() =>
-                      panel.show("comments", {
-                        kind: "item",
-                        item: {
-                          type: "validation_answer",
-                          id: validationId,
-                          key: question.key,
-                        },
-                      })
-                    }
-                  />
+                  <>
+                    <ItemCommentsButton
+                      label={questionLabel(question.key, question.title)}
+                      count={answer.commentCount}
+                      onPress={() =>
+                        panel.show("comments", answerItem(question.key))
+                      }
+                    />
+                    <ItemHistoryButton
+                      label={questionLabel(question.key, question.title)}
+                      onPress={() =>
+                        panel.show("history", answerItem(question.key))
+                      }
+                    />
+                  </>
                 }
                 onFocusRequest={() => setCurrent(question.key)}
               >
@@ -821,16 +828,17 @@ function CompetitorsBody({
       }
     />
   );
-  // Everyone who reads the card can comment on it, so every card has its ⋯: Comments,
-  // then the Owners' and Members' Edit, Reorder and Delete (design-spec 6.0.4・6.10).
+  // Everyone who reads the card can comment on it and read its changes, so every card has
+  // its ⋯: Comments and History, then the Owners' and Members' Edit, Reorder and Delete
+  // (design-spec 6.0.4・6.0.5・6.10).
   const moreOf = (competitor: Competitor) => (
     <ActionMenu
       aria-label={t("validation:competitors.more", {
         name: competitor.name,
       })}
       onAction={(key) => {
-        if (key === "comments") {
-          panel.show("comments", {
+        if (key === "comments" || key === "history") {
+          panel.show(key, {
             kind: "item",
             item: { type: "competitor", id: competitor.id, key: null },
           });
@@ -847,6 +855,7 @@ function CompetitorsBody({
             })
           : t("panels:comments.menu")}
       </MenuItem>
+      <MenuItem id="history">{t("panels:history.menu")}</MenuItem>
       {canEdit && (
         <MenuItem id="edit">{t("validation:competitors.edit")}</MenuItem>
       )}
@@ -1287,6 +1296,14 @@ export function CompetitorsScreen({
           : ["competitor:", answerKey(data.validationId, "V.04.")]
       }
       comments={comments}
+      history={
+        comments && {
+          ...comments,
+          hasFau: (key) =>
+            list.data?.patterns.find(({ question }) => question.key === key)
+              ?.question.hasFau ?? true,
+        }
+      }
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

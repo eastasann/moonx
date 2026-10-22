@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
+  planContext,
   prices,
   selfAnalysisContext,
   survey,
@@ -870,4 +871,13 @@ describe("25 Import from AI (design-spec 6.7)", () => {
       false,
     );
   });
+});
+
+test("a plan's crumb leads to its 20 (SDD 4章: 25's home is the plan's)", async () => {
+  const plan = planContext();
+  importApi({ context: () => plan });
+  renderApp(importPath(`target=business_plan&id=${plan.target.id}`));
+  expect(
+    (await screen.findByRole("link", { name: "Plan A" })).getAttribute("href"),
+  ).toBe(`${ideaHref}/plans/${plan.target.id}`);
 });

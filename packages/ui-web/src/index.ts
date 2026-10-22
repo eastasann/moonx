@@ -120,6 +120,8 @@ export {
   MenuItem,
   type MenuItemProps,
   type MenuProps,
+  MenuSection,
+  type MenuSectionProps,
   MenuTrigger,
   type MenuTriggerProps,
 } from "./components/Menu";

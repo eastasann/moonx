@@ -12,7 +12,12 @@ import {
   Text,
   useFauLabel,
 } from "@moonx/ui-web";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { History } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -32,10 +37,16 @@ import {
   commentsKey,
   historyKey,
   historyPage,
+  membersQuery,
+  planItemQuery,
   workspaceKey,
 } from "../lib/queries";
 import { isSessionLost, useSendThrough } from "../lib/send";
-import { type ScreenComments, screenAccepts } from "./CommentsPanel";
+import {
+  archivedNotice,
+  type ScreenComments,
+  screenAccepts,
+} from "./CommentsPanel";
 import { useCreationUndo } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import { failureCode } from "./SendFailure";
@@ -90,6 +101,31 @@ export function historyAccepts(
     );
   }
   return screenAccepts(history, target);
+}
+
+/** Whether a plan answer's change kept the rows of a table (history-values.ts). */
+const hasRows = (value: unknown) =>
+  typeof value === "object" &&
+  value !== null &&
+  Array.isArray((value as { rows?: unknown }).rows);
+
+/**
+ * The plan items whose table answers `entries` changed: their number is the question
+ * ID's (`P.{2桁の項目番号}.{連番}`, design-spec 6.6).
+ */
+function tableItemsOf(entries: readonly HistoryEntry[]): number[] {
+  const items = new Set<number>();
+  for (const entry of entries) {
+    if (
+      entry.target.type !== "plan_answer" ||
+      !(hasRows(entry.before) || hasRows(entry.after))
+    ) {
+      continue;
+    }
+    const itemNo = Number(entry.target.key?.split(".")[1]);
+    if (Number.isInteger(itemNo)) items.add(itemNo);
+  }
+  return [...items].sort((a, b) => a - b);
 }
 
 /** Operations "Undo the whole operation" takes back as one (SDD 5.11 H3). */
@@ -152,6 +188,7 @@ function HistoryRow({
   entry,
   label,
   context,
+  isWordsPending,
   actions,
   failure,
 }: {
@@ -159,13 +196,15 @@ function HistoryRow({
   /** The item's name, over the row in a screen's list. */
   label: string | undefined;
   context: ChangeContext;
+  /** What its diff is worded with is still being read: a placeholder in its place. */
+  isWordsPending: boolean;
   actions: ReactNode;
   /** Why its revert failed, under it. */
   failure: ReactNode;
 }) {
   const { me } = useWorkspace();
   const title = changeTitle(entry);
-  const fields = fieldChanges(entry, context);
+  const fields = isWordsPending ? [] : fieldChanges(entry, context);
   return (
     <Stack gap="space-200">
       {label !== undefined && (
@@ -191,6 +230,11 @@ function HistoryRow({
             {changeKind(entry)}
           </Text>
           {title !== null && <Text>{title}</Text>}
+          {isWordsPending && (
+            <Skeleton isLoading>
+              <Text>{entry.label}</Text>
+            </Skeleton>
+          )}
           {fields.map((field) => (
             // An item's fields have names of their own; only its text has none.
             <FieldDiff key={field.label ?? ""} {...field} />
@@ -245,13 +289,83 @@ export function HistoryPanelBody({
     | { id: string; error: unknown; retry: () => void }
     | null
   >(null);
-  const isArchived = history.idea?.archived === true || refusedArchived;
-  const canRevert = !isArchived && role !== "viewer";
+  const notice = archivedNotice(history, refusedArchived);
+  const canRevert = notice === null && role !== "viewer";
+  // A change made since page 1 was read pushes its last rows onto page 2: shown once.
+  const entries = [
+    ...new Map(
+      (query.data?.pages.flatMap((page) => page.items) ?? []).map((entry) => [
+        entry.id,
+        entry,
+      ]),
+    ).values(),
+  ];
+  // A plan's changes name an execution item's assignee and a table's columns (6.0.5):
+  // the members, and the items whose tables are listed, are read for their words.
+  const { plan, idea } = history;
+  const members = useQuery({
+    ...membersQuery(workspace.id),
+    enabled: plan !== undefined,
+  });
+  const tableItemNos =
+    plan === undefined || idea === undefined ? [] : tableItemsOf(entries);
+  const items = useQueries({
+    queries:
+      plan === undefined || idea === undefined
+        ? []
+        : tableItemNos.map((itemNo) => planItemQuery(idea.id, plan.id, itemNo)),
+  });
+  const pendingItems = new Set(
+    tableItemNos.filter((_, index) => items[index]?.isPending === true),
+  );
+  /** Whether a change names an assignee by their id, whose name W2 gives. */
+  const namesAssignee = (entry: HistoryEntry) =>
+    entry.target.type === "execution_item" &&
+    [entry.before, entry.after].some(
+      (side) =>
+        typeof (side as { assigneeUserId?: unknown } | null)?.assigneeUserId ===
+        "string",
+    );
+  /**
+   * Whether a row's words wait for a read: a table whose columns, or an assignee whose
+   * name, are not in yet. Only that row waits; the others, and "Show more", stay.
+   */
+  const waitsForWords = (entry: HistoryEntry) => {
+    if (entry.target.type === "plan_answer") {
+      return (
+        (hasRows(entry.before) || hasRows(entry.after)) &&
+        pendingItems.has(Number(entry.target.key?.split(".")[1]))
+      );
+    }
+    return plan !== undefined && members.isPending && namesAssignee(entry);
+  };
+  // A failed read counts only for the rows worded with it: the tables its items hold
+  // (every listed table's item is read for one) and the assignees named by id.
+  const wordsFailure =
+    (plan !== undefined && entries.some(namesAssignee)
+      ? members.error
+      : null) ??
+    items.find((item) => item.isError)?.error ??
+    null;
+  const columns = new Map(
+    items.flatMap((item) =>
+      (item.data?.prompts ?? []).flatMap((prompt) =>
+        prompt.options?.kind === "table"
+          ? [[prompt.key, prompt.options.columns] as const]
+          : [],
+      ),
+    ),
+  );
+  const names = new Map(
+    (members.data?.items ?? []).map(({ user }) => [user.id, user.displayName]),
+  );
   const context: ChangeContext = {
     currency: history.currency ?? workspace.currency,
     timeZone: me.timezone,
     hasFau: history.hasFau ?? (() => true),
     answerTypeOf: history.answerTypeOf,
+    tableColumnsOf: (questionKey) => columns.get(questionKey),
+    memberName: (userId) => names.get(userId),
     fauLabel,
   };
   // The screen's own saves are changes too: an open panel lists them as they land.
@@ -350,15 +464,6 @@ export function HistoryPanelBody({
     );
   };
 
-  // A change made since page 1 was read pushes its last rows onto page 2: shown once.
-  const entries = [
-    ...new Map(
-      (query.data?.pages.flatMap((page) => page.items) ?? []).map((entry) => [
-        entry.id,
-        entry,
-      ]),
-    ).values(),
-  ];
   const heads = operationHeads(entries);
   const itemLabel =
     target.kind === "item"
@@ -413,11 +518,15 @@ export function HistoryPanelBody({
   };
 
   let rows: ReactNode;
-  if (query.isError) {
+  if (query.isError || wordsFailure !== null) {
     rows = (
       <FailureState
-        error={query.error}
-        onRetry={() => void query.refetch()}
+        error={query.error ?? wordsFailure}
+        onRetry={() => {
+          if (query.isError) void query.refetch();
+          if (members.isError) void members.refetch();
+          for (const item of items) if (item.isError) void item.refetch();
+        }}
         dashboardHref={dashboardHref(me)}
         headingLevel={3}
         size="S"
@@ -445,6 +554,7 @@ export function HistoryPanelBody({
               entry={entry}
               label={target.kind === "screen" ? name : undefined}
               context={context}
+              isWordsPending={waitsForWords(entry)}
               actions={actionsOf(entry, name)}
               failure={
                 failure?.id !== entry.id ? null : "words" in failure ? (
@@ -479,11 +589,7 @@ export function HistoryPanelBody({
 
   return (
     <Stack gap="space-400">
-      {isArchived && (
-        <InlineAlert variant="notice">
-          {t("panels:comments.archived.idea")}
-        </InlineAlert>
-      )}
+      {notice !== null && <InlineAlert variant="notice">{notice}</InlineAlert>}
       {itemLabel !== undefined && (
         <Text variant="caption" tone="secondary">
           {t("panels:history.onItem", { item: itemLabel })}

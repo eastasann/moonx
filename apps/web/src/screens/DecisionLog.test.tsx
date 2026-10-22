@@ -1,5 +1,5 @@
 import type { DecisionLogEntry, DecisionLogSummary } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ana, type Call, renderApp, stubApi } from "../test/api";
@@ -73,6 +73,32 @@ const holdEntry: DecisionLogEntry = {
   },
 };
 
+const versionRef = {
+  id: "e0000000-0000-4000-8000-000000000002",
+  name: "v1 For advisors",
+};
+const savedEntry: DecisionLogEntry = {
+  ...saved,
+  reason: null,
+  snapshot: { ...holdEntry.snapshot, planVersion: versionRef },
+};
+const goNoGo: DecisionLogSummary = {
+  ...saved,
+  id: "d0000000-0000-4000-8000-000000000003",
+  kind: "go_no_go",
+  value: "delay",
+  reasonExcerpt: "Permits first.",
+};
+const goNoGoEntry: DecisionLogEntry = {
+  ...goNoGo,
+  reason: "Permits first.",
+  snapshot: {
+    ...holdEntry.snapshot,
+    conditions: { launchIf: null, delayIf: null, stopIf: null },
+    planVersion: versionRef,
+  },
+};
+
 function logApi(
   items: DecisionLogSummary[] = [hold, saved],
   /** An entry L2 finds by its id, of an idea of another workspace. */
@@ -96,6 +122,12 @@ function logApi(
     }
     if (method === "GET" && path === `/api/v1/decision-log/${hold.id}`) {
       return Response.json(holdEntry);
+    }
+    if (method === "GET" && path === `/api/v1/decision-log/${saved.id}`) {
+      return Response.json(savedEntry);
+    }
+    if (method === "GET" && path === `/api/v1/decision-log/${goNoGo.id}`) {
+      return Response.json(goNoGoEntry);
     }
     if (method === "GET" && path === `/api/v1/decision-log/${elsewhere}`) {
       return Response.json({
@@ -150,6 +182,26 @@ describe("7 Decision Log (design-spec 6.15)", () => {
       screen.getByRole("group", { name: "Key numbers then" }),
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: "Open validation" })).toBeTruthy();
+  });
+
+  test("a Go / No-Go opens its plan's 20, a saved version that version read only", async () => {
+    logApi([goNoGo, saved]);
+    const plan = `/w/${workspaceId}/ideas/${home.idea.id}/plans/${saved.plan?.id}`;
+    renderApp(`${base}?selected=${goNoGo.id}`);
+    expect(
+      (await screen.findByRole("link", { name: "Open plan" })).getAttribute(
+        "href",
+      ),
+    ).toBe(plan);
+    cleanup();
+    vi.unstubAllGlobals();
+    logApi([goNoGo, saved]);
+    renderApp(`${base}?selected=${saved.id}`);
+    expect(
+      (
+        await screen.findByRole("link", { name: "Open this version" })
+      ).getAttribute("href"),
+    ).toBe(`${plan}?version=${versionRef.id}`);
   });
 
   test("Kind filters the list, in the URL", async () => {

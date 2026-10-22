@@ -12,7 +12,7 @@ import { Checkbox } from "./Checkbox";
 import { ComboBox } from "./ComboBox";
 import { ContextualHelp } from "./ContextualHelp";
 import { AlertDialog, Dialog, DialogTrigger } from "./Dialog";
-import { ActionMenu, Menu, MenuItem, MenuTrigger } from "./Menu";
+import { ActionMenu, Menu, MenuItem, MenuSection, MenuTrigger } from "./Menu";
 import { Picker } from "./Picker";
 import { Popover } from "./Popover";
 import { Radio, RadioGroup } from "./RadioGroup";
@@ -648,6 +648,31 @@ describe("Menu and ActionMenu", () => {
     await settle();
     expect(onAction.mock.calls[0]?.[0]).toBe("export");
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  test("MenuSection: its items as a group named by its heading, chosen as any", async () => {
+    const user = userEvent.setup();
+    const onAction = vi.fn();
+    render(
+      <MenuTrigger>
+        <Button variant="secondary">Plan A</Button>
+        <Menu onAction={onAction}>
+          <MenuItem id="a">Plan A</MenuItem>
+          <MenuSection title="Archived">
+            <MenuItem id="b">Plan B</MenuItem>
+          </MenuSection>
+        </Menu>
+      </MenuTrigger>,
+    );
+    await user.click(screen.getByRole("button", { name: "Plan A" }));
+    const group = screen.getByRole("group", { name: "Archived" });
+    expect(
+      within(group)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Plan B"]);
+    await user.click(within(group).getByRole("menuitem", { name: "Plan B" }));
+    expect(onAction.mock.calls[0]?.[0]).toBe("b");
   });
 
   test("ActionMenu: the ⋯ button opens its items", async () => {

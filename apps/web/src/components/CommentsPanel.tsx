@@ -1,4 +1,4 @@
-import { formatCount, formatRelativeTime } from "@moonx/i18n";
+import { formatCount, formatRelativeTime, i18n } from "@moonx/i18n";
 import {
   type Comment,
   type CommentTargetType,
@@ -68,6 +68,11 @@ export interface ScreenComments {
    */
   idea?: { id: string; name: string; archived: boolean };
   /**
+   * The plan the screen is of (20–23). Archived, its panels are read-only and say so in
+   * the plan's words, unless its idea is archived too (6.0.4).
+   */
+  plan?: { id: string; archived: boolean };
+  /**
    * The screen's data that counts the comments of its items (`ideaKey`, or the
    * self-analysis's): read again after each write, with the threads.
    */
@@ -88,6 +93,30 @@ export interface ScreenComments {
   shows: (item: TargetRef) => boolean;
   /** An item's name, over its threads in the screen's list ("01 WHO", "Costs · Rent"). */
   labelOf: (target: TargetRef) => string | undefined;
+  /**
+   * Where the names of the screen's list stand when the screen reads them for it (20 reads
+   * its items' once the list opens): the list waits for them, and a failed read says so.
+   */
+  labelsState?: { isPending: boolean; error: unknown; retry: () => void };
+}
+
+/**
+ * Why a panel is read-only, in the words of 6.0.4: "This idea is archived…" or, on a
+ * plan's screen whose idea is not, "This plan is archived…"; null while it can be
+ * written in. `refused` is a write the API turned down as archived before the screen
+ * knew: the screen's plan, if it has one, is then the likelier, until it reads again.
+ */
+export function archivedNotice(
+  comments: Pick<ScreenComments, "idea" | "plan">,
+  refused: boolean,
+): string | null {
+  if (comments.idea?.archived === true) {
+    return i18n.t("panels:comments.archived.idea");
+  }
+  if (comments.plan?.archived === true || (refused && comments.plan)) {
+    return i18n.t("panels:comments.archived.plan");
+  }
+  return refused ? i18n.t("panels:comments.archived.idea") : null;
 }
 
 /** Whether the screen shows what `target` names, so its panel may open on it. */
@@ -600,13 +629,18 @@ export function CommentsPanelBody({
   const { t } = useTranslation(["panels", "app"]);
   const { me, workspace } = useWorkspace();
   const { idea, dataKey, fromWorkspaces } = comments;
+  const queryClient = useQueryClient();
   const changed = useCommentsChanged(dataKey);
   const query = useQuery(commentsQuery(workspace.id, target));
-  // A write the API refused as archived (the screen did not know): read-only from then on.
+  // A write the API refused as archived (the screen did not know): read-only from then on,
+  // and the screen reads again to learn what is archived.
   const [refusedArchived, setRefusedArchived] = useState(false);
-  const isArchived = idea?.archived === true || refusedArchived;
-  const canWrite = !isArchived;
-  const onArchived = () => setRefusedArchived(true);
+  const notice = archivedNotice(comments, refusedArchived);
+  const canWrite = notice === null;
+  const onArchived = () => {
+    setRefusedArchived(true);
+    void queryClient.invalidateQueries({ queryKey: dataKey });
+  };
   const newTarget: TargetRef | undefined =
     target.kind === "item"
       ? target.item
@@ -643,18 +677,22 @@ export function CommentsPanelBody({
     return parts.length === 0 ? undefined : parts.join(t("app:separator"));
   };
 
+  const labels = target.kind === "screen" ? comments.labelsState : undefined;
   let threads: ReactNode;
-  if (query.isError) {
+  if (query.isError || (labels !== undefined && labels.error !== null)) {
     threads = (
       <FailureState
-        error={query.error}
-        onRetry={() => void query.refetch()}
+        error={query.error ?? labels?.error}
+        onRetry={() => {
+          if (query.isError) void query.refetch();
+          labels?.retry();
+        }}
         dashboardHref={dashboardHref(me)}
         headingLevel={3}
         size="S"
       />
     );
-  } else if (query.data === undefined) {
+  } else if (query.data === undefined || labels?.isPending === true) {
     threads = (
       <Skeleton isLoading>
         <Stack gap="space-200">
@@ -685,11 +723,7 @@ export function CommentsPanelBody({
 
   return (
     <Stack gap="space-400">
-      {isArchived && (
-        <InlineAlert variant="notice">
-          {t("panels:comments.archived.idea")}
-        </InlineAlert>
-      )}
+      {notice !== null && <InlineAlert variant="notice">{notice}</InlineAlert>}
       {itemLabel !== undefined && (
         <Text variant="caption" tone="secondary">
           {t("panels:comments.onItem", { item: itemLabel })}

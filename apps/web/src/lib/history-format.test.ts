@@ -358,6 +358,183 @@ describe("fieldChanges", () => {
   });
 });
 
+describe("fieldChanges of a plan (20)", () => {
+  const ownership = [
+    { key: "name", label: "Name", type: "text" as const },
+    {
+      key: "initial_ownership",
+      label: "Initial ownership (%)",
+      type: "percent" as const,
+    },
+    {
+      key: "initial_capital",
+      label: "Initial capital contribution",
+      type: "money" as const,
+    },
+  ];
+  const planContext: ChangeContext = {
+    ...context,
+    tableColumnsOf: (key) => (key === "P.13.1" ? ownership : undefined),
+    memberName: (userId) => (userId === "u-ana" ? "Ana Villanueva" : undefined),
+  };
+
+  test("the header's fields by their names on 20", () => {
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "business_plan", id, key: null },
+          before: { name: "Plan A", businessName: "", preparedBy: "Ana" },
+          after: {
+            name: "Plan A",
+            businessName: "Piaya Gift Box Co.",
+            preparedBy: "Ana",
+          },
+        }),
+        planContext,
+      ),
+    ).toEqual([
+      { label: "Business Name", before: "", after: "Piaya Gift Box Co." },
+    ]);
+  });
+
+  test("a text answer unnamed; a table's rows a line each, a % and money as 21 shows them", () => {
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "plan_answer", id, key: "P.01.1" },
+          action: "create",
+          source: "plan_draft",
+          after: { text: "Gift boxes of piaya", rows: null },
+        }),
+        planContext,
+      ),
+    ).toEqual([{ label: null, before: "", after: "Gift boxes of piaya" }]);
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "plan_answer", id, key: "P.13.1" },
+          before: {
+            text: null,
+            rows: [
+              { name: "Ana", initial_ownership: 0.6, initial_capital: null },
+            ],
+          },
+          after: {
+            text: null,
+            rows: [
+              {
+                name: "Ana",
+                initial_ownership: 0.6,
+                initial_capital: 50000.5,
+                // A column a template migration removed: kept, not shown.
+                note: "old",
+              },
+              { name: null, initial_ownership: null, initial_capital: null },
+            ],
+          },
+        }),
+        planContext,
+      ),
+    ).toEqual([
+      {
+        label: null,
+        before: "Name: Ana · Initial ownership (%): 60%",
+        after:
+          "Name: Ana · Initial ownership (%): 60% · Initial capital contribution: ₱50,000.50\nEmpty row",
+      },
+    ]);
+    // A table the plan's template no longer has: its rows by the keys they were kept under.
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "plan_answer", id, key: "P.11.1" },
+          action: "create",
+          after: { text: null, rows: [{ name: "Ana", time: 0.5 }] },
+        }),
+        planContext,
+      ),
+    ).toEqual([{ label: null, before: "", after: "name: Ana · time: 0.5" }]);
+  });
+
+  test("an execution item's fields as 22 names them; a new one leaves out its first status", () => {
+    const milestone = {
+      type: "milestone",
+      title: "Business decision",
+      assigneeUserId: null,
+      assigneeName: null,
+      dueDate: null,
+      status: "todo",
+      goal: null,
+      exitCondition: null,
+      launchTiming: null,
+      actions: null,
+      completionCriteria: null,
+      kpiArea: null,
+      kpiTarget: null,
+      kpiReviewFrequency: null,
+      kpiActual: null,
+      whyItMatters: null,
+      answer: null,
+    };
+    const added = fieldChanges(
+      entry({
+        target: { type: "execution_item", id, key: null },
+        action: "create",
+        source: "plan_draft",
+        after: milestone,
+      }),
+      planContext,
+    );
+    expect(added).toEqual([
+      { label: "Milestone", before: "", after: "Business decision" },
+    ]);
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "execution_item", id, key: null },
+          before: milestone,
+          after: {
+            ...milestone,
+            assigneeUserId: "u-ana",
+            dueDate: "2031-11-02",
+            status: "doing",
+          },
+        }),
+        planContext,
+      ),
+    ).toEqual([
+      { label: "Assignee", before: "", after: "Ana Villanueva" },
+      { label: "Deadline", before: "", after: "Nov 2, 2031" },
+      { label: "Status", before: "To do", after: "Doing" },
+    ]);
+    const launch = {
+      ...milestone,
+      type: "launch",
+      title: "Launch day",
+      launchTiming: "launch_day",
+    };
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "execution_item", id, key: null },
+          before: launch,
+          after: {
+            ...launch,
+            assigneeUserId: "u-gone",
+            launchTiming: "other",
+            dueDate: "2031-11-02",
+          },
+        }),
+        planContext,
+      ).map(({ label, after }) => [label, after]),
+    ).toEqual([
+      ["Phase", "Other"],
+      ["Assignee", "A former member"],
+      ["Date", "Nov 2, 2031"],
+    ]);
+  });
+});
+
 describe("changeKind and changeTitle", () => {
   test("the kind of change beside the kind of operation", () => {
     expect(changeKind(entry({ source: "ai_import", action: "create" }))).toBe(

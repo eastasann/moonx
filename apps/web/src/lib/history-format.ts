@@ -7,18 +7,23 @@ import {
   formatMoney,
   i18n,
 } from "@moonx/i18n";
-import type {
-  AnswerType,
-  CanReduce,
-  CompetitorType,
-  Confidence,
-  EconomicsField,
-  Fau,
-  FauState,
-  HistoryEntry,
-  HistorySource,
-  SourceType,
-  SupportsCheck,
+import {
+  type AnswerType,
+  type CanReduce,
+  type CompetitorType,
+  type Confidence,
+  type EconomicsField,
+  EXECUTION_STATUSES,
+  type ExecutionStatus,
+  type ExecutionType,
+  type Fau,
+  type FauState,
+  type HistoryEntry,
+  type HistorySource,
+  type LaunchTiming,
+  type QuestionOptions,
+  type SourceType,
+  type SupportsCheck,
 } from "@moonx/schemas";
 
 /**
@@ -52,12 +57,25 @@ export interface ChangeContext {
    * it: an amount question's text is its reason, named as its field on 11.
    */
   answerTypeOf?: (questionKey: string) => AnswerType | undefined;
+  /**
+   * The columns of the plan's table sub-item `questionKey` (§11, §13, §21, §22), where the
+   * screen has read them: a table answer's rows are worded with their names and kinds.
+   */
+  tableColumnsOf?: (questionKey: string) => readonly TableColumn[] | undefined;
+  /** A workspace member's name, for an execution item's assignee; undefined for none. */
+  memberName?: (userId: string) => string | undefined;
   /** F/A/U in words, as the screens put it ("Fact · 2 sources"). 4.5 FauPicker. */
   fauLabel: (
     state: FauState,
     options: { confidence: Confidence | null; evidenceCount: number },
   ) => string;
 }
+
+/** A column of a plan's table sub-item (the template's `options.columns`). */
+export type TableColumn = Extract<
+  QuestionOptions,
+  { kind: "table" }
+>["columns"][number];
 
 type Content = Record<string, unknown> | null;
 
@@ -151,6 +169,161 @@ function economicsValue(
   }
   if (field === "target_margin") return formatInputPercent(value);
   return formatInputNumber(value);
+}
+
+/** A table cell as 21 shows it: a % of 0–1 as "40%", money in the currency (6.12). */
+function cellWords(
+  column: TableColumn,
+  value: unknown,
+  currency: string,
+): string {
+  if (typeof value === "string") return value;
+  if (typeof value !== "number") return "";
+  switch (column.type) {
+    case "percent":
+      return formatInputPercent(value);
+    case "money":
+      return formatMoney(value, currency, { cents: !Number.isInteger(value) });
+    default:
+      return formatInputNumber(value);
+  }
+}
+
+/**
+ * A table answer's rows, one line each: its cells with their columns' names, in the
+ * columns' order ("Name: Ana · Role: Operations"); a row without a value "Empty row".
+ * Values a template migration left in columns it removed are not shown, as on 21.
+ */
+function rowsWords(
+  rows: readonly unknown[],
+  columns: readonly TableColumn[],
+  currency: string,
+): string {
+  return rows
+    .map((row) => {
+      const cells = asContent(row) ?? {};
+      const words = columns.flatMap((column) => {
+        const value = cellWords(column, cells[column.key], currency);
+        return value === ""
+          ? []
+          : [i18n.t("plans:table.cell", { label: column.label, value })];
+      });
+      return words.length === 0
+        ? i18n.t("plans:table.emptyRow")
+        : words.join(i18n.t("app:separator"));
+    })
+    .join("\n");
+}
+
+/**
+ * The columns of a table the plan's template no longer has (a migration took it away):
+ * the keys its rows kept, by the names they were kept under, in the order first met.
+ */
+function keptColumns(rows: readonly unknown[]): TableColumn[] {
+  const columns = new Map<string, TableColumn>();
+  for (const row of rows) {
+    for (const [key, value] of Object.entries(asContent(row) ?? {})) {
+      if (columns.has(key)) continue;
+      columns.set(key, {
+        key,
+        label: key,
+        type: typeof value === "number" ? "number" : "text",
+      });
+    }
+  }
+  return [...columns.values()];
+}
+
+/** The fields of an execution item of `type`, named as 22's columns (design-spec 6.13). */
+function executionFields(
+  type: ExecutionType,
+  context: ChangeContext,
+): readonly FieldSpec[] {
+  const name = (field: string) =>
+    i18n.t(`plans:execution.field.${type}.${field}` as never);
+  const assignee: FieldSpec = {
+    label: i18n.t("plans:execution.assignee"),
+    words: (content) => {
+      if (typeof content.assigneeUserId === "string") {
+        return (
+          context.memberName?.(content.assigneeUserId) ??
+          i18n.t("plans:execution.formerMember")
+        );
+      }
+      return text(content.assigneeName);
+    },
+  };
+  const dueDate: FieldSpec = {
+    label: name("dueDate"),
+    words: (content) =>
+      typeof content.dueDate === "string"
+        ? formatDate(content.dueDate, { timeZone: context.timeZone })
+        : "",
+  };
+  // A new item starts at its type's first status (SDD 5.9 P9 POST): not one it was given.
+  const status: FieldSpec = choiceField(
+    i18n.t("plans:execution.status"),
+    "status",
+    (value) => i18n.t(`common:executionStatus.${value as ExecutionStatus}`),
+    (content) => content.status === EXECUTION_STATUSES[type][0],
+  );
+  const textOf = (field: string) => textField(name(field), field);
+  switch (type) {
+    case "milestone":
+      return [
+        textOf("title"),
+        textOf("goal"),
+        assignee,
+        dueDate,
+        textOf("exitCondition"),
+        status,
+      ];
+    case "launch":
+      return [
+        textOf("title"),
+        // A launch row added without a phase goes under Other (6.13).
+        choiceField(
+          name("launchTiming"),
+          "launchTiming",
+          (value) => i18n.t(`common:launchTiming.${value as LaunchTiming}`),
+          (content) => content.launchTiming === "other",
+        ),
+        textOf("actions"),
+        assignee,
+        textOf("completionCriteria"),
+        dueDate,
+        status,
+      ];
+    case "kpi":
+      return [
+        textOf("kpiArea"),
+        textOf("title"),
+        textOf("kpiTarget"),
+        textOf("kpiReviewFrequency"),
+        assignee,
+        textOf("kpiActual"),
+      ];
+    case "open_question":
+      return [
+        textOf("title"),
+        textOf("whyItMatters"),
+        assignee,
+        dueDate,
+        textOf("answer"),
+        status,
+      ];
+    case "next_action":
+      return [textOf("title"), assignee, dueDate, status];
+  }
+}
+
+/** The type of the execution item a change kept: the same on both sides. */
+function executionTypeOf(entry: HistoryEntry): ExecutionType {
+  const type = (asContent(entry.after) ?? asContent(entry.before))?.type;
+  if (typeof type !== "string" || !(type in EXECUTION_STATUSES)) {
+    throw new Error(`An execution item's change without its type: ${entry.id}`);
+  }
+  return type as ExecutionType;
 }
 
 function fieldsOf(
@@ -400,10 +573,35 @@ function fieldsOf(
         evidenceField(),
       ];
     }
+    case "business_plan":
+      return [
+        textField(i18n.t("plans:header.name"), "name"),
+        textField(i18n.t("plans:header.businessName"), "businessName"),
+        textField(i18n.t("plans:header.preparedBy"), "preparedBy"),
+      ];
+    case "plan_answer": {
+      // A text sub-item's text has no name, as a question's answer; a table's rows are
+      // the answer too, worded with the columns the screen read (6.0.5).
+      const key = entry.target.key ?? "";
+      return [
+        {
+          label: null,
+          words: (content) => {
+            if (!Array.isArray(content.rows)) return text(content.text);
+            return rowsWords(
+              content.rows,
+              context.tableColumnsOf?.(key) ?? keptColumns(content.rows),
+              context.currency,
+            );
+          },
+        },
+      ];
+    }
+    case "execution_item":
+      return executionFields(executionTypeOf(entry), context);
     default:
-      // Only the screens of 10, 11 and 13–18 open PNL-2, and their history holds these
-      // kinds (SDD 6.3「画面と節の対応」). The plan's header, answers and execution items
-      // come with 20 and 21 (Step 34).
+      // Only the screens of 10, 11, 13–18 and 20 open PNL-2, and their history holds
+      // these kinds (SDD 6.3「画面と節の対応」); comments and Pitch Deck slides have none.
       throw new Error(`No history words for ${type}`);
   }
 }

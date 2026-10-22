@@ -282,6 +282,20 @@ describe("24 Export for AI (design-spec 6.6)", () => {
     );
   });
 
+  test("a plan's crumbs and way back lead to its 20", async () => {
+    const plan = planContext();
+    exportApi({ context: plan });
+    renderApp(exportPath(`source=business_plan&id=${plan.target.id}`));
+    await screen.findByText(`${home.idea.name} · Plan A`);
+    const planHref = `${ideaHref}/plans/${plan.target.id}`;
+    expect(
+      screen.getByRole("link", { name: "Plan A" }).getAttribute("href"),
+    ).toBe(planHref);
+    expect(
+      screen.getByRole("link", { name: home.idea.name }).getAttribute("href"),
+    ).toBe(ideaHref);
+  });
+
   test("a self-analysis: no Reference, no id, no idea in the crumbs", async () => {
     const user = userEvent.setup();
     const calls = exportApi({ context: selfAnalysisContext() });

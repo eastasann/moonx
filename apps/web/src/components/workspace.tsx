@@ -67,7 +67,14 @@ export const ownPersonalId = (me: Me): string | undefined =>
   me.memberships.find(({ workspace }) => workspace.isPersonal)?.workspace.id;
 
 /** The modals opened by the search parameter `modal` (SDD 4章) this app has so far. */
-export type ModalName = "switch-workspace" | "new-idea" | "evidence" | "share";
+export type ModalName =
+  | "switch-workspace"
+  | "new-idea"
+  | "evidence"
+  | "share"
+  | "create-plan"
+  | "save-version"
+  | "go-no-go";
 
 declare module "@tanstack/react-router" {
   interface HistoryState {

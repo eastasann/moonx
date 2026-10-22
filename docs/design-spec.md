@@ -399,7 +399,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 |---|---|---|---|
 | Button / ButtonGroup | 主要な操作（Record decision・Apply n changes・Save version など） | primary（主要な操作。1画面に1つまで。インクの塗り）/ secondary（薄い枠 `border.default`）/ negative（削除の確認だけ）。補助の操作は quiet（枠なし）。secondary と quiet の文字は medium の太さ。S / M / L / XL（ランディングの見出しの下と最後の Log in、スマホの下部の操作は XL。上の行の Log in は M）。送信中（isPending）は ProgressCircle を出し、押せなくする | 主要な操作は 4.1 のとおり下部に固定する。固定した行では XL になり、B では quiet の Cancel も含めてボタンが行の幅を等分し、A・G では quiet でないボタンが行の幅を分け合う（G の quiet の Cancel は自分の幅。4.3） |
 | ActionButton / ActionGroup | ツールバーの操作（💬・🕘・⋯） | quiet あり（文字とアイコンは secondary、ホバーで primary。押せないときも地を付けない）。枠は薄い線（`border.default`）。S / M / L / XL | 同じ |
-| ActionMenu / Menu | 行の ⋯、アイデアの ⋯（複製・アーカイブ・移行）、AI ▼ | — | トレイで開く |
+| ActionMenu / Menu | 行の ⋯、アイデアの ⋯（複製・アーカイブ・移行）、AI ▼、20 の案の切替 | 項目のまとまりを見出しの下に置く `MenuSection`（Spectrum 2 の MenuSection。20 の案の切替の「Archived」。見出しは caption の secondary の文字） | トレイで開く |
 | Link | 「Edit in validation」・「See all decisions」など単独のリンクと、読み物の中の文中のリンク | 単独のリンク（primary）の下線は薄い線（`border.default`。ホバーで文字の色）。`isQuiet` は下線を付けず、ホバーで下線を出す（公開ページのフッターのリンク）。23 のスライドの上の「Edit source」などは PresentationPattern の `slideTools` が secondary の文字にし、ホバーで下線の代わりに地の色（`surface.hover`）を付ける | 同じ |
 | TextField / TextArea | 短文・長文の回答、名前、理由 | TextArea は入力に合わせて広がる（Web フォントを読み込み終えたときにも高さを測り直す）。理由を書く欄（`isReason`。19 の「Why?」と、同じ形の M4 の理由）は 06 `field.text-area-reason-min-height` の高さから広がる（s19-decision.html の textarea）。欄の最小の高さは中の入力の場所が持ち、欄のどこを押しても入力が始まる。必須の欄（`isRequired`）はラベルの後ろに secondary の「Required」を出す（s19-decision.html の「Why? Required」。Spectrum 2 の `necessityIndicator="label"` と同じ。NumberField・SearchField・Picker・ComboBox・DatePicker・MentionTextArea・DiffTextArea も同じ）。補足（`description`）は `descriptionTone="notice"` で琥珀色の文字と印にする（9 の通貨の警告。ほかの入力欄も同じ）。設問の回答の欄（QuestionCard の中）は、文字が 06 `typography.answer`、最小の高さと内側が `layout.question-form.answer-*`、角丸が `radius.callout`、地が canvas（s11-form.html の .answer）。枠はほかの入力欄と同じ `border.strong`（枠で位置を示す入力欄は 3:1。s11 の薄い線は採らない）。フォーカスで raised の地にする（s11 の .answer:focus） | キーボードで隠れない（4.3） |
 | NumberField | 金額（通貨記号・桁区切り）、%、日数、販売数 | 書式は en-PH（1.2）。表の数字の列の中では、数字を右にそろえて通貨記号と % を数字に付けて並べ、行の編集に入っても数字の位置を変えない（s17-costs.html） | 数字のキーボード |
@@ -421,7 +421,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | Breadcrumbs | Web のヘッダーのパンくず（6.0.1） | 区切りは「/」の文字（secondary。文字と区切りの間は 06 `component.breadcrumbs.gap`。M は moon-base.css の .crumbs）。今の画面はリンクにせず文字で出す（`aria-current`） | 出さない（部品が幅で隠す。画面は ← 戻る を出す） |
 | CheckDots | 5・6 の一覧の行の、確認項目6つの状態の点列（MoonGlyph の ●達成 ◐途中 ○未着手）。形で状態を伝え、読み上げは全項目の名前と状態を1つの画像として読む | S / M | 同じ |
 | StatusLight | F/A/U（Fact / Assumption / Unknown / Unclassified / Empty）、確認項目の状態（Not started / Partial / Done）、保存状態 | MoonGlyph の印＋ラベル（4.4「状態の形」。形だけ・色だけで伝えない）。保存状態は印の代わりにアイコン（Saving… は回る読み込みの印、Saved は ✓、Couldn't save は警告。Couldn't save は文字とアイコンを negative の赤にする） | 同じ |
-| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、ヘッダーの 💬 の未解決のスレッドの数（6.0.1）、「Overdue」「Lump sum」「(former member)」 | 色を付けない薄い枠（`border.default`）の札（Undecided は点線の枠で、文字は secondary）。TabBar の未読数とヘッダーの 💬 の数は、アイコンの右上に重ねるインクの小さな札（大きさの段によらず同じ大きさ）。SideNav の未読数は札にせず、行の右端の等幅の数字（secondary）だけ。「Overdue」と期限切れの日数（「overdue 3d」）は、枠を付けない琥珀色の等幅の文字。Drop を negative にしない。props は `fillStyle`（Spectrum 2 の outline = 枠と bold = 塗りに、moonx の dashed = 点線の枠を足したもの。bold は未読数の札。既定は outline で、Spectrum 2 の既定の bold と違う）と `variant`（neutral / notice。notice は枠の無い琥珀色の等幅の文字） | 同じ |
+| Badge | 判定（Proceed / Hold / Drop）、工程、未読数、ヘッダーの 💬 の未解決のスレッドの数（6.0.1）、「Overdue」「Lump sum」「(former member)」 | 色を付けない薄い枠（`border.default`）の札（Undecided は点線の枠で、文字は secondary）。TabBar の未読数とヘッダーの 💬 の数は、アイコンの右上に重ねるインクの小さな札（大きさの段によらず同じ大きさ）。SideNav の未読数は札にせず、行の右端の等幅の数字（secondary）だけ。「Overdue」と期限切れの日数（「overdue 3d」）は、枠を付けない琥珀色の等幅の文字。Drop を negative にしない。props は `fillStyle`（Spectrum 2 の outline = 枠と bold = 塗りに、moonx の dashed = 点線の枠を足したもの。bold は未読数の札。既定は outline で、Spectrum 2 の既定の bold と違う）と `variant`（neutral / notice。notice は枠の無い琥珀色の等幅の文字）。札の文字が印だけのとき（20 の [V]・[S]）は `aria-label` で読み上げる文を渡し、印は読み上げない | 同じ |
 | InlineAlert | 粗利のマイナス・Capacity 超過・費用の下限の注意・「Latest decision is Hold」・アーカイブ中（画面上部の帯は AlertBanner） | informative / notice / negative / neutral。地は種類の淡い色、文字はインク、アイコンだけ種類の色。左の色の帯は付けない。角丸は 06 `radius.callout` | 同じ |
 | Toast | 「Decision recorded」「2 answers updated · 1 needs F/A/U」「Duplicated from …」と「Undo」（6.8） | 文と、任意の操作のボタン1つと、閉じるボタン。デスクトップとタブレットは下の中央 | 下部（タブの上） |
 | ProgressBar / ProgressCircle | 「Preparing PDF…」、送信中のボタン | — | 同じ |
@@ -675,6 +675,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - 作成の取り消しは、作ったアイデア（またはプラン）を論理削除する。一覧・検索・ダッシュボード・工程の集計・通知のどこにも出さず、URL で開くと 6.0.6 の「見つからない」を出す。作ったものの中の変更履歴は消さずに残す。取り消したことは、元の側の履歴に1行（「Duplicate undone」「Plan draft undone」）で残す。元の側は、複製ならコピー元のアイデア、プラン下書きならそのアイデアで、どちらも 13 の履歴に出る。この行には「この時点に戻す」も「Undo the whole operation」も出さず、取り消したものは戻せない。取り消すと、複製はアイデア一覧（6）へ、下書きはそのアイデアの 13 へ移る。
 - 自己分析の履歴は本人だけが見られる。共有先のメンバーには履歴ボタンを出さない。10 は回答を項目として並べないので、13 と同じく項目の 🕘 は置かず、ヘッダーの 🕘 が自己分析の全体の履歴を開く（2026-10-22 に Step 33 で決めた）。
 - 自己分析の回答の差分（2026-10-22 に Step 33 で決めた）: 本文は名前を出さない。Q15〜17 は 11 の欄と同じく、理由を「Why this amount?」、金額を「Amount」の名前で出し、金額は自己分析の通貨（6.11）で出す。
+- プランの差分（2026-10-22 に Step 34 で決めた）: ヘッダは「Plan name」「Business Name」「Prepared by」。小項目の文章は名前を出さない。表の小項目も名前を出さず、行ごとに1行で「{列の名前}: {値}」を「 · 」でつなぐ（値の無い列は出さず、どの列も空の行は「Empty row」。% は「40%」、金額はワークスペースの通貨で 21 と同じ書式。テンプレートの移行で消えた列の値は、21 と同じく出さない。移行で表の小項目ごと消えたときは、行が保っていた列のキーをそのまま列の名前にして出す）。実行管理の項目は 22 の列の名前（6.13。種類ごとに 1列目は Milestone / Timing / KPI / Open Question / Action、期限は Deadline / Date / Target Date、ほかに Goal・Exit Condition・Actions・Completion Criteria・Area・Target・Review Frequency・Actual・Why It Matters・Answer・Assignee・Status、ローンチの区分は「Phase」）で出す。担当はメンバーの表示名で、今はメンバーでない人は「A former member」。追加した行は、種類の最初の状態（To do / Open）と区分の Other を、作ったときのままとして設定した欄に数えない。20 の画面全体の履歴は、表の小項目の列の名前と種類を、その項目（SDD 5.9 P4）から読み、担当の名前をメンバーの一覧（W2）から読む（読み終えるまで、それを使う行だけを骨組みにする。読めなければ一覧の位置に 6.0.6 の失敗の表示と Retry を出す）。
 - Viewer は見られるが、戻せない。
 - 空の状態: 「No changes yet」。
 - 項目の 🕘（2026-10-22 に Step 32b で決めた並び）: 項目の 💬（6.0.4）と同じ所に置き、Viewer とアーカイブ済みのアイデアにも出す（履歴は全ロールが読めるため）。💬 のボタンを置く所（11・15 の V.04・18 の V.08 のカードの道具、14・16 の詳細の見出しの右、18 の数字の末尾の列とスマホのシート）では 💬 の右に 🕘（読み上げは「History of {項目の名前}」）を置き、⋯ のメニューに「Comments」を置く所（15 のカード、17 の行とスマホのシート）では「Comments」の次に「History」を置く。シートの 🕘・「History」は、シートを閉じてからパネルを開く。13 の項目はアイデアの概要だけなので、項目の 🕘 は置かず、ヘッダーの 🕘 がその履歴を開く。
@@ -1360,7 +1361,7 @@ Summary は DescriptionList、判定は RadioGroup の cards。s19-decision.html
 | 判定を選ぶ | 選んだ値に応じて注意書き。Proceed: 「Proceed means it is worth planning, not approval to launch.」。Drop: 「Dropped ideas are hidden from lists by default. You can decide again later.」。Hold と、まだ選んでいないあいだは「You can decide again at any time. Every decision stays in the log.」（s19-decision.html）。不足があれば「n checks are missing. They will be recorded with this decision.」（不足があっても記録できる） |
 | 理由を書く | 必須。空のままでは記録できない（規則は 6.0.8） |
 | Record decision | 決定ログに記録する（判定・理由・記録者・日時・その時点の不足項目・主要指標・F/A/U の内訳のスナップショット）。アイデアの最新の判定が変わる。ワークスペースのメンバーに通知する |
-| 記録の後（Proceed） | 「Create a plan draft?」の確認を出す → [Create draft]（M5）/ [Later]（13 へ） |
+| 記録の後（Proceed） | 「Create a plan draft?」の確認を出す → [Create draft]（M5）/ [Later]（13 へ）。確認は AlertDialog で、本文は「Proceed is recorded. A draft copies your validation's answers into a Business Plan, which you can also start later from the idea's Plans.」。Create draft は M5 を 13 の上に開く（M5 の Cancel で 13 に残る。2026-10-22 に Step 34 で決めた）。「Decision recorded」のトーストは記録したときに出す |
 | 記録の後（Hold / Drop） | 13 へ戻り、「Decision recorded」と表示する |
 | Cancel | 何も記録せず 13 へ |
 
@@ -1934,6 +1935,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
   - 下の表の「下書きでコピー」の小項目に、検証の回答をコピーする。
   - 実行管理の初期行（マイルストーン6行・ローンチ5行・KPI 12行）をテンプレートから作る（6.13）。
   - コピーと初期行の作成は変更履歴に「下書き作成」として残る。下書きはほかに何も足されていない間、履歴パネルの「Undo the whole operation」で取り消せる（作成の取り消し。プランを論理削除し、戻せない。6.0.5）。
+- 形（2026-10-22 に Step 34 で決めた）: Dialog の small（スマホはトレイ）。題「Create plan draft」、本文「The draft copies your validation's answers where the plan asks the same, and starts the execution lists from the template.」、「Plan name」の欄、Create draft と Cancel（名前が空のあいだは Create draft を押せない。6.0.6）。既定の名前は「Plan A」「Plan B」…のうち、このアイデアの案（アーカイブした案を含む）に使われていない最初のもの（間が空いていればそこを使う。名前を変えた案の元の名前も使える）。「Z」の次は「AA」「AB」…（表計算の列の名前と同じ）。名前の重複は欄の下に「This name is already used」、最新の判定が Proceed でなくなっていたら（`DECISION_NOT_PROCEED`）「The latest decision is no longer Proceed.」、公開済みのテンプレートが無ければ 6.0.6 の文を Create draft の上に出し、Create draft を押せなくする。作ると M5 の履歴の項目の代わりにその案の 20 を開く（戻るで M5 に戻らない。M1 と同じ）。13 と 20 では `?modal=create-plan` で開く。
 
 #### 20 プランホーム（パターン A）
 
@@ -1968,10 +1970,18 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - **案のアーカイブ**（Owner / Member）: 案の切替では「Archived」の下にまとめ、13 の Plans では一覧から外して末尾の「n archived plans · Show」にまとめる（6.1）。読み取り専用で、版の保存・Go / No-Go・Add plan の対象にならない。工程の判定（プランの有無・Launch）、Due soon の対象から外す。Pitch Deck は表示できる。アーカイブした案を開くと上部に「This plan is archived」と「Restore」（Owner / Member）を出し、そこから Restore する（案の切替の「Archived」からも、13 の「Show」からも開ける）。M5 の既定名はアーカイブした案の名前も使用済みとして数える。閲覧・コメントの閲覧・変更履歴の閲覧はできるが、コメントを書く・元に戻すはできない（アイデアのアーカイブと同じ）。
 - 版を指定して開く（Versions から）と、その版のスナップショットを読み取り専用で表示する（上部に「Viewing v1 For advisors (read only)」）。
 - 空の状態: 回答がすべて下書き作成時のコピーのままで、実行管理の初期行も変えていない間（API の `draftOnly`）は、案内文「Start with the items marked [V]. They already have your validation data.」を出す。版を開いているときは出さない。
+- 並びと文言（2026-10-22 に Step 34 で決めた）:
+  - ヘッダ: 上から、アイデアのアーカイブの注意（6.1 と同じ。アイデアがアーカイブ済みならこちらだけ）か案のアーカイブの注意（題「This plan is archived」と Restore）、版を開いているときの「Viewing {版の名前} (read only)」と「Show the latest」のリンク（今のプランの 20）、案の名前（見出し）と ▼（案の切替。押すとメニューで、案を作った順に並べ、アーカイブした案は見出し「Archived」の下にまとめ、最後に Add plan）、「Version: {版の名前}」（変更があれば「Version: {版の名前} + changes」、版が無ければ「No version saved」）と「Updated {最終更新日}」（版を開いているときは「Saved {保存日}」）を「 · 」でつないだ1行、Business Name と Prepared by の欄（ラベル付きの小さな TextField を横に並べ、6.0.2 の自動保存で保存する。読み取りのときは「Business Name: {値} · Prepared by: {値}」の1行で、空の値は「Empty」）、最新の判定が Proceed でないときの注意「Latest decision is {判定}.」（上の図のとおりヘッダの最後の行）、空の状態の案内文。
+  - 題の横の道具は Save version（M3）と ⋯（Rename plan・Export for AI・Import from AI・Archive plan）。主要な操作は Record Go / No-Go（M4。スマホは下部に固定。4.1 A）。どれも Owner / Member が、アイデアも案もアーカイブしておらず、版を開いていないときだけ出す。Add plan（案の切替の中）は Owner / Member に、アイデアも開いている案もアーカイブしておらず、最新の判定が Proceed のときだけ出す。Pitch Deck の入口（23）は、6.8 のとおり Viewer・アーカイブ中にも開けるので、この道具の組の条件に入れない。案の切替は、案の一覧（P1）を読み終えるまで押せず、読めなかったときはメニューに今の案と「Couldn't load the plans. Try again」を出す。
+  - Rename plan は小さな Dialog（題「Rename plan」、「Plan name」の欄、Save と Cancel。名前が空のあいだは Save を押せない）。名前の重複は欄の下に「This name is already used」を出す。開いた後にほかの人がヘッダを保存していたときは、6.0.2 の衝突の確認を出す（Overwrite with mine は名前だけを送る。Load theirs はヘッダを読み直して閉じる）。
+  - 主列に「Key numbers」（題の右に「From validation」、版を開いているときは「As saved in this version」。13 と同じ4つの数字を 2×2 で出し、下に 18 を開くリンク。Owner / Member でアイデアがアーカイブされていなければ「Edit in validation」、Viewer とアーカイブ中は「Open in validation」（6.1 の Summary のリンクと同じく、入力できない人には文言だけを変える））、「Go / No-Go」（最新の値の Badge と「{日付} · {記録者}」、その下に「See all Go / No-Go decisions」（種類を Go / No-Go に、アイデアをこのアイデアに絞った 7）。記録が無ければ「Not recorded yet」）、「Versions」（新しい順に版の名前と「{保存日} · {保存した人}」。押すとその版を読み取り専用で開く。開いている版は押せず、「Viewing · …」と出す。無ければ「No versions saved yet」）、「Execution」（「{n} items overdue」（琥珀色）と「{n} items due in the next 7 days」。0 の行は出さず、どちらも 0 なら「Nothing due in the next 7 days」）。副列に「Part A: Business Case」と「Part B: Execution Plan」（題の右に「{完了した項目の数} / {項目の数}」。各行は小項目の記入の割合だけ満ちた MoonGlyph（数える小項目の無い項目は満ちた月）・「{番号} {項目名}」・[V] と [S] の Badge（読み上げは「Uses your validation」「Refers to shared self analyses」）・コメントの数・「{記入済み}/{小項目の数}」）。
+  - ヘッダーの 💬 の一覧（プラン全体のスレッドとアイデアへのコメント）は、各スレッドの上に SDD 5.11 の `HistoryEntry.label` と同じ書き方で項目の名前を出す（小項目は「{項目の番号2桁} {小項目のタイトル}」、実行管理の項目は「Execution · {1列目}」、スライドは「Pitch Deck」）。名前は一覧を開いたときに、スレッドのある項目（SDD 5.9 P4）と実行管理の項目（P9）から読み、読み終えるまで一覧は骨組み、読めなければ 6.0.6 の失敗の表示と Retry を出す。20 は項目を画面に並べないので、項目の 💬・🕘 は置かない（13 と同じ）。
+  - 別のアイデアの案の id を、このアイデアのパスに付けて開いたときは「見つからない」（6.0.6）を出す。
 
 #### M3 版の保存（名前付きスナップショット）
 
 - 入力: 版の名前（必須。既定は「v{n}」。例: 「v1 For advisors」。規則は 6.0.8）。
+- 形（2026-10-22 に Step 34 で決めた）: Dialog の small（スマホはトレイ）。題「Save version」、本文「Keeps the plan as it is now, read only, to look back on or to show as a Pitch Deck.」、「Version name」の欄（既定の n は最新の版の番号の次）、Save version と Cancel（名前が空のあいだは Save version を押せない。6.0.6）。保存すると閉じ、トースト「{版の名前} saved」を出す。
 - その時点のプランを、読み取り専用のスナップショットとして保存する（中身は SDD 6.3 の末尾）。
 - 決定ログに「版の保存」として残す。ヘッダの Version には最新の版の名前を出す。
 - 保存した後に、このプランの回答・表・ヘッダ・実行管理の項目のどれかが変わると「+ changes」が付く。検証の数字が変わっただけでは付けない（プランは数字を常に検証から読むため）。
@@ -1984,6 +1994,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 入力: Launch / Delay / Stop と理由（必須。規則は 6.0.8）。Launch / Delay / Stop は 4.5 の RadioGroup の `cards`（19 の判定と同じ形。題だけで説明の行は持たない）で並べる。
 - 決定ログに「Go / No-Go」として残し、対象の版・主要指標・§24 の3つの条件の文章を記録する。対象の版は最新の保存済みの版（「+ changes」でも直前の版。版が無ければ空）。ワークスペースに通知する。
 - 何度でも記録し直せる（最新が有効）。どれかの案の最新の Go / No-Go が Launch なら、アイデアの工程が「立ち上げ準備」になる。
+- 形（2026-10-22 に Step 34 で決めた）: Dialog の large（スマホは全画面のシート）。題「Record Go / No-Go」。上から「Conditions」（「We proceed to launch if」「We delay if」「We stop / abandon if」と §24 の回答。空なら「Empty」）、「Key numbers」（19 と同じ5つ。6.5）、「Version」（最新の版の名前か「No version saved」。「+ changes」のときは琥珀色の注意「The plan has changed since {版の名前} was saved. Save a version first?」とリンク「Save a version」。押すと M4 の代わりに M3 を開き、M3 を閉じると M4 に戻る。M4 で選んだ値と書いた理由は、M4 に戻ったときも残る）、判定の題「Go / No-Go」のカード（Launch / Delay / Stop）、「Why?」（必須）。操作は Record と Cancel。Record は判定を選んで理由を書くまで押せない（6.0.6 のモーダルの決まり。理由の欄は書いた後に規則に合わなくなれば、欄の下に理由を出す）。記録すると閉じ、トースト「Go / No-Go recorded」を出す。失敗は 6.0.6 のモーダルの決まり。
 
 #### 21 プラン項目の編集（パターン C。11 と同じ部品）
 
@@ -2153,7 +2164,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 記録は追記だけで、編集・削除できない。
 - 一覧の形（2026-10-22 に Step 32 で決めた）: 左のペインの TableView（4.5）を3列にする。1列目はアイデア（プランの記録は「{案名} · {アイデア名}」）、その下に「{種類} · {記録者}」と理由の冒頭（「“…”」。2行まで。4.5 Text の `maxLines`）、2列目は値（判定と Go / No-Go は Badge、版の保存は版の名前）、3列目は記録した日時（列の名前は「Recorded」。日付の下に時刻）。6 列に分けると、左のペインの幅で文字が1文字ずつ折れるため（28 と同じ判断）。
 - 絞り込みの形: Kind・Idea（アーカイブしたもの・Drop も含む全アイデア）・Recorded by（今の Owner と Member と、ログに記録のある人。外れた人や Viewer になった人の記録も選べる）・Period の Picker（ラベルを中に置く。s06-ideas.html の .filters）。Period は「Any time」「Last 7 days」「Last 30 days」「Last 90 days」「Last 12 months」（どれも今日まで。日数は今日を含めて数え、12か月は去年の同じ日の翌日から。今日は利用者のタイムゾーンの日付。去年に無い日（2月29日）はその月の最後の日を去年の同じ日とする）と「Choose dates…」（From・To の DatePicker の Dialog。To が From より前なら「Choose a To date on or after the From date」と出して適用しない）。URL の `from`・`to` が選択肢のどれにも当たらないときは、その日付を選択肢の1つとして出す。絞り込みを変えると、選んでいた記録を外し、一覧の先頭を横に出す。
-- 詳細の形: 値の Badge と種類、題（アイデア、プランの記録は「{案名} · {アイデア名}」。版の保存は版の名前）、「Recorded by {記録者} · {日付}, {時刻}」（版の保存は「Saved by」）。その下に表の項目を、見出し「Why」「Checks missing then」（不足が無ければ「All 6 checks done」）「Key numbers then」（19 と同じ5つ。6.5）「Fact / Assumption / Unknown then」（19 と同じ1行）「Version」「Conditions」（Launch if / Delay if / Stop if。空なら「Empty」）で並べる。判定の詳細の末尾に「Open validation →」（13）。
+- 詳細の形: 値の Badge と種類、題（アイデア、プランの記録は「{案名} · {アイデア名}」。版の保存は版の名前）、「Recorded by {記録者} · {日付}, {時刻}」（版の保存は「Saved by」）。その下に表の項目を、見出し「Why」「Checks missing then」（不足が無ければ「All 6 checks done」）「Key numbers then」（19 と同じ5つ。6.5）「Fact / Assumption / Unknown then」（19 と同じ1行）「Version」「Conditions」（Launch if / Delay if / Stop if。空なら「Empty」）で並べる。判定の詳細の末尾に「Open validation →」（13）、Go / No-Go の詳細の末尾に「Open plan →」（20）、版の保存の詳細の末尾に「Open this version →」（その版を読み取り専用で開く 20）（2026-10-22 に Step 34 で決めた）。
 - 13 の Decisions の「See all decisions」（4.5 Link。d1-moon.html）は、そのアイデアで絞った 7 を開く。19 の「Last decision: …」は、その記録を選んだ 7 を開く。
 - 空の状態: 「Decisions you record will appear here, with who, when and why.」
 

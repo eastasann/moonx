@@ -62,3 +62,23 @@ export const itemDescription = style({
   ...typography("caption"),
   color: vars.color.text.secondary,
 });
+
+export const section = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: vars.space["25"],
+});
+
+/** A section's heading: a caption over its items, set in from the edge as they are. */
+export const sectionHeader = styleVariants(
+  Object.fromEntries(sizes.map((size) => [size, size])) as Record<Size, Size>,
+  (size) => [
+    typography("caption"),
+    {
+      color: vars.color.text.secondary,
+      paddingInline: vars.scale.component.menu.paddingX[size],
+      paddingBlockStart: vars.space["100"],
+      paddingBlockEnd: vars.space["25"],
+    },
+  ],
+);

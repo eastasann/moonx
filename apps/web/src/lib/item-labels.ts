@@ -19,6 +19,7 @@ type ListType = Extract<
   | "risk"
   | "cost_item"
   | "economics_input"
+  | "execution_item"
 >;
 
 /**

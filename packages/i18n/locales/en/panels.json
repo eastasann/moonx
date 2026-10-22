@@ -31,7 +31,8 @@
     "invalidMention": "Someone you mentioned can't be mentioned here. Remove the mention and post again.",
     "noCandidates": "Couldn't load who you can mention.",
     "archived": {
-      "idea": "This idea is archived. Restore it to make changes."
+      "idea": "This idea is archived. Restore it to make changes.",
+      "plan": "This plan is archived. Restore it to make changes."
     },
     "item": "Comments on {{item}}",
     "itemCount_one": "Comments on {{item}}, {{formatted}} comment",

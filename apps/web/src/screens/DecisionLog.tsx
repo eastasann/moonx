@@ -49,7 +49,12 @@ import {
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
-import { type DecisionsSearch, decisionsHref, ideaHref } from "../lib/links";
+import {
+  type DecisionsSearch,
+  decisionsHref,
+  ideaHref,
+  planHref,
+} from "../lib/links";
 import {
   decisionLogEntryQuery,
   decisionLogQuery,
@@ -354,8 +359,8 @@ function Filters({
 /**
  * What an entry kept when it was recorded (design-spec 6.15「詳細」): a decision's whole
  * reason, the checks missing then, the key numbers and F/A/U, and the way to 13; a Go /
- * No-Go's reason, version, the three conditions and key numbers; a saved version's name,
- * who saved it and when. The ways to 20 come with its screen.
+ * No-Go's reason, version, the three conditions, key numbers and the way to its plan's
+ * 20; a saved version's name, who saved it and when, and the way to that version on 20.
  */
 function EntryDetail({ entryId }: { entryId: string }) {
   const { t } = useTranslation(["decisions", "app"]);
@@ -486,14 +491,10 @@ function EntryDetail({ entryId }: { entryId: string }) {
           )}
           {keyNumbers}
           {section(t("decisions:detail.fau"), <FauCounts fau={snapshot.fau} />)}
-          <Flex>
-            <Link href={ideaHref(workspace.id, entry.idea.id)}>
-              <Flex gap="space-50" alignItems="center">
-                {t("decisions:detail.openValidation")}
-                <ArrowRight aria-hidden size={14} />
-              </Flex>
-            </Link>
-          </Flex>
+          <OpenLink
+            href={ideaHref(workspace.id, entry.idea.id)}
+            label={t("decisions:detail.openValidation")}
+          />
         </>
       )}
       {entry.kind === "go_no_go" && (
@@ -522,9 +523,39 @@ function EntryDetail({ entryId }: { entryId: string }) {
             </DescriptionList>,
           )}
           {keyNumbers}
+          {entry.plan !== null && (
+            <OpenLink
+              href={planHref(workspace.id, entry.idea.id, entry.plan.id)}
+              label={t("decisions:detail.openPlan")}
+            />
+          )}
         </>
       )}
+      {entry.kind === "version_saved" &&
+        entry.plan !== null &&
+        snapshot.planVersion != null && (
+          <OpenLink
+            href={planHref(workspace.id, entry.idea.id, entry.plan.id, {
+              version: snapshot.planVersion.id,
+            })}
+            label={t("decisions:detail.openVersion")}
+          />
+        )}
     </Stack>
+  );
+}
+
+/** "Open … →" at the end of an entry's detail: the screen it was recorded on (6.15). */
+function OpenLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Flex>
+      <Link href={href}>
+        <Flex gap="space-50" alignItems="center">
+          {label}
+          <ArrowRight aria-hidden size={14} />
+        </Flex>
+      </Link>
+    </Flex>
   );
 }
 

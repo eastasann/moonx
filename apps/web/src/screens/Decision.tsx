@@ -270,6 +270,8 @@ function DecisionBody({ home }: { home: ValidationHome }) {
   const [reason, setReason] = useState("");
   const [isChecked, setChecked] = useState(false);
   const [newer, setNewer] = useState<DecisionLogSummary | null>(null);
+  // Proceed recorded: "Create a plan draft?" before leaving (design-spec 6.5).
+  const [asksPlan, setAsksPlan] = useState(false);
   const toHome = () => void navigate({ href: ideaHref(workspace.id, idea.id) });
   // Whether 19 is still open when a record settles, which may be later: a user who left
   // meanwhile is not taken back to 13.
@@ -299,7 +301,7 @@ function DecisionBody({ home }: { home: ValidationHome }) {
             ...(confirmNewer ? { confirmNewer } : {}),
           }),
       ),
-    onSuccess: () => {
+    onSuccess: (_entry, { chosen }) => {
       // 13's latest decision and history, the lists of ideas and the dashboard.
       void queryClient.invalidateQueries({ queryKey: ideaKey(idea.id) });
       void queryClient.invalidateQueries({
@@ -308,7 +310,9 @@ function DecisionBody({ home }: { home: ValidationHome }) {
       ToastQueue.neutral(t("validation:decision.recorded"), {
         timeout: TOAST_MS,
       });
-      if (isOpen.current) toHome();
+      if (!isOpen.current) return;
+      if (chosen === "proceed") setAsksPlan(true);
+      else toHome();
     },
     onError: (error) => {
       const latest = newerOf(error);
@@ -446,6 +450,25 @@ function DecisionBody({ home }: { home: ValidationHome }) {
           )}
         </Stack>
       </FocusPattern>
+      {asksPlan && (
+        <AlertDialog
+          isOpen
+          variant="confirmation"
+          size="S"
+          title={t("validation:decision.planPrompt.title")}
+          primaryActionLabel={t("validation:decision.planPrompt.create")}
+          cancelLabel={t("validation:decision.planPrompt.later")}
+          onPrimaryAction={() =>
+            // M5 over 13: Cancel there leaves 13, not this form again (6.5「Later（13 へ）」).
+            void navigate({
+              href: `${ideaHref(workspace.id, idea.id)}?modal=create-plan`,
+            })
+          }
+          onCancel={toHome}
+        >
+          {t("validation:decision.planPrompt.body")}
+        </AlertDialog>
+      )}
       {newer !== null && newer.value !== null && (
         <AlertDialog
           isOpen
@@ -494,7 +517,8 @@ export function DecisionSkeleton() {
  * 19 Decision (design-spec 6.5, s19-decision.html): pattern B. What is known so far in a
  * Well (Summary, key numbers, the checks not done, F/A/U, the last decision), then
  * Proceed / Hold / Drop as cards and Why?; Record decision adds it to the decision log
- * and goes back to 13. Owners and Members only; read only for an archived idea.
+ * and goes back to 13, after Proceed asking first whether to create a plan draft (M5).
+ * Owners and Members only; read only for an archived idea.
  */
 export function DecisionScreen({ ideaId }: { ideaId: string }) {
   const { t } = useTranslation(["ideas", "validation"]);

@@ -59,6 +59,8 @@
     "delayIf": "Delay if",
     "stopIf": "Stop if",
     "emptyCondition": "Empty",
-    "openValidation": "Open validation"
+    "openValidation": "Open validation",
+    "openPlan": "Open plan",
+    "openVersion": "Open this version"
   }
 }

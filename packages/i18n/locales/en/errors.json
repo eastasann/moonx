@@ -2,6 +2,7 @@
   "ACCOUNT_SUSPENDED": "This account is suspended",
   "ALREADY_REVERTED": "This was already undone",
   "BUSY": "Something is being changed right now. Try again.",
+  "DECISION_NOT_PROCEED": "The latest decision is no longer Proceed.",
   "INVALID_EMAIL_OR_PASSWORD": "Email or password is incorrect",
   "INVALID_TOKEN": "This link has expired or was already used.",
   "INVITATION_ALREADY_ACCEPTED": "Already accepted",

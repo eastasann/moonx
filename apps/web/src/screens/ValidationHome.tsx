@@ -47,6 +47,7 @@ import {
   DecisionBadge,
   KeyMetrics,
 } from "../components/ideaParts";
+import { CreatePlanDialog } from "../components/PlanDialogs";
 import {
   FailureState,
   NoAccessState,
@@ -55,13 +56,14 @@ import {
 } from "../components/states";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useWorkspace } from "../components/workspace";
+import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
 import {
   decideHref,
   decisionsHref,
   hrefOf,
   ideaHref,
   ideasHref,
+  planHref,
   questionsHref,
   sectionHref,
 } from "../lib/links";
@@ -441,10 +443,12 @@ function DecisionsBlock({ home }: { home: ValidationHome }) {
   );
 }
 
-function PlanRow({ plan }: { plan: PlanSummary }) {
+function PlanRow({ plan, ideaId }: { plan: PlanSummary; ideaId: string }) {
   const { t } = useTranslation(["validation", "common"]);
+  const { workspace } = useWorkspace();
   return (
     <RowListItem
+      href={planHref(workspace.id, ideaId, plan.id)}
       description={
         plan.latestVersion?.name ?? t("validation:home.plans.noVersion")
       }
@@ -467,9 +471,17 @@ function PlanRow({ plan }: { plan: PlanSummary }) {
 /**
  * The idea's plans (design-spec 6.1): their latest version and Go / No-Go; the archived
  * ones counted under them, listed once "Show" is pressed (P1 GET with them). A row opens
- * 20 once it is built.
+ * its 20 (an archived plan's, read only). After Proceed, Add plan opens M5.
  */
-function PlansBlock({ home }: { home: ValidationHome }) {
+function PlansBlock({
+  home,
+  canAddPlan,
+  onAddPlan,
+}: {
+  home: ValidationHome;
+  canAddPlan: boolean;
+  onAddPlan: () => void;
+}) {
   const { t } = useTranslation(["validation", "app"]);
   const [showsArchived, setShowsArchived] = useState(false);
   const archived = useQuery({
@@ -496,11 +508,11 @@ function PlansBlock({ home }: { home: ValidationHome }) {
           {(home.plans.length > 0 || archivedPlans.length > 0) && (
             <RowList aria-label={t("validation:home.plans.title")}>
               {home.plans.map((plan) => (
-                <PlanRow key={plan.id} plan={plan} />
+                <PlanRow key={plan.id} plan={plan} ideaId={home.idea.id} />
               ))}
               {showsArchived &&
                 archivedPlans.map((plan) => (
-                  <PlanRow key={plan.id} plan={plan} />
+                  <PlanRow key={plan.id} plan={plan} ideaId={home.idea.id} />
                 ))}
             </RowList>
           )}
@@ -524,6 +536,11 @@ function PlansBlock({ home }: { home: ValidationHome }) {
             />
           )}
         </>
+      )}
+      {canAddPlan && (
+        <Flex>
+          <Link onPress={onAddPlan}>{t("validation:home.plans.add")}</Link>
+        </Flex>
       )}
     </HubBlock>
   );
@@ -583,8 +600,8 @@ function Header({ home }: { home: ValidationHome }) {
 /**
  * The tools beside the title for the Owners and Members (design-spec 6.1「操作」): Edit
  * summary and AI ▼ while the idea is not archived (6.8: no AI round trip then), and ⋯
- * with Duplicate, and Archive while it is not. Add plan and Update template join with
- * their screens.
+ * with Duplicate, and Archive while it is not. Update template joins with M8 (Step 35);
+ * Add plan is in the Plans block.
  */
 function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {
   const { t } = useTranslation(["validation", "ideas"]);
@@ -621,13 +638,22 @@ function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {
   );
 }
 
-function ValidationHub({ home }: { home: ValidationHome }) {
+function ValidationHub({
+  home,
+  modal,
+}: {
+  home: ValidationHome;
+  modal: string | undefined;
+}) {
   const { t } = useTranslation(["validation"]);
   const { workspace, role } = useWorkspace();
   const navigate = useNavigate();
+  const modals = useModal();
   const [isEditing, setEditing] = useState(false);
   const canWrite = role !== "viewer";
   const canEdit = canWrite && !home.idea.archived;
+  // M5 only after Proceed (design-spec 6.12「M5」, 6.1「操作」).
+  const canAddPlan = canEdit && home.idea.latestDecision === "proceed";
   const blocks: HubBlockSpec[] = [
     { id: "next", column: "main", content: <NextSteps home={home} /> },
     {
@@ -663,7 +689,17 @@ function ValidationHub({ home }: { home: ValidationHome }) {
       column: "aside",
       content: <DecisionsBlock home={home} />,
     },
-    { id: "plans", column: "aside", content: <PlansBlock home={home} /> },
+    {
+      id: "plans",
+      column: "aside",
+      content: (
+        <PlansBlock
+          home={home}
+          canAddPlan={canAddPlan}
+          onAddPlan={() => modals.open("create-plan")}
+        />
+      ),
+    },
   ];
   return (
     <>
@@ -702,6 +738,11 @@ function ValidationHub({ home }: { home: ValidationHome }) {
       {isEditing && canEdit && (
         <ModalBoundary onClose={() => setEditing(false)}>
           <EditSummaryDialog home={home} onClose={() => setEditing(false)} />
+        </ModalBoundary>
+      )}
+      {modal === "create-plan" && canAddPlan && (
+        <ModalBoundary key={modal} onClose={modals.close}>
+          <CreatePlanDialog ideaId={home.idea.id} onClose={modals.close} />
         </ModalBoundary>
       )}
     </>
@@ -755,14 +796,20 @@ export function ValidationHomeSkeleton() {
   );
 }
 
-function ValidationHomeBody({ ideaId }: { ideaId: string }) {
+function ValidationHomeBody({
+  ideaId,
+  modal,
+}: {
+  ideaId: string;
+  modal: string | undefined;
+}) {
   const { me, workspace } = useWorkspace();
   const query = useQuery(validationHomeQuery(ideaId));
   const isSlow = useIsSlow(query.isPending);
   if (query.data !== undefined) {
     // Another workspace's idea under this one's URL (SDD 4章): its role is not this one's.
     return query.data.idea.workspaceId === workspace.id ? (
-      <ValidationHub home={query.data} />
+      <ValidationHub home={query.data} modal={modal} />
     ) : (
       <NoAccessState dashboardHref={dashboardHref(me)} />
     );
@@ -790,7 +837,14 @@ function ValidationHomeBody({ ideaId }: { ideaId: string }) {
  * Decisions and Plans beside them; on a phone Next steps, Checks, F/A/U, Sections,
  * Summary, Decisions, Plans. The header's save state follows Edit summary.
  */
-export function ValidationHomeScreen({ ideaId }: { ideaId: string }) {
+export function ValidationHomeScreen({
+  ideaId,
+  modal,
+}: {
+  ideaId: string;
+  /** The modal open over 13 (SDD 4章 `?modal=`): M5 after Proceed. */
+  modal?: string;
+}) {
   const { t } = useTranslation(["ideas"]);
   const { workspace } = useWorkspace();
   const { data } = useQuery(validationHomeQuery(ideaId));
@@ -829,7 +883,7 @@ export function ValidationHomeScreen({ ideaId }: { ideaId: string }) {
         </Breadcrumbs>
       }
     >
-      <ValidationHomeBody ideaId={ideaId} />
+      <ValidationHomeBody ideaId={ideaId} modal={modal} />
     </WorkspaceFrame>
   );
 }

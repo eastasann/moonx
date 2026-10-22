@@ -268,6 +268,25 @@ export const economicsHref = (
 export const decideHref = (workspaceId: string, ideaId: string) =>
   `${ideaHref(workspaceId, ideaId)}/decide`;
 
+/** What 20's URL may open with (SDD 4章): a saved version, read only. */
+export interface PlanSearch {
+  /** The `plan_version` shown read only. */
+  version?: string;
+}
+
+/** 20 Plan home (SDD 4章), or a saved version of it read only. */
+export const planHref = (
+  workspaceId: string,
+  ideaId: string,
+  planId: string,
+  search: PlanSearch = {},
+) =>
+  `${ideaHref(workspaceId, ideaId)}/plans/${planId}${
+    search.version === undefined
+      ? ""
+      : `?${new URLSearchParams({ version: search.version })}`
+  }`;
+
 /**
  * Where a section of 13 opens (design-spec 6.1「セクションを開く」): 01, 02 and 10 on
  * 11, 03 on 14, 04 on 15, 05 on 17, 06–08 on 18, 09 on 16.
@@ -286,10 +305,10 @@ export function sectionHref(
   return undefined;
 }
 
-/** The screens whose panels are built: PNL-1 on 10–18, PNL-2 on 10, 11 and 13–18. */
+/** The screens whose panels are built: PNL-1 on 10–18 and 20, PNL-2 on 10, 11, 13–18 and 20. */
 const PANEL_SCREENS = {
-  comments: new Set([10, 11, 12, 13, 14, 15, 16, 17, 18]),
-  history: new Set([10, 11, 13, 14, 15, 16, 17, 18]),
+  comments: new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 20]),
+  history: new Set([10, 11, 13, 14, 15, 16, 17, 18, 20]),
 };
 
 /**
@@ -386,6 +405,10 @@ function screenHrefOf(target: LinkTarget): string | undefined {
           });
     case 19:
       return ideaId === undefined ? undefined : decideHref(workspaceId, ideaId);
+    case 20:
+      return ideaId === undefined || target.planId === undefined
+        ? undefined
+        : planHref(workspaceId, ideaId, target.planId);
     default:
       return undefined;
   }

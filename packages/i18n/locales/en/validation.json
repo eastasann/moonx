@@ -235,7 +235,8 @@
       "archived_one": "{{count}} archived plan",
       "archived_other": "{{count}} archived plans",
       "show": "Show",
-      "archivedBadge": "Archived"
+      "archivedBadge": "Archived",
+      "add": "Add plan"
     },
     "recordDecision": "Record decision"
   },
@@ -578,6 +579,12 @@
       "body": "Both decisions stay in the log, and yours becomes the latest.",
       "record": "Record mine",
       "cancel": "Cancel"
+    },
+    "planPrompt": {
+      "title": "Create a plan draft?",
+      "body": "Proceed is recorded. A draft copies your validation's answers into a Business Plan, which you can also start later from the idea's Plans.",
+      "create": "Create draft",
+      "later": "Later"
     }
   }
 }

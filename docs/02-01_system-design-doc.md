@@ -975,7 +975,7 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | ワークスペース（5.5） | | | | |
 | W0 | POST | `/api/v1/workspaces` | ログイン | M7 |
 | W1 | GET / PATCH | `/api/v1/workspaces/{workspaceId}` | O,M,V / O | 9・M7 |
-| W2 | GET | `/api/v1/workspaces/{workspaceId}/members` | O,M,V | 9・22 |
+| W2 | GET | `/api/v1/workspaces/{workspaceId}/members` | O,M,V | 9・20・22 |
 | W3 | PATCH / DELETE | `/api/v1/workspaces/{workspaceId}/members/{userId}` | O（DELETE は本人も。`userId` に `me`） | 4・9 |
 | W4 | GET / POST | `/api/v1/workspaces/{workspaceId}/invitations` | O | 9 |
 | W5 | POST | `/api/v1/invitations/{invitationId}/resend` | O・Admin | 9・28 |
@@ -1022,12 +1022,12 @@ interface ConflictCurrent { value: unknown; lockVersion: number; updatedAt: Date
 | P1 | GET / POST | `/api/v1/ideas/{ideaId}/plans` | O,M,V / O,M | 13・20・M5 |
 | P2 | GET / PATCH | `/api/v1/plans/{planId}` | O,M,V / O,M | 20 |
 | P3 | POST | `/api/v1/plans/{planId}/archive`・`/restore` | O,M | 20 |
-| P4 | GET | `/api/v1/plans/{planId}/items/{itemNo}` | O,M,V | 21 |
+| P4 | GET | `/api/v1/plans/{planId}/items/{itemNo}` | O,M,V | 20・21 |
 | P5 | PUT | `/api/v1/plans/{planId}/answers/{questionKey}` | O,M | 21 |
 | P6 | GET / POST | `/api/v1/plans/{planId}/versions` | O,M,V / O,M | 20・M3 |
 | P7 | GET | `/api/v1/plans/{planId}/go-no-go-context` | O,M | M4 |
 | P8 | POST | `/api/v1/plans/{planId}/go-no-go` | O,M | M4 |
-| P9 | GET / POST | `/api/v1/plans/{planId}/execution-items` | O,M,V / O,M | 21・22 |
+| P9 | GET / POST | `/api/v1/plans/{planId}/execution-items` | O,M,V / O,M | 20・21・22 |
 | P10 | PATCH / DELETE | `/api/v1/execution-items/{itemId}` | O,M | 21・22 |
 | P11 | PUT | `/api/v1/plans/{planId}/execution-items/order` | O,M | 22 |
 | P12 | GET | `/api/v1/plans/{planId}/pitch-deck` | O,M,V | 23 |

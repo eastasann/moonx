@@ -6,8 +6,10 @@ import {
   MenuItem as AriaMenuItem,
   type MenuItemProps as AriaMenuItemProps,
   type MenuProps as AriaMenuProps,
+  MenuSection as AriaMenuSection,
   MenuTrigger as AriaMenuTrigger,
   type MenuTriggerProps as AriaMenuTriggerProps,
+  Header,
   Text,
 } from "react-aria-components";
 import { useTranslation } from "react-i18next";
@@ -111,6 +113,27 @@ export function MenuItem({
         )}
       </span>
     </AriaMenuItem>
+  );
+}
+
+export interface MenuSectionProps {
+  /** The heading over its items ("Archived"), which also names the group. */
+  title: string;
+  /** `MenuItem`s. */
+  children: ReactNode;
+}
+
+/**
+ * A group of a `Menu`'s items under a heading (Spectrum's MenuSection): 20's plan switch
+ * puts the archived plans under "Archived" (design-spec 6.12).
+ */
+export function MenuSection({ title, children }: MenuSectionProps) {
+  const size = useContext(MenuSizeContext);
+  return (
+    <AriaMenuSection className={styles.section}>
+      <Header className={styles.sectionHeader[size]}>{title}</Header>
+      {children}
+    </AriaMenuSection>
   );
 }
 

@@ -267,11 +267,41 @@ describe("19 Decision (design-spec 6.5)", () => {
         confirmNewer: true,
       }),
     );
+    // Proceed recorded: Later leaves for 13 without a draft (design-spec 6.5).
+    const prompt = await screen.findByRole("alertdialog", {
+      name: "Create a plan draft?",
+    });
+    await user.click(within(prompt).getByRole("button", { name: "Later" }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(
         `/w/${workspaceId}/ideas/${home.idea.id}`,
       ),
     );
+    expect(router.state.location.search).toEqual({});
+  });
+
+  test("Proceed asks for a plan draft first: Create draft opens M5 over 13", async () => {
+    const user = userEvent.setup();
+    decisionApi();
+    const router = renderApp(base);
+    await screen.findByText("Healthy bowls for office lunches.");
+    await user.click(screen.getByRole("radio", { name: /Proceed/ }));
+    await user.type(screen.getByRole("textbox", { name: /Why\?/ }), "Go.");
+    await user.click(screen.getByRole("button", { name: "Record decision" }));
+    const prompt = await screen.findByRole("alertdialog", {
+      name: "Create a plan draft?",
+    });
+    // 19 stays until the answer.
+    expect(router.state.location.pathname).toBe(base);
+    await user.click(
+      within(prompt).getByRole("button", { name: "Create draft" }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/w/${workspaceId}/ideas/${home.idea.id}`,
+      ),
+    );
+    expect(router.state.location.search).toEqual({ modal: "create-plan" });
   });
 
   test("a failed record keeps the input and offers Retry", async () => {

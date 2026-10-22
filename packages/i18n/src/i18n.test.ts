@@ -50,6 +50,7 @@ test("the shared instance is ready on import", () => {
     "notifications",
     "panels",
     "pitch",
+    "plans",
     "selfAnalysis",
     "settings",
     "validation",

@@ -5,6 +5,7 @@ import {
   decisionsHref,
   hrefOf,
   notificationsHref,
+  planHref,
   researchHref,
   sectionHref,
 } from "./links";
@@ -139,6 +140,39 @@ describe("the routes of the screens the API names (SDD 4章・5.2 LinkTarget)", 
       hrefOf({ screen: 18, workspaceId, ideaId, questionKey: "V.08.WORTH" }),
     ).toBe(`${idea}/economics?q=V.08.WORTH`);
     expect(hrefOf({ screen: 19, workspaceId, ideaId })).toBe(`${idea}/decide`);
+  });
+
+  test("20 on a plan or a saved version of it; 21 not yet", () => {
+    const planId = "2b3c4d5e-0000-4000-8000-000000000001";
+    const versionId = "2b3c4d5e-0000-4000-8000-000000000002";
+    expect(hrefOf({ screen: 20, workspaceId, ideaId, planId })).toBe(
+      `${idea}/plans/${planId}`,
+    );
+    expect(hrefOf({ screen: 20, workspaceId, ideaId })).toBeUndefined();
+    expect(planHref(workspaceId, ideaId, planId, { version: versionId })).toBe(
+      `${idea}/plans/${planId}?version=${versionId}`,
+    );
+    // 21 comes with Step 34b: no way into it before it exists.
+    expect(
+      hrefOf({
+        screen: 21,
+        workspaceId,
+        ideaId,
+        planId,
+        itemNo: 1,
+        questionKey: "P.01.1",
+      }),
+    ).toBeUndefined();
+    expect(
+      hrefOf({
+        screen: 20,
+        workspaceId,
+        ideaId,
+        planId,
+        panel: "comments",
+        target: { type: "idea", id: ideaId },
+      }),
+    ).toBe(`${idea}/plans/${planId}?panel=comments&target=idea%3A${ideaId}`);
   });
 
   test("13's sections: 01, 02 and 10 on 11, 03 on 14, 04 on 15, 05 on 17, 06–08 on 18, 09 on 16", () => {

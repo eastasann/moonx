@@ -1,0 +1,154 @@
+{
+  "home": {
+    "plans": "Plans of {{idea}}",
+    "switchPlan": "Switch plan",
+    "archivedGroup": "Archived",
+    "addPlan": "Add plan",
+    "plansRetry": "Couldn't load the plans. Try again",
+    "version": "Version: {{name}}",
+    "versionChanged": "Version: {{name}} + changes",
+    "noVersion": "No version saved",
+    "updated": "Updated {{date}}",
+    "saved": "Saved {{date}}",
+    "businessName": "Business Name",
+    "preparedBy": "Prepared by",
+    "headerLine": "{{label}}: {{value}}",
+    "empty": "Empty",
+    "headerNoun": "plan header",
+    "latestDecision": "Latest decision is {{value}}.",
+    "archived": "This plan is archived",
+    "restore": "Restore",
+    "viewing": "Viewing {{name}} (read only)",
+    "showLatest": "Show the latest",
+    "startWith": "Start with the items marked [V]. They already have your validation data.",
+    "saveVersion": "Save version",
+    "recordGoNoGo": "Record Go / No-Go",
+    "more": "More for {{name}}",
+    "rename": "Rename plan",
+    "archive": "Archive plan",
+    "keyNumbers": {
+      "title": "Key numbers",
+      "fromValidation": "From validation",
+      "fromVersion": "As saved in this version",
+      "edit": "Edit in validation",
+      "open": "Open in validation"
+    },
+    "goNoGo": {
+      "title": "Go / No-Go",
+      "none": "Not recorded yet",
+      "seeAll": "See all Go / No-Go decisions"
+    },
+    "versions": {
+      "title": "Versions",
+      "none": "No versions saved yet",
+      "meta": "{{date}} · {{name}}",
+      "viewing": "Viewing"
+    },
+    "execution": {
+      "title": "Execution",
+      "dueSoon_one": "{{count}} item due in the next 7 days",
+      "dueSoon_other": "{{count}} items due in the next 7 days",
+      "overdue_one": "{{count}} item overdue",
+      "overdue_other": "{{count}} items overdue",
+      "nothingDue": "Nothing due in the next 7 days"
+    },
+    "part": {
+      "a": "Part A: Business Case",
+      "b": "Part B: Execution Plan",
+      "complete": "{{complete}} / {{total}}"
+    },
+    "item": "{{no}} {{title}}",
+    "filled": "{{filled}}/{{total}}",
+    "mark": {
+      "V": "V",
+      "S": "S",
+      "VName": "Uses your validation",
+      "SName": "Refers to shared self analyses"
+    }
+  },
+  "create": {
+    "title": "Create plan draft",
+    "body": "The draft copies your validation's answers where the plan asks the same, and starts the execution lists from the template.",
+    "name": "Plan name",
+    "create": "Create draft",
+    "cancel": "Cancel"
+  },
+  "rename": {
+    "title": "Rename plan",
+    "name": "Plan name",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "version": {
+    "title": "Save version",
+    "body": "Keeps the plan as it is now, read only, to look back on or to show as a Pitch Deck.",
+    "name": "Version name",
+    "save": "Save version",
+    "cancel": "Cancel",
+    "saved": "{{name}} saved"
+  },
+  "goNoGo": {
+    "title": "Record Go / No-Go",
+    "conditions": "Conditions",
+    "launchIf": "We proceed to launch if",
+    "delayIf": "We delay if",
+    "stopIf": "We stop / abandon if",
+    "empty": "Empty",
+    "keyNumbers": "Key numbers",
+    "version": "Version",
+    "noVersion": "No version saved",
+    "changes": "The plan has changed since {{name}} was saved. Save a version first?",
+    "saveFirst": "Save a version",
+    "question": "Go / No-Go",
+    "why": "Why?",
+    "cancel": "Cancel",
+    "record": "Record",
+    "recorded": "Go / No-Go recorded"
+  },
+  "header": {
+    "name": "Plan name",
+    "businessName": "Business Name",
+    "preparedBy": "Prepared by"
+  },
+  "execution": {
+    "assignee": "Assignee",
+    "status": "Status",
+    "field": {
+      "milestone": {
+        "title": "Milestone",
+        "goal": "Goal",
+        "dueDate": "Deadline",
+        "exitCondition": "Exit Condition"
+      },
+      "launch": {
+        "title": "Timing",
+        "launchTiming": "Phase",
+        "dueDate": "Date",
+        "actions": "Actions",
+        "completionCriteria": "Completion Criteria"
+      },
+      "kpi": {
+        "title": "KPI",
+        "kpiArea": "Area",
+        "kpiTarget": "Target",
+        "kpiReviewFrequency": "Review Frequency",
+        "kpiActual": "Actual"
+      },
+      "open_question": {
+        "title": "Open Question",
+        "whyItMatters": "Why It Matters",
+        "dueDate": "Target Date",
+        "answer": "Answer"
+      },
+      "next_action": {
+        "title": "Action",
+        "dueDate": "Deadline"
+      }
+    },
+    "formerMember": "A former member"
+  },
+  "table": {
+    "cell": "{{label}}: {{value}}",
+    "emptyRow": "Empty row"
+  }
+}

@@ -1,5 +1,5 @@
 import type { Me, Role } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
@@ -287,6 +287,69 @@ describe("13 Validation home (design-spec 6.1)", () => {
         ),
       ).toBe(true),
     );
+  });
+});
+
+describe("13's plans (design-spec 6.1・6.12)", () => {
+  const proceeded = {
+    ...validationHome({ latestDecision: "proceed" }),
+    plans: [
+      {
+        id: "3d6f0a2c-5b1e-4c8d-9a7f-2e4b6c8d0a1f",
+        name: "Plan A",
+        archived: false,
+        latestVersion: null,
+        hasChangesSinceVersion: false,
+        latestGoNoGo: null,
+      },
+    ],
+  };
+
+  test("a plan opens its 20; after Proceed, Add plan opens M5 over 13", async () => {
+    const user = userEvent.setup();
+    homeApi({ data: proceeded });
+    const router = renderApp(path);
+    const plans = await screen.findByRole("list", { name: "Plans" });
+    expect(
+      within(plans)
+        .getByRole("link", { name: /Plan A/ })
+        .getAttribute("href"),
+    ).toBe(`${path}/plans/3d6f0a2c-5b1e-4c8d-9a7f-2e4b6c8d0a1f`);
+    expect(within(plans).getByText("No version saved")).toBeTruthy();
+    await user.click(screen.getByRole("link", { name: "Add plan" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        modal: "create-plan",
+      }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Create plan draft" }),
+    ).toBeTruthy();
+  });
+
+  test("no Add plan before Proceed, nor for a Viewer", async () => {
+    homeApi();
+    renderApp(path);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Bacolod Health Bowl",
+    });
+    expect(screen.queryByRole("link", { name: "Add plan" })).toBeNull();
+    cleanup();
+    vi.unstubAllGlobals();
+    homeApi({ me: as("viewer"), data: proceeded });
+    renderApp(path);
+    await screen.findAllByRole("list", { name: "Plans" });
+    expect(screen.queryByRole("link", { name: "Add plan" })).toBeNull();
+    // A Viewer opening M5's URL gets nothing (6.0.6: no way to act).
+    cleanup();
+    vi.unstubAllGlobals();
+    homeApi({ me: as("viewer"), data: proceeded });
+    renderApp(`${path}?modal=create-plan`);
+    await screen.findAllByRole("list", { name: "Plans" });
+    expect(
+      screen.queryByRole("dialog", { name: "Create plan draft" }),
+    ).toBeNull();
   });
 });
 

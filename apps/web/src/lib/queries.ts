@@ -262,6 +262,69 @@ export const archivedPlansQuery = (ideaId: string) =>
       ),
   });
 
+/** What is cached of one plan, under its idea's: the plan is read again with the idea. */
+export const planKey = (ideaId: string, planId: string) => [
+  ...ideaKey(ideaId),
+  "plans",
+  planId,
+];
+
+/** P2 GET: 20 Plan home, or a saved version of it read only (SDD 5.9). */
+export const planHomeQuery = (
+  ideaId: string,
+  planId: string,
+  versionId?: string,
+) =>
+  queryOptions({
+    queryKey: [...planKey(ideaId, planId), "home", versionId ?? null],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.plans({ planId: inPath(planId) })
+          .get({ query: versionId === undefined ? {} : { versionId } }),
+      ),
+  });
+
+/**
+ * P4: one plan item (21) as the plan has it now. 20's history panel reads the items whose
+ * table answers it lists, for the names and kinds of their columns.
+ */
+export const planItemQuery = (ideaId: string, planId: string, itemNo: number) =>
+  queryOptions({
+    queryKey: [...planKey(ideaId, planId), "items", itemNo],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.plans({ planId: inPath(planId) })
+          .items({ itemNo: String(itemNo) })
+          .get({ query: {} }),
+      ),
+  });
+
+/** P9 GET: the plan's execution items, by type in 22's order (SDD 5.9). */
+export const executionItemsQuery = (ideaId: string, planId: string) =>
+  queryOptions({
+    queryKey: [...planKey(ideaId, planId), "execution"],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.plans({ planId: inPath(planId) })
+          ["execution-items"].get({ query: {} }),
+      ),
+  });
+
+/** P7: what M4 records a Go / No-Go on (SDD 5.9). */
+export const goNoGoContextQuery = (ideaId: string, planId: string) =>
+  queryOptions({
+    queryKey: [...planKey(ideaId, planId), "go-no-go"],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.plans({ planId: inPath(planId) })
+          ["go-no-go-context"].get(),
+      ),
+  });
+
 /** V2: a validation section's questions, one answer per question (SDD 5.7). */
 export const validationQuestionsQuery = (
   ideaId: string,

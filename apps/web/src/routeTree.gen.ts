@@ -40,6 +40,7 @@ import { Route as SignedInWWorkspaceIdIdeasIdeaIdDecideRouteImport } from './rou
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdEconomicsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/economics'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdResearchRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/research'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/questions.$sectionKey'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -215,6 +216,12 @@ const SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute =
     path: '/ideas/$ideaId/questions/$sectionKey',
     getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
   } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport.update({
+    id: '/ideas/$ideaId/plans/$planId/',
+    path: '/ideas/$ideaId/plans/$planId/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -247,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId/': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -278,6 +286,7 @@ export interface FileRoutesByTo {
   '/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -312,6 +321,7 @@ export interface FileRoutesById {
   '/_signedIn/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -346,6 +356,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId/'
     | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -377,6 +388,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId'
     | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId'
   id:
     | '__root__'
     | '/'
@@ -410,6 +422,7 @@ export interface FileRouteTypes {
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/research'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -641,6 +654,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport
       parentRoute: typeof SignedInWWorkspaceIdRouteRoute
     }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/'
+      path: '/ideas/$ideaId/plans/$planId'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId/'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
   }
 }
 
@@ -662,6 +682,7 @@ interface SignedInWWorkspaceIdRouteRouteChildren {
   SignedInWWorkspaceIdIdeasIdeaIdResearchRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   SignedInWWorkspaceIdIdeasIdeaIdIndexRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
 }
 
 const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChildren =
@@ -694,6 +715,8 @@ const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChil
       SignedInWWorkspaceIdIdeasIdeaIdIndexRoute,
     SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute:
       SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute,
   }
 
 const SignedInWWorkspaceIdRouteRouteWithChildren =

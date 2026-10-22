@@ -328,6 +328,11 @@ test.describe("on a phone", () => {
       page.getByRole("heading", { level: 1, name: "Workspace Settings" }),
     ).toBeVisible();
     await expect(page.getByRole("list", { name: "Members" })).toBeVisible();
+    // The tray closes with an animation over the tab bar: the page is checked once it
+    // has gone (axe found the tabs covered while it faded).
+    await expect(
+      page.getByRole("menuitem", { name: "Workspace Settings" }),
+    ).toHaveCount(0);
     await expectNoAxeViolations(page);
 
     // The header's ← More opens the menu again (design-spec 6.0.1), on 9 and on 4.

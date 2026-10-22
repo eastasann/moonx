@@ -45,7 +45,14 @@ import {
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
-import { hrefOf, ideaHref, ideasHref, settingsHref } from "../lib/links";
+import {
+  hrefOf,
+  ideaHref,
+  ideasHref,
+  selfAnalysisHref,
+  settingsHref,
+  teamHref,
+} from "../lib/links";
 import {
   dashboardActivityQuery,
   dashboardDueSoonQuery,
@@ -209,8 +216,7 @@ function IdeaRow({
 /**
  * In the Ideas block's place while the workspace has no idea, dropped ones included
  * (design-spec 6.9): the first steps for those who may take them, one line for a Viewer.
- * Inviting opens 9 and the first idea M1; the self analysis becomes a way in when 10 is
- * built.
+ * The self analysis opens 10, inviting 9 and the first idea M1.
  */
 export function GettingStarted({
   onFirstIdea,
@@ -235,7 +241,9 @@ export function GettingStarted({
         {t("dashboard:gettingStarted.lead")}
       </Text>
       <RowList ordered aria-label={t("dashboard:gettingStarted.title")}>
-        <RowListItem>{t("dashboard:gettingStarted.selfAnalysis")}</RowListItem>
+        <RowListItem href={selfAnalysisHref(workspace.id)}>
+          {t("dashboard:gettingStarted.selfAnalysis")}
+        </RowListItem>
         {role === "owner" && (
           <RowListItem href={settingsHref(workspace.id)}>
             {t("dashboard:gettingStarted.invite")}
@@ -362,6 +370,7 @@ function SelfAnalysesBlock({
             {items.map(({ user, shared, status }) => (
               <RowListItem
                 key={user.id}
+                href={shared ? teamHref(workspaceId, user.id) : undefined}
                 start={<Avatar name={user.displayName} src={user.avatarUrl} />}
                 end={
                   shared && status !== null ? (

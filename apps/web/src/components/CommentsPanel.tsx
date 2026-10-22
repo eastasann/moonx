@@ -19,11 +19,17 @@ import {
   type MentionCandidate,
   MentionTextArea,
   MenuItem,
+  Picker,
   Skeleton,
   Stack,
   Text,
 } from "@moonx/ui-web";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type QueryKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -39,7 +45,6 @@ import {
 import {
   commentsKey,
   commentsQuery,
-  ideaKey,
   mentionCandidatesQuery,
 } from "../lib/queries";
 import { isSessionLost } from "../lib/send";
@@ -58,9 +63,23 @@ export interface ScreenComments {
   screen: ScreenTarget;
   /**
    * The idea the screen is inside: its comments list with the screen's, and a new thread
-   * from the header's 💬 goes on it (design-spec 6.0.1). Archived, it is read-only.
+   * from the header's 💬 goes on it (design-spec 6.0.1). Archived, it is read-only. None
+   * outside an idea (10–12), whose header list takes no new thread.
    */
-  idea: { id: string; name: string; archived: boolean };
+  idea?: { id: string; name: string; archived: boolean };
+  /**
+   * The screen's data that counts the comments of its items (`ideaKey`, or the
+   * self-analysis's): read again after each write, with the threads.
+   */
+  dataKey: QueryKey;
+  /**
+   * The owner's own self-analysis (10, 11, their own row on 12): its threads come from
+   * every workspace it is shared with (`shares`), each saying which and replied to there.
+   * A new thread goes to the workspace open now while it is one of them, else to the one
+   * chosen of them: C1 POST takes a self-analysis's comments in those only (design-spec
+   * 6.0.4).
+   */
+  fromWorkspaces?: { shares: readonly { id: string; name: string }[] };
   /**
    * Whether the screen shows `item`, so its panel may open on it: a `target` for another
    * screen's item, or an item this one does not hold, opens nothing (SDD 4章). Items the
@@ -79,7 +98,7 @@ export function screenAccepts(
   if (target.kind === "screen")
     return sameScreen(target.screen, comments.screen);
   if (target.item.type === "idea") {
-    return target.item.id === comments.idea.id && target.item.key == null;
+    return target.item.id === comments.idea?.id && target.item.key == null;
   }
   return comments.shows(target.item);
 }
@@ -95,15 +114,15 @@ const commentTarget = (target: TargetRef) => ({
 const asCandidates = (people: readonly UserRef[]): MentionCandidate[] =>
   people.map(({ id, displayName }) => ({ id, name: displayName }));
 
-/** Every list of threads and every count of the idea's items read again after a write. */
-function useCommentsChanged(ideaId: string) {
+/** Every list of threads and the counts of the screen's items read again after a write. */
+function useCommentsChanged(dataKey: QueryKey) {
   const queryClient = useQueryClient();
   // Awaited by the writes, which stay pending until the threads are read again: a second
   // press of Resolve then acts on the thread as it is now.
   return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: commentsKey }),
-      queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) }),
+      queryClient.invalidateQueries({ queryKey: dataKey }),
     ]);
 }
 
@@ -173,6 +192,7 @@ function PostFailure({
  */
 function CommentBox({
   label,
+  workspaceId,
   target,
   initial,
   submitLabel,
@@ -183,7 +203,9 @@ function CommentBox({
   autoFocus = false,
 }: {
   label: string;
-  /** What the comment is on: who it can mention depends on it (W8). */
+  /** The workspace the comment goes to: who it can mention depends on it (W8). */
+  workspaceId: string;
+  /** What the comment is on: who it can mention depends on it too. */
   target: TargetRef;
   /** An edit starts from the comment's words and mentions. */
   initial?: { body: string; mentions: MentionCandidate[] };
@@ -196,14 +218,20 @@ function CommentBox({
   autoFocus?: boolean;
 }) {
   const { t } = useTranslation(["panels", "app"]);
-  const { workspace } = useWorkspace();
   const isOnline = useIsOnline();
   const [text, setText] = useState(initial?.body ?? "");
   const [mentions, setMentions] = useState<MentionCandidate[]>(
     initial?.mentions ?? [],
   );
+  // Mentions are of the workspace the comment goes to: another one ("Post to") drops
+  // them, as its people differ (W8).
+  const [mentionsIn, setMentionsIn] = useState(workspaceId);
+  if (mentionsIn !== workspaceId) {
+    setMentionsIn(workspaceId);
+    setMentions([]);
+  }
   const candidates = useQuery(
-    mentionCandidatesQuery(workspace.id, commentTarget(target)),
+    mentionCandidatesQuery(workspaceId, commentTarget(target)),
   );
   const post = useMutation({
     mutationFn: () =>
@@ -307,20 +335,20 @@ const commentCalls = (commentId: string) => {
 function CommentEntry({
   comment,
   canWrite,
-  ideaId,
+  dataKey,
   onArchived,
   children,
 }: {
   comment: Comment;
   canWrite: boolean;
-  ideaId: string;
+  dataKey: QueryKey;
   onArchived: () => void;
   /** Under its words: a root's replies and the thread's actions. */
   children?: ReactNode;
 }) {
   const { t } = useTranslation(["panels", "app"]);
   const { me } = useWorkspace();
-  const changed = useCommentsChanged(ideaId);
+  const changed = useCommentsChanged(dataKey);
   const [isEditing, setEditing] = useState(false);
   const [isDeleting, setDeleting] = useState(false);
   const calls = commentCalls(comment.id);
@@ -376,6 +404,7 @@ function CommentEntry({
         ) : isEditing ? (
           <CommentBox
             label={t("panels:comments.editLabel")}
+            workspaceId={comment.workspace.id}
             target={comment.target}
             initial={{
               body: comment.body,
@@ -425,18 +454,18 @@ function ThreadView({
   thread,
   label,
   canWrite,
-  ideaId,
+  dataKey,
   onArchived,
 }: {
   thread: CommentThread;
   label: string | undefined;
   canWrite: boolean;
-  ideaId: string;
+  dataKey: QueryKey;
   onArchived: () => void;
 }) {
   const { t } = useTranslation(["panels"]);
   const { root, replies } = thread;
-  const changed = useCommentsChanged(ideaId);
+  const changed = useCommentsChanged(dataKey);
   const [isReplying, setReplying] = useState(false);
   const calls = commentCalls(root.id);
   const resolved = root.resolvedAt !== null;
@@ -458,7 +487,7 @@ function ThreadView({
       <CommentEntry
         comment={root}
         canWrite={canWrite}
-        ideaId={ideaId}
+        dataKey={dataKey}
         onArchived={onArchived}
       >
         {replies.map((reply) => (
@@ -466,7 +495,7 @@ function ThreadView({
             key={reply.id}
             comment={reply}
             canWrite={canWrite}
-            ideaId={ideaId}
+            dataKey={dataKey}
             onArchived={onArchived}
           />
         ))}
@@ -483,6 +512,7 @@ function ThreadView({
               label={t("panels:comments.replyTo", {
                 name: root.author.displayName,
               })}
+              workspaceId={root.workspace.id}
               target={root.target}
               submitLabel={t("panels:comments.reply")}
               send={(body, mentionUserIds) =>
@@ -557,7 +587,8 @@ function ThreadView({
 /**
  * PNL-1's content (design-spec 6.0.4): the threads of one item, or of the screen with the
  * comments on its idea (the header's 💬, 6.0.1), oldest first, and a box for a new thread
- * on the item or on the idea. Read-only, with why, while the idea is archived.
+ * on the item or on the idea. Read-only, with why, while the idea is archived. On the
+ * owner's own self-analysis each thread says the workspace it is from (6.0.4).
  */
 export function CommentsPanelBody({
   target,
@@ -566,20 +597,51 @@ export function CommentsPanelBody({
   target: PanelTarget;
   comments: ScreenComments;
 }) {
-  const { t } = useTranslation(["panels"]);
+  const { t } = useTranslation(["panels", "app"]);
   const { me, workspace } = useWorkspace();
-  const changed = useCommentsChanged(comments.idea.id);
+  const { idea, dataKey, fromWorkspaces } = comments;
+  const changed = useCommentsChanged(dataKey);
   const query = useQuery(commentsQuery(workspace.id, target));
   // A write the API refused as archived (the screen did not know): read-only from then on.
   const [refusedArchived, setRefusedArchived] = useState(false);
-  const canWrite = !comments.idea.archived && !refusedArchived;
+  const isArchived = idea?.archived === true || refusedArchived;
+  const canWrite = !isArchived;
   const onArchived = () => setRefusedArchived(true);
-  const newTarget: TargetRef =
+  const newTarget: TargetRef | undefined =
     target.kind === "item"
       ? target.item
-      : { type: "idea", id: comments.idea.id, key: null };
+      : idea === undefined
+        ? undefined
+        : { type: "idea", id: idea.id, key: null };
+  // Where a new thread goes: here, or on the owner's own self-analysis to a workspace it
+  // is shared with, the one open now when it is (6.0.4).
+  const here = { id: workspace.id, name: workspace.name };
+  const destinations =
+    fromWorkspaces === undefined ||
+    fromWorkspaces.shares.some(({ id }) => id === workspace.id)
+      ? [here]
+      : fromWorkspaces.shares;
+  const [chosenId, setChosenId] = useState<string | null>(null);
+  const postIn =
+    destinations.find(({ id }) => id === chosenId) ?? destinations[0];
   const itemLabel =
     target.kind === "item" ? comments.labelOf(target.item) : undefined;
+  /** What heads a thread: its item in a screen's list, and the workspace it is from. */
+  const threadLabel = (thread: CommentThread) => {
+    const parts = [
+      ...(target.kind === "screen"
+        ? [comments.labelOf(thread.root.target)]
+        : []),
+      ...(fromWorkspaces === undefined
+        ? []
+        : [
+            t("panels:comments.fromWorkspace", {
+              workspace: thread.root.workspace.name,
+            }),
+          ]),
+    ].filter((part): part is string => part !== undefined);
+    return parts.length === 0 ? undefined : parts.join(t("app:separator"));
+  };
 
   let threads: ReactNode;
   if (query.isError) {
@@ -610,13 +672,9 @@ export function CommentsPanelBody({
           <Stack key={thread.root.id}>
             <ThreadView
               thread={thread}
-              label={
-                target.kind === "screen"
-                  ? comments.labelOf(thread.root.target)
-                  : undefined
-              }
+              label={threadLabel(thread)}
               canWrite={canWrite}
-              ideaId={comments.idea.id}
+              dataKey={dataKey}
               onArchived={onArchived}
             />
           </Stack>
@@ -627,7 +685,7 @@ export function CommentsPanelBody({
 
   return (
     <Stack gap="space-400">
-      {!canWrite && (
+      {isArchived && (
         <InlineAlert variant="notice">
           {t("panels:comments.archived.idea")}
         </InlineAlert>
@@ -638,28 +696,52 @@ export function CommentsPanelBody({
         </Text>
       )}
       {threads}
-      {canWrite && query.data !== undefined && (
-        <CommentBox
-          label={
-            target.kind === "item"
-              ? t("panels:comments.new")
-              : t("panels:comments.newOnIdea", { idea: comments.idea.name })
-          }
-          target={newTarget}
-          submitLabel={t("panels:comments.post")}
-          send={(body, mentionUserIds) =>
-            unwrap(
-              api().api.v1.comments.post({
-                workspaceId: workspace.id,
-                target: commentTarget(newTarget),
-                body,
-                mentionUserIds,
-              }),
-            ).finally(changed)
-          }
-          onArchived={onArchived}
-        />
-      )}
+      {canWrite &&
+        query.data !== undefined &&
+        newTarget !== undefined &&
+        (postIn === undefined ? (
+          // Shared nowhere: no one could read a thread (6.0.4).
+          <Text variant="body-sm" tone="secondary" elementType="p">
+            {t("panels:comments.noNewThread")}
+          </Text>
+        ) : (
+          <Stack gap="space-100">
+            {postIn.id !== workspace.id && (
+              <Picker
+                label={t("panels:comments.postTo")}
+                items={destinations.map(({ id, name }) => ({
+                  id,
+                  label: name,
+                }))}
+                value={postIn.id}
+                onChange={(id) => setChosenId(id)}
+                size="S"
+                width="full"
+              />
+            )}
+            <CommentBox
+              label={
+                target.kind === "item" || idea === undefined
+                  ? t("panels:comments.new")
+                  : t("panels:comments.newOnIdea", { idea: idea.name })
+              }
+              workspaceId={postIn.id}
+              target={newTarget}
+              submitLabel={t("panels:comments.post")}
+              send={(body, mentionUserIds) =>
+                unwrap(
+                  api().api.v1.comments.post({
+                    workspaceId: postIn.id,
+                    target: commentTarget(newTarget),
+                    body,
+                    mentionUserIds,
+                  }),
+                ).finally(changed)
+              }
+              onArchived={onArchived}
+            />
+          </Stack>
+        ))}
     </Stack>
   );
 }

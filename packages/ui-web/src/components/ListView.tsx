@@ -34,6 +34,12 @@ export interface ListViewProps<T extends object> {
   onSelectionChange?: (keys: Set<Key>) => void;
   /** Shown in place of the items when there are none. */
   renderEmptyState?: () => ReactNode;
+  /**
+   * `selection` keeps the rows that cannot be chosen (`isDisabled`) in the arrow keys'
+   * way, to be read (12's "Not shared"); `all` skips them.
+   * @default "all"
+   */
+  disabledBehavior?: "all" | "selection";
   /** @default "regular" */
   density?: Density;
   /**
@@ -118,11 +124,12 @@ export function ListViewItem({
 }: ListViewItemProps) {
   const list = useContext(ItemContext);
   // A list of rows that act one by one (8: only those that open somewhere) leaves the
-  // others still, without ›.
+  // others still, without ›; so does a row that cannot be chosen (12's "Not shared").
   const isActionable =
-    list.isActionable ||
-    props.href !== undefined ||
-    props.onAction !== undefined;
+    props.isDisabled !== true &&
+    (list.isActionable ||
+      props.href !== undefined ||
+      props.onAction !== undefined);
   return (
     <GridListItem
       {...props}

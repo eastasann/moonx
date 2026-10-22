@@ -562,6 +562,64 @@ describe("ListView", () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
+  test("a row that cannot be chosen has no ›, and is not chosen when pressed", async () => {
+    const user = userEvent.setup();
+    const onSelectionChange = vi.fn();
+    render(
+      <ListView
+        aria-label="Members"
+        items={ideas}
+        selectionMode="single"
+        onSelectionChange={onSelectionChange}
+      >
+        {(idea) => (
+          <ListViewItem
+            id={idea.id}
+            textValue={idea.name}
+            isDisabled={idea.id === "b"}
+          >
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+    );
+    const [first, second] = screen.getAllByRole("row");
+    expect(first?.querySelector("svg")).not.toBeNull();
+    expect(second?.querySelector("svg")).toBeNull();
+    expect(second?.getAttribute("aria-disabled")).toBe("true");
+    await user.click(screen.getByText("Health Bowl"));
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
+  test("disabledBehavior selection: a row that cannot be chosen is still reached by the arrows", async () => {
+    const user = userEvent.setup();
+    const onSelectionChange = vi.fn();
+    render(
+      <ListView
+        aria-label="Members"
+        items={ideas}
+        selectionMode="single"
+        disabledBehavior="selection"
+        onSelectionChange={onSelectionChange}
+      >
+        {(idea) => (
+          <ListViewItem
+            id={idea.id}
+            textValue={idea.name}
+            isDisabled={idea.id === "b"}
+          >
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+    );
+    await user.tab();
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(screen.getAllByRole("row")[1]);
+    await user.keyboard("{Enter}");
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
   test("a row's ⋯ opens its menu without choosing the row; after the ›", async () => {
     const user = userEvent.setup();
     const onSelectionChange = vi.fn();

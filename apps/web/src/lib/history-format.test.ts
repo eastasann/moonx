@@ -207,6 +207,52 @@ describe("fieldChanges", () => {
     ).toEqual([{ label: null, before: "", after: "Ask the BPOs" }]);
   });
 
+  test("a self-analysis answer: its text unnamed, or its reason and amount named as on 11", () => {
+    const answer = (text: string | null, amount: number | null) => ({
+      text,
+      amount,
+    });
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "self_analysis_answer", id, key: "SA.WHY.1" },
+          action: "update",
+          before: answer("To stay", null),
+          after: answer("To stay home", null),
+        }),
+        context,
+      ),
+    ).toEqual([{ label: null, before: "To stay", after: "To stay home" }]);
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "self_analysis_answer", id, key: "SA.INCOME.1" },
+          action: "create",
+          after: answer("Rent and school", 30000.5),
+        }),
+        {
+          ...context,
+          currency: "USD",
+          answerTypeOf: (key) =>
+            key === "SA.INCOME.1" ? "amount_with_reason" : "long_text",
+        },
+      ),
+    ).toEqual([
+      { label: "Why this amount?", before: "", after: "Rent and school" },
+      { label: "Amount", before: "", after: "$30,000.50" },
+    ]);
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "self_analysis_answer", id, key: "SA.INCOME.1" },
+          before: answer("Rent", 30000),
+          after: answer("Rent", 35000),
+        }),
+        context,
+      ),
+    ).toEqual([{ label: "Amount", before: "₱30,000", after: "₱35,000" }]);
+  });
+
   test("a number reads as 18 shows it; a cost as 17 does", () => {
     expect(
       fieldChanges(

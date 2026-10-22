@@ -69,6 +69,7 @@ import {
   sectionHref,
 } from "../lib/links";
 import {
+  ideaKey,
   putSaved,
   validationHomeQuery,
   validationQuestionsQuery,
@@ -617,6 +618,7 @@ export function QuestionFormScreen({
             name: home.idea.name,
             archived: home.idea.archived,
           },
+          dataKey: ideaKey(ideaId),
           shows: (item) =>
             item.type === "validation_answer" &&
             item.id === home.validationId &&

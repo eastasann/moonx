@@ -255,6 +255,11 @@ export type { ChoiceItem } from "./internal/ChoiceListBox";
  */
 export { useTwoColumns } from "./internal/frame";
 /**
+ * Whether the window is at least desktop wide (design-spec 4.3): what a docked panel
+ * narrows, not the window, keeps a list's item on screen (4.1).
+ */
+export { useIsDesktop } from "./internal/useIsDesktop";
+/**
  * Whether the window is narrower than a tablet: a phone, where pattern D edits a row in a
  * sheet instead of the detail (4.1 D「編集はボトムシート」).
  */

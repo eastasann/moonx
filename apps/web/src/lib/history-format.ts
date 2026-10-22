@@ -8,6 +8,7 @@ import {
   i18n,
 } from "@moonx/i18n";
 import type {
+  AnswerType,
   CanReduce,
   CompetitorType,
   Confidence,
@@ -34,7 +35,10 @@ export interface FieldChange {
 
 /** What the words of a change depend on besides the change itself. */
 export interface ChangeContext {
-  /** The workspace's currency (ISO 4217), for amounts. */
+  /**
+   * The currency (ISO 4217) of the amounts: the workspace's, or on 10 and 11 the
+   * self-analysis's own (design-spec 6.11「通貨」).
+   */
   currency: string;
   /** The user's time zone, for a research log entry's date. */
   timeZone: string;
@@ -43,6 +47,11 @@ export interface ChangeContext {
    * 6.0.3): an answer without it shows no F/A/U and takes no evidence.
    */
   hasFau: (questionKey: string) => boolean;
+  /**
+   * The answer type of the self-analysis question `questionKey`, where the screen knows
+   * it: an amount question's text is its reason, named as its field on 11.
+   */
+  answerTypeOf?: (questionKey: string) => AnswerType | undefined;
   /** F/A/U in words, as the screens put it ("Fact · 2 sources"). 4.5 FauPicker. */
   fauLabel: (
     state: FauState,
@@ -159,6 +168,30 @@ function fieldsOf(
               evidenceField(),
             ]
           : []),
+      ];
+    case "self_analysis_answer":
+      // Fields named as on 11 (design-spec 6.0.5): the answer's text has no name; on
+      // Q15–17 the text is the reason, beside the amount.
+      return [
+        {
+          label:
+            context.answerTypeOf?.(entry.target.key ?? "") ===
+            "amount_with_reason"
+              ? i18n.t("selfAnalysis:form.reason")
+              : null,
+          words: (content) => text(content.text),
+        },
+        {
+          label: i18n.t("selfAnalysis:form.amount"),
+          words: (content) => {
+            const amount = number(content.amount);
+            return amount === null
+              ? ""
+              : formatMoney(amount, context.currency, {
+                  cents: !Number.isInteger(amount),
+                });
+          },
+        },
       ];
     case "economics_input": {
       const field = entry.target.key as EconomicsField;
@@ -368,9 +401,9 @@ function fieldsOf(
       ];
     }
     default:
-      // Only the screens of 11 and 13–18 open PNL-2, and their history holds these kinds
-      // (SDD 6.3「画面と節の対応」). Self-analysis answers come with 10 and 11 (Step 33);
-      // the plan's header, answers and execution items with 20 and 21 (Step 34).
+      // Only the screens of 10, 11 and 13–18 open PNL-2, and their history holds these
+      // kinds (SDD 6.3「画面と節の対応」). The plan's header, answers and execution items
+      // come with 20 and 21 (Step 34).
       throw new Error(`No history words for ${type}`);
   }
 }

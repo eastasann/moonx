@@ -87,6 +87,63 @@ export const dashboardSelfAnalysesQuery = (workspaceId: string) =>
       ),
   });
 
+/**
+ * What is cached of the user's own self-analysis (S1, S2): it is theirs in every
+ * workspace (SDD 4章), so its keys name none.
+ */
+export const selfAnalysisKey = ["self-analysis"];
+
+/**
+ * S1 GET: 10's self-analysis, made on the template's latest version the first time it
+ * is read (SDD 5.8). 10 and 11 read it before anything else of it.
+ */
+export const selfAnalysisHomeQuery = () =>
+  queryOptions({
+    queryKey: [...selfAnalysisKey, "home"],
+    queryFn: () => unwrap(api().api.v1.me["self-analysis"].get()),
+  });
+
+/** S2: a section of the self-analysis, one answer per question (SDD 5.8). */
+export const selfAnalysisSectionQuery = (sectionKey: string) =>
+  queryOptions({
+    queryKey: [...selfAnalysisKey, "sections", sectionKey],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.me["self-analysis"].sections({
+            sectionKey: inPath(sectionKey),
+          })
+          .get(),
+      ),
+  });
+
+/** What is cached of the self-analyses shared with a workspace (S6, S7). */
+export const memberSelfAnalysesKey = (workspaceId: string) => [
+  ...workspaceKey(workspaceId),
+  "self-analyses",
+];
+
+/** S6: 12's Owners and Members, and whose self-analysis is shared here. */
+export const memberSelfAnalysesQuery = (workspaceId: string) =>
+  queryOptions({
+    queryKey: [...memberSelfAnalysesKey(workspaceId), "list"],
+    queryFn: () =>
+      unwrap(api().api.v1.workspaces({ workspaceId })["self-analyses"].get()),
+  });
+
+/** S7: one member's self-analysis as shared with the workspace, read only. */
+export const memberSelfAnalysisQuery = (workspaceId: string, userId: string) =>
+  queryOptions({
+    queryKey: [...memberSelfAnalysesKey(workspaceId), "member", userId],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.workspaces({ workspaceId })
+          ["self-analyses"]({ userId: inPath(userId) })
+          .get(),
+      ),
+  });
+
 /** D3: what is overdue or due within the week, the user's own first. */
 export const dashboardDueSoonQuery = (workspaceId: string) =>
   queryOptions({

@@ -131,6 +131,42 @@ describe("8 Notifications (design-spec 6.15)", () => {
     ).toBe(true);
   });
 
+  test("a comment on a member's self analysis opens 12 on them with its thread", async () => {
+    const user = userEvent.setup();
+    const selfAnalysisId = "5a5a5a5a-0000-4000-8000-000000000001";
+    const onShared = notification("a0000000-0000-4000-8000-000000000004", {
+      kind: "comment",
+      title:
+        "Paolo Gonzaga commented on WHY Q1 · Paolo Gonzaga's self-analysis",
+      link: {
+        screen: 12,
+        workspaceId,
+        userId: paolo.id,
+        sectionKey: "WHY",
+        questionKey: "SA.WHY.1",
+        panel: "comments",
+        target: {
+          type: "self_analysis_answer",
+          id: selfAnalysisId,
+          key: "SA.WHY.1",
+        },
+      },
+    });
+    notificationsApi({ items: [onShared] });
+    const router = renderApp("/notifications");
+    const list = await screen.findByRole("grid", { name: "Notifications" });
+    await user.click(within(list).getByText(onShared.title));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/w/${workspaceId}/team/${paolo.id}`,
+      ),
+    );
+    expect(router.state.location.search).toMatchObject({
+      panel: "comments",
+      target: `self_analysis_answer:${selfAnalysisId}:SA.WHY.1`,
+    });
+  });
+
   test("one the user can no longer read says so and stays", async () => {
     const user = userEvent.setup();
     notificationsApi({ items: [gone] });

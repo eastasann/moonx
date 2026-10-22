@@ -1,13 +1,13 @@
 import type { ImportContext, TemplateKind } from "@moonx/schemas";
 import { Breadcrumb, Breadcrumbs, Skeleton } from "@moonx/ui-web";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { safeReturnTo } from "../lib/ai";
-import { hrefOf, ideaHref, ideasHref } from "../lib/links";
+import { hrefOf, ideaHref, ideasHref, selfAnalysisHref } from "../lib/links";
 import { importContextQuery, validationHomeQuery } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { useMovesToPersonal } from "./selfAnalysis";
 import {
   FailureState,
   NoAccessState,
@@ -67,30 +67,13 @@ export function AiTargetScreen({
 }) {
   const { t } = useTranslation(["ai", "ideas"]);
   const { me, workspace, role } = useWorkspace();
-  const navigate = useNavigate();
-  const href = useRouterState({ select: (state) => state.location.href });
   const { kind, returnTo } = search;
   // A self-analysis is the user's own and takes no id (X2 refuses one).
   const id = kind === "self_analysis" ? undefined : search.id;
   const isLink =
     kind !== undefined && (kind === "self_analysis" || id !== undefined);
-  const personal = me.memberships.find(
-    ({ workspace: candidate }) => candidate.isPersonal,
-  )?.workspace;
-  const movesToPersonal =
-    kind === "self_analysis" &&
-    role === "viewer" &&
-    personal !== undefined &&
-    personal.id !== workspace.id;
+  const movesToPersonal = useMovesToPersonal(kind === "self_analysis");
   const canEnter = isLink && role !== "viewer";
-
-  useEffect(() => {
-    if (!movesToPersonal || personal === undefined) return;
-    void navigate({
-      href: href.replace(`/w/${workspace.id}`, `/w/${personal.id}`),
-      replace: true,
-    });
-  }, [movesToPersonal, personal, href, workspace.id, navigate]);
 
   // Read afresh on each opening, not from a visit before: 25 compares later reads with
   // this one to tell who changed an answer since it opened (design-spec 6.7 ③). A read
@@ -135,10 +118,10 @@ export function AiTargetScreen({
 
   const homeOf = (target: ImportContext["target"]): Home => {
     if (target.type === "self_analysis") {
-      const selfAnalysis = hrefOf({ screen: 10, workspaceId: workspace.id });
-      return selfAnalysis === undefined
-        ? { href: `/w/${workspace.id}`, label: t("ai:back.dashboard") }
-        : { href: selfAnalysis, label: t("ai:back.selfAnalysis") };
+      return {
+        href: selfAnalysisHref(workspace.id),
+        label: t("ai:back.selfAnalysis"),
+      };
     }
     const validation = ideaHref(workspace.id, target.ideaId ?? "");
     if (target.type === "validation") {
@@ -210,7 +193,6 @@ export function AiTargetScreen({
   // The levels above (6.0.1); one whose screen is not built yet is left out, as no way
   // leads into a screen before it exists (docs/claude-code-prompts.md).
   const target = loaded?.target;
-  const selfAnalysisHref = hrefOf({ screen: 10, workspaceId: workspace.id });
   const planHref =
     target === undefined
       ? undefined
@@ -222,7 +204,7 @@ export function AiTargetScreen({
         });
   return (
     <WorkspaceFrame
-      current={kind === "self_analysis" ? undefined : "ideas"}
+      current={kind === "self_analysis" ? "selfAnalysis" : "ideas"}
       back={home}
       breadcrumbs={
         <Breadcrumbs>
@@ -231,8 +213,8 @@ export function AiTargetScreen({
               {t("ideas:title")}
             </Breadcrumb>
           )}
-          {kind === "self_analysis" && selfAnalysisHref !== undefined && (
-            <Breadcrumb href={selfAnalysisHref}>
+          {kind === "self_analysis" && (
+            <Breadcrumb href={selfAnalysisHref(workspace.id)}>
               {t("ai:crumb.selfAnalysis")}
             </Breadcrumb>
           )}

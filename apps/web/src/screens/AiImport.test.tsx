@@ -676,11 +676,23 @@ describe("25 Import from AI (design-spec 6.7)", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe(ideaHref));
   });
 
-  test("a self-analysis's amount: read with its currency, refused until it reads", async () => {
+  test("a self-analysis's amount: read with its currency, refused until it reads; applied, back to 10", async () => {
     const user = userEvent.setup();
     const calls = importApi({ context: selfAnalysisContext });
-    renderApp(importPath("target=self_analysis"));
+    const router = renderApp(importPath("target=self_analysis"));
     expect(await screen.findByText("Self analysis")).toBeTruthy();
+    // Inside Self Analysis (6.0.1): its crumb, and the navigation's page.
+    const selfAnalysis = `/w/${workspaceId}/self-analysis`;
+    expect(
+      within(screen.getByRole("list", { name: "Breadcrumbs" }))
+        .getByRole("link", { name: "Self Analysis" })
+        .getAttribute("href"),
+    ).toBe(selfAnalysis);
+    expect(
+      screen
+        .getAllByRole("link", { name: "Self Analysis" })
+        .some((link) => link.getAttribute("aria-current") === "page"),
+    ).toBe(true);
     await paste(
       user,
       "## [SA.INCOME.1]\n### Amount\n30k\n\n### Why this amount?\nRent, food and savings.",
@@ -710,6 +722,10 @@ describe("25 Import from AI (design-spec 6.7)", () => {
         },
       ],
     });
+    // Without returnTo, back to the target's home: 10 (SDD 4章).
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(selfAnalysis),
+    );
   });
 
   test("a file: read as UTF-8, refused when larger than 1 MB or not UTF-8", async () => {

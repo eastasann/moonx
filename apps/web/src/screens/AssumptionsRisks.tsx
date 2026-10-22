@@ -59,6 +59,7 @@ import {
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { ItemHistoryButton } from "../components/HistoryPanel";
 import { toastFailure } from "../components/ideaActions";
+import { useKeepShownItem } from "../components/keepShownItem";
 import { ReorderDialog } from "../components/ReorderDialog";
 import { RowEvidence, RowEvidenceSheet } from "../components/RowEvidence";
 import {
@@ -754,8 +755,14 @@ function AssumptionsBody({
   const [deleting, setDeleting] = useState<Row | null>(null);
   const items: Row[] = query.data?.items ?? [];
   const isNew = search.new === 1 && canEdit;
-  const selected =
-    search.row ?? (isTwoColumns && !isNew ? items[0]?.id : undefined);
+  const shownFirst =
+    search.row === undefined && isTwoColumns && !isNew
+      ? items[0]?.id
+      : undefined;
+  const kept = useKeepShownItem(isTwoColumns, shownFirst, search.row, (row) =>
+    onSearch({ ...search, row }),
+  );
+  const selected = search.row ?? shownFirst ?? kept;
 
   // What the screen shows when a delete settles, which may be later: a user who left or
   // moved on meanwhile is not taken back to the list.
@@ -1165,6 +1172,7 @@ export function AssumptionsScreen({
             name: data.idea.name,
             archived: data.idea.archived,
           },
+          dataKey: ideaKey(ideaId),
           shows: (item) => {
             if (item.type !== "assumption" && item.type !== "risk") {
               return false;

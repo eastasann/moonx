@@ -1,20 +1,16 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { IdeaDetail, Me, Workspace } from "@moonx/schemas";
-import {
-  request as apiRequest,
-  type Browser,
-  type Page,
-} from "@playwright/test";
+import type { IdeaDetail, Me } from "@moonx/schemas";
+import type { Browser, Page } from "@playwright/test";
 import { WEB_ORIGIN } from "./env";
 import {
+  type Account,
   test as base,
   DEMO_PASSWORD,
   demo,
   expect,
-  linkMailedTo,
   nextAddress,
-  signUpThroughApi,
-  uniqueEmail,
+  operatorInvited,
+  teamWithMember,
   workspaceOf,
 } from "./fixtures";
 
@@ -23,54 +19,11 @@ import {
 // the test's own account, or in a team workspace the test makes, whose two people are
 // accounts of its own.
 
-/** An account the tests of one worker share. */
-interface Account {
-  email: string;
-  password: string;
-}
-
-/**
- * A user of their own with only a personal workspace, signed up from the operator's
- * invitation without a workspace (AD9): BCDX's Owner sends the other specs' invitations,
- * 20 an hour for the whole run (SDD 7.2), and this spec takes none of them.
- */
-async function operatorInvited(workerIndex: number): Promise<Account> {
-  const operator = await apiRequest.newContext({
-    baseURL: WEB_ORIGIN,
-    extraHTTPHeaders: {
-      Origin: WEB_ORIGIN,
-      "X-Forwarded-For": nextAddress(workerIndex),
-    },
-  });
-  const email = uniqueEmail("collab");
-  try {
-    const signedIn = await operator.post("/api/auth/sign-in/email", {
-      data: { email: demo.operator, password: DEMO_PASSWORD },
-    });
-    expect(signedIn.ok(), await signedIn.text()).toBe(true);
-    const sent = await operator.post("/api/v1/admin/invitations", {
-      data: { email },
-    });
-    expect(sent.status(), await sent.text()).toBe(201);
-    const { link } = (await sent.json()) as { link: string };
-    const token = new URL(link).pathname.replace("/invite/", "");
-    const password = "collab-password-2026";
-    await signUpThroughApi(
-      token,
-      { displayName: "Test Person", password },
-      workerIndex,
-    );
-    return { email, password };
-  } finally {
-    await operator.dispose();
-  }
-}
-
 const test = base.extend<object, { account: Account }>({
   account: [
     // biome-ignore lint/correctness/noEmptyPattern: Playwright reads the fixtures a fixture needs from this pattern, and this one needs none.
     async ({}, use, workerInfo) => {
-      await use(await operatorInvited(workerInfo.workerIndex));
+      await use(await operatorInvited(workerInfo.workerIndex, "collab"));
     },
     { scope: "worker" },
   ],
@@ -116,41 +69,12 @@ async function otherBrowser(browser: Browser, workerIndex: number) {
   return { context, page: await context.newPage() };
 }
 
-/**
- * A team workspace of the page's user (W0) with a second person, signed up from its
- * invitation and in it as a Member (W4, U5, U6), and an idea in it (I1).
- */
+/** A team workspace of the page's user with a second person as a Member, and an idea in it (I1). */
 async function teamWithIdea(page: Page, other: Page, workerIndex: number) {
-  const made = await page.request.post("/api/v1/workspaces", {
-    data: { name: `Collab ${Date.now() % 1_000_000}` },
-    headers: { Origin: WEB_ORIGIN },
+  const workspace = await teamWithMember(page, other, workerIndex, {
+    label: "Collab",
+    displayName: "Bea Cruz",
   });
-  expect(made.status(), await made.text()).toBe(201);
-  const workspace = (await made.json()) as Workspace;
-  const email = uniqueEmail("collab-member");
-  const invited = await page.request.post(
-    `/api/v1/workspaces/${workspace.id}/invitations`,
-    { data: { email, role: "member" }, headers: { Origin: WEB_ORIGIN } },
-  );
-  expect(invited.status(), await invited.text()).toBe(201);
-  const link = await linkMailedTo(email, /https?:\/\/\S+\/invite\/[\w-]+/);
-  const token = link.pathname.replace("/invite/", "");
-  const password = "collab-member-2026";
-  await signUpThroughApi(
-    token,
-    { displayName: "Bea Cruz", password },
-    workerIndex,
-  );
-  const signedIn = await other.request.post("/api/auth/sign-in/email", {
-    data: { email, password },
-    headers: { Origin: WEB_ORIGIN },
-  });
-  expect(signedIn.ok(), await signedIn.text()).toBe(true);
-  const accepted = await other.request.post(
-    `/api/v1/invitations/by-token/${token}/accept`,
-    { data: {}, headers: { Origin: WEB_ORIGIN } },
-  );
-  expect(accepted.ok(), await accepted.text()).toBe(true);
   const created = await page.request.post(
     `/api/v1/workspaces/${workspace.id}/ideas`,
     {

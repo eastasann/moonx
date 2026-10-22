@@ -95,6 +95,26 @@ export const ideasHref = (
   return `/w/${workspaceId}/ideas${query === "" ? "" : `?${query}`}`;
 };
 
+/** 10 Self Analysis (SDD 4章): the user's own, the same in every workspace. */
+export const selfAnalysisHref = (workspaceId: string) =>
+  `/w/${workspaceId}/self-analysis`;
+
+/** 11 Question form of a self-analysis section, focused on `questionKey` (SDD 4章 `?q=`). */
+export const selfAnalysisSectionHref = (
+  workspaceId: string,
+  sectionKey: string,
+  questionKey?: string,
+) =>
+  `${selfAnalysisHref(workspaceId)}/${encodeURIComponent(sectionKey)}${
+    questionKey === undefined
+      ? ""
+      : `?${new URLSearchParams({ q: questionKey })}`
+  }`;
+
+/** 12 Team Self Analyses (SDD 4章), with the member whose self-analysis is open. */
+export const teamHref = (workspaceId: string, userId?: string) =>
+  `/w/${workspaceId}/team${userId === undefined ? "" : `/${userId}`}`;
+
 /** The validation sections 11 asks its questions in (SDD 5.7 V2). */
 const QUESTION_SECTIONS = ["01", "02", "10"] as const;
 
@@ -266,10 +286,10 @@ export function sectionHref(
   return undefined;
 }
 
-/** The screens whose panels are built: PNL-1 and PNL-2 on 11 and 13–18. */
+/** The screens whose panels are built: PNL-1 on 10–18, PNL-2 on 10, 11 and 13–18. */
 const PANEL_SCREENS = {
-  comments: new Set([11, 13, 14, 15, 16, 17, 18]),
-  history: new Set([11, 13, 14, 15, 16, 17, 18]),
+  comments: new Set([10, 11, 12, 13, 14, 15, 16, 17, 18]),
+  history: new Set([10, 11, 13, 14, 15, 16, 17, 18]),
 };
 
 /**
@@ -306,18 +326,31 @@ function screenHrefOf(target: LinkTarget): string | undefined {
       return `/w/${workspaceId}`;
     case 6:
       return ideasHref(workspaceId);
-    case 13:
-      return ideaId === undefined ? undefined : ideaHref(workspaceId, ideaId);
+    case 10:
+      return selfAnalysisHref(workspaceId);
     case 11:
-      // The self-analysis's 11 has no idea; it comes with its own screens.
-      return ideaId === undefined || !isQuestionSection(target.sectionKey)
-        ? undefined
-        : questionsHref(
+      // Without an idea, it is the user's own self-analysis.
+      if (ideaId === undefined) {
+        return target.sectionKey === undefined
+          ? undefined
+          : selfAnalysisSectionHref(
+              workspaceId,
+              target.sectionKey,
+              target.questionKey,
+            );
+      }
+      return isQuestionSection(target.sectionKey)
+        ? questionsHref(
             workspaceId,
             ideaId,
             target.sectionKey,
             target.questionKey,
-          );
+          )
+        : undefined;
+    case 12:
+      return teamHref(workspaceId, target.userId);
+    case 13:
+      return ideaId === undefined ? undefined : ideaHref(workspaceId, ideaId);
     case 14:
       return ideaId === undefined
         ? undefined

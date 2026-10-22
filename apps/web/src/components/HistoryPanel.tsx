@@ -1,5 +1,5 @@
 import { formatRelativeTime } from "@moonx/i18n";
-import type { HistoryEntry } from "@moonx/schemas";
+import type { AnswerType, HistoryEntry } from "@moonx/schemas";
 import {
   ActionButton,
   Avatar,
@@ -32,7 +32,6 @@ import {
   commentsKey,
   historyKey,
   historyPage,
-  ideaKey,
   workspaceKey,
 } from "../lib/queries";
 import { isSessionLost, useSendThrough } from "../lib/send";
@@ -52,6 +51,13 @@ import { dashboardHref, usePanel, useWorkspace } from "./workspace";
 export type ScreenHistory = ScreenComments & {
   /** The template's `hasFau` of a question the screen shows; true where it knows none. */
   hasFau?: (questionKey: string) => boolean;
+  /**
+   * The currency of the screen's amounts: the self-analysis's own on 10 and 11
+   * (design-spec 6.11「通貨」); the workspace's when left out.
+   */
+  currency?: string;
+  /** The answer type of a self-analysis question the screen knows (10, 11). */
+  answerTypeOf?: (questionKey: string) => AnswerType | undefined;
 };
 
 /**
@@ -239,12 +245,13 @@ export function HistoryPanelBody({
     | { id: string; error: unknown; retry: () => void }
     | null
   >(null);
-  const isArchived = history.idea.archived || refusedArchived;
+  const isArchived = history.idea?.archived === true || refusedArchived;
   const canRevert = !isArchived && role !== "viewer";
   const context: ChangeContext = {
-    currency: workspace.currency,
+    currency: history.currency ?? workspace.currency,
     timeZone: me.timezone,
     hasFau: history.hasFau ?? (() => true),
+    answerTypeOf: history.answerTypeOf,
     fauLabel,
   };
   // The screen's own saves are changes too: an open panel lists them as they land.
@@ -258,7 +265,7 @@ export function HistoryPanelBody({
   const changed = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: historyKey }),
-      queryClient.invalidateQueries({ queryKey: ideaKey(history.idea.id) }),
+      queryClient.invalidateQueries({ queryKey: history.dataKey }),
       queryClient.invalidateQueries({ queryKey: commentsKey }),
       queryClient.invalidateQueries({ queryKey: workspaceKey(workspace.id) }),
     ]);
@@ -309,6 +316,11 @@ export function HistoryPanelBody({
     );
   const undoOperation = (entry: HistoryEntry, batchId: string) => {
     if (isCreation(entry)) {
+      const { idea } = history;
+      // Copies and plan drafts are an idea's (SDD 5.11「作成の取り消し」).
+      if (idea === undefined) {
+        throw new Error("A creation's history is an idea's");
+      }
       setFailure(null);
       requestUndo(
         entry.source === "duplicate"
@@ -317,14 +329,14 @@ export function HistoryPanelBody({
               batchId,
               workspaceId: workspace.id,
               // A copy's rows are filed under the copy: the screen's idea is it.
-              ideaId: history.idea.id,
-              name: history.idea.name,
+              ideaId: idea.id,
+              name: idea.name,
             }
           : {
               kind: "plan_draft",
               batchId,
               workspaceId: workspace.id,
-              ideaId: history.idea.id,
+              ideaId: idea.id,
             },
       );
       return;

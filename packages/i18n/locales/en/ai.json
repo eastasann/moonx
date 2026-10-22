@@ -64,8 +64,7 @@
   "back": {
     "validation": "Validation",
     "plan": "Plan",
-    "selfAnalysis": "Self Analysis",
-    "dashboard": "Dashboard"
+    "selfAnalysis": "Self Analysis"
   },
   "crumb": {
     "selfAnalysis": "Self Analysis"

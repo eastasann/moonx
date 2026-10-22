@@ -11,6 +11,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
+  Compass,
   House,
   Lightbulb,
   ScrollText,
@@ -24,6 +25,7 @@ import {
   adminTemplatesHref,
   decisionsHref,
   notificationsHref,
+  selfAnalysisHref,
   settingsHref,
 } from "../lib/links";
 import { commentsQuery, unreadCountQuery } from "../lib/queries";
@@ -53,6 +55,7 @@ export interface WorkspaceFrameProps
   current?:
     | "dashboard"
     | "ideas"
+    | "selfAnalysis"
     | "notifications"
     | "decisions"
     | "settings"
@@ -82,8 +85,9 @@ export interface WorkspaceFrameProps
 
 /**
  * AppFrame for the screens of a workspace, and for 4 and 8, which stand in the one last
- * opened (design-spec 6.0.1・6.16): the workspace, the pages the user may open (9 for an
- * Owner only, 26 Admin for an operator only), Notifications with the unread count,
+ * opened (design-spec 6.0.1・6.16): the workspace, the pages the user may open (Self
+ * Analysis not for a Viewer, 9 for an Owner only, 26 Admin for an operator only),
+ * Notifications with the unread count,
  * Account and Log out in the sidebar's account menu or in More, the header's save state
  * with its Retry, 💬 and 🕘 with their panels, and the offline band. Logging out with
  * unsaved input asks first (5章「共通ナビ」). The pages appear here as their screens are
@@ -127,6 +131,18 @@ export function WorkspaceFrame({
       icon: <Lightbulb />,
       href: `/w/${workspace.id}/ideas`,
     },
+    // A Viewer has no tab for it (5章「Viewer」): their own opens in their personal
+    // workspace.
+    ...(role === "viewer"
+      ? []
+      : [
+          {
+            id: "selfAnalysis",
+            label: t("app:nav.selfAnalysis"),
+            icon: <Compass />,
+            href: selfAnalysisHref(workspace.id),
+          },
+        ]),
     {
       id: "notifications",
       label: t("app:nav.notifications"),

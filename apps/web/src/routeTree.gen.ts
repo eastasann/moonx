@@ -29,6 +29,9 @@ import { Route as SignedInAdminTemplatesVersionsVersionIdRouteImport } from './r
 import { Route as SignedInWWorkspaceIdAiExportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/export'
 import { Route as SignedInWWorkspaceIdAiImportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/import'
 import { Route as SignedInWWorkspaceIdIdeasIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/index'
+import { Route as SignedInWWorkspaceIdSelfAnalysisIndexRouteImport } from './routes/_signedIn/w/$workspaceId/self-analysis/index'
+import { Route as SignedInWWorkspaceIdSelfAnalysisSectionKeyRouteImport } from './routes/_signedIn/w/$workspaceId/self-analysis/$sectionKey'
+import { Route as SignedInWWorkspaceIdTeamChar123UserIdChar125RouteImport } from './routes/_signedIn/w/$workspaceId/team.{-$userId}'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/index'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/competitors'
@@ -146,6 +149,24 @@ const SignedInWWorkspaceIdIdeasIndexRoute =
     path: '/ideas/',
     getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
   } as any)
+const SignedInWWorkspaceIdSelfAnalysisIndexRoute =
+  SignedInWWorkspaceIdSelfAnalysisIndexRouteImport.update({
+    id: '/self-analysis/',
+    path: '/self-analysis/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute =
+  SignedInWWorkspaceIdSelfAnalysisSectionKeyRouteImport.update({
+    id: '/self-analysis/$sectionKey',
+    path: '/self-analysis/$sectionKey',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdTeamChar123UserIdChar125Route =
+  SignedInWWorkspaceIdTeamChar123UserIdChar125RouteImport.update({
+    id: '/team/{-$userId}',
+    path: '/team/{-$userId}',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
 const SignedInWWorkspaceIdIdeasIdeaIdIndexRoute =
   SignedInWWorkspaceIdIdeasIdeaIdIndexRouteImport.update({
     id: '/ideas/$ideaId/',
@@ -214,7 +235,10 @@ export interface FileRoutesByFullPath {
   '/admin/templates/versions/$versionId': typeof SignedInAdminTemplatesVersionsVersionIdRoute
   '/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
+  '/w/$workspaceId/self-analysis/$sectionKey': typeof SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute
+  '/w/$workspaceId/team/{-$userId}': typeof SignedInWWorkspaceIdTeamChar123UserIdChar125Route
   '/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/self-analysis/': typeof SignedInWWorkspaceIdSelfAnalysisIndexRoute
   '/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   '/w/$workspaceId/ideas/$ideaId/costs': typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
@@ -242,7 +266,10 @@ export interface FileRoutesByTo {
   '/admin/templates/versions/$versionId': typeof SignedInAdminTemplatesVersionsVersionIdRoute
   '/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
   '/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
+  '/w/$workspaceId/self-analysis/$sectionKey': typeof SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute
+  '/w/$workspaceId/team/{-$userId}': typeof SignedInWWorkspaceIdTeamChar123UserIdChar125Route
   '/w/$workspaceId/ideas': typeof SignedInWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/self-analysis': typeof SignedInWWorkspaceIdSelfAnalysisIndexRoute
   '/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   '/w/$workspaceId/ideas/$ideaId/costs': typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
@@ -273,7 +300,10 @@ export interface FileRoutesById {
   '/_signedIn/admin/templates/versions/$versionId': typeof SignedInAdminTemplatesVersionsVersionIdRoute
   '/_signedIn/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
   '/_signedIn/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
+  '/_signedIn/w/$workspaceId/self-analysis/$sectionKey': typeof SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute
+  '/_signedIn/w/$workspaceId/team/{-$userId}': typeof SignedInWWorkspaceIdTeamChar123UserIdChar125Route
   '/_signedIn/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
+  '/_signedIn/w/$workspaceId/self-analysis/': typeof SignedInWWorkspaceIdSelfAnalysisIndexRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/costs': typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
@@ -304,7 +334,10 @@ export interface FileRouteTypes {
     | '/admin/templates/versions/$versionId'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
+    | '/w/$workspaceId/self-analysis/$sectionKey'
+    | '/w/$workspaceId/team/{-$userId}'
     | '/w/$workspaceId/ideas/'
+    | '/w/$workspaceId/self-analysis/'
     | '/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/w/$workspaceId/ideas/$ideaId/competitors'
     | '/w/$workspaceId/ideas/$ideaId/costs'
@@ -332,7 +365,10 @@ export interface FileRouteTypes {
     | '/admin/templates/versions/$versionId'
     | '/w/$workspaceId/ai/export'
     | '/w/$workspaceId/ai/import'
+    | '/w/$workspaceId/self-analysis/$sectionKey'
+    | '/w/$workspaceId/team/{-$userId}'
     | '/w/$workspaceId/ideas'
+    | '/w/$workspaceId/self-analysis'
     | '/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/w/$workspaceId/ideas/$ideaId/competitors'
     | '/w/$workspaceId/ideas/$ideaId/costs'
@@ -362,7 +398,10 @@ export interface FileRouteTypes {
     | '/_signedIn/admin/templates/versions/$versionId'
     | '/_signedIn/w/$workspaceId/ai/export'
     | '/_signedIn/w/$workspaceId/ai/import'
+    | '/_signedIn/w/$workspaceId/self-analysis/$sectionKey'
+    | '/_signedIn/w/$workspaceId/team/{-$userId}'
     | '/_signedIn/w/$workspaceId/ideas/'
+    | '/_signedIn/w/$workspaceId/self-analysis/'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/competitors'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/costs'
@@ -525,6 +564,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIndexRouteImport
       parentRoute: typeof SignedInWWorkspaceIdRouteRoute
     }
+    '/_signedIn/w/$workspaceId/self-analysis/': {
+      id: '/_signedIn/w/$workspaceId/self-analysis/'
+      path: '/self-analysis'
+      fullPath: '/w/$workspaceId/self-analysis/'
+      preLoaderRoute: typeof SignedInWWorkspaceIdSelfAnalysisIndexRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/self-analysis/$sectionKey': {
+      id: '/_signedIn/w/$workspaceId/self-analysis/$sectionKey'
+      path: '/self-analysis/$sectionKey'
+      fullPath: '/w/$workspaceId/self-analysis/$sectionKey'
+      preLoaderRoute: typeof SignedInWWorkspaceIdSelfAnalysisSectionKeyRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/team/{-$userId}': {
+      id: '/_signedIn/w/$workspaceId/team/{-$userId}'
+      path: '/team/{-$userId}'
+      fullPath: '/w/$workspaceId/team/{-$userId}'
+      preLoaderRoute: typeof SignedInWWorkspaceIdTeamChar123UserIdChar125RouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
     '/_signedIn/w/$workspaceId/ideas/$ideaId/': {
       id: '/_signedIn/w/$workspaceId/ideas/$ideaId/'
       path: '/ideas/$ideaId'
@@ -590,7 +650,10 @@ interface SignedInWWorkspaceIdRouteRouteChildren {
   SignedInWWorkspaceIdIndexRoute: typeof SignedInWWorkspaceIdIndexRoute
   SignedInWWorkspaceIdAiExportRoute: typeof SignedInWWorkspaceIdAiExportRoute
   SignedInWWorkspaceIdAiImportRoute: typeof SignedInWWorkspaceIdAiImportRoute
+  SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute: typeof SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute
+  SignedInWWorkspaceIdTeamChar123UserIdChar125Route: typeof SignedInWWorkspaceIdTeamChar123UserIdChar125Route
   SignedInWWorkspaceIdIdeasIndexRoute: typeof SignedInWWorkspaceIdIdeasIndexRoute
+  SignedInWWorkspaceIdSelfAnalysisIndexRoute: typeof SignedInWWorkspaceIdSelfAnalysisIndexRoute
   SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
   SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
   SignedInWWorkspaceIdIdeasIdeaIdCostsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
@@ -608,7 +671,13 @@ const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChil
     SignedInWWorkspaceIdIndexRoute: SignedInWWorkspaceIdIndexRoute,
     SignedInWWorkspaceIdAiExportRoute: SignedInWWorkspaceIdAiExportRoute,
     SignedInWWorkspaceIdAiImportRoute: SignedInWWorkspaceIdAiImportRoute,
+    SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute:
+      SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute,
+    SignedInWWorkspaceIdTeamChar123UserIdChar125Route:
+      SignedInWWorkspaceIdTeamChar123UserIdChar125Route,
     SignedInWWorkspaceIdIdeasIndexRoute: SignedInWWorkspaceIdIdeasIndexRoute,
+    SignedInWWorkspaceIdSelfAnalysisIndexRoute:
+      SignedInWWorkspaceIdSelfAnalysisIndexRoute,
     SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute:
       SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute,
     SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute:

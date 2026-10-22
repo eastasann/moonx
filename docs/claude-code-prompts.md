@@ -2029,7 +2029,7 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 33: Should（2）: 10 自己分析ホーム・11 設問フォーム（自己分析）・12 メンバーの自己分析・M6
 
-Status:
+Status: done 2026-10-22
 
 ```
 自己分析の画面を作ってください（PRD 4章の Should）。
@@ -2126,7 +2126,8 @@ Status:
 - docs/02-01_system-design-doc.md 4章・5.9（P9〜P13）・5.12（T1・T2）
 
 やること:
-1. 22 実行管理（マイルストーン・ローンチ計画・KPI・Open Questions・Next Actions。担当・期限・状態）。欄の名前は、Step 34 が PNL-2 の差分の書式のためにカタログに置いた名前を使う
+1. 22 実行管理（マイルストーン・ローンチ計画・KPI・Open Questions・Next Actions。担当・期限・状態）。欄の名前は、Step 34 が PNL-2 の差分の書式のためにカタログに置いた名前を使う。
+   一覧の横に選ばずに出す項目（先頭）は、パネルで本文が1ペインになっても保つ（design-spec 4.1。Step 33 で 14・16 に入れた apps/web の useKeepShownItem を使う）
 2. 23 Pitch Deck（1分版と5分版・版の表示・PDF の書き出し）
 3. M8 テンプレートの移行（10・13・20 からの入口）
 4. 20 からの 22・23 の入口、PNL-1（22・23）と PNL-2（22）をつなぐ。8 の通知と 5 の Recent activity・Due soon から 22・23 へのリンク（コメントはパネルを開いた状態。

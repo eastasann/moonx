@@ -50,8 +50,13 @@ describe("Getting started (design-spec 6.9)", () => {
     ]);
   });
 
-  test("inviting the team opens 9", () => {
+  test("the self analysis opens 10, inviting the team 9", () => {
     renderAs("owner");
+    expect(
+      screen
+        .getByRole("link", { name: "Start your self analysis" })
+        .getAttribute("href"),
+    ).toBe(`/w/${workspace.id}/self-analysis`);
     expect(
       screen
         .getByRole("link", { name: "Invite your team" })

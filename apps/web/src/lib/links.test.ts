@@ -24,12 +24,55 @@ describe("the routes of the screens the API names (SDD 4章・5.2 LinkTarget)", 
         questionKey: "V.02.OCEAN",
       }),
     ).toBe(`${idea}/questions/02?q=V.02.OCEAN`);
-    // The self-analysis's 11 and a section 11 does not ask have no route yet.
-    expect(
-      hrefOf({ screen: 11, workspaceId, sectionKey: "WHY" }),
-    ).toBeUndefined();
+    // A section 11 does not ask has its own screen.
     expect(
       hrefOf({ screen: 11, workspaceId, ideaId, sectionKey: "04" }),
+    ).toBeUndefined();
+  });
+
+  test("10, 11 for a self-analysis question, and 12 on a member", () => {
+    const userId = "6f1e2d3c-0000-4000-8000-000000000001";
+    expect(hrefOf({ screen: 10, workspaceId })).toBe(
+      `/w/${workspaceId}/self-analysis`,
+    );
+    expect(
+      hrefOf({
+        screen: 11,
+        workspaceId,
+        sectionKey: "WHY",
+        questionKey: "SA.WHY.1",
+      }),
+    ).toBe(`/w/${workspaceId}/self-analysis/WHY?q=SA.WHY.1`);
+    expect(hrefOf({ screen: 11, workspaceId })).toBeUndefined();
+    expect(hrefOf({ screen: 12, workspaceId })).toBe(`/w/${workspaceId}/team`);
+    expect(
+      hrefOf({
+        screen: 12,
+        workspaceId,
+        userId,
+        panel: "comments",
+        target: {
+          type: "self_analysis_answer",
+          id: "5a5a5a5a-0000-4000-8000-000000000001",
+          key: "SA.WHY.1",
+        },
+      }),
+    ).toBe(
+      `/w/${workspaceId}/team/${userId}?panel=comments&target=self_analysis_answer%3A5a5a5a5a-0000-4000-8000-000000000001%3ASA.WHY.1`,
+    );
+    // 12 has no history (design-spec 6.11).
+    expect(
+      hrefOf({
+        screen: 12,
+        workspaceId,
+        userId,
+        panel: "history",
+        target: {
+          type: "self_analysis_answer",
+          id: "5a5a5a5a-0000-4000-8000-000000000001",
+          key: "SA.WHY.1",
+        },
+      }),
     ).toBeUndefined();
   });
 

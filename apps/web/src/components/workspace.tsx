@@ -67,7 +67,7 @@ export const ownPersonalId = (me: Me): string | undefined =>
   me.memberships.find(({ workspace }) => workspace.isPersonal)?.workspace.id;
 
 /** The modals opened by the search parameter `modal` (SDD 4章) this app has so far. */
-export type ModalName = "switch-workspace" | "new-idea" | "evidence";
+export type ModalName = "switch-workspace" | "new-idea" | "evidence" | "share";
 
 declare module "@tanstack/react-router" {
   interface HistoryState {
@@ -86,6 +86,12 @@ declare module "@tanstack/react-router" {
      * later carries a copy of the state but another index.
      */
     openedPanel?: { index: number; place: string };
+    /**
+     * 12's member whose answers the screen stays about while its list stands alone beside
+     * a panel (← from them on a desktop): kept with the entry, so Back, Forward and a
+     * reload find the same member.
+     */
+    teamMember?: string;
   }
 }
 
@@ -231,6 +237,13 @@ export function usePanel(): {
         to: ".",
         search: ({ panel: _, target: __, ...rest }) => rest,
         replace: true,
+        // The entry stays what it was without the panel (12's member left by ←), but
+        // its detail, opened over a list that had the panel, no longer goes back there
+        // (as `show` marks a new entry).
+        state: ({ openedPanel: _, ...rest }) => ({
+          ...rest,
+          openedDetail: false,
+        }),
       });
     },
     keep: (href) => {

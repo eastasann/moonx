@@ -15,6 +15,7 @@ import mail from "../locales/en/mail.json";
 import notifications from "../locales/en/notifications.json";
 import panels from "../locales/en/panels.json";
 import pitch from "../locales/en/pitch.json";
+import selfAnalysis from "../locales/en/selfAnalysis.json";
 import settings from "../locales/en/settings.json";
 import validation from "../locales/en/validation.json";
 
@@ -40,6 +41,7 @@ export const resources = {
     notifications,
     panels,
     pitch,
+    selfAnalysis,
     settings,
     validation,
   },

@@ -425,6 +425,45 @@ test.describe("11 for a Member on a Fact that lost its research log", () => {
   });
 });
 
+test.describe("14 beside a panel on a narrow desktop", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test("the entry beside the list stays when its 💬 opens the panel and the list takes one pane (4.1)", async ({
+    page,
+    signIn,
+  }) => {
+    const me = await signIn(demo.member);
+    const { bcdx, ideaId } = await bcdxIdea(
+      page,
+      me,
+      "Piaya Gift Box Delivery",
+    );
+    await page.goto(`/w/${bcdx.id}/ideas/${ideaId}/research`);
+    // The first entry beside the list, not chosen: nothing in the URL yet.
+    const detail = page.getByRole("heading", { level: 2 }).first();
+    await expect(detail).toBeVisible();
+    const topic = (await detail.textContent()) ?? "";
+    await expect(page).toHaveURL(/\/research$/);
+    await page
+      .getByRole("button", {
+        name: new RegExp(`^Comments on Research Log · ${topic}`),
+      })
+      .click();
+    await expect(
+      page.getByRole("complementary", { name: "Comments" }),
+    ).toBeVisible();
+    // One pane beside the panel: the entry, written into the URL, in place of the list.
+    await expect(page).toHaveURL(/entry=/);
+    await expect(
+      page.getByRole("complementary", { name: "Comments" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: topic }),
+    ).toBeVisible();
+    await expect(page.getByRole("grid", { name: /Research/ })).toHaveCount(0);
+  });
+});
+
 test.describe("11 and 14 for a Viewer", () => {
   test.use(desktop);
 

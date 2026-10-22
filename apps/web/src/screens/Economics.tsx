@@ -1351,6 +1351,7 @@ export function EconomicsScreen({
             name: data.idea.name,
             archived: data.idea.archived,
           },
+          dataKey: ideaKey(ideaId),
           shows: (item) =>
             item.id === data.validationId &&
             (item.type === "economics_input"

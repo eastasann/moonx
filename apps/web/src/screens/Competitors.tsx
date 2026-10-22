@@ -1205,6 +1205,7 @@ export function CompetitorsScreen({
             name: data.idea.name,
             archived: data.idea.archived,
           },
+          dataKey: ideaKey(ideaId),
           shows: (item) =>
             item.type === "validation_answer"
               ? item.id === data.validationId &&

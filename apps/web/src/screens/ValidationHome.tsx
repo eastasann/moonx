@@ -65,7 +65,11 @@ import {
   questionsHref,
   sectionHref,
 } from "../lib/links";
-import { archivedPlansQuery, validationHomeQuery } from "../lib/queries";
+import {
+  archivedPlansQuery,
+  ideaKey,
+  validationHomeQuery,
+} from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
 
 type Section = ValidationHome["sections"][number];
@@ -805,6 +809,7 @@ export function ValidationHomeScreen({ ideaId }: { ideaId: string }) {
             sectionKeys: [],
           },
           idea: { id: ideaId, name: idea.name, archived: idea.archived },
+          dataKey: ideaKey(ideaId),
           shows: () => false,
           labelOf: (target) => (target.type === "idea" ? idea.name : undefined),
         };

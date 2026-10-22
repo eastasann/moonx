@@ -54,6 +54,7 @@ import {
 } from "../components/CommentsPanel";
 import { ItemHistoryButton } from "../components/HistoryPanel";
 import { toastFailure } from "../components/ideaActions";
+import { useKeepShownItem } from "../components/keepShownItem";
 import {
   inputOf,
   isValid,
@@ -934,8 +935,17 @@ function ResearchBody({
     search.supports !== undefined || search.source !== undefined;
   const isNew = search.new === 1 && canEdit;
   const isPhone = useIsNarrow();
-  const selected =
-    search.entry ?? (isTwoColumns && !isNew ? items[0]?.id : undefined);
+  const shownFirst =
+    search.entry === undefined && isTwoColumns && !isNew
+      ? items[0]?.id
+      : undefined;
+  const kept = useKeepShownItem(
+    isTwoColumns,
+    shownFirst,
+    search.entry,
+    (entry) => onSearch({ ...search, entry }),
+  );
+  const selected = search.entry ?? shownFirst ?? kept;
   const openNew = () => {
     const next = {
       ...search,
@@ -1171,6 +1181,7 @@ export function ResearchLogScreen({
             name: data.idea.name,
             archived: data.idea.archived,
           },
+          dataKey: ideaKey(ideaId),
           shows: (item) =>
             item.type === "research_log_entry" &&
             item.key == null &&

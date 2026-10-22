@@ -1693,6 +1693,7 @@ export function CostsScreen({
             name: data.idea.name,
             archived: data.idea.archived,
           },
+          dataKey: ideaKey(ideaId),
           shows: (item) =>
             item.type === "cost_item" &&
             item.key == null &&

@@ -142,6 +142,36 @@ const headerSaved = (page: Page, planId: string) =>
       response.ok(),
   );
 
+/** Waits for the save of a plan answer (P5 PUT). */
+const answerSaved = (page: Page, planId: string, questionKey: string) =>
+  page.waitForResponse(
+    (response) =>
+      response.request().method() === "PUT" &&
+      response
+        .url()
+        .endsWith(`/api/v1/plans/${planId}/answers/${questionKey}`) &&
+      response.ok(),
+  );
+
+/** BCDX's Piaya Gift Box Delivery and its Plan A, as the seed makes them (8.2). */
+async function piayaPlanA(page: Page, me: Me) {
+  const bcdx = workspaceOf(me, "BCDX");
+  const listed = await page.request.get(
+    `/api/v1/workspaces/${bcdx.id}/ideas?decision=all`,
+  );
+  const { items } = (await listed.json()) as {
+    items: { id: string; name: string }[];
+  };
+  const piaya = items.find(({ name }) => name === "Piaya Gift Box Delivery");
+  if (piaya === undefined) throw new Error("No Piaya Gift Box Delivery");
+  const plans = (await (
+    await page.request.get(`/api/v1/ideas/${piaya.id}/plans`)
+  ).json()) as { items: PlanSummary[] };
+  const planA = plans.items.find(({ name }) => name === "Plan A");
+  if (planA === undefined) throw new Error("No Plan A");
+  return { bcdx, piaya, planA };
+}
+
 test.describe("20 and M3〜M5 on a desktop", () => {
   test.use(desktop);
 
@@ -219,6 +249,33 @@ test.describe("20 and M3〜M5 on a desktop", () => {
       .getByRole("textbox", { name: "Business Name" })
       .fill("Picnic Piaya Co.");
     await saved;
+
+    // 21 from 20's items: its first sub-item not answered has focus, and saves as typed.
+    await page
+      .getByRole("list", { name: "Part A: Business Case" })
+      .getByRole("link", { name: /1 Executive Summary/ })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/plans/${planId}/items/1$`));
+    await expect(
+      page.getByRole("heading", { level: 1, name: "1 Executive Summary" }),
+    ).toBeVisible();
+    await expect(page.getByText("1/6")).toBeVisible();
+    const customer = page.getByRole("textbox", {
+      name: "Answer to Who is the primary customer?",
+    });
+    await expect(customer).toBeFocused();
+    const answered = answerSaved(page, planId, "P.01.2");
+    await customer.fill("Families who picnic in Bacolod's parks.");
+    await answered;
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await expect(page.getByText("2/6")).toBeVisible();
+    await page
+      .getByRole("list", { name: "Breadcrumbs" })
+      .getByRole("link", { name: "Plan A" })
+      .click();
+    await expect(
+      page.getByRole("list", { name: "Part A: Business Case" }),
+    ).toContainText("2/6");
 
     // M3: v1 by default, named, then the version in the header and Versions.
     await page.getByRole("button", { name: "Save version" }).click();
@@ -451,5 +508,219 @@ test.describe("20 on a phone", () => {
     const sheetBox = await sheet.boundingBox();
     expect(sheetBox?.width).toBe(390);
     await expectNoAxeViolations(page);
+  });
+});
+
+test.describe("21 on a desktop", () => {
+  test.use(desktop);
+
+  test("a row added to §11's table, a milestone added to §23; the saved version's 21 read only", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea, planId } = await ownPlan(page, signIn, account);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}/plans/${planId}`);
+    await page
+      .getByRole("list", { name: "Part B: Execution Plan" })
+      .getByRole("link", { name: /11 Founder Roles/ })
+      .click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "11 Founder Roles" }),
+    ).toBeVisible();
+    await expect(page).toHaveTitle(
+      `11 Founder Roles · Plan A · ${workspace.name} · moonx`,
+    );
+
+    // §11's table: "No rows", then a row typed cell by cell, saved as the whole table.
+    const founders = page.getByRole("region", {
+      name: "Founders",
+      exact: true,
+    });
+    await expect(founders.getByText("No rows")).toBeVisible();
+    let saved = answerSaved(page, planId, "P.11.1");
+    await founders.getByRole("button", { name: "Add row to Founders" }).click();
+    await saved;
+    saved = answerSaved(page, planId, "P.11.1");
+    await founders.getByRole("textbox", { name: "Name" }).fill("Ana");
+    await saved;
+    saved = answerSaved(page, planId, "P.11.1");
+    await founders.getByRole("textbox", { name: "Role" }).fill("Operations");
+    await saved;
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await expectNoAxeViolations(page);
+
+    // §23 through the item switch: the template's six milestones, then a seventh.
+    await page.getByRole("button", { name: "Switch item" }).click();
+    await page
+      .getByRole("menuitem", { name: "23 Pre-launch Milestones" })
+      .click();
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "23 Pre-launch Milestones",
+      }),
+    ).toBeVisible();
+    const milestones = page.getByRole("grid", { name: "Milestones" });
+    await expect(milestones.getByRole("row")).toHaveCount(6);
+    await page.getByRole("button", { name: "Add milestone" }).click();
+    const added = page.getByRole("dialog", { name: "New milestone" });
+    await expect(added.getByRole("button", { name: "Add" })).toBeDisabled();
+    await added
+      .getByRole("textbox", { name: /Milestone/ })
+      .fill("Sign the lease");
+    await added
+      .getByRole("textbox", { name: "Goal" })
+      .fill("A stall near the plaza.");
+    await expectNoAxeViolations(page);
+    await added.getByRole("button", { name: "Add" }).click();
+    await expect(added).toBeHidden();
+    await expect(milestones.getByRole("row")).toHaveCount(7);
+    await expect(milestones.getByRole("row").last()).toContainText(
+      "Sign the lease",
+    );
+    await expect(page.getByText("1/1")).toBeVisible();
+
+    // The header's 🕘 lists the item's milestones with its sub-items (SDD 6.3).
+    await page.getByRole("button", { name: "History", exact: true }).click();
+    const history = page.getByRole("complementary", { name: "History" });
+    await expect(
+      history.getByText("Execution · Sign the lease").first(),
+    ).toBeVisible();
+    await history.getByRole("button", { name: "Close" }).click();
+    await expect(history).toBeHidden();
+
+    // Opened, it saves as typed (P10 PATCH).
+    await milestones.getByRole("row").last().click();
+    const edit = page.getByRole("dialog", { name: "Edit milestone" });
+    const patched = page.waitForResponse(
+      (response) =>
+        response.request().method() === "PATCH" &&
+        /\/api\/v1\/execution-items\//.test(response.url()) &&
+        response.ok(),
+    );
+    await edit
+      .getByRole("textbox", { name: "Exit Condition" })
+      .fill("The lease is signed.");
+    await patched;
+    await edit.getByRole("button", { name: "Close" }).click();
+    await expect(edit).toBeHidden();
+
+    // A saved version's 21 reads only, with what it kept.
+    const version = await page.request.post(
+      `/api/v1/plans/${planId}/versions`,
+      { data: { name: "v1" }, headers: { Origin: WEB_ORIGIN } },
+    );
+    expect(version.status(), await version.text()).toBe(201);
+    const { id: versionId } = (await version.json()) as { id: string };
+    await page.goto(
+      `/w/${workspace.id}/ideas/${idea.id}/plans/${planId}?version=${versionId}`,
+    );
+    await page
+      .getByRole("list", { name: "Part B: Execution Plan" })
+      .getByRole("link", { name: /11 Founder Roles/ })
+      .click();
+    await expect(page).toHaveURL(
+      new RegExp(`/plans/${planId}/items/11\\?version=${versionId}$`),
+    );
+    await expect(page.getByText("Viewing v1 (read only)")).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Founders", exact: true }),
+    ).toContainText("Ana");
+    await expect(page.getByRole("textbox")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Add row to Founders" }),
+    ).toHaveCount(0);
+    await expectNoAxeViolations(page);
+    await page.getByRole("link", { name: "Show the latest" }).click();
+    await expect(page).toHaveURL(new RegExp(`/plans/${planId}/items/11$`));
+  });
+
+  test("a Viewer reads Piaya's §1 with every sub-item open and the numbers to open in validation", async ({
+    page,
+    signIn,
+  }) => {
+    const me = await signIn(demo.viewer);
+    const { bcdx, piaya, planA } = await piayaPlanA(page, me);
+    await page.goto(
+      `/w/${bcdx.id}/ideas/${piaya.id}/plans/${planA.id}/items/1`,
+    );
+    await expect(
+      page.getByRole("heading", { level: 1, name: "1 Executive Summary" }),
+    ).toBeVisible();
+    await expect(page.getByRole("textbox")).toHaveCount(0);
+    // Every sub-item open: none is a quiet row, whose title is a button to open it.
+    await expect(
+      page.getByRole("region", {
+        name: "Who is the primary customer?",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Who is the primary customer?",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Key numbers", exact: true }),
+    ).toContainText("Startup cost");
+    await expect(
+      page.getByRole("link", { name: "Open in validation" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /AI/ })).toHaveCount(0);
+    await expectNoAxeViolations(page);
+  });
+});
+
+test.describe("21 on a phone", () => {
+  test.use(phone);
+
+  test("one sub-item at a time; a table's row typed in its sheet", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea, planId } = await ownPlan(page, signIn, account);
+    await page.goto(
+      `/w/${workspace.id}/ideas/${idea.id}/plans/${planId}/items/13`,
+    );
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "13 Ownership & Money Between Founders",
+      }),
+    ).toBeVisible();
+    const table = page.getByRole("region", {
+      name: "Ownership and capital",
+      exact: true,
+    });
+    await expect(table).toBeVisible();
+    await expect(
+      page.getByRole("region", {
+        name: "Founder compensation at launch",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    const saved = answerSaved(page, planId, "P.13.1");
+    await table
+      .getByRole("button", { name: "Add row to Ownership and capital" })
+      .click();
+    await saved;
+    const sheet = page.getByRole("dialog", { name: "Row 1" });
+    await expect(sheet).toBeVisible();
+    let typed = answerSaved(page, planId, "P.13.1");
+    await sheet.getByRole("textbox", { name: "Name" }).fill("Ana");
+    await typed;
+    typed = answerSaved(page, planId, "P.13.1");
+    await sheet
+      .getByRole("textbox", { name: "Initial ownership (%)" })
+      .fill("40");
+    await typed;
+    await expectNoAxeViolations(page);
+    await sheet.getByRole("button", { name: "Close" }).click();
+    await expect(table).toContainText("Ana");
+    await expect(table).toContainText("40%");
+    await expect(page.getByText("Total ownership: 40%")).toBeVisible();
   });
 });

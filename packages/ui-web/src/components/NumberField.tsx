@@ -26,6 +26,7 @@ export interface NumberFieldProps extends FieldTextProps {
   value?: string;
   defaultValue?: string;
   onChange?: (text: string) => void;
+  onFocus?: () => void;
   onBlur?: () => void;
   /** ISO 4217 code: the amount's currency symbol shows beside the number. */
   currency?: string;

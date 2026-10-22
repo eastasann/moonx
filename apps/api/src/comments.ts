@@ -32,6 +32,7 @@ import { historySectionKey } from "./history";
 import { lockMembers } from "./membership";
 import { notifyComment } from "./notifications";
 import { recordChange, type Scope, type ScopeRef, writeInScope } from "./scope";
+import { inSections } from "./screen-sections";
 import {
   checkCommentKey,
   locateTarget,
@@ -197,7 +198,7 @@ const onScreen = (
     eq(comments.containerId, id),
     sectionKeys === undefined
       ? undefined
-      : inArray(comments.sectionKey, [...sectionKeys]),
+      : inSections(comments, { type, id }, sectionKeys),
   ) as SQL;
 
 /**
@@ -528,7 +529,7 @@ export function commentRoutes({ access, db, now }: CommentRoutesOptions) {
         detail: {
           summary: "C1 The comments on an item or a screen (PNL-1)",
           description:
-            "One item (targetType, targetId, targetKey), or one screen (containerType, containerId, sectionKeys) with, inside an idea, the comments on the idea. Threads oldest first, deleted comments as deleted without their body. Comments on deleted rows and on questions a migration hid are not returned. A self-analysis's owner reads the comments of every workspace it is shared with now; its Owners and Members read those of workspaceId (Viewers 403 FORBIDDEN, 403 NOT_SHARED).",
+            "One item (targetType, targetId, targetKey), or one screen (containerType, containerId, sectionKeys; on a plan, execution:{type} is its execution items of that type) with, inside an idea, the comments on the idea. Threads oldest first, deleted comments as deleted without their body. Comments on deleted rows and on questions a migration hid are not returned. A self-analysis's owner reads the comments of every workspace it is shared with now; its Owners and Members read those of workspaceId (Viewers 403 FORBIDDEN, 403 NOT_SHARED).",
         },
       },
     )

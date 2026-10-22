@@ -57,6 +57,7 @@ import { lockMembers } from "./membership";
 import { planContentTime } from "./plan-views";
 import { type Restoration, restoreItem, type StoredItem } from "./revert";
 import { type Scope, type ScopeRef, writeInScope } from "./scope";
+import { inSections } from "./screen-sections";
 import { lockSelfAnalysis, startIfAnswered } from "./self-analysis";
 import { locateTarget, selfAnalysisOwner } from "./targets";
 import { loadUserRefs } from "./user-refs";
@@ -339,7 +340,7 @@ async function historyWhere(
     eq(changeHistory.containerId, id),
     query.sectionKeys === undefined
       ? undefined
-      : inArray(changeHistory.sectionKey, query.sectionKeys),
+      : inSections(changeHistory, { type, id }, query.sectionKeys),
   ) as SQL;
   if (type !== "idea" || query.sectionKeys !== undefined) return screen;
   // 13 also lists the template migrations of the idea's validation (design-spec 6.0.7).
@@ -743,7 +744,7 @@ export function historyRoutes({ access, db, now }: HistoryRoutesOptions) {
         detail: {
           summary: "H1 The history of an item or a screen (PNL-2)",
           description:
-            "One item (targetType, targetId, targetKey), deleted rows included, or one screen (containerType, containerId, sectionKeys), newest first. The idea's screen (13) adds the template migrations of its validation and the undone creations. A self-analysis's history is its owner's only (403 FORBIDDEN).",
+            "One item (targetType, targetId, targetKey), deleted rows included, or one screen (containerType, containerId, sectionKeys; on a plan, execution:{type} is its execution items of that type), newest first. The idea's screen (13) adds the template migrations of its validation and the undone creations. A self-analysis's history is its owner's only (403 FORBIDDEN).",
         },
       },
     )

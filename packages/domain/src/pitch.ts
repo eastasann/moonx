@@ -217,6 +217,15 @@ interface SlideSpec {
 const answer = (key: string): BulletSource => ({ kind: "answer", key });
 const answers = (...keys: string[]) => keys.map(answer);
 
+/**
+ * The sub-items of §30 the decks show as their speaker notes (design-spec 6.14): the
+ * One-minute explanation for the 1-minute deck, the Five-minute one for the 5-minute.
+ */
+export const PITCH_SPEAKER_NOTE_KEYS = {
+  one: "P.30.1",
+  five: "P.30.2",
+} as const satisfies Record<PitchVariant, string>;
+
 /** The sub-items each source of design-spec 6.14 reads. */
 const KEYS = {
   business: "P.01.1",
@@ -226,8 +235,8 @@ const KEYS = {
   milestones: "P.23.1",
   launch: "P.25.1",
   nextActions: "P.29.1",
-  oneMinute: "P.30.1",
-  fiveMinute: "P.30.2",
+  oneMinute: PITCH_SPEAKER_NOTE_KEYS.one,
+  fiveMinute: PITCH_SPEAKER_NOTE_KEYS.five,
 } as const;
 
 const TITLE: SlideSpec = { key: "title", type: "title", itemNo: 1 };

@@ -725,7 +725,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 - 作成の取り消し（5.11）で論理削除したアイデア・プランのパスは、無いものとして design-spec 6.0.6「見つからない」を出す。
 - モーダル（M1〜M8）とパネル（PNL-1・PNL-2）はルートを作らず、検索パラメータで開く: `?modal=new-idea|evidence|save-version|go-no-go|create-plan|share|switch-workspace|update-template`、`?panel=comments|history&target=<targetType>:<targetId>[:<targetKey>]`。モーダルを開くと履歴に1つ足し、ブラウザの戻る（スマホの戻るの操作）でモーダルが閉じる。閉じる操作（×・Esc・Cancel など）は、その画面で開いたモーダルなら足した1つを戻り、URL から直接開いたモーダルなら今の履歴の項目から `modal` を外す（どちらも、閉じた後の戻るで同じモーダルが開き直さない）。パネルも同じく、閉じた状態から開くと履歴に1つ足し、閉じるとその1つを戻る（URL から開いたパネルは `panel`・`target` を外す）。開いたまま別のパネルや別の対象に替えるときは、今の履歴の項目を書き換える。画面の中の移動（一覧の項目を選ぶ・絞り込みを変える）は、開いているパネルの `panel`・`target` を引き継ぐ。開いた後に画面の中で移ってから閉じるときは、戻らずに今の履歴の項目から `panel`・`target` を外す（戻ると移動まで取り消すため。移る前の履歴の項目は、パネルを開いた状態のまま残る）。
 - M9（ログインし直し）は 401 のときにだけ開くので、ルートも検索パラメータも持たない（8.2）。
-- `target` の書式は2つ。項目は `<targetType>:<targetId>[:<targetKey>]`（`targetKey` に `:` を含んでもよい）で、その項目のコメントのスレッド（C1）と項目の履歴（H1 の `targetType`・`targetId`・`targetKey`）に使う。画面全体は `container:<containerType>:<containerId>[:<sectionKey>,...]`（`containerType` は `self_analysis` / `validation` / `business_plan` / `idea`。`sectionKey` は画面が持つ節のキーで、複数ならカンマでつなぐ。画面と節の対応は 6.3 の末尾）で、画面全体の履歴（H1）と、画面のコメントの一覧（C1）に使う。画面のコメントの一覧は、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea:<ideaId>`）をまとめて出す（ヘッダーの 💬。design-spec 6.0.1・6.0.4）。どちらにも当てはまらない値は、パネルを開かない。
+- `target` の書式は2つ。項目は `<targetType>:<targetId>[:<targetKey>]`（`targetKey` に `:` を含んでもよい）で、その項目のコメントのスレッド（C1）と項目の履歴（H1 の `targetType`・`targetId`・`targetKey`）に使う。画面全体は `container:<containerType>:<containerId>[:<sectionKey>,...]`（`containerType` は `self_analysis` / `validation` / `business_plan` / `idea`。`sectionKey` は画面が持つ節のキーで、複数ならカンマでつなぐ。21 の `execution:{種類}` のように `:` を含んでもよい。画面と節の対応は 6.3 の末尾）で、画面全体の履歴（H1）と、画面のコメントの一覧（C1）に使う。画面のコメントの一覧は、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea:<ideaId>`）をまとめて出す（ヘッダーの 💬。design-spec 6.0.1・6.0.4）。どちらにも当てはまらない値は、パネルを開かない。
 - モーダルが対象の項目を持つとき（M2 の根拠シート）は `?modal=evidence&about=<targetType>:<targetId>[:<targetKey>]` とする。`about` の書式は `target` の項目と同じで、パネルの `target` と同時に使える（パネルを開いたまま根拠シートを開ける）。M2 を Fact のボタンから開いたこと（付けた根拠で Fact にする。design-spec 6.0.3）は、URL ではなく、開いたときに足した履歴の項目の state に持つ（戻る・進む・再読み込みでも保たれる。URL から開いた M2 は Fact から開いたものとして扱わない）。
 - M8 は `?modal=update-template&about=<templateKind>:<targetId>`（`templateKind` は `self_analysis` / `validation` / `business_plan`、`targetId` は自己分析・検証・プランの id）で開く。`about` が無いとき、画面の対象と食い違うとき、操作できない人が開いたときは、何も出さない。
 - 認証が要るルートで未ログインなら `/login?next=<元のパス>` へ移る。
@@ -1399,7 +1399,7 @@ interface PlanReference {
 // PlanReference.data の形（packages/schemas の planReferenceSchema が型を持つ）:
 // validation_answers: { questionKey; title; text }[]（表示条件で隠れた設問は除く。空の回答は text: null）
 // competitors: { id; name; type; typicalPrice; strength; weakness }[]（15 の順の上位 limit 件）
-// cost_rows: { id; category; templateKey; name; inputMode; amount; percent; value: MetricValue }[]（CostItem の一部と、計算した金額。keys の順。value は主要指標 cost_row:{key}）
+// cost_rows: { id; category; templateKey; name; inputMode; amount; percent; value: MetricValue }[]（CostItem の一部と、計算した金額。keys の順。value は主要指標 cost_row:{key}）。検証にそのキーの行が無い（削除した・検証のテンプレートの版に無い）キーは、id・inputMode・amount・percent を null にした1件にし、name と category は、そのキーを持つ公開済みの検証のテンプレートの版のうち最新のものの初期行から入れる（どの版にも無ければ null）。21 はこの行に「Not in validation」を出す（design-spec 6.0.7）
 // research_log: { id; observedOn; topic; observation; sourceType; sourceUrl }[]（14 の順）
 // decision_log・go_no_go_history: DecisionLogSummary[]（新しい順。アイデアの全件、プランの Go / No-Go）
 // self_analysis: { selfAnalysisId; user: UserRef; currency; sections: { key; part; title; subtitle; guidance; answers: { questionKey; title; text; amount }[] }[] }[]（このワークスペースに共有された自己分析を持ち主の名前の順。sections は指定のセクション）
@@ -2377,7 +2377,7 @@ export const changeHistory = pgTable("change_history", {
 | 17 費用 | `validation` | `costs` |
 | 18 損益・シナリオ | `validation` | `08`,`economics` |
 | 20 プランホーム | `business_plan` | 省く（プランの全体） |
-| 21 プラン項目の編集 | `business_plan` | 項目のセクションのキー（`01`〜`30`） |
+| 21 プラン項目の編集 | `business_plan` | 項目のセクションのキー（`01`〜`30`）。実行管理の小項目を持つ項目は、その種類ごとに `execution:{種類}`（`execution:milestone` など）を足す。`execution:{種類}` は、そのプランの実行管理の項目のうちその種類のもの（論理削除したものを含む）の行で、行の `section_key` は 22 と同じ `execution` のまま（21 は、その項目の小項目と、その種類の実行管理の項目を並べるため） |
 | 22 実行管理 | `business_plan` | `execution` |
 | 23 Pitch Deck | `business_plan` | `pitch`（スライドへのコメントだけ。変更履歴は無い） |
 

@@ -21,10 +21,10 @@ import {
   type HistoryEntry,
   type HistorySource,
   type LaunchTiming,
-  type QuestionOptions,
   type SourceType,
   type SupportsCheck,
 } from "@moonx/schemas";
+import { type TableColumn, tableCellText } from "./plan-table";
 
 /**
  * One field a change touched, as PNL-2 shows it (design-spec 6.0.5): its name, and its
@@ -70,12 +70,6 @@ export interface ChangeContext {
     options: { confidence: Confidence | null; evidenceCount: number },
   ) => string;
 }
-
-/** A column of a plan's table sub-item (the template's `options.columns`). */
-export type TableColumn = Extract<
-  QuestionOptions,
-  { kind: "table" }
->["columns"][number];
 
 type Content = Record<string, unknown> | null;
 
@@ -171,24 +165,6 @@ function economicsValue(
   return formatInputNumber(value);
 }
 
-/** A table cell as 21 shows it: a % of 0–1 as "40%", money in the currency (6.12). */
-function cellWords(
-  column: TableColumn,
-  value: unknown,
-  currency: string,
-): string {
-  if (typeof value === "string") return value;
-  if (typeof value !== "number") return "";
-  switch (column.type) {
-    case "percent":
-      return formatInputPercent(value);
-    case "money":
-      return formatMoney(value, currency, { cents: !Number.isInteger(value) });
-    default:
-      return formatInputNumber(value);
-  }
-}
-
 /**
  * A table answer's rows, one line each: its cells with their columns' names, in the
  * columns' order ("Name: Ana · Role: Operations"); a row without a value "Empty row".
@@ -203,7 +179,7 @@ function rowsWords(
     .map((row) => {
       const cells = asContent(row) ?? {};
       const words = columns.flatMap((column) => {
-        const value = cellWords(column, cells[column.key], currency);
+        const value = tableCellText(column, cells[column.key], currency);
         return value === ""
           ? []
           : [i18n.t("plans:table.cell", { label: column.label, value })];

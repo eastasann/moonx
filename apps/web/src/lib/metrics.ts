@@ -6,7 +6,7 @@ import {
   formatUnits,
   i18n,
 } from "@moonx/i18n";
-import type { CostTotal, MetricValue } from "@moonx/schemas";
+import type { CostTotal, MetricValue, ScenarioColumn } from "@moonx/schemas";
 
 /**
  * How a calculated number reads (design-spec 6.4「端数」): an amount in whole units or
@@ -81,3 +81,41 @@ export function costGapText(total: CostTotal): string | null {
     ? null
     : parts.join(i18n.t("validation:costs.gapSeparator"));
 }
+
+/** The figures of a scenario column (design-spec 6.4「計算仕様」), in 18's order. */
+export const SCENARIO_FIGURES = [
+  "unitsPerDay",
+  "unitsPerMonth",
+  "revenue",
+  "variableCostTotal",
+  "operatingProfit",
+  "operatingMargin",
+] as const satisfies readonly (keyof ScenarioColumn)[];
+
+export type ScenarioFigure = (typeof SCENARIO_FIGURES)[number];
+
+/** A `scenario:*` key metric's figures: its column of 6.4's table, as the deck shows it. */
+export const SCENARIO_KEY_FIGURES = [
+  "unitsPerDay",
+  "revenue",
+  "operatingProfit",
+  "operatingMargin",
+] as const satisfies readonly ScenarioFigure[];
+
+/** How a scenario figure reads (design-spec 6.4「端数」). */
+export const scenarioFigureFormat = (
+  figure: ScenarioFigure,
+  column: ScenarioColumn,
+): MetricFormat => {
+  switch (figure) {
+    case "unitsPerDay":
+      // Typed daily sales show as typed; break-even's are calculated.
+      return column.key === "break_even" ? "units" : "typedUnits";
+    case "unitsPerMonth":
+      return "units";
+    case "operatingMargin":
+      return "percent";
+    default:
+      return "money";
+  }
+};

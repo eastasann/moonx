@@ -30,6 +30,17 @@ describe("the panels' `target` (SDD 4章)", () => {
       kind: "screen",
       screen: { containerType: "idea", containerId: id, sectionKeys: [] },
     });
+    // 21's execution items of a type (SDD 6.3「画面と節の対応」).
+    expect(
+      parsePanelTarget(`container:business_plan:${id}:23,execution:milestone`),
+    ).toEqual({
+      kind: "screen",
+      screen: {
+        containerType: "business_plan",
+        containerId: id,
+        sectionKeys: ["23", "execution:milestone"],
+      },
+    });
   });
 
   test("anything else names nothing", () => {
@@ -42,7 +53,8 @@ describe("the panels' `target` (SDD 4章)", () => {
       `competitor:${id}:`,
       `container:plan:${id}`,
       `container:validation:${id}:04,`,
-      `container:validation:${id}:04:05`,
+      `container:validation:${id}:,04`,
+      `container:validation:${id}:`,
     ]) {
       expect(parsePanelTarget(value)).toBeUndefined();
     }
@@ -53,6 +65,7 @@ describe("the panels' `target` (SDD 4章)", () => {
       `validation_answer:${id}:V.01.WHO`,
       `cost_item:${id}`,
       `container:validation:${id}:08,economics`,
+      `container:business_plan:${id}:29,execution:next_action`,
       `container:idea:${id}`,
     ]) {
       const target = parsePanelTarget(value);

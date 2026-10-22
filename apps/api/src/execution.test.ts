@@ -1,9 +1,11 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { changeHistory, executionItems, memberships } from "@moonx/db";
 import {
+  commentListSchema,
   errorBodySchema,
   executionItemSchema,
   executionListSchema,
+  historyPageSchema,
   planHomeSchema,
 } from "@moonx/schemas";
 import { and, eq } from "drizzle-orm";
@@ -491,5 +493,72 @@ describe("P11 PUT /api/v1/plans/{planId}/execution-items/order", () => {
         ),
       );
     expect(history).toEqual([]);
+  });
+});
+
+describe("21's execution sub-items in H1 and C1", () => {
+  test("execution:{type} lists the plan's execution items of that type, deleted ones included", async () => {
+    const team = await teamWithPlan();
+    const milestone = await add(team, { type: "milestone", title: "Lease" });
+    const gone = await add(team, { type: "milestone", title: "Old" });
+    const kpi = await add(team, { type: "kpi", title: "Revenue" });
+    expect(
+      (
+        await call(
+          "DELETE",
+          `/api/v1/execution-items/${gone.id}`,
+          team.memberCookie,
+        )
+      ).status,
+    ).toBe(204);
+    for (const item of [milestone, kpi]) {
+      const posted = await call("POST", "/api/v1/comments", team.memberCookie, {
+        workspaceId: team.workspace.id,
+        target: { type: "execution_item", id: item.id, key: null },
+        body: `On ${item.title}`,
+        mentionUserIds: [],
+      });
+      expect(posted.status).toBe(201);
+    }
+    const screen = `containerType=business_plan&containerId=${team.planId}`;
+
+    const history = await call(
+      "GET",
+      `/api/v1/history?${screen}&sectionKeys=23,execution:milestone`,
+      team.viewerCookie,
+    );
+    expect(history.status).toBe(200);
+    const changed = new Set(
+      historyPageSchema
+        .parse(await history.json())
+        .items.map((entry) => entry.target.id),
+    );
+    expect(changed.has(milestone.id)).toBe(true);
+    expect(changed.has(gone.id)).toBe(true);
+    expect(changed.has(kpi.id)).toBe(false);
+
+    const threads = await call(
+      "GET",
+      `/api/v1/comments?workspaceId=${team.workspace.id}&${screen}&sectionKeys=23,execution:milestone`,
+      team.viewerCookie,
+    );
+    expect(threads.status).toBe(200);
+    expect(
+      commentListSchema
+        .parse(await threads.json())
+        .threads.map((thread) => thread.root.body),
+    ).toEqual(["On Lease"]);
+
+    // The item's own section alone, or a type unknown, lists none of them.
+    const plain = await call(
+      "GET",
+      `/api/v1/history?${screen}&sectionKeys=23,execution:unknown`,
+      team.viewerCookie,
+    );
+    expect(
+      historyPageSchema
+        .parse(await plain.json())
+        .items.filter((entry) => entry.target.type === "execution_item"),
+    ).toEqual([]);
   });
 });

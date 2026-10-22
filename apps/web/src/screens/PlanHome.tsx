@@ -38,14 +38,13 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import type { ScreenComments } from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
-import { toastFailure } from "../components/ideaActions";
 import { KeyMetrics } from "../components/ideaParts";
 import {
   CreatePlanDialog,
@@ -54,6 +53,7 @@ import {
   RenamePlanDialog,
   SaveVersionDialog,
 } from "../components/PlanDialogs";
+import { ArchivedPlanAlert, usePlanActions } from "../components/planParts";
 import { SaveFailureNote } from "../components/SaveFeedback";
 import {
   FailureState,
@@ -82,6 +82,7 @@ import {
   ideaHref,
   ideasHref,
   planHref,
+  planItemHref,
 } from "../lib/links";
 import { useIsOnline } from "../lib/online";
 import {
@@ -92,9 +93,7 @@ import {
   planHomeQuery,
   planItemQuery,
   validationHomeQuery,
-  workspaceKey,
 } from "../lib/queries";
-import { useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
 
 /** `/w/$workspaceId/ideas/$ideaId/plans/$planId`'s own search (SDD 4章). */
@@ -244,67 +243,6 @@ function HeaderLine({ home }: { home: PlanHome }) {
         }),
       ].join(t("app:separator"))}
     </Text>
-  );
-}
-
-/**
- * Archive and restore a plan (P3, design-spec 6.12「案のアーカイブ」), one at a time; a
- * failure says so in a toast with Retry. 13, 5 and 6 read the plans and stage again.
- */
-function usePlanActions() {
-  const { workspace } = useWorkspace();
-  const queryClient = useQueryClient();
-  const pending = useRef(false);
-  const sendThrough = useSendThrough();
-  const setArchived = useCallback(
-    async (plan: PlanHome, archived: boolean): Promise<void> => {
-      if (pending.current) return;
-      pending.current = true;
-      try {
-        await sendThrough(async () => {
-          const plans = api().api.v1.plans({ planId: inPath(plan.id) });
-          await unwrap(archived ? plans.archive.post() : plans.restore.post());
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ideaKey(plan.ideaId) }),
-            queryClient.invalidateQueries({
-              queryKey: workspaceKey(workspace.id),
-            }),
-          ]);
-        });
-      } catch (error) {
-        toastFailure(error, () => void setArchived(plan, archived));
-      } finally {
-        pending.current = false;
-      }
-    },
-    [queryClient, sendThrough, workspace.id],
-  );
-  return {
-    archive: (plan: PlanHome) => void setArchived(plan, true),
-    restore: (plan: PlanHome) => void setArchived(plan, false),
-  };
-}
-
-/**
- * "This plan is archived" at the top of 20 (design-spec 6.12「案のアーカイブ」), with
- * Restore for the Owners and Members.
- */
-function ArchivedPlanAlert({ home }: { home: PlanHome }) {
-  const { t } = useTranslation(["plans"]);
-  const { role } = useWorkspace();
-  const actions = usePlanActions();
-  return (
-    <InlineAlert title={t("plans:home.archived")}>
-      {role !== "viewer" && (
-        <Button
-          variant="secondary"
-          size="S"
-          onPress={() => actions.restore(home)}
-        >
-          {t("plans:home.restore")}
-        </Button>
-      )}
-    </InlineAlert>
   );
 }
 
@@ -661,10 +599,11 @@ type Part = PlanHome["parts"][number];
 /**
  * One part's items (design-spec 6.12「項目の状態」): how many are complete, and each item
  * with a moon as full as its sub-items are filled, its [V] and [S] marks, its count and
- * its comments. An item opens 21 once it is built (Step 34b).
+ * its comments. An item opens 21, on the version open here if one is.
  */
-function PartBlock({ part }: { part: Part }) {
+function PartBlock({ home, part }: { home: PlanHome; part: Part }) {
   const { t } = useTranslation(["plans"]);
+  const { workspace } = useWorkspace();
   const title = t(`plans:home.part.${part.part}`);
   return (
     <HubBlock
@@ -679,6 +618,15 @@ function PartBlock({ part }: { part: Part }) {
         {part.items.map((item) => (
           <RowListItem
             key={item.itemNo}
+            href={planItemHref(
+              workspace.id,
+              home.ideaId,
+              home.id,
+              item.itemNo,
+              {
+                version: home.viewingVersion?.id,
+              },
+            )}
             start={
               <MoonGlyph
                 value={item.total === 0 ? 1 : item.filled / item.total}
@@ -769,7 +717,7 @@ function PlanHub({
             {
               id: `part-${part.part}`,
               column: "aside" as const,
-              content: <PartBlock part={part} />,
+              content: <PartBlock home={home} part={part} />,
             },
           ],
     ),

@@ -30,19 +30,20 @@ const CONTAINER = "container";
 /**
  * The `target` of SDD 4章: `<targetType>:<targetId>[:<targetKey>]` for an item (the key
  * may hold `:`), `container:<containerType>:<containerId>[:<sectionKey>,...]` for a
- * screen. Anything else names nothing, and the panel stays closed.
+ * screen (a key may hold `:` too, as 21's `execution:milestone`). Anything else names
+ * nothing, and the panel stays closed.
  */
 export function parsePanelTarget(value: unknown): PanelTarget | undefined {
   if (typeof value !== "string") return undefined;
   const [head, id, ...rest] = value.split(":");
   if (head === CONTAINER) {
-    const [containerId, sections] = [rest[0], rest.slice(1)];
+    const [containerId, ...sections] = rest;
     const type = historyContainerTypeSchema.safeParse(id);
     if (!type.success || !uuidSchema.safeParse(containerId).success) {
       return undefined;
     }
-    if (sections.length > 1) return undefined;
-    const sectionKeys = sections[0] === undefined ? [] : sections[0].split(",");
+    const sectionKeys =
+      sections.length === 0 ? [] : sections.join(":").split(",");
     if (sectionKeys.some((key) => key === "")) return undefined;
     return {
       kind: "screen",

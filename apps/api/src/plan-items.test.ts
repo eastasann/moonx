@@ -227,6 +227,28 @@ describe("P4 GET /api/v1/plans/{planId}/items/{itemNo}", () => {
         value: { value: 8500, bound: "exact", reason: null },
       },
     ]);
+    // A row the validation deleted is "Not in validation", by the template's name.
+    await db
+      .update(costItems)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(
+          eq(costItems.validationId, validationId),
+          eq(costItems.templateKey, "initial.lease_deposit"),
+        ),
+      );
+    const location = await item(team, 15);
+    expect(refOf(location, "cost_rows")?.data).toMatchObject([
+      { templateKey: "monthly.rent", name: "Rent", inputMode: "amount" },
+      {
+        id: null,
+        templateKey: "initial.lease_deposit",
+        name: "Lease Deposit / Advance",
+        category: "initial",
+        inputMode: null,
+        amount: null,
+      },
+    ]);
     expect(refOf(legal, "research_log")).toMatchObject({
       title: "Research Log · Permits",
       data: [{ topic: "City hall visit", observedOn: "2026-09-02" }],

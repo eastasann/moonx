@@ -2051,6 +2051,15 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 実行管理の項目（§23・25・26・28・29）は、21 の中で 22 と同じ部品で一覧・追加・編集する（同じデータ）。「Open in Execution」で 22 の該当のタブへ移れる。
 - 数字の小項目に数字を書き込む欄は作らない。
 - 21 の状態: 表の小項目が0行なら「No rows」と + Add row、実行管理の小項目が0件なら「Nothing yet」と + Add。ローディング・エラーは 6.0.6。
+- 並びと文言（2026-10-22 に Step 34b で決めた）:
+  - 見出しの並びは 11 と同じ（6.2）。題は「{番号} {項目名}」と ▼（項目の切替。メニューは Part A・Part B の見出しの下に「{番号} {項目名}」を並べ、版を開いているときは同じ版の 21 を開く）、右に MoonGlyph と「{記入済み}/{小項目の数} answered」（数え方は 20 の「項目の状態」と同じで、数字の小項目は数えない）、その下にテンプレートのガイダンス。版を開いているときは上に 20 と同じ「Viewing {版の名前} (read only)」と「Show the latest」（今のプランの 21）、アーカイブ済みの案・アイデアは 20 と同じ注意を出す。
+  - 参照は見出しの下に「References」と「Always the latest」の行、その下に参照ごとの閉じた Disclosure（題は API の `title`）。中身は種類ごとの一覧（検証の回答はタイトルと回答、競合は名前と Type・Typical Price・Strength・Weakness、費用行は名前と金額（検証にそのキーの行が無いときは、テンプレートの初期行の名前と「Not in validation」。6.0.7）、調査ログは「{日付} {トピック}」と Observation、決定ログは「{種類}: {値}」（版の保存は「Version saved: {版の名前}」）と「{日付} · {記録者}」と理由の冒頭、前提とリスクは文と各欄、自己分析はメンバーを選ぶ Picker「Member」とセクションごとの回答）で、空なら「Nothing in it yet」。下に全体を出す画面へのリンク（検証の画面は「Open in validation」、決定ログは「Open Decision Log」。§24 の Go / No-Go の履歴は種類を Go / No-Go に絞った 7）。§13 の合計は参照の位置ではなく表の下に出す。§24 は参照の下に「Record a decision with Record Go / No-Go on the plan home.」（プランを変えられる Owner / Member にだけ）、§30 の2つの小項目は欄の下に「Shown as the speaker notes of the 1-minute Pitch Deck.」（5分版は「5-minute」）を出す。
+  - 数字の小項目は、数字が1つなら値だけ、複数なら名前と値の一覧（6.4 の表示名。費用行は検証のその行の名前で、検証にその行が無ければテンプレートのキー）、シナリオは 6.4 の `scenario:*` の1列分（1日の販売数・売上・営業利益・営業利益率。23 の表と同じ並び）。「横に」置く「Edit in validation」は、同じカードの数字の下に置く（Viewer とアーカイブ済みのアイデアは「Open in validation」。20 と同じ）。移る先は 6.4 の「直す画面」で、費用行は 17 のその行、費用の合計と変動費/件は 17、価格・営業日数・Capacity Limit は 18 のその欄、それ以外と複数の数字は 18。版を開いているときは横に「As saved in this version」。控えめな行の冒頭は、数字が1つなら値、複数なら「{名前} {値}」を「 · 」でつなぎ、シナリオは売上と営業利益。
+  - 表の小項目は 17 と同じ TableView（触った行のセルが欄になる）。+ Add row は表の下に置き、足した行は保存されてから1列目の欄にフォーカスする（スマホは行のシートを開く）。行の ⋯ に「Delete row」（「Delete this row?」と確かめる）。スマホは行を押すと、その行の欄と Delete row を並べたシート（題「Row {n}」）を開く。規則に合わないセルは理由を出し、そのセルは打ち始める前の値のまま送る。§13 の合計は表の下に「Total ownership: {%} · Total capital: {金額}」。控えめな行の冒頭は1列目の値を「 · 」でつなぎ、1列目がどれも空なら「{n} rows」。
+  - 実行管理の小項目は、1列目と「{状態} · {担当} · {期限}」（KPI は先頭に Target と Actual）、期限切れの「Overdue」、コメントの数を並べた ListView（ローンチは区分の見出し、KPI は Area の見出しの下。Area の無い KPI は「No area」）。行を押すと Dialog で欄を開き（題「Edit milestone」など。Owner / Member は 6.0.2 の自動保存、それ以外は読み取り。題は項目の1列目。KPI の Actual の下に「Updated {日付}, {時刻}」）、行の ⋯ に Comments・History・Delete（Delete は Owner / Member だけで、「Delete this milestone?」などと確かめる）。+ Add（読み上げは「Add milestone」など）は「New milestone」などの Dialog で、1列目を書くまで Add を押せない。担当は Owner / Member から選ぶか名前を書く ComboBox（書いた名前は「Use “{名前}”」）。控えめな行の冒頭は1列目を「 · 」でつなぐ。
+  - 読み取りの表示（Viewer・アーカイブ・版）でも、各小項目の Example とヒントを出す（11 と同じ）。
+  - 下に留めるフッターは「Previous item」・AI ▼・「Next: {番号} {項目名}」。最後の小項目の後の完了カード（スマホ）は「{項目の番号2桁}: {記入済み}/{小項目の数} answered」と「Next: {番号} {項目名}」・「Back to plan」。
+  - 欄の無い小項目（数字・表・実行管理）を `?q=` で開いたときは、カードを画面の縦の中央へ移す（入力できる表示のとき。読み取りの表示は 6.2 のとおりフォーカスを動かさない）。
 
 ---
 

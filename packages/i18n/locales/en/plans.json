@@ -145,10 +145,92 @@
         "dueDate": "Deadline"
       }
     },
-    "formerMember": "A former member"
+    "formerMember": "A former member",
+    "list": {
+      "milestone": "Milestones",
+      "launch": "Launch",
+      "kpi": "KPIs",
+      "open_question": "Open Questions",
+      "next_action": "Next Actions"
+    },
+    "add": "Add",
+    "addTo": {
+      "milestone": "Add milestone",
+      "launch": "Add launch step",
+      "kpi": "Add KPI",
+      "open_question": "Add open question",
+      "next_action": "Add next action"
+    },
+    "newTitle": {
+      "milestone": "New milestone",
+      "launch": "New launch step",
+      "kpi": "New KPI",
+      "open_question": "New open question",
+      "next_action": "New next action"
+    },
+    "editTitle": {
+      "milestone": "Edit milestone",
+      "launch": "Edit launch step",
+      "kpi": "Edit KPI",
+      "open_question": "Edit open question",
+      "next_action": "Edit next action"
+    },
+    "deleteTitle": {
+      "milestone": "Delete this milestone?",
+      "launch": "Delete this launch step?",
+      "kpi": "Delete this KPI?",
+      "open_question": "Delete this open question?",
+      "next_action": "Delete this next action?"
+    },
+    "nothingYet": "Nothing yet",
+    "overdue": "Overdue",
+    "noAssignee": "No assignee",
+    "useName": "Use “{{name}}”",
+    "noArea": "No area",
+    "actualUpdated": "Updated {{date}}, {{time}}",
+    "more": "More for {{title}}",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "noun": "item"
   },
   "table": {
     "cell": "{{label}}: {{value}}",
     "emptyRow": "Empty row"
+  },
+  "item": {
+    "switchItem": "Switch item",
+    "items": "Items of {{plan}}",
+    "previousItem": "Previous item",
+    "next": "Next: {{item}}",
+    "complete": "{{item}}: {{answered}}/{{total}} answered",
+    "toHome": "Back to plan",
+    "noun": "answer",
+    "tableNoun": "table",
+    "references": "References",
+    "referencesAside": "Always the latest",
+    "openValidation": "Open in validation",
+    "openDecisionLog": "Open Decision Log",
+    "nothing": "Nothing in it yet",
+    "noRows": "No rows",
+    "addRow": "Add row",
+    "addRowTo": "Add row to {{title}}",
+    "row": "Row {{n}}",
+    "rowMore": "More for row {{n}}",
+    "editRow": "Edit row",
+    "deleteRow": "Delete row",
+    "deleteRowTitle": "Delete this row?",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "rows_one": "{{count}} row",
+    "rows_other": "{{count}} rows",
+    "ownership": "Total ownership",
+    "capital": "Total capital",
+    "pitchNotes": {
+      "one": "Shown as the speaker notes of the 1-minute Pitch Deck.",
+      "five": "Shown as the speaker notes of the 5-minute Pitch Deck."
+    },
+    "goNoGoNote": "Record a decision with Record Go / No-Go on the plan home.",
+    "memberPicker": "Member",
+    "notInValidation": "Not in validation"
   }
 }

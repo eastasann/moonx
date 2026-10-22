@@ -287,6 +287,29 @@ export const planHref = (
       : `?${new URLSearchParams({ version: search.version })}`
   }`;
 
+/** What 21's URL may open with (SDD 4章). */
+export interface PlanItemSearch {
+  /** The sub-item to focus: its ID ("P.01.2"). */
+  q?: string;
+  /** The `plan_version` shown read only. */
+  version?: string;
+}
+
+/** 21 Plan item, `itemNo` 1–30 (SDD 4章), or a saved version of it read only. */
+export const planItemHref = (
+  workspaceId: string,
+  ideaId: string,
+  planId: string,
+  itemNo: number,
+  search: PlanItemSearch = {},
+) => {
+  const query = new URLSearchParams();
+  if (search.q !== undefined) query.set("q", search.q);
+  if (search.version !== undefined) query.set("version", search.version);
+  const text = query.toString();
+  return `${planHref(workspaceId, ideaId, planId)}/items/${itemNo}${text === "" ? "" : `?${text}`}`;
+};
+
 /**
  * Where a section of 13 opens (design-spec 6.1「セクションを開く」): 01, 02 and 10 on
  * 11, 03 on 14, 04 on 15, 05 on 17, 06–08 on 18, 09 on 16.
@@ -305,10 +328,10 @@ export function sectionHref(
   return undefined;
 }
 
-/** The screens whose panels are built: PNL-1 on 10–18 and 20, PNL-2 on 10, 11, 13–18 and 20. */
+/** The screens whose panels are built: PNL-1 on 10–18, 20 and 21, PNL-2 on 10, 11, 13–18, 20 and 21. */
 const PANEL_SCREENS = {
-  comments: new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 20]),
-  history: new Set([10, 11, 13, 14, 15, 16, 17, 18, 20]),
+  comments: new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21]),
+  history: new Set([10, 11, 13, 14, 15, 16, 17, 18, 20, 21]),
 };
 
 /**
@@ -409,6 +432,14 @@ function screenHrefOf(target: LinkTarget): string | undefined {
       return ideaId === undefined || target.planId === undefined
         ? undefined
         : planHref(workspaceId, ideaId, target.planId);
+    case 21:
+      return ideaId === undefined ||
+        target.planId === undefined ||
+        target.itemNo === undefined
+        ? undefined
+        : planItemHref(workspaceId, ideaId, target.planId, target.itemNo, {
+            q: target.questionKey,
+          });
     default:
       return undefined;
   }

@@ -2119,7 +2119,7 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 34b: 21 プラン項目の編集
 
-Status:
+Status: done 2026-10-22
 
 ```
 プランの項目を編集する画面を作ってください（Step 34 から分けた残り。Step 34 は 20 プランホーム・M3・M4・M5 と、19・13・7 からの入口、
@@ -2171,7 +2171,11 @@ Status:
 
 やること:
 1. 22 実行管理（マイルストーン・ローンチ計画・KPI・Open Questions・Next Actions。担当・期限・状態）。欄の名前は、Step 34 が PNL-2 の差分の書式のためにカタログに置いた名前を使う。
-   一覧・追加・編集の部品は、Step 34b が 21 の実行管理の小項目のために 22 でそのまま使う形で作ったものを使う（design-spec 6.12「22 と同じ部品」）。21 の「Open in Execution」もつなぐ。
+   一覧・追加・編集の部品は、Step 34b が 21 の実行管理の小項目のために 22 でそのまま使う形で作ったものを使う（design-spec 6.12「22 と同じ部品」）。
+   apps/web の components/ExecutionItems.tsx の行（ExecutionRowContent）・区分と Area のまとめ（executionGroups）・行の ⋯（ExecutionItemMenu）・削除の確認（useDeleteExecutionItem）・
+   追加（NewExecutionItem）・編集（ExecutionItemEditor）・読み取り（ExecutionItemFacts）・並び（inListOrder）がそれで、21 はこれを ExecutionList で Dialog に並べている。
+   22 はパターン D（4.1）なので、同じ部品をリストと詳細のペインに組み、22 にだけあるもの（`?item=` の選択と詳細のペイン、行の ⋯ の並べ替え（6.10 の Dialog）、
+   Next Actions の絞り込み）を足す（ExecutionItemMenu に並べ替えの項目を足すなど、部品を広げるのはよい）。21 の「Open in Execution」もつなぐ。
    一覧の横に選ばずに出す項目（先頭）は、パネルで本文が1ペインになっても保つ（design-spec 4.1。Step 33 で 14・16 に入れた apps/web の useKeepShownItem を使う）
 2. 23 Pitch Deck（1分版と5分版・版の表示・PDF の書き出し）
 3. M8 テンプレートの移行（10・13・20 からの入口）

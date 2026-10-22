@@ -22329,12 +22329,12 @@
                                   "type": "object",
                                   "properties": {
                                     "id": {
-                                      "type": "string",
+                                      "type": ["string", "null"],
                                       "format": "uuid",
                                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                                     },
                                     "category": {
-                                      "type": "string",
+                                      "type": ["string", "null"],
                                       "enum": [
                                         "initial",
                                         "monthly_fixed",
@@ -22342,9 +22342,9 @@
                                       ]
                                     },
                                     "templateKey": { "type": "string" },
-                                    "name": { "type": "string" },
+                                    "name": { "type": ["string", "null"] },
                                     "inputMode": {
-                                      "type": "string",
+                                      "type": ["string", "null"],
                                       "enum": ["amount", "percent_of_price"]
                                     },
                                     "amount": { "type": ["number", "null"] },
@@ -27407,7 +27407,7 @@
     "/api/v1/comments": {
       "get": {
         "summary": "C1 The comments on an item or a screen (PNL-1)",
-        "description": "One item (targetType, targetId, targetKey), or one screen (containerType, containerId, sectionKeys) with, inside an idea, the comments on the idea. Threads oldest first, deleted comments as deleted without their body. Comments on deleted rows and on questions a migration hid are not returned. A self-analysis's owner reads the comments of every workspace it is shared with now; its Owners and Members read those of workspaceId (Viewers 403 FORBIDDEN, 403 NOT_SHARED).",
+        "description": "One item (targetType, targetId, targetKey), or one screen (containerType, containerId, sectionKeys; on a plan, execution:{type} is its execution items of that type) with, inside an idea, the comments on the idea. Threads oldest first, deleted comments as deleted without their body. Comments on deleted rows and on questions a migration hid are not returned. A self-analysis's owner reads the comments of every workspace it is shared with now; its Owners and Members read those of workspaceId (Viewers 403 FORBIDDEN, 403 NOT_SHARED).",
         "parameters": [
           {
             "name": "workspaceId",
@@ -28903,7 +28903,7 @@
     "/api/v1/history": {
       "get": {
         "summary": "H1 The history of an item or a screen (PNL-2)",
-        "description": "One item (targetType, targetId, targetKey), deleted rows included, or one screen (containerType, containerId, sectionKeys), newest first. The idea's screen (13) adds the template migrations of its validation and the undone creations. A self-analysis's history is its owner's only (403 FORBIDDEN).",
+        "description": "One item (targetType, targetId, targetKey), deleted rows included, or one screen (containerType, containerId, sectionKeys; on a plan, execution:{type} is its execution items of that type), newest first. The idea's screen (13) adds the template migrations of its validation and the undone creations. A self-analysis's history is its owner's only (403 FORBIDDEN).",
         "parameters": [
           {
             "name": "cursor",

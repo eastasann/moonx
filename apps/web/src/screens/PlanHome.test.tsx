@@ -193,8 +193,12 @@ describe("20 Plan home (design-spec 6.12)", () => {
     expect(summary?.textContent).toContain("5/6");
     expect(summary?.textContent).toContain("Uses your validation");
     expect(summary?.textContent).toContain("2 comments");
-    // 21 is not built yet: no way into it (docs/claude-code-prompts.md).
-    expect(within(partA).queryAllByRole("link")).toHaveLength(0);
+    // Each item opens 21.
+    expect(
+      within(partA)
+        .getAllByRole("link")
+        .map((link) => link.getAttribute("href")),
+    ).toEqual([planPath("/items/1"), planPath("/items/2")]);
     expect(
       screen.getByRole("region", { name: "Part B: Execution Plan" })
         .textContent,
@@ -416,9 +420,14 @@ describe("20 Plan home (design-spec 6.12)", () => {
     expect(
       screen.getByText("Business Name: Health Bowl · Prepared by: Ana"),
     ).toBeTruthy();
-    // The version open is not a link to itself.
+    // The version open is not a link to itself; its items open 21 on it.
     const versions = screen.getByRole("list", { name: "Versions" });
     expect(within(versions).queryAllByRole("link")).toHaveLength(0);
+    expect(
+      within(screen.getByRole("list", { name: "Part B: Execution Plan" }))
+        .getByRole("link", { name: /13 Ownership/ })
+        .getAttribute("href"),
+    ).toBe(planPath(`/items/13?version=${versionId}`));
     expect(versions.textContent).toContain("Viewing · Sep 20 · Ana Villanueva");
   });
 

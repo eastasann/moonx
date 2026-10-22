@@ -286,18 +286,24 @@ export const planHomeQuery = (
   });
 
 /**
- * P4: one plan item (21) as the plan has it now. 20's history panel reads the items whose
- * table answers it lists, for the names and kinds of their columns.
+ * P4: one plan item (21) as the plan has it now, or as a saved version keeps it. The
+ * history panels read the items whose table answers they list, for the names and kinds
+ * of their columns.
  */
-export const planItemQuery = (ideaId: string, planId: string, itemNo: number) =>
+export const planItemQuery = (
+  ideaId: string,
+  planId: string,
+  itemNo: number,
+  versionId?: string,
+) =>
   queryOptions({
-    queryKey: [...planKey(ideaId, planId), "items", itemNo],
+    queryKey: [...planKey(ideaId, planId), "items", itemNo, versionId ?? null],
     queryFn: () =>
       unwrap(
         api()
           .api.v1.plans({ planId: inPath(planId) })
           .items({ itemNo: String(itemNo) })
-          .get({ query: {} }),
+          .get({ query: versionId === undefined ? {} : { versionId } }),
       ),
   });
 

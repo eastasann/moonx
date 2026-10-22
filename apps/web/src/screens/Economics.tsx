@@ -115,7 +115,14 @@ import {
   ideaHref,
   ideasHref,
 } from "../lib/links";
-import { costTotalText, type MetricFormat, metricText } from "../lib/metrics";
+import {
+  costTotalText,
+  type MetricFormat,
+  metricText,
+  SCENARIO_FIGURES,
+  type ScenarioFigure,
+  scenarioFigureFormat,
+} from "../lib/metrics";
 import { useIsOnline } from "../lib/online";
 import {
   economicsQuery,
@@ -452,35 +459,6 @@ function NumberSheet({
   );
 }
 
-/** The format of each scenario figure (design-spec 6.4「端数」). */
-const SCENARIO_METRICS = [
-  "unitsPerDay",
-  "unitsPerMonth",
-  "revenue",
-  "variableCostTotal",
-  "operatingProfit",
-  "operatingMargin",
-] as const satisfies readonly (keyof ScenarioColumn)[];
-
-type ScenarioMetric = (typeof SCENARIO_METRICS)[number];
-
-const formatOf = (
-  metric: ScenarioMetric,
-  column: ScenarioColumn,
-): MetricFormat => {
-  switch (metric) {
-    case "unitsPerDay":
-      // Typed daily sales show as typed; break-even's are calculated.
-      return column.key === "break_even" ? "units" : "typedUnits";
-    case "unitsPerMonth":
-      return "units";
-    case "operatingMargin":
-      return "percent";
-    default:
-      return "money";
-  }
-};
-
 /**
  * The scenarios in the results (design-spec 6.4「計算仕様」, 4.1 F): break-even and the
  * four scenarios, a line each with its figures under its name, as a phone shows them at
@@ -498,7 +476,7 @@ function ScenarioTable({ result }: { result: EconomicsResult }) {
       name: t("validation:economics.scenarioColumn"),
       isRowHeader: true,
     },
-    ...SCENARIO_METRICS.map((metric) => ({
+    ...SCENARIO_FIGURES.map((metric) => ({
       id: metric,
       name: t(`validation:economics.metric.${metric}`),
       numeric: true,
@@ -516,8 +494,8 @@ function ScenarioTable({ result }: { result: EconomicsResult }) {
         id === "name"
           ? scenarioName(column)
           : metricText(
-              column[id as ScenarioMetric],
-              formatOf(id as ScenarioMetric, column),
+              column[id as ScenarioFigure],
+              scenarioFigureFormat(id as ScenarioFigure, column),
               workspace.currency,
             )
       }

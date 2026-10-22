@@ -543,14 +543,21 @@ export function saveStateOf(
 }
 
 /** The codes a refused save names as its reason beside "Couldn't save" (6.0.2). */
-export type RejectionReason = "archived" | "noAccess" | "gone" | "format";
+export type RejectionReason =
+  | "archived"
+  | "noAccess"
+  | "gone"
+  | "format"
+  | "published";
 
 /**
- * Why the API refused a save for good (design-spec 6.0.2: archived, no access, gone), or
- * null for a refusal it does not name, shown as unexpected with its Ref.
+ * Why the API refused a save for good (design-spec 6.0.2: archived, no access, gone, a
+ * template version published meanwhile), or null for a refusal it does not name, shown
+ * as unexpected with its Ref.
  */
 export function rejectionReason(error: ApiError): RejectionReason | null {
   const reasons: Partial<Record<ErrorCode, RejectionReason>> = {
+    PUBLISHED_READ_ONLY: "published",
     ARCHIVED: "archived",
     FORBIDDEN: "noAccess",
     NO_ACCESS: "noAccess",

@@ -21,10 +21,11 @@ export const adminTemplatesHref = (kind?: TemplateKind) =>
   `/admin/templates${kind === undefined ? "" : `?kind=${kind}`}`;
 
 /**
- * The nodes of 27 that are no section or question (SDD 4章 `?node=`): a kind's settings at
- * the end of the tree.
+ * The nodes of 27 that are no section or question (SDD 4章 `?node=`): the template's name
+ * and a kind's settings at the end of the tree.
  */
 export const SETTINGS_NODES = [
+  "name",
   "ai-prompt",
   "cost-defaults",
   "check-rules",

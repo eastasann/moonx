@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  type AnswerType,
   answerTypeSchema,
   type CheckKey,
   costCategorySchema,
@@ -56,7 +57,36 @@ export const flagRepeats = (
   }
 };
 
-const tableColumnTypeSchema = z.enum(["text", "number", "percent", "money"]);
+/**
+ * The answer types the questions of each kind may have (SDD 5.13 AD6): those its answers
+ * table holds (6.3: a self-analysis keeps a text and an amount, a validation a text, a
+ * plan a text and table rows), and in a plan the sub-items that show the validation's
+ * numbers and the plan's execution items and keep no answer. AD6 checks them; 27 offers
+ * only these.
+ */
+export const TEMPLATE_ANSWER_TYPES: Record<
+  TemplateKind,
+  readonly AnswerType[]
+> = {
+  self_analysis: ["long_text", "short_text", "choice", "amount_with_reason"],
+  validation: ["long_text", "short_text", "choice"],
+  business_plan: [
+    "long_text",
+    "short_text",
+    "choice",
+    "table",
+    "linked_metric",
+    "execution_view",
+  ],
+};
+
+/** The kind of a table column's values (SDD 5.2 `QuestionOptions`). */
+export const tableColumnTypeSchema = z.enum([
+  "text",
+  "number",
+  "percent",
+  "money",
+]);
 
 /**
  * QuestionOptions (SDD 5.2) as a file writes them: choices and column names are required
@@ -232,7 +262,8 @@ const displayConditionSchema = (kind: TemplateKind) =>
           message: "Shows on a key that is not a question ID of this template",
         });
     })
-    .pipe(z.record(z.string(), z.array(requiredText(shortText))));
+    // With no answer to show on, a question would never show (design-spec 6.0.8).
+    .pipe(z.record(z.string(), z.array(requiredText(shortText)).min(1)));
 
 const questionSchema = (kind: TemplateKind) =>
   z.strictObject({

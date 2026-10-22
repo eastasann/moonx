@@ -1,12 +1,12 @@
 import { formatList, formatRelativeTime } from "@moonx/i18n";
 import {
-  type CostCategory,
   type TemplateCheckResult,
   type TemplateKind,
   type TemplateVersionDetail,
   THRESHOLD_CHECK_KEYS,
 } from "@moonx/schemas";
 import {
+  ActionMenu,
   AlertDialog,
   Badge,
   Breadcrumb,
@@ -14,12 +14,14 @@ import {
   Button,
   DescriptionList,
   DescriptionListItem,
+  Dialog,
   Flex,
   Heading,
   IllustratedMessage,
   ListDetailPattern,
   ListView,
   ListViewItem,
+  MenuItem,
   RowList,
   RowListItem,
   Skeleton,
@@ -27,15 +29,21 @@ import {
   Text,
   Tree,
   TreeItem,
+  useIsNarrow,
   useTwoColumns,
 } from "@moonx/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { MousePointerClick } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { MousePointerClick, Plus } from "lucide-react";
+import { type ReactNode, useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { adminToast, useDetailHistory } from "../components/admin";
+import { toastFailure } from "../components/ideaActions";
+import {
+  ReorderDialog,
+  ReorderGroupedDialog,
+} from "../components/ReorderDialog";
 import { failureCode, SendFailure } from "../components/SendFailure";
 import {
   FailureState,
@@ -44,9 +52,29 @@ import {
   SlowLoadingState,
   useIsSlow,
 } from "../components/states";
+import {
+  AddQuestionDialog,
+  AddSectionDialog,
+  DeleteNodeDialog,
+  type DeleteTarget,
+  PreviewDialog,
+} from "../components/TemplateDialogs";
+import {
+  AiPromptEditor,
+  CHECK_PARAMS,
+  CheckRulesEditor,
+  COST_CATEGORIES,
+  CostDefaultsEditor,
+  ExecutionPresetsEditor,
+  NameEditor,
+  QuestionEditor,
+  SectionEditor,
+} from "../components/TemplateEditors";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
+import { useAutosave, useAutosaveState } from "../lib/autosave-react";
+import { HeldInputContext } from "../lib/draft-fields";
 import {
   adminTemplatesHref,
   SETTINGS_NODES,
@@ -60,6 +88,14 @@ import {
   templateVersionQuery,
 } from "../lib/queries";
 import { isSessionLost, useSendThrough } from "../lib/send";
+import {
+  draftScope,
+  putVersion,
+  type Question,
+  questionItemKey,
+  type Section,
+  sectionItemKey,
+} from "../lib/template-drafts";
 import { useDocumentTitle } from "../lib/title";
 
 /** `/admin/templates/versions/$versionId`'s search parameters (SDD 4章). */
@@ -68,9 +104,6 @@ export interface TemplateVersionSearch {
   node?: string;
 }
 
-type Section = TemplateVersionDetail["sections"][number];
-type Question = Section["questions"][number];
-
 /** A node of 27's tree (design-spec 6.17 27). */
 type TreeNode =
   | { kind: "section"; section: Section }
@@ -78,14 +111,14 @@ type TreeNode =
   | { kind: "settings"; node: SettingsNode };
 
 /**
- * The settings at the end of the tree that the template's kind holds (design-spec 6.17):
- * the AI prompt only for a self analysis, the cost rows and check thresholds only for a
- * validation, the execution rows only for a plan.
+ * The settings at the end of the tree (design-spec 6.17): the template's name, then what
+ * the kind holds: the AI prompt only for a self analysis, the cost rows and check
+ * thresholds only for a validation, the execution rows only for a plan.
  */
 export function settingsNodesOf(kind: TemplateKind): SettingsNode[] {
-  if (kind === "self_analysis") return ["ai-prompt"];
-  if (kind === "validation") return ["cost-defaults", "check-rules"];
-  return ["execution-presets"];
+  if (kind === "self_analysis") return ["name", "ai-prompt"];
+  if (kind === "validation") return ["name", "cost-defaults", "check-rules"];
+  return ["name", "execution-presets"];
 }
 
 /**
@@ -144,7 +177,7 @@ function Value({
 }
 
 /** A section as it stands (design-spec 6.17「セクション」); plans call it an item. */
-function SectionDetail({
+function SectionFacts({
   section,
   kind,
 }: {
@@ -153,49 +186,46 @@ function SectionDetail({
 }) {
   const { t } = useTranslation(["admin"]);
   return (
-    <Stack gap="space-300">
-      <Heading level={2}>{section.title}</Heading>
-      <DescriptionList>
-        <DescriptionListItem label={t("admin:version.section.key")}>
-          <Value>{section.key}</Value>
+    <DescriptionList>
+      <DescriptionListItem label={t("admin:version.section.key")}>
+        <Value>{section.key}</Value>
+      </DescriptionListItem>
+      <DescriptionListItem label={t("admin:version.section.title")}>
+        <Value>{section.title}</Value>
+      </DescriptionListItem>
+      {kind === "self_analysis" && (
+        <DescriptionListItem label={t("admin:version.section.subtitle")}>
+          <Value>{section.subtitle}</Value>
         </DescriptionListItem>
-        <DescriptionListItem label={t("admin:version.section.title")}>
-          <Value>{section.title}</Value>
+      )}
+      <DescriptionListItem
+        label={
+          kind === "business_plan"
+            ? t("admin:version.section.description")
+            : t("admin:version.section.guidance")
+        }
+      >
+        <Value isLong>{section.guidance}</Value>
+      </DescriptionListItem>
+      {kind === "business_plan" && (
+        <DescriptionListItem label={t("admin:version.section.part")}>
+          <Value>
+            {section.part === null
+              ? null
+              : t(`admin:version.part.${section.part}`)}
+          </Value>
         </DescriptionListItem>
-        {kind === "self_analysis" && (
-          <DescriptionListItem label={t("admin:version.section.subtitle")}>
-            <Value>{section.subtitle}</Value>
-          </DescriptionListItem>
-        )}
-        <DescriptionListItem
-          label={
-            kind === "business_plan"
-              ? t("admin:version.section.description")
-              : t("admin:version.section.guidance")
-          }
-        >
-          <Value isLong>{section.guidance}</Value>
-        </DescriptionListItem>
-        {kind === "business_plan" && (
-          <DescriptionListItem label={t("admin:version.section.part")}>
-            <Value>
-              {section.part === null
-                ? null
-                : t(`admin:version.part.${section.part}`)}
-            </Value>
-          </DescriptionListItem>
-        )}
-        <DescriptionListItem
-          label={
-            kind === "business_plan"
-              ? t("admin:version.section.prompts")
-              : t("admin:version.section.questions")
-          }
-        >
-          <Text variant="number-sm">{String(section.questions.length)}</Text>
-        </DescriptionListItem>
-      </DescriptionList>
-    </Stack>
+      )}
+      <DescriptionListItem
+        label={
+          kind === "business_plan"
+            ? t("admin:version.section.prompts")
+            : t("admin:version.section.questions")
+        }
+      >
+        <Text variant="number-sm">{String(section.questions.length)}</Text>
+      </DescriptionListItem>
+    </DescriptionList>
   );
 }
 
@@ -236,7 +266,7 @@ function optionsOf(question: Question, t: TFunction<["admin"]>) {
 }
 
 /** A question as it stands (design-spec 6.17「設問」); plans call it a prompt. */
-function QuestionDetail({
+function QuestionFacts({
   question,
   kind,
 }: {
@@ -247,95 +277,68 @@ function QuestionDetail({
   const options = optionsOf(question, t);
   const conditions = Object.entries(question.displayCondition ?? {});
   return (
-    <Stack gap="space-300">
-      <Stack gap="space-50">
-        <Text variant="number-sm" tone="secondary">
-          {question.key}
-        </Text>
-        <Heading level={2}>{question.title}</Heading>
-      </Stack>
-      <DescriptionList>
-        <DescriptionListItem label={t("admin:version.question.key")}>
-          <Value>{question.key}</Value>
+    <DescriptionList>
+      <DescriptionListItem label={t("admin:version.question.key")}>
+        <Value>{question.key}</Value>
+      </DescriptionListItem>
+      <DescriptionListItem label={t("admin:version.question.title")}>
+        <Value>{question.title}</Value>
+      </DescriptionListItem>
+      <DescriptionListItem label={t("admin:version.question.prompt")}>
+        <Value isLong>{question.prompt}</Value>
+      </DescriptionListItem>
+      <DescriptionListItem label={t("admin:version.question.example")}>
+        <Value isLong>{question.example}</Value>
+      </DescriptionListItem>
+      <DescriptionListItem label={t("admin:version.question.hint")}>
+        <Value isLong>{question.hint}</Value>
+      </DescriptionListItem>
+      <DescriptionListItem label={t("admin:version.question.answerType")}>
+        <Value>{t(`admin:answerType.${question.answerType}`)}</Value>
+      </DescriptionListItem>
+      {options !== null && (
+        <DescriptionListItem label={options.label}>
+          <Value isLong>{options.value}</Value>
         </DescriptionListItem>
-        <DescriptionListItem label={t("admin:version.question.title")}>
-          <Value>{question.title}</Value>
-        </DescriptionListItem>
-        <DescriptionListItem label={t("admin:version.question.prompt")}>
-          <Value isLong>{question.prompt}</Value>
-        </DescriptionListItem>
-        <DescriptionListItem label={t("admin:version.question.example")}>
-          <Value isLong>{question.example}</Value>
-        </DescriptionListItem>
-        <DescriptionListItem label={t("admin:version.question.hint")}>
-          <Value isLong>{question.hint}</Value>
-        </DescriptionListItem>
-        <DescriptionListItem label={t("admin:version.question.answerType")}>
-          <Value>{t(`admin:answerType.${question.answerType}`)}</Value>
-        </DescriptionListItem>
-        {options !== null && (
-          <DescriptionListItem label={options.label}>
-            <Value isLong>{options.value}</Value>
-          </DescriptionListItem>
-        )}
-        <DescriptionListItem label={t("admin:version.question.shownWhen")}>
-          <Value isLong>
-            {conditions.length === 0
-              ? t("admin:version.question.always")
-              : conditions
-                  .map(([key, values]) =>
-                    t("admin:version.question.condition", {
-                      key,
-                      values: formatList(values),
-                    }),
-                  )
-                  .join("\n")}
+      )}
+      <DescriptionListItem label={t("admin:version.question.shownWhen")}>
+        <Value isLong>
+          {conditions.length === 0
+            ? t("admin:version.question.always")
+            : conditions
+                .map(([key, values]) =>
+                  t("admin:version.question.condition", {
+                    key,
+                    values: formatList(values),
+                  }),
+                )
+                .join("\n")}
+        </Value>
+      </DescriptionListItem>
+      {kind === "validation" && (
+        <DescriptionListItem label={t("admin:version.question.fau")}>
+          <Value>
+            {question.hasFau
+              ? t("admin:version.question.fauOn")
+              : t("admin:version.question.fauOff")}
           </Value>
         </DescriptionListItem>
-        {kind === "validation" && (
-          <DescriptionListItem label={t("admin:version.question.fau")}>
-            <Value>
-              {question.hasFau
-                ? t("admin:version.question.fauOn")
-                : t("admin:version.question.fauOff")}
-            </Value>
-          </DescriptionListItem>
-        )}
-        {kind === "business_plan" && (
-          <DescriptionListItem label={t("admin:version.question.copyFrom")}>
-            <Value>
-              {question.copyFrom === null || question.copyFrom.length === 0
-                ? null
-                : formatList(question.copyFrom)}
-            </Value>
-          </DescriptionListItem>
-        )}
-      </DescriptionList>
-    </Stack>
+      )}
+      {kind === "business_plan" && (
+        <DescriptionListItem label={t("admin:version.question.copyFrom")}>
+          <Value>
+            {question.copyFrom === null || question.copyFrom.length === 0
+              ? null
+              : formatList(question.copyFrom)}
+          </Value>
+        </DescriptionListItem>
+      )}
+    </DescriptionList>
   );
 }
 
-const COST_CATEGORIES = [
-  "initial",
-  "monthly_fixed",
-  "variable",
-] as const satisfies readonly CostCategory[];
-
-/** The thresholds of each check and their names, in the order design-spec 6.1 tells them. */
-const CHECK_PARAMS = {
-  competitors: [["min", "admin:checkRule.competitors.min"]],
-  local_price: [
-    ["pricedCompetitors", "admin:checkRule.local_price.pricedCompetitors"],
-    ["researchLogs", "admin:checkRule.local_price.researchLogs"],
-  ],
-  permits: [["researchLogs", "admin:checkRule.permits.researchLogs"]],
-  demand_signal: [
-    ["researchLogs", "admin:checkRule.demand_signal.researchLogs"],
-  ],
-} as const;
-
 /** A setting at the end of the tree as it stands (design-spec 6.17). */
-function SettingsDetail({
+function SettingsFacts({
   node,
   version,
 }: {
@@ -343,9 +346,10 @@ function SettingsDetail({
   version: TemplateVersionDetail;
 }) {
   const { t } = useTranslation(["admin", "common"]);
-  const title = t(`admin:version.settings.${node}`);
   let body: ReactNode;
-  if (node === "ai-prompt") {
+  if (node === "name") {
+    body = <Value>{version.name}</Value>;
+  } else if (node === "ai-prompt") {
     body = <Value isLong>{version.aiPrompt}</Value>;
   } else if (node === "cost-defaults") {
     body = COST_CATEGORIES.map((category) => {
@@ -434,12 +438,7 @@ function SettingsDetail({
       );
     });
   }
-  return (
-    <Stack gap="space-300">
-      <Heading level={2}>{title}</Heading>
-      {body}
-    </Stack>
-  );
+  return <Stack gap="space-300">{body}</Stack>;
 }
 
 /** Beside the tree while no node is chosen: what to do. */
@@ -455,8 +454,8 @@ function ChooseNode() {
   );
 }
 
-/** The selected node beside the tree. */
-function NodeDetail({
+/** A node as it stands: what a published version and a phone's draft show. */
+function NodeFacts({
   node,
   version,
 }: {
@@ -464,12 +463,181 @@ function NodeDetail({
   version: TemplateVersionDetail;
 }) {
   if (node.kind === "section") {
-    return <SectionDetail section={node.section} kind={version.kind} />;
+    return <SectionFacts section={node.section} kind={version.kind} />;
   }
   if (node.kind === "question") {
-    return <QuestionDetail question={node.question} kind={version.kind} />;
+    return <QuestionFacts question={node.question} kind={version.kind} />;
   }
-  return <SettingsDetail node={node.node} version={version} />;
+  return <SettingsFacts node={node.node} version={version} />;
+}
+
+/** A draft's node, its fields saved as they are typed (design-spec 6.17「下書きの編集」). */
+function NodeEditor({
+  node,
+  version,
+}: {
+  node: TreeNode;
+  version: TemplateVersionDetail;
+}) {
+  if (node.kind === "section") {
+    return <SectionEditor version={version} section={node.section} />;
+  }
+  if (node.kind === "question") {
+    return <QuestionEditor version={version} question={node.question} />;
+  }
+  switch (node.node) {
+    case "name":
+      return <NameEditor version={version} />;
+    case "ai-prompt":
+      return <AiPromptEditor version={version} />;
+    case "cost-defaults":
+      return <CostDefaultsEditor version={version} />;
+    case "check-rules":
+      return <CheckRulesEditor version={version} />;
+    case "execution-presets":
+      return <ExecutionPresetsEditor version={version} />;
+  }
+}
+
+/** What the ⋯ and Preview of a node ask the screen for (design-spec 6.17). */
+type NodeAction =
+  | { kind: "preview"; section: Section }
+  | { kind: "add-question"; section: Section }
+  | { kind: "reorder-sections" }
+  | { kind: "reorder-questions" }
+  | { kind: "delete"; target: DeleteTarget };
+
+/** The id that names a node in the tree and the URL. */
+const nodeIdOf = (node: TreeNode) =>
+  node.kind === "settings"
+    ? node.node
+    : node.kind === "section"
+      ? node.section.id
+      : node.question.id;
+
+/**
+ * The selected node beside the tree: its heading, with Preview and, on a draft, its ⋯ for
+ * a section or question; then, on a draft, its fields to edit, which a phone shows as they
+ * stand with Edit opening them in a sheet (4.1 D); on a published version, as it stands.
+ */
+function NodeDetail({
+  node,
+  version,
+  onAction,
+}: {
+  node: TreeNode;
+  version: TemplateVersionDetail;
+  onAction: (action: NodeAction) => void;
+}) {
+  const { t } = useTranslation(["admin"]);
+  const isPhone = useIsNarrow();
+  const [isEditing, setEditing] = useState(false);
+  const isDraft = version.status === "draft";
+  const words = version.kind === "business_plan" ? "plan" : "other";
+  const section = node.kind === "settings" ? null : node.section;
+  const name = nodeName(node, t);
+  const heading =
+    node.kind === "question" ? (
+      <Stack gap="space-50">
+        <Text variant="number-sm" tone="secondary">
+          {node.question.key}
+        </Text>
+        <Heading level={2}>{node.question.title}</Heading>
+      </Stack>
+    ) : (
+      <Heading level={2}>
+        {node.kind === "section"
+          ? node.section.title
+          : t(`admin:version.settings.${node.node}`)}
+      </Heading>
+    );
+  const editor = (
+    <NodeEditor key={nodeIdOf(node)} node={node} version={version} />
+  );
+  return (
+    <Stack gap="space-400">
+      <Flex justifyContent="space-between" alignItems="start" gap="space-200">
+        {heading}
+        {section !== null && (
+          <Flex gap="space-100" alignItems="center">
+            <Button
+              variant="secondary"
+              size="S"
+              onPress={() => onAction({ kind: "preview", section })}
+            >
+              {t("admin:version.preview.open")}
+            </Button>
+            {isDraft && (
+              <ActionMenu
+                aria-label={t("admin:version.more", { name })}
+                onAction={(key) => {
+                  if (key === "add-question") {
+                    onAction({ kind: "add-question", section });
+                  } else if (key === "reorder-sections") {
+                    onAction({ kind: "reorder-sections" });
+                  } else if (key === "reorder-questions") {
+                    onAction({ kind: "reorder-questions" });
+                  } else if (key === "delete") {
+                    onAction({
+                      kind: "delete",
+                      target:
+                        node.kind === "question"
+                          ? { kind: "question", question: node.question }
+                          : { kind: "section", section },
+                    });
+                  }
+                }}
+              >
+                <MenuItem id="add-question">
+                  {t(`admin:version.add.question.${words}`)}
+                </MenuItem>
+                {node.kind === "section" && (
+                  <MenuItem id="reorder-sections">
+                    {t(`admin:version.reorder.sections.${words}`)}
+                  </MenuItem>
+                )}
+                <MenuItem id="reorder-questions">
+                  {t(`admin:version.reorder.questions.${words}`)}
+                </MenuItem>
+                <MenuItem id="delete">
+                  {node.kind === "question"
+                    ? t(`admin:version.delete.question.${words}`)
+                    : t(`admin:version.delete.section.${words}`)}
+                </MenuItem>
+              </ActionMenu>
+            )}
+          </Flex>
+        )}
+      </Flex>
+      {isDraft && !isPhone ? (
+        editor
+      ) : (
+        <Stack gap="space-300">
+          <NodeFacts node={node} version={version} />
+          {isDraft && (
+            <Flex>
+              <Button variant="secondary" onPress={() => setEditing(true)}>
+                {t("admin:version.edit")}
+              </Button>
+            </Flex>
+          )}
+        </Stack>
+      )}
+      {isDraft && isPhone && isEditing && (
+        <Dialog
+          isOpen
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setEditing(false);
+          }}
+          isDismissable
+          size="M"
+          title={t("admin:version.editTitle", { name })}
+        >
+          {editor}
+        </Dialog>
+      )}
+    </Stack>
+  );
 }
 
 /** The id of the section that holds the question `id`, for the tree to open its branch. */
@@ -697,12 +865,15 @@ function VersionHeader({
   version,
   check,
   isChecking,
+  isSaving,
   onPublish,
   isPublishing,
 }: {
   version: TemplateVersionDetail;
   check: TemplateCheckResult | undefined;
   isChecking: boolean;
+  /** Input on its way or not saved: what is published must be what was typed (6.17). */
+  isSaving: boolean;
   onPublish: () => void;
   isPublishing: boolean;
 }) {
@@ -783,7 +954,11 @@ function VersionHeader({
             onPress={onPublish}
             isPending={isPublishing}
             isDisabled={
-              !isOnline || isChecking || check === undefined || problems > 0
+              !isOnline ||
+              isChecking ||
+              isSaving ||
+              check === undefined ||
+              problems > 0
             }
           >
             {t("admin:version.publish", { version: version.versionNumber })}
@@ -816,6 +991,26 @@ function TreeSkeleton() {
 /** The tabs of the tree's pane: the contents, and for a draft the check. */
 type PaneTab = "contents" | "check";
 
+type OpenDialog = NodeAction | { kind: "add-section" };
+
+/** The order of the version's sections and their questions, as AD5 takes it. */
+const orderOf = (version: TemplateVersionDetail) =>
+  version.sections.map((section) => ({
+    id: section.id,
+    questionIds: section.questions.map((question) => question.id),
+  }));
+
+/** Whether input of the version waits to be saved, is on its way, or failed (6.0.2). */
+function useIsSaving(versionId: string) {
+  const state = useAutosaveState();
+  const scope = draftScope(versionId);
+  return [...(state?.items.values() ?? [])].some(
+    (item) =>
+      item.key.startsWith(scope) &&
+      (item.status !== "saved" || Object.keys(item.unsaved).length > 0),
+  );
+}
+
 /** The tree, the check and the node beside them, once the version is read. */
 function VersionBody({
   version,
@@ -831,7 +1026,23 @@ function VersionBody({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const isOnline = useIsOnline();
+  const autosave = useAutosave();
   const sendThrough = useSendThrough();
+  const isNarrow = useIsNarrow();
+  // Items holding input that breaks its rules: not sent, so not saved (6.17).
+  const [held, setHeld] = useState<ReadonlySet<string>>(() => new Set());
+  const reportHeld = useCallback(
+    (itemKey: string, isHeld: boolean) =>
+      setHeld((current) => {
+        if (current.has(itemKey) === isHeld) return current;
+        const next = new Set(current);
+        if (isHeld) next.add(itemKey);
+        else next.delete(itemKey);
+        return next;
+      }),
+    [],
+  );
+  const isSaving = useIsSaving(version.id) || held.size > 0;
   const isDraft = version.status === "draft";
   const check = useQuery({
     ...templateCheckQuery(version.id),
@@ -840,12 +1051,23 @@ function VersionBody({
   const [tab, setTab] = useState<PaneTab>("contents");
   const [isAsking, setAsking] = useState(false);
   const [isPublishing, setPublishing] = useState(false);
+  const [dialog, setDialog] = useState<OpenDialog | null>(null);
   const busy = useRef(false);
   const [failure, setFailure] = useState<unknown>(null);
   const node = findNode(version, search.node);
   const select = (id: string) =>
     detailHistory.open({ search: { node: id } }, isTwoColumns);
   const kindLabel = t(`admin:kind.${version.kind}`);
+  const words = version.kind === "business_plan" ? "plan" : "other";
+  const versionKey = templateVersionKey(version.id);
+  /** The version as cached now: a dialog opened before an edit sends today's order. */
+  const latest = () =>
+    queryClient.getQueryData<TemplateVersionDetail>(versionKey) ?? version;
+  const reload = () =>
+    queryClient.fetchQuery({
+      ...templateVersionQuery(version.id),
+      staleTime: 0,
+    });
 
   const publish = async () => {
     if (busy.current) return;
@@ -865,9 +1087,7 @@ function VersionBody({
       await queryClient.invalidateQueries({
         queryKey: adminTemplatesQuery().queryKey,
       });
-      void queryClient.invalidateQueries({
-        queryKey: templateVersionKey(version.id),
-      });
+      void queryClient.invalidateQueries({ queryKey: versionKey });
       adminToast(
         t("admin:version.published", {
           kind: kindLabel,
@@ -888,15 +1108,96 @@ function VersionBody({
         code === "PUBLISHED_READ_ONLY" ||
         (error instanceof ApiError && error.status === 404)
       ) {
-        void queryClient.invalidateQueries({
-          queryKey: templateVersionKey(version.id),
-        });
+        void queryClient.invalidateQueries({ queryKey: versionKey });
       }
       setFailure(error);
     } finally {
       busy.current = false;
       setPublishing(false);
     }
+  };
+
+  /**
+   * Deletes a section with its questions, or a question (AD4 DELETE). One already gone
+   * counts as deleted; one published meanwhile reads the version again, read only now.
+   * The deleted node's saves have nothing left to save, and its detail closes.
+   */
+  const remove = async (target: DeleteTarget) => {
+    const ids =
+      target.kind === "section"
+        ? [target.section.id, ...target.section.questions.map((q) => q.id)]
+        : [target.question.id];
+    try {
+      await sendThrough(() =>
+        target.kind === "section"
+          ? unwrap(
+              api()
+                .api.v1.admin["template-sections"]({
+                  id: inPath(target.section.id),
+                })
+                .delete(),
+            )
+          : unwrap(
+              api()
+                .api.v1.admin["template-questions"]({
+                  id: inPath(target.question.id),
+                })
+                .delete(),
+            ),
+      );
+    } catch (error) {
+      if (isSessionLost(error)) return;
+      const code = failureCode(error);
+      if (code === "PUBLISHED_READ_ONLY") {
+        void queryClient.invalidateQueries({ queryKey: versionKey });
+        adminToast(t("admin:version.alreadyPublished"));
+        return;
+      }
+      if (code !== "NOT_FOUND") {
+        toastFailure(error, () => void remove(target));
+        return;
+      }
+    }
+    const keys = [
+      ...(target.kind === "section"
+        ? [sectionItemKey(version.id, target.section.id)]
+        : []),
+      ...(target.kind === "section"
+        ? target.section.questions.map((q) => questionItemKey(version.id, q.id))
+        : [questionItemKey(version.id, target.question.id)]),
+    ];
+    for (const key of keys) {
+      const item = autosave.getState().items.get(key);
+      if (item !== undefined) autosave.discard(key, Object.keys(item.unsaved));
+    }
+    void queryClient.invalidateQueries({ queryKey: versionKey });
+    if (search.node !== undefined && ids.includes(search.node)) {
+      detailHistory.close({ search: {} });
+      // The ⋯ that asked went with the node: the keyboard goes to the tree, on the row
+      // it keeps in the Tab order.
+      requestAnimationFrame(() =>
+        (
+          document.querySelector<HTMLElement>(
+            '[role="treegrid"] [role="row"][tabindex="0"]',
+          ) ?? document.querySelector<HTMLElement>('[role="treegrid"]')
+        )?.focus(),
+      );
+    }
+  };
+
+  const sendOrder = async (sections: ReturnType<typeof orderOf>) => {
+    putVersion(
+      queryClient,
+      await sendThrough(() =>
+        unwrap(
+          api()
+            .api.v1.admin["template-versions"]({
+              versionId: inPath(version.id),
+            })
+            .order.put({ sections }),
+        ),
+      ),
+    );
   };
 
   let checkList: ReactNode;
@@ -926,8 +1227,50 @@ function VersionBody({
     checkList = <TreeSkeleton />;
   }
   const problems = check.data?.errors.length;
+  const sectionLabel = (section: Section) =>
+    t("admin:version.sectionName", { key: section.key, title: section.title });
+  const questionLabel = (question: Question) =>
+    t("admin:version.questionName", {
+      key: question.key,
+      title: question.title,
+    });
+  const groupsOf = (current: TemplateVersionDetail) =>
+    current.sections.map((section) => ({
+      id: section.id,
+      label: sectionLabel(section),
+      items: section.questions.map((question) => ({
+        id: question.id,
+        label: questionLabel(question),
+      })),
+    }));
+  const addSection = {
+    label: t(`admin:version.add.section.${words}`),
+    onPress: () => setDialog({ kind: "add-section" }),
+  };
+  let listNote: ReactNode;
+  if (isDraft && tab === "check") {
+    listNote =
+      check.data === undefined ? undefined : (
+        <CheckNotes version={version} check={check.data} />
+      );
+  } else if (isDraft && !isNarrow) {
+    // Under the tree, not at the title's end: Publish is the pane's primary action.
+    listNote = (
+      <Flex>
+        <Button
+          variant="secondary"
+          isQuiet
+          onPress={addSection.onPress}
+          isDisabled={!isOnline}
+        >
+          <Plus />
+          {addSection.label}
+        </Button>
+      </Flex>
+    );
+  }
   return (
-    <>
+    <HeldInputContext.Provider value={reportHeld}>
       <ListDetailPattern
         header={
           <Stack gap="space-200">
@@ -935,6 +1278,7 @@ function VersionBody({
               version={version}
               check={check.data}
               isChecking={check.isFetching}
+              isSaving={isSaving}
               onPublish={() => setAsking(true)}
               isPublishing={isPublishing}
             />
@@ -986,15 +1330,15 @@ function VersionBody({
             />
           )
         }
-        listNote={
-          isDraft && tab === "check" && check.data !== undefined ? (
-            <CheckNotes version={version} check={check.data} />
-          ) : undefined
+        listNote={listNote}
+        // A phone's new item floats at the bottom right (4.1 D).
+        newItem={
+          isDraft && tab === "contents" && isNarrow ? addSection : undefined
         }
         detail={
           // In one pane the list shows until a node is chosen; beside it, what to do.
           node !== null ? (
-            <NodeDetail node={node} version={version} />
+            <NodeDetail node={node} version={version} onAction={setDialog} />
           ) : isTwoColumns ? (
             <ChooseNode />
           ) : null
@@ -1020,7 +1364,84 @@ function VersionBody({
           {t("admin:version.publishBody", { version: version.versionNumber })}
         </AlertDialog>
       )}
-    </>
+      {dialog?.kind === "add-section" && (
+        <AddSectionDialog
+          version={version}
+          onClose={() => setDialog(null)}
+          onAdded={select}
+        />
+      )}
+      {dialog?.kind === "add-question" && (
+        <AddQuestionDialog
+          version={version}
+          section={dialog.section}
+          onClose={() => setDialog(null)}
+          onAdded={select}
+        />
+      )}
+      {dialog?.kind === "delete" && (
+        <DeleteNodeDialog
+          version={version}
+          target={dialog.target}
+          onDelete={() => void remove(dialog.target)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === "preview" && (
+        <PreviewDialog
+          version={version}
+          section={
+            version.sections.find(
+              (section) => section.id === dialog.section.id,
+            ) ?? dialog.section
+          }
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === "reorder-sections" && (
+        <ReorderDialog
+          title={t(`admin:version.reorder.sectionsTitle.${words}`)}
+          items={version.sections.map((section) => ({
+            id: section.id,
+            label: sectionLabel(section),
+          }))}
+          listPath="sections"
+          send={(ids) => {
+            const questions = new Map(
+              orderOf(latest()).map((entry) => [entry.id, entry.questionIds]),
+            );
+            return sendOrder(
+              ids.map((id) => ({ id, questionIds: questions.get(id) ?? [] })),
+            );
+          }}
+          reload={async () =>
+            (await reload()).sections.map((section) => ({
+              id: section.id,
+              label: sectionLabel(section),
+            }))
+          }
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === "reorder-questions" && (
+        <ReorderGroupedDialog
+          title={t(`admin:version.reorder.questionsTitle.${words}`)}
+          groups={groupsOf(version)}
+          emptyText={t(`admin:version.reorder.noQuestions.${words}`)}
+          listPath="sections"
+          send={(order) =>
+            sendOrder(
+              order.map((group) => ({
+                id: group.id,
+                questionIds: group.itemIds,
+              })),
+            )
+          }
+          reload={async () => groupsOf(await reload())}
+          onClose={() => setDialog(null)}
+        />
+      )}
+    </HeldInputContext.Provider>
   );
 }
 
@@ -1100,6 +1521,7 @@ export function TemplateVersionScreen({
   return (
     <WorkspaceFrame
       current="admin"
+      saveScope={draftScope(versionId)}
       back={
         me.isAdmin
           ? { label: t("admin:templates.title"), href: templatesHref }

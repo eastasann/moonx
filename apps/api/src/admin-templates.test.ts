@@ -198,14 +198,20 @@ describe("a self-analysis template from file to published versions", () => {
       versionNumber: 1,
       status: "draft",
       aiPrompt: "Ask me one question at a time.",
+      name: "Self analysis",
       sections: [
         {
           key: "WHY",
           subtitle: "Why do I want this?",
           sortOrder: 0,
           questions: [
-            { key: "SA.WHY.1", sectionKey: "WHY", copyFrom: null },
-            { key: "SA.WHY.2", sortOrder: 1 },
+            {
+              key: "SA.WHY.1",
+              sectionKey: "WHY",
+              copyFrom: null,
+              isKeyPublished: false,
+            },
+            { key: "SA.WHY.2", sortOrder: 1, isKeyPublished: false },
           ],
         },
       ],
@@ -219,6 +225,23 @@ describe("a self-analysis template from file to published versions", () => {
       }),
     );
     expect(draft.aiPrompt).toBe("Ask one question at a time, then summarize.");
+    // The fields sent change; the name is required (design-spec 6.0.8 for 27).
+    draft = await detailOf(
+      await call("PATCH", `/template-versions/${v1.versionId}`, {}),
+    );
+    expect(draft).toMatchObject({
+      name: "Self analysis",
+      aiPrompt: "Ask one question at a time, then summarize.",
+    });
+    const blankName = await call(
+      "PATCH",
+      `/template-versions/${v1.versionId}`,
+      {
+        name: "  ",
+      },
+    );
+    expect(blankName.status).toBe(422);
+    expect((await errorOf(blankName)).details?.[0]?.path).toBe("name");
 
     // AD4 sections
     const sectionAdded = await call(
@@ -420,6 +443,9 @@ describe("a self-analysis template from file to published versions", () => {
       await call("PATCH", `/template-versions/${v1.versionId}`, {
         aiPrompt: "",
       }),
+      await call("PATCH", `/template-versions/${v1.versionId}`, {
+        name: "Renamed",
+      }),
       await call("PATCH", `/template-sections/${income.id}`, { title: "X" }),
       await call("DELETE", `/template-questions/${choice.id}`),
       await call("PUT", `/template-versions/${v1.versionId}/check-rules`, {
@@ -471,6 +497,7 @@ describe("a self-analysis template from file to published versions", () => {
     const kept = copy.sections
       .flatMap((section) => section.questions)
       .find((q) => q.key === "SA.WHY.1");
+    expect(kept?.isKeyPublished).toBe(true);
     const renamed = await call("PATCH", `/template-questions/${kept?.id}`, {
       key: "SA.WHY.5",
     });
@@ -490,6 +517,7 @@ describe("a self-analysis template from file to published versions", () => {
       201,
     );
     const fresh = questionOf(added, "SA.WHY.6");
+    expect(fresh.isKeyPublished).toBe(false);
     expect(
       questionOf(
         await detailOf(
@@ -506,6 +534,20 @@ describe("a self-analysis template from file to published versions", () => {
     expect(
       (await call("DELETE", `/template-questions/${fresh.id}`)).status,
     ).toBe(404);
+    // The name is the template's: renamed on the draft, every version shows it.
+    expect(
+      (
+        await detailOf(
+          await call("PATCH", `/template-versions/${v2.id}`, {
+            name: "Self Analysis",
+          }),
+        )
+      ).name,
+    ).toBe("Self Analysis");
+    expect(
+      (await detailOf(await call("GET", `/template-versions/${v1.versionId}`)))
+        .name,
+    ).toBe("Self Analysis");
     // The question v2 drops is a warning, which does not block.
     const [question] = await db
       .select({ id: templateQuestions.id })
@@ -535,7 +577,7 @@ describe("a self-analysis template from file to published versions", () => {
     );
     expect(list.items[0]).toEqual({
       kind: "self_analysis",
-      name: "Self analysis",
+      name: "Self Analysis",
       versions: [
         {
           id: v2.id,
@@ -674,6 +716,16 @@ describe("the settings only one kind of template has", () => {
     );
     expect(condition.status).toBe(422);
     expect((await errorOf(condition)).details?.[0]?.path).toBe(
+      "displayCondition",
+    );
+    // A condition with no answer would hide its question for good (6.0.8).
+    const never = await call(
+      "PATCH",
+      `/template-questions/${questionOf(draft, "V.01.REACH").id}`,
+      { displayCondition: { "V.02.OCEAN": [] } },
+    );
+    expect(never.status).toBe(422);
+    expect((await errorOf(never)).details?.[0]?.path).toStartWith(
       "displayCondition",
     );
     // Deleting a section takes its questions with it.

@@ -124,6 +124,10 @@ describe("templateFileSchema", () => {
     expect(at({ "V.02.OCEAN": [" "] })).toEqual([
       "sections.0.questions.0.displayCondition.V.02.OCEAN.0",
     ]);
+    // With no answer to show on, the question would never show.
+    expect(at({ "V.02.OCEAN": [] })).toEqual([
+      "sections.0.questions.0.displayCondition.V.02.OCEAN",
+    ]);
   });
 
   test("keeps optional texts as typed and turns blank ones into null", () => {

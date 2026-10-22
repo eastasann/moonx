@@ -66,6 +66,7 @@
     "none": "None",
     "unnamed": "Unnamed row",
     "settings": {
+      "name": "Template name",
       "ai-prompt": "AI prompt",
       "cost-defaults": "Starting cost rows",
       "check-rules": "Check thresholds",
@@ -103,7 +104,45 @@
       "fau": "F/A/U",
       "fauOn": "Asked",
       "fauOff": "Not asked",
-      "copyFrom": "Copies from"
+      "copyFrom": "Copies from",
+      "keyPublished": "This question ID is in a published version, so it can't change.",
+      "keyForm": {
+        "self_analysis": "SA, the section key and a number, like SA.WHY.1",
+        "validation": "V, the section (01, 02, 04, 08 or 10) and a key in capitals, digits and _, like V.01.WHO",
+        "business_plan": "P, the item number (01 to 30) and a number, like P.01.1"
+      },
+      "askFau": "Ask for F/A/U (Fact, Assumption or Unknown)",
+      "sourceN": "Source {{n}}",
+      "addSource": "Add source",
+      "copiesNothing": "Copies nothing",
+      "copyFromForm": "Validation question IDs like V.01.WHO, or IDEA.ONE_LINE_CONCEPT, IDEA.PROPOSED_SOLUTION, LIST.ASSUMPTIONS or LIST.RISKS. Several are joined in this order.",
+      "changeTypeTitle": "Change the answer type to {{type}}?",
+      "changeType": "Change",
+      "changeTypeBody": {
+        "choice": "Its choices are removed.",
+        "table": "Its columns are removed.",
+        "linked_metric": "Its key numbers are removed.",
+        "execution_view": "Its execution list is removed."
+      },
+      "choiceN": "Choice {{n}}",
+      "metricN": "Key number {{n}}",
+      "addChoice": "Add choice",
+      "addMetric": "Add key number",
+      "noChoices": "No choices yet",
+      "noMetrics": "No key numbers yet",
+      "metricForm": "Keys of the key numbers, like break_even_units_day, or cost_row: and a starting cost row's key, like cost_row:initial.permits",
+      "columnN": "Column {{n}}",
+      "columnKey": "Key",
+      "columnLabel": "Name",
+      "columnType": "Type",
+      "addColumn": "Add column",
+      "noColumns": "No columns yet",
+      "conditionN": "Condition {{n}}",
+      "conditionQuestion": "Question",
+      "notInTemplate": "{{key}} (not in this template)",
+      "conditionValues": "When the answer is",
+      "conditionText": "When the answer is (one per line)",
+      "addCondition": "Add condition"
     },
     "tabs": {
       "label": "Template",
@@ -144,7 +183,100 @@
     "publishInvalid": "This version has problems. Fix them on Check, then publish.",
     "alreadyPublished": "This version was already published",
     "publishedUnknown": "Couldn't load when it was published.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "nameNote": "It's the template's name, shared by all its versions. Only operators see it.",
+    "partNone": "None",
+    "edit": "Edit",
+    "editTitle": "Edit {{name}}",
+    "more": "More actions for {{name}}",
+    "rowN": "Row {{n}}",
+    "addRow": "Add row",
+    "costKey": "Key",
+    "costName": "Name",
+    "presetTitle": {
+      "milestone": "Milestone",
+      "launch": "Timing",
+      "kpi": "KPI"
+    },
+    "presetArea": "Area",
+    "presetTiming": "Period",
+    "add": {
+      "section": {
+        "plan": "Add item",
+        "other": "Add section"
+      },
+      "sectionTitle": {
+        "plan": "Add item",
+        "other": "Add section"
+      },
+      "question": {
+        "plan": "Add prompt",
+        "other": "Add question"
+      },
+      "questionTitle": {
+        "plan": "Add a prompt to {{section}}",
+        "other": "Add a question to {{section}}"
+      }
+    },
+    "reorder": {
+      "sections": {
+        "plan": "Reorder items",
+        "other": "Reorder sections"
+      },
+      "questions": {
+        "plan": "Reorder prompts",
+        "other": "Reorder questions"
+      },
+      "sectionsTitle": {
+        "plan": "Reorder items",
+        "other": "Reorder sections"
+      },
+      "questionsTitle": {
+        "plan": "Reorder prompts",
+        "other": "Reorder questions"
+      },
+      "noQuestions": {
+        "plan": "No prompts",
+        "other": "No questions"
+      }
+    },
+    "delete": {
+      "section": {
+        "plan": "Delete item",
+        "other": "Delete section"
+      },
+      "question": {
+        "plan": "Delete prompt",
+        "other": "Delete question"
+      },
+      "title": "Delete {{name}}?",
+      "action": "Delete",
+      "sectionBody": {
+        "plan_zero": "This can't be undone.",
+        "plan_one": "Its prompt is deleted with it. This can't be undone.",
+        "plan_other": "Its {{count}} prompts are deleted with it. This can't be undone.",
+        "other_zero": "This can't be undone.",
+        "other_one": "Its question is deleted with it. This can't be undone.",
+        "other_other": "Its {{count}} questions are deleted with it. This can't be undone."
+      },
+      "questionBody": "This can't be undone. Published versions keep it."
+    },
+    "preview": {
+      "open": "Preview",
+      "title": "Preview: {{section}}",
+      "empty": {
+        "plan": "No prompts yet",
+        "other": "No questions yet"
+      },
+      "amount": "Amount",
+      "why": "Why this amount?",
+      "metrics": "Shows the key numbers {{metrics}}",
+      "execution": "Shows {{list}} from Execution",
+      "executionNone": "Shows an execution list once one is chosen",
+      "shownWhen": "Shown when {{condition}}",
+      "noColumns": "A table with no columns yet"
+    },
+    "fieldInRow": "{{field}}, row {{n}}"
   },
   "answerType": {
     "long_text": "Long text",
@@ -289,5 +421,20 @@
     "accepted": "Accepted",
     "revoked": "Cancelled",
     "expired": "Expired"
+  },
+  "noun": {
+    "section": {
+      "plan": "item",
+      "other": "section"
+    },
+    "question": {
+      "plan": "prompt",
+      "other": "question"
+    }
+  },
+  "list": {
+    "up": "Move {{item}} up",
+    "down": "Move {{item}} down",
+    "remove": "Remove {{item}}"
   }
 }

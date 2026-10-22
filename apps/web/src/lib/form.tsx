@@ -59,14 +59,15 @@ function FormTextField({
 }
 
 /** A TextArea bound to its form field, as FormTextField is. */
-function FormTextArea(
-  props: Omit<
-    TextAreaProps,
-    "value" | "onChange" | "onBlur" | "name" | "errorMessage" | "isInvalid"
-  >,
-) {
+function FormTextArea({
+  rejection,
+  ...props
+}: Omit<
+  TextAreaProps,
+  "value" | "onChange" | "onBlur" | "name" | "errorMessage" | "isInvalid"
+> & { rejection?: string }) {
   const field = useFieldContext<string>();
-  const error = useFieldError();
+  const error = useFieldError() ?? rejection;
   return (
     <TextArea
       {...props}

@@ -42,6 +42,7 @@ const question = (
   sortOrder: 0,
   copyFrom: null,
   reference: null,
+  isKeyPublished: false,
   ...extra,
 });
 
@@ -51,6 +52,7 @@ const draft: TemplateVersionDetail = {
   versionNumber: 3,
   status: "draft",
   aiPrompt: "",
+  name: "Business Idea & Validation",
   sections: [
     {
       id: sectionId,
@@ -185,6 +187,7 @@ describe("27 Admin: Edit Template (design-spec 6.17)", () => {
     ).toBeTruthy();
     const tree = await treeOf();
     expect(within(tree).getByText("Customer & Problem")).toBeTruthy();
+    expect(within(tree).getByText("Template name")).toBeTruthy();
     expect(within(tree).getByText("Starting cost rows")).toBeTruthy();
     expect(within(tree).getByText("Check thresholds")).toBeTruthy();
     // Only a self analysis holds an AI prompt; only a plan its execution rows.
@@ -207,15 +210,30 @@ describe("27 Admin: Edit Template (design-spec 6.17)", () => {
     expect(
       await screen.findByRole("heading", { level: 2, name: "OCEAN" }),
     ).toBeTruthy();
-    expect(screen.getByText("Red, Blue, Mixed")).toBeTruthy();
-    expect(screen.getByText("V.01.WHO is Yes")).toBeTruthy();
-    expect(screen.getByText("Asked")).toBeTruthy();
+    // A draft's node is edited beside the tree (design-spec 6.17「下書きの編集」).
+    const value = (name: string) =>
+      (
+        screen.getByRole("textbox", {
+          name: new RegExp(`^${name.replace(/[()]/g, "\\$&")}`),
+        }) as HTMLInputElement
+      ).value;
+    expect(value("Question ID")).toBe("V.01.OCEAN");
+    expect(value("Choice 1")).toBe("Red");
+    expect(value("Choice 3")).toBe("Mixed");
+    expect(value("When the answer is (one per line)")).toBe("Yes");
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: "Ask for F/A/U (Fact, Assumption or Unknown)",
+        }) as HTMLInputElement
+      ).checked,
+    ).toBe(true);
     expect(document.title).toBe("Edit Template · moonx");
   });
 
-  test("a setting from the URL: the thresholds; a setting the kind lacks selects nothing", async () => {
+  test("a published version's setting from the URL: the thresholds as they stand", async () => {
     versionApi();
-    renderApp(`/admin/templates/versions/${draftId}?node=check-rules`);
+    renderApp(`/admin/templates/versions/${published.id}?node=check-rules`);
     expect(
       await screen.findByRole("heading", {
         level: 2,

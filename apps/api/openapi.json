@@ -30349,6 +30349,7 @@
                       "enum": ["draft", "published"]
                     },
                     "aiPrompt": { "type": "string" },
+                    "name": { "type": "string" },
                     "sections": {
                       "type": "array",
                       "items": {
@@ -30661,7 +30662,8 @@
                                       }
                                     ]
                                   }
-                                }
+                                },
+                                "isKeyPublished": { "type": "boolean" }
                               },
                               "required": [
                                 "key",
@@ -30677,7 +30679,8 @@
                                 "id",
                                 "sortOrder",
                                 "copyFrom",
-                                "reference"
+                                "reference",
+                                "isKeyPublished"
                               ],
                               "additionalProperties": false
                             }
@@ -30805,6 +30808,7 @@
                     "versionNumber",
                     "status",
                     "aiPrompt",
+                    "name",
                     "sections",
                     "costDefaults",
                     "checkRules",
@@ -30843,8 +30847,8 @@
         "operationId": "getApiV1AdminTemplate-versionsByVersionId"
       },
       "patch": {
-        "summary": "AD3 Edit a draft's AI prompt (27)",
-        "description": "Self-analysis templates only; another kind takes only the empty text (422 VALIDATION_FAILED otherwise). 409 PUBLISHED_READ_ONLY for a published version.",
+        "summary": "AD3 Edit a draft's AI prompt or the template's name (27)",
+        "description": "Changes the fields sent. The AI prompt is for self-analysis templates only; another kind takes only the empty text (422 VALIDATION_FAILED otherwise). The name is the template's, shared by all its versions. 409 PUBLISHED_READ_ONLY for a published version.",
         "parameters": [
           {
             "name": "versionId",
@@ -30859,8 +30863,10 @@
               "schema": {
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
                 "type": "object",
-                "properties": { "aiPrompt": { "type": "string" } },
-                "required": ["aiPrompt"]
+                "properties": {
+                  "aiPrompt": { "type": "string" },
+                  "name": { "type": "string" }
+                }
               }
             }
           },
@@ -30894,6 +30900,7 @@
                       "enum": ["draft", "published"]
                     },
                     "aiPrompt": { "type": "string" },
+                    "name": { "type": "string" },
                     "sections": {
                       "type": "array",
                       "items": {
@@ -31206,7 +31213,8 @@
                                       }
                                     ]
                                   }
-                                }
+                                },
+                                "isKeyPublished": { "type": "boolean" }
                               },
                               "required": [
                                 "key",
@@ -31222,7 +31230,8 @@
                                 "id",
                                 "sortOrder",
                                 "copyFrom",
-                                "reference"
+                                "reference",
+                                "isKeyPublished"
                               ],
                               "additionalProperties": false
                             }
@@ -31350,6 +31359,7 @@
                     "versionNumber",
                     "status",
                     "aiPrompt",
+                    "name",
                     "sections",
                     "costDefaults",
                     "checkRules",
@@ -31463,6 +31473,7 @@
                       "enum": ["draft", "published"]
                     },
                     "aiPrompt": { "type": "string" },
+                    "name": { "type": "string" },
                     "sections": {
                       "type": "array",
                       "items": {
@@ -31775,7 +31786,8 @@
                                       }
                                     ]
                                   }
-                                }
+                                },
+                                "isKeyPublished": { "type": "boolean" }
                               },
                               "required": [
                                 "key",
@@ -31791,7 +31803,8 @@
                                 "id",
                                 "sortOrder",
                                 "copyFrom",
-                                "reference"
+                                "reference",
+                                "isKeyPublished"
                               ],
                               "additionalProperties": false
                             }
@@ -31919,6 +31932,7 @@
                     "versionNumber",
                     "status",
                     "aiPrompt",
+                    "name",
                     "sections",
                     "costDefaults",
                     "checkRules",
@@ -32031,6 +32045,7 @@
                       "enum": ["draft", "published"]
                     },
                     "aiPrompt": { "type": "string" },
+                    "name": { "type": "string" },
                     "sections": {
                       "type": "array",
                       "items": {
@@ -32343,7 +32358,8 @@
                                       }
                                     ]
                                   }
-                                }
+                                },
+                                "isKeyPublished": { "type": "boolean" }
                               },
                               "required": [
                                 "key",
@@ -32359,7 +32375,8 @@
                                 "id",
                                 "sortOrder",
                                 "copyFrom",
-                                "reference"
+                                "reference",
+                                "isKeyPublished"
                               ],
                               "additionalProperties": false
                             }
@@ -32487,6 +32504,7 @@
                     "versionNumber",
                     "status",
                     "aiPrompt",
+                    "name",
                     "sections",
                     "costDefaults",
                     "checkRules",
@@ -32720,6 +32738,7 @@
                     "type": ["object", "null"],
                     "propertyNames": { "type": "string" },
                     "additionalProperties": {
+                      "minItems": 1,
                       "type": "array",
                       "items": { "type": "string" }
                     }
@@ -32906,6 +32925,7 @@
                       "enum": ["draft", "published"]
                     },
                     "aiPrompt": { "type": "string" },
+                    "name": { "type": "string" },
                     "sections": {
                       "type": "array",
                       "items": {
@@ -33218,7 +33238,8 @@
                                       }
                                     ]
                                   }
-                                }
+                                },
+                                "isKeyPublished": { "type": "boolean" }
                               },
                               "required": [
                                 "key",
@@ -33234,7 +33255,8 @@
                                 "id",
                                 "sortOrder",
                                 "copyFrom",
-                                "reference"
+                                "reference",
+                                "isKeyPublished"
                               ],
                               "additionalProperties": false
                             }
@@ -33362,6 +33384,7 @@
                     "versionNumber",
                     "status",
                     "aiPrompt",
+                    "name",
                     "sections",
                     "costDefaults",
                     "checkRules",
@@ -33542,6 +33565,7 @@
                     "type": ["object", "null"],
                     "propertyNames": { "type": "string" },
                     "additionalProperties": {
+                      "minItems": 1,
                       "type": "array",
                       "items": { "type": "string" }
                     }
@@ -33727,6 +33751,7 @@
                       "enum": ["draft", "published"]
                     },
                     "aiPrompt": { "type": "string" },
+                    "name": { "type": "string" },
                     "sections": {
                       "type": "array",
                       "items": {
@@ -34039,7 +34064,8 @@
                                       }
                                     ]
                                   }
-                                }
+                                },
+                                "isKeyPublished": { "type": "boolean" }
                               },
                               "required": [
                                 "key",
@@ -34055,7 +34081,8 @@
                                 "id",
                                 "sortOrder",
                                 "copyFrom",
-                                "reference"
+                                "reference",
+                                "isKeyPublished"
                               ],
                               "additionalProperties": false
                             }
@@ -34183,6 +34210,7 @@
                     "versionNumber",
                     "status",
                     "aiPrompt",
+                    "name",
                     "sections",
                     "costDefaults",
                     "checkRules",
@@ -34367,6 +34395,7 @@
                       "enum": ["draft", "published"]
                     },
                     "aiPrompt": { "type": "string" },
+                    "name": { "type": "string" },
                     "sections": {
                       "type": "array",
                       "items": {
@@ -34679,7 +34708,8 @@
                                       }
                                     ]
                                   }
-                                }
+                                },
+                                "isKeyPublished": { "type": "boolean" }
                               },
                               "required": [
                                 "key",
@@ -34695,7 +34725,8 @@
                                 "id",
                                 "sortOrder",
                                 "copyFrom",
-                                "reference"
+                                "reference",
+                                "isKeyPublished"
                               ],
                               "additionalProperties": false
                             }
@@ -34823,6 +34854,7 @@
                     "versionNumber",
                     "status",
                     "aiPrompt",
+                    "name",
                     "sections",
                     "costDefaults",
                     "checkRules",
@@ -34947,6 +34979,7 @@
                       "enum": ["draft", "published"]
                     },
                     "aiPrompt": { "type": "string" },
+                    "name": { "type": "string" },
                     "sections": {
                       "type": "array",
                       "items": {
@@ -35259,7 +35292,8 @@
                                       }
                                     ]
                                   }
-                                }
+                                },
+                                "isKeyPublished": { "type": "boolean" }
                               },
                               "required": [
                                 "key",
@@ -35275,7 +35309,8 @@
                                 "id",
                                 "sortOrder",
                                 "copyFrom",
-                                "reference"
+                                "reference",
+                                "isKeyPublished"
                               ],
                               "additionalProperties": false
                             }
@@ -35403,6 +35438,7 @@
                     "versionNumber",
                     "status",
                     "aiPrompt",
+                    "name",
                     "sections",
                     "costDefaults",
                     "checkRules",
@@ -35645,6 +35681,7 @@
                       "enum": ["draft", "published"]
                     },
                     "aiPrompt": { "type": "string" },
+                    "name": { "type": "string" },
                     "sections": {
                       "type": "array",
                       "items": {
@@ -35957,7 +35994,8 @@
                                       }
                                     ]
                                   }
-                                }
+                                },
+                                "isKeyPublished": { "type": "boolean" }
                               },
                               "required": [
                                 "key",
@@ -35973,7 +36011,8 @@
                                 "id",
                                 "sortOrder",
                                 "copyFrom",
-                                "reference"
+                                "reference",
+                                "isKeyPublished"
                               ],
                               "additionalProperties": false
                             }
@@ -36101,6 +36140,7 @@
                     "versionNumber",
                     "status",
                     "aiPrompt",
+                    "name",
                     "sections",
                     "costDefaults",
                     "checkRules",
@@ -36256,6 +36296,7 @@
                       "enum": ["draft", "published"]
                     },
                     "aiPrompt": { "type": "string" },
+                    "name": { "type": "string" },
                     "sections": {
                       "type": "array",
                       "items": {
@@ -36568,7 +36609,8 @@
                                       }
                                     ]
                                   }
-                                }
+                                },
+                                "isKeyPublished": { "type": "boolean" }
                               },
                               "required": [
                                 "key",
@@ -36584,7 +36626,8 @@
                                 "id",
                                 "sortOrder",
                                 "copyFrom",
-                                "reference"
+                                "reference",
+                                "isKeyPublished"
                               ],
                               "additionalProperties": false
                             }
@@ -36712,6 +36755,7 @@
                     "versionNumber",
                     "status",
                     "aiPrompt",
+                    "name",
                     "sections",
                     "costDefaults",
                     "checkRules",

@@ -404,16 +404,16 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | TextField / TextArea | 短文・長文の回答、名前、理由 | TextArea は入力に合わせて広がる（Web フォントを読み込み終えたときにも高さを測り直す）。理由を書く欄（`isReason`。19 の「Why?」と、同じ形の M4 の理由）は 06 `field.text-area-reason-min-height` の高さから広がる（s19-decision.html の textarea）。欄の最小の高さは中の入力の場所が持ち、欄のどこを押しても入力が始まる。必須の欄（`isRequired`）はラベルの後ろに secondary の「Required」を出す（s19-decision.html の「Why? Required」。Spectrum 2 の `necessityIndicator="label"` と同じ。NumberField・SearchField・Picker・ComboBox・DatePicker・MentionTextArea・DiffTextArea も同じ）。補足（`description`）は `descriptionTone="notice"` で琥珀色の文字と印にする（9 の通貨の警告。ほかの入力欄も同じ）。設問の回答の欄（QuestionCard の中）は、文字が 06 `typography.answer`、最小の高さと内側が `layout.question-form.answer-*`、角丸が `radius.callout`、地が canvas（s11-form.html の .answer）。枠はほかの入力欄と同じ `border.strong`（枠で位置を示す入力欄は 3:1。s11 の薄い線は採らない）。フォーカスで raised の地にする（s11 の .answer:focus） | キーボードで隠れない（4.3） |
 | NumberField | 金額（通貨記号・桁区切り）、%、日数、販売数 | 書式は en-PH（1.2）。表の数字の列の中では、数字を右にそろえて通貨記号と % を数字に付けて並べ、行の編集に入っても数字の位置を変えない（s17-costs.html） | 数字のキーボード |
 | SearchField | 一覧の検索、M2 の調査ログの検索 | `width="fill"` は並んだ行の残りの幅に広げる（6 の絞り込みの行。s06-ideas.html） | 同じ |
-| Picker | 通貨・出典の種類・ロール・15 の Type・16 の Risks の Probability / Impact・22 の Status・4 の表示モード（System / Light / Dark）・6 などの絞り込み・23 の生成元 | `labelPosition="inside"` はラベルを枠の中の値の前に置き（「Stage All ▾」。ラベルは secondary、値は medium の太さ）、幅を中身に合わせる（s06-ideas.html の絞り込み・s23-deck.html の生成元）。`width="fit"` は外のラベルのままで幅を中身に合わせる（9 のメンバーの役割。SettingsListItem の中では既定。s09-settings.html）。枠はほかの Picker と同じ `border.strong`（枠で位置を示す部品は 3:1。s06・s23 の薄い線は採らない）。変えられない（`isDisabled`）ときは、どの Picker も点線の薄い枠（`border.default`）と tertiary の文字（s09-settings.html の最後の Owner の役割。使えない部品はコントラストの基準の対象外） | トレイで選ぶ |
+| Picker | 通貨・出典の種類・ロール・15 の Type・16 の Risks の Probability / Impact・22 の Status・4 の表示モード（System / Light / Dark）・6 などの絞り込み・23 の生成元・27 の回答の型・Part・表の列の種類・実行管理の一覧・表示条件の設問・ローンチの区分 | `labelPosition="inside"` はラベルを枠の中の値の前に置き（「Stage All ▾」。ラベルは secondary、値は medium の太さ）、幅を中身に合わせる（s06-ideas.html の絞り込み・s23-deck.html の生成元）。`width="fit"` は外のラベルのままで幅を中身に合わせる（9 のメンバーの役割。SettingsListItem の中では既定。s09-settings.html）。枠はほかの Picker と同じ `border.strong`（枠で位置を示す部品は 3:1。s06・s23 の薄い線は採らない）。変えられない（`isDisabled`）ときは、どの Picker も点線の薄い枠（`border.default`）と tertiary の文字（s09-settings.html の最後の Owner の役割。使えない部品はコントラストの基準の対象外） | トレイで選ぶ |
 | ComboBox | 担当（メンバーか自由記述）、25 の「Choose question」、4 のタイムゾーン（メンションは MentionTextArea） | — | 入力欄を押すとトレイが開き、トレイの中の入力欄で絞り込んで選ぶ |
 | RadioGroup | 判定（Proceed / Hold / Drop）、Go / No-Go、02 OCEAN | 選んだ状態はインクの輪と点。`variant="cards"` は肢を題と説明のカードで並べる（19 の判定・M4 の Go / No-Go。s19-decision.html）: 肢の数だけの列、カードの枠は薄い線（`border.default`）、選んだカードはインクの枠と内側の線（`border-width.hairline`）、問いは `typography.heading-choice` | 同じ（`cards` は1列） |
-| Checkbox / CheckboxGroup | 24 の範囲、25 の「反映する」、M6 の共有先、14 と M2 の調査ログの入力の「Supports check」（決まった3つの確認項目から選んで付け外しする。削除できるタグだけでは付け足せないため）、M2 の「Research log」の一覧 | 選んでいない四角の枠は `border.strong`（太さは 06 `component.checkbox.border-width`） | 同じ |
+| Checkbox / CheckboxGroup | 24 の範囲、25 の「反映する」、M6 の共有先、14 と M2 の調査ログの入力の「Supports check」（決まった3つの確認項目から選んで付け外しする。削除できるタグだけでは付け足せないため）、M2 の「Research log」の一覧、27 の F/A/U を付けるかと表示条件の答え | 選んでいない四角の枠は `border.strong`（太さは 06 `component.checkbox.border-width`） | 同じ |
 | Switch | 11 の Focus の切替、22 の「Overdue のみ」の絞り込み | `labelPosition="start"` はラベルを切替の前に置く（11 のヘッダーの「Focus ●」。s11-form.html）。11 のヘッダーの Focus のラベルは、保存状態と並ぶ `typography.caption` の大きさの secondary の文字（s11-form.html の .switch。QuestionFormPattern が付ける） | 同じ |
 | ToggleButtonGroup | F/A/U の3つのボタン（もう一度押すと外れる。6.0.3） | SegmentedControl と同じ溝。F/A/U の各ボタンに MoonGlyph（● Fact・◐ Assumption・○ Unknown）を付ける。`isJustified` で幅いっぱいにし、ボタンが幅を分け合う（どのボタンも文字より狭くしない。FauPicker の中。6.0.3） | 同じ（折り返さない。幅に入らないときは、Tabs と同じく溝の中で横にスクロールする） |
 | SegmentedControl | 確信度（Low / Medium / High。6.0.3 の Assumption・FauPicker の中・16 の Assumptions の Confidence）、1分版 / 5分版、Markdown / JSON、Cards / Table、9 の招待の Pending / All、M2 の追加の手段（Research log / New entry / URL） | 1本の溝（地は canvas、薄い枠 `border.default`、角丸の外は 06 `radius.groove`・中は `radius.groove-item`、内側の余白と間は `space.50`）。選んでいない項目の文字は secondary、選んだ項目はインクの塗り。`isJustified` は ToggleButtonGroup と同じ | 同じ（折り返さない。幅に入らないときは、Tabs と同じく溝の中で横にスクロールする） |
 | TagGroup | 調査ログの「裏付ける確認項目」（14 の読み取りの詳細。選ぶ入力は Checkbox）、根拠のチップ（11 の関連する調査ログと M2 の付いている根拠。6.0.3）、絞り込みの条件 | 削除できるタグ（11 の関連する調査ログと 14 の詳細のタグは読むだけで × を付けない）。幅に入らないタグは名前を省略記号で切り、名前の後ろの添え書き（6.0.3 の「(deleted)」）は切らない | 同じ |
 | DatePicker | 期限（Deadline / Target Date）、調査ログの日付 | — | トレイで選ぶ |
-| Dialog / AlertDialog | M1〜M9、15 の競合の追加・編集、削除の確認、衝突の確認（6.0.2） | small / medium / large / fullscreen。どれをどの大きさにするかは 3.8 | トレイ（ボトムシート）か全画面シート（3.8） |
+| Dialog / AlertDialog | M1〜M9、15 の競合の追加・編集、27 のセクションと設問の追加・プレビュー、削除の確認、衝突の確認（6.0.2） | small / medium / large / fullscreen。どれをどの大きさにするかは 3.8 | トレイ（ボトムシート）か全画面シート（3.8） |
 | Popover / Tray | ポップオーバーはデスクトップ、トレイはスマホ（自動で切り替える） | — | — |
 | Tooltip / ContextualHelp | アイコンだけのボタンの説明 / 設問のヒント（▸ Hint） | — | ContextualHelp はトレイ |
 | Disclosure / Accordion | EXAMPLE・関連する調査ログの開閉、解決済みのスレッド、25 ③ の「{n} unchanged answers」 | 題は secondary の medium の太さ。中身は題の文字の頭から始める（印の分だけ下げる。s11-form.html の .discl .body） | 同じ |
@@ -596,7 +596,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - **変更履歴**: 保存のたびに、誰が・いつ・どの項目を・変更前 → 変更後を記録する（6.0.5）。
 - **ヘッダーの保存状態の出し方**: 保存できなかった入力と送っている途中の入力は、どの画面で打ったものでも、いま開いている画面のヘッダーに「Couldn't save」（と Retry）・「Saving…」で出す（画面を移っても再送を続け、ヘッダーの Retry がすべてを送り直すため）。保存していない画面には「Saved」を出さない。13 は、Edit summary で保存するまで保存状態を出さず（d1-moon.html のヘッダーに保存状態が無いため）、保存した後に「Saved」を出す。衝突の確認を待っている入力と、ログインが切れて M9 を待っている入力も「Couldn't save」に数える。
 - **一時的な失敗の再送の間隔**: 1・2・4・8・16・30 秒と伸ばし、その後は 30 秒ごと。回数の上限（429）は応答の待ち時間の後に送る。通信の失敗（応答が無い）が続けて 3 回になったら「通信の失敗が続いた」とみなし、オフラインと同じく帯を出して入力欄を読み取り専用にする。API から応答が届くか（断られた応答も含む）、ブラウザが online を知らせたら戻す。online になったら帯はすぐに消し、入力欄は残っていた入力を送り終えてから戻す。
-- **恒久的に断られた保存の理由の文言**: アーカイブ済み「It's archived」、権限がない「You don't have access to this」、対象が無い「It no longer exists」、入力の検査に通らない「Check the format」。ほかのコードは 6.0.6 の想定外のエラーの文（「Something went wrong. Ref: xxxxxxxx」）を理由の位置に出す。入力の検査に通らない 422 が欄を名指ししているとき（`details[].path`）は、その欄の下にも「Check the format」を出す（M1 などのフォームと同じ）。断られた入力は、続けて打っても自動では送らず、Retry で送る。
+- **恒久的に断られた保存の理由の文言**: アーカイブ済み「It's archived」、権限がない「You don't have access to this」、対象が無い「It no longer exists」、入力の検査に通らない「Check the format」、27 の下書きが公開された（ほかの運営者が公開した。SDD 5.13 の `PUBLISHED_READ_ONLY`）「It's published」。ほかのコードは 6.0.6 の想定外のエラーの文（「Something went wrong. Ref: xxxxxxxx」）を理由の位置に出す。入力の検査に通らない 422 が欄を名指ししているとき（`details[].path`）は、その欄の下にも「Check the format」を出す（M1 などのフォームと同じ）。断られた入力は、続けて打っても自動では送らず、Retry で送る。
 - **衝突の確認の文言**: AlertDialog（warning）の題は「{名前} updated this {項目} {相対時刻}」（保存した人が分からなければ「Someone updated this …」。{項目} は 13 の Edit summary なら「summary」）、本文は「Load theirs to see their version: what you typed is then dropped. Or overwrite it with yours: theirs stays in the history.」と「Copy my input」のボタン（押すと自分の未保存の入力をクリップボードに写し、「Copied」と出す。写せなかったときは「Couldn't copy. Select your input below to copy it.」と出し、確認の中に読み取り専用の欄「Your input」で自分の入力を出す。入力の欄は確認の後ろにあって選べないため）。ヘッダーの Retry は、答えを待っている衝突の入力も送り直し、相手の保存に当たればもう一度確かめる。操作は「Overwrite with mine」と「Load theirs」。
 
 #### 6.0.3 F/A/U の付け方と根拠シート（M2）
@@ -808,7 +808,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 27 | EXAMPLE | 任意 | 長文 |
 | 27 | AI 用プロンプト（自己分析のテンプレートだけ） | 任意 | 長文 |
 | 27 | 選択肢（選択の型）・表の列名（表の型） | 必須 | 短文。選択肢は設問の中で重ならない |
-| 27 | 表示条件 | 任意 | 6.6 の形式の設問 ID と、出すときの答えの値の一覧（値は短文） |
+| 27 | 表示条件 | 任意 | 6.6 の形式の設問 ID と、出すときの答えの値の一覧（値は短文。1つ以上。値の無い条件の設問は出ることがないため） |
 | 27 | 費用行の初期値の名前 | 任意 | 17 の費用行の名前と同じ |
 | 27 | 実行管理の初期行の1列目・Area | 1列目は必須、Area は任意（KPI の行だけ） | 22 の同じ欄と同じ |
 | 27 | 実行管理の初期行の時期の区分 | ローンチの行だけ、必須 | 6.13 の区分のどれか（22 は区分ごとにまとめて出す） |
@@ -2211,7 +2211,8 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 
 #### 27 管理: テンプレート編集（パターン D・ツリー）
 
-- 左にセクション（プランは項目）と設問（プランは小項目）のツリー（並べ替え・追加・削除）。ツリーの末尾に、種類ごとの設定（AI 用プロンプト・費用行の初期値・確認項目の基準値・実行管理の初期行）を置く。右に選んだものの編集欄。
+- 左にセクション（プランは項目）と設問（プランは小項目）のツリー（並べ替え・追加・削除）。ツリーの末尾に、テンプレートの名前（Template name。どの種類も）と種類ごとの設定（AI 用プロンプト・費用行の初期値・確認項目の基準値・実行管理の初期行）を置く。右に選んだものの編集欄。
+- テンプレートの名前は、テンプレートが持つ（版ごとには持たない。SDD 5.13 AD3）。下書きで直すと、26 の一覧とほかの版の 27 にもすぐに出る。名前を出すのは運営者の 26・27 だけ。
 - セクション: キー・タイトル・小見出し（自己分析。例: 「Why do I want this?」。11 で見出しの下に出す）・ガイダンス（プランは項目の1行の説明）。検証の設問のセクション（01・02・10）のタイトルは 11 と 13 にそのまま出る（03〜09 の画面のセクションの名前はアプリの固定。6.1）。
 - 設問: 設問 ID（公開後は変えられない）・タイトル・問い・EXAMPLE・ヒント・回答の型・選択肢（選択の型）・表の列（表の型）・表示する主要指標（検証の数字の型）・表示条件（例: 02 OCEAN が Red か Mixed のとき）・F/A/U を付けるか（検証）・下書きでコピーする元（プラン）。
 - 設問の「参照」（プランの小項目が参照する費用行のキーなど）は画面では編集しない。版のコピーで引き継ぎ、変えるときはテンプレートのファイルを直して取り込む（AD10。2026-10-12 にユーザーが確かめた）。回答の型を変えると、その型の選択肢・列・指標・実行管理の指定は消えるので、設定があるときは確認を出す。
@@ -2219,6 +2220,14 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - プランのテンプレートだけ: 実行管理の初期行（マイルストーン・ローンチ・KPI）。
 - 自己分析のテンプレートだけ: AI 用の対話プロンプト（長文）。検証とプランのテンプレートには用意しない（2026-10-02 のユーザーの決定。検証の内容を書き出して外部の AI と壁打ちすることはあるが、対話用のプロンプトは置かない）。
 - 操作: 自動保存（下書き）、プレビュー（11 の見た目）、「Publish as v{n}」（確認: 既存の回答は変わらないこと、利用者は M8 で移れることを示す）。公開済みの版は編集できない。
+- 下書きの編集: 右の編集欄の各欄を 6.0.2 の自動保存で保存する。保存の項目は、1つのセクション・1つの設問・テンプレートの名前・AI 用プロンプト、費用行の初期値・確認項目の基準値・実行管理の初期行の一覧（AD5 が一覧ごと置き換えるため、一覧が1つの項目）。規則（6.0.8 の 27 の行）に合わない値は送らず、欄の下に理由を出す。同時編集の確認（6.0.2）は無い（テンプレートの表は版の番号（`lock_version`）を持たない。SDD 6.3・ADR-019）。保存のたびに公開の前の検査を読み直す。保存の途中・保存できなかった入力・規則に合わず送っていない入力がある間と、検査を読み直している間は「Publish as v{n}」を押せない（保存していない内容を公開しないため）。スマホは詳細を読み取りで出し、その後の「Edit」で編集欄をシート（medium の Dialog）で開く（4.1 D。16 と同じ）。
+- 設問 ID: 同じテンプレートの公開済みの版にある ID は、読み取りで出し「This question ID is in a published version, so it can't change.」を添える（SDD 5.13 の `isKeyPublished`）。欄の下に種類ごとの形式（6.6）を1行で出す。
+- 回答の型は Picker で、テンプレートの種類が持てる型だけを並べる（SDD 5.13 AD6 の `answer_type_mismatch` の型。取り込んだファイルが持てない型を指定していれば、その型も並べて Check に任せる）。プランのほかの種類のセクションの Part は、値があるときだけ出す（AD6 の `invalid_part` を直すため）。
+- 型ごとの設定: 選択肢・表の列（キー・列名・種類（Text / Number / Percent / Amount））・表示する主要指標（6.4 の主要指標のキー）・下書きでコピーする元（6.6 の設問 ID と疑似キー）・費用行の初期値（表ごと）・実行管理の初期行（種類ごと）は、行ごとに上下の移動と削除のボタンを持つ一覧で直し、末尾の「Add …」で行を足す。1行に欄が並ぶ一覧（表の列・費用行の初期値・実行管理の初期行・表示条件）は、欄の名前を最初の行の上にだけ出す（表の見出しと同じ。2行目からは読み上げの名前に行の番号を添える）。「Add …」で足した行は最初の欄にフォーカスを移し、空のうちは、その一覧の欄を離れるか選ぶまで理由を出さない（送りもしない）。実行管理の一覧（実行管理の型）は Picker で選ぶ。表示条件は、条件ごとに条件の設問（この版の設問から選ぶ Picker）と出すときの答えの値（条件の設問が選択の型ならその選択肢のチェックボックス、ほかの型は1行に1つの値を書く欄）を並べ、「Add condition」で足す。
+- 追加: ツリーの下に「Add section」（プランは「Add item」。スマホは右下に浮かぶ「+」。4.1 D。題の行に置かないのは、主要な操作が「Publish as v{n}」のため）。セクションと設問の見出しの横の ⋯ に「Add question」（プランは「Add prompt」）。どちらも medium の Dialog で必須の欄（セクションはキーとタイトル、設問は設問 ID・タイトル・問い・回答の型）を入れて作り、作ったノードを選ぶ。設問 ID の欄には、そのセクションの最後の設問の ID の最後の連番を1つ進めた値を初めから入れる（最後が数でなければ、最後の「.」までを入れる）。
+- 削除: ⋯ の「Delete section」「Delete question」（プランは item / prompt）。AlertDialog で確かめる（セクションは、その設問も消えること）。テンプレートの編集は変更履歴を持たないので、戻せないことを添える。
+- 並べ替え: セクションの ⋯ の「Reorder sections」と、セクションと設問の ⋯ の「Reorder questions」（プランは items / prompts）で、6.10 の並べ替えの Dialog（large）を開く。設問はセクションの見出しの下に並べ、セクションの先頭で上へ・末尾で下へ移すと、隣のセクションの末尾・先頭へ移る（AD5）。並べている間にツリーが変わって送信が断られたら、6.10 と同じく読み直して始め直す。
+- プレビュー: セクションと設問の見出しの横の「Preview」で、そのセクションを 11 と同じ部品（見出し・小見出し・ガイダンスと、全設問を開いた QuestionCard）で、large の Dialog（スマホは全画面のシート）に出す。回答の欄は型ごとの形を読み取りで出し（長文・短文・選択・金額＋理由。検証は F/A/U のボタンを押せない形で。プランの表は列の見出しだけで行の無い表）、主要指標・実行管理は何を出すかを1行で書く（21 はこれを検証と案のデータから出し、テンプレートには無いため）。EXAMPLE とヒントは 11 と同じ。表示条件のある設問には条件を1行で添える（プレビューは全設問を出す）。公開済みの版でも開ける。
 - 公開の前の検査: エラーがあれば公開できず、警告は公開をふさがない。エラーと警告の項目は System Design Doc 5.13 の AD6。画面は項目ごとに、ツリーの該当のノードへ移れる一覧で出す。
 - 並び: 左のペインの題は「{種類} v{n}」と状態（Draft / Published）の札、その下に状態の1行（公開済みの版は公開日時と公開した人（26 の一覧（AD1）から読む。読めなければ「Couldn't load when it was published.」と Retry）、編集できないこと）。下書きは題の下に「Publish as v{n}」を置き、エラーがある間は押せなくして「Fix {n} problems on Check to publish」を添える。下書きのツリーのペインは Contents（ツリー）と Check（検査の一覧。タブの名前にエラーの件数）のタブ（ListDetailPattern の `tabs`）に分け、Check の行を押すと、そのノードを選んで Contents に戻る（ツリーはそのノードの枝を開く）。ノードを指さない検査の結果（テンプレート全体のエラーと警告）は、行にせず一覧の下に文で出す。検査の結果の文はカタログの文言で、AD6 の `message` は出さない（SDD 9章）。ノードを選ぶまで、2列の並びの右は「Choose a section, question or setting to see it」、1ペインの並びはツリーのまま。
 

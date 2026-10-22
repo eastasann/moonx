@@ -1915,7 +1915,7 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 31b: 27 テンプレート編集の下書きの編集
 
-Status:
+Status: done 2026-10-22
 
 ```
 27 管理: テンプレート編集で、下書きの版を編集できるようにしてください（Step 31 から分けた残り。Step 31 は 27 のツリー・各ノードの読み取りの表示・

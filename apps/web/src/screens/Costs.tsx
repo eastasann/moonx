@@ -1,5 +1,6 @@
 import { hasText } from "@moonx/domain";
 import {
+  formatCount,
   formatInputNumber,
   formatInputPercent,
   formatMoney,
@@ -29,6 +30,7 @@ import {
   Breadcrumb,
   Breadcrumbs,
   Button,
+  CommentCount,
   DescriptionList,
   DescriptionListItem,
   Dialog,
@@ -68,6 +70,10 @@ import { useTranslation } from "react-i18next";
 import type { z } from "zod";
 import { moonOf } from "../components/AnswerFields";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
+import {
+  ItemCommentsButton,
+  type ScreenComments,
+} from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { EvidenceSheet } from "../components/EvidenceSheet";
 import { toastFailure } from "../components/ideaActions";
@@ -88,11 +94,17 @@ import {
   settleUnknown,
   useWorksheet,
 } from "../components/worksheet";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  usePanel,
+  useWorkspace,
+} from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import type { SaveFields, SaveTarget } from "../lib/autosave";
 import { useAutosave } from "../lib/autosave-react";
 import { inputIssueMessage } from "../lib/input-issues";
+import { rowLabel } from "../lib/item-labels";
 import {
   type CostsSearch,
   economicsHref,
@@ -508,47 +520,69 @@ function CanReducePicker({
   );
 }
 
-/** The ⋯ of a row (design-spec 6.3「操作」): its id names the action. */
-type RowAction = "rename" | "mode" | "lump" | "reorder" | "delete";
+/** The ⋯ of a row (design-spec 6.3「操作」, 6.0.4): its id names the action. */
+type RowAction = "comments" | "rename" | "mode" | "lump" | "reorder" | "delete";
 
+/**
+ * A row's ⋯: Comments for everyone who reads the row (design-spec 6.0.4), then the
+ * Owners' and Members' actions.
+ */
 function RowMenu({
   view,
+  canEdit,
   isInSheet = false,
   onAction,
 }: {
   view: CostRowView;
+  canEdit: boolean;
   /** In the phone's sheet the name is a field already: no Rename. */
   isInSheet?: boolean;
   onAction: (action: RowAction) => void;
 }) {
-  const { t } = useTranslation(["validation"]);
+  const { t } = useTranslation(["validation", "panels"]);
   const nameOf = useNameOf();
-  // Offline, nothing can be sent (design-spec 6.0.6「オフライン」).
+  // Offline, nothing can be sent (design-spec 6.0.6「オフライン」); the comments read
+  // so far still open.
   const isOnline = useIsOnline();
   return (
     <ActionMenu
       size="S"
-      isDisabled={!isOnline}
+      disabledKeys={
+        isOnline ? [] : ["rename", "mode", "lump", "reorder", "delete"]
+      }
       aria-label={t("validation:costs.more", { name: nameOf(view) })}
       onAction={(key) => onAction(String(key) as RowAction)}
     >
-      {!isInSheet && (
+      <MenuItem id="comments">
+        {view.row.commentCount > 0
+          ? t("panels:comments.menuCount", {
+              formatted: formatCount(view.row.commentCount),
+            })
+          : t("panels:comments.menu")}
+      </MenuItem>
+      {canEdit && !isInSheet && (
         <MenuItem id="rename">{t("validation:costs.menu.rename")}</MenuItem>
       )}
-      {view.row.category === "variable" && (
+      {canEdit && view.row.category === "variable" && (
         <MenuItem id="mode">
           {view.inputMode === "amount"
             ? t("validation:costs.menu.usePercent")
             : t("validation:costs.menu.useAmount")}
         </MenuItem>
       )}
-      <MenuItem id="lump">
-        {view.isLumpSum
-          ? t("validation:costs.menu.unmarkLumpSum")
-          : t("validation:costs.menu.markLumpSum")}
-      </MenuItem>
-      <MenuItem id="reorder">{t("validation:costs.menu.reorder")}</MenuItem>
-      <MenuItem id="delete">{t("validation:costs.menu.delete")}</MenuItem>
+      {canEdit && (
+        <MenuItem id="lump">
+          {view.isLumpSum
+            ? t("validation:costs.menu.unmarkLumpSum")
+            : t("validation:costs.menu.markLumpSum")}
+        </MenuItem>
+      )}
+      {canEdit && (
+        <MenuItem id="reorder">{t("validation:costs.menu.reorder")}</MenuItem>
+      )}
+      {canEdit && (
+        <MenuItem id="delete">{t("validation:costs.menu.delete")}</MenuItem>
+      )}
     </ActionMenu>
   );
 }
@@ -598,7 +632,7 @@ function CostRowSheet({
           onAction={onAction}
         />
       ) : (
-        <CostRowFacts view={view} price={price} />
+        <CostRowFacts view={view} price={price} onAction={onAction} />
       )}
     </Dialog>
   );
@@ -645,7 +679,7 @@ function CostRowEditor({
   return (
     <Stack gap="space-300">
       <Flex justifyContent="end">
-        <RowMenu view={view} isInSheet onAction={onAction} />
+        <RowMenu view={view} canEdit isInSheet onAction={onAction} />
       </Flex>
       <SaveFailureNote itemKey={target.key} />
       <TextField
@@ -704,13 +738,18 @@ function CostRowEditor({
   );
 }
 
-/** A row to read in the phone's sheet (a Viewer, an archived idea). */
+/**
+ * A row to read in the phone's sheet (a Viewer, an archived idea), with its ⋯ for its
+ * comments.
+ */
 function CostRowFacts({
   view,
   price,
+  onAction,
 }: {
   view: CostRowView;
   price: number | null;
+  onAction: (action: RowAction) => void;
 }) {
   const { t } = useTranslation(["validation", "common"]);
   const fauLabel = useFauLabel();
@@ -718,6 +757,9 @@ function CostRowFacts({
   const text = (value: string | null) => (hasText(value) ? value : empty);
   return (
     <Stack gap="space-300">
+      <Flex justifyContent="end">
+        <RowMenu view={view} canEdit={false} isInSheet onAction={onAction} />
+      </Flex>
       <DescriptionList>
         <DescriptionListItem
           label={t(
@@ -1025,6 +1067,7 @@ function CostsBody({
   const queryClient = useQueryClient();
   const autosave = useAutosave();
   const modals = useModal();
+  const panel = usePanel();
   const isPhone = useIsNarrow();
   const isOnline = useIsOnline();
   const columns = useColumns();
@@ -1093,6 +1136,14 @@ function CostsBody({
     });
   const act = (view: CostRowView, action: RowAction) => {
     switch (action) {
+      case "comments":
+        // The sheet is modal: the thread opens in the panel once it is closed.
+        setSheetRowId(null);
+        panel.show("comments", {
+          kind: "item",
+          item: { type: "cost_item", id: view.row.id, key: null },
+        });
+        break;
       case "rename":
         openRow(view.row.id, "name");
         break;
@@ -1338,6 +1389,20 @@ function CostsBody({
                         {view.isLumpSum && (
                           <Badge>{t("validation:costs.lumpSum")}</Badge>
                         )}
+                        {isCard ? (
+                          // A phone's row presses as a whole and holds no buttons.
+                          <Text variant="caption" tone="secondary">
+                            <CommentCount count={view.row.commentCount} />
+                          </Text>
+                        ) : (
+                          view.row.commentCount > 0 && (
+                            <ItemCommentsButton
+                              label={rowLabel("cost_item", view.name)}
+                              count={view.row.commentCount}
+                              onPress={() => act(view, "comments")}
+                            />
+                          )
+                        )}
                       </Flex>
                     )}
                     {isEditing && view.isLumpSum && (
@@ -1408,12 +1473,13 @@ function CostsBody({
                   t(`validation:costs.canReduce.${view.canReduce}`)
                 );
               default:
-                return canEdit ? (
+                return (
                   <RowMenu
                     view={view}
+                    canEdit={canEdit}
                     onAction={(action) => act(view, action)}
                   />
-                ) : null;
+                );
             }
           }}
         />
@@ -1598,6 +1664,38 @@ export function CostsScreen({
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "05")?.title;
+  // The body reads the same rows: the panel names them.
+  const rows = useQuery({
+    ...costsQuery(ideaId, data?.validationId ?? ""),
+    enabled: data !== undefined,
+  });
+  const comments: ScreenComments | undefined =
+    data === undefined
+      ? undefined
+      : {
+          screen: {
+            containerType: "validation",
+            containerId: data.validationId,
+            sectionKeys: ["costs"],
+          },
+          idea: {
+            id: ideaId,
+            name: data.idea.name,
+            archived: data.idea.archived,
+          },
+          shows: (item) =>
+            item.type === "cost_item" &&
+            item.key == null &&
+            (rows.data === undefined ||
+              rows.data.items.some(({ id }) => id === item.id)),
+          labelOf: (target) => {
+            if (target.type === "idea") return data.idea.name;
+            const row = rows.data?.items.find(({ id }) => id === target.id);
+            return row === undefined
+              ? undefined
+              : rowLabel("cost_item", row.name);
+          },
+        };
   useDocumentTitle(
     ...(data === undefined || title === undefined
       ? []
@@ -1633,6 +1731,7 @@ export function CostsScreen({
     <WorkspaceFrame
       current="ideas"
       saveScope="cost_item:"
+      comments={comments}
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

@@ -36,6 +36,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AiMenu } from "../components/AiMenu";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
+import type { ScreenComments } from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
 import { EditSummaryDialog } from "../components/IdeaDialogs";
@@ -57,6 +58,7 @@ import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
 import {
   decideHref,
+  decisionsHref,
   hrefOf,
   ideaHref,
   ideasHref,
@@ -383,10 +385,13 @@ function SectionsBlock({ home }: { home: ValidationHome }) {
   );
 }
 
-/** The idea's decisions, newest first (design-spec 6.1, d1-moon.html .decision). */
+/**
+ * The idea's decisions, newest first, and "See all" to this idea's in 7 (design-spec
+ * 6.1, d1-moon.html .decision).
+ */
 function DecisionsBlock({ home }: { home: ValidationHome }) {
   const { t } = useTranslation(["validation", "common", "app"]);
-  const { me } = useWorkspace();
+  const { me, workspace } = useWorkspace();
   return (
     <HubBlock title={t("validation:home.decisions.title")}>
       {home.decisions.length === 0 ? (
@@ -421,6 +426,11 @@ function DecisionsBlock({ home }: { home: ValidationHome }) {
             </Stack>
           ))}
           <Divider size="S" />
+          <Flex>
+            <Link href={decisionsHref(workspace.id, { idea: home.idea.id })}>
+              {t("validation:home.decisions.seeAll")}
+            </Link>
+          </Flex>
         </Stack>
       )}
     </HubBlock>
@@ -780,13 +790,28 @@ export function ValidationHomeScreen({ ideaId }: { ideaId: string }) {
   const { t } = useTranslation(["ideas"]);
   const { workspace } = useWorkspace();
   const { data } = useQuery(validationHomeQuery(ideaId));
-  const name =
-    data?.idea.workspaceId === workspace.id ? data.idea.name : undefined;
+  const idea = data?.idea.workspaceId === workspace.id ? data.idea : undefined;
+  const name = idea?.name;
   useDocumentTitle(...(name === undefined ? [] : [name, workspace.name]));
+  // 13's own comments are the idea's (SDD 6.3「画面と節の対応」).
+  const comments: ScreenComments | undefined =
+    idea === undefined
+      ? undefined
+      : {
+          screen: {
+            containerType: "idea",
+            containerId: ideaId,
+            sectionKeys: [],
+          },
+          idea: { id: ideaId, name: idea.name, archived: idea.archived },
+          shows: () => false,
+          labelOf: (target) => (target.type === "idea" ? idea.name : undefined),
+        };
   return (
     <WorkspaceFrame
       current="ideas"
       saveScope={`idea:${ideaId}`}
+      comments={comments}
       back={{ label: t("ideas:title"), href: ideasHref(workspace.id) }}
       breadcrumbs={
         <Breadcrumbs>

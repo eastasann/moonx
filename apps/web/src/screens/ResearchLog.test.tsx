@@ -419,4 +419,22 @@ describe("14 Research log (design-spec 6.10)", () => {
       }),
     ).toBeTruthy();
   });
+
+  test("an entry's 💬 opens its thread in the comments panel (design-spec 6.0.4)", async () => {
+    const user = userEvent.setup();
+    logApi();
+    const router = renderApp(`${base}?entry=${prices.id}`);
+    await user.click(
+      await screen.findByRole("button", {
+        name: `Comments on Research Log · ${prices.topic}`,
+      }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        entry: prices.id,
+        panel: "comments",
+        target: `research_log_entry:${prices.id}`,
+      }),
+    );
+  });
 });

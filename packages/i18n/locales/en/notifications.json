@@ -18,5 +18,19 @@
     "validation_decision": "{{actor}} recorded a decision",
     "go_no_go": "{{actor}} recorded a Go / No-Go",
     "version_saved": "{{actor}} saved a version"
+  },
+  "screen": {
+    "title": "Notifications",
+    "show": "Show",
+    "all": "All",
+    "unread": "Unread",
+    "markAllRead": "Mark all as read",
+    "empty": "You're all caught up.",
+    "emptyFiltered": "Nothing matches these filters",
+    "clear": "Clear filters",
+    "noAccess": "You no longer have access",
+    "unreadMark": "Unread",
+    "more": "Show more",
+    "list": "Notifications"
   }
 }

@@ -37,6 +37,10 @@ import {
   useAnswers,
 } from "../components/AnswerFields";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
+import {
+  ItemCommentsButton,
+  type ScreenComments,
+} from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { SectionTitle } from "../components/SectionTitle";
 import {
@@ -47,8 +51,14 @@ import {
   useIsSlow,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  usePanel,
+  useWorkspace,
+} from "../components/workspace";
 import { useAutosave } from "../lib/autosave-react";
+import { questionLabel } from "../lib/item-labels";
 import {
   ideaHref,
   ideasHref,
@@ -99,6 +109,7 @@ function SectionForm({
   const queryClient = useQueryClient();
   const autosave = useAutosave();
   const modals = useModal();
+  const panel = usePanel();
   const navigate = useNavigate();
   const fauLabel = useFauLabel();
   const forFact = useRouterState({
@@ -399,6 +410,22 @@ function SectionForm({
               }
               excerpt={hasText(view.text) ? view.text : null}
               commentCount={view.answer.commentCount}
+              actions={
+                <ItemCommentsButton
+                  label={questionLabel(question.key, question.title)}
+                  count={view.answer.commentCount}
+                  onPress={() =>
+                    panel.show("comments", {
+                      kind: "item",
+                      item: {
+                        type: "validation_answer",
+                        id: validationId,
+                        key: question.key,
+                      },
+                    })
+                  }
+                />
+              }
               onFocusRequest={() => {
                 setAtEnd(false);
                 setChosen(id);
@@ -560,9 +587,49 @@ export function QuestionFormScreen({
   const { workspace } = useWorkspace();
   const { data } = useQuery(validationHomeQuery(ideaId));
   const home = data?.idea.workspaceId === workspace.id ? data : undefined;
-  const title = isQuestionSection(sectionKey)
+  const isSection = isQuestionSection(sectionKey);
+  const title = isSection
     ? home?.sections.find((section) => section.key === sectionKey)?.title
     : undefined;
+  // The body reads the same questions: the panel names the answers by their titles.
+  const questions = useQuery({
+    ...validationQuestionsQuery(ideaId, home?.validationId ?? "", sectionKey),
+    enabled: home !== undefined && isSection,
+  });
+  const comments: ScreenComments | undefined =
+    home === undefined || !isSection
+      ? undefined
+      : {
+          screen: {
+            containerType: "validation",
+            containerId: home.validationId,
+            sectionKeys: [sectionKey],
+          },
+          idea: {
+            id: ideaId,
+            name: home.idea.name,
+            archived: home.idea.archived,
+          },
+          shows: (item) =>
+            item.type === "validation_answer" &&
+            item.id === home.validationId &&
+            (item.key ?? "").startsWith(`V.${sectionKey}.`) &&
+            (questions.data === undefined ||
+              questions.data.section.questions.some(
+                ({ key }) => key === item.key,
+              )),
+          labelOf: (target) =>
+            target.type === "idea"
+              ? home.idea.name
+              : target.type === "validation_answer" && target.key != null
+                ? questionLabel(
+                    target.key,
+                    questions.data?.section.questions.find(
+                      ({ key }) => key === target.key,
+                    )?.title,
+                  )
+                : undefined,
+        };
   useDocumentTitle(
     ...(home === undefined || title === undefined
       ? []
@@ -576,6 +643,7 @@ export function QuestionFormScreen({
           ? undefined
           : `${answerKey(home.validationId, `V.${sectionKey}.`)}`
       }
+      comments={comments}
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

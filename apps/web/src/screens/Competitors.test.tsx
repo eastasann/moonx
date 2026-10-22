@@ -435,14 +435,21 @@ describe("15 Competitors (design-spec 6.10)", () => {
     );
   });
 
-  test("a Viewer reads: no adding, no ⋯, a card opens to read, the patterns open", async () => {
+  test("a Viewer reads: no adding, ⋯ for comments only, a card opens to read, the patterns open", async () => {
     const user = userEvent.setup();
     competitorsApi({ me: as("viewer") });
     renderApp(base);
     await screen.findByText("2 competitors · aim for 3–5");
     expect(screen.queryByRole("button", { name: "Add competitor" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /More for/ })).toBeNull();
     expect(screen.queryByRole("textbox")).toBeNull();
+    // A Viewer comments too (design-spec 2.2): the card's ⋯ holds Comments alone.
+    await user.click(
+      screen.getByRole("button", { name: "More for Salad Station" }),
+    );
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Comments"]);
+    await user.keyboard("{Escape}");
     // Both patterns open, to read.
     for (const title of ["Survivor Patterns", "Failure Patterns"]) {
       const pattern = screen.getByRole("region", { name: title });
@@ -475,7 +482,13 @@ describe("15 Competitors (design-spec 6.10)", () => {
     expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy();
     await screen.findByText("2 competitors · aim for 3–5");
     expect(screen.queryByRole("button", { name: "Add competitor" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /More for/ })).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: "More for Salad Station" }),
+    );
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Comments"]);
+    await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("textbox")).toBeNull();
     // M2's URL opens nothing on an archived idea.
     expect(screen.queryByRole("dialog")).toBeNull();

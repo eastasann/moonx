@@ -1,6 +1,8 @@
 import type { AiScope } from "@moonx/domain";
 import type {
   AdminUserStatus,
+  CommentTargetType,
+  DecisionLogKind,
   IdeaDecisionFilter,
   IdeaSort,
   SourceType,
@@ -12,9 +14,11 @@ import {
   type QueryClient,
   type QueryKey,
   queryOptions,
+  skipToken,
 } from "@tanstack/react-query";
 import { scopeParam } from "./ai";
 import { ApiError, api, inPath, unwrap } from "./api";
+import { formatPanelTarget, type PanelTarget } from "./panel-target";
 
 /** U1: the signed-in user, their memberships and last workspace (SDD 5.4). */
 export const meQuery = () =>
@@ -566,3 +570,163 @@ export function putSaved<TData>(
     void queryClient.invalidateQueries({ queryKey, exact: true });
   }
 }
+
+/** What is cached of comments (C1): every list of threads, an item's or a screen's. */
+export const commentsKey = ["comments"];
+
+/**
+ * C1 GET: the threads of an item, or of a screen with the comments on its idea (design-spec
+ * 6.0.1・6.0.4), as `workspaceId`, the workspace being viewed, sees them. Without a
+ * target (a screen with nothing to comment on) it asks nothing.
+ */
+export const commentsQuery = (
+  workspaceId: string,
+  target: PanelTarget | undefined,
+) =>
+  queryOptions({
+    queryKey: [
+      ...commentsKey,
+      workspaceId,
+      target === undefined ? null : formatPanelTarget(target),
+    ],
+    queryFn:
+      target === undefined
+        ? skipToken
+        : () =>
+            unwrap(
+              api().api.v1.comments.get({
+                query:
+                  target.kind === "item"
+                    ? {
+                        workspaceId,
+                        targetType: target.item.type as CommentTargetType,
+                        targetId: target.item.id,
+                        ...(target.item.key == null
+                          ? {}
+                          : { targetKey: target.item.key }),
+                      }
+                    : {
+                        workspaceId,
+                        containerType: target.screen.containerType,
+                        containerId: target.screen.containerId,
+                        ...(target.screen.sectionKeys.length === 0
+                          ? {}
+                          : { sectionKeys: [...target.screen.sectionKeys] }),
+                      },
+              }),
+            ),
+  });
+
+/** W8: who a comment on `target` can mention (design-spec 6.0.4), by display name. */
+export const mentionCandidatesQuery = (
+  workspaceId: string,
+  target: { type: CommentTargetType; id: string; key?: string | null },
+) =>
+  queryOptions({
+    queryKey: [
+      ...workspaceKey(workspaceId),
+      "mention-candidates",
+      target.type,
+      target.id,
+      target.key ?? null,
+    ],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.workspaces({ workspaceId })
+          ["mention-candidates"].get({
+            query: {
+              targetType: target.type,
+              targetId: target.id,
+              ...(target.key == null ? {} : { targetKey: target.key }),
+            },
+          }),
+      ),
+  });
+
+/** What is cached of the user's notifications: the lists and the unread count. */
+export const notificationsKey = ["notifications"];
+
+/** How often the navigation asks for the unread count while the page shows (SDD 2章). */
+const UNREAD_EVERY_MS = 60_000;
+
+/**
+ * N2: the unread count of the navigation's Notifications, asked when a screen opens, when
+ * the page comes to the front and every 60 seconds while it shows (SDD 2章「通知の受け取り」).
+ */
+export const unreadCountQuery = () =>
+  queryOptions({
+    queryKey: [...notificationsKey, "unread-count"],
+    queryFn: () => unwrap(api().api.v1.notifications["unread-count"].get()),
+    refetchInterval: UNREAD_EVERY_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: "always",
+  });
+
+/** The most N1 gives at once (SDD 5.1「一覧」). */
+const NOTIFICATIONS_PAGE = 50;
+
+/** N1: the user's notifications across workspaces, newest first, a page at a time. */
+export const notificationsPage = (
+  filter: "all" | "unread",
+  cursor: number | undefined,
+) =>
+  unwrap(
+    api().api.v1.notifications.get({
+      query: {
+        filter,
+        limit: NOTIFICATIONS_PAGE,
+        ...(cursor === undefined ? {} : { cursor }),
+      },
+    }),
+  );
+
+/** L1's filters, as 7's URL holds them (SDD 4章). */
+export interface DecisionLogFilters {
+  kind?: DecisionLogKind;
+  ideaId?: string;
+  recordedBy?: string;
+  from?: string;
+  to?: string;
+}
+
+/** The most L1 gives at once (SDD 5.1「一覧」). */
+const DECISIONS_PAGE = 200;
+
+/**
+ * L1: the workspace's decision log under `filters`, every page of it (a workspace records
+ * tens of decisions; 7 lists them in one list), newest first.
+ */
+export const decisionLogQuery = (
+  workspaceId: string,
+  filters: DecisionLogFilters,
+) =>
+  queryOptions({
+    queryKey: [...workspaceKey(workspaceId), "decision-log", filters],
+    queryFn: () =>
+      everyPage((cursor) =>
+        unwrap(
+          api()
+            .api.v1.workspaces({ workspaceId })
+            ["decision-log"].get({
+              query: {
+                ...filters,
+                limit: DECISIONS_PAGE,
+                ...(cursor === undefined ? {} : { cursor }),
+              },
+            }),
+        ),
+      ),
+  });
+
+/** L2: one entry of the decision log with what it kept at the time (SDD 5.11). */
+export const decisionLogEntryQuery = (entryId: string) =>
+  queryOptions({
+    queryKey: ["decision-log", entryId],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1["decision-log"]({ entryId: inPath(entryId) })
+          .get(),
+      ),
+  });

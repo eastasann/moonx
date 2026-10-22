@@ -225,7 +225,8 @@
     "decisions": {
       "title": "Decisions",
       "empty": "No decisions yet",
-      "reason": "“{{reason}}”"
+      "reason": "“{{reason}}”",
+      "seeAll": "See all decisions"
     },
     "plans": {
       "title": "Plans",
@@ -465,7 +466,8 @@
       "mark": "State",
       "name": "Input",
       "value": "Value",
-      "fau": "F/A/U"
+      "fau": "F/A/U",
+      "more": "Row actions"
     },
     "label": {
       "value": "Value of {{name}}",

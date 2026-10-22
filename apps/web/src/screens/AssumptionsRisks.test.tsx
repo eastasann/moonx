@@ -372,4 +372,22 @@ describe("16 Assumptions & Risks (design-spec 6.10)", () => {
     );
     expect(calls.filter(({ method }) => method === "DELETE")).toHaveLength(2);
   });
+
+  test("a row's 💬 opens its thread in the comments panel (design-spec 6.0.4)", async () => {
+    const user = userEvent.setup();
+    listsApi();
+    const router = renderApp(`${base}?row=${believe.id}`);
+    await user.click(
+      await screen.findByRole("button", {
+        name: `Comments on Assumptions · ${believe.statement}`,
+      }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        row: believe.id,
+        panel: "comments",
+        target: `assumption:${believe.id}`,
+      }),
+    );
+  });
 });

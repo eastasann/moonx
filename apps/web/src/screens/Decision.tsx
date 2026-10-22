@@ -1,19 +1,11 @@
 import { hasText } from "@moonx/domain";
-import {
-  formatCheckName,
-  formatCount,
-  formatDate,
-  formatMonths,
-  formatRelativeTime,
-  i18n,
-} from "@moonx/i18n";
+import { formatDate, formatRelativeTime } from "@moonx/i18n";
 import {
   type DecisionContext,
   type DecisionLogSummary,
   type DecisionValue,
   decisionLogSummarySchema,
   decisionValueSchema,
-  type MetricValue,
   reasonSchema,
   type ValidationHome,
 } from "@moonx/schemas";
@@ -28,13 +20,9 @@ import {
   FocusPattern,
   Heading,
   InlineAlert,
-  MetricGroup,
-  MetricTile,
-  MoonGlyph,
+  Link,
   Radio,
   RadioGroup,
-  RowList,
-  RowListItem,
   Skeleton,
   Stack,
   Text,
@@ -47,7 +35,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
-import { checkReason, dotState } from "../components/ideaParts";
+import {
+  DecisionKeyNumbers,
+  FauCounts,
+  MissingCheckRows,
+} from "../components/decisionParts";
 import { rateLimitWords } from "../components/SendFailure";
 import {
   FailureState,
@@ -61,8 +53,7 @@ import { dashboardHref, useWorkspace } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { rejectionReason } from "../lib/autosave";
 import { inputIssueMessage } from "../lib/input-issues";
-import { ideaHref, ideasHref } from "../lib/links";
-import { metricText } from "../lib/metrics";
+import { decisionsHref, ideaHref, ideasHref } from "../lib/links";
 import { useIsOnline } from "../lib/online";
 import {
   decisionContextQuery,
@@ -74,51 +65,6 @@ import { useDocumentTitle } from "../lib/title";
 
 /** How long "Decision recorded" stays: the shortest 4.5 Toast allows. */
 const TOAST_MS = 5000;
-
-/** The key numbers of 19 (design-spec 6.5「表示内容」), with how each reads. */
-const KEY_NUMBERS = [
-  ["initial_cost_total", "startup"],
-  ["break_even_units_day", "breakEven"],
-  ["expected_operating_profit", "expectedProfit"],
-  ["payback_months", "payback"],
-  ["simple_roi", "roi"],
-] as const satisfies readonly [keyof DecisionContext["keyMetrics"], string][];
-
-/** A key number's value with its unit in one ("14.4+ / day", s19-decision.html .kn). */
-function keyNumberText(
-  key: (typeof KEY_NUMBERS)[number][0],
-  metric: MetricValue,
-  currency: string,
-): string {
-  const t = i18n.t.bind(i18n);
-  switch (key) {
-    case "initial_cost_total":
-      return metricText(metric, "money", currency);
-    case "break_even_units_day":
-      return metric.value === null
-        ? metricText(metric, "units", currency)
-        : t("validation:decision.perDay", {
-            value: metricText(metric, "units", currency),
-          });
-    case "expected_operating_profit":
-      return metric.value === null
-        ? metricText(metric, "money", currency)
-        : t("validation:decision.perMonth", {
-            value: metricText(metric, "money", currency),
-          });
-    case "payback_months":
-      return metric.value === null
-        ? metricText(metric, "months", currency)
-        : t("validation:decision.months", {
-            value: formatMonths(metric.value, {
-              bound: metric.bound,
-              withUnit: false,
-            }),
-          });
-    case "simple_roi":
-      return metricText(metric, "percent", currency);
-  }
-}
 
 /**
  * What 19 shows to decide on (design-spec 6.5「表示内容」, s19-decision.html .well): the
@@ -141,23 +87,6 @@ function Material({ context }: { context: DecisionContext }) {
     ["biggestUnknown", text(summary.biggestUnknown)],
     ["biggestRisk", text(summary.biggestRisk)],
   ];
-  const counts = [
-    { state: "fact", label: "fact", value: fau.fact, notice: false },
-    {
-      state: "assumption",
-      label: "assumption",
-      value: fau.assumption.total,
-      notice: false,
-    },
-    { state: "unknown", label: "unknown", value: fau.unknown, notice: true },
-    {
-      state: null,
-      label: "unclassified",
-      value: fau.unclassified,
-      notice: true,
-    },
-    { state: null, label: "empty", value: fau.empty, notice: false },
-  ] as const;
   return (
     <Well
       density="spacious"
@@ -184,22 +113,11 @@ function Material({ context }: { context: DecisionContext }) {
           <Heading level={2} variant="label">
             {t("validation:decision.keyNumbers")}
           </Heading>
-          <MetricGroup
+          <DecisionKeyNumbers
+            keyMetrics={keyMetrics}
+            currency={workspace.currency}
             aria-label={t("validation:decision.keyNumbers")}
-            variant="compact"
-          >
-            {KEY_NUMBERS.map(([key, label]) => {
-              const metric = keyMetrics[key];
-              return (
-                <MetricTile
-                  key={key}
-                  label={t(`validation:decision.metric.${label}`)}
-                  value={keyNumberText(key, metric, workspace.currency)}
-                  isPlaceholder={metric.value === null}
-                />
-              );
-            })}
-          </MetricGroup>
+          />
         </Stack>
         <Stack gap="space-100">
           <Flex justifyContent="space-between" alignItems="baseline">
@@ -217,54 +135,32 @@ function Material({ context }: { context: DecisionContext }) {
           {missingChecks.length === 0 ? (
             <Text tone="secondary">{t("validation:decision.allDone")}</Text>
           ) : (
-            <RowList aria-label={t("validation:decision.missingChecks")}>
-              {missingChecks.map((check) => (
-                <RowListItem
-                  key={check.key}
-                  start={<MoonGlyph state={dotState[check.state]} />}
-                  end={t(`common:checkState.${check.state}`)}
-                  description={checkReason(check) ?? undefined}
-                >
-                  {formatCheckName(check.key, check.params)}
-                </RowListItem>
-              ))}
-            </RowList>
+            <MissingCheckRows
+              checks={missingChecks}
+              aria-label={t("validation:decision.missingChecks")}
+            />
           )}
         </Stack>
         <Stack gap="space-100">
           <Heading level={2} variant="label">
             {t("validation:decision.fau")}
           </Heading>
-          <Flex gap="space-200" alignItems="center" wrap>
-            {counts.map((count) => (
-              <Flex key={count.label} gap="space-75" alignItems="center">
-                {count.state !== null && (
-                  <MoonGlyph state={count.state} size="S" />
-                )}
-                <Text
-                  variant="body-sm"
-                  tone={count.notice ? "notice" : "secondary"}
-                >
-                  {`${t(`common:fauState.${count.label}`)} `}
-                  <Text
-                    variant="number"
-                    tone={count.notice ? "notice" : "primary"}
-                  >
-                    {formatCount(count.value)}
-                  </Text>
-                </Text>
-              </Flex>
-            ))}
-          </Flex>
+          <FauCounts fau={fau} />
           {lastDecision !== null && lastDecision.value !== null && (
             <Text variant="body-sm" tone="secondary">
-              {t("validation:decision.last", {
-                value: t(`common:decision.${lastDecision.value}` as never),
-                date: formatDate(lastDecision.recordedAt, {
-                  timeZone: me.timezone,
-                }),
-                name: lastDecision.recordedBy.displayName,
-              })}
+              <Link
+                href={decisionsHref(workspace.id, {
+                  selected: lastDecision.id,
+                })}
+              >
+                {t("validation:decision.last", {
+                  value: t(`common:decision.${lastDecision.value}` as never),
+                  date: formatDate(lastDecision.recordedAt, {
+                    timeZone: me.timezone,
+                  }),
+                  name: lastDecision.recordedBy.displayName,
+                })}
+              </Link>
             </Text>
           )}
         </Stack>

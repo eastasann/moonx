@@ -15,6 +15,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignedInAccountRouteImport } from './routes/_signedIn/account'
+import { Route as SignedInNotificationsRouteImport } from './routes/_signedIn/notifications'
 import { Route as SignedInWelcomeRouteImport } from './routes/_signedIn/welcome'
 import { Route as DevComponentsRouteImport } from './routes/dev.components'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
@@ -22,6 +23,7 @@ import { Route as SignedInAdminUsersRouteImport } from './routes/_signedIn/admin
 import { Route as SignedInWWorkspaceIdRouteRouteImport } from './routes/_signedIn/w/$workspaceId/route'
 import { Route as SignedInAdminTemplatesIndexRouteImport } from './routes/_signedIn/admin/templates/index'
 import { Route as SignedInWWorkspaceIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/index'
+import { Route as SignedInWWorkspaceIdDecisionsRouteImport } from './routes/_signedIn/w/$workspaceId/decisions'
 import { Route as SignedInWWorkspaceIdSettingsRouteImport } from './routes/_signedIn/w/$workspaceId/settings'
 import { Route as SignedInAdminTemplatesVersionsVersionIdRouteImport } from './routes/_signedIn/admin/templates/versions.$versionId'
 import { Route as SignedInWWorkspaceIdAiExportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/export'
@@ -65,6 +67,11 @@ const SignedInAccountRoute = SignedInAccountRouteImport.update({
   path: '/account',
   getParentRoute: () => SignedInRoute,
 } as any)
+const SignedInNotificationsRoute = SignedInNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => SignedInRoute,
+} as any)
 const SignedInWelcomeRoute = SignedInWelcomeRouteImport.update({
   id: '/welcome',
   path: '/welcome',
@@ -101,6 +108,12 @@ const SignedInWWorkspaceIdIndexRoute =
   SignedInWWorkspaceIdIndexRouteImport.update({
     id: '/',
     path: '/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdDecisionsRoute =
+  SignedInWWorkspaceIdDecisionsRouteImport.update({
+    id: '/decisions',
+    path: '/decisions',
     getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
   } as any)
 const SignedInWWorkspaceIdSettingsRoute =
@@ -188,11 +201,13 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/account': typeof SignedInAccountRoute
+  '/notifications': typeof SignedInNotificationsRoute
   '/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
   '/admin/users': typeof SignedInAdminUsersRoute
+  '/w/$workspaceId/decisions': typeof SignedInWWorkspaceIdDecisionsRoute
   '/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
   '/admin/templates/': typeof SignedInAdminTemplatesIndexRoute
   '/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
@@ -215,10 +230,12 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/account': typeof SignedInAccountRoute
+  '/notifications': typeof SignedInNotificationsRoute
   '/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/admin/users': typeof SignedInAdminUsersRoute
+  '/w/$workspaceId/decisions': typeof SignedInWWorkspaceIdDecisionsRoute
   '/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
   '/admin/templates': typeof SignedInAdminTemplatesIndexRoute
   '/w/$workspaceId': typeof SignedInWWorkspaceIdIndexRoute
@@ -243,11 +260,13 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_signedIn/account': typeof SignedInAccountRoute
+  '/_signedIn/notifications': typeof SignedInNotificationsRoute
   '/_signedIn/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
   '/invite/$token': typeof InviteTokenRoute
   '/_signedIn/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
   '/_signedIn/admin/users': typeof SignedInAdminUsersRoute
+  '/_signedIn/w/$workspaceId/decisions': typeof SignedInWWorkspaceIdDecisionsRoute
   '/_signedIn/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
   '/_signedIn/admin/templates/': typeof SignedInAdminTemplatesIndexRoute
   '/_signedIn/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
@@ -272,11 +291,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/account'
+    | '/notifications'
     | '/welcome'
     | '/dev/components'
     | '/invite/$token'
     | '/w/$workspaceId'
     | '/admin/users'
+    | '/w/$workspaceId/decisions'
     | '/w/$workspaceId/settings'
     | '/admin/templates/'
     | '/w/$workspaceId/'
@@ -299,10 +320,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/account'
+    | '/notifications'
     | '/welcome'
     | '/dev/components'
     | '/invite/$token'
     | '/admin/users'
+    | '/w/$workspaceId/decisions'
     | '/w/$workspaceId/settings'
     | '/admin/templates'
     | '/w/$workspaceId'
@@ -326,11 +349,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/_signedIn/account'
+    | '/_signedIn/notifications'
     | '/_signedIn/welcome'
     | '/dev/components'
     | '/invite/$token'
     | '/_signedIn/w/$workspaceId'
     | '/_signedIn/admin/users'
+    | '/_signedIn/w/$workspaceId/decisions'
     | '/_signedIn/w/$workspaceId/settings'
     | '/_signedIn/admin/templates/'
     | '/_signedIn/w/$workspaceId/'
@@ -402,6 +427,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedInAccountRouteImport
       parentRoute: typeof SignedInRoute
     }
+    '/_signedIn/notifications': {
+      id: '/_signedIn/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof SignedInNotificationsRouteImport
+      parentRoute: typeof SignedInRoute
+    }
     '/_signedIn/welcome': {
       id: '/_signedIn/welcome'
       path: '/welcome'
@@ -449,6 +481,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/w/$workspaceId/'
       preLoaderRoute: typeof SignedInWWorkspaceIdIndexRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/decisions': {
+      id: '/_signedIn/w/$workspaceId/decisions'
+      path: '/decisions'
+      fullPath: '/w/$workspaceId/decisions'
+      preLoaderRoute: typeof SignedInWWorkspaceIdDecisionsRouteImport
       parentRoute: typeof SignedInWWorkspaceIdRouteRoute
     }
     '/_signedIn/w/$workspaceId/settings': {
@@ -546,6 +585,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface SignedInWWorkspaceIdRouteRouteChildren {
+  SignedInWWorkspaceIdDecisionsRoute: typeof SignedInWWorkspaceIdDecisionsRoute
   SignedInWWorkspaceIdSettingsRoute: typeof SignedInWWorkspaceIdSettingsRoute
   SignedInWWorkspaceIdIndexRoute: typeof SignedInWWorkspaceIdIndexRoute
   SignedInWWorkspaceIdAiExportRoute: typeof SignedInWWorkspaceIdAiExportRoute
@@ -563,6 +603,7 @@ interface SignedInWWorkspaceIdRouteRouteChildren {
 
 const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChildren =
   {
+    SignedInWWorkspaceIdDecisionsRoute: SignedInWWorkspaceIdDecisionsRoute,
     SignedInWWorkspaceIdSettingsRoute: SignedInWWorkspaceIdSettingsRoute,
     SignedInWWorkspaceIdIndexRoute: SignedInWWorkspaceIdIndexRoute,
     SignedInWWorkspaceIdAiExportRoute: SignedInWWorkspaceIdAiExportRoute,
@@ -593,6 +634,7 @@ const SignedInWWorkspaceIdRouteRouteWithChildren =
 
 interface SignedInRouteChildren {
   SignedInAccountRoute: typeof SignedInAccountRoute
+  SignedInNotificationsRoute: typeof SignedInNotificationsRoute
   SignedInWelcomeRoute: typeof SignedInWelcomeRoute
   SignedInWWorkspaceIdRouteRoute: typeof SignedInWWorkspaceIdRouteRouteWithChildren
   SignedInAdminUsersRoute: typeof SignedInAdminUsersRoute
@@ -602,6 +644,7 @@ interface SignedInRouteChildren {
 
 const SignedInRouteChildren: SignedInRouteChildren = {
   SignedInAccountRoute: SignedInAccountRoute,
+  SignedInNotificationsRoute: SignedInNotificationsRoute,
   SignedInWelcomeRoute: SignedInWelcomeRoute,
   SignedInWWorkspaceIdRouteRoute: SignedInWWorkspaceIdRouteRouteWithChildren,
   SignedInAdminUsersRoute: SignedInAdminUsersRoute,

@@ -49,6 +49,10 @@ export {
 } from "./components/CheckDots";
 export { ComboBox, type ComboBoxProps } from "./components/ComboBox";
 export {
+  CommentCount,
+  type CommentCountProps,
+} from "./components/CommentCount";
+export {
   ContextualHelp,
   type ContextualHelpProps,
 } from "./components/ContextualHelp";

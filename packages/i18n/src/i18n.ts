@@ -6,12 +6,14 @@ import auth from "../locales/en/auth.json";
 import common from "../locales/en/common.json";
 import components from "../locales/en/components.json";
 import dashboard from "../locales/en/dashboard.json";
+import decisions from "../locales/en/decisions.json";
 import errors from "../locales/en/errors.json";
 import format from "../locales/en/format.json";
 import ideas from "../locales/en/ideas.json";
 import landing from "../locales/en/landing.json";
 import mail from "../locales/en/mail.json";
 import notifications from "../locales/en/notifications.json";
+import panels from "../locales/en/panels.json";
 import pitch from "../locales/en/pitch.json";
 import settings from "../locales/en/settings.json";
 import validation from "../locales/en/validation.json";
@@ -29,12 +31,14 @@ export const resources = {
     common,
     components,
     dashboard,
+    decisions,
     errors,
     format,
     ideas,
     landing,
     mail,
     notifications,
+    panels,
     pitch,
     settings,
     validation,

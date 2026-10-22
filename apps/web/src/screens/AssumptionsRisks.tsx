@@ -12,6 +12,7 @@ import {
   Breadcrumbs,
   Button,
   ButtonGroup,
+  CommentCount,
   DescriptionList,
   DescriptionListItem,
   Dialog,
@@ -51,6 +52,10 @@ import {
   riskSpec,
   riskValues,
 } from "../components/AssumptionFields";
+import {
+  ItemCommentsButton,
+  type ScreenComments,
+} from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { toastFailure } from "../components/ideaActions";
 import { ReorderDialog } from "../components/ReorderDialog";
@@ -71,11 +76,17 @@ import {
   useIsSlow,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  usePanel,
+  useWorkspace,
+} from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import type { SaveTarget } from "../lib/autosave";
 import { countingEvidence } from "../lib/evidence";
 import { useOneAtATime } from "../lib/form";
+import { rowLabel } from "../lib/item-labels";
 import {
   type AssumptionsSearch,
   type AssumptionsTab,
@@ -396,30 +407,44 @@ function RowDetail({
   onOpenEvidence: () => void;
 }) {
   const { t } = useTranslation(["validation"]);
+  const panel = usePanel();
   const isPhone = useIsNarrow();
   const [isEditing, setEditing] = useState(false);
+  const type = typeOf[tab];
   return (
     <Stack gap="space-400">
       <Flex justifyContent="space-between" alignItems="start" gap="space-200">
         <Heading level={2}>{row.statement}</Heading>
-        {canEdit && (
-          <ActionMenu
-            aria-label={t("validation:assumptions.more", {
-              statement: row.statement,
-            })}
-            onAction={(key) => {
-              if (key === "reorder") onReorder();
-              if (key === "delete") onDelete();
-            }}
-          >
-            <MenuItem id="reorder">
-              {t("validation:assumptions.reorder")}
-            </MenuItem>
-            <MenuItem id="delete">
-              {t("validation:assumptions.delete")}
-            </MenuItem>
-          </ActionMenu>
-        )}
+        <Flex gap="space-50" alignItems="center">
+          <ItemCommentsButton
+            label={rowLabel(type, row.statement)}
+            count={row.commentCount}
+            onPress={() =>
+              panel.show("comments", {
+                kind: "item",
+                item: { type, id: row.id, key: null },
+              })
+            }
+          />
+          {canEdit && (
+            <ActionMenu
+              aria-label={t("validation:assumptions.more", {
+                statement: row.statement,
+              })}
+              onAction={(key) => {
+                if (key === "reorder") onReorder();
+                if (key === "delete") onDelete();
+              }}
+            >
+              <MenuItem id="reorder">
+                {t("validation:assumptions.reorder")}
+              </MenuItem>
+              <MenuItem id="delete">
+                {t("validation:assumptions.delete")}
+              </MenuItem>
+            </ActionMenu>
+          )}
+        </Flex>
       </Flex>
       {canEdit && !isPhone ? (
         <RowEditor
@@ -653,10 +678,17 @@ function RowLine({ tab, row }: { tab: AssumptionsTab; row: Row }) {
   return (
     <Stack gap="space-50">
       <Text variant="label">{row.statement}</Text>
-      {meta.length > 0 && (
-        <Text variant="caption" tone="secondary">
-          {meta.join(t("app:separator"))}
-        </Text>
+      {(meta.length > 0 || row.commentCount > 0) && (
+        <Flex gap="space-200" alignItems="center">
+          {meta.length > 0 && (
+            <Text variant="caption" tone="secondary">
+              {meta.join(t("app:separator"))}
+            </Text>
+          )}
+          <Text variant="caption" tone="secondary">
+            <CommentCount count={row.commentCount} />
+          </Text>
+        </Flex>
       )}
     </Stack>
   );
@@ -1100,11 +1132,60 @@ export function AssumptionsScreen({
   const { me, workspace } = useWorkspace();
   const navigate = useNavigate();
   const router = useRouter();
+  const panel = usePanel();
   const home = useQuery(validationHomeQuery(ideaId));
   const isSlow = useIsSlow(home.isPending);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "09")?.title;
+  // The body reads the same lists: the panel names the rows by their statements.
+  const assumptions = useQuery({
+    ...assumptionsQuery(ideaId, data?.validationId ?? ""),
+    enabled: data !== undefined,
+  });
+  const risks = useQuery({
+    ...risksQuery(ideaId, data?.validationId ?? ""),
+    enabled: data !== undefined,
+  });
+  const comments: ScreenComments | undefined =
+    data === undefined
+      ? undefined
+      : {
+          screen: {
+            containerType: "validation",
+            containerId: data.validationId,
+            sectionKeys: ["assumptions_risks"],
+          },
+          idea: {
+            id: ideaId,
+            name: data.idea.name,
+            archived: data.idea.archived,
+          },
+          shows: (item) => {
+            if (item.type !== "assumption" && item.type !== "risk") {
+              return false;
+            }
+            const rows = (item.type === "assumption" ? assumptions : risks).data
+              ?.items;
+            return (
+              item.key == null &&
+              (rows === undefined || rows.some(({ id }) => id === item.id))
+            );
+          },
+          labelOf: (target) => {
+            if (target.type === "idea") return data.idea.name;
+            const rows: readonly Row[] =
+              (target.type === "assumption" ? assumptions.data : risks.data)
+                ?.items ?? [];
+            const row = rows.find(({ id }) => id === target.id);
+            return row === undefined
+              ? undefined
+              : rowLabel(
+                  target.type === "assumption" ? "assumption" : "risk",
+                  row.statement,
+                );
+          },
+        };
   useDocumentTitle(
     ...(data === undefined || title === undefined
       ? []
@@ -1115,7 +1196,7 @@ export function AssumptionsScreen({
   });
   const to = (next: AssumptionsSearch, replace: boolean) =>
     void navigate({
-      href: assumptionsHref(workspace.id, ideaId, next),
+      href: panel.keep(assumptionsHref(workspace.id, ideaId, next)),
       replace,
       // Replacing keeps how the row was reached: a new row made in a pushed form still
       // goes back to the list.
@@ -1160,6 +1241,7 @@ export function AssumptionsScreen({
     <WorkspaceFrame
       current="ideas"
       saveScope={["assumption:", "risk:"]}
+      comments={comments}
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

@@ -345,4 +345,21 @@ describe("18 Unit Economics & Scenarios (design-spec 6.4)", () => {
       screen.queryByRole("textbox", { name: /Answer to Is the return/ }),
     ).toBeNull();
   });
+
+  test("a number's 💬 opens its thread in the comments panel (design-spec 6.0.4)", async () => {
+    const user = userEvent.setup();
+    economicsApi();
+    const router = renderApp(base);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Comments on Unit Economics · Price",
+      }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        panel: "comments",
+        target: `economics_input:${validationId}:selling_price`,
+      }),
+    );
+  });
 });

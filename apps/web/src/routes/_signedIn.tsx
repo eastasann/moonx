@@ -29,6 +29,10 @@ export interface SignedInSearch {
   modal?: string;
   /** What the modal is about: M2's item, `<targetType>:<targetId>[:<targetKey>]`. */
   about?: string;
+  /** The panel open beside the screen: `comments` (PNL-1) or `history` (PNL-2). */
+  panel?: string;
+  /** What the panel is about: an item, or `container:…` for the whole screen. */
+  target?: string;
 }
 
 /**
@@ -40,6 +44,8 @@ export const Route = createFileRoute("/_signedIn")({
   validateSearch: (search: Record<string, unknown>): SignedInSearch => ({
     ...(typeof search.modal === "string" ? { modal: search.modal } : {}),
     ...(typeof search.about === "string" ? { about: search.about } : {}),
+    ...(typeof search.panel === "string" ? { panel: search.panel } : {}),
+    ...(typeof search.target === "string" ? { target: search.target } : {}),
   }),
   beforeLoad: async ({ context }) => {
     // What is cached shows at once and is asked again behind it (ADR-011).

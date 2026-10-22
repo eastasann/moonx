@@ -13,6 +13,7 @@ import {
   Breadcrumbs,
   Button,
   ButtonGroup,
+  CommentCount,
   DescriptionList,
   DescriptionListItem,
   Dialog,
@@ -47,6 +48,10 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
+import {
+  ItemCommentsButton,
+  type ScreenComments,
+} from "../components/CommentsPanel";
 import { toastFailure } from "../components/ideaActions";
 import {
   inputOf,
@@ -71,11 +76,12 @@ import {
 } from "../components/states";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useWorkspace } from "../components/workspace";
+import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import type { SaveFields, SaveTarget } from "../lib/autosave";
 import { useAutosave, useSaveItem } from "../lib/autosave-react";
 import { useOneAtATime } from "../lib/form";
+import { rowLabel } from "../lib/item-labels";
 import {
   hrefOf,
   ideaHref,
@@ -433,6 +439,7 @@ function EntryDetail({
   const { t } = useTranslation(["validation", "app"]);
   const { me } = useWorkspace();
   const queryClient = useQueryClient();
+  const panel = usePanel();
   const isPhone = useIsNarrow();
   const query = useQuery(researchLogEntryQuery(ideaId, entryId));
   const [isEditing, setEditing] = useState(false);
@@ -517,17 +524,33 @@ function EntryDetail({
       <Stack gap="space-50">
         <Flex justifyContent="space-between" alignItems="start" gap="space-200">
           <Heading level={2}>{entry.topic}</Heading>
-          {canEdit && (
-            <ActionMenu
-              aria-label={t("validation:research.more", { topic: entry.topic })}
-              onAction={(key) => {
-                if (key === "delete") setDeleting(true);
-              }}
-              isDisabled={query.data === undefined}
-            >
-              <MenuItem id="delete">{t("validation:research.delete")}</MenuItem>
-            </ActionMenu>
-          )}
+          <Flex gap="space-50" alignItems="center">
+            <ItemCommentsButton
+              label={rowLabel("research_log_entry", entry.topic)}
+              count={entry.commentCount}
+              onPress={() =>
+                panel.show("comments", {
+                  kind: "item",
+                  item: { type: "research_log_entry", id: entry.id, key: null },
+                })
+              }
+            />
+            {canEdit && (
+              <ActionMenu
+                aria-label={t("validation:research.more", {
+                  topic: entry.topic,
+                })}
+                onAction={(key) => {
+                  if (key === "delete") setDeleting(true);
+                }}
+                isDisabled={query.data === undefined}
+              >
+                <MenuItem id="delete">
+                  {t("validation:research.delete")}
+                </MenuItem>
+              </ActionMenu>
+            )}
+          </Flex>
         </Flex>
         <Text variant="caption" tone="secondary">
           {t("validation:research.recordedBy")}
@@ -837,12 +860,19 @@ function EntryRow({ entry }: { entry: ResearchLogEntry }) {
       <Text variant="caption" tone="secondary">
         {meta}
       </Text>
-      {entry.usedAsEvidenceCount > 0 && (
-        <Text variant="caption" tone="secondary">
-          {t("validation:research.usedCount", {
-            count: entry.usedAsEvidenceCount,
-          })}
-        </Text>
+      {(entry.usedAsEvidenceCount > 0 || entry.commentCount > 0) && (
+        <Flex gap="space-200" alignItems="center">
+          {entry.usedAsEvidenceCount > 0 && (
+            <Text variant="caption" tone="secondary">
+              {t("validation:research.usedCount", {
+                count: entry.usedAsEvidenceCount,
+              })}
+            </Text>
+          )}
+          <Text variant="caption" tone="secondary">
+            <CommentCount count={entry.commentCount} />
+          </Text>
+        </Flex>
       )}
     </Stack>
   );
@@ -1110,11 +1140,45 @@ export function ResearchLogScreen({
   const { me, workspace } = useWorkspace();
   const navigate = useNavigate();
   const router = useRouter();
+  const panel = usePanel();
   const home = useQuery(validationHomeQuery(ideaId));
   const isSlow = useIsSlow(home.isPending);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "03")?.title;
+  // Every entry, whatever the filters show: the panel lists the threads of them all.
+  const entries = useQuery({
+    ...researchLogQuery(ideaId, data?.validationId ?? "", {}),
+    enabled: data !== undefined,
+  });
+  const entryOf = (entryId: string) =>
+    entries.data?.find(({ id }) => id === entryId);
+  const comments: ScreenComments | undefined =
+    data === undefined
+      ? undefined
+      : {
+          screen: {
+            containerType: "validation",
+            containerId: data.validationId,
+            sectionKeys: ["research_log"],
+          },
+          idea: {
+            id: ideaId,
+            name: data.idea.name,
+            archived: data.idea.archived,
+          },
+          shows: (item) =>
+            item.type === "research_log_entry" &&
+            item.key == null &&
+            (entries.data === undefined || entryOf(item.id) !== undefined),
+          labelOf: (target) => {
+            if (target.type === "idea") return data.idea.name;
+            const entry = entryOf(target.id);
+            return entry === undefined
+              ? undefined
+              : rowLabel("research_log_entry", entry.topic);
+          },
+        };
   useDocumentTitle(
     ...(data === undefined || title === undefined
       ? []
@@ -1125,7 +1189,7 @@ export function ResearchLogScreen({
   });
   const to = (next: ResearchSearch, replace: boolean) =>
     void navigate({
-      href: researchHref(workspace.id, ideaId, next),
+      href: panel.keep(researchHref(workspace.id, ideaId, next)),
       replace,
       // Replacing keeps how the entry was reached: a new entry made in a pushed form
       // still goes back to the list.
@@ -1168,6 +1232,7 @@ export function ResearchLogScreen({
     <WorkspaceFrame
       current="ideas"
       saveScope="research_log_entry:"
+      comments={comments}
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

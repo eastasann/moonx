@@ -2,7 +2,9 @@ import { describe, expect, test } from "vitest";
 import {
   assumptionsHref,
   competitorsHref,
+  decisionsHref,
   hrefOf,
+  notificationsHref,
   researchHref,
   sectionHref,
 } from "./links";
@@ -103,5 +105,62 @@ describe("the routes of the screens the API names (SDD 4章・5.2 LinkTarget)", 
     expect(sectionHref(workspaceId, ideaId, "05")).toBe(`${idea}/costs`);
     expect(sectionHref(workspaceId, ideaId, "06-08")).toBe(`${idea}/economics`);
     expect(sectionHref(workspaceId, ideaId, "09")).toBe(`${idea}/assumptions`);
+  });
+
+  test("a link with the comments panel opens it on the item, on the screens that have it", () => {
+    const rowId = "4c1d2e3f-0000-4000-8000-000000000001";
+    expect(
+      hrefOf({
+        screen: 17,
+        workspaceId,
+        ideaId,
+        rowId,
+        panel: "comments",
+        target: { type: "cost_item", id: rowId },
+      }),
+    ).toBe(
+      `${idea}/costs?row=${rowId}&panel=comments&target=cost_item%3A${rowId}`,
+    );
+    expect(
+      hrefOf({
+        screen: 13,
+        workspaceId,
+        ideaId,
+        panel: "comments",
+        target: { type: "idea", id: ideaId },
+      }),
+    ).toBe(`${idea}?panel=comments&target=idea%3A${ideaId}`);
+    // History, and the screens whose panels come later, have no way in yet.
+    expect(
+      hrefOf({
+        screen: 17,
+        workspaceId,
+        ideaId,
+        panel: "history",
+        target: { type: "cost_item", id: rowId },
+      }),
+    ).toBeUndefined();
+    expect(
+      hrefOf({
+        screen: 19,
+        workspaceId,
+        ideaId,
+        panel: "comments",
+        target: { type: "idea", id: ideaId },
+      }),
+    ).toBeUndefined();
+  });
+
+  test("7 with its filters and entry, and 8 with the unread", () => {
+    expect(
+      decisionsHref(workspaceId, {
+        idea: ideaId,
+        selected: "d0000000-0000-4000-8000-000000000001",
+      }),
+    ).toBe(
+      `/w/${workspaceId}/decisions?idea=${ideaId}&selected=d0000000-0000-4000-8000-000000000001`,
+    );
+    expect(decisionsHref(workspaceId)).toBe(`/w/${workspaceId}/decisions`);
+    expect(notificationsHref("unread")).toBe("/notifications?filter=unread");
   });
 });

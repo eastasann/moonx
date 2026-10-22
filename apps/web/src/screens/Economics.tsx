@@ -29,6 +29,7 @@ import {
 import {
   Breadcrumb,
   Breadcrumbs,
+  CommentCount,
   DescriptionList,
   DescriptionListItem,
   Dialog,
@@ -73,6 +74,10 @@ import {
   useAnswers,
 } from "../components/AnswerFields";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
+import {
+  ItemCommentsButton,
+  type ScreenComments,
+} from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { EvidenceSheet } from "../components/EvidenceSheet";
 import { type RowFieldsSpec, useRowFields } from "../components/RowFields";
@@ -92,11 +97,17 @@ import {
   unknownWaits,
   useWorksheet,
 } from "../components/worksheet";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  usePanel,
+  useWorkspace,
+} from "../components/workspace";
 import { api, inPath, unwrap } from "../lib/api";
 import type { SaveTarget } from "../lib/autosave";
 import { useAutosave } from "../lib/autosave-react";
 import { inputIssueMessage } from "../lib/input-issues";
+import { economicsLabel, questionLabel } from "../lib/item-labels";
 import {
   costsHref,
   type EconomicsSearch,
@@ -373,6 +384,7 @@ function NumberSheet({
   canEdit,
   onFau,
   onFact,
+  onComments,
   onClose,
 }: {
   view: NumberView;
@@ -380,6 +392,8 @@ function NumberSheet({
   canEdit: boolean;
   onFau: (change: FauChange) => void;
   onFact: () => void;
+  /** The number's 💬: the sheet closes and its thread opens in the panel. */
+  onComments: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation(["validation", "common"]);
@@ -396,6 +410,13 @@ function NumberSheet({
       title={canEdit ? t("validation:economics.editTitle", { name }) : name}
     >
       <Stack gap="space-300">
+        <Flex justifyContent="end">
+          <ItemCommentsButton
+            label={economicsLabel(view.input.fieldKey)}
+            count={view.input.commentCount}
+            onPress={onComments}
+          />
+        </Flex>
         {canEdit ? (
           <>
             <SaveFailureNote itemKey={target.key} />
@@ -728,6 +749,7 @@ function EconomicsBody({
   const queryClient = useQueryClient();
   const autosave = useAutosave();
   const modals = useModal();
+  const panel = usePanel();
   const isPhone = useIsNarrow();
   const isOnline = useIsOnline();
   const fauLabel = useFauLabel();
@@ -899,7 +921,18 @@ function EconomicsBody({
       name: t("validation:economics.column.fau"),
       isBelowName: true,
     },
+    // Each number's 💬 (design-spec 6.0.4); a phone's row opens its sheet, which has it.
+    {
+      id: "more",
+      name: t("validation:economics.column.more"),
+      isRowActions: true,
+    },
   ];
+  const showComments = (field: EconomicsField) =>
+    panel.show("comments", {
+      kind: "item",
+      item: { type: "economics_input", id: validationId, key: field },
+    });
   const table = (
     label: string,
     unit: string | null,
@@ -936,11 +969,35 @@ function EconomicsBody({
             case "name":
               return (
                 <Stack gap="space-75">
-                  {name}
+                  <Flex gap="space-100" alignItems="center" wrap>
+                    {name}
+                    {isCard ? (
+                      // A phone's row presses as a whole and holds no buttons.
+                      <Text variant="caption" tone="secondary">
+                        <CommentCount count={view.input.commentCount} />
+                      </Text>
+                    ) : (
+                      view.input.commentCount > 0 && (
+                        <ItemCommentsButton
+                          label={economicsLabel(id)}
+                          count={view.input.commentCount}
+                          onPress={() => showComments(id)}
+                        />
+                      )
+                    )}
+                  </Flex>
                   {canEdit && !isCard && (
                     <SaveFailureNote itemKey={numberKey(validationId, id)} />
                   )}
                 </Stack>
+              );
+            case "more":
+              return (
+                <ItemCommentsButton
+                  label={economicsLabel(id)}
+                  count={view.input.commentCount}
+                  onPress={() => showComments(id)}
+                />
               );
             case "value":
               return isEditing ? (
@@ -1055,6 +1112,25 @@ function EconomicsBody({
                     }
                     excerpt={hasText(worthView.text) ? worthView.text : null}
                     commentCount={worth.commentCount}
+                    actions={
+                      <ItemCommentsButton
+                        label={questionLabel(
+                          worthQuestion.key,
+                          worthQuestion.title,
+                        )}
+                        count={worth.commentCount}
+                        onPress={() =>
+                          panel.show("comments", {
+                            kind: "item",
+                            item: {
+                              type: "validation_answer",
+                              id: validationId,
+                              key: worthQuestion.key,
+                            },
+                          })
+                        }
+                      />
+                    }
                     onFocusRequest={() => setWorthOpen(true)}
                   >
                     {worthMode === "quiet" ? undefined : (
@@ -1090,6 +1166,10 @@ function EconomicsBody({
           canEdit={canEdit}
           onFau={(change) => classify(sheetView, change)}
           onFact={() => openEvidence(sheetView, true)}
+          onComments={() => {
+            setSheetField(null);
+            showComments(sheetView.input.fieldKey);
+          }}
           onClose={() => setSheetField(null)}
         />
       )}
@@ -1225,6 +1305,47 @@ export function EconomicsScreen({
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title =
     data === undefined ? undefined : t("validation:economics.title");
+  // The body reads the same numbers: the panel names WORTH by its title.
+  const numbers = useQuery({
+    ...economicsQuery(ideaId, data?.validationId ?? ""),
+    enabled: data !== undefined,
+  });
+  const comments: ScreenComments | undefined =
+    data === undefined
+      ? undefined
+      : {
+          screen: {
+            containerType: "validation",
+            containerId: data.validationId,
+            sectionKeys: ["08", "economics"],
+          },
+          idea: {
+            id: ideaId,
+            name: data.idea.name,
+            archived: data.idea.archived,
+          },
+          shows: (item) =>
+            item.id === data.validationId &&
+            (item.type === "economics_input"
+              ? economicsFieldSchema.safeParse(item.key).success
+              : item.type === "validation_answer" &&
+                (item.key ?? "").startsWith("V.08.") &&
+                (numbers.data === undefined ||
+                  numbers.data.worthQuestion?.key === item.key)),
+          labelOf: (target) => {
+            if (target.type === "idea") return data.idea.name;
+            if (target.key == null) return undefined;
+            if (target.type === "validation_answer") {
+              const question = numbers.data?.worthQuestion;
+              return questionLabel(
+                target.key,
+                question?.key === target.key ? question.title : undefined,
+              );
+            }
+            const field = economicsFieldSchema.safeParse(target.key);
+            return field.success ? economicsLabel(field.data) : undefined;
+          },
+        };
   useDocumentTitle(
     ...(data === undefined || title === undefined
       ? []
@@ -1264,6 +1385,7 @@ export function EconomicsScreen({
           ? "economics_input:"
           : ["economics_input:", answerKey(data.validationId, WORTH)]
       }
+      comments={comments}
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

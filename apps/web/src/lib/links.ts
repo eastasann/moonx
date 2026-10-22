@@ -1,5 +1,6 @@
 import type {
   CostCategory,
+  DecisionLogKind,
   EconomicsField,
   LinkTarget,
   SourceType,
@@ -7,10 +8,51 @@ import type {
   TemplateKind,
 } from "@moonx/schemas";
 import type { CompareView } from "@moonx/ui-tokens";
+import { formatPanelTarget } from "./panel-target";
 
 /** An idea's 13 Validation home (SDD 4章). */
 export const ideaHref = (workspaceId: string, ideaId: string) =>
   `/w/${workspaceId}/ideas/${ideaId}`;
+
+/** 8 Notifications (SDD 4章), across the workspaces; `unread` filters to the unread. */
+export const notificationsHref = (filter?: "unread") =>
+  `/notifications${filter === undefined ? "" : `?filter=${filter}`}`;
+
+/** What 7's URL holds (SDD 4章): the filters, and the entry shown beside the list. */
+export interface DecisionsSearch {
+  kind?: DecisionLogKind;
+  /** The idea whose decisions are listed. */
+  idea?: string;
+  /** Who recorded them: a user's id. */
+  recordedBy?: string;
+  /** The first day of the period, `YYYY-MM-DD`. */
+  from?: string;
+  /** Its last day. */
+  to?: string;
+  /** The entry shown beside the list. */
+  selected?: string;
+}
+
+/** 7 Decision Log (SDD 4章), with its filters and entry. */
+export const decisionsHref = (
+  workspaceId: string,
+  search: DecisionsSearch = {},
+) => {
+  const query = new URLSearchParams();
+  for (const key of [
+    "kind",
+    "idea",
+    "recordedBy",
+    "from",
+    "to",
+    "selected",
+  ] as const) {
+    const value = search[key];
+    if (value !== undefined) query.set(key, value);
+  }
+  const text = query.toString();
+  return `/w/${workspaceId}/decisions${text === "" ? "" : `?${text}`}`;
+};
 
 /** 9 Workspace Settings (SDD 4章), which only an Owner opens. */
 export const settingsHref = (workspaceId: string) =>
@@ -224,14 +266,39 @@ export function sectionHref(
   return undefined;
 }
 
+/** The screens whose comments panel is built (PNL-1 on 11 and 13–18). */
+const COMMENTED_SCREENS = new Set([11, 13, 14, 15, 16, 17, 18]);
+
 /**
  * The route of a screen the API names (SDD 5.2 LinkTarget), or undefined while that screen
  * is not built, or the way it opens (a panel) is not: no way into a screen before it
- * exists (docs/claude-code-prompts.md). Each screen's step adds its route here.
+ * exists (docs/claude-code-prompts.md). Each screen's step adds its route here. A link
+ * with the comments panel opens it on the item (`?panel=comments&target=`, SDD 4章).
  */
 export function hrefOf(target: LinkTarget): string | undefined {
+  if (target.panel === undefined) return screenHrefOf(target);
+  if (
+    target.panel !== "comments" ||
+    target.target === undefined ||
+    !COMMENTED_SCREENS.has(target.screen)
+  ) {
+    return undefined;
+  }
+  const base = screenHrefOf({ ...target, panel: undefined, target: undefined });
+  if (base === undefined) return undefined;
+  const [path, query = ""] = base.split("?");
+  const search = new URLSearchParams(query);
+  search.set("panel", "comments");
+  search.set(
+    "target",
+    formatPanelTarget({ kind: "item", item: target.target }),
+  );
+  return `${path}?${search}`;
+}
+
+function screenHrefOf(target: LinkTarget): string | undefined {
   const { workspaceId, ideaId } = target;
-  if (workspaceId === undefined || target.panel !== undefined) return undefined;
+  if (workspaceId === undefined) return undefined;
   switch (target.screen) {
     case 5:
       return `/w/${workspaceId}`;

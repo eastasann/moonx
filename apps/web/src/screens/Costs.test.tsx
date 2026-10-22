@@ -431,12 +431,20 @@ describe("17 Costs (design-spec 6.3)", () => {
     expect(table("Variable costs").textContent).toContain("No rows");
   });
 
-  test("a Viewer reads: no Add row, no ⋯, F/A/U as a label", async () => {
+  test("a Viewer reads: no Add row, ⋯ for comments only, F/A/U as a label", async () => {
+    const user = userEvent.setup();
     costsApi({ me: as("viewer") });
     renderApp(base);
     await screen.findByRole("grid", { name: "Startup costs" });
     expect(screen.queryByRole("button", { name: "Add row" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Row actions/ })).toBeNull();
+    // A Viewer comments too (design-spec 2.2): the row's ⋯ holds Comments alone.
+    await user.click(
+      screen.getByRole("button", { name: "Row actions for Equipment" }),
+    );
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Comments"]);
+    await user.keyboard("{Escape}");
     expect(screen.queryByRole("button", { name: /^F\/A\/U of/ })).toBeNull();
     expect(rowOf("Equipment").textContent).toContain("Assumption · High");
   });

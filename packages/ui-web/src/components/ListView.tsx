@@ -92,7 +92,10 @@ export function ListView<T extends object>({
 }
 
 export interface ListViewItemProps
-  extends Pick<GridListItemProps, "href" | "routerOptions" | "isDisabled"> {
+  extends Pick<
+    GridListItemProps,
+    "href" | "routerOptions" | "isDisabled" | "onAction"
+  > {
   id: Key;
   /** The item's text, for screen readers and typing to find it. */
   textValue: string;
@@ -114,7 +117,12 @@ export function ListViewItem({
   ...props
 }: ListViewItemProps) {
   const list = useContext(ItemContext);
-  const isActionable = list.isActionable || props.href !== undefined;
+  // A list of rows that act one by one (8: only those that open somewhere) leaves the
+  // others still, without ›.
+  const isActionable =
+    list.isActionable ||
+    props.href !== undefined ||
+    props.onAction !== undefined;
   return (
     <GridListItem
       {...props}

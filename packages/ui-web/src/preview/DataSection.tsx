@@ -11,6 +11,7 @@ import { Avatar } from "../components/Avatar";
 import { Badge } from "../components/Badge";
 import { Card, CardView } from "../components/Card";
 import { CheckDots } from "../components/CheckDots";
+import { CommentCount } from "../components/CommentCount";
 import { FauPicker, useFauLabel } from "../components/FauPicker";
 import { ListView, ListViewItem } from "../components/ListView";
 import { ActionMenu, MenuItem } from "../components/Menu";
@@ -422,6 +423,34 @@ export function ListViewSection() {
           </ListViewItem>
           <ListViewItem id="n2" textValue="Ana recorded Hold">
             <Text>Ana recorded Hold on Piaya Gift Box</Text>
+          </ListViewItem>
+        </ListView>
+      </Specimen>
+      <Specimen name="each row's onAction: only rows that open end in ›; maxLines and CommentCount">
+        <ListView aria-label="Rows that act one by one">
+          <ListViewItem
+            id="r1"
+            textValue="Paolo mentioned you"
+            onAction={() => {}}
+          >
+            <Stack gap="space-50">
+              <Text variant="label">
+                Paolo mentioned you on 01 WHO · Piaya Gift Box
+              </Text>
+              <Text variant="body-sm" tone="secondary" maxLines={2}>
+                Do we count the BPO night-shift teams as well? They order for 3
+                a.m. birthdays too, and the HR officers asked for a smaller box
+                with fewer pieces for the night shift.
+              </Text>
+            </Stack>
+          </ListViewItem>
+          <ListViewItem id="r2" textValue="Ana saved a version">
+            <Stack gap="space-50">
+              <Text>Ana saved the version “v1” of Plan A · Piaya Gift Box</Text>
+              <Text variant="caption" tone="secondary">
+                <CommentCount count={2} />
+              </Text>
+            </Stack>
           </ListViewItem>
         </ListView>
       </Specimen>

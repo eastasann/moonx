@@ -7,6 +7,7 @@ import { setPhoneWidth, setTabletWidth, settle } from "../test/helpers";
 import { Avatar, initialsOf } from "./Avatar";
 import { Card, CardView } from "./Card";
 import { CheckDots } from "./CheckDots";
+import { CommentCount } from "./CommentCount";
 import { ListView, ListViewItem } from "./ListView";
 import { ActionMenu, MenuItem } from "./Menu";
 import { Meter } from "./Meter";
@@ -536,6 +537,31 @@ describe("ListView", () => {
     expect(onAction).toHaveBeenCalledWith("b");
   });
 
+  test("rows that act one by one: only those with their own action press and end in ›", async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    render(
+      <ListView aria-label="Notifications" items={ideas}>
+        {(idea) => (
+          <ListViewItem
+            id={idea.id}
+            textValue={idea.name}
+            onAction={idea.id === "a" ? onOpen : undefined}
+          >
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+    );
+    const [first, second] = screen.getAllByRole("row");
+    expect(first?.querySelector("svg")).not.toBeNull();
+    expect(second?.querySelector("svg")).toBeNull();
+    await user.click(screen.getByText("Health Bowl"));
+    expect(onOpen).not.toHaveBeenCalled();
+    await user.click(screen.getByText("Piaya Gift Box"));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
   test("a row's ⋯ opens its menu without choosing the row; after the ›", async () => {
     const user = userEvent.setup();
     const onSelectionChange = vi.fn();
@@ -809,6 +835,20 @@ describe("Card and CardView", () => {
       ),
     ).toThrow("needs an id and a textValue");
     vi.restoreAllMocks();
+  });
+});
+
+describe("CommentCount", () => {
+  test("the mark and the number, read as how many comments; none shows nothing", () => {
+    const { container, rerender } = render(<CommentCount count={2} />);
+    expect(container.textContent).toBe("22 comments");
+    expect(
+      screen.getByText("2", { exact: true }).getAttribute("aria-hidden"),
+    ).toBe("true");
+    rerender(<CommentCount count={1} />);
+    expect(container.textContent).toBe("11 comment");
+    rerender(<CommentCount count={0} />);
+    expect(container.textContent).toBe("");
   });
 });
 

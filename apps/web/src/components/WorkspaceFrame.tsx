@@ -3,28 +3,56 @@ import {
   type AppFrameProps,
   MenuItem,
   type NavItem,
+  Panel,
   SideNav,
   TabBar,
   useMoreMenu,
 } from "@moonx/ui-web";
-import { House, Lightbulb, Settings2, Shield } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Bell,
+  House,
+  Lightbulb,
+  ScrollText,
+  Settings2,
+  Shield,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useAutosave, useSaveState } from "../lib/autosave-react";
-import { adminTemplatesHref, settingsHref } from "../lib/links";
+import {
+  adminTemplatesHref,
+  decisionsHref,
+  notificationsHref,
+  settingsHref,
+} from "../lib/links";
+import { commentsQuery, unreadCountQuery } from "../lib/queries";
+import {
+  CommentsPanelBody,
+  type ScreenComments,
+  screenAccepts,
+} from "./CommentsPanel";
+import { ModalBoundary } from "./ErrorBoundary";
 import { useLogOutRequest } from "./LogOutRequest";
 import { useOfflineBanner } from "./StandaloneFrame";
-import { useModal, useWorkspace } from "./workspace";
+import { useModal, usePanel, useWorkspace } from "./workspace";
 
 export interface WorkspaceFrameProps
   extends Pick<AppFrameProps, "breadcrumbs" | "back" | "title"> {
   /**
    * The navigation item of the screen; none for a screen whose item is not built yet.
-   * `account`, `settings` and `admin` are opened from the More menu, so their phone
-   * header reads "← More" (design-spec 6.0.1); a screen under one of them (27) passes its
-   * own `back` instead.
+   * `decisions`, `account`, `settings` and `admin` are opened from the More menu, so
+   * their phone header reads "← More" (design-spec 6.0.1); a screen under one of them
+   * (27) passes its own `back` instead.
    */
-  current?: "dashboard" | "ideas" | "settings" | "account" | "admin";
+  current?:
+    | "dashboard"
+    | "ideas"
+    | "notifications"
+    | "decisions"
+    | "settings"
+    | "account"
+    | "admin";
   /**
    * The screen's saved items, by key prefix (`idea:<id>`), or prefixes for a screen of
    * several kinds of item: "Saved" shows once one of them saved on this visit. Failures
@@ -32,30 +60,43 @@ export interface WorkspaceFrameProps
    * the user moves).
    */
   saveScope?: string | readonly string[];
+  /**
+   * The screen's comments (PNL-1): the header's 💬 with its unresolved threads, and the
+   * panel that `?panel=comments&target=` opens on it or on one of its items (SDD 4章).
+   * None on a screen with nothing to comment on (design-spec 6.0.1).
+   */
+  comments?: ScreenComments;
   children: ReactNode;
 }
 
 /**
- * AppFrame for the screens of a workspace, and for 4, which stands in the one last
+ * AppFrame for the screens of a workspace, and for 4 and 8, which stand in the one last
  * opened (design-spec 6.0.1・6.16): the workspace, the pages the user may open (9 for an
- * Owner only, 26 Admin for an operator only), Account and Log out in the sidebar's account menu or in More, the
- * header's save state with its Retry, and the offline band. Logging out with unsaved
- * input asks first (5章「共通ナビ」). The pages appear here as their screens are built
- * (docs/claude-code-prompts.md: no way into a screen before it exists).
+ * Owner only, 26 Admin for an operator only), Notifications with the unread count,
+ * Account and Log out in the sidebar's account menu or in More, the header's save state
+ * with its Retry, 💬 and the comments panel, and the offline band. Logging out with
+ * unsaved input asks first (5章「共通ナビ」). The pages appear here as their screens are
+ * built (docs/claude-code-prompts.md: no way into a screen before it exists).
  */
 export function WorkspaceFrame({
   current,
   saveScope,
+  comments,
   children,
   ...header
 }: WorkspaceFrameProps) {
-  const { t } = useTranslation(["app"]);
+  const { t } = useTranslation(["app", "panels"]);
   const { me, workspace, role } = useWorkspace();
   const modal = useModal();
+  const panel = usePanel();
   const moreMenu = useMoreMenu();
+  const unread = useQuery(unreadCountQuery());
   const isInMore =
     header.back === undefined &&
-    (current === "account" || current === "settings" || current === "admin");
+    (current === "decisions" ||
+      current === "account" ||
+      current === "settings" ||
+      current === "admin");
   const offline = useOfflineBanner();
   const autosave = useAutosave();
   const saveState = useSaveState(saveScope);
@@ -74,7 +115,20 @@ export function WorkspaceFrame({
       icon: <Lightbulb />,
       href: `/w/${workspace.id}/ideas`,
     },
+    {
+      id: "notifications",
+      label: t("app:nav.notifications"),
+      icon: <Bell />,
+      href: notificationsHref(),
+      badge: unread.data?.total ?? 0,
+    },
   ];
+  const decisionLog: NavItem = {
+    id: "decisions",
+    label: t("app:nav.decisionLog"),
+    icon: <ScrollText />,
+    href: decisionsHref(workspace.id),
+  };
   // Only an Owner opens 9 and only an operator 26 (design-spec 2.2); the rest never see
   // the way in (1.3).
   const settings: NavItem[] =
@@ -98,17 +152,62 @@ export function WorkspaceFrame({
         },
       ]
     : [];
+  const screenTarget =
+    comments === undefined
+      ? undefined
+      : ({ kind: "screen", screen: comments.screen } as const);
+  const screenThreads = useQuery(commentsQuery(workspace.id, screenTarget));
+  const openComments =
+    comments !== undefined &&
+    panel.open !== null &&
+    panel.open.name === "comments" &&
+    screenAccepts(comments, panel.open.target)
+      ? panel.open.target
+      : undefined;
   return (
     <AppFrame
       {...header}
       back={isInMore ? moreMenu.back : header.back}
       saveState={saveState}
       onRetrySave={() => autosave.retry()}
+      comments={
+        screenTarget === undefined
+          ? undefined
+          : {
+              count: screenThreads.data?.unresolvedCount ?? 0,
+              isOpen: openComments !== undefined,
+              // The screen's list from an item's thread; pressed again, it closes.
+              onPress: () =>
+                openComments?.kind === "screen"
+                  ? panel.close()
+                  : panel.show("comments", screenTarget),
+            }
+      }
+      panel={
+        comments === undefined ? undefined : (
+          <Panel
+            title={t("panels:comments.title")}
+            isOpen={openComments !== undefined}
+            onOpenChange={(isOpen) => {
+              if (!isOpen) panel.close();
+            }}
+          >
+            {openComments !== undefined && (
+              <ModalBoundary
+                key={JSON.stringify(openComments)}
+                onClose={panel.close}
+              >
+                <CommentsPanelBody target={openComments} comments={comments} />
+              </ModalBoundary>
+            )}
+          </Panel>
+        )
+      }
       sideNav={
         <SideNav
           workspaceName={workspace.name}
           onWorkspacePress={openSwitch}
-          items={pages}
+          items={[...pages, decisionLog]}
           secondaryItems={[...settings, ...admin]}
           currentId={current}
           user={{ name: me.displayName, avatarSrc: me.avatarUrl }}
@@ -131,6 +230,9 @@ export function WorkspaceFrame({
           moreMenu={isInMore ? moreMenu.tabBar : undefined}
           more={
             <>
+              <MenuItem id={decisionLog.id} href={decisionLog.href}>
+                {decisionLog.label}
+              </MenuItem>
               <MenuItem id="switch-workspace" onAction={openSwitch}>
                 {t("app:nav.switchWorkspace")}
               </MenuItem>

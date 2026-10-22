@@ -1,0 +1,39 @@
+{
+  "comments": {
+    "title": "Comments",
+    "onItem": "On {{item}}",
+    "empty": "No comments yet",
+    "new": "Add a comment",
+    "newOnIdea": "Comment on {{idea}}",
+    "placeholder": "Write a comment…",
+    "post": "Post",
+    "reply": "Reply",
+    "replyTo": "Reply to {{name}}",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "editLabel": "Edit your comment",
+    "delete": "Delete",
+    "deleteTitle": "Delete this comment?",
+    "deleteBody": "Its words are removed for good. The thread keeps a line that says it was deleted.",
+    "deleted": "deleted",
+    "edited": "edited",
+    "more": "More for {{name}}'s comment",
+    "resolve": "Resolve",
+    "reopen": "Reopen",
+    "resolvedBy": "Resolved by {{name}}",
+    "resolvedThread": "Resolved · {{name}}: {{excerpt}}",
+    "resolvedDeleted": "Resolved · {{name}}",
+    "couldNotPost": "Couldn't post",
+    "invalidMention": "Someone you mentioned can't be mentioned here. Remove the mention and post again.",
+    "noCandidates": "Couldn't load who you can mention.",
+    "archived": {
+      "idea": "This idea is archived. Restore it to make changes."
+    },
+    "item": "Comments on {{item}}",
+    "itemCount_one": "Comments on {{item}}, {{formatted}} comment",
+    "itemCount_other": "Comments on {{item}}, {{formatted}} comments",
+    "menu": "Comments",
+    "menuCount": "Comments ({{formatted}})"
+  }
+}

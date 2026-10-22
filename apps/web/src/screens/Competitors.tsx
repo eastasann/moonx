@@ -1,5 +1,5 @@
 import { hasText } from "@moonx/domain";
-import { formatMoney } from "@moonx/i18n";
+import { formatCount, formatMoney } from "@moonx/i18n";
 import type {
   CheckState,
   Competitor,
@@ -54,6 +54,10 @@ import {
 } from "../components/AnswerFields";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import {
+  ItemCommentsButton,
+  type ScreenComments,
+} from "../components/CommentsPanel";
+import {
   COMPETITOR_TEXTS,
   CompetitorFields,
   competitorInput,
@@ -78,12 +82,18 @@ import {
   useIsSlow,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  usePanel,
+  useWorkspace,
+} from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import type { SaveTarget } from "../lib/autosave";
 import { useAutosave } from "../lib/autosave-react";
 import { countingEvidence } from "../lib/evidence";
 import { useOneAtATime } from "../lib/form";
+import { questionLabel, rowLabel } from "../lib/item-labels";
 import {
   type CompetitorsSearch,
   competitorsHref,
@@ -537,6 +547,7 @@ function PatternQuestions({
 }) {
   const { t } = useTranslation(["validation"]);
   const autosave = useAutosave();
+  const panel = usePanel();
   const fauLabel = useFauLabel();
   const { idea, validationId } = home;
   const [current, setCurrent] = useState<string | null>(() =>
@@ -611,6 +622,22 @@ function PatternQuestions({
                 }
                 excerpt={hasText(view.text) ? view.text : null}
                 commentCount={answer.commentCount}
+                actions={
+                  <ItemCommentsButton
+                    label={questionLabel(question.key, question.title)}
+                    count={answer.commentCount}
+                    onPress={() =>
+                      panel.show("comments", {
+                        kind: "item",
+                        item: {
+                          type: "validation_answer",
+                          id: validationId,
+                          key: question.key,
+                        },
+                      })
+                    }
+                  />
+                }
                 onFocusRequest={() => setCurrent(question.key)}
               >
                 {mode === "quiet" ? undefined : (
@@ -666,10 +693,11 @@ function CompetitorsBody({
   /** Closes the competitor's dialog, going back if it was opened here. */
   onCloseRow: () => void;
 }) {
-  const { t } = useTranslation(["validation", "common", "app"]);
+  const { t } = useTranslation(["validation", "common", "app", "panels"]);
   const { me, workspace, role } = useWorkspace();
   const queryClient = useQueryClient();
   const modals = useModal();
+  const panel = usePanel();
   const sources = useSources();
   const forFact = useRouterState({
     select: (state) => state.location.state.evidenceForFact === true,
@@ -793,23 +821,43 @@ function CompetitorsBody({
       }
     />
   );
-  const moreOf = (competitor: Competitor) =>
-    canEdit ? (
-      <ActionMenu
-        aria-label={t("validation:competitors.more", {
-          name: competitor.name,
-        })}
-        onAction={(key) => {
-          if (key === "edit") onOpenRow(competitor.id);
-          if (key === "reorder") setReordering(true);
-          if (key === "delete") setDeleting(competitor);
-        }}
-      >
+  // Everyone who reads the card can comment on it, so every card has its ⋯: Comments,
+  // then the Owners' and Members' Edit, Reorder and Delete (design-spec 6.0.4・6.10).
+  const moreOf = (competitor: Competitor) => (
+    <ActionMenu
+      aria-label={t("validation:competitors.more", {
+        name: competitor.name,
+      })}
+      onAction={(key) => {
+        if (key === "comments") {
+          panel.show("comments", {
+            kind: "item",
+            item: { type: "competitor", id: competitor.id, key: null },
+          });
+        }
+        if (key === "edit") onOpenRow(competitor.id);
+        if (key === "reorder") setReordering(true);
+        if (key === "delete") setDeleting(competitor);
+      }}
+    >
+      <MenuItem id="comments">
+        {competitor.commentCount > 0
+          ? t("panels:comments.menuCount", {
+              formatted: formatCount(competitor.commentCount),
+            })
+          : t("panels:comments.menu")}
+      </MenuItem>
+      {canEdit && (
         <MenuItem id="edit">{t("validation:competitors.edit")}</MenuItem>
+      )}
+      {canEdit && (
         <MenuItem id="reorder">{t("validation:competitors.reorder")}</MenuItem>
+      )}
+      {canEdit && (
         <MenuItem id="delete">{t("validation:competitors.delete")}</MenuItem>
-      </ActionMenu>
-    ) : undefined;
+      )}
+    </ActionMenu>
+  );
 
   const cards = (
     <CardView
@@ -1123,11 +1171,61 @@ export function CompetitorsScreen({
   const { me, workspace } = useWorkspace();
   const navigate = useNavigate();
   const router = useRouter();
+  const panel = usePanel();
   const home = useQuery(validationHomeQuery(ideaId));
   const isSlow = useIsSlow(home.isPending);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "04")?.title;
+  // The body reads the same list: the panel names the competitors and the questions.
+  const list = useQuery({
+    ...competitorsQuery(ideaId, data?.validationId ?? ""),
+    enabled: data !== undefined,
+  });
+  const comments: ScreenComments | undefined =
+    data === undefined
+      ? undefined
+      : {
+          screen: {
+            containerType: "validation",
+            containerId: data.validationId,
+            sectionKeys: ["04", "competitors"],
+          },
+          idea: {
+            id: ideaId,
+            name: data.idea.name,
+            archived: data.idea.archived,
+          },
+          shows: (item) =>
+            item.type === "validation_answer"
+              ? item.id === data.validationId &&
+                (item.key ?? "").startsWith("V.04.") &&
+                (list.data === undefined ||
+                  list.data.patterns.some(
+                    ({ question }) => question.key === item.key,
+                  ))
+              : item.type === "competitor" &&
+                item.key == null &&
+                (list.data === undefined ||
+                  list.data.items.some(({ id }) => id === item.id)),
+          labelOf: (target) => {
+            if (target.type === "idea") return data.idea.name;
+            if (target.type === "validation_answer" && target.key != null) {
+              return questionLabel(
+                target.key,
+                list.data?.patterns.find(
+                  ({ question }) => question.key === target.key,
+                )?.question.title,
+              );
+            }
+            const competitor = list.data?.items.find(
+              ({ id }) => id === target.id,
+            );
+            return competitor === undefined
+              ? undefined
+              : rowLabel("competitor", competitor.name);
+          },
+        };
   useDocumentTitle(
     ...(data === undefined || title === undefined
       ? []
@@ -1138,7 +1236,7 @@ export function CompetitorsScreen({
   });
   const to = (next: CompetitorsSearch, replace: boolean) =>
     void navigate({
-      href: competitorsHref(workspace.id, ideaId, next),
+      href: panel.keep(competitorsHref(workspace.id, ideaId, next)),
       replace,
       state: (previous) =>
         replace ? previous : { ...previous, openedDetail: true },
@@ -1188,6 +1286,7 @@ export function CompetitorsScreen({
           ? "competitor:"
           : ["competitor:", answerKey(data.validationId, "V.04.")]
       }
+      comments={comments}
       back={{
         label: t("validation:questions.back"),
         href: ideaHref(workspace.id, ideaId),

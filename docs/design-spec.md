@@ -430,12 +430,12 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | IllustratedMessage | 空の状態・0件・権限がない・見つからない（6.0.6）。絵は使わず、Lucide のアイコンと見出しと説明 | — | 同じ |
 | Avatar | 提案者・記録者・コメントの書き手・4 のプロフィール写真。写真が無い・読めないときは頭文字 | S / M。角の丸い四角（地は sunken、頭文字は等幅の semibold、枠なし） | 同じ |
 | TableView | 17 費用・18 シナリオ表・7 決定ログ・28 の一覧・15 の「表で比較」・21 の表の小項目（§11 など） | 密度 compact / regular / spacious。layout は auto（幅で切り替え。既定）/ table / cards（`cards` はスマホの行の形をどの幅でも出す）。地の色を付けず、見出しは 06 `typography.table-header` の文字と下の薄い線（`border.default`）、行は hairline の区切り（行の高さは `component.table-view.row-height`。s17-costs.html）。列は幅（px か %）を持てる固定の組み方で、行を入力欄にしても表の幅と列が動かない。編集できる表は、行の値を文字として見せ、触った行（フォーカスか編集中）のセルだけを入力欄にする。数字の列は等幅で右にそろえる。行の名前の列は medium の太さ。表の下の行（s17-costs.html の tfoot）は、左に `footerAction`（「+ Add row」の quiet の Button）、右に `footerTotal`（「Subtotal ₱145,000+ · 3 Unknown, 1 Empty」） | 線で区切った行（4.3。下の補足）。表の下は `footerAction` だけを全幅の行（高さは 06 `table-view.narrow-footer-min-height` 以上、下に hairline。s17-costs.html の .cards .add）にし、`footerTotal` は出さない（合計は F の要約バーと結果のトレイにある。6.3）。`footerTotal` を使う表は、スマホでも合計をほかの所に出す |
-| ListView | 6 アイデア一覧・14 調査ログ・8 通知・22 の各リスト・12 のメンバー・26 のテンプレート（9 のメンバーと招待は SettingsList） | 密度 compact / regular / spacious。layout は auto / table / cards。押すと開く行と選ぶと横に詳細を出す行は末尾に ›（4.4。s06-ideas.html の行に › は無いが、画面をまたいでそろえるために置く。2026-10-17 のユーザーの決定）。D の一覧の選んだ行は地と線で示し、スマホでは一覧と詳細が入れ替わるので選んだ行を示さない。行の ⋯（`actions`。6 の Duplicate・Archive）は › の後ろに置き、TableView の `isRowActions` の列と同じく、マウスの端末ではポインタの下の行・フォーカスのある行・メニューを開いている行だけで見せ、タッチの端末では常に見せる | 全画面のリスト。行の ⋯ はトレイで開く |
+| ListView | 6 アイデア一覧・14 調査ログ・8 通知・22 の各リスト・12 のメンバー・26 のテンプレート（9 のメンバーと招待は SettingsList） | 密度 compact / regular / spacious。layout は auto / table / cards。押すと開く行と選ぶと横に詳細を出す行は末尾に ›（4.4。s06-ideas.html の行に › は無いが、画面をまたいでそろえるために置く。2026-10-17 のユーザーの決定）。D の一覧の選んだ行は地と線で示し、スマホでは一覧と詳細が入れ替わるので選んだ行を示さない。行の ⋯（`actions`。6 の Duplicate・Archive）は › の後ろに置き、TableView の `isRowActions` の列と同じく、マウスの端末ではポインタの下の行・フォーカスのある行・メニューを開いている行だけで見せ、タッチの端末では常に見せる。押した先は一覧ではなく行ごとにも渡せる（`ListViewItem` の `onAction`。8 は通知ごとに開く先が違う）。押した先を持たない行は › を持たず、押せない | 全画面のリスト。行の ⋯ はトレイで開く |
 | Card / CardView | 15 競合・代替のカード | 枠だけで影を付けない（4.4）。CardView の `addItem` は最後に点線の枠の追加のタイル（「+ Add competitor」。s15-competitors.html の .addcard）を置き、押すとカードを開く代わりに追加する。15 のカードの形（s15-competitors.html）: 題の上に種類（`eyebrow`。等幅の小さな文字で、大文字にしない）、右上に `figure`（価格。等幅）とその下の注記（per bowl）、無いときは「No price」を薄く、その下にラベルと値の行（`details`。hairline で区切り、ラベルの列を取る）、最後の行に注記（根拠の件数）と 💬 の数（`openThreadCount`。解決していないスレッドの数。0 なら出さない）とカードの ⋯（`actions`） | 1列（`details` はラベルを値の上に置く） |
 | Well | 判断材料の要約（19）、AI 書き出しのプレビュー（24） | 白い面（`surface.raised`）を hairline の枠で囲む。角丸は Card と同じ | 同じ |
 | Divider | 区切り | S / M / L。S と M は hairline の色、L は薄い線（`border.default`） | 同じ |
 | Tree | 27 のセクションと設問のツリー | — | 全画面のリスト |
-| Heading / Text | 画面の見出しと本文。Heading は本文と同じ書体の太字で level 1〜4。見た目が level と違うときは variant: ランディングの題名は display、ランディングの節の題は display-2、画面の題がパターンで違う大きさのときは heading-1-hub（A）・heading-1-list（D の左のペイン）・heading-1-steps（G）・heading-1-settings（H）・heading-1-toolbar（I の道具の行）、設問の問いは heading-question、level 2 や 3 で level 4 の見た目にするときは heading-4（H のまとまりの名前・F の表の題）、ブロックの小さな見出しは label。display-2 の幅は 06 `layout.public.heading-measure` まで（s01-landing.html の h2）。Text は body / body-long / body-sm / lead（ランディングのリード。既定の tone は secondary、幅は 06 `layout.lead-measure` まで）/ caption / label / number（等幅の数字）/ number-sm（注記の大きさの等幅の数字。13 の「62 items」・17 の「· ₱77.00」と要約バーの値。RowList の `isEndNumeric` も同じ文字）/ body-compact（行の中の1文。幅によらない大きさ。5 の Recent activity）と tone（primary / secondary / tertiary / notice（琥珀色。6.2 の「Not classified yet」・19 の「Unknown 5」）/ negative） | — | 同じ |
+| Heading / Text | 画面の見出しと本文。Heading は本文と同じ書体の太字で level 1〜4。見た目が level と違うときは variant: ランディングの題名は display、ランディングの節の題は display-2、画面の題がパターンで違う大きさのときは heading-1-hub（A）・heading-1-list（D の左のペイン）・heading-1-steps（G）・heading-1-settings（H）・heading-1-toolbar（I の道具の行）、設問の問いは heading-question、level 2 や 3 で level 4 の見た目にするときは heading-4（H のまとまりの名前・F の表の題）、ブロックの小さな見出しは label。display-2 の幅は 06 `layout.public.heading-measure` まで（s01-landing.html の h2）。Text は body / body-long / body-sm / lead（ランディングのリード。既定の tone は secondary、幅は 06 `layout.lead-measure` まで）/ caption / label / number（等幅の数字）/ number-sm（注記の大きさの等幅の数字。13 の「62 items」・17 の「· ₱77.00」と要約バーの値。RowList の `isEndNumeric` も同じ文字）/ body-compact（行の中の1文。幅によらない大きさ。5 の Recent activity）と tone（primary / secondary / tertiary / notice（琥珀色。6.2 の「Not classified yet」・19 の「Unknown 5」）/ negative）。長い文の冒頭を行に添えるときは `maxLines`（1 か 2）で行の数を切り、切ったところに「…」を出す（7 の理由の冒頭・8 の本文と理由の冒頭。6.15） | — | 同じ |
 | Form | 入力欄と送信ボタンを縦に並べる。ブラウザの検査は切り、画面が Zod で検査して各欄に理由を渡す | — | 同じ |
 | FileTrigger（Spectrum の名前） | 4 のプロフィール写真の選択、25 の `.md` / `.json` の選択。包んだボタンでファイルの選択を開く | — | 同じ |
 | Steps（Spectrum の名前） | パターン G のステップ表示（1 → 2 → 3）。済み・今・これから | 済みは secondary の塗りの丸にチェック、今は輪のインクの丸に番号で、名前を semibold にして下にインクの線（06 `component.steps.current-rule-width`）、これからは tertiary。つなぎの線を引かず、並びの下に hairline を引く（タブに似た形。s25-import.html） | 印だけと今のステップの名前を1行に出す（ほかの名前は読み上げだけ） |
@@ -445,6 +445,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 独自: PageFrame | 枠の無い画面（1 ランディング・2 ログイン系・3 オンボーディング・29・30）の main ランドマーク。見た目は持たず、中のレイアウトパターンが並びを決める。画面上部の帯（オフライン・新しい版。6.0.6）は main の先頭に出す | — | 同じ |
 | 独自: RouterProvider | `href` を持つ部品（Link・MenuItem・Breadcrumb）をアプリのルーターで移動させる。アプリのルートに1つ置く | — | 同じ |
 | 独自: Panel | コメント・変更履歴のパネル（PNL-1・PNL-2） | — | トレイ |
+| 独自: CommentCount | 項目の横のコメントの数を、ボタンを持てない所に出す（6.0.4。14・16 の一覧の行と、スマホの 17・18 の行）。15 のカードの「💬 1」（Card の `openThreadCount`）と同じ印と数字で、数だけを伝える（押せない。その項目の 💬 は詳細の見出しの横か、行を押して開くシートにある）。読み上げは「2 comments」。0 件は出さない | 置いた行の文字の大きさ | 同じ |
 | 独自: DiffText | 変更履歴（PNL-2）と 25 ③ の変更前・変更後の文章。変わった語を追加（下線）・削除（取り消し線）で強調し、色だけで伝えない（語の単位は下の補足） | before / after。削除は secondary の文字と取り消し線、追加はインクの文字と文字から少し離した下線。どちらも sunken の地 | 同じ |
 | 独自: MentionTextArea | コメントの入力欄（PNL-1）。本文に `@` と文字を打つと候補（メンバー）の一覧を出し、選ぶと `@名前` を本文に入れる。候補は画面が渡す | 一覧は入力欄の下に開く（↑↓で選び、Enter か Tab で決め、Esc で閉じる） | トレイで選ぶ（`semantic.breakpoint.tablet` より狭い幅。トレイの中の入力欄で絞り込み、入力欄の初期値は `@` の後に打った文字） |
 | 独自: QuestionCard | 設問フォームの1問（4.1 パターン C のフォーカスの表示と控えめな表示） | `focused` は薄い線（`border.default`）の枠・角丸（06 `radius.card`）・2つの影（`shadow.question-card-edge`・`question-card`）のカードで、列から左右に `layout.question-form.card-outset` だけはみ出す。問いは `typography.heading-question`。`quiet` は hairline で区切った一覧の行（印の列（`layout.question-form.row-mark-width`）｜等幅の名前とその下の回答の冒頭｜右に F/A/U のラベルとコメント数）。「Fact · No evidence」のラベルには、どの表示でも FauPicker と同じ警告の印を添える（6.0.3）。s11-form.html | 1問ずつのカード（はみ出さない） |
@@ -657,6 +658,9 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - 自己分析へのコメントは、共有先のワークスペースごとに分かれる。本人には、どのワークスペースからのコメントかを表示する。共有をやめるとそのワークスペースのコメントは見えなくなり、共有し直すと戻る。
 - 空の状態: 「No comments yet」と入力欄。
 - 書き込みに失敗したら、入力内容を残して「Couldn't post」と Retry を出す。
+- 項目の 💬（項目の横のバッジ。2026-10-22 に Step 32 で決めた並び）: 設問のカード（11、15 の V.04、18 の V.08）は、開いたカードの見出しの右端の道具に 💬 と件数を置く（s11-form.html の .tools）。控えめなカードは件数だけを出し、押すとカードが開く。14・16 は詳細の見出しの右（⋯ の前）に 💬。15 のカードと 17 の行は ⋯ のメニューの先頭に「Comments」（件数があれば「Comments (2)」）を置き、Viewer とアーカイブ済みのアイデアにも、この項目だけの ⋯ を出す（コメントは全ロールが書き、アーカイブ済みのアイデアのものも読めるため。2.2・6.8）。15 のカードは、ボタンを ⋯ だけ持つ（4.5 Card）ので、足下の「💬 1」の横の ⋯ から開く。18 の数字は、行の末尾の列（17 の ⋯ と同じ列。マウスでは行に重ねたときに見せる）に 💬。タブレットの幅から上の 17・18 の表では、コメントのある行の名前の後ろに件数の 💬（押すとスレッドを開く）も出す。スマホで行を押すとシートを開く 17・18 は、行に件数（4.5 CommentCount。行は押すとシートを開くだけで、ボタンを持たない）を出し、シートの中に同じ ⋯・💬 を置く。シートの ⋯・💬 を押すと、シートを閉じてからパネルを開く（シートとパネルを重ねない）。14・16 の一覧の行には件数（CommentCount）を出し、スレッドは詳細の見出しの横の 💬 から開く。
+- パネルの中: 項目の 💬 から開いたパネルは、上に「On {項目の名前}」、下に新しいスレッドの入力欄「Add a comment」。ヘッダーの 💬 から開いた一覧は、各スレッドの上に項目の名前（SDD 5.11 の `HistoryEntry.label` と同じ書き方。「01 WHO」「Costs · Rent」。アイデアへのコメントはアイデア名）を出し、下の入力欄はアイデアへのコメント（「Comment on {アイデア名}」）にする。
+- スレッドの形: 書き手の Avatar・名前・相対時刻（直したコメントは「edited」を添える）と本文。返信は最初のコメントの本文の下に同じ形で字下げして並べ、その下に「Reply」と「Resolve」（解決済みは「Reopen」と「Resolved by {名前}」）。解決済みのスレッドは「Resolved · {書き手}: {本文}」の1行の Disclosure に畳み、押すと開く。自分のコメントの ⋯ に Edit（その場で直し、Save・Cancel）と Delete を置き、Delete は「Delete this comment?」と確かめる（消した本文は戻せないため）。入力欄の Post は、何か打つまで押せず、送っている間は二度押せない（6.0.6 のモーダルの決まりと同じ）。
 - アーカイブ済みのアイデア・プラン: パネルを開く画面（13〜23）がアーカイブ済みと分かっているので、パネルは最初から読み取り専用にする。スレッドの上に注意（アイデアなら「This idea is archived. Restore it to make changes.」、案なら「This plan is archived. Restore it to make changes.」）を出し、入力欄は出さない。ほかの画面から開いたパネルなど、画面が知らないときは最初の書き込みを API が拒否し（`ARCHIVED`）、拒否されたらパネルが同じ読み取り専用の表示に切り替わる。
 
 #### 6.0.5 変更履歴パネル（PNL-2）
@@ -874,7 +878,7 @@ Web（パターン A ハブ: 上に主要指標、その下の左に状態、右
 | F/A/U（左） | Fact / Assumption（確信度の内訳）/ Unknown / 未分類 / 未入力 の件数。1本の帯（Meter）と凡例（帯と同じ見本・ラベル・件数）で示す。見出し「Fact / Assumption / Unknown」の右端に項目の総数（「62 items」。等幅の数字）を出し、帯の上には名前を出さない（見出しが兼ねる。読み上げの名前は残す。d1-moon.html） | 6.0.3 の対象項目 |
 | Summary（左） | Customer / Problem / Solution / Market type。未入力なら「Empty」と、入力する画面へのリンク | 01 WHO、01 PROBLEM、アイデアの「提案する解決策」、02 OCEAN |
 | セクション（右） | 名前は番号付き。設問のセクション（01・02・10）は検証のテンプレートの版の題（27 で直すと 11 と同じく変わる）、画面のセクション（03〜09）はアプリの固定の名前（2026-10-12 のユーザーの決定）。01〜10 の進み具合（入力済みの数 / 全体）。分母のあるセクションは、その割合だけ満ちた MoonGlyph を添える。セクションごとの F/A/U の帯は出さない（内訳は左の F/A/U で見る。2026-10-12） | 各セクション |
-| Decisions（右） | 判定の履歴（新しい順、最大5件 + 「See all」で 7 へ） | 決定ログ |
+| Decisions（右） | 判定の履歴（新しい順、最大5件 + 「See all decisions」で 7 へ） | 決定ログ |
 | Plans（右） | このアイデアのプラン（案名・最新の版の名前（版が無ければ「No version saved」）・最新の Go / No-Go）。アーカイブした案は並べず、末尾に「n archived plans · Show」を出す。押すとアーカイブした案を並べ、案を押すと 20 を読み取り専用で開く（そこで Restore できる。6.12）。最新の判定が Proceed なら「Add plan」（M5） | プラン |
 
 セクションの進み具合の数え方:
@@ -1335,7 +1339,7 @@ Summary は DescriptionList、判定は RadioGroup の cards。s19-decision.html
 - Key numbers: 6.4 の主要指標のうち、初期費用・損益分岐（件/日）・Expected の月次営業利益・回収期間・ROI。
 - Checks: 達成していない確認項目だけを出す（すべて達成なら「All 6 checks done」）。
 - F/A/U の内訳（未分類と Unknown を強調）。帯は使わず、MoonGlyph・ラベル・件数を1行に並べる（Empty も含む）。
-- 直前の判定（あれば「Last decision: Hold · Sep 30 · Ana Villanueva」。s19-decision.html）。
+- 直前の判定（あれば「Last decision: Hold · Sep 30 · Ana Villanueva」。s19-decision.html）。押すとその記録を選んだ 7 を開く（6.15）。
 - Checks の行は、MoonGlyph・確認項目の名前・右端の状態（「Partial」）と、名前の下に不足の理由（13 の確認項目と同じ文と並び。d1-moon.html の .rows .sub）。s19-decision.html は理由を右端の状態に続けて「Partial · 1 row is Empty」と1行に置いているが、理由は長いことがあり（「18 rows are Empty · No startup or monthly cost amounts yet」）、そうするとスマホで名前が押しつぶされて1文字ずつ折り返すので、13 と同じく名前の下に置く。
 - 題は「Record a decision」、その上に小さくアイデア名、パンくずの最後は「Record decision」（s19-decision.html と、それに合わせた /dev/components の 19 の見本の文言。3.4 の UI 表示名「Decision」はほかの画面からこの画面を呼ぶ名前で、画面の題は記録する操作の名前にする）。
 - 判定は、題と説明のカードで並べる（4.5 の RadioGroup の `cards`。スマホは1列。s19-decision.html）: Proceed「Worth planning」、Hold「Come back later」、Drop「Hide from lists」。Summary はラベルと値の並び（4.5 の DescriptionList）、Key numbers は MetricGroup の `compact`。
@@ -2127,6 +2131,10 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 版の保存 | 版の名前、保存した人と日時、その版を読み取り専用で開くリンク（20） |
 
 - 記録は追記だけで、編集・削除できない。
+- 一覧の形（2026-10-22 に Step 32 で決めた）: 左のペインの TableView（4.5）を3列にする。1列目はアイデア（プランの記録は「{案名} · {アイデア名}」）、その下に「{種類} · {記録者}」と理由の冒頭（「“…”」。2行まで。4.5 Text の `maxLines`）、2列目は値（判定と Go / No-Go は Badge、版の保存は版の名前）、3列目は記録した日時（列の名前は「Recorded」。日付の下に時刻）。6 列に分けると、左のペインの幅で文字が1文字ずつ折れるため（28 と同じ判断）。
+- 絞り込みの形: Kind・Idea（アーカイブしたもの・Drop も含む全アイデア）・Recorded by（今の Owner と Member と、ログに記録のある人。外れた人や Viewer になった人の記録も選べる）・Period の Picker（ラベルを中に置く。s06-ideas.html の .filters）。Period は「Any time」「Last 7 days」「Last 30 days」「Last 90 days」「Last 12 months」（どれも今日まで。日数は今日を含めて数え、12か月は去年の同じ日の翌日から。今日は利用者のタイムゾーンの日付。去年に無い日（2月29日）はその月の最後の日を去年の同じ日とする）と「Choose dates…」（From・To の DatePicker の Dialog。To が From より前なら「Choose a To date on or after the From date」と出して適用しない）。URL の `from`・`to` が選択肢のどれにも当たらないときは、その日付を選択肢の1つとして出す。絞り込みを変えると、選んでいた記録を外し、一覧の先頭を横に出す。
+- 詳細の形: 値の Badge と種類、題（アイデア、プランの記録は「{案名} · {アイデア名}」。版の保存は版の名前）、「Recorded by {記録者} · {日付}, {時刻}」（版の保存は「Saved by」）。その下に表の項目を、見出し「Why」「Checks missing then」（不足が無ければ「All 6 checks done」）「Key numbers then」（19 と同じ5つ。6.5）「Fact / Assumption / Unknown then」（19 と同じ1行）「Version」「Conditions」（Launch if / Delay if / Stop if。空なら「Empty」）で並べる。判定の詳細の末尾に「Open validation →」（13）。
+- 13 の Decisions の「See all decisions」（4.5 Link。d1-moon.html）は、そのアイデアで絞った 7 を開く。19 の「Last decision: …」は、その記録を選んだ 7 を開く。
 - 空の状態: 「Decisions you record will appear here, with who, when and why.」
 
 #### 8 通知（パターン D）
@@ -2145,6 +2153,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - ワークスペースから外れた人の通知は、押すと「You no longer have access」と出す。停止されたユーザーには通知を作らない。
 - 通知はワークスペースをまたいで1つの一覧に出し、各行にワークスペース名を添える。押すとそのワークスペースに切り替えて開く。
 - 空の状態: 「You're all caught up.」
+- 形（2026-10-22 に Step 32 で決めた）: 各行は行った人の Avatar、題（太字が未読）、本文や理由の冒頭（2行まで。4.5 Text の `maxLines`）、「Unread · {ワークスペース名} · {相対時刻}」（未読は太字だけでなく文字でも示す。既読は「Unread」を出さない）。All / Unread は Picker「Show」（ラベルを中に置く）、その横に quiet の「Mark all as read」（未読が無ければ押せない）。50件ずつ読み、続きは一覧の下の「Show more」で読む。
 
 ---
 

@@ -4,6 +4,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "ideas": "Ideas",
+    "notifications": "Notifications",
+    "decisionLog": "Decision Log",
     "settings": "Settings",
     "workspaceSettings": "Workspace Settings",
     "account": "Account",

@@ -11,18 +11,11 @@ import {
 } from "../../../../../../screens/ResearchLog";
 
 /**
- * `presetSupports`: the checks, comma-separated as links write them, or the list a search
- * read before holds (the router validates it again as it builds the location); any other
- * value names none.
+ * `presetSupports`: the checks, comma-separated (SDD 4章); any other value names none.
  */
 const presetOf = (value: unknown) => {
-  const parts =
-    typeof value === "string"
-      ? value.split(",")
-      : Array.isArray(value)
-        ? value
-        : undefined;
-  if (parts === undefined) return undefined;
+  if (typeof value !== "string") return undefined;
+  const parts = value.split(",");
   const checks = parts.map((part) => supportsCheckSchema.safeParse(part));
   return checks.every((check) => check.success)
     ? [...new Set(checks.map((check) => check.data))]
@@ -36,12 +29,16 @@ const presetOf = (value: unknown) => {
 export const Route = createFileRoute(
   "/_signedIn/w/$workspaceId/ideas/$ideaId/research",
 )({
-  validateSearch: (search: Record<string, unknown>): ResearchSearch => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): Omit<ResearchSearch, "presetSupports"> & { presetSupports?: string } => ({
     supports: supportsCheckSchema.safeParse(search.supports).data,
     source: sourceTypeSchema.safeParse(search.source).data,
     entry: uuidSchema.safeParse(search.entry).data,
     new: search.new === 1 || search.new === "1" ? 1 : undefined,
-    presetSupports: presetOf(search.presetSupports),
+    // Kept as the comma-separated text: the router writes the validated search back to
+    // the address, and would write a list there as JSON.
+    presetSupports: presetOf(search.presetSupports)?.join(","),
   }),
   staticData: { skeleton: ResearchLogSkeleton },
   component: ResearchLogRoute,
@@ -49,6 +46,11 @@ export const Route = createFileRoute(
 
 function ResearchLogRoute() {
   const { ideaId } = Route.useParams();
-  const { modal: _, about: __, ...search } = Route.useSearch();
-  return <ResearchLogScreen ideaId={ideaId} search={search} />;
+  const { modal: _, about: __, presetSupports, ...search } = Route.useSearch();
+  return (
+    <ResearchLogScreen
+      ideaId={ideaId}
+      search={{ ...search, presetSupports: presetOf(presetSupports) }}
+    />
+  );
 }

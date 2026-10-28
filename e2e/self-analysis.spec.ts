@@ -211,28 +211,50 @@ test.describe("10, 11, 12 and M6 on a desktop", () => {
 
   test("a Viewer opening 10 in a workspace they view is taken to their personal workspace's 10", async ({
     page,
+    browser,
     signIn,
-  }) => {
-    const me: Me = await signIn(demo.viewer);
-    const bcdx = workspaceOf(me, "BCDX");
-    const own = me.memberships.find(({ workspace }) => workspace.isPersonal);
-    if (own === undefined) throw new Error("No personal workspace");
-    await page.goto(`/w/${bcdx.id}`);
-    // No way into it from BCDX (5章「Viewer」).
-    await expect(
-      page.getByRole("link", { name: "Ideas" }).first(),
-    ).toBeVisible();
-    await expect(page.getByRole("link", { name: "Self Analysis" })).toHaveCount(
-      0,
-    );
-    await page.goto(`/w/${bcdx.id}/self-analysis`);
-    await expect(page).toHaveURL(
-      new RegExp(`/w/${own.workspace.id}/self-analysis$`),
-    );
-    await expect(
-      page.getByRole("heading", { level: 1, name: "My Self Analysis" }),
-    ).toBeVisible();
-    await expect(page.getByText("Not started · 0 / 36 answered")).toBeVisible();
+    account,
+  }, testInfo) => {
+    // A Viewer of a team of the test's own: the move makes the personal workspace the
+    // last opened, which the specs reading demo Grace's would see.
+    await signIn(account.email, account.password);
+    const viewer = await otherBrowser(browser, testInfo.workerIndex);
+    try {
+      const team = await teamWithMember(
+        page,
+        viewer.page,
+        testInfo.workerIndex,
+        { label: "Viewed", displayName: "Vic Viewer", role: "viewer" },
+      );
+      const me = (await (
+        await viewer.page.request.get("/api/v1/me")
+      ).json()) as Me;
+      const own = me.memberships.find(({ workspace }) => workspace.isPersonal);
+      if (own === undefined) throw new Error("No personal workspace");
+      await viewer.page.goto(`/w/${team.id}`);
+      // No way into it from the team (5章「Viewer」).
+      await expect(
+        viewer.page.getByRole("link", { name: "Ideas" }).first(),
+      ).toBeVisible();
+      await expect(
+        viewer.page.getByRole("link", { name: "Self Analysis" }),
+      ).toHaveCount(0);
+      await viewer.page.goto(`/w/${team.id}/self-analysis`);
+      await expect(viewer.page).toHaveURL(
+        new RegExp(`/w/${own.workspace.id}/self-analysis$`),
+      );
+      await expect(
+        viewer.page.getByRole("heading", {
+          level: 1,
+          name: "My Self Analysis",
+        }),
+      ).toBeVisible();
+      await expect(
+        viewer.page.getByText("Not started · 0 / 36 answered"),
+      ).toBeVisible();
+    } finally {
+      await viewer.context.close();
+    }
   });
 });
 

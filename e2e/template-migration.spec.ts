@@ -154,6 +154,11 @@ test.describe("on a desktop", () => {
     await expect(dialog).toBeHidden();
     await expect(page.getByText("Template updated to v3")).toBeVisible();
     await expect(band(page)).toHaveCount(0);
+    // M8 closes back to 13 (screen_flow.mermaid M8 -.-> S13).
+    await expect(page).toHaveURL(`${WEB_ORIGIN}${home}`);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Bacolod Health Bowl" }),
+    ).toBeVisible();
 
     // The answer is kept but no longer shows on 11.
     await page.goto(`${home}/questions/01`);
@@ -247,6 +252,13 @@ test.describe("on a desktop", () => {
     await planDialog.getByRole("button", { name: "Cancel" }).click();
     await expect(planDialog).toBeHidden();
     await expect(band(page)).toBeVisible();
+    // M8 closes back to 20 (screen_flow.mermaid M8 -.-> S20).
+    await expect(page).toHaveURL(
+      `${WEB_ORIGIN}/w/${bcdx.id}/ideas/${ideaId}/plans/${planA.id}`,
+    );
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Plan A" }),
+    ).toBeVisible();
 
     await page.goto(`/w/${bcdx.id}/self-analysis`);
     await expect(

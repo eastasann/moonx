@@ -1,18 +1,36 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { Me } from "@moonx/schemas";
+import type { Me, Workspace } from "@moonx/schemas";
 import { request as apiRequest, type Page } from "@playwright/test";
 import { WEB_ORIGIN } from "./env";
 import {
+  type Account,
+  test as base,
   DEMO_PASSWORD,
   demo,
   expect,
   nextAddress,
-  test,
+  operatorInvited,
   workspaceOf,
 } from "./fixtures";
 
 // 5 Dashboard and M7 (design-spec 6.9・3.8・5章・6.0.1・6.0.6) against the seeded demo
-// data (design-spec 8), signed in through the API.
+// data (design-spec 8), signed in through the API. What M7 writes is done by an account of
+// the worker's own.
+
+/**
+ * One account per worker for what goes through M7 (a switch, online or offline, and New
+ * workspace): opening a workspace makes it the one opened last (5章「ログイン後」), which
+ * a demo user's tests in other specs set back as they open BCDX at the same time.
+ */
+const test = base.extend<object, { account: Account }>({
+  account: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright reads the fixtures a fixture needs from this pattern, and this one needs none.
+    async ({}, use, workerInfo) => {
+      await use(await operatorInvited(workerInfo.workerIndex, "dashboard"));
+    },
+    { scope: "worker" },
+  ],
+});
 
 const phone = {
   viewport: { width: 390, height: 844 },
@@ -230,23 +248,31 @@ test("another workspace's URL: no access; an unknown one: not found; both lead h
 test("M7 switches workspace, and the workspace becomes the last opened", async ({
   page,
   signIn,
+  account,
 }) => {
-  const me = await signIn(demo.member);
-  const bcdx = workspaceOf(me, "BCDX");
-  const personal = workspaceOf(me, "Kenji Mori's workspace");
-  await page.goto(`/w/${bcdx.id}`);
-  await page.getByRole("button", { name: "BCDX, switch workspace" }).click();
+  const me = await signIn(account.email, account.password);
+  const personal = workspaceOf(me, "Test Person's workspace");
+  const made = await page.request.post("/api/v1/workspaces", {
+    data: { name: `Switch team ${Date.now() % 1_000_000}` },
+    headers: { Origin: WEB_ORIGIN },
+  });
+  expect(made.status(), await made.text()).toBe(201);
+  const team = (await made.json()) as Workspace;
+  await page.goto(`/w/${team.id}`);
+  await page
+    .getByRole("button", { name: `${team.name}, switch workspace` })
+    .click();
   const dialog = page.getByRole("dialog", { name: "Switch workspace" });
   await expect(dialog).toBeVisible();
   await expect(page).toHaveURL(/modal=switch-workspace/);
-  const current = dialog.getByRole("listitem").filter({ hasText: "BCDX" });
+  const current = dialog.getByRole("listitem").filter({ hasText: team.name });
   await expect(current).toContainText("Current");
   await expect(current.getByRole("link")).toHaveCount(0);
-  await dialog.getByRole("link", { name: /Kenji Mori's workspace/ }).click();
+  await dialog.getByRole("link", { name: /Test Person's workspace/ }).click();
   await expect(page).toHaveURL(`${WEB_ORIGIN}/w/${personal.id}`);
   await expect(dialog).toBeHidden();
   await expect(
-    page.getByRole("heading", { level: 1, name: "Kenji Mori's workspace" }),
+    page.getByRole("heading", { level: 1, name: "Test Person's workspace" }),
   ).toBeVisible();
   await expect
     .poll(
@@ -259,10 +285,13 @@ test("M7 switches workspace, and the workspace becomes the last opened", async (
 test("M7's New workspace makes one with the user as Owner and opens its Getting started", async ({
   page,
   signIn,
+  account,
 }) => {
-  const me = await signIn(demo.otherMember);
-  await page.goto(`/w/${workspaceOf(me, "BCDX").id}`);
-  await page.getByRole("button", { name: "BCDX, switch workspace" }).click();
+  const me = await signIn(account.email, account.password);
+  await page.goto(`/w/${workspaceOf(me, "Test Person's workspace").id}`);
+  await page
+    .getByRole("button", { name: "Test Person's workspace, switch workspace" })
+    .click();
   await page.getByRole("button", { name: "New workspace" }).click();
   const dialog = page.getByRole("dialog", { name: "New workspace" });
   const create = dialog.getByRole("button", { name: "Create" });
@@ -274,12 +303,13 @@ test("M7's New workspace makes one with the user as Owner and opens its Getting 
   await name.fill("x".repeat(61));
   await expect(dialog).toContainText("Too long. Shorten to 60 characters.");
   await expect(create).toBeDisabled();
-  await name.fill("Paolo's tutoring");
+  const tutoring = `Weekend tutoring ${Date.now() % 1_000_000}`;
+  await name.fill(tutoring);
   await expect(create).toBeEnabled();
   await create.click();
   await expect(page).toHaveURL(/\/w\/[0-9a-f-]{36}$/);
   await expect(
-    page.getByRole("heading", { level: 1, name: "Paolo's tutoring" }),
+    page.getByRole("heading", { level: 1, name: tutoring }),
   ).toBeVisible();
   const steps = page.getByRole("list", { name: "Getting started" });
   await expect(steps.getByRole("listitem")).toHaveText([
@@ -289,8 +319,7 @@ test("M7's New workspace makes one with the user as Owner and opens its Getting 
   ]);
   const after = await (await page.request.get("/api/v1/me")).json();
   const made = after.memberships.find(
-    (m: { workspace: { name: string } }) =>
-      m.workspace.name === "Paolo's tutoring",
+    (m: { workspace: { name: string } }) => m.workspace.name === tutoring,
   );
   expect(made.role).toBe("owner");
   expect(made.workspace.currency).toBe("PHP");
@@ -369,20 +398,38 @@ test("offline, a workspace not loaded yet says it cannot open", async ({
   page,
   context,
   signIn,
+  account,
 }) => {
-  const me = await signIn(demo.owner);
-  const personal = workspaceOf(me, "Ana Villanueva's workspace");
-  await page.goto(`/w/${workspaceOf(me, "BCDX").id}`);
+  const me = await signIn(account.email, account.password);
+  const personal = workspaceOf(me, "Test Person's workspace");
+  const made = await page.request.post("/api/v1/workspaces", {
+    data: { name: `Offline team ${Date.now() % 1_000_000}` },
+    headers: { Origin: WEB_ORIGIN },
+  });
+  expect(made.status(), await made.text()).toBe(201);
+  const team = (await made.json()) as Workspace;
+  // An idea, so that 5 lists it in Ideas rather than showing Getting started.
+  const idea = await page.request.post(`/api/v1/workspaces/${team.id}/ideas`, {
+    data: {
+      name: "Banana Cue Cart",
+      oneLineConcept: "Banana cue by the school gate.",
+    },
+    headers: { Origin: WEB_ORIGIN },
+  });
+  expect(idea.status(), await idea.text()).toBe(201);
+  await page.goto(`/w/${team.id}`);
   await loaded(page, allBlocks);
   // The route's skeleton has the same blocks, not busy, while the screen's code still
   // loads: offline before it has, the router could not load it and reloaded the page,
-  // blank. The seed's idea in the list is the screen's own.
-  await expect(block(page, "Ideas")).toContainText("Piaya Gift Box Delivery");
+  // blank. The idea in the list is the screen's own.
+  await expect(block(page, "Ideas")).toContainText("Banana Cue Cart");
   await context.setOffline(true);
-  await page.getByRole("button", { name: "BCDX, switch workspace" }).click();
+  await page
+    .getByRole("button", { name: `${team.name}, switch workspace` })
+    .click();
   await page
     .getByRole("dialog", { name: "Switch workspace" })
-    .getByRole("link", { name: /Ana Villanueva's workspace/ })
+    .getByRole("link", { name: /Test Person's workspace/ })
     .click();
   await expect(page).toHaveURL(`${WEB_ORIGIN}/w/${personal.id}`);
   for (const name of ["Ideas", "Due soon", "Recent activity"]) {

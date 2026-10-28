@@ -135,7 +135,7 @@ export function uniqueEmail(label: string) {
 }
 
 /** A context of its own for the API, as a browser of WEB_ORIGIN would call it. */
-const apiAs = (workerIndex: number) =>
+export const apiAs = (workerIndex: number) =>
   apiRequest.newContext({
     baseURL: WEB_ORIGIN,
     extraHTTPHeaders: {
@@ -244,13 +244,18 @@ export async function operatorInvited(
 
 /**
  * A team workspace of the page's user (W0) with a second person, signed up from its
- * invitation and in it as a Member (W4, U5, U6); `other` is signed in as them.
+ * invitation and in it as a Member, or with `role` (W4, U5, U6); `other` is signed in as
+ * them.
  */
 export async function teamWithMember(
   page: Page,
   other: Page,
   workerIndex: number,
-  { label, displayName }: { label: string; displayName: string },
+  {
+    label,
+    displayName,
+    role = "member",
+  }: { label: string; displayName: string; role?: "member" | "viewer" },
 ): Promise<Workspace> {
   const made = await page.request.post("/api/v1/workspaces", {
     data: { name: `${label} ${Date.now() % 1_000_000}` },
@@ -261,7 +266,7 @@ export async function teamWithMember(
   const email = uniqueEmail(`${label.toLowerCase()}-member`);
   const invited = await page.request.post(
     `/api/v1/workspaces/${workspace.id}/invitations`,
-    { data: { email, role: "member" }, headers: { Origin: WEB_ORIGIN } },
+    { data: { email, role }, headers: { Origin: WEB_ORIGIN } },
   );
   expect(invited.status(), await invited.text()).toBe(201);
   const link = await linkMailedTo(email, /https?:\/\/\S+\/invite\/[\w-]+/);

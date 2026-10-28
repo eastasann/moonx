@@ -371,7 +371,7 @@ function ItemSwitchTitle({
         <ActionButton isQuiet aria-label={t("plans:item.switchItem")}>
           <ChevronDown />
         </ActionButton>
-        <Menu aria-label={t("plans:item.items", { plan: home.name })}>
+        <Menu>
           {home.parts.map((part) => (
             <MenuSection
               key={part.part}
@@ -1113,16 +1113,12 @@ export function PlanItemScreen({
       ]}
       comments={comments}
       history={comments}
-      back={
-        home === undefined
-          ? { label: t("ideas:title"), href: ideasHref(workspace.id) }
-          : {
-              label: home.name,
-              href: planHref(workspace.id, ideaId, planId, {
-                version: search.version,
-              }),
-            }
-      }
+      back={{
+        label: t("plans:home.back"),
+        href: planHref(workspace.id, ideaId, planId, {
+          version: search.version,
+        }),
+      }}
       breadcrumbs={
         <Breadcrumbs>
           <Breadcrumb href={ideasHref(workspace.id)}>

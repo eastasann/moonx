@@ -263,12 +263,10 @@ function HeaderLine({ home }: { home: PlanHome }) {
  */
 function PlanSwitch({
   home,
-  ideaName,
   canAddPlan,
   onAddPlan,
 }: {
   home: PlanHome;
-  ideaName: string;
   canAddPlan: boolean;
   onAddPlan: () => void;
 }) {
@@ -301,7 +299,6 @@ function PlanSwitch({
           <ChevronDown />
         </ActionButton>
         <Menu
-          aria-label={t("plans:home.plans", { idea: ideaName })}
           onAction={(key) => {
             if (key === "add-plan") onAddPlan();
             else if (key === "retry") void plans.refetch();
@@ -333,13 +330,11 @@ function PlanSwitch({
  */
 function Header({
   home,
-  ideaName,
   canEdit,
   canAddPlan,
   onAddPlan,
 }: {
   home: PlanHome;
-  ideaName: string;
   canEdit: boolean;
   canAddPlan: boolean;
   onAddPlan: () => void;
@@ -373,12 +368,7 @@ function Header({
           </Link>
         </InlineAlert>
       )}
-      <PlanSwitch
-        home={home}
-        ideaName={ideaName}
-        canAddPlan={canAddPlan}
-        onAddPlan={onAddPlan}
-      />
+      <PlanSwitch home={home} canAddPlan={canAddPlan} onAddPlan={onAddPlan} />
       <Text variant="caption" tone="secondary">
         {[
           version,
@@ -722,12 +712,10 @@ function PartBlock({ home, part }: { home: PlanHome; part: Part }) {
 
 function PlanHub({
   home,
-  ideaName,
   modal,
   about,
 }: {
   home: PlanHome;
-  ideaName: string;
   modal: string | undefined;
   about: string | undefined;
 }) {
@@ -798,7 +786,6 @@ function PlanHub({
         header={
           <Header
             home={home}
-            ideaName={ideaName}
             canEdit={canEdit}
             canAddPlan={canAddPlan}
             onAddPlan={() => modals.open("create-plan")}
@@ -953,7 +940,6 @@ function PlanHomeBody({
         // Another plan is another hub: its typed header and M4's choice stay its own.
         key={home.data.id}
         home={home.data}
-        ideaName={idea.data.idea.name}
         modal={modal}
         about={about}
       />
@@ -1095,7 +1081,7 @@ export function PlanHomeScreen({
   /** What the modal is about: M8's `business_plan:<id>`. */
   about: string | undefined;
 }) {
-  const { t } = useTranslation(["ideas"]);
+  const { t } = useTranslation(["ideas", "validation"]);
   const { workspace, role } = useWorkspace();
   const panel = usePanel();
   const { data } = useQuery(planHomeQuery(ideaId, planId, search.version));
@@ -1157,11 +1143,10 @@ export function PlanHomeScreen({
       comments={comments}
       history={comments}
       templateBanner={templateBanner}
-      back={
-        idea === undefined
-          ? { label: t("ideas:title"), href: ideasHref(workspace.id) }
-          : { label: idea.name, href: ideaHref(workspace.id, ideaId) }
-      }
+      back={{
+        label: t("validation:questions.back"),
+        href: ideaHref(workspace.id, ideaId),
+      }}
       breadcrumbs={
         <Breadcrumbs>
           <Breadcrumb href={ideasHref(workspace.id)}>

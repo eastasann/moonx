@@ -2279,7 +2279,7 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 35d: screen_flow.mermaid の全遷移の E2E
 
-Status:
+Status: done 2026-10-28
 
 ```
 画面遷移図の全遷移をたどる E2E を作ってください（Step 35 から分けた残り。Step 35〜35c で Web の全画面がそろった）。

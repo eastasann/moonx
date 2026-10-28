@@ -559,7 +559,6 @@ function SectionForm({
             href: selfAnalysisSectionHref(workspace.id, candidate.key),
           }))}
           title={section.title}
-          menuLabel={t("selfAnalysis:home.sections.title")}
         />
         <Flex gap="space-100" alignItems="center">
           <MoonGlyph value={shown.length === 0 ? 0 : answered / shown.length} />

@@ -1,6 +1,6 @@
 {
   "home": {
-    "plans": "Plans of {{idea}}",
+    "back": "Plan",
     "switchPlan": "Switch plan",
     "archivedGroup": "Archived",
     "addPlan": "Add plan",
@@ -226,7 +226,6 @@
   },
   "item": {
     "switchItem": "Switch item",
-    "items": "Items of {{plan}}",
     "previousItem": "Previous item",
     "next": "Next: {{item}}",
     "complete": "{{item}}: {{answered}}/{{total}} answered",

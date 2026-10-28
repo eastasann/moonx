@@ -176,12 +176,16 @@ describe("14 Research log (design-spec 6.10)", () => {
   test("Add entry: the date today and the link's tags, then the entry it made is shown", async () => {
     const user = userEvent.setup();
     const calls = logApi();
-    renderApp(`${base}?new=1&presetSupports=permits`);
+    const router = renderApp(`${base}?new=1&presetSupports=permits`);
     const topic = await screen.findByRole("textbox", { name: /Topic/ });
     expect(
       (screen.getByRole("checkbox", { name: "Permits" }) as HTMLInputElement)
         .checked,
     ).toBe(true);
+    // The address keeps the tags as SDD 4章 writes them.
+    expect(router.state.location.searchStr).toBe(
+      "?new=1&presetSupports=permits",
+    );
     const add = screen.getAllByRole("button", { name: "Add entry" }).at(-1);
     expect(add?.hasAttribute("disabled")).toBe(true);
     await user.type(topic, "Asked the city hall");

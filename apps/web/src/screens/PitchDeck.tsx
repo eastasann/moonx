@@ -660,11 +660,10 @@ export function PitchDeckScreen({
     <WorkspaceFrame
       current="ideas"
       comments={comments}
-      back={
-        data === undefined
-          ? { label: t("ideas:title"), href: ideasHref(workspace.id) }
-          : { label: data.name, href: planHref(workspace.id, ideaId, planId) }
-      }
+      back={{
+        label: t("plans:home.back"),
+        href: planHref(workspace.id, ideaId, planId),
+      }}
       breadcrumbs={
         <Breadcrumbs>
           <Breadcrumb href={ideasHref(workspace.id)}>

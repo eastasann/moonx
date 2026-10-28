@@ -100,6 +100,13 @@ export interface QuestionFormPatternProps {
   isAnswered?: (id: string) => boolean;
   /** → pressed on the last question, on a phone (6.2: the section's completion card). */
   onEnd?: () => void;
+  /**
+   * On a phone, the section's completion card (6.2) the screen shows once → was pressed on
+   * the last question: it takes the question's place and focus, → does nothing more, and
+   * ← goes back to the last question. Null while a question is shown; ignored from the
+   * tablet breakpoint up, where every question is in the list.
+   */
+  end?: ReactNode;
 }
 
 /**
@@ -122,13 +129,22 @@ export function QuestionFormPattern({
   nextSection,
   isAnswered,
   onEnd,
+  end,
 }: QuestionFormPatternProps) {
   const { t } = useTranslation(["components"]);
   const isNarrow = useIsNarrow();
   const tools = useHeaderTools();
   const [isFocusMode, setFocusMode] = useState(readFocusMode);
   const strip = useRef<HTMLDivElement>(null);
+  const endCard = useRef<HTMLLIElement>(null);
   const hasFocus = isFocusMode && !isReadOnly;
+  const isAtEnd = isNarrow && end != null;
+
+  // → that showed the card is disabled under the finger: focus moves to the card instead
+  // of falling to the page.
+  useLayoutEffect(() => {
+    if (isAtEnd) endCard.current?.focus();
+  }, [isAtEnd]);
 
   // The phone's dots: the current one stays in view as the questions change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the current question changes
@@ -200,9 +216,13 @@ export function QuestionFormPattern({
     0,
     currentId === null ? 0 : questionIds.indexOf(currentId),
   );
-  const shown = isNarrow ? questionIds.slice(index, index + 1) : questionIds;
-  const previous = questionIds[index - 1];
-  const next = questionIds[index + 1];
+  const shown = isAtEnd
+    ? []
+    : isNarrow
+      ? questionIds.slice(index, index + 1)
+      : questionIds;
+  const previous = isAtEnd ? questionIds.at(-1) : questionIds[index - 1];
+  const next = isAtEnd ? undefined : questionIds[index + 1];
   const modeOf = (id: string): QuestionCardMode => {
     if (isReadOnly) return "open";
     if (isNarrow) return "focused";
@@ -233,6 +253,11 @@ export function QuestionFormPattern({
                 {renderQuestion(id, modeOf(id))}
               </li>
             ))}
+            {isAtEnd && (
+              <li ref={endCard} tabIndex={-1} className={styles.question}>
+                {end}
+              </li>
+            )}
           </ol>
           {footer != null && isNarrow && (
             <div className={styles.sectionFooter}>{footer}</div>
@@ -278,7 +303,9 @@ export function QuestionFormPattern({
                             total: formatCount(questionIds.length),
                           },
                         )}
-                        aria-current={id === currentId ? "step" : undefined}
+                        aria-current={
+                          id === currentId && !isAtEnd ? "step" : undefined
+                        }
                         onPress={() => onCurrentChange(id)}
                         className={styles.questionDot}
                       >
@@ -295,7 +322,9 @@ export function QuestionFormPattern({
             </div>
             <AriaButton
               aria-label={t("components:questionFormPattern.next")}
-              isDisabled={next === undefined && onEnd === undefined}
+              isDisabled={
+                isAtEnd || (next === undefined && onEnd === undefined)
+              }
               onPress={() => (next ? onCurrentChange(next) : onEnd?.())}
               className={styles.questionArrow}
             >

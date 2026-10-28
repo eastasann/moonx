@@ -4,6 +4,7 @@ import {
   changeHistory,
   type DatabaseTransaction,
   economicsInputs,
+  HISTORY_MERGE_WINDOW_MS,
   ideas,
   selfAnalyses,
   users,
@@ -129,7 +130,7 @@ function saveIdeaName(
 }
 
 describe("change history (ADR-020)", () => {
-  test("each save adds one row, with the columns of SDD 6.3", async () => {
+  test("a save adds a row, with the columns of SDD 6.3", async () => {
     const t = await setUp();
     const scope = await scopeOf(
       { ideaId: t.idea.id },
@@ -159,11 +160,20 @@ describe("change history (ADR-020)", () => {
         revertedFromId: null,
         changedById: t.member.id,
         changedAt: at,
+        firstChangedAt: null,
       },
     ]);
 
-    await saveIdeaName(scope, t.member.id, "Second", { lockVersion: 1 });
-    await saveIdeaName(scope, t.owner.id, "Third", { lockVersion: 2 });
+    // Another person's save adds a row; the same person's next save, more than
+    // HISTORY_MERGE_WINDOW_MS later, adds one too (ADR-020).
+    await saveIdeaName(scope, t.owner.id, "Second", { lockVersion: 1 }, at);
+    await saveIdeaName(
+      scope,
+      t.owner.id,
+      "Third",
+      { lockVersion: 2 },
+      new Date(at.getTime() + HISTORY_MERGE_WINDOW_MS + 1),
+    );
     const rows = await historyOf(t.idea.id);
     expect(rows).toHaveLength(3);
     expect((await ideaRow(t.idea.id))?.lockVersion).toBe(3);
@@ -625,7 +635,9 @@ describe("optimistic lock (ADR-019)", () => {
 
   test("lets every save through for an item not stored yet", async () => {
     await expect(
-      checkLockVersion(db, null, { lockVersion: 3 }, null),
+      db.transaction((tx) =>
+        checkLockVersion(tx, null, { lockVersion: 3 }, null),
+      ),
     ).resolves.toBeUndefined();
   });
 

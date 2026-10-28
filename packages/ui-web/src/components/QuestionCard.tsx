@@ -1,6 +1,6 @@
 import { formatCount } from "@moonx/i18n";
 import type { QuestionCardMode } from "@moonx/ui-tokens";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, TriangleAlert } from "lucide-react";
 import {
   type FocusEvent,
   type ReactNode,
@@ -15,6 +15,7 @@ import { IconSlot } from "../internal/IconSlot";
 import type { MoonState } from "../internal/MoonMark";
 import * as moonStyles from "../internal/moon.css";
 import { scrollToFocusAnchor } from "../internal/scrollToFocusAnchor";
+import { narrowQuery } from "../styles/helpers";
 import { MoonGlyph } from "./MoonGlyph";
 import * as styles from "./QuestionCard.css";
 
@@ -60,7 +61,12 @@ export interface QuestionCardProps {
    * The answer's F/A/U (validation only; self-analysis has none): its mark at the start of
    * a quiet card, and its label (`useFauLabel`).
    */
-  status?: { state: MoonState; label: string };
+  status?: {
+    state: MoonState;
+    label: string;
+    /** A Fact without evidence: the label carries a warning (design-spec 6.0.3). */
+    isWarning?: boolean;
+  };
   /** A quiet card's excerpt: the answer's start, or null for "Empty". */
   excerpt?: string | null;
   /** A quiet card's number of comments; none shows nothing. @default 0 */
@@ -77,6 +83,17 @@ export interface QuestionCardProps {
   /** The title's level in the page outline. @default 2 */
   headingLevel?: 2 | 3 | 4;
   id?: string;
+}
+
+/** The warning beside "Fact · No evidence", as FauPicker's (its label says why). */
+function Warning() {
+  return (
+    <span className={styles.warning}>
+      <IconSlot size="XS">
+        <TriangleAlert />
+      </IconSlot>
+    </span>
+  );
 }
 
 /**
@@ -113,9 +130,16 @@ export function QuestionCard({
 
   // Entering an answer's field moves its question to the middle (4.1 C), in the focused
   // card and with every question open alike. A read-only answer (a Viewer's) is no field
-  // to enter, so it moves nothing (6.2).
+  // to enter, so it moves nothing (6.2). Nor does a phone's (6.2「設問の入力欄に入る
+  // （Web）」): one question at a time sits under the section's description, which the
+  // move would hide under the header, and a field keeps itself above the keyboard
+  // (useKeepAboveKeyboard, 4.3), in a list of questions too.
   const onFocus = (event: FocusEvent<HTMLElement>) => {
-    if (mode !== "quiet" && isAnswerField(event.target)) {
+    if (
+      mode !== "quiet" &&
+      isAnswerField(event.target) &&
+      !window.matchMedia(narrowQuery).matches
+    ) {
       scrollToFocusAnchor(event.currentTarget, event.target);
     }
   };
@@ -164,6 +188,7 @@ export function QuestionCard({
               {status.label}
             </span>
           )}
+          {status?.isWarning === true && <Warning />}
           {commentCount > 0 && (
             <span className={styles.comments}>
               <IconSlot size="XS">
@@ -201,6 +226,7 @@ export function QuestionCard({
             <span className={moonStyles.labelColor[status.state]}>
               {status.label}
             </span>
+            {status.isWarning === true && <Warning />}
           </span>
         )}
         {actions != null && <div className={styles.actions}>{actions}</div>}

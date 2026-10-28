@@ -393,9 +393,16 @@ describe("C1 GET /api/v1/comments", () => {
     expect(ids(await list(team.ownerCookie, screen("01,02")))).toEqual(
       [who.id, ocean.id, onIdea.id].sort(),
     );
-    expect(ids(await list(team.ownerCookie, screen()))).toEqual(
-      [who.id, ocean.id, onIdea.id].sort(),
+    const all = await list(team.ownerCookie, screen());
+    expect(ids(all)).toEqual([who.id, ocean.id, onIdea.id].sort());
+    // Each thread names its item as HistoryEntry `label` does (SDD 5.11), so a screen's
+    // list needs no read per item.
+    const labels = new Map(
+      all.threads.map((thread) => [thread.root.id, thread.label]),
     );
+    expect(labels.get(who.id)).toMatch(/^01 \S/);
+    expect(labels.get(ocean.id)).toMatch(/^02 \S/);
+    expect(labels.get(onIdea.id)).toBe(team.idea.name);
     expect(
       ids(
         await list(

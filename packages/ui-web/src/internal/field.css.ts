@@ -1,5 +1,5 @@
 import { vars } from "@moonx/ui-tokens";
-import { style } from "@vanilla-extract/css";
+import { createVar, fallbackVar, style } from "@vanilla-extract/css";
 import { recipe } from "@vanilla-extract/recipes";
 import {
   atLeastTarget,
@@ -173,13 +173,16 @@ export const endFrame = style({
 });
 
 /**
- * Grows with the text it holds (`data-value`), so the input is as wide as its digits and
- * the symbol before it stays beside them; a text wider than the frame scrolls inside the
- * input.
+ * Grows with the symbol and the text it holds (`data-value`), so the input is as wide as
+ * its digits and the symbol in front of them; a text wider than the frame scrolls inside
+ * the input. A short or empty number still leaves the input target-min wide and as tall as
+ * the frame (WCAG 2.5.8), so it can be seen and pressed: the digits sit at its end, and
+ * the symbol, drawn over the input (`endPrefix`), right before them.
  */
 export const endSizer = style({
   display: "inline-grid",
-  gridTemplateColumns: "minmax(0, max-content)",
+  gridTemplateColumns: `minmax(${vars.scale.component.targetMin}, max-content)`,
+  alignSelf: "stretch",
   minWidth: "1ch",
   flexShrink: 1,
   selectors: {
@@ -197,11 +200,45 @@ export const endSizer = style({
 
 // Without an intrinsic width of its own (an input's is about 20 characters), the input
 // leaves the sizer the text's width and then fills it.
+/** The width of `endPrefix`'s symbol, measured: the input keeps that room at its start. */
+export const endPrefixWidth = createVar();
+
 export const endInput = style({
   gridArea: "1 / 1",
   width: 0,
   minWidth: "100%",
+  // Under the symbol: digits wider than the input start after it, not beneath it.
+  paddingInlineStart: fallbackVar(endPrefixWidth, "0px"),
   textAlign: "end",
+});
+
+/**
+ * The currency symbol over the input's empty start, followed by a hidden copy of the text
+ * as wide as the digits: set at the end, it puts the symbol right before them however wide
+ * the input is. Wider than the input, it is cut at the end, leaving the symbol at the
+ * start, over the room the input keeps there (`endPrefixWidth`). Presses go through to
+ * the input.
+ */
+export const endPrefix = style({
+  gridArea: "1 / 1",
+  justifySelf: "end",
+  alignSelf: "center",
+  maxWidth: "100%",
+  overflow: "hidden",
+  whiteSpace: "pre",
+  pointerEvents: "none",
+  fontFamily: vars.font.family.mono,
+  fontVariantNumeric: "tabular-nums",
+});
+
+/** `endPrefix`'s symbol: a box of its own, so a change of its width is observed. */
+export const endPrefixSymbol = style({
+  display: "inline-block",
+});
+
+/** `endPrefix`'s copy of the text: it takes the digits' room without showing. */
+export const endPrefixText = style({
+  visibility: "hidden",
 });
 
 export const necessity = style({

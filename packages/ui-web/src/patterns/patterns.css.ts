@@ -453,6 +453,12 @@ export const listFilters = style({
   },
 });
 
+/** The tabs under the title, at the pane's insets (16's Assumptions / Risks). */
+export const listTabs = style({
+  paddingInline: pane.panePaddingXMobile,
+  "@media": { [tabletUp]: { paddingInline: pane.panePaddingX } },
+});
+
 export const listNote = style({
   paddingBlock: pane.rowPaddingY,
   paddingInline: pane.panePaddingXMobile,
@@ -497,6 +503,9 @@ export const detailPane = recipe({
         alignSelf: "flex-start",
         maxHeight: `calc(100dvh - ${frame.top})`,
         overflowY: "auto",
+        // The ring shows only when the keyboard reaches a pane taller than the window,
+        // to scroll it (ListDetailPattern), not when focus is put here as it opens.
+        selectors: { "&:focus-visible": focusRing },
         "@media": {
           [tabletUp]: { paddingInline: pane.detailPaddingX },
           [desktopUp]: { paddingInline: pane.detailPaddingX },
@@ -545,6 +554,11 @@ export const comparePage = style(
     bottom: compare.paddingBottom,
   }),
 );
+
+/** Above the title's line: the archived idea's notice. */
+export const compareNotice = style({
+  marginBlockEnd: vars.space["200"],
+});
 
 /** The title, the count beside it, and the tools at the end (s15 .sechead). */
 export const compareHeader = style({
@@ -616,6 +630,12 @@ export const inputs = style({
   "@media": { [tabletUp]: { gap: sheet.inputsGap } },
 });
 
+/** Under both columns, as far from them as the inputs' tables are from each other. */
+export const worksheetAfter = style({
+  marginBlockStart: sheet.inputsGapMobile,
+  "@media": { [tabletUp]: { marginBlockStart: sheet.inputsGap } },
+});
+
 /**
  * The results stay in view while the inputs scroll (4.1 F): a card with the light frame,
  * 288px wide (s17-costs.html .totals).
@@ -635,8 +655,11 @@ export const results = style({
   border: `${vars.borderWidth.hairline} solid ${vars.color.border.default}`,
   borderRadius: vars.radius.card,
   background: vars.color.surface.raised,
-  // Focus is put here when it takes the summary bar's place; the column draws no ring.
+  // Focus is put here when it takes the summary bar's place; the column draws no ring
+  // then, only when the keyboard reaches it to scroll it (a column taller than the
+  // window).
   outline: "none",
+  selectors: { "&:focus-visible": focusRing },
 });
 
 /** The results' name at the top of their card (.totals h2). */
@@ -719,6 +742,9 @@ export const stepsContent = style({
   flexDirection: "column",
   gap: steps.itemGap,
   minWidth: 0,
+  // Focused only by a step change (StepsPattern focusKey), to start reading there: it
+  // is not a control, and the ring would frame the whole step.
+  outline: "none",
 });
 
 /** A question of the diff check in its frame (s25-import.html .item). */
@@ -863,6 +889,8 @@ export const settingsContent = style({
  * full width on a phone.
  */
 export const settingsFieldRow = style({
+  // The line is the group's, inside a Form too, whose column keeps children at their size.
+  alignSelf: "stretch",
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr)",
   alignItems: "end",
@@ -1026,6 +1054,18 @@ export const settingsRowActions = recipe({
 
 const deck = vars.layout.presentation;
 
+/** Above the tools' line, as far from the body's edges as the line's content. */
+export const deckAlert = style({
+  paddingBlockStart: deck.barPaddingYMobile,
+  paddingInline: gutter.mobile,
+  "@media": {
+    [tabletUp]: {
+      paddingBlockStart: deck.barPaddingY,
+      paddingInline: deck.barPaddingX,
+    },
+  },
+});
+
 /** The tools' line across the body, a hairline under it (s23-deck.html .bar). */
 export const deckBar = style({
   display: "flex",
@@ -1111,6 +1151,14 @@ export const stageColumn = style({
   maxWidth: deck.slideMax,
   minWidth: 0,
   outline: "none",
+});
+
+/** What the screen says about the slide or the deck, above the slide's links. */
+export const slideNotices = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: vars.space["200"],
+  marginBlockEnd: vars.space["200"],
 });
 
 /** The quiet links over the slide, at its end (s23-deck.html .slide-tools). */
@@ -1380,7 +1428,8 @@ export const publicFooterInner = style({
   display: "flex",
   flexDirection: "column",
   alignItems: "flex-start",
-  justifyContent: "center",
+  // "moonx" at the start whether or not the links follow it (they push to the end).
+  justifyContent: "flex-start",
   gap: pub.footerGapMobile,
   paddingBlock: pub.footerPaddingYMobile,
   color: vars.color.text.secondary,

@@ -48,6 +48,11 @@
     "partial": "Partial",
     "done": "Done"
   },
+  "selfAnalysisStatus": {
+    "not_started": "Not started",
+    "in_progress": "In progress",
+    "done": "Done"
+  },
   "check": {
     "competitorsRange": "Competitors ({{min}}–{{max}})",
     "competitorsAtLeast": "Competitors ({{min}}+)",

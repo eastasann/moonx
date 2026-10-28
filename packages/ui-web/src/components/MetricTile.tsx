@@ -3,6 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 import { BodyRoomContext } from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
+import { lineIcon } from "../internal/lineIcon.css";
 import * as styles from "./MetricTile.css";
 
 /** The group's variant, and whether a band is drawn 2×2 where a phone would not. */
@@ -109,9 +110,11 @@ export function MetricTile({
       {supplement != null && (
         <dd className={styles.supplement[supplementTone]}>
           {supplementTone === "notice" && (
-            <IconSlot size="XS">
-              <TriangleAlert />
-            </IconSlot>
+            <span className={lineIcon}>
+              <IconSlot size="XS">
+                <TriangleAlert />
+              </IconSlot>
+            </span>
           )}
           <span>{supplement}</span>
         </dd>

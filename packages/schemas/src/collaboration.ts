@@ -110,6 +110,11 @@ export const commentThreadSchema = z.object({
   root: commentSchema,
   /** Oldest first. */
   replies: z.array(commentSchema),
+  /**
+   * The name of the item the thread is on, made as HistoryEntry's `label` ("01 WHO",
+   * "Costs · Rent"; an idea by its name): over the thread in a screen's list.
+   */
+  label: z.string(),
 });
 export type CommentThread = z.infer<typeof commentThreadSchema>;
 

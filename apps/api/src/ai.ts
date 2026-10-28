@@ -547,10 +547,12 @@ async function importContext(
     return {
       questionKey: question.key,
       title: question.title,
+      prompt: question.prompt,
       sectionKey: question.sectionKey,
       answerType: question.answerType,
       options: question.options,
       importable: isImportable(question, target.kind),
+      hasFau: target.kind === "validation" && question.hasFau,
       hidden,
       current: {
         text,

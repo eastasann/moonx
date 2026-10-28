@@ -48,6 +48,20 @@ export const inPane = style({
   },
 });
 
+/** A list under its `title` (ListView). */
+export const titled = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: vars.space["75"],
+  minWidth: 0,
+});
+
+/** The title over the rows: a label, set in from the edge as the rows are. */
+export const title = style([
+  typography("label"),
+  { color: vars.color.text.secondary, paddingInline: padX },
+]);
+
 export const list = recipe({
   base: {
     display: "flex",
@@ -61,40 +75,46 @@ export const list = recipe({
   },
 });
 
+/** Every item, whatever its variants: the ⋯ follows the row it sits in. */
+const itemClass = style({});
+
 /**
  * Rows divided by hairlines, at least the density's row height. A chosen row has the
  * selected surface and the indicator line at its start (06 surface.selected).
  */
 export const item = recipe({
-  base: {
-    ...hoverTransition,
-    ...typography("body"),
-    display: "flex",
-    alignItems: "center",
-    gap: vars.space["200"],
-    // A row is a target too: never lower than the scale's minimum (design-spec 4.3).
-    minHeight: atLeastTarget(rowHeight),
-    paddingInline: padX,
-    paddingBlock: padY,
-    borderBottom: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
-    outline: "none",
-    selectors: {
-      "&[data-selected]": {
-        background: vars.color.surface.selected,
-        boxShadow: `inset ${vars.borderWidth.selectedIndicator} 0 0 ${vars.color.control.primary}`,
-      },
-      [`${inPane} &[data-selected]`]: {
-        "@media": {
-          [narrowQuery]: { background: "none", boxShadow: "none" },
+  base: [
+    itemClass,
+    {
+      ...hoverTransition,
+      ...typography("body"),
+      display: "flex",
+      alignItems: "center",
+      gap: vars.space["200"],
+      // A row is a target too: never lower than the scale's minimum (design-spec 4.3).
+      minHeight: atLeastTarget(rowHeight),
+      paddingInline: padX,
+      paddingBlock: padY,
+      borderBottom: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
+      outline: "none",
+      selectors: {
+        "&[data-selected]": {
+          background: vars.color.surface.selected,
+          boxShadow: `inset ${vars.borderWidth.selectedIndicator} 0 0 ${vars.color.control.primary}`,
         },
+        [`${inPane} &[data-selected]`]: {
+          "@media": {
+            [narrowQuery]: { background: "none", boxShadow: "none" },
+          },
+        },
+        "&[data-focus-visible]": {
+          ...focusRing,
+          outlineOffset: `calc(-1 * ${vars.borderWidth.focusRing})`,
+        },
+        "&[data-disabled]": { color: vars.color.text.disabled },
       },
-      "&[data-focus-visible]": {
-        ...focusRing,
-        outlineOffset: `calc(-1 * ${vars.borderWidth.focusRing})`,
-      },
-      "&[data-disabled]": { color: vars.color.text.disabled },
     },
-  },
+  ],
   variants: {
     // An item of the cards layout: framed and raised, apart from the next one.
     isCard: {
@@ -125,6 +145,28 @@ export const content = style({
   flex: 1,
   minWidth: 0,
   overflowWrap: "break-word",
+});
+
+/**
+ * The row's ⋯ (design-spec 4.5, as TableView's): out of sight with a mouse until the row
+ * is under the pointer, has focus or has its menu open; on touch (the large scale)
+ * always (a phone's included; its menu opens in a tray).
+ */
+export const actions = style({
+  display: "inline-flex",
+  flexShrink: 0,
+  selectors: {
+    [`:root[data-scale="medium"] ${itemClass}:not(:hover):not(:focus-within):not(:has([aria-expanded="true"])) &`]:
+      { opacity: 0 },
+  },
+  "@media": {
+    "not all and (pointer: coarse)": {
+      selectors: {
+        [`:root:not([data-scale]) ${itemClass}:not(:hover):not(:focus-within):not(:has([aria-expanded="true"])) &`]:
+          { opacity: 0 },
+      },
+    },
+  },
 });
 
 export const chevron = style({

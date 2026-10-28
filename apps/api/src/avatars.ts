@@ -15,7 +15,7 @@ import { ApiError } from "./errors";
 /** Where profile photos are kept (ADR-024). */
 export interface AvatarStore {
   /** Saves a photo under `name` and returns the URL `users.avatar_url` holds. */
-  save(name: string, webp: Uint8Array): Promise<string>;
+  save(name: string, webp: Uint8Array<ArrayBuffer>): Promise<string>;
   /**
    * Removes the photo at `url`. A URL this store did not give is left alone, and a photo
    * that is already gone is no failure.
@@ -266,7 +266,9 @@ const notAPhoto = (cause?: unknown) =>
  * @throws {ApiError} VALIDATION_FAILED on `file` when the bytes are not a JPEG, PNG or
  * WebP image sharp can read
  */
-export async function toAvatar(bytes: Uint8Array): Promise<Uint8Array> {
+export async function toAvatar(
+  bytes: Uint8Array,
+): Promise<Uint8Array<ArrayBuffer>> {
   let format: string | undefined;
   try {
     ({ format } = await sharp(bytes).metadata());
@@ -275,11 +277,15 @@ export async function toAvatar(bytes: Uint8Array): Promise<Uint8Array> {
   }
   if (format === undefined || !PHOTO_FORMATS.has(format)) throw notAPhoto();
   try {
-    return await sharp(bytes)
-      .rotate()
-      .resize(AVATAR_SIDE, AVATAR_SIDE, { fit: "cover" })
-      .webp()
-      .toBuffer();
+    // A copy on an ArrayBuffer of its own: a fetch body must be one under the DOM's
+    // types, which the Web's type check reads this file with (Eden's App type).
+    return Uint8Array.from(
+      await sharp(bytes)
+        .rotate()
+        .resize(AVATAR_SIDE, AVATAR_SIDE, { fit: "cover" })
+        .webp()
+        .toBuffer(),
+    );
   } catch (error) {
     throw notAPhoto(error);
   }

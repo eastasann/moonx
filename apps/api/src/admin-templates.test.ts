@@ -4,7 +4,9 @@ import { join } from "node:path";
 import {
   connectDatabase,
   selfAnalyses,
+  templateCostDefaults,
   templateQuestions,
+  templates,
   templateVersions,
 } from "@moonx/db";
 import {
@@ -24,7 +26,7 @@ import {
   templateVersionDetailSchema,
 } from "@moonx/schemas";
 import { SQL } from "bun";
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { buildTestApp, uniqueIp } from "./test-app";
 import { apiRequest, signIn, testFixtures } from "./test-fixtures";
 
@@ -198,14 +200,20 @@ describe("a self-analysis template from file to published versions", () => {
       versionNumber: 1,
       status: "draft",
       aiPrompt: "Ask me one question at a time.",
+      name: "Self analysis",
       sections: [
         {
           key: "WHY",
           subtitle: "Why do I want this?",
           sortOrder: 0,
           questions: [
-            { key: "SA.WHY.1", sectionKey: "WHY", copyFrom: null },
-            { key: "SA.WHY.2", sortOrder: 1 },
+            {
+              key: "SA.WHY.1",
+              sectionKey: "WHY",
+              copyFrom: null,
+              isKeyPublished: false,
+            },
+            { key: "SA.WHY.2", sortOrder: 1, isKeyPublished: false },
           ],
         },
       ],
@@ -219,6 +227,23 @@ describe("a self-analysis template from file to published versions", () => {
       }),
     );
     expect(draft.aiPrompt).toBe("Ask one question at a time, then summarize.");
+    // The fields sent change; the name is required (design-spec 6.0.8 for 27).
+    draft = await detailOf(
+      await call("PATCH", `/template-versions/${v1.versionId}`, {}),
+    );
+    expect(draft).toMatchObject({
+      name: "Self analysis",
+      aiPrompt: "Ask one question at a time, then summarize.",
+    });
+    const blankName = await call(
+      "PATCH",
+      `/template-versions/${v1.versionId}`,
+      {
+        name: "  ",
+      },
+    );
+    expect(blankName.status).toBe(422);
+    expect((await errorOf(blankName)).details?.[0]?.path).toBe("name");
 
     // AD4 sections
     const sectionAdded = await call(
@@ -420,6 +445,9 @@ describe("a self-analysis template from file to published versions", () => {
       await call("PATCH", `/template-versions/${v1.versionId}`, {
         aiPrompt: "",
       }),
+      await call("PATCH", `/template-versions/${v1.versionId}`, {
+        name: "Renamed",
+      }),
       await call("PATCH", `/template-sections/${income.id}`, { title: "X" }),
       await call("DELETE", `/template-questions/${choice.id}`),
       await call("PUT", `/template-versions/${v1.versionId}/check-rules`, {
@@ -471,6 +499,7 @@ describe("a self-analysis template from file to published versions", () => {
     const kept = copy.sections
       .flatMap((section) => section.questions)
       .find((q) => q.key === "SA.WHY.1");
+    expect(kept?.isKeyPublished).toBe(true);
     const renamed = await call("PATCH", `/template-questions/${kept?.id}`, {
       key: "SA.WHY.5",
     });
@@ -490,6 +519,7 @@ describe("a self-analysis template from file to published versions", () => {
       201,
     );
     const fresh = questionOf(added, "SA.WHY.6");
+    expect(fresh.isKeyPublished).toBe(false);
     expect(
       questionOf(
         await detailOf(
@@ -506,6 +536,20 @@ describe("a self-analysis template from file to published versions", () => {
     expect(
       (await call("DELETE", `/template-questions/${fresh.id}`)).status,
     ).toBe(404);
+    // The name is the template's: renamed on the draft, every version shows it.
+    expect(
+      (
+        await detailOf(
+          await call("PATCH", `/template-versions/${v2.id}`, {
+            name: "Self Analysis",
+          }),
+        )
+      ).name,
+    ).toBe("Self Analysis");
+    expect(
+      (await detailOf(await call("GET", `/template-versions/${v1.versionId}`)))
+        .name,
+    ).toBe("Self Analysis");
     // The question v2 drops is a warning, which does not block.
     const [question] = await db
       .select({ id: templateQuestions.id })
@@ -535,7 +579,7 @@ describe("a self-analysis template from file to published versions", () => {
     );
     expect(list.items[0]).toEqual({
       kind: "self_analysis",
-      name: "Self analysis",
+      name: "Self Analysis",
       versions: [
         {
           id: v2.id,
@@ -676,6 +720,16 @@ describe("the settings only one kind of template has", () => {
     expect((await errorOf(condition)).details?.[0]?.path).toBe(
       "displayCondition",
     );
+    // A condition with no answer would hide its question for good (6.0.8).
+    const never = await call(
+      "PATCH",
+      `/template-questions/${questionOf(draft, "V.01.REACH").id}`,
+      { displayCondition: { "V.02.OCEAN": [] } },
+    );
+    expect(never.status).toBe(422);
+    expect((await errorOf(never)).details?.[0]?.path).toStartWith(
+      "displayCondition",
+    );
     // Deleting a section takes its questions with it.
     expect(
       (await call("DELETE", `/template-sections/${section?.id}`)).status,
@@ -745,6 +799,46 @@ describe("the settings only one kind of template has", () => {
   });
 });
 
+/**
+ * Gives the newest published validation version the starting cost row the BCDX plan's
+ * §18 names (`cost_row:monthly.salaries`), publishing the BCDX validation file when none is
+ * published: AD6 refuses a plan whose number sub-items name a cost row no published
+ * validation starts (`unknown_metric_key`), and the validations of these tests are their
+ * own.
+ */
+const publishSalariesRow = async () => {
+  const [published] = await db
+    .select({ id: templateVersions.id })
+    .from(templateVersions)
+    .innerJoin(templates, eq(templates.id, templateVersions.templateId))
+    .where(
+      and(
+        eq(templates.kind, "validation"),
+        eq(templateVersions.status, "published"),
+      ),
+    )
+    .orderBy(desc(templateVersions.versionNumber))
+    .limit(1);
+  if (published === undefined) {
+    const id = await draftOf("validation");
+    expect(
+      (await call("POST", `/template-versions/${id}/publish`)).status,
+    ).toBe(200);
+    return publishSalariesRow();
+  }
+  await db
+    .insert(templateCostDefaults)
+    .values({
+      templateVersionId: published.id,
+      category: "monthly_fixed",
+      key: "monthly.salaries",
+      name: "Salaries",
+      sortOrder: 99,
+    })
+    // Once per version: a second call finds it there.
+    .onConflictDoNothing();
+};
+
 /** The draft of `kind`, imported from the BCDX file when there is none. */
 const draftOf = async (kind: "validation" | "business_plan") => {
   const list = adminTemplateListSchema.parse(
@@ -764,6 +858,7 @@ const draftOf = async (kind: "validation" | "business_plan") => {
 
 describe("AD6 and the answer types of each kind", () => {
   test("an amount with a reason blocks publishing a validation or a plan", async () => {
+    await publishSalariesRow();
     for (const kind of ["validation", "business_plan"] as const) {
       const id = await draftOf(kind);
       const section = (
@@ -813,10 +908,56 @@ describe("AD6 and the answer types of each kind", () => {
       expect(after.errors).toEqual([]);
     }
   });
+
+  test("a plan's number sub-item names only key numbers 21 shows; AD3 offers the published cost rows", async () => {
+    await publishSalariesRow();
+    const id = await draftOf("business_plan");
+    const detail = await detailOf(
+      await call("GET", `/template-versions/${id}`),
+    );
+    expect(detail.costRows).toContainEqual({
+      key: "monthly.salaries",
+      name: "Salaries",
+    });
+    const payroll = detail.sections
+      .flatMap((section) => section.questions)
+      .find((question) => question.key === "P.18.3");
+    if (payroll === undefined) throw new Error("No P.18.3");
+    const keys = async (metricKeys: string[]) => {
+      expect(
+        (
+          await call("PATCH", `/template-questions/${payroll.id}`, {
+            options: { kind: "linked_metric", metricKeys },
+          })
+        ).status,
+      ).toBe(200);
+      return templateCheckSchema
+        .parse(
+          await (
+            await call("POST", `/template-versions/${id}/validate`)
+          ).json(),
+        )
+        .errors.filter((error) => error.nodeId === payroll.id);
+    };
+    expect(await keys(["cost_row:monthly.salary", "scenario_table"])).toEqual([
+      {
+        code: "unknown_metric_key",
+        message: expect.stringContaining("cost_row:monthly.salary"),
+        nodeId: payroll.id,
+      },
+      {
+        code: "unknown_metric_key",
+        message: expect.stringContaining("scenario_table"),
+        nodeId: payroll.id,
+      },
+    ]);
+    expect(await keys(["cost_row:monthly.salaries"])).toEqual([]);
+  });
 });
 
 describe("AD6 and the Pitch Deck of a plan template (design-spec 6.14)", () => {
   test("a slide the most material runs past the bottom of blocks publishing, once in each deck", async () => {
+    await publishSalariesRow();
     const id = await draftOf("business_plan");
     const detail = await detailOf(
       await call("GET", `/template-versions/${id}`),

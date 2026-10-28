@@ -262,7 +262,11 @@ interface Job {
   waiting: Set<(parts: DiffPart[]) => void>;
 }
 
-/** Diffs being worked out, oldest first: the one asked for first is finished first. */
+/**
+ * Diffs being worked out, in the order `tick` steps them next: a stepped job goes to the
+ * back, so each waited diff gets a step in turn and a short one asked for later is not
+ * held behind long ones.
+ */
 const running = new Map<string, Job>();
 
 /**
@@ -490,19 +494,22 @@ let tickPending = false;
 
 /**
  * Carries the waited-for diffs on within one budget per task, a step of each in turn:
- * a few changes finish in a step, even behind a long rewrite.
+ * a few changes finish in a step, even behind a long rewrite. A job stepped goes to the
+ * back of `running`, so the round goes on in the next task where this one's budget
+ * stopped it: on a slow device, where a budget reaches only some of the jobs, the ones
+ * at the front would otherwise take every budget.
  */
 function tick() {
   tickPending = false;
   const until = performance.now() + BUDGET_MS;
-  let stepped = true;
-  while (stepped && performance.now() < until) {
-    stepped = false;
-    for (const [key, job] of running) {
-      if (performance.now() >= until) break;
-      if (job.waiting.size === 0) continue;
-      stepped = true;
-      step(key, job);
+  // A Map's iteration reaches the entries set again during it: the round goes on until
+  // the budget ends or no job waited for is left.
+  for (const [key, job] of running) {
+    if (performance.now() >= until) break;
+    if (job.waiting.size === 0) continue;
+    if (step(key, job) === null) {
+      running.delete(key);
+      running.set(key, job);
     }
   }
   if ([...running.values()].some((job) => job.waiting.size > 0)) {

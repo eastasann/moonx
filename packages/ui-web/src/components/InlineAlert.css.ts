@@ -29,9 +29,14 @@ export const icon = styleVariants(
     (typeof statusVariants)[number],
     (typeof statusVariants)[number]
   >,
+  // One line of the message tall, the sign in its middle: on the first line however
+  // the message wraps (design-spec 4.5).
   (variant) => ({
+    ...typography("callout"),
     display: "inline-flex",
+    alignItems: "center",
     flexShrink: 0,
+    height: "1lh",
     color: vars.color[variant].fg,
   }),
 );

@@ -11,8 +11,10 @@ import { Avatar } from "../components/Avatar";
 import { Badge } from "../components/Badge";
 import { Card, CardView } from "../components/Card";
 import { CheckDots } from "../components/CheckDots";
+import { CommentCount } from "../components/CommentCount";
 import { FauPicker, useFauLabel } from "../components/FauPicker";
 import { ListView, ListViewItem } from "../components/ListView";
+import { ActionMenu, MenuItem } from "../components/Menu";
 import { Meter } from "../components/Meter";
 import { MoonGlyph, type MoonState } from "../components/MoonGlyph";
 import { NumberField } from "../components/NumberField";
@@ -387,6 +389,57 @@ export function ListViewSection() {
           </ListView>
         </Specimen>
       ))}
+      <Specimen name="actions: the row's ⋯ after its › (with a mouse, on the row under the pointer or with focus; on touch always)">
+        <ListView
+          aria-label="Ideas with actions"
+          items={ideas}
+          selectionMode="single"
+          selectedKeys={chosen}
+          onSelectionChange={setChosen}
+        >
+          {(idea) => (
+            <ListViewItem
+              id={idea.id}
+              textValue={idea.name}
+              actions={
+                <ActionMenu aria-label={`More for ${idea.name}`}>
+                  <MenuItem id="duplicate">Duplicate</MenuItem>
+                  <MenuItem id="archive">Archive</MenuItem>
+                </ActionMenu>
+              }
+            >
+              <Text variant="label">{idea.name}</Text>
+              <Text variant="caption" tone="secondary">
+                {idea.meta}
+              </Text>
+            </ListViewItem>
+          )}
+        </ListView>
+      </Specimen>
+      <Specimen name="title: a heading over the rows, set in as they are (22's launch phases)">
+        <Stack gap="space-200">
+          <ListView aria-label="Launch · T−30" title="T−30" onAction={() => {}}>
+            <ListViewItem id="t30" textValue="30 days before launch">
+              <Text variant="label">30 days before launch</Text>
+              <Text variant="caption" tone="secondary">
+                To do · Ana
+              </Text>
+            </ListViewItem>
+          </ListView>
+          <ListView
+            aria-label="Launch · Launch day"
+            title="Launch day"
+            onAction={() => {}}
+          >
+            <ListViewItem id="day" textValue="Launch day">
+              <Text variant="label">Launch day</Text>
+              <Text variant="caption" tone="secondary">
+                To do · Paolo
+              </Text>
+            </ListViewItem>
+          </ListView>
+        </Stack>
+      </Specimen>
       <Specimen name="onAction: rows end in ›">
         <ListView aria-label="Notifications" onAction={() => {}}>
           <ListViewItem id="n1" textValue="Paolo mentioned you">
@@ -394,6 +447,34 @@ export function ListViewSection() {
           </ListViewItem>
           <ListViewItem id="n2" textValue="Ana recorded Hold">
             <Text>Ana recorded Hold on Piaya Gift Box</Text>
+          </ListViewItem>
+        </ListView>
+      </Specimen>
+      <Specimen name="each row's onAction: only rows that open end in ›; maxLines and CommentCount">
+        <ListView aria-label="Rows that act one by one">
+          <ListViewItem
+            id="r1"
+            textValue="Paolo mentioned you"
+            onAction={() => {}}
+          >
+            <Stack gap="space-50">
+              <Text variant="label">
+                Paolo mentioned you on 01 WHO · Piaya Gift Box
+              </Text>
+              <Text variant="body-sm" tone="secondary" maxLines={2}>
+                Do we count the BPO night-shift teams as well? They order for 3
+                a.m. birthdays too, and the HR officers asked for a smaller box
+                with fewer pieces for the night shift.
+              </Text>
+            </Stack>
+          </ListViewItem>
+          <ListViewItem id="r2" textValue="Ana saved a version">
+            <Stack gap="space-50">
+              <Text>Ana saved the version “v1” of Plan A · Piaya Gift Box</Text>
+              <Text variant="caption" tone="secondary">
+                <CommentCount count={2} />
+              </Text>
+            </Stack>
           </ListViewItem>
         </ListView>
       </Specimen>

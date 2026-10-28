@@ -217,7 +217,7 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
     ).toEqual(["Added later", "Kept"]);
   });
 
-  test("no edit links for a Viewer, or once the plan or its idea is archived, which still show the deck", async () => {
+  test("no edit links for a Viewer or an archived idea; an archived plan keeps Edit in validation", async () => {
     const team = await newTeam();
     const plan = await draft(team);
     const viewer = await deck(plan.id, team.viewerCookie, "variant=one");
@@ -235,9 +235,10 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
     expect(member.slides.every((slide) => slide.editSource === null)).toBe(
       true,
     );
-    expect(
-      member.slides.every((slide) => slide.editInValidation === null),
-    ).toBe(true);
+    // Its idea's validation is still open to edit, as 20 and 21 link to it (6.14).
+    expect(slideOf(member, "business_model").editInValidation).toBe(
+      "economics",
+    );
 
     const other = await newTeam();
     const live = await draft(other);
@@ -254,6 +255,9 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
     );
     expect(
       ofArchivedIdea.slides.every((slide) => slide.editSource === null),
+    ).toBe(true);
+    expect(
+      ofArchivedIdea.slides.every((slide) => slide.editInValidation === null),
     ).toBe(true);
   });
 

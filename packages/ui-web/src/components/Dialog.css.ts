@@ -1,5 +1,5 @@
 import { vars } from "@moonx/ui-tokens";
-import { style, styleVariants } from "@vanilla-extract/css";
+import { globalStyle, style, styleVariants } from "@vanilla-extract/css";
 import { typography } from "../styles/helpers";
 
 // Modals are writing screens: spacious padding (design-spec 4.4「密度とスケールの対応」, M1〜M9).
@@ -27,11 +27,20 @@ export const header = style({
   paddingBlockEnd: vars.density.spacious.gap,
 });
 
+/**
+ * The heading takes the line beside the close button, so the button sits at the end of
+ * the header, not after the title's words.
+ */
+globalStyle(`${header} > h2`, {
+  flex: "1 1 auto",
+  minWidth: 0,
+});
+
 export const title = style({
   flex: "1 1 auto",
   minWidth: 0,
   display: "flex",
-  alignItems: "center",
+  alignItems: "flex-start",
   gap: vars.space["100"],
 });
 
@@ -58,10 +67,21 @@ export const footer = style({
   paddingBlockEnd: padding,
 });
 
-/** The AlertDialog's sign before the title: red for error, amber for warning (4.4). */
+const alertIconBox = {
+  display: "inline-flex",
+  alignItems: "center",
+  flexShrink: 0,
+  height: "1lh",
+} as const;
+
+/**
+ * The AlertDialog's sign before the title: red for error, amber for warning (4.4). One
+ * line of the title tall with the sign in its middle, so it sits on the first line if
+ * the title wraps (4.5).
+ */
 export const alertIcon = styleVariants({
-  error: { display: "inline-flex", color: vars.color.negative.strong },
-  warning: { display: "inline-flex", color: vars.color.notice.strong },
+  error: { ...alertIconBox, color: vars.color.negative.strong },
+  warning: { ...alertIconBox, color: vars.color.notice.strong },
 });
 
 /** Hears Escape around the dialog without a box of its own. */

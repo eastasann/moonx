@@ -24,6 +24,9 @@ const sized = <T>(make: (size: SizeKey) => T) =>
  */
 export const row = recipe({
   base: {
+    // React Aria's hidden input is placed absolutely: held by its row, it scrolls with a
+    // dialog's body instead of staying where the body first laid it out.
+    position: "relative",
     display: "inline-flex",
     alignItems: "center",
     gap: vars.space["100"],

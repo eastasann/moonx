@@ -1070,7 +1070,8 @@ export const changeHistory = pgTable(
     changedById: uuid()
       .notNull()
       .references(() => users.id),
-    changedAt: ts().notNull().defaultNow(),
+    changedAt: ts().notNull().defaultNow(), // The last change merged into the row (ADR-020)
+    firstChangedAt: ts(), // The first change merged into the row; null while it holds one (ADR-020)
   },
   (t) => [
     index("change_history_target_idx").on(

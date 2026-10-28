@@ -57,6 +57,7 @@ import { lockMembers } from "./membership";
 import { planContentTime } from "./plan-views";
 import { type Restoration, restoreItem, type StoredItem } from "./revert";
 import { type Scope, type ScopeRef, writeInScope } from "./scope";
+import { inSections } from "./screen-sections";
 import { lockSelfAnalysis, startIfAnswered } from "./self-analysis";
 import { locateTarget, selfAnalysisOwner } from "./targets";
 import { loadUserRefs } from "./user-refs";
@@ -339,7 +340,7 @@ async function historyWhere(
     eq(changeHistory.containerId, id),
     query.sectionKeys === undefined
       ? undefined
-      : inArray(changeHistory.sectionKey, query.sectionKeys),
+      : inSections(changeHistory, { type, id }, query.sectionKeys),
   ) as SQL;
   if (type !== "idea" || query.sectionKeys !== undefined) return screen;
   // 13 also lists the template migrations of the idea's validation (design-spec 6.0.7).
@@ -743,7 +744,7 @@ export function historyRoutes({ access, db, now }: HistoryRoutesOptions) {
         detail: {
           summary: "H1 The history of an item or a screen (PNL-2)",
           description:
-            "One item (targetType, targetId, targetKey), deleted rows included, or one screen (containerType, containerId, sectionKeys), newest first. The idea's screen (13) adds the template migrations of its validation and the undone creations. A self-analysis's history is its owner's only (403 FORBIDDEN).",
+            "One item (targetType, targetId, targetKey), deleted rows included, or one screen (containerType, containerId, sectionKeys; on a plan, execution:{type} is its execution items of that type), newest first. The idea's screen (13) adds the template migrations of its validation and the undone creations. A self-analysis's history is its owner's only (403 FORBIDDEN).",
         },
       },
     )
@@ -767,10 +768,6 @@ export function historyRoutes({ access, db, now }: HistoryRoutesOptions) {
             "What an undone creation removed does not come back",
           );
         }
-        const restoration: Restoration =
-          entry.action === "delete"
-            ? { kind: "undelete" }
-            : { kind: "content", content: entry.after };
         const container = containerOfRow(entry);
         const workspaceId = entry.workspaceId;
         const at = new Date(now());
@@ -780,6 +777,19 @@ export function historyRoutes({ access, db, now }: HistoryRoutesOptions) {
           container,
           at,
           async (tx, when) => {
+            // The same person's next save may have merged into the row, or removed it,
+            // since it was read (ADR-020). Those saves take the scope's locks this
+            // revert now holds, so the row read here stays as it is until the end.
+            const [current] = await tx
+              .select()
+              .from(changeHistory)
+              .where(eq(changeHistory.id, entry.id));
+            if (current === undefined)
+              throw new ApiError("NOT_FOUND", "No such change");
+            const restoration: Restoration =
+              current.action === "delete"
+                ? { kind: "undelete" }
+                : { kind: "content", content: current.after };
             const { change, item } = await restoreItem(
               {
                 tx,

@@ -613,6 +613,45 @@ describe("QuestionFormPattern (C)", () => {
     expect(screen.getByRole("textbox", { name: "Answer WHY" })).toBeTruthy();
   });
 
+  test("phone: the completion card takes the last question's place and focus", async () => {
+    const user = userEvent.setup();
+    setPhoneWidth();
+    function Ending() {
+      const [current, setCurrent] = useState<string | null>("WHY");
+      const [isAtEnd, setAtEnd] = useState(false);
+      return (
+        <QuestionFormPattern
+          header={<h1>Section</h1>}
+          questionIds={["WHO", "WHY"]}
+          currentId={current}
+          onCurrentChange={(id) => {
+            setAtEnd(false);
+            setCurrent(id);
+          }}
+          onEnd={() => setAtEnd(true)}
+          end={isAtEnd ? <p>01: 1/2 answered</p> : null}
+          isAnswered={(id) => id === "WHO"}
+          renderQuestion={(id) => <TextArea aria-label={`Answer ${id}`} />}
+        />
+      );
+    }
+    render(<Ending />);
+    await user.click(screen.getByRole("button", { name: "Next question" }));
+    const card = screen.getByText("01: 1/2 answered").closest("li");
+    expect(document.activeElement).toBe(card);
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Next question" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    // No dot is the current one while the card shows.
+    expect(document.querySelector("[aria-current]")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Previous question" }));
+    expect(screen.getByRole("textbox", { name: "Answer WHY" })).toBeTruthy();
+    expect(screen.queryByText("01: 1/2 answered")).toBeNull();
+  });
+
   test("phone: the footer stays under the one question", () => {
     setPhoneWidth();
     render(
@@ -868,6 +907,44 @@ describe("ListDetailPattern (D)", () => {
     expect(screen.getByRole("button", { name: "New idea" })).toBeTruthy();
   });
 
+  test("tabs (16): under the title, the selected list in their panel, the detail outside them", async () => {
+    const user = userEvent.setup();
+    function Tabbed() {
+      const [tab, setTab] = useState("assumptions");
+      return (
+        <ListDetailPattern
+          header={<h1>Assumptions & Risks</h1>}
+          tabs={{
+            "aria-label": "Lists",
+            items: [
+              { id: "assumptions", label: "Assumptions" },
+              { id: "risks", label: "Risks" },
+            ],
+            selectedKey: tab,
+            onSelectionChange: setTab,
+          }}
+          list={<p>{`List of ${tab}`}</p>}
+          detail={<p>Detail</p>}
+          listLabel="Lists"
+          onBack={() => {}}
+        />
+      );
+    }
+    render(<Tabbed />);
+    const risks = screen.getByRole("tab", { name: "Risks" });
+    expect(screen.getByRole("tabpanel").textContent).toBe(
+      "List of assumptions",
+    );
+    expect(
+      screen.getByRole("tabpanel").contains(screen.getByText("Detail")),
+    ).toBe(false);
+    await user.click(risks);
+    const panel = screen.getByRole("tabpanel");
+    expect(panel.textContent).toBe("List of risks");
+    // The selected tab names the panel that is there.
+    expect(risks.getAttribute("aria-controls")).toBe(panel.id);
+  });
+
   test("no detail area (8): the list alone", () => {
     render(
       <ListDetailPattern
@@ -894,6 +971,25 @@ describe("CardComparePattern (E)", () => {
       />
     );
   }
+
+  test("the notice sits above the title's line", () => {
+    render(
+      <CardComparePattern
+        notice={<p>This idea is archived</p>}
+        header={<h1>Competitors</h1>}
+        view="cards"
+        onViewChange={() => {}}
+        cards={<p>Cards</p>}
+        table={<p>Table</p>}
+      />,
+    );
+    expect(
+      follows(
+        screen.getByText("This idea is archived"),
+        screen.getByRole("heading", { name: "Competitors" }),
+      ),
+    ).toBe(true);
+  });
 
   test("Cards / Table switches between the cards and the table", async () => {
     const user = userEvent.setup();
@@ -1089,6 +1185,48 @@ describe("StepsPattern (G)", () => {
   });
 });
 
+describe("StepsPattern (G) moving between steps in place", () => {
+  function Flow() {
+    const [step, setStep] = useState("one");
+    return (
+      <StepsPattern
+        steps={<ol aria-label="Steps" />}
+        focusKey={step}
+        actions={
+          step === "one" ? (
+            <Button variant="primary" onPress={() => setStep("two")}>
+              Next
+            </Button>
+          ) : (
+            <Button variant="secondary" onPress={() => setStep("one")}>
+              Back
+            </Button>
+          )
+        }
+      >
+        <p>{step === "one" ? "First step" : "Second step"}</p>
+      </StepsPattern>
+    );
+  }
+
+  test("a new step takes focus at the start of its content and the page back to its top; opening does not", async () => {
+    const user = userEvent.setup();
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    render(<Flow />);
+    const content = screen.getByText("First step").parentElement;
+    expect(document.activeElement).not.toBe(content);
+    expect(scrollTo).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    // The button that moved on is gone; focus is where the new step starts.
+    expect(document.activeElement).toBe(
+      screen.getByText("Second step").parentElement,
+    );
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("SettingsPattern (H)", () => {
   test("each group a region named by its heading", () => {
     render(
@@ -1183,6 +1321,47 @@ describe("PresentationPattern (I)", () => {
       within(list).getByRole("option", { name: "3 Business model" }),
     );
     expect(screen.getByText("Slide model")).toBeTruthy();
+  });
+
+  test("the notices above the slide's links; while loading, only the tools' line is in reach", () => {
+    setTabletWidth();
+    const { rerender } = render(
+      <PresentationPattern
+        header={<h1>Pitch Deck</h1>}
+        tools={<button type="button">Five-minute</button>}
+        slides={slideList}
+        currentId="title"
+        onCurrentChange={() => {}}
+        notices={<p>Too long</p>}
+        slideTools={<a href="#source">Edit source</a>}
+        slide={<p>Slide title</p>}
+      />,
+    );
+    expect(
+      follows(
+        screen.getByText("Too long"),
+        screen.getByRole("link", { name: "Edit source" }),
+      ),
+    ).toBe(true);
+    expect(
+      screen.getByRole("listbox", { name: "Slides" }).closest("[inert]"),
+    ).toBeNull();
+    rerender(
+      <PresentationPattern
+        header={<h1>Pitch Deck</h1>}
+        tools={<button type="button">Five-minute</button>}
+        slides={slideList}
+        currentId="title"
+        onCurrentChange={() => {}}
+        slide={<p>Slide title</p>}
+        isLoading
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Five-minute" }).closest("[inert]"),
+    ).toBeNull();
+    expect(screen.getByText("Slide title").closest("[inert]")).not.toBeNull();
+    expect(screen.getByText("Mini title").closest("[inert]")).not.toBeNull();
   });
 
   test("desktop beside a docked panel without room: the slide alone, as on a phone (4.1)", async () => {

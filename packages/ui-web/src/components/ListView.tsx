@@ -34,6 +34,18 @@ export interface ListViewProps<T extends object> {
   onSelectionChange?: (keys: Set<Key>) => void;
   /** Shown in place of the items when there are none. */
   renderEmptyState?: () => ReactNode;
+  /**
+   * A heading over the rows, set in from the edge as they are (22's launch phases and KPI
+   * Areas, design-spec 6.13): in pattern D's pane, at the pane's padding. The list still
+   * takes its own name (`aria-label`).
+   */
+  title?: string;
+  /**
+   * `selection` keeps the rows that cannot be chosen (`isDisabled`) in the arrow keys'
+   * way, to be read (12's "Not shared"); `all` skips them.
+   * @default "all"
+   */
+  disabledBehavior?: "all" | "selection";
   /** @default "regular" */
   density?: Density;
   /**
@@ -56,10 +68,33 @@ export function ListView<T extends object>({
   selectionMode = "none",
   onSelectionChange,
   renderEmptyState,
+  title,
   ...props
 }: ListViewProps<T>) {
   const isCard = layout === "cards";
   const inPane = useContext(ListPaneContext);
+  // The inset of the rows (padX), for the title as well.
+  const insets = `${styles.density[density]}${inPane ? ` ${styles.inPane}` : ""}`;
+  const list = (
+    <GridList
+      {...props}
+      selectionMode={selectionMode}
+      onSelectionChange={
+        onSelectionChange
+          ? (selection: Selection) =>
+              onSelectionChange(
+                selection === "all" ? new Set() : new Set(selection),
+              )
+          : undefined
+      }
+      renderEmptyState={
+        renderEmptyState
+          ? () => <div className={styles.empty}>{renderEmptyState()}</div>
+          : undefined
+      }
+      className={`${styles.list({ isCard })} ${insets}`}
+    />
+  );
   return (
     <ItemContext.Provider
       value={{
@@ -67,43 +102,51 @@ export function ListView<T extends object>({
         isCard,
       }}
     >
-      <GridList
-        {...props}
-        selectionMode={selectionMode}
-        onSelectionChange={
-          onSelectionChange
-            ? (selection: Selection) =>
-                onSelectionChange(
-                  selection === "all" ? new Set() : new Set(selection),
-                )
-            : undefined
-        }
-        renderEmptyState={
-          renderEmptyState
-            ? () => <div className={styles.empty}>{renderEmptyState()}</div>
-            : undefined
-        }
-        className={`${styles.list({ isCard })} ${styles.density[density]}${
-          inPane ? ` ${styles.inPane}` : ""
-        }`}
-      />
+      {title === undefined ? (
+        list
+      ) : (
+        <div className={`${styles.titled} ${insets}`}>
+          <div className={styles.title}>{title}</div>
+          {list}
+        </div>
+      )}
     </ItemContext.Provider>
   );
 }
 
 export interface ListViewItemProps
-  extends Pick<GridListItemProps, "href" | "routerOptions" | "isDisabled"> {
+  extends Pick<
+    GridListItemProps,
+    "href" | "routerOptions" | "isDisabled" | "onAction"
+  > {
   id: Key;
   /** The item's text, for screen readers and typing to find it. */
   textValue: string;
   /** The row's content: lines of Text, a StatusLight, a Badge, CheckDots. */
   children: ReactNode;
+  /**
+   * The row's ⋯ (an ActionMenu: 6's Duplicate and Archive), after its ›, as TableView's
+   * `isRowActions` column (design-spec 4.5): with a mouse it shows on the row under the
+   * pointer, with focus or with its menu open; on touch always. On a phone its menu opens
+   * in a tray.
+   */
+  actions?: ReactNode;
 }
 
 /** An item of a ListView. With an `href`, or a list that acts, the whole row presses. */
-export function ListViewItem({ children, ...props }: ListViewItemProps) {
+export function ListViewItem({
+  children,
+  actions,
+  ...props
+}: ListViewItemProps) {
   const list = useContext(ItemContext);
-  const isActionable = list.isActionable || props.href !== undefined;
+  // A list of rows that act one by one (8: only those that open somewhere) leaves the
+  // others still, without ›; so does a row that cannot be chosen (12's "Not shared").
+  const isActionable =
+    props.isDisabled !== true &&
+    (list.isActionable ||
+      props.href !== undefined ||
+      props.onAction !== undefined);
   return (
     <GridListItem
       {...props}
@@ -117,6 +160,7 @@ export function ListViewItem({ children, ...props }: ListViewItemProps) {
           </IconSlot>
         </span>
       )}
+      {actions != null && <span className={styles.actions}>{actions}</span>}
     </GridListItem>
   );
 }

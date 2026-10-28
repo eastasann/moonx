@@ -1,5 +1,6 @@
+import { formatCount } from "@moonx/i18n";
 import type { CardSize } from "@moonx/ui-tokens";
-import { Plus } from "lucide-react";
+import { MessageSquare, Plus } from "lucide-react";
 import {
   Children,
   createContext,
@@ -13,7 +14,9 @@ import {
   GridListItem,
   type Key,
   type Selection,
+  VisuallyHidden,
 } from "react-aria-components";
+import { useTranslation } from "react-i18next";
 import { IconSlot } from "../internal/IconSlot";
 import * as styles from "./Card.css";
 
@@ -63,8 +66,13 @@ export interface CardProps {
   details?: readonly CardDetail[];
   /** The card's content under its details: values, StatusLights, chips. No buttons (4.5). */
   children?: ReactNode;
-  /** The last line, in the small secondary type (15's "1 source · 💬 1"). */
+  /** The last line, in the small secondary type (15's "1 source"). */
   footer?: ReactNode;
+  /**
+   * After the footer's text: the comments' mark and how many threads on the item are not
+   * resolved (15's "💬 1", design-spec 6.10). None shows nothing. @default 0
+   */
+  openThreadCount?: number;
   /**
    * At the end of the last line: the card's ⋯ (an ActionMenu), the one button a card in a
    * CardView may hold (design-spec 4.5). Tab moves from the card to it.
@@ -92,8 +100,10 @@ export function Card({
   details,
   children,
   footer,
+  openThreadCount = 0,
   actions,
 }: CardProps) {
+  const { t } = useTranslation(["components"]);
   const view = useContext(CardViewContext);
   const size = ownSize ?? view?.size ?? "M";
   const hasHead = eyebrow != null || title != null || figure != null;
@@ -138,10 +148,24 @@ export function Card({
         </dl>
       )}
       {children != null && <div className={styles.content}>{children}</div>}
-      {(footer != null || actions != null) && (
+      {(footer != null || openThreadCount > 0 || actions != null) && (
         <div className={styles.footer}>
           {footer != null && (
             <span className={styles.footerText}>{footer}</span>
+          )}
+          {openThreadCount > 0 && (
+            <span className={styles.comments}>
+              <IconSlot size="XS">
+                <MessageSquare />
+              </IconSlot>
+              <span aria-hidden="true">{formatCount(openThreadCount)}</span>
+              <VisuallyHidden>
+                {t("components:card.openThreads", {
+                  count: openThreadCount,
+                  formatted: formatCount(openThreadCount),
+                })}
+              </VisuallyHidden>
+            </span>
           )}
           {actions != null && <span className={styles.actions}>{actions}</span>}
         </div>

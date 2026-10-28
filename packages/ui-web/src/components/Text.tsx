@@ -19,6 +19,11 @@ export interface TextProps {
   tone?: TextTone;
   /** @default "span" */
   elementType?: "span" | "p" | "div";
+  /**
+   * Shows only the first lines, cut with "…": a row's excerpt of a longer text (a
+   * reason, a comment), which is read in full where the row leads.
+   */
+  maxLines?: 1 | 2;
   id?: string;
   /** Lets a surrounding component take the text (`description` of a field). */
   slot?: string;
@@ -30,6 +35,7 @@ export function Text({
   variant = "body",
   tone = variant === "lead" ? "secondary" : "primary",
   elementType = "span",
+  maxLines,
   children,
   ...props
 }: TextProps) {
@@ -37,7 +43,7 @@ export function Text({
     <AriaText
       {...props}
       elementType={elementType}
-      className={styles.text({ variant, tone })}
+      className={styles.text({ variant, tone, maxLines: maxLines ?? "none" })}
     >
       <SkeletonText>{children}</SkeletonText>
     </AriaText>

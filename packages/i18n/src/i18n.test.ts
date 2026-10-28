@@ -1,23 +1,32 @@
 import { expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import {
+  adminUserStatusSchema,
+  answerTypeSchema,
   checkKeySchema,
   checkStateSchema,
   competitorTypeSchema,
   confidenceSchema,
+  costCategorySchema,
   decisionValueSchema,
   economicsFieldSchema,
   executionStatusSchema,
+  executionTypeSchema,
   fauSchema,
   fauStateSchema,
   goNoGoValueSchema,
+  invitationStatusSchema,
   launchTimingSchema,
   metricReasonSchema,
   roleSchema,
   scenarioKeySchema,
+  selfAnalysisStatusSchema,
   sourceTypeSchema,
   stageSchema,
   supportsCheckSchema,
+  templateCheckSchema,
+  templateKindSchema,
+  templateVersionStatusSchema,
 } from "@moonx/schemas";
 import { createI18n, i18n, namespaces, resources } from "./i18n";
 
@@ -25,13 +34,25 @@ test("the shared instance is ready on import", () => {
   expect(i18n.isInitialized).toBe(true);
   expect(i18n.language).toBe("en");
   expect(namespaces).toEqual([
+    "admin",
     "ai",
+    "app",
+    "auth",
     "common",
     "components",
+    "dashboard",
+    "decisions",
+    "errors",
     "format",
+    "ideas",
+    "landing",
     "mail",
     "notifications",
+    "panels",
     "pitch",
+    "plans",
+    "selfAnalysis",
+    "settings",
     "validation",
   ]);
 });
@@ -78,6 +99,7 @@ test.each([
   ["goNoGo", goNoGoValueSchema.options],
   ["stage", stageSchema.options],
   ["checkState", checkStateSchema.options],
+  ["selfAnalysisStatus", selfAnalysisStatusSchema.options],
   ["supportsCheck", supportsCheckSchema.options],
   ["economicsField", economicsFieldSchema.options],
   ["metricReason", metricReasonSchema.options],
@@ -89,6 +111,33 @@ test.each([
 ] as const)("common:%s labels every value", (group, values) => {
   const labels = resources.en.common[group] as Record<string, string>;
   for (const value of values) expect(labels[value]).toBeString();
+});
+
+/** The enums 26–28 show by name (design-spec 6.17) have a label for every value. */
+test.each([
+  ["kind", templateKindSchema.options],
+  ["versionStatus", templateVersionStatusSchema.options],
+  ["answerType", answerTypeSchema.options],
+  ["executionType", executionTypeSchema.options],
+  ["costCategory", costCategorySchema.options],
+  ["userStatus", adminUserStatusSchema.options],
+  ["invitationStatus", invitationStatusSchema.options],
+] as const)("admin:%s labels every value", (group, values) => {
+  const labels = resources.en.admin[group] as Record<string, string>;
+  for (const value of values) expect(labels[value]).toBeString();
+});
+
+test("every problem of the check before publishing has its words (SDD 9章)", () => {
+  const words = resources.en.admin.version.check.code as Record<string, string>;
+  for (const code of templateCheckSchema.shape.errors.element.shape.code
+    .options) {
+    // A part is wrong one way for a plan and the other for the rest.
+    const keys =
+      code === "invalid_part"
+        ? ["invalid_part_plan", "invalid_part_other"]
+        : [code];
+    for (const key of keys) expect(words[key]).toBeString();
+  }
 });
 
 test("every check has a name", () => {

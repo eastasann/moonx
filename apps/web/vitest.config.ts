@@ -8,5 +8,6 @@ export default defineConfig({
   plugins: [viteReact(), vanillaExtractPlugin()],
   test: {
     environment: "happy-dom",
+    setupFiles: ["./src/test/setup.ts"],
   },
 });

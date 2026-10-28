@@ -158,6 +158,9 @@ export function testFixtures(db: Database) {
    * tests pin. There is one template per kind, so tests share it.
    */
   async function templateVersion(kind: TemplateKind) {
+    // A plan's number sub-items name the validation's cost rows (AD6 `unknown_metric_key`):
+    // published first, as an operator does.
+    if (kind === "business_plan") await templateVersion("validation");
     if (kind === "validation" || kind === "business_plan") {
       const made = bcdxVersions.get(kind) ?? bcdxVersion(kind);
       bcdxVersions.set(kind, made);

@@ -8,6 +8,7 @@ import { ArrowLeft, ChevronDown, History, MessageSquare } from "lucide-react";
 import {
   type MouseEvent,
   type ReactNode,
+  useCallback,
   useId,
   useLayoutEffect,
   useRef,
@@ -26,6 +27,7 @@ import {
   Banners,
   type BodyRoom,
   BodyRoomContext,
+  BodyRoomNowContext,
   type FrameBanners,
   fullBodyRoom,
   HeaderToolsContext,
@@ -256,23 +258,30 @@ export function AppFrame({
   // the body's width, and rendered at once, so the squeezed two columns are never painted.
   // The body is measured through a probe of no height: the switch changes the body's
   // height, which, observed, would end the browser's round of observations with an error.
+  const measureRoom = useCallback((): BodyRoom => {
+    const body = bodyWidthRef.current;
+    const column = panelRef.current;
+    if (!body || !column) return fullBodyRoom;
+    // Where the stable scrollbar gutter (AppFrame.css.ts) is not supported, a scrollbar
+    // coming and going would flip the arrangement on and on: the body is measured as if
+    // the scrollbar took no width.
+    const scrollbar = CSS.supports("scrollbar-gutter", "stable")
+      ? 0
+      : window.innerWidth - document.documentElement.clientWidth;
+    // The column is empty, and 0 wide, unless a panel is docked in it.
+    const isDocked = column.getBoundingClientRect().width > 0;
+    const width = body.getBoundingClientRect().width + scrollbar;
+    return {
+      hasTwoColumns: !isDocked || width >= twoColumnMinWidth,
+      hasThumbnails: !isDocked || width >= presentationTwoColumnMinWidth,
+    };
+  }, []);
   useLayoutEffect(() => {
     const body = bodyWidthRef.current;
     const column = panelRef.current;
     if (!body || !column || typeof ResizeObserver === "undefined") return;
-    // Where the stable scrollbar gutter (AppFrame.css.ts) is not supported, a scrollbar
-    // coming and going would flip the arrangement on and on: the body is measured as if
-    // the scrollbar took no width.
-    const hasStableGutter = CSS.supports("scrollbar-gutter", "stable");
     const observer = new ResizeObserver(() => {
-      const scrollbar = hasStableGutter
-        ? 0
-        : window.innerWidth - document.documentElement.clientWidth;
-      // The column is empty, and 0 wide, unless a panel is docked in it.
-      const isDocked = column.getBoundingClientRect().width > 0;
-      const width = body.getBoundingClientRect().width + scrollbar;
-      const hasTwoColumns = !isDocked || width >= twoColumnMinWidth;
-      const hasThumbnails = !isDocked || width >= presentationTwoColumnMinWidth;
+      const { hasTwoColumns, hasThumbnails } = measureRoom();
       flushSync(() =>
         setRoom((current) =>
           current.hasTwoColumns === hasTwoColumns &&
@@ -285,7 +294,7 @@ export function AppFrame({
     observer.observe(body);
     observer.observe(column);
     return () => observer.disconnect();
-  }, []);
+  }, [measureRoom]);
 
   // The link goes to the content without changing the URL, which the router owns.
   const skipToContent = (event: MouseEvent) => {
@@ -495,7 +504,9 @@ export function AppFrame({
             <HeaderToolsContext.Provider value={tools}>
               <BackOverrideContext.Provider value={setBackOverride}>
                 <BodyRoomContext.Provider value={room}>
-                  {children}
+                  <BodyRoomNowContext.Provider value={measureRoom}>
+                    {children}
+                  </BodyRoomNowContext.Provider>
                 </BodyRoomContext.Provider>
               </BackOverrideContext.Provider>
             </HeaderToolsContext.Provider>

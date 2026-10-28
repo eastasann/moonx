@@ -1,0 +1,63 @@
+{
+  "home": {
+    "title": "My Self Analysis",
+    "status": "{{status}} · {{answered}} / {{total}} answered",
+    "start": "Start",
+    "continue": "Continue",
+    "markDone": "Mark as done",
+    "reopen": "Reopen",
+    "share": "Share",
+    "team": "Team",
+    "more": "More for My Self Analysis",
+    "changeCurrency": "Change currency",
+    "empty": "Answer {{count}} questions at your own pace. Only you can see your answers until you share them.",
+    "state": {
+      "title": "Status",
+      "answered": "Answered",
+      "answeredCount": "{{answered}} / {{total}} answered",
+      "sharedWith": "Shared with",
+      "notShared": "Not shared",
+      "template": "Template",
+      "version": "v{{version}}"
+    },
+    "sections": {
+      "title": "Sections",
+      "count": "{{answered}}/{{total}}"
+    },
+    "markDoneConfirm": {
+      "title_one": "{{count}} question is empty. Mark as done anyway?",
+      "title_other": "{{count}} questions are empty. Mark as done anyway?",
+      "body": "You can still edit your answers, and Reopen it.",
+      "confirm": "Mark as done",
+      "cancel": "Cancel"
+    }
+  },
+  "share": {
+    "title": "Share",
+    "lead": "Owners and Members of the workspaces you choose can read your answers and comment on them. Viewers can't.",
+    "workspaces": "Workspaces",
+    "none": "Join a team workspace to share your self analysis",
+    "notDone": "Mark your self analysis as done to share it with more workspaces.",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "currency": {
+    "title": "Currency",
+    "label": "Currency",
+    "note": "Changing the currency does not convert amounts you already entered.",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "form": {
+    "amount": "Amount",
+    "reason": "Why this amount?",
+    "toHome": "Back to Self Analysis"
+  },
+  "team": {
+    "title": "Team Self Analyses",
+    "members": "Members",
+    "notShared": "Not shared",
+    "shared": "Shared · {{status}}",
+    "empty": "No one has shared their self analysis in this workspace yet."
+  }
+}

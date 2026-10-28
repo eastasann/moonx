@@ -9,6 +9,8 @@ import { useIsNarrow } from "../internal/useIsNarrow";
 import * as styles from "./patterns.css";
 
 export interface CardComparePatternProps {
+  /** Above the title's line: the archived idea's notice (6.10, as 13's). */
+  notice?: ReactNode;
   /** The title: its level 1 Heading ("04 Competitors"). */
   header: ReactNode;
   /**
@@ -38,6 +40,7 @@ export interface CardComparePatternProps {
  * the Cards / Table switch. Phone: the cards in one column and no table.
  */
 export function CardComparePattern({
+  notice,
   header,
   count,
   primaryAction,
@@ -52,6 +55,7 @@ export function CardComparePattern({
   return (
     <div className={styles.root}>
       <div className={styles.comparePage}>
+        {notice != null && <div className={styles.compareNotice}>{notice}</div>}
         <div className={styles.compareHeader}>
           {header}
           {count != null && (

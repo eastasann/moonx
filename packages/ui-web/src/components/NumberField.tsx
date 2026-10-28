@@ -1,6 +1,6 @@
 import { formatNumberAffixes, formatNumberText } from "@moonx/i18n";
 import type { Size } from "@moonx/ui-tokens";
-import { useId, useRef } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { TextField as AriaTextField, Input } from "react-aria-components";
 import {
   FieldHelp,
@@ -13,6 +13,9 @@ import { useFieldWidth, useSize } from "../internal/size";
 import { useTableCell } from "../internal/tableCell";
 import { useControlledState } from "../internal/useControlledState";
 import { useKeepAboveKeyboard } from "../internal/useKeepAboveKeyboard";
+import { cssVarName } from "../styles/helpers";
+
+const endPrefixWidthName = cssVarName(styles.endPrefixWidth);
 
 export interface NumberFieldProps extends FieldTextProps {
   /**
@@ -23,6 +26,7 @@ export interface NumberFieldProps extends FieldTextProps {
   value?: string;
   defaultValue?: string;
   onChange?: (text: string) => void;
+  onFocus?: () => void;
   onBlur?: () => void;
   /** ISO 4217 code: the amount's currency symbol shows beside the number. */
   currency?: string;
@@ -30,6 +34,11 @@ export interface NumberFieldProps extends FieldTextProps {
   isPercent?: boolean;
   /** Whole numbers only (days): the phone shows a keypad without a decimal point. */
   isInteger?: boolean;
+  /**
+   * Shown faintly while the field is empty: the value used when none is entered (18's
+   * operating days "30", design-spec 6.4).
+   */
+  placeholder?: string;
   /** @default "M"; "L" in a spacious pattern, dialog or `Form` (06 semantic.density) */
   size?: Size;
   /** @default "default" */
@@ -64,6 +73,7 @@ export function NumberField({
   currency,
   isPercent = false,
   isInteger = false,
+  placeholder,
   size,
   width: givenWidth,
   ...props
@@ -85,14 +95,36 @@ export function NumberField({
       ? formatNumberAffixes({ percent: true })
       : { prefix: "", suffix: "" };
   const hasAffix = prefix !== "" || suffix !== "";
+  // What the input shows: the text, or the placeholder while it is empty.
+  const shown = text === "" ? (placeholder ?? "") : text;
   // In a table's number column the digits stay where the cell's value was: at the end.
   const alignsEnd = useTableCell()?.isNumeric ?? false;
+  // In a number column the symbol is drawn over the input's start, and the input keeps
+  // its width there, measured (the symbol's face may not be the digits').
+  const endPrefixRef = useRef<HTMLSpanElement>(null);
+  const [endPrefixWidth, setEndPrefixWidth] = useState(0);
+  useLayoutEffect(() => {
+    const symbol = endPrefixRef.current;
+    // The symbol is drawn there only in a number column, and only for an amount.
+    if (!alignsEnd || prefix === "" || symbol === null) {
+      setEndPrefixWidth(0);
+      return;
+    }
+    const measure = () =>
+      setEndPrefixWidth(symbol.getBoundingClientRect().width);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(symbol);
+    return () => observer.disconnect();
+  }, [alignsEnd, prefix]);
   const input = (
     <Input
       ref={inputRef}
       className={`${styles.input} ${styles.numberInput}${alignsEnd ? ` ${styles.endInput}` : ""}`}
       inputMode={isInteger ? "numeric" : "decimal"}
       autoComplete="off"
+      placeholder={placeholder}
     />
   );
   return (
@@ -132,14 +164,32 @@ export function NumberField({
             : undefined
         }
       >
-        {prefix !== "" && (
+        {prefix !== "" && !alignsEnd && (
           <span id={affixId} className={styles.affix}>
             {prefix}
           </span>
         )}
         {alignsEnd ? (
-          <span className={styles.endSizer} data-value={text}>
+          <span
+            className={styles.endSizer}
+            data-value={`${prefix}${shown}`}
+            style={{ [endPrefixWidthName]: `${endPrefixWidth}px` }}
+          >
             {input}
+            {prefix !== "" && (
+              <span className={styles.endPrefix}>
+                <span
+                  ref={endPrefixRef}
+                  id={affixId}
+                  className={`${styles.affix} ${styles.endPrefixSymbol}`}
+                >
+                  {prefix}
+                </span>
+                <span className={styles.endPrefixText} aria-hidden="true">
+                  {shown}
+                </span>
+              </span>
+            )}
           </span>
         ) : (
           input

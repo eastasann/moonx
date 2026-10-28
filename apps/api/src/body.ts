@@ -57,7 +57,7 @@ export async function readBodyWithin(
   body: ReadableStream<Uint8Array> | null,
   maxBytes: number,
   signal: AbortSignal,
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   if (body === null) return new Uint8Array();
   if (signal.aborted) throw disconnected();
   const chunks: Uint8Array[] = [];

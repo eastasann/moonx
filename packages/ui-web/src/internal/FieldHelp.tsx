@@ -4,6 +4,7 @@ import { FieldError, Label, Text } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import * as styles from "./field.css";
 import { IconSlot } from "./IconSlot";
+import { lineIcon } from "./lineIcon.css";
 
 /** The props every field takes for the text around its input. */
 export interface FieldTextProps {
@@ -34,7 +35,8 @@ export const invalidOf = ({ errorMessage, isInvalid }: FieldTextProps) =>
 
 /**
  * The description and the error under a field. The error carries an icon as well as the
- * colour, so it does not rely on colour alone (design-spec 4.4).
+ * colour, so it does not rely on colour alone (design-spec 4.4); the icon sits at the
+ * middle of the text's first line (4.5).
  */
 export function FieldHelp({
   description,
@@ -49,9 +51,11 @@ export function FieldHelp({
             slot="description"
             className={`${styles.description} ${styles.noticeDescription}`}
           >
-            <IconSlot size="XS">
-              <TriangleAlert />
-            </IconSlot>
+            <span className={lineIcon}>
+              <IconSlot size="XS">
+                <TriangleAlert />
+              </IconSlot>
+            </span>
             <span>{description}</span>
           </Text>
         ) : (
@@ -62,9 +66,11 @@ export function FieldHelp({
       <FieldError className={styles.error}>
         {({ validationErrors }) => (
           <>
-            <IconSlot size="XS">
-              <CircleAlert />
-            </IconSlot>
+            <span className={lineIcon}>
+              <IconSlot size="XS">
+                <CircleAlert />
+              </IconSlot>
+            </span>
             <span>{errorMessage ?? validationErrors.join(" ")}</span>
           </>
         )}

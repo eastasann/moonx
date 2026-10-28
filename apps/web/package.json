@@ -3,21 +3,33 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@elysiajs/eden": "^1.4.9",
     "@moonx/i18n": "workspace:*",
+    "@moonx/schemas": "workspace:*",
+    "@moonx/ui-tokens": "workspace:*",
     "@moonx/ui-web": "workspace:*",
+    "@sentry/browser": "^11.8.0",
+    "@tanstack/react-form": "^1.33.5",
+    "@tanstack/react-query": "^5.104.4",
     "@tanstack/react-router": "^1.170.42",
     "@tanstack/react-start": "^1.168.61",
+    "lucide-react": "^1.58.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-i18next": "^17.0.20"
+    "react-i18next": "^17.0.20",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
+    "@moonx/api": "workspace:*",
     "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@vanilla-extract/css": "^1.21.3",
     "@vanilla-extract/vite-plugin": "^5.2.6",
     "@vitejs/plugin-react": "^6.1.2",
     "happy-dom": "^21.0.1",
+    "i18next": "^26.4.4",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"
   }

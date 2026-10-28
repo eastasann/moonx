@@ -186,12 +186,16 @@ async function loadPitchDeck(
       }),
     ),
     competitors,
-    // The links lead to screens a version, an archive or a Viewer cannot edit (6.14).
-    canEdit:
+    // No links on a saved version, whose slides editing does not change, nor for a Viewer
+    // or to a screen an archive makes read only: an archived plan's 21, an archived
+    // idea's validation (6.14).
+    canEditPlan:
       version === null &&
       scope.role !== "viewer" &&
       !scope.planArchived &&
       !scope.ideaArchived,
+    canEditValidation:
+      version === null && scope.role !== "viewer" && !scope.ideaArchived,
     commentCount: (key) => comments({ type: "pitch_slide", id: planId, key }),
   });
   return {

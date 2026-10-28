@@ -103,6 +103,23 @@ export const text = recipe({
       },
     },
     tone,
+    // An excerpt kept to its first lines, cut with "…" (7's reasons and 8's excerpts,
+    // design-spec 6.15: "1〜2行").
+    maxLines: {
+      none: {},
+      1: {
+        display: "-webkit-box",
+        overflow: "hidden",
+        WebkitBoxOrient: "vertical",
+        WebkitLineClamp: 1,
+      },
+      2: {
+        display: "-webkit-box",
+        overflow: "hidden",
+        WebkitBoxOrient: "vertical",
+        WebkitLineClamp: 2,
+      },
+    },
   },
-  defaultVariants: { variant: "body", tone: "primary" },
+  defaultVariants: { variant: "body", tone: "primary", maxLines: "none" },
 });

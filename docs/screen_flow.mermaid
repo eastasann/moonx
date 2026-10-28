@@ -6,7 +6,7 @@
 %%   - 各画面の戻る（← Back・パンくず）で、来た画面や親の画面へ戻る遷移
 %%   - 14〜18 と 11（検証の設問）は、ヘッダーのセクション切替で互いに移れ、どれからも 13 へ戻れる
 %%   - パネル（コメント PNL-1・変更履歴 PNL-2）は各画面の上に開くだけなので描かない
-%%   - 通知（8）は該当の項目の画面へ移る。図は代表の 10 / 12 / 13 / 20 だけを描く（押した先の正は design-spec 6.15）
+%%   - 通知（8）は該当の項目の画面へ移る。図は代表の 11 / 12 / 13 / 20 / 21 だけを描く（押した先の正は design-spec 6.15）
 %%   - 使っている間にログインが切れたら、ログイン後のどの画面からでも、未保存の入力があれば M9、無ければ 2 へ移る（図は M9 から 2 への遷移だけを描く。design-spec 5章「認証」）
 %% 権限: [OM] = Owner / Member のみ、[O] = Owner のみ、[A] = Admin のみ、[本人] = 自己分析の持ち主のみ
 
@@ -68,7 +68,7 @@ graph TD
     S5 <-->|"Viewer として開いているときは出さない"| S10
     S10 --> S11
     S11 --> S10
-    S10 -->|"完了後"| M6
+    S10 -->|"完了後（外すのは共有先がある間いつでも）"| M6
     S10 -->|"Team [OM]"| S12
     S5 -->|"共有済みのみ [OM]"| S12
 
@@ -96,7 +96,8 @@ graph TD
     S13 --> S16
     S13 --> S17
     S13 --> S18
-    S13 -->|"See all"| S7
+    S13 -->|"See all decisions"| S7
+    S19 -->|"Last decision"| S7
     S17 <--> S18
     S11 --> S13
     S11 -->|"Log research（検証）[OM]"| S14
@@ -134,8 +135,8 @@ graph TD
     S21 --> S20
     S20 --> S22
     S5 -->|"Due soon"| S22
-    S20 -->|"Edit in validation [OM]"| S17
     S20 -->|"Edit in validation [OM]"| S18
+    S20 -->|"Open in validation（Viewer・アーカイブ中）"| S18
     S21 -->|"Open in Execution（§23・25・26・28・29）"| S22
     S20 --> S23
     S23 -->|"Edit source [OM]"| S21
@@ -146,6 +147,16 @@ graph TD
     M4 -.->|"Save a version first?"| M3
     S21 -->|"引き継いだ数字を直す [OM]"| S17
     S21 -->|"引き継いだ数字を直す [OM]"| S18
+    S21 -->|"Open in validation（Viewer・アーカイブ中）"| S17
+    S21 -->|"Open in validation（Viewer・アーカイブ中）"| S18
+    S21 -->|"参照の Open in validation"| S11
+    S21 -->|"参照の Open in validation"| S14
+    S21 -->|"参照の Open in validation"| S15
+    S21 -->|"参照の Open in validation"| S16
+    S21 -->|"参照の Open in validation"| S17
+    S21 -->|"参照の Open in validation"| S18
+    S21 -->|"参照の Open Decision Log"| S7
+    S21 --> S13
 
     %% === テンプレートの移行 ===
     M8{{"M8 テンプレートの移行 [OM / 本人]"}}
@@ -184,7 +195,8 @@ graph TD
     %% === 通知・決定ログからの移動 ===
     S8 -->|"該当箇所へ"| S13
     S8 -->|"該当箇所へ"| S20
-    S8 -->|"自己分析へのコメント"| S10
+    S8 -->|"該当箇所へ"| S21
+    S8 -->|"自己分析へのコメント"| S11
     S8 -->|"共有された自己分析へのコメント"| S12
     S7 --> S13
     S7 --> S20

@@ -227,6 +227,57 @@ describe("P4 GET /api/v1/plans/{planId}/items/{itemNo}", () => {
         value: { value: 8500, bound: "exact", reason: null },
       },
     ]);
+    // A row the validation deleted is "Not in validation", by the template's name.
+    await db
+      .update(costItems)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(
+          eq(costItems.validationId, validationId),
+          eq(costItems.templateKey, "initial.lease_deposit"),
+        ),
+      );
+    const location = await item(team, 15);
+    expect(refOf(location, "cost_rows")?.data).toMatchObject([
+      { templateKey: "monthly.rent", name: "Rent", inputMode: "amount" },
+      {
+        id: null,
+        templateKey: "initial.lease_deposit",
+        name: "Lease Deposit / Advance",
+        category: "initial",
+        inputMode: null,
+        amount: null,
+      },
+    ]);
+    // A number sub-item's cost row: named by the validation's row, Empty while it has no
+    // value; once deleted, left out of the metrics and named by the template (6.0.7).
+    await db
+      .update(costItems)
+      .set({ name: "Crew wages" })
+      .where(
+        and(
+          eq(costItems.validationId, validationId),
+          eq(costItems.templateKey, "monthly.salaries"),
+        ),
+      );
+    const people = await item(team, 18);
+    expect(people.metrics["cost_row:monthly.salaries"]).toMatchObject({
+      value: null,
+      reason: "empty",
+    });
+    expect(people.costRowNames).toEqual({ "monthly.salaries": "Crew wages" });
+    await db
+      .update(costItems)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(
+          eq(costItems.validationId, validationId),
+          eq(costItems.templateKey, "monthly.salaries"),
+        ),
+      );
+    const withoutRow = await item(team, 18);
+    expect("cost_row:monthly.salaries" in withoutRow.metrics).toBe(false);
+    expect(withoutRow.costRowNames).toEqual({ "monthly.salaries": "Salaries" });
     expect(refOf(legal, "research_log")).toMatchObject({
       title: "Research Log · Permits",
       data: [{ topic: "City hall visit", observedOn: "2026-09-02" }],
@@ -362,6 +413,8 @@ describe("P5 PUT /api/v1/plans/{planId}/answers/{questionKey}", () => {
       force: true,
     });
     expect(lost.status).toBe(409);
+    // Rows of one moment have no order between them: the saves below are a second apart.
+    clock += 1000;
     const forced = await save(team, "P.01.5", {
       text: "Mine",
       lockVersion: 7,
@@ -371,6 +424,7 @@ describe("P5 PUT /api/v1/plans/{planId}/answers/{questionKey}", () => {
       text: "Mine",
       lockVersion: 2,
     });
+    clock += 1000;
     const cleared = await save(team, "P.01.5", { text: "  ", lockVersion: 2 });
     expect(planAnswerSchema.parse(await cleared.json()).text).toBeNull();
 
@@ -383,12 +437,18 @@ describe("P5 PUT /api/v1/plans/{planId}/answers/{questionKey}", () => {
           eq(changeHistory.targetKey, "P.01.5"),
         ),
       );
+    // Overwriting, then clearing it a moment later: one row from before the overwrite
+    // to the cleared text (ADR-020).
     expect(
-      history.map((row) => [row.action, row.sectionKey, row.after]),
+      history.map((row) => [row.action, row.sectionKey, row.before, row.after]),
     ).toEqual([
-      ["create", "01", { text: "Boxes invoiced monthly", rows: null }],
-      ["update", "01", { text: "Mine", rows: null }],
-      ["update", "01", { text: null, rows: null }],
+      ["create", "01", null, { text: "Boxes invoiced monthly", rows: null }],
+      [
+        "update",
+        "01",
+        { text: "Boxes invoiced monthly", rows: null },
+        { text: null, rows: null },
+      ],
     ]);
   });
 

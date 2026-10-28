@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Density } from "../internal/Density";
 import { BottomBar } from "../internal/frame";
 import { useIsNarrow } from "../internal/useIsNarrow";
@@ -45,6 +45,13 @@ export interface StepsPatternProps {
    * history as an AI import."); on a phone, at the end of the content.
    */
   note?: ReactNode;
+  /**
+   * The step on screen, for a procedure whose steps change in place (24, 25): when it
+   * changes, the page goes back to its top, where the steps show where the user is, and
+   * focus moves to the start of the new step's content, so it is read from its beginning
+   * and the buttons that went with the old step do not leave focus nowhere.
+   */
+  focusKey?: string;
 }
 
 /**
@@ -60,16 +67,29 @@ export function StepsPattern({
   footer,
   actions,
   note,
+  focusKey,
 }: StepsPatternProps) {
   const isNarrow = useIsNarrow();
   const isComparison = comparisons !== undefined;
+  const contentRef = useRef<HTMLDivElement>(null);
+  const shownKey = useRef(focusKey);
+  useEffect(() => {
+    if (shownKey.current === focusKey) return;
+    shownKey.current = focusKey;
+    contentRef.current?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0 });
+  }, [focusKey]);
   return (
     <Density density="spacious">
       <div className={styles.root}>
         <div className={styles.stepsPage({ isComparison })}>
           {header != null && <div className={styles.stepsHeader}>{header}</div>}
           <div className={styles.stepsBar}>{steps}</div>
-          <div className={styles.stepsContent}>
+          <div
+            ref={contentRef}
+            tabIndex={focusKey === undefined ? undefined : -1}
+            className={styles.stepsContent}
+          >
             {children}
             {comparisons?.map((item) => (
               <section

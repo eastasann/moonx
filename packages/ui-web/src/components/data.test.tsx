@@ -7,7 +7,9 @@ import { setPhoneWidth, setTabletWidth, settle } from "../test/helpers";
 import { Avatar, initialsOf } from "./Avatar";
 import { Card, CardView } from "./Card";
 import { CheckDots } from "./CheckDots";
+import { CommentCount } from "./CommentCount";
 import { ListView, ListViewItem } from "./ListView";
+import { ActionMenu, MenuItem } from "./Menu";
 import { Meter } from "./Meter";
 import { MoonGlyph } from "./MoonGlyph";
 import { NumberField } from "./NumberField";
@@ -472,10 +474,12 @@ describe("TableView", () => {
     await user.click(screen.getByText("15,000"));
     await settle();
     const amount = screen.getByRole("textbox", { name: "Amount of rent" });
-    // The input sits in a sizer as wide as its text, beside the symbol.
-    expect(amount.parentElement?.getAttribute("data-value")).toBe("15,000");
+    // The input sits in a sizer as wide as the symbol and its text; the symbol is drawn
+    // in it, before a copy of the text, so it stays beside the digits.
+    expect(amount.parentElement?.getAttribute("data-value")).toBe("₱15,000");
+    expect(amount.parentElement?.textContent).toBe("₱15,000");
     await user.keyboard("{End}0");
-    expect(amount.parentElement?.getAttribute("data-value")).toBe("15,0000");
+    expect(amount.parentElement?.getAttribute("data-value")).toBe("₱15,0000");
     expect(
       screen
         .getByRole("textbox", { name: "Price" })
@@ -531,6 +535,146 @@ describe("ListView", () => {
     await user.tab();
     await user.keyboard("{ArrowDown}{Enter}");
     expect(onAction).toHaveBeenCalledWith("b");
+  });
+
+  test("a title sits over the rows, outside the grid, which keeps its own name", () => {
+    render(
+      <ListView aria-label="Launch · T−30" title="T−30" items={ideas}>
+        {(idea) => (
+          <ListViewItem id={idea.id} textValue={idea.name}>
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+    );
+    const grid = screen.getByRole("grid", { name: "Launch · T−30" });
+    const title = screen.getByText("T−30");
+    expect(grid.contains(title)).toBe(false);
+    expect(
+      title.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(grid).getAllByRole("row")).toHaveLength(2);
+  });
+
+  test("rows that act one by one: only those with their own action press and end in ›", async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    render(
+      <ListView aria-label="Notifications" items={ideas}>
+        {(idea) => (
+          <ListViewItem
+            id={idea.id}
+            textValue={idea.name}
+            onAction={idea.id === "a" ? onOpen : undefined}
+          >
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+    );
+    const [first, second] = screen.getAllByRole("row");
+    expect(first?.querySelector("svg")).not.toBeNull();
+    expect(second?.querySelector("svg")).toBeNull();
+    await user.click(screen.getByText("Health Bowl"));
+    expect(onOpen).not.toHaveBeenCalled();
+    await user.click(screen.getByText("Piaya Gift Box"));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  test("a row that cannot be chosen has no ›, and is not chosen when pressed", async () => {
+    const user = userEvent.setup();
+    const onSelectionChange = vi.fn();
+    render(
+      <ListView
+        aria-label="Members"
+        items={ideas}
+        selectionMode="single"
+        onSelectionChange={onSelectionChange}
+      >
+        {(idea) => (
+          <ListViewItem
+            id={idea.id}
+            textValue={idea.name}
+            isDisabled={idea.id === "b"}
+          >
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+    );
+    const [first, second] = screen.getAllByRole("row");
+    expect(first?.querySelector("svg")).not.toBeNull();
+    expect(second?.querySelector("svg")).toBeNull();
+    expect(second?.getAttribute("aria-disabled")).toBe("true");
+    await user.click(screen.getByText("Health Bowl"));
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
+  test("disabledBehavior selection: a row that cannot be chosen is still reached by the arrows", async () => {
+    const user = userEvent.setup();
+    const onSelectionChange = vi.fn();
+    render(
+      <ListView
+        aria-label="Members"
+        items={ideas}
+        selectionMode="single"
+        disabledBehavior="selection"
+        onSelectionChange={onSelectionChange}
+      >
+        {(idea) => (
+          <ListViewItem
+            id={idea.id}
+            textValue={idea.name}
+            isDisabled={idea.id === "b"}
+          >
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+    );
+    await user.tab();
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(screen.getAllByRole("row")[1]);
+    await user.keyboard("{Enter}");
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
+  test("a row's ⋯ opens its menu without choosing the row; after the ›", async () => {
+    const user = userEvent.setup();
+    const onSelectionChange = vi.fn();
+    const onAction = vi.fn();
+    render(
+      <ListView
+        aria-label="Ideas"
+        items={ideas}
+        selectionMode="single"
+        onSelectionChange={onSelectionChange}
+      >
+        {(idea) => (
+          <ListViewItem
+            id={idea.id}
+            textValue={idea.name}
+            actions={
+              <ActionMenu
+                aria-label={`More for ${idea.name}`}
+                onAction={onAction}
+              >
+                <MenuItem id="duplicate">Duplicate</MenuItem>
+              </ActionMenu>
+            }
+          >
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+    );
+    const more = screen.getByRole("button", { name: "More for Health Bowl" });
+    const chevron = screen.getAllByRole("row")[1]?.querySelector("svg");
+    expect(chevron && follows(chevron, more)).toBe(true);
+    await user.click(more);
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+    expect(onAction.mock.calls[0]?.[0]).toBe("duplicate");
+    expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
   test('layout="cards" frames each item', () => {
@@ -658,6 +802,17 @@ describe("Card and CardView", () => {
     expect(screen.queryByRole("grid")).toBeNull();
   });
 
+  test("open threads: the comments' mark and their count after the footer, none for zero", () => {
+    const { rerender } = render(
+      <Card title="Bowl & Co" footer="No sources" openThreadCount={2} />,
+    );
+    expect(screen.getByText("2 open comment threads")).toBeTruthy();
+    rerender(
+      <Card title="Bowl & Co" footer="No sources" openThreadCount={0} />,
+    );
+    expect(screen.queryByText(/open comment thread/)).toBeNull();
+  });
+
   test("in a CardView the cards are its items: pressed, chosen, moved between by arrows", async () => {
     const user = userEvent.setup();
     const onAction = vi.fn();
@@ -757,6 +912,20 @@ describe("Card and CardView", () => {
       ),
     ).toThrow("needs an id and a textValue");
     vi.restoreAllMocks();
+  });
+});
+
+describe("CommentCount", () => {
+  test("the mark and the number, read as how many comments; none shows nothing", () => {
+    const { container, rerender } = render(<CommentCount count={2} />);
+    expect(container.textContent).toBe("22 comments");
+    expect(
+      screen.getByText("2", { exact: true }).getAttribute("aria-hidden"),
+    ).toBe("true");
+    rerender(<CommentCount count={1} />);
+    expect(container.textContent).toBe("11 comment");
+    rerender(<CommentCount count={0} />);
+    expect(container.textContent).toBe("");
   });
 });
 

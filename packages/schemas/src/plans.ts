@@ -240,11 +240,17 @@ export const planReferenceSchema = z.discriminatedUnion("kind", [
     "cost_rows",
     z.array(
       z.object({
-        id: uuidSchema,
-        category: costCategorySchema,
+        /**
+         * Null for a key the validation has no row of (design-spec 6.0.7「Not in
+         * validation」): its row deleted, or a key its template lacks. Such an entry has
+         * the template's name and category for the key (null when no published
+         * validation template has it) and no input.
+         */
+        id: uuidSchema.nullable(),
+        category: costCategorySchema.nullable(),
         templateKey: z.string(),
-        name: z.string(),
-        inputMode: z.enum(["amount", "percent_of_price"]),
+        name: z.string().nullable(),
+        inputMode: z.enum(["amount", "percent_of_price"]).nullable(),
         amount: z.number().nullable(),
         /** A 0–1 rate of the price, on a variable row entered as a %. */
         percent: z.number().nullable(),
@@ -407,6 +413,28 @@ export const EXECUTION_STATUSES: Record<
   next_action: ["todo", "doing", "done"],
 };
 
+/** What starts a plan screen's section key for the execution items of one type. */
+const EXECUTION_SECTION_PREFIX = "execution:";
+
+/**
+ * The section key (C1's and H1's `sectionKeys`) of a plan's execution items of `type`, as
+ * 21 lists them beside its item's own section (SDD 6.3「画面と節の対応」): their comments
+ * and changes keep 22's key, `execution`.
+ */
+export const executionSectionKey = (type: ExecutionType) =>
+  `${EXECUTION_SECTION_PREFIX}${type}`;
+
+/** The type an {@link executionSectionKey} names; undefined for any other key. */
+export function executionTypeOfSectionKey(
+  key: string,
+): ExecutionType | undefined {
+  if (!key.startsWith(EXECUTION_SECTION_PREFIX)) return undefined;
+  const parsed = executionTypeSchema.safeParse(
+    key.slice(EXECUTION_SECTION_PREFIX.length),
+  );
+  return parsed.success ? parsed.data : undefined;
+}
+
 /** The types 22 reorders by hand: Next Actions go by their due date (design-spec 6.13). */
 export const ORDERED_EXECUTION_TYPES = [
   "milestone",
@@ -460,6 +488,11 @@ export const executionListQuerySchema = z.object({
   type: executionTypeSchema.optional(),
   /** `me`, or a user's id. */
   assignee: z.union([z.literal("me"), storedUuidSchema]).optional(),
+  /**
+   * An assignee typed as a name (design-spec 6.13), matched without regard to case: the
+   * Picker of 22 lists names that differ only in case once.
+   */
+  assigneeName: z.string().trim().min(1).max(60).optional(),
   status: executionStatusSchema.optional(),
 });
 
@@ -520,8 +553,16 @@ export const planItemSchema = z.object({
   prompts: z.array(templateQuestionSchema),
   /** One per prompt that takes an answer (text, choice, table), unanswered ones included. */
   answers: z.array(planAnswerSchema),
-  /** The single-value key metrics the number sub-items show (a viewed version's). */
+  /**
+   * The single-value key metrics the number sub-items show (a viewed version's). A
+   * `cost_row:*` the validation does not have (had not) is left out.
+   */
   metrics: keyMetricsSchema,
+  /**
+   * The name of each cost row the number sub-items name, by template key: the validation's
+   * row's, else the template's (as the cost_rows reference); null where neither has one.
+   */
+  costRowNames: z.record(z.string(), z.string().nullable()),
   /** The scenario columns the `scenario:*` sub-items show (a viewed version's). */
   scenarios: z.array(scenarioColumnSchema),
   /** The items of its execution views, in P9's order (a viewed version's). */

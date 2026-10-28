@@ -41,6 +41,8 @@ import { researchLogInputSchema, validationAnswerSchema } from "./validation";
 
 export const researchLogEntrySchema = versionedSchema.extend({
   id: uuidSchema,
+  /** The validation it was recorded in: V7 finds an entry by its id alone. */
+  validationId: uuidSchema,
   observedOn: dateOnlySchema.nullable(),
   topic: z.string(),
   observation: z.string().nullable(),
@@ -121,6 +123,8 @@ export const competitorSchema = versionedSchema.extend({
   evidence: z.array(evidenceSchema),
   sortOrder: z.int(),
   commentCount: z.int().nonnegative(),
+  /** The threads on it not resolved, as C1's `unresolvedCount` (15's card, 💬 n). */
+  unresolvedThreadCount: z.int().nonnegative(),
 });
 export type Competitor = z.infer<typeof competitorSchema>;
 

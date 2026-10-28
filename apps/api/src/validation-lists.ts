@@ -44,6 +44,7 @@ import {
   type EvidenceRef,
   loadCommentCounts,
   loadEvidence,
+  loadUnresolvedThreadCounts,
 } from "./validation-items";
 import {
   deleteListRow,
@@ -118,6 +119,10 @@ async function competitorViews(
     "competitor",
     rows,
   );
+  const unresolved = await loadUnresolvedThreadCounts(
+    db,
+    rows.map((row) => ({ type: "competitor", id: row.id })),
+  );
   return rows.map((row) => {
     const { evidenceIds: _, ...content } = competitorContent(row, []);
     return {
@@ -126,6 +131,7 @@ async function competitorViews(
       evidence: extras.evidence(row.id),
       sortOrder: row.sortOrder,
       commentCount: extras.comments(row.id),
+      unresolvedThreadCount: unresolved({ type: "competitor", id: row.id }),
       ...versionedView(row, extras.users),
     };
   });

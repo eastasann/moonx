@@ -25,6 +25,27 @@ export const body = style({
   padding: vars.density.regular.panelPadding,
 });
 
+/**
+ * Under the part that scrolls, as the header is over it: a PanelFooter's box for a new
+ * thread. Without one, it takes no room. A long comment grows it up to half the tallest
+ * a tray may be (06 layout.sheet-max-height-ratio of the visible height; the window's
+ * where no modal measures it), then it scrolls on its own, so the threads keep room and
+ * Post stays reachable. A tray's height follows its content, so a share of the panel
+ * would not hold there.
+ */
+export const footer = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: vars.density.regular.gap,
+  flexShrink: 0,
+  maxHeight: `calc(${vars.layout.sheetMaxHeightRatio} * var(--visual-viewport-height, 100dvh) / 2)`,
+  overflowY: "auto",
+  overscrollBehavior: "contain",
+  padding: vars.density.regular.panelPadding,
+  borderTop: `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`,
+  selectors: { "&:empty": { display: "none" } },
+});
+
 /** The desktop's column: as tall as its place, `layout.side-panel-width` wide. */
 export const docked = style({
   display: "flex",

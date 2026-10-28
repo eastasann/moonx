@@ -42,7 +42,11 @@ export default defineConfig({
       },
     },
     tanstackStart({
-      spa: { enabled: true },
+      // The shell of every other screen (_shell.html, ADR-004) is rendered at /login, so
+      // that / can be built into 1's own HTML (ADR-002): two pages of one path would be
+      // rendered once. Only the root route renders into the shell, whatever the path.
+      spa: { enabled: true, maskPath: "/login" },
+      pages: [{ path: "/", prerender: { enabled: true, crawlLinks: false } }],
       // Tests sit next to the routes they cover without becoming routes themselves.
       router: { routeFileIgnorePattern: "\\.test\\.tsx?$" },
     }),

@@ -34,6 +34,12 @@ export interface WorksheetPatternProps {
    * opens the results.
    */
   summary: ReactNode;
+  /**
+   * What goes under the inputs and the results, across the whole width, as one more of
+   * the inputs' tables apart (18's scenario table, design-spec 6.4). Where the results
+   * have no column of their own, it follows the inputs.
+   */
+  after?: ReactNode;
 }
 
 /**
@@ -50,6 +56,7 @@ export function WorksheetPattern({
   results,
   resultsTitle,
   summary,
+  after,
 }: WorksheetPatternProps) {
   const isTwoColumns = useTwoColumns();
   const resultsTitleId = useId();
@@ -67,6 +74,33 @@ export function WorksheetPattern({
   // here.
   const summaryButton = useRef<HTMLButtonElement>(null);
   const resultsColumn = useRef<HTMLElement>(null);
+  // A column taller than the window scrolls on its own: the keyboard must reach it to
+  // scroll it (WCAG 2.1.1), as it does any other scrolling region.
+  const [isScrolling, setScrolling] = useState(false);
+  useLayoutEffect(() => {
+    const column = resultsColumn.current;
+    if (
+      !isTwoColumns ||
+      column === null ||
+      typeof ResizeObserver === "undefined"
+    ) {
+      return;
+    }
+    const measure = () =>
+      setScrolling(column.scrollHeight > column.clientHeight);
+    measure();
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    });
+    observer.observe(column);
+    for (const child of column.children) observer.observe(child);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [isTwoColumns]);
   const hasFocus = useRef(false);
   const wasTwoColumns = useRef(isTwoColumns);
   useLayoutEffect(() => {
@@ -104,7 +138,7 @@ export function WorksheetPattern({
           {isTwoColumns && (
             <aside
               ref={resultsColumn}
-              tabIndex={-1}
+              tabIndex={isScrolling ? 0 : -1}
               aria-labelledby={resultsTitleId}
               className={styles.results}
             >
@@ -117,6 +151,7 @@ export function WorksheetPattern({
             </aside>
           )}
         </div>
+        {after != null && <div className={styles.worksheetAfter}>{after}</div>}
       </div>
       {!isTwoColumns && (
         <BottomBar variant="summary" column="worksheet">

@@ -26,6 +26,8 @@ export interface SegmentedControlProps {
   id?: string;
   "aria-label"?: string;
   "aria-labelledby"?: string;
+  /** What is said under it, such as why its value was refused. */
+  "aria-describedby"?: string;
   children: ReactNode;
 }
 

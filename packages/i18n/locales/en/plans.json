@@ -1,0 +1,278 @@
+{
+  "home": {
+    "back": "Plan",
+    "switchPlan": "Switch plan",
+    "archivedGroup": "Archived",
+    "addPlan": "Add plan",
+    "plansRetry": "Couldn't load the plans. Try again",
+    "version": "Version: {{name}}",
+    "versionChanged": "Version: {{name}} + changes",
+    "noVersion": "No version saved",
+    "updated": "Updated {{date}}",
+    "saved": "Saved {{date}}",
+    "businessName": "Business Name",
+    "preparedBy": "Prepared by",
+    "headerLine": "{{label}}: {{value}}",
+    "empty": "Empty",
+    "headerNoun": "plan header",
+    "latestDecision": "Latest decision is {{value}}.",
+    "archived": "This plan is archived",
+    "restore": "Restore",
+    "viewing": "Viewing {{name}} (read only)",
+    "showLatest": "Show the latest",
+    "startWith": "Start with the items marked [V]. They already have your validation data.",
+    "saveVersion": "Save version",
+    "pitchDeck": "Pitch Deck",
+    "recordGoNoGo": "Record Go / No-Go",
+    "more": "More for {{name}}",
+    "rename": "Rename plan",
+    "archive": "Archive plan",
+    "keyNumbers": {
+      "title": "Key numbers",
+      "fromValidation": "From validation",
+      "fromVersion": "As saved in this version",
+      "edit": "Edit in validation",
+      "open": "Open in validation"
+    },
+    "goNoGo": {
+      "title": "Go / No-Go",
+      "none": "Not recorded yet",
+      "seeAll": "See all Go / No-Go decisions"
+    },
+    "versions": {
+      "title": "Versions",
+      "none": "No versions saved yet",
+      "meta": "{{date}} · {{name}}",
+      "viewing": "Viewing"
+    },
+    "execution": {
+      "title": "Execution",
+      "dueSoon_one": "{{count}} item due in the next 7 days",
+      "dueSoon_other": "{{count}} items due in the next 7 days",
+      "overdue_one": "{{count}} item overdue",
+      "overdue_other": "{{count}} items overdue",
+      "nothingDue": "Nothing due in the next 7 days",
+      "open": "Open Execution"
+    },
+    "part": {
+      "a": "Part A: Business Case",
+      "b": "Part B: Execution Plan",
+      "complete": "{{complete}} / {{total}}"
+    },
+    "item": "{{no}} {{title}}",
+    "filled": "{{filled}}/{{total}}",
+    "mark": {
+      "V": "V",
+      "S": "S",
+      "VName": "Uses your validation",
+      "SName": "Refers to shared self analyses"
+    }
+  },
+  "create": {
+    "title": "Create plan draft",
+    "body": "The draft copies your validation's answers where the plan asks the same, and starts the execution lists from the template.",
+    "name": "Plan name",
+    "create": "Create draft",
+    "cancel": "Cancel"
+  },
+  "rename": {
+    "title": "Rename plan",
+    "name": "Plan name",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "version": {
+    "title": "Save version",
+    "body": "Keeps the plan as it is now, read only, to look back on or to show as a Pitch Deck.",
+    "name": "Version name",
+    "save": "Save version",
+    "cancel": "Cancel",
+    "saved": "{{name}} saved"
+  },
+  "goNoGo": {
+    "title": "Record Go / No-Go",
+    "conditions": "Conditions",
+    "launchIf": "We proceed to launch if",
+    "delayIf": "We delay if",
+    "stopIf": "We stop / abandon if",
+    "empty": "Empty",
+    "keyNumbers": "Key numbers",
+    "version": "Version",
+    "noVersion": "No version saved",
+    "changes": "The plan has changed since {{name}} was saved. Save a version first?",
+    "saveFirst": "Save a version",
+    "question": "Go / No-Go",
+    "why": "Why?",
+    "cancel": "Cancel",
+    "record": "Record",
+    "recorded": "Go / No-Go recorded"
+  },
+  "header": {
+    "name": "Plan name",
+    "businessName": "Business Name",
+    "preparedBy": "Prepared by"
+  },
+  "execution": {
+    "assignee": "Assignee",
+    "status": "Status",
+    "field": {
+      "milestone": {
+        "title": "Milestone",
+        "goal": "Goal",
+        "dueDate": "Deadline",
+        "exitCondition": "Exit Condition"
+      },
+      "launch": {
+        "title": "Timing",
+        "launchTiming": "Phase",
+        "dueDate": "Date",
+        "actions": "Actions",
+        "completionCriteria": "Completion Criteria"
+      },
+      "kpi": {
+        "title": "KPI",
+        "kpiArea": "Area",
+        "kpiTarget": "Target",
+        "kpiReviewFrequency": "Review Frequency",
+        "kpiActual": "Actual"
+      },
+      "open_question": {
+        "title": "Open Question",
+        "whyItMatters": "Why It Matters",
+        "dueDate": "Target Date",
+        "answer": "Answer"
+      },
+      "next_action": {
+        "title": "Action",
+        "dueDate": "Deadline"
+      }
+    },
+    "formerMember": "A former member",
+    "list": {
+      "milestone": "Milestones",
+      "launch": "Launch",
+      "kpi": "KPIs",
+      "open_question": "Open Questions",
+      "next_action": "Next Actions"
+    },
+    "add": "Add",
+    "addTo": {
+      "milestone": "Add milestone",
+      "launch": "Add launch step",
+      "kpi": "Add KPI",
+      "open_question": "Add open question",
+      "next_action": "Add next action"
+    },
+    "newTitle": {
+      "milestone": "New milestone",
+      "launch": "New launch step",
+      "kpi": "New KPI",
+      "open_question": "New open question",
+      "next_action": "New next action"
+    },
+    "editTitle": {
+      "milestone": "Edit milestone",
+      "launch": "Edit launch step",
+      "kpi": "Edit KPI",
+      "open_question": "Edit open question",
+      "next_action": "Edit next action"
+    },
+    "deleteTitle": {
+      "milestone": "Delete this milestone?",
+      "launch": "Delete this launch step?",
+      "kpi": "Delete this KPI?",
+      "open_question": "Delete this open question?",
+      "next_action": "Delete this next action?"
+    },
+    "nothingYet": "Nothing yet",
+    "overdue": "Overdue",
+    "noAssignee": "No assignee",
+    "membersFailed": "Couldn't load the members to choose from.",
+    "useName": "Use “{{name}}”",
+    "noArea": "No area",
+    "actualUpdated": "Updated {{date}}, {{time}}",
+    "more": "More for {{title}}",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "noun": "item",
+    "title": "Execution",
+    "tabs": "Execution lists",
+    "empty": {
+      "milestones": "List the milestones to reach before launch, with who owns each and by when.",
+      "launch": "Plan what to do before launch, on the day and in the first 90 days.",
+      "kpis": "List the numbers to watch once the business runs, with a target for each.",
+      "questions": "Write down what you still need to find out, and why it matters.",
+      "actions": "List what to do next, with who does it and by when."
+    },
+    "emptyFiltered": "Nothing matches these filters",
+    "filter": {
+      "all": "All",
+      "me": "Me",
+      "overdueOnly": "Overdue only",
+      "clear": "Clear filters"
+    },
+    "edit": "Edit",
+    "reorder": "Reorder",
+    "reorderTitle": {
+      "milestone": "Reorder milestones",
+      "launch": "Reorder launch steps",
+      "kpi": "Reorder KPIs",
+      "open_question": "Reorder open questions"
+    },
+    "openInExecution": "Open in Execution"
+  },
+  "table": {
+    "cell": "{{label}}: {{value}}",
+    "emptyRow": "Empty row"
+  },
+  "item": {
+    "switchItem": "Switch item",
+    "previousItem": "Previous item",
+    "next": "Next: {{item}}",
+    "complete": "{{item}}: {{answered}}/{{total}} answered",
+    "toHome": "Back to plan",
+    "noun": "answer",
+    "tableNoun": "table",
+    "references": "References",
+    "referencesAside": "Always the latest",
+    "openValidation": "Open in validation",
+    "openDecisionLog": "Open Decision Log",
+    "nothing": "Nothing in it yet",
+    "noRows": "No rows",
+    "addRow": "Add row",
+    "addRowTo": "Add row to {{title}}",
+    "row": "Row {{n}}",
+    "rowMore": "More for row {{n}}",
+    "editRow": "Edit row",
+    "deleteRow": "Delete row",
+    "deleteRowTitle": "Delete this row?",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "rows_one": "{{count}} row",
+    "rows_other": "{{count}} rows",
+    "ownership": "Total ownership",
+    "capital": "Total capital",
+    "pitchNotes": {
+      "one": "Shown as the speaker notes of the 1-minute Pitch Deck.",
+      "five": "Shown as the speaker notes of the 5-minute Pitch Deck."
+    },
+    "goNoGoNote": "Record a decision with Record Go / No-Go on the plan home.",
+    "memberPicker": "Member",
+    "notInValidation": "Not in validation"
+  },
+  "pitch": {
+    "title": "Pitch Deck",
+    "length": "Length",
+    "one": "One-minute",
+    "five": "Five-minute",
+    "from": "From",
+    "latest": "Latest",
+    "download": "Download PDF",
+    "preparing": "Preparing PDF…",
+    "pdfFailed": "Couldn't make the PDF",
+    "editSource": "Edit source",
+    "editInValidation": "Edit in validation",
+    "tooLong": "Too long for this slide. Shorten it in the plan.",
+    "whatToSay": "What to say"
+  }
+}

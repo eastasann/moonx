@@ -9,38 +9,529 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as SignedInRouteImport } from './routes/_signedIn'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SignedInAccountRouteImport } from './routes/_signedIn/account'
+import { Route as SignedInNotificationsRouteImport } from './routes/_signedIn/notifications'
+import { Route as SignedInWelcomeRouteImport } from './routes/_signedIn/welcome'
 import { Route as DevComponentsRouteImport } from './routes/dev.components'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
+import { Route as SignedInAdminUsersRouteImport } from './routes/_signedIn/admin/users'
+import { Route as SignedInWWorkspaceIdRouteRouteImport } from './routes/_signedIn/w/$workspaceId/route'
+import { Route as SignedInAdminTemplatesIndexRouteImport } from './routes/_signedIn/admin/templates/index'
+import { Route as SignedInWWorkspaceIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/index'
+import { Route as SignedInWWorkspaceIdDecisionsRouteImport } from './routes/_signedIn/w/$workspaceId/decisions'
+import { Route as SignedInWWorkspaceIdSettingsRouteImport } from './routes/_signedIn/w/$workspaceId/settings'
+import { Route as SignedInAdminTemplatesVersionsVersionIdRouteImport } from './routes/_signedIn/admin/templates/versions.$versionId'
+import { Route as SignedInWWorkspaceIdAiExportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/export'
+import { Route as SignedInWWorkspaceIdAiImportRouteImport } from './routes/_signedIn/w/$workspaceId/ai/import'
+import { Route as SignedInWWorkspaceIdIdeasIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/index'
+import { Route as SignedInWWorkspaceIdSelfAnalysisIndexRouteImport } from './routes/_signedIn/w/$workspaceId/self-analysis/index'
+import { Route as SignedInWWorkspaceIdSelfAnalysisSectionKeyRouteImport } from './routes/_signedIn/w/$workspaceId/self-analysis/$sectionKey'
+import { Route as SignedInWWorkspaceIdTeamChar123UserIdChar125RouteImport } from './routes/_signedIn/w/$workspaceId/team.{-$userId}'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/index'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/competitors'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdCostsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/costs'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdDecideRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/decide'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdEconomicsRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/economics'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdResearchRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/research'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/questions.$sectionKey'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/index'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/items.$itemNo'
 
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignedInRoute = SignedInRouteImport.update({
+  id: '/_signedIn',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignedInAccountRoute = SignedInAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => SignedInRoute,
+} as any)
+const SignedInNotificationsRoute = SignedInNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => SignedInRoute,
+} as any)
+const SignedInWelcomeRoute = SignedInWelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => SignedInRoute,
+} as any)
 const DevComponentsRoute = DevComponentsRouteImport.update({
   id: '/dev/components',
   path: '/dev/components',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignedInAdminUsersRoute = SignedInAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => SignedInRoute,
+} as any)
+const SignedInWWorkspaceIdRouteRoute =
+  SignedInWWorkspaceIdRouteRouteImport.update({
+    id: '/w/$workspaceId',
+    path: '/w/$workspaceId',
+    getParentRoute: () => SignedInRoute,
+  } as any)
+const SignedInAdminTemplatesIndexRoute =
+  SignedInAdminTemplatesIndexRouteImport.update({
+    id: '/admin/templates/',
+    path: '/admin/templates/',
+    getParentRoute: () => SignedInRoute,
+  } as any)
+const SignedInWWorkspaceIdIndexRoute =
+  SignedInWWorkspaceIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdDecisionsRoute =
+  SignedInWWorkspaceIdDecisionsRouteImport.update({
+    id: '/decisions',
+    path: '/decisions',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdSettingsRoute =
+  SignedInWWorkspaceIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInAdminTemplatesVersionsVersionIdRoute =
+  SignedInAdminTemplatesVersionsVersionIdRouteImport.update({
+    id: '/admin/templates/versions/$versionId',
+    path: '/admin/templates/versions/$versionId',
+    getParentRoute: () => SignedInRoute,
+  } as any)
+const SignedInWWorkspaceIdAiExportRoute =
+  SignedInWWorkspaceIdAiExportRouteImport.update({
+    id: '/ai/export',
+    path: '/ai/export',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdAiImportRoute =
+  SignedInWWorkspaceIdAiImportRouteImport.update({
+    id: '/ai/import',
+    path: '/ai/import',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIndexRoute =
+  SignedInWWorkspaceIdIdeasIndexRouteImport.update({
+    id: '/ideas/',
+    path: '/ideas/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdSelfAnalysisIndexRoute =
+  SignedInWWorkspaceIdSelfAnalysisIndexRouteImport.update({
+    id: '/self-analysis/',
+    path: '/self-analysis/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute =
+  SignedInWWorkspaceIdSelfAnalysisSectionKeyRouteImport.update({
+    id: '/self-analysis/$sectionKey',
+    path: '/self-analysis/$sectionKey',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdTeamChar123UserIdChar125Route =
+  SignedInWWorkspaceIdTeamChar123UserIdChar125RouteImport.update({
+    id: '/team/{-$userId}',
+    path: '/team/{-$userId}',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdIndexRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdIndexRouteImport.update({
+    id: '/ideas/$ideaId/',
+    path: '/ideas/$ideaId/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRouteImport.update({
+    id: '/ideas/$ideaId/assumptions',
+    path: '/ideas/$ideaId/assumptions',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRouteImport.update({
+    id: '/ideas/$ideaId/competitors',
+    path: '/ideas/$ideaId/competitors',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdCostsRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdCostsRouteImport.update({
+    id: '/ideas/$ideaId/costs',
+    path: '/ideas/$ideaId/costs',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdDecideRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdDecideRouteImport.update({
+    id: '/ideas/$ideaId/decide',
+    path: '/ideas/$ideaId/decide',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdEconomicsRouteImport.update({
+    id: '/ideas/$ideaId/economics',
+    path: '/ideas/$ideaId/economics',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdResearchRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdResearchRouteImport.update({
+    id: '/ideas/$ideaId/research',
+    path: '/ideas/$ideaId/research',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport.update({
+    id: '/ideas/$ideaId/questions/$sectionKey',
+    path: '/ideas/$ideaId/questions/$sectionKey',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport.update({
+    id: '/ideas/$ideaId/plans/$planId/',
+    path: '/ideas/$ideaId/plans/$planId/',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRouteImport.update({
+    id: '/ideas/$ideaId/plans/$planId/execution',
+    path: '/ideas/$ideaId/plans/$planId/execution',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRouteImport.update({
+    id: '/ideas/$ideaId/plans/$planId/pitch',
+    path: '/ideas/$ideaId/plans/$planId/pitch',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRouteImport.update({
+    id: '/ideas/$ideaId/plans/$planId/items/$itemNo',
+    path: '/ideas/$ideaId/plans/$planId/items/$itemNo',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/account': typeof SignedInAccountRoute
+  '/notifications': typeof SignedInNotificationsRoute
+  '/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
+  '/invite/$token': typeof InviteTokenRoute
+  '/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
+  '/admin/users': typeof SignedInAdminUsersRoute
+  '/w/$workspaceId/decisions': typeof SignedInWWorkspaceIdDecisionsRoute
+  '/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
+  '/admin/templates/': typeof SignedInAdminTemplatesIndexRoute
+  '/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
+  '/admin/templates/versions/$versionId': typeof SignedInAdminTemplatesVersionsVersionIdRoute
+  '/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
+  '/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
+  '/w/$workspaceId/self-analysis/$sectionKey': typeof SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute
+  '/w/$workspaceId/team/{-$userId}': typeof SignedInWWorkspaceIdTeamChar123UserIdChar125Route
+  '/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/self-analysis/': typeof SignedInWWorkspaceIdSelfAnalysisIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
+  '/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
+  '/w/$workspaceId/ideas/$ideaId/costs': typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
+  '/w/$workspaceId/ideas/$ideaId/decide': typeof SignedInWWorkspaceIdIdeasIdeaIdDecideRoute
+  '/w/$workspaceId/ideas/$ideaId/economics': typeof SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute
+  '/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
+  '/w/$workspaceId/ideas/$ideaId/': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/account': typeof SignedInAccountRoute
+  '/notifications': typeof SignedInNotificationsRoute
+  '/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
+  '/invite/$token': typeof InviteTokenRoute
+  '/admin/users': typeof SignedInAdminUsersRoute
+  '/w/$workspaceId/decisions': typeof SignedInWWorkspaceIdDecisionsRoute
+  '/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
+  '/admin/templates': typeof SignedInAdminTemplatesIndexRoute
+  '/w/$workspaceId': typeof SignedInWWorkspaceIdIndexRoute
+  '/admin/templates/versions/$versionId': typeof SignedInAdminTemplatesVersionsVersionIdRoute
+  '/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
+  '/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
+  '/w/$workspaceId/self-analysis/$sectionKey': typeof SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute
+  '/w/$workspaceId/team/{-$userId}': typeof SignedInWWorkspaceIdTeamChar123UserIdChar125Route
+  '/w/$workspaceId/ideas': typeof SignedInWWorkspaceIdIdeasIndexRoute
+  '/w/$workspaceId/self-analysis': typeof SignedInWWorkspaceIdSelfAnalysisIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
+  '/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
+  '/w/$workspaceId/ideas/$ideaId/costs': typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
+  '/w/$workspaceId/ideas/$ideaId/decide': typeof SignedInWWorkspaceIdIdeasIdeaIdDecideRoute
+  '/w/$workspaceId/ideas/$ideaId/economics': typeof SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute
+  '/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
+  '/w/$workspaceId/ideas/$ideaId': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/_signedIn': typeof SignedInRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/_signedIn/account': typeof SignedInAccountRoute
+  '/_signedIn/notifications': typeof SignedInNotificationsRoute
+  '/_signedIn/welcome': typeof SignedInWelcomeRoute
   '/dev/components': typeof DevComponentsRoute
+  '/invite/$token': typeof InviteTokenRoute
+  '/_signedIn/w/$workspaceId': typeof SignedInWWorkspaceIdRouteRouteWithChildren
+  '/_signedIn/admin/users': typeof SignedInAdminUsersRoute
+  '/_signedIn/w/$workspaceId/decisions': typeof SignedInWWorkspaceIdDecisionsRoute
+  '/_signedIn/w/$workspaceId/settings': typeof SignedInWWorkspaceIdSettingsRoute
+  '/_signedIn/admin/templates/': typeof SignedInAdminTemplatesIndexRoute
+  '/_signedIn/w/$workspaceId/': typeof SignedInWWorkspaceIdIndexRoute
+  '/_signedIn/admin/templates/versions/$versionId': typeof SignedInAdminTemplatesVersionsVersionIdRoute
+  '/_signedIn/w/$workspaceId/ai/export': typeof SignedInWWorkspaceIdAiExportRoute
+  '/_signedIn/w/$workspaceId/ai/import': typeof SignedInWWorkspaceIdAiImportRoute
+  '/_signedIn/w/$workspaceId/self-analysis/$sectionKey': typeof SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute
+  '/_signedIn/w/$workspaceId/team/{-$userId}': typeof SignedInWWorkspaceIdTeamChar123UserIdChar125Route
+  '/_signedIn/w/$workspaceId/ideas/': typeof SignedInWWorkspaceIdIdeasIndexRoute
+  '/_signedIn/w/$workspaceId/self-analysis/': typeof SignedInWWorkspaceIdSelfAnalysisIndexRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions': typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/competitors': typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/costs': typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/decide': typeof SignedInWWorkspaceIdIdeasIdeaIdDecideRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/economics': typeof SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/dev/components'
+  fullPaths:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/reset-password'
+    | '/account'
+    | '/notifications'
+    | '/welcome'
+    | '/dev/components'
+    | '/invite/$token'
+    | '/w/$workspaceId'
+    | '/admin/users'
+    | '/w/$workspaceId/decisions'
+    | '/w/$workspaceId/settings'
+    | '/admin/templates/'
+    | '/w/$workspaceId/'
+    | '/admin/templates/versions/$versionId'
+    | '/w/$workspaceId/ai/export'
+    | '/w/$workspaceId/ai/import'
+    | '/w/$workspaceId/self-analysis/$sectionKey'
+    | '/w/$workspaceId/team/{-$userId}'
+    | '/w/$workspaceId/ideas/'
+    | '/w/$workspaceId/self-analysis/'
+    | '/w/$workspaceId/ideas/$ideaId/assumptions'
+    | '/w/$workspaceId/ideas/$ideaId/competitors'
+    | '/w/$workspaceId/ideas/$ideaId/costs'
+    | '/w/$workspaceId/ideas/$ideaId/decide'
+    | '/w/$workspaceId/ideas/$ideaId/economics'
+    | '/w/$workspaceId/ideas/$ideaId/research'
+    | '/w/$workspaceId/ideas/$ideaId/'
+    | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/dev/components'
-  id: '__root__' | '/dev/components'
+  to:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/reset-password'
+    | '/account'
+    | '/notifications'
+    | '/welcome'
+    | '/dev/components'
+    | '/invite/$token'
+    | '/admin/users'
+    | '/w/$workspaceId/decisions'
+    | '/w/$workspaceId/settings'
+    | '/admin/templates'
+    | '/w/$workspaceId'
+    | '/admin/templates/versions/$versionId'
+    | '/w/$workspaceId/ai/export'
+    | '/w/$workspaceId/ai/import'
+    | '/w/$workspaceId/self-analysis/$sectionKey'
+    | '/w/$workspaceId/team/{-$userId}'
+    | '/w/$workspaceId/ideas'
+    | '/w/$workspaceId/self-analysis'
+    | '/w/$workspaceId/ideas/$ideaId/assumptions'
+    | '/w/$workspaceId/ideas/$ideaId/competitors'
+    | '/w/$workspaceId/ideas/$ideaId/costs'
+    | '/w/$workspaceId/ideas/$ideaId/decide'
+    | '/w/$workspaceId/ideas/$ideaId/economics'
+    | '/w/$workspaceId/ideas/$ideaId/research'
+    | '/w/$workspaceId/ideas/$ideaId'
+    | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
+  id:
+    | '__root__'
+    | '/'
+    | '/_signedIn'
+    | '/forgot-password'
+    | '/login'
+    | '/reset-password'
+    | '/_signedIn/account'
+    | '/_signedIn/notifications'
+    | '/_signedIn/welcome'
+    | '/dev/components'
+    | '/invite/$token'
+    | '/_signedIn/w/$workspaceId'
+    | '/_signedIn/admin/users'
+    | '/_signedIn/w/$workspaceId/decisions'
+    | '/_signedIn/w/$workspaceId/settings'
+    | '/_signedIn/admin/templates/'
+    | '/_signedIn/w/$workspaceId/'
+    | '/_signedIn/admin/templates/versions/$versionId'
+    | '/_signedIn/w/$workspaceId/ai/export'
+    | '/_signedIn/w/$workspaceId/ai/import'
+    | '/_signedIn/w/$workspaceId/self-analysis/$sectionKey'
+    | '/_signedIn/w/$workspaceId/team/{-$userId}'
+    | '/_signedIn/w/$workspaceId/ideas/'
+    | '/_signedIn/w/$workspaceId/self-analysis/'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/competitors'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/costs'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/decide'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/economics'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/research'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
+  SignedInRoute: typeof SignedInRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
+  LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   DevComponentsRoute: typeof DevComponentsRoute
+  InviteTokenRoute: typeof InviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_signedIn': {
+      id: '/_signedIn'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof SignedInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_signedIn/account': {
+      id: '/_signedIn/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof SignedInAccountRouteImport
+      parentRoute: typeof SignedInRoute
+    }
+    '/_signedIn/notifications': {
+      id: '/_signedIn/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof SignedInNotificationsRouteImport
+      parentRoute: typeof SignedInRoute
+    }
+    '/_signedIn/welcome': {
+      id: '/_signedIn/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof SignedInWelcomeRouteImport
+      parentRoute: typeof SignedInRoute
+    }
     '/dev/components': {
       id: '/dev/components'
       path: '/dev/components'
@@ -48,11 +539,293 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevComponentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_signedIn/admin/users': {
+      id: '/_signedIn/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof SignedInAdminUsersRouteImport
+      parentRoute: typeof SignedInRoute
+    }
+    '/_signedIn/w/$workspaceId': {
+      id: '/_signedIn/w/$workspaceId'
+      path: '/w/$workspaceId'
+      fullPath: '/w/$workspaceId'
+      preLoaderRoute: typeof SignedInWWorkspaceIdRouteRouteImport
+      parentRoute: typeof SignedInRoute
+    }
+    '/_signedIn/admin/templates/': {
+      id: '/_signedIn/admin/templates/'
+      path: '/admin/templates'
+      fullPath: '/admin/templates/'
+      preLoaderRoute: typeof SignedInAdminTemplatesIndexRouteImport
+      parentRoute: typeof SignedInRoute
+    }
+    '/_signedIn/w/$workspaceId/': {
+      id: '/_signedIn/w/$workspaceId/'
+      path: '/'
+      fullPath: '/w/$workspaceId/'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIndexRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/decisions': {
+      id: '/_signedIn/w/$workspaceId/decisions'
+      path: '/decisions'
+      fullPath: '/w/$workspaceId/decisions'
+      preLoaderRoute: typeof SignedInWWorkspaceIdDecisionsRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/settings': {
+      id: '/_signedIn/w/$workspaceId/settings'
+      path: '/settings'
+      fullPath: '/w/$workspaceId/settings'
+      preLoaderRoute: typeof SignedInWWorkspaceIdSettingsRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/admin/templates/versions/$versionId': {
+      id: '/_signedIn/admin/templates/versions/$versionId'
+      path: '/admin/templates/versions/$versionId'
+      fullPath: '/admin/templates/versions/$versionId'
+      preLoaderRoute: typeof SignedInAdminTemplatesVersionsVersionIdRouteImport
+      parentRoute: typeof SignedInRoute
+    }
+    '/_signedIn/w/$workspaceId/ai/export': {
+      id: '/_signedIn/w/$workspaceId/ai/export'
+      path: '/ai/export'
+      fullPath: '/w/$workspaceId/ai/export'
+      preLoaderRoute: typeof SignedInWWorkspaceIdAiExportRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ai/import': {
+      id: '/_signedIn/w/$workspaceId/ai/import'
+      path: '/ai/import'
+      fullPath: '/w/$workspaceId/ai/import'
+      preLoaderRoute: typeof SignedInWWorkspaceIdAiImportRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/': {
+      id: '/_signedIn/w/$workspaceId/ideas/'
+      path: '/ideas'
+      fullPath: '/w/$workspaceId/ideas/'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIndexRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/self-analysis/': {
+      id: '/_signedIn/w/$workspaceId/self-analysis/'
+      path: '/self-analysis'
+      fullPath: '/w/$workspaceId/self-analysis/'
+      preLoaderRoute: typeof SignedInWWorkspaceIdSelfAnalysisIndexRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/self-analysis/$sectionKey': {
+      id: '/_signedIn/w/$workspaceId/self-analysis/$sectionKey'
+      path: '/self-analysis/$sectionKey'
+      fullPath: '/w/$workspaceId/self-analysis/$sectionKey'
+      preLoaderRoute: typeof SignedInWWorkspaceIdSelfAnalysisSectionKeyRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/team/{-$userId}': {
+      id: '/_signedIn/w/$workspaceId/team/{-$userId}'
+      path: '/team/{-$userId}'
+      fullPath: '/w/$workspaceId/team/{-$userId}'
+      preLoaderRoute: typeof SignedInWWorkspaceIdTeamChar123UserIdChar125RouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/'
+      path: '/ideas/$ideaId'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/assumptions'
+      path: '/ideas/$ideaId/assumptions'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/assumptions'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/competitors': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/competitors'
+      path: '/ideas/$ideaId/competitors'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/competitors'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/costs': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/costs'
+      path: '/ideas/$ideaId/costs'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/costs'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/decide': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/decide'
+      path: '/ideas/$ideaId/decide'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/decide'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdDecideRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/economics': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/economics'
+      path: '/ideas/$ideaId/economics'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/economics'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdEconomicsRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/research': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/research'
+      path: '/ideas/$ideaId/research'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/research'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+      path: '/ideas/$ideaId/questions/$sectionKey'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/'
+      path: '/ideas/$ideaId/plans/$planId'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId/'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+      path: '/ideas/$ideaId/plans/$planId/execution'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+      path: '/ideas/$ideaId/plans/$planId/pitch'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
+      path: '/ideas/$ideaId/plans/$planId/items/$itemNo'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
   }
 }
 
+interface SignedInWWorkspaceIdRouteRouteChildren {
+  SignedInWWorkspaceIdDecisionsRoute: typeof SignedInWWorkspaceIdDecisionsRoute
+  SignedInWWorkspaceIdSettingsRoute: typeof SignedInWWorkspaceIdSettingsRoute
+  SignedInWWorkspaceIdIndexRoute: typeof SignedInWWorkspaceIdIndexRoute
+  SignedInWWorkspaceIdAiExportRoute: typeof SignedInWWorkspaceIdAiExportRoute
+  SignedInWWorkspaceIdAiImportRoute: typeof SignedInWWorkspaceIdAiImportRoute
+  SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute: typeof SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute
+  SignedInWWorkspaceIdTeamChar123UserIdChar125Route: typeof SignedInWWorkspaceIdTeamChar123UserIdChar125Route
+  SignedInWWorkspaceIdIdeasIndexRoute: typeof SignedInWWorkspaceIdIdeasIndexRoute
+  SignedInWWorkspaceIdSelfAnalysisIndexRoute: typeof SignedInWWorkspaceIdSelfAnalysisIndexRoute
+  SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute
+  SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute
+  SignedInWWorkspaceIdIdeasIdeaIdCostsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdCostsRoute
+  SignedInWWorkspaceIdIdeasIdeaIdDecideRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdDecideRoute
+  SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute
+  SignedInWWorkspaceIdIdeasIdeaIdResearchRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
+  SignedInWWorkspaceIdIdeasIdeaIdIndexRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
+  SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
+}
+
+const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChildren =
+  {
+    SignedInWWorkspaceIdDecisionsRoute: SignedInWWorkspaceIdDecisionsRoute,
+    SignedInWWorkspaceIdSettingsRoute: SignedInWWorkspaceIdSettingsRoute,
+    SignedInWWorkspaceIdIndexRoute: SignedInWWorkspaceIdIndexRoute,
+    SignedInWWorkspaceIdAiExportRoute: SignedInWWorkspaceIdAiExportRoute,
+    SignedInWWorkspaceIdAiImportRoute: SignedInWWorkspaceIdAiImportRoute,
+    SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute:
+      SignedInWWorkspaceIdSelfAnalysisSectionKeyRoute,
+    SignedInWWorkspaceIdTeamChar123UserIdChar125Route:
+      SignedInWWorkspaceIdTeamChar123UserIdChar125Route,
+    SignedInWWorkspaceIdIdeasIndexRoute: SignedInWWorkspaceIdIdeasIndexRoute,
+    SignedInWWorkspaceIdSelfAnalysisIndexRoute:
+      SignedInWWorkspaceIdSelfAnalysisIndexRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdAssumptionsRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdCompetitorsRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdCostsRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdCostsRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdDecideRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdDecideRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdEconomicsRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdResearchRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdResearchRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdIndexRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdIndexRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdPitchRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute,
+  }
+
+const SignedInWWorkspaceIdRouteRouteWithChildren =
+  SignedInWWorkspaceIdRouteRoute._addFileChildren(
+    SignedInWWorkspaceIdRouteRouteChildren,
+  )
+
+interface SignedInRouteChildren {
+  SignedInAccountRoute: typeof SignedInAccountRoute
+  SignedInNotificationsRoute: typeof SignedInNotificationsRoute
+  SignedInWelcomeRoute: typeof SignedInWelcomeRoute
+  SignedInWWorkspaceIdRouteRoute: typeof SignedInWWorkspaceIdRouteRouteWithChildren
+  SignedInAdminUsersRoute: typeof SignedInAdminUsersRoute
+  SignedInAdminTemplatesIndexRoute: typeof SignedInAdminTemplatesIndexRoute
+  SignedInAdminTemplatesVersionsVersionIdRoute: typeof SignedInAdminTemplatesVersionsVersionIdRoute
+}
+
+const SignedInRouteChildren: SignedInRouteChildren = {
+  SignedInAccountRoute: SignedInAccountRoute,
+  SignedInNotificationsRoute: SignedInNotificationsRoute,
+  SignedInWelcomeRoute: SignedInWelcomeRoute,
+  SignedInWWorkspaceIdRouteRoute: SignedInWWorkspaceIdRouteRouteWithChildren,
+  SignedInAdminUsersRoute: SignedInAdminUsersRoute,
+  SignedInAdminTemplatesIndexRoute: SignedInAdminTemplatesIndexRoute,
+  SignedInAdminTemplatesVersionsVersionIdRoute:
+    SignedInAdminTemplatesVersionsVersionIdRoute,
+}
+
+const SignedInRouteWithChildren = SignedInRoute._addFileChildren(
+  SignedInRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
+  SignedInRoute: SignedInRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
+  LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   DevComponentsRoute: DevComponentsRoute,
+  InviteTokenRoute: InviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

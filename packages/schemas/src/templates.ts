@@ -136,6 +136,8 @@ export const templateVersionDetailSchema = z.object({
   versionNumber: z.int().positive(),
   status: templateVersionStatusSchema,
   aiPrompt: z.string(),
+  /** The template's name: one for all its versions (AD3 PATCH changes it). */
+  name: z.string(),
   sections: z.array(
     templateSectionSchema.omit({ questions: true }).extend({
       id: uuidSchema,
@@ -148,6 +150,11 @@ export const templateVersionDetailSchema = z.object({
           copyFrom: z.array(z.string()).nullable(),
           /** Plans: what the sub-item shows beside it (SDD 6.3 `reference`). */
           reference: z.array(planReferenceSpecSchema).nullable(),
+          /**
+           * A published version of the template has this question ID: it names the same
+           * question from then on and cannot change (design-spec 6.6, AD4 PATCH).
+           */
+          isKeyPublished: z.boolean(),
         }),
       ),
     }),
@@ -161,6 +168,11 @@ export const templateVersionDetailSchema = z.object({
       sortOrder: z.int(),
     }),
   ),
+  /**
+   * Plans only (empty for the others): the starting cost rows of the published validation
+   * templates, whose `cost_row:*` a number sub-item may show (AD6 `unknown_metric_key`).
+   */
+  costRows: z.array(z.object({ key: z.string(), name: z.string() })),
   checkRules: z.array(
     z.object({
       checkKey: checkKeySchema,
@@ -181,11 +193,13 @@ export const templateVersionDetailSchema = z.object({
 export type TemplateVersionDetail = z.infer<typeof templateVersionDetailSchema>;
 
 /**
- * The body of AD3 PATCH. Only a self-analysis template has an AI prompt: the API refuses
- * any other text for the other kinds (2026-10-02 user decision).
+ * The body of AD3 PATCH: the fields to change. Only a self-analysis template has an AI
+ * prompt: the API refuses any other text for the other kinds (2026-10-02 user decision).
+ * The name is the template's, shared by its versions.
  */
 export const templateVersionUpdateSchema = z.object({
-  aiPrompt: plainText(longText),
+  aiPrompt: plainText(longText).optional(),
+  name: requiredText(shortText).optional(),
 });
 
 const sectionFields = {
@@ -228,7 +242,7 @@ const questionFields = {
   options: templateFileOptionsSchema.nullable().optional(),
   /** Example: `{ "V.02.OCEAN": ["Red", "Mixed"] }`. */
   displayCondition: z
-    .record(z.string(), z.array(requiredText(shortText)))
+    .record(z.string(), z.array(requiredText(shortText)).min(1))
     .nullable()
     .optional(),
   hasFau: z.boolean().optional(),
@@ -337,6 +351,7 @@ export const templateCheckSchema = z.object({
         "options_mismatch",
         "unknown_condition_key",
         "copy_from_mismatch",
+        "unknown_metric_key",
         "pitch_deck_overflow",
       ]),
       message: z.string(),

@@ -1,0 +1,107 @@
+{
+  "name": "moonx",
+  "documentTitle": "{{page}} · moonx",
+  "nav": {
+    "dashboard": "Dashboard",
+    "ideas": "Ideas",
+    "selfAnalysis": "Self Analysis",
+    "notifications": "Notifications",
+    "decisionLog": "Decision Log",
+    "workspaceSettings": "Workspace Settings",
+    "account": "Account",
+    "admin": "Admin",
+    "switchWorkspace": "Switch workspace",
+    "logOut": "Log out"
+  },
+  "separator": " · ",
+  "userBadge": {
+    "former_member": "(former member)",
+    "suspended": "(suspended)"
+  },
+  "state": {
+    "loading": "Loading",
+    "slow": "Taking longer than usual",
+    "loadError": "Couldn't load this page",
+    "noAccess": "You don't have access to this",
+    "notFound": "Not found. Check the link.",
+    "unexpected": "Something went wrong",
+    "ref": "Ref: {{ref}}",
+    "retry": "Retry",
+    "close": "Close",
+    "couldNotSave": "Couldn't save",
+    "toDashboard": "Go to Dashboard",
+    "toHome": "Go to Home",
+    "offline": "You're offline. Changes can't be saved until you reconnect.",
+    "offlinePage": "You're offline. Connect to the internet to open this page.",
+    "unexpectedRef": "Something went wrong. Ref: {{ref}}"
+  },
+  "switchWorkspace": {
+    "title": "Switch workspace",
+    "workspaces": "Workspaces",
+    "current": "Current",
+    "personal": "Personal",
+    "newWorkspace": "New workspace"
+  },
+  "newWorkspace": {
+    "title": "New workspace",
+    "name": "Name",
+    "currency": "Currency",
+    "create": "Create",
+    "cancel": "Cancel"
+  },
+  "save": {
+    "reason": {
+      "archived": "It's archived",
+      "noAccess": "You don't have access to this",
+      "gone": "It no longer exists",
+      "format": "Check the format",
+      "published": "It's published"
+    },
+    "conflict": {
+      "title": "{{name}} updated this {{noun}} {{when}}",
+      "titleSomeone": "Someone updated this {{noun}} {{when}}",
+      "body": "Load theirs to see their version: what you typed is then dropped. Or overwrite it with yours: theirs stays in the history.",
+      "copy": "Copy my input",
+      "copied": "Copied",
+      "copyFailed": "Couldn't copy. Select your input below to copy it.",
+      "yourInput": "Your input",
+      "loadTheirs": "Load theirs",
+      "overwrite": "Overwrite with mine"
+    }
+  },
+  "signInAgain": {
+    "title": "Sign in again",
+    "lead": "Your session ended. Sign in to save your changes.",
+    "googleLead": "Your session ended. You sign in with Google, so sign in on the login page.",
+    "submit": "Sign in",
+    "loginPage": "Sign in on the login page",
+    "wrongPassword": "Password is incorrect"
+  },
+  "unsaved": {
+    "message": "Unsaved changes on this page will be lost.",
+    "logOutTitle": "Log out?",
+    "leaveTitle": "Leave this page?",
+    "cancel": "Cancel"
+  },
+  "templateUpdate": {
+    "bannerTitle": "A newer template is available.",
+    "bannerBody": "Your answers stay on v{{version}} until you update.",
+    "action": "Update template",
+    "title": "Update template",
+    "lead": "Move from v{{from}} to v{{to}} of the template.",
+    "carried": "Answers carried over",
+    "added": "New questions",
+    "addedCostRows": "Cost rows added",
+    "none": "None",
+    "hidden": "Questions not in v{{version}}",
+    "hiddenNote": "Answers to these questions stay saved but no longer show.",
+    "hiddenNone": "Every question carries over to v{{version}}.",
+    "answered": "Answered",
+    "notAnswered": "No answer",
+    "cancel": "Cancel",
+    "close": "Close",
+    "latest": "You're already on the latest template",
+    "changed": "The template changed since this opened. Check what moves now, then update again.",
+    "updated": "Template updated to v{{version}}"
+  }
+}

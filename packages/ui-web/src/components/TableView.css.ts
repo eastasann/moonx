@@ -12,6 +12,7 @@ import {
   atLeastTarget,
   focusRing,
   hoverTransition,
+  tabletUp,
   typography,
 } from "../styles/helpers";
 
@@ -431,4 +432,34 @@ export const footerTotal = style({
   marginInlineStart: "auto",
   color: vars.color.text.secondary,
   textAlign: "end",
+});
+
+/**
+ * In pattern D's list pane (28's lists, design-spec 4.5): rows to the pane's edges, the
+ * first and last cells inset by the pane's padding as ListView's rows are (s06-ideas.html
+ * .ideas a). On a phone, where a row opens over the list, a selected line is not marked.
+ */
+export const inPane = style({});
+
+globalStyle(`${inPane} :is(th, td):first-child`, {
+  "@media": {
+    [tabletUp]: {
+      paddingInlineStart: vars.layout.listDetail.panePaddingX,
+    },
+  },
+});
+
+globalStyle(`${inPane} :is(th, td):last-child`, {
+  "@media": {
+    [tabletUp]: { paddingInlineEnd: vars.layout.listDetail.panePaddingX },
+  },
+});
+
+globalStyle(`${inPane} ${line.classNames.base}`, {
+  paddingInline: vars.layout.listDetail.panePaddingXMobile,
+});
+
+globalStyle(`${inPane} ${line.classNames.base}[data-selected]`, {
+  background: "none",
+  boxShadow: "none",
 });

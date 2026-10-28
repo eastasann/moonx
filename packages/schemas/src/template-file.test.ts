@@ -124,6 +124,10 @@ describe("templateFileSchema", () => {
     expect(at({ "V.02.OCEAN": [" "] })).toEqual([
       "sections.0.questions.0.displayCondition.V.02.OCEAN.0",
     ]);
+    // With no answer to show on, the question would never show.
+    expect(at({ "V.02.OCEAN": [] })).toEqual([
+      "sections.0.questions.0.displayCondition.V.02.OCEAN",
+    ]);
   });
 
   test("keeps optional texts as typed and turns blank ones into null", () => {
@@ -221,7 +225,7 @@ describe("templateFileSchema", () => {
     ]);
   });
 
-  test("refuses repeated choices and column keys", () => {
+  test("refuses repeated choices, column keys and key numbers", () => {
     expect(
       issues(
         file("validation", [
@@ -251,6 +255,21 @@ describe("templateFileSchema", () => {
       ),
     ).toEqual([
       ["sections.0.questions.0.options.columns.1.key", "custom", "unique"],
+    ]);
+    expect(
+      issues(
+        file("business_plan", [
+          question("P.01.1", {
+            answerType: "linked_metric",
+            options: {
+              kind: "linked_metric",
+              metricKeys: ["selling_price", "selling_price"],
+            },
+          }),
+        ]),
+      ),
+    ).toEqual([
+      ["sections.0.questions.0.options.metricKeys.1", "custom", "unique"],
     ]);
   });
 

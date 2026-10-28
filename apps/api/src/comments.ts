@@ -29,9 +29,11 @@ import { z } from "zod";
 import type { AccessPlugin, ScopeLocator } from "./access";
 import { ApiError } from "./errors";
 import { historySectionKey } from "./history";
+import { loadItemLabels } from "./labels";
 import { lockMembers } from "./membership";
 import { notifyComment } from "./notifications";
 import { recordChange, type Scope, type ScopeRef, writeInScope } from "./scope";
+import { inSections } from "./screen-sections";
 import {
   checkCommentKey,
   locateTarget,
@@ -146,7 +148,10 @@ async function commentViews(
 const oldestFirst = (a: CommentRow, b: CommentRow) =>
   a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
 
-/** The threads of `rows`, oldest first, and how many are not resolved (C1). */
+/**
+ * The threads of `rows`, oldest first, each with its item's name (HistoryEntry `label`),
+ * and how many are not resolved (C1).
+ */
 async function threadsOf(
   db: Executor,
   rows: readonly CommentRow[],
@@ -166,10 +171,15 @@ async function threadsOf(
         .filter((row) => row.parentId === root.id)
         .toSorted(oldestFirst),
     }));
+  const labelOf = await loadItemLabels(
+    db,
+    threads.map(({ root }) => view(root).target),
+  );
   return {
     threads: threads.map(({ root, replies }) => ({
       root: view(root),
       replies: replies.map(view),
+      label: labelOf(view(root).target),
     })),
     unresolvedCount: threads.filter(({ root }) => root.resolvedAt === null)
       .length,
@@ -197,7 +207,7 @@ const onScreen = (
     eq(comments.containerId, id),
     sectionKeys === undefined
       ? undefined
-      : inArray(comments.sectionKey, [...sectionKeys]),
+      : inSections(comments, { type, id }, sectionKeys),
   ) as SQL;
 
 /**
@@ -528,7 +538,7 @@ export function commentRoutes({ access, db, now }: CommentRoutesOptions) {
         detail: {
           summary: "C1 The comments on an item or a screen (PNL-1)",
           description:
-            "One item (targetType, targetId, targetKey), or one screen (containerType, containerId, sectionKeys) with, inside an idea, the comments on the idea. Threads oldest first, deleted comments as deleted without their body. Comments on deleted rows and on questions a migration hid are not returned. A self-analysis's owner reads the comments of every workspace it is shared with now; its Owners and Members read those of workspaceId (Viewers 403 FORBIDDEN, 403 NOT_SHARED).",
+            "One item (targetType, targetId, targetKey), or one screen (containerType, containerId, sectionKeys; on a plan, execution:{type} is its execution items of that type) with, inside an idea, the comments on the idea. Threads oldest first, deleted comments as deleted without their body. Comments on deleted rows and on questions a migration hid are not returned. A self-analysis's owner reads the comments of every workspace it is shared with now; its Owners and Members read those of workspaceId (Viewers 403 FORBIDDEN, 403 NOT_SHARED).",
         },
       },
     )

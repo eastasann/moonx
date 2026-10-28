@@ -6,6 +6,7 @@
   },
   "overdue": "overdue {{count}}d",
   "months": "{{value}} months",
+  "currency": "{{code}} · {{name}}",
   "wait": {
     "minute_one": "{{count}} minute",
     "minute_other": "{{count}} minutes",

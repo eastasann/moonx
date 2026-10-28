@@ -68,6 +68,20 @@ describe("Text", () => {
       screen.getByText("Error").className,
     );
   });
+
+  test("maxLines keeps an excerpt to its first lines, the whole text still there", () => {
+    render(
+      <>
+        <Text>Whole</Text>
+        <Text maxLines={2}>Two lines of a long reason</Text>
+        <Text maxLines={1}>One line</Text>
+      </>,
+    );
+    const two = screen.getByText("Two lines of a long reason");
+    expect(two.className).not.toBe(screen.getByText("Whole").className);
+    expect(two.className).not.toBe(screen.getByText("One line").className);
+    expect(two.textContent).toBe("Two lines of a long reason");
+  });
 });
 
 describe("Divider", () => {

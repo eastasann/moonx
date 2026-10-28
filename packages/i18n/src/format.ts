@@ -165,20 +165,48 @@ export const formatNumberAffixes = (
   };
 };
 
-/** The payback period: one decimal, keeping ".0" ("9.2 months", "9.2+ months"). */
-export const formatMonths = (months: number, options: BoundOption = {}) =>
-  i18n.t("format:months", {
-    value: withBound(
-      signed(months, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-      options.bound,
-    ),
-  });
+/**
+ * The payback period: one decimal, keeping ".0" ("9.2 months", "9.2+ months"). Without
+ * the unit ("9.2+") where a key number sets its unit apart (13's MetricTile `unit`).
+ */
+export const formatMonths = (
+  months: number,
+  options: BoundOption & { withUnit?: boolean } = {},
+) => {
+  const value = withBound(
+    signed(months, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    options.bound,
+  );
+  return options.withUnit === false
+    ? value
+    : i18n.t("format:months", { value });
+};
 
 /** A badge count: above 99 it shows "99+". */
 export const formatCount = (count: number) =>
   count > 99
     ? `${numberFormat({}).format(99)}+`
     : numberFormat({}).format(count);
+
+/**
+ * A currency as a picker offers it (s09-settings.html): its code and name, "PHP ·
+ * Philippine Peso". The code alone where the runtime has no name for it (codes newer
+ * than its data, such as XCG).
+ */
+export const formatCurrencyOption = (code: string) => {
+  const name = new Intl.DisplayNames(LOCALE, {
+    type: "currency",
+    fallback: "none",
+  }).of(code);
+  return name === undefined ? code : i18n.t("format:currency", { code, name });
+};
+
+/**
+ * Names in a running list, "Startup & monthly costs, Permits": joined without "and",
+ * as a list of labels.
+ */
+export const formatList = (items: readonly string[]) =>
+  new Intl.ListFormat(LOCALE, { style: "short", type: "unit" }).format(items);
 
 /**
  * How far a ProgressCircle or ProgressBar has got, read out as a whole percent ("40%").

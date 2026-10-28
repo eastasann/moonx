@@ -280,6 +280,7 @@ async function entryViews(
     if (createdBy === undefined) throw new Error(`No user ${row.createdById}`);
     return {
       id: row.id,
+      validationId,
       ...researchLogContent(row),
       ...versionedView(row, users),
       createdBy,

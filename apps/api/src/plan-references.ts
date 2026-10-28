@@ -11,6 +11,9 @@ import {
   selfAnalyses,
   selfAnalysisAnswers,
   selfAnalysisShares,
+  templateCostDefaults,
+  templates,
+  templateVersions,
   users,
 } from "@moonx/db";
 import {
@@ -32,7 +35,16 @@ import type {
   PlanReferenceSpec,
   Role,
 } from "@moonx/schemas";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from "drizzle-orm";
 import {
   decisionSummaries,
   type IdeaContext,
@@ -46,6 +58,79 @@ import { loadUserRefs } from "./user-refs";
 // draft copies into §21 and §22.
 
 type Executor = Database | DatabaseTransaction;
+
+type CostRowReference = Extract<
+  PlanReference,
+  { kind: "cost_rows" }
+>["data"][number];
+
+/**
+ * The name and category the validation template gives each of `keys`, from its newest
+ * published version that has the key: what a cost row the validation does not have is
+ * called on 21 (design-spec 6.0.7「Not in validation」).
+ */
+async function costDefaultsOf(db: Executor, keys: readonly string[]) {
+  if (keys.length === 0) return new Map<string, never>();
+  const rows = await db
+    .select({
+      key: templateCostDefaults.key,
+      name: templateCostDefaults.name,
+      category: templateCostDefaults.category,
+    })
+    .from(templateCostDefaults)
+    .innerJoin(
+      templateVersions,
+      eq(templateVersions.id, templateCostDefaults.templateVersionId),
+    )
+    .innerJoin(templates, eq(templates.id, templateVersions.templateId))
+    .where(
+      and(
+        eq(templates.kind, "validation"),
+        isNotNull(templateVersions.publishedAt),
+        inArray(templateCostDefaults.key, [...keys]),
+      ),
+    )
+    .orderBy(desc(templateVersions.versionNumber));
+  const byKey = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) if (!byKey.has(row.key)) byKey.set(row.key, row);
+  return byKey;
+}
+
+/**
+ * The names of the cost rows `keys` (template keys) name, for 21's number sub-items: the
+ * validation's row's, else, for a row it does not have, the template's as the cost_rows
+ * reference gives it (design-spec 6.0.7「Not in validation」); null where neither has one.
+ */
+export async function loadCostRowNames(
+  db: Executor,
+  validationId: string,
+  keys: readonly string[],
+): Promise<Map<string, string | null>> {
+  if (keys.length === 0) return new Map();
+  const rows = await db
+    .select({ key: costItems.templateKey, name: costItems.name })
+    .from(costItems)
+    .where(
+      and(
+        eq(costItems.validationId, validationId),
+        isNull(costItems.deletedAt),
+        inArray(costItems.templateKey, [...keys]),
+      ),
+    )
+    .orderBy(asc(costItems.sortOrder));
+  const names = new Map<string, string | null>();
+  for (const row of rows) {
+    if (row.key !== null && !names.has(row.key)) names.set(row.key, row.name);
+  }
+  const defaults = await costDefaultsOf(
+    db,
+    keys.filter((key) => !names.has(key)),
+  );
+  for (const key of keys) {
+    if (!names.has(key)) names.set(key, defaults.get(key)?.name ?? null);
+  }
+  return names;
+}
 
 /** An assumption of 16 with its evidence, as §21 copies and shows it. */
 export interface ListedAssumption extends DraftAssumption {
@@ -272,23 +357,43 @@ async function referenceOf(
           ),
         );
       const metrics = context.evaluation.keyMetrics;
+      const missing = spec.keys.filter(
+        (key) => !rows.some((row) => row.templateKey === key),
+      );
+      const defaults = await costDefaultsOf(db, missing);
       return {
         kind: "cost_rows",
         title: i18n.t("common:planReference.cost_rows"),
-        data: spec.keys.flatMap((key) =>
-          rows
-            .filter((row) => row.templateKey === key)
-            .map((row) => ({
-              id: row.id,
-              category: row.category,
-              templateKey: key,
-              name: row.name,
-              inputMode: row.inputMode,
-              amount: row.amount,
-              percent: row.percent,
-              value: keyMetricOf(metrics, `cost_row:${key}`),
-            })),
-        ),
+        data: spec.keys.flatMap((key): CostRowReference[] => {
+          const value = keyMetricOf(metrics, `cost_row:${key}`);
+          const found = rows.filter((row) => row.templateKey === key);
+          if (found.length === 0) {
+            // Not in validation (design-spec 6.0.7): deleted, or a key its template lacks.
+            const preset = defaults.get(key);
+            return [
+              {
+                id: null,
+                category: preset?.category ?? null,
+                templateKey: key,
+                name: preset?.name ?? null,
+                inputMode: null,
+                amount: null,
+                percent: null,
+                value,
+              },
+            ];
+          }
+          return found.map((row) => ({
+            id: row.id,
+            category: row.category,
+            templateKey: key,
+            name: row.name,
+            inputMode: row.inputMode,
+            amount: row.amount,
+            percent: row.percent,
+            value,
+          }));
+        }),
         link: { screen: 17, ...base },
       };
     }

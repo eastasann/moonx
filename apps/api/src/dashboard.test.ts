@@ -13,10 +13,11 @@ import {
   dashboardDueSoonSchema,
   dashboardIdeasSchema,
   dashboardSelfAnalysesSchema,
+  evidenceResultSchema,
   ideaDetailSchema,
   ideaDuplicateResultSchema,
 } from "@moonx/schemas";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { buildTestApp, connectTestDatabase, uniqueIp } from "./test-app";
 import { apiRequest, signIn, testFixtures } from "./test-fixtures";
 
@@ -274,6 +275,31 @@ describe("D4 GET .../dashboard/activity", () => {
     await saveWho(team, team.ownerCookie, "HR and admin", 2);
     minute(20);
     await saveWho(team, team.memberCookie, "Admins", 3);
+    // The owner's answer added at 1 and their saves at 4 and 13 are one history row,
+    // the addition, from 1 to 13 (ADR-020).
+    const who = await db
+      .select({
+        changedAt: changeHistory.changedAt,
+        firstChangedAt: changeHistory.firstChangedAt,
+      })
+      .from(changeHistory)
+      .where(
+        and(
+          eq(changeHistory.targetId, team.idea.validationId),
+          eq(changeHistory.targetKey, "V.01.WHO"),
+        ),
+      )
+      .orderBy(changeHistory.changedAt);
+    expect(
+      who
+        .filter((row) => row.changedAt.getTime() < start + 20 * MINUTE)
+        .map((row) => [
+          (row.changedAt.getTime() - start) / MINUTE,
+          row.firstChangedAt === null
+            ? null
+            : (row.firstChangedAt.getTime() - start) / MINUTE,
+        ]),
+    ).toEqual([[13, 1]]);
     const [rival] = await db
       .insert(competitors)
       .values({
@@ -370,7 +396,8 @@ describe("D4 GET .../dashboard/activity", () => {
       ["decision", team.member.id, 30, "hold", "Piaya boxes"],
       ["comment", team.viewer.id, 25, "01 WHO", "Piaya boxes"],
       ["change", team.member.id, 20, "01 WHO", "Piaya boxes"],
-      // 13 is 9 minutes after 4, which is 3 after 1: one run, shown at its last save.
+      // The answer's addition with the saves at 4 and 13 (ADR-020): one move, shown at
+      // its last save.
       ["change", team.owner.id, 13, "01 WHO", "Piaya boxes"],
       ["change", team.owner.id, 0, "Piaya boxes", "Piaya boxes"],
     ]);
@@ -406,6 +433,171 @@ describe("D4 GET .../dashboard/activity", () => {
       questionKey: "V.01.WHO",
     });
     expect(created?.plan).toBeNull();
+  });
+
+  test("a row of merged saves joins the run before it from its first change", async () => {
+    clock = Date.UTC(2026, 9, 3, 0, 0);
+    const start = clock;
+    const team = await teamWithIdea();
+    const minute = (n: number) => {
+      clock = start + n * MINUTE;
+    };
+    minute(1);
+    await saveWho(team, team.ownerCookie, "HR", 0);
+    minute(12);
+    await saveWho(team, team.memberCookie, "Admins", 1);
+    const [added] = await db
+      .select({ id: changeHistory.id })
+      .from(changeHistory)
+      .where(
+        and(
+          eq(changeHistory.targetId, team.idea.validationId),
+          eq(changeHistory.targetKey, "V.01.WHO"),
+          eq(changeHistory.action, "create"),
+        ),
+      );
+    // The owner puts their answer back at 13 (a revert, which nothing merges into),
+    // then types on at 15, 18 and 26: one history row from 15 to 26 (ADR-020).
+    minute(13);
+    const reverted = await app.handle(
+      apiRequest("POST", `/api/v1/history/${added?.id}/revert`, {
+        cookie: team.ownerCookie,
+      }),
+    );
+    expect(reverted.status).toBe(200);
+    minute(15);
+    await saveWho(team, team.ownerCookie, "HR staff", 3);
+    minute(18);
+    await saveWho(team, team.ownerCookie, "HR officers", 4);
+    minute(26);
+    await saveWho(team, team.ownerCookie, "HR officers in Bacolod", 5);
+
+    const body = dashboardActivitySchema.parse(
+      await dashboard(team, "activity", team.viewerCookie),
+    );
+    expect(
+      body.items.map((item) => [
+        item.actor.id,
+        (Date.parse(item.at) - start) / MINUTE,
+        item.summary,
+      ]),
+    ).toEqual([
+      // 13 minutes before the row's last save, but 2 before its first: one run.
+      [team.owner.id, 26, "01 WHO"],
+      [team.member.id, 12, "01 WHO"],
+      [team.owner.id, 1, "01 WHO"],
+      [team.owner.id, 0, "Piaya boxes"],
+    ]);
+  });
+
+  test("a row a request added leaves that request's move once its adder's edits join it", async () => {
+    clock = Date.UTC(2026, 9, 5, 0, 0);
+    const start = clock;
+    const team = await teamWithIdea();
+    const minute = (n: number) => {
+      clock = start + n * MINUTE;
+    };
+    minute(11);
+    await saveWho(team, team.ownerCookie, "HR", 0);
+    // One request (V4) adds a research log and makes WHO a Fact on it.
+    minute(22);
+    const added = await app.handle(
+      apiRequest(
+        "POST",
+        `/api/v1/validations/${team.idea.validationId}/evidence`,
+        {
+          cookie: team.ownerCookie,
+          body: {
+            target: {
+              type: "validation_answer",
+              id: team.idea.validationId,
+              key: "V.01.WHO",
+            },
+            newResearchLog: { topic: "Called five offices" },
+            setFact: true,
+            lockVersion: 1,
+          },
+        },
+      ),
+    );
+    expect(added.status).toBe(201);
+    const { evidence } = evidenceResultSchema.parse(await added.json());
+    // The owner's fix joins the log's addition (ADR-020), whose row now counts with the
+    // request of 24 (SDD D4).
+    minute(24);
+    const fixed = await app.handle(
+      apiRequest("PATCH", `/api/v1/research-log/${evidence.researchLog?.id}`, {
+        cookie: team.ownerCookie,
+        body: { topic: "Called six offices", lockVersion: 0 },
+      }),
+    );
+    expect(fixed.status).toBe(200);
+
+    const body = dashboardActivitySchema.parse(
+      await dashboard(team, "activity", team.viewerCookie),
+    );
+    expect(
+      body.items.map((item) => [
+        item.actor.id,
+        (Date.parse(item.at) - start) / MINUTE,
+        item.summary,
+      ]),
+    ).toEqual([
+      [team.owner.id, 24, "Research Log · Called six offices"],
+      [team.owner.id, 22, "01 WHO"],
+      [team.owner.id, 11, "01 WHO"],
+      [team.owner.id, 0, "Piaya boxes"],
+    ]);
+  });
+
+  test("a request whose change joins an earlier row stays one move with that row", async () => {
+    clock = Date.UTC(2026, 9, 6, 0, 0);
+    const start = clock;
+    const team = await teamWithIdea();
+    clock = start + 11 * MINUTE;
+    await saveWho(team, team.ownerCookie, "HR", 0);
+    // V4 makes WHO a Fact 4 minutes later: its change joins WHO's addition (ADR-020),
+    // which now counts with V4's research log as the request of 15 (SDD D4).
+    clock = start + 15 * MINUTE;
+    const added = await app.handle(
+      apiRequest(
+        "POST",
+        `/api/v1/validations/${team.idea.validationId}/evidence`,
+        {
+          cookie: team.ownerCookie,
+          body: {
+            target: {
+              type: "validation_answer",
+              id: team.idea.validationId,
+              key: "V.01.WHO",
+            },
+            newResearchLog: { topic: "Called five offices" },
+            setFact: true,
+            lockVersion: 1,
+          },
+        },
+      ),
+    );
+    expect(added.status).toBe(201);
+
+    const body = dashboardActivitySchema.parse(
+      await dashboard(team, "activity", team.viewerCookie),
+    );
+    expect(
+      body.items.map((item) => [
+        item.actor.id,
+        (Date.parse(item.at) - start) / MINUTE,
+        item.summary,
+      ]),
+    ).toEqual([
+      [team.owner.id, 15, "Piaya boxes"],
+      [team.owner.id, 0, "Piaya boxes"],
+    ]);
+    expect(body.items[0]?.link).toEqual({
+      screen: 13,
+      workspaceId: team.workspace.id,
+      ideaId: team.idea.id,
+    });
   });
 
   test("reads past one page of operations when a long run of saves merges into one move", async () => {

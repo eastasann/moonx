@@ -224,6 +224,13 @@ const writeErrors = {
 } as const;
 
 /** P9–P11 (SDD 5.9): the execution items of a plan (22, and 21's execution views). */
+/**
+ * The white space at either end of a text, as JavaScript's `trim()` takes it off the
+ * query's `assigneeName` (Postgres's `btrim` takes spaces only).
+ */
+const EDGE_SPACE =
+  "^[\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+|[\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+$";
+
 export function executionRoutes({ access, db, now }: ExecutionRoutesOptions) {
   /** One item as P9 lists it, for the caller. */
   const itemView = async (scope: Scope, callerId: string, id: string) => {
@@ -269,6 +276,10 @@ export function executionRoutes({ access, db, now }: ExecutionRoutesOptions) {
               assignee === undefined
                 ? undefined
                 : eq(executionItems.assigneeUserId, assignee),
+              query.assigneeName === undefined
+                ? undefined
+                : // Names are kept as typed: spaces around one do not make another.
+                  sql`lower(regexp_replace(${executionItems.assigneeName}, ${EDGE_SPACE}, '', 'g')) = lower(${query.assigneeName})`,
               query.status === undefined
                 ? undefined
                 : eq(executionItems.status, query.status),
@@ -295,7 +306,7 @@ export function executionRoutes({ access, db, now }: ExecutionRoutesOptions) {
         detail: {
           summary: "P9 The execution items of a plan (22)",
           description:
-            "By type; Next Actions by due date (none last), the others in their order (P11). assignee is me or a user's id.",
+            "By type; Next Actions by due date (none last), the others in their order (P11). assignee is me or a user's id; assigneeName is a typed name, in any case.",
         },
       },
     )

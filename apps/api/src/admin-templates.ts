@@ -5,6 +5,7 @@ import {
   type DatabaseTransaction,
   ideas,
   importTemplateFile,
+  loadPublishedCostRows,
   lockTemplateDraft,
   publishTemplateVersion,
   selfAnalyses,
@@ -102,11 +103,31 @@ async function loadVersionDetail(
       versionNumber: templateVersions.versionNumber,
       status: templateVersions.status,
       aiPrompt: templateVersions.aiPrompt,
+      name: templates.name,
+      templateId: templateVersions.templateId,
     })
     .from(templateVersions)
     .innerJoin(templates, eq(templates.id, templateVersions.templateId))
     .where(eq(templateVersions.id, versionId));
   if (version === undefined) throw noVersion(versionId);
+  const { templateId, ...head } = version;
+  const published = new Set(
+    (
+      await db
+        .selectDistinct({ key: templateQuestions.questionKey })
+        .from(templateQuestions)
+        .innerJoin(
+          templateVersions,
+          eq(templateVersions.id, templateQuestions.templateVersionId),
+        )
+        .where(
+          and(
+            eq(templateVersions.templateId, templateId),
+            eq(templateVersions.status, "published"),
+          ),
+        )
+    ).map((row) => row.key),
+  );
   const ofVersion = { templateVersionId: version.id };
   const sections = await db
     .select()
@@ -146,7 +167,7 @@ async function loadVersionDetail(
       asc(templateExecutionPresets.id),
     );
   return {
-    ...version,
+    ...head,
     sections: sections.map((section) => ({
       id: section.id,
       key: section.key,
@@ -174,6 +195,7 @@ async function loadVersionDetail(
           hasFau: question.hasFau,
           copyFrom: question.copyFrom as string[] | null,
           reference: question.reference as PlanReferenceSpec[] | null,
+          isKeyPublished: published.has(question.questionKey),
           sortOrder: question.sortOrder,
         })),
     })),
@@ -184,6 +206,8 @@ async function loadVersionDetail(
       name: row.name,
       sortOrder: row.sortOrder,
     })),
+    costRows:
+      head.kind === "business_plan" ? await loadPublishedCostRows(db) : [],
     checkRules: checkRules.map((rule) => ({
       checkKey: rule.checkKey,
       params: rule.params as Record<string, number>,
@@ -548,18 +572,27 @@ export function adminTemplateRoutes({
           params.versionId,
           new Date(now()),
           async (tx, draft) => {
-            // Only a self-analysis template has an AI prompt (2026-10-02 user decision).
-            if (draft.kind !== "self_analysis" && body.aiPrompt !== "") {
-              throw invalid(
-                "aiPrompt",
-                "too_big",
-                "Only a self-analysis template has an AI prompt",
-              );
+            if (body.aiPrompt !== undefined) {
+              // Only a self-analysis template has an AI prompt (2026-10-02 user decision).
+              if (draft.kind !== "self_analysis" && body.aiPrompt !== "") {
+                throw invalid(
+                  "aiPrompt",
+                  "too_big",
+                  "Only a self-analysis template has an AI prompt",
+                );
+              }
+              await tx
+                .update(templateVersions)
+                .set({ aiPrompt: body.aiPrompt })
+                .where(eq(templateVersions.id, draft.id));
             }
-            await tx
-              .update(templateVersions)
-              .set({ aiPrompt: body.aiPrompt })
-              .where(eq(templateVersions.id, draft.id));
+            if (body.name !== undefined) {
+              // The template's, so every version shows it from now (SDD 5.13).
+              await tx
+                .update(templates)
+                .set({ name: body.name, updatedAt: new Date(now()) })
+                .where(eq(templates.id, draft.templateId));
+            }
             return draft.id;
           },
         );
@@ -572,9 +605,9 @@ export function adminTemplateRoutes({
         parse: "json",
         response: { 200: templateVersionDetailSchema, ...editErrors },
         detail: {
-          summary: "AD3 Edit a draft's AI prompt (27)",
+          summary: "AD3 Edit a draft's AI prompt or the template's name (27)",
           description:
-            "Self-analysis templates only; another kind takes only the empty text (422 VALIDATION_FAILED otherwise). 409 PUBLISHED_READ_ONLY for a published version.",
+            "Changes the fields sent. The AI prompt is for self-analysis templates only; another kind takes only the empty text (422 VALIDATION_FAILED otherwise). The name is the template's, shared by all its versions. 409 PUBLISHED_READ_ONLY for a published version.",
         },
       },
     )

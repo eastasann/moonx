@@ -49,6 +49,10 @@ export {
 } from "./components/CheckDots";
 export { ComboBox, type ComboBoxProps } from "./components/ComboBox";
 export {
+  CommentCount,
+  type CommentCountProps,
+} from "./components/CommentCount";
+export {
   ContextualHelp,
   type ContextualHelpProps,
 } from "./components/ContextualHelp";
@@ -80,6 +84,7 @@ export {
   type DisclosureProps,
 } from "./components/Disclosure";
 export { Divider, type DividerProps } from "./components/Divider";
+export { FauButtons, type FauButtonsProps } from "./components/FauButtons";
 export {
   type FauChange,
   type FauLabelOptions,
@@ -115,6 +120,8 @@ export {
   MenuItem,
   type MenuItemProps,
   type MenuProps,
+  MenuSection,
+  type MenuSectionProps,
   MenuTrigger,
   type MenuTriggerProps,
 } from "./components/Menu";
@@ -136,7 +143,7 @@ export {
 } from "./components/MoonGlyph";
 export { NumberField, type NumberFieldProps } from "./components/NumberField";
 export { PageFrame, type PageFrameProps } from "./components/PageFrame";
-export { Panel, type PanelProps } from "./components/Panel";
+export { Panel, PanelFooter, type PanelProps } from "./components/Panel";
 export { PhaseRoute, type PhaseRouteProps } from "./components/PhaseRoute";
 export { Picker, type PickerProps } from "./components/Picker";
 export { Popover, type PopoverProps } from "./components/Popover";
@@ -243,6 +250,22 @@ export {
 } from "./components/Tree";
 export { Well, type WellProps } from "./components/Well";
 export type { ChoiceItem } from "./internal/ChoiceListBox";
+/**
+ * Whether patterns A, D and F stand in their two columns (design-spec 4.1): a screen
+ * whose press differs between them asks (6's row opens 13 where the list has no detail
+ * beside it).
+ */
+export { useTwoColumns, useTwoColumnsNow } from "./internal/frame";
+/**
+ * Whether the window is at least desktop wide (design-spec 4.3): what a docked panel
+ * narrows, not the window, keeps a list's item on screen (4.1).
+ */
+export { useIsDesktop } from "./internal/useIsDesktop";
+/**
+ * Whether the window is narrower than a tablet: a phone, where pattern D edits a row in a
+ * sheet instead of the detail (4.1 D「編集はボトムシート」).
+ */
+export { useIsNarrow } from "./internal/useIsNarrow";
 export { Container, type ContainerProps } from "./layout/Container";
 export { Flex, type FlexProps, Stack, type StackProps } from "./layout/Flex";
 export { Grid, type GridColumns, type GridProps } from "./layout/Grid";
@@ -260,6 +283,7 @@ export {
 export {
   ListDetailPattern,
   type ListDetailPatternProps,
+  type ListTabs,
 } from "./patterns/ListDetailPattern";
 export {
   PresentationPattern,

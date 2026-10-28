@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  type AnswerType,
   answerTypeSchema,
   type CheckKey,
   costCategorySchema,
@@ -56,12 +57,42 @@ export const flagRepeats = (
   }
 };
 
-const tableColumnTypeSchema = z.enum(["text", "number", "percent", "money"]);
+/**
+ * The answer types the questions of each kind may have (SDD 5.13 AD6): those its answers
+ * table holds (6.3: a self-analysis keeps a text and an amount, a validation a text, a
+ * plan a text and table rows), and in a plan the sub-items that show the validation's
+ * numbers and the plan's execution items and keep no answer. AD6 checks them; 27 offers
+ * only these.
+ */
+export const TEMPLATE_ANSWER_TYPES: Record<
+  TemplateKind,
+  readonly AnswerType[]
+> = {
+  self_analysis: ["long_text", "short_text", "choice", "amount_with_reason"],
+  validation: ["long_text", "short_text", "choice"],
+  business_plan: [
+    "long_text",
+    "short_text",
+    "choice",
+    "table",
+    "linked_metric",
+    "execution_view",
+  ],
+};
+
+/** The kind of a table column's values (SDD 5.2 `QuestionOptions`). */
+export const tableColumnTypeSchema = z.enum([
+  "text",
+  "number",
+  "percent",
+  "money",
+]);
 
 /**
  * QuestionOptions (SDD 5.2) as a file writes them: choices and column names are required
  * short texts (design-spec 6.0.8), and a table's column keys and a question's choices do
- * not repeat, since answers are stored by them.
+ * not repeat, since answers are stored by them, nor its key numbers, which 21 shows one
+ * by one.
  */
 export const templateFileOptionsSchema = z
   .discriminatedUnion("kind", [
@@ -81,7 +112,10 @@ export const templateFileOptionsSchema = z
     }),
     z.strictObject({
       kind: z.literal("linked_metric"),
-      /** Key metric keys of design-spec 6.4. */
+      /**
+       * Key metric keys of design-spec 6.4 that 21 shows: which ones, AD6 checks
+       * (`unknown_metric_key`), as it needs the published validation templates.
+       */
       metricKeys: z.array(keyText),
     }),
     z.strictObject({
@@ -104,6 +138,15 @@ export const templateFileOptionsSchema = z
           path: ["columns", i, "key"],
         })),
         "column key",
+      );
+    if (options.kind === "linked_metric")
+      flagRepeats(
+        ctx,
+        options.metricKeys.map((value, i) => ({
+          value,
+          path: ["metricKeys", i],
+        })),
+        "key number",
       );
   });
 
@@ -232,7 +275,8 @@ const displayConditionSchema = (kind: TemplateKind) =>
           message: "Shows on a key that is not a question ID of this template",
         });
     })
-    .pipe(z.record(z.string(), z.array(requiredText(shortText))));
+    // With no answer to show on, a question would never show (design-spec 6.0.8).
+    .pipe(z.record(z.string(), z.array(requiredText(shortText)).min(1)));
 
 const questionSchema = (kind: TemplateKind) =>
   z.strictObject({

@@ -96,8 +96,13 @@ export interface PitchDeckInput {
   execution: readonly PitchExecutionItem[];
   /** At most five, in 15's order. */
   competitors: readonly PitchCompetitor[];
-  /** Owner or Member, on the plan now, neither plan nor idea archived. */
-  canEdit: boolean;
+  /** Owner or Member, on the plan now, neither plan nor idea archived: "Edit source". */
+  canEditPlan: boolean;
+  /**
+   * Owner or Member, on the plan now, the idea not archived: "Edit in validation" (an
+   * archived plan leaves its idea's validation open to edit, as 20 and 21 link to it).
+   */
+  canEditValidation: boolean;
   /** The comments on the slide `{variant}.{key}`. */
   commentCount: (target: string) => number;
 }
@@ -217,6 +222,15 @@ interface SlideSpec {
 const answer = (key: string): BulletSource => ({ kind: "answer", key });
 const answers = (...keys: string[]) => keys.map(answer);
 
+/**
+ * The sub-items of §30 the decks show as their speaker notes (design-spec 6.14): the
+ * One-minute explanation for the 1-minute deck, the Five-minute one for the 5-minute.
+ */
+export const PITCH_SPEAKER_NOTE_KEYS = {
+  one: "P.30.1",
+  five: "P.30.2",
+} as const satisfies Record<PitchVariant, string>;
+
 /** The sub-items each source of design-spec 6.14 reads. */
 const KEYS = {
   business: "P.01.1",
@@ -226,8 +240,8 @@ const KEYS = {
   milestones: "P.23.1",
   launch: "P.25.1",
   nextActions: "P.29.1",
-  oneMinute: "P.30.1",
-  fiveMinute: "P.30.2",
+  oneMinute: PITCH_SPEAKER_NOTE_KEYS.one,
+  fiveMinute: PITCH_SPEAKER_NOTE_KEYS.five,
 } as const;
 
 const TITLE: SlideSpec = { key: "title", type: "title", itemNo: 1 };
@@ -755,8 +769,10 @@ class DeckBuilder {
       emptySources,
       shrink: 0,
       overflow: false,
-      editSource: input.canEdit ? { itemNo: spec.itemNo } : null,
-      editInValidation: input.canEdit ? (spec.editInValidation ?? null) : null,
+      editSource: input.canEditPlan ? { itemNo: spec.itemNo } : null,
+      editInValidation: input.canEditValidation
+        ? (spec.editInValidation ?? null)
+        : null,
       commentCount: input.commentCount(target),
     };
   }

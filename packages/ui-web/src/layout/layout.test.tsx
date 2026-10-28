@@ -46,6 +46,33 @@ describe("Flex", () => {
     );
   });
 
+  test("shrink={false} adds a class: a group of buttons keeps its width", () => {
+    render(
+      <>
+        <Flex id="shrinks" />
+        <Flex id="keeps" shrink={false} />
+      </>,
+    );
+    const [shrinks, keeps] = [byId("shrinks"), byId("keeps")];
+    for (const name of classOf(shrinks)) expect(classOf(keeps)).toContain(name);
+    expect(classOf(keeps).length).toBe(classOf(shrinks).length + 1);
+  });
+
+  test("grow adds a class to a Flex and a Stack: a column takes the room left", () => {
+    render(
+      <>
+        <Flex id="fits" />
+        <Flex id="grows" grow />
+        <Stack id="stack" grow />
+      </>,
+    );
+    const [fits, grows] = [byId("fits"), byId("grows")];
+    for (const name of classOf(fits)) expect(classOf(grows)).toContain(name);
+    expect(classOf(grows).length).toBe(classOf(fits).length + 1);
+    const added = classOf(grows).find((name) => !classOf(fits).includes(name));
+    expect(classOf(byId("stack"))).toContain(added);
+  });
+
   test("Stack is a Flex column", () => {
     render(
       <>

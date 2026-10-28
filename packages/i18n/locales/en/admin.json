@@ -1,0 +1,443 @@
+{
+  "title": "Admin",
+  "tabs": {
+    "label": "Admin",
+    "templates": "Templates",
+    "users": "Users",
+    "workspaces": "Workspaces",
+    "invitations": "Invitations"
+  },
+  "kind": {
+    "self_analysis": "Self Analysis",
+    "validation": "Validation",
+    "business_plan": "Business Plan"
+  },
+  "versionStatus": {
+    "draft": "Draft",
+    "published": "Published"
+  },
+  "templates": {
+    "title": "Templates",
+    "list": "Templates",
+    "noVersions": "No versions yet",
+    "row": {
+      "published": "v{{version}} published",
+      "draft": "Draft v{{version}}"
+    },
+    "empty": "No versions yet. Import a template file to start.",
+    "import": "Import from file",
+    "versions": "Versions",
+    "versionsOf": "Versions of {{kind}}",
+    "version": "v{{version}}",
+    "versionMenu": "Actions for v{{version}}",
+    "view": "View",
+    "newDraft": "New draft from this version",
+    "draftLine": "Not published yet",
+    "usage": "{{count}} in use",
+    "publishedLine": "Published {{date}} by {{name}} · {{usage}}",
+    "publishedLineNoName": "Published {{date}} · {{usage}}",
+    "draftOpen": "Draft v{{version}} is open. Publish it before importing a file or starting another draft.",
+    "openDraft": "Open draft v{{version}}",
+    "imported": "Imported as draft v{{version}}",
+    "drafted": "New draft made from v{{version}}",
+    "importErrors": {
+      "tooLarge": "This file is too large. Use one under 1 MB.",
+      "unreadable": "This file can't be read. Choose a moonx template file (JSON).",
+      "otherKind": "This is a {{kind}} template file. Import it into {{kind}} instead.",
+      "notThisKind": "This isn't a {{kind}} template file",
+      "format": "This file doesn't follow the template file format",
+      "at": "At {{path}}",
+      "atTop": "At the top of the file",
+      "more": "And {{count}} more",
+      "draftExists": "This template already has a draft. Publish it first."
+    }
+  },
+  "version": {
+    "title": "Edit Template",
+    "heading": "{{kind}} v{{version}}",
+    "draftLine": "Draft. Check it, then publish it.",
+    "publishedLine": "Published {{date}} by {{name}}",
+    "publishedLineNoName": "Published {{date}}",
+    "readOnly": "A published version can't be changed. Start a new draft from it on Templates.",
+    "tree": "Sections and questions of {{kind}}",
+    "sectionName": "{{key}} {{title}}",
+    "questionName": "{{key}} {{title}}",
+    "choose": "Choose a section, question or setting to see it",
+    "none": "None",
+    "unnamed": "Unnamed row",
+    "settings": {
+      "name": "Template name",
+      "ai-prompt": "AI prompt",
+      "cost-defaults": "Starting cost rows",
+      "check-rules": "Check thresholds",
+      "execution-presets": "Starting execution rows"
+    },
+    "section": {
+      "key": "Key",
+      "title": "Title",
+      "subtitle": "Subtitle",
+      "guidance": "Guidance",
+      "description": "Description",
+      "part": "Part",
+      "questions": "Questions",
+      "prompts": "Prompts"
+    },
+    "part": {
+      "a": "Part A",
+      "b": "Part B"
+    },
+    "question": {
+      "key": "Question ID",
+      "title": "Title",
+      "prompt": "Question",
+      "example": "Example",
+      "hint": "Hint",
+      "answerType": "Answer type",
+      "choices": "Choices",
+      "columns": "Columns",
+      "column": "{{label}} ({{key}}) · {{type}}",
+      "metrics": "Key numbers",
+      "executionList": "Shows",
+      "shownWhen": "Shown when",
+      "always": "Always",
+      "condition": "{{key}} is {{values}}",
+      "fau": "F/A/U",
+      "fauOn": "Asked",
+      "fauOff": "Not asked",
+      "copyFrom": "Copies from",
+      "keyPublished": "This question ID is in a published version, so it can't change.",
+      "keyForm": {
+        "self_analysis": "SA, the section key and a number, like SA.WHY.1",
+        "validation": "V, the section (01, 02, 04, 08 or 10) and a key in capitals, digits and _, like V.01.WHO",
+        "business_plan": "P, the item number (01 to 30) and a number, like P.01.1"
+      },
+      "askFau": "Ask for F/A/U (Fact, Assumption or Unknown)",
+      "sourceN": "Source {{n}}",
+      "addSource": "Add source",
+      "copiesNothing": "Copies nothing",
+      "copyFromForm": "Validation question IDs like V.01.WHO, or IDEA.ONE_LINE_CONCEPT, IDEA.PROPOSED_SOLUTION, LIST.ASSUMPTIONS or LIST.RISKS. Several are joined in this order.",
+      "changeTypeTitle": "Change the answer type to {{type}}?",
+      "changeType": "Change",
+      "changeTypeBody": {
+        "choice": "Its choices are removed.",
+        "table": "Its columns are removed.",
+        "linked_metric": "Its key numbers are removed.",
+        "execution_view": "Its execution list is removed."
+      },
+      "choiceN": "Choice {{n}}",
+      "metricN": "Key number {{n}}",
+      "addChoice": "Add choice",
+      "addMetric": "Add key number",
+      "noChoices": "No choices yet",
+      "noMetrics": "No key numbers yet",
+      "metricScenario": "{{scenario}} scenario",
+      "metricCostRow": "Cost row: {{name}}",
+      "metricUnknown": "{{key}} (not a key number)",
+      "columnN": "Column {{n}}",
+      "columnKey": "Key",
+      "columnLabel": "Name",
+      "columnType": "Type",
+      "addColumn": "Add column",
+      "noColumns": "No columns yet",
+      "conditionN": "Condition {{n}}",
+      "conditionQuestion": "Question",
+      "notInTemplate": "{{key}} (not in this template)",
+      "conditionValues": "When the answer is",
+      "conditionText": "When the answer is (one per line)",
+      "addCondition": "Add condition"
+    },
+    "tabs": {
+      "label": "Template",
+      "contents": "Contents",
+      "check": "Check",
+      "checkCount": "Check ({{count}})"
+    },
+    "check": {
+      "list": "Problems before publishing",
+      "ready": "No problems. Ready to publish as v{{version}}.",
+      "blocked_one": "Fix 1 problem on Check to publish",
+      "blocked_other": "Fix {{count}} problems on Check to publish",
+      "in": "In {{node}}",
+      "whole": "In the whole template",
+      "warning": "Warning. It doesn't block publishing.",
+      "removedKeys": "Removed since the last version: {{keys}}",
+      "noneInNodes": "No problems in the sections and questions",
+      "code": {
+        "no_questions": "The template has no questions",
+        "invalid_part_plan": "Each item needs Part A or Part B",
+        "invalid_part_other": "Only the items of a plan have a part",
+        "invalid_question_key": "The question ID doesn't follow the question ID format",
+        "question_key_section_mismatch": "The question ID doesn't match its section",
+        "duplicate_question_key": "The question ID is used more than once",
+        "answer_type_mismatch": "This template's answers can't hold this answer type",
+        "options_mismatch": "The choices, columns or key numbers don't fit the answer type",
+        "unknown_condition_key": "Shown when names a question that isn't in the template",
+        "copy_from_mismatch": "This prompt can't hold what it copies from the validation",
+        "unknown_metric_key": "A key number isn't one a prompt can show",
+        "pitch_deck_overflow": "A Pitch Deck slide runs past its bottom with the most material"
+      }
+    },
+    "publish": "Publish as v{{version}}",
+    "publishTitle": "Publish as v{{version}}?",
+    "publishBody": "Answers already written don't change. People on an earlier version can move to v{{version}} when they choose.",
+    "publishAction": "Publish",
+    "cancel": "Cancel",
+    "published": "{{kind}} v{{version}} is published",
+    "publishInvalid": "This version has problems. Fix them on Check, then publish.",
+    "alreadyPublished": "This version was already published",
+    "publishedUnknown": "Couldn't load when it was published.",
+    "retry": "Retry",
+    "nameNote": "It's the template's name, shared by all its versions. Only operators see it.",
+    "partNone": "None",
+    "edit": "Edit",
+    "editTitle": "Edit {{name}}",
+    "more": "More actions for {{name}}",
+    "rowN": "Row {{n}}",
+    "addRow": "Add row",
+    "costKey": "Key",
+    "costName": "Name",
+    "presetTitle": {
+      "milestone": "Milestone",
+      "launch": "Timing",
+      "kpi": "KPI"
+    },
+    "presetArea": "Area",
+    "presetTiming": "Period",
+    "add": {
+      "section": {
+        "plan": "Add item",
+        "other": "Add section"
+      },
+      "sectionTitle": {
+        "plan": "Add item",
+        "other": "Add section"
+      },
+      "question": {
+        "plan": "Add prompt",
+        "other": "Add question"
+      },
+      "questionTitle": {
+        "plan": "Add a prompt to {{section}}",
+        "other": "Add a question to {{section}}"
+      }
+    },
+    "reorder": {
+      "sections": {
+        "plan": "Reorder items",
+        "other": "Reorder sections"
+      },
+      "questions": {
+        "plan": "Reorder prompts",
+        "other": "Reorder questions"
+      },
+      "sectionsTitle": {
+        "plan": "Reorder items",
+        "other": "Reorder sections"
+      },
+      "questionsTitle": {
+        "plan": "Reorder prompts",
+        "other": "Reorder questions"
+      },
+      "noQuestions": {
+        "plan": "No prompts",
+        "other": "No questions"
+      }
+    },
+    "delete": {
+      "section": {
+        "plan": "Delete item",
+        "other": "Delete section"
+      },
+      "question": {
+        "plan": "Delete prompt",
+        "other": "Delete question"
+      },
+      "title": "Delete {{name}}?",
+      "action": "Delete",
+      "sectionBody": {
+        "plan_zero": "This can't be undone.",
+        "plan_one": "Its prompt is deleted with it. This can't be undone.",
+        "plan_other": "Its {{count}} prompts are deleted with it. This can't be undone.",
+        "other_zero": "This can't be undone.",
+        "other_one": "Its question is deleted with it. This can't be undone.",
+        "other_other": "Its {{count}} questions are deleted with it. This can't be undone."
+      },
+      "questionBody": "This can't be undone. Published versions keep it."
+    },
+    "preview": {
+      "open": "Preview",
+      "title": "Preview: {{section}}",
+      "empty": {
+        "plan": "No prompts yet",
+        "other": "No questions yet"
+      },
+      "amount": "Amount",
+      "why": "Why this amount?",
+      "metrics": "Shows the key numbers {{metrics}}",
+      "execution": "Shows {{list}} from Execution",
+      "executionNone": "Shows an execution list once one is chosen",
+      "shownWhen": "Shown when {{condition}}",
+      "noColumns": "A table with no columns yet"
+    },
+    "fieldInRow": "{{field}}, row {{n}}"
+  },
+  "answerType": {
+    "long_text": "Long text",
+    "short_text": "Short text",
+    "choice": "Choice",
+    "amount_with_reason": "Amount and reason",
+    "table": "Table",
+    "linked_metric": "Key numbers",
+    "execution_view": "Execution list"
+  },
+  "columnType": {
+    "text": "Text",
+    "number": "Number",
+    "percent": "Percent",
+    "money": "Amount"
+  },
+  "executionType": {
+    "milestone": "Milestones",
+    "launch": "Launch plan",
+    "kpi": "KPIs",
+    "open_question": "Open questions",
+    "next_action": "Next actions"
+  },
+  "costCategory": {
+    "initial": "Startup costs",
+    "monthly_fixed": "Monthly fixed costs",
+    "variable": "Variable costs per sale"
+  },
+  "checkRule": {
+    "competitors": {
+      "title": "Competitors",
+      "min": "Competitors to list"
+    },
+    "local_price": {
+      "title": "Local price range",
+      "pricedCompetitors": "Competitors with a price",
+      "researchLogs": "Research log entries tagged Local price"
+    },
+    "permits": {
+      "title": "Permits",
+      "researchLogs": "Research log entries tagged Permits"
+    },
+    "demand_signal": {
+      "title": "Demand or problem signal",
+      "researchLogs": "Research log entries tagged Demand or problem signal"
+    }
+  },
+  "presetType": {
+    "milestone": "Milestones",
+    "launch": "Launch plan",
+    "kpi": "KPIs"
+  },
+  "users": {
+    "title": "Users & Workspaces",
+    "name": "Name",
+    "you": "{{name}} (you)",
+    "suspendedName": "{{name}} (suspended)",
+    "operator": "Operator",
+    "status": "Status",
+    "all": "All",
+    "search": "Search users",
+    "joined": "Joined",
+    "lastActive": "Last active",
+    "never": "Never",
+    "workspaces": "Workspaces",
+    "noMatch": "Nothing matches these filters",
+    "clear": "Clear filters",
+    "suspend": "Suspend",
+    "reactivate": "Resume",
+    "suspendNote": "Suspending logs them out and stops them logging in. Their workspaces, shares and assignments stay.",
+    "suspendedNote": "They can't log in. Resume them to let them back in, with everything as it was.",
+    "deletedNote": "This account was deleted. Nothing about it can be changed.",
+    "notSelf": "You can't suspend yourself",
+    "gone": "This account no longer exists",
+    "suspendTitle": "Suspend {{name}}?",
+    "suspendBody": "They're logged out everywhere and can't log in until you resume them. Their workspaces, shares and assignments stay, and no one is notified.",
+    "cancel": "Cancel",
+    "suspended": "{{name}} is suspended",
+    "reactivated": "{{name}} can log in again"
+  },
+  "userStatus": {
+    "active": "Active",
+    "suspended": "Suspended",
+    "deleted": "Deleted"
+  },
+  "workspaces": {
+    "name": "Name",
+    "search": "Search workspaces",
+    "personal": "Personal workspace",
+    "team": "Team workspace",
+    "owners": "Owners",
+    "noOwner": "No Owner",
+    "members": "Members",
+    "ideas": "Ideas",
+    "lastActive": "Last active"
+  },
+  "invitations": {
+    "invite": "Invite someone",
+    "inviteTitle": "Invite someone",
+    "email": "Email",
+    "workspace": "Workspace",
+    "workspaceNote": "Without a workspace, they get only their personal workspace.",
+    "noWorkspace": "No workspace",
+    "where": "{{workspace}} · {{role}}",
+    "role": "Role",
+    "noRole": "No role",
+    "status": "Status",
+    "invitedBy": "Invited by",
+    "nobody": "No one",
+    "show": "Show",
+    "pending": "Pending",
+    "all": "All",
+    "none": "No pending invitations",
+    "noneAll": "No invitations yet",
+    "send": "Send invitation",
+    "cancelDialog": "Cancel",
+    "sentTitle": "Invitation sent",
+    "sent": "Invitation sent to {{email}}",
+    "link": "Invitation link",
+    "linkNote": "If the email doesn't arrive, send them this link yourself. It works for 7 days.",
+    "copy": "Copy link",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy. Select the link to copy it.",
+    "close": "Close",
+    "line": {
+      "pending": "{{role}} · sent {{sent}} · expires {{expires}}",
+      "expired": "{{role}} · sent {{sent}} · expired {{expires}}",
+      "accepted": "{{role}} · accepted {{accepted}}",
+      "revoked": "{{role}} · sent {{sent}} · cancelled"
+    },
+    "resend": "Resend",
+    "cancel": "Cancel invitation",
+    "alreadyMember": "{{email}} is already a member of this workspace",
+    "alreadyPending": "An invitation to {{email}} is already pending",
+    "wasCancelled": "The invitation to {{email}} was cancelled",
+    "workspaceGone": "This workspace no longer exists",
+    "resent": "Invitation sent again to {{email}}",
+    "cancelled": "Invitation to {{email}} cancelled"
+  },
+  "invitationStatus": {
+    "pending": "Pending",
+    "accepted": "Accepted",
+    "revoked": "Cancelled",
+    "expired": "Expired"
+  },
+  "noun": {
+    "section": {
+      "plan": "item",
+      "other": "section"
+    },
+    "question": {
+      "plan": "prompt",
+      "other": "question"
+    }
+  },
+  "list": {
+    "up": "Move {{item}} up",
+    "down": "Move {{item}} down",
+    "remove": "Remove {{item}}"
+  }
+}

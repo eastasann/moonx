@@ -286,6 +286,18 @@ describe("Badge", () => {
     expect(new Set(looks).size).toBe(4);
   });
 
+  test("a mark's aria-label is what it reads; the mark itself is hidden from it", () => {
+    render(
+      <p>
+        <Badge aria-label="Uses your validation">V</Badge>
+      </p>,
+    );
+    const mark = screen.getByText("V");
+    expect(mark.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByText("Uses your validation")).toBeTruthy();
+    expect(mark.closest("p")?.textContent).toBe("VUses your validation");
+  });
+
   test("notice takes only the outline frame (design-spec 4.5)", () => {
     expectTypeOf<{
       variant: "notice";

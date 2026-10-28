@@ -1,0 +1,66 @@
+{
+  "title": "Decision Log",
+  "list": "Decisions",
+  "empty": "Decisions you record will appear here, with who, when and why.",
+  "emptyFiltered": "Nothing matches these filters",
+  "clear": "Clear filters",
+  "filter": {
+    "kind": "Kind",
+    "idea": "Idea",
+    "recordedBy": "Recorded by",
+    "period": "Period",
+    "all": "All",
+    "anyTime": "Any time",
+    "last7": "Last 7 days",
+    "last30": "Last 30 days",
+    "last90": "Last 90 days",
+    "last365": "Last 12 months",
+    "custom": "Choose dates…",
+    "range": "{{from}} – {{to}}",
+    "since": "From {{from}}",
+    "until": "Until {{to}}"
+  },
+  "periodDialog": {
+    "title": "Choose a period",
+    "from": "From",
+    "to": "To",
+    "apply": "Apply",
+    "cancel": "Cancel",
+    "order": "Choose a To date on or after the From date"
+  },
+  "kind": {
+    "validation_decision": "Decision",
+    "go_no_go": "Go / No-Go",
+    "version_saved": "Version saved"
+  },
+  "column": {
+    "decision": "Decision",
+    "value": "Value",
+    "date": "Recorded"
+  },
+  "row": {
+    "plan": "{{plan}} · {{idea}}",
+    "meta": "{{kind}} · {{name}}",
+    "reason": "“{{reason}}”"
+  },
+  "detail": {
+    "recordedBy": "Recorded by",
+    "savedBy": "Saved by",
+    "when": "{{date}}, {{time}}",
+    "reason": "Why",
+    "missingChecks": "Checks missing then",
+    "allDone": "All 6 checks done",
+    "keyNumbers": "Key numbers then",
+    "fau": "Fact / Assumption / Unknown then",
+    "version": "Version",
+    "noVersion": "No version saved",
+    "conditions": "Conditions",
+    "launchIf": "Launch if",
+    "delayIf": "Delay if",
+    "stopIf": "Stop if",
+    "emptyCondition": "Empty",
+    "openValidation": "Open validation",
+    "openPlan": "Open plan",
+    "openVersion": "Open this version"
+  }
+}

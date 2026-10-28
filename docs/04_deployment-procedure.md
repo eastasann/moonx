@@ -199,7 +199,7 @@ production の `deploy.yml` は、GitHub の環境 `production` の承認を待�
 
 1. 運営者を作る（03 5.4 K）
 2. 運営者でログインし、テンプレートの管理（26・27）で、`data/templates/bcdx/` の3つのファイル（`self-analysis.json`・`validation.json`・`plan.json`）を1つずつ取り込む（SDD 5.13 AD10。取り込むと下書きの版ができる）
-3. 下書きごとに公開の前の検査（AD6 validate）を動かし、エラーが無いことを確かめてから公開する（AD6 publish）
+3. 下書きごとに公開の前の検査（AD6 validate）を動かし、エラーが無いことを確かめてから公開する（AD6 publish）。検証はプランより先に公開する（プランの数字の小項目が名前を出す費用行は、公開済みの検証のテンプレートの初期行だけを受け付ける。SDD 5.13 AD6 の `unknown_metric_key`）
 4. 自己分析（10）が開けることを確かめる（アイデアの作成は、デプロイ後の確認（6章）で確かめる）
 
 ---

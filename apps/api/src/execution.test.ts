@@ -1,9 +1,11 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { changeHistory, executionItems, memberships } from "@moonx/db";
 import {
+  commentListSchema,
   errorBodySchema,
   executionItemSchema,
   executionListSchema,
+  historyPageSchema,
   planHomeSchema,
 } from "@moonx/schemas";
 import { and, eq } from "drizzle-orm";
@@ -155,6 +157,26 @@ describe("P9 /api/v1/plans/{planId}/execution-items", () => {
     expect(
       (await list(team, `?assignee=${team.owner.id}&status=done`)).length,
     ).toBe(0);
+    // A typed name matches in any case: 22 lists "Lito" and "lito" once (design-spec 6.13).
+    expect(
+      (await list(team, "?assigneeName=%20lITO%20")).map((item) => item.id),
+    ).toEqual([soon.id]);
+    expect((await list(team, "?assigneeName=Lit")).length).toBe(0);
+    // A name kept as typed, spaces and all, matches without them.
+    const spaced = await add(team, {
+      type: "next_action",
+      title: "Pay the courier",
+      assigneeName: "\u3000Mara\u00a0",
+    });
+    expect(
+      (await list(team, "?assigneeName=mara")).map((item) => item.id),
+    ).toEqual([spaced.id]);
+    const blank = await call(
+      "GET",
+      `/api/v1/plans/${team.planId}/execution-items?assigneeName=%20`,
+      team.viewerCookie,
+    );
+    expect(blank.status).toBe(422);
     expect(
       (await list(team, "?status=resolved")).map((item) => item.id),
     ).toEqual([question.id]);
@@ -396,13 +418,22 @@ describe("P10 /api/v1/execution-items/{itemId}", () => {
     const history = await db
       .select()
       .from(changeHistory)
-      .where(eq(changeHistory.targetId, milestone.id));
+      .where(eq(changeHistory.targetId, milestone.id))
+      .orderBy(changeHistory.changedAt, changeHistory.id);
+    // The member's saves, minutes apart, are one row (ADR-020): from the item as the
+    // draft made it to the last accepted save, which the refused ones did not touch.
     expect(history.map((row) => [row.source, row.action])).toEqual([
       ["plan_draft", "create"],
       ["manual", "update"],
-      ["manual", "update"],
-      ["manual", "update"],
     ]);
+    const [created, merged] = history;
+    expect(merged?.before).toEqual(created?.after);
+    expect(merged?.after).toMatchObject({
+      status: "doing",
+      assigneeUserId: null,
+      assigneeName: "Lito",
+      goal: "Signed lease",
+    });
   });
 
   test("DELETE hides the item, with its history; a deleted item is 404", async () => {
@@ -491,5 +522,72 @@ describe("P11 PUT /api/v1/plans/{planId}/execution-items/order", () => {
         ),
       );
     expect(history).toEqual([]);
+  });
+});
+
+describe("21's execution sub-items in H1 and C1", () => {
+  test("execution:{type} lists the plan's execution items of that type, deleted ones included", async () => {
+    const team = await teamWithPlan();
+    const milestone = await add(team, { type: "milestone", title: "Lease" });
+    const gone = await add(team, { type: "milestone", title: "Old" });
+    const kpi = await add(team, { type: "kpi", title: "Revenue" });
+    expect(
+      (
+        await call(
+          "DELETE",
+          `/api/v1/execution-items/${gone.id}`,
+          team.memberCookie,
+        )
+      ).status,
+    ).toBe(204);
+    for (const item of [milestone, kpi]) {
+      const posted = await call("POST", "/api/v1/comments", team.memberCookie, {
+        workspaceId: team.workspace.id,
+        target: { type: "execution_item", id: item.id, key: null },
+        body: `On ${item.title}`,
+        mentionUserIds: [],
+      });
+      expect(posted.status).toBe(201);
+    }
+    const screen = `containerType=business_plan&containerId=${team.planId}`;
+
+    const history = await call(
+      "GET",
+      `/api/v1/history?${screen}&sectionKeys=23,execution:milestone`,
+      team.viewerCookie,
+    );
+    expect(history.status).toBe(200);
+    const changed = new Set(
+      historyPageSchema
+        .parse(await history.json())
+        .items.map((entry) => entry.target.id),
+    );
+    expect(changed.has(milestone.id)).toBe(true);
+    expect(changed.has(gone.id)).toBe(true);
+    expect(changed.has(kpi.id)).toBe(false);
+
+    const threads = await call(
+      "GET",
+      `/api/v1/comments?workspaceId=${team.workspace.id}&${screen}&sectionKeys=23,execution:milestone`,
+      team.viewerCookie,
+    );
+    expect(threads.status).toBe(200);
+    expect(
+      commentListSchema
+        .parse(await threads.json())
+        .threads.map((thread) => thread.root.body),
+    ).toEqual(["On Lease"]);
+
+    // The item's own section alone, or a type unknown, lists none of them.
+    const plain = await call(
+      "GET",
+      `/api/v1/history?${screen}&sectionKeys=23,execution:unknown`,
+      team.viewerCookie,
+    );
+    expect(
+      historyPageSchema
+        .parse(await plain.json())
+        .items.filter((entry) => entry.target.type === "execution_item"),
+    ).toEqual([]);
   });
 });

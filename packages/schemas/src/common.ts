@@ -354,7 +354,7 @@ export const questionOptionsSchema = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("linked_metric"),
-    /** Key metric keys of design-spec 6.4. */
+    /** Key metric keys of design-spec 6.4 that 21 shows (AD6 `unknown_metric_key`). */
     metricKeys: z.array(z.string()),
   }),
   z.object({

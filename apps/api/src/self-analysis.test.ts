@@ -493,14 +493,17 @@ describe("S3 PUT /api/v1/me/self-analysis/answers/{questionKey}", () => {
     );
     expect(forced).toMatchObject({ text: "v3", lockVersion: 3 });
 
+    // v2 is part of the answer's addition (ADR-020). The overwrite keeps a row of its
+    // own, though v2 was the same person's a moment before: what it overwrote stays in
+    // the history (ADR-019, ADR-020).
     const history = await db
       .select({ action: changeHistory.action, after: changeHistory.after })
       .from(changeHistory)
-      .where(eq(changeHistory.containerId, home.id));
-    expect(history.map((row) => row.after)).toEqual([
-      { text: "v1", amount: null },
-      { text: "v2", amount: null },
-      { text: "v3", amount: null },
+      .where(eq(changeHistory.containerId, home.id))
+      .orderBy(changeHistory.changedAt);
+    expect(history.map((row) => [row.action, row.after])).toEqual([
+      ["create", { text: "v2", amount: null }],
+      ["update", { text: "v3", amount: null }],
     ]);
   });
 
@@ -910,12 +913,9 @@ describe("S5 PUT /api/v1/me/self-analysis/shares", () => {
       a: long.getTime(),
       b: long.getTime(),
     });
-    expect(await historyOf(onlyB.id)).toEqual([
-      "create",
-      "create",
-      "create",
-      "update",
-    ]);
+    // The shares wrote no rows; the save of "c" is part of the answer's addition, made
+    // a moment before by the same person (ADR-020).
+    expect(await historyOf(onlyB.id)).toEqual(["create", "create", "create"]);
 
     // Shared again, it comes after the share that stayed.
     const again = await homeOf(

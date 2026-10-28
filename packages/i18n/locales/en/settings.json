@@ -1,0 +1,149 @@
+{
+  "savesOnTheirOwn": "Changes save on their own.",
+  "account": {
+    "title": "Account",
+    "profile": {
+      "title": "Profile",
+      "photo": "Photo",
+      "displayName": "Display name",
+      "displayNameNoun": "display name",
+      "email": "Email"
+    },
+    "password": {
+      "title": "Password",
+      "lead": "Changing it logs you out on your other devices.",
+      "leadSet": "You log in with Google. Set a password to log in with your email too.",
+      "current": "Current password",
+      "new": "New password",
+      "change": "Change password",
+      "set": "Set password",
+      "changed": "Password changed",
+      "setDone": "Password set. You can log in with your email too.",
+      "wrong": "Password is incorrect",
+      "reauth": "Log in again to set a password",
+      "logInAgain": "Log in again"
+    },
+    "preferences": {
+      "title": "Preferences",
+      "lead": "Dates and times show in your time zone.",
+      "timeZone": "Time zone",
+      "timeZoneNoun": "time zone",
+      "theme": "Display mode",
+      "themeOption": {
+        "system": "System",
+        "light": "Light",
+        "dark": "Dark"
+      }
+    },
+    "workspaces": {
+      "title": "Workspaces",
+      "lead": "The workspaces you belong to, and your role in each.",
+      "list": "Your workspaces",
+      "personal": "Personal",
+      "leave": "Leave",
+      "leaveOf": "Leave {{workspace}}",
+      "lastOwner": "Make someone else Owner first"
+    },
+    "logOut": {
+      "title": "Log out",
+      "lead": "Log out of moonx on this device."
+    },
+    "delete": {
+      "title": "Delete account",
+      "lead": "Deletes your account and your self analysis. This can't be undone.",
+      "open": "Delete account",
+      "dialogTitle": "Delete your account?",
+      "intro": "This can't be undone.",
+      "deletedTitle": "Deleted",
+      "deleted": {
+        "profile": "Your email, name, photo, password and sign-ins",
+        "selfAnalysis": "Your self analysis, its sharing and the comments on it",
+        "personal": "Your personal workspace and its contents, if no one else is in it",
+        "memberships": "Your place in every team workspace",
+        "notifications": "Your notifications, and the invitations you sent that are still open"
+      },
+      "keptTitle": "Kept",
+      "kept": "Team workspaces, even one with no one else in it, and what you wrote in them (ideas, validations, plans, comments, decisions), shown as written by “Deleted user”",
+      "email": "Your email",
+      "emailHelp": "Type {{email}} to confirm.",
+      "password": "Password",
+      "confirm": "Delete account",
+      "cancel": "Cancel",
+      "emailMismatch": "The email doesn't match your account",
+      "wrongPassword": "Password is incorrect",
+      "reauth": "Log in again to delete your account",
+      "lastOwner": "Make someone else Owner of {{workspace}} first",
+      "toSettings": "Open Workspace Settings of {{workspace}}"
+    }
+  },
+  "workspace": {
+    "title": "Workspace Settings",
+    "workspace": {
+      "title": "Workspace",
+      "name": "Name",
+      "nameNoun": "workspace name",
+      "currency": "Currency",
+      "currencyNote": "Changing the currency does not convert amounts you already entered."
+    },
+    "members": {
+      "title": "Members",
+      "lead_one": "{{count}} person. Owners can invite and change roles.",
+      "lead_other": "{{count}} people. Owners can invite and change roles.",
+      "list": "Members",
+      "you": "(you)",
+      "role": "Role of {{name}}",
+      "actions": "Member actions of {{name}}",
+      "remove": "Remove",
+      "leave": "Leave",
+      "lastOwner": "This workspace needs at least one Owner",
+      "personalOwner": "Owner of this personal workspace"
+    },
+    "invitations": {
+      "title": "Invitations",
+      "lead": "Links expire after 7 days and go only to the invited email.",
+      "email": "Email to invite",
+      "emailPlaceholder": "name@example.com",
+      "role": "Role of the invited",
+      "send": "Send invitation",
+      "show": "Show",
+      "pending": "Pending",
+      "all": "All",
+      "list": "Invitations",
+      "status": {
+        "pending": "{{role}} · sent {{sent}} · expires {{expires}}",
+        "expired": "{{role}} · sent {{sent}} · expired {{expires}}",
+        "accepted": "{{role}} · accepted {{accepted}}",
+        "revoked": "{{role}} · sent {{sent}} · cancelled"
+      },
+      "resend": "Resend",
+      "resendTo": "Resend invitation to {{email}}",
+      "cancel": "Cancel",
+      "cancelTo": "Cancel invitation to {{email}}",
+      "none": "No pending invitations",
+      "noneAll": "No invitations yet",
+      "alreadyMember": "{{email}} is already a member of this workspace",
+      "alreadyPending": "An invitation to {{email}} is already pending",
+      "sent": "Invitation sent to {{email}}",
+      "resent": "Invitation sent again to {{email}}",
+      "cancelled": "Invitation to {{email}} cancelled",
+      "wasCancelled": "The invitation to {{email}} was cancelled"
+    }
+  },
+  "confirm": {
+    "cancel": "Cancel",
+    "leaveTitle": "Leave {{workspace}}?",
+    "leaveBody": "You lose access to this workspace. Your self analysis stops being shared with it.",
+    "leave": "Leave",
+    "left": "You left {{workspace}}",
+    "removeTitle": "Remove {{name}}?",
+    "removeBody": "They lose access to this workspace. Their self analysis stops being shared with it, and the execution items assigned to them keep their name as text.",
+    "remove": "Remove",
+    "removed": "{{name}} was removed",
+    "viewerTitle": "Make {{name}} a Viewer?",
+    "viewerBody": "Viewers read and comment. {{name}}'s self analysis stops being shared with this workspace and stays unshared if they become a Member again, and the execution items assigned to them keep their name as text.",
+    "viewer": "Make Viewer",
+    "demoteSelfTitle": "Make yourself {{role}}?",
+    "demoteSelfBody": "Only Owners open Workspace Settings. Another Owner has to make you Owner again.",
+    "demoteSelf": "Change my role"
+  }
+}

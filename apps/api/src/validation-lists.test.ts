@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import {
   assumptions,
   changeHistory,
+  comments,
   competitors,
   costItems,
   ideas,
@@ -149,6 +150,7 @@ describe("V8 and V9 competitors", () => {
       lockVersion: 0,
       evidence: [],
       commentCount: 0,
+      unresolvedThreadCount: 0,
       updatedBy: { id: team.owner.id },
     });
     const second = await addCompetitor(team, { name: "Home bakers" });
@@ -181,6 +183,37 @@ describe("V8 and V9 competitors", () => {
       ).json(),
     );
     expect(home.checks[0]).toMatchObject({ key: "competitors", count: 2 });
+  });
+
+  test("a card counts its threads not resolved, as C1 does (design-spec 6.10)", async () => {
+    const team = await newTeam();
+    const card = await addCompetitor(team, { name: "Bongbong's" });
+    const thread = (extra: Partial<typeof comments.$inferInsert> = {}) => ({
+      workspaceId: team.workspace.id,
+      containerType: "validation" as const,
+      containerId: team.validationId,
+      sectionKey: "competitors",
+      targetType: "competitor" as const,
+      targetId: card.id,
+      authorId: team.owner.id,
+      body: "Is this price current?",
+      ...extra,
+    });
+    const [open] = await db.insert(comments).values(thread()).returning();
+    if (open === undefined) throw new Error("no comment");
+    await db.insert(comments).values([
+      // A reply is part of its thread, not a thread of its own.
+      thread({ parentId: open.id, body: "Checked last week." }),
+      thread({ resolvedAt: new Date(), resolvedById: team.owner.id }),
+      // Deleted, but not resolved: still open, as C1's unresolvedCount has it.
+      thread({ deletedAt: new Date() }),
+    ]);
+    const [listed] = (await competitorList(team)).items;
+    expect(listed).toMatchObject({
+      id: card.id,
+      unresolvedThreadCount: 2,
+      commentCount: 3,
+    });
   });
 
   test("GET leaves out the patterns questions the pinned version lacks", async () => {
@@ -484,7 +517,7 @@ describe("V10 and V11 assumptions and risks", () => {
     ]);
   });
 
-  test("V11 saves under the optimistic lock with a history row each; a deleted row is 404", async () => {
+  test("V11 saves under the optimistic lock, its adder's save joining the addition; a deleted row is 404", async () => {
     const team = await newTeam();
     const assumption = await addAssumption(team, {
       statement: "Offices order monthly",
@@ -496,15 +529,19 @@ describe("V10 and V11 assumptions and risks", () => {
         path: `/api/v1/assumptions/${assumption.id}`,
         first: { nextCheck: "Ask HR" },
         second: { nextCheck: "Call HR" },
+        // The member added it, so their save right after is part of the addition
+        // (ADR-020).
+        addedByMember: true,
       },
       {
         id: risk.id,
         path: `/api/v1/risks/${risk.id}`,
         first: { mitigation: "Tents" },
         second: { mitigation: "Indoor stalls" },
+        addedByMember: false,
       },
     ];
-    for (const { id, path, first, second } of cases) {
+    for (const { id, path, first, second, addedByMember } of cases) {
       const saved = await call("PATCH", path, team.memberCookie, {
         ...first,
         lockVersion: 0,
@@ -543,13 +580,14 @@ describe("V10 and V11 assumptions and risks", () => {
         history.map((row) => [row.action, row.sectionKey, row.source]),
       ).toEqual([
         ["create", "assumptions_risks", "manual"],
-        ["update", "assumptions_risks", "manual"],
+        ...(addedByMember ? [] : [["update", "assumptions_risks", "manual"]]),
         ["update", "assumptions_risks", "manual"],
         ["delete", "assumptions_risks", "manual"],
       ]);
-      expect(history[2]?.before).toMatchObject(first);
-      expect(history[2]?.after).toMatchObject(second);
-      expect(history[3]).toMatchObject({ before: second, after: null });
+      expect(history.at(-3)?.after).toMatchObject(first);
+      expect(history.at(-2)?.before).toMatchObject(first);
+      expect(history.at(-2)?.after).toMatchObject(second);
+      expect(history.at(-1)).toMatchObject({ before: second, after: null });
     }
   });
 });

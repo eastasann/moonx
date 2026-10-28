@@ -467,6 +467,34 @@ export type KeyMetricKey = (typeof KEY_METRIC_KEYS)[number];
 /** The key metric of one template cost row is this prefix and the row's template key. */
 export const COST_ROW_METRIC_PREFIX = "cost_row:";
 
+/** The key metrics that are one scenario's column (design-spec 6.4 `scenario:*`). */
+export const SCENARIO_METRIC_KEYS = [
+  "scenario:conservative",
+  "scenario:expected",
+  "scenario:strong",
+  "scenario:capacity",
+] as const;
+
+/**
+ * Whether a plan template's number sub-item may name `key` (SDD 5.2 `linked_metric`):
+ * one of design-spec 6.4's key metrics that 21 shows (6.12), a single value, a scenario's
+ * column, or the cost row of one of `costRowKeys`, the template keys that published
+ * validation templates give their starting rows. `scenario_table` is not one: 21 shows a
+ * scenario's column, never the whole table.
+ */
+export function isLinkedMetricKey(
+  key: string,
+  costRowKeys: ReadonlySet<string>,
+): boolean {
+  if (key.startsWith(COST_ROW_METRIC_PREFIX)) {
+    return costRowKeys.has(key.slice(COST_ROW_METRIC_PREFIX.length));
+  }
+  return (
+    (KEY_METRIC_KEYS as readonly string[]).includes(key) ||
+    (SCENARIO_METRIC_KEYS as readonly string[]).includes(key)
+  );
+}
+
 const inputMetric = (input: NumberInput | undefined): MetricValue =>
   input?.value != null
     ? exact(input.value)

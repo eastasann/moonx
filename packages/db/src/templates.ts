@@ -1,7 +1,9 @@
 import {
+  isLinkedMetricKey,
   type MeasureText,
   type PitchSection,
   pitchTemplateOverflows,
+  SCENARIO_METRIC_KEYS,
 } from "@moonx/domain";
 import {
   type AnswerType,
@@ -10,8 +12,10 @@ import {
   isQuestionKey,
   issueDetails,
   PLAN_LIST_COLUMNS,
+  planReferenceSpecSchema,
   type QuestionOptions,
   questionOptionsSchema,
+  TEMPLATE_ANSWER_TYPES,
   type TemplateFile,
   type TemplateKind,
   templateFileSchema,
@@ -279,6 +283,7 @@ export type TemplateProblemCode =
   | "options_mismatch"
   | "unknown_condition_key"
   | "copy_from_mismatch"
+  | "unknown_metric_key"
   | "pitch_deck_overflow";
 
 /** The AD6 validate response. */
@@ -310,35 +315,18 @@ export interface TemplateContent {
       displayCondition: unknown;
       /** Plans only: what the draft copies (SDD 6.3 `copy_from`). */
       copyFrom?: unknown;
+      /** Plans only: what the sub-item shows beside it (SDD 6.3 `reference`). */
+      reference?: unknown;
     }[];
   }[];
   /** The question IDs of the version before it; null when it is the first. */
   previousQuestionKeys: readonly string[] | null;
+  /**
+   * Plans only: the template keys of the starting cost rows of published validation
+   * templates, which a number sub-item's `cost_row:*` may name.
+   */
+  costRowKeys?: ReadonlySet<string>;
 }
-
-/**
- * The answer types the questions of each kind may have (SDD 5.13 AD6): those its answers
- * table holds (6.3: a self-analysis keeps a text and an amount, a validation a text, a
- * plan a text and table rows), and in a plan the sub-items that show the validation's
- * numbers and the plan's execution items and keep no answer.
- */
-const ANSWER_TYPES: Record<TemplateKind, ReadonlySet<AnswerType>> = {
-  self_analysis: new Set([
-    "long_text",
-    "short_text",
-    "choice",
-    "amount_with_reason",
-  ]),
-  validation: new Set(["long_text", "short_text", "choice"]),
-  business_plan: new Set([
-    "long_text",
-    "short_text",
-    "choice",
-    "table",
-    "linked_metric",
-    "execution_view",
-  ]),
-};
 
 const optionsKindOf: Record<AnswerType, QuestionOptions["kind"] | null> = {
   long_text: null,
@@ -428,6 +416,57 @@ const pitchDeckErrors = (
   );
 };
 
+/** The keys of the key numbers a sub-item's references list (SDD 6.3 `metrics`). */
+const referencedMetricKeysOf = (reference: unknown): string[] => {
+  const parsed = planReferenceSpecSchema.array().safeParse(reference);
+  return parsed.success
+    ? parsed.data.flatMap((spec) => (spec.kind === "metrics" ? spec.keys : []))
+    : [];
+};
+
+/** The keys a number sub-item names; none for options of any other kind. */
+const linkedMetricKeysOf = (options: unknown): string[] => {
+  const parsed = questionOptionsSchema.safeParse(options);
+  return parsed.success && parsed.data.kind === "linked_metric"
+    ? parsed.data.metricKeys
+    : [];
+};
+
+/**
+ * The starting cost rows of the published validation templates (design-spec 6.4
+ * `cost_row:*`): each key once, by the name of the newest version that has it, in that
+ * version's order, newer versions first.
+ */
+export async function loadPublishedCostRows(
+  db: Executor,
+): Promise<{ key: string; name: string }[]> {
+  const rows = await db
+    .select({ key: templateCostDefaults.key, name: templateCostDefaults.name })
+    .from(templateCostDefaults)
+    .innerJoin(
+      templateVersions,
+      eq(templateVersions.id, templateCostDefaults.templateVersionId),
+    )
+    .innerJoin(templates, eq(templates.id, templateVersions.templateId))
+    .where(
+      and(
+        eq(templates.kind, "validation"),
+        eq(templateVersions.status, "published"),
+      ),
+    )
+    .orderBy(
+      desc(templateVersions.versionNumber),
+      asc(templateCostDefaults.sortOrder),
+      asc(templateCostDefaults.id),
+    );
+  const seen = new Set<string>();
+  return rows.filter(({ key }) => {
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /**
  * The checks of AD6 validate on a version's content (SDD 5.13).
  *
@@ -485,7 +524,7 @@ export function checkTemplateContent(
         nodeId: question.id,
       });
     seen.add(key);
-    if (!ANSWER_TYPES[content.kind].has(question.answerType))
+    if (!TEMPLATE_ANSWER_TYPES[content.kind].includes(question.answerType))
       errors.push({
         code: "answer_type_mismatch",
         message: `${key} is ${question.answerType}, which answers of this template cannot hold`,
@@ -506,6 +545,29 @@ export function checkTemplateContent(
         message: `${key} cannot hold what it copies from the validation`,
         nodeId: question.id,
       });
+    if (content.kind === "business_plan") {
+      const costRowKeys = content.costRowKeys ?? new Set<string>();
+      for (const metricKey of linkedMetricKeysOf(question.options)) {
+        if (!isLinkedMetricKey(metricKey, costRowKeys))
+          errors.push({
+            code: "unknown_metric_key",
+            message: `${key} shows ${metricKey}, which is not a key number a prompt can show`,
+            nodeId: question.id,
+          });
+      }
+      // A reference lists single values, never a scenario's column (P4 `metrics`).
+      for (const metricKey of referencedMetricKeysOf(question.reference)) {
+        if (
+          !isLinkedMetricKey(metricKey, costRowKeys) ||
+          (SCENARIO_METRIC_KEYS as readonly string[]).includes(metricKey)
+        )
+          errors.push({
+            code: "unknown_metric_key",
+            message: `${key} refers to ${metricKey}, which is not a key number a reference can show`,
+            nodeId: question.id,
+          });
+      }
+    }
     for (const conditionKey of conditionKeys(question.displayCondition)) {
       if (!keys.has(conditionKey))
         errors.push({
@@ -602,6 +664,7 @@ const checkStoredVersion = async (
       options: templateQuestions.options,
       displayCondition: templateQuestions.displayCondition,
       copyFrom: templateQuestions.copyFrom,
+      reference: templateQuestions.reference,
     })
     .from(templateQuestions)
     .where(eq(templateQuestions.templateVersionId, versionId))
@@ -628,6 +691,10 @@ const checkStoredVersion = async (
       })),
       previousQuestionKeys:
         previous === undefined ? null : await questionKeysOf(db, previous.id),
+      costRowKeys:
+        version.kind === "business_plan"
+          ? new Set((await loadPublishedCostRows(db)).map(({ key }) => key))
+          : undefined,
     },
     measure,
   );

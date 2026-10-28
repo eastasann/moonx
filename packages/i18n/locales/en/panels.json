@@ -1,0 +1,84 @@
+{
+  "comments": {
+    "title": "Comments",
+    "onItem": "On {{item}}",
+    "empty": "No comments yet",
+    "new": "Add a comment",
+    "newOnIdea": "Comment on {{idea}}",
+    "fromWorkspace": "From {{workspace}}",
+    "noNewThread": "Share your self analysis with a team workspace to start a thread.",
+    "postTo": "Post to",
+    "placeholder": "Write a comment…",
+    "post": "Post",
+    "reply": "Reply",
+    "replyTo": "Reply to {{name}}",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "editLabel": "Edit your comment",
+    "delete": "Delete",
+    "deleteTitle": "Delete this comment?",
+    "deleteBody": "Its words are removed for good. The thread keeps a line that says it was deleted.",
+    "deleted": "deleted",
+    "edited": "edited",
+    "more": "More for {{name}}'s comment",
+    "resolve": "Resolve",
+    "reopen": "Reopen",
+    "resolvedBy": "Resolved by {{name}}",
+    "resolvedThread": "Resolved · {{name}}: {{excerpt}}",
+    "resolvedDeleted": "Resolved · {{name}}",
+    "couldNotPost": "Couldn't post",
+    "invalidMention": "Someone you mentioned can't be mentioned here. Remove the mention and post again.",
+    "noCandidates": "Couldn't load who you can mention.",
+    "archived": {
+      "idea": "This idea is archived. Restore it to make changes.",
+      "plan": "This plan is archived. Restore it to make changes."
+    },
+    "item": "Comments on {{item}}",
+    "itemCount_one": "Comments on {{item}}, {{formatted}} comment",
+    "itemCount_other": "Comments on {{item}}, {{formatted}} comments",
+    "menu": "Comments",
+    "menuCount": "Comments ({{formatted}})"
+  },
+  "history": {
+    "title": "History",
+    "onItem": "On {{item}}",
+    "empty": "No changes yet",
+    "more": "Show more",
+    "revert": "Revert to this point",
+    "revertItem": "Revert to this point, {{item}}",
+    "undelete": "Undo delete",
+    "undeleteItem": "Undo delete of {{item}}",
+    "undoOperation": "Undo the whole operation",
+    "undoOperationItem": "Undo the whole operation that changed {{item}}",
+    "item": "History of {{item}}",
+    "menu": "History",
+    "templateUpdated": "Template updated to v{{version}}",
+    "templateBack": "Template set back to v{{version}}",
+    "planDraftUndo": {
+      "title": "Delete this plan draft?",
+      "body": "This plan draft and everything in it will be deleted. This can't be undone."
+    },
+    "source": {
+      "manual": "Manual",
+      "ai_import": "AI import",
+      "revert": "Revert",
+      "template_migration": "Template update",
+      "duplicate": "Duplicate",
+      "plan_draft": "Plan draft",
+      "duplicateUndone": "Duplicate undone",
+      "planDraftUndone": "Plan draft undone"
+    },
+    "action": {
+      "create": "Added",
+      "update": "Changed",
+      "delete": "Deleted",
+      "restore": "Restored"
+    },
+    "field": {
+      "inputMode": "Entered as"
+    },
+    "yes": "Yes",
+    "no": "No"
+  }
+}

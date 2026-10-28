@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { type DiffPart, diffNow, diffText, waitForDiff, words } from "./diff";
 
 const side = (parts: DiffPart[], kind: "delete" | "insert") =>
@@ -366,6 +366,39 @@ describe("diffText", () => {
     expect(finished).toHaveLength(41);
     // A step of each in turn: the small one is not the last.
     expect(finished.indexOf("small")).toBeLessThan(40);
+  });
+
+  test("each task's round starts where the last one's budget stopped: a short diff is not starved by long ones on a slow device", async () => {
+    // Every reading of the clock takes 1 ms: a budget reaches a few diffs per task.
+    let now = 0;
+    const clock = vi.spyOn(performance, "now").mockImplementation(() => {
+      now += 1;
+      return now;
+    });
+    try {
+      const next = random(11);
+      const text = (length: number) =>
+        Array.from({ length }, () => "ijklmnop "[Math.floor(next() * 9)]).join(
+          "",
+        );
+      const finished: string[] = [];
+      const wait = (name: string, before: string, after: string) =>
+        new Promise<void>((resolve) => {
+          waitForDiff(before, after, () => {
+            finished.push(name);
+            resolve();
+          });
+        });
+      const long = Array.from({ length: 12 }, (_, index) =>
+        wait(`long ${index}`, text(3000), text(3000)),
+      );
+      const small = wait("small", "Night market", "Night stall");
+      await Promise.all([...long, small]);
+      expect(finished).toHaveLength(13);
+      expect(finished.indexOf("small")).toBeLessThan(12);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   test("the same pair again (DiffText's other side) is not worked out twice", () => {

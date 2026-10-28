@@ -302,11 +302,15 @@ export const importContextSchema = z.object({
     z.object({
       questionKey: z.string(),
       title: z.string(),
+      /** The question asked (25 ③ heads each change with it). */
+      prompt: z.string(),
       sectionKey: z.string(),
       answerType: answerTypeSchema,
       options: questionOptionsSchema.nullable(),
       /** False for tables, numbers and execution items. */
       importable: z.boolean(),
+      /** The question has F/A/U (validation only): 25 ③ sets it again. */
+      hasFau: z.boolean(),
       /**
        * Hidden by 02 OCEAN or by a template migration. A question a migration hid is
        * here only when it has a saved answer of a type an import can write, as the

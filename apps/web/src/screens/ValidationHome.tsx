@@ -1,0 +1,939 @@
+import { formatDate, i18n } from "@moonx/i18n";
+import {
+  type CheckResult,
+  decisionValueSchema,
+  type FauBreakdown,
+  type NextStep,
+  type PlanSummary,
+  type ValidationHome,
+} from "@moonx/schemas";
+import {
+  ActionMenu,
+  Badge,
+  Breadcrumb,
+  Breadcrumbs,
+  Button,
+  DescriptionList,
+  DescriptionListItem,
+  Divider,
+  Flex,
+  Heading,
+  type HubBlock as HubBlockSpec,
+  HubPattern,
+  Link,
+  MenuItem,
+  Meter,
+  MoonGlyph,
+  RowList,
+  RowListItem,
+  Skeleton,
+  Stack,
+  Text,
+} from "@moonx/ui-web";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { type ReactNode, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { AiMenu } from "../components/AiMenu";
+import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
+import type { ScreenComments } from "../components/CommentsPanel";
+import { ModalBoundary } from "../components/ErrorBoundary";
+import { HubBlock } from "../components/HubBlock";
+import { EditSummaryDialog } from "../components/IdeaDialogs";
+import { useIdeaActions } from "../components/ideaActions";
+import {
+  CheckRows,
+  checkReason,
+  DecisionBadge,
+  KeyMetrics,
+} from "../components/ideaParts";
+import { CreatePlanDialog } from "../components/PlanDialogs";
+import {
+  FailureState,
+  NoAccessState,
+  SlowLoadingState,
+  useIsSlow,
+} from "../components/states";
+import {
+  type TemplateTarget,
+  TemplateUpdateDialog,
+  useIsTemplateUpdateOpen,
+  useOpenTemplateUpdate,
+  useTemplateBanner,
+} from "../components/TemplateUpdate";
+import { UserName } from "../components/UserName";
+import { WorkspaceFrame } from "../components/WorkspaceFrame";
+import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  decideHref,
+  decisionsHref,
+  hrefOf,
+  ideaHref,
+  ideasHref,
+  planHref,
+  questionsHref,
+  sectionHref,
+} from "../lib/links";
+import {
+  archivedPlansQuery,
+  ideaKey,
+  validationHomeQuery,
+} from "../lib/queries";
+import { useDocumentTitle } from "../lib/title";
+
+type Section = ValidationHome["sections"][number];
+
+const nextStepKey = "validation:home.nextSteps";
+
+/** A section's numbered name (V1 sections[].title), by its key. */
+const sectionName = (sections: readonly Section[], key: string | null) =>
+  sections.find((section) => section.key === key)?.title ?? key ?? "";
+
+/** What a Next step says (design-spec 6.1「Next steps の決め方」). */
+function nextStepLabel(step: NextStep, sections: readonly Section[]): string {
+  const t = i18n.t.bind(i18n);
+  const count = step.count ?? 0;
+  switch (step.kind) {
+    case "add_evidence":
+    case "classify":
+    case "check_unknowns":
+      return t(`${nextStepKey}.${step.kind}`, { count });
+    case "start_customer_problem":
+    case "start_section":
+      return t(`${nextStepKey}.${step.kind}`, {
+        section: sectionName(sections, step.sectionKey),
+      });
+    case "ready_to_decide":
+      return t(`${nextStepKey}.ready_to_decide`);
+    case "check":
+      switch (step.checkKey) {
+        case "competitors":
+          return t(`${nextStepKey}.check.competitors`, { count });
+        case "costs":
+          return step.count === null
+            ? t(`${nextStepKey}.check.costs`)
+            : t(`${nextStepKey}.check.costsEmpty`, { count });
+        case null:
+          throw new Error("A check's Next step names its check (SDD 5.2)");
+        default:
+          return t(`${nextStepKey}.check.${step.checkKey}`);
+      }
+  }
+}
+
+/**
+ * The line under the first Next step: why it is first (design-spec 6.1). A check's is its
+ * reason in the Checks block; a break-even with price and monthly costs but no positive
+ * margin is told to review them.
+ */
+function nextStepReason(
+  step: NextStep,
+  sections: readonly Section[],
+  checks: readonly CheckResult[],
+): string | undefined {
+  const t = i18n.t.bind(i18n);
+  const count = step.count ?? 0;
+  switch (step.kind) {
+    case "add_evidence":
+      return t(`${nextStepKey}.add_evidenceWhy`, {
+        count,
+        section: sectionName(sections, step.sectionKey),
+      });
+    case "classify":
+    case "check_unknowns":
+      return t(`${nextStepKey}.${step.kind}Why`, { count });
+    case "start_customer_problem":
+    case "ready_to_decide":
+      return t(`${nextStepKey}.${step.kind}Why`);
+    case "start_section":
+      return t(`${nextStepKey}.start_sectionWhy`, {
+        section: sectionName(sections, step.sectionKey),
+      });
+    case "check": {
+      const check = checks.find(({ key }) => key === step.checkKey);
+      return check === undefined
+        ? undefined
+        : (checkReason(check) ?? undefined);
+    }
+  }
+}
+
+/** A break-even blocked only by its margin reads "Review price or variable costs" (6.1). */
+function labelOf(
+  step: NextStep,
+  sections: readonly Section[],
+  checks: readonly CheckResult[],
+): string {
+  if (step.kind === "check" && step.checkKey === "break_even") {
+    const check = checks.find(({ key }) => key === "break_even");
+    if (check !== undefined && (check.detail?.missing ?? []).length === 0) {
+      return i18n.t(`${nextStepKey}.check.break_evenMargin`);
+    }
+  }
+  return nextStepLabel(step, sections);
+}
+
+function NextSteps({ home }: { home: ValidationHome }) {
+  const { t } = useTranslation(["validation"]);
+  return (
+    <HubBlock title={t("validation:home.nextSteps.title")}>
+      <RowList ordered aria-label={t("validation:home.nextSteps.title")}>
+        {home.nextSteps.map((step, index) => (
+          <RowListItem
+            // A kind shows once, but a check per check key.
+            key={`${step.kind}:${step.checkKey ?? step.sectionKey ?? ""}`}
+            href={step.link === null ? undefined : hrefOf(step.link)}
+            isEmphasized={index === 0}
+            description={
+              index === 0
+                ? nextStepReason(step, home.sections, home.checks)
+                : undefined
+            }
+          >
+            {labelOf(step, home.sections, home.checks)}
+          </RowListItem>
+        ))}
+      </RowList>
+    </HubBlock>
+  );
+}
+
+const total = (fau: FauBreakdown) =>
+  fau.fact + fau.assumption.total + fau.unknown + fau.unclassified + fau.empty;
+
+/** The F/A/U of every item, in one band and its legend (design-spec 6.1, d1-moon.html). */
+function FauBlock({ fau }: { fau: FauBreakdown }) {
+  const { t } = useTranslation(["validation", "common"]);
+  return (
+    <HubBlock
+      title={t("validation:home.fau.title")}
+      aside={t("validation:home.fau.items", { count: total(fau) })}
+      isAsideNumeric
+    >
+      <Meter
+        aria-label={t("validation:home.fau.meter")}
+        // Only what the items hold: a new idea shows "Empty" alone (6.1「作ったばかり」).
+        segments={[
+          {
+            state: "fact" as const,
+            label: t("common:fauState.fact"),
+            count: fau.fact,
+          },
+          {
+            state: "assumption" as const,
+            label: t("common:fauState.assumption"),
+            count: fau.assumption.total,
+            detail: t("validation:home.fau.confidences", fau.assumption),
+          },
+          {
+            state: "unknown" as const,
+            label: t("common:fauState.unknown"),
+            count: fau.unknown,
+          },
+          {
+            state: "unclassified" as const,
+            label: t("common:fauState.unclassified"),
+            count: fau.unclassified,
+          },
+          {
+            state: "empty" as const,
+            label: t("common:fauState.empty"),
+            count: fau.empty,
+          },
+        ].filter(({ count }) => count > 0)}
+      />
+    </HubBlock>
+  );
+}
+
+/** The answers 13's Summary shows (SDD 5.7 V1 `summary`): the question each comes from. */
+const SUMMARY_QUESTIONS = {
+  customer: { section: "01", key: "V.01.WHO" },
+  problem: { section: "01", key: "V.01.PROBLEM" },
+  marketType: { section: "02", key: "V.02.OCEAN" },
+} as const;
+
+/**
+ * Customer, Problem, Solution and Market type (design-spec 6.1): "Empty" where nothing is
+ * written, and the way to its screen: the question on 11 for everyone (read only for a
+ * Viewer and on an archived idea), Edit summary for the idea's own Solution for the
+ * Owners and Members.
+ */
+function SummaryBlock({
+  home,
+  canEdit,
+  onEdit,
+}: {
+  home: ValidationHome;
+  canEdit: boolean;
+  onEdit: () => void;
+}) {
+  const { t } = useTranslation(["validation"]);
+  const { workspace } = useWorkspace();
+  const empty = (
+    <Text tone="secondary">{t("validation:home.summary.empty")}</Text>
+  );
+  const emptyWith = (way: ReactNode) =>
+    canEdit ? (
+      <Stack gap="space-50">
+        {empty}
+        <Flex>{way}</Flex>
+      </Stack>
+    ) : (
+      empty
+    );
+  const answer = (field: keyof typeof SUMMARY_QUESTIONS) => {
+    const text = home.summary[field];
+    if (text !== null) return text;
+    const { section, key } = SUMMARY_QUESTIONS[field];
+    const title =
+      home.sections.find((candidate) => candidate.key === section)?.title ??
+      section;
+    return (
+      <Stack gap="space-50">
+        {empty}
+        <Flex>
+          <Link href={questionsHref(workspace.id, home.idea.id, section, key)}>
+            {canEdit
+              ? t("validation:home.summary.answerIn", { section: title })
+              : t("validation:home.summary.openIn", { section: title })}
+          </Link>
+        </Flex>
+      </Stack>
+    );
+  };
+  return (
+    <HubBlock title={t("validation:home.summary.title")}>
+      <DescriptionList>
+        <DescriptionListItem label={t("validation:home.summary.customer")}>
+          {answer("customer")}
+        </DescriptionListItem>
+        <DescriptionListItem label={t("validation:home.summary.problem")}>
+          {answer("problem")}
+        </DescriptionListItem>
+        <DescriptionListItem label={t("validation:home.summary.solution")}>
+          {home.summary.solution ??
+            emptyWith(
+              <Link onPress={onEdit}>{t("validation:home.editSummary")}</Link>,
+            )}
+        </DescriptionListItem>
+        <DescriptionListItem label={t("validation:home.summary.marketType")}>
+          {answer("marketType")}
+        </DescriptionListItem>
+      </DescriptionList>
+    </HubBlock>
+  );
+}
+
+/** What a section's row ends with (design-spec 6.1「セクションの進み具合の数え方」). */
+function sectionEnd(section: Section, checks: readonly CheckResult[]): string {
+  const t = i18n.t.bind(i18n);
+  const counts = {
+    answered: section.answered ?? 0,
+    total: section.total ?? 0,
+  };
+  switch (section.key) {
+    case "03":
+      return t("validation:home.sections.entries", {
+        count: section.count ?? 0,
+      });
+    case "04": {
+      const { min = 0, max = 0 } =
+        checks.find(({ key }) => key === "competitors")?.params ?? {};
+      return t("validation:home.sections.competitors", {
+        count: section.count ?? 0,
+        range:
+          min < max
+            ? t("validation:home.sections.range", { min, max })
+            : t("validation:home.sections.rangeAtLeast", { min }),
+      });
+    }
+    case "05":
+      return t("validation:home.sections.rows", counts);
+    case "06-08":
+      return t("validation:home.sections.inputs", counts);
+    case "09":
+      return t("validation:home.sections.assumptionsRisks", {
+        assumptions: section.count ?? 0,
+        risks: section.countB ?? 0,
+      });
+    default:
+      return t("validation:home.sections.answered", counts);
+  }
+}
+
+/**
+ * The ten sections with how far each is (design-spec 6.1): a moon filled as far for the
+ * ones with a whole. A row opens its screen.
+ */
+function SectionsBlock({ home }: { home: ValidationHome }) {
+  const { t } = useTranslation(["validation"]);
+  const { workspace } = useWorkspace();
+  return (
+    <HubBlock title={t("validation:home.sections.title")}>
+      <RowList aria-label={t("validation:home.sections.title")}>
+        {home.sections.map((section) => (
+          <RowListItem
+            key={section.key}
+            href={sectionHref(workspace.id, home.idea.id, section.key)}
+            start={
+              section.total === null ? undefined : (
+                <MoonGlyph
+                  value={
+                    section.total === 0
+                      ? 0
+                      : (section.answered ?? 0) / section.total
+                  }
+                />
+              )
+            }
+            end={sectionEnd(section, home.checks)}
+            isEndNumeric
+          >
+            {section.title}
+          </RowListItem>
+        ))}
+      </RowList>
+    </HubBlock>
+  );
+}
+
+/**
+ * The idea's decisions, newest first, and "See all" to this idea's in 7 (design-spec
+ * 6.1, d1-moon.html .decision).
+ */
+function DecisionsBlock({ home }: { home: ValidationHome }) {
+  const { t } = useTranslation(["validation", "common", "app"]);
+  const { me, workspace } = useWorkspace();
+  return (
+    <HubBlock title={t("validation:home.decisions.title")}>
+      {home.decisions.length === 0 ? (
+        <Text tone="secondary" elementType="p">
+          {t("validation:home.decisions.empty")}
+        </Text>
+      ) : (
+        <Stack gap="space-100">
+          {home.decisions.map((decision) => (
+            <Stack key={decision.id} gap="space-100">
+              <Divider size="S" />
+              <Text variant="caption" tone="secondary">
+                <Text variant="caption" tone="primary">
+                  <strong>
+                    {t(
+                      `common:decision.${decisionValueSchema.parse(decision.value)}`,
+                    )}
+                  </strong>
+                </Text>
+                {t("app:separator")}
+                {formatDate(decision.recordedAt, { timeZone: me.timezone })}
+                {t("app:separator")}
+                <UserName user={decision.recordedBy} />
+              </Text>
+              {decision.reasonExcerpt !== null && (
+                <Text>
+                  {t("validation:home.decisions.reason", {
+                    reason: decision.reasonExcerpt,
+                  })}
+                </Text>
+              )}
+            </Stack>
+          ))}
+          <Divider size="S" />
+          <Flex>
+            <Link href={decisionsHref(workspace.id, { idea: home.idea.id })}>
+              {t("validation:home.decisions.seeAll")}
+            </Link>
+          </Flex>
+        </Stack>
+      )}
+    </HubBlock>
+  );
+}
+
+function PlanRow({ plan, ideaId }: { plan: PlanSummary; ideaId: string }) {
+  const { t } = useTranslation(["validation", "common"]);
+  const { workspace } = useWorkspace();
+  return (
+    <RowListItem
+      href={planHref(workspace.id, ideaId, plan.id)}
+      description={
+        plan.latestVersion?.name ?? t("validation:home.plans.noVersion")
+      }
+      end={
+        plan.latestGoNoGo === null
+          ? undefined
+          : t(`common:goNoGo.${plan.latestGoNoGo.value}`)
+      }
+      badge={
+        plan.archived ? (
+          <Badge>{t("validation:home.plans.archivedBadge")}</Badge>
+        ) : undefined
+      }
+    >
+      {plan.name}
+    </RowListItem>
+  );
+}
+
+/**
+ * The idea's plans (design-spec 6.1): their latest version and Go / No-Go; the archived
+ * ones counted under them, listed once "Show" is pressed (P1 GET with them). A row opens
+ * its 20 (an archived plan's, read only). After Proceed, Add plan opens M5.
+ */
+function PlansBlock({
+  home,
+  canAddPlan,
+  onAddPlan,
+}: {
+  home: ValidationHome;
+  canAddPlan: boolean;
+  onAddPlan: () => void;
+}) {
+  const { t } = useTranslation(["validation", "app"]);
+  const [showsArchived, setShowsArchived] = useState(false);
+  const archived = useQuery({
+    ...archivedPlansQuery(home.idea.id),
+    enabled: showsArchived,
+  });
+  const archivedPlans = (archived.data?.items ?? []).filter(
+    (plan) => plan.archived,
+  );
+  return (
+    <HubBlock
+      title={t("validation:home.plans.title")}
+      isBusy={showsArchived && archived.isPending}
+    >
+      {home.plans.length === 0 && home.archivedPlanCount === 0 ? (
+        <Text tone="secondary" elementType="p">
+          {/* Before any decision, as Decisions (6.1「作ったばかり」); after, d1-moon.html's. */}
+          {home.decisions.length === 0
+            ? t("validation:home.decisions.empty")
+            : t("validation:home.plans.empty")}
+        </Text>
+      ) : (
+        <>
+          {(home.plans.length > 0 || archivedPlans.length > 0) && (
+            <RowList aria-label={t("validation:home.plans.title")}>
+              {home.plans.map((plan) => (
+                <PlanRow key={plan.id} plan={plan} ideaId={home.idea.id} />
+              ))}
+              {showsArchived &&
+                archivedPlans.map((plan) => (
+                  <PlanRow key={plan.id} plan={plan} ideaId={home.idea.id} />
+                ))}
+            </RowList>
+          )}
+          {home.archivedPlanCount > 0 && !showsArchived && (
+            <Text variant="body-sm" tone="secondary">
+              {t("validation:home.plans.archived", {
+                count: home.archivedPlanCount,
+              })}
+              {t("app:separator")}
+              <Link onPress={() => setShowsArchived(true)}>
+                {t("validation:home.plans.show")}
+              </Link>
+            </Text>
+          )}
+          {showsArchived && archived.isError && (
+            <FailureState
+              error={archived.error}
+              onRetry={() => void archived.refetch()}
+              headingLevel={3}
+              size="S"
+            />
+          )}
+        </>
+      )}
+      {canAddPlan && (
+        <Flex>
+          <Link onPress={onAddPlan}>{t("validation:home.plans.add")}</Link>
+        </Flex>
+      )}
+    </HubBlock>
+  );
+}
+
+/**
+ * The title and what goes under it (design-spec 6.1, d1-moon.html .hero): the archived
+ * notice with Restore, the latest decision and the stage, the name, the concept and who
+ * proposed it, and the idea it was copied from.
+ */
+function Header({ home }: { home: ValidationHome }) {
+  const { t } = useTranslation(["validation", "common", "app"]);
+  const { me, workspace } = useWorkspace();
+  const { idea } = home;
+  const latest = home.decisions[0];
+  const status = [
+    ...(latest === undefined || idea.latestDecision === null
+      ? []
+      : [
+          t("validation:home.latestDecision", {
+            date: formatDate(latest.recordedAt, { timeZone: me.timezone }),
+          }),
+        ]),
+    t("validation:home.stage", { stage: t(`common:stage.${idea.stage}`) }),
+  ].join(t("app:separator"));
+  return (
+    <>
+      {idea.archived && <ArchivedIdeaAlert ideaId={idea.id} />}
+      <Flex gap="space-200" alignItems="center" wrap>
+        <DecisionBadge decision={idea.latestDecision} />
+        <Text variant="caption" tone="secondary">
+          {status}
+        </Text>
+      </Flex>
+      <Heading level={1} variant="heading-1-hub">
+        {idea.name}
+      </Heading>
+      <Text tone="secondary">
+        {`${idea.oneLineConcept} `}
+        <Text tone="tertiary">
+          {t("validation:home.by", { name: idea.proposer.displayName })}
+        </Text>
+      </Text>
+      {idea.duplicatedFrom !== null && (
+        <Flex>
+          <Link href={ideaHref(workspace.id, idea.duplicatedFrom.id)}>
+            {t("validation:home.duplicatedFrom", {
+              name: idea.duplicatedFrom.name,
+            })}
+          </Link>
+        </Flex>
+      )}
+    </>
+  );
+}
+
+/** What M8 moves on 13: the idea's validation (SDD 4章 `about=validation:<id>`). */
+const validationTarget = (home: ValidationHome): TemplateTarget => ({
+  kind: "validation",
+  id: home.validationId,
+});
+
+/**
+ * The tools beside the title for the Owners and Members (design-spec 6.1「操作」): Edit
+ * summary and AI ▼ while the idea is not archived (6.8: no AI round trip then), and ⋯
+ * with Duplicate, and Archive and, while a newer template is published, Update template
+ * (M8) while it is not. Add plan is in the Plans block.
+ */
+function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {
+  const { t } = useTranslation(["validation", "ideas", "app"]);
+  const { workspace } = useWorkspace();
+  const actions = useIdeaActions();
+  const openTemplateUpdate = useOpenTemplateUpdate();
+  const { idea } = home;
+  return (
+    <>
+      {!idea.archived && (
+        <Button variant="secondary" isQuiet onPress={onEdit}>
+          {t("validation:home.editSummary")}
+        </Button>
+      )}
+      {!idea.archived && (
+        <AiMenu
+          kind="validation"
+          id={home.validationId}
+          returnTo={ideaHref(workspace.id, idea.id)}
+        />
+      )}
+      <ActionMenu
+        aria-label={t("validation:home.more", { name: idea.name })}
+        onAction={(key) => {
+          if (key === "duplicate") actions.duplicate(idea);
+          else if (key === "archive") actions.archive(idea.id);
+          else if (key === "update-template") {
+            openTemplateUpdate(validationTarget(home));
+          }
+        }}
+      >
+        <MenuItem id="duplicate">{t("ideas:action.duplicate")}</MenuItem>
+        {!idea.archived && (
+          <MenuItem id="archive">{t("ideas:action.archive")}</MenuItem>
+        )}
+        {!idea.archived && home.template.newerVersion !== null && (
+          <MenuItem id="update-template">
+            {t("app:templateUpdate.action")}
+          </MenuItem>
+        )}
+      </ActionMenu>
+    </>
+  );
+}
+
+function ValidationHub({
+  home,
+  modal,
+  about,
+}: {
+  home: ValidationHome;
+  modal: string | undefined;
+  about: string | undefined;
+}) {
+  const { t } = useTranslation(["validation"]);
+  const { workspace, role } = useWorkspace();
+  const navigate = useNavigate();
+  const modals = useModal();
+  const [isEditing, setEditing] = useState(false);
+  const canWrite = role !== "viewer";
+  const canEdit = canWrite && !home.idea.archived;
+  // M5 only after Proceed (design-spec 6.12「M5」, 6.1「操作」).
+  const canAddPlan = canEdit && home.idea.latestDecision === "proceed";
+  const isUpdatingTemplate = useIsTemplateUpdateOpen(
+    modal,
+    about,
+    validationTarget(home),
+    canEdit,
+  );
+  const blocks: HubBlockSpec[] = [
+    { id: "next", column: "main", content: <NextSteps home={home} /> },
+    {
+      id: "checks",
+      column: "main",
+      content: (
+        <HubBlock
+          title={t("validation:home.checks.title")}
+          aside={t("validation:home.checks.legend")}
+        >
+          <CheckRows
+            checks={home.checks}
+            aria-label={t("validation:home.checks.title")}
+          />
+        </HubBlock>
+      ),
+    },
+    { id: "fau", column: "main", content: <FauBlock fau={home.fau} /> },
+    { id: "sections", column: "aside", content: <SectionsBlock home={home} /> },
+    {
+      id: "summary",
+      column: "main",
+      content: (
+        <SummaryBlock
+          home={home}
+          canEdit={canEdit}
+          onEdit={() => setEditing(true)}
+        />
+      ),
+    },
+    {
+      id: "decisions",
+      column: "aside",
+      content: <DecisionsBlock home={home} />,
+    },
+    {
+      id: "plans",
+      column: "aside",
+      content: (
+        <PlansBlock
+          home={home}
+          canAddPlan={canAddPlan}
+          onAddPlan={() => modals.open("create-plan")}
+        />
+      ),
+    },
+  ];
+  return (
+    <>
+      <HubPattern
+        header={<Header home={home} />}
+        actions={
+          canWrite ? (
+            <Tools home={home} onEdit={() => setEditing(true)} />
+          ) : undefined
+        }
+        primaryAction={
+          canEdit ? (
+            <Button
+              variant="primary"
+              onPress={() =>
+                void navigate({ href: decideHref(workspace.id, home.idea.id) })
+              }
+            >
+              {t("validation:home.recordDecision")}
+            </Button>
+          ) : undefined
+        }
+        metrics={
+          <KeyMetrics
+            metrics={home.keyMetrics}
+            currency={workspace.currency}
+            variant="band"
+            hasMarginWarning={home.economicsWarnings.includes(
+              "margin_not_positive",
+            )}
+            aria-label={t("validation:home.keyNumbers")}
+          />
+        }
+        blocks={blocks}
+      />
+      {isEditing && canEdit && (
+        <ModalBoundary onClose={() => setEditing(false)}>
+          <EditSummaryDialog home={home} onClose={() => setEditing(false)} />
+        </ModalBoundary>
+      )}
+      {modal === "create-plan" && canAddPlan && (
+        <ModalBoundary key={modal} onClose={modals.close}>
+          <CreatePlanDialog ideaId={home.idea.id} onClose={modals.close} />
+        </ModalBoundary>
+      )}
+      {isUpdatingTemplate && (
+        <ModalBoundary key={modal} onClose={modals.close}>
+          <TemplateUpdateDialog
+            target={validationTarget(home)}
+            dataKeys={[ideaKey(home.idea.id)]}
+            onClose={modals.close}
+          />
+        </ModalBoundary>
+      )}
+    </>
+  );
+}
+
+/**
+ * 13 Validation home's shape while it loads (design-spec 6.0.6・6.1「ローディング」): the
+ * title, the key numbers, the checks and the sections. Drawn inside a `Skeleton`, its
+ * words are bars.
+ */
+export function ValidationHomeSkeleton() {
+  const { t } = useTranslation(["validation"]);
+  const rows = (label: string) => (
+    <RowList aria-label={label}>
+      {[0, 1, 2, 3].map((row) => (
+        <RowListItem key={row} end={t("validation:home.summary.empty")}>
+          {label}
+        </RowListItem>
+      ))}
+    </RowList>
+  );
+  return (
+    <HubPattern
+      header={
+        <Heading level={1} variant="heading-1-hub">
+          {t("validation:home.keyNumbers")}
+        </Heading>
+      }
+      blocks={[
+        {
+          id: "checks",
+          column: "main",
+          content: (
+            <HubBlock title={t("validation:home.checks.title")}>
+              {rows(t("validation:home.checks.title"))}
+            </HubBlock>
+          ),
+        },
+        {
+          id: "sections",
+          column: "aside",
+          content: (
+            <HubBlock title={t("validation:home.sections.title")}>
+              {rows(t("validation:home.sections.title"))}
+            </HubBlock>
+          ),
+        },
+      ]}
+    />
+  );
+}
+
+function ValidationHomeBody({
+  ideaId,
+  modal,
+  about,
+}: {
+  ideaId: string;
+  modal: string | undefined;
+  about: string | undefined;
+}) {
+  const { me, workspace } = useWorkspace();
+  const query = useQuery(validationHomeQuery(ideaId));
+  const isSlow = useIsSlow(query.isPending);
+  if (query.data !== undefined) {
+    // Another workspace's idea under this one's URL (SDD 4章): its role is not this one's.
+    return query.data.idea.workspaceId === workspace.id ? (
+      <ValidationHub home={query.data} modal={modal} about={about} />
+    ) : (
+      <NoAccessState dashboardHref={dashboardHref(me)} />
+    );
+  }
+  if (query.isError) {
+    return (
+      <FailureState
+        error={query.error}
+        onRetry={() => void query.refetch()}
+        dashboardHref={dashboardHref(me)}
+      />
+    );
+  }
+  if (isSlow) return <SlowLoadingState onRetry={() => void query.refetch()} />;
+  return (
+    <Skeleton isLoading>
+      <ValidationHomeSkeleton />
+    </Skeleton>
+  );
+}
+
+/**
+ * 13 Validation home (design-spec 6.1, d1-moon.html): pattern A with the key numbers
+ * across the top. Next steps, Checks, F/A/U and Summary in the main column; Sections,
+ * Decisions and Plans beside them; on a phone Next steps, Checks, F/A/U, Sections,
+ * Summary, Decisions, Plans. The header's save state follows Edit summary.
+ */
+export function ValidationHomeScreen({
+  ideaId,
+  modal,
+  about,
+}: {
+  ideaId: string;
+  /** The modal open over 13 (SDD 4章 `?modal=`): M5 after Proceed, M8. */
+  modal?: string;
+  /** What the modal is about: M8's `validation:<id>`. */
+  about?: string;
+}) {
+  const { t } = useTranslation(["ideas"]);
+  const { workspace, role } = useWorkspace();
+  const { data } = useQuery(validationHomeQuery(ideaId));
+  const idea = data?.idea.workspaceId === workspace.id ? data.idea : undefined;
+  const templateBanner = useTemplateBanner(
+    data?.template,
+    data === undefined ? undefined : validationTarget(data),
+    idea !== undefined && role !== "viewer" && !idea.archived,
+  );
+  const name = idea?.name;
+  useDocumentTitle(...(name === undefined ? [] : [name, workspace.name]));
+  // 13's own comments and history are the idea's (SDD 6.3「画面と節の対応」): its
+  // summary, with the template migrations and undone creations in its history.
+  const comments: ScreenComments | undefined =
+    idea === undefined
+      ? undefined
+      : {
+          screen: {
+            containerType: "idea",
+            containerId: ideaId,
+            sectionKeys: [],
+          },
+          idea: { id: ideaId, name: idea.name, archived: idea.archived },
+          dataKey: ideaKey(ideaId),
+          shows: () => false,
+          labelOf: (target) => (target.type === "idea" ? idea.name : undefined),
+        };
+  return (
+    <WorkspaceFrame
+      current="ideas"
+      saveScope={`idea:${ideaId}`}
+      comments={comments}
+      history={comments}
+      templateBanner={templateBanner}
+      back={{ label: t("ideas:title"), href: ideasHref(workspace.id) }}
+      breadcrumbs={
+        <Breadcrumbs>
+          <Breadcrumb href={ideasHref(workspace.id)}>
+            {t("ideas:title")}
+          </Breadcrumb>
+          {name !== undefined && <Breadcrumb>{name}</Breadcrumb>}
+        </Breadcrumbs>
+      }
+    >
+      <ValidationHomeBody ideaId={ideaId} modal={modal} about={about} />
+    </WorkspaceFrame>
+  );
+}

@@ -60,6 +60,9 @@
   "checkDots": {
     "check": "{{name}}: {{state}}"
   },
+  "fauButtons": {
+    "notClassified": "Not classified yet"
+  },
   "fauPicker": {
     "trigger": "{{name}}: {{state}}",
     "question": "How do you know this amount?",
@@ -74,6 +77,14 @@
   "tree": {
     "expand": "Expand",
     "collapse": "Collapse"
+  },
+  "card": {
+    "openThreads_one": "{{formatted}} open comment thread",
+    "openThreads_other": "{{formatted}} open comment threads"
+  },
+  "commentCount": {
+    "comments_one": "{{formatted}} comment",
+    "comments_other": "{{formatted}} comments"
   },
   "questionCard": {
     "empty": "Empty",

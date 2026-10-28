@@ -10,6 +10,7 @@
         "@babel/types": "^8.0.6",
         "@biomejs/biome": "^2.5.15",
         "@moonx/schemas": "workspace:*",
+        "@moonx/ui-tokens": "workspace:*",
         "@playwright/test": "^1.64.0",
         "@sentry/cli": "3.8.0",
         "@types/bun": "^1.4.2",

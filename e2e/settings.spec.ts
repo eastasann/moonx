@@ -299,6 +299,7 @@ test.describe("on a desktop", () => {
     await expect(
       dialog.getByText("The email doesn't match your account"),
     ).toBeVisible();
+    await expectNoAxeViolations(page);
     await dialog
       .getByRole("textbox", { name: /^Your email/ })
       .fill(account.email);

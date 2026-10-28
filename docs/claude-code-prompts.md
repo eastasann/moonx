@@ -2530,7 +2530,7 @@ make build と make build-web が通り、その結果を API から返す形で
 
 ## Step 37: 仕上げ（1）: E2E の受入スイート
 
-Status:
+Status: done 2026-10-29
 
 ```
 E2E の受入スイートを仕上げてください。
@@ -2715,7 +2715,7 @@ blocked にし、理由（BCDX の本文待ち）を書く。本文がそろっ�
 やること:
 1. apps/web/src/content/ の Markdown から、ビルドのときに 29・30 の HTML を作る
 2. 1・2 のフッターと 4 からのリンクをつなぐ
-3. テスト: E2E（1・2・4 から 29・30 が開く）、make build-web で HTML ができること
+3. テスト: E2E（1・2・4 から 29・30 が開く。29・30 の axe の検査。SDD 10章の「主要な画面」）、make build-web で HTML ができること
 
 まだ staging には出さない（Step 43）。
 

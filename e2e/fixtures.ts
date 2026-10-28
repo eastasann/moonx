@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import AxeBuilder from "@axe-core/playwright";
 import type { Me, Workspace } from "@moonx/schemas";
 import {
   request as apiRequest,
@@ -62,6 +63,40 @@ export const test = base.extend<{
 });
 
 export { expect };
+
+/**
+ * Checks the page with axe against WCAG 2.2 A and AA (SDD 10章, ADR-022), once what moves
+ * on it has settled. It checks the page where it is scrolled: axe counts a target the
+ * fold cuts under a fixed bar (a phone's TabBar) as too small, so callers scroll first.
+ */
+export async function expectNoAxeViolations(page: Page) {
+  // A Button pending as its screen went left React Aria's announcement of its spinner in
+  // the live region, which React Aria clears after 7 seconds.
+  await expect(
+    page.locator("[data-live-announcer] [aria-labelledby]"),
+  ).toHaveCount(0, { timeout: 10_000 });
+  // A dialog or popover fading in or out has its words part-transparent, which axe reads
+  // as low contrast, as are colours still changing after a press.
+  await expect(page.locator("[data-entering], [data-exiting]")).toHaveCount(0);
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          !(animation instanceof CSSTransition) ||
+          animation.playState !== "running",
+      ),
+  );
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(
+    violations.map((violation) => ({
+      id: violation.id,
+      targets: violation.nodes.map((node) => node.target.join(" ")),
+    })),
+  ).toEqual([]);
+}
 
 /**
  * The workspace of `me` named `name`, as the seed names them.

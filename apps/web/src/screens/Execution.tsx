@@ -20,10 +20,8 @@ import {
   ListViewItem,
   MenuItem,
   Picker,
-  Skeleton,
   Stack,
   Switch,
-  Text,
   useIsNarrow,
   useTwoColumns,
 } from "@moonx/ui-web";
@@ -93,6 +91,7 @@ import {
   validationHomeQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { ExecutionSkeleton, ListSkeleton } from "./ExecutionSkeleton";
 
 export type { ExecutionSearch };
 
@@ -363,24 +362,6 @@ function ItemDetail({
         </Dialog>
       )}
     </Stack>
-  );
-}
-
-function ListSkeleton() {
-  const { t } = useTranslation(["plans"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("plans:execution.title")}</Text>
-            <Text variant="caption">
-              {t("plans:execution.empty.milestones")}
-            </Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
   );
 }
 
@@ -860,24 +841,6 @@ function ExecutionBody({
       )}
       {deletion.question}
     </>
-  );
-}
-
-/** 22's shape while its route loads (design-spec 6.0.6). */
-export function ExecutionSkeleton() {
-  const { t } = useTranslation(["plans"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("plans:execution.title")}
-        </Heading>
-      }
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("plans:execution.title")}
-      onBack={() => {}}
-    />
   );
 }
 

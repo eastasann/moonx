@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  TeamSelfAnalysesScreen,
-  TeamSelfAnalysesSkeleton,
-} from "../../../../screens/TeamSelfAnalyses";
+import { TeamSelfAnalysesScreen } from "../../../../screens/TeamSelfAnalyses";
+import { TeamSelfAnalysesSkeleton } from "../../../../screens/TeamSelfAnalysesSkeleton";
 
 /**
  * `/w/$workspaceId/team` and `/w/$workspaceId/team/$userId`: 12 Team Self Analyses, with

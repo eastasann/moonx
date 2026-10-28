@@ -1,6 +1,6 @@
 import { isQuestionKey } from "@moonx/schemas";
 import { createFileRoute } from "@tanstack/react-router";
-import { QuestionFormSkeleton } from "../../../../../screens/QuestionForm";
+import { QuestionFormSkeleton } from "../../../../../screens/QuestionFormSkeleton";
 import {
   SelfAnalysisFormScreen,
   type SelfAnalysisFormSearch,

@@ -101,6 +101,7 @@ import {
   validationHomeQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { ListSkeleton, ResearchLogSkeleton } from "./ResearchLogSkeleton";
 
 export type { ResearchSearch };
 
@@ -883,22 +884,6 @@ function EntryRow({ entry }: { entry: ResearchLogEntry }) {
   );
 }
 
-function ListSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("validation:research.title")}</Text>
-            <Text variant="caption">{t("validation:research.empty")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 function ResearchBody({
   home,
   search,
@@ -1116,24 +1101,6 @@ function ResearchBody({
       />
       {isNew && isPhone && newEntry(true)}
     </>
-  );
-}
-
-/** 14's shape while its route loads (design-spec 6.0.6). */
-export function ResearchLogSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("validation:research.title")}
-        </Heading>
-      }
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("validation:research.title")}
-      onBack={() => {}}
-    />
   );
 }
 

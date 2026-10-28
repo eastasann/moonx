@@ -10,7 +10,9 @@ declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
     /**
      * The screen's skeleton (design-spec 6.0.6「ローディング」): the shape of its layout,
-     * drawn in the frame while its route still loads.
+     * drawn in the frame while its route still loads. Taken from the screen's
+     * `<Screen>Skeleton.tsx`, never from the screen's own module: a route's static data
+     * loads with every page (SDD 7.3, which the Web's build checks).
      */
     skeleton?: ComponentType;
     /** A screen drawn without AppFrame (3, design-spec 4.5 PageFrame), and so its skeleton. */

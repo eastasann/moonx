@@ -10,12 +10,10 @@ import {
   DescriptionListItem,
   Heading,
   HubPattern,
-  IllustratedMessage,
   MenuItem,
   MoonGlyph,
   RowList,
   RowListItem,
-  Skeleton,
   Text,
 } from "@moonx/ui-web";
 import {
@@ -25,8 +23,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Hourglass } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AiMenu } from "../components/AiMenu";
 import type { ScreenComments } from "../components/CommentsPanel";
@@ -34,12 +31,10 @@ import { ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
 import { toastFailure } from "../components/ideaActions";
 import { CurrencyDialog, ShareDialog } from "../components/SelfAnalysisDialogs";
-import { useMovesToPersonal } from "../components/selfAnalysis";
 import {
-  FailureState,
-  SlowLoadingState,
-  useIsSlow,
-} from "../components/states";
+  SelfAnalysisBody,
+  useMovesToPersonal,
+} from "../components/selfAnalysis";
 import {
   type TemplateTarget,
   TemplateUpdateDialog,
@@ -47,12 +42,7 @@ import {
   useTemplateBanner,
 } from "../components/TemplateUpdate";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import {
-  dashboardHref,
-  useModal,
-  usePanel,
-  useWorkspace,
-} from "../components/workspace";
+import { useModal, usePanel, useWorkspace } from "../components/workspace";
 import { ApiError, api, unwrap } from "../lib/api";
 import { questionLabel } from "../lib/item-labels";
 import {
@@ -69,6 +59,7 @@ import {
 } from "../lib/queries";
 import { useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
+import { SelfAnalysisHomeSkeleton } from "./SelfAnalysisHomeSkeleton";
 
 /** Where 11 opens to go on (design-spec 6.11「Continue」): the first question not answered. */
 function continueHref(workspaceId: string, home: SelfAnalysisHome): string {
@@ -405,67 +396,6 @@ function SelfAnalysisHub({
 }
 
 /**
- * 10's shape while it loads (design-spec 6.0.6): the title, the status and the sections.
- * Drawn inside a `Skeleton`, its words are bars.
- */
-export function SelfAnalysisHomeSkeleton() {
-  const { t } = useTranslation(["selfAnalysis"]);
-  const rows = (
-    <RowList aria-label={t("selfAnalysis:home.sections.title")}>
-      {[0, 1, 2, 3].map((row) => (
-        <RowListItem key={row} end={t("selfAnalysis:home.sections.count")}>
-          {t("selfAnalysis:home.sections.title")}
-        </RowListItem>
-      ))}
-    </RowList>
-  );
-  return (
-    <HubPattern
-      header={
-        <Heading level={1} variant="heading-1-hub">
-          {t("selfAnalysis:home.title")}
-        </Heading>
-      }
-      blocks={[
-        {
-          id: "status",
-          column: "main",
-          content: (
-            <HubBlock title={t("selfAnalysis:home.state.title")}>
-              {rows}
-            </HubBlock>
-          ),
-        },
-        {
-          id: "sections",
-          column: "aside",
-          content: (
-            <HubBlock title={t("selfAnalysis:home.sections.title")}>
-              {rows}
-            </HubBlock>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
-/**
- * 11 when no self-analysis can be made yet (design-spec 6.0.6「公開済みのテンプレートが
- * 無い」): the form has nothing to ask.
- */
-function TemplatesNotReadyState() {
-  const { t } = useTranslation(["errors"]);
-  return (
-    <IllustratedMessage
-      headingLevel={1}
-      icon={<Hourglass />}
-      heading={t("errors:TEMPLATE_NOT_PUBLISHED")}
-    />
-  );
-}
-
-/**
  * 10 when no self-analysis can be made yet (design-spec 6.0.6): its title, and the words
  * in the place of Start, where the Status block would be.
  */
@@ -493,43 +423,6 @@ function HomeNotReady() {
       ]}
     />
   );
-}
-
-/**
- * Reads the self-analysis first (S1 GET makes it, SDD 5.8) and shows `children` with it,
- * or the state it is in (6.0.6): `notReady` while no template is published. 10 and 11
- * open through it.
- */
-export function SelfAnalysisBody({
-  skeleton,
-  notReady = <TemplatesNotReadyState />,
-  children,
-}: {
-  skeleton: ReactNode;
-  notReady?: ReactNode;
-  children: (home: SelfAnalysisHome) => ReactNode;
-}) {
-  const { me } = useWorkspace();
-  const query = useQuery(selfAnalysisHomeQuery());
-  const isSlow = useIsSlow(query.isPending);
-  if (query.data !== undefined) return children(query.data);
-  if (
-    query.error instanceof ApiError &&
-    query.error.code === "TEMPLATE_NOT_PUBLISHED"
-  ) {
-    return notReady;
-  }
-  if (query.isError) {
-    return (
-      <FailureState
-        error={query.error}
-        onRetry={() => void query.refetch()}
-        dashboardHref={dashboardHref(me)}
-      />
-    );
-  }
-  if (isSlow) return <SlowLoadingState onRetry={() => void query.refetch()} />;
-  return <Skeleton isLoading>{skeleton}</Skeleton>;
 }
 
 /**

@@ -23,7 +23,6 @@ import {
   ListView,
   ListViewItem,
   MenuItem,
-  Skeleton,
   Stack,
   Text,
   useIsNarrow,
@@ -105,6 +104,7 @@ import {
   validationHomeQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { AssumptionsSkeleton, ListSkeleton } from "./AssumptionsRisksSkeleton";
 
 export type { AssumptionsSearch };
 
@@ -699,24 +699,6 @@ function RowLine({ tab, row }: { tab: AssumptionsTab; row: Row }) {
   );
 }
 
-function ListSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("validation:assumptions.title")}</Text>
-            <Text variant="caption">
-              {t("validation:assumptions.empty.assumptions")}
-            </Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 function AssumptionsBody({
   home,
   search,
@@ -1100,24 +1082,6 @@ function AssumptionsBody({
         </ModalBoundary>
       )}
     </>
-  );
-}
-
-/** 16's shape while its route loads (design-spec 6.0.6). */
-export function AssumptionsSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("validation:assumptions.title")}
-        </Heading>
-      }
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("validation:assumptions.title")}
-      onBack={() => {}}
-    />
   );
 }
 

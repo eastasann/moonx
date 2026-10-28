@@ -44,6 +44,7 @@ import {
   memberSelfAnalysisQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { ListSkeleton } from "./TeamSelfAnalysesSkeleton";
 
 type Section = SharedSelfAnalysis["sections"][number];
 type Answer = Section["answers"][number];
@@ -227,23 +228,6 @@ function SharedDetail({ userId }: { userId: string }) {
   );
 }
 
-/** 12's list while it loads: rows of names and their sharing. */
-function ListSkeleton() {
-  const { t } = useTranslation(["selfAnalysis"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text>{t("selfAnalysis:team.members")}</Text>
-            <Text variant="caption">{t("selfAnalysis:team.notShared")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 function TeamBody({
   userId,
   fallbackId,
@@ -388,24 +372,6 @@ function TeamBody({
       }
       listLabel={t("selfAnalysis:team.title")}
       onBack={onBack}
-    />
-  );
-}
-
-/** 12's shape while its route loads (design-spec 6.0.6). */
-export function TeamSelfAnalysesSkeleton() {
-  const { t } = useTranslation(["selfAnalysis"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("selfAnalysis:team.title")}
-        </Heading>
-      }
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("selfAnalysis:team.title")}
-      onBack={() => {}}
     />
   );
 }

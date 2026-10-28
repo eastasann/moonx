@@ -52,10 +52,10 @@ require-project = $(if $(GCP_PROJECT_ID),,$(error No Google Cloud project: run g
 require-env = $(if $(and $(filter 1,$(words $(ENV))),$(filter $(1),$(ENV))),,$(error ENV must be one of: $(1)))
 
 .PHONY: install setup dev dev-api dev-web build build-web build-api-image \
-	test test-domain test-api test-web test-e2e coverage lint format typecheck \
-	db-up db-down db-generate db-check db-migrate db-seed db-reset db-studio \
-	tokens openapi kpi doc-lint admin-create infra-plan infra-apply deploy-api \
-	promote promote-check db-backup
+	test test-domain test-api test-web test-e2e coverage first-paint lint format \
+	typecheck db-up db-down db-generate db-check db-migrate db-seed db-reset \
+	db-studio tokens openapi kpi doc-lint admin-create infra-plan infra-apply \
+	deploy-api promote promote-check db-backup
 
 install:
 	bun install --frozen-lockfile
@@ -126,6 +126,14 @@ test-e2e:
 	$(BUNX) playwright install chromium
 	$(MAKE) build-web SHA=dev
 	$(BUNX) playwright test --config=e2e/playwright.config.ts
+
+# SDD 7.3's first display estimated on this machine, against the same build as the PWA
+# checks. Its timings follow the host's CPU, so CI does not run it.
+first-paint:
+	$(BUNX) playwright install chromium
+	$(MAKE) build-web SHA=dev
+	MOONX_FIRST_PAINT=1 $(BUNX) playwright test --config=e2e/playwright.config.ts \
+		--project=first-paint
 
 lint:
 	$(BUNX) biome check .

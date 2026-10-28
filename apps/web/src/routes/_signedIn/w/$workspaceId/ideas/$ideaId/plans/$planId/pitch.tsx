@@ -1,10 +1,10 @@
 import { pitchVariantSchema, uuidSchema } from "@moonx/schemas";
 import { createFileRoute } from "@tanstack/react-router";
 import {
-  PitchDeckRouteSkeleton,
   PitchDeckScreen,
   type PitchSearch,
 } from "../../../../../../../../screens/PitchDeck";
+import { PitchDeckRouteSkeleton } from "../../../../../../../../screens/PitchDeckSkeleton";
 
 /**
  * `/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch`: 23 Pitch Deck (SDD 4章). A

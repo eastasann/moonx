@@ -11,7 +11,6 @@ import {
   type CostCategory,
   type CostItem,
   canReduceSchema,
-  costCategorySchema,
   costRowNameSchema,
   type costsSchema,
   type EconomicsResult,
@@ -121,14 +120,12 @@ import {
   workspaceKey,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { CATEGORIES, CostsSkeleton, TablesSkeleton } from "./CostsSkeleton";
 
 export type { CostsSearch };
 
 type CostList = z.infer<typeof costsSchema>;
 type CostListKey = ReturnType<typeof costsQuery>["queryKey"];
-
-/** The three tables in the order 17 shows them (design-spec 6.3「表と列」). */
-const CATEGORIES = costCategorySchema.options;
 
 /** M2's `about` for a cost row (SDD 4章). */
 const aboutOf = (costItemId: string) => `cost_item:${costItemId}`;
@@ -1037,25 +1034,6 @@ function TotalsSummary({ result }: { result: EconomicsResult }) {
   );
 }
 
-/** The tables' shape while the rows load (design-spec 6.0.6). */
-function TablesSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <Stack gap="space-500">
-      {CATEGORIES.map((category) => (
-        <Stack key={category} gap="space-100">
-          <Heading level={2} variant="heading-4">
-            {t(`validation:costs.table.${category}`)}
-          </Heading>
-          {[0, 1, 2, 3].map((row) => (
-            <Text key={row}>{t(`validation:costs.table.${category}`)}</Text>
-          ))}
-        </Stack>
-      ))}
-    </Stack>
-  );
-}
-
 const NO_ITEMS: CostItem[] = [];
 const NO_INPUTS: CostList["economicsInputs"] = [];
 
@@ -1630,23 +1608,6 @@ function CostsBody({
         </ModalBoundary>
       )}
     </>
-  );
-}
-
-/**
- * 17's shape while its route loads (design-spec 6.0.6). Drawn inside a `Skeleton`, its
- * words are bars.
- */
-export function CostsSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <WorksheetPattern
-      header={<Heading level={1}>{t("validation:costs.title")}</Heading>}
-      inputs={<TablesSkeleton />}
-      resultsTitle={t("validation:costs.totals")}
-      results={null}
-      summary={null}
-    />
   );
 }
 

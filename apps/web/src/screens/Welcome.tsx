@@ -27,12 +27,13 @@ import { StandaloneFrame } from "../components/StandaloneFrame";
 import { StandaloneLoading } from "../components/StandaloneLoading";
 import { FailureState } from "../components/states";
 import { dashboardHref } from "../components/workspace";
+import { deviceTimeZone } from "../lib/account";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
 import { useIsOnline } from "../lib/online";
 import { invitationQuery, isInvitationToken, meQuery } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
-import { deviceTimeZone } from "./SignUp";
+import { WelcomeSkeleton } from "./WelcomeSkeleton";
 
 /** 3's steps (design-spec 6.16): ① the invitation, ② the profile, ③ done. */
 export type WelcomeStep = "invite" | "profile" | "done";
@@ -72,19 +73,6 @@ function dashboardAfter(me: Me, invitation: InvitationPreview | undefined) {
     me.memberships.some(({ workspace }) => workspace.id === id)
     ? `/w/${id}`
     : (dashboardHref(me) ?? "/");
-}
-
-/** The skeleton of 3, shown while the user or the invitation loads. */
-export function WelcomeSkeleton() {
-  const { t } = useTranslation(["auth"]);
-  return (
-    <StepsPattern
-      header={<Heading level={1}>{t("auth:welcome.title")}</Heading>}
-      steps={<Text>{t("auth:welcome.step.invite")}</Text>}
-    >
-      <Text>{t("auth:welcome.join")}</Text>
-    </StepsPattern>
-  );
 }
 
 /**

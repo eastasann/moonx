@@ -1,4 +1,10 @@
-import { type ListTabs, ToastQueue } from "@moonx/ui-web";
+import {
+  Breadcrumb,
+  Breadcrumbs,
+  Heading,
+  type ListTabs,
+  ToastQueue,
+} from "@moonx/ui-web";
 import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -125,4 +131,25 @@ export function useDetailHistory() {
       });
     },
   };
+}
+
+/** The title of the list's pane of 26 and 28: the operator's screens as one place. */
+export function AdminHeading() {
+  const { t } = useTranslation(["admin"]);
+  return (
+    <Heading level={1} variant="heading-1-list">
+      {t("admin:title")}
+    </Heading>
+  );
+}
+
+/** The breadcrumbs of 26 and 28: "Admin / {screen}" (design-spec 6.0.1). */
+export function AdminBreadcrumbs({ screen }: { screen: string }) {
+  const { t } = useTranslation(["admin"]);
+  return (
+    <Breadcrumbs>
+      <Breadcrumb href={adminTemplatesHref()}>{t("admin:title")}</Breadcrumb>
+      <Breadcrumb>{screen}</Breadcrumb>
+    </Breadcrumbs>
+  );
 }

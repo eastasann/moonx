@@ -5,15 +5,12 @@ import {
   Checkbox,
   CheckboxGroup,
   Flex,
-  Heading,
   InlineAlert,
   Radio,
   RadioGroup,
   SegmentedControl,
   SegmentedControlItem,
-  Skeleton,
   Stack,
-  Steps,
   StepsPattern,
   Text,
   Well,
@@ -30,6 +27,13 @@ import { dashboardHref, useWorkspace } from "../components/workspace";
 import { aiImportHref, parseScope, scopeParam } from "../lib/ai";
 import { copyText, downloadText } from "../lib/files";
 import { aiExportQuery } from "../lib/queries";
+import {
+  AiExportSkeleton,
+  ExportSteps,
+  Header,
+  PreviewSkeleton,
+  type Step,
+} from "./AiExportSkeleton";
 
 /** `/w/$workspaceId/ai/export`'s search parameters (SDD 4章). */
 export interface AiExportSearch {
@@ -38,10 +42,6 @@ export interface AiExportSearch {
   scope?: string;
   returnTo?: string;
 }
-
-/** 24's steps (design-spec 6.6). */
-const STEPS = ["scope", "review", "export"] as const;
-type Step = (typeof STEPS)[number];
 
 /** What a plan's export covers (design-spec 6.6「範囲」). */
 type PlanChoice = "all" | "a" | "b" | "items";
@@ -54,62 +54,6 @@ const OPTIONS = [
 type Option = (typeof OPTIONS)[number];
 
 type Format = "markdown" | "json";
-
-/** The title and what it exports from, above the steps (as 25's, s25-import.html). */
-function Header({ eyebrow }: { eyebrow: ReactNode }) {
-  const { t } = useTranslation(["ai"]);
-  return (
-    <Stack gap="space-75">
-      <Text variant="caption" tone="secondary">
-        {eyebrow}
-      </Text>
-      <Heading level={1} variant="heading-1-steps">
-        {t("ai:export.title")}
-      </Heading>
-    </Stack>
-  );
-}
-
-function ExportSteps({ current }: { current: Step }) {
-  const { t } = useTranslation(["ai"]);
-  return (
-    <Steps
-      aria-label={t("ai:steps")}
-      steps={STEPS.map((id) => ({ id, label: t(`ai:export.step.${id}`) }))}
-      currentId={current}
-      doneLabel={t("ai:stepDone")}
-    />
-  );
-}
-
-/** The preview's shape while X1 answers (design-spec 6.6「ローディング」). */
-function PreviewSkeleton() {
-  const { t } = useTranslation(["ai"]);
-  return (
-    <Skeleton isLoading>
-      <Well>
-        <Stack gap="space-100">
-          {[0, 1, 2, 3, 4].map((line) => (
-            <Text key={line}>{t("ai:export.preview")}</Text>
-          ))}
-        </Stack>
-      </Well>
-    </Skeleton>
-  );
-}
-
-/** 24's shape while its target loads (design-spec 6.0.6). */
-export function AiExportSkeleton() {
-  const { t } = useTranslation(["ai"]);
-  return (
-    <StepsPattern
-      header={<Header eyebrow={t("ai:export.preview")} />}
-      steps={<ExportSteps current="scope" />}
-    >
-      <PreviewSkeleton />
-    </StepsPattern>
-  );
-}
 
 /**
  * The scope 24 opens on (design-spec 6.6「範囲の初期値」): the link's, else the whole. All

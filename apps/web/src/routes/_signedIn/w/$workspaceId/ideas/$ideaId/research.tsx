@@ -6,9 +6,9 @@ import {
 import { createFileRoute } from "@tanstack/react-router";
 import {
   ResearchLogScreen,
-  ResearchLogSkeleton,
   type ResearchSearch,
 } from "../../../../../../screens/ResearchLog";
+import { ResearchLogSkeleton } from "../../../../../../screens/ResearchLogSkeleton";
 
 /**
  * `presetSupports`: the checks, comma-separated (SDD 4章); any other value names none.

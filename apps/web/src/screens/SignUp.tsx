@@ -3,7 +3,6 @@ import {
   type InvitationPreview,
   type Me,
   passwordSchema,
-  timeZoneSchema,
 } from "@moonx/schemas";
 import {
   Button,
@@ -25,6 +24,7 @@ import { StandaloneFrame } from "../components/StandaloneFrame";
 import { StandaloneLoading } from "../components/StandaloneLoading";
 import { FailureState } from "../components/states";
 import { useGoogleStart } from "../components/useGoogleStart";
+import { deviceTimeZone } from "../lib/account";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { continueWithGoogle } from "../lib/auth";
 import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
@@ -37,15 +37,6 @@ import {
 } from "../lib/queries";
 import { dropAllBut } from "../lib/session";
 import { useDocumentTitle } from "../lib/title";
-
-/** What `users.timezone` starts as when the device names no zone moonx knows (SDD 6.3). */
-const FALLBACK_TIME_ZONE = "Asia/Manila";
-
-/** The device's time zone, which a new account starts with (design-spec 6.16 3 ②). */
-export function deviceTimeZone(): string {
-  const zone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return timeZoneSchema.safeParse(zone).success ? zone : FALLBACK_TIME_ZONE;
-}
 
 /** Where a sign-up from the invitation goes on: 3, its steps from ① (SDD 4章 `/welcome`). */
 const welcomeHref = (token: string) =>

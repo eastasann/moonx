@@ -8,8 +8,6 @@ import {
 import {
   ActionMenu,
   Badge,
-  Breadcrumb,
-  Breadcrumbs,
   Button,
   FileTrigger,
   Flex,
@@ -20,7 +18,6 @@ import {
   ListView,
   ListViewItem,
   MenuItem,
-  Skeleton,
   Stack,
   Text,
   useTwoColumns,
@@ -32,6 +29,8 @@ import { FileJson, FileUp } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  AdminBreadcrumbs,
+  AdminHeading,
   adminToast,
   useAdminTabs,
   useDetailHistory,
@@ -47,11 +46,12 @@ import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { readUtf8 } from "../lib/files";
-import { adminTemplatesHref, templateVersionHref } from "../lib/links";
+import { templateVersionHref } from "../lib/links";
 import { useIsOnline } from "../lib/online";
 import { adminTemplatesQuery } from "../lib/queries";
 import { isSessionLost, useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
+import { TemplatesListSkeleton } from "./AdminTemplatesSkeleton";
 
 /** `/admin/templates`'s search parameters (SDD 4章). */
 export interface AdminTemplatesSearch {
@@ -69,27 +69,6 @@ const draftOf = (template: Template) =>
 /** Its newest published version. */
 const latestOf = (template: Template) =>
   template.versions.find((version) => version.status === "published");
-
-/** The breadcrumbs of 26 and 28: "Admin / {screen}" (design-spec 6.0.1). */
-export function AdminBreadcrumbs({ screen }: { screen: string }) {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <Breadcrumbs>
-      <Breadcrumb href={adminTemplatesHref()}>{t("admin:title")}</Breadcrumb>
-      <Breadcrumb>{screen}</Breadcrumb>
-    </Breadcrumbs>
-  );
-}
-
-/** The title of the list's pane of 26 and 28: the operator's screens as one place. */
-export function AdminHeading() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <Heading level={1} variant="heading-1-list">
-      {t("admin:title")}
-    </Heading>
-  );
-}
 
 /**
  * A template's row (design-spec 6.17 26): its kind, and where its versions stand, or that
@@ -498,25 +477,6 @@ function TemplateDetail({ template }: { template: Template }) {
   );
 }
 
-/** Rows of placeholder words in the shape of the list (design-spec 6.0.6). */
-function TemplatesListSkeleton() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {(["self_analysis", "validation", "business_plan"] as const).map(
-          (kind) => (
-            <Stack key={kind} gap="space-50">
-              <Text variant="label">{t(`admin:kind.${kind}`)}</Text>
-              <Text variant="caption">{t("admin:templates.noVersions")}</Text>
-            </Stack>
-          ),
-        )}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 function TemplatesBody({ search }: { search: AdminTemplatesSearch }) {
   const { t } = useTranslation(["admin"]);
   const { me } = useWorkspace();
@@ -593,20 +553,6 @@ function TemplatesBody({ search }: { search: AdminTemplatesSearch }) {
       }
       listLabel={t("admin:templates.title")}
       onBack={() => detailHistory.close({ search: {} })}
-    />
-  );
-}
-
-/** 26's shape while its route loads (design-spec 6.0.6). */
-export function AdminTemplatesSkeleton() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <ListDetailPattern
-      header={<AdminHeading />}
-      list={<TemplatesListSkeleton />}
-      detail={null}
-      listLabel={t("admin:templates.title")}
-      onBack={() => {}}
     />
   );
 }

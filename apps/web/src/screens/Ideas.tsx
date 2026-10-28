@@ -1,11 +1,9 @@
 import { formatDate, formatList, formatRelativeTime } from "@moonx/i18n";
-import {
-  type IdeaDecisionFilter,
-  type IdeaSort,
-  type IdeaSummary,
-  plainText,
-  type Stage,
-  TEXT_LIMITS,
+import type {
+  IdeaDecisionFilter,
+  IdeaSort,
+  IdeaSummary,
+  Stage,
 } from "@moonx/schemas";
 import {
   ActionMenu,
@@ -51,7 +49,7 @@ import {
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
 import { inputIssueMessage } from "../lib/input-issues";
-import { ideaHref } from "../lib/links";
+import { ideaHref, ideasSearchSchema } from "../lib/links";
 import {
   type IdeaFilters,
   ideasQuery,
@@ -59,6 +57,7 @@ import {
   validationHomeQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { IdeasListSkeleton } from "./IdeasSkeleton";
 
 /** `/w/$workspaceId/ideas`'s search parameters (SDD 4章). */
 export interface IdeasSearch {
@@ -73,9 +72,6 @@ export interface IdeasSearch {
   /** The idea shown beside the list. */
   selected?: string;
 }
-
-/** The search as I1 takes it (SDD 5.6 `q`). */
-export const searchSchema = plainText(TEXT_LIMITS.short);
 
 /** How long typing in the search pauses before the list asks again. */
 const SEARCH_PAUSE_MS = 300;
@@ -119,7 +115,7 @@ function Filters({
   // The URL's search, set elsewhere (Clear filters), shows in the field.
   useEffect(() => setText(search.q ?? ""), [search.q]);
   // The search's rules are I1's (6.0.8 短文): text that breaks them says why, unsent.
-  const [issue] = searchSchema.safeParse(text).error?.issues ?? [];
+  const [issue] = ideasSearchSchema.safeParse(text).error?.issues ?? [];
   const textError = issue === undefined ? undefined : inputIssueMessage(issue);
   useEffect(() => {
     if (text === (search.q ?? "") || textError !== undefined) return;
@@ -584,41 +580,6 @@ function IdeasBody({
       }
       listLabel={t("ideas:title")}
       onBack={() => onSearch({ ...search, selected: undefined })}
-    />
-  );
-}
-
-/** Rows of placeholder words in the shape of the list (design-spec 6.0.6). */
-function IdeasListSkeleton() {
-  const { t } = useTranslation(["ideas"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("ideas:newIdea")}</Text>
-            <Text variant="caption">{t("ideas:empty")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
-/** 6 Ideas' shape while its route loads (design-spec 6.0.6). */
-export function IdeasSkeleton() {
-  const { t } = useTranslation(["ideas"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("ideas:title")}
-        </Heading>
-      }
-      list={<IdeasListSkeleton />}
-      detail={null}
-      listLabel={t("ideas:title")}
-      onBack={() => {}}
     />
   );
 }

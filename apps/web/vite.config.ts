@@ -136,13 +136,112 @@ function zodWithoutEval(): Plugin {
   };
 }
 
+// A screen's own module, as against the skeleton module routes may name (PendingScreen.tsx).
+const SCREEN = /[\\/]apps[\\/]web[\\/]src[\\/]screens[\\/](?!.*Skeleton\.tsx$)/;
+// The route files, the only modules that may import a screen.
+const ROUTE = /[\\/]apps[\\/]web[\\/]src[\\/]routes[\\/]/;
+
+/**
+ * SDD 7.3's per-route code splitting in the client build. The build fails if anything
+ * but a route file imports a screen (opening one screen would load another's code: what
+ * they share goes in components/ or lib/), or if a screen is among what the app's entry
+ * loads before any route (a route file that imports one outside its `component` puts it
+ * in every page's first load). Those entry files are its chunk, the chunks those import
+ * statically, and their CSS, as the bundle has them (served paths without the leading
+ * `/`).
+ */
+function routeSplitting() {
+  let entryFiles: Set<string> | undefined;
+  const plugin: Plugin = {
+    name: "moonx-route-splitting",
+    apply: "build",
+    applyToEnvironment: (environment) => environment.name === "client",
+    buildEnd() {
+      let screens = 0;
+      for (const id of this.getModuleIds()) {
+        if (!SCREEN.test(id)) continue;
+        screens += 1;
+        const info = this.getModuleInfo(id);
+        const others = [
+          ...(info?.importers ?? []),
+          ...(info?.dynamicImporters ?? []),
+        ].filter((importer) => !ROUTE.test(importer));
+        if (others.length > 0) {
+          this.error(`${id} is imported by ${others.join(", ")}, not a route`);
+        }
+      }
+      // A moved folder would leave both checks with nothing to check.
+      if (screens === 0) this.error("The client build has no screen modules");
+    },
+    generateBundle(_, bundle) {
+      const entries = Object.values(bundle).filter(
+        (output) => output.type === "chunk" && output.isEntry,
+      );
+      if (entries.length !== 1) {
+        this.error(`The client build has ${entries.length} entries, not 1`);
+      }
+      const files = new Set<string>();
+      const visit = (fileName: string) => {
+        const chunk = bundle[fileName];
+        if (files.has(fileName) || chunk?.type !== "chunk") return;
+        files.add(fileName);
+        const screens = chunk.moduleIds.filter((id) => SCREEN.test(id));
+        if (screens.length > 0) {
+          this.error(
+            `The entry loads the screens ${screens.join(", ")} (${fileName}): ` +
+              "a route may import only its skeleton module outside its component",
+          );
+        }
+        for (const css of chunk.viteMetadata?.importedCss ?? []) files.add(css);
+        chunk.imports.forEach(visit);
+      };
+      visit(entries[0]?.fileName ?? "");
+      entryFiles = files;
+    },
+  };
+  /**
+   * Leaves in `_shell.html` only the preloads and styles of the entry. The shell is
+   * prerendered at /login (`spa.maskPath`), which adds that route's chunks; every other
+   * screen opens on the same shell and must not load them (SDD 7.3). Each route loads
+   * its own chunks, with their CSS, when it opens.
+   */
+  async function trimShell(outDir: string) {
+    if (entryFiles === undefined) {
+      throw new Error("The client build's entry files were not recorded");
+    }
+    const kept = entryFiles;
+    const path = join(outDir, "_shell.html");
+    const html = (await readFile(path, "utf8")).replace(
+      SHELL_LINK,
+      (link, _rel, file: string) => (kept.has(file) ? link : ""),
+    );
+    // Every preload and stylesheet left is one of the entry's: a link written another
+    // way would be neither matched nor dropped.
+    const left = [...html.matchAll(SHELL_LINK)].length;
+    const rels = html.match(/rel="(modulepreload|stylesheet)"/g)?.length ?? 0;
+    if (left === 0 || left !== rels) {
+      throw new Error(
+        `_shell.html keeps ${rels} links, ${left} of the entry's`,
+      );
+    }
+    await writeFile(path, html);
+  }
+  return { plugin, trimShell };
+}
+
+// A preload or stylesheet link TanStack Start writes into the shell, and its file.
+const SHELL_LINK =
+  /<link rel="(modulepreload|stylesheet)" href="\/([^"]+)"[^>]*>/g;
+
 /**
  * The PWA of ADR-031 in the Web's build: the manifest and icons from
  * `packages/ui-tokens`, and the service worker (`src/sw.ts`) with the list of the built
  * files injected by vite-plugin-pwa's `injectManifest`. The dev server serves the
  * manifest and icons only; the worker is never registered there (src/lib/pwa.ts).
+ *
+ * @param trimShell Rewrites the prerendered `_shell.html` before the worker lists it.
  */
-function pwa(): Plugin[] {
+function pwa(trimShell: (outDir: string) => Promise<void>): Plugin[] {
   const plugins = VitePWA(SERVICE_WORKER);
   // vite-plugin-pwa builds the worker when each environment's bundle closes, which in
   // TanStack Start is before the prerender writes _shell.html. Only its main plugin is
@@ -193,12 +292,15 @@ function pwa(): Plugin[] {
           // The plugin order puts the prerender first; the worker must list its shell.
           await access(join(outDir, "_shell.html"));
           await externalizeInlineScripts(outDir);
+          await trimShell(outDir);
           await api.generateSW();
         },
       },
     },
   ];
 }
+
+const shell = routeSplitting();
 
 export default defineConfig({
   // One .env at the repository root serves the API and the Web (SDD 2章「環境変数」).
@@ -245,7 +347,8 @@ export default defineConfig({
     tanstackStart({
       // The shell of every other screen (_shell.html, ADR-004) is rendered at /login, so
       // that / can be built into 1's own HTML (ADR-002): two pages of one path would be
-      // rendered once. Only the root route renders into the shell, whatever the path.
+      // rendered once. Only the root route renders into the shell, whatever the path, and
+      // routeSplitting() takes the links to /login's own chunks back out.
       spa: { enabled: true, maskPath: "/login" },
       pages: [{ path: "/", prerender: { enabled: true, crawlLinks: false } }],
       // Tests sit next to the routes they cover without becoming routes themselves.
@@ -254,7 +357,8 @@ export default defineConfig({
     viteReact(),
     vanillaExtractPlugin(),
     zodWithoutEval(),
+    shell.plugin,
     // After tanstackStart: the service worker lists the shell its prerender writes.
-    pwa(),
+    pwa(shell.trimShell),
   ],
 });

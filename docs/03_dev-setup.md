@@ -508,7 +508,7 @@ Google Auth Platform → クライアント → クライアントを作成 → 
 ## 7. テスト実行
 
 ```bash
-make db-up         # test-api・test-e2e の前に（DB が起動していなければ）
+make db-up         # test-api・test-e2e・coverage・first-paint の前に（DB が起動していなければ）
 
 make test
 make test-domain
@@ -516,6 +516,7 @@ make test-api
 make test-web
 make test-e2e
 make coverage
+make first-paint
 
 make lint
 make format
@@ -528,7 +529,9 @@ PWA の検査（`e2e/pwa.spec.ts`）は、`make test-e2e` が先に動かす `ma
 
 カバレッジ（SDD 10章の目標）は `make coverage` で測る（`make test` は測らない）。目標に届かない層と、どのテストも読み込まないファイルを出して失敗する。テスト用の DB を作り直すのは `make test-api` と同じ。結果は `coverage/`（`.gitignore` で外してある）。
 
-各ターゲットが何を動かすかは [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)、テスト用の DB（`DATABASE_URL_TEST`）は SDD 2章「環境変数」、ツールの選定は ADR-022、テストの方針は SDD 10章。PR では CI が同じターゲットを動かす（`coverage` を除く。04 2章）。
+Web の最初の表示（SDD 7.3）は `make first-paint` で見積もる。PWA の検査と同じビルドを、同じ API（ポート 3200。ほかのサーバーは起動しない）から返して測り、ページごとに LCP の中央値を出す。`make test-e2e` と同じくテスト用の DB を作り直す。CPU を手元の機械の4分の1の速さにするので、ほかの重い処理（`make test-e2e` など）と同時に動かさない。条件と目安は SDD 10章。
+
+各ターゲットが何を動かすかは [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)、テスト用の DB（`DATABASE_URL_TEST`）は SDD 2章「環境変数」、ツールの選定は ADR-022、テストの方針は SDD 10章。PR では CI が同じターゲットを動かす（`coverage` と `first-paint` を除く。04 2章）。
 
 ---
 

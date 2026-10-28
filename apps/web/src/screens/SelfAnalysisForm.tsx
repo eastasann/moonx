@@ -52,7 +52,11 @@ import {
 import { ItemHistoryButton } from "../components/HistoryPanel";
 import { SaveFailureNote } from "../components/SaveFeedback";
 import { SectionSwitchTitle } from "../components/SectionTitle";
-import { selfAnswerKey, useMovesToPersonal } from "../components/selfAnalysis";
+import {
+  SelfAnalysisBody,
+  selfAnswerKey,
+  useMovesToPersonal,
+} from "../components/selfAnalysis";
 import {
   FailureState,
   NotFoundState,
@@ -75,8 +79,7 @@ import {
   selfAnalysisSectionQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
-import { QuestionFormSkeleton } from "./QuestionForm";
-import { SelfAnalysisBody } from "./SelfAnalysisHome";
+import { QuestionFormSkeleton } from "./QuestionFormSkeleton";
 
 /** `/w/$workspaceId/self-analysis/$sectionKey`'s own search (SDD 4章). */
 export interface SelfAnalysisFormSearch {

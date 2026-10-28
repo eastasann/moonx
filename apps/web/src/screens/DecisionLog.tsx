@@ -62,6 +62,7 @@ import {
   membersQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { ListSkeleton } from "./DecisionLogSkeleton";
 
 export type { DecisionsSearch };
 
@@ -559,23 +560,6 @@ function OpenLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-/** Rows of placeholder words in the shape of the list (design-spec 6.0.6). */
-function ListSkeleton() {
-  const { t } = useTranslation(["decisions"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("decisions:title")}</Text>
-            <Text variant="caption">{t("decisions:empty")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 /**
  * The list and the entry beside it (design-spec 6.15, 4.1 D): the decisions under the
  * filters, newest first, in a TableView of three columns (where and how it was recorded,
@@ -738,24 +722,6 @@ function DecisionLogBody({
       }
       listLabel={t("decisions:title")}
       onBack={onBack}
-    />
-  );
-}
-
-/** 7's shape while its route loads (design-spec 6.0.6). */
-export function DecisionLogSkeleton() {
-  const { t } = useTranslation(["decisions"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("decisions:title")}
-        </Heading>
-      }
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("decisions:title")}
-      onBack={() => {}}
     />
   );
 }

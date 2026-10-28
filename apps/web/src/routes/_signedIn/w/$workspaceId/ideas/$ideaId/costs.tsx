@@ -1,10 +1,7 @@
 import { costCategorySchema } from "@moonx/schemas";
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  CostsScreen,
-  type CostsSearch,
-  CostsSkeleton,
-} from "../../../../../../screens/Costs";
+import { CostsScreen, type CostsSearch } from "../../../../../../screens/Costs";
+import { CostsSkeleton } from "../../../../../../screens/CostsSkeleton";
 
 /** A template key ("initial.permits") or a UUID: what `row` names a cost row by. */
 const isRowName = (value: unknown): value is string =>

@@ -75,6 +75,7 @@ import {
   validationQuestionsQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { QuestionFormSkeleton } from "./QuestionFormSkeleton";
 
 /** `/w/$workspaceId/ideas/$ideaId/questions/$sectionKey`'s own search (SDD 4章). */
 export interface QuestionFormSearch {
@@ -466,29 +467,6 @@ function SectionForm({
         </ModalBoundary>
       )}
     </>
-  );
-}
-
-/**
- * 11's shape while it loads (design-spec 6.2「ローディング」): the title and the questions'
- * rows. Drawn inside a `Skeleton`, its words are bars.
- */
-export function QuestionFormSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <QuestionFormPattern
-      header={<Heading level={1}>{t("validation:questions.empty")}</Heading>}
-      questionIds={["a", "b", "c", "d"]}
-      currentId={null}
-      onCurrentChange={() => {}}
-      isReadOnly
-      renderQuestion={() => (
-        <Stack gap="space-100">
-          <Text variant="caption">{t("validation:questions.empty")}</Text>
-          <Text>{t("validation:questions.placeholder")}</Text>
-        </Stack>
-      )}
-    />
   );
 }
 

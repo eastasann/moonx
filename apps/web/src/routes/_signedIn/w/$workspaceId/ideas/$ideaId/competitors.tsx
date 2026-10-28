@@ -4,8 +4,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   CompetitorsScreen,
   type CompetitorsSearch,
-  CompetitorsSkeleton,
 } from "../../../../../../screens/Competitors";
+import { CompetitorsSkeleton } from "../../../../../../screens/CompetitorsSkeleton";
 
 /** The two pattern questions 15 asks (design-spec 6.10). */
 const isPatternKey = (value: unknown): value is string =>

@@ -11,7 +11,7 @@ import type {
   TargetRef,
   TemplateKind,
 } from "@moonx/schemas";
-import { pitchVariantSchema } from "@moonx/schemas";
+import { pitchVariantSchema, plainText, TEXT_LIMITS } from "@moonx/schemas";
 import type { CompareView } from "@moonx/ui-tokens";
 import { formatPanelTarget } from "./panel-target";
 
@@ -90,6 +90,9 @@ export type AdminUsersTab = "users" | "workspaces" | "invitations";
 /** 28 Admin: Users & Workspaces (SDD 4章), on its tab. */
 export const adminUsersHref = (tab?: AdminUsersTab) =>
   `/admin/users${tab === undefined ? "" : `?tab=${tab}`}`;
+
+/** The search of 6 Ideas as I1 takes it (SDD 5.6 `q`). */
+export const ideasSearchSchema = plainText(TEXT_LIMITS.short);
 
 /** 6 Ideas, with the filters given (SDD 4章). */
 export const ideasHref = (

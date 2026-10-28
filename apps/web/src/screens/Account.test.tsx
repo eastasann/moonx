@@ -1,7 +1,8 @@
 import type { Me, Member } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { PENDING_MS } from "../components/states";
 import {
   ana,
   apiError,
@@ -482,5 +483,34 @@ describe("4 Account (design-spec 6.16)", () => {
     await user.click(screen.getByRole("button", { name: "Change password" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
     expect(screen.queryByText("Something went wrong")).toBeNull();
+  });
+});
+
+describe("4 while its route loads (design-spec 6.0.6「ローディング」)", () => {
+  test("its skeleton in the frame: the groups' names and their fields, as bars", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      // U1 does not answer, so the route stays on its way.
+      stubApi(({ path }) =>
+        path === "/api/v1/me" ? new Promise<Response>(() => {}) : undefined,
+      );
+      renderApp("/account");
+      await act(() => vi.advanceTimersByTimeAsync(PENDING_MS));
+      for (const text of ["Account", "Profile", "Password", "Preferences"]) {
+        expect(screen.getByText(text).closest("[inert]")).not.toBeNull();
+      }
+      for (const label of [
+        "Display name",
+        "Email",
+        "New password",
+        "Time zone",
+      ]) {
+        expect(
+          screen.getByText(label, { selector: "label" }).closest("[inert]"),
+        ).not.toBeNull();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

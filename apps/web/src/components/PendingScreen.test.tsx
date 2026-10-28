@@ -1,5 +1,6 @@
-import { act, screen } from "@testing-library/react";
+import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { createAppRouter } from "../router";
 import { ana, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
 import { PENDING_MS, SLOW_LOADING_MS } from "./states";
@@ -93,4 +94,39 @@ describe("PendingScreen", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("navigation")).toBeNull();
   });
+});
+
+/**
+ * A URL each route answers to, its parameters filled in: the workspace the user is in,
+ * one id for every other record, the first section or item.
+ */
+const urlOf = (fullPath: string) =>
+  fullPath
+    .replace(/\{-\$[A-Za-z]+\}/g, "")
+    .replace("$workspaceId", workspaceId)
+    .replace(/\$(sectionKey)/, "why")
+    .replace(/\$(itemNo)/, "1")
+    .replace(/\$[A-Za-z]+/g, "0b1c2d3e-4f50-4617-8829-3a4b5c6d7e8f")
+    .replace(/\/+$/, "");
+
+describe("every route's own skeleton (design-spec 6.0.6, SDD 7.3)", () => {
+  // Each route names its screen's skeleton apart from the screen (PendingScreen.tsx).
+  const routes = Object.values(createAppRouter().routesById).filter(
+    (route) => route.options.staticData?.skeleton !== undefined,
+  );
+
+  test("all the screens with a skeleton name one", () => {
+    expect(routes.length).toBeGreaterThanOrEqual(26);
+  });
+
+  test.each(routes.map((route) => [route.fullPath]))(
+    "%s: its title in the skeleton while the route loads",
+    async (fullPath) => {
+      heldMe();
+      renderApp(urlOf(fullPath));
+      await wait(PENDING_MS);
+      expect(document.querySelector("[inert] h1")?.textContent).toBeTruthy();
+      cleanup();
+    },
+  );
 });

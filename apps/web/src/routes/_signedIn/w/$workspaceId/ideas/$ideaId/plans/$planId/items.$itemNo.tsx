@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   PlanItemScreen,
   type PlanItemSearch,
-  PlanItemSkeleton,
 } from "../../../../../../../../screens/PlanItem";
+import { PlanItemSkeleton } from "../../../../../../../../screens/PlanItemSkeleton";
 
 /**
  * `/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo`: 21 Plan item (SDD 4章).

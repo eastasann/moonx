@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   EconomicsScreen,
   type EconomicsSearch,
-  EconomicsSkeleton,
 } from "../../../../../../screens/Economics";
+import { EconomicsSkeleton } from "../../../../../../screens/EconomicsSkeleton";
 
 /**
  * `/w/$workspaceId/ideas/$ideaId/economics`: 18 Unit Economics & Scenarios (SDD 4章).

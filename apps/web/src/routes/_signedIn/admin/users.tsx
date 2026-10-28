@@ -4,8 +4,8 @@ import type { AdminUsersTab } from "../../../lib/links";
 import {
   AdminUsersScreen,
   type AdminUsersSearch,
-  AdminUsersSkeleton,
 } from "../../../screens/AdminUsers";
+import { AdminUsersSkeleton } from "../../../screens/AdminUsersSkeleton";
 
 const TABS: readonly AdminUsersTab[] = ["users", "workspaces", "invitations"];
 

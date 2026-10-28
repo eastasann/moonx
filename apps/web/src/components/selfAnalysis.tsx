@@ -1,6 +1,14 @@
+import type { SelfAnalysisHome } from "@moonx/schemas";
+import { IllustratedMessage, Skeleton } from "@moonx/ui-web";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { ownPersonalId, useWorkspace } from "./workspace";
+import { Hourglass } from "lucide-react";
+import { type ReactNode, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { ApiError } from "../lib/api";
+import { selfAnalysisHomeQuery } from "../lib/queries";
+import { FailureState, SlowLoadingState, useIsSlow } from "./states";
+import { dashboardHref, ownPersonalId, useWorkspace } from "./workspace";
 
 /**
  * The page's save of a self-analysis answer (design-spec 6.0.2's item "1つの回答"). Its
@@ -33,4 +41,56 @@ export function useMovesToPersonal(applies = true): boolean {
     });
   }, [moves, personal, href, workspace.id, navigate]);
   return moves;
+}
+
+/**
+ * 11 when no self-analysis can be made yet (design-spec 6.0.6「公開済みのテンプレートが
+ * 無い」): the form has nothing to ask.
+ */
+function TemplatesNotReadyState() {
+  const { t } = useTranslation(["errors"]);
+  return (
+    <IllustratedMessage
+      headingLevel={1}
+      icon={<Hourglass />}
+      heading={t("errors:TEMPLATE_NOT_PUBLISHED")}
+    />
+  );
+}
+
+/**
+ * Reads the self-analysis first (S1 GET makes it, SDD 5.8) and shows `children` with it,
+ * or the state it is in (6.0.6): `notReady` while no template is published. 10 and 11
+ * open through it.
+ */
+export function SelfAnalysisBody({
+  skeleton,
+  notReady = <TemplatesNotReadyState />,
+  children,
+}: {
+  skeleton: ReactNode;
+  notReady?: ReactNode;
+  children: (home: SelfAnalysisHome) => ReactNode;
+}) {
+  const { me } = useWorkspace();
+  const query = useQuery(selfAnalysisHomeQuery());
+  const isSlow = useIsSlow(query.isPending);
+  if (query.data !== undefined) return children(query.data);
+  if (
+    query.error instanceof ApiError &&
+    query.error.code === "TEMPLATE_NOT_PUBLISHED"
+  ) {
+    return notReady;
+  }
+  if (query.isError) {
+    return (
+      <FailureState
+        error={query.error}
+        onRetry={() => void query.refetch()}
+        dashboardHref={dashboardHref(me)}
+      />
+    );
+  }
+  if (isSlow) return <SlowLoadingState onRetry={() => void query.refetch()} />;
+  return <Skeleton isLoading>{skeleton}</Skeleton>;
 }

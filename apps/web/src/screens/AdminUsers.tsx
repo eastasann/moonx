@@ -28,7 +28,6 @@ import {
   ListDetailPattern,
   Picker,
   SearchField,
-  Skeleton,
   Stack,
   type TableColumn,
   TableView,
@@ -43,6 +42,8 @@ import { SearchX, Users } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  AdminBreadcrumbs,
+  AdminHeading,
   adminToast,
   useAdminTabs,
   useDetailHistory,
@@ -71,7 +72,7 @@ import {
 } from "../lib/queries";
 import { isSessionLost, useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
-import { AdminBreadcrumbs, AdminHeading } from "./AdminTemplates";
+import { ListSkeleton } from "./AdminUsersSkeleton";
 
 /** `/admin/users`'s search parameters (SDD 4章). */
 export interface AdminUsersSearch {
@@ -192,23 +193,6 @@ function ListState({
     );
   }
   return <ListSkeleton />;
-}
-
-/** Rows of placeholder words in the shape of a list (design-spec 6.0.6). */
-function ListSkeleton() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2, 3].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("admin:users.title")}</Text>
-            <Text variant="caption">{t("admin:users.never")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
 }
 
 /** "Nothing matches" a search or filter, with the way back to the whole list. */
@@ -1257,20 +1241,6 @@ function UsersBody({ tab }: { tab: AdminUsersTab }) {
       />
       {invitations.dialog}
     </>
-  );
-}
-
-/** 28's shape while its route loads (design-spec 6.0.6). */
-export function AdminUsersSkeleton() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <ListDetailPattern
-      header={<AdminHeading />}
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("admin:tabs.users")}
-      onBack={() => {}}
-    />
   );
 }
 

@@ -4,8 +4,8 @@ import { isAssumptionsTab } from "../../../../../../lib/links";
 import {
   AssumptionsScreen,
   type AssumptionsSearch,
-  AssumptionsSkeleton,
 } from "../../../../../../screens/AssumptionsRisks";
+import { AssumptionsSkeleton } from "../../../../../../screens/AssumptionsRisksSkeleton";
 
 /**
  * `/w/$workspaceId/ideas/$ideaId/assumptions`: 16 Assumptions & Risks (SDD 4章). Values it

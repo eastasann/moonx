@@ -30,12 +30,10 @@ import {
   type FauChange,
   FileTrigger,
   Flex,
-  Heading,
   IllustratedMessage,
   InlineAlert,
   MoonGlyph,
   Stack,
-  Steps,
   StepsPattern,
   Text,
   TextArea,
@@ -84,6 +82,12 @@ import { countingEvidence } from "../lib/evidence";
 import { readUtf8 } from "../lib/files";
 import { useIsOnline } from "../lib/online";
 import { importContextQuery } from "../lib/queries";
+import {
+  AiImportSkeleton,
+  Header,
+  ImportSteps,
+  type Step,
+} from "./AiImportSkeleton";
 
 /** `/w/$workspaceId/ai/import`'s search parameters (SDD 4章). */
 export interface AiImportSearch {
@@ -93,61 +97,11 @@ export interface AiImportSearch {
   returnTo?: string;
 }
 
-/** 25's steps (design-spec 6.7). ④ Apply is the button that ends ③. */
-const STEPS = ["paste", "match", "review", "apply"] as const;
-type Step = Exclude<(typeof STEPS)[number], "apply">;
-
 /** How long "2 answers updated · 1 needs F/A/U" stays: the shortest 4.5 Toast allows. */
 const TOAST_MS = 5000;
 
 /** How much of a block without an ID ② quotes to name it. */
 const EXCERPT_CHARS = 40;
-
-/** The title and where the import goes, above the steps (s25-import.html .eyebrow). */
-function Header({ eyebrow }: { eyebrow: ReactNode }) {
-  const { t } = useTranslation(["ai"]);
-  return (
-    <Stack gap="space-75">
-      <Text variant="caption" tone="secondary">
-        {eyebrow}
-      </Text>
-      <Heading level={1} variant="heading-1-steps">
-        {t("ai:import.title")}
-      </Heading>
-    </Stack>
-  );
-}
-
-function ImportSteps({ current }: { current: Step }) {
-  const { t } = useTranslation(["ai"]);
-  return (
-    <Steps
-      aria-label={t("ai:steps")}
-      steps={STEPS.map((id) => ({ id, label: t(`ai:import.step.${id}`) }))}
-      currentId={current}
-      doneLabel={t("ai:stepDone")}
-    />
-  );
-}
-
-/** 25's shape while its target loads (design-spec 6.0.6). */
-export function AiImportSkeleton() {
-  const { t } = useTranslation(["ai"]);
-  return (
-    <StepsPattern
-      header={<Header eyebrow={t("ai:import.reply")} />}
-      steps={<ImportSteps current="paste" />}
-    >
-      <Well>
-        <Stack gap="space-100">
-          {[0, 1, 2, 3].map((line) => (
-            <Text key={line}>{t("ai:import.replyPlaceholder")}</Text>
-          ))}
-        </Stack>
-      </Well>
-    </StepsPattern>
-  );
-}
 
 /** A block's first line, to name a block without an ID ("Unmatched block “…”"). */
 function excerptOf(body: ReplyBody, truncate: (text: string) => string) {

@@ -24,7 +24,6 @@ import {
   MenuItem,
   RowList,
   RowListItem,
-  Skeleton,
   Stack,
   Text,
   Tree,
@@ -98,6 +97,10 @@ import {
   sectionItemKey,
 } from "../lib/template-drafts";
 import { useDocumentTitle } from "../lib/title";
+import {
+  TemplateVersionSkeleton,
+  TreeSkeleton,
+} from "./TemplateVersionSkeleton";
 
 /** `/admin/templates/versions/$versionId`'s search parameters (SDD 4章). */
 export interface TemplateVersionSearch {
@@ -989,20 +992,6 @@ function VersionHeader({
   );
 }
 
-/** The tree's pane while the version loads (design-spec 6.0.6). */
-function TreeSkeleton() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-200">
-        {[0, 1, 2, 3].map((row) => (
-          <Text key={row}>{t("admin:version.choose")}</Text>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 /** The tabs of the tree's pane: the contents, and for a draft the check. */
 type PaneTab = "contents" | "check";
 
@@ -1457,26 +1446,6 @@ function VersionBody({
         />
       )}
     </HeldInputContext.Provider>
-  );
-}
-
-/** 27's shape while its route loads (design-spec 6.0.6). */
-export function TemplateVersionSkeleton() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Skeleton isLoading>
-          <Heading level={1} variant="heading-1-list">
-            {t("admin:version.title")}
-          </Heading>
-        </Skeleton>
-      }
-      list={<TreeSkeleton />}
-      detail={null}
-      listLabel={t("admin:templates.title")}
-      onBack={() => {}}
-    />
   );
 }
 

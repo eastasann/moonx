@@ -62,6 +62,7 @@ import {
   workspaceKey,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { DecisionSkeleton, MaterialSkeleton } from "./DecisionSkeleton";
 
 /** How long "Decision recorded" stays: the shortest 4.5 Toast allows. */
 const TOAST_MS = 5000;
@@ -166,31 +167,6 @@ function Material({ context }: { context: DecisionContext }) {
         </Stack>
       </Stack>
     </Well>
-  );
-}
-
-/** The material's shape while it loads (design-spec 6.5: the fields come first). */
-function MaterialSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <Skeleton isLoading>
-      <Well density="spacious">
-        <Stack gap="space-300">
-          {[
-            t("validation:decision.summary"),
-            t("validation:decision.keyNumbers"),
-            t("validation:decision.checks"),
-          ].map((label) => (
-            <Stack key={label} gap="space-100">
-              <Heading level={2} variant="label">
-                {label}
-              </Heading>
-              <Text>{t("validation:decision.material")}</Text>
-            </Stack>
-          ))}
-        </Stack>
-      </Well>
-    </Skeleton>
   );
 }
 
@@ -498,18 +474,6 @@ function DecisionBody({ home }: { home: ValidationHome }) {
         </AlertDialog>
       )}
     </>
-  );
-}
-
-/** 19's shape while its route loads (design-spec 6.0.6・6.5「ローディング」). */
-export function DecisionSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <FocusPattern
-      header={<Heading level={1}>{t("validation:decision.title")}</Heading>}
-    >
-      <MaterialSkeleton />
-    </FocusPattern>
   );
 }
 

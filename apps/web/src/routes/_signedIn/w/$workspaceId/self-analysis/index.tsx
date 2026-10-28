@@ -13,6 +13,6 @@ export const Route = createFileRoute(
 });
 
 function SelfAnalysisHomeRoute() {
-  const { modal } = Route.useSearch();
-  return <SelfAnalysisHomeScreen modal={modal} />;
+  const { modal, about } = Route.useSearch();
+  return <SelfAnalysisHomeScreen modal={modal} about={about} />;
 }

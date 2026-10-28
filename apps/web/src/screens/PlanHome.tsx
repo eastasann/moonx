@@ -63,6 +63,13 @@ import {
   SlowLoadingState,
   useIsSlow,
 } from "../components/states";
+import {
+  type TemplateTarget,
+  TemplateUpdateDialog,
+  useIsTemplateUpdateOpen,
+  useOpenTemplateUpdate,
+  useTemplateBanner,
+} from "../components/TemplateUpdate";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
@@ -419,11 +426,17 @@ function PitchDeckButton({ home }: { home: PlanHome }) {
   );
 }
 
+/** What M8 moves on 20: the plan (SDD 4章 `about=business_plan:<id>`). */
+const planTarget = (home: PlanHome): TemplateTarget => ({
+  kind: "business_plan",
+  id: home.id,
+});
+
 /**
  * The tools beside the plan's name for the Owners and Members while it can be changed
  * (design-spec 6.12): Save version (M3), Pitch Deck (23), and ⋯ with Rename plan,
- * Export for AI and Import from AI (24, 25) and Archive plan. Update template joins with
- * M8 (Step 35c).
+ * Export for AI and Import from AI (24, 25), Archive plan and, while a newer template is
+ * published, Update template (M8).
  */
 function Tools({
   home,
@@ -434,9 +447,10 @@ function Tools({
   onSaveVersion: () => void;
   onRename: () => void;
 }) {
-  const { t } = useTranslation(["plans", "ai"]);
+  const { t } = useTranslation(["plans", "ai", "app"]);
   const { workspace } = useWorkspace();
   const actions = usePlanActions();
+  const openTemplateUpdate = useOpenTemplateUpdate();
   const here = planHref(workspace.id, home.ideaId, home.id);
   const ai = { kind: "business_plan" as const, id: home.id, returnTo: here };
   return (
@@ -450,6 +464,8 @@ function Tools({
         onAction={(key) => {
           if (key === "rename") onRename();
           else if (key === "archive") actions.archive(home);
+          else if (key === "update-template")
+            openTemplateUpdate(planTarget(home));
         }}
       >
         <MenuItem id="rename">{t("plans:home.rename")}</MenuItem>
@@ -460,6 +476,11 @@ function Tools({
           {t("ai:menu.import")}
         </MenuItem>
         <MenuItem id="archive">{t("plans:home.archive")}</MenuItem>
+        {home.template.newerVersion !== null && (
+          <MenuItem id="update-template">
+            {t("app:templateUpdate.action")}
+          </MenuItem>
+        )}
       </ActionMenu>
     </>
   );
@@ -703,10 +724,12 @@ function PlanHub({
   home,
   ideaName,
   modal,
+  about,
 }: {
   home: PlanHome;
   ideaName: string;
   modal: string | undefined;
+  about: string | undefined;
 }) {
   const { t } = useTranslation(["plans"]);
   const { role } = useWorkspace();
@@ -728,6 +751,12 @@ function PlanHub({
     !home.ideaArchived &&
     !home.archived &&
     home.latestDecision === "proceed";
+  const isUpdatingTemplate = useIsTemplateUpdateOpen(
+    modal,
+    about,
+    planTarget(home),
+    canEdit,
+  );
   const [partA, partB] = [
     home.parts.find((part) => part.part === "a"),
     home.parts.find((part) => part.part === "b"),
@@ -830,6 +859,15 @@ function PlanHub({
           <RenamePlanDialog home={home} onClose={() => setRenaming(false)} />
         </ModalBoundary>
       )}
+      {isUpdatingTemplate && (
+        <ModalBoundary key={modal} onClose={modals.close}>
+          <TemplateUpdateDialog
+            target={planTarget(home)}
+            dataKeys={[ideaKey(home.ideaId)]}
+            onClose={modals.close}
+          />
+        </ModalBoundary>
+      )}
     </>
   );
 }
@@ -888,11 +926,13 @@ function PlanHomeBody({
   planId,
   versionId,
   modal,
+  about,
 }: {
   ideaId: string;
   planId: string;
   versionId: string | undefined;
   modal: string | undefined;
+  about: string | undefined;
 }) {
   const { me, workspace } = useWorkspace();
   const home = useQuery(planHomeQuery(ideaId, planId, versionId));
@@ -915,6 +955,7 @@ function PlanHomeBody({
         home={home.data}
         ideaName={idea.data.idea.name}
         modal={modal}
+        about={about}
       />
     );
   }
@@ -1045,14 +1086,17 @@ export function PlanHomeScreen({
   planId,
   search,
   modal,
+  about,
 }: {
   ideaId: string;
   planId: string;
   search: PlanHomeSearch;
   modal: string | undefined;
+  /** What the modal is about: M8's `business_plan:<id>`. */
+  about: string | undefined;
 }) {
   const { t } = useTranslation(["ideas"]);
-  const { workspace } = useWorkspace();
+  const { workspace, role } = useWorkspace();
   const panel = usePanel();
   const { data } = useQuery(planHomeQuery(ideaId, planId, search.version));
   const { data: ideaData } = useQuery(validationHomeQuery(ideaId));
@@ -1062,6 +1106,16 @@ export function PlanHomeScreen({
       : undefined;
   const idea =
     ideaData?.idea.workspaceId === workspace.id ? ideaData.idea : undefined;
+  // Not on a saved version, which is read only (6.12): the plan is migrated as it is now.
+  const templateBanner = useTemplateBanner(
+    home?.template,
+    home === undefined ? undefined : planTarget(home),
+    home !== undefined &&
+      role !== "viewer" &&
+      !home.ideaArchived &&
+      !home.archived &&
+      home.viewingVersion === null,
+  );
   useDocumentTitle(
     ...(home === undefined || idea === undefined
       ? []
@@ -1102,6 +1156,7 @@ export function PlanHomeScreen({
       saveScope={headerKey(planId)}
       comments={comments}
       history={comments}
+      templateBanner={templateBanner}
       back={
         idea === undefined
           ? { label: t("ideas:title"), href: ideasHref(workspace.id) }
@@ -1126,6 +1181,7 @@ export function PlanHomeScreen({
         planId={planId}
         versionId={search.version}
         modal={modal}
+        about={about}
       />
     </WorkspaceFrame>
   );

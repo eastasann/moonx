@@ -2247,7 +2247,7 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 35c: M8 テンプレートの移行
 
-Status:
+Status: done 2026-10-28
 
 ```
 テンプレートの移行（M8）を作ってください（Step 35 から分けた残り）。

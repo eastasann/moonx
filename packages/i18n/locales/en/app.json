@@ -83,5 +83,26 @@
     "logOutTitle": "Log out?",
     "leaveTitle": "Leave this page?",
     "cancel": "Cancel"
+  },
+  "templateUpdate": {
+    "bannerTitle": "A newer template is available.",
+    "bannerBody": "Your answers stay on v{{version}} until you update.",
+    "action": "Update template",
+    "title": "Update template",
+    "lead": "Move from v{{from}} to v{{to}} of the template.",
+    "carried": "Answers carried over",
+    "added": "New questions",
+    "addedCostRows": "Cost rows added",
+    "none": "None",
+    "hidden": "Questions not in v{{version}}",
+    "hiddenNote": "Answers to these questions stay saved but no longer show.",
+    "hiddenNone": "Every question carries over to v{{version}}.",
+    "answered": "Answered",
+    "notAnswered": "No answer",
+    "cancel": "Cancel",
+    "close": "Close",
+    "latest": "You're already on the latest template",
+    "changed": "The template changed since this opened. Check what moves now, then update again.",
+    "updated": "Template updated to v{{version}}"
   }
 }

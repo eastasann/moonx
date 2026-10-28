@@ -24,13 +24,14 @@ export const Route = createFileRoute(
 
 function PlanHomeRoute() {
   const { ideaId, planId } = Route.useParams();
-  const { modal, about: _, ...search } = Route.useSearch();
+  const { modal, about, ...search } = Route.useSearch();
   return (
     <PlanHomeScreen
       ideaId={ideaId}
       planId={planId}
       search={search}
       modal={modal}
+      about={about}
     />
   );
 }

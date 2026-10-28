@@ -735,6 +735,8 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | プランが参照する費用行のキー | 新しい版のプランのテンプレートの参照に従う。キーの行が検証にないときは「Not in validation」と出す |
 
 - 移行は1回の操作を単位に元に戻せる。10 / 13 / 20 の履歴に「Template updated to v2」の行として出し、その行の「Undo the whole operation」で版と回答の状態をまとめて戻す。この行に個別の「この時点に戻す」は出さない。13 の履歴は、アイデア自身の行に加えて検証の移行の行だけを含む（検証の回答の行は各セクションの画面に出る）。
+- 帯と入口（2026-10-28 に Step 35c で決めた）: 帯の文は「**A newer template is available.** Your answers stay on v{今の版} until you update.」で、右端に「Update template」（d1-moon.html の .banner）。アーカイブ済みのアイデア・案と、20 で保存した版を開いている間は読み取り専用（6.8・6.12）なので、帯も ⋯ の M8 も出さない。13・20 の ⋯ の「Update template」は、帯と同じく新しい版があるときだけ出す（screen_flow.mermaid の「新しい版があるとき」）。
+- M8 の並びと文言（2026-10-28 に Step 35c で決めた）: 題「Update template」の下に「Move from v{今の版} to v{新しい版} of the template.」、DescriptionList で「Answers carried over」（T1 の `carried`）・「New questions」（`addedQuestions`）・検証だけ「Cost rows added」（`addedCostRows` を並べる。無ければ「None」）、小見出し「Questions not in v{新しい版}」と注記「Answers to these questions stay saved but no longer show.」の下に、新しい版にない設問を「{節} {設問のタイトル}」（「01 NON-CUSTOMER」）で並べ、行の右に回答の有無（「Answered」「No answer」）を出す。無ければ「Every question carries over to v{新しい版}.」。ボタンは「Cancel」と「Update template」（T1 を読み終えるまで押せない）。移行したら M8 を閉じ、トースト「Template updated to v{新しい版}」を出す（帯は消える）。「You're already on the latest template」の間は、ボタンを「Close」だけにする。開いている間に、ほかの人が新しい版へ移したうえで、さらに新しい版が公開されていたとき（T2 の `422 VALIDATION_FAILED`）は、T1 を読み直して今の移行の中身を出し、その上に注意「The template changed since this opened. Check what moves now, then update again.」を出す（読み直している間は Update template を押せない）。開いている間にアイデア・案がアーカイブされたとき（`409 ARCHIVED`）は、M8 を開いたまま 6.0.6 の送信の失敗（「Couldn't save」と理由）を出し、閉じるまで残す（背後の画面は読み取り専用に変わる）。
 
 #### 6.0.8 入力の規則
 

@@ -14,6 +14,6 @@ export const Route = createFileRoute(
 
 function ValidationHomeRoute() {
   const { ideaId } = Route.useParams();
-  const { modal } = Route.useSearch();
-  return <ValidationHomeScreen ideaId={ideaId} modal={modal} />;
+  const { modal, about } = Route.useSearch();
+  return <ValidationHomeScreen ideaId={ideaId} modal={modal} about={about} />;
 }

@@ -54,6 +54,13 @@ import {
   SlowLoadingState,
   useIsSlow,
 } from "../components/states";
+import {
+  type TemplateTarget,
+  TemplateUpdateDialog,
+  useIsTemplateUpdateOpen,
+  useOpenTemplateUpdate,
+  useTemplateBanner,
+} from "../components/TemplateUpdate";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
@@ -597,16 +604,23 @@ function Header({ home }: { home: ValidationHome }) {
   );
 }
 
+/** What M8 moves on 13: the idea's validation (SDD 4章 `about=validation:<id>`). */
+const validationTarget = (home: ValidationHome): TemplateTarget => ({
+  kind: "validation",
+  id: home.validationId,
+});
+
 /**
  * The tools beside the title for the Owners and Members (design-spec 6.1「操作」): Edit
  * summary and AI ▼ while the idea is not archived (6.8: no AI round trip then), and ⋯
- * with Duplicate, and Archive while it is not. Update template joins with M8 (Step 35c);
- * Add plan is in the Plans block.
+ * with Duplicate, and Archive and, while a newer template is published, Update template
+ * (M8) while it is not. Add plan is in the Plans block.
  */
 function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {
-  const { t } = useTranslation(["validation", "ideas"]);
+  const { t } = useTranslation(["validation", "ideas", "app"]);
   const { workspace } = useWorkspace();
   const actions = useIdeaActions();
+  const openTemplateUpdate = useOpenTemplateUpdate();
   const { idea } = home;
   return (
     <>
@@ -627,11 +641,19 @@ function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {
         onAction={(key) => {
           if (key === "duplicate") actions.duplicate(idea);
           else if (key === "archive") actions.archive(idea.id);
+          else if (key === "update-template") {
+            openTemplateUpdate(validationTarget(home));
+          }
         }}
       >
         <MenuItem id="duplicate">{t("ideas:action.duplicate")}</MenuItem>
         {!idea.archived && (
           <MenuItem id="archive">{t("ideas:action.archive")}</MenuItem>
+        )}
+        {!idea.archived && home.template.newerVersion !== null && (
+          <MenuItem id="update-template">
+            {t("app:templateUpdate.action")}
+          </MenuItem>
         )}
       </ActionMenu>
     </>
@@ -641,9 +663,11 @@ function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {
 function ValidationHub({
   home,
   modal,
+  about,
 }: {
   home: ValidationHome;
   modal: string | undefined;
+  about: string | undefined;
 }) {
   const { t } = useTranslation(["validation"]);
   const { workspace, role } = useWorkspace();
@@ -654,6 +678,12 @@ function ValidationHub({
   const canEdit = canWrite && !home.idea.archived;
   // M5 only after Proceed (design-spec 6.12「M5」, 6.1「操作」).
   const canAddPlan = canEdit && home.idea.latestDecision === "proceed";
+  const isUpdatingTemplate = useIsTemplateUpdateOpen(
+    modal,
+    about,
+    validationTarget(home),
+    canEdit,
+  );
   const blocks: HubBlockSpec[] = [
     { id: "next", column: "main", content: <NextSteps home={home} /> },
     {
@@ -745,6 +775,15 @@ function ValidationHub({
           <CreatePlanDialog ideaId={home.idea.id} onClose={modals.close} />
         </ModalBoundary>
       )}
+      {isUpdatingTemplate && (
+        <ModalBoundary key={modal} onClose={modals.close}>
+          <TemplateUpdateDialog
+            target={validationTarget(home)}
+            dataKeys={[ideaKey(home.idea.id)]}
+            onClose={modals.close}
+          />
+        </ModalBoundary>
+      )}
     </>
   );
 }
@@ -799,9 +838,11 @@ export function ValidationHomeSkeleton() {
 function ValidationHomeBody({
   ideaId,
   modal,
+  about,
 }: {
   ideaId: string;
   modal: string | undefined;
+  about: string | undefined;
 }) {
   const { me, workspace } = useWorkspace();
   const query = useQuery(validationHomeQuery(ideaId));
@@ -809,7 +850,7 @@ function ValidationHomeBody({
   if (query.data !== undefined) {
     // Another workspace's idea under this one's URL (SDD 4章): its role is not this one's.
     return query.data.idea.workspaceId === workspace.id ? (
-      <ValidationHub home={query.data} modal={modal} />
+      <ValidationHub home={query.data} modal={modal} about={about} />
     ) : (
       <NoAccessState dashboardHref={dashboardHref(me)} />
     );
@@ -840,15 +881,23 @@ function ValidationHomeBody({
 export function ValidationHomeScreen({
   ideaId,
   modal,
+  about,
 }: {
   ideaId: string;
-  /** The modal open over 13 (SDD 4章 `?modal=`): M5 after Proceed. */
+  /** The modal open over 13 (SDD 4章 `?modal=`): M5 after Proceed, M8. */
   modal?: string;
+  /** What the modal is about: M8's `validation:<id>`. */
+  about?: string;
 }) {
   const { t } = useTranslation(["ideas"]);
-  const { workspace } = useWorkspace();
+  const { workspace, role } = useWorkspace();
   const { data } = useQuery(validationHomeQuery(ideaId));
   const idea = data?.idea.workspaceId === workspace.id ? data.idea : undefined;
+  const templateBanner = useTemplateBanner(
+    data?.template,
+    data === undefined ? undefined : validationTarget(data),
+    idea !== undefined && role !== "viewer" && !idea.archived,
+  );
   const name = idea?.name;
   useDocumentTitle(...(name === undefined ? [] : [name, workspace.name]));
   // 13's own comments and history are the idea's (SDD 6.3「画面と節の対応」): its
@@ -873,6 +922,7 @@ export function ValidationHomeScreen({
       saveScope={`idea:${ideaId}`}
       comments={comments}
       history={comments}
+      templateBanner={templateBanner}
       back={{ label: t("ideas:title"), href: ideasHref(workspace.id) }}
       breadcrumbs={
         <Breadcrumbs>
@@ -883,7 +933,7 @@ export function ValidationHomeScreen({
         </Breadcrumbs>
       }
     >
-      <ValidationHomeBody ideaId={ideaId} modal={modal} />
+      <ValidationHomeBody ideaId={ideaId} modal={modal} about={about} />
     </WorkspaceFrame>
   );
 }

@@ -28,7 +28,7 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: "admin-publish.spec.ts",
+      testIgnore: ["admin-publish.spec.ts", "template-migration.spec.ts"],
     },
     // A published template version is what every new self analysis, idea and plan takes
     // from then on (design-spec 6.0.7): publishing waits until the others are done.
@@ -37,6 +37,14 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       testMatch: "admin-publish.spec.ts",
       dependencies: ["chromium"],
+    },
+    // Moving to a newer version (M8) needs the ones published: the self analysis v2
+    // admin-publish.spec.ts publishes, and the versions this one publishes itself.
+    {
+      name: "after-publishing",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: "template-migration.spec.ts",
+      dependencies: ["after-the-others"],
     },
   ],
   webServer: [

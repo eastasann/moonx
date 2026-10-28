@@ -80,6 +80,11 @@ export interface WorkspaceFrameProps
    * screen without a history (design-spec 6.0.5).
    */
   history?: ScreenHistory;
+  /**
+   * 10, 13 and 20: "A newer template is available." with Update template, under the
+   * other bands (design-spec 6.0.1・6.0.7).
+   */
+  templateBanner?: ReactNode;
   children: ReactNode;
 }
 
@@ -89,15 +94,17 @@ export interface WorkspaceFrameProps
  * Analysis not for a Viewer, 9 for an Owner only, 26 Admin for an operator only),
  * Notifications with the unread count,
  * Account and Log out in the sidebar's account menu or in More, the header's save state
- * with its Retry, 💬 and 🕘 with their panels, and the offline band. Logging out with
- * unsaved input asks first (5章「共通ナビ」). The pages appear here as their screens are
- * built (docs/claude-code-prompts.md: no way into a screen before it exists).
+ * with its Retry, 💬 and 🕘 with their panels, and the bands: offline, then the screen's
+ * newer template. Logging out with unsaved input asks first (5章「共通ナビ」). The pages
+ * appear here as their screens are built (docs/claude-code-prompts.md: no way into a
+ * screen before it exists).
  */
 export function WorkspaceFrame({
   current,
   saveScope,
   comments,
   history,
+  templateBanner,
   children,
   ...header
 }: WorkspaceFrameProps) {
@@ -321,7 +328,7 @@ export function WorkspaceFrame({
           }
         />
       }
-      banners={offline === undefined ? undefined : { offline }}
+      banners={{ offline, template: templateBanner }}
     >
       {children}
       {confirmation}

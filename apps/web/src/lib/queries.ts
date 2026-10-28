@@ -512,6 +512,26 @@ export const decisionContextQuery = (ideaId: string) =>
       ),
   });
 
+/**
+ * T1: what moving a self-analysis, validation or plan to the newest template version
+ * keeps, hides and adds (SDD 5.12). Dropped once M8 closes, so the next M8 reads it anew
+ * and never offers a move that has been made.
+ */
+export const templateMigrationPreviewQuery = (kind: TemplateKind, id: string) =>
+  queryOptions({
+    queryKey: ["template-migration", kind, id],
+    gcTime: 0,
+    // Read again only when M8 asks: a read after its own move, which the window coming
+    // back to the front could start, would say the template is the latest already.
+    refetchOnWindowFocus: false,
+    queryFn: () =>
+      unwrap(
+        api().api.v1["template-migrations"].preview.get({
+          query: { targetType: kind, targetId: id },
+        }),
+      ),
+  });
+
 /** What is cached of where an AI export or import goes: a self-analysis has no id. */
 export const aiKey = (kind: TemplateKind, id: string | undefined) => [
   "ai",

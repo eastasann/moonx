@@ -74,7 +74,8 @@ export type ModalName =
   | "share"
   | "create-plan"
   | "save-version"
-  | "go-no-go";
+  | "go-no-go"
+  | "update-template";
 
 declare module "@tanstack/react-router" {
   interface HistoryState {
@@ -104,7 +105,10 @@ declare module "@tanstack/react-router" {
 
 /** What a modal opens about (SDD 4章): M2's item, and whether Fact opened it. */
 interface ModalOptions {
-  /** `?about=<targetType>:<targetId>[:<targetKey>]`. */
+  /**
+   * `?about=<targetType>:<targetId>[:<targetKey>]` for M2, `<templateKind>:<targetId>`
+   * for M8.
+   */
   about?: string;
   forFact?: boolean;
 }

@@ -40,6 +40,12 @@ import {
   SlowLoadingState,
   useIsSlow,
 } from "../components/states";
+import {
+  type TemplateTarget,
+  TemplateUpdateDialog,
+  useIsTemplateUpdateOpen,
+  useTemplateBanner,
+} from "../components/TemplateUpdate";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
   dashboardHref,
@@ -59,6 +65,7 @@ import {
   selfAnalysisHomeQuery,
   selfAnalysisKey,
   selfAnalysisSectionQuery,
+  workspaceKey,
 } from "../lib/queries";
 import { useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
@@ -236,12 +243,20 @@ function MarkDoneConfirmation({
   );
 }
 
+/** What M8 moves on 10: the user's own self-analysis (SDD 4章 `about=self_analysis:<id>`). */
+const selfAnalysisTarget = (home: SelfAnalysisHome): TemplateTarget => ({
+  kind: "self_analysis",
+  id: home.id,
+});
+
 function SelfAnalysisHub({
   home,
   modal,
+  about,
 }: {
   home: SelfAnalysisHome;
   modal: string | undefined;
+  about: string | undefined;
 }) {
   const { t } = useTranslation(["selfAnalysis", "common"]);
   const { workspace } = useWorkspace();
@@ -259,6 +274,13 @@ function SelfAnalysisHub({
   const [wasSharing, setSharing] = useState(false);
   const isSharing = modal === "share" && (canShare || wasSharing);
   if (isSharing !== wasSharing) setSharing(isSharing);
+  // The self-analysis here is always the user's own, which only they migrate (2.2).
+  const isUpdatingTemplate = useIsTemplateUpdateOpen(
+    modal,
+    about,
+    selfAnalysisTarget(home),
+    true,
+  );
   return (
     <>
       <HubPattern
@@ -360,6 +382,21 @@ function SelfAnalysisHub({
           <CurrencyDialog
             home={home}
             onClose={() => setChangingCurrency(false)}
+          />
+        </ModalBoundary>
+      )}
+      {isUpdatingTemplate && (
+        <ModalBoundary key={modal} onClose={modals.close}>
+          <TemplateUpdateDialog
+            target={selfAnalysisTarget(home)}
+            // The workspaces it is shared with read its answers (12) too.
+            dataKeys={[
+              selfAnalysisKey,
+              ...home.shares.map(({ workspace: shared }) =>
+                workspaceKey(shared.id),
+              ),
+            ]}
+            onClose={modals.close}
           />
         </ModalBoundary>
       )}
@@ -524,7 +561,14 @@ function useQuestions(home: SelfAnalysisHome | undefined, enabled: boolean) {
  * currency under ⋯. The header's 💬 lists its threads, its 🕘 its changes. A Viewer of
  * this workspace is taken to their personal workspace's 10 (SDD 4章).
  */
-export function SelfAnalysisHomeScreen({ modal }: { modal?: string }) {
+export function SelfAnalysisHomeScreen({
+  modal,
+  about,
+}: {
+  modal?: string;
+  /** What the modal is about: M8's `self_analysis:<id>`. */
+  about?: string;
+}) {
   const { t } = useTranslation(["app"]);
   const { workspace } = useWorkspace();
   const panel = usePanel();
@@ -533,6 +577,12 @@ export function SelfAnalysisHomeScreen({ modal }: { modal?: string }) {
     ...selfAnalysisHomeQuery(),
     enabled: !moves,
   });
+  // The self-analysis is always the user's own here: only its owner migrates it (2.2).
+  const templateBanner = useTemplateBanner(
+    home?.template,
+    home === undefined ? undefined : selfAnalysisTarget(home),
+    !moves,
+  );
   useDocumentTitle(t("app:nav.selfAnalysis"), workspace.name);
   const questions = useQuestions(home, panel.open !== null);
   const comments: ScreenComments | undefined =
@@ -566,6 +616,7 @@ export function SelfAnalysisHomeScreen({ modal }: { modal?: string }) {
       current="selfAnalysis"
       title={{ label: t("app:nav.selfAnalysis") }}
       comments={comments}
+      templateBanner={templateBanner}
       history={
         comments && {
           ...comments,
@@ -585,7 +636,9 @@ export function SelfAnalysisHomeScreen({ modal }: { modal?: string }) {
           skeleton={<SelfAnalysisHomeSkeleton />}
           notReady={<HomeNotReady />}
         >
-          {(loaded) => <SelfAnalysisHub home={loaded} modal={modal} />}
+          {(loaded) => (
+            <SelfAnalysisHub home={loaded} modal={modal} about={about} />
+          )}
         </SelfAnalysisBody>
       )}
     </WorkspaceFrame>

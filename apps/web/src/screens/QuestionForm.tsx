@@ -187,7 +187,8 @@ function SectionForm({
   const [isAtEnd, setAtEnd] = useState(false);
 
   // Opening, and a `?q=` given later, focus the question (6.2「開いたとき」): its answer's
-  // field, which moves it to the middle (4.1 C). A Viewer's form has no focus to move.
+  // field, which moves it to the middle from a tablet's width up (4.1 C). A Viewer's form
+  // has no focus to move.
   const latest = useRef({ shownIds, currentId, canEdit });
   latest.current = { shownIds, currentId, canEdit };
   const hasOpened = useRef(false);

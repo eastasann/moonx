@@ -620,6 +620,24 @@ test.describe("11 on a phone", () => {
     const { workspace, idea } = await ownIdea(page, signIn, account);
     await page.goto(`/w/${workspace.id}/ideas/${idea.id}/questions/10`);
     await expect(page.getByRole("textbox")).toHaveCount(1);
+    // Opening focuses the first question without moving the page: the section's title
+    // stays in sight below the header (design-spec 4.5 QuestionCard). A move would have
+    // begun with the focus, two frames before this reads.
+    await expect(page.getByRole("textbox")).toBeFocused();
+    const scrollY = await page.evaluate(
+      () =>
+        new Promise<number>((resolve) =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => resolve(window.scrollY)),
+          ),
+        ),
+    );
+    expect(scrollY).toBe(0);
+    const header = await page.getByRole("banner").boundingBox();
+    const title = await page.getByRole("heading", { level: 1 }).boundingBox();
+    if (header === null || title === null)
+      throw new Error("No header or title");
+    expect(title.y).toBeGreaterThanOrEqual(header.y + header.height - 1);
     await expect(
       page.getByRole("link", { name: "Back to Validation" }),
     ).toBeVisible();

@@ -861,6 +861,18 @@ describe("QuestionCard", () => {
     expect(window.scrollBy).toHaveBeenCalledTimes(1);
   });
 
+  test("on a phone, entering an answer moves nothing: its one question sits under the description", async () => {
+    setPhoneWidth();
+    const user = userEvent.setup();
+    render(
+      <QuestionCard title="WHO" question="Who?" mode="focused">
+        <TextArea aria-label="Answer" />
+      </QuestionCard>,
+    );
+    await user.click(screen.getByRole("textbox", { name: "Answer" }));
+    expect(window.scrollBy).not.toHaveBeenCalled();
+  });
+
   test("the F/A/U buttons and a read-only choice move nothing", async () => {
     const user = userEvent.setup();
     render(

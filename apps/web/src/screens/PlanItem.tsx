@@ -38,6 +38,7 @@ import {
   Skeleton,
   Stack,
   Text,
+  useIsNarrow,
   Well,
 } from "@moonx/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -563,9 +564,11 @@ function ItemForm({
   const [isAtEnd, setAtEnd] = useState(false);
 
   // Opening, and a `?q=` given later, focus the sub-item (6.2「開いたとき」): its field,
-  // which moves it to the middle (4.1 C). A read-only item has no focus to move.
-  const latest = useRef({ shownIds, currentId, canEdit });
-  latest.current = { shownIds, currentId, canEdit };
+  // which moves it to the middle from a tablet's width up (4.1 C). A read-only item has
+  // no focus to move.
+  const isNarrow = useIsNarrow();
+  const latest = useRef({ shownIds, currentId, canEdit, isNarrow });
+  latest.current = { shownIds, currentId, canEdit, isNarrow };
   const hasOpened = useRef(false);
   // Runs on opening and when `?q=` changes; the rest is read from `latest`.
   useEffect(() => {
@@ -573,6 +576,7 @@ function ItemForm({
       shownIds: ids,
       currentId: current,
       canEdit: editable,
+      isNarrow: narrow,
     } = latest.current;
     const target =
       focusKey !== undefined && ids.includes(focusKey)
@@ -595,7 +599,9 @@ function ItemForm({
         return;
       }
       // Numbers, a table's rows and execution items have no field to enter: the card
-      // itself comes to the middle (4.1 C).
+      // itself comes to the middle (4.1 C), but for a phone's, the one card shown under
+      // the item's description (4.5 QuestionCard).
+      if (narrow) return;
       document
         .querySelector(`[data-question="${target}"]`)
         ?.scrollIntoView({ block: "center" });

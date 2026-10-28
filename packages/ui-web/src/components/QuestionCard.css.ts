@@ -65,6 +65,11 @@ export const quiet = style({
   selectors: {
     "&:hover": { background: vars.color.surface.hover },
   },
+  "@media": {
+    [narrowQuery]: {
+      gridTemplateColumns: `${form.rowMarkWidth} minmax(0, 1fr)`,
+    },
+  },
 });
 
 /** The F/A/U moon, down the rows' left edge so the states line up (.row .g). */
@@ -74,6 +79,8 @@ export const glyph = style({
   display: "grid",
   placeItems: "center",
   paddingBlockStart: vars.space["50"],
+  // On a phone the label's line under the excerpt is the second row, absent when empty.
+  "@media": { [narrowQuery]: { gridRow: "1" } },
 });
 
 export const quietText = style({
@@ -82,6 +89,7 @@ export const quietText = style({
   display: "flex",
   flexDirection: "column",
   minWidth: 0,
+  "@media": { [narrowQuery]: { gridRow: "1" } },
 });
 
 /**
@@ -135,7 +143,11 @@ export const press = style({
   },
 });
 
-/** The F/A/U label and the comments at the end of the quiet row (.meta). */
+/**
+ * The F/A/U label and the comments at the end of the quiet row (.meta). On a phone they
+ * go under the excerpt, as s17's rows put the state under the name: beside it they
+ * would leave the excerpt half the row.
+ */
 export const meta = style({
   ...typography("caption"),
   gridColumn: "3",
@@ -146,6 +158,15 @@ export const meta = style({
   paddingBlockStart: vars.space["25"],
   color: vars.color.text.secondary,
   whiteSpace: "nowrap",
+  "@media": {
+    [narrowQuery]: {
+      gridColumn: "2",
+      gridRow: "2",
+      paddingBlockStart: 0,
+      // An empty answer's row has nothing here: no line under it.
+      selectors: { "&:empty": { display: "none" } },
+    },
+  },
 });
 
 export const comments = style({

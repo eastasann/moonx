@@ -481,7 +481,8 @@ function SectionForm({
   const [isAtEnd, setAtEnd] = useState(false);
 
   // Opening, and a `?q=` given later, focus the question (6.2「開いたとき」, 10's
-  // Continue): its first field, which moves it to the middle (4.1 C).
+  // Continue): its first field, which moves it to the middle from a tablet's width up
+  // (4.1 C).
   const latest = useRef({ shownIds, currentId });
   latest.current = { shownIds, currentId };
   const hasOpened = useRef(false);

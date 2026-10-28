@@ -24,14 +24,29 @@ const phone = {
 };
 
 async function expectNoAxeViolations(page: Page) {
-  // At the page's end: a row cut by the fold half under a phone's fixed TabBar is
-  // reported by axe's target-size rule wherever the fold falls.
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   // A pending Button's spinner leaves React Aria's announcement in the live region for
-  // 7 seconds; the page is checked once it has gone.
+  // 7 seconds; the page is checked once it has gone, and once every section has loaded
+  // (a Skeleton is inert).
   await expect(
     page.locator("[data-live-announcer] [aria-labelledby]"),
   ).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("main").locator("[inert]")).toHaveCount(0, {
+    timeout: 10_000,
+  });
+  // At the page's end: a row cut by the fold half under a phone's sticky TabBar is
+  // reported by axe's target-size rule wherever the fold falls. A page still growing
+  // after the scroll left 9's invite field half under it in a full run, so the window
+  // must still be at the end a retry after the last scroll.
+  await expect(async () => {
+    const atEnd = await page.evaluate(() => {
+      const root = document.documentElement;
+      const atEnd =
+        Math.ceil(window.scrollY + root.clientHeight) >= root.scrollHeight - 1;
+      if (!atEnd) window.scrollTo(0, root.scrollHeight);
+      return atEnd;
+    });
+    expect(atEnd).toBe(true);
+  }).toPass({ timeout: 10_000 });
   const { violations } = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();

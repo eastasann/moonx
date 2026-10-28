@@ -705,7 +705,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 入力値が範囲外 | 入力欄の下に理由（例: 「Enter a number greater than 0」）。保存しない。入力ごとの規則は 6.0.8 |
 | 公開済みのテンプレートが無い | 自己分析・アイデア・プラン下書きを作れないので、作る操作の位置に「Templates aren't ready yet. Ask your administrator.」を出す（運営者がテンプレートを取り込んで公開する前。6.17） |
 | オフライン | 画面上部の帯に「You're offline. Changes can't be saved until you reconnect.」。入力欄は読み取り専用にする（6.0.2）。再接続したら帯を消し、残っていた入力を送る。読み込んでいない画面を開こうとしたら、本文の位置に「You're offline. Connect to the internet to open this page.」 |
-| 新しい版がある | 新しい版が待っているとき、画面上部の帯に「A new version of moonx is available.」と [Reload]。閉じられる（閉じても、次に開いたときにまた出す）。未保存の入力があれば、Reload でブラウザの離脱の確認が出る |
+| 新しい版がある | 新しい版が待っているとき、画面上部の帯に「A new version of moonx is available.」と [Reload]。閉じられる（閉じても、次に開いたときにまた出す）。未保存の入力があれば、Reload でブラウザの離脱の確認が出る。別のタブで新しい版に切り替わったときと、離脱の確認で留まったときは、その画面は前の版のままなので同じ帯を出し、Reload で読み込み直す |
 | ホーム画面への追加の案内 | iPhone の Safari で開いていて、ホーム画面から開いていないときだけ、ログイン後の画面の上部の帯に「Add moonx to your Home Screen: tap Share, then Add to Home Screen.」と閉じるボタンを出す。閉じたら、その端末のそのブラウザでは出さない（ブラウザに覚えておく）。iPhone は追加を勧める表示を自分では出さないため |
 | 回数の上限 | 「Too many attempts. Try again in {待ち時間}.」（操作のボタンの近く。入力は残す）。待ち時間は API の応答から `packages/i18n` の書式で出す（値の出どころは SDD 8.2。例: 「1 minute」「45 minutes」。丸め方は 1.2）。待ち時間が分からないときは「Too many attempts. Try again later.」。数える枠と回数の正は SDD 7.2 |
 | 想定外のエラー | 本文の位置に「Something went wrong」と再試行。小さく「Ref: xxxxxxxx」（問い合わせのときに伝える番号）を出す。ナビは使えるままにする。モーダル・パネルの中の失敗は下のモーダルの決まりのとおり小さなダイアログに出す |

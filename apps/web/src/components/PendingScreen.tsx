@@ -1,6 +1,8 @@
 import { AppFrame, SideNav, Skeleton, TabBar } from "@moonx/ui-web";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { type ComponentType, useState, useSyncExternalStore } from "react";
+import { useNewVersionBanner } from "./pwaBanners";
+import { useOfflineBanner } from "./StandaloneFrame";
 import { StandaloneLoading } from "./StandaloneLoading";
 import { PENDING_MS, SlowLoadingState, useIsSlow } from "./states";
 
@@ -62,6 +64,9 @@ export function PendingScreen() {
   const [elapsed] = useState(() => loadingFor(key));
   const isSlow = useIsSlow(true, elapsed);
   const isBrowser = useIsBrowser();
+  // Before the user is known: the bands of every screen, not iPhone's Home Screen hint.
+  const offline = useOfflineBanner();
+  const newVersion = useNewVersionBanner();
   if (!isBrowser) return null;
   const retry = () => void router.invalidate();
   if (target?.isStandalone === true) {
@@ -89,6 +94,7 @@ export function PendingScreen() {
           <TabBar items={[]} more={null} />
         </Skeleton>
       }
+      banners={{ offline, newVersion }}
     >
       {isSlow ? (
         <SlowLoadingState onRetry={retry} />

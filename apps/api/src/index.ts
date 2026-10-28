@@ -10,6 +10,7 @@ import { ConfigError, loadConfig } from "./config";
 import { createLogger } from "./log";
 import { createMailer } from "./mail";
 import { createErrorReporter } from "./sentry";
+import { WebBuildError } from "./web";
 
 /** Stops the process with one JSON line, so Cloud Logging records why a revision failed. */
 function refuseToStart(error: Error): never {
@@ -47,7 +48,12 @@ function buildApp() {
           : createCloudStorageAvatarStore({ bucket: config.avatarBucket }),
     });
   } catch (error) {
-    if (!(error instanceof AccessDeclarationError)) throw error;
+    if (
+      !(error instanceof AccessDeclarationError) &&
+      !(error instanceof WebBuildError)
+    ) {
+      throw error;
+    }
     refuseToStart(error);
   }
 }

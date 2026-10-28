@@ -46,12 +46,12 @@ export const test = base.extend<{
     });
     await use(context);
   },
-  signIn: async ({ page }, use) => {
+  signIn: async ({ page, baseURL }, use) => {
     await use(async (email, password = DEMO_PASSWORD) => {
       // The page's request context shares its cookies, so the page is signed in too.
       const signedIn = await page.request.post("/api/auth/sign-in/email", {
         data: { email, password },
-        headers: { Origin: WEB_ORIGIN },
+        headers: { Origin: baseURL ?? WEB_ORIGIN },
       });
       expect(signedIn.ok(), await signedIn.text()).toBe(true);
       const me = await page.request.get("/api/v1/me");

@@ -140,7 +140,7 @@ GitHub の環境は3つとも `main` からだけ使える。Google Cloud への
 | `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `WEB_DIST_DIR`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS` も必須。Web へは、API が返す HTML の meta 要素で渡す（ADR-004） | `local` | Cloud Run の環境変数 |
 | `APP_VERSION` | api | `/api/health` の `version`（コミット SHA） | 未設定なら `dev` | API の Dockerfile が `build-api-image` の build-arg から環境変数に入れる |
 | `PORT` | api, web（開発サーバー） | 待ち受けるポート（未設定なら `3000`。1〜65535 の整数でなければ起動しない）。API は、local では `127.0.0.1` だけで待ち受け（同じネットワークのほかの端末からは開けない）、staging・production ではすべてのインターフェースで待ち受ける。local と e2e では、Vite の開発サーバーが `/api/` で始まるパスをこのポートへ転送する（API と同じ値を、Makefile が `.env` から、e2e は Playwright の `webServer` が渡す） | `3000` | Cloud Run が `8080` を渡す |
-| `WEB_DIST_DIR` | api | Web のビルドの出力の置き場所。ここにあるファイルを API が `/*` で返す（ADR-004） | 未設定（静的ファイルを返さない。Web は Vite の開発サーバーが返す） | API の Dockerfile が入れる（イメージの中のパス） |
+| `WEB_DIST_DIR` | api | Web のビルドの出力の置き場所。ここにあるファイルを API が `/*` で返す（ADR-004）。置き場所が読めないとき、`_shell.html` か `index.html` が無いとき、HTML に `</head>` が無いときは起動しない | 未設定（静的ファイルを返さない。Web は Vite の開発サーバーが返す） | API の Dockerfile が入れる（イメージの中のパス） |
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列（API は無ければ起動しない） | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
 | `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
 | `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直してマイグレーションを当てる。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと。作り直しは同じサーバーの `postgres` の DB につなぎ、その DB への接続を切って消してから作るので、ロールに CREATEDB の権限が要り、テスト用の DB の持ち主かスーパーユーザーでなければならない。local の Docker と CI のサービスコンテナのロールはスーパーユーザー） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
@@ -161,7 +161,7 @@ API は値の前後の空白を除き、空の値（空白だけの値を含む�
 
 `.env` はリポジトリの直下に1つ置く。`make setup` が `.env.example` をコピーする。直下の `.env` は Makefile が読み込んで各コマンドに渡し、Vite は `envDir` をリポジトリの直下にする。Web はビルドに環境ごとの値を持たない（環境名と Sentry の DSN は、API が返す HTML から読む。local の Vite の開発サーバーでは meta 要素が無いので、環境名は `local`、Sentry は使わない）。
 
-e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100）と Web（ポート 5273）を起動し、次の値を上書きする: `PORT=3100`、`BETTER_AUTH_URL=http://localhost:5273`、`TRUSTED_ORIGINS=http://localhost:5273`、`DATABASE_URL` は `DATABASE_URL_TEST` の値、`MAIL_TRANSPORT=console`、`LOG_LEVEL=info`（`e2e/playwright.config.ts` の `webServer`）。この API のログは `.data/e2e/api.log` に書き、テストは送ったメール（招待とパスワード再設定のリンク）をそこから読む。PWA の検査（10章）は、`make build-web` の結果を `WEB_DIST_DIR` で渡した API（ポート 3200。`BETTER_AUTH_URL`・`TRUSTED_ORIGINS` は `http://localhost:3200`）に対して行う。
+e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100）と Web（ポート 5273）を起動し、次の値を上書きする: `PORT=3100`、`BETTER_AUTH_URL=http://localhost:5273`、`TRUSTED_ORIGINS=http://localhost:5273`、`DATABASE_URL` は `DATABASE_URL_TEST` の値、`MAIL_TRANSPORT=console`、`LOG_LEVEL=info`（`e2e/playwright.config.ts` の `webServer`）。この API のログは `.data/e2e/api.log` に書き、テストは送ったメール（招待とパスワード再設定のリンク）をそこから読む。PWA の検査（10章）は、`make build-web` の結果を `WEB_DIST_DIR` で渡した API（ポート 3200。`BETTER_AUTH_URL`・`TRUSTED_ORIGINS` は `http://localhost:3200`、`DATABASE_URL`・`MAIL_TRANSPORT`・`LOG_LEVEL` は 3100 の API と同じ。ログは `.data/e2e/api-pwa.log`）に対して行う。テストが `sw.js` を書き換えて新しい版を作るので、この API に渡すのはビルドを `.data/e2e/web` に写したもの。
 
 **CI（GitHub Actions）のシークレットと変数**: 環境ごとに値が違うものは GitHub の環境（`staging` / `production` / `production-backup`）に、環境をまたいで同じものはリポジトリに置く。
 
@@ -290,9 +290,9 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 **決定:**
 
 - 配信の形は「`/*` は静的ファイル、`/api/*` は API」に固定する（前と同じ）。
-- 置き場所は API と同じ Cloud Run のサービス `moonx-api-{env}`。イメージに Web のビルドの出力を入れ（ADR-016）、API が `WEB_DIST_DIR` のファイルを返す。返し方: `/` はビルド時に作るランディング（`index.html`。ADR-002）、`/privacy`・`/support` はビルド時に作る HTML、ビルドの出力にあるファイルはそのまま、それ以外の GET の画面のパス（`/api/` で始まらず、`/assets/` の下でも拡張子の付いたパスでもないもの）は SPA の殻の `_shell.html`（200）。見つからないファイル（`/assets/` の下か拡張子の付いたパス）は 404。`WEB_DIST_DIR` の無い local では静的ファイルを返さない（Web は Vite の開発サーバーが返し、`/api` を API へ転送する）。
+- 置き場所は API と同じ Cloud Run のサービス `moonx-api-{env}`。イメージに Web のビルドの出力を入れ（ADR-016）、API が `WEB_DIST_DIR` のファイルを返す。返し方: `/` はビルド時に作るランディング（`index.html`。ADR-002）、`/privacy`・`/support` はビルド時に作る HTML、ビルドの出力にあるファイルはそのまま、それ以外の GET の画面のパス（`/api/` で始まらず、ファイルの置き場所でもないもの）は SPA の殻の `_shell.html`（200）。ファイルの置き場所は、ビルドがファイルを置く所（`/assets/`・`/icons/` の下と、トップの階層の拡張子の付いた名前。`/sw.js` など）で、そこで見つからないファイルは 404。それより下の階層の拡張子では見分けない（画面のパスの下の階層にはテンプレートが自由に決めるセクションのキーが入り、`.` を含みうるため。5.13）。`WEB_DIST_DIR` の無い local では静的ファイルを返さない（Web は Vite の開発サーバーが返し、`/api` を API へ転送する）。
 - キャッシュの見出し: ファイル名にハッシュの付いたアセットは `Cache-Control: public, max-age=31536000, immutable`。HTML・マニフェスト・Service Worker のファイルは `no-cache`（ADR-031）。アイコンなどハッシュの無いファイルは `public, max-age=86400`。API の応答は `no-store`（ADR-011）。
-- 環境ごとに違う値はイメージに焼き込まない（staging で確かめたイメージをそのまま production に出すため。ADR-016）。API は起動のときに HTML のファイルを読み、`<head>` に `<meta name="moonx-app-env" content="{APP_ENV}">` と `<meta name="moonx-sentry-dsn" content="{WEB_SENTRY_DSN}">` を入れて返す。Web はこの2つを読んで環境名と Sentry を決める。インラインのスクリプトを使わないので、CSP の `script-src 'self'` を保てる（7.2）。
+- 環境ごとに違う値はイメージに焼き込まない（staging で確かめたイメージをそのまま production に出すため。ADR-016）。API は起動のときに HTML のファイルを読み、`<head>` に `<meta name="moonx-app-env" content="{APP_ENV}">` と `<meta name="moonx-sentry-dsn" content="{WEB_SENTRY_DSN}">` を入れて返す。Web はこの2つを読んで環境名と Sentry を決める。インラインのスクリプトを使わないので、CSP の `script-src 'self'` を保てる（7.2）。TanStack Start がプリレンダーした HTML に書くスクリプト（スクロールの復元とルーターの起動）は、`build-web` が `assets/` の下のファイル（ハッシュ付きの名前）に移し、同じ位置の `<script src>` で読ませる。Web のビルドの Zod は、パーサーを `new Function` で作れるかを試さない設定（`jitless`）で動かす（試すと CSP が拒んで違反を報告する。拒まれても解析の結果は同じ。API は CSP の外なので作る）。
 - セキュリティヘッダー（CSP・HSTS など）は API が付ける（7.2）。
 - 独自ドメインは Cloud Run のドメインマッピングで付ける（production は `{DOMAIN}`、staging は `stg.{DOMAIN}`）。DNS は Vercel にあり、CNAME（`ghs.googlehosted.com`）を手で入れる（2章「インフラ管理」）。ドメインマッピングを作る Google のアカウントは、Search Console で `dwnfrc.app` の所有を確認しておく。
 - Cloud Run は IAM の認証をかけない（誰でも呼べる設定）。前段のプロキシが無いので、共有シークレットは持たない。
@@ -506,7 +506,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 - **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は 4 アカウント設定の System / Light / Dark に従い、Light と Dark は `<html data-theme="light|dark">` で固定し、System は属性を置かずに `prefers-color-scheme` に従う。
 - **スケール（Web）**: 既定は `medium`。タッチ操作が主の端末（`@media (pointer: coarse)`）は `large` にする。`<html data-scale="medium|large">` で固定でき、固定が優先される。タッチパネル付きのノート PC も `pointer: coarse` に当たるときは `large` になる。large が変えるのは押せる部品の高さと target-min だけで、文字の大きさは変えない（2026-10-17 のユーザーの決定）。唯一の例外は入力欄の文字の下限で、large では入力欄の文字を幅によらず 06 `component.field.font-size-min` 以上にする（2026-10-18 のユーザーの決定。iOS は 16px より小さい入力欄を押すと画面を拡大し、入力のあとも拡大したままになるので、下限はその 16px。横向きのスマホは `semantic.breakpoint.tablet` より広く、narrow の入力欄の文字が効かない。タッチの端末の入力欄は、モックアップの入力欄の文字より大きくなる（M と L は 1〜2px、S は 3px）。design-spec 4.3）。
 - **文字の幅（Web）**: 文字の大きさは画面の幅で切り替える。既定は `wide`、`semantic.breakpoint.tablet` より狭い幅（`@media not all and (min-width: …)`）は `narrow`（`semantic.font-size.narrow`。design-spec 4.3）。ランディングの題は `semantic.fluid-type` の clamp() で幅に合わせて滑らかに変える。
-- **書体**: 書体の名前の正は 06 の `primitive.font.family`（self-host する書体はどれも SIL OFL 1.1。並びの残りは配らない OS の書体）。Web は npm の `@fontsource/ibm-plex-sans`・`@fontsource/ibm-plex-mono`・`@fontsource/ibm-plex-sans-jp` を依存に入れて self-host する（外部の CDN からは読まない）。読み込むのは 06 の `primitive.font.weight` の太さだけで、ファイルは woff2 だけを使う。日本語の書体は字の範囲（`unicode-range`）ごとに分かれたファイルのまま使い、画面に出た字のファイルだけをブラウザが読む。Service Worker でのキャッシュの仕方は ADR-031、PDF の書体は ADR-012。
+- **書体**: 書体の名前の正は 06 の `primitive.font.family`（self-host する書体はどれも SIL OFL 1.1。並びの残りは配らない OS の書体）。Web は npm の `@fontsource/ibm-plex-sans`・`@fontsource/ibm-plex-mono`・`@fontsource/ibm-plex-sans-jp` を依存に入れて self-host する（外部の CDN からは読まない）。読み込むのは 06 の `primitive.font.weight` の太さだけで、ファイルは woff2 だけを使う（Vite は小さなファイルもデータ URL に埋め込まず、ファイルのまま出す。CSP の `font-src 'self'` がデータ URL を拒むため。7.2）。日本語の書体は字の範囲（`unicode-range`）ごとに分かれたファイルのまま使い、画面に出た字のファイルだけをブラウザが読む。Service Worker でのキャッシュの仕方は ADR-031、PDF の書体は ADR-012。
 - **アイコン**: Lucide（`lucide-react`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。
 
 **理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は moonx 独自のもの（2026-10-12 に月相に決めた）にすることを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、のちのネイティブでも同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは押せる部品を一段高く」をそのまま表せる。文字の大きさをスケールでなく幅で切り替えるのは、合意したモックアップがスマホの幅で本文を 15px から 16px にするだけで、タッチの端末のタブレットでは文字を大きくしないため（2026-10-17）。入力欄の文字の下限だけをスケールで決めるのは、iOS の拡大が画面の幅ではなくタッチの端末で起きるため（2026-10-18）。Lucide はネイティブ（`lucide-react-native`）にも同じ絵柄の版があり、線の太さと大きさを props で変えられる。変換を自前のスクリプトにするのは、出力が限られ（vanilla-extract・react-pdf・PWA のアイコン）、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため。
@@ -696,11 +696,12 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 - **マニフェスト**（`/manifest.webmanifest`）: `name` と `short_name` は下の「名前」、`display` は `standalone`、`start_url` と `scope` は `/`、`theme_color` と `background_color` はトークン（`semantic` の地の色）から作る。`make tokens` が生成する（ADR-018）。
 - **アイコン**: 形と色は design-spec 4.4「アプリのアイコン」に従う。ここは作り方だけを持つ: `make tokens` がトークンから SVG を作り、PNG（favicon 32、`apple-touch-icon` 180、192、512、maskable 512）は SVG から sharp で作る。生成物（`packages/ui-tokens/src/generated/pwa/`）は手で直さず、Web のビルドが `/icons/` に出す。
 - **Service Worker**（`/sw.js`。`apps/web` の Service Worker のソースに、ビルドしたアセットの一覧を vite-plugin-pwa の `injectManifest` で埋め込む）:
-  - キャッシュするのは画面の外側だけ: `_shell.html`、ビルドしたアセット、フォント、アイコン。ランディング（`index.html`）と 29・30 の HTML はキャッシュしない。フォントのうち事前にキャッシュする（インストールのときに取る）のは欧文と等幅の書体の woff2 だけ。日本語の書体の字の範囲ごとのファイル（1つの太さで100を超える）は事前にキャッシュせず、使われたときに実行時にキャッシュする（CacheFirst。ADR-018）。
+  - キャッシュするのは画面の外側だけ: `_shell.html`、ビルドしたアセット、フォント、アイコン。ランディング（`index.html`）と 29・30 の HTML はキャッシュしない。フォントのうち事前にキャッシュする（インストールのときに取る）のは欧文と等幅の書体の woff2 だけ。日本語の書体の字の範囲ごとのファイル（1つの太さで100を超える）は事前にキャッシュせず、使われたときに実行時にキャッシュする（CacheFirst。ADR-018）。新しい版が切り替わったら、そのビルドに無い日本語の書体のファイルをキャッシュから消す。
   - `/api/*` はキャッシュせず、必ずネットワークに出す（オフラインでも代わりの応答を返さない）。
   - 画面のパスへのナビゲーションはネットワークを先に使い、オフラインのときだけキャッシュした `_shell.html` を返す（API が meta を入れた最新の HTML を使うため）。
   - 入力をオフラインで受けて後で送る仕組みは作らない（入力には接続が要る。ADR-021）。
-  - 新しい版の Service Worker が待っているときは、design-spec の表示で再読み込みを促し、利用者が選んだときだけ切り替える（`skipWaiting` を自動では呼ばない）。
+  - 新しい版の Service Worker が待っているときは、design-spec の表示で再読み込みを促し、利用者が選んだときだけ切り替える（`skipWaiting` を自動では呼ばない）。選んだら、待っている版に切り替えてから画面を読み込み直す。表示を出すとき（別のタブで切り替わったときと、離脱の確認で留まったときを含む）は design-spec 6.0.6。
+  - 開いている画面は、表に戻ったときと1時間ごとに新しい版を問い合わせる（画面の移動ではページを読み込まないので、ブラウザ任せでは開いたままの画面が新しい版を見つけない）。
   - 登録は本番のビルドだけで行い、Vite の開発サーバーでは登録しない。
 - **パスと見出し**（API が返す。ADR-004）:
 
@@ -2427,7 +2428,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | リソース / 操作（API） | 未認証 | Viewer | Member | Owner | Admin（運営者） |
 |---|---|---|---|---|---|
 | ログイン・パスワード再設定・招待の内容・招待からの新規登録（A1〜A3・A6・A7・U4・U5） | ○ | ○ | ○ | ○ | ○ |
-| 死活確認（Z1）・local の写真の配信（U9）・API の仕様書（Z3。staging だけ） | ○ | ○ | ○ | ○ | ○ |
+| 死活確認（Z1）・local の写真の配信（U9）・API の仕様書（Z3。staging だけ）・Web のファイル（ADR-004。`WEB_DIST_DIR` があるときだけ） | ○ | ○ | ○ | ○ | ○ |
 | 自分のアカウント（U1〜U3・U7・U8・A4・A5・A8）・招待の受諾（U6。招待のメールと同じ人だけ） | × | 本人 | 本人 | 本人 | 本人 |
 | ワークスペースの作成（W0） | × | ○ | ○ | ○ | ○ |
 | ワークスペースの閲覧・メンバー一覧（W1 GET・W2） | × | ○ | ○ | ○ | 所属していれば、そのロールのとおり |

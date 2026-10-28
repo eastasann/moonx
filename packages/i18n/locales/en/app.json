@@ -33,6 +33,9 @@
     "toHome": "Go to Home",
     "offline": "You're offline. Changes can't be saved until you reconnect.",
     "offlinePage": "You're offline. Connect to the internet to open this page.",
+    "newVersion": "A new version of moonx is available.",
+    "reload": "Reload",
+    "addToHomeScreen": "Add moonx to your Home Screen: tap Share, then Add to Home Screen.",
     "unexpectedRef": "Something went wrong. Ref: {{ref}}"
   },
   "switchWorkspace": {

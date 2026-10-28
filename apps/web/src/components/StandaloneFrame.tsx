@@ -2,6 +2,7 @@ import { AlertBanner, PageFrame } from "@moonx/ui-web";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useIsReachable } from "../lib/online";
+import { useNewVersionBanner } from "./pwaBanners";
 
 /** The offline band across the top of a screen (design-spec 6.0.6「オフライン」). */
 export function useOfflineBanner(): ReactNode {
@@ -14,13 +15,10 @@ export function useOfflineBanner(): ReactNode {
 
 /**
  * The screens without AppFrame (1, 2 and 3, design-spec 4.5 PageFrame), with the offline
- * band over them.
+ * and new version bands over them.
  */
 export function StandaloneFrame({ children }: { children: ReactNode }) {
   const offline = useOfflineBanner();
-  return (
-    <PageFrame banners={offline === undefined ? undefined : { offline }}>
-      {children}
-    </PageFrame>
-  );
+  const newVersion = useNewVersionBanner();
+  return <PageFrame banners={{ offline, newVersion }}>{children}</PageFrame>;
 }

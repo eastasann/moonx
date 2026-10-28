@@ -20,3 +20,5 @@ Vitest ＋ Testing Library で書く（ADR-022）。`apps/api` と `packages/` �
 ## 型
 
 API の呼び出しは Eden Treaty（ADR-006）で、型は `@moonx/api` の `App` から取る。そのため Web の型検査（`tsconfig.json`）は API のソースも読む。Bun の型（`types` の `bun`）と、API が持つ `swagger-ui-dist` の宣言のファイル（`include`）は、そのために入れている。Web のコードから Bun の API を呼ばない（ブラウザには無い）。
+
+Service Worker のソース（`src/sw.ts`）は、DOM の型と WebWorker の型がぶつかるので、`tsconfig.json` から外して `tsconfig.sw.json` で検査する（`make typecheck` が両方を動かす）。

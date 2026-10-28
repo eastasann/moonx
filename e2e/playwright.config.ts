@@ -1,7 +1,17 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
-import { API_LOG, API_ORIGIN, API_PORT, WEB_ORIGIN, WEB_PORT } from "./env";
+import {
+  API_LOG,
+  API_ORIGIN,
+  API_PORT,
+  PWA_API_LOG,
+  PWA_ORIGIN,
+  PWA_PORT,
+  PWA_WEB_DIR,
+  WEB_ORIGIN,
+  WEB_PORT,
+} from "./env";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -28,7 +38,18 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: ["admin-publish.spec.ts", "template-migration.spec.ts"],
+      testIgnore: [
+        "admin-publish.spec.ts",
+        "template-migration.spec.ts",
+        "pwa.spec.ts",
+      ],
+    },
+    // The PWA and the serving of ADR-004 and ADR-031 (SDD 10章): against the API that
+    // serves make build-web's output, which make test-e2e builds first.
+    {
+      name: "pwa",
+      use: { ...devices["Desktop Chrome"], baseURL: PWA_ORIGIN },
+      testMatch: "pwa.spec.ts",
     },
     // A published template version is what every new self analysis, idea and plan takes
     // from then on (design-spec 6.0.7): publishing waits until the others are done.
@@ -36,7 +57,7 @@ export default defineConfig({
       name: "after-the-others",
       use: { ...devices["Desktop Chrome"] },
       testMatch: "admin-publish.spec.ts",
-      dependencies: ["chromium"],
+      dependencies: ["chromium", "pwa"],
     },
     // Moving to a newer version (M8) needs the ones published: the self analysis v2
     // admin-publish.spec.ts publishes, and the versions this one publishes itself.
@@ -62,6 +83,29 @@ export default defineConfig({
         TRUSTED_ORIGINS: WEB_ORIGIN,
         DATABASE_URL: testDatabase,
         // The mails go to the log at info, where the tests read them.
+        MAIL_TRANSPORT: "console",
+        LOG_LEVEL: "info",
+      },
+    },
+    {
+      // The build is copied, so the tests may change the copy (env.ts PWA_WEB_DIR).
+      command: [
+        `rm -rf "${PWA_WEB_DIR}"`,
+        `mkdir -p "${dirname(PWA_WEB_DIR)}"`,
+        `cp -R "${root}apps/web/dist/client" "${PWA_WEB_DIR}"`,
+        `exec bun src/index.ts > "${PWA_API_LOG}"`,
+      ].join(" && "),
+      cwd: `${root}apps/api`,
+      url: `${PWA_ORIGIN}/api/health`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      // SDD 2章「環境変数」: the PWA checks' values over the root .env.
+      env: {
+        PORT: String(PWA_PORT),
+        WEB_DIST_DIR: PWA_WEB_DIR,
+        BETTER_AUTH_URL: PWA_ORIGIN,
+        TRUSTED_ORIGINS: PWA_ORIGIN,
+        DATABASE_URL: testDatabase,
         MAIL_TRANSPORT: "console",
         LOG_LEVEL: "info",
       },

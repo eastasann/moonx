@@ -2497,7 +2497,7 @@ make lint・make typecheck・make doc-lint・make db-check BASE=main・make test
 
 ## Step 36: PWA
 
-Status:
+Status: done 2026-10-29
 
 ```
 docs/02-01_system-design-doc.md ADR-031 に従って、Web を PWA にしてください。

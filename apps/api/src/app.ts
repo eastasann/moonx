@@ -33,6 +33,7 @@ import type { ErrorReporter } from "./sentry";
 import { templateMigrationRoutes } from "./template-migrations";
 import { validationRoutes } from "./validation";
 import { validationListRoutes } from "./validation-lists";
+import { webRoutes } from "./web";
 import { workspaceInvitationRoutes } from "./workspace-invitations";
 import { workspaceRoutes } from "./workspaces";
 
@@ -66,6 +67,7 @@ export interface AppServices {
  *
  * @throws {AccessDeclarationError} when a route declares no way of access (ADR-005),
  * so the API does not start.
+ * @throws {WebBuildError} when `WEB_DIST_DIR` holds no build of the Web.
  */
 export function createApp(config: Config, services: AppServices) {
   const {
@@ -132,6 +134,10 @@ export function createApp(config: Config, services: AppServices) {
   // reads (ADR-006), so they and the docs stay out of the app's type.
   app.use(authRoutes(access));
   if (config.appEnv === "staging") app.use(docsRoutes(access));
+  // Unset locally, where Vite's dev server serves the Web (ADR-004).
+  if (config.webDistDir !== undefined) {
+    app.use(webRoutes(access, config.webDistDir, config));
+  }
   assertAccessDeclared(app);
   return app;
 }

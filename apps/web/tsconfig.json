@@ -10,5 +10,6 @@
     "vite.config.ts",
     "vitest.config.ts",
     "../api/src/swagger-ui-dist.d.ts"
-  ]
+  ],
+  "exclude": ["src/sw.ts"]
 }

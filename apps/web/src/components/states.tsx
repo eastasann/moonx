@@ -2,7 +2,6 @@ import {
   Button,
   IllustratedMessage,
   Link,
-  PageFrame,
   Skeleton,
   Text,
 } from "@moonx/ui-web";
@@ -19,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "../lib/api";
 import { useIsOnline } from "../lib/online";
 import { reportError } from "../lib/sentry";
+import { StandaloneFrame } from "./StandaloneFrame";
 
 /** Where a state stands: a whole page, or one block of a screen (its heading's level). */
 export interface StatePlacement {
@@ -276,7 +276,11 @@ export function LoadingBlock({
   );
 }
 
-/** A state that is all a page shows, without the frame: before the user is known. */
+/**
+ * A state that is all a page shows, without the frame: before the user is known. The
+ * bands of a page without the frame stand over it (design-spec 4.5 PageFrame): offline
+ * is how a page that cannot load while offline says so in full (6.0.6).
+ */
 export function StatePage({ children }: { children: ReactNode }) {
-  return <PageFrame>{children}</PageFrame>;
+  return <StandaloneFrame>{children}</StandaloneFrame>;
 }

@@ -41,6 +41,7 @@ import {
   type ScreenHistory,
 } from "./HistoryPanel";
 import { useLogOutRequest } from "./LogOutRequest";
+import { useAddToHomeScreenBanner, useNewVersionBanner } from "./pwaBanners";
 import { useOfflineBanner } from "./StandaloneFrame";
 import { useModal, usePanel, useWorkspace } from "./workspace";
 
@@ -94,8 +95,9 @@ export interface WorkspaceFrameProps
  * Analysis not for a Viewer, 9 for an Owner only, 26 Admin for an operator only),
  * Notifications with the unread count,
  * Account and Log out in the sidebar's account menu or in More, the header's save state
- * with its Retry, 💬 and 🕘 with their panels, and the bands: offline, then the screen's
- * newer template. Logging out with unsaved input asks first (5章「共通ナビ」). The pages
+ * with its Retry, 💬 and 🕘 with their panels, and the bands: offline, the app's new
+ * version, iPhone Safari's hint to add it to the Home Screen, then the screen's newer
+ * template. Logging out with unsaved input asks first (5章「共通ナビ」). The pages
  * appear here as their screens are built (docs/claude-code-prompts.md: no way into a
  * screen before it exists).
  */
@@ -121,6 +123,8 @@ export function WorkspaceFrame({
       current === "settings" ||
       current === "admin");
   const offline = useOfflineBanner();
+  const newVersion = useNewVersionBanner();
+  const addToHomeScreen = useAddToHomeScreenBanner();
   const autosave = useAutosave();
   const saveState = useSaveState(saveScope);
   const { requestLogOut, confirmation } = useLogOutRequest();
@@ -328,7 +332,12 @@ export function WorkspaceFrame({
           }
         />
       }
-      banners={{ offline, template: templateBanner }}
+      banners={{
+        offline,
+        newVersion,
+        addToHomeScreen,
+        template: templateBanner,
+      }}
     >
       {children}
       {confirmation}

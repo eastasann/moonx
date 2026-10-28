@@ -25,6 +25,18 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       // What the tab reads where a screen names itself no further (useDocumentTitle).
       { title: i18n.t("app:name") },
     ],
+    // The manifest and icons of ADR-031, which the build copies from packages/ui-tokens.
+    links: [
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      {
+        rel: "icon",
+        href: "/icons/favicon.png",
+        type: "image/png",
+        sizes: "32x32",
+      },
+      { rel: "icon", href: "/icons/icon.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
+    ],
   }),
   shellComponent: RootDocument,
   component: RootLayout,

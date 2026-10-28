@@ -43,7 +43,9 @@ REGION := asia-southeast1
 # Recursive, so gcloud runs only for the targets that touch Google Cloud.
 GCP_PROJECT_ID ?= $(shell gcloud config get-value project 2>/dev/null)
 IMAGE = $(REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/moonx/api
-TS_PROJECTS := . $(patsubst %/tsconfig.json,%,$(wildcard apps/*/tsconfig.json packages/*/tsconfig.json e2e/tsconfig.json))
+# The service worker has its own project: the WebWorker types and the DOM's clash.
+TS_PROJECTS := . $(patsubst %/tsconfig.json,%,$(wildcard apps/*/tsconfig.json packages/*/tsconfig.json e2e/tsconfig.json)) \
+	apps/web/tsconfig.sw.json
 
 require = $(if $($(1)),,$(error $(1) is required: make $@ $(1)=...))
 require-project = $(if $(GCP_PROJECT_ID),,$(error No Google Cloud project: run gcloud config set project, or make $@ GCP_PROJECT_ID=...))
@@ -111,8 +113,10 @@ test-web:
 	cd apps/web && $(BUNX) vitest run --passWithNoTests
 	cd packages/ui-web && $(BUNX) vitest run --passWithNoTests
 
+# The PWA checks run against the API serving this build (SDD 10章「PWA と配信」).
 test-e2e:
 	$(BUNX) playwright install chromium
+	$(MAKE) build-web SHA=dev
 	$(BUNX) playwright test --config=e2e/playwright.config.ts
 
 lint:

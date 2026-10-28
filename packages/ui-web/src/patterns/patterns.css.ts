@@ -1135,6 +1135,14 @@ export const stageColumn = style({
   outline: "none",
 });
 
+/** What the screen says about the slide or the deck, above the slide's links. */
+export const slideNotices = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: vars.space["200"],
+  marginBlockEnd: vars.space["200"],
+});
+
 /** The quiet links over the slide, at its end (s23-deck.html .slide-tools). */
 export const slideTools = style({
   display: "flex",

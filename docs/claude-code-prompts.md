@@ -2209,7 +2209,7 @@ make test-e2e で上の流れ（22 の分）が通り、make test-web・make typ
 
 ## Step 35b: 23 Pitch Deck
 
-Status:
+Status: done 2026-10-28
 
 ```
 Pitch Deck の画面を作ってください（Step 35 から分けた残り。Step 35 は 22 実行管理を作った）。

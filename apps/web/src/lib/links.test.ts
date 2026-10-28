@@ -6,6 +6,7 @@ import {
   executionHref,
   hrefOf,
   notificationsHref,
+  pitchHref,
   planHref,
   planItemHref,
   researchHref,
@@ -194,7 +195,7 @@ describe("the routes of the screens the API names (SDD 4章・5.2 LinkTarget)", 
     ).toBe(`${idea}/plans/${planId}?panel=comments&target=idea%3A${ideaId}`);
   });
 
-  test("22 on its tab, an item, its filters, and with its panels; 23 not yet", () => {
+  test("22 on its tab, an item, its filters, and with its panels", () => {
     const planId = "2b3c4d5e-0000-4000-8000-000000000001";
     const rowId = "5e0c0000-0000-4000-8000-000000000001";
     const userId = "0f8fad5b-d9cb-469f-a165-70867728950f";
@@ -232,7 +233,43 @@ describe("the routes of the screens the API names (SDD 4章・5.2 LinkTarget)", 
         `${execution}?item=${rowId}&panel=${panel}&target=execution_item%3A${rowId}`,
       );
     }
-    expect(hrefOf({ screen: 23, workspaceId, ideaId, planId })).toBeUndefined();
+  });
+
+  test("23 on a length and a version; a slide's comment on its deck, with the panel", () => {
+    const planId = "2b3c4d5e-0000-4000-8000-000000000001";
+    const versionId = "2b3c4d5e-0000-4000-8000-000000000002";
+    const pitch = `${idea}/plans/${planId}/pitch`;
+    expect(
+      pitchHref(workspaceId, ideaId, planId, {
+        variant: "five",
+        version: versionId,
+      }),
+    ).toBe(`${pitch}?variant=five&version=${versionId}`);
+    expect(hrefOf({ screen: 23, workspaceId, ideaId, planId })).toBe(pitch);
+    expect(hrefOf({ screen: 23, workspaceId, ideaId })).toBeUndefined();
+    expect(
+      hrefOf({
+        screen: 23,
+        workspaceId,
+        ideaId,
+        planId,
+        panel: "comments",
+        target: { type: "pitch_slide", id: planId, key: "five.market" },
+      }),
+    ).toBe(
+      `${pitch}?variant=five&panel=comments&target=pitch_slide%3A${planId}%3Afive.market`,
+    );
+    // 23 has no history (design-spec 6.0.5).
+    expect(
+      hrefOf({
+        screen: 23,
+        workspaceId,
+        ideaId,
+        planId,
+        panel: "history",
+        target: { type: "pitch_slide", id: planId, key: "one.title" },
+      }),
+    ).toBeUndefined();
   });
 
   test("13's sections: 01, 02 and 10 on 11, 03 on 14, 04 on 15, 05 on 17, 06–08 on 18, 09 on 16", () => {

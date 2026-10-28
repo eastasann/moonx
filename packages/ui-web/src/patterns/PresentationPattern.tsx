@@ -4,6 +4,7 @@ import { type ReactNode, useCallback, useLayoutEffect, useRef } from "react";
 import { ListBox, ListBoxItem } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { ActionButton } from "../components/ActionButton";
+import { Skeleton } from "../components/Skeleton";
 import { useThumbnailColumn } from "../internal/frame";
 import * as deck from "./PresentationPattern.css";
 import * as styles from "./patterns.css";
@@ -29,10 +30,23 @@ export interface PresentationPatternProps {
   onCurrentChange: (id: string) => void;
   /** The slide on screen, wide: a `Slide`. */
   slide: ReactNode;
-  /** Over the slide, at its end: quiet links ("Edit source", "Edit in validation", 💬). */
+  /**
+   * Above the slide's links: what the screen says about the slide or the deck ("Too long
+   * for this slide…", a PDF that could not be made).
+   */
+  notices?: ReactNode;
+  /**
+   * Over the slide, at its end: quiet links ("Edit source", "Edit in validation") and the
+   * slide's 💬, a quiet ActionButton.
+   */
   slideTools?: ReactNode;
   /** What to say (§30), under the slide: its heading and its text. */
   notes?: ReactNode;
+  /**
+   * The deck is on its way (another length or version chosen): the thumbnails and the
+   * slide show as their skeleton, out of reach, while the tools' line stays in use.
+   */
+  isLoading?: boolean;
 }
 
 /**
@@ -50,8 +64,10 @@ export function PresentationPattern({
   currentId,
   onCurrentChange,
   slide,
+  notices,
   slideTools,
   notes,
+  isLoading = false,
 }: PresentationPatternProps) {
   const { t } = useTranslation(["components"]);
   const hasThumbnails = useThumbnailColumn();
@@ -121,7 +137,7 @@ export function PresentationPattern({
   });
 
   return (
-    <div className={styles.root}>
+    <div className={styles.root} aria-busy={isLoading || undefined}>
       <div className={styles.deckBar}>
         <div className={styles.deckTitle}>{header}</div>
         {tools}
@@ -129,80 +145,88 @@ export function PresentationPattern({
           <div className={styles.deckAction}>{primaryAction}</div>
         )}
       </div>
-      <div className={styles.presentation}>
-        {hasThumbnails && (
-          <>
-            <div ref={thumbnailsRef} className={styles.thumbnails}>
-              <ListBox
-                aria-label={t("components:presentationPattern.slides")}
-                items={slides.map((item, position) => ({ ...item, position }))}
-                selectionMode="single"
-                disallowEmptySelection
-                selectedKeys={[currentId]}
-                onSelectionChange={(keys) => {
-                  if (keys === "all") return;
-                  const [key] = [...keys];
-                  if (key !== undefined) onCurrentChange(String(key));
-                }}
-                className={deck.list}
-              >
-                {(item) => (
-                  // Named by its number and title, the text on screen: the small slide
-                  // inside is a picture of the slide, not read out. Typing a title
-                  // finds its slide.
-                  <ListBoxItem
-                    id={item.id}
-                    textValue={item.title}
-                    className={deck.item}
-                  >
-                    <span className={deck.number}>
-                      {formatCount(item.position + 1)}
-                    </span>
-                    <span aria-hidden="true" className={deck.mini}>
-                      {item.thumbnail}
-                    </span>
-                    <span className={deck.caption}>{item.title}</span>
-                  </ListBoxItem>
-                )}
-              </ListBox>
-            </div>
-            <div aria-hidden="true" className={styles.thumbnailRule} />
-          </>
-        )}
-        <div className={styles.stage}>
-          <div ref={stageColumn} tabIndex={-1} className={styles.stageColumn}>
-            {slideTools != null && (
-              <div className={styles.slideTools}>{slideTools}</div>
-            )}
-            {slide}
-            {!hasThumbnails && (
-              <div ref={navRef} className={styles.slideNav}>
-                <ActionButton
-                  aria-label={t("components:presentationPattern.previous")}
-                  isDisabled={previous === undefined}
-                  onPress={() => previous && move(previous, "last")}
+      <Skeleton isLoading={isLoading}>
+        <div className={styles.presentation}>
+          {hasThumbnails && (
+            <>
+              <div ref={thumbnailsRef} className={styles.thumbnails}>
+                <ListBox
+                  aria-label={t("components:presentationPattern.slides")}
+                  items={slides.map((item, position) => ({
+                    ...item,
+                    position,
+                  }))}
+                  selectionMode="single"
+                  disallowEmptySelection
+                  selectedKeys={[currentId]}
+                  onSelectionChange={(keys) => {
+                    if (keys === "all") return;
+                    const [key] = [...keys];
+                    if (key !== undefined) onCurrentChange(String(key));
+                  }}
+                  className={deck.list}
                 >
-                  <ChevronLeft />
-                </ActionButton>
-                <span aria-live="polite" className={styles.slidePosition}>
-                  {t("components:presentationPattern.position", {
-                    number: formatCount(index + 1),
-                    total: formatCount(slides.length),
-                  })}
-                </span>
-                <ActionButton
-                  aria-label={t("components:presentationPattern.next")}
-                  isDisabled={next === undefined}
-                  onPress={() => next && move(next, "first")}
-                >
-                  <ChevronRight />
-                </ActionButton>
+                  {(item) => (
+                    // Named by its number and title, the text on screen: the small slide
+                    // inside is a picture of the slide, not read out. Typing a title
+                    // finds its slide.
+                    <ListBoxItem
+                      id={item.id}
+                      textValue={item.title}
+                      className={deck.item}
+                    >
+                      <span className={deck.number}>
+                        {formatCount(item.position + 1)}
+                      </span>
+                      <span aria-hidden="true" className={deck.mini}>
+                        {item.thumbnail}
+                      </span>
+                      <span className={deck.caption}>{item.title}</span>
+                    </ListBoxItem>
+                  )}
+                </ListBox>
               </div>
-            )}
-            {notes != null && <div className={styles.notes}>{notes}</div>}
+              <div aria-hidden="true" className={styles.thumbnailRule} />
+            </>
+          )}
+          <div className={styles.stage}>
+            <div ref={stageColumn} tabIndex={-1} className={styles.stageColumn}>
+              {notices != null && (
+                <div className={styles.slideNotices}>{notices}</div>
+              )}
+              {slideTools != null && (
+                <div className={styles.slideTools}>{slideTools}</div>
+              )}
+              {slide}
+              {!hasThumbnails && (
+                <div ref={navRef} className={styles.slideNav}>
+                  <ActionButton
+                    aria-label={t("components:presentationPattern.previous")}
+                    isDisabled={previous === undefined}
+                    onPress={() => previous && move(previous, "last")}
+                  >
+                    <ChevronLeft />
+                  </ActionButton>
+                  <span aria-live="polite" className={styles.slidePosition}>
+                    {t("components:presentationPattern.position", {
+                      number: formatCount(index + 1),
+                      total: formatCount(slides.length),
+                    })}
+                  </span>
+                  <ActionButton
+                    aria-label={t("components:presentationPattern.next")}
+                    isDisabled={next === undefined}
+                    onPress={() => next && move(next, "first")}
+                  >
+                    <ChevronRight />
+                  </ActionButton>
+                </div>
+              )}
+              {notes != null && <div className={styles.notes}>{notes}</div>}
+            </div>
           </div>
         </div>
-      </div>
+      </Skeleton>
     </div>
   );
 }

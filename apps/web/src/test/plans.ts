@@ -1,6 +1,9 @@
 import type {
   ExecutionItem,
   ExecutionType,
+  PitchDeck,
+  PitchSlide,
+  PitchVariant,
   PlanHome,
   PlanItem,
   PlanSummary,
@@ -226,3 +229,162 @@ export const executionItem = (
   updatedBy: anaRef,
   ...extra,
 });
+
+const exact = (value: number) => ({
+  value,
+  bound: "exact" as const,
+  reason: null,
+});
+
+const bullet = (label: string, text: string | null) => ({
+  label,
+  text: text ?? "Not written yet",
+  empty: text === null,
+});
+
+/** A slide of P12 (SDD 5.9): unfitted, without links, comments or cut text. */
+export const pitchSlide = (
+  key: PitchSlide["key"],
+  type: PitchSlide["type"],
+  title: string,
+  extra: Partial<PitchSlide> = {},
+): PitchSlide => ({
+  key,
+  type,
+  title: { text: title, empty: false },
+  subtitle: null,
+  bullets: [],
+  numbers: [],
+  figureColumns: null,
+  table: null,
+  emptySources: [],
+  shrink: 0,
+  overflow: false,
+  editSource: null,
+  editInValidation: null,
+  commentCount: 0,
+  ...extra,
+});
+
+/**
+ * P12: Plan A's deck of `variant` (design-spec 6.14), from the plan now, as an Owner gets
+ * it: the four types of slide, links to the sources, one slide cut short.
+ */
+export function pitchDeck(
+  variant: PitchVariant,
+  extra: Partial<PitchDeck> = {},
+): PitchDeck {
+  const title = pitchSlide("title", "title", "Health Bowl Co.", {
+    subtitle: { text: "Fresh grain bowls for office lunches.", empty: false },
+    bullets: [
+      bullet("Prepared by", "Ana"),
+      bullet("Date", "Oct 1, 2026"),
+      bullet("Version", "Draft"),
+    ],
+    editSource: { itemNo: 1 },
+  });
+  const problem = pitchSlide("problem", "text", "Problem", {
+    bullets: [
+      bullet("Primary problem", "Office workers skip lunch or eat fast food."),
+      bullet("Frequency", null),
+      bullet("Severity", "Every working day."),
+    ],
+    emptySources: ["Frequency"],
+    editSource: { itemNo: 4 },
+    commentCount: 2,
+  });
+  const text = (key: PitchSlide["key"], name: string, itemNo: number) =>
+    pitchSlide(key, "text", name, {
+      bullets: [bullet(name, `About ${name.toLowerCase()}.`)],
+      editSource: { itemNo },
+    });
+  const model = pitchSlide("business_model", "number", "Business model", {
+    bullets: [bullet("Primary revenue stream", "Bowls sold at lunch.")],
+    numbers: [
+      { label: "Price", metricKey: "selling_price", value: exact(220) },
+      {
+        label: "Contribution / sale",
+        metricKey: "contribution_margin",
+        value: exact(118),
+      },
+      {
+        label: "Break-even / day",
+        metricKey: "break_even_units_day",
+        value: exact(6.9),
+      },
+    ],
+    figureColumns: { widths: [240, 260, 240], fits: true },
+    editSource: { itemNo: 8 },
+    editInValidation: "economics",
+  });
+  const whyUs = pitchSlide("why_us", "text", "Why us", {
+    bullets: [
+      bullet(
+        "Founder advantages",
+        "Ten years running a canteen, with suppliers who know us and the offices that…",
+      ),
+    ],
+    shrink: 2,
+    overflow: true,
+    editSource: { itemNo: 10 },
+  });
+  const slides =
+    variant === "one"
+      ? [
+          title,
+          problem,
+          text("customer", "Customer", 3),
+          text("solution", "Solution", 5),
+          text("why_now", "Why now", 1),
+          model,
+          whyUs,
+          text("next_step", "Next step", 29),
+        ]
+      : [
+          title,
+          problem,
+          text("customer", "Customer", 3),
+          text("solution", "Solution", 5),
+          text("market", "Market", 6),
+          pitchSlide("competition", "table", "Competition", {
+            table: {
+              columns: [
+                { label: "Name", numeric: false, width: 0.25 },
+                { label: "Type", numeric: false, width: 0.18 },
+                { label: "Price", numeric: true, width: 0.15 },
+                { label: "Strength", numeric: false, width: 0.42 },
+              ],
+              rows: [["Lacson Eats", "Direct", "₱180", "Cheap and near"]],
+            },
+            editSource: { itemNo: 6 },
+          }),
+          model,
+          pitchSlide("economics", "table", "Economics", {
+            editSource: { itemNo: 20 },
+            editInValidation: "costs",
+          }),
+          text("funding", "Funding plan", 20),
+          whyUs,
+          text("execution", "Execution plan", 23),
+          text("launch", "Launch plan", 25),
+          text("risks", "Risks", 22),
+          text("ask", "Ask / next step", 24),
+        ];
+  return {
+    variant,
+    source: { kind: "latest" },
+    businessName: "Health Bowl Co.",
+    generatedAt: "2026-10-02T02:00:00.000Z",
+    footer: {
+      businessName: "Health Bowl Co.",
+      versionLabel: "Draft",
+      date: "2026-10-01",
+    },
+    speakerNotes:
+      variant === "one"
+        ? "We sell healthy bowls to office workers at lunch."
+        : "Five minutes on why offices will buy our bowls.",
+    slides,
+    ...extra,
+  };
+}

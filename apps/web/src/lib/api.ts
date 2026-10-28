@@ -79,6 +79,13 @@ function createClient() {
     // string that looks like a date, a date-only due date or a typed answer included,
     // into a Date.
     parseDate: false,
+    // A PDF (P13) comes back as its bytes: Eden reads a type it does not know as text,
+    // which would garble them. A refusal is JSON, read as any other.
+    onResponse: (response) =>
+      response.ok &&
+      response.headers.get("content-type")?.split(";")[0] === "application/pdf"
+        ? response.blob()
+        : undefined,
     onRequest: (_path, init) => {
       const method = (init.method ?? "GET").toUpperCase();
       if (method === "GET" || method === "HEAD") return;

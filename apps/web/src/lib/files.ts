@@ -4,14 +4,37 @@
  */
 const KEEP_URL_MS = 60_000;
 
-/** Saves `text` as the file `name` through the browser's download (24's Download). */
-export function downloadText(name: string, text: string, type: string) {
-  const url = URL.createObjectURL(new Blob([text], { type }));
+/** Saves `blob` as the file `name` through the browser's download (23's PDF). */
+export function downloadBlob(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = name;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), KEEP_URL_MS);
+}
+
+/** Saves `text` as the file `name` through the browser's download (24's Download). */
+export function downloadText(name: string, text: string, type: string) {
+  downloadBlob(name, new Blob([text], { type }));
+}
+
+/**
+ * The file name a `Content-Disposition` gives (RFC 6266): its UTF-8 `filename*` where
+ * there is one, else its `filename`; null when it names none.
+ */
+export function attachmentName(disposition: string | null): string | null {
+  if (disposition === null) return null;
+  const extended = /filename\*\s*=\s*UTF-8''([^;\s]+)/i.exec(disposition);
+  if (extended?.[1] !== undefined) {
+    try {
+      return decodeURIComponent(extended[1]);
+    } catch {
+      // A broken escape: the ASCII name below still names the file.
+    }
+  }
+  const plain = /filename\s*=\s*"([^"]*)"/i.exec(disposition);
+  return plain?.[1] ?? null;
 }
 
 /**

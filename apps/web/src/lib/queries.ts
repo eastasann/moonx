@@ -5,6 +5,7 @@ import type {
   DecisionLogKind,
   IdeaDecisionFilter,
   IdeaSort,
+  PitchVariant,
   SourceType,
   Stage,
   SupportsCheck,
@@ -316,6 +317,32 @@ export const executionItemsQuery = (ideaId: string, planId: string) =>
         api()
           .api.v1.plans({ planId: inPath(planId) })
           ["execution-items"].get({ query: {} }),
+      ),
+  });
+
+/** Every deck of a plan, of either length and from any version: their comment counts. */
+export const pitchKey = (ideaId: string, planId: string) => [
+  ...planKey(ideaId, planId),
+  "pitch",
+];
+
+/** P12: the Pitch Deck of `variant`, from the plan now or from a saved version (SDD 5.9). */
+export const pitchDeckQuery = (
+  ideaId: string,
+  planId: string,
+  variant: PitchVariant,
+  versionId?: string,
+) =>
+  queryOptions({
+    queryKey: [...pitchKey(ideaId, planId), variant, versionId ?? null],
+    queryFn: () =>
+      unwrap(
+        api()
+          .api.v1.plans({ planId: inPath(planId) })
+          ["pitch-deck"].get({
+            query:
+              versionId === undefined ? { variant } : { variant, versionId },
+          }),
       ),
   });
 

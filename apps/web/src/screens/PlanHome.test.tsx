@@ -212,8 +212,7 @@ describe("20 Plan home (design-spec 6.12)", () => {
       screen.getByRole("button", { name: "Record Go / No-Go" }),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save version" })).toBeTruthy();
-    // Pitch Deck and Update template come with their screens (Step 35).
-    expect(screen.queryByRole("button", { name: "Pitch Deck" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Pitch Deck" })).toBeTruthy();
   });
 
   test("a draft not yet changed says where to start", async () => {
@@ -347,6 +346,39 @@ describe("20 Plan home (design-spec 6.12)", () => {
     expect(screen.queryByRole("menuitem", { name: "Add plan" })).toBeNull();
   });
 
+  test("Pitch Deck opens 23 for every role, on the version open", async () => {
+    const user = userEvent.setup();
+    planApi();
+    const router = renderApp(planPath());
+    await screen.findByRole("heading", { level: 1, name: "Plan A" });
+    await user.click(screen.getByRole("button", { name: "Pitch Deck" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(planPath("/pitch")),
+    );
+    cleanup();
+
+    planApi({ me: as("viewer") });
+    const asViewer = renderApp(planPath());
+    await screen.findByRole("heading", { level: 1, name: "Plan A" });
+    await user.click(screen.getByRole("button", { name: "Pitch Deck" }));
+    await waitFor(() =>
+      expect(asViewer.state.location.pathname).toBe(planPath("/pitch")),
+    );
+    cleanup();
+
+    planApi({
+      version: planHome({ viewingVersion: planHome().latestVersion }),
+    });
+    const onVersion = renderApp(planPath(`?version=${versionId}`));
+    await screen.findByText("Viewing v1 For advisors (read only)");
+    await user.click(screen.getByRole("button", { name: "Pitch Deck" }));
+    await waitFor(() =>
+      expect(onVersion.state.location.href).toBe(
+        planPath(`/pitch?version=${versionId}`),
+      ),
+    );
+  });
+
   test("an archived plan: the notice with Restore, read only, and its panels say so", async () => {
     const user = userEvent.setup();
     const calls = planApi({
@@ -376,6 +408,8 @@ describe("20 Plan home (design-spec 6.12)", () => {
     renderApp(planPath());
     expect(await screen.findByText("This plan is archived")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save version" })).toBeNull();
+    // 23 shows an archived plan's deck (6.12).
+    expect(screen.getByRole("button", { name: "Pitch Deck" })).toBeTruthy();
     expect(screen.queryByRole("textbox", { name: "Business Name" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "History" }));
     const panel = await waitFor(

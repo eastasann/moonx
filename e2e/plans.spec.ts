@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import AxeBuilder from "@axe-core/playwright";
 import type { IdeaDetail, Me, PlanSummary } from "@moonx/schemas";
 import type { Page } from "@playwright/test";
@@ -953,5 +954,139 @@ test.describe("22 on a phone", () => {
     await expect(page.getByText("Two cooks hired.")).toBeVisible();
     await page.goBack();
     await expect(milestones).toBeVisible();
+  });
+});
+
+/** The slide on 23's stage: the region its title names. */
+const slideOn = (page: Page, name: string) =>
+  page.getByRole("main").getByRole("region", { name, exact: true });
+
+test.describe("23 on a desktop", () => {
+  test.use(desktop);
+
+  test("from 20: five-minute, a saved version, its PDF; a comment on a slide", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea, planId } = await ownPlan(page, signIn, account);
+    const saved = await page.request.post(`/api/v1/plans/${planId}/versions`, {
+      data: { name: "v1 For advisors" },
+      headers: { Origin: WEB_ORIGIN },
+    });
+    expect(saved.status(), await saved.text()).toBe(201);
+    await page.goto(`/w/${workspace.id}/ideas/${idea.id}/plans/${planId}`);
+    await page.getByRole("button", { name: "Pitch Deck" }).click();
+    await expect(page).toHaveURL(/\/pitch$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pitch Deck" }),
+    ).toBeVisible();
+    // The one-minute deck of the plan now, on its title slide.
+    const slides = page.getByRole("listbox", { name: "Slides" });
+    await expect(slides.getByRole("option")).toHaveCount(8);
+    // The title slide is headed by the Business Name, the idea's name in a draft.
+    await expect(slideOn(page, "Piaya Picnic Boxes")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Edit source" }),
+    ).toHaveAttribute(
+      "href",
+      `/w/${workspace.id}/ideas/${idea.id}/plans/${planId}/items/1`,
+    );
+
+    await page.getByRole("radio", { name: "Five-minute" }).click();
+    await expect(page).toHaveURL(/\/pitch\?variant=five$/);
+    await expect(slides.getByRole("option")).toHaveCount(14);
+    await slides.getByRole("option", { name: "8 Economics" }).click();
+    await expect(slideOn(page, "Economics")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Edit in validation" }),
+    ).toHaveAttribute("href", `/w/${workspace.id}/ideas/${idea.id}/costs`);
+
+    await page.getByRole("button", { name: /^From/ }).click();
+    await page.getByRole("option", { name: "v1 For advisors" }).click();
+    await expect(page).toHaveURL(/\?variant=five&version=[\w-]+$/);
+    // A version is read only: its slides lead to no editing.
+    await expect(slideOn(page, "Economics")).toContainText("v1 For advisors ·");
+    await expect(page.getByRole("link", { name: "Edit source" })).toHaveCount(
+      0,
+    );
+
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download PDF" }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toMatch(
+      /^Piaya Picnic Boxes-five-v1 For advisors-\d{4}-\d{2}-\d{2}\.pdf$/,
+    );
+    const bytes = await readFile(await file.path());
+    expect(bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+
+    await page.getByRole("button", { name: "Comments on Economics" }).click();
+    const panel = page.getByRole("complementary", { name: "Comments" });
+    await expect(panel.getByText("No comments yet")).toBeVisible();
+    const box = panel.getByRole("textbox", { name: "Add a comment" });
+    await box.click();
+    await box.pressSequentially("Add the delivery van to the startup cost.");
+    await panel.getByRole("button", { name: "Post" }).click();
+    await expect(
+      panel.getByText("Add the delivery van to the startup cost."),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Comments on Economics, 1 comment",
+      }),
+    ).toBeVisible();
+    await expectNoAxeViolations(page);
+  });
+});
+
+test.describe("23 for a Viewer", () => {
+  test.use(desktop);
+
+  test("Piaya's Plan A: the deck and its PDF, no way to edit the sources", async ({
+    page,
+    signIn,
+  }) => {
+    const me = await signIn(demo.viewer);
+    const { bcdx, piaya, planA } = await piayaPlanA(page, me);
+    await page.goto(`/w/${bcdx.id}/ideas/${piaya.id}/plans/${planA.id}`);
+    await page.getByRole("button", { name: "Pitch Deck" }).click();
+    await expect(page).toHaveURL(/\/pitch$/);
+    const slides = page.getByRole("listbox", { name: "Slides" });
+    await slides.getByRole("option", { name: "6 Business model" }).click();
+    await expect(slideOn(page, "Business model")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Edit source" })).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByRole("link", { name: "Edit in validation" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Download PDF" }),
+    ).toBeEnabled();
+    await expectNoAxeViolations(page);
+  });
+});
+
+test.describe("23 on a phone", () => {
+  test.use(phone);
+
+  test("the slide alone with ‹ n / m ›, Download PDF in place", async ({
+    page,
+    signIn,
+  }) => {
+    const me = await signIn(demo.viewer);
+    const { bcdx, piaya, planA } = await piayaPlanA(page, me);
+    await page.goto(
+      `/w/${bcdx.id}/ideas/${piaya.id}/plans/${planA.id}/pitch?variant=five`,
+    );
+    await expect(page.getByText("1 / 14")).toBeVisible();
+    await expect(page.getByRole("listbox", { name: "Slides" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Next slide" }).click();
+    await expect(page.getByText("2 / 14")).toBeVisible();
+    await expect(slideOn(page, "Problem")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Download PDF" }),
+    ).toBeVisible();
+    await expectNoAxeViolations(page);
   });
 });

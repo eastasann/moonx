@@ -1323,6 +1323,47 @@ describe("PresentationPattern (I)", () => {
     expect(screen.getByText("Slide model")).toBeTruthy();
   });
 
+  test("the notices above the slide's links; while loading, only the tools' line is in reach", () => {
+    setTabletWidth();
+    const { rerender } = render(
+      <PresentationPattern
+        header={<h1>Pitch Deck</h1>}
+        tools={<button type="button">Five-minute</button>}
+        slides={slideList}
+        currentId="title"
+        onCurrentChange={() => {}}
+        notices={<p>Too long</p>}
+        slideTools={<a href="#source">Edit source</a>}
+        slide={<p>Slide title</p>}
+      />,
+    );
+    expect(
+      follows(
+        screen.getByText("Too long"),
+        screen.getByRole("link", { name: "Edit source" }),
+      ),
+    ).toBe(true);
+    expect(
+      screen.getByRole("listbox", { name: "Slides" }).closest("[inert]"),
+    ).toBeNull();
+    rerender(
+      <PresentationPattern
+        header={<h1>Pitch Deck</h1>}
+        tools={<button type="button">Five-minute</button>}
+        slides={slideList}
+        currentId="title"
+        onCurrentChange={() => {}}
+        slide={<p>Slide title</p>}
+        isLoading
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Five-minute" }).closest("[inert]"),
+    ).toBeNull();
+    expect(screen.getByText("Slide title").closest("[inert]")).not.toBeNull();
+    expect(screen.getByText("Mini title").closest("[inert]")).not.toBeNull();
+  });
+
   test("desktop beside a docked panel without room: the slide alone, as on a phone (4.1)", async () => {
     const user = userEvent.setup();
     render(

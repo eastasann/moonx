@@ -600,7 +600,7 @@ function Header({ home }: { home: ValidationHome }) {
 /**
  * The tools beside the title for the Owners and Members (design-spec 6.1「操作」): Edit
  * summary and AI ▼ while the idea is not archived (6.8: no AI round trip then), and ⋯
- * with Duplicate, and Archive while it is not. Update template joins with M8 (Step 35);
+ * with Duplicate, and Archive while it is not. Update template joins with M8 (Step 35c);
  * Add plan is in the Plans block.
  */
 function Tools({ home, onEdit }: { home: ValidationHome; onEdit: () => void }) {

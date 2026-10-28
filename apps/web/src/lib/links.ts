@@ -5,10 +5,13 @@ import type {
   ExecutionStatus,
   ExecutionType,
   LinkTarget,
+  PitchVariant,
   SourceType,
   SupportsCheck,
+  TargetRef,
   TemplateKind,
 } from "@moonx/schemas";
+import { pitchVariantSchema } from "@moonx/schemas";
 import type { CompareView } from "@moonx/ui-tokens";
 import { formatPanelTarget } from "./panel-target";
 
@@ -359,6 +362,39 @@ export const executionHref = (
   return `${planHref(workspaceId, ideaId, planId)}/execution${text === "" ? "" : `?${text}`}`;
 };
 
+/** What 23's URL may open with (SDD 4章). */
+export interface PitchSearch {
+  /** The one-minute or five-minute deck; the one-minute when left out. */
+  variant?: PitchVariant;
+  /** The `plan_version` the deck is made from; the plan now when left out. */
+  version?: string;
+}
+
+/** 23 Pitch Deck (SDD 4章). */
+export const pitchHref = (
+  workspaceId: string,
+  ideaId: string,
+  planId: string,
+  search: PitchSearch = {},
+) => {
+  const query = new URLSearchParams();
+  if (search.variant !== undefined) query.set("variant", search.variant);
+  if (search.version !== undefined) query.set("version", search.version);
+  const text = query.toString();
+  return `${planHref(workspaceId, ideaId, planId)}/pitch${text === "" ? "" : `?${text}`}`;
+};
+
+/**
+ * The deck a slide's comment target names (`{variant}.{slide}`, SDD 5.1 TargetRef), or
+ * undefined for any other target.
+ */
+export function pitchVariantOf(
+  target: TargetRef | undefined,
+): PitchVariant | undefined {
+  if (target?.type !== "pitch_slide") return undefined;
+  return pitchVariantSchema.safeParse(target.key?.split(".")[0]).data;
+}
+
 /**
  * Where a section of 13 opens (design-spec 6.1「セクションを開く」): 01, 02 and 10 on
  * 11, 03 on 14, 04 on 15, 05 on 17, 06–08 on 18, 09 on 16.
@@ -377,9 +413,9 @@ export function sectionHref(
   return undefined;
 }
 
-/** The screens whose panels are built: PNL-1 on 10–18 and 20–22, PNL-2 on 10, 11, 13–18 and 20–22. */
+/** The screens whose panels are built: PNL-1 on 10–18 and 20–23, PNL-2 on 10, 11, 13–18 and 20–22. */
 const PANEL_SCREENS = {
-  comments: new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22]),
+  comments: new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23]),
   history: new Set([10, 11, 13, 14, 15, 16, 17, 18, 20, 21, 22]),
 };
 
@@ -397,7 +433,7 @@ export function hrefOf(target: LinkTarget): string | undefined {
   ) {
     return undefined;
   }
-  const base = screenHrefOf({ ...target, panel: undefined, target: undefined });
+  const base = screenHrefOf({ ...target, panel: undefined });
   if (base === undefined) return undefined;
   const [path, query = ""] = base.split("?");
   const search = new URLSearchParams(query);
@@ -496,6 +532,13 @@ function screenHrefOf(target: LinkTarget): string | undefined {
         : executionHref(workspaceId, ideaId, target.planId, {
             tab: isExecutionTab(target.tab) ? target.tab : undefined,
             item: target.rowId,
+          });
+    case 23:
+      // A slide's comment opens the deck it is on.
+      return ideaId === undefined || target.planId === undefined
+        ? undefined
+        : pitchHref(workspaceId, ideaId, target.planId, {
+            variant: pitchVariantOf(target.target),
           });
     default:
       return undefined;

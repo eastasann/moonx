@@ -761,7 +761,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId` | 20 プランホーム | `?version=<plan_version の id>`（版の読み取り専用表示） |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo` | 21 プラン項目の編集 | `$itemNo` は 1〜30。`?q=&version=<plan_version の id>`（P4 の `versionId`。版の読み取り専用表示から項目を開くとき） |
 | `/w/$workspaceId/ideas/$ideaId/plans/$planId/execution` | 22 実行管理 | `?tab=milestones|launch|kpis|questions|actions&item=&assignee=me|<user の id>&status=`（`item` は詳細に出す execution_item の id。`tab` が無ければ `item` の種類のタブ、どちらも無ければ milestones。`assignee` と `status` は Next Actions の絞り込みで、`status` は todo / doing / done） |
-| `/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch` | 23 Pitch Deck | `?variant=one|five&version=` |
+| `/w/$workspaceId/ideas/$ideaId/plans/$planId/pitch` | 23 Pitch Deck | `?variant=one|five&version=`（`variant` を省くと1分版、`version` を省くと今のプラン。design-spec 6.14） |
 | `/w/$workspaceId/ai/export` | 24 AI 書き出し | `?source=self_analysis|validation|business_plan&id=&scope=&returnTo=`（`id` は検証かプランの id で、自己分析には付けない。`scope` は範囲の初期値で、書き出しのヘッダーの `scope:` と同じ書き方（`all`・`part:a`・`part:b`、またはセクションのキーを `,` でつなぐ。プランの項目は2桁のキー。design-spec 6.6 規則）。テンプレートに無いキーは捨て、何も残らなければ全体。`returnTo` は 24 を開いた画面のパスで、同じワークスペースの `/w/$workspaceId` の下のパスだけを受け付け、ほかは無いものとして扱う。自己分析の 24・25 を Viewer として開いているワークスペースで開いたら、10・11 と同じく自分の個人用ワークスペースの同じ画面へ移す） |
 | `/w/$workspaceId/ai/import` | 25 AI 取り込み | `?target=self_analysis|validation|business_plan&id=&scope=&returnTo=`（`id`・`scope`・`returnTo` の書き方は 24 と同じ。`scope` は振り分けの範囲（design-spec 6.7「取り込み先」）。`returnTo` は反映の後と Cancel・Close で戻る画面で、無いときは取り込み先のホーム（13・20・10）） |
 | `/admin/templates` | 26 管理: テンプレート一覧 | `?kind=` |

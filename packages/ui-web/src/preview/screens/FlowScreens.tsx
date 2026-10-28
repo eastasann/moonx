@@ -1,5 +1,6 @@
 import { MessageSquare } from "lucide-react";
 import { useState } from "react";
+import { ActionButton } from "../../components/ActionButton";
 import { Button } from "../../components/Button";
 import { Checkbox } from "../../components/Checkbox";
 import { CostPreview } from "../../components/CostPreview";
@@ -28,7 +29,6 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from "../../components/ToggleButtonGroup";
-import { IconSlot } from "../../internal/IconSlot";
 import { Flex, Stack } from "../../layout/Flex";
 import { PresentationPattern } from "../../patterns/PresentationPattern";
 import { PublicPattern, PublicSection } from "../../patterns/PublicPattern";
@@ -270,18 +270,14 @@ export function DeckScreen() {
             <Link href="#edit-validation" isQuiet>
               Edit in validation
             </Link>
-            <Link
-              href="#slide-comments"
+            <ActionButton
               isQuiet
-              aria-label={`Comments on this slide, ${count}`}
+              size="S"
+              aria-label={`Comments on ${slide.title.text}, ${count}`}
             >
-              <Flex gap="space-50" alignItems="center">
-                <IconSlot size="XS">
-                  <MessageSquare />
-                </IconSlot>
-                {count}
-              </Flex>
-            </Link>
+              <MessageSquare />
+              {count}
+            </ActionButton>
           </>
         }
         slide={

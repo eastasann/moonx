@@ -22,6 +22,7 @@
     "showLatest": "Show the latest",
     "startWith": "Start with the items marked [V]. They already have your validation data.",
     "saveVersion": "Save version",
+    "pitchDeck": "Pitch Deck",
     "recordGoNoGo": "Record Go / No-Go",
     "more": "More for {{name}}",
     "rename": "Rename plan",
@@ -258,5 +259,20 @@
     "goNoGoNote": "Record a decision with Record Go / No-Go on the plan home.",
     "memberPicker": "Member",
     "notInValidation": "Not in validation"
+  },
+  "pitch": {
+    "title": "Pitch Deck",
+    "length": "Length",
+    "one": "One-minute",
+    "five": "Five-minute",
+    "from": "From",
+    "latest": "Latest",
+    "download": "Download PDF",
+    "preparing": "Preparing PDF…",
+    "pdfFailed": "Couldn't make the PDF",
+    "editSource": "Edit source",
+    "editInValidation": "Edit in validation",
+    "tooLong": "Too long for this slide. Shorten it in the plan.",
+    "whatToSay": "What to say"
   }
 }

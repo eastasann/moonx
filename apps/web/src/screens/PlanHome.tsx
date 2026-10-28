@@ -37,6 +37,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -82,6 +83,7 @@ import {
   executionHref,
   ideaHref,
   ideasHref,
+  pitchHref,
   planHref,
   planItemHref,
 } from "../lib/links";
@@ -394,10 +396,34 @@ function Header({
 }
 
 /**
+ * The way to 23 (design-spec 6.12): for every role, archived too (6.8), and to the deck
+ * of the version open.
+ */
+function PitchDeckButton({ home }: { home: PlanHome }) {
+  const { t } = useTranslation(["plans"]);
+  const { workspace } = useWorkspace();
+  const navigate = useNavigate();
+  return (
+    <Button
+      variant="secondary"
+      onPress={() =>
+        void navigate({
+          href: pitchHref(workspace.id, home.ideaId, home.id, {
+            version: home.viewingVersion?.id,
+          }),
+        })
+      }
+    >
+      {t("plans:home.pitchDeck")}
+    </Button>
+  );
+}
+
+/**
  * The tools beside the plan's name for the Owners and Members while it can be changed
- * (design-spec 6.12): Save version (M3), and ⋯ with Rename plan, Export for AI and
- * Import from AI (24, 25) and Archive plan. Pitch Deck and Update template join with
- * their screens (Step 35).
+ * (design-spec 6.12): Save version (M3), Pitch Deck (23), and ⋯ with Rename plan,
+ * Export for AI and Import from AI (24, 25) and Archive plan. Update template joins with
+ * M8 (Step 35c).
  */
 function Tools({
   home,
@@ -418,6 +444,7 @@ function Tools({
       <Button variant="secondary" onPress={onSaveVersion}>
         {t("plans:home.saveVersion")}
       </Button>
+      <PitchDeckButton home={home} />
       <ActionMenu
         aria-label={t("plans:home.more", { name: home.name })}
         onAction={(key) => {
@@ -755,7 +782,9 @@ function PlanHub({
               onSaveVersion={() => modals.open("save-version")}
               onRename={() => setRenaming(true)}
             />
-          ) : undefined
+          ) : (
+            <PitchDeckButton home={home} />
+          )
         }
         primaryAction={
           canEdit ? (

@@ -39,6 +39,7 @@ import { dashboardHref, useWorkspace } from "../components/workspace";
 import { api, inPath, unwrap } from "../lib/api";
 import { hrefOf, notificationsHref } from "../lib/links";
 import {
+  asList,
   notificationsKey,
   notificationsPage,
   unreadCountQuery,
@@ -131,6 +132,7 @@ function NotificationsBody({ search }: { search: NotificationsSearch }) {
   const query = useInfiniteQuery({
     queryKey: listKey(filter),
     queryFn: ({ pageParam }) => notificationsPage(filter, pageParam),
+    ...asList,
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (last) =>
       last.nextCursor === null ? undefined : Number(last.nextCursor),

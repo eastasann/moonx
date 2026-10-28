@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, sep } from "node:path";
+import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import { Elysia } from "elysia";
 import type { AccessPlugin } from "./access";
 import type { Config } from "./config";
@@ -24,6 +25,63 @@ const CONTENT_TYPES: Record<string, string> = {
   ".txt": "text/plain; charset=utf-8",
 };
 
+/**
+ * The types sent compressed (ADR-004): text. Images and fonts are compressed already.
+ * Cloud Run does not compress responses, so without this the first visit downloads the
+ * build at its full size (SDD 7.3).
+ */
+const COMPRESSIBLE = new Set([
+  ".html",
+  ".js",
+  ".css",
+  ".webmanifest",
+  ".svg",
+  ".txt",
+]);
+
+type Encoding = "br" | "gzip";
+
+// Brotli's quality 6 keeps a file's first request on a new instance short: about 25 ms for
+// the largest chunk, where quality 11 takes seconds for a tenth less.
+const ENCODERS: Record<
+  Encoding,
+  (data: Uint8Array) => Uint8Array<ArrayBuffer>
+> = {
+  br: (data) =>
+    new Uint8Array(
+      brotliCompressSync(data, {
+        params: {
+          [constants.BROTLI_PARAM_QUALITY]: 6,
+          [constants.BROTLI_PARAM_SIZE_HINT]: data.length,
+        },
+      }),
+    ),
+  gzip: (data) => new Uint8Array(gzipSync(data)),
+};
+
+/**
+ * The encoding to send for an `Accept-Encoding` value (RFC 9110 12.5.3): the accepted one
+ * of Brotli and gzip with the higher weight, Brotli on a tie; none when neither is
+ * accepted. A coding with `q=0`, or one `*;q=0` leaves out, is refused.
+ */
+export function chooseEncoding(accept: string | null): Encoding | null {
+  if (accept === null) return null;
+  const weights = new Map<string, number>();
+  for (const part of accept.split(",")) {
+    const [coding = "", ...params] = part
+      .split(";")
+      .map((piece) => piece.trim().toLowerCase());
+    const q = params.find((param) => param.startsWith("q="));
+    weights.set(coding, q === undefined ? 1 : Number(q.slice(2)));
+  }
+  const weight = (coding: Encoding) => {
+    const q = weights.get(coding) ?? weights.get("*") ?? 0;
+    return Number.isFinite(q) ? q : 0;
+  };
+  const best = weight("br") >= weight("gzip") ? "br" : "gzip";
+  return weight(best) > 0 ? best : null;
+}
+
 // The Cache-Control values of ADR-004 and ADR-031.
 const IMMUTABLE = "public, max-age=31536000, immutable";
 const REVALIDATE = "no-cache";
@@ -46,6 +104,38 @@ interface WebFile {
   cacheControl: string;
   /** The HTML with the meta elements written in, or the file to stream. */
   body: string | { path: string };
+  /**
+   * For a compressible file, its encodings as they are first asked for: null where the
+   * encoding is no smaller. A file streamed from the disk keeps them for the version it
+   * was read at (`version`), as its uncompressed body is read anew on each request.
+   */
+  encoded?: Partial<Record<Encoding, Uint8Array<ArrayBuffer> | null>>;
+  version?: string;
+}
+
+/** The body of `file` in `encoding`, or null to send it as it is. */
+function encodedBody(
+  file: WebFile,
+  encoding: Encoding,
+): Uint8Array<ArrayBuffer> | null {
+  if (file.encoded === undefined) return null;
+  if (typeof file.body !== "string") {
+    const { mtimeMs, size } = statSync(file.body.path);
+    const version = `${mtimeMs}/${size}`;
+    if (file.version !== version) {
+      file.encoded = {};
+      file.version = version;
+    }
+  }
+  const known = file.encoded[encoding];
+  if (known !== undefined) return known;
+  const data =
+    typeof file.body === "string"
+      ? new TextEncoder().encode(file.body)
+      : new Uint8Array(readFileSync(file.body.path));
+  const body = ENCODERS[encoding](data);
+  file.encoded[encoding] = body.length < data.length ? body : null;
+  return file.encoded[encoding];
 }
 
 const escapeAttribute = (value: string) =>
@@ -138,11 +228,12 @@ function readBuild(
         if (!html.includes("</head>")) {
           throw new WebBuildError(`${served} in WEB_DIST_DIR has no </head>`);
         }
-        const file = {
+        const file: WebFile = {
           contentType,
           cacheControl: REVALIDATE,
           // A function, so that a `$` in a value is not read as a replacement pattern.
           body: html.replace("</head>", () => `${meta}</head>`),
+          encoded: {},
         };
         files.set(served, file);
         if (served !== SHELL) pages.set(pagePath(served), file);
@@ -156,6 +247,7 @@ function readBuild(
             ? IMMUTABLE
             : ONE_DAY,
         body: { path },
+        ...(COMPRESSIBLE.has(extension) ? { encoded: {} } : {}),
       });
     }
   } catch (error) {
@@ -177,8 +269,9 @@ function readBuild(
 /**
  * The Web, served from `WEB_DIST_DIR` at `/*` by the same service as the API (ADR-004):
  * the build's files as they are, the screens' paths with their page, and 404 for a file
- * that is not there. Content types and Cache-Control are those of ADR-004 and ADR-031;
- * the entry plugin adds the security headers of SDD 7.2 to every response.
+ * that is not there. Content types and Cache-Control are those of ADR-004 and ADR-031,
+ * and text goes compressed where the browser accepts it; the entry plugin adds the
+ * security headers of SDD 7.2 to every response.
  *
  * @throws {WebBuildError} when the directory holds no build of the Web.
  */
@@ -190,7 +283,7 @@ export function webRoutes(
   const { files, pages, shell } = readBuild(directory, config);
   return new Elysia().use(access).get(
     "/*",
-    ({ path }) => {
+    ({ path, request }) => {
       // An /api/ path no route took is the API's 404, not a screen.
       if (path.startsWith("/api/")) {
         throw new ApiError("NOT_FOUND", "No route matches the request");
@@ -204,14 +297,26 @@ export function webRoutes(
       if (file === null) {
         throw new ApiError("NOT_FOUND", "No file matches the request");
       }
+      const encoding =
+        file.encoded === undefined
+          ? null
+          : chooseEncoding(request.headers.get("accept-encoding"));
+      const encoded = encoding === null ? null : encodedBody(file, encoding);
+      const headers = new Headers({
+        "content-type": file.contentType,
+        "cache-control": file.cacheControl,
+      });
+      // A cache keeps the encodings of a compressible file apart.
+      if (file.encoded !== undefined) headers.set("vary", "Accept-Encoding");
+      if (encoding !== null && encoded !== null) {
+        headers.set("content-encoding", encoding);
+      }
       return new Response(
-        typeof file.body === "string" ? file.body : Bun.file(file.body.path),
-        {
-          headers: {
-            "content-type": file.contentType,
-            "cache-control": file.cacheControl,
-          },
-        },
+        encoded ??
+          (typeof file.body === "string"
+            ? file.body
+            : Bun.file(file.body.path)),
+        { headers },
       );
     },
     {

@@ -8,10 +8,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { brotliDecompressSync, gunzipSync } from "node:zlib";
 import type { Config } from "./config";
 import { HEALTH_DB_IP_LIMIT } from "./health";
 import { buildTestApp, connectTestDatabase, uniqueIp } from "./test-app";
-import { WebBuildError } from "./web";
+import { chooseEncoding, WebBuildError } from "./web";
 
 // ADR-004 and ADR-031 on a build laid out as make build-web writes it (SDD 10章「PWA と
 // 配信」). The browser's side of it is e2e/pwa.spec.ts.
@@ -254,6 +255,151 @@ describe("the Web's files (ADR-004, ADR-031)", () => {
 
     expect(response.status).toBe(404);
   });
+});
+
+describe("compression of the Web's text (ADR-004)", () => {
+  const script = "console.log('moonx');\n".repeat(400);
+  const landing = page(`Landing ${"moonx ".repeat(400)}`);
+  const big = buildTestApp(database, {
+    config: {
+      webDistDir: writeBuild({
+        ...BUILD,
+        "index.html": landing,
+        "assets/screens-Mn12Op34.js": script,
+        "assets/plex-Qr56St78.woff2": "woff2".repeat(400),
+      }),
+    },
+  }).app;
+  const fetchAs = (path: string, acceptEncoding?: string) =>
+    big.handle(
+      new Request(`http://localhost${path}`, {
+        headers:
+          acceptEncoding === undefined
+            ? {}
+            : { "accept-encoding": acceptEncoding },
+      }),
+    );
+  const bytes = async (response: Response) =>
+    Buffer.from(await response.arrayBuffer());
+
+  test("a script goes in Brotli to a browser that takes it", async () => {
+    const response = await fetchAs(
+      "/assets/screens-Mn12Op34.js",
+      "gzip, deflate, br, zstd",
+    );
+
+    expect(response.headers.get("content-encoding")).toBe("br");
+    expect(response.headers.get("vary")).toBe("Accept-Encoding");
+    expect(response.headers.get("content-type")).toBe(
+      "text/javascript; charset=utf-8",
+    );
+    expect(response.headers.get("cache-control")).toBe(
+      "public, max-age=31536000, immutable",
+    );
+    const body = await bytes(response);
+    expect(body.length).toBeLessThan(script.length / 10);
+    expect(brotliDecompressSync(body).toString()).toBe(script);
+  });
+
+  test("a file changed on the disk goes out changed, compressed or not", async () => {
+    // e2e/pwa.spec.ts writes a new /sw.js under the running API.
+    const directory = writeBuild({ ...BUILD, "sw.js": script });
+    const served = buildTestApp(database, {
+      config: { webDistDir: directory },
+    }).app;
+    const sw = (acceptEncoding: string) =>
+      served.handle(
+        new Request("http://localhost/sw.js", {
+          headers: { "accept-encoding": acceptEncoding },
+        }),
+      );
+    expect(brotliDecompressSync(await bytes(await sw("br"))).toString()).toBe(
+      script,
+    );
+
+    const next = `${script}// version 2\n`;
+    writeFileSync(join(directory, "sw.js"), next);
+    expect(brotliDecompressSync(await bytes(await sw("br"))).toString()).toBe(
+      next,
+    );
+    expect(gunzipSync(await bytes(await sw("gzip"))).toString()).toBe(next);
+    expect(await (await sw("identity")).text()).toBe(next);
+  });
+
+  test("gzip to a browser that takes only gzip", async () => {
+    const response = await fetchAs("/assets/screens-Mn12Op34.js", "gzip");
+
+    expect(response.headers.get("content-encoding")).toBe("gzip");
+    expect(gunzipSync(await bytes(response)).toString()).toBe(script);
+  });
+
+  test("the pages go compressed with their meta elements", async () => {
+    for (const path of ["/", "/login"]) {
+      const response = await fetchAs(path, "br");
+
+      expect(response.headers.get("content-encoding")).toBe("br");
+      expect(response.headers.get("cache-control")).toBe("no-cache");
+      expect(brotliDecompressSync(await bytes(response)).toString()).toContain(
+        '<meta name="moonx-app-env" content="test">',
+      );
+    }
+  });
+
+  for (const acceptEncoding of [
+    undefined,
+    "identity",
+    "br;q=0, gzip;q=0",
+    "*;q=0",
+    "deflate",
+  ]) {
+    test(`as it is to Accept-Encoding: ${acceptEncoding ?? "(none)"}`, async () => {
+      const response = await fetchAs(
+        "/assets/screens-Mn12Op34.js",
+        acceptEncoding,
+      );
+
+      expect(response.headers.get("content-encoding")).toBeNull();
+      expect(response.headers.get("vary")).toBe("Accept-Encoding");
+      expect(await response.text()).toBe(script);
+    });
+  }
+
+  test("a file compression would not shrink goes as it is", async () => {
+    const response = await fetchAs("/assets/index-Ab12-_Cd.js", "br, gzip");
+
+    expect(response.headers.get("content-encoding")).toBeNull();
+    expect(await response.text()).toBe("console.log('app')");
+  });
+
+  test("fonts and images go as they are, compressed already", async () => {
+    for (const path of ["/assets/plex-Qr56St78.woff2", "/icons/icon-192.png"]) {
+      const response = await fetchAs(path, "br, gzip");
+
+      expect(response.headers.get("content-encoding")).toBeNull();
+      expect(response.headers.get("vary")).toBeNull();
+    }
+  });
+});
+
+describe("chooseEncoding (RFC 9110 12.5.3)", () => {
+  for (const [accept, chosen] of [
+    [null, null],
+    ["", null],
+    ["gzip, deflate, br, zstd", "br"],
+    ["BR", "br"],
+    ["gzip", "gzip"],
+    ["gzip;q=1.0, br;q=0.5", "gzip"],
+    ["br;q=0.8, gzip;q=0.8", "br"],
+    ["br;q=0, gzip", "gzip"],
+    ["*", "br"],
+    ["*;q=0.5, br;q=0", "gzip"],
+    ["gzip;q=x", null],
+    ["identity, deflate", null],
+  ] as const) {
+    test(`${accept === null ? "no header" : `"${accept}"`} → ${chosen ?? "none"}`, () => {
+      expect(chooseEncoding(accept)).toBe(chosen);
+    });
+  }
 });
 
 describe("headers on the Web's responses (SDD 7.2)", () => {

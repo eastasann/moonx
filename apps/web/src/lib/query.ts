@@ -1,6 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
-import { ApiError } from "./api";
-import { historyKey } from "./queries";
+import { ApiError, onWrite } from "./api";
+import { historyKey, isList } from "./queries";
 
 /** Tries again only what may pass next time: the network, and an API that is not up. */
 export const isTransient = (error: unknown) =>
@@ -9,11 +9,12 @@ export const isTransient = (error: unknown) =>
 
 /**
  * The client's cache of API data (ADR-011): a screen shows what it has at once and takes
- * it again behind (the defaults' stale-while-revalidate). Every failed query or mutation
- * passes here first: a 401 means the session is gone, and NO_ACCESS that the user's
- * memberships changed, so `me` is taken again and the screens follow it (SDD 8.2). Every
- * write that went through has a line in the change history (ADR-020), so an open history
- * panel reads it again.
+ * it again behind (stale-while-revalidate; a list only once it is 30 seconds old, or the
+ * page has changed something since, SDD 7.3). Every failed query or mutation passes here
+ * first: a 401 means the session is gone, and NO_ACCESS that the user's memberships
+ * changed, so `me` is taken again and the screens follow it (SDD 8.2). Every write that
+ * went through has a line in the change history (ADR-020), so an open history panel
+ * reads it again.
  *
  * @param onUnauthenticated Leaves for the sign-in screen, the cache dropped (SDD 8.2).
  */
@@ -45,6 +46,13 @@ export function createQueryClient(onUnauthenticated: () => void): QueryClient {
       },
       mutations: { networkMode: "always", retry: false },
     },
+  });
+  // A read under way may bring what the list was before the change: it is dropped, and
+  // a list on screen is read again at once; the others when next shown.
+  onWrite(() => {
+    void queryClient
+      .cancelQueries({ predicate: isList })
+      .then(() => queryClient.invalidateQueries({ predicate: isList }));
   });
   return queryClient;
 }

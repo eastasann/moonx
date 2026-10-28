@@ -7,8 +7,11 @@ import { workspaceId } from "../test/ideas";
 import {
   answer,
   competitor,
+  evidenceOf,
   home,
+  prices,
   question,
+  survey,
   validationId,
 } from "../test/validation";
 
@@ -81,6 +84,7 @@ function competitorsApi({
     { question: failure, answer: answer(failure.key) },
   ],
   order,
+  evidence,
 }: {
   me?: Me;
   items?: Competitor[];
@@ -88,6 +92,8 @@ function competitorsApi({
   guidance?: { min: number; max: number };
   patterns?: { question: typeof survivor; answer: ValidationAnswer }[];
   order?: () => Response;
+  /** V5's answer to an attachment. */
+  evidence?: (call: Call) => Response;
 } = {}) {
   // The test's own array, so it can change the list behind the screen.
   const held = items;
@@ -111,6 +117,19 @@ function competitorsApi({
       });
       held.push(made);
       return Response.json(made, { status: 201 });
+    }
+    if (
+      method === "GET" &&
+      path.startsWith(`/api/v1/validations/${validationId}/research-log`)
+    ) {
+      return Response.json({ items: [survey, prices], nextCursor: null });
+    }
+    if (
+      method === "POST" &&
+      path === `/api/v1/validations/${validationId}/evidence` &&
+      evidence !== undefined
+    ) {
+      return evidence(call);
     }
     if (method === "PUT" && path === `${listPath}/order`) {
       if (order !== undefined) return order();
@@ -278,6 +297,68 @@ describe("15 Competitors (design-spec 6.10)", () => {
     ).toBeTruthy();
     expect(router.state.location.search).toMatchObject({ row: madeId });
     expect(screen.getByText("3 competitors · aim for 3–5")).toBeTruthy();
+  });
+
+  test("Add evidence opens M2 on the card; what it attaches shows on the card, a deleted log's link does not", async () => {
+    const user = userEvent.setup();
+    const attached = evidenceOf("7d0f0000-0000-4000-8000-000000000003", survey);
+    const calls = competitorsApi({
+      evidence: () =>
+        Response.json(
+          {
+            evidence: attached,
+            classification: {
+              fau: null,
+              confidence: null,
+              state: "unclassified",
+              evidence: [
+                ...salad.evidence,
+                attached,
+                evidenceOf(
+                  "7d0f0000-0000-4000-8000-000000000004",
+                  prices,
+                  true,
+                ),
+              ],
+            },
+            lockVersion: 2,
+          },
+          { status: 201 },
+        ),
+    });
+    renderApp(`${base}?row=${salad.id}`);
+    const dialog = await screen.findByRole("dialog", {
+      name: "Edit competitor",
+    });
+    await user.click(
+      within(dialog).getByRole("link", { name: "Add evidence" }),
+    );
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    expect(sheet.textContent).toContain("Competitors · Salad Station");
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    await waitFor(() =>
+      expect(calls.find(({ method }) => method === "POST")?.body).toEqual({
+        target: { type: "competitor", id: salad.id, key: null },
+        lockVersion: salad.lockVersion,
+        researchLogEntryId: survey.id,
+      }),
+    );
+    await user.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull(),
+    );
+    const evidence = within(dialog).getByRole("grid", { name: "Evidence" });
+    expect(
+      within(evidence)
+        .getAllByRole("row")
+        .map((row) => row.textContent),
+    ).toEqual([
+      expect.stringContaining("example.com/menu"),
+      expect.stringContaining("Lunch survey"),
+    ]);
+    expect(cardsOf()[0]?.textContent).toContain("2 sources");
   });
 
   test("Reorder sends every card in the new order; Delete asks first", async () => {

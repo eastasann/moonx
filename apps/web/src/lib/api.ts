@@ -73,8 +73,31 @@ function clientKind(): "web" | "web_mobile" {
     : "web";
 }
 
+let writeListener: (() => void) | null = null;
+
+/**
+ * Calls `listener` after each change the API accepts from this page: a request other than
+ * GET or HEAD that succeeded, a save included. One listener at a time, the page's query
+ * cache (query.ts), which makes its lists stale (SDD 7.3).
+ */
+export function onWrite(listener: () => void) {
+  writeListener = listener;
+}
+
+async function fetchNotingWrites(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await fetch(input, init);
+  const method = (
+    init?.method ?? (input instanceof Request ? input.method : "GET")
+  ).toUpperCase();
+  if (response.ok && method !== "GET" && method !== "HEAD") writeListener?.();
+  return response;
+}
+
 function createClient() {
   return treaty<App>(window.location.origin, {
+    // Eden calls it as fetch(input, init). Bun's type of fetch adds `preconnect`, which
+    // Eden does not use and the browser's fetch does not have.
+    fetcher: fetchNotingWrites as typeof fetch,
     // Dates stay the strings the API sends (SDD 5.1): Eden would otherwise turn any
     // string that looks like a date, a date-only due date or a typed answer included,
     // into a Date.

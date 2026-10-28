@@ -185,6 +185,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `test` | `test-domain`・`test-api`・`test-web` をまとめて実行 |
 | `test-domain` / `test-api` / `test-web` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査・`db-check`・`promote`・`promote-check`）、`test-api` は `apps/api` と `packages/db`（どちらも `DATABASE_URL_TEST` の DB を作り直し、マイグレーションを当てて使う）、`test-web` は `apps/web`・`packages/ui-web` |
 | `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して。PWA の検査は、先に `build-web SHA=dev` でビルドした Web を API から返す形で起動する）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
+| `coverage` | 10章のカバレッジの目標を測って比べる。`test-domain` と `test-api` を Bun のカバレッジを付けて動かし（lcov を `coverage/` に書く）、`apps/web` の Vitest を `--coverage` で動かし、`scripts/coverage-check.ts` で `packages/domain/src` と `apps/api/src` のファイルの行と関数を合計して目標と比べる（どのテストも読み込まないファイルがあれば失敗。テストが別のプロセスで動かす入口と再エクスポートだけのファイルは除く）。Web はファイルごとの下限を Vitest が比べる（`apps/web/vitest.config.ts`）。どれかが目標に届かなければ失敗する。CI は動かさない |
 | `lint` / `format` / `typecheck` | Biome の検査・整形（`lint` は画面の検査スクリプト `scripts/check-screens.ts` も動かす）、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
@@ -285,13 +286,14 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 
 ### ADR-004: Web は「静的ファイル＋/api」の形で、API と同じ Cloud Run のサービスから配る
 
-**状態・日付:** 採用（2026-10-03 に置き換えた。ユーザーの決定。ドキュメントへの反映は 2026-10-11）。前の決定（2026-10-01）は、Cloudflare の Worker の静的アセットで Web を配り、`/api/*` を Cloud Run へ転送し、Cloud Run を共有シークレットで守る、だった。
+**状態・日付:** 採用（2026-10-03 に置き換えた。ユーザーの決定。ドキュメントへの反映は 2026-10-11。2026-10-29 にテキストの圧縮を足した。Cloud Run が圧縮せず、初回の表示で約 2.9 MB をそのまま送っていたため。実装のエージェントの判断）。前の決定（2026-10-01）は、Cloudflare の Worker の静的アセットで Web を配り、`/api/*` を Cloud Run へ転送し、Cloud Run を共有シークレットで守る、だった。
 
 **決定:**
 
 - 配信の形は「`/*` は静的ファイル、`/api/*` は API」に固定する（前と同じ）。
 - 置き場所は API と同じ Cloud Run のサービス `moonx-api-{env}`。イメージに Web のビルドの出力を入れ（ADR-016）、API が `WEB_DIST_DIR` のファイルを返す。返し方: `/` はビルド時に作るランディング（`index.html`。ADR-002）、`/privacy`・`/support` はビルド時に作る HTML、ビルドの出力にあるファイルはそのまま、それ以外の GET の画面のパス（`/api/` で始まらず、ファイルの置き場所でもないもの）は SPA の殻の `_shell.html`（200）。ファイルの置き場所は、ビルドがファイルを置く所（`/assets/`・`/icons/` の下と、トップの階層の拡張子の付いた名前。`/sw.js` など）で、そこで見つからないファイルは 404。それより下の階層の拡張子では見分けない（画面のパスの下の階層にはテンプレートが自由に決めるセクションのキーが入り、`.` を含みうるため。5.13）。`WEB_DIST_DIR` の無い local では静的ファイルを返さない（Web は Vite の開発サーバーが返し、`/api` を API へ転送する）。
 - キャッシュの見出し: ファイル名にハッシュの付いたアセットは `Cache-Control: public, max-age=31536000, immutable`。HTML・マニフェスト・Service Worker のファイルは `no-cache`（ADR-031）。アイコンなどハッシュの無いファイルは `public, max-age=86400`。API の応答は `no-store`（ADR-011）。
+- 圧縮: Cloud Run は応答を圧縮しないので、API が圧縮する。テキストのファイル（HTML・JS・CSS・マニフェスト・SVG・テキスト）には `Vary: Accept-Encoding` を付け、`Accept-Encoding` の Brotli と gzip のうち重み（`q`）の大きい方で返す（同じなら Brotli。`q=0` と、`*;q=0` で外れたものは受け入れないとみなす）。どちらも受け入れないとき、圧縮しても小さくならないときは、そのまま返す。画像とフォントは圧縮済みなので、そのまま返し `Vary` も付けない。各ファイルは、プロセスで最初に求められたときに圧縮して持っておく。HTML 以外のファイルは、ディスクのファイルが変わったら（更新時刻か大きさ）圧縮し直す（HTML は起動のときに読んだものを返す）。API の応答は圧縮しない（7.3 の目安は小さい応答で届いていて、利用者のデータと入力を含む応答の圧縮は BREACH のような攻撃の手がかりになりうる）。
 - 環境ごとに違う値はイメージに焼き込まない（staging で確かめたイメージをそのまま production に出すため。ADR-016）。API は起動のときに HTML のファイルを読み、`<head>` に `<meta name="moonx-app-env" content="{APP_ENV}">` と `<meta name="moonx-sentry-dsn" content="{WEB_SENTRY_DSN}">` を入れて返す。Web はこの2つを読んで環境名と Sentry を決める。インラインのスクリプトを使わないので、CSP の `script-src 'self'` を保てる（7.2）。TanStack Start がプリレンダーした HTML に書くスクリプト（スクロールの復元とルーターの起動）は、`build-web` が `assets/` の下のファイル（ハッシュ付きの名前）に移し、同じ位置の `<script src>` で読ませる。Web のビルドの Zod は、パーサーを `new Function` で作れるかを試さない設定（`jitless`）で動かす（試すと CSP が拒んで違反を報告する。拒まれても解析の結果は同じ。API は CSP の外なので作る）。
 - セキュリティヘッダー（CSP・HSTS など）は API が付ける（7.2）。
 - 独自ドメインは Cloud Run のドメインマッピングで付ける（production は `{DOMAIN}`、staging は `stg.{DOMAIN}`）。DNS は Vercel にあり、CNAME（`ghs.googlehosted.com`）を手で入れる（2章「インフラ管理」）。ドメインマッピングを作る Google のアカウントは、Search Console で `dwnfrc.app` の所有を確認しておく。
@@ -311,6 +313,7 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 - Cloud Run のドメインマッピングは Preview の機能で、Google は遅延の問題から本番向けではないとしている。ユーザーはこれを承知で選んだ。問題が出たら、外部アプリケーション ロードバランサ（サーバーレス NEG）に乗り換える。配信の形は同じなので、アプリのコードは変わらない。
 - Cloud Run が0台のときは、最初の画面の表示も API の起動を待つ（数秒。7.3）。最小の台数は ADR-007 のまま（0台）で、遅く感じたら ADR-007 の手順で1台にする。
 - CDN を通さないので、静的ファイルも asia-southeast1 から返る（利用者はフィリピンにいるので遅れは小さい）。静的ファイルのリクエストも Cloud Run の無料枠に数えられる。2回目からはブラウザと Service Worker のキャッシュから出る（ADR-031）。
+- 圧縮はリクエストの中で同期で行うので、新しいインスタンスで各ファイルが最初に求められたときだけ、その分（いちばん大きいチャンクで手元で約 25 ms）応答が遅れ、その間ほかのリクエストも待つ。ビルドの時に圧縮したファイルを作る案（`build-web` に手順とスクリプトが増え、Brotli の最高の品質でも1割ほどしか小さくならない）と、起動の時にすべて圧縮する案（0台からの起動が延びる。7.3）は採らなかった。
 - Cloud Run の URL（`*.run.app`）も公開のまま残る。ドメインの外から呼ばれても、認証・認可・回数制限は同じにかかり、ログインの Cookie は `{DOMAIN}` にしか送られない。
 
 ### ADR-005: API は ElysiaJS（Bun）（ユーザー指定）
@@ -395,7 +398,7 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 
 **状態・日付:** 採用（2026-10-01。2026-10-11 に、M9 でログインし直したときはキャッシュを残すと変えた）
 
-**決定:** Redis などのサーバー側のキャッシュは置かない。クライアントは TanStack Query でデータを持ち（画面の移動ではキャッシュを先に出し、裏で取り直す。保存したら関係するキーを無効にする。ログインの画面へ移るとき（401 で M9 を開かないときと、M9 から移るとき）、ログアウト、ログイン・新規登録・パスワードの再設定で別のセッションに入ったときは、キャッシュをすべて捨てる。キャッシュは1人の利用者のデータなので、次の人に見せない。M9 で同じアカウントにログインし直したときは残す（8.2。2026-10-11 に変えた））、API の応答は `Cache-Control: no-store`（個人のデータのため）。静的アセットは、ファイル名にハッシュを付けて長期キャッシュの見出しで返し（ADR-004）、ブラウザと Service Worker（ADR-031）が持つ。Better Auth の回数制限は DB に記録する。
+**決定:** Redis などのサーバー側のキャッシュは置かない。クライアントは TanStack Query でデータを持ち（画面の移動ではキャッシュを先に出し、裏で取り直す。一覧をいつ取り直すかは 7.3「クライアントのデータ」。保存したら関係するキーを無効にする。ログインの画面へ移るとき（401 で M9 を開かないときと、M9 から移るとき）、ログアウト、ログイン・新規登録・パスワードの再設定で別のセッションに入ったときは、キャッシュをすべて捨てる。キャッシュは1人の利用者のデータなので、次の人に見せない。M9 で同じアカウントにログインし直したときは残す（8.2。2026-10-11 に変えた））、API の応答は `Cache-Control: no-store`（個人のデータのため）。静的アセットは、ファイル名にハッシュを付けて長期キャッシュの見出しで返し（ADR-004）、ブラウザと Service Worker（ADR-031）が持つ。Better Auth の回数制限は DB に記録する。
 
 **理由:** 利用者は BCDX の数人で、データ量も小さい。複数人が同じアイデアを編集するので、サーバー側のキャッシュは古い内容を見せる危険の方が大きい。重く見える計算（損益分岐・確認項目）は純粋関数で一瞬で終わる。
 
@@ -2482,10 +2485,10 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目の保存（V3・V14・V16 など） | p95 300ms 以内（コールドスタートを除く） | 1項目＋変更履歴の1トランザクション。クライアントは表示を先に変え（楽観的更新）、design-spec 6.0.2 の保存のタイミングで送る |
 | ハブの画面（V1・P2・D1） | p95 800ms 以内 | 検証1件分のデータを決まった数のクエリでまとめて読み（N+1 をしない）、`packages/domain` でメモリ上で計算する。アイデアの一覧は検証ごとのデータを `IN (...)` でまとめて読む。一覧はページに分ける（I1 は50件） |
 | 0台からの最初の応答 | 5秒以内（Cloud Run の起動＋Neon の起動） | Bun で起動を速くし、Cloud Run の起動時の CPU ブーストを有効にする。死活確認（Z1）は DB に触れない |
-| Web の最初の表示 | 4G のミドルクラスのスマホで LCP 2.5秒以内（Cloud Run が0台のときは、上の「0台からの最初の応答」の分を足す） | ランディングはプリレンダー。アプリはルートごとにコードを分割し、静的アセットはハッシュ付きのファイル名で長期キャッシュ（ADR-004）。2回目からは Service Worker のキャッシュから画面の外側を出す（ADR-031） |
+| Web の最初の表示 | 4G のミドルクラスのスマホで LCP 2.5秒以内（Cloud Run が0台のときは、上の「0台からの最初の応答」の分を足す） | ランディングはプリレンダー。アプリはルートごとにコードを分割し、テキストのファイルは圧縮して返し、静的アセットはハッシュ付きのファイル名で長期キャッシュ（ADR-004）。2回目からは Service Worker のキャッシュから画面の外側を出す（ADR-031） |
 | PDF の作成（P13） | 5秒以内（14枚） | react-pdf をサーバーで実行。フォントは起動時に読み込んでおく |
 | DB の接続 | Neon のプールの上限を超えない | postgres.js のプールはインスタンスごとに最大5。Cloud Run は最大3台なので最大15接続 |
-| クライアントのデータ | 画面の移動を速くする | TanStack Query。一覧は `staleTime` 30秒、編集中の画面は保存の応答で該当のキャッシュだけを更新する。通知の未読数は60秒ごと |
+| クライアントのデータ | 画面の移動を速くする | TanStack Query。一覧（5・6・7・8・12 の一覧、13 のアーカイブ済みのプラン、26・28）は `staleTime` 30秒（読んでから30秒のうちは、画面に戻ってもウィンドウに戻っても取り直さない）。このページから API への GET 以外のリクエストが通ったら（保存を含む）、読んでいる途中の一覧の読み込みを捨て、すべての一覧を古いものにし、画面にある一覧はすぐ取り直す（自分の変更は次に見る一覧に出る）。ほかの人の変更は、自分の変更の後か、読んでから30秒を過ぎて画面かウィンドウに戻ったときに出る。編集中の画面（9 のメンバーと招待、14・15・16・17・22 のような、並べたものをその場で直す画面を含む）は保存の応答で該当のキャッシュだけを更新する。通知の未読数は60秒ごと |
 
 インデックスは 6.3 のスキーマに書いたもの。遅いクエリが見つかったら、Cloud Logging の `latencyMs` とクエリの実行計画で確かめてから足す。
 
@@ -2596,9 +2599,9 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | DB のスキーマとマイグレーション（`packages/db`・`scripts/db-check.ts`） | Bun test ＋ 実際の PostgreSQL（`db-check` は一時的な Git のリポジトリ） | — | 6.3 のコードと `schema.ts` がコメントと整形を除いて同じこと、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB の列・制約・インデックス・列挙が `schema.ts` から作った一時的なテーブルと PostgreSQL の表記で一致すること、`relations()` が外部キーと1対1に対応し、名前が `relations.ts` の先頭に書いた規則に従うこと、テスト用の DB の作り直しが `_test` で終わらない名前とクエリ文字列を拒むこと、`db-check` が2章の失敗の場合をすべて捕まえること |
 | API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること（同じ人が続けて手で直した変更は1件にまとまり、更新の行はすべての欄が元に戻ると消え、追加の行は空に戻っても残ること。ADR-020）、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012）、P12 の数字の列の組み方（`figureColumns`）が PDF の数字の列の位置と同じであること（ADR-012）、上限の件数の素材で Pitch Deck のどのスライドも本文の下端で切れないこと（英語の文と日本語の文、1分版と5分版、計算した指標が 6.14 の大きな表示でも計算できない主要指標の理由の文でも。PDF と同じフォントで測る。design-spec 6.14）、6.14 の範囲の金額と計算した指標で数字が折り返さないことと、範囲の外で 6.14 のとおりに折り返し、折り返しただけでは注意を出さないこと、6.14 が本文に収まるとする金額の外で5分版の Economics が本文の下端で切れて注意を出すこと、公開の前の検査（AD6 の `pitch_deck_overflow`）が、§20 に文章の小項目を足した版と小項目のタイトルを長くした版を、英語の文で溢れる場合も日本語の文だけで溢れる場合も断り、BCDX のプランのテンプレートとシードを通すこと |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作（axe の検査は E2E で行う。ADR-022） |
-| Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |
+| Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上（`apps/web/src` のどのファイルも行 60% 以上。テストの補助・生成したルートの木と、happy-dom で動かせない入口の `client.tsx` と Service Worker の `sw.ts` を除く。この2つは E2E で確かめる。`make coverage`） | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |
 | E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査（主要な画面は design-spec 3章の全画面と 3.8 のモーダル・シート・パネルとし、どれもアプリの画面で少なくとも1回確かめる。規則は WCAG 2.2 の A と AA を使う（axe のタグ `wcag2a`・`wcag2aa`・`wcag21a`・`wcag21aa`・`wcag22aa`）。ライトとダークの両方は、次の部品の確認用ページで確かめる）。部品の確認用ページ（`/dev/components`）を3つの幅・ライトとダーク・2つのスケールで開き、design-spec 4.5 の部品が描かれ、横にスクロールせず、自前の書体（woff2）が読まれ、axe の検査が通ること。Popover とトレイが幅で切り替わること。happy-dom では確かめられない部品のキーボード操作（`packages/ui-web/README.md`） |
-| PWA と配信（`apps/web`・`apps/api`） | Playwright（Chromium。`make build-web` の結果を `WEB_DIST_DIR` で渡した API に対して。2章「環境変数」）と Bun test（API の静的ファイルの配信） | — | マニフェストの中身（ADR-031）、Service Worker が `/api/*` をキャッシュしないこと、新しい版の再読み込みの表示、iPhone の追加の案内が iPhone の Safari のときだけ出ること（User-Agent を変えて確かめる）、CDP の `Page.getInstallabilityErrors` が空であること。API が返すもの: 画面のパスに `_shell.html`、見つからないファイルに 404、ADR-004 と ADR-031 の Content-Type とキャッシュの見出し、7.2 のセキュリティヘッダー、HTML の meta 要素の値、`X-Forwarded-For` の左側を偽っても回数制限を逃れられないこと |
+| PWA と配信（`apps/web`・`apps/api`） | Playwright（Chromium。`make build-web` の結果を `WEB_DIST_DIR` で渡した API に対して。2章「環境変数」）と Bun test（API の静的ファイルの配信） | — | マニフェストの中身（ADR-031）、Service Worker が `/api/*` をキャッシュしないこと、新しい版の再読み込みの表示、iPhone の追加の案内が iPhone の Safari のときだけ出ること（User-Agent を変えて確かめる）、CDP の `Page.getInstallabilityErrors` が空であること。API が返すもの: 画面のパスに `_shell.html`、見つからないファイルに 404、ADR-004 と ADR-031 の Content-Type とキャッシュの見出し、テキストの圧縮（`Accept-Encoding` による Brotli と gzip の選び方・`Vary`・画像とフォントはそのまま）、7.2 のセキュリティヘッダー、HTML の meta 要素の値、`X-Forwarded-For` の左側を偽っても回数制限を逃れられないこと |
 | デザイントークン | Bun test（`make test-domain`）と `make tokens` の検査 | — | エイリアスの参照先が実在すること・循環しないこと・`semantic` がエイリアスだけであること、意味色のコントラスト（WCAG AA。検査の対象に無い色の組が増えたら失敗）、生成物が 06 と一致すること、Web のテーマが vanilla-extract でコンパイルできること、`packages/ui-tokens/src/types.ts` の値が 06 と合っていること |
 
 CI（GitHub Actions）が PR ごとに動かすターゲットは 04_deployment-procedure.md 2章（`ci.yml`）が正。`main` への取り込みは、すべて通ったときだけ。

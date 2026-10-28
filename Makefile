@@ -52,7 +52,7 @@ require-project = $(if $(GCP_PROJECT_ID),,$(error No Google Cloud project: run g
 require-env = $(if $(and $(filter 1,$(words $(ENV))),$(filter $(1),$(ENV))),,$(error ENV must be one of: $(1)))
 
 .PHONY: install setup dev dev-api dev-web build build-web build-api-image \
-	test test-domain test-api test-web test-e2e lint format typecheck \
+	test test-domain test-api test-web test-e2e coverage lint format typecheck \
 	db-up db-down db-generate db-check db-migrate db-seed db-reset db-studio \
 	tokens openapi kpi doc-lint admin-create infra-plan infra-apply deploy-api \
 	promote promote-check db-backup
@@ -102,12 +102,20 @@ build-api-image:
 test: test-domain test-api test-web
 
 test-domain:
-	bun test --pass-with-no-tests ./packages/domain ./packages/schemas ./packages/i18n \
-		./packages/ui-tokens ./scripts
+	bun test --pass-with-no-tests $(TEST_COVERAGE_FLAGS) ./packages/domain ./packages/schemas \
+		./packages/i18n ./packages/ui-tokens ./scripts
 
 test-api:
 	bun packages/db/src/recreate-test-database.ts
-	bun test --pass-with-no-tests ./apps/api ./packages/db
+	bun test --pass-with-no-tests $(TEST_COVERAGE_FLAGS) ./apps/api ./packages/db
+
+# SDD 10章's coverage targets: the suites above with coverage on, then each layer's own
+# files against its target. The Web's Vitest checks its own (apps/web/vitest.config.ts).
+coverage:
+	$(MAKE) test-domain TEST_COVERAGE_FLAGS="--coverage --coverage-reporter=lcov --coverage-dir=coverage/domain"
+	$(MAKE) test-api TEST_COVERAGE_FLAGS="--coverage --coverage-reporter=lcov --coverage-dir=coverage/api"
+	cd apps/web && $(BUNX) vitest run --coverage
+	bun scripts/coverage-check.ts
 
 test-web:
 	cd apps/web && $(BUNX) vitest run --passWithNoTests

@@ -81,7 +81,7 @@ Claude Code で実装するときの決まり（2026-10-12 のユーザーの決
 
 - 仕様を弱める変更は、エージェントが自分で決めない。無人ループ（`/draft:implement loop`）でも同じ。機能・検査・制約・文言を減らす・緩める変更と、docs の記述を実装に合わせて弱める書き換えがこれにあたる。エージェントは手を止めて、弱める点・理由・選択肢を示す（無人ループではそのステップを `blocked` にする）。弱めずに直せる docs の欠けや食い違いは、`/draft:implement` の決まりどおりに扱う。ステップを分けて残りを新しいステップに書き出すのは、弱める変更にあたらない
 - エージェントが docs に書かれていない細部を決めたら、完了報告とコミットの本文に、決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所をすべて書く。自分で決めてよいのは、画面と API の外から見える振る舞い（応答・状態・権限・文言の意味）を変えない細部だけ。変えるものは設計の不備として扱う
-- 手元の Docker の DB（`moonx`・`moonx_test`）を消す make ターゲット（`db-seed`・`db-reset`、`test-api`・`test-e2e` のテスト用の DB の作り直しと、それらを呼ぶ `setup`・`test`）は、確認なしで動かしてよい。ほかの破壊的な操作は、実行の前にユーザーの確認を取る
+- 手元の Docker の DB（`moonx`・`moonx_test`）を消す make ターゲット（`db-seed`・`db-reset`、`test-api`・`test-e2e` のテスト用の DB の作り直しと、それらを呼ぶ `setup`・`test`・`coverage`）は、確認なしで動かしてよい。ほかの破壊的な操作は、実行の前にユーザーの確認を取る
 
 ---
 
@@ -515,6 +515,7 @@ make test-domain
 make test-api
 make test-web
 make test-e2e
+make coverage
 
 make lint
 make format
@@ -525,7 +526,9 @@ make typecheck
 
 PWA の検査（`e2e/pwa.spec.ts`）は、`make test-e2e` が先に動かす `make build-web SHA=dev` の結果を、もう1つの API（ポート 3200）が `WEB_DIST_DIR` で返す形で行う。テストが `sw.js` を書き換えて新しい版を作るので、この API が返すのはビルドを `.data/e2e/web` に写したもの。この API のログは `.data/e2e/api-pwa.log`。
 
-各ターゲットが何を動かすかは [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)、テスト用の DB（`DATABASE_URL_TEST`）は SDD 2章「環境変数」、ツールの選定は ADR-022、テストの方針は SDD 10章。PR では CI が同じターゲットを動かす（04 2章）。
+カバレッジ（SDD 10章の目標）は `make coverage` で測る（`make test` は測らない）。目標に届かない層と、どのテストも読み込まないファイルを出して失敗する。テスト用の DB を作り直すのは `make test-api` と同じ。結果は `coverage/`（`.gitignore` で外してある）。
+
+各ターゲットが何を動かすかは [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)、テスト用の DB（`DATABASE_URL_TEST`）は SDD 2章「環境変数」、ツールの選定は ADR-022、テストの方針は SDD 10章。PR では CI が同じターゲットを動かす（`coverage` を除く。04 2章）。
 
 ---
 

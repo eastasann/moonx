@@ -633,6 +633,9 @@ test.describe("15 Competitors on a desktop", () => {
     signIn,
     account,
   }) => {
+    // Its two axe checks each wait about 7 s for React Aria's announcements to clear, and
+    // the whole flow reaches the default 30 s.
+    test.slow();
     const { workspace, idea } = await ownIdea(page, signIn, account);
     await page.goto(`/w/${workspace.id}/ideas/${idea.id}`);
     await block(page, "Sections")

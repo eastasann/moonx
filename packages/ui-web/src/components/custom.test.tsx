@@ -896,7 +896,7 @@ describe("QuestionCard", () => {
 });
 
 describe("DiffText", () => {
-  test("before strikes out what was removed, after underlines what was added", () => {
+  test("before strikes out what was removed, after underlines what was added", async () => {
     render(
       <>
         <DiffText
@@ -911,6 +911,12 @@ describe("DiffText", () => {
         />
       </>,
     );
+    // The marks come in a later task when this one's diff budget is spent (a slow or
+    // busy machine): they are waited for, as the long rewrite's below.
+    await waitFor(() => {
+      expect(document.querySelector("del")).not.toBeNull();
+      expect(document.querySelector("ins")).not.toBeNull();
+    });
     const removed = [...document.querySelectorAll("del")].map(
       (node) => node.textContent,
     );

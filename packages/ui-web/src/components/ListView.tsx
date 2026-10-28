@@ -35,6 +35,12 @@ export interface ListViewProps<T extends object> {
   /** Shown in place of the items when there are none. */
   renderEmptyState?: () => ReactNode;
   /**
+   * A heading over the rows, set in from the edge as they are (22's launch phases and KPI
+   * Areas, design-spec 6.13): in pattern D's pane, at the pane's padding. The list still
+   * takes its own name (`aria-label`).
+   */
+  title?: string;
+  /**
    * `selection` keeps the rows that cannot be chosen (`isDisabled`) in the arrow keys'
    * way, to be read (12's "Not shared"); `all` skips them.
    * @default "all"
@@ -62,10 +68,33 @@ export function ListView<T extends object>({
   selectionMode = "none",
   onSelectionChange,
   renderEmptyState,
+  title,
   ...props
 }: ListViewProps<T>) {
   const isCard = layout === "cards";
   const inPane = useContext(ListPaneContext);
+  // The inset of the rows (padX), for the title as well.
+  const insets = `${styles.density[density]}${inPane ? ` ${styles.inPane}` : ""}`;
+  const list = (
+    <GridList
+      {...props}
+      selectionMode={selectionMode}
+      onSelectionChange={
+        onSelectionChange
+          ? (selection: Selection) =>
+              onSelectionChange(
+                selection === "all" ? new Set() : new Set(selection),
+              )
+          : undefined
+      }
+      renderEmptyState={
+        renderEmptyState
+          ? () => <div className={styles.empty}>{renderEmptyState()}</div>
+          : undefined
+      }
+      className={`${styles.list({ isCard })} ${insets}`}
+    />
+  );
   return (
     <ItemContext.Provider
       value={{
@@ -73,26 +102,14 @@ export function ListView<T extends object>({
         isCard,
       }}
     >
-      <GridList
-        {...props}
-        selectionMode={selectionMode}
-        onSelectionChange={
-          onSelectionChange
-            ? (selection: Selection) =>
-                onSelectionChange(
-                  selection === "all" ? new Set() : new Set(selection),
-                )
-            : undefined
-        }
-        renderEmptyState={
-          renderEmptyState
-            ? () => <div className={styles.empty}>{renderEmptyState()}</div>
-            : undefined
-        }
-        className={`${styles.list({ isCard })} ${styles.density[density]}${
-          inPane ? ` ${styles.inPane}` : ""
-        }`}
-      />
+      {title === undefined ? (
+        list
+      ) : (
+        <div className={`${styles.titled} ${insets}`}>
+          <div className={styles.title}>{title}</div>
+          {list}
+        </div>
+      )}
     </ItemContext.Provider>
   );
 }

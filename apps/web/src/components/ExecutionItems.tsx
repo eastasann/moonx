@@ -29,6 +29,7 @@ import {
   DescriptionListItem,
   Dialog,
   Flex,
+  Link,
   ListView,
   ListViewItem,
   MenuItem,
@@ -696,8 +697,8 @@ export function NewExecutionItem({
   type: ExecutionType;
   /** The item is made: put it in the screen's data, even once the form is closed. */
   onMade: (item: ExecutionItem) => void;
-  /** The item is made while the form is open: close it. */
-  onCreated: () => void;
+  /** The item is made while the form is open: close it (22 shows the item). */
+  onCreated: (item: ExecutionItem) => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation(["plans", "errors"]);
@@ -760,7 +761,7 @@ export function NewExecutionItem({
           create.mutate(createBody(type, values, assignee), {
             // Fires only while the form is still open: Cancel meanwhile keeps the user
             // where they went (the item is made all the same).
-            onSuccess: () => latestOnCreated.current(),
+            onSuccess: (item) => latestOnCreated.current(item),
             onSettled: () => resolve(),
           });
         }),
@@ -951,16 +952,19 @@ export function ExecutionRowContent({ item }: { item: ExecutionItem }) {
 }
 
 /**
- * A row's ⋯ (6.0.4・6.0.5): Comments (with their count) and History for everyone, Delete
- * for who can change the plan (asked first, by the caller).
+ * A row's ⋯ (6.0.4・6.0.5): Comments (with their count) and History for everyone, Reorder
+ * (22's, 6.13) and Delete for who can change the plan (asked first, by the caller).
  */
 export function ExecutionItemMenu({
   item,
   canEdit,
+  onReorder,
   onDelete,
 }: {
   item: ExecutionItem;
   canEdit: boolean;
+  /** Opens 6.10's Reorder dialog on the row's list: none where its type is not ordered. */
+  onReorder?: () => void;
   onDelete: () => void;
 }) {
   const { t } = useTranslation(["plans", "panels"]);
@@ -978,6 +982,7 @@ export function ExecutionItemMenu({
       onAction={(key) => {
         if (key === "comments") panel.show("comments", target);
         if (key === "history") panel.show("history", target);
+        if (key === "reorder") onReorder?.();
         if (key === "delete") onDelete();
       }}
     >
@@ -989,6 +994,9 @@ export function ExecutionItemMenu({
           : t("panels:comments.menu")}
       </MenuItem>
       <MenuItem id="history">{t("panels:history.menu")}</MenuItem>
+      {canEdit && onReorder !== undefined && (
+        <MenuItem id="reorder">{t("plans:execution.reorder")}</MenuItem>
+      )}
       {canEdit && (
         <MenuItem id="delete">{t("plans:execution.delete")}</MenuItem>
       )}
@@ -1043,7 +1051,7 @@ export function useDeleteExecutionItem(
  * phases, KPIs under their Areas, Next Actions by their due date (P9's order), each row
  * an {@link ExecutionRowContent} with its {@link ExecutionItemMenu}; pressing a row opens
  * it in a Dialog. "+ Add" under the list, and "Nothing yet" while it has none (6.12
- * 「21 の状態」).
+ * 「21 の状態」); "Open in Execution" to 22's tab of the type.
  */
 export function ExecutionList({
   planId,
@@ -1052,6 +1060,7 @@ export function ExecutionList({
   cache,
   canEdit,
   onSaved,
+  executionHref,
 }: {
   planId: string;
   type: ExecutionType;
@@ -1061,6 +1070,8 @@ export function ExecutionList({
   canEdit: boolean;
   /** An item was made, changed or deleted: what counts the items reads again. */
   onSaved: () => void;
+  /** 22 on the type's tab (6.12「Open in Execution」). */
+  executionHref: string;
 }) {
   const { t } = useTranslation(["plans", "common", "app"]);
   const isOnline = useIsOnline();
@@ -1083,43 +1094,38 @@ export function ExecutionList({
         </Text>
       ) : (
         groups.map((group) => (
-          <Stack key={group.id} gap="space-75">
-            {group.title !== null && (
-              <Text variant="label" tone="secondary">
-                {group.title}
-              </Text>
+          <ListView
+            key={group.id}
+            aria-label={
+              group.title === null
+                ? listName
+                : `${listName}${t("app:separator")}${group.title}`
+            }
+            title={group.title ?? undefined}
+            items={group.items}
+            dependencies={[canEdit, isOnline]}
+            onAction={(key) => setOpenId(String(key))}
+          >
+            {(item) => (
+              <ListViewItem
+                id={item.id}
+                textValue={item.title}
+                actions={
+                  <ExecutionItemMenu
+                    item={item}
+                    canEdit={canEdit}
+                    onDelete={() => deletion.ask(item)}
+                  />
+                }
+              >
+                <ExecutionRowContent item={item} />
+              </ListViewItem>
             )}
-            <ListView
-              aria-label={
-                group.title === null
-                  ? listName
-                  : `${listName}${t("app:separator")}${group.title}`
-              }
-              items={group.items}
-              dependencies={[canEdit, isOnline]}
-              onAction={(key) => setOpenId(String(key))}
-            >
-              {(item) => (
-                <ListViewItem
-                  id={item.id}
-                  textValue={item.title}
-                  actions={
-                    <ExecutionItemMenu
-                      item={item}
-                      canEdit={canEdit}
-                      onDelete={() => deletion.ask(item)}
-                    />
-                  }
-                >
-                  <ExecutionRowContent item={item} />
-                </ListViewItem>
-              )}
-            </ListView>
-          </Stack>
+          </ListView>
         ))
       )}
-      {canEdit && (
-        <Flex>
+      <Flex alignItems="center" columnGap="space-300" wrap>
+        {canEdit && (
           <Button
             variant="secondary"
             isQuiet
@@ -1131,8 +1137,9 @@ export function ExecutionList({
             <Plus />
             {t("plans:execution.add")}
           </Button>
-        </Flex>
-      )}
+        )}
+        <Link href={executionHref}>{t("plans:execution.openInExecution")}</Link>
+      </Flex>
       {open !== undefined && (
         <Dialog
           isOpen

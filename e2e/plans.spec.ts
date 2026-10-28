@@ -36,7 +36,7 @@ const desktop = { viewport: { width: 1440, height: 900 } };
 const block = (page: Page, name: string) =>
   page.getByRole("region", { name, exact: true });
 
-/** Presses a Radio by its row: React Aria's input is hidden under the card. */
+/** Presses a Radio or Switch by its label: React Aria's input is hidden under it. */
 const press = (control: ReturnType<Page["getByRole"]>) =>
   control.locator("xpath=ancestor::label[1]").click();
 
@@ -722,5 +722,236 @@ test.describe("21 on a phone", () => {
     await expect(table).toContainText("Ana");
     await expect(table).toContainText("40%");
     await expect(page.getByText("Total ownership: 40%")).toBeVisible();
+  });
+});
+
+/** Waits for the save of an execution item (P10 PATCH). */
+const itemSaved = (page: Page) =>
+  page.waitForResponse(
+    (response) =>
+      response.request().method() === "PATCH" &&
+      /\/api\/v1\/execution-items\/[\w-]+$/.test(response.url()) &&
+      response.ok(),
+  );
+
+/** `days` from today as 22's Deadline takes it typed: month, day, year (en-PH). */
+const typedDate = (days: number) => {
+  const date = new Date(Date.now() + days * 86_400_000);
+  return [
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+    String(date.getUTCFullYear()),
+  ].join("");
+};
+
+test.describe("22 on a desktop", () => {
+  test.use(desktop);
+
+  test("from 20: milestones reordered, a next action added and its deadline and status changed; 21 and 5's Due soon open it", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea, planId } = await ownPlan(page, signIn, account);
+    const plan = `/w/${workspace.id}/ideas/${idea.id}/plans/${planId}`;
+    await page.goto(plan);
+    await block(page, "Execution")
+      .getByRole("link", { name: "Open Execution" })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/plans/${planId}/execution$`));
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Execution" }),
+    ).toBeVisible();
+    await expect(page).toHaveTitle(
+      `Execution · Plan A · ${workspace.name} · moonx`,
+    );
+    // The template's six milestones, the first beside them (6.13, 4.1 D).
+    const milestones = page.getByRole("grid", { name: "Milestones" });
+    await expect(milestones.getByRole("row")).toHaveCount(6);
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Business decision" }),
+    ).toBeVisible();
+    await expectNoAxeViolations(page);
+
+    // Reorder from a row's ⋯ (6.10's dialog, P11).
+    await milestones
+      .getByRole("button", { name: "More for Legal / company setup" })
+      .click();
+    await page.getByRole("menuitem", { name: "Reorder" }).click();
+    const reorder = page.getByRole("dialog", { name: "Reorder milestones" });
+    await reorder
+      .getByRole("button", { name: "Move Legal / company setup up" })
+      .click();
+    const ordered = page.waitForResponse(
+      (response) =>
+        response.request().method() === "PUT" &&
+        response.url().endsWith(`/plans/${planId}/execution-items/order`) &&
+        response.status() === 204,
+    );
+    await reorder.getByRole("button", { name: "Save order" }).click();
+    await ordered;
+    await expect(reorder).toBeHidden();
+    await expect(milestones.getByRole("row").first()).toContainText(
+      "Legal / company setup",
+    );
+
+    // Launch steps under their phases.
+    await page.getByRole("tab", { name: "Launch" }).click();
+    await expect(
+      page.getByRole("grid", { name: "Launch · Launch day" }),
+    ).toBeVisible();
+
+    // Next Actions: empty, then one added and shown beside the list.
+    await page.getByRole("tab", { name: "Next Actions" }).click();
+    await expect(page).toHaveURL(/\/execution\?tab=actions$/);
+    await expect(
+      page.getByRole("heading", {
+        level: 2,
+        name: "List what to do next, with who does it and by when.",
+      }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Add next action" }).first().click();
+    const added = page.getByRole("dialog", { name: "New next action" });
+    await expect(added.getByRole("button", { name: "Add" })).toBeDisabled();
+    await added
+      .getByRole("textbox", { name: /Action/ })
+      .fill("Call the supplier");
+    await added.getByRole("button", { name: "Add" }).click();
+    await expect(added).toBeHidden();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Call the supplier" }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/execution\?tab=actions&item=[\w-]+$/);
+
+    // Its deadline and status, saved as they change (P10).
+    let saved = itemSaved(page);
+    await page
+      .getByRole("group", { name: "Deadline" })
+      .getByRole("spinbutton")
+      .first()
+      .click();
+    await page.keyboard.type(typedDate(3));
+    await saved;
+    saved = itemSaved(page);
+    // The detail's Status, after the list's filter of the same name.
+    await page
+      .getByRole("button", { name: /Status/ })
+      .last()
+      .click();
+    await page.getByRole("option", { name: "Doing" }).click();
+    await saved;
+    const actions = page.getByRole("grid", { name: "Next Actions" });
+    await expect(actions.getByRole("row")).toContainText("Doing");
+    await expectNoAxeViolations(page);
+
+    // Filtered to Done, nothing is left; Clear filters brings it back.
+    await page
+      .getByRole("tabpanel")
+      .getByRole("button", { name: /Status/ })
+      .click();
+    await page.getByRole("option", { name: "Done" }).click();
+    await expect(page).toHaveURL(/status=done/);
+    await expect(
+      page.getByRole("heading", {
+        level: 2,
+        name: "Nothing matches these filters",
+      }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Clear filters" }).click();
+    await expect(actions.getByRole("row")).toHaveCount(1);
+
+    // The header's 🕘 lists its changes (SDD 6.3 `execution`).
+    await page.getByRole("button", { name: "History", exact: true }).click();
+    const history = page.getByRole("complementary", { name: "History" });
+    await expect(
+      history.getByText("Execution · Call the supplier").first(),
+    ).toBeVisible();
+    await history.getByRole("button", { name: "Close" }).click();
+    await expect(history).toBeHidden();
+
+    // 21's §29 opens 22 on its tab (6.12「Open in Execution」).
+    await page.goto(`${plan}/items/29`);
+    await page.getByRole("link", { name: "Open in Execution" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/plans/${planId}/execution\\?tab=actions$`),
+    );
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Call the supplier" }),
+    ).toBeVisible();
+
+    // 5's Due soon opens the item on 22 (6.9).
+    await page.goto(`/w/${workspace.id}`);
+    await block(page, "Due soon")
+      .getByRole("link", { name: /Call the supplier/ })
+      .click();
+    await expect(page).toHaveURL(
+      new RegExp(`/plans/${planId}/execution\\?tab=actions&item=[\\w-]+$`),
+    );
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Call the supplier" }),
+    ).toBeVisible();
+  });
+});
+
+test.describe("22 for a Viewer", () => {
+  test.use(desktop);
+
+  test("Piaya's Plan A read only: the fields as text, no + Add, the overdue action", async ({
+    page,
+    signIn,
+  }) => {
+    const me = await signIn(demo.viewer);
+    const { bcdx, piaya, planA } = await piayaPlanA(page, me);
+    await page.goto(
+      `/w/${bcdx.id}/ideas/${piaya.id}/plans/${planA.id}/execution`,
+    );
+    await expect(
+      page.getByRole("grid", { name: "Milestones" }).getByRole("row").first(),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Add / })).toHaveCount(0);
+    await expect(page.getByRole("textbox")).toHaveCount(0);
+    await page.getByRole("tab", { name: "Next Actions" }).click();
+    await press(page.getByRole("switch", { name: "Overdue only" }));
+    await expect(
+      page.getByRole("grid", { name: "Next Actions" }).getByRole("row"),
+    ).toHaveCount(1);
+    await expect(
+      page.getByRole("grid", { name: "Next Actions" }).getByText("Overdue"),
+    ).toBeVisible();
+    await expectNoAxeViolations(page);
+  });
+});
+
+test.describe("22 on a phone", () => {
+  test.use(phone);
+
+  test("the list, then an item on its own with Edit in a sheet; ← back to the list", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea, planId } = await ownPlan(page, signIn, account);
+    await page.goto(
+      `/w/${workspace.id}/ideas/${idea.id}/plans/${planId}/execution`,
+    );
+    const milestones = page.getByRole("grid", { name: "Milestones" });
+    await expect(milestones.getByRole("row")).toHaveCount(6);
+    // Nothing beside the list on a phone.
+    await expect(page.getByRole("heading", { level: 2 })).toHaveCount(0);
+    await milestones.getByRole("row", { name: /Team readiness/ }).click();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Team readiness" }),
+    ).toBeVisible();
+    await expect(milestones).toBeHidden();
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Edit milestone" });
+    const saved = itemSaved(page);
+    await sheet.getByRole("textbox", { name: "Goal" }).fill("Two cooks hired.");
+    await saved;
+    await expectNoAxeViolations(page);
+    await sheet.getByRole("button", { name: "Close" }).click();
+    await expect(page.getByText("Two cooks hired.")).toBeVisible();
+    await page.goBack();
+    await expect(milestones).toBeVisible();
   });
 });

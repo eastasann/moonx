@@ -46,6 +46,18 @@ describe("Flex", () => {
     );
   });
 
+  test("shrink={false} adds a class: a group of buttons keeps its width", () => {
+    render(
+      <>
+        <Flex id="shrinks" />
+        <Flex id="keeps" shrink={false} />
+      </>,
+    );
+    const [shrinks, keeps] = [byId("shrinks"), byId("keeps")];
+    for (const name of classOf(shrinks)) expect(classOf(keeps)).toContain(name);
+    expect(classOf(keeps).length).toBe(classOf(shrinks).length + 1);
+  });
+
   test("Stack is a Flex column", () => {
     render(
       <>

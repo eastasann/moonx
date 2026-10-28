@@ -5,6 +5,8 @@ import { desktopUp, tabletUp } from "../styles/helpers";
 
 export const flex = style({ display: "flex", minWidth: 0 });
 
+export const noShrink = style({ flexShrink: 0 });
+
 export const grid = style({ display: "grid", minWidth: 0 });
 
 /**

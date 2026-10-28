@@ -537,6 +537,25 @@ describe("ListView", () => {
     expect(onAction).toHaveBeenCalledWith("b");
   });
 
+  test("a title sits over the rows, outside the grid, which keeps its own name", () => {
+    render(
+      <ListView aria-label="Launch · T−30" title="T−30" items={ideas}>
+        {(idea) => (
+          <ListViewItem id={idea.id} textValue={idea.name}>
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+    );
+    const grid = screen.getByRole("grid", { name: "Launch · T−30" });
+    const title = screen.getByText("T−30");
+    expect(grid.contains(title)).toBe(false);
+    expect(
+      title.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(grid).getAllByRole("row")).toHaveLength(2);
+  });
+
   test("rows that act one by one: only those with their own action press and end in ›", async () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();

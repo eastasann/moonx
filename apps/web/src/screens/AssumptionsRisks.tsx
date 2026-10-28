@@ -421,7 +421,7 @@ function RowDetail({
     <Stack gap="space-400">
       <Flex justifyContent="space-between" alignItems="start" gap="space-200">
         <Heading level={2}>{row.statement}</Heading>
-        <Flex gap="space-50" alignItems="center">
+        <Flex gap="space-50" alignItems="center" shrink={false}>
           <ItemCommentsButton
             label={rowLabel(type, row.statement)}
             count={row.commentCount}

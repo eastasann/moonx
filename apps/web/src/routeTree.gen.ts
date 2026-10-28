@@ -41,6 +41,7 @@ import { Route as SignedInWWorkspaceIdIdeasIdeaIdEconomicsRouteImport } from './
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdResearchRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/research'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/questions.$sectionKey'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/index'
+import { Route as SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
 import { Route as SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRouteImport } from './routes/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/items.$itemNo'
 
 const IndexRoute = IndexRouteImport.update({
@@ -223,6 +224,12 @@ const SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute =
     path: '/ideas/$ideaId/plans/$planId/',
     getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
   } as any)
+const SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute =
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRouteImport.update({
+    id: '/ideas/$ideaId/plans/$planId/execution',
+    path: '/ideas/$ideaId/plans/$planId/execution',
+    getParentRoute: () => SignedInWWorkspaceIdRouteRoute,
+  } as any)
 const SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute =
   SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRouteImport.update({
     id: '/ideas/$ideaId/plans/$planId/items/$itemNo',
@@ -261,6 +268,7 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId/': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
   '/w/$workspaceId/ideas/$ideaId/plans/$planId/': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
 }
@@ -294,6 +302,7 @@ export interface FileRoutesByTo {
   '/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/w/$workspaceId/ideas/$ideaId': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
   '/w/$workspaceId/ideas/$ideaId/plans/$planId': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
   '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
 }
@@ -330,6 +339,7 @@ export interface FileRoutesById {
   '/_signedIn/w/$workspaceId/ideas/$ideaId/research': typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/': typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey': typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
   '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
 }
@@ -366,6 +376,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId/'
     | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
     | '/w/$workspaceId/ideas/$ideaId/plans/$planId/'
     | '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
   fileRoutesByTo: FileRoutesByTo
@@ -399,6 +410,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/ideas/$ideaId/research'
     | '/w/$workspaceId/ideas/$ideaId'
     | '/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
     | '/w/$workspaceId/ideas/$ideaId/plans/$planId'
     | '/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
   id:
@@ -434,6 +446,7 @@ export interface FileRouteTypes {
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/research'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/questions/$sectionKey'
+    | '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/'
     | '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
   fileRoutesById: FileRoutesById
@@ -674,6 +687,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRouteImport
       parentRoute: typeof SignedInWWorkspaceIdRouteRoute
     }
+    '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/execution': {
+      id: '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+      path: '/ideas/$ideaId/plans/$planId/execution'
+      fullPath: '/w/$workspaceId/ideas/$ideaId/plans/$planId/execution'
+      preLoaderRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRouteImport
+      parentRoute: typeof SignedInWWorkspaceIdRouteRoute
+    }
     '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo': {
       id: '/_signedIn/w/$workspaceId/ideas/$ideaId/plans/$planId/items/$itemNo'
       path: '/ideas/$ideaId/plans/$planId/items/$itemNo'
@@ -702,6 +722,7 @@ interface SignedInWWorkspaceIdRouteRouteChildren {
   SignedInWWorkspaceIdIdeasIdeaIdResearchRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdResearchRoute
   SignedInWWorkspaceIdIdeasIdeaIdIndexRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdIndexRoute
   SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute
+  SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute
   SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute
   SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute: typeof SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute
 }
@@ -736,6 +757,8 @@ const SignedInWWorkspaceIdRouteRouteChildren: SignedInWWorkspaceIdRouteRouteChil
       SignedInWWorkspaceIdIdeasIdeaIdIndexRoute,
     SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute:
       SignedInWWorkspaceIdIdeasIdeaIdQuestionsSectionKeyRoute,
+    SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute:
+      SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdExecutionRoute,
     SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute:
       SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdIndexRoute,
     SignedInWWorkspaceIdIdeasIdeaIdPlansPlanIdItemsItemNoRoute:

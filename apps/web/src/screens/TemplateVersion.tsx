@@ -559,7 +559,7 @@ function NodeDetail({
       <Flex justifyContent="space-between" alignItems="start" gap="space-200">
         {heading}
         {section !== null && (
-          <Flex gap="space-100" alignItems="center">
+          <Flex gap="space-100" alignItems="center" shrink={false}>
             <Button
               variant="secondary"
               size="S"

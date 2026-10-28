@@ -187,6 +187,11 @@ describe("20 Plan home (design-spec 6.12)", () => {
     expect(
       within(execution).getByText("2 items due in the next 7 days"),
     ).toBeTruthy();
+    expect(
+      within(execution)
+        .getByRole("link", { name: "Open Execution" })
+        .getAttribute("href"),
+    ).toBe(planPath("/execution"));
     const partA = screen.getByRole("list", { name: "Part A: Business Case" });
     const summary = within(partA).getAllByRole("listitem")[0];
     expect(summary?.textContent).toContain("1 Executive Summary");

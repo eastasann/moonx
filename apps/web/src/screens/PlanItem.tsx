@@ -84,6 +84,8 @@ import { questionLabel, rowLabel } from "../lib/item-labels";
 import {
   costsHref,
   economicsHref,
+  executionHref,
+  executionTabOf,
   ideaHref,
   ideasHref,
   type PlanItemSearch,
@@ -757,6 +759,9 @@ function ItemForm({
           cache={executionCache}
           canEdit={canEdit}
           onSaved={onSaved}
+          executionHref={executionHref(workspace.id, home.ideaId, home.id, {
+            tab: executionTabOf(question.options.executionType),
+          })}
         />
       );
     }

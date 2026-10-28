@@ -16,6 +16,13 @@ export interface FlexProps extends LayoutDomProps, GapProps {
   wrap?: Responsive<boolean>;
   alignItems?: Responsive<FlexAlign>;
   justifyContent?: Responsive<FlexJustify>;
+  /**
+   * `false` keeps it from getting narrower than its content in a row, which a Flex
+   * otherwise may (so that text in it wraps): a group of buttons beside a title that
+   * wraps (a detail's 💬, 🕘 and ⋯).
+   * @default true
+   */
+  shrink?: boolean;
   children?: ReactNode;
 }
 
@@ -29,18 +36,21 @@ export function Flex({
   columnGap,
   alignItems,
   justifyContent,
+  shrink = true,
   children,
   ...dom
 }: FlexProps) {
-  const className = `${styles.flex} ${sprinkles({
-    flexDirection: direction,
-    flexWrap: mapResponsive(wrap, (value) => (value ? "wrap" : "nowrap")),
-    gap,
-    rowGap,
-    columnGap,
-    alignItems,
-    justifyContent,
-  })}`;
+  const className = `${styles.flex}${shrink ? "" : ` ${styles.noShrink}`} ${sprinkles(
+    {
+      flexDirection: direction,
+      flexWrap: mapResponsive(wrap, (value) => (value ? "wrap" : "nowrap")),
+      gap,
+      rowGap,
+      columnGap,
+      alignItems,
+      justifyContent,
+    },
+  )}`;
   return createElement(elementType, { ...dom, className }, children);
 }
 

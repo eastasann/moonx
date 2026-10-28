@@ -2,6 +2,8 @@ import type {
   CostCategory,
   DecisionLogKind,
   EconomicsField,
+  ExecutionStatus,
+  ExecutionType,
   LinkTarget,
   SourceType,
   SupportsCheck,
@@ -310,6 +312,53 @@ export const planItemHref = (
   return `${planHref(workspaceId, ideaId, planId)}/items/${itemNo}${text === "" ? "" : `?${text}`}`;
 };
 
+/** 22's tabs (SDD 4章 `?tab=`), each the list of an execution type, in 6.13's order. */
+export const EXECUTION_TABS = {
+  milestones: "milestone",
+  launch: "launch",
+  kpis: "kpi",
+  questions: "open_question",
+  actions: "next_action",
+} as const satisfies Record<string, ExecutionType>;
+export type ExecutionTab = keyof typeof EXECUTION_TABS;
+
+/** Whether `tab` names one of 22's tabs. */
+export const isExecutionTab = (tab: unknown): tab is ExecutionTab =>
+  typeof tab === "string" && Object.hasOwn(EXECUTION_TABS, tab);
+
+/** The tab of 22 that lists items of `type`. */
+export const executionTabOf = (type: ExecutionType): ExecutionTab =>
+  (Object.keys(EXECUTION_TABS) as ExecutionTab[]).find(
+    (tab) => EXECUTION_TABS[tab] === type,
+  ) ?? "milestones";
+
+/** What 22's URL may open with (SDD 4章). */
+export interface ExecutionSearch {
+  tab?: ExecutionTab;
+  /** The execution item shown beside the list. */
+  item?: string;
+  /** Next Actions' filter by assignee: `me` or a member's user id. */
+  assignee?: string;
+  /** Next Actions' filter by status. */
+  status?: ExecutionStatus;
+}
+
+/** 22 Execution (SDD 4章). */
+export const executionHref = (
+  workspaceId: string,
+  ideaId: string,
+  planId: string,
+  search: ExecutionSearch = {},
+) => {
+  const query = new URLSearchParams();
+  for (const key of ["tab", "item", "assignee", "status"] as const) {
+    const value = search[key];
+    if (value !== undefined) query.set(key, value);
+  }
+  const text = query.toString();
+  return `${planHref(workspaceId, ideaId, planId)}/execution${text === "" ? "" : `?${text}`}`;
+};
+
 /**
  * Where a section of 13 opens (design-spec 6.1「セクションを開く」): 01, 02 and 10 on
  * 11, 03 on 14, 04 on 15, 05 on 17, 06–08 on 18, 09 on 16.
@@ -328,10 +377,10 @@ export function sectionHref(
   return undefined;
 }
 
-/** The screens whose panels are built: PNL-1 on 10–18, 20 and 21, PNL-2 on 10, 11, 13–18, 20 and 21. */
+/** The screens whose panels are built: PNL-1 on 10–18 and 20–22, PNL-2 on 10, 11, 13–18 and 20–22. */
 const PANEL_SCREENS = {
-  comments: new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21]),
-  history: new Set([10, 11, 13, 14, 15, 16, 17, 18, 20, 21]),
+  comments: new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22]),
+  history: new Set([10, 11, 13, 14, 15, 16, 17, 18, 20, 21, 22]),
 };
 
 /**
@@ -439,6 +488,14 @@ function screenHrefOf(target: LinkTarget): string | undefined {
         ? undefined
         : planItemHref(workspaceId, ideaId, target.planId, target.itemNo, {
             q: target.questionKey,
+          });
+    case 22:
+      // An item's link names it alone: 22 opens the tab of its type.
+      return ideaId === undefined || target.planId === undefined
+        ? undefined
+        : executionHref(workspaceId, ideaId, target.planId, {
+            tab: isExecutionTab(target.tab) ? target.tab : undefined,
+            item: target.rowId,
           });
     default:
       return undefined;

@@ -79,6 +79,7 @@ import { questionLabel, rowLabel } from "../lib/item-labels";
 import {
   decisionsHref,
   economicsHref,
+  executionHref,
   ideaHref,
   ideasHref,
   planHref,
@@ -565,10 +566,11 @@ function VersionsBlock({ home }: { home: PlanHome }) {
 
 /**
  * How many execution items are due within 7 days and overdue (design-spec 6.12, SDD 5.9
- * `execution`), counted from the plan as it is now. 22 opens from here once it is built.
+ * `execution`), counted from the plan as it is now, and the way to 22.
  */
 function ExecutionBlock({ home }: { home: PlanHome }) {
   const { t } = useTranslation(["plans"]);
+  const { workspace } = useWorkspace();
   const { dueSoon, overdue } = home.execution;
   return (
     <HubBlock title={t("plans:home.execution.title")}>
@@ -590,6 +592,11 @@ function ExecutionBlock({ home }: { home: PlanHome }) {
           </>
         )}
       </Stack>
+      <Flex>
+        <Link href={executionHref(workspace.id, home.ideaId, home.id)}>
+          {t("plans:home.execution.open")}
+        </Link>
+      </Flex>
     </HubBlock>
   );
 }

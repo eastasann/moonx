@@ -3,6 +3,7 @@ import {
   assumptionsHref,
   competitorsHref,
   decisionsHref,
+  executionHref,
   hrefOf,
   notificationsHref,
   planHref,
@@ -191,6 +192,47 @@ describe("the routes of the screens the API names (SDD 4章・5.2 LinkTarget)", 
         target: { type: "idea", id: ideaId },
       }),
     ).toBe(`${idea}/plans/${planId}?panel=comments&target=idea%3A${ideaId}`);
+  });
+
+  test("22 on its tab, an item, its filters, and with its panels; 23 not yet", () => {
+    const planId = "2b3c4d5e-0000-4000-8000-000000000001";
+    const rowId = "5e0c0000-0000-4000-8000-000000000001";
+    const userId = "0f8fad5b-d9cb-469f-a165-70867728950f";
+    const execution = `${idea}/plans/${planId}/execution`;
+    expect(
+      executionHref(workspaceId, ideaId, planId, {
+        tab: "actions",
+        assignee: userId,
+        status: "doing",
+      }),
+    ).toBe(`${execution}?tab=actions&assignee=${userId}&status=doing`);
+    // An item's link names it alone: 22 finds its tab.
+    expect(hrefOf({ screen: 22, workspaceId, ideaId, planId, rowId })).toBe(
+      `${execution}?item=${rowId}`,
+    );
+    expect(
+      hrefOf({ screen: 22, workspaceId, ideaId, planId, tab: "kpis", rowId }),
+    ).toBe(`${execution}?tab=kpis&item=${rowId}`);
+    expect(
+      hrefOf({ screen: 22, workspaceId, ideaId, planId, tab: "other" }),
+    ).toBe(execution);
+    expect(hrefOf({ screen: 22, workspaceId, ideaId })).toBeUndefined();
+    for (const panel of ["comments", "history"] as const) {
+      expect(
+        hrefOf({
+          screen: 22,
+          workspaceId,
+          ideaId,
+          planId,
+          rowId,
+          panel,
+          target: { type: "execution_item", id: rowId },
+        }),
+      ).toBe(
+        `${execution}?item=${rowId}&panel=${panel}&target=execution_item%3A${rowId}`,
+      );
+    }
+    expect(hrefOf({ screen: 23, workspaceId, ideaId, planId })).toBeUndefined();
   });
 
   test("13's sections: 01, 02 and 10 on 11, 03 on 14, 04 on 15, 05 on 17, 06–08 on 18, 09 on 16", () => {

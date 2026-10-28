@@ -2159,10 +2159,10 @@ make test-e2e で上の流れが通り、make test-web・make typecheck・make l
 
 ## Step 35: Could: 22 実行管理・23 Pitch Deck・M8 テンプレートの移行
 
-Status:
+Status: done 2026-10-28
 
 ```
-残りの画面を作ってください（PRD 4章の Could）。これで Web の全画面がそろう。
+残りの画面を作ってください（PRD 4章の Could）。これで Web の全画面がそろう（23 は Step 35b、M8 は Step 35c、全遷移の E2E は Step 35d に分けた）。
 
 参照:
 - docs/design-spec.md 6.13（22 実行管理）・6.14（23 Pitch Deck）・6.0.7（M8 テンプレートの移行）・4.1（パターン D・I）
@@ -2177,23 +2177,126 @@ Status:
    22 はパターン D（4.1）なので、同じ部品をリストと詳細のペインに組み、22 にだけあるもの（`?item=` の選択と詳細のペイン、行の ⋯ の並べ替え（6.10 の Dialog）、
    Next Actions の絞り込み）を足す（ExecutionItemMenu に並べ替えの項目を足すなど、部品を広げるのはよい）。21 の「Open in Execution」もつなぐ。
    一覧の横に選ばずに出す項目（先頭）は、パネルで本文が1ペインになっても保つ（design-spec 4.1。Step 33 で 14・16 に入れた apps/web の useKeepShownItem を使う）
-2. 23 Pitch Deck（1分版と5分版・版の表示・PDF の書き出し）
-3. M8 テンプレートの移行（10・13・20 からの入口）
+2. 23 Pitch Deck（1分版と5分版・版の表示・PDF の書き出し）（Step 35b に分けた）
+3. M8 テンプレートの移行（10・13・20 からの入口）（Step 35c に分けた）
 4. 20 からの 22・23 の入口、PNL-1（22・23）と PNL-2（22）をつなぐ。8 の通知と 5 の Recent activity・Due soon から 22・23 へのリンク（コメントはパネルを開いた状態。
-   lib/links.ts の hrefOf と `PANEL_SCREENS` の comments に 22・23、history に 22 を足す）もつなぐ（Step 32 で残したもの）
+   lib/links.ts の hrefOf と `PANEL_SCREENS` の comments に 22・23、history に 22 を足す）もつなぐ（Step 32 で残したもの）（23 の分は Step 35b に分けた）
 5. テスト: Vitest（主要な操作と出し分け）、E2E（実行管理の項目を足して期限と状態を変える、Pitch Deck を開いて PDF を書き出す、
    M8 で新しい版へ移り、引き継げない回答の表示を確かめ、13 の 🕘 の「Template updated to v{n}」の「Undo the whole operation」で移行を戻す（design-spec 6.0.7。
    Step 32b が作った行と戻すボタンを、実際の移行で通す）、Viewer は読み取りだけ。screen_flow.mermaid の全遷移（29・30 を除く）を辿る E2E）
+   （Pitch Deck は Step 35b、M8 は Step 35c、全遷移は Step 35d に分けた）
 
-まだ作らないもの: PWA（Step 36）。
+まだ作らないもの: 23・M8（Step 35b・35c）、PWA（Step 36）。
 
-screen_flow.mermaid の全遷移（29・30 を除く）がたどれ、design-spec 3章の全画面・モーダル・パネル（29・30 を除く。Step 42）が開き、
-make test-e2e・make test-web・make typecheck・make lint が通る状態をゴールとする。
+分けた理由（2026-10-22。Step 35 の無人ループの反復が分けた）: 22（パターン D・5つのタブ・絞り込み・並べ替え・詳細のペイン）、23（パターン I・スライドの4つの型・
+収め方の表示・PDF）、M8（3つの画面の帯・引き継げない回答・移行を戻す）、全遷移の E2E は、それぞれが Step 34 の 20 や Step 34b の 21 と同じくらいの大きさで、
+まとめると1チャットに余裕を持って収まる大きさ（このファイルの冒頭）を超える。22 を先にするのは、Step 34b が 22 の部品を作ってあり、21 の「Open in Execution」と
+5 の Due soon がそこへ移るため。23 と M8 は 22 に依らないので、どちらを先にしてもよい。全遷移の E2E は、全画面がそろってからでないとたどれないので最後にする。
+
+make test-e2e で上の流れ（22 の分）が通り、make test-web・make typecheck・make lint が通る状態をゴールとする（全遷移と全画面が開くことは Step 35d のゴール）。
 
 見た目の確かめ（2026-10-18 のユーザーの決定。design-spec 4.5・docs/mockups/README.md）: 作った画面のうち docs/mockups に画面があるもの（README.md の表）は、
 モックアップと並べて（1440 と 390、スマホは Playwright の hasTouch と isMobile、ライトとダーク）、並び・色・文字の階層・部品の形・文の幅と折り返し・崩れに
 明らかな違いが無いことを確かめる。数 px の余白、0.5〜1px の文字の大きさ、アイコンの 2px、太さの1段の違いは追わない。画面は /dev/components?screen= の見本と
 同じ部品とパターンの組み方で作る。モックアップの無い画面は、同じパターンのモックアップの画面と見た目がそろっていることを確かめる。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 35b: 23 Pitch Deck
+
+Status:
+
+```
+Pitch Deck の画面を作ってください（Step 35 から分けた残り。Step 35 は 22 実行管理を作った）。
+
+参照:
+- docs/design-spec.md 6.14（23 Pitch Deck）・4.1（パターン I と、パネルで本文が狭いときの並び）・4.5（スライドに使う部品）・6.0.4・6.0.6
+- docs/screen_flow.mermaid
+- docs/02-01_system-design-doc.md 4章（`/plans/$planId/pitch` と `?variant=one|five&version=`）・5.9（P12・P13、PitchDeck）・6.3 末尾（画面と節の対応の 23）
+- docs/mockups/s23-deck.html
+
+やること:
+1. 23 Pitch Deck（パターン I）: 1分版 / 5分版の切り替え、生成元の Picker（Latest と保存済みの版）、番号付きのサムネイルの列と今のスライド、スマホ（とパネルで本文が狭い間）の「‹ n / m ›」、
+   話す内容（What to say）、スライドの4つの型（表紙・文章・数字・表。文字の大きさと切り方は API の `shrink`・`overflow`・`figureColumns` のまま出す）、
+   「Too long for this slide. Shorten it in the plan.」、Edit source・Edit in validation（出す条件は 6.14）、Download PDF（P13。「Preparing PDF…」、失敗したら再試行）、
+   ダークモードでもスライドはライトの配色、ローディング（スライドの骨組み）・エラー（6.0.6）
+2. 20 からの 23 の入口（6.12 の [Pitch Deck]。Viewer・アーカイブ中も開ける）、PNL-1（23。スライドの 💬 と、ヘッダーの一覧。画面と節の対応は `pitch` で、変更履歴は無い）、
+   8 の通知と 5 の Recent activity から 23 へのリンク（コメントはパネルを開いた状態。lib/links.ts の hrefOf と `PANEL_SCREENS` の comments に 23 を足す）
+3. テスト: Vitest（型ごとのスライド・切り替え・生成元・リンクの出し分け・PDF の書き出しと失敗）、E2E（20 から Pitch Deck を開き、5分版に切り替え、版を選び、
+   PDF を書き出す。スライドの 💬 でコメントを書く。Viewer は Edit source・Edit in validation が出ない）
+
+まだ作らないもの: M8（Step 35c）。
+
+make test-e2e で上の流れが通り、make test-web・make typecheck・make lint が通る状態をゴールとする。
+
+見た目の確かめ（2026-10-18 のユーザーの決定。design-spec 4.5・docs/mockups/README.md）: s23-deck.html と並べて
+（1440 と 390、スマホは Playwright の hasTouch と isMobile、ライトとダーク）、並び・色・文字の階層・部品の形・文の幅と折り返し・崩れに明らかな違いが無いことを確かめる。
+数 px の余白、0.5〜1px の文字の大きさ、アイコンの 2px、太さの1段の違いは追わない。画面は /dev/components?screen= の見本と同じ部品とパターンの組み方で作る。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 35c: M8 テンプレートの移行
+
+Status:
+
+```
+テンプレートの移行（M8）を作ってください（Step 35 から分けた残り）。
+
+参照:
+- docs/design-spec.md 6.0.7（M8）・6.0.1（ヘッダーの下の帯）・6.0.5（履歴の「Template updated to v{n}」と Undo the whole operation）・3.8・6.11（10）・6.1（13）・6.12（20 の ⋯）
+- docs/screen_flow.mermaid
+- docs/02-01_system-design-doc.md 4章（`?modal=update-template&about=`）・5.12（T1・T2）・5.11（H1・H3）
+
+やること:
+1. M8（新しい版の名前、引き継げない回答の一覧、移行、ほかの人が先に移行していたときの「You're already on the latest template」と閉じるボタン、失敗の表示）
+2. 10・13・20 の帯（「A newer template is available.」と「Update template」。Owner / Member、自己分析は本人だけ。d1-moon.html の .banner）と、20 の ⋯ の M8
+3. テスト: Vitest（帯の出し分け・M8 の一覧と状態）、E2E（運営者が新しい版を公開する → 13 の帯から M8 で新しい版へ移り、引き継げない回答の表示を確かめ、
+   13 の 🕘 の「Template updated to v{n}」の「Undo the whole operation」で移行を戻す（design-spec 6.0.7。Step 32b が作った行と戻すボタンを、実際の移行で通す）。
+   10 と 20 の帯からも M8 が開く。Viewer には帯が出ず、`?modal=update-template` を URL から開いても何も出ない）
+
+make test-e2e で上の流れが通り、make test-web・make typecheck・make lint が通る状態をゴールとする。
+
+見た目の確かめ（2026-10-18 のユーザーの決定。design-spec 4.5・docs/mockups/README.md）: 帯は d1-moon.html の .banner と、M8 は同じ大きさのモーダルのある画面と並べて
+（1440 と 390、スマホは Playwright の hasTouch と isMobile、ライトとダーク）、並び・色・文字の階層・部品の形・文の幅と折り返し・崩れに明らかな違いが無いことを確かめる。
+数 px の余白、0.5〜1px の文字の大きさ、アイコンの 2px、太さの1段の違いは追わない。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 35d: screen_flow.mermaid の全遷移の E2E
+
+Status:
+
+```
+画面遷移図の全遷移をたどる E2E を作ってください（Step 35 から分けた残り。Step 35〜35c で Web の全画面がそろった）。
+
+参照:
+- docs/screen_flow.mermaid
+- docs/design-spec.md 3章（画面一覧）・5章（画面遷移）・6.1（Next steps）・6.9（5 の各ブロックの押した先）・6.15（7 と 8 の押した先）
+- e2e/ の既存のスペック
+
+やること:
+1. screen_flow.mermaid の遷移（29・30 を除く）を1本ずつ、既存の E2E が通しているかと突き合わせ、通していない遷移を E2E に足す。
+   図の注釈で省いた遷移（共通ナビのタブとメニュー、戻る・パンくず、14〜18 と 11 のセクション切替、8 の通知の押した先の各画面）も、注釈の書き方のとおりにたどる
+2. design-spec 3章の全画面・モーダル・パネル（29・30 を除く。Step 42）が開くことを確かめる E2E
+3. たどれない遷移や開かない画面が見つかったら、その場で根本の原因を直す（遷移元に入口が無い、ルートが無い、など）
+
+screen_flow.mermaid の全遷移（29・30 を除く）がたどれ、design-spec 3章の全画面・モーダル・パネル（29・30 を除く）が開き、
+make test-e2e・make test-web・make typecheck・make lint が通る状態をゴールとする。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。

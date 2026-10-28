@@ -46,6 +46,8 @@ import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
 import {
+  executionHref,
+  executionTabOf,
   hrefOf,
   ideaHref,
   ideasHref,
@@ -284,7 +286,12 @@ function DueSoonBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
           ) : (
             <RowList aria-label={t("dashboard:due.title")}>
               {items.map((item) => (
-                <DueRow key={item.id} item={item} timeZone={me.timezone} />
+                <DueRow
+                  key={item.id}
+                  item={item}
+                  workspaceId={workspaceId}
+                  timeZone={me.timezone}
+                />
               ))}
             </RowList>
           )
@@ -297,9 +304,17 @@ function DueSoonBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
 /**
  * An item of a plan's execution with a deadline (design-spec 6.9): "Yours" when it is
  * the user's, its idea and assignee under it, and its date, or how long it is overdue,
- * in figures at the end. Opening 22 joins when 22 is built.
+ * in figures at the end. It opens on 22, on its tab.
  */
-function DueRow({ item, timeZone }: { item: DueItem; timeZone: string }) {
+function DueRow({
+  item,
+  workspaceId,
+  timeZone,
+}: {
+  item: DueItem;
+  workspaceId: string;
+  timeZone: string;
+}) {
   const { t } = useTranslation(["dashboard", "app"]);
   const overdue = item.overdue
     ? formatOverdue(item.dueDate, { timeZone })
@@ -312,6 +327,10 @@ function DueRow({ item, timeZone }: { item: DueItem; timeZone: string }) {
     );
   return (
     <RowListItem
+      href={executionHref(workspaceId, item.idea.id, item.plan.id, {
+        tab: executionTabOf(item.type),
+        item: item.id,
+      })}
       start={<TaskMark />}
       description={
         <>

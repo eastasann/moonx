@@ -48,6 +48,20 @@ export const inPane = style({
   },
 });
 
+/** A list under its `title` (ListView). */
+export const titled = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: vars.space["75"],
+  minWidth: 0,
+});
+
+/** The title over the rows: a label, set in from the edge as the rows are. */
+export const title = style([
+  typography("label"),
+  { color: vars.color.text.secondary, paddingInline: padX },
+]);
+
 export const list = recipe({
   base: {
     display: "flex",

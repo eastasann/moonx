@@ -1,4 +1,6 @@
 import type {
+  ExecutionItem,
+  ExecutionType,
   PlanHome,
   PlanItem,
   PlanSummary,
@@ -188,3 +190,39 @@ export function planItem(itemNo: number): PlanItem {
     references: [],
   };
 }
+
+/** An execution item of the plan as P9 answers it: nothing filled in but its title. */
+export const executionItem = (
+  type: ExecutionType,
+  id: string,
+  title: string,
+  extra: Partial<ExecutionItem> = {},
+): ExecutionItem => ({
+  id,
+  type,
+  title,
+  assignee: null,
+  dueDate: null,
+  status: type === "kpi" ? null : type === "open_question" ? "open" : "todo",
+  overdue: false,
+  goal: null,
+  exitCondition: null,
+  launchTiming: type === "launch" ? "other" : null,
+  actions: null,
+  completionCriteria: null,
+  kpiArea: null,
+  kpiTarget: null,
+  kpiReviewFrequency: null,
+  kpiActual: null,
+  kpiActualUpdatedAt: null,
+  whyItMatters: null,
+  answer: null,
+  fromPreset: false,
+  completedAt: null,
+  sortOrder: 0,
+  commentCount: 0,
+  lockVersion: 1,
+  updatedAt: "2026-10-01T02:00:00.000Z",
+  updatedBy: anaRef,
+  ...extra,
+});

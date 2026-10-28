@@ -935,6 +935,11 @@ describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
     expect(row.textContent).toContain("Sep 30");
     expect(within(row).getByText("Overdue")).toBeTruthy();
     expect(row.textContent).toContain("2 comments");
+    expect(
+      screen
+        .getByRole("link", { name: "Open in Execution" })
+        .getAttribute("href"),
+    ).toBe(planPath("/execution?tab=milestones"));
     await user.click(within(row).getByText("Lease"));
     const dialog = await screen.findByRole("dialog", {
       name: "Edit milestone",

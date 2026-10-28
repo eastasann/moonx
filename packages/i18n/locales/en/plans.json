@@ -50,7 +50,8 @@
       "dueSoon_other": "{{count}} items due in the next 7 days",
       "overdue_one": "{{count}} item overdue",
       "overdue_other": "{{count}} items overdue",
-      "nothingDue": "Nothing due in the next 7 days"
+      "nothingDue": "Nothing due in the next 7 days",
+      "open": "Open Execution"
     },
     "part": {
       "a": "Part A: Business Case",
@@ -191,7 +192,32 @@
     "more": "More for {{title}}",
     "delete": "Delete",
     "cancel": "Cancel",
-    "noun": "item"
+    "noun": "item",
+    "title": "Execution",
+    "tabs": "Execution lists",
+    "empty": {
+      "milestones": "List the milestones to reach before launch, with who owns each and by when.",
+      "launch": "Plan what to do before launch, on the day and in the first 90 days.",
+      "kpis": "List the numbers to watch once the business runs, with a target for each.",
+      "questions": "Write down what you still need to find out, and why it matters.",
+      "actions": "List what to do next, with who does it and by when."
+    },
+    "emptyFiltered": "Nothing matches these filters",
+    "filter": {
+      "all": "All",
+      "me": "Me",
+      "overdueOnly": "Overdue only",
+      "clear": "Clear filters"
+    },
+    "edit": "Edit",
+    "reorder": "Reorder",
+    "reorderTitle": {
+      "milestone": "Reorder milestones",
+      "launch": "Reorder launch steps",
+      "kpi": "Reorder KPIs",
+      "open_question": "Reorder open questions"
+    },
+    "openInExecution": "Open in Execution"
   },
   "table": {
     "cell": "{{label}}: {{value}}",

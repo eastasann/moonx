@@ -416,6 +416,30 @@ export function ListViewSection() {
           )}
         </ListView>
       </Specimen>
+      <Specimen name="title: a heading over the rows, set in as they are (22's launch phases)">
+        <Stack gap="space-200">
+          <ListView aria-label="Launch · T−30" title="T−30" onAction={() => {}}>
+            <ListViewItem id="t30" textValue="30 days before launch">
+              <Text variant="label">30 days before launch</Text>
+              <Text variant="caption" tone="secondary">
+                To do · Ana
+              </Text>
+            </ListViewItem>
+          </ListView>
+          <ListView
+            aria-label="Launch · Launch day"
+            title="Launch day"
+            onAction={() => {}}
+          >
+            <ListViewItem id="day" textValue="Launch day">
+              <Text variant="label">Launch day</Text>
+              <Text variant="caption" tone="secondary">
+                To do · Paolo
+              </Text>
+            </ListViewItem>
+          </ListView>
+        </Stack>
+      </Specimen>
       <Specimen name="onAction: rows end in ›">
         <ListView aria-label="Notifications" onAction={() => {}}>
           <ListViewItem id="n1" textValue="Paolo mentioned you">

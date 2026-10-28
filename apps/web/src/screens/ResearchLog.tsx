@@ -530,7 +530,7 @@ function EntryDetail({
       <Stack gap="space-50">
         <Flex justifyContent="space-between" alignItems="start" gap="space-200">
           <Heading level={2}>{entry.topic}</Heading>
-          <Flex gap="space-50" alignItems="center">
+          <Flex gap="space-50" alignItems="center" shrink={false}>
             <ItemCommentsButton
               label={rowLabel("research_log_entry", entry.topic)}
               count={entry.commentCount}

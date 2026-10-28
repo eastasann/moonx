@@ -1,4 +1,9 @@
 import {
+  COST_ROW_METRIC_PREFIX,
+  KEY_METRIC_KEYS,
+  SCENARIO_METRIC_KEYS,
+} from "@moonx/domain";
+import {
   type AnswerType,
   type CostCategory,
   executionTypeSchema,
@@ -109,6 +114,47 @@ function rowLabel(label: string, index: number, t: AdminT) {
           n: index + 1,
         }),
       };
+}
+
+// ---- Key numbers ----
+
+/**
+ * The key numbers a plan's number sub-item may show, by name (SDD 5.2 `linked_metric`;
+ * AD6 `unknown_metric_key` refuses any other): design-spec 6.4's single values, the
+ * scenarios' columns, and the published validation templates' cost rows.
+ */
+export function metricChoices(
+  costRows: TemplateVersionDetail["costRows"],
+  t: AdminT,
+): { id: string; label: string }[] {
+  return [
+    ...KEY_METRIC_KEYS,
+    ...SCENARIO_METRIC_KEYS,
+    ...costRows.map(({ key }) => `${COST_ROW_METRIC_PREFIX}${key}`),
+  ].map((key) => ({ id: key, label: metricLabel(key, costRows, t) }));
+}
+
+/** A key number's name on 27, or its key with a note when it is none of them. */
+export function metricLabel(
+  key: string,
+  costRows: TemplateVersionDetail["costRows"],
+  t: AdminT,
+): string {
+  if (key.startsWith(COST_ROW_METRIC_PREFIX)) {
+    const row = costRows.find(
+      (each) => `${COST_ROW_METRIC_PREFIX}${each.key}` === key,
+    );
+    if (row !== undefined) {
+      return t("admin:version.question.metricCostRow", { name: row.name });
+    }
+  } else if ((SCENARIO_METRIC_KEYS as readonly string[]).includes(key)) {
+    return t("admin:version.question.metricScenario", {
+      scenario: t(`common:scenario.${key.slice("scenario:".length)}` as never),
+    });
+  } else if ((KEY_METRIC_KEYS as readonly string[]).includes(key)) {
+    return t(`common:metric.${key}` as never);
+  }
+  return t("admin:version.question.metricUnknown", { key });
 }
 
 // ---- Section ----
@@ -413,6 +459,7 @@ export function QuestionEditor({
       <OptionsEditor
         answerType={values.answerType}
         options={values.options}
+        costRows={version.costRows}
         issues={fields.issues("options")}
         onChange={(options, quietly) => fields.change({ options }, { quietly })}
         onDone={() => fields.blur("options")}
@@ -523,6 +570,7 @@ export function QuestionEditor({
 function OptionsEditor({
   answerType,
   options,
+  costRows,
   issues,
   onChange,
   onDone,
@@ -530,6 +578,8 @@ function OptionsEditor({
 }: {
   answerType: AnswerType;
   options: QuestionOptions | null;
+  /** The cost rows a number sub-item may show (AD3 `costRows`). */
+  costRows: TemplateVersionDetail["costRows"];
   issues: readonly Issue[];
   /** `quietly`: a row was just added, empty. */
   onChange: (options: QuestionOptions, quietly: boolean) => void;
@@ -540,79 +590,110 @@ function OptionsEditor({
   const { t } = useTranslation(["admin", "common"]);
   const at = (path: PropertyKey[]) => messageAt(issues, path);
   const whole = at([]);
-  if (answerType === "choice" || answerType === "linked_metric") {
-    const isChoice = answerType === "choice";
-    const entries =
-      options?.kind === "choice"
-        ? options.choices
-        : options?.kind === "linked_metric"
-          ? options.metricKeys
-          : [];
-    const listKey = isChoice ? "choices" : "metricKeys";
-    const make = (next: string[]): QuestionOptions =>
-      isChoice
-        ? { kind: "choice", choices: next }
-        : { kind: "linked_metric", metricKeys: next };
+  if (answerType === "choice") {
+    const entries = options?.kind === "choice" ? options.choices : [];
+    const make = (next: string[]): QuestionOptions => ({
+      kind: "choice",
+      choices: next,
+    });
     const nameOf = (index: number) =>
-      isChoice
-        ? t("admin:version.question.choiceN", { n: index + 1 })
-        : t("admin:version.question.metricN", { n: index + 1 });
+      t("admin:version.question.choiceN", { n: index + 1 });
     return (
-      <Stack gap="space-100">
-        <EditableList
-          label={
-            isChoice
-              ? t("admin:version.question.choices")
-              : t("admin:version.question.metrics")
-          }
-          rows={entries}
-          rowLabel={(entry, index) =>
-            entry.trim() === "" ? nameOf(index) : entry
-          }
-          renderRow={(entry, index) => (
-            <TextField
-              aria-label={nameOf(index)}
-              value={entry}
-              onChange={(value) =>
-                onChange(
-                  make(entries.map((item, i) => (i === index ? value : item))),
-                  false,
-                )
-              }
-              onBlur={onDone}
-              errorMessage={at([listKey, index])}
-              isReadOnly={isReadOnly}
-              width="fill"
-            />
-          )}
-          onMove={(index, step) => {
-            onChange(make(moved(entries, index, step)), false);
-            onDone();
-          }}
-          onRemove={(index) => {
-            onChange(make(without(entries, index)), false);
-            onDone();
-          }}
-          onAdd={() => onChange(make([...entries, ""]), true)}
-          addLabel={
-            isChoice
-              ? t("admin:version.question.addChoice")
-              : t("admin:version.question.addMetric")
-          }
-          emptyText={
-            isChoice
-              ? t("admin:version.question.noChoices")
-              : t("admin:version.question.noMetrics")
-          }
-          isReadOnly={isReadOnly}
-          errorMessage={whole}
-        />
-        {!isChoice && (
-          <Text variant="caption" tone="secondary">
-            {t("admin:version.question.metricForm")}
-          </Text>
+      <EditableList
+        label={t("admin:version.question.choices")}
+        rows={entries}
+        rowLabel={(entry, index) =>
+          entry.trim() === "" ? nameOf(index) : entry
+        }
+        renderRow={(entry, index) => (
+          <TextField
+            aria-label={nameOf(index)}
+            value={entry}
+            onChange={(value) =>
+              onChange(
+                make(entries.map((item, i) => (i === index ? value : item))),
+                false,
+              )
+            }
+            onBlur={onDone}
+            errorMessage={at(["choices", index])}
+            isReadOnly={isReadOnly}
+            width="fill"
+          />
         )}
-      </Stack>
+        onMove={(index, step) => {
+          onChange(make(moved(entries, index, step)), false);
+          onDone();
+        }}
+        onRemove={(index) => {
+          onChange(make(without(entries, index)), false);
+          onDone();
+        }}
+        onAdd={() => onChange(make([...entries, ""]), true)}
+        addLabel={t("admin:version.question.addChoice")}
+        emptyText={t("admin:version.question.noChoices")}
+        isReadOnly={isReadOnly}
+        errorMessage={whole}
+      />
+    );
+  }
+  if (answerType === "linked_metric") {
+    const keys = options?.kind === "linked_metric" ? options.metricKeys : [];
+    const make = (next: string[]): QuestionOptions => ({
+      kind: "linked_metric",
+      metricKeys: next,
+    });
+    const nameOf = (index: number) =>
+      t("admin:version.question.metricN", { n: index + 1 });
+    const choices = metricChoices(costRows, t);
+    return (
+      <EditableList
+        label={t("admin:version.question.metrics")}
+        rows={keys}
+        rowLabel={(key, index) =>
+          key === "" ? nameOf(index) : metricLabel(key, costRows, t)
+        }
+        renderRow={(key, index) => (
+          <Picker
+            aria-label={nameOf(index)}
+            // A key chosen in another row is not offered again. A key that is none of
+            // them (a typo in an imported file) stays, by its key, for AD6 to flag.
+            items={[
+              ...(key === "" || choices.some(({ id }) => id === key)
+                ? []
+                : [{ id: key, label: metricLabel(key, costRows, t) }]),
+              ...choices.filter(({ id }) => id === key || !keys.includes(id)),
+            ]}
+            value={key === "" ? null : key}
+            onChange={(value) => {
+              if (value === null) return;
+              onChange(
+                make(
+                  keys.map((item, i) => (i === index ? String(value) : item)),
+                ),
+                false,
+              );
+              onDone();
+            }}
+            errorMessage={at(["metricKeys", index])}
+            isDisabled={isReadOnly}
+            width="full"
+          />
+        )}
+        onMove={(index, step) => {
+          onChange(make(moved(keys, index, step)), false);
+          onDone();
+        }}
+        onRemove={(index) => {
+          onChange(make(without(keys, index)), false);
+          onDone();
+        }}
+        onAdd={() => onChange(make([...keys, ""]), true)}
+        addLabel={t("admin:version.question.addMetric")}
+        emptyText={t("admin:version.question.noMetrics")}
+        isReadOnly={isReadOnly}
+        errorMessage={whole}
+      />
     );
   }
   if (answerType === "table") {

@@ -91,7 +91,8 @@ export const tableColumnTypeSchema = z.enum([
 /**
  * QuestionOptions (SDD 5.2) as a file writes them: choices and column names are required
  * short texts (design-spec 6.0.8), and a table's column keys and a question's choices do
- * not repeat, since answers are stored by them.
+ * not repeat, since answers are stored by them, nor its key numbers, which 21 shows one
+ * by one.
  */
 export const templateFileOptionsSchema = z
   .discriminatedUnion("kind", [
@@ -111,7 +112,10 @@ export const templateFileOptionsSchema = z
     }),
     z.strictObject({
       kind: z.literal("linked_metric"),
-      /** Key metric keys of design-spec 6.4. */
+      /**
+       * Key metric keys of design-spec 6.4 that 21 shows: which ones, AD6 checks
+       * (`unknown_metric_key`), as it needs the published validation templates.
+       */
       metricKeys: z.array(keyText),
     }),
     z.strictObject({
@@ -134,6 +138,15 @@ export const templateFileOptionsSchema = z
           path: ["columns", i, "key"],
         })),
         "column key",
+      );
+    if (options.kind === "linked_metric")
+      flagRepeats(
+        ctx,
+        options.metricKeys.map((value, i) => ({
+          value,
+          path: ["metricKeys", i],
+        })),
+        "key number",
       );
   });
 

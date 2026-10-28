@@ -203,7 +203,8 @@ export function fullestPitchDeckInput(
       typicalPrice: 1380,
       strength: text,
     })),
-    canEdit: true,
+    canEditPlan: true,
+    canEditValidation: true,
     commentCount: () => 0,
   };
 }

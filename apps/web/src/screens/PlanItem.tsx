@@ -98,7 +98,6 @@ import {
   scenarioFigureFormat,
 } from "../lib/metrics";
 import {
-  costsQuery,
   ideaKey,
   planHomeQuery,
   planItemQuery,
@@ -188,35 +187,30 @@ function metricsOf(question: TemplateQuestion, item: PlanItem) {
 
 /**
  * A key metric's name (design-spec 6.4): a cost row's is the row's name in the validation,
- * read only when a sub-item names numbers beside one (alone, its sub-item names it), and
- * its template key while it loads or for a row the validation no longer has.
+ * else the template's (P4 `costRowNames`), else its template key.
  */
-function useMetricName(ideaId: string, item: PlanItem) {
+function useMetricName(item: PlanItem) {
   const { t } = useTranslation(["common"]);
-  const namesCostRow = item.prompts.some(
-    (prompt) =>
-      prompt.options?.kind === "linked_metric" &&
-      prompt.options.metricKeys.length > 1 &&
-      prompt.options.metricKeys.some((key) => key.startsWith(COST_ROW_PREFIX)),
-  );
-  const validationId = useQuery({
-    ...validationHomeQuery(ideaId),
-    enabled: namesCostRow,
-  }).data?.validationId;
-  const costs = useQuery({
-    ...costsQuery(ideaId, validationId ?? ""),
-    enabled: namesCostRow && validationId !== undefined,
-  });
   return (key: string) => {
     if (!key.startsWith(COST_ROW_PREFIX)) {
       return t(`common:metric.${key}` as never);
     }
     const templateKey = key.slice(COST_ROW_PREFIX.length);
-    return (
-      costs.data?.items.find((row) => row.templateKey === templateKey)?.name ??
-      templateKey
-    );
+    return item.costRowNames[templateKey] ?? templateKey;
   };
+}
+
+/**
+ * A key metric's value as text (design-spec 6.4): a cost row the validation does not have
+ * says so (6.0.7 "Not in validation"); one it has with no value is Empty.
+ */
+function useMetricValue(item: PlanItem) {
+  const { t } = useTranslation(["plans"]);
+  const { workspace } = useWorkspace();
+  return (key: string) =>
+    key.startsWith(COST_ROW_PREFIX) && item.metrics[key] === undefined
+      ? t("plans:item.notInValidation")
+      : formatMetric(key, keyMetricOf(item.metrics, key), workspace.currency);
 }
 
 /** A scenario's figures, as 6.4 gives `scenario:*` (units, revenue, profit, margin). */
@@ -269,10 +263,9 @@ function MetricsContent({
 }) {
   const { t } = useTranslation(["plans", "common"]);
   const { workspace } = useWorkspace();
-  const nameOf = useMetricName(ideaId, item);
+  const nameOf = useMetricName(item);
+  const value = useMetricValue(item);
   const { keys, scenarios, single } = metricsOf(question, item);
-  const value = (key: string) =>
-    formatMetric(key, keyMetricOf(item.metrics, key), workspace.currency);
   return (
     <Stack gap="space-200">
       {single.length === 1 &&
@@ -315,22 +308,18 @@ function MetricsContent({
 }
 
 /** A number sub-item's quiet line: its numbers, named when there are several. */
-function useMetricsExcerpt(ideaId: string, item: PlanItem) {
+function useMetricsExcerpt(item: PlanItem) {
   const { t } = useTranslation(["validation", "app"]);
   const { workspace } = useWorkspace();
-  const nameOf = useMetricName(ideaId, item);
+  const nameOf = useMetricName(item);
+  const value = useMetricValue(item);
   return (question: TemplateQuestion): string => {
     const { scenarios, single } = metricsOf(question, item);
     const named = single.length + scenarios.length > 1;
     const parts = [
-      ...single.map((key) => {
-        const text = formatMetric(
-          key,
-          keyMetricOf(item.metrics, key),
-          workspace.currency,
-        );
-        return named ? `${nameOf(key)} ${text}` : text;
-      }),
+      ...single.map((key) =>
+        named ? `${nameOf(key)} ${value(key)}` : value(key),
+      ),
       ...scenarios.flatMap((column) =>
         (["revenue", "operatingProfit"] as const).map(
           (figure) =>
@@ -458,7 +447,7 @@ function ItemForm({
   const autosave = useAutosave();
   const panel = usePanel();
   const navigate = useNavigate();
-  const metricsExcerpt = useMetricsExcerpt(home.ideaId, item);
+  const metricsExcerpt = useMetricsExcerpt(item);
   const noteOf = useSubItemNote();
   const canEdit = !item.readOnly;
   const itemKey = itemKeyOf(item.itemNo);

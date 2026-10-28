@@ -5,6 +5,7 @@ import {
   type DatabaseTransaction,
   ideas,
   importTemplateFile,
+  loadPublishedCostRows,
   lockTemplateDraft,
   publishTemplateVersion,
   selfAnalyses,
@@ -205,6 +206,8 @@ async function loadVersionDetail(
       name: row.name,
       sortOrder: row.sortOrder,
     })),
+    costRows:
+      head.kind === "business_plan" ? await loadPublishedCostRows(db) : [],
     checkRules: checkRules.map((rule) => ({
       checkKey: rule.checkKey,
       params: rule.params as Record<string, number>,

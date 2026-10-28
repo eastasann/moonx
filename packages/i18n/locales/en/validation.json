@@ -482,6 +482,7 @@
     "toCosts": "Costs",
     "scenarios": "Scenarios",
     "scenarioColumn": "Scenario",
+    "figureColumn": "Metric",
     "metric": {
       "unitsPerDay": "Units / day",
       "unitsPerMonth": "Units / month",

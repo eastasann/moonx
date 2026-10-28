@@ -96,8 +96,13 @@ export interface PitchDeckInput {
   execution: readonly PitchExecutionItem[];
   /** At most five, in 15's order. */
   competitors: readonly PitchCompetitor[];
-  /** Owner or Member, on the plan now, neither plan nor idea archived. */
-  canEdit: boolean;
+  /** Owner or Member, on the plan now, neither plan nor idea archived: "Edit source". */
+  canEditPlan: boolean;
+  /**
+   * Owner or Member, on the plan now, the idea not archived: "Edit in validation" (an
+   * archived plan leaves its idea's validation open to edit, as 20 and 21 link to it).
+   */
+  canEditValidation: boolean;
   /** The comments on the slide `{variant}.{key}`. */
   commentCount: (target: string) => number;
 }
@@ -764,8 +769,10 @@ class DeckBuilder {
       emptySources,
       shrink: 0,
       overflow: false,
-      editSource: input.canEdit ? { itemNo: spec.itemNo } : null,
-      editInValidation: input.canEdit ? (spec.editInValidation ?? null) : null,
+      editSource: input.canEditPlan ? { itemNo: spec.itemNo } : null,
+      editInValidation: input.canEditValidation
+        ? (spec.editInValidation ?? null)
+        : null,
       commentCount: input.commentCount(target),
     };
   }

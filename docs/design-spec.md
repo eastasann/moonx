@@ -179,7 +179,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 
 ## 3. 画面一覧
 
-画面の存在・目的・レイアウト・認証要否はこの文書が所有する。番号は壁打ちメモと同じ（29・30 は後から足した）。レイアウト列の記号は 4.1 のパターン。全画面をスマホと Web の両方で使える。UI 表示名は画面の見出しに使い、幅の狭い所（13 のセクションの一覧・ナビ）では短い名前を使う（15 は「Competitors」、18 は「Unit Economics」、20 は「Plan」、9 は「Settings」）。
+画面の存在・目的・レイアウト・認証要否はこの文書が所有する。番号は壁打ちメモと同じ（29・30 は後から足した）。レイアウト列の記号は 4.1 のパターン。全画面をスマホと Web の両方で使える。UI 表示名は画面の見出しに使い、幅の狭い所（13 のセクションの一覧・ナビ）では短い名前を使う（15 は「Competitors」、18 は「Unit Economics」、20 は「Plan」）。
 
 ### 3.1 公開画面と認証
 
@@ -265,11 +265,11 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | M4 | Go / No-Go の記録 | Record Go / No-Go | 20 | Launch / Delay / Stop と理由。§24 の3つの条件と主要指標を表示し、決定ログに残す |
 | M5 | プラン下書きの作成 | Create plan draft | 19（Proceed の直後）/ 13 / 20 | 案の名前を決めて下書きを作る。検証から文章をコピーし、実行管理の初期行を作る。直後に何も足していなければ、変更履歴から作成ごと取り消せる（6.0.5） |
 | M6 | 共有先の選択 | Share | 10 | 自己分析を共有するワークスペースを選ぶ |
-| M7 | ワークスペース切替 | Switch workspace | 共通ナビ | 所属するワークスペースの一覧と切替。「New workspace」で新しいワークスペースを作る（名前・通貨。作った人が Owner） |
+| M7 | ワークスペース切替 | Switch workspace | 共通ナビ | 所属するワークスペースの一覧と切替。行はワークスペース名の下に自分のロール（個人用は「Personal · {ロール}」）、今のワークスペースの行の右に「Current」。「New workspace」で新しいワークスペースを作る（名前・通貨。作った人が Owner。ボタンは「Create」と「Cancel」）。作成の一時的な失敗はその場に「Couldn't save」と Retry、想定外のエラーは M7 の上に 6.0.6 の小さなダイアログ（Ref・Retry・Close。Retry は送り直し、Close は M7 を閉じる）で出し、入力を残す |
 | M8 | テンプレートの移行 | Update template | 10 / 13 / 20 | 新しい版のテンプレートへ移る。引き継げない回答を事前に示す |
 | M9 | ログインし直し | Sign in again | ログイン後のすべての画面（未保存の入力があるときにログインが切れたら開く） | 画面を移らずにログインし直し、未保存の入力を送る。メールは今のアカウントのものから変えられない。パスワードでログインし直すと、未保存の入力を送って閉じる。Google でログインする人と「Sign in on the login page」を選んだ人は、「Unsaved changes on this page will be lost.」と確かめてから 2 へ移る（ログイン後に元の画面へ戻る）。パスワードが違う: 「Password is incorrect」。回数の上限: 6.0.6 の「回数の上限」を M9 の中に出し、開いたままにする。アカウントが停止されている: 未保存の入力を捨てて 2 へ移り、2 の停止されたユーザーの文言を出す（2026-10-11 のユーザーの決定）。並び: 「Your session ended. Sign in to save your changes.」、読み取り専用の Email、Password、「Sign in」と quiet の「Sign in on the login page」。パスワードを持たない人（Google だけ）には Email・Password・Sign in を出さず、「Your session ended. You sign in with Google, so sign in on the login page.」と「Sign in on the login page」だけを出す。2 へ移る前の確認は AlertDialog の「Leave this page?」と「Unsaved changes on this page will be lost.」、「Sign in on the login page」と「Cancel」。閉じるボタンは置かず、Esc でも閉じない |
 | PNL-1 | コメントパネル | Comments | 10〜18・20〜23 の各項目（12 は共有された自己分析の回答） | 項目ごとのスレッド。返信・メンション・解決 |
-| PNL-2 | 変更履歴パネル | History | 10・11・13〜18・20〜22 の各項目 | 項目ごとの変更（誰が・いつ・差分）と元に戻す |
+| PNL-2 | 変更履歴パネル | History | 10・11・13〜18・20〜22 の各項目（10 と 13 は回答を項目として並べないので、ヘッダーの 🕘 から全体の履歴だけを開く。6.0.5） | 項目ごとの変更（誰が・いつ・差分）と元に戻す |
 
 ---
 
@@ -286,7 +286,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | C | 設問フォーム | セクション（またはプランの1項目）の問いに答える | セクションの全設問を、hairline で区切った一覧として縦に並べたフォーム（中身の幅は 06 `layout.reading-column-max`。s11-form.html）。**入力中の設問が画面の縦の中央に来るようにスクロールし**、その設問だけを枠と影のカード（列から左右に 06 `layout.question-form.card-outset` だけはみ出す）にして、EXAMPLE・ヒント・F/A/U の操作を開く。他の設問は印・名前・回答の冒頭・F/A/U のラベルだけの控えめな行にする（押せばそこへ移る）。前後のセクションと AI ▼ の行は下に留める | デスクトップと同じ縦並び | 1画面に1問のカード。前後の移動は下部に固定 |
 | D | リスト＋詳細 | 多くの対象から探して開く、並べて管理する | 左のペインに題・新規作成・絞り込み・検索とリスト、右に選んだ項目の詳細（マスター / ディテール）。2つのペインは枠の端まで広げ、左と右の比は 06 `layout.list-detail.list-ratio`・`detail-ratio`（左は `list-min-width` 以上）、間に全高の hairline（s06-ideas.html）。ツリー構造（27）はリストの代わりにツリー | 1ペインずつ全幅で出す（リスト → 詳細。スマホと同じ） | リストを全画面で出し、項目を開くと詳細を全画面で出す。編集はボトムシート。新規作成の操作は右下に浮かぶ「+」（06 `layout.list-detail.floating-action-*`。ListDetailPattern の `newItem`）。絞り込みと検索は1行のまま横にスクロールする（s06-ideas.html のスマホは検索を省いているが、件数の多い一覧で探す手段が減るので残す） |
 | E | カード比較 | 対象を並べて見比べる | 題の行に件数と目安・Cards / Table の切り替え・追加のボタン。2〜3列のカードグリッドの最後に点線の枠の追加のタイル。「表で比較」に切り替えると、項目を行・対象を列にした表（s15-competitors.html）。ページは左にそろえる | デスクトップと同じ（列の数は幅で決まる） | カードを1列に並べる。比較表と切り替えは出さない。追加のボタンは題の下のその場に置く |
-| F | ワークシート | 数字を入れて、結果をその場で見る | 左に入力の表、右に計算結果のカード（幅は 06 `layout.worksheet.results-width`、表との間は `column-gap`。スクロールしても見える位置に固定。s17-costs.html）。ページは左にそろえる | 入力の表を全幅で出す（スマホの行の形にしない）。列はデスクトップと同じものを出す（s17-costs.html の 1023px 以下は Why Needed・Notes の列を省いているが、表の中で読めて直せる項目が減るので残す）。結果は下部に固定した要約バーで出し、押すと右の引き出し（ドロワー）で全体を開く | 入力の表を線で区切った行にする。下部に結果の要約バーを固定し、タップで結果の全体を開く |
+| F | ワークシート | 数字を入れて、結果をその場で見る | 左に入力の表、右に計算結果のカード（幅は 06 `layout.worksheet.results-width`、表との間は `column-gap`。スクロールしても見える位置に固定。s17-costs.html）。ページは左にそろえる。結果のカードに入らない表（18 のシナリオ表）は2列の下に全幅で置く（6.4） | 入力の表を全幅で出す（スマホの行の形にしない）。列はデスクトップと同じものを出す（s17-costs.html の 1023px 以下は Why Needed・Notes の列を省いているが、表の中で読めて直せる項目が減るので残す）。結果は下部に固定した要約バーで出し、押すと右の引き出し（ドロワー）で全体を開く。18 のシナリオ表は引き出しに入れず、入力の表の下に全幅で置く（6.4） | 入力の表を線で区切った行にする。下部に結果の要約バーを固定し、タップで結果の全体を開く |
 | G | ステップ | 決まった手順を順に進める | 上にステップ表示（1 → 2 → 3）、中央のカラムに各ステップの内容。差分確認は設問ごとの枠の中を左右2列にし、ページを広げる（中身の幅は 06 `layout.comparison-max`。s25-import.html）。操作の行は下に留め、左に注記 | デスクトップと同じ | 上にステップ表示、1カラム。差分は上下に並べる。操作は下部に固定し、注記は内容の最後に置く（s25-import.html のスマホは注記を省いているが、反映が変更履歴に残ることを伝える文が減るので残す） |
 | H | 設定フォーム | 設定値を項目ごとに直す | 中央のカラムに設定のまとまりを縦に並べる（左の列（06 `layout.settings.label-width`）にまとまりの名前、右に項目を列いっぱいに。まとまりの間は hairline。s09-settings.html） | デスクトップと同じ | 同じ。1カラム（名前を項目の上に） |
 | I | プレゼン | スライドを見せる・書き出す | 上に道具の行（題・長さ・版・書き出し）。左に番号付きのサムネイル列（06 `layout.presentation.thumbnail-column-width`。右の区切りの線を含む。全高。列はページの流れに置き、ページだけがスクロールする（列を別にスクロールさせない。s23-deck.html））、右に横長のスライド（寸法は `semantic.print.slide`）、下に話す内容（§30）（s23-deck.html） | デスクトップと同じ（s23-deck.html の 1023px 以下はサムネイルの列を省いているが、スライドを見渡す一覧と、好きなスライドへ直に移る手段が減るので残す） | 今のスライドだけを幅に合わせて出し、その下の前後の移動（「‹ 7 / 14 ›」）で切り替える（s23-deck.html のスマホは前後の移動を描いていないが、サムネイルの列の無いスマホではほかにスライドを移る手段が無いので残す）。話す内容はその下 |
@@ -296,7 +296,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 
 スマホで下部に固定する操作は、A・B・G の主要な操作、C の前後の移動、F の要約バーだけにする。E・H・I の主要な操作（15 の「Add competitor」、23 の「Download PDF」など）は、スマホでもその場に置く（`docs/mockups` の s15-competitors.html・s23-deck.html）。
 
-デスクトップでパネル（PNL-1・PNL-2）を開いていて、本文の領域の幅が 06 `semantic.layout.two-column-min-width` より狭い間は、D と F をタブレットの列の並びにする（D は1ペインずつ全幅、F は入力の表を全幅にして、結果は下部の要約バーと右の引き出しで開く）。パネルは本文の右の列のまま置き、本文の入力を閉じずに読める 4.3 の決まりを保つ。切り替えは画面の幅ではなく本文の領域の幅で決め、パネルを閉じるか幅が足りれば2列に戻す。選んでいた項目と入力中の欄は、並びが変わっても保つ（2026-10-17 のユーザーの決定）。
+デスクトップでパネル（PNL-1・PNL-2）を開いていて、本文の領域の幅が 06 `semantic.layout.two-column-min-width` より狭い間は、D と F をタブレットの列の並びにする（D は1ペインずつ全幅、F は入力の表を全幅にして、結果は下部の要約バーと右の引き出しで開く）。パネルは本文の右の列のまま置き、本文の入力を閉じずに読める 4.3 の決まりを保つ。切り替えは画面の幅ではなく本文の領域の幅で決め、パネルを閉じるか幅が足りれば2列に戻す。選んでいた項目と入力中の欄は、並びが変わっても保つ（2026-10-17 のユーザーの決定）。ブラウザの戻る・進むで移った履歴の項目は、離れたときの並びのまま出す（一覧だけをパネルの横に出していた項目に、前の項目で一覧の横に出していた項目を持ち込まない。並びは、パネルの列を測ってから決める）。
 
 同じ決まりを A と I にも当てる（2026-10-17。上のユーザーの決定を同じ考え方で広げた）:
 
@@ -457,7 +457,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 独自: RowList / RowListItem | 区切り線つきの静的な行の並び（10・13・20 のセクションの一覧、13 の確認項目・Next steps・Decisions・Plans、6 の詳細と 19 の確認項目）。`ordered` で番号付き。押せる行は行全体が移動先で、右端に › を置く（下線のリンクにしない。4.4。ホバーで名前に下線を出す）。一覧の上と最後の行の下にも hairline を引く。印（`start`）は 06 `component.row-list.mark-width` の列に置き、印のある行がある一覧では印の無い行もその列を空けて名前の頭をそろえる。番号は `row-list.number-width` の列の tertiary の等幅（`typography.number-emphasis` の太さで、大きさは `caption`）、名前は `typography.label`、右端の文字（`end`）は `caption`（件数と日付（「7/10」「5 entries」「Oct 14」）は `isEndNumeric` で等幅の `typography.number-sm`）、› は tertiary。2行目（`description`）のある行は、印・右端の文字・› を1行目に並べる（d1-moon.html）。5 の Ideas のように行に印の並び（`marks`。CheckDots）と札（`badge`。Badge）を持つ行は、名前の後ろに `marks`、その後ろに `badge` を、どの行でも同じ幅の列（06 `row-list.badge-width`。札は列の右端にそろえる。列の間は `row-list.status-gap`）に置き、行の高さの中央にそろえて、印の位置を行ごとにそろえる（s05-dashboard.html の .ideas）。まだ終わっていない実行管理の項目の行頭には `TaskMark`（☐。大きさ・角丸・線の太さは 06 `row-list.task-mark-*` の、tertiary の線の飾り。5 の Due soon。s05-dashboard.html の .due .box）を置く | ordered。`isEmphasized`（13 の Next steps の1件目: 薄い線（`border.default`）の枠と左のインクの線（`border-width.selected-indicator`）、角丸は `radius.callout`、影なし、番号はインクの semibold、名前は `typography.label-emphasis`、理由の行は `caption`） | 行の高さは 06 `row-list.narrow-min-height` 以上。`badge` は名前の行の右端、`marks` は2行目の下の行に置く（s05-dashboard.html の 390px） |
 | 独自: DescriptionList / DescriptionListItem | ラベルと値の並び（13 の Summary・19 の判断材料の Summary）。ラベルは 06 `component.description-list.label-width` の列（spacious の密度では `label-width-spacious`。s19-decision.html の .sum）の `typography.caption` の secondary、値は `body-compact`、行を hairline で区切る（d1-moon.html・s19-decision.html） | — | ラベルを値の上に置く |
 | 独自: Slide | Pitch Deck のスライドの4つの型（6.14） | `headingLevel`（2 か 3、既定 3）: スライドの題が画面の見出しの階層で占める位置。h1 の直下にスライドが続く画面だけ 2 にする。地は白（PDF と同じ）、角丸（06 `radius.slide`）、柔らかい影（`semantic.shadow.*.slide-edge`・`slide`。s23-deck.html）。サムネイル（`isThumbnail`）は白の地だけ同じで、角丸と影を付けない（枠は置く側の PresentationPattern が持つ。PDF のページと同じ hairline と角丸（`layout.presentation.thumbnail-radius`）。s23-deck.html の .mini） | 幅に合わせる |
-| 独自: Flex / Stack / Grid / Container と、パターン A〜J の枠（HubPattern・FocusPattern・QuestionFormPattern・ListDetailPattern・CardComparePattern・WorksheetPattern・StepsPattern・SettingsPattern・PresentationPattern・PublicPattern と PublicSection） | 画面の並び。間隔はトークンの名前だけを受け取る。パターンの枠は 4.1 の並び（デスクトップ・タブレット・モバイル）と、`docs/mockups` の列の幅・余白・比（06 `semantic.layout`）を持つ | PublicSection の `layout`: hero・pair（2列の比は 06 `layout.public.hero-*-ratio`・`pair-*-ratio`）・stack・close。`isFullBleed` は節の上の線を端から端まで引く。節の中の Text の幅は、stack が 06 `layout.public.stack-measure`、pair の文の列が `pair-measure`、close が `close-measure` まで（s01-landing.html の .stages .lead・.pair p・.close p。ヒーローのリードは lead の幅）。Flex は中の文が折り返せるよう、行の中で中身より狭くなれる。`shrink={false}` のときは中身より狭くならない（折り返す題の横に並べる 💬・🕘・⋯ などのボタンのまとまり。狭くなるとボタンが枠からはみ出す） | 同じ |
+| 独自: Flex / Stack / Grid / Container と、パターン A〜J の枠（HubPattern・FocusPattern・QuestionFormPattern・ListDetailPattern・CardComparePattern・WorksheetPattern・StepsPattern・SettingsPattern・PresentationPattern・PublicPattern と PublicSection） | 画面の並び。間隔はトークンの名前だけを受け取る。パターンの枠は 4.1 の並び（デスクトップ・タブレット・モバイル）と、`docs/mockups` の列の幅・余白・比（06 `semantic.layout`）を持つ。WorksheetPattern の `after` は入力と結果の2列の下に全幅で置くもの（18 のシナリオ表。入力の表どうしと同じだけ離す）、PresentationPattern の `alert` は道具の行の上に置く画面全体の注意（23 のアーカイブの注意。道具の行と同じだけ端から離す） | PublicSection の `layout`: hero・pair（2列の比は 06 `layout.public.hero-*-ratio`・`pair-*-ratio`）・stack・close。`isFullBleed` は節の上の線を端から端まで引く。節の中の Text の幅は、stack が 06 `layout.public.stack-measure`、pair の文の列が `pair-measure`、close が `close-measure` まで（s01-landing.html の .stages .lead・.pair p・.close p。ヒーローのリードは lead の幅）。Flex は中の文が折り返せるよう、行の中で中身より狭くなれる。`shrink={false}` のときは中身より狭くならない（折り返す題の横に並べる 💬・🕘・⋯ などのボタンのまとまり。狭くなるとボタンが枠からはみ出す） | 同じ |
 | 独自: SettingsList / SettingsListItem | 9 のメンバーと招待の行（パターン H のまとまりの中） | Avatar の列（06 `layout.settings.row-avatar-width`）｜名前と「(you)」とその下のメール｜役割（中身の幅の Picker）｜⋯ の列（`row-menu-width`）を列の端にそろえ、理由（`note`）をメールの下に出す。招待は Avatar なしでメールと補足｜右端に操作（役割の列を持たないので、その列と間を空けない）。行の間は hairline（s09-settings.html）。題のメールは、入らないときは「@」と「.」の後ろで折り返し、そこで折り返しても入らない部分だけを語の途中で折り返す | 同じ |
 | 独自: SettingsFieldRow | 9 の招待の行（メールの欄・役割の Picker・Send invitation） | 1つ目の欄が残りの幅、2つ目が 06 `layout.settings.field-row-control-width` の列、残り（ボタン）が自分の幅で、1行に並べる（間は `field-row-gap`。s09-settings.html の .invite） | 縦に並べ、どれも全幅 |
 | 独自: QuestionList / QuestionListItem | パターン C 以外の画面に置く設問（15 のカードの下の Survivor Patterns と Failure Patterns） | QuestionCard を hairline で区切って並べる（パターン C と同じ行。どの幅でも区切る）。幅は 06 `layout.compare.questions-max` まで（s15-competitors.html の .qs） | 同じ |
@@ -508,7 +508,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - QuestionCard の `mode` には `focused`（入力中。カードの枠と影を付け、回答の入力欄・F/A/U の操作・EXAMPLE・ヒントを画面が中に置く）・`open`（全設問を開いた表示と Viewer。枠を付けない）・`quiet`（控えめな表示）がある。`quiet` のカードは全体を押せて、押すか Tab で入ると、画面が `focused` に変え、カードが回答の入力欄にフォーカスを移す。`focused` と `open` のカードは、回答の入力欄（打てる欄と選択肢。読み取り専用と無効のものを除く）にフォーカスが入ると、カードの中央を 06 `semantic.layout.focus-anchor` の高さへスクロールする（4.1 C。動きを減らす設定ではアニメーションしない）。カードが見えている高さより高いときは、カードの中央の代わりに、フォーカスのある入力欄をその高さへ送る（カードの中央を合わせると、入力欄が見えなくなるため）。入力欄そのものが見えている高さより高いときは動かさない（カーソルの位置はブラウザが見える所に保つ）。読み取りの回答（Viewer）とボタン（💬 や F/A/U の操作など）にフォーカスが入っても動かさない（6.2 の Viewer は「フォーカスの動きはなく」）。コメント数は `formatCount()` で出す。設問を移るキー（Ctrl+↓ / Ctrl+↑ と、macOS の Ctrl+Option+↓ / ↑）と Focus の切り替え（4.1 C）は QuestionFormPattern が持つ。
 - Panel はデスクトップでは、開くとパネルへフォーカスを移し、パネルの中での Esc と閉じるボタン（「Close」）で閉じる（モーダルにしない）。閉じたときにフォーカスがパネルの中にあれば、開いたボタンへ戻す（💬 をもう一度押して閉じたときは、そのボタンのまま）。開いたまま別のパネル（💬 から 🕘）に替えると、新しいパネルへフォーカスを移す。本文の右の列には AppFrame が置き、AppFrame は本文の領域の幅とパネルの有無から、中のパターン A・D・F が2列で並べられるかと、I がサムネイルの列を出せるかを渡す（4.1）。タブレットの幅の右の引き出しとスマホのトレイはモーダルで、外側のタップと Esc でも閉じる。
 - Slide は 06 `semantic.print` の寸法を、置かれた幅に対する割合で描く（PDF のページを拡大・縮小したのと同じ見た目。サムネイルも同じ部品を小さく置く）。文字の大きさと文の切り方は P12 の `shrink` と文（API の `fitPitchDeck()` が決めたもの）に従い、数字の列は P12 の `figureColumns`（API が PDF と同じフォントで測った列の幅。SDD 5.9・ADR-012）のまま並べる（画面では文字の幅を測らない）。各ページのフッターは `pitchFooterText()` の文（PDF と同じ）を画面が渡す。「Too long for this slide. Shorten it in the plan.」の注意と「Edit source」「Edit in validation」は、スライドの外に画面が出す。
-- PresentationPattern は、スライドの上のリンクの行のさらに上に、画面がスライドやデッキについて出す注意（`notices`。「Too long for this slide…」や PDF の失敗）の場所を持つ。読み込み中（`isLoading`）は、道具の行を使えるまま、サムネイルの列とスライドの段だけを骨組み（Skeleton。読み上げとフォーカスの対象から外す）にし、パターンの全体に `aria-busy` を付けて読み込み中であることを伝える（2026-10-28 に Step 35b で決めた。6.14）。
+- PresentationPattern は、スライドの上のリンクの行のさらに上に、画面がスライドやデッキについて出す注意（`notices`。「Too long for this slide…」や PDF の失敗）の場所を持つ。読み込み中（`isLoading`）は、道具の行を使えるまま、サムネイルの列とスライドの段だけを骨組み（Skeleton。読み上げとフォーカスの対象から外す）にし、パターンの全体に `aria-busy` を付けて読み込み中であることを伝える（6.14）。
 - Avatar の頭文字は、表示名の最初の語と最後の語の1文字目を大文字にして並べる（1語なら1文字。「Ana Reyes」は AR）。文字は見た目の1文字（絵文字や日本語の1字）で数える。
 - MoonGlyph の `value` の月も、満ちる割合にかかわらずインクの色で描く。CheckDots は、「{確認項目の名前}: {状態}」を並べた文を、1つの画像の名前として読み上げる（例: 「Competitors (3–5): Done, Permits: Not started, …」）。Meter の凡例の件数は書式関数（`formatUnits()`）で出す。MetricTile は1つの指標だけを持ち、横一列や 2×2 の並びは MetricGroup が作る（画面はレイアウトの部品で並べない）。
 - DiffText と DiffTextArea の差分は、語の単位の最小の差分にする（s25-import.html の「25–40」を丸ごと取り消し線、「25–45」を丸ごと下線）。語は空白で区切った文字の並びで、語の中の約物（「25–40」の「–」）は語に含め、語の頭と終わりの約物はそれだけで1つの語にする（「meals.」が「meals,」になっても「meals」には印を付けない。s25-import.html）。約物は Unicode の句読点の区分（P。句読点・括弧・引用符・ダッシュ・% など。基本多言語面の文字）で、₱・+ などの記号（S）は含めない。約物は後ろに結合する文字（異体字セレクタなど）と1つにして扱い（「Great‼️」は「Great」と「‼️」）、約物と結合する文字だけの並び（「#️⃣」）は1つの語にする。空白を入れずに書く文字（日本語・中国語・タイ語）は、ブラウザの語の区切り（`Intl.Segmenter`）の語を単位にし、句読点は前の語に含める。語だけを比べ、空白は前後の語に合わせて出す（空白が同じ語を変えたことにしない。空白だけが変わったところは空白に印を付ける）。続けて変わった語は1つの削除と1つの追加にまとめ、間の空白も含める。変更と変更の間にある、約物（と空白）だけの変わらない部分は（空白だけが変わった所は変更に数えない）、そこでつながる変更が全体として削除と追加の両方を持つとき、変更に含める（言い換えた句の下線を「,」などで途中で切らない。追加だけ、削除だけがつながるときは、もう一方の文にそのまま残る約物なので印を付けない）。変更の前の、両方にある空白には印を付けない。長い回答を書き直した変更は計算に時間がかかるので、計算は画面のすべての DiffText を合わせて1フレームの半分の時間ずつ進め、その間は変更前・変更後の文だけを出し、計算し終えたら印を付ける（画面を止めないため）。
@@ -531,7 +531,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - **ログイン後**: 最後に開いたワークスペースの 5 へ進む。初回は招待元のワークスペース（なければ個人用）。ワークスペースは M7 で切り替える。
 - **共通ナビ**: スマホは下のタブ、Web は左のサイドバー。
   - タブ: 5 Dashboard / 6 Ideas / 10 Self Analysis / 8 Notifications（未読数のバッジ）
-  - サイドバー（タブレットの幅から上）: タブの4つと 7 Decision Log の下に区切りの線を引き、その下に 9（Owner。3章の短い名前「Settings」）と 26 Admin（Admin）。いちばん下の利用者（Avatar と名前）のメニューは 4 Account とログアウト
+  - サイドバー（タブレットの幅から上）: タブの4つと 7 Decision Log の下に区切りの線を引き、その下に 9（Owner。「Workspace Settings」。docs/mockups の s05・s06・s09・s11・s17・d1-moon のサイドバーと同じ）と 26 Admin（Admin）。いちばん下の利用者（Avatar と名前）のメニューは 4 Account とログアウト
   - メニュー（More）: 7 Decision Log / M7 ワークスペース切替 / 4 Account / 9 Workspace Settings（Owner）/ 26 Admin（Admin）/ ログアウト（1 へ移る。未保存の入力があれば「Unsaved changes on this page will be lost.」と確かめてから（AlertDialog の題は「Log out?」、操作は「Log out」と「Cancel」）。2026-10-11 のユーザーの決定。API がログアウトできなかったときは、セッションが残っていて 1 から 5 へ戻ってしまうので、画面に留まり、6.0.6 の想定外のエラーをトーストで出す（「Something went wrong. Ref: xxxxxxxx」と Retry。Ref は番号があるときだけ。回数の上限なら 6.0.6 の回数の上限の文言。Retry はログアウトをやり直す））
 - **Viewer**: 編集ボタン、19 判定、M1 / M2 / M3 / M4 / M5 / M8、24 / 25 の AI 往復、自己分析タブ（10）と 12 への入口を出さない。21 の [S] 参照（共有された自己分析）も出さない。10・11 と自己分析の 24・25 の URL を開いたら、自分の個人用ワークスペースの同じ画面へ移す（自己分析はどのワークスペースから開いても同じ中身のため）。
 - **12 への入口**: 10 のヘッダーの「Team」、5 の Self analyses、通知。読めるのは、今のワークスペースに共有済みの自己分析だけ。
@@ -569,6 +569,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 │ Decision  │                                  │  ├───────────────────────┤
 │ Log       │                                  │  │ 🏠  💡  🧭  🔔③  ≡   │
 │ ─────     │                                  │  └───────────────────────┘
+│ Workspace │                                  │
 │ Settings  │                                  │   Dashboard / Ideas / Self
 │ Admin     │                                  │   Analysis / Notifications / More
 │ [Ana ▼]   │                                  │
@@ -581,9 +582,9 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - タブレットのアイコンだけのサイドバーは、ワークスペースの切り替え・各ページ・利用者のメニュー（Avatar）の名前をツールチップで出す（デスクトップは名前が見えているので出さない）。
 - 未読数を持つナビの項目（SideNav と TabBar の Notifications）は、件数を名前に含めて読み上げる（「Notifications, 3 unread」）。見た目の数（SideNav の数字・TabBar の札）は読み上げない。
 - サイドバーのナビの今のページは、`surface.selected` の地（ライトで白）と内側の hairline の枠と semibold の名前で示し、左の線は付けない。いちばん下に利用者の Avatar（M）と名前を置く。スマホの TabBar は raised の地で、今のタブは塗らず、上にインクの線（4.5 の TabBar）を引いて名前を太くする（moon-base.css）。
-- スマホのヘッダーの高さは 06 `layout.header-height-mobile` にする。下の階層の画面は「← 戻り先」、TabBar で開く上の階層の画面（5・6・8・10 など）は画面の題を出す。More のメニューで開く画面（7・4・9・26）は「← More」を出す（s09-settings.html）。押すと More のメニューを開き直す（More は画面ではなくメニューのままで、← はページへ移らずにメニューを開く。2026-10-18 のユーザーの決定）。フォーカスは、TabBar の More を同じ操作で押したときと同じ所に入り（キーボードの Enter・Space・↓ と読み上げの操作では最初の項目、↑ では最後の項目、タップとクリックではメニュー）、メニューを閉じると ← More に戻る。← More はメニューのボタンとして読み上げる（開くのがメニューであることと、開いているか）。5 の題はワークスペースの切り替えにする（「BCDX ▾」。押すと M7）。タブレットから上のヘッダーは `layout.header-height` にし、パンくずの区切りは「/」の文字にする（moon-base.css）。
+- スマホのヘッダーの高さは 06 `layout.header-height-mobile` にする。下の階層の画面は「← 戻り先」、TabBar で開く上の階層の画面（5・6・8・10 など）は画面の題を出す。More のメニューで開く画面（7・4・9・26）と 28（6.17）は「← More」を出す（s09-settings.html）。押すと More のメニューを開き直す（More は画面ではなくメニューのままで、← はページへ移らずにメニューを開く。2026-10-18 のユーザーの決定）。フォーカスは、TabBar の More を同じ操作で押したときと同じ所に入り（キーボードの Enter・Space・↓ と読み上げの操作では最初の項目、↑ では最後の項目、タップとクリックではメニュー）、メニューを閉じると ← More に戻る。← More はメニューのボタンとして読み上げる（開くのがメニューであることと、開いているか）。5 の題はワークスペースの切り替えにする（「BCDX ▾」。押すと M7）。タブレットから上のヘッダーは `layout.header-height` にし、パンくずの区切りは「/」の文字にする（moon-base.css）。
 - ブラウザのタブの題（文書の title）は、ワークスペースの画面で「{画面名} · {ワークスペース名} · moonx」（例: 「Dashboard · BCDX · moonx」）、ワークスペースに属さない画面で「{画面名} · moonx」。画面が名前を持たない状態（6.0.6 の見つからない・権限がないなど）は「moonx」。
-- ヘッダー右に保存状態、コメント（💬、件数バッジ）、変更履歴（🕘）。変更履歴は、画面全体の履歴と、項目ごとの履歴の両方を開ける。保存状態はスマホでもヘッダーに出す（幅が足りなければ印だけ。4.3）。
+- ヘッダー右に保存状態、コメント（💬、件数バッジ）、変更履歴（🕘）。変更履歴は、画面全体の履歴と、項目ごとの履歴の両方を開ける（10 と 13 は回答を項目として並べないので、ヘッダーの 🕘 で全体の履歴だけを開く。6.0.5）。保存状態はスマホでもヘッダーに出す（幅が足りなければ印だけ。4.3）。
 - パンくず（デスクトップとタブレット）は「Ideas / {アイデア名} / {画面名}」の3段。13 はアイデアの段そのもので、「Validation」の段は置かない。プランの中は「Ideas / {アイデア名} / {案名} / {画面名}」、自己分析は「Self Analysis / {画面名}」、運営者の画面は「Admin / {画面名}」。画面名はセクションの番号付きの名前（例: 「05 Costs」）。スマホはパンくずを出さず、← の横に戻り先の短い名前を出す（13 へ戻るときは「Validation」、20 へは「Plan」、10 へは「Self Analysis」、6 へは「Ideas」）。s25-import.html のスマホは「← Back」と描いているが、ほかのモックアップは戻り先の名前を出し、名前が無いとどこへ戻るかが分からなくなるので、25 も戻り先の名前（「← Validation」など）にする。
 - 画面上部の帯（オフライン・新しい版・ホーム画面への追加の案内（6.0.6）と、テンプレートの新しい版の案内（6.0.7））は、ヘッダーの下、本文の上に、端から端まで出す（AlertBanner。sunken の地・下に hairline・secondary の文字・状態の色の印・右端に操作。InlineAlert のカードにしない。d1-moon.html の .banner）。複数あるときは上から、オフライン → アプリの新しい版 → ホーム画面への追加の案内 → テンプレートの新しい版の案内の順に重ねる。
 - ヘッダーの 💬 は、今の画面にある項目のスレッドと、アイデアの中の画面（13〜23）ではそのアイデアへのコメントを、まとめた一覧でコメントパネルに開く。件数バッジは未解決のスレッドの数。コメントの対象が無い画面（1〜9・19・24〜30）には 💬 を出さない。項目ごとのスレッドは、項目の横のバッジからも開ける（6.0.4）。
@@ -657,29 +658,29 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - スレッド: コメントと返信（1段まで）。本文に `@` と文字を打つとワークスペースのメンバーの候補が出て、選ぶと `@名前` が入りメンションになる（Viewer も含む。ただし自己分析へのコメントでは、その自己分析を読める Owner / Member だけを候補にする）。自分のコメントは編集・削除できる（削除は「deleted」と残す）。スレッドは、コメントできる人なら誰でも「解決」にでき、解決の取り消しもできる。解決済みは折りたたむ。
 - 行（競合・リスク・費用行など）を削除すると、その行へのコメントも一緒に隠れる。削除を取り消すと戻る。
 - 自己分析へのコメントは、共有先のワークスペースごとに分かれる。本人には、どのワークスペースからのコメントかを表示する。共有をやめるとそのワークスペースのコメントは見えなくなり、共有し直すと戻る。
-- 本人が開くパネル（10・11 と、12 の本人の行。2026-10-22 に Step 33 で決めた）: 各スレッドの上に「From {ワークスペース名}」を出す（ヘッダーの 💬 の一覧では、項目の名前の後ろに「 · 」でつなぐ）。返信とメンションの候補は、そのスレッドのワークスペースのもの。新しいスレッドは、今のワークスペースに共有していればそこに書く。共有していなければ（個人用ワークスペースなど）、入力欄の上に共有先から選ぶ Picker「Post to」（既定は共有した順の最初）を置き、選んだワークスペースに書く（SDD 5.11 の C1 POST は共有先のワークスペースのコメントしか受け付けないため）。どこにも共有していなければ、入力欄の代わりに「Share your self analysis with a team workspace to start a thread.」を出す（読める人がいないため）。12 の本人の行の 💬 の件数は、ほかの人と同じく今のワークスペースのコメントの数（SDD 5.8 S7）。
+- 本人が開くパネル（10・11 と、12 の本人の行）: 各スレッドの上に「From {ワークスペース名}」を出す（ヘッダーの 💬 の一覧では、項目の名前の後ろに「 · 」でつなぐ）。返信とメンションの候補は、そのスレッドのワークスペースのもの。新しいスレッドは、今のワークスペースに共有していればそこに書く。共有していなければ（個人用ワークスペースなど）、入力欄の上に共有先から選ぶ Picker「Post to」（既定は共有した順の最初）を置き、選んだワークスペースに書く（SDD 5.11 の C1 POST は共有先のワークスペースのコメントしか受け付けないため）。どこにも共有していなければ、入力欄の代わりに「Share your self analysis with a team workspace to start a thread.」を出す（読める人がいないため）。12 の本人の行の 💬 の件数は、ほかの人と同じく今のワークスペースのコメントの数（SDD 5.8 S7）。
 - アイデアの外の画面（10〜12）のヘッダーの 💬 の一覧には、新しいスレッドの入力欄を置かない（一覧の入力欄が書くアイデアへのコメントが無いため）。項目のスレッドは項目の 💬 から書く。
 - 空の状態: 「No comments yet」と入力欄（入力欄を置かない所は、上の自己分析の項目のとおり）。
 - 書き込みに失敗したら、入力内容を残して「Couldn't post」と Retry を出す。
-- 項目の 💬（項目の横のバッジ。2026-10-22 に Step 32 で決めた並び）: 設問のカード（11、15 の V.04、18 の V.08）は、開いたカードの見出しの右端の道具に 💬 と件数を置く（s11-form.html の .tools）。控えめなカードは件数だけを出し、押すとカードが開く。14・16 は詳細の見出しの右（⋯ の前）に 💬。15 のカードと 17 の行は ⋯ のメニューの先頭に「Comments」（件数があれば「Comments (2)」）を置き、Viewer とアーカイブ済みのアイデアにも、この項目と「History」（6.0.5）だけの ⋯ を出す（コメントは全ロールが書き、アーカイブ済みのアイデアのものも読めるため。2.2・6.8）。15 のカードは、ボタンを ⋯ だけ持つ（4.5 Card）ので、足下の「💬 1」の横の ⋯ から開く。18 の数字は、行の末尾の列（17 の ⋯ と同じ列。マウスでは行に重ねたときに見せる）に 💬。タブレットの幅から上の 17・18 の表では、コメントのある行の名前の後ろに件数の 💬（押すとスレッドを開く）も出す。スマホで行を押すとシートを開く 17・18 は、行に件数（4.5 CommentCount。行は押すとシートを開くだけで、ボタンを持たない）を出し、シートの中に同じ ⋯・💬 を置く。シートの ⋯・💬 を押すと、シートを閉じてからパネルを開く（シートとパネルを重ねない）。14・16 の一覧の行には件数（CommentCount）を出し、スレッドは詳細の見出しの横の 💬 から開く。
+- 項目の 💬（項目の横のバッジ）: 設問のカード（11、15 の V.04、18 の V.08）は、開いたカードの見出しの右端の道具に 💬 と件数を置く（s11-form.html の .tools）。控えめなカードは件数だけを出し、押すとカードが開く。14・16 は詳細の見出しの右（⋯ の前）に 💬。15 のカードと 17 の行は ⋯ のメニューの先頭に「Comments」（件数があれば「Comments (2)」）を置き、Viewer とアーカイブ済みのアイデアにも、この項目と「History」（6.0.5）だけの ⋯ を出す（コメントは全ロールが書き、アーカイブ済みのアイデアのものも読めるため。2.2・6.8）。15 のカードは、ボタンを ⋯ だけ持つ（4.5 Card）ので、足下の「💬 1」の横の ⋯ から開く。⋯ の「Comments (n)」の n は、ほかの項目の件数と同じく返信を含むコメントの数（削除していないもの）で、足下の 💬 の数は解決していないスレッドの数（Card の `openThreadCount`。SDD 5.7 の `unresolvedThreadCount`）。18 の数字は、行の末尾の列（17 の ⋯ と同じ列。マウスでは行に重ねたときに見せる）に 💬。タブレットの幅から上の 17・18 の表では、コメントのある行の名前の後ろに件数の 💬（押すとスレッドを開く）も出す。スマホで行を押すとシートを開く 17・18 は、行に件数（4.5 CommentCount。行は押すとシートを開くだけで、ボタンを持たない）を出し、シートの中に同じ ⋯・💬 を置く。シートの ⋯・💬 を押すと、シートを閉じてからパネルを開く（シートとパネルを重ねない）。14・16 の一覧の行には件数（CommentCount）を出し、スレッドは詳細の見出しの横の 💬 から開く。
 - パネルの中: 項目の 💬 から開いたパネルは、上に「On {項目の名前}」、下に新しいスレッドの入力欄「Add a comment」。ヘッダーの 💬 から開いた一覧は、各スレッドの上に項目の名前（SDD 5.11 の `HistoryEntry.label` と同じ書き方。「01 WHO」「Costs · Rent」。アイデアへのコメントはアイデア名）を出し、下の入力欄はアイデアへのコメント（「Comment on {アイデア名}」）にする。
 - スレッドの形: 書き手の Avatar・名前・相対時刻（直したコメントは「edited」を添える）と本文。返信は最初のコメントの本文の下に同じ形で字下げして並べ、その下に「Reply」と「Resolve」（解決済みは「Reopen」と「Resolved by {名前}」）。解決済みのスレッドは「Resolved · {書き手}: {本文}」の1行の Disclosure に畳み、押すと開く。自分のコメントの ⋯ に Edit（その場で直し、Save・Cancel）と Delete を置き、Delete は「Delete this comment?」と確かめる（消した本文は戻せないため）。入力欄の Post は、何か打つまで押せず、送っている間は二度押せない（6.0.6 のモーダルの決まりと同じ）。
 - アーカイブ済みのアイデア・プラン: パネルを開く画面（13〜23）がアーカイブ済みと分かっているので、パネルは最初から読み取り専用にする。スレッドの上に注意（アイデアなら「This idea is archived. Restore it to make changes.」、案なら「This plan is archived. Restore it to make changes.」）を出し、入力欄は出さない。ほかの画面から開いたパネルなど、画面が知らないときは最初の書き込みを API が拒否し（`ARCHIVED`）、拒否されたらパネルが同じ読み取り専用の表示に切り替わる。
 
 #### 6.0.5 変更履歴パネル（PNL-2）
 
-- 対象: 10・11・13〜18・20〜22 の各項目と、画面全体（その画面の全項目の履歴をまとめて表示）。出し方はコメントパネルと同じ（Web は右のパネル、スマホはボトムシート）。
+- 対象: 10・11・13〜18・20〜22 の各項目と、画面全体（その画面の全項目の履歴をまとめて表示）。10 と 13 は画面全体だけ（下の項目の 🕘）。出し方はコメントパネルと同じ（Web は右のパネル、スマホはボトムシート）。
 - 記録する変更: 回答の本文・数字・F/A/U・確信度・根拠の付け外し・行の追加と削除・アイデアの概要・プランのヘッダ・実行管理の項目。コメント・設定・テンプレートの編集は対象外（テンプレートは版で管理する）。ただしテンプレートの移行は、自己分析・プランの履歴と、13 ではアイデアの履歴に1行（版の更新）で出す。
 - 1件ごとに、誰が・いつ・どの項目・変更前と変更後の差分（語の単位の強調。4.5 の DiffText）・変更の種類（手入力 / AI 取り込み / 元に戻す / テンプレートの移行 / 複製 / 下書き作成 / 作成の取り消し）を出す。
 - 行には、変更の種類（手入力など）の隣に、操作の種類のラベル（Added / Changed / Deleted / Restored）を出す。
 - 「この時点に戻す」で、その項目の本文・数字・F/A/U・確信度・根拠の紐づけをその時点の状態に戻す。戻すこと自体も新しい変更として履歴に残る。削除した行は「削除を取り消す」で戻せる。AI 取り込み・テンプレートの移行・元に戻すの一括の操作は、その操作の先頭の行に「Undo the whole operation」を出し、操作全体を1回で取り消せる（SDD 5.11 の H3）。複製（6.8）とプラン下書きの作成（M5）の先頭の行にも同じボタンを出す。これは戻すのではなく作ったものを消す「作成の取り消し」で、確認のダイアログ（複製は「Delete the copied idea?」、下書きは「Delete this plan draft?」。消えるものと、元に戻せないことを書く）を挟む。作ったあとに変更・コメント・判定・プランなどが足されていると取り消せず、「Something was added after this was created, so it cannot be undone」と出す。すでに取り消した操作をもう一度取り消そうとしたとき（別の画面で先に取り消したときなど）は「This was already undone」と出して履歴を読み直す。対象をほかの保存が書き込んでいる最中で取り消せないときは「Something is being changed right now. Try again.」と出す（SDD 8.1 の `ALREADY_REVERTED`・`UNDO_BLOCKED`・`BUSY`）。
 - 作成の取り消しは、作ったアイデア（またはプラン）を論理削除する。一覧・検索・ダッシュボード・工程の集計・通知のどこにも出さず、URL で開くと 6.0.6 の「見つからない」を出す。作ったものの中の変更履歴は消さずに残す。取り消したことは、元の側の履歴に1行（「Duplicate undone」「Plan draft undone」）で残す。元の側は、複製ならコピー元のアイデア、プラン下書きならそのアイデアで、どちらも 13 の履歴に出る。この行には「この時点に戻す」も「Undo the whole operation」も出さず、取り消したものは戻せない。取り消すと、複製はアイデア一覧（6）へ、下書きはそのアイデアの 13 へ移る。
-- 自己分析の履歴は本人だけが見られる。共有先のメンバーには履歴ボタンを出さない。10 は回答を項目として並べないので、13 と同じく項目の 🕘 は置かず、ヘッダーの 🕘 が自己分析の全体の履歴を開く（2026-10-22 に Step 33 で決めた）。
-- 自己分析の回答の差分（2026-10-22 に Step 33 で決めた）: 本文は名前を出さない。Q15〜17 は 11 の欄と同じく、理由を「Why this amount?」、金額を「Amount」の名前で出し、金額は自己分析の通貨（6.11）で出す。
-- プランの差分（2026-10-22 に Step 34 で決めた）: ヘッダは「Plan name」「Business Name」「Prepared by」。小項目の文章は名前を出さない。表の小項目も名前を出さず、行ごとに1行で「{列の名前}: {値}」を「 · 」でつなぐ（値の無い列は出さず、どの列も空の行は「Empty row」。% は「40%」、金額はワークスペースの通貨で 21 と同じ書式。テンプレートの移行で消えた列の値は、21 と同じく出さない。移行で表の小項目ごと消えたときは、行が保っていた列のキーをそのまま列の名前にして出す）。実行管理の項目は 22 の列の名前（6.13。種類ごとに 1列目は Milestone / Timing / KPI / Open Question / Action、期限は Deadline / Date / Target Date、ほかに Goal・Exit Condition・Actions・Completion Criteria・Area・Target・Review Frequency・Actual・Why It Matters・Answer・Assignee・Status、ローンチの区分は「Phase」）で出す。担当はメンバーの表示名で、今はメンバーでない人は「A former member」。追加した行は、種類の最初の状態（To do / Open）と区分の Other を、作ったときのままとして設定した欄に数えない。20 の画面全体の履歴は、表の小項目の列の名前と種類を、その項目（SDD 5.9 P4）から読み、担当の名前をメンバーの一覧（W2）から読む（読み終えるまで、それを使う行だけを骨組みにする。読めなければ一覧の位置に 6.0.6 の失敗の表示と Retry を出す）。
+- 自己分析の履歴は本人だけが見られる。共有先のメンバーには履歴ボタンを出さない。10 は回答を項目として並べないので、13 と同じく項目の 🕘 は置かず、ヘッダーの 🕘 が自己分析の全体の履歴を開く。
+- 自己分析の回答の差分: 本文は名前を出さない。Q15〜17 は 11 の欄と同じく、理由を「Why this amount?」、金額を「Amount」の名前で出し、金額は自己分析の通貨（6.11）で出す。
+- プランの差分: ヘッダは「Plan name」「Business Name」「Prepared by」。小項目の文章は名前を出さない。表の小項目も名前を出さず、行ごとに1行で「{列の名前}: {値}」を「 · 」でつなぐ（値の無い列は出さず、どの列も空の行は「Empty row」。% は「40%」、金額はワークスペースの通貨で 21 と同じ書式。テンプレートの移行で消えた列の値は、21 と同じく出さない。移行で表の小項目ごと消えたときは、行が保っていた列のキーをそのまま列の名前にして出す）。実行管理の項目は 22 の列の名前（6.13。種類ごとに 1列目は Milestone / Timing / KPI / Open Question / Action、期限は Deadline / Date / Target Date、ほかに Goal・Exit Condition・Actions・Completion Criteria・Area・Target・Review Frequency・Actual・Why It Matters・Answer・Assignee・Status、ローンチの区分は「Phase」）で出す。担当はメンバーの表示名で、今はメンバーでない人は「A former member」。追加した行は、種類の最初の状態（To do / Open）と区分の Other を、作ったときのままとして設定した欄に数えない。20 の画面全体の履歴は、表の小項目の列の名前と種類を、その項目（SDD 5.9 P4）から読み、担当の名前をメンバーの一覧（W2）から読む。21・22 の履歴も担当の名前を W2 から読む。読み終えるまで、それを使う行だけを骨組みにする。10 秒を超えたら一覧の位置に 6.0.6 の「Taking longer than usual」と Retry（読み終えていないものだけを読み直す）を出し、読めなければ一覧の位置に 6.0.6 の失敗の表示と Retry を出す。
 - Viewer は見られるが、戻せない。
 - 空の状態: 「No changes yet」。
-- 項目の 🕘（2026-10-22 に Step 32b で決めた並び）: 項目の 💬（6.0.4）と同じ所に置き、Viewer とアーカイブ済みのアイデアにも出す（履歴は全ロールが読めるため）。💬 のボタンを置く所（11・15 の V.04・18 の V.08 のカードの道具、14・16 の詳細の見出しの右、18 の数字の末尾の列とスマホのシート）では 💬 の右に 🕘（読み上げは「History of {項目の名前}」）を置き、⋯ のメニューに「Comments」を置く所（15 のカード、17 の行とスマホのシート）では「Comments」の次に「History」を置く。シートの 🕘・「History」は、シートを閉じてからパネルを開く。13 の項目はアイデアの概要だけなので、項目の 🕘 は置かず、ヘッダーの 🕘 がその履歴を開く。
+- 項目の 🕘: 項目の 💬（6.0.4）と同じ所に置き、Viewer とアーカイブ済みのアイデアにも出す（履歴は全ロールが読めるため）。💬 のボタンを置く所（11・15 の V.04・18 の V.08 のカードの道具、14・16 の詳細の見出しの右、18 の数字の末尾の列とスマホのシート）では 💬 の右に 🕘（読み上げは「History of {項目の名前}」）を置き、⋯ のメニューに「Comments」を置く所（15 のカード、17 の行とスマホのシート）では「Comments」の次に「History」を置く。シートの 🕘・「History」は、シートを閉じてからパネルを開く。13 の項目はアイデアの概要だけなので、項目の 🕘 は置かず、ヘッダーの 🕘 がその履歴を開く。
 - パネルの中: 新しい順に50件ずつ出し、続きは「Show more」で読む。ヘッダーの 🕘 から開いた一覧は各行の上に項目の名前（SDD 5.11 の `HistoryEntry.label`）を出し、項目の 🕘 から開いたパネルは上に「On {項目の名前}」を出す。1件は、変更した人の Avatar・名前・相対時刻、その下に「{変更の種類} · {操作の種類}」（例: 「Manual · Changed」）、差分、操作のボタンの順に並べる。変更の種類の文言は、手入力「Manual」・AI 取り込み「AI import」・元に戻す「Revert」・テンプレートの移行「Template update」・複製「Duplicate」・下書き作成「Plan draft」・作成の取り消し「Duplicate undone」「Plan draft undone」。
 - 差分: 項目の欄ごとに、欄の名前（入力欄と同じ名前。回答の本文は名前を出さない）の下に、変更前の DiffText と変更後の DiffText を縦に並べる。変わった欄だけを出し、追加の行は設定した欄を、削除の行は削除する前に設定していた欄を出す（空の側は出さない。根拠が無い・Lump sum でない・金額で入れる・F/A/U が Empty は、行を作ったときのままなので設定した欄に数えない）。F/A/U は「F/A/U」の名前で 6.0.3 の表示（「Assumption · Medium」「Fact · 2 sources」。根拠は、その変更が記録した紐づけの数で数える。値が入って Empty から Unclassified に変わったときも、F/A/U の表示が変わったので出す）。根拠の数の変化は「Evidence」の名前で件数（「1 source」「No sources」）を出す。ただし F/A/U も変わった行で、変更前と変更後のどちらの F/A/U の表示も根拠の数を読める（Fact か、根拠が0件）ときは、F/A/U が示すので「Evidence」を出さない。F/A/U を持たない設問の回答（テンプレートの `hasFau` が無いもの）は、F/A/U も「Evidence」も出さない。金額・% は 17・18 と同じ書式、選択肢は画面と同じ文言で出す。17 の入力の方法は、入力欄が無い（⋯ の「Use % of price」で替える）ので「Entered as」の名前で「Amount」「% of price」と出し、Lump sum は「Lump sum」の名前で「Yes」「No」と出す。テンプレートの版の行は差分の代わりに「Template updated to v{n}」（移行を戻した行は「Template set back to v{n}」）、作成の取り消しの行は差分を出さない。
 - 操作のボタン: 「この時点に戻す」は「Revert to this point」、「削除を取り消す」は削除の行の「Undo delete」（読み上げは見える文言の後に項目の名前を付ける。「Revert to this point, 01 WHO」「Undo delete of 01 WHO」「Undo the whole operation that changed 01 WHO」）。「Undo the whole operation」の「その操作の先頭の行」は、その操作の行のうち一覧でいちばん上（いちばん新しい）の行にする（操作が複数の画面にまたがるときは、各画面の一覧のいちばん上の行）。テンプレートの版の行には「Undo the whole operation」だけを出す。戻す操作は一度に1つで、送っている間はほかの戻すボタンを押せない。オフラインのときは押せない。
@@ -735,8 +736,8 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | プランが参照する費用行のキー | 新しい版のプランのテンプレートの参照に従う。キーの行が検証にないときは「Not in validation」と出す |
 
 - 移行は1回の操作を単位に元に戻せる。10 / 13 / 20 の履歴に「Template updated to v2」の行として出し、その行の「Undo the whole operation」で版と回答の状態をまとめて戻す。この行に個別の「この時点に戻す」は出さない。13 の履歴は、アイデア自身の行に加えて検証の移行の行だけを含む（検証の回答の行は各セクションの画面に出る）。
-- 帯と入口（2026-10-28 に Step 35c で決めた）: 帯の文は「**A newer template is available.** Your answers stay on v{今の版} until you update.」で、右端に「Update template」（d1-moon.html の .banner）。アーカイブ済みのアイデア・案と、20 で保存した版を開いている間は読み取り専用（6.8・6.12）なので、帯も ⋯ の M8 も出さない。13・20 の ⋯ の「Update template」は、帯と同じく新しい版があるときだけ出す（screen_flow.mermaid の「新しい版があるとき」）。
-- M8 の並びと文言（2026-10-28 に Step 35c で決めた）: 題「Update template」の下に「Move from v{今の版} to v{新しい版} of the template.」、DescriptionList で「Answers carried over」（T1 の `carried`）・「New questions」（`addedQuestions`）・検証だけ「Cost rows added」（`addedCostRows` を並べる。無ければ「None」）、小見出し「Questions not in v{新しい版}」と注記「Answers to these questions stay saved but no longer show.」の下に、新しい版にない設問を「{節} {設問のタイトル}」（「01 NON-CUSTOMER」）で並べ、行の右に回答の有無（「Answered」「No answer」）を出す。無ければ「Every question carries over to v{新しい版}.」。ボタンは「Cancel」と「Update template」（T1 を読み終えるまで押せない）。移行したら M8 を閉じ、トースト「Template updated to v{新しい版}」を出す（帯は消える）。「You're already on the latest template」の間は、ボタンを「Close」だけにする。開いている間に、ほかの人が新しい版へ移したうえで、さらに新しい版が公開されていたとき（T2 の `422 VALIDATION_FAILED`）は、T1 を読み直して今の移行の中身を出し、その上に注意「The template changed since this opened. Check what moves now, then update again.」を出す（読み直している間は Update template を押せない）。開いている間にアイデア・案がアーカイブされたとき（`409 ARCHIVED`）は、M8 を開いたまま 6.0.6 の送信の失敗（「Couldn't save」と理由）を出し、閉じるまで残す（背後の画面は読み取り専用に変わる）。
+- 帯と入口: 帯の文は「**A newer template is available.** Your answers stay on v{今の版} until you update.」で、右端に「Update template」を置く（d1-moon.html の .banner）。アーカイブ済みのアイデア・案と、20 で保存した版を開いている間は読み取り専用（6.8・6.12）なので、帯も ⋯ の M8 も出さず、`?modal=update-template` の URL から開いても何も出さない（SDD 4章）。開いた後は閉じるまで残す（下のアーカイブされたときの決まり）。13・20 の ⋯ の「Update template」は、帯と同じく新しい版があるときだけ出す（screen_flow.mermaid の「新しい版があるとき」）。
+- M8 の並びと文言: 題「Update template」の下に「Move from v{今の版} to v{新しい版} of the template.」、DescriptionList で「Answers carried over」（T1 の `carried`）・「New questions」（`addedQuestions`）・検証だけ「Cost rows added」（`addedCostRows` を並べる。無ければ「None」）、小見出し「Questions not in v{新しい版}」と注記「Answers to these questions stay saved but no longer show.」の下に、新しい版にない設問を「{節} {設問のタイトル}」（「01 NON-CUSTOMER」）で並べ、行の右に回答の有無（「Answered」「No answer」）を出す。無ければ「Every question carries over to v{新しい版}.」。ボタンは「Cancel」と「Update template」（T1 を読み終えるまで押せない）。移行したら M8 を閉じ、トースト「Template updated to v{新しい版}」を出す。帯は、移った版より新しい版が無ければ消える（M8 を開いている間にさらに新しい版が公開されていれば残る。SDD 5.12 の T2 は最新でない新しい版へも移れるため）。「You're already on the latest template」の間は、ボタンを「Close」だけにする。ほかの人が先に移行していたとき（`ALREADY_LATEST`。開いたときの T1 でも、Update template を押したときの T2 でも）と、アーカイブされたとき（`409 ARCHIVED`）は、背後の画面・コメント・履歴を読み直し、帯が消える。開いている間に、ほかの人が新しい版へ移したうえで、さらに新しい版が公開されていたとき（T2 の `422 VALIDATION_FAILED`）は、T1 を読み直して今の移行の中身を出し、その上に注意「The template changed since this opened. Check what moves now, then update again.」を出す（読み直している間は Update template を押せない）。開いている間にアイデア・案がアーカイブされたとき（`409 ARCHIVED`）は、M8 を開いたまま 6.0.6 の送信の失敗（「Couldn't save」と理由）を出し、閉じるまで残す（背後の画面は読み取り専用に変わる）。
 
 #### 6.0.8 入力の規則
 
@@ -825,6 +826,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 27 | EXAMPLE | 任意 | 長文 |
 | 27 | AI 用プロンプト（自己分析のテンプレートだけ） | 任意 | 長文 |
 | 27 | 選択肢（選択の型）・表の列名（表の型） | 必須 | 短文。選択肢は設問の中で重ならない |
+| 27 | 表示する主要指標（検証の数字の型） | 必須（1つ以上） | 6.4 の主要指標のうち 21 が出せるもの（1つの値・`scenario:*` のシナリオの列・公開済みの検証のテンプレートの費用行の初期値の `cost_row:*`）から選ぶ（ほかのキーは SDD 5.13 AD6 の `unknown_metric_key` が公開をふさぐ）。設問の中で重ならない（AD4・AD10 が断る。27 の Picker はほかの行で選んだキーを出さない） |
 | 27 | 表示条件 | 任意 | 6.6 の形式の設問 ID と、出すときの答えの値の一覧（値は短文。1つ以上。値の無い条件の設問は出ることがないため） |
 | 27 | 費用行の初期値の名前 | 任意 | 17 の費用行の名前と同じ |
 | 27 | 実行管理の初期行の1列目・Area | 1列目は必須、Area は任意（KPI の行だけ） | 22 の同じ欄と同じ |
@@ -942,7 +944,7 @@ Viewer にも同じ Next steps を出す。ただし Viewer が入れない行�
 | AI ▼ Export for AI / Import from AI | 24 へ（範囲の初期値は「この検証の設問型の全セクション」）/ 25 へ（取り込み先はこの検証）。どちらも反映や戻る先は 13。アーカイブ済みのアイデアでは出さない（6.8 の表。AI 往復はできない） | Owner / Member |
 | Record decision | 19 へ | Owner / Member |
 | Add plan | M5（最新の判定が Proceed のときだけ出す） | Owner / Member |
-| ⋯ メニュー | アイデアを複製（6.8）/ アーカイブ / テンプレートの移行（M8） | Owner / Member |
+| ⋯ メニュー | アイデアを複製（6.8）/ アーカイブ / テンプレートの移行（M8。新しい版があるときだけ。6.0.7） | Owner / Member |
 
 画面の細部:
 
@@ -1042,7 +1044,7 @@ Web（パターン C 設問フォーム）
 | 長文 | 入力に合わせて広がるテキスト欄 | ほとんどの設問 |
 | 短文 | 1行のテキスト欄 | 02 CATEGORY |
 | 選択 | ラジオボタン | 02 OCEAN（Red / Blue / Mixed） |
-| 金額＋理由 | 金額（通貨記号付き。欄の名前は「Amount」）と「Why this amount?」の2欄（どちらも見える名前。設問はカードの region の名前で分かる）。控えめな表示の回答の冒頭は「₱40,000 · {理由}」（2026-10-22 に Step 33 で決めた） | 自己分析 Q15〜17（PERSONAL INCOME） |
+| 金額＋理由 | 金額（通貨記号付き。欄の名前は「Amount」）と「Why this amount?」の2欄（どちらも見える名前。設問はカードの region の名前で分かる）。控えめな表示の回答の冒頭は「₱40,000 · {理由}」 | 自己分析 Q15〜17（PERSONAL INCOME） |
 
 - 検証のときだけ、各回答に F/A/U（6.0.3）。自己分析には出さない。
 - フォーカス中の設問だけに出すもの: EXAMPLE（テンプレートの例。最初は開いた状態）、ヒント、検証のときは「関連する調査ログ」（この設問の根拠に付いているもの。Disclosure の「Related research」）。関連する調査ログが無いときは、中に「No research linked to this answer. Mark it Fact to attach a source.」と、その下の単独の行に「Log research」のリンクを出す。押すと 14 を開いて新しい調査ログの入力を開く（SDD のルーティングの `new=1`。14 の「+ Add entry」と同じ。根拠に付けるのは、Fact を選んで開く M2）。s11-form.html はこのリンクを文の中に置くが、文中のリンクは読み物だけに置く決まり（4.5 の Link）に合わせて単独の行にする。Viewer とアーカイブ中のアイデアでは、新しい調査ログも F/A/U の変更も入れられないので、空のときは「No research linked to this answer.」だけを出す（6.1 の Next steps と同じく、入れない行き先をリンクにしない）。根拠が付いているときは、題を「Related research ({件数})」（数える根拠の数）にし、中に根拠のチップ（6.0.3。調査ログは「{日付} {トピック}」、URL は URL）を付けた順に並べる。Owner / Member には（アーカイブ中は出さない）、その下に「Add evidence」のリンクを置き、M2 を開く（Fact のボタンはもう一度押すと外れるので、Fact のまま根拠を足し外しする入口。4.5 の FauPicker の「Add evidence」と同じ）。「Fact · No evidence」（6.0.3。根拠の調査ログが削除された Fact）では数える根拠が無いので、題は「Related research」のまま、中に「No research linked to this answer.」（もう Fact なので「Mark it Fact」の案内は付けない）を出し、Owner / Member には（アーカイブ中は出さない）その下に「Log research」と「Add evidence」を置く（「Add evidence」は根拠を付け直す入口。M2 では削除した調査ログを指す根拠が「(deleted)」で並び、外せる）。カードの状態のラベル「Fact · No evidence」には警告の印を添える（4.5 の QuestionCard）。EXAMPLE とヒントは、テンプレートの設問が持つときだけ出す。
@@ -1192,20 +1194,29 @@ Web（パターン F ワークシート）
 │ Daily sales (units/day)           │  Units for target margin  9.8 / day     │
 │ ◐ Conservative   6     Assm·L     │  Expected profit  ₱18,490 / mo          │
 │ ◐ Expected       10    Assm·M     │  Payback 9.2 months · ROI 130.9% / year │
-│ ◐ Strong         15    Assm·L     │ Scenarios                               │
-│ ● Capacity limit 25    Fact·1 src │  Break-even   6.9 / day · 180.1 / month │
-│                                   │   Revenue ₱81,058 · Op. profit ₱0 …     │
-│ Costs from 05: Startup ₱169,500   │  Conservative 6 / day · 156 / month     │
-│  Monthly ₱41,700 → Costs          │   Revenue ₱70,200 · Op. profit −₱5,586 …│
-│                                   │  Expected … Strong … Capacity limit …   │
+│ ◐ Strong         15    Assm·L     │                                         │
+│ ● Capacity limit 25    Fact·1 src │                                         │
+│                                   │                                         │
+│ Costs from 05: Startup ₱169,500   │                                         │
+│  Monthly ₱41,700 → Costs          │                                         │
+│                                   │                                         │
 │ Is the return worth the capital   │                                         │
 │ and effort?  (長文・F/A/U)          │                                         │
-└───────────────────────────────────┴────────────────────────────────────────┘
+├───────────────────────────────────┴────────────────────────────────────────┤
+│ Scenarios                                                                  │
+│ Metric            Break-even  Conservative  Expected   Strong  Capacity limit │
+│ Units / day              6.9             6        10       15             25 │
+│ Units / month          180.1           156       260      390            650 │
+│ Revenue              ₱81,058       ₱70,200  ₱117,000      …              …  │
+│ Variable costs       ₱39,358       ₱34,086   ₱56,810      …              …  │
+│ Operating profit          ₱0       −₱5,586   ₱18,490      …              …  │
+│ Operating margin        0.0%         −8.0%     15.8%      …              …  │
+└────────────────────────────────────────────────────────────────────────────┘
 
 スマホ: 入力を線で区切った行で縦に並べる。結果は下部の要約バー（「BE 6.9/day · Exp ₱18,490/mo」）に固定し、押すと全体を開く。
-シナリオは表の列が多く、結果のカード（4.1 F）にも入らないので、どの幅でも行と列を入れ替え、シナリオ（Break-even・Conservative・Expected・Strong・Capacity Limit）
-ごとの行5つを縦に並べる（各行に件数/日・件数/月・売上・変動費合計・営業利益・利益率をラベルと値で並べる。4.3 の「表は1行ずつの行」の
-決まりに合わせる。スマホの並びは 2026-10-12 のユーザーの決定）。F/A/U は行を押して開く行の編集シートの中のボタンで付ける（6.0.3）。
+シナリオは、開いた結果の中で、シナリオ（Break-even・Conservative・Expected・Strong・Capacity Limit）ごとの行5つを縦に並べる
+（各行に件数/日・件数/月・売上・変動費合計・営業利益・利益率をラベルと値で並べる。4.3 の「表は1行ずつの行」の決まりに合わせる。
+スマホの並びは 2026-10-12 のユーザーの決定）。F/A/U は行を押して開く行の編集シートの中のボタンで付ける（6.0.3）。
 ```
 
 #### 入力
@@ -1222,7 +1233,7 @@ Web（パターン F ワークシート）
 - 「Is the return worth the capital and effort?」の見出し・問い・EXAMPLE・ヒントは、15 の Survivor Patterns / Failure Patterns と同じく、検証のテンプレートの版にある設問 `V.08.WORTH` のものを、11 と同じ QuestionCard で出す（27 で編集した内容が反映される）。
 - 営業日数と目標利益率は、入力欄に既定値を薄く表示し、値が空（未入力、または Unknown）のあいだは既定値で計算する。結果には「using default 30 days」と添える。「既定値のまま」とは値が空のことで、自分で 30 や 15% を入れたら入力済みとして扱う。
 - 費用（17 の合計）はこの画面では直さず、要約と 17 へのリンクを出す。
-- Web の並び（モックアップが無いので、パターン F の s17-costs.html にそろえた）: 題は UI 表示名の「06–08 Unit Economics & Scenarios」（3章。セクションの一覧と ▼ の切替は短い名前）、その横に「What each sale earns, how many sales break even, and what each scenario makes.」。左の列に Inputs の表（価格・営業日数・目標利益率）、Daily sales の表（4シナリオの1日の販売数。表の題の横に「units / day」）、Costs from 05 の要約（「Startup ₱169,500 · Monthly ₱41,700 · Variable ₱218.50 / sale」と「Costs →」）、「Is the return worth the capital and effort?」の設問。右の結果のカード（「Results」。4.1 F）に、警告（下の計算仕様の警告と注意書き。題「Warnings」の琥珀色の InlineAlert にまとめる）、変動費/件、粗利/件（「{粗利率} of the price」を添える）、損益分岐（件/日。「{件/月} / month · {売上/月} / month」を添える）、目標利益率の件数（件/日。「{件/月} / month at {率}」を添える）、Expected の営業利益（/ mo）、回収期間、ROI（/ year）、既定値を使っているときの「using default 30 days」「using default 15%」、シナリオ（小見出し「Scenarios」）。シナリオは、4.1 F の結果のカードの幅に上の図の6列の表が入らないので、どの幅でもスマホと同じく損益分岐と4シナリオの1行ずつ（各行に件数/日・件数/月・売上・変動費合計・営業利益・営業利益率をラベルと値で並べる）にする。結果のカードが窓より高いときは、カードの中がスクロールし、キーボードでもカードへ移ってスクロールできる。要約バーは「BE 6.9/day · Exp ₱18,490/mo」。
+- Web の並び（モックアップが無いので、パターン F の s17-costs.html にそろえる）: 題は UI 表示名の「06–08 Unit Economics & Scenarios」（3章。セクションの一覧と ▼ の切替は短い名前）、その横に「What each sale earns, how many sales break even, and what each scenario makes.」。左の列に Inputs の表（価格・営業日数・目標利益率）、Daily sales の表（4シナリオの1日の販売数。表の題の横に「units / day」）、Costs from 05 の要約（「Startup ₱169,500 · Monthly ₱41,700 · Variable ₱218.50 / sale」と「Costs →」）、「Is the return worth the capital and effort?」の設問。右の結果のカード（「Results」。4.1 F）に、警告（下の計算仕様の警告と注意書き。題「Warnings」の琥珀色の InlineAlert にまとめる）、変動費/件、粗利/件（「{粗利率} of the price」を添える）、損益分岐（件/日。「{件/月} / month · {売上/月} / month」を添える）、目標利益率の件数（件/日。「{件/月} / month at {率}」を添える）、Expected の営業利益（/ mo）、回収期間、ROI（/ year）、既定値を使っているときの「using default 30 days」「using default 15%」。シナリオは結果のカードに入れず、入力の列と結果のカードの2列の下に全幅で置く。題「Scenarios」（入力の表と同じ大きさの見出し）の下の表（TableView）で、損益分岐と4シナリオ（Break-even・Conservative・Expected・Strong・Capacity limit）を列に、件数/日・件数/月・売上・変動費合計・営業利益・営業利益率を行にする（1列目の題は「Metric」。2026-10-22 のユーザーの決定）。空のシナリオの列は「Empty」、赤字はそのまま見せる（下の「状態」）。2列の下との間は入力の表どうしの間と同じにする。タブレットと、パネルで本文が狭いデスクトップ（4.1 F のタブレットの並び）も、入力の表の下に同じ表を全幅で置き、表の形は TableView の layout auto が幅で選ぶ。スマホは上の図の下の説明のとおり、開いた結果の中にシナリオごとの行を並べる。結果のカードが窓より高いときは、カードの中がスクロールし、キーボードでもカードへ移ってスクロールできる。要約バーは「BE 6.9/day · Exp ₱18,490/mo」。
 
 #### 計算仕様
 
@@ -1284,7 +1295,7 @@ Web（パターン F ワークシート）
 
 - 1つの行に複数のキーをまとめた表示名は、キーごとに並べるとき（AI 書き出しの Key numbers。6.6）は次の名前にする: `contribution_margin` Contribution / sale、`contribution_margin_rate` Contribution margin rate、`break_even_units_month` Break-even units / month、`break_even_units_day` Break-even units / day、`break_even_revenue` Break-even revenue / month、`expected_revenue` Expected revenue per month、`expected_operating_profit` Expected profit per month、`payback_months` Payback、`simple_roi` ROI。ほかのキーは表の表示名のまま。
 - 計算できない主要指標の表示（13・19・20・21・23 と、決定ログ・版のスナップショットで同じ）:
-  - 入力をそのまま出す指標（`selling_price`・`capacity_units_day`・`cost_row:*`）: 値が無ければ「Empty」、Unknown なら「Unknown」。`cost_row:*` は、テンプレートの初期行を削除したときも「Empty」
+  - 入力をそのまま出す指標（`selling_price`・`capacity_units_day`・`cost_row:*`）: 値が無ければ「Empty」、Unknown なら「Unknown」。`cost_row:*` は、検証にその行があって値が無ければ「Empty」、検証にその行が無ければ（テンプレートの初期行を削除した、固定している版にそのキーの初期行が無い）「Not in validation」（6.0.7。名前はテンプレートの初期行の名前。6.12）
   - 費用の合計と変動費/件（`initial_cost_total`・`monthly_fixed_total`・`variable_cost_per_unit`）: 17 の合計と同じ。金額の入った行が無ければ「Empty」（価格の%の行があって価格が無いときの変動費/件は「Needs price」）
   - Expected の売上・営業利益: 上のシナリオの Expected の列と同じ（Expected の販売数に値が無ければ「Empty」）
   - `operating_days`: D。値が空（未入力・Unknown）なら既定の 30 で、計算できないことは無い
@@ -1364,7 +1375,7 @@ Summary は DescriptionList、判定は RadioGroup の cards。s19-decision.html
 | 判定を選ぶ | 選んだ値に応じて注意書き。Proceed: 「Proceed means it is worth planning, not approval to launch.」。Drop: 「Dropped ideas are hidden from lists by default. You can decide again later.」。Hold と、まだ選んでいないあいだは「You can decide again at any time. Every decision stays in the log.」（s19-decision.html）。不足があれば「n checks are missing. They will be recorded with this decision.」（不足があっても記録できる） |
 | 理由を書く | 必須。空のままでは記録できない（規則は 6.0.8） |
 | Record decision | 決定ログに記録する（判定・理由・記録者・日時・その時点の不足項目・主要指標・F/A/U の内訳のスナップショット）。アイデアの最新の判定が変わる。ワークスペースのメンバーに通知する |
-| 記録の後（Proceed） | 「Create a plan draft?」の確認を出す → [Create draft]（M5）/ [Later]（13 へ）。確認は AlertDialog で、本文は「Proceed is recorded. A draft copies your validation's answers into a Business Plan, which you can also start later from the idea's Plans.」。Create draft は M5 を 13 の上に開く（M5 の Cancel で 13 に残る。2026-10-22 に Step 34 で決めた）。「Decision recorded」のトーストは記録したときに出す |
+| 記録の後（Proceed） | 「Create a plan draft?」の確認を出す → [Create draft]（M5）/ [Later]（13 へ）。確認は AlertDialog で、本文は「Proceed is recorded. A draft copies your validation's answers into a Business Plan, which you can also start later from the idea's Plans.」。Create draft は M5 を 13 の上に開く（M5 の Cancel で 13 に残る）。「Decision recorded」のトーストは記録したときに出す |
 | 記録の後（Hold / Drop） | 13 へ戻り、「Decision recorded」と表示する |
 | Cancel | 何も記録せず 13 へ |
 
@@ -1905,7 +1916,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 自己分析はワークスペースに属さないので、どのワークスペースから開いても同じ内容。Viewer として開いているワークスペースで 10・11 の URL を開くと、自分の個人用ワークスペースの同じ画面へ移す。
 - 自己分析は、本人が最初に 10 を開いたとき（10 を経ずに 11 を開いたときも）に、その時点の最新のテンプレートの版で作る（運営者も同じ）。
 - 空の状態（未着手）: 「Answer 36 questions at your own pace. Only you can see your answers until you share them.」と [Start]。
-- 並びと文言（2026-10-22 に Step 33 で決めた）: 題「My Self Analysis」の下に「{状態} · {回答済みの数} / {問いの数} answered」。題の横の道具は AI ▼・Mark as done（完了の後は Reopen）・Share・Team・⋯（「Change currency」）で、主要な操作は Continue（未着手の間は Start。スマホは下部に固定。4.1 A）。主列に「Status」（Answered「21 / 36 answered」・Shared with（共有先の名前。無ければ「Not shared」）・Template「v1」。未着手の間は上の空の状態の文）、副列に「Sections」（セクションごとの MoonGlyph・名前・「2/2」。押すと 11）。
+- 並びと文言: 題「My Self Analysis」の下に「{状態} · {回答済みの数} / {問いの数} answered」。題の横の道具は AI ▼・Mark as done（完了の後は Reopen）・Share・Team・⋯（「Change currency」）で、主要な操作は Continue（未着手の間は Start。スマホは下部に固定。4.1 A）。主列に「Status」（Answered「21 / 36 answered」・Shared with（共有先の名前。無ければ「Not shared」）・Template「v1」。未着手の間は上の空の状態の文）、副列に「Sections」（セクションごとの MoonGlyph・名前・「2/2」。押すと 11）。
 - Share は、完了しているか共有先があるときだけ押せる。上の「共有（M6）」の「完了にした後で使える」と「共有をやめるのはいつでもできる」を両方守るため、Reopen した後も共有先がある間は M6 を開き、共有先を外すことだけができる（足せるのは完了のときだけ）。
 - Team は、個人用ワークスペースでも出す（個人用ワークスペースには誰も共有できないので、12 は空の状態になる）。Mark as done・Reopen が失敗したときは、6.0.6 の想定外のエラー（または回数の上限）をトーストで出し、Retry で送り直す。
 - 公開済みのテンプレートが無いとき（6.0.6）は、題「My Self Analysis」と、Start の代わりに Status の位置に「Templates aren't ready yet. Ask your administrator.」を出す。11 では本文の位置に同じ文を出す。
@@ -1919,7 +1930,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 左に今のワークスペースの Owner / Member の一覧（共有済みの人は押せる。共有していない人は「Not shared」でグレー）。
 - 右に選んだ人の自己分析を、セクションごとの読み物として表示（問い・回答。Q15〜17 は金額と理由）。各回答にコメントできる（PNL-1）。変更履歴は出さない。
 - 空の状態: 「No one has shared their self analysis in this workspace yet.」
-- 並び（2026-10-22 に Step 33 で決めた）: 一覧の行は Avatar・名前・「Shared · {状態}」（共有していない人は「Not shared」）。共有していない行は名前と状態を tertiary の文字にし、› を出さず押せない（4.5 ListView）。一覧と右の2列で誰も選んでいないときは、← で離れた人（いなければ最初の共有済みの人）を右に出し、その人をパス（`/team/$userId`）に入れる（ヘッダーの 💬 がその人のものになり、パネルで本文が1ペインになっても右の人を保つため。4.1）。右は名前と状態、セクションごとに hairline で区切った題と小見出し、各問いのタイトル（小さな文字）・問い・回答（未回答は「Empty」。Q15〜17 は「Amount」と「Why this amount?」の見出しの下に金額と理由）、問いの右に 💬 と件数。
+- 並び: 一覧の行は Avatar・名前・「Shared · {状態}」（共有していない人は「Not shared」）。共有していない行は名前と状態を tertiary の文字にし、› を出さず押せない（4.5 ListView）。一覧と右の2列で誰も選んでいないときは、← で離れた人（いなければ最初の共有済みの人）を右に出し、その人をパス（`/team/$userId`）に入れる（ヘッダーの 💬 がその人のものになり、パネルで本文が1ペインになっても右の人を保つため。4.1）。右は名前と状態、セクションごとに hairline で区切った題と小見出し、各問いのタイトル（小さな文字）・問い・回答（未回答は「Empty」。Q15〜17 は「Amount」と「Why this amount?」の見出しの下に金額と理由）、問いの右に 💬 と件数。
 - Viewer が 12 の URL を開いたときは「権限がない」（6.0.6）を出し、10 への入口（ナビ・パンくず・←）を出さない（5章「Viewer」）。共有していない人を URL で開いたときも、右に「権限がない」を出す（SDD 5.8 S7 の `NOT_SHARED`）。
 - 右の題の横に、その人の Avatar を置く。本人の行の 💬 は 6.0.4 の「本人が開くパネル」のとおり。別の人に移ると、パネルの `panel`・`target` を引き継ぎ（SDD 4章）、ヘッダーの 💬 の一覧は開いたまま、移った先の人の自己分析の一覧に替わる。移る前の人の回答のパネルは、その回答が画面に無いので開かない。デスクトップでパネルを開いて本文が1ペインのとき、← で一覧に戻っても、画面は離れた人のもので、パネルはその人のまま開いている（離れた人はその履歴の項目に覚え、戻る・進む・再読み込みでも同じ）。
 
@@ -1938,16 +1949,16 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
   - 下の表の「下書きでコピー」の小項目に、検証の回答をコピーする。
   - 実行管理の初期行（マイルストーン6行・ローンチ5行・KPI 12行）をテンプレートから作る（6.13）。
   - コピーと初期行の作成は変更履歴に「下書き作成」として残る。下書きはほかに何も足されていない間、履歴パネルの「Undo the whole operation」で取り消せる（作成の取り消し。プランを論理削除し、戻せない。6.0.5）。
-- 形（2026-10-22 に Step 34 で決めた）: Dialog の small（スマホはトレイ）。題「Create plan draft」、本文「The draft copies your validation's answers where the plan asks the same, and starts the execution lists from the template.」、「Plan name」の欄、Create draft と Cancel（名前が空のあいだは Create draft を押せない。6.0.6）。既定の名前は「Plan A」「Plan B」…のうち、このアイデアの案（アーカイブした案を含む）に使われていない最初のもの（間が空いていればそこを使う。名前を変えた案の元の名前も使える）。「Z」の次は「AA」「AB」…（表計算の列の名前と同じ）。名前の重複は欄の下に「This name is already used」、最新の判定が Proceed でなくなっていたら（`DECISION_NOT_PROCEED`）「The latest decision is no longer Proceed.」、公開済みのテンプレートが無ければ 6.0.6 の文を Create draft の上に出し、Create draft を押せなくする。作ると M5 の履歴の項目の代わりにその案の 20 を開く（戻るで M5 に戻らない。M1 と同じ）。13 と 20 では `?modal=create-plan` で開く。
+- 形: Dialog の small（スマホはトレイ）。題「Create plan draft」、本文「The draft copies your validation's answers where the plan asks the same, and starts the execution lists from the template.」、「Plan name」の欄、Create draft と Cancel（名前が空のあいだは Create draft を押せない。6.0.6）。既定の名前は「Plan A」「Plan B」…のうち、このアイデアの案（アーカイブした案を含む）に使われていない最初のもの（間が空いていればそこを使う。名前を変えた案の元の名前も使える）。「Z」の次は「AA」「AB」…（表計算の列の名前と同じ）。名前の重複は欄の下に「This name is already used」、最新の判定が Proceed でなくなっていたら（`DECISION_NOT_PROCEED`）「The latest decision is no longer Proceed.」、公開済みのテンプレートが無ければ 6.0.6 の文を Create draft の上に出し、Create draft を押せなくする。作ると M5 の履歴の項目の代わりにその案の 20 を開く（戻るで M5 に戻らない。M1 と同じ）。13 と 20 では `?modal=create-plan` で開く。
 
 #### 20 プランホーム（パターン A）
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
 │ Ideas / Piaya Gift Box Delivery / Plan A                               │
-│ Plan A ▼   Version: v1 For advisors + changes                          │
+│ Plan A ▼   Version: v1 For advisors + changes · Updated Oct 1          │
 │ [Save version] [Pitch Deck] ⋯ [Record Go/No-Go]                 💬 🕘   │
-│ Business Name: Piaya Gift Box Co. · Prepared by Ana · Updated Oct 1    │
+│ Business Name: Piaya Gift Box Co. · Prepared by: Ana                   │
 │ ⚠ Latest decision is Hold.（最新の判定が Proceed でないときだけ）            │
 ├───────────────────────────────────┬───────────────────────────────────┤
 │ 状態                               │ 項目                               │
@@ -1960,7 +1971,9 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 │ Versions                           │  …                                 │
 │  v1 For advisors · Sep 20 · Ana    │                                    │
 │ Execution                          │                                    │
-│  3 actions due soon →              │                                    │
+│  1 item overdue                    │                                    │
+│  3 items due in the next 7 days    │                                    │
+│  [Open Execution]                  │                                    │
 └───────────────────────────────────┴───────────────────────────────────┘
 ```
 
@@ -1969,22 +1982,21 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - Part の進み具合（「Part A 7 / 10」）: 小項目がすべて記入済みの項目の数 / 項目の数。
 - 項目を押すと 21 を開く（Viewer は読み取り表示）。
 - スマホで積む順: ヘッダー → 主要指標 → 項目（Part A・Part B）→ Go / No-Go → Versions → Execution（4.1 パターン A）。
-- ⋯ メニュー: 案の名前を変える / AI 書き出し（24）/ AI 取り込み（25）/ アーカイブ / テンプレートの移行（M8）。
 - **案のアーカイブ**（Owner / Member）: 案の切替では「Archived」の下にまとめ、13 の Plans では一覧から外して末尾の「n archived plans · Show」にまとめる（6.1）。読み取り専用で、版の保存・Go / No-Go・Add plan の対象にならない。工程の判定（プランの有無・Launch）、Due soon の対象から外す。Pitch Deck は表示できる。アーカイブした案を開くと上部に「This plan is archived」と「Restore」（Owner / Member）を出し、そこから Restore する（案の切替の「Archived」からも、13 の「Show」からも開ける）。M5 の既定名はアーカイブした案の名前も使用済みとして数える。閲覧・コメントの閲覧・変更履歴の閲覧はできるが、コメントを書く・元に戻すはできない（アイデアのアーカイブと同じ）。
 - 版を指定して開く（Versions から）と、その版のスナップショットを読み取り専用で表示する（上部に「Viewing v1 For advisors (read only)」）。
 - 空の状態: 回答がすべて下書き作成時のコピーのままで、実行管理の初期行も変えていない間（API の `draftOnly`）は、案内文「Start with the items marked [V]. They already have your validation data.」を出す。版を開いているときは出さない。
-- 並びと文言（2026-10-22 に Step 34 で決めた）:
+- 並びと文言:
   - ヘッダ: 上から、アイデアのアーカイブの注意（6.1 と同じ。アイデアがアーカイブ済みならこちらだけ）か案のアーカイブの注意（題「This plan is archived」と Restore）、版を開いているときの「Viewing {版の名前} (read only)」と「Show the latest」のリンク（今のプランの 20）、案の名前（見出し）と ▼（案の切替。押すとメニューで、案を作った順に並べ、アーカイブした案は見出し「Archived」の下にまとめ、最後に Add plan）、「Version: {版の名前}」（変更があれば「Version: {版の名前} + changes」、版が無ければ「No version saved」）と「Updated {最終更新日}」（版を開いているときは「Saved {保存日}」）を「 · 」でつないだ1行、Business Name と Prepared by の欄（ラベル付きの小さな TextField を横に並べ、6.0.2 の自動保存で保存する。読み取りのときは「Business Name: {値} · Prepared by: {値}」の1行で、空の値は「Empty」）、最新の判定が Proceed でないときの注意「Latest decision is {判定}.」（上の図のとおりヘッダの最後の行）、空の状態の案内文。
-  - 題の横の道具は Save version（M3）と ⋯（Rename plan・Export for AI・Import from AI・Archive plan）。主要な操作は Record Go / No-Go（M4。スマホは下部に固定。4.1 A）。どれも Owner / Member が、アイデアも案もアーカイブしておらず、版を開いていないときだけ出す。Add plan（案の切替の中）は Owner / Member に、アイデアも開いている案もアーカイブしておらず、最新の判定が Proceed のときだけ出す。Pitch Deck の入口（23）は、6.8 のとおり Viewer・アーカイブ中にも開けるので、この道具の組の条件に入れない。案の切替は、案の一覧（P1）を読み終えるまで押せず、読めなかったときはメニューに今の案と「Couldn't load the plans. Try again」を出す。
+  - 題の横の道具は Save version（M3）と ⋯（Rename plan・Export for AI（24）・Import from AI（25）・Archive plan・Update template（M8。新しい版があるときだけ。6.0.7））。主要な操作は Record Go / No-Go（M4。スマホは下部に固定。4.1 A）。どれも Owner / Member が、アイデアも案もアーカイブしておらず、版を開いていないときだけ出す。Add plan（案の切替の中）は Owner / Member に、アイデアも開いている案もアーカイブしておらず、最新の判定が Proceed のときだけ出す。Pitch Deck の入口（23）は、6.8 のとおり Viewer・アーカイブ中にも開けるので、この道具の組の条件に入れない。案の切替は、案の一覧（P1）を読み終えるまで押せず、読めなかったときはメニューに今の案と「Couldn't load the plans. Try again」を出す。
   - Rename plan は小さな Dialog（題「Rename plan」、「Plan name」の欄、Save と Cancel。名前が空のあいだは Save を押せない）。名前の重複は欄の下に「This name is already used」を出す。開いた後にほかの人がヘッダを保存していたときは、6.0.2 の衝突の確認を出す（Overwrite with mine は名前だけを送る。Load theirs はヘッダを読み直して閉じる）。
-  - 主列に「Key numbers」（題の右に「From validation」、版を開いているときは「As saved in this version」。13 と同じ4つの数字を 2×2 で出し、下に 18 を開くリンク。Owner / Member でアイデアがアーカイブされていなければ「Edit in validation」、Viewer とアーカイブ中は「Open in validation」（6.1 の Summary のリンクと同じく、入力できない人には文言だけを変える））、「Go / No-Go」（最新の値の Badge と「{日付} · {記録者}」、その下に「See all Go / No-Go decisions」（種類を Go / No-Go に、アイデアをこのアイデアに絞った 7）。記録が無ければ「Not recorded yet」）、「Versions」（新しい順に版の名前と「{保存日} · {保存した人}」。押すとその版を読み取り専用で開く。開いている版は押せず、「Viewing · …」と出す。無ければ「No versions saved yet」）、「Execution」（「{n} items overdue」（琥珀色）と「{n} items due in the next 7 days」。0 の行は出さず、どちらも 0 なら「Nothing due in the next 7 days」）。副列に「Part A: Business Case」と「Part B: Execution Plan」（題の右に「{完了した項目の数} / {項目の数}」。各行は小項目の記入の割合だけ満ちた MoonGlyph（数える小項目の無い項目は満ちた月）・「{番号} {項目名}」・[V] と [S] の Badge（読み上げは「Uses your validation」「Refers to shared self analyses」）・コメントの数・「{記入済み}/{小項目の数}」）。
-  - ヘッダーの 💬 の一覧（プラン全体のスレッドとアイデアへのコメント）は、各スレッドの上に SDD 5.11 の `HistoryEntry.label` と同じ書き方で項目の名前を出す（小項目は「{項目の番号2桁} {小項目のタイトル}」、実行管理の項目は「Execution · {1列目}」、スライドは「Pitch Deck」）。名前は一覧を開いたときに、スレッドのある項目（SDD 5.9 P4）と実行管理の項目（P9）から読み、読み終えるまで一覧は骨組み、読めなければ 6.0.6 の失敗の表示と Retry を出す。20 は項目を画面に並べないので、項目の 💬・🕘 は置かない（13 と同じ）。
+  - 主列に「Key numbers」（題の右に「From validation」、版を開いているときは「As saved in this version」。13 と同じ4つの数字を 2×2 で出し、下に 18 を開くリンク。Owner / Member でアイデアがアーカイブされていなければ「Edit in validation」、Viewer とアーカイブ中は「Open in validation」（6.1 の Summary のリンクと同じく、入力できない人には文言だけを変える））、「Go / No-Go」（最新の値の Badge と「{日付} · {記録者}」、その下に「See all Go / No-Go decisions」（種類を Go / No-Go に、アイデアをこのアイデアに絞った 7）。記録が無ければ「Not recorded yet」）、「Versions」（新しい順に版の名前と「{保存日} · {保存した人}」。押すとその版を読み取り専用で開く。開いている版は押せず、「Viewing · …」と出す。無ければ「No versions saved yet」）、「Execution」（「{n} items overdue」（琥珀色）と「{n} items due in the next 7 days」。0 の行は出さず、どちらも 0 なら「Nothing due in the next 7 days」。その下に 22 を開く「Open Execution」）。副列に「Part A: Business Case」と「Part B: Execution Plan」（題の右に「{完了した項目の数} / {項目の数}」。各行は小項目の記入の割合だけ満ちた MoonGlyph（数える小項目の無い項目は満ちた月）・「{番号} {項目名}」・[V] と [S] の Badge（読み上げは「Uses your validation」「Refers to shared self analyses」）・コメントの数・「{記入済み}/{小項目の数}」）。
+  - ヘッダーの 💬 の一覧（プラン全体のスレッドとアイデアへのコメント）は、各スレッドの上に SDD 5.11 の `HistoryEntry.label` と同じ書き方で項目の名前を出す（小項目は「{項目の番号2桁} {小項目のタイトル}」、実行管理の項目は「Execution · {1列目}」、スライドは「Pitch Deck」）。名前は C1 がスレッドごとに返す（SDD 5.11 の `label`）ので、項目ごとに読まない。20 は項目を画面に並べないので、項目の 💬・🕘 は置かない（13 と同じ）。
   - 別のアイデアの案の id を、このアイデアのパスに付けて開いたときは「見つからない」（6.0.6）を出す。
 
 #### M3 版の保存（名前付きスナップショット）
 
 - 入力: 版の名前（必須。既定は「v{n}」。例: 「v1 For advisors」。規則は 6.0.8）。
-- 形（2026-10-22 に Step 34 で決めた）: Dialog の small（スマホはトレイ）。題「Save version」、本文「Keeps the plan as it is now, read only, to look back on or to show as a Pitch Deck.」、「Version name」の欄（既定の n は最新の版の番号の次）、Save version と Cancel（名前が空のあいだは Save version を押せない。6.0.6）。保存すると閉じ、トースト「{版の名前} saved」を出す。
+- 形: Dialog の small（スマホはトレイ）。題「Save version」、本文「Keeps the plan as it is now, read only, to look back on or to show as a Pitch Deck.」、「Version name」の欄（既定の n は最新の版の番号の次）、Save version と Cancel（名前が空のあいだは Save version を押せない。6.0.6）。保存すると閉じ、トースト「{版の名前} saved」を出す。
 - その時点のプランを、読み取り専用のスナップショットとして保存する（中身は SDD 6.3 の末尾）。
 - 決定ログに「版の保存」として残す。ヘッダの Version には最新の版の名前を出す。
 - 保存した後に、このプランの回答・表・ヘッダ・実行管理の項目のどれかが変わると「+ changes」が付く。検証の数字が変わっただけでは付けない（プランは数字を常に検証から読むため）。
@@ -1997,7 +2009,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 入力: Launch / Delay / Stop と理由（必須。規則は 6.0.8）。Launch / Delay / Stop は 4.5 の RadioGroup の `cards`（19 の判定と同じ形。題だけで説明の行は持たない）で並べる。
 - 決定ログに「Go / No-Go」として残し、対象の版・主要指標・§24 の3つの条件の文章を記録する。対象の版は最新の保存済みの版（「+ changes」でも直前の版。版が無ければ空）。ワークスペースに通知する。
 - 何度でも記録し直せる（最新が有効）。どれかの案の最新の Go / No-Go が Launch なら、アイデアの工程が「立ち上げ準備」になる。
-- 形（2026-10-22 に Step 34 で決めた）: Dialog の large（スマホは全画面のシート）。題「Record Go / No-Go」。上から「Conditions」（「We proceed to launch if」「We delay if」「We stop / abandon if」と §24 の回答。空なら「Empty」）、「Key numbers」（19 と同じ5つ。6.5）、「Version」（最新の版の名前か「No version saved」。「+ changes」のときは琥珀色の注意「The plan has changed since {版の名前} was saved. Save a version first?」とリンク「Save a version」。押すと M4 の代わりに M3 を開き、M3 を閉じると M4 に戻る。M4 で選んだ値と書いた理由は、M4 に戻ったときも残る）、判定の題「Go / No-Go」のカード（Launch / Delay / Stop）、「Why?」（必須）。操作は Record と Cancel。Record は判定を選んで理由を書くまで押せない（6.0.6 のモーダルの決まり。理由の欄は書いた後に規則に合わなくなれば、欄の下に理由を出す）。記録すると閉じ、トースト「Go / No-Go recorded」を出す。失敗は 6.0.6 のモーダルの決まり。
+- 形: Dialog の large（スマホは全画面のシート）。題「Record Go / No-Go」。上から「Conditions」（「We proceed to launch if」「We delay if」「We stop / abandon if」と §24 の回答。空なら「Empty」）、「Key numbers」（19 と同じ5つ。6.5）、「Version」（最新の版の名前か「No version saved」。「+ changes」のときは琥珀色の注意「The plan has changed since {版の名前} was saved. Save a version first?」とリンク「Save a version」。押すと M4 の代わりに M3 を開き、M3 を閉じると M4 に戻る。M4 で選んだ値と書いた理由は、M4 に戻ったときも残る）、判定の題「Go / No-Go」のカード（Launch / Delay / Stop）、「Why?」（必須）。操作は Record と Cancel。Record は判定を選んで理由を書くまで押せない（6.0.6 のモーダルの決まり。理由の欄は書いた後に規則に合わなくなれば、欄の下に理由を出す）。記録すると閉じ、トースト「Go / No-Go recorded」を出す。失敗は 6.0.6 のモーダルの決まり。
 
 #### 21 プラン項目の編集（パターン C。11 と同じ部品）
 
@@ -2054,12 +2066,12 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 実行管理の項目（§23・25・26・28・29）は、21 の中で 22 と同じ部品で一覧・追加・編集する（同じデータ）。「Open in Execution」で 22 の該当のタブへ移れる。
 - 数字の小項目に数字を書き込む欄は作らない。
 - 21 の状態: 表の小項目が0行なら「No rows」と + Add row、実行管理の小項目が0件なら「Nothing yet」と + Add。ローディング・エラーは 6.0.6。
-- 並びと文言（2026-10-22 に Step 34b で決めた）:
+- 並びと文言:
   - 見出しの並びは 11 と同じ（6.2）。題は「{番号} {項目名}」と ▼（項目の切替。メニューは Part A・Part B の見出しの下に「{番号} {項目名}」を並べ、版を開いているときは同じ版の 21 を開く）、右に MoonGlyph と「{記入済み}/{小項目の数} answered」（数え方は 20 の「項目の状態」と同じで、数字の小項目は数えない）、その下にテンプレートのガイダンス。版を開いているときは上に 20 と同じ「Viewing {版の名前} (read only)」と「Show the latest」（今のプランの 21）、アーカイブ済みの案・アイデアは 20 と同じ注意を出す。
   - 参照は見出しの下に「References」と「Always the latest」の行、その下に参照ごとの閉じた Disclosure（題は API の `title`）。中身は種類ごとの一覧（検証の回答はタイトルと回答、競合は名前と Type・Typical Price・Strength・Weakness、費用行は名前と金額（検証にそのキーの行が無いときは、テンプレートの初期行の名前と「Not in validation」。6.0.7）、調査ログは「{日付} {トピック}」と Observation、決定ログは「{種類}: {値}」（版の保存は「Version saved: {版の名前}」）と「{日付} · {記録者}」と理由の冒頭、前提とリスクは文と各欄、自己分析はメンバーを選ぶ Picker「Member」とセクションごとの回答）で、空なら「Nothing in it yet」。下に全体を出す画面へのリンク（検証の画面は「Open in validation」、決定ログは「Open Decision Log」。§24 の Go / No-Go の履歴は種類を Go / No-Go に絞った 7）。§13 の合計は参照の位置ではなく表の下に出す。§24 は参照の下に「Record a decision with Record Go / No-Go on the plan home.」（プランを変えられる Owner / Member にだけ）、§30 の2つの小項目は欄の下に「Shown as the speaker notes of the 1-minute Pitch Deck.」（5分版は「5-minute」）を出す。
-  - 数字の小項目は、数字が1つなら値だけ、複数なら名前と値の一覧（6.4 の表示名。費用行は検証のその行の名前で、検証にその行が無ければテンプレートのキー）、シナリオは 6.4 の `scenario:*` の1列分（1日の販売数・売上・営業利益・営業利益率。23 の表と同じ並び）。「横に」置く「Edit in validation」は、同じカードの数字の下に置く（Viewer とアーカイブ済みのアイデアは「Open in validation」。20 と同じ）。移る先は 6.4 の「直す画面」で、費用行は 17 のその行、費用の合計と変動費/件は 17、価格・営業日数・Capacity Limit は 18 のその欄、それ以外と複数の数字は 18。版を開いているときは横に「As saved in this version」。控えめな行の冒頭は、数字が1つなら値、複数なら「{名前} {値}」を「 · 」でつなぎ、シナリオは売上と営業利益。
+  - 数字の小項目は、数字が1つなら値だけ、複数なら名前と値の一覧（6.4 の表示名。費用行は検証のその行の名前で、検証にその行が無ければ、参照（P4 の `cost_rows`）と同じ引き方でテンプレートの初期行の名前（それも無ければテンプレートのキー）を出し、値の代わりに「Not in validation」（6.0.7。6.4））、シナリオは 6.4 の `scenario:*` の1列分（1日の販売数・売上・営業利益・営業利益率。23 の表と同じ並び）。「横に」置く「Edit in validation」は、同じカードの数字の下に置く（Viewer とアーカイブ済みのアイデアは「Open in validation」。20 と同じ）。移る先は 6.4 の「直す画面」で、費用行は 17 のその行、費用の合計と変動費/件は 17、価格・営業日数・Capacity Limit は 18 のその欄、それ以外と複数の数字は 18。版を開いているときは横に「As saved in this version」。控えめな行の冒頭は、数字が1つなら値、複数なら「{名前} {値}」を「 · 」でつなぎ、シナリオは売上と営業利益。
   - 表の小項目は 17 と同じ TableView（触った行のセルが欄になる）。+ Add row は表の下に置き、足した行は保存されてから1列目の欄にフォーカスする（スマホは行のシートを開く）。行の ⋯ に「Delete row」（「Delete this row?」と確かめる）。スマホは行を押すと、その行の欄と Delete row を並べたシート（題「Row {n}」）を開く。規則に合わないセルは理由を出し、そのセルは打ち始める前の値のまま送る。§13 の合計は表の下に「Total ownership: {%} · Total capital: {金額}」。控えめな行の冒頭は1列目の値を「 · 」でつなぎ、1列目がどれも空なら「{n} rows」。
-  - 実行管理の小項目は、1列目と「{状態} · {担当} · {期限}」（KPI は先頭に Target と Actual）、期限切れの「Overdue」、コメントの数を並べた ListView（ローンチは区分の見出し、KPI は Area の見出しの下。Area の無い KPI は「No area」）。行を押すと Dialog で欄を開き（題「Edit milestone」など。Owner / Member は 6.0.2 の自動保存、それ以外は読み取り。題は項目の1列目。KPI の Actual の下に「Updated {日付}, {時刻}」）、行の ⋯ に Comments・History・Delete（Delete は Owner / Member だけで、「Delete this milestone?」などと確かめる）。+ Add（読み上げは「Add milestone」など）は「New milestone」などの Dialog で、1列目を書くまで Add を押せない。担当は Owner / Member から選ぶか名前を書く ComboBox（書いた名前は「Use “{名前}”」）。控えめな行の冒頭は1列目を「 · 」でつなぐ。
+  - 実行管理の小項目は、1列目と「{状態} · {担当} · {期限}」（KPI は先頭に Target と Actual）、期限切れの「Overdue」、コメントの数を並べた ListView（ローンチは区分の見出し、KPI は Area の見出しの下。Area の無い KPI は「No area」）。行を押すと Dialog で欄を開き（題「Edit milestone」など。Owner / Member は 6.0.2 の自動保存、それ以外は読み取り。題は項目の1列目。KPI の Actual の下に「Updated {日付}, {時刻}」）、行の ⋯ に Comments・History・Delete（Delete は Owner / Member だけで、「Delete this milestone?」などと確かめる）。+ Add（読み上げは「Add milestone」など）は「New milestone」などの Dialog で、1列目を書くまでと、欄の値が規則（6.0.8）に合わない間（担当の名前が60文字を超える間を含む）は Add を押せない。担当は Owner / Member から選ぶか名前を書く ComboBox（書いた名前は「Use “{名前}”」）。編集できる担当の欄は、メンバーの一覧（W2）を読めなかったとき、欄の下に「Couldn't load the members to choose from.」と Retry を出す（名前を書くことはできる。6.0.6。22 の詳細も同じ）。控えめな行の冒頭は1列目を「 · 」でつなぐ。
   - 読み取りの表示（Viewer・アーカイブ・版）でも、各小項目の Example とヒントを出す（11 と同じ）。
   - 下に留めるフッターは「Previous item」・AI ▼・「Next: {番号} {項目名}」。最後の小項目の後の完了カード（スマホ）は「{項目の番号2桁}: {記入済み}/{小項目の数} answered」と「Next: {番号} {項目名}」・「Back to plan」。
   - 欄の無い小項目（数字・表・実行管理）を `?q=` で開いたときは、カードを画面の縦の中央へ移す（入力できる表示のとき。読み取りの表示は 6.2 のとおりフォーカスを動かさない）。
@@ -2086,13 +2098,13 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - ローンチは時期の区分（T−30 / T−7 / Launch day / First 30 days / Days 31–90 / Other）ごとにまとめて出す。初期行はそれぞれの区分に入り、追加した行は区分を選ぶ（既定は Other）。Timing の文言は自由に直せ、区分とは別に持つ。KPI は Area ごとにまとめて出す。
 - 初期行は追加・削除・名前の変更ができる。
 - 空の状態: タブごとに説明と + Add。
-- 並びと文言（2026-10-22 に Step 35 で決めた）:
+- 並びと文言:
   - 題は「Execution」（heading-1-list）。上に 20 と同じアーカイブの注意（アイデアがアーカイブ済みならアイデアの注意、そうでなく案がアーカイブ済みなら案の注意）を出す。タブの並びは上の5つの順で、既定は Milestones。パンくずは「Ideas / {アイデア名} / {案の名前} / Execution」、← は 20（「Plan」。6.0.1）。
-  - 一覧の行は 21 の実行管理の小項目と同じ（6.12 の「並びと文言」。1列目と「{状態} · {担当} · {期限}」、KPI は先頭に Target と Actual、期限切れの「Overdue」、コメントの数）。ローンチは区分の見出し、KPI は Area の見出し（Area の無い KPI は「No area」）の下に並べる。行の ⋯ は Comments・History・Reorder（Owner / Member。Next Actions には無い）・Delete（Owner / Member）。2列の並びでは、選ぶまでタブの一覧の最初の項目を右に出す（14・16 と同じ）。
+  - 一覧の行は 21 の実行管理の小項目と同じ（6.12 の「並びと文言」。1列目と「{状態} · {担当} · {期限}」、KPI は先頭に Target と Actual、期限切れの「Overdue」、コメントの数）。Owner / Member には、その項目の保存に失敗している間、行の中にも「Couldn't save」と理由と Retry を出す（6.0.2 の「失敗した項目（欄・行）の横にも」。21 の行も同じ）。ローンチは区分の見出し、KPI は Area の見出し（Area の無い KPI は「No area」）の下に並べる。行の ⋯ は Comments・History・Reorder（Owner / Member。Next Actions には無い）・Delete（Owner / Member）。2列の並びでは、選ぶまでタブの一覧の最初の項目を右に出す（14・16 と同じ）。
   - 詳細: 1列目（見出し）・💬・🕘・⋯（Reorder と Delete。Owner / Member だけ）の行の下に、各欄（6.13 の列と状態）。Owner / Member はタブレットの幅から上では詳細の中でそのまま直し（6.0.2 の自動保存。項目の1件が保存の単位）、スマホは読み取りの欄と「Edit」で「Edit milestone」などのシートを開く（16 と同じ）。Viewer とアーカイブ中は読み取りの欄だけ。
   - + Add（スマホは右下の「+」）と空の状態のボタンは「Add milestone」「Add launch step」「Add KPI」「Add open question」「Add next action」。押すと 21 と同じ「New milestone」などの Dialog（スマホはシート）を開き、作った項目を詳細に出す（1ペインの並びでは開いた状態で、戻るで一覧へ）。今の絞り込みで外れる項目を作ったときは、絞り込みを外して出す。
   - 空の状態の説明: Milestones「List the milestones to reach before launch, with who owns each and by when.」、Launch「Plan what to do before launch, on the day and in the first 90 days.」、KPIs「List the numbers to watch once the business runs, with a target for each.」、Open Questions「Write down what you still need to find out, and why it matters.」、Next Actions「List what to do next, with who does it and by when.」（Viewer には説明だけ）。
-  - Next Actions の絞り込み（このタブだけ）: 小さな Picker の「Assignee」（All・Me・ワークスペースの Owner / Member。URL の `assignee` がメンバーでなくなった人を指すときは「A former member」）と「Status」（All・To do・Doing・Done）、Switch の「Overdue only」。名前を書いた担当は Assignee では選べない（SDD 4章の `assignee` はメンバーだけ）。絞り込みで0件なら「Nothing matches these filters」と「Clear filters」。絞り込みを変えると選んだ項目を外し（外れた項目が詳細に残らないように）、タブを替えると絞り込みと選んだ項目を外す。
+  - Next Actions の絞り込み（このタブだけ）: 小さな Picker の「Assignee」（All・Me・ワークスペースの Owner / Member と、その後ろにこの案の Next Actions に書かれた担当の名前。URL の `assignee` がメンバーでなくなった人を指すときは「A former member」）と「Status」（All・To do・Doing・Done）、Switch の「Overdue only」。書かれた名前は、大文字と小文字の違いだけのものを1つにまとめ（一覧で最初に出てくる書き方で出す）、選ぶとその名前（大文字と小文字は区別しない）の担当だけに絞る（URL の `assigneeName`。SDD 4章）。URL の名前が今の Next Actions に無くなっても、選んだまま出す。絞り込みで0件なら「Nothing matches these filters」と「Clear filters」。絞り込みを変えると選んだ項目を外し（外れた項目が詳細に残らないように）、タブを替えると絞り込みと選んだ項目を外す。タブ・絞り込みの変更と、2列の並びで項目を選ぶことは、履歴の項目を足さずに置き換える（戻るで 22 を離れる）。1ペインの並びで詳細を開くときは履歴を1つ足し、← と戻るで一覧に戻る（14 と同じ）。
   - 並べ替えの Dialog の題は「Reorder milestones」「Reorder launch steps」「Reorder KPIs」「Reorder open questions」。ローンチと KPI は、⋯ を押した行の区分（Area）の行だけを並べる。
   - 入口: 20 の Execution のブロックの下に「Open Execution」、21 の実行管理の小項目の + Add の横に「Open in Execution」（その種類のタブ。読み取りの表示にも出す）、5 の Due soon の行（その項目を詳細に出す）。8 の通知・5 の Recent activity の項目へのリンクは、項目だけを指し、その種類のタブを開く（SDD 4章）。タブは一覧を読むまで決まらないので、それまではタブと + Add を出さない。決まったタブは、URL がその項目を指している間は保つ（後で項目が消えても同じタブに留まる）。
   - ヘッダーの 💬・🕘 は 22 の全項目（SDD 6.3「画面と節の対応」の `execution`）。
@@ -2101,7 +2113,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 
 ### 6.14 23 Pitch Deck（パターン I）
 
-- プランから毎回生成する。スライドは直接編集しない。各スライドに「Edit source」（元の項目の 21 へ。Owner / Member）。数字の入るスライドには「Edit in validation」（17 / 18 へ。Owner / Member）も置く。版を指定して開いているとき、プラン・アイデアがアーカイブ済みのときは、どちらのリンクも出さない（遷移先が読み取り専用のため）。
+- プランから毎回生成する。スライドは直接編集しない。各スライドに「Edit source」（元の項目の 21 へ。Owner / Member）。数字の入るスライドには「Edit in validation」（17 / 18 へ。Owner / Member）も置く。版を指定して開いているときは、どちらのリンクも出さない（版のスライドは保存した時点の値で、元を直しても変わらないため）。アイデアがアーカイブ済みのときも、どちらも出さない（遷移先が読み取り専用のため）。生きているアイデアのアーカイブ済みのプランでは、「Edit source」だけを出さず（21 が読み取り専用のため）、「Edit in validation」は 20・21 と同じく、検証を直せる人（Owner / Member）に出す。
 - スライドの型は4つ: 表紙（大きな見出しと副題）/ 文章（見出しと箇条書き。箇条書きの数は素材で決まる。下の決まり）/ 数字（見出しと大きな数字2〜4つ）/ 表（見出しと表）。各スライドの型は下の表のとおり。ロゴは置かず、Business Name を表紙とフッターに出す。
 - スライドへのコメントは「版の種類 + スライドのキー」で指す（例: `five.market`）。
 - 上部で **1分版（One-minute）/ 5分版（Five-minute）** を切り替える（原本 §30 の流れどおり。ただし5分版は、原本の Economics を Economics と Funding plan の2枚に、Execution plan を Execution plan と Launch plan の2枚に分ける）。
@@ -2166,13 +2178,13 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
   - 範囲の外: 1個あたりの金額が ₱1,000,000 のとき（「+」「≤」が付けば ₱10,000 のとき）に5分版の Business model の数字が、初期費用が「₱1,000,000,000+」のときに5分版の Economics の数字が折り返す。文字を小さくしていないスライドでは、競合の価格は ₱10,000,000 から、シナリオの売上と営業利益は ₱1,000,000,000,000 から、表のセルで折り返す。1個あたりの金額と競合の価格が入力の上限（₱1,000,000,000,000。6.0.8）、初期費用が「₱999,999,999,999+」、シナリオの売上と営業利益が ₱10,000,000,000,000,000 でも、計算した指標が上の大きな表示や理由の文でも、どのスライドも本文の高さに収まる（数字は折り返し、注意は出さない）。シナリオの売上と営業利益がもっと大きいと、5分版の Economics が本文の下端で切れることがある（測った例: 初期費用「₱999,999,999,999+」で、売上と営業利益が ₱1,000,000,000,000,000,000 のとき）。
 - 数字は生成元に合わせる（Latest は今の検証、版はスナップショットの値）。
 - ローディング: スライドの骨組み。PDF の作成中は「Preparing PDF…」。失敗したら再試行。
-- 並びと文言（2026-10-28 に Step 35b で決めた）:
-  - 題は「Pitch Deck」（heading-1-toolbar）。パンくずは「Ideas / {アイデア名} / {案の名前} / Pitch Deck」、← は 20（「Plan」。6.0.1）。アイデア・案がアーカイブ済みでも、20〜22 のアーカイブの注意は出さない（23 は誰にとっても読み取りの画面で、アーカイブで変わるのは編集のリンクを出さないことだけのため）。コメントのパネルは 6.0.4 のとおり読み取り専用にする。
+- 並びと文言:
+  - 題は「Pitch Deck」（heading-1-toolbar）。パンくずは「Ideas / {アイデア名} / {案の名前} / Pitch Deck」、← は 20（「Plan」。6.0.1）。アイデア・案がアーカイブ済みなら、20〜22・24・25 と同じアーカイブの注意（アイデアがアーカイブ済みならアイデアの注意、そうでなく案がアーカイブ済みなら案の注意。Restore はその画面と同じく Owner / Member）を、道具の行の上に出す（アーカイブでコメントのパネルが読み取り専用になり、編集のリンクも減るため）。コメントのパネルは 6.0.4 のとおり読み取り専用にする。
   - URL に `variant` が無ければ1分版、`version` が無ければ Latest で開く。長さと生成元を替えても履歴の項目は足さず（22 のタブと同じ。戻るで 23 を離れる）、開いているパネルは引き継ぐ。今のスライドは URL に入れない。長さか生成元を替えると、同じキーのスライドがあればそれを、無ければ表紙を出す。
   - 生成元の Picker（ラベル「From」）は「Latest」と保存済みの版（20 の Versions と同じく新しい順に、版の名前）を並べる。サムネイルの題はスライドの名前（上の表の英語の名前。表紙は「Title」）。
   - スライドの上の 💬 は、ほかの項目の 💬（6.0.4）と同じ ActionButton にし、コメントの数を添える（読み上げは「Comments on {スライドの名前}」）。押すと、そのスライド（`{版の種類}.{キー}`）のスレッドのパネルを開く。ヘッダーの 💬 の一覧は、両方の長さのスライドのスレッドとアイデアへのコメント（SDD 6.3 の `pitch`）で、スライドの項目の名前は SDD 5.11 の `HistoryEntry.label` のとおり「Pitch Deck」。8 の通知と 5 の Recent activity のスライドへのコメントのリンクは、コメントのキーの長さで 23 を開き、そのスライドを出してパネルを開く。
   - 「Too long for this slide. Shorten it in the plan.」は、`overflow` のスライドを出している間、スライドの上のリンクの行のさらに上に notice の InlineAlert で出す。
-  - Download PDF: 作成中はボタンに ProgressCircle を出して押せなくし、ボタンの左に「Preparing PDF…」を出す。ファイルの名前は P13 の `Content-Disposition` のもの。失敗したら、スライドの上（「Too long…」の上）に negative の InlineAlert（題「Couldn't make the PDF」。回数の上限なら 6.0.6 の待ち時間の文、ほかは「Something went wrong」と Ref）と Retry を出す。失敗の表示は、失敗した長さと生成元を開いている間だけ出す。オフラインの間は押せない。
+  - Download PDF: 作成中はボタンに ProgressCircle を出して押せなくし、ボタンの左に「Preparing PDF…」を出す。ファイルの名前は P13 の `Content-Disposition` のもの（読めなければ「Pitch Deck.pdf」）。失敗したら、スライドの上（「Too long…」の上）に negative の InlineAlert（題「Couldn't make the PDF」。回数の上限なら 6.0.6 の待ち時間の文、ほかは「Something went wrong」と Ref）と Retry を出す。失敗の表示は、失敗した長さと生成元を開いている間だけ出す。Retry を押すと、フォーカスを Download PDF へ移してから作り直す（Retry は失敗の表示と一緒に消えるため）。オフラインの間は押せない。
   - What to say: §30 の文章が空なら「Not written yet」をグレーで出す。
   - ローディング: 23 を開いたときは、題と白紙のスライド（サムネイルと今のスライド。URL の長さの枚数）と What to say の骨組み。長さか生成元を替えて読み込む間は、道具の行（切り替え・Picker・Download PDF）を使えるまま、サムネイルの列とスライドと What to say だけを骨組みにする（押した切り替えからフォーカスを外さないため）。読み込みが10秒を超えたときと読めなかったとき（版がその案のものでないときの「見つからない」など）は 6.0.6 の表示。
   - 入口: 20 の題の横の道具の「Pitch Deck」（secondary。Owner / Member には Save version の次、⋯ の前に置き、Viewer・アーカイブ中・版を開いているときはこれだけを出す）。版を開いている 20 からは、その版を生成元にして開く。
@@ -2183,7 +2195,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 
 #### 7 決定ログ（パターン D）
 
-- 一覧の列: 日時・アイデア（とプランの案）・種類（判定 / Go / No-Go / 版の保存）・値（Proceed / Hold / Drop、Launch / Delay / Stop、版の名前）・理由の冒頭（版の保存は理由を持たないので空）・記録者。
+- 一覧に出すもの: 日時・アイデア（とプランの案）・種類（判定 / Go / No-Go / 版の保存）・値（Proceed / Hold / Drop、Launch / Delay / Stop、版の名前）・理由の冒頭（版の保存は理由を持たないので空）・記録者。
 - 絞り込み: 種類・アイデア・記録者・期間。新しい順。
 - 詳細に出すもの（記録した時点の内容）:
 
@@ -2194,9 +2206,9 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 | 版の保存 | 版の名前、保存した人と日時、その版を読み取り専用で開くリンク（20） |
 
 - 記録は追記だけで、編集・削除できない。
-- 一覧の形（2026-10-22 に Step 32 で決めた）: 左のペインの TableView（4.5）を3列にする。1列目はアイデア（プランの記録は「{案名} · {アイデア名}」）、その下に「{種類} · {記録者}」と理由の冒頭（「“…”」。2行まで。4.5 Text の `maxLines`）、2列目は値（判定と Go / No-Go は Badge、版の保存は版の名前）、3列目は記録した日時（列の名前は「Recorded」。日付の下に時刻）。6 列に分けると、左のペインの幅で文字が1文字ずつ折れるため（28 と同じ判断）。
+- 一覧の形: 左のペインの TableView（4.5）を3列にする。1列目はアイデア（プランの記録は「{案名} · {アイデア名}」）、その下に「{種類} · {記録者}」と理由の冒頭（「“…”」。2行まで。4.5 Text の `maxLines`）、2列目は値（判定と Go / No-Go は Badge、版の保存は版の名前）、3列目は記録した日時（列の名前は「Recorded」。日付の下に時刻）。6 列に分けると、左のペインの幅で文字が1文字ずつ折れるため（28 と同じ判断）。
 - 絞り込みの形: Kind・Idea（アーカイブしたもの・Drop も含む全アイデア）・Recorded by（今の Owner と Member と、ログに記録のある人。外れた人や Viewer になった人の記録も選べる）・Period の Picker（ラベルを中に置く。s06-ideas.html の .filters）。Period は「Any time」「Last 7 days」「Last 30 days」「Last 90 days」「Last 12 months」（どれも今日まで。日数は今日を含めて数え、12か月は去年の同じ日の翌日から。今日は利用者のタイムゾーンの日付。去年に無い日（2月29日）はその月の最後の日を去年の同じ日とする）と「Choose dates…」（From・To の DatePicker の Dialog。To が From より前なら「Choose a To date on or after the From date」と出して適用しない）。URL の `from`・`to` が選択肢のどれにも当たらないときは、その日付を選択肢の1つとして出す。絞り込みを変えると、選んでいた記録を外し、一覧の先頭を横に出す。
-- 詳細の形: 値の Badge と種類、題（アイデア、プランの記録は「{案名} · {アイデア名}」。版の保存は版の名前）、「Recorded by {記録者} · {日付}, {時刻}」（版の保存は「Saved by」）。その下に表の項目を、見出し「Why」「Checks missing then」（不足が無ければ「All 6 checks done」）「Key numbers then」（19 と同じ5つ。6.5）「Fact / Assumption / Unknown then」（19 と同じ1行）「Version」「Conditions」（Launch if / Delay if / Stop if。空なら「Empty」）で並べる。判定の詳細の末尾に「Open validation →」（13）、Go / No-Go の詳細の末尾に「Open plan →」（20）、版の保存の詳細の末尾に「Open this version →」（その版を読み取り専用で開く 20）（2026-10-22 に Step 34 で決めた）。
+- 詳細の形: 値の Badge と種類、題（アイデア、プランの記録は「{案名} · {アイデア名}」。版の保存は版の名前）、「Recorded by {記録者} · {日付}, {時刻}」（版の保存は「Saved by」）。その下に表の項目を、見出し「Why」「Checks missing then」（不足が無ければ「All 6 checks done」）「Key numbers then」（19 と同じ5つ。6.5）「Fact / Assumption / Unknown then」（19 と同じ1行）「Version」「Conditions」（Launch if / Delay if / Stop if。空なら「Empty」）で並べる。判定の詳細の末尾に「Open validation →」（13）、Go / No-Go の詳細の末尾に「Open plan →」（20）、版の保存の詳細の末尾に「Open this version →」（その版を読み取り専用で開く 20）。
 - 13 の Decisions の「See all decisions」（4.5 Link。d1-moon.html）は、そのアイデアで絞った 7 を開く。19 の「Last decision: …」は、その記録を選んだ 7 を開く。
 - 空の状態: 「Decisions you record will appear here, with who, when and why.」
 
@@ -2216,7 +2228,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - ワークスペースから外れた人の通知は、押すと「You no longer have access」と出す。停止されたユーザーには通知を作らない。
 - 通知はワークスペースをまたいで1つの一覧に出し、各行にワークスペース名を添える。押すとそのワークスペースに切り替えて開く。
 - 空の状態: 「You're all caught up.」
-- 形（2026-10-22 に Step 32 で決めた）: 各行は行った人の Avatar、題（太字が未読）、本文や理由の冒頭（2行まで。4.5 Text の `maxLines`）、「Unread · {ワークスペース名} · {相対時刻}」（未読は太字だけでなく文字でも示す。既読は「Unread」を出さない）。All / Unread は Picker「Show」（ラベルを中に置く）、その横に quiet の「Mark all as read」（未読が無ければ押せない）。50件ずつ読み、続きは一覧の下の「Show more」で読む。
+- 形: 各行は行った人の Avatar、題（太字が未読）、本文や理由の冒頭（2行まで。4.5 Text の `maxLines`）、「Unread · {ワークスペース名} · {相対時刻}」（未読は太字だけでなく文字でも示す。既読は「Unread」を出さない）。All / Unread は Picker「Show」（ラベルを中に置く）、その横に quiet の「Mark all as read」（未読が無ければ押せない）。50件ずつ読み、続きは一覧の下の「Show more」で読む。
 
 ---
 
@@ -2273,11 +2285,13 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 
 ### 6.17 26〜28 運営者の画面
 
+- 26〜28 は、4 と同じく最後に開いたワークスペースの枠（サイドバーとヘッダー）の中に出す。サイドバーと More の Admin のアイコンは Shield（Lucide）。
+
 #### 26 管理: テンプレート一覧（パターン D）
 
 - 左に3つのテンプレート（自己分析 / 検証 / プラン）。右に選んだテンプレートの版の一覧（版番号・状態（下書き / 公開）・公開日時・公開した人・この版を使っている件数）。
 - 操作: 「Import from file」（ファイルから新しい版の下書きを作る。下記）、「New draft from this version」（その版をコピーして下書きを作る）、下書きを開く（27）。下書きは1つのテンプレートに1つまで。下書きがあるときは「Import from file」と「New draft from this version」を押せなくし、下書きを開く案内を出す。公開済みの版は「View」で読み取り専用の 27 を開く。
-- **ファイルからの取り込み**: テンプレートのファイル（JSON。書式は System Design Doc 5.13 の AD10、規則は 6.0.8）を選ぶと、その中身で下書きの版を作り、27 で開く。公開は、ほかの下書きと同じく 27 の検査と「Publish as v{n}」で行う。ファイルの種類が選んだテンプレートと違う・書式が読めないときは、理由を出して下書きを作らない。
+- **ファイルからの取り込み**: テンプレートのファイル（JSON。書式は System Design Doc 5.13 の AD10、規則は 6.0.8）を選ぶと、その中身で下書きの版を作り、27 で開く。公開は、ほかの下書きと同じく 27 の検査と「Publish as v{n}」で行う。ファイルの種類が選んだテンプレートと違う・書式が読めないときは、理由を出して下書きを作らない。ファイルは送る前にブラウザで確かめ（1 MB まで・UTF-8・JSON のオブジェクト）、書式に合わない所は場所（「At {パス}」。ファイルの先頭なら「At the top of the file」）で5つまで出し、残りは「And {n} more」とする。
 - BCDX のテンプレート v1 は、リポジトリの `data/templates/bcdx/` にあるファイルを、リリースの手順で運営者がここから取り込んで公開する（手順は 04）。local のシードも同じファイルを同じ取り込みの処理で入れる（8.4）。
 - 空の状態（版が1つも無いテンプレート）: 「No versions yet. Import a template file to start.」と「Import from file」。テンプレートを公開するまで、利用者は自己分析・アイデア・プラン下書きを作れない（6.0.6）。
 
@@ -2295,7 +2309,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 下書きの編集: 右の編集欄の各欄を 6.0.2 の自動保存で保存する。保存の項目は、1つのセクション・1つの設問・テンプレートの名前・AI 用プロンプト、費用行の初期値・確認項目の基準値・実行管理の初期行の一覧（AD5 が一覧ごと置き換えるため、一覧が1つの項目）。規則（6.0.8 の 27 の行）に合わない値は送らず、欄の下に理由を出す。同時編集の確認（6.0.2）は無い（テンプレートの表は版の番号（`lock_version`）を持たない。SDD 6.3・ADR-019）。保存のたびに公開の前の検査を読み直す。保存の途中・保存できなかった入力・規則に合わず送っていない入力がある間と、検査を読み直している間は「Publish as v{n}」を押せない（保存していない内容を公開しないため）。スマホは詳細を読み取りで出し、その後の「Edit」で編集欄をシート（medium の Dialog）で開く（4.1 D。16 と同じ）。
 - 設問 ID: 同じテンプレートの公開済みの版にある ID は、読み取りで出し「This question ID is in a published version, so it can't change.」を添える（SDD 5.13 の `isKeyPublished`）。欄の下に種類ごとの形式（6.6）を1行で出す。
 - 回答の型は Picker で、テンプレートの種類が持てる型だけを並べる（SDD 5.13 AD6 の `answer_type_mismatch` の型。取り込んだファイルが持てない型を指定していれば、その型も並べて Check に任せる）。プランのほかの種類のセクションの Part は、値があるときだけ出す（AD6 の `invalid_part` を直すため）。
-- 型ごとの設定: 選択肢・表の列（キー・列名・種類（Text / Number / Percent / Amount））・表示する主要指標（6.4 の主要指標のキー）・下書きでコピーする元（6.6 の設問 ID と疑似キー）・費用行の初期値（表ごと）・実行管理の初期行（種類ごと）は、行ごとに上下の移動と削除のボタンを持つ一覧で直し、末尾の「Add …」で行を足す。1行に欄が並ぶ一覧（表の列・費用行の初期値・実行管理の初期行・表示条件）は、欄の名前を最初の行の上にだけ出す（表の見出しと同じ。2行目からは読み上げの名前に行の番号を添える）。「Add …」で足した行は最初の欄にフォーカスを移し、空のうちは、その一覧の欄を離れるか選ぶまで理由を出さない（送りもしない）。実行管理の一覧（実行管理の型）は Picker で選ぶ。表示条件は、条件ごとに条件の設問（この版の設問から選ぶ Picker）と出すときの答えの値（条件の設問が選択の型ならその選択肢のチェックボックス、ほかの型は1行に1つの値を書く欄）を並べ、「Add condition」で足す。
+- 型ごとの設定: 選択肢・表の列（キー・列名・種類（Text / Number / Percent / Amount））・表示する主要指標（6.4 の主要指標から行ごとの Picker で選ぶ。選択肢は1つの値（6.4 の表示名）・シナリオの列（「Expected scenario」など）・公開済みの検証のテンプレートの費用行の初期値（「Cost row: {名前}」。SDD 5.13 AD3 の `costRows`）で、ほかの行で選んだものは出さない。取り込んだファイルのどれでもないキーは「{キー} (not a key number)」で出し、Check の `unknown_metric_key` で直す）・下書きでコピーする元（6.6 の設問 ID と疑似キー）・費用行の初期値（表ごと）・実行管理の初期行（種類ごと）は、行ごとに上下の移動と削除のボタンを持つ一覧で直し、末尾の「Add …」で行を足す。1行に欄が並ぶ一覧（表の列・費用行の初期値・実行管理の初期行・表示条件）は、欄の名前を最初の行の上にだけ出す（表の見出しと同じ。2行目からは読み上げの名前に行の番号を添える）。「Add …」で足した行は最初の欄にフォーカスを移し、空のうちは、その一覧の欄を離れるか選ぶまで理由を出さない（送りもしない）。実行管理の一覧（実行管理の型）は Picker で選ぶ。表示条件は、条件ごとに条件の設問（この版の設問から選ぶ Picker）と出すときの答えの値（条件の設問が選択の型ならその選択肢のチェックボックス、ほかの型は1行に1つの値を書く欄）を並べ、「Add condition」で足す。
 - 追加: ツリーの下に「Add section」（プランは「Add item」。スマホは右下に浮かぶ「+」。4.1 D。題の行に置かないのは、主要な操作が「Publish as v{n}」のため）。セクションと設問の見出しの横の ⋯ に「Add question」（プランは「Add prompt」）。どちらも medium の Dialog で必須の欄（セクションはキーとタイトル、設問は設問 ID・タイトル・問い・回答の型）を入れて作り、作ったノードを選ぶ。設問 ID の欄には、そのセクションの最後の設問の ID の最後の連番を1つ進めた値を初めから入れる（最後が数でなければ、最後の「.」までを入れる）。
 - 削除: ⋯ の「Delete section」「Delete question」（プランは item / prompt）。AlertDialog で確かめる（セクションは、その設問も消えること）。テンプレートの編集は変更履歴を持たないので、戻せないことを添える。
 - 並べ替え: セクションの ⋯ の「Reorder sections」と、セクションと設問の ⋯ の「Reorder questions」（プランは items / prompts）で、6.10 の並べ替えの Dialog（large）を開く。設問はセクションの見出しの下に並べ、セクションの先頭で上へ・末尾で下へ移すと、隣のセクションの末尾・先頭へ移る（AD5）。並べている間にツリーが変わって送信が断られたら、6.10 と同じく読み直して始め直す。
@@ -2306,7 +2320,8 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 #### 28 管理: ユーザーとワークスペース（パターン D）
 
 - タブ: Users / Workspaces / Invitations。
-- Users: 表示名・メール・登録日・最終利用日・所属ワークスペース数・状態（有効 / 停止）。操作: 停止 / 再開。運営者には中身（アイデア・回答）は見せない。
+- Users: 表示名・メール・登録日・最終利用日・所属ワークスペース数・状態（有効 / 停止）。操作: 停止 / 再開。運営者には中身（アイデア・回答）は見せない。停止（Suspend）は AlertDialog（destructive。題「Suspend {名前}?」）で確かめてから行い、再開（Resume）は確かめない。運営者が自分を停止するボタンは押せなくし、理由「You can't suspend yourself」を添える。
+- Invitations の「Invite someone」は medium の Dialog で、メール、ワークスペース（任意の ComboBox。選ばなければ個人用ワークスペースだけになることを添える）、ロール（ワークスペースを選んだときだけ出し、既定は Member）を入れて送る。送ったあとは同じ Dialog に招待のリンクと「Copy link」を出す（メールが届かないときに運営者が渡すため）。
 - 停止の効果: ログイン中のセッションを切り、ログインできなくする。所属・共有・担当は残す（名前に「(suspended)」を添える）。通知は作らない。再開すると元どおり。停止の対象はユーザーだけで、ワークスペースは停止しない。停止した人が最後の Owner だったワークスペースは、初期リリースでは何もしない（残ったメンバーは今のロールのまま使える。Owner がいないので、招待とロールの変更はできなくなる。必要なら運営者が停止を解く）。運営者が Owner を付け替える機能を作るかは 9.2。
 - Workspaces: 名前・Owner・メンバー数・アイデア数・最終利用日。
 - 26 と 28 は管理の画面のタブで行き来する（ナビの Admin は 26 を開く）。タブは左のペインの題「Admin」の下の1列で、Templates（26）・Users・Workspaces・Invitations（28 の3つのタブ）を並べる（タブの列を2段に重ねないため）。28 のタブの切り替えは履歴を足さず、26 と 28 の間の移動は足す。28 もスマホのヘッダーは「← More」（26 からタブで移る同じ管理の画面のため）。

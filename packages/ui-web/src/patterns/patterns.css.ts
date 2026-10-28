@@ -630,6 +630,12 @@ export const inputs = style({
   "@media": { [tabletUp]: { gap: sheet.inputsGap } },
 });
 
+/** Under both columns, as far from them as the inputs' tables are from each other. */
+export const worksheetAfter = style({
+  marginBlockStart: sheet.inputsGapMobile,
+  "@media": { [tabletUp]: { marginBlockStart: sheet.inputsGap } },
+});
+
 /**
  * The results stay in view while the inputs scroll (4.1 F): a card with the light frame,
  * 288px wide (s17-costs.html .totals).
@@ -1047,6 +1053,18 @@ export const settingsRowActions = recipe({
 // I: presentation (s23-deck.html).
 
 const deck = vars.layout.presentation;
+
+/** Above the tools' line, as far from the body's edges as the line's content. */
+export const deckAlert = style({
+  paddingBlockStart: deck.barPaddingYMobile,
+  paddingInline: gutter.mobile,
+  "@media": {
+    [tabletUp]: {
+      paddingBlockStart: deck.barPaddingY,
+      paddingInline: deck.barPaddingX,
+    },
+  },
+});
 
 /** The tools' line across the body, a hairline under it (s23-deck.html .bar). */
 export const deckBar = style({

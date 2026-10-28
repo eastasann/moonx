@@ -50,6 +50,7 @@ const comment = (id: string, extra: Partial<Comment> = {}): Comment => ({
 const rootId = "c0000000-0000-4000-8000-000000000001";
 const thread: CommentThread = {
   root: comment(rootId),
+  label: "01 WHO",
   replies: [
     comment("c0000000-0000-4000-8000-000000000002", {
       parentId: rootId,

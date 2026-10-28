@@ -1,9 +1,10 @@
-import type { ExecutionItem, Me, Role } from "@moonx/schemas";
+import type { ExecutionItem, HistoryEntry, Me, Role } from "@moonx/schemas";
 import { focusManager } from "@tanstack/react-query";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, type Call, renderApp, stubApi } from "../test/api";
+import { SLOW_LOADING_MS } from "../components/states";
+import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
 import { anaRef, executionItem, ideaId, planHome, planId } from "../test/plans";
 import { home as ideaHome } from "../test/validation";
@@ -105,10 +106,18 @@ function executionApi({
   me = ana,
   items = everything(),
   archived = false,
+  patch,
+  history = [],
+  members = true,
 }: {
   me?: Me;
   items?: ExecutionItem[];
   archived?: boolean;
+  /** Answers P10 PATCH instead of keeping what it sends. */
+  patch?: () => Response;
+  history?: HistoryEntry[];
+  /** Whether W2 answers; else it never does. */
+  members?: boolean;
 } = {}) {
   return stubApi((call: Call) => {
     const { method, path } = call;
@@ -142,6 +151,7 @@ function executionApi({
     }
     const one = path.match(/^\/api\/v1\/execution-items\/([\w-]+)$/);
     if (one !== null && method === "PATCH") {
+      if (patch !== undefined) return patch();
       const found = items.find(({ id }) => id === one[1]);
       const body = call.body as Record<string, unknown> & {
         lockVersion: number;
@@ -164,6 +174,7 @@ function executionApi({
       method === "GET" &&
       path === `/api/v1/workspaces/${workspaceId}/members`
     ) {
+      if (!members) return new Promise<Response>(() => {});
       return Response.json({
         items: [anaRef, kenji].map((user, index) => ({
           user,
@@ -178,7 +189,7 @@ function executionApi({
       return Response.json({ threads: [], unresolvedCount: 0 });
     }
     if (method === "GET" && path.startsWith("/api/v1/history?")) {
-      return Response.json({ items: [], nextCursor: null });
+      return Response.json({ items: history, nextCursor: null });
     }
     return undefined;
   });
@@ -410,6 +421,123 @@ describe("22 Execution (design-spec 6.13)", () => {
     await waitFor(() =>
       expect(router.state.location.search).toEqual({ tab: "actions" }),
     );
+  });
+
+  test("Assignee lists the names typed on Next Actions once, and filters by one", async () => {
+    const user = userEvent.setup();
+    const typed = (id: string, title: string, name: string) =>
+      executionItem("next_action", id, title, {
+        dueDate: "2026-10-20",
+        assignee: { name },
+      });
+    const items = [
+      ...everything(),
+      typed("5e0c0000-0000-4000-8000-000000000033", "Call Lito", "Lito"),
+      typed("5e0c0000-0000-4000-8000-000000000034", "Pay Lito", "lito"),
+      typed("5e0c0000-0000-4000-8000-000000000035", "Ask Mara", "Mara"),
+    ];
+    executionApi({ items });
+    const router = renderApp(`${base}?tab=actions`);
+    await screen.findByRole("grid", { name: "Next Actions" });
+    await user.click(
+      within(screen.getByRole("tabpanel")).getByRole("button", {
+        name: /Assignee/,
+      }),
+    );
+    const listbox = await screen.findByRole("listbox");
+    expect(
+      within(listbox)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["All", "Me", anaRef.displayName, "Kenji Reyes", "Lito", "Mara"]);
+    await user.click(within(listbox).getByRole("option", { name: "Lito" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        tab: "actions",
+        assigneeName: "Lito",
+      }),
+    );
+    const list = await screen.findByRole("grid", { name: "Next Actions" });
+    await waitFor(() =>
+      expect(
+        within(list)
+          .getAllByRole("row")
+          .map((row) => row.textContent?.split(/To do/)[0]),
+      ).toEqual(["Call Lito", "Pay Lito"]),
+    );
+  });
+
+  test("a typed name in the URL stays chosen once no Next Action has it", async () => {
+    executionApi();
+    renderApp(`${base}?tab=actions&assigneeName=Nora`);
+    const filters = await screen.findByRole("tabpanel");
+    await waitFor(() =>
+      expect(
+        within(filters).getByRole("button", { name: /Assignee/ }).textContent,
+      ).toContain("Nora"),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Nothing matches these filters",
+      }),
+    ).toBeTruthy();
+  });
+
+  test("a save the API refused says so in the list's row too, with Retry (6.0.2)", async () => {
+    const user = userEvent.setup();
+    executionApi({ patch: () => apiError(409, "ARCHIVED") });
+    renderApp(base);
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "Business decision",
+    });
+    await user.type(screen.getByRole("textbox", { name: "Goal" }), "!");
+    const list = screen.getByRole("grid", { name: "Milestones" });
+    const row = within(list).getByRole("row", { name: /Business decision/ });
+    await waitFor(() => expect(row.textContent).toContain("Couldn't save"));
+    expect(row.textContent).toContain("It's archived");
+    expect(within(row).getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+
+  test("a change whose assignee's name takes over 10 seconds: Taking longer than usual in the list's place", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      executionApi({
+        members: false,
+        history: [
+          {
+            id: "a0000000-0000-4000-8000-000000000031",
+            batchId: null,
+            target: { type: "execution_item", id: decision.id, key: null },
+            label: "Execution · Business decision",
+            action: "update",
+            source: "manual",
+            before: { assigneeUserId: null },
+            after: { assigneeUserId: kenji.id },
+            changedBy: anaRef,
+            changedAt: "2026-10-01T02:00:00.000Z",
+            revertible: true,
+          },
+        ],
+      });
+      renderApp(
+        `${base}?panel=history&target=container:business_plan:${planId}:execution`,
+      );
+      const panel = await screen.findByRole("complementary", {
+        name: "History",
+      });
+      await within(panel).findAllByText("Execution · Business decision");
+      act(() => vi.advanceTimersByTime(SLOW_LOADING_MS));
+      expect(
+        await within(panel).findByRole("heading", {
+          name: "Taking longer than usual",
+        }),
+      ).toBeTruthy();
+      expect(within(panel).getByRole("button", { name: "Retry" })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("+ Add makes an item of the tab and shows it beside the list", async () => {

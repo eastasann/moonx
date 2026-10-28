@@ -13,7 +13,7 @@ import type {
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, type Call, renderApp, stubApi } from "../test/api";
+import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   anaRef,
@@ -164,6 +164,7 @@ const summary: PlanItem = {
     answer("P.01.2"),
   ],
   metrics,
+  costRowNames: {},
   scenarios: [],
   execution: [],
   references: [],
@@ -197,6 +198,7 @@ const ownership = (rows: PlanAnswer["rows"]): PlanItem => ({
   ],
   answers: [answer("P.13.1", { rows, lockVersion: rows === null ? 0 : 3 })],
   metrics: {},
+  costRowNames: {},
   scenarios: [],
   execution: [],
   references: [
@@ -223,6 +225,7 @@ const milestones = (execution: ExecutionItem[]): PlanItem => ({
   ],
   answers: [],
   metrics: {},
+  costRowNames: {},
   scenarios: [],
   execution,
   references: [],
@@ -258,6 +261,7 @@ const market: PlanItem = {
   ],
   answers: [answer("P.06.1")],
   metrics: {},
+  costRowNames: {},
   scenarios: [],
   execution: [],
   references: [
@@ -319,6 +323,8 @@ function itemApi({
   ideaArchived = false,
   created,
   history = [],
+  members = true,
+  patch,
 }: {
   me?: Me;
   items: PlanItem[];
@@ -327,6 +333,10 @@ function itemApi({
   ideaArchived?: boolean;
   created?: ExecutionItem;
   history?: HistoryEntry[];
+  /** Whether W2 answers; else it fails as not found. */
+  members?: boolean;
+  /** Answers P10 PATCH instead of keeping what it sends. */
+  patch?: () => Response;
 }) {
   const answers = new Map(
     items.flatMap((item) =>
@@ -397,6 +407,7 @@ function itemApi({
         : Response.json(created, { status: 201 });
     }
     if (method === "PATCH" && path.startsWith("/api/v1/execution-items/")) {
+      if (patch !== undefined) return patch();
       const id = path.split("/").at(-1);
       const item = items
         .flatMap(({ execution }) => execution)
@@ -414,7 +425,8 @@ function itemApi({
     }
     if (
       method === "GET" &&
-      path === `/api/v1/workspaces/${workspaceId}/members`
+      path === `/api/v1/workspaces/${workspaceId}/members` &&
+      members
     ) {
       return Response.json({
         items: [
@@ -637,11 +649,33 @@ describe("21 Plan item (design-spec 6.12)", () => {
             metricKeys: ["selling_price", "cost_row:monthly.rent"],
           },
         }),
+        prompt("P.08.14", "Utilities and payroll", {
+          answerType: "linked_metric",
+          options: {
+            kind: "linked_metric",
+            metricKeys: [
+              "cost_row:monthly.utilities",
+              "cost_row:monthly.salaries",
+            ],
+          },
+        }),
       ],
       answers: [answer("P.08.11")],
+      // Payroll is not in the validation: the API leaves it out and names it as the
+      // template does (P4 `costRowNames`).
       metrics: {
         selling_price: value(250),
         "cost_row:monthly.rent": value(18000),
+        "cost_row:monthly.utilities": {
+          value: null,
+          bound: "exact",
+          reason: "empty",
+        },
+      },
+      costRowNames: {
+        "monthly.rent": "Stall rent",
+        "monthly.utilities": "Utilities",
+        "monthly.salaries": "Salaries / Wages",
       },
       scenarios: [
         {
@@ -675,16 +709,17 @@ describe("21 Plan item (design-spec 6.12)", () => {
         .getByRole("link", { name: "Edit in validation" })
         .getAttribute("href"),
     ).toBe(`/w/${workspaceId}/ideas/${ideaId}/economics`);
-    // Quiet, a single number reads as its value; a deleted cost row as Empty (6.4).
+    // Quiet, a single number reads as its value; a cost row the validation does not have
+    // says so (6.0.7), one it has without a value is Empty (6.4).
     expect(card("Average selling price").textContent).toContain("₱250");
-    expect(card("Payroll").textContent).toContain("Empty");
-    // Beside other numbers, a cost row goes by its name in the validation (6.4).
-    await waitFor(() =>
-      expect(card("Price and rent").textContent).toContain(
-        "Stall rent ₱18,000",
-      ),
-    );
+    expect(card("Payroll").textContent).toContain("Not in validation");
+    // Beside other numbers, a cost row goes by its name in the validation, or the
+    // template's for one it does not have (6.4).
+    expect(card("Price and rent").textContent).toContain("Stall rent ₱18,000");
     expect(card("Price and rent").textContent).toContain("Price ₱250");
+    expect(card("Utilities and payroll").textContent).toContain(
+      "Utilities Empty · Salaries / Wages Not in validation",
+    );
   });
 
   test("AI ▼ exports this item and imports into this plan, both back to 21", async () => {
@@ -956,6 +991,35 @@ describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
     );
   });
 
+  test("a save the API refused says so in the list's row too, with Retry (6.0.2)", async () => {
+    const user = userEvent.setup();
+    itemApi({
+      items: [milestones([lease])],
+      patch: () => apiError(409, "ARCHIVED"),
+    });
+    renderApp(itemPath(23));
+    const list = await screen.findByRole("grid", { name: "Milestones" });
+    await user.click(
+      within(within(list).getByRole("row", { name: /Lease/ })).getByText(
+        "Lease",
+      ),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Edit milestone",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: "Exit Condition" }),
+      "Signed",
+    );
+    await user.tab();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const row = within(list).getByRole("row", { name: /Lease/ });
+    await waitFor(() => expect(row.textContent).toContain("Couldn't save"));
+    expect(row.textContent).toContain("It's archived");
+    expect(within(row).getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+
   test("the row's ⋯ holds Comments, History and Delete; Delete asks first", async () => {
     const user = userEvent.setup();
     const calls = itemApi({ items: [milestones([lease])] });
@@ -1138,6 +1202,27 @@ describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
         status: "todo",
         assigneeUserId: ana.id,
       }),
+    );
+  });
+
+  test("members that could not be read say so under the assignee, with Retry", async () => {
+    const user = userEvent.setup();
+    const calls = itemApi({ items: [milestones([])], members: false });
+    renderApp(itemPath(23));
+    await user.click(
+      await screen.findByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    expect(
+      await within(dialog).findByText(
+        "Couldn't load the members to choose from.",
+      ),
+    ).toBeTruthy();
+    const path = `/api/v1/workspaces/${workspaceId}/members`;
+    const before = sent(calls, "GET", path).length;
+    await user.click(within(dialog).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(sent(calls, "GET", path).length).toBeGreaterThan(before),
     );
   });
 

@@ -2,8 +2,9 @@ import { i18n } from "@moonx/i18n";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Bell, Lightbulb, ScrollText } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { useTwoColumns, useTwoColumnsNow } from "../internal/frame";
 import { HubPattern } from "../patterns/HubPattern";
 import { ListDetailPattern } from "../patterns/ListDetailPattern";
 import { PresentationPattern } from "../patterns/PresentationPattern";
@@ -587,6 +588,47 @@ describe("AppFrame: a docked panel and the body's width (design-spec 4.1)", () =
       </AppFrame>
     );
   }
+
+  test("an effect reads two columns as laid out before the docked panel is observed", async () => {
+    stubLayout();
+    const user = userEvent.setup();
+    const seen: [rendered: boolean, now: boolean][] = [];
+    function Probe() {
+      const isTwoColumns = useTwoColumns();
+      const isTwoColumnsNow = useTwoColumnsNow();
+      useEffect(() => {
+        seen.push([isTwoColumns, isTwoColumnsNow()]);
+      });
+      return null;
+    }
+    function WithPanel() {
+      const [isOpen, setOpen] = useState(false);
+      return (
+        <AppFrame
+          sideNav={null}
+          tabBar={null}
+          comments={{ count: 0, isOpen, onPress: () => setOpen(!isOpen) }}
+          panel={
+            isOpen ? (
+              <aside data-docked aria-label="Comments">
+                Threads
+              </aside>
+            ) : null
+          }
+        >
+          <Probe />
+        </AppFrame>
+      );
+    }
+    render(<WithPanel />);
+    resized(784);
+    seen.length = 0;
+    await user.click(screen.getByRole("button", { name: "Comments" }));
+    // The render that docks the panel still says two columns; the layout no longer does.
+    expect(seen[0]).toEqual([true, false]);
+    resized(784);
+    expect(seen.at(-1)).toEqual([false, false]);
+  });
 
   test("too narrow beside the panel: one pane; the field keeps its focus and text", async () => {
     stubLayout();

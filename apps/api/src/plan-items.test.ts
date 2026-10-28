@@ -249,6 +249,35 @@ describe("P4 GET /api/v1/plans/{planId}/items/{itemNo}", () => {
         amount: null,
       },
     ]);
+    // A number sub-item's cost row: named by the validation's row, Empty while it has no
+    // value; once deleted, left out of the metrics and named by the template (6.0.7).
+    await db
+      .update(costItems)
+      .set({ name: "Crew wages" })
+      .where(
+        and(
+          eq(costItems.validationId, validationId),
+          eq(costItems.templateKey, "monthly.salaries"),
+        ),
+      );
+    const people = await item(team, 18);
+    expect(people.metrics["cost_row:monthly.salaries"]).toMatchObject({
+      value: null,
+      reason: "empty",
+    });
+    expect(people.costRowNames).toEqual({ "monthly.salaries": "Crew wages" });
+    await db
+      .update(costItems)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(
+          eq(costItems.validationId, validationId),
+          eq(costItems.templateKey, "monthly.salaries"),
+        ),
+      );
+    const withoutRow = await item(team, 18);
+    expect("cost_row:monthly.salaries" in withoutRow.metrics).toBe(false);
+    expect(withoutRow.costRowNames).toEqual({ "monthly.salaries": "Salaries" });
     expect(refOf(legal, "research_log")).toMatchObject({
       title: "Research Log · Permits",
       data: [{ topic: "City hall visit", observedOn: "2026-09-02" }],

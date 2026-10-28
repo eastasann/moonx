@@ -34,6 +34,12 @@ export interface WorksheetPatternProps {
    * opens the results.
    */
   summary: ReactNode;
+  /**
+   * What goes under the inputs and the results, across the whole width, as one more of
+   * the inputs' tables apart (18's scenario table, design-spec 6.4). Where the results
+   * have no column of their own, it follows the inputs.
+   */
+  after?: ReactNode;
 }
 
 /**
@@ -50,6 +56,7 @@ export function WorksheetPattern({
   results,
   resultsTitle,
   summary,
+  after,
 }: WorksheetPatternProps) {
   const isTwoColumns = useTwoColumns();
   const resultsTitleId = useId();
@@ -144,6 +151,7 @@ export function WorksheetPattern({
             </aside>
           )}
         </div>
+        {after != null && <div className={styles.worksheetAfter}>{after}</div>}
       </div>
       {!isTwoColumns && (
         <BottomBar variant="summary" column="worksheet">

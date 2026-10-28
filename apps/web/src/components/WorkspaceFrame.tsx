@@ -171,7 +171,7 @@ export function WorkspaceFrame({
       ? [
           {
             id: "settings",
-            label: t("app:nav.settings"),
+            label: t("app:nav.workspaceSettings"),
             icon: <Settings2 />,
             href: settingsHref(workspace.id),
           },

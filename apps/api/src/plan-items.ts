@@ -6,6 +6,7 @@ import {
   planAnswers,
 } from "@moonx/db";
 import {
+  COST_ROW_METRIC_PREFIX,
   keyMetricOf,
   type PlanAnswerContent,
   type PlanQuestion,
@@ -39,7 +40,7 @@ import { ApiError, standardIssueDetails } from "./errors";
 import { withHistory } from "./history";
 import { findIdea, loadIdeaContexts } from "./idea-views";
 import { checkKeyedLockVersion, createKeyedItem } from "./lock";
-import { loadPlanReferences } from "./plan-references";
+import { loadCostRowNames, loadPlanReferences } from "./plan-references";
 import {
   executionItemViews,
   executionTypesOf,
@@ -170,7 +171,25 @@ async function loadPlanItem(
     metrics: Object.fromEntries(
       metricKeys
         .filter((key) => !key.startsWith(SCENARIO_PREFIX))
+        // A cost row the validation does not have (had not, for a version) is left out,
+        // as in the key metrics: 21 says "Not in validation" (design-spec 6.0.7).
+        .filter(
+          (key) =>
+            !key.startsWith(COST_ROW_METRIC_PREFIX) ||
+            shownMetrics[key] !== undefined,
+        )
         .map((key) => [key, keyMetricOf(shownMetrics, key)]),
+    ),
+    costRowNames: Object.fromEntries(
+      await loadCostRowNames(
+        db,
+        context.loaded.validationId,
+        metricKeys.flatMap((key) =>
+          key.startsWith(COST_ROW_METRIC_PREFIX)
+            ? [key.slice(COST_ROW_METRIC_PREFIX.length)]
+            : [],
+        ),
+      ),
     ),
     scenarios: shownScenarios.filter((column) => scenarioKeys.has(column.key)),
     execution: await executionItemViews(

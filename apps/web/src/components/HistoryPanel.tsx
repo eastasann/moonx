@@ -50,7 +50,12 @@ import {
 import { useCreationUndo } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import { failureCode } from "./SendFailure";
-import { FailureState, LoadingBlock } from "./states";
+import {
+  FailureState,
+  LoadingBlock,
+  SlowLoadingState,
+  useIsSlow,
+} from "./states";
 import { UserName } from "./UserName";
 import { dashboardHref, usePanel, useWorkspace } from "./workspace";
 
@@ -517,6 +522,9 @@ export function HistoryPanelBody({
     );
   };
 
+  // A row's words that take over 10 seconds are a slow load like the list's (6.0.6): the
+  // list's place says so, with Retry, which reads again what those rows wait for.
+  const isWordsSlow = useIsSlow(entries.some(waitsForWords));
   let rows: ReactNode;
   if (query.isError || wordsFailure !== null) {
     rows = (
@@ -528,6 +536,17 @@ export function HistoryPanelBody({
           for (const item of items) if (item.isError) void item.refetch();
         }}
         dashboardHref={dashboardHref(me)}
+        headingLevel={3}
+        size="S"
+      />
+    );
+  } else if (isWordsSlow) {
+    rows = (
+      <SlowLoadingState
+        onRetry={() => {
+          if (members.isPending) void members.refetch();
+          for (const item of items) if (item.isPending) void item.refetch();
+        }}
         headingLevel={3}
         size="S"
       />

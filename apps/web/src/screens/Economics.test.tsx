@@ -5,7 +5,7 @@ import type {
   Role,
   ValidationAnswer,
 } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ana, type Call, renderApp, stubApi } from "../test/api";
@@ -23,8 +23,21 @@ import {
 
 // 18 Unit Economics & Scenarios (design-spec 6.4), on the numbers of 8.3.
 
+/** happy-dom's window, whose viewport a test sets. */
+const setViewport = (width: number) =>
+  act(() =>
+    (
+      window as unknown as {
+        happyDOM: {
+          setViewport: (size: { width: number; height: number }) => void;
+        };
+      }
+    ).happyDOM.setViewport({ width, height: 900 }),
+  );
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  setViewport(1024);
 });
 
 const base = `/w/${workspaceId}/ideas/${home.idea.id}/economics`;
@@ -322,17 +335,80 @@ describe("18 Unit Economics & Scenarios (design-spec 6.4)", () => {
     ).toBeTruthy();
   });
 
-  test("the scenarios sit in the results, a line each", async () => {
-    economicsApi();
+  test("wider than a phone the scenarios are a table under both columns, a column each", async () => {
+    economicsApi({
+      inputs: economicsInputs({ ...piayaNumbers, units_strong: undefined }),
+    });
     renderApp(base);
     await screen.findByRole("grid", { name: "Inputs" });
-    const lines = within(scenarios()).getAllByRole("row");
-    expect(lines).toHaveLength(5);
     expect(
       screen
         .getByRole("complementary", { name: "Results" })
         .contains(scenarios()),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      within(scenarios())
+        .getAllByRole("columnheader")
+        .map((header) => header.textContent),
+    ).toEqual([
+      "Metric",
+      "Break-even",
+      "Conservative",
+      "Expected",
+      "Strong",
+      "Capacity limit",
+    ]);
+    const rows = within(scenarios())
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) =>
+        [...row.querySelectorAll('[role="rowheader"], [role="gridcell"]')].map(
+          (cell) => cell.textContent,
+        ),
+      );
+    expect(rows.map(([name]) => name)).toEqual([
+      "Units / day",
+      "Units / month",
+      "Revenue",
+      "Variable costs",
+      "Operating profit",
+      "Operating margin",
+    ]);
+    // Break-even makes nothing; Conservative a loss, shown as one; Strong is empty.
+    expect(rows[4]).toEqual([
+      "Operating profit",
+      "₱0",
+      "−₱5,586",
+      "₱18,490",
+      "Empty",
+      expect.any(String),
+    ]);
+  });
+
+  test("on a phone the scenarios stay in the results, a line each; no table under the inputs", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    economicsApi({
+      inputs: economicsInputs({ ...piayaNumbers, units_strong: undefined }),
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Inputs" });
+    expect(screen.queryByRole("grid", { name: "Scenarios" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /^BE / }));
+    const drawer = await screen.findByRole("dialog", { name: "Results" });
+    const lines = within(
+      within(drawer).getByRole("grid", { name: "Scenarios" }),
+    ).getAllByRole("row");
+    expect(lines.map((line) => line.textContent?.split("Units")[0])).toEqual([
+      "Break-even",
+      "Conservative",
+      "Expected",
+      "Strong",
+      "Capacity limit",
+    ]);
+    // An empty scenario is Empty, a loss shows as one.
+    expect(lines[3]?.textContent).toContain("Empty");
+    expect(lines[1]?.textContent).toContain("−₱5,586");
   });
 
   test("a Viewer reads every number and the question; nothing to edit", async () => {

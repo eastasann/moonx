@@ -65,6 +65,16 @@ export const fullBodyRoom: BodyRoom = {
 export const BodyRoomContext = createContext<BodyRoom>(fullBodyRoom);
 
 /**
+ * AppFrame's room as the page is laid out at the moment it is called, read from the
+ * layout instead of from the last observation. A render can be a frame behind: the
+ * navigation that docks or closes a panel renders, and runs its effects, before the
+ * body is measured again.
+ */
+export const BodyRoomNowContext = createContext<() => BodyRoom>(
+  () => fullBodyRoom,
+);
+
+/**
  * Whether patterns A, D and F stand in their two columns: on a desktop whose body has
  * room for them. Otherwise they take the tablet's arrangement, a docked panel staying
  * beside the body (4.1).
@@ -73,6 +83,18 @@ export function useTwoColumns(): boolean {
   const isDesktop = useIsDesktop();
   const { hasTwoColumns } = useContext(BodyRoomContext);
   return isDesktop && hasTwoColumns;
+}
+
+/**
+ * {@link useTwoColumns} as the page is laid out when the returned function is called: for
+ * an effect that writes into the URL what goes beside a list. On the navigation that
+ * docks a panel, the render still says two columns, and what it would put beside the
+ * list was never on screen.
+ */
+export function useTwoColumnsNow(): () => boolean {
+  const isDesktop = useIsDesktop();
+  const measure = useContext(BodyRoomNowContext);
+  return () => isDesktop && measure().hasTwoColumns;
 }
 
 /**

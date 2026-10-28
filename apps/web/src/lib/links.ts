@@ -342,6 +342,11 @@ export interface ExecutionSearch {
   item?: string;
   /** Next Actions' filter by assignee: `me` or a member's user id. */
   assignee?: string;
+  /**
+   * Next Actions' filter by an assignee typed as a name, in any case. Not with `assignee`:
+   * an item has one or the other.
+   */
+  assigneeName?: string;
   /** Next Actions' filter by status. */
   status?: ExecutionStatus;
 }
@@ -354,7 +359,13 @@ export const executionHref = (
   search: ExecutionSearch = {},
 ) => {
   const query = new URLSearchParams();
-  for (const key of ["tab", "item", "assignee", "status"] as const) {
+  for (const key of [
+    "tab",
+    "item",
+    "assignee",
+    "assigneeName",
+    "status",
+  ] as const) {
     const value = search[key];
     if (value !== undefined) query.set(key, value);
   }

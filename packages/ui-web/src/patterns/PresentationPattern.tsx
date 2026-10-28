@@ -19,6 +19,11 @@ export interface PresentationSlide {
 }
 
 export interface PresentationPatternProps {
+  /**
+   * Above the tools' line: what holds for the whole screen (an archived idea or plan, with
+   * Restore; design-spec 6.14).
+   */
+  alert?: ReactNode;
   /** The title: its level 1 Heading, `heading-1-toolbar`. */
   header: ReactNode;
   /** The deck's tools after the title: One-minute / Five-minute, the version to show. */
@@ -57,6 +62,7 @@ export interface PresentationPatternProps {
  * next under it, then the notes.
  */
 export function PresentationPattern({
+  alert,
   header,
   tools,
   primaryAction,
@@ -138,6 +144,7 @@ export function PresentationPattern({
 
   return (
     <div className={styles.root} aria-busy={isLoading || undefined}>
+      {alert != null && <div className={styles.deckAlert}>{alert}</div>}
       <div className={styles.deckBar}>
         <div className={styles.deckTitle}>{header}</div>
         {tools}

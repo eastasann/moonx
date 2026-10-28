@@ -356,6 +356,52 @@ test.describe("12 beside a panel on a narrow desktop", () => {
     await expect(page).toHaveURL(/\/team\/[\w-]+$/);
     expect(page.url()).not.toContain(me.id);
   });
+
+  test("Back to two columns, then Forward onto the list beside its panel: the list stays alone", async ({
+    page,
+    signIn,
+  }) => {
+    const me = await signIn(demo.owner);
+    const bcdx = workspaceOf(me, "BCDX");
+    await page.goto(`/w/${bcdx.id}/team`);
+    const members = page.getByRole("grid", { name: "Members" });
+    await members.getByText("Paolo Gonzaga").click();
+    await expect(
+      page.getByText("I want to own my time", { exact: false }),
+    ).toBeVisible();
+    const twoColumns = page.url();
+    // The header's 💬 narrows the body to one pane; ← leaves the list alone beside it.
+    await page
+      .getByRole("banner")
+      .getByRole("button", { name: /^Comments/ })
+      .click();
+    const comments = page.getByRole("complementary", { name: "Comments" });
+    await expect(comments).toBeVisible();
+    await page
+      .getByRole("button", { name: "Back to Team Self Analyses" })
+      .click();
+    await expect(members).toBeVisible();
+    const listAlone = page.url();
+    expect(listAlone).toMatch(/\/team\?panel=comments/);
+
+    // ← replaced the panel's entry: one step back is the two columns, with no panel.
+    await page.goBack();
+    await expect(page).toHaveURL(twoColumns);
+    await expect(comments).toHaveCount(0);
+    // Forward docks the panel again: the list stays alone beside it, with no member
+    // written into its path from the render before the panel's column is measured.
+    await page.goForward();
+    await expect(comments).toBeVisible();
+    await expect(members).toBeVisible();
+    await expect(
+      page.getByText("I want to own my time", { exact: false }),
+    ).toHaveCount(0);
+    // An effect writing the member would replace the entry in the frame after the panel
+    // shows, which nothing on the page marks: the URL is read again half a second later,
+    // many frames past it, as the run before the fix showed it within one.
+    await page.waitForTimeout(500);
+    expect(page.url()).toBe(listAlone);
+  });
 });
 
 test.describe("10 and 11 on a phone", () => {

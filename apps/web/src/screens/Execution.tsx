@@ -131,6 +131,15 @@ function passesFilters(
       return false;
     }
   }
+  if (search.assigneeName !== undefined) {
+    if (
+      item.assignee === null ||
+      !("name" in item.assignee) ||
+      nameKey(item.assignee.name) !== nameKey(search.assigneeName)
+    ) {
+      return false;
+    }
+  }
   if (search.status !== undefined && item.status !== search.status) {
     return false;
   }
@@ -138,16 +147,28 @@ function passesFilters(
 }
 
 /**
- * Next Actions' filters (6.13): the assignee (a member, or the user), the status, and
- * "Overdue only", which the URL does not hold.
+ * Typed names that differ only in case, or in spaces around them, are one assignee
+ * (design-spec 6.13), as P9's `assigneeName` matches them.
+ */
+const nameKey = (name: string) => name.trim().toLowerCase();
+
+/** The Assignee Picker's id of a typed name: apart from `all`, `me` and user ids. */
+const NAME_PREFIX = "name:";
+
+/**
+ * Next Actions' filters (6.13): the assignee (a member, the user, or a name typed on this
+ * plan's Next Actions), the status, and "Overdue only", which the URL does not hold.
  */
 function Filters({
   search,
+  names,
   overdueOnly,
   onChange,
   onOverdueChange,
 }: {
   search: ExecutionSearch;
+  /** The names typed as assignees on this plan's Next Actions, in the list's order. */
+  names: string[];
   overdueOnly: boolean;
   onChange: (next: ExecutionSearch) => void;
   onOverdueChange: (value: boolean) => void;
@@ -175,6 +196,16 @@ function Filters({
         members.data === undefined ? "" : t("plans:execution.formerMember"),
     });
   }
+  // A name the URL holds stays chosen once no Next Action has it any more.
+  const typed =
+    search.assigneeName === undefined ? names : [...names, search.assigneeName];
+  const seen = new Set<string>();
+  for (const name of typed) {
+    const key = nameKey(name);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    assignees.push({ id: `${NAME_PREFIX}${key}`, label: name.trim() });
+  }
   return (
     <>
       <Picker
@@ -182,14 +213,24 @@ function Filters({
         labelPosition="inside"
         size="S"
         items={assignees}
-        value={search.assignee ?? ALL}
-        onChange={(value) =>
+        value={
+          search.assigneeName !== undefined
+            ? `${NAME_PREFIX}${nameKey(search.assigneeName)}`
+            : (search.assignee ?? ALL)
+        }
+        onChange={(value) => {
+          const chosen =
+            value === null || value === ALL ? undefined : String(value);
+          const name = chosen?.startsWith(NAME_PREFIX)
+            ? assignees.find(({ id }) => id === chosen)?.label
+            : undefined;
           onChange({
             ...search,
             item: undefined,
-            assignee: value === null || value === ALL ? undefined : value,
-          })
-        }
+            assignee: name === undefined ? chosen : undefined,
+            assigneeName: name,
+          });
+        }}
       />
       <Picker
         label={t("plans:execution.status")}
@@ -588,6 +629,7 @@ function ExecutionBody({
                 ...current,
                 item: undefined,
                 assignee: undefined,
+                assigneeName: undefined,
                 status: undefined,
               });
             }}
@@ -639,7 +681,7 @@ function ExecutionBody({
                   />
                 }
               >
-                <ExecutionRowContent item={item} />
+                <ExecutionRowContent item={item} canEdit={canEdit} />
               </ListViewItem>
             )}
           </ListView>
@@ -724,6 +766,9 @@ function ExecutionBody({
           hasFilters && isTabKnown ? (
             <Filters
               search={current}
+              names={ofType.flatMap(({ assignee }) =>
+                assignee !== null && "name" in assignee ? [assignee.name] : [],
+              )}
               overdueOnly={overdueOnly}
               onChange={onSearch}
               onOverdueChange={(value) => {

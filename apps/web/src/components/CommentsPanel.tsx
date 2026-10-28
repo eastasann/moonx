@@ -90,14 +90,12 @@ export interface ScreenComments {
    * screen has not read yet count as shown until it has.
    */
   shows: (item: TargetRef) => boolean;
-  /** An item's name, over its threads in the screen's list ("01 WHO", "Costs · Rent"). */
-  labelOf: (target: TargetRef) => string | undefined;
   /**
-   * Where the names of the screen's list stand when the screen reads them for it (20 reads
-   * its items' once the list opens): the list waits for them, and a failed read says so.
-   * `retry` reads again the ones not in yet, failed or slow.
+   * An item's name, over its threads in the screen's list ("01 WHO", "Costs · Rent"), and
+   * over an item's panel ("On 01 WHO"). In the list, a thread whose item the screen does
+   * not name takes the name C1 gives it.
    */
-  labelsState?: { isPending: boolean; error: unknown; retry: () => void };
+  labelOf: (target: TargetRef) => string | undefined;
 }
 
 /**
@@ -664,7 +662,7 @@ export function CommentsPanelBody({
   const threadLabel = (thread: CommentThread) => {
     const parts = [
       ...(target.kind === "screen"
-        ? [comments.labelOf(thread.root.target)]
+        ? [comments.labelOf(thread.root.target) ?? thread.label]
         : []),
       ...(fromWorkspaces === undefined
         ? []
@@ -677,29 +675,20 @@ export function CommentsPanelBody({
     return parts.length === 0 ? undefined : parts.join(t("app:separator"));
   };
 
-  const labels = target.kind === "screen" ? comments.labelsState : undefined;
   let threads: ReactNode;
-  if (query.isError || (labels !== undefined && labels.error !== null)) {
+  if (query.isError) {
     threads = (
       <FailureState
-        error={query.error ?? labels?.error}
-        onRetry={() => {
-          if (query.isError) void query.refetch();
-          labels?.retry();
-        }}
+        error={query.error}
+        onRetry={() => void query.refetch()}
         dashboardHref={dashboardHref(me)}
         headingLevel={3}
         size="S"
       />
     );
-  } else if (query.data === undefined || labels?.isPending === true) {
+  } else if (query.data === undefined) {
     threads = (
-      <LoadingBlock
-        onRetry={() => {
-          void query.refetch();
-          labels?.retry();
-        }}
-      >
+      <LoadingBlock onRetry={() => void query.refetch()}>
         <Stack gap="space-200">
           <Text>{t("panels:comments.empty")}</Text>
           <Text>{t("panels:comments.placeholder")}</Text>

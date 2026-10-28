@@ -96,6 +96,42 @@ async function costDefaultsOf(db: Executor, keys: readonly string[]) {
   return byKey;
 }
 
+/**
+ * The names of the cost rows `keys` (template keys) name, for 21's number sub-items: the
+ * validation's row's, else, for a row it does not have, the template's as the cost_rows
+ * reference gives it (design-spec 6.0.7「Not in validation」); null where neither has one.
+ */
+export async function loadCostRowNames(
+  db: Executor,
+  validationId: string,
+  keys: readonly string[],
+): Promise<Map<string, string | null>> {
+  if (keys.length === 0) return new Map();
+  const rows = await db
+    .select({ key: costItems.templateKey, name: costItems.name })
+    .from(costItems)
+    .where(
+      and(
+        eq(costItems.validationId, validationId),
+        isNull(costItems.deletedAt),
+        inArray(costItems.templateKey, [...keys]),
+      ),
+    )
+    .orderBy(asc(costItems.sortOrder));
+  const names = new Map<string, string | null>();
+  for (const row of rows) {
+    if (row.key !== null && !names.has(row.key)) names.set(row.key, row.name);
+  }
+  const defaults = await costDefaultsOf(
+    db,
+    keys.filter((key) => !names.has(key)),
+  );
+  for (const key of keys) {
+    if (!names.has(key)) names.set(key, defaults.get(key)?.name ?? null);
+  }
+  return names;
+}
+
 /** An assumption of 16 with its evidence, as §21 copies and shows it. */
 export interface ListedAssumption extends DraftAssumption {
   id: string;

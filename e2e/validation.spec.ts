@@ -444,6 +444,13 @@ test.describe("14 beside a panel on a narrow desktop", () => {
     await expect(detail).toBeVisible();
     const topic = (await detail.textContent()) ?? "";
     await expect(page).toHaveURL(/\/research$/);
+    // A modal opened and closed goes back an entry: the entry beside the list is still
+    // the one kept when the panel docks.
+    await page.getByRole("button", { name: /switch workspace/ }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/research$/);
     await page
       .getByRole("button", {
         name: new RegExp(`^Comments on Research Log · ${topic}`),
@@ -461,6 +468,52 @@ test.describe("14 beside a panel on a narrow desktop", () => {
       page.getByRole("heading", { level: 2, name: topic }),
     ).toBeVisible();
     await expect(page.getByRole("grid", { name: /Research/ })).toHaveCount(0);
+  });
+
+  test("Back to two columns, then Forward onto the list beside its panel: no entry kept from the render before", async ({
+    page,
+    signIn,
+  }) => {
+    const me = await signIn(demo.member);
+    const { bcdx, ideaId } = await bcdxIdea(
+      page,
+      me,
+      "Piaya Gift Box Delivery",
+    );
+    await page.goto(`/w/${bcdx.id}/ideas/${ideaId}/research`);
+    const list = page.getByRole("grid", { name: "Research Log" });
+    await expect(list).toBeVisible();
+    await expect(page).toHaveURL(/\/research$/);
+    const twoColumns = page.url();
+    // The header's 💬 narrows the body to one pane: the first entry is kept in the URL;
+    // ← leaves the list alone beside the panel.
+    await page
+      .getByRole("banner")
+      .getByRole("button", { name: /^Comments/ })
+      .click();
+    const comments = page.getByRole("complementary", { name: "Comments" });
+    await expect(comments).toBeVisible();
+    await expect(page).toHaveURL(/entry=/);
+    await page.getByRole("button", { name: /^Back to Research Log/ }).click();
+    await expect(list).toBeVisible();
+    const listAlone = page.url();
+    expect(listAlone).not.toContain("entry=");
+
+    // ← replaced the kept entry: one step back is the two columns, with no panel.
+    await page.goBack();
+    await expect(page).toHaveURL(twoColumns);
+    await expect(comments).toHaveCount(0);
+    // Forward docks the panel again: the entry shown beside the list on the two columns
+    // is not carried to the list that ← left alone.
+    await page.goForward();
+    await expect(page).toHaveURL(listAlone);
+    await expect(comments).toBeVisible();
+    await expect(list).toBeVisible();
+    // A kept entry would be written in the frame after the panel shows, which nothing on
+    // the page marks: the URL is read again half a second later, many frames past it, as
+    // the run before the fix showed it within one.
+    await page.waitForTimeout(500);
+    expect(page.url()).toBe(listAlone);
   });
 });
 
@@ -1163,21 +1216,62 @@ test.describe("17 Costs and 18 Unit Economics on a desktop", () => {
       await expect(results).toContainText(value);
     }
     await expect(page.getByText("using default 15%")).toBeVisible();
-    // The scenarios sit in the results, a line each (design-spec 6.4・4.1 F).
-    const scenarios = page
+    // The scenarios are a table under both columns, a column each (design-spec 6.4).
+    const scenarios = page.getByRole("grid", { name: "Scenarios" });
+    await expect(
+      page
+        .getByRole("complementary", { name: "Results" })
+        .getByRole("grid", { name: "Scenarios" }),
+    ).toHaveCount(0);
+    await expect(scenarios.getByRole("columnheader")).toHaveText([
+      "Metric",
+      "Break-even",
+      "Conservative",
+      "Expected",
+      "Strong",
+      "Capacity limit",
+    ]);
+    const figure = (name: string) =>
+      scenarios.getByRole("row").filter({
+        has: page.getByRole("rowheader", { name, exact: true }),
+      });
+    await expect(figure("Units / month").getByRole("gridcell")).toHaveText([
+      "180.1",
+      "156",
+      "260",
+      "390",
+      "650",
+    ]);
+    await expect(figure("Revenue").getByRole("gridcell").nth(2)).toHaveText(
+      "₱117,000",
+    );
+    await expect(
+      figure("Variable costs").getByRole("gridcell").nth(2),
+    ).toHaveText("₱56,810");
+    // A loss shows as one.
+    await expect(figure("Operating profit").getByRole("gridcell")).toHaveText([
+      "₱0",
+      "−₱5,586",
+      "₱18,490",
+      /^₱/,
+      /^₱/,
+    ]);
+    await expect(
+      figure("Operating margin").getByRole("gridcell").nth(2),
+    ).toHaveText("15.8%");
+    // Across the whole width, under the inputs and the results.
+    const table = await scenarios.boundingBox();
+    const inputs = await page
+      .getByRole("grid", { name: "Inputs" })
+      .boundingBox();
+    const resultsBox = await page
       .getByRole("complementary", { name: "Results" })
-      .getByRole("grid", { name: "Scenarios" });
-    await expect(scenarios.getByRole("row")).toHaveCount(5);
-    const expected = scenarios.getByRole("row").filter({ hasText: "Expected" });
-    for (const value of ["260", "₱117,000", "₱56,810", "₱18,490", "15.8%"]) {
-      await expect(expected).toContainText(value);
-    }
-    const conservative = scenarios
-      .getByRole("row")
-      .filter({ hasText: "Conservative" });
-    for (const value of ["156", "₱70,200", "−₱5,586"]) {
-      await expect(conservative).toContainText(value);
-    }
+      .boundingBox();
+    expect(table?.x).toBeCloseTo(inputs?.x ?? 0, 0);
+    expect((table?.x ?? 0) + (table?.width ?? 0)).toBeCloseTo(
+      (resultsBox?.x ?? 0) + (resultsBox?.width ?? 0),
+      0,
+    );
     await expectNoAxeViolations(page);
   });
 

@@ -16,6 +16,7 @@ import {
   Text,
   useIsDesktop,
   useTwoColumns,
+  useTwoColumnsNow,
 } from "@moonx/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
@@ -283,8 +284,19 @@ function TeamBody({
   });
   const latestShow = useRef(onShow);
   latestShow.current = onShow;
+  // Two columns as laid out, not as rendered: Forward onto the list standing alone beside
+  // a panel renders once as two columns before the panel's column is measured.
+  const isTwoColumnsNow = useTwoColumnsNow();
+  const latestTwoColumnsNow = useRef(isTwoColumnsNow);
+  latestTwoColumnsNow.current = isTwoColumnsNow;
   useEffect(() => {
-    if (isSettled && besideList !== undefined) latestShow.current(besideList);
+    if (
+      isSettled &&
+      besideList !== undefined &&
+      latestTwoColumnsNow.current()
+    ) {
+      latestShow.current(besideList);
+    }
   }, [isSettled, besideList]);
   const selected = userId ?? besideList;
   const header = (

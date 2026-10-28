@@ -285,7 +285,7 @@ function AssigneeField({
   onChange: (change: AssigneeChange) => void;
   isReadOnly: boolean;
 }) {
-  const { t } = useTranslation(["plans"]);
+  const { t } = useTranslation(["plans", "app"]);
   const { workspace } = useWorkspace();
   const members = useQuery(membersQuery(workspace.id));
   const items = (members.data?.items ?? [])
@@ -310,7 +310,7 @@ function AssigneeField({
   // and the field holds the saved assignee again (6.0.8).
   const error =
     typed === null ? undefined : ruleErrorOf(assigneeNameSchema, typed);
-  return (
+  const combo = (
     <ComboBox
       label={t("plans:execution.assignee")}
       items={items}
@@ -355,6 +355,27 @@ function AssigneeField({
       isDisabled={isReadOnly}
       width="full"
     />
+  );
+  if (isReadOnly || !members.isError) return combo;
+  // Without the members the list is empty, which reads as a workspace with no one to pick
+  // (6.0.6: say why, with Retry).
+  return (
+    <Stack gap="space-75">
+      {combo}
+      <Flex gap="space-100" alignItems="center" wrap>
+        <Text variant="caption" tone="notice">
+          {t("plans:execution.membersFailed")}
+        </Text>
+        <Button
+          variant="secondary"
+          isQuiet
+          size="S"
+          onPress={() => void members.refetch()}
+        >
+          {t("app:state.retry")}
+        </Button>
+      </Flex>
+    </Stack>
   );
 }
 
@@ -934,8 +955,16 @@ function RowMeta({ item }: { item: ExecutionItem }) {
 /**
  * A row of a type's list (6.13): its first column with its comments' count, and under it
  * its state, assignee and date (a KPI's Target and Actual first), "Overdue" past its date.
+ * Where the item can be changed, a save of it that failed says so here too, with Retry
+ * (6.0.2: beside the row as well as in the fields that were typed).
  */
-export function ExecutionRowContent({ item }: { item: ExecutionItem }) {
+export function ExecutionRowContent({
+  item,
+  canEdit,
+}: {
+  item: ExecutionItem;
+  canEdit: boolean;
+}) {
   return (
     <Stack gap="space-25">
       <Flex columnGap="space-100" alignItems="center" wrap>
@@ -947,6 +976,7 @@ export function ExecutionRowContent({ item }: { item: ExecutionItem }) {
         )}
       </Flex>
       <RowMeta item={item} />
+      {canEdit && <SaveFailureNote itemKey={executionKey(item.id)} />}
     </Stack>
   );
 }
@@ -1118,7 +1148,7 @@ export function ExecutionList({
                   />
                 }
               >
-                <ExecutionRowContent item={item} />
+                <ExecutionRowContent item={item} canEdit={canEdit} />
               </ListViewItem>
             )}
           </ListView>

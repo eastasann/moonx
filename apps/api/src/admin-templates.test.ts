@@ -4,7 +4,9 @@ import { join } from "node:path";
 import {
   connectDatabase,
   selfAnalyses,
+  templateCostDefaults,
   templateQuestions,
+  templates,
   templateVersions,
 } from "@moonx/db";
 import {
@@ -24,7 +26,7 @@ import {
   templateVersionDetailSchema,
 } from "@moonx/schemas";
 import { SQL } from "bun";
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { buildTestApp, uniqueIp } from "./test-app";
 import { apiRequest, signIn, testFixtures } from "./test-fixtures";
 
@@ -797,6 +799,46 @@ describe("the settings only one kind of template has", () => {
   });
 });
 
+/**
+ * Gives the newest published validation version the starting cost row the BCDX plan's
+ * §18 names (`cost_row:monthly.salaries`), publishing the BCDX validation file when none is
+ * published: AD6 refuses a plan whose number sub-items name a cost row no published
+ * validation starts (`unknown_metric_key`), and the validations of these tests are their
+ * own.
+ */
+const publishSalariesRow = async () => {
+  const [published] = await db
+    .select({ id: templateVersions.id })
+    .from(templateVersions)
+    .innerJoin(templates, eq(templates.id, templateVersions.templateId))
+    .where(
+      and(
+        eq(templates.kind, "validation"),
+        eq(templateVersions.status, "published"),
+      ),
+    )
+    .orderBy(desc(templateVersions.versionNumber))
+    .limit(1);
+  if (published === undefined) {
+    const id = await draftOf("validation");
+    expect(
+      (await call("POST", `/template-versions/${id}/publish`)).status,
+    ).toBe(200);
+    return publishSalariesRow();
+  }
+  await db
+    .insert(templateCostDefaults)
+    .values({
+      templateVersionId: published.id,
+      category: "monthly_fixed",
+      key: "monthly.salaries",
+      name: "Salaries",
+      sortOrder: 99,
+    })
+    // Once per version: a second call finds it there.
+    .onConflictDoNothing();
+};
+
 /** The draft of `kind`, imported from the BCDX file when there is none. */
 const draftOf = async (kind: "validation" | "business_plan") => {
   const list = adminTemplateListSchema.parse(
@@ -816,6 +858,7 @@ const draftOf = async (kind: "validation" | "business_plan") => {
 
 describe("AD6 and the answer types of each kind", () => {
   test("an amount with a reason blocks publishing a validation or a plan", async () => {
+    await publishSalariesRow();
     for (const kind of ["validation", "business_plan"] as const) {
       const id = await draftOf(kind);
       const section = (
@@ -865,10 +908,56 @@ describe("AD6 and the answer types of each kind", () => {
       expect(after.errors).toEqual([]);
     }
   });
+
+  test("a plan's number sub-item names only key numbers 21 shows; AD3 offers the published cost rows", async () => {
+    await publishSalariesRow();
+    const id = await draftOf("business_plan");
+    const detail = await detailOf(
+      await call("GET", `/template-versions/${id}`),
+    );
+    expect(detail.costRows).toContainEqual({
+      key: "monthly.salaries",
+      name: "Salaries",
+    });
+    const payroll = detail.sections
+      .flatMap((section) => section.questions)
+      .find((question) => question.key === "P.18.3");
+    if (payroll === undefined) throw new Error("No P.18.3");
+    const keys = async (metricKeys: string[]) => {
+      expect(
+        (
+          await call("PATCH", `/template-questions/${payroll.id}`, {
+            options: { kind: "linked_metric", metricKeys },
+          })
+        ).status,
+      ).toBe(200);
+      return templateCheckSchema
+        .parse(
+          await (
+            await call("POST", `/template-versions/${id}/validate`)
+          ).json(),
+        )
+        .errors.filter((error) => error.nodeId === payroll.id);
+    };
+    expect(await keys(["cost_row:monthly.salary", "scenario_table"])).toEqual([
+      {
+        code: "unknown_metric_key",
+        message: expect.stringContaining("cost_row:monthly.salary"),
+        nodeId: payroll.id,
+      },
+      {
+        code: "unknown_metric_key",
+        message: expect.stringContaining("scenario_table"),
+        nodeId: payroll.id,
+      },
+    ]);
+    expect(await keys(["cost_row:monthly.salaries"])).toEqual([]);
+  });
 });
 
 describe("AD6 and the Pitch Deck of a plan template (design-spec 6.14)", () => {
   test("a slide the most material runs past the bottom of blocks publishing, once in each deck", async () => {
+    await publishSalariesRow();
     const id = await draftOf("business_plan");
     const detail = await detailOf(
       await call("GET", `/template-versions/${id}`),

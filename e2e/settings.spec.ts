@@ -84,11 +84,11 @@ test.describe("on a desktop", () => {
     const teamName = `Team ${Date.now() % 100_000}`;
     const team = await newWorkspace(page, teamName);
 
-    // In from the sidebar's Settings, which only an Owner has.
+    // In from the sidebar's Workspace Settings, which only an Owner has.
     await page.goto(`/w/${team.id}`);
     await page
       .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: "Settings" })
+      .getByRole("link", { name: "Workspace Settings" })
       .click();
     await expect(page).toHaveURL(`${WEB_ORIGIN}/w/${team.id}/settings`);
     await expect(
@@ -172,7 +172,7 @@ test.describe("on a desktop", () => {
       await expect(
         other.page
           .getByRole("navigation", { name: "Main" })
-          .getByRole("link", { name: "Settings" }),
+          .getByRole("link", { name: "Workspace Settings" }),
       ).toHaveCount(0);
       await other.page.goto(`/w/${team.id}/settings`);
       await expect(

@@ -894,6 +894,55 @@ test.describe("22 on a desktop", () => {
   });
 });
 
+test.describe("22's Assignee filter on a desktop", () => {
+  test.use(desktop);
+
+  test("names typed as assignees are listed once whatever their case, and filter Next Actions (6.13)", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const { workspace, idea, planId } = await ownPlan(page, signIn, account);
+    for (const [title, assigneeName] of [
+      ["Call Lito", "Lito"],
+      ["Pay lito", "lito"],
+      ["Ask Mara", "Mara"],
+      ["Book the stall", null],
+    ] as const) {
+      const made = await page.request.post(
+        `/api/v1/plans/${planId}/execution-items`,
+        {
+          data: {
+            type: "next_action",
+            title,
+            ...(assigneeName === null ? {} : { assigneeName }),
+          },
+          headers: { Origin: WEB_ORIGIN },
+        },
+      );
+      expect(made.status(), await made.text()).toBe(201);
+    }
+    await page.goto(
+      `/w/${workspace.id}/ideas/${idea.id}/plans/${planId}/execution?tab=actions`,
+    );
+    const actions = page.getByRole("grid", { name: "Next Actions" });
+    await expect(actions.getByRole("row")).toHaveCount(4);
+    await page
+      .getByRole("tabpanel")
+      .getByRole("button", { name: /Assignee/ })
+      .click();
+    const options = page.getByRole("listbox").getByRole("option");
+    await expect(options.filter({ hasText: /^Lito$/i })).toHaveCount(1);
+    await expect(options.filter({ hasText: /^Mara$/ })).toHaveCount(1);
+    await options.filter({ hasText: /^Lito$/i }).click();
+    await expect(page).toHaveURL(/assigneeName=Lito/);
+    await expect(actions.getByRole("row")).toHaveCount(2);
+    await expect(actions).toContainText("Call Lito");
+    await expect(actions).toContainText("Pay lito");
+    await expectNoAxeViolations(page);
+  });
+});
+
 test.describe("22 for a Viewer", () => {
   test.use(desktop);
 

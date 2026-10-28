@@ -89,6 +89,7 @@ const validation = (): TemplateVersionDetail => ({
       questions: [question(worthId, "V.08.WORTH", "WORTH")],
     },
   ],
+  costRows: [],
   costDefaults: [
     {
       id: "1a2b3c4d-0000-4000-8000-000000000010",
@@ -630,6 +631,7 @@ describe("27: each kind's own fields (design-spec 6.17)", () => {
       ...validation(),
       kind: "business_plan",
       checkRules: [],
+      costRows: [],
       costDefaults: [],
       sections: [
         {
@@ -705,6 +707,71 @@ describe("27: each kind's own fields (design-spec 6.17)", () => {
     );
   });
 
+  test("a plan's key numbers: chosen by name from 6.4's and the published cost rows, each once", async () => {
+    const user = userEvent.setup();
+    const itemId = "1a2b3c4d-0000-4000-8000-000000000030";
+    const promptId = "1a2b3c4d-0000-4000-8000-000000000031";
+    const { calls } = draftApi({
+      ...validation(),
+      kind: "business_plan",
+      checkRules: [],
+      costDefaults: [],
+      costRows: [{ key: "monthly.salaries", name: "Salaries" }],
+      sections: [
+        {
+          id: itemId,
+          key: "18",
+          part: "b",
+          title: "Team",
+          subtitle: null,
+          guidance: null,
+          sortOrder: 0,
+          questions: [
+            question(promptId, "P.18.3", "Expected monthly payroll", {
+              hasFau: false,
+              answerType: "linked_metric",
+              options: {
+                kind: "linked_metric",
+                metricKeys: ["selling_price", "sellng_price"],
+              },
+            }),
+          ],
+        },
+      ],
+    });
+    open(promptId);
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "Expected monthly payroll",
+    });
+    // A key that is none of them (an imported typo) shows as one, for Check to flag.
+    expect(
+      screen.getByRole("button", { name: /Key number 2$/ }).textContent,
+    ).toContain("sellng_price (not a key number)");
+    await user.click(screen.getByRole("button", { name: /Key number 2$/ }));
+    const options = within(await screen.findByRole("listbox"))
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(options).toContain("Break-even units / day");
+    expect(options).toContain("Expected scenario");
+    expect(options).toContain("Cost row: Salaries");
+    // Price is chosen in the first row, so not offered again.
+    expect(options).not.toContain("Price");
+    await user.click(
+      screen.getByRole("option", { name: "Cost row: Salaries" }),
+    );
+    await waitFor(() =>
+      expect(
+        sent(calls, "PATCH", `/template-questions/${promptId}`).at(-1)?.body,
+      ).toEqual({
+        options: {
+          kind: "linked_metric",
+          metricKeys: ["selling_price", "cost_row:monthly.salaries"],
+        },
+      }),
+    );
+  });
+
   test("a self analysis: the AI prompt, and a subtitle", async () => {
     const user = userEvent.setup();
     const whyId = "1a2b3c4d-0000-4000-8000-000000000030";
@@ -713,6 +780,7 @@ describe("27: each kind's own fields (design-spec 6.17)", () => {
       kind: "self_analysis",
       aiPrompt: "Ask me one question at a time.",
       checkRules: [],
+      costRows: [],
       costDefaults: [],
       sections: [
         {

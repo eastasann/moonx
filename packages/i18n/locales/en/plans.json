@@ -187,6 +187,7 @@
     "nothingYet": "Nothing yet",
     "overdue": "Overdue",
     "noAssignee": "No assignee",
+    "membersFailed": "Couldn't load the members to choose from.",
     "useName": "Use “{{name}}”",
     "noArea": "No area",
     "actualUpdated": "Updated {{date}}, {{time}}",

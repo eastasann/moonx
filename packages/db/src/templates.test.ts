@@ -206,6 +206,19 @@ const versionRows = () =>
     .innerJoin(templates, eq(templates.id, templateVersions.templateId))
     .orderBy(asc(templates.kind), asc(templateVersions.versionNumber));
 
+/**
+ * Publishes the BCDX validation template: a plan's number sub-items name the cost rows it
+ * starts (`cost_row:*`, AD6 `unknown_metric_key`), as an operator publishes it first.
+ */
+const publishBcdxValidation = async () => {
+  const { versionId } = await importTemplateFile(
+    db,
+    "validation",
+    bcdxFile("validation.json"),
+  );
+  await publishTemplateVersion(db, versionId, null, measure);
+};
+
 // Check rules have no order of their own.
 const byCheckKey = (a: { checkKey: string }, b: { checkKey: string }) =>
   a.checkKey.localeCompare(b.checkKey);
@@ -305,6 +318,7 @@ describe("the BCDX template files", () => {
 
   for (const [kind, name] of files) {
     test(`${name} imports as v1, passes AD6 and publishes`, async () => {
+      if (kind === "business_plan") await publishBcdxValidation();
       const file = bcdxFile(name);
       const imported = await importTemplateFile(db, kind, file);
       expect(imported).toEqual({
@@ -326,7 +340,7 @@ describe("the BCDX template files", () => {
       );
       expect(published.versionNumber).toBe(1);
       expect(published.publishedAt).toBeInstanceOf(Date);
-      expect(await versionRows()).toEqual([
+      expect((await versionRows()).filter((row) => row.kind === kind)).toEqual([
         { kind, name: file.name, versionNumber: 1, status: "published" },
       ]);
     });
@@ -605,6 +619,7 @@ describe("validateTemplateVersion and publishTemplateVersion", () => {
       copyFrom: null,
       reference: null,
     }));
+    await publishBcdxValidation();
     const { versionId } = await importTemplateFile(db, "business_plan", {
       ...file,
       sections: file.sections.map((section) =>
@@ -632,7 +647,11 @@ describe("validateTemplateVersion and publishTemplateVersion", () => {
     );
     expect(error.code).toBe("TEMPLATE_INVALID");
     expect(error.message).toContain("pitch_deck_overflow");
-    expect((await versionRows()).map((row) => row.status)).toEqual(["draft"]);
+    expect(
+      (await versionRows())
+        .filter((row) => row.kind === "business_plan")
+        .map((row) => row.status),
+    ).toEqual(["draft"]);
   });
 
   test("refuse a published version with PUBLISHED_READ_ONLY, but still validate it", async () => {
@@ -864,6 +883,65 @@ describe("checkTemplateContent", () => {
         ]),
       ),
     ).toEqual([["unknown_condition_key", "q:V.02.RED_1"]]);
+  });
+
+  test("unknown_metric_key: a plan's number sub-item names only key numbers 21 shows", () => {
+    const metrics = (metricKeys: string[]) =>
+      codes({
+        ...content("business_plan", [
+          {
+            id: "s1",
+            key: "08",
+            part: "a",
+            questions: [
+              q("P.08.3", {
+                answerType: "linked_metric",
+                options: { kind: "linked_metric", metricKeys },
+              }),
+            ],
+          },
+        ]),
+        costRowKeys: new Set(["monthly.salaries"]),
+      }).filter(([code]) => code !== "pitch_deck_overflow");
+    expect(
+      metrics([
+        "selling_price",
+        "scenario:expected",
+        "cost_row:monthly.salaries",
+      ]),
+    ).toEqual([]);
+    // A typo, the whole scenario table and a cost row no published validation has.
+    expect(
+      metrics(["sellng_price", "scenario_table", "cost_row:monthly.salary"]),
+    ).toEqual([
+      ["unknown_metric_key", "q:P.08.3"],
+      ["unknown_metric_key", "q:P.08.3"],
+      ["unknown_metric_key", "q:P.08.3"],
+    ]);
+    // A reference lists single values and cost rows, not a scenario's column.
+    const referred = (keys: string[]) =>
+      codes({
+        ...content("business_plan", [
+          {
+            id: "s1",
+            key: "20",
+            part: "b",
+            questions: [
+              q("P.20.1", {
+                reference: [{ kind: "metrics", keys }],
+              }),
+            ],
+          },
+        ]),
+        costRowKeys: new Set(["monthly.salaries"]),
+      }).filter(([code]) => code !== "pitch_deck_overflow");
+    expect(referred(["payback_months", "cost_row:monthly.salaries"])).toEqual(
+      [],
+    );
+    expect(referred(["scenario:expected", "paybak_months"])).toEqual([
+      ["unknown_metric_key", "q:P.20.1"],
+      ["unknown_metric_key", "q:P.20.1"],
+    ]);
   });
 
   test("copy_from_mismatch: a plan sub-item must hold what the draft copies", () => {

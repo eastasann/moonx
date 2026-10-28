@@ -168,6 +168,11 @@ export const templateVersionDetailSchema = z.object({
       sortOrder: z.int(),
     }),
   ),
+  /**
+   * Plans only (empty for the others): the starting cost rows of the published validation
+   * templates, whose `cost_row:*` a number sub-item may show (AD6 `unknown_metric_key`).
+   */
+  costRows: z.array(z.object({ key: z.string(), name: z.string() })),
   checkRules: z.array(
     z.object({
       checkKey: checkKeySchema,
@@ -346,6 +351,7 @@ export const templateCheckSchema = z.object({
         "options_mismatch",
         "unknown_condition_key",
         "copy_from_mismatch",
+        "unknown_metric_key",
         "pitch_deck_overflow",
       ]),
       message: z.string(),

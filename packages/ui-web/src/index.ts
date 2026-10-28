@@ -255,7 +255,7 @@ export type { ChoiceItem } from "./internal/ChoiceListBox";
  * whose press differs between them asks (6's row opens 13 where the list has no detail
  * beside it).
  */
-export { useTwoColumns } from "./internal/frame";
+export { useTwoColumns, useTwoColumnsNow } from "./internal/frame";
 /**
  * Whether the window is at least desktop wide (design-spec 4.3): what a docked panel
  * narrows, not the window, keeps a list's item on screen (4.1).

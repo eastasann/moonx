@@ -29,6 +29,7 @@ import { z } from "zod";
 import type { AccessPlugin, ScopeLocator } from "./access";
 import { ApiError } from "./errors";
 import { historySectionKey } from "./history";
+import { loadItemLabels } from "./labels";
 import { lockMembers } from "./membership";
 import { notifyComment } from "./notifications";
 import { recordChange, type Scope, type ScopeRef, writeInScope } from "./scope";
@@ -147,7 +148,10 @@ async function commentViews(
 const oldestFirst = (a: CommentRow, b: CommentRow) =>
   a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
 
-/** The threads of `rows`, oldest first, and how many are not resolved (C1). */
+/**
+ * The threads of `rows`, oldest first, each with its item's name (HistoryEntry `label`),
+ * and how many are not resolved (C1).
+ */
 async function threadsOf(
   db: Executor,
   rows: readonly CommentRow[],
@@ -167,10 +171,15 @@ async function threadsOf(
         .filter((row) => row.parentId === root.id)
         .toSorted(oldestFirst),
     }));
+  const labelOf = await loadItemLabels(
+    db,
+    threads.map(({ root }) => view(root).target),
+  );
   return {
     threads: threads.map(({ root, replies }) => ({
       root: view(root),
       replies: replies.map(view),
+      label: labelOf(view(root).target),
     })),
     unresolvedCount: threads.filter(({ root }) => root.resolvedAt === null)
       .length,

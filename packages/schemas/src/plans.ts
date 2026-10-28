@@ -488,6 +488,11 @@ export const executionListQuerySchema = z.object({
   type: executionTypeSchema.optional(),
   /** `me`, or a user's id. */
   assignee: z.union([z.literal("me"), storedUuidSchema]).optional(),
+  /**
+   * An assignee typed as a name (design-spec 6.13), matched without regard to case: the
+   * Picker of 22 lists names that differ only in case once.
+   */
+  assigneeName: z.string().trim().min(1).max(60).optional(),
   status: executionStatusSchema.optional(),
 });
 
@@ -548,8 +553,16 @@ export const planItemSchema = z.object({
   prompts: z.array(templateQuestionSchema),
   /** One per prompt that takes an answer (text, choice, table), unanswered ones included. */
   answers: z.array(planAnswerSchema),
-  /** The single-value key metrics the number sub-items show (a viewed version's). */
+  /**
+   * The single-value key metrics the number sub-items show (a viewed version's). A
+   * `cost_row:*` the validation does not have (had not) is left out.
+   */
   metrics: keyMetricsSchema,
+  /**
+   * The name of each cost row the number sub-items name, by template key: the validation's
+   * row's, else the template's (as the cost_rows reference); null where neither has one.
+   */
+  costRowNames: z.record(z.string(), z.string().nullable()),
   /** The scenario columns the `scenario:*` sub-items show (a viewed version's). */
   scenarios: z.array(scenarioColumnSchema),
   /** The items of its execution views, in P9's order (a viewed version's). */

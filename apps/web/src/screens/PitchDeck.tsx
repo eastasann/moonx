@@ -30,10 +30,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type ReactNode, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import {
   ItemCommentsButton,
   type ScreenComments,
 } from "../components/CommentsPanel";
+import { ArchivedPlanAlert } from "../components/planParts";
 import { rateLimitWords } from "../components/SendFailure";
 import {
   FailureState,
@@ -350,6 +352,12 @@ function DeckBody({
       {t("plans:pitch.title")}
     </Heading>
   );
+  // As 20-22: the comments are read only, and Restore is here for those who may.
+  const alert = home.ideaArchived ? (
+    <ArchivedIdeaAlert ideaId={home.ideaId} />
+  ) : home.archived ? (
+    <ArchivedPlanAlert home={home} />
+  ) : undefined;
   const tools = (
     <DeckTools
       home={home}
@@ -395,6 +403,7 @@ function DeckBody({
     }
     return (
       <PresentationPattern
+        alert={alert}
         header={header}
         tools={tools}
         primaryAction={primaryAction}
@@ -475,6 +484,7 @@ function DeckBody({
 
   return (
     <PresentationPattern
+      alert={alert}
       header={header}
       tools={tools}
       primaryAction={primaryAction}
@@ -562,7 +572,7 @@ export function PitchDeckRouteSkeleton() {
  * 23 Pitch Deck (design-spec 6.14): the one-minute or five-minute deck, from the plan now
  * or a saved version, made again each time it opens; its PDF; PNL-1 on the slides and,
  * from the header, on the deck with the idea's comments. Every role reads it, archived
- * too; the edit links are the API's to give.
+ * too, under 20's archive notice; the edit links are the API's to give.
  */
 export function PitchDeckScreen({
   ideaId,

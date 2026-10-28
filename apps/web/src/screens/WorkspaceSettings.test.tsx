@@ -155,15 +155,19 @@ describe("9 Workspace Settings (design-spec 6.16)", () => {
           name: "You don't have access to this",
         }),
       ).toBeTruthy();
-      expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
+      expect(
+        screen.queryByRole("link", { name: "Workspace Settings" }),
+      ).toBeNull();
       expect(calls.some(({ path }) => path === membersPath)).toBe(false);
     },
   );
 
-  test("an Owner has Settings in the navigation", async () => {
+  test("an Owner has Workspace Settings in the navigation", async () => {
     settingsApi();
     renderApp(`/w/${workspaceId}`);
-    const link = await screen.findByRole("link", { name: "Settings" });
+    const link = await screen.findByRole("link", {
+      name: "Workspace Settings",
+    });
     expect(link.getAttribute("href")).toBe(base);
   });
 

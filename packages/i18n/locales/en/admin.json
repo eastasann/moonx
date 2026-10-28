@@ -130,7 +130,9 @@
       "addMetric": "Add key number",
       "noChoices": "No choices yet",
       "noMetrics": "No key numbers yet",
-      "metricForm": "Keys of the key numbers, like break_even_units_day, or cost_row: and a starting cost row's key, like cost_row:initial.permits",
+      "metricScenario": "{{scenario}} scenario",
+      "metricCostRow": "Cost row: {{name}}",
+      "metricUnknown": "{{key}} (not a key number)",
       "columnN": "Column {{n}}",
       "columnKey": "Key",
       "columnLabel": "Name",
@@ -171,6 +173,7 @@
         "options_mismatch": "The choices, columns or key numbers don't fit the answer type",
         "unknown_condition_key": "Shown when names a question that isn't in the template",
         "copy_from_mismatch": "This prompt can't hold what it copies from the validation",
+        "unknown_metric_key": "A key number isn't one a prompt can show",
         "pitch_deck_overflow": "A Pitch Deck slide runs past its bottom with the most material"
       }
     },

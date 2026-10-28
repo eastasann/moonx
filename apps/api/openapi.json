@@ -21611,6 +21611,11 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRowNames": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": { "type": ["string", "null"] }
+                    },
                     "scenarios": {
                       "type": "array",
                       "items": {
@@ -23955,6 +23960,7 @@
                     "prompts",
                     "answers",
                     "metrics",
+                    "costRowNames",
                     "scenarios",
                     "execution",
                     "references"
@@ -24179,7 +24185,7 @@
     "/api/v1/plans/{planId}/execution-items": {
       "get": {
         "summary": "P9 The execution items of a plan (22)",
-        "description": "By type; Next Actions by due date (none last), the others in their order (P11). assignee is me or a user's id.",
+        "description": "By type; Next Actions by due date (none last), the others in their order (P11). assignee is me or a user's id; assigneeName is a typed name, in any case.",
         "parameters": [
           {
             "name": "planId",
@@ -24216,6 +24222,12 @@
                 }
               ]
             }
+          },
+          {
+            "name": "assigneeName",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "minLength": 1, "maxLength": 60 }
           },
           {
             "name": "status",
@@ -27853,9 +27865,10 @@
                               ],
                               "additionalProperties": false
                             }
-                          }
+                          },
+                          "label": { "type": "string" }
                         },
-                        "required": ["root", "replies"],
+                        "required": ["root", "replies", "label"],
                         "additionalProperties": false
                       }
                     },
@@ -30731,6 +30744,18 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["key", "name"],
+                        "additionalProperties": false
+                      }
+                    },
                     "checkRules": {
                       "type": "array",
                       "items": {
@@ -30811,6 +30836,7 @@
                     "name",
                     "sections",
                     "costDefaults",
+                    "costRows",
                     "checkRules",
                     "executionPresets"
                   ],
@@ -31282,6 +31308,18 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["key", "name"],
+                        "additionalProperties": false
+                      }
+                    },
                     "checkRules": {
                       "type": "array",
                       "items": {
@@ -31362,6 +31400,7 @@
                     "name",
                     "sections",
                     "costDefaults",
+                    "costRows",
                     "checkRules",
                     "executionPresets"
                   ],
@@ -31855,6 +31894,18 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["key", "name"],
+                        "additionalProperties": false
+                      }
+                    },
                     "checkRules": {
                       "type": "array",
                       "items": {
@@ -31935,6 +31986,7 @@
                     "name",
                     "sections",
                     "costDefaults",
+                    "costRows",
                     "checkRules",
                     "executionPresets"
                   ],
@@ -32427,6 +32479,18 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["key", "name"],
+                        "additionalProperties": false
+                      }
+                    },
                     "checkRules": {
                       "type": "array",
                       "items": {
@@ -32507,6 +32571,7 @@
                     "name",
                     "sections",
                     "costDefaults",
+                    "costRows",
                     "checkRules",
                     "executionPresets"
                   ],
@@ -33307,6 +33372,18 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["key", "name"],
+                        "additionalProperties": false
+                      }
+                    },
                     "checkRules": {
                       "type": "array",
                       "items": {
@@ -33387,6 +33464,7 @@
                     "name",
                     "sections",
                     "costDefaults",
+                    "costRows",
                     "checkRules",
                     "executionPresets"
                   ],
@@ -34133,6 +34211,18 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["key", "name"],
+                        "additionalProperties": false
+                      }
+                    },
                     "checkRules": {
                       "type": "array",
                       "items": {
@@ -34213,6 +34303,7 @@
                     "name",
                     "sections",
                     "costDefaults",
+                    "costRows",
                     "checkRules",
                     "executionPresets"
                   ],
@@ -34777,6 +34868,18 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["key", "name"],
+                        "additionalProperties": false
+                      }
+                    },
                     "checkRules": {
                       "type": "array",
                       "items": {
@@ -34857,6 +34960,7 @@
                     "name",
                     "sections",
                     "costDefaults",
+                    "costRows",
                     "checkRules",
                     "executionPresets"
                   ],
@@ -35361,6 +35465,18 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["key", "name"],
+                        "additionalProperties": false
+                      }
+                    },
                     "checkRules": {
                       "type": "array",
                       "items": {
@@ -35441,6 +35557,7 @@
                     "name",
                     "sections",
                     "costDefaults",
+                    "costRows",
                     "checkRules",
                     "executionPresets"
                   ],
@@ -36063,6 +36180,18 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["key", "name"],
+                        "additionalProperties": false
+                      }
+                    },
                     "checkRules": {
                       "type": "array",
                       "items": {
@@ -36143,6 +36272,7 @@
                     "name",
                     "sections",
                     "costDefaults",
+                    "costRows",
                     "checkRules",
                     "executionPresets"
                   ],
@@ -36678,6 +36808,18 @@
                         "additionalProperties": false
                       }
                     },
+                    "costRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["key", "name"],
+                        "additionalProperties": false
+                      }
+                    },
                     "checkRules": {
                       "type": "array",
                       "items": {
@@ -36758,6 +36900,7 @@
                     "name",
                     "sections",
                     "costDefaults",
+                    "costRows",
                     "checkRules",
                     "executionPresets"
                   ],
@@ -36848,6 +36991,7 @@
                               "options_mismatch",
                               "unknown_condition_key",
                               "copy_from_mismatch",
+                              "unknown_metric_key",
                               "pitch_deck_overflow"
                             ]
                           },

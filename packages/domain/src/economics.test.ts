@@ -5,6 +5,7 @@ import {
   type CostRowInput,
   computeEconomics,
   type EconomicsInput,
+  isLinkedMetricKey,
   KEY_METRIC_KEYS,
   keyMetricOf,
   scenarioOf,
@@ -713,4 +714,31 @@ test("scenarioOf finds a column and refuses a result without it", () => {
   const result = computeEconomics(piaya);
   expect(scenarioOf(result, "strong").unitsPerDay.value).toBe(15);
   expect(() => scenarioOf({ ...result, scenarios: [] }, "strong")).toThrow();
+});
+
+describe("the key metrics a number sub-item may name (SDD 5.2 linked_metric)", () => {
+  const costRows = new Set(["monthly.salaries"]);
+  test("single values, scenario columns and published cost rows", () => {
+    for (const key of [
+      "break_even_units_day",
+      "operating_days",
+      "scenario:expected",
+      "scenario:capacity",
+      "cost_row:monthly.salaries",
+    ]) {
+      expect(isLinkedMetricKey(key, costRows)).toBe(true);
+    }
+  });
+  test("not a typo, the whole scenario table, break-even's column or an unknown row", () => {
+    for (const key of [
+      "break_even_unit_day",
+      "scenario_table",
+      "scenario:break_even",
+      "cost_row:monthly.salary",
+      "cost_row:",
+      "",
+    ]) {
+      expect(isLinkedMetricKey(key, costRows)).toBe(false);
+    }
+  });
 });

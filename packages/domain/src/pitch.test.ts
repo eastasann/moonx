@@ -120,7 +120,8 @@ const input = (overrides: Partial<PitchDeckInput> = {}): PitchDeckInput => ({
   ],
   execution: [],
   competitors: [],
-  canEdit: true,
+  canEditPlan: true,
+  canEditValidation: true,
   commentCount: () => 0,
   ...overrides,
 });
@@ -736,11 +737,19 @@ describe("buildPitchDeck: the slides", () => {
       slideOf(buildPitchDeck(input({ variant: "one" })), "next_step")
         .editSource,
     ).toEqual({ itemNo: 29 });
-    const readOnly = buildPitchDeck(input({ canEdit: false }));
+    const readOnly = buildPitchDeck(
+      input({ canEditPlan: false, canEditValidation: false }),
+    );
     for (const slide of readOnly.slides) {
       expect(slide.editSource).toBeNull();
       expect(slide.editInValidation).toBeNull();
     }
+    // An archived plan of a live idea: its validation stays open to edit (6.14).
+    const archivedPlan = buildPitchDeck(input({ canEditPlan: false }));
+    expect(slideOf(archivedPlan, "business_model").editSource).toBeNull();
+    expect(slideOf(archivedPlan, "business_model").editInValidation).toBe(
+      "economics",
+    );
   });
 
   test("comments count per slide of the variant, and §30 is the speaker notes", () => {

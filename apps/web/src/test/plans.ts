@@ -188,6 +188,7 @@ export function planItem(itemNo: number): PlanItem {
     prompts,
     answers: [],
     metrics: {},
+    costRowNames: {},
     scenarios: [],
     execution: [],
     references: [],

@@ -2307,7 +2307,7 @@ make test-e2e・make test-web・make typecheck・make lint が通る状態をゴ
 
 ## Step 35e: 画面の段階の終わりの点検の直し
 
-Status:
+Status: done 2026-10-28
 
 ```
 Step 23〜35d の docs の変更とコミットの本文を、段階の終わりに独立した点検で読み直しました。見つかった点を、下のとおりにすべて直してください。

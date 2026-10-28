@@ -81,7 +81,7 @@ interface Navigation {
 const TABS = ["Dashboard", "Ideas", "Self Analysis", /^Notifications/];
 
 /** The sidebar's pages of a workspace's Owner; the operator's add Admin. */
-const OWNER_PAGES = [...TABS, "Decision Log", "Settings"];
+const OWNER_PAGES = [...TABS, "Decision Log", "Workspace Settings"];
 
 /** More's items for a workspace's Owner; the operator's add Admin before Log out. */
 const OWNER_MORE = [
@@ -294,7 +294,7 @@ async function bcdxTour(
         { via: "link", label: "Self Analysis", to: selfAnalysis },
         { via: "link", label: "Notifications", to: notifications },
         { via: "link", label: "Decision Log", to: decisions },
-        { via: "link", label: "Settings", to: settings },
+        { via: "link", label: "Workspace Settings", to: settings },
         { via: "workspace", label: "Switch workspace", to: "M7" },
         { via: "account", label: "Account", to: account },
       ],

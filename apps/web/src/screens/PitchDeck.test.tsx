@@ -498,10 +498,47 @@ describe("23 Pitch Deck (design-spec 6.14)", () => {
     ).toBeTruthy();
   });
 
-  test("an archived plan: the deck without the plan's notice; a slide's thread read only", async () => {
+  test("an archived plan: 20's notice with Restore, Edit in validation kept, a slide's thread read only", async () => {
     const user = userEvent.setup();
     deckApi({
       home: planHome({ archived: true }),
+      // As the API gives it: no Edit source to the read-only 21, the validation open.
+      deck: (variant) => ({
+        ...pitchDeck(variant),
+        slides: pitchDeck(variant).slides.map((slide) => ({
+          ...slide,
+          editSource: null,
+        })),
+      }),
+    });
+    renderApp(base);
+    await shownSlide("Health Bowl Co.");
+    expect(screen.getByText("This plan is archived")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Edit source" })).toBeNull();
+    const slides = screen.getByRole("listbox", { name: "Slides" });
+    await user.click(
+      within(slides).getByRole("option", { name: "6 Business model" }),
+    );
+    await shownSlide("Business model");
+    expect(
+      screen.getByRole("link", { name: "Edit in validation" }),
+    ).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", { name: "Comments on Business model" }),
+    );
+    expect(
+      await screen.findByText(
+        "This plan is archived. Restore it to make changes.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "Add a comment" })).toBeNull();
+  });
+
+  test("an archived idea: its notice, Restore only for an Owner or Member", async () => {
+    deckApi({
+      me: as("viewer"),
+      home: planHome({ ideaArchived: true }),
       deck: (variant) => ({
         ...pitchDeck(variant),
         slides: pitchDeck(variant).slides.map((slide) => ({
@@ -513,15 +550,9 @@ describe("23 Pitch Deck (design-spec 6.14)", () => {
     });
     renderApp(base);
     await shownSlide("Health Bowl Co.");
+    expect(screen.getByText("This idea is archived")).toBeTruthy();
     expect(screen.queryByText("This plan is archived")).toBeNull();
-    expect(screen.queryByRole("link", { name: "Edit source" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Comments on Title" }));
-    expect(
-      await screen.findByText(
-        "This plan is archived. Restore it to make changes.",
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByRole("textbox", { name: "Add a comment" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
   });
 
   test("a version that is not the plan's is not found", async () => {

@@ -460,12 +460,11 @@ function NumberSheet({
 }
 
 /**
- * The scenarios in the results (design-spec 6.4「計算仕様」, 4.1 F): break-even and the
- * four scenarios, a line each with its figures under its name, as a phone shows them at
- * every width (the six columns do not fit the results' card). An empty scenario reads
+ * The scenarios on a phone, in the results (design-spec 6.4): break-even and the four
+ * scenarios, a line each with its figures under its name. An empty scenario reads
  * "Empty", never 0; a loss shows as one.
  */
-function ScenarioTable({ result }: { result: EconomicsResult }) {
+function ScenarioRows({ result }: { result: EconomicsResult }) {
   const { t } = useTranslation(["validation", "common"]);
   const { workspace } = useWorkspace();
   const scenarioName = (column: ScenarioColumn) =>
@@ -500,6 +499,55 @@ function ScenarioTable({ result }: { result: EconomicsResult }) {
             )
       }
     />
+  );
+}
+
+/**
+ * The scenario table under the inputs and the results, wider than a phone (design-spec
+ * 6.4, 2026-10-22 user decision): break-even and the four scenarios as columns, their
+ * figures as rows. An empty scenario's column reads "Empty", never 0; a loss shows as one.
+ */
+function ScenarioTable({ result }: { result: EconomicsResult }) {
+  const { t } = useTranslation(["validation", "common"]);
+  const { workspace } = useWorkspace();
+  const title = t("validation:economics.scenarios");
+  const columns: TableColumn[] = [
+    {
+      id: "figure",
+      name: t("validation:economics.figureColumn"),
+      isRowHeader: true,
+    },
+    ...result.scenarios.map((column) => ({
+      id: column.key,
+      name: t(`common:scenario.${column.key}`),
+      numeric: true,
+    })),
+  ];
+  return (
+    <Stack gap="space-100">
+      <Heading level={2} variant="heading-4">
+        {title}
+      </Heading>
+      <TableView
+        aria-label={title}
+        density="compact"
+        columns={columns}
+        items={SCENARIO_FIGURES.map((figure) => ({ id: figure }))}
+        textValue={({ id }) => t(`validation:economics.metric.${id}`)}
+        renderCell={({ id: figure }, key) => {
+          if (key === "figure")
+            return t(`validation:economics.metric.${figure}`);
+          const column = result.scenarios.find((each) => each.key === key);
+          return column === undefined
+            ? null
+            : metricText(
+                column[figure],
+                scenarioFigureFormat(figure, column),
+                workspace.currency,
+              );
+        }}
+      />
+    </Stack>
   );
 }
 
@@ -554,10 +602,13 @@ function Warnings({ result }: { result: EconomicsResult }) {
 function Results({
   result,
   targetMargin,
+  withScenarios,
 }: {
   result: EconomicsResult;
   /** The target margin in use: the one entered, else the default. */
   targetMargin: number;
+  /** On a phone the scenarios stay in the results; wider, their table is under both. */
+  withScenarios: boolean;
 }) {
   const { t } = useTranslation(["validation", "common"]);
   const { workspace } = useWorkspace();
@@ -663,12 +714,14 @@ function Results({
           {t("validation:economics.usingDefaultMargin", { margin })}
         </Text>
       )}
-      <Stack gap="space-100">
-        <Heading level={3} variant="label">
-          {t("validation:economics.scenarios")}
-        </Heading>
-        <ScenarioTable result={result} />
-      </Stack>
+      {withScenarios && (
+        <Stack gap="space-100">
+          <Heading level={3} variant="label">
+            {t("validation:economics.scenarios")}
+          </Heading>
+          <ScenarioRows result={result} />
+        </Stack>
+      )}
     </Stack>
   );
 }
@@ -1156,8 +1209,10 @@ function EconomicsBody({
             targetMargin={
               viewOf("target_margin")?.value ?? DEFAULT_TARGET_MARGIN
             }
+            withScenarios={isPhone}
           />
         }
+        after={isPhone ? null : <ScenarioTable result={result} />}
         summary={<ResultsSummary result={result} />}
       />
       {sheetView !== undefined && (

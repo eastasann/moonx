@@ -157,6 +157,26 @@ describe("P9 /api/v1/plans/{planId}/execution-items", () => {
     expect(
       (await list(team, `?assignee=${team.owner.id}&status=done`)).length,
     ).toBe(0);
+    // A typed name matches in any case: 22 lists "Lito" and "lito" once (design-spec 6.13).
+    expect(
+      (await list(team, "?assigneeName=%20lITO%20")).map((item) => item.id),
+    ).toEqual([soon.id]);
+    expect((await list(team, "?assigneeName=Lit")).length).toBe(0);
+    // A name kept as typed, spaces and all, matches without them.
+    const spaced = await add(team, {
+      type: "next_action",
+      title: "Pay the courier",
+      assigneeName: "\u3000Mara\u00a0",
+    });
+    expect(
+      (await list(team, "?assigneeName=mara")).map((item) => item.id),
+    ).toEqual([spaced.id]);
+    const blank = await call(
+      "GET",
+      `/api/v1/plans/${team.planId}/execution-items?assigneeName=%20`,
+      team.viewerCookie,
+    );
+    expect(blank.status).toBe(422);
     expect(
       (await list(team, "?status=resolved")).map((item) => item.id),
     ).toEqual([question.id]);

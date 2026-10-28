@@ -839,9 +839,14 @@ describe("20's panels", () => {
     );
   });
 
-  test("the header's list names each thread's item: a sub-item, an execution item, the idea", async () => {
+  test("the header's list names each thread's item as C1 does: a sub-item, an execution item, the idea", async () => {
     const user = userEvent.setup();
-    const comment = (id: string, target: object, body: string) => ({
+    const comment = (
+      id: string,
+      target: object,
+      body: string,
+      label: string,
+    ) => ({
       root: {
         id,
         workspace: { id: workspaceId, name: "BCDX" },
@@ -857,13 +862,15 @@ describe("20's panels", () => {
         createdAt: "2026-10-20T02:00:00.000Z",
       },
       replies: [],
+      label,
     });
-    planApi({
+    const calls = planApi({
       threads: [
         comment(
           "c0000000-0000-4000-8000-000000000001",
           { type: "plan_answer", id: planId, key: "P.01.1" },
           "Shorter, please.",
+          "01 What is the business?",
         ),
         comment(
           "c0000000-0000-4000-8000-000000000002",
@@ -873,11 +880,13 @@ describe("20's panels", () => {
             key: null,
           },
           "Who owns this?",
+          "Execution · Business decision",
         ),
         comment(
           "c0000000-0000-4000-8000-000000000003",
           { type: "idea", id: ideaId, key: null },
           "Nice.",
+          ideaHome.idea.name,
         ),
       ],
     });
@@ -900,5 +909,13 @@ describe("20's panels", () => {
         name: `Comment on ${ideaHome.idea.name}`,
       }),
     ).toBeTruthy();
+    // One read for the names: no item (P4) nor the execution items (P9) for them.
+    expect(
+      calls.some(
+        ({ method, path }) =>
+          method === "GET" &&
+          (path.includes("/items/") || path.includes("/execution-items")),
+      ),
+    ).toBe(false);
   });
 });

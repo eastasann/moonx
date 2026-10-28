@@ -66,6 +66,7 @@ import {
   COST_CATEGORIES,
   CostDefaultsEditor,
   ExecutionPresetsEditor,
+  metricLabel,
   NameEditor,
   QuestionEditor,
   SectionEditor,
@@ -230,7 +231,11 @@ function SectionFacts({
 }
 
 /** What a question's answer type carries: its choices, columns, key numbers or list. */
-function optionsOf(question: Question, t: TFunction<["admin"]>) {
+function optionsOf(
+  question: Question,
+  costRows: TemplateVersionDetail["costRows"],
+  t: TFunction<["admin", "common"]>,
+) {
   const { options } = question;
   if (options === null) return null;
   switch (options.kind) {
@@ -255,7 +260,9 @@ function optionsOf(question: Question, t: TFunction<["admin"]>) {
     case "linked_metric":
       return {
         label: t("admin:version.question.metrics"),
-        value: formatList(options.metricKeys),
+        value: formatList(
+          options.metricKeys.map((key) => metricLabel(key, costRows, t)),
+        ),
       };
     case "execution_view":
       return {
@@ -269,12 +276,14 @@ function optionsOf(question: Question, t: TFunction<["admin"]>) {
 function QuestionFacts({
   question,
   kind,
+  costRows,
 }: {
   question: Question;
   kind: TemplateKind;
+  costRows: TemplateVersionDetail["costRows"];
 }) {
-  const { t } = useTranslation(["admin"]);
-  const options = optionsOf(question, t);
+  const { t } = useTranslation(["admin", "common"]);
+  const options = optionsOf(question, costRows, t);
   const conditions = Object.entries(question.displayCondition ?? {});
   return (
     <DescriptionList>
@@ -466,7 +475,13 @@ function NodeFacts({
     return <SectionFacts section={node.section} kind={version.kind} />;
   }
   if (node.kind === "question") {
-    return <QuestionFacts question={node.question} kind={version.kind} />;
+    return (
+      <QuestionFacts
+        question={node.question}
+        kind={version.kind}
+        costRows={version.costRows}
+      />
+    );
   }
   return <SettingsFacts node={node.node} version={version} />;
 }

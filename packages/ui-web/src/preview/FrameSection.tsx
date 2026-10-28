@@ -82,7 +82,7 @@ const decisionLog: NavItem = {
 const settings: NavItem[] = [
   {
     id: "settings",
-    label: "Settings",
+    label: "Workspace Settings",
     icon: <Settings />,
     href: `${base}/settings`,
   },

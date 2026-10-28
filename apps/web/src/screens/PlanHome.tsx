@@ -1,9 +1,8 @@
-import { formatDate, i18n } from "@moonx/i18n";
+import { formatDate } from "@moonx/i18n";
 import {
   type PlanHome,
   type PlanSummary,
   shortTextSchema,
-  type TargetRef,
 } from "@moonx/schemas";
 import {
   ActionButton,
@@ -33,7 +32,6 @@ import {
 } from "@moonx/ui-web";
 import {
   type QueryClient,
-  useQueries,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
@@ -72,18 +70,12 @@ import {
 } from "../components/TemplateUpdate";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import {
-  dashboardHref,
-  useModal,
-  usePanel,
-  useWorkspace,
-} from "../components/workspace";
+import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
 import { aiExportHref, aiImportHref } from "../lib/ai";
 import { api, inPath, unwrap } from "../lib/api";
 import type { SaveTarget } from "../lib/autosave";
 import { useAutosave, useSaveItem } from "../lib/autosave-react";
 import { inputIssueMessage } from "../lib/input-issues";
-import { questionLabel, rowLabel } from "../lib/item-labels";
 import {
   decisionsHref,
   economicsHref,
@@ -97,11 +89,8 @@ import {
 import { useIsOnline } from "../lib/online";
 import {
   archivedPlansQuery,
-  commentsQuery,
-  executionItemsQuery,
   ideaKey,
   planHomeQuery,
-  planItemQuery,
   validationHomeQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
@@ -975,92 +964,6 @@ function PlanHomeBody({
 }
 
 /**
- * The names of the items the plan's threads are on, for the header's list of comments
- * (design-spec 6.0.4: "{section} {question}", "Execution · {its first column}", "Pitch
- * Deck", as SDD 5.11 names them): read once the list is open, from the items whose
- * answers have threads and from the execution items.
- */
-function usePlanThreadLabels(
-  ideaId: string,
-  planId: string,
-  isListOpen: boolean,
-) {
-  const { workspace } = useWorkspace();
-  const threads = useQuery({
-    ...commentsQuery(workspace.id, {
-      kind: "screen",
-      screen: {
-        containerType: "business_plan",
-        containerId: planId,
-        sectionKeys: [],
-      },
-    }),
-    enabled: isListOpen,
-  });
-  const targets = (threads.data?.threads ?? []).map(
-    (thread) => thread.root.target,
-  );
-  const itemNos = [
-    ...new Set(
-      targets.flatMap((target) =>
-        target.type === "plan_answer"
-          ? [Number(target.key?.split(".")[1])]
-          : [],
-      ),
-    ),
-  ].filter(Number.isInteger);
-  const items = useQueries({
-    queries: itemNos.map((itemNo) => planItemQuery(ideaId, planId, itemNo)),
-  });
-  const execution = useQuery({
-    ...executionItemsQuery(ideaId, planId),
-    enabled: targets.some((target) => target.type === "execution_item"),
-  });
-  const prompts = new Map(
-    items.flatMap((item) =>
-      (item.data?.prompts ?? []).map(
-        (prompt) => [prompt.key, prompt.title] as const,
-      ),
-    ),
-  );
-  const rows = new Map(
-    (execution.data?.items ?? []).map((row) => [row.id, row.title] as const),
-  );
-  const reads = [...items, ...(execution.isEnabled ? [execution] : [])];
-  const state = {
-    isPending: reads.some((read) => read.isPending),
-    error: reads.find((read) => read.isError)?.error ?? null,
-    // From a failure and from a wait that has gone on (6.0.6): the reads not in yet.
-    retry: () => {
-      for (const read of reads) {
-        if (read.isError || read.isPending) void read.refetch();
-      }
-    },
-  };
-  const labelOf = (target: TargetRef): string | undefined => {
-    switch (target.type) {
-      case "plan_answer": {
-        const title = prompts.get(target.key ?? "");
-        return title === undefined || target.key == null
-          ? undefined
-          : questionLabel(target.key, title);
-      }
-      case "execution_item": {
-        const title = rows.get(target.id);
-        return title === undefined
-          ? undefined
-          : rowLabel("execution_item", title);
-      }
-      case "pitch_slide":
-        return i18n.t("common:itemLabel.list.pitch_slide");
-      default:
-        return undefined;
-    }
-  };
-  return { labelOf, state };
-}
-
-/**
  * 20 Plan home (design-spec 6.12): pattern A. The plan's name with its switch, the
  * version and the header; the key numbers, Go / No-Go, Versions and Execution in the main
  * column, Part A and Part B beside them; on a phone the numbers, the parts, Go / No-Go,
@@ -1083,7 +986,6 @@ export function PlanHomeScreen({
 }) {
   const { t } = useTranslation(["ideas", "validation"]);
   const { workspace, role } = useWorkspace();
-  const panel = usePanel();
   const { data } = useQuery(planHomeQuery(ideaId, planId, search.version));
   const { data: ideaData } = useQuery(validationHomeQuery(ideaId));
   const home =
@@ -1107,9 +1009,6 @@ export function PlanHomeScreen({
       ? []
       : [home.name, idea.name, workspace.name]),
   );
-  const isListOpen =
-    panel.open?.name === "comments" && panel.open.target.kind === "screen";
-  const threadLabels = usePlanThreadLabels(ideaId, planId, isListOpen);
   // 20's comments and history are the whole plan's (SDD 6.3「画面と節の対応」), with the
   // idea's comments in the list; it shows no item of its own to open a thread on.
   const comments: ScreenComments | undefined =
@@ -1132,9 +1031,8 @@ export function PlanHomeScreen({
           // which a reverted rename changes.
           dataKey: ideaKey(ideaId),
           shows: () => false,
-          labelOf: (target) =>
-            target.type === "idea" ? idea.name : threadLabels.labelOf(target),
-          labelsState: threadLabels.state,
+          // The other items' names come with their threads (C1 `label`).
+          labelOf: (target) => (target.type === "idea" ? idea.name : undefined),
         };
   return (
     <WorkspaceFrame

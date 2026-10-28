@@ -50,7 +50,7 @@ import {
 import { useCreationUndo } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import { failureCode } from "./SendFailure";
-import { FailureState } from "./states";
+import { FailureState, LoadingBlock } from "./states";
 import { UserName } from "./UserName";
 import { dashboardHref, usePanel, useWorkspace } from "./workspace";
 
@@ -534,12 +534,12 @@ export function HistoryPanelBody({
     );
   } else if (query.data === undefined) {
     rows = (
-      <Skeleton isLoading>
+      <LoadingBlock onRetry={() => void query.refetch()}>
         <Stack gap="space-200">
           <Text>{t("panels:history.empty")}</Text>
           <Text>{t("panels:history.empty")}</Text>
         </Stack>
-      </Skeleton>
+      </LoadingBlock>
     );
   } else if (entries.length === 0) {
     rows = <Text tone="secondary">{t("panels:history.empty")}</Text>;

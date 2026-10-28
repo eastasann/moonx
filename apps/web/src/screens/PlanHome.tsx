@@ -1003,8 +1003,11 @@ function usePlanThreadLabels(
   const state = {
     isPending: reads.some((read) => read.isPending),
     error: reads.find((read) => read.isError)?.error ?? null,
+    // From a failure and from a wait that has gone on (6.0.6): the reads not in yet.
     retry: () => {
-      for (const read of reads) if (read.isError) void read.refetch();
+      for (const read of reads) {
+        if (read.isError || read.isPending) void read.refetch();
+      }
     },
   };
   const labelOf = (target: TargetRef): string | undefined => {

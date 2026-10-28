@@ -20,7 +20,6 @@ import {
   MentionTextArea,
   MenuItem,
   Picker,
-  Skeleton,
   Stack,
   Text,
 } from "@moonx/ui-web";
@@ -50,7 +49,7 @@ import {
 import { isSessionLost } from "../lib/send";
 import { toastFailure } from "./ideaActions";
 import { rateLimitWords } from "./SendFailure";
-import { FailureState, reportOnce } from "./states";
+import { FailureState, LoadingBlock, reportOnce } from "./states";
 import { UserName } from "./UserName";
 import { dashboardHref, useWorkspace } from "./workspace";
 
@@ -96,6 +95,7 @@ export interface ScreenComments {
   /**
    * Where the names of the screen's list stand when the screen reads them for it (20 reads
    * its items' once the list opens): the list waits for them, and a failed read says so.
+   * `retry` reads again the ones not in yet, failed or slow.
    */
   labelsState?: { isPending: boolean; error: unknown; retry: () => void };
 }
@@ -694,12 +694,17 @@ export function CommentsPanelBody({
     );
   } else if (query.data === undefined || labels?.isPending === true) {
     threads = (
-      <Skeleton isLoading>
+      <LoadingBlock
+        onRetry={() => {
+          void query.refetch();
+          labels?.retry();
+        }}
+      >
         <Stack gap="space-200">
           <Text>{t("panels:comments.empty")}</Text>
           <Text>{t("panels:comments.placeholder")}</Text>
         </Stack>
-      </Skeleton>
+      </LoadingBlock>
     );
   } else if (query.data.threads.length === 0) {
     threads = <Text tone="secondary">{t("panels:comments.empty")}</Text>;

@@ -1,9 +1,10 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ApiError } from "../lib/api";
 import * as sentry from "../lib/sentry";
 import {
   FailureState,
+  LoadingBlock,
   SLOW_LOADING_MS,
   SlowLoadingState,
   useIsSlow,
@@ -159,4 +160,22 @@ test("after 10 seconds of loading: Taking longer than usual", () => {
   expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
   rerender(<Loading isLoading={false} />);
   expect(screen.queryByText("Taking longer than usual")).toBeNull();
+});
+
+test("a modal's or panel's loading: its skeleton, then Taking longer than usual with Retry (6.0.6)", () => {
+  vi.useFakeTimers();
+  const onRetry = vi.fn();
+  render(
+    <LoadingBlock onRetry={onRetry}>
+      <p>Conditions</p>
+    </LoadingBlock>,
+  );
+  expect(screen.getByText("Conditions")).toBeTruthy();
+  act(() => vi.advanceTimersByTime(SLOW_LOADING_MS));
+  expect(screen.queryByText("Conditions")).toBeNull();
+  expect(
+    screen.getByRole("heading", { level: 3, name: "Taking longer than usual" }),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  expect(onRetry).toHaveBeenCalledOnce();
 });

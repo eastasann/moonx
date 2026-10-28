@@ -20,7 +20,6 @@ import {
   Link,
   Radio,
   RadioGroup,
-  Skeleton,
   Stack,
   Text,
   TextArea,
@@ -48,7 +47,7 @@ import { DecisionKeyNumbers } from "./decisionParts";
 import { ModalSendFailure } from "./ModalFailure";
 import { ConflictAlert } from "./SaveFeedback";
 import { failureCode } from "./SendFailure";
-import { FailureState } from "./states";
+import { FailureState, LoadingBlock } from "./states";
 import { dashboardHref, useWorkspace } from "./workspace";
 
 /** How long a toast without an action stays: the shortest 4.5 Toast allows. */
@@ -185,12 +184,12 @@ export function CreatePlanDialog({
           size="S"
         />
       ) : (
-        <Skeleton isLoading>
+        <LoadingBlock onRetry={() => void plans.refetch()}>
           <Stack gap="space-300">
             <Text>{t("plans:create.body")}</Text>
             <Text>{t("plans:create.name")}</Text>
           </Stack>
-        </Skeleton>
+        </LoadingBlock>
       )}
     </Dialog>
   );
@@ -698,7 +697,7 @@ export function GoNoGoDialog({
     );
   } else {
     material = (
-      <Skeleton isLoading>
+      <LoadingBlock onRetry={() => void context.refetch()}>
         <Stack gap="space-300">
           <Heading level={3} variant="label">
             {t("plans:goNoGo.conditions")}
@@ -706,7 +705,7 @@ export function GoNoGoDialog({
           <Text>{t("plans:goNoGo.launchIf")}</Text>
           <Text>{t("plans:goNoGo.delayIf")}</Text>
         </Stack>
-      </Skeleton>
+      </LoadingBlock>
     );
   }
   return (

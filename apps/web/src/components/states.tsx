@@ -3,6 +3,7 @@ import {
   IllustratedMessage,
   Link,
   PageFrame,
+  Skeleton,
   Text,
 } from "@moonx/ui-web";
 import {
@@ -251,6 +252,27 @@ export function SlowLoadingState({
         </Button>
       }
     />
+  );
+}
+
+/**
+ * What a modal or a panel shows while its content loads (6.0.6, whose table holds for
+ * every modal): `children` as its skeleton, then "Taking longer than usual" and Retry once
+ * it has loaded for {@link SLOW_LOADING_MS}. Rendered only while loading, so the count
+ * starts as it appears.
+ */
+export function LoadingBlock({
+  onRetry,
+  children,
+}: {
+  onRetry: () => void;
+  children: ReactNode;
+}) {
+  const isSlow = useIsSlow(true);
+  return isSlow ? (
+    <SlowLoadingState onRetry={onRetry} headingLevel={3} size="S" />
+  ) : (
+    <Skeleton isLoading>{children}</Skeleton>
   );
 }
 

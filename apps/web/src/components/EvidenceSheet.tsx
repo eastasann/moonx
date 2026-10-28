@@ -21,7 +21,6 @@ import {
   SearchField,
   SegmentedControl,
   SegmentedControlItem,
-  Skeleton,
   Stack,
   TagGroup,
   Text,
@@ -58,7 +57,7 @@ import {
 } from "./ResearchLogFields";
 import { ConflictAlert, SaveFailureNote } from "./SaveFeedback";
 import { rateLimitWords } from "./SendFailure";
-import { FailureState, reportOnce } from "./states";
+import { FailureState, LoadingBlock, reportOnce } from "./states";
 import { useWorkspace } from "./workspace";
 
 /** The items M2 attaches evidence to (SDD 5.7 V4). */
@@ -594,12 +593,12 @@ export function EvidenceSheet({
                 size="S"
               />
             ) : log.data === undefined ? (
-              <Skeleton isLoading>
+              <LoadingBlock onRetry={() => void log.refetch()}>
                 <Stack gap="space-100">
                   <Text>{t("validation:evidence.source.log")}</Text>
                   <Text>{t("validation:evidence.source.log")}</Text>
                 </Stack>
-              </Skeleton>
+              </LoadingBlock>
             ) : log.data.length === 0 ? (
               <Text tone="secondary" elementType="p">
                 {t("validation:evidence.noLog")}

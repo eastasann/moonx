@@ -7,6 +7,9 @@ export const flex = style({ display: "flex", minWidth: 0 });
 
 export const noShrink = style({ flexShrink: 0 });
 
+/** Grows into the room left; with `noShrink` it still keeps its content's width. */
+export const grow = style({ flexGrow: 1 });
+
 export const grid = style({ display: "grid", minWidth: 0 });
 
 /**

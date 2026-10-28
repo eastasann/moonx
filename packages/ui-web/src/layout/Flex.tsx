@@ -23,6 +23,12 @@ export interface FlexProps extends LayoutDomProps, GapProps {
    * @default true
    */
   shrink?: boolean;
+  /**
+   * Takes the room its parent Flex or Stack leaves: a comment's column beside its Avatar
+   * fills the panel's width, so the ⋯ at the end of its first row sits at the edge.
+   * @default false
+   */
+  grow?: boolean;
   children?: ReactNode;
 }
 
@@ -37,10 +43,11 @@ export function Flex({
   alignItems,
   justifyContent,
   shrink = true,
+  grow = false,
   children,
   ...dom
 }: FlexProps) {
-  const className = `${styles.flex}${shrink ? "" : ` ${styles.noShrink}`} ${sprinkles(
+  const className = `${styles.flex}${shrink ? "" : ` ${styles.noShrink}`}${grow ? ` ${styles.grow}` : ""} ${sprinkles(
     {
       flexDirection: direction,
       flexWrap: mapResponsive(wrap, (value) => (value ? "wrap" : "nowrap")),
@@ -57,7 +64,7 @@ export function Flex({
 export interface StackProps
   extends LayoutDomProps,
     Pick<GapProps, "gap">,
-    Pick<FlexProps, "alignItems" | "children"> {}
+    Pick<FlexProps, "alignItems" | "grow" | "children"> {}
 
 /** A column of children with one gap between them: Flex with direction column. */
 export function Stack(props: StackProps) {

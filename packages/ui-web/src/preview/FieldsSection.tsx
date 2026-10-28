@@ -71,6 +71,21 @@ export function TextFieldSection() {
           <TextField label="Template" defaultValue="BCDX v3" isReadOnly />
         </Flex>
       </Specimen>
+      <Specimen name='descriptionTone="notice", a long errorMessage (the icon on the first line)'>
+        <Flex gap="space-300" wrap alignItems="start">
+          <TextField
+            label="Currency"
+            defaultValue="PHP"
+            description="Changing the currency does not convert amounts you already entered, so check them after you change it."
+            descriptionTone="notice"
+          />
+          <TextField
+            label="Website"
+            defaultValue="piaya"
+            errorMessage="Enter a web address that starts with https://, such as https://example.com."
+          />
+        </Flex>
+      </Specimen>
       <Specimen name='TextArea width="full" (grows with its text)'>
         <TextArea
           label="Who exactly is the customer?"
@@ -196,7 +211,13 @@ export function SearchAndPickSection() {
       </Specimen>
       <Specimen name="ComboBox (a field that opens a tray on a phone)">
         <Flex gap="space-300" wrap alignItems="start">
-          <ComboBox label="Assignee" items={members} defaultValue="u2" />
+          <ComboBox
+            label="Assignee"
+            items={members}
+            defaultValue="u2"
+            description="Only Owners and Members of this workspace can be assigned."
+            descriptionTone="notice"
+          />
           <ComboBox
             label="Assignee or name"
             items={members}

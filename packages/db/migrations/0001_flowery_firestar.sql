@@ -1,0 +1,1 @@
+ALTER TABLE "change_history" ADD COLUMN "first_changed_at" timestamp with time zone;

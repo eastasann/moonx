@@ -2395,7 +2395,7 @@ make lint・make typecheck・make doc-lint・make test・make test-e2e・make op
 
 ## Step 35f: 操作確認の直し（入力欄のエラーの印・コメントのパネル・変更履歴をまとめる）
 
-Status:
+Status: done 2026-10-29
 
 ```
 ユーザーが手元で画面を操作して見つけた点を直してください（2026-10-29）。PR #10 をマージする前に、このブランチで直す。

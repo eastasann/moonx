@@ -493,10 +493,13 @@ describe("S3 PUT /api/v1/me/self-analysis/answers/{questionKey}", () => {
     );
     expect(forced).toMatchObject({ text: "v3", lockVersion: 3 });
 
+    // The overwrite keeps a row of its own, though v2 was the same person's a moment
+    // before: what it overwrote stays in the history (ADR-019, ADR-020).
     const history = await db
       .select({ action: changeHistory.action, after: changeHistory.after })
       .from(changeHistory)
-      .where(eq(changeHistory.containerId, home.id));
+      .where(eq(changeHistory.containerId, home.id))
+      .orderBy(changeHistory.changedAt);
     expect(history.map((row) => row.after)).toEqual([
       { text: "v1", amount: null },
       { text: "v2", amount: null },

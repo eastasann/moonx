@@ -418,13 +418,22 @@ describe("P10 /api/v1/execution-items/{itemId}", () => {
     const history = await db
       .select()
       .from(changeHistory)
-      .where(eq(changeHistory.targetId, milestone.id));
+      .where(eq(changeHistory.targetId, milestone.id))
+      .orderBy(changeHistory.changedAt, changeHistory.id);
+    // The member's saves, minutes apart, are one row (ADR-020): from the item as the
+    // draft made it to the last accepted save, which the refused ones did not touch.
     expect(history.map((row) => [row.source, row.action])).toEqual([
       ["plan_draft", "create"],
       ["manual", "update"],
-      ["manual", "update"],
-      ["manual", "update"],
     ]);
+    const [created, merged] = history;
+    expect(merged?.before).toEqual(created?.after);
+    expect(merged?.after).toMatchObject({
+      status: "doing",
+      assigneeUserId: null,
+      assigneeName: "Lito",
+      goal: "Signed lease",
+    });
   });
 
   test("DELETE hides the item, with its history; a deleted item is 404", async () => {

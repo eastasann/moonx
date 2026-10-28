@@ -1,13 +1,17 @@
 import { X } from "lucide-react";
 import {
+  createContext,
   type KeyboardEvent,
   type ReactNode,
+  useContext,
   useEffect,
   useId,
   useLayoutEffect,
   useRef,
+  useState,
 } from "react";
 import { Dialog, Modal, ModalOverlay } from "react-aria-components";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { FixedLocale } from "../internal/FixedLocale";
 import { OverlayContexts } from "../internal/OverlayContexts";
@@ -23,7 +27,10 @@ export interface PanelProps {
   title: string;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  /** The threads or the changes; they scroll inside the panel. */
+  /**
+   * The threads or the changes; they scroll inside the panel. What they put in a
+   * {@link PanelFooter} stays under them instead.
+   */
   children: ReactNode;
 }
 
@@ -91,6 +98,21 @@ export function ModalPanel({
   );
 }
 
+/** The panel's footer, where a {@link PanelFooter} in its children puts what it holds. */
+const FooterContext = createContext<HTMLElement | null>(null);
+
+/**
+ * What stays at the bottom of the panel, under the part that scrolls: the box for a new
+ * thread under the threads (PNL-1, design-spec 6.0.4), in the docked column, the
+ * drawer and the tray alike. It may sit anywhere among the panel's children, which keeps
+ * it in their state; on a phone the tray rises above the on-screen keyboard (4.3), and
+ * the footer with it.
+ */
+export function PanelFooter({ children }: { children: ReactNode }) {
+  const footer = useContext(FooterContext);
+  return footer === null ? null : createPortal(children, footer);
+}
+
 function PanelContent({
   title,
   onClose,
@@ -105,6 +127,7 @@ function PanelContent({
   children: ReactNode;
 }) {
   const { t } = useTranslation(["components"]);
+  const [footer, setFooter] = useState<HTMLElement | null>(null);
   return (
     <>
       <div className={styles.header}>
@@ -120,7 +143,10 @@ function PanelContent({
           <X />
         </ActionButton>
       </div>
-      <div className={styles.body}>{children}</div>
+      <FooterContext.Provider value={footer}>
+        <div className={styles.body}>{children}</div>
+      </FooterContext.Provider>
+      <div ref={setFooter} className={styles.footer} />
     </>
   );
 }

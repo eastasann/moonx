@@ -413,6 +413,8 @@ describe("P5 PUT /api/v1/plans/{planId}/answers/{questionKey}", () => {
       force: true,
     });
     expect(lost.status).toBe(409);
+    // Rows of one moment have no order between them: the saves below are a second apart.
+    clock += 1000;
     const forced = await save(team, "P.01.5", {
       text: "Mine",
       lockVersion: 7,
@@ -422,6 +424,7 @@ describe("P5 PUT /api/v1/plans/{planId}/answers/{questionKey}", () => {
       text: "Mine",
       lockVersion: 2,
     });
+    clock += 1000;
     const cleared = await save(team, "P.01.5", { text: "  ", lockVersion: 2 });
     expect(planAnswerSchema.parse(await cleared.json()).text).toBeNull();
 
@@ -434,12 +437,18 @@ describe("P5 PUT /api/v1/plans/{planId}/answers/{questionKey}", () => {
           eq(changeHistory.targetKey, "P.01.5"),
         ),
       );
+    // Overwriting, then clearing it a moment later: one row from before the overwrite
+    // to the cleared text (ADR-020).
     expect(
-      history.map((row) => [row.action, row.sectionKey, row.after]),
+      history.map((row) => [row.action, row.sectionKey, row.before, row.after]),
     ).toEqual([
-      ["create", "01", { text: "Boxes invoiced monthly", rows: null }],
-      ["update", "01", { text: "Mine", rows: null }],
-      ["update", "01", { text: null, rows: null }],
+      ["create", "01", null, { text: "Boxes invoiced monthly", rows: null }],
+      [
+        "update",
+        "01",
+        { text: "Boxes invoiced monthly", rows: null },
+        { text: null, rows: null },
+      ],
     ]);
   });
 

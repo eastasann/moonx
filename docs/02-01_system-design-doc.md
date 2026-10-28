@@ -234,7 +234,7 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 | ADR-017 | モノレポ | **Bun workspaces** ＋ Makefile |
 | ADR-018 | デザインシステムとトークン（ユーザー指定） | **Adobe Spectrum の仕組み**を取り入れ、見た目は月相（design-spec 4.4）。06_design-tokens.json から Web（vanilla-extract）・PDF のテーマと PWA のアイコンを生成する。アイコンは Lucide |
 | ADR-019 | 同時編集 | 項目単位の楽観ロック（`lock_version`）。衝突は 409 で返し、利用者に選ばせる |
-| ADR-020 | 変更履歴の記録 | アプリのコードで、本体の更新と同じトランザクションの中で `change_history` に書く |
+| ADR-020 | 変更履歴の記録 | アプリのコードで、本体の更新と同じトランザクションの中で `change_history` に書く。同じ人が続けて手で直した変更は1行にまとめる |
 | ADR-021 | 保存できなかった入力の再送 | ページを開いている間だけ、メモリに持った最新の値を再送する。端末には残さない。オフラインのときは入力を止める |
 | ADR-022 | テスト・リント | Bun test・Vitest・Playwright・axe・Biome |
 | ADR-023 | 監視・ログ | Sentry ＋ Cloud Logging（構造化 JSON・リクエスト ID）＋ Cloud Monitoring の稼働時間チェック |
@@ -517,9 +517,9 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 ### ADR-019: 同時編集は項目単位の楽観ロック
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-29 に、上書きした保存を ADR-020 の行をまとめる対象にしないことを足した。前は、上書きされた版が残ることを ADR-020 の行の書き方がそのまま満たしていた）
 
-**決定:** 保存の単位の項目（回答・行・数字・アイデアの概要・プランのヘッダ）は `lock_version` を持つ。更新の API は、クライアントが持っている `lockVersion` を受け取り、DB の値と違えば **409 `CONFLICT`** と相手の内容（値・保存した人・日時）を返す。利用者が「自分の内容で上書きする」を選ぶと、クライアントは `force: true` で送り直す。どちらの内容も変更履歴に残る（design-spec 6.0.2）。
+**決定:** 保存の単位の項目（回答・行・数字・アイデアの概要・プランのヘッダ）は `lock_version` を持つ。更新の API は、クライアントが持っている `lockVersion` を受け取り、DB の値と違えば **409 `CONFLICT`** と相手の内容（値・保存した人・日時）を返す。利用者が「自分の内容で上書きする」を選ぶと、クライアントは `force: true` で送り直す。どちらの内容も変更履歴に残る（design-spec 6.0.2。上書きした保存は、上書きされた版が自分のものでも、ADR-020 の行をまとめる対象にしない）。
 
 まとめて反映する操作（AI 取り込みの X3）は、1つでも古い `lockVersion` があれば何も変えずに **409 `CONFLICT_MULTI`** と衝突した項目の一覧を返す（全部反映するか、何もしない）。
 
@@ -533,15 +533,20 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 ### ADR-020: 変更履歴はアプリのコードで、同じトランザクションの中で書く
 
-**状態・日付:** 採用（2026-10-01）
+**状態・日付:** 採用（2026-10-01。2026-10-29 に、同じ人が続けて手で直した変更を1行にまとめる決まりを足した。ユーザーの決定。前の決定は、保存ごとに1行を書く、だった）
 
 **決定:** 変更履歴の対象（design-spec 6.0.5）を更新する API は、本体の更新と `change_history` への書き込みを1つのトランザクションで行う。書き込みは共通の関数 `withHistory` だけを通す。`withHistory` は、書き込む画面（`container`）・変えた人・変更の種類（`source`）・1回の操作のまとまり（`batchId`）と、本体を変える処理を受け取る。本体を変える処理は変える前と後の値を返し、前と後が等しければ履歴を書かない（値を変えない保存は版も上げない）。`change_history` の各列をどこから決めるかは 6.3 の末尾。例外は作らない（作成の取り消しも `withHistory` で取り消しの行を書く。5.11）。
 
+同じ人が同じ項目を続けて手で直している間は、新しい行を書かずに、その項目の最新の行を1件のまま更新する（2026-10-29 のユーザーの決定。自動保存（design-spec 6.0.2）は入力が止まるたびに保存するので、保存ごとの行で履歴が埋まっていた）。
+- まとめる条件: 変更が手入力（`source = manual`・`batch_id` が null）の更新（`action = update`。回答や数字の最初の保存は `create` で、まとめない）で、その項目（`target_type`・`target_id`・`target_key`）の最新の行（`changed_at` の新しい順、同じなら `id` の降順の最初）も同じ人の手入力の更新で、その行の `changed_at` から `HISTORY_MERGE_WINDOW_MS`（10分。`packages/db/src/history-merge.ts`）以内であること。最新の行が、ほかの人の変更・元に戻す（`revert`）・AI 取り込み・テンプレートの移行・複製・下書き作成・作成の取り消しの行ならまとめない。行の追加・削除・削除の取り消し（`action` が `create`・`delete`・`restore`）はまとめない。上書き（`force: true` で、読んだ版と違う版に保存する。ADR-019）もまとめない（上書きされた版を履歴に残して戻せるようにする。上書きされた版が同じ人の別のタブのものでも同じ）
+- まとめた行: `before` は最初の変更の前の値のまま、`after` は最新の値、`changed_at` は最新の変更の時刻、`client` は最新の変更のもの、`first_changed_at` は最初の変更の時刻。差分（design-spec 6.0.5）は `before` と `after` で出すので、どれかの変更で変わって元に戻った欄は出ない。`after` が `before` と等しくなったら（すべての欄が元に戻ったら）行を消す（値を変えない保存が履歴を書かないのと同じ）。H2 は、まとめた行では `after`（最新の値）へ戻す。まとめた途中の状態には戻せない
+- 同時に来た保存: まとめる行の読み書きは本体の更新と同じトランザクションで行う。本体の更新が項目の行のロックを取ったあとに、最新の行を `FOR UPDATE` で読み、その行がまだ最新である（同じ `id`・`changed_at` で、それより新しい行も同じ時刻の行も無く、それを指す `reverted_from_id` も無い）ことを条件に更新する。条件に合わなければ、まとめずに新しい行を書く（同じ時刻の行どうしには順が無く、どれが最後か分からないため）。H2 は、戻す行を書き込みのロックの中で読み直す（まとめられて変わった・消えた行を、読んだときのままで戻さない。消えていれば `404 NOT_FOUND`）
+
 **理由:** 変更の種類（手入力・AI 取り込み・元に戻す・テンプレートの移行・複製・下書き作成）と、誰が変えたかはアプリしか知らない。
 
-**捨てた案:** DB のトリガー（乗り換えのときに DB 側のロジックを持ち出す必要が出る）。
+**捨てた案:** DB のトリガー（乗り換えのときに DB 側のロジックを持ち出す必要が出る）。行をまとめる決まりは、比較の記録なし（自動保存の間隔は変えない。2026-10-29 のユーザーの決定）。
 
-**トレードオフ:** 履歴を書き忘れる API を作る危険がある。対象のテーブルを更新するリポジトリ関数を `withHistory` 経由に限り、結合テストで「更新したら履歴が1件増える」を確かめる。
+**トレードオフ:** 履歴を書き忘れる API を作る危険がある。対象のテーブルを更新するリポジトリ関数を `withHistory` 経由に限り、結合テストで、まとめない変更では履歴が1件増え、まとめる変更では行の数が変わらずにその行の中身が更新され、すべての欄が元に戻ると行が消えることを確かめる。同じ人が続けて手で直した変更の途中の状態は履歴に残らず、戻せない。
 
 ### ADR-021: 保存できなかった入力は、ページを開いている間だけ再送する
 
@@ -1202,7 +1207,7 @@ interface Activity {
 | D1 | — | `200 { items: IdeaSummary[]; droppedCount: number }` | アーカイブ・Drop を除く。更新順。`droppedCount` はアーカイブしていない Drop の件数 |
 | D2 | — | `200 { items: { user: UserRef; shared: boolean; status: "not_started" | "in_progress" | "done" | null }[] }` | Owner / Member の一覧（表示名の順）。共有していない人の `status` は null（進み具合を見せない） |
 | D3 | — | `200 { items: DueItem[] }` | 対象の期間は design-spec 6.9（Due soon）。期限（`due_date`）のある実行管理の項目（milestone・launch・open_question・next_action。kpi は期限を持たない）から、Done / Resolved のもの、アーカイブ・論理削除したものを除く。自分の担当を先、次に期限順（同じ期限は項目名の順）。「今日」は利用者の `users.timezone` の日付で、`overdue` と期間もそれで決める |
-| D4 | — | `200 { items: Activity[] }` | 件数は design-spec 6.9。自己分析に関わる動きは除く。変更・コメント・決定ログを合わせて新しい順に並べる。`batch_id` のある変更は1回の操作を1件にまとめる（複製は新しいアイデアの行で示す）。`batch_id` の無い変更も、1回の要求で書いた行（同じ人・同じ時刻・同じアイデア。I1 POST のアイデアと費用の初期行、V4 の調査ログと根拠を付けた項目など）は1件にまとめる。1つの項目だけを変えた操作は、同じ人が同じ項目を続けて変えたものなら、design-spec 6.9 の時間の幅の中で1件にまとめ、最後の時刻で出す（前の変更からの間が時間の幅を超えたら別の1件。自動保存のたびに履歴が1行増えるため。履歴の行そのものは1件ずつ残る）。`link`: 1つの項目の変更はその項目を出す画面（コメントの通知と同じ行き先で、パネルは開かない）、コメントはその行き先に `panel: "comments"` と `target` を付けたもの、複数の項目にまたがる操作・判定は 13、プランの中の操作・Go / No-Go・版の保存は 20。削除した行へのコメントと、削除したコメントは除く |
+| D4 | — | `200 { items: Activity[] }` | 件数は design-spec 6.9。自己分析に関わる動きは除く。変更・コメント・決定ログを合わせて新しい順に並べる。`batch_id` のある変更は1回の操作を1件にまとめる（複製は新しいアイデアの行で示す）。`batch_id` の無い変更も、1回の要求で書いた行（同じ人・同じ時刻・同じアイデア。I1 POST のアイデアと費用の初期行、V4 の調査ログと根拠を付けた項目など）は1件にまとめる。1つの項目だけを変えた操作は、同じ人が同じ項目を続けて変えたものなら、design-spec 6.9 の時間の幅の中で1件にまとめ、最後の時刻で出す（前の変更からの間が時間の幅を超えたら別の1件。同じ人が続けて手で直した変更をまとめた行（ADR-020）は、`first_changed_at` から `changed_at` までの変更として間を測る。そうした変更は変更履歴でも1行だが、行の追加とその後の入力のように、変更履歴では別の行になるものもここで1件にする）。`link`: 1つの項目の変更はその項目を出す画面（コメントの通知と同じ行き先で、パネルは開かない）、コメントはその行き先に `panel: "comments"` と `target` を付けたもの、複数の項目にまたがる操作・判定は 13、プランの中の操作・Go / No-Go・版の保存は 20。削除した行へのコメントと、削除したコメントは除く |
 | I1 GET | `?stage=&decision=not_dropped|all|undecided|proceed|hold|drop&proposerId=&includeArchived=true&sort=updated|created|name&q=&cursor=&limit=` | `200 Page<IdeaSummary> & { hiddenDroppedCount: number }` | `decision` の既定は `not_dropped`。`q` は名前と一行コンセプトの部分一致（大文字小文字を区別しない。空白だけなら絞り込まない）。`sort` の既定は `updated`: `updated` は最終活動（`lastActivityAt`）の新しい順、`created` は作成の新しい順、`name` は名前の順（大文字小文字を区別しない）。`q` は短文の上限（design-spec 6.0.8）まで。`hiddenDroppedCount` は `decision=not_dropped` のときだけ、ほかの条件（工程・提案者・アーカイブ・`q`）に合う Drop のアイデアを数え、他は 0 |
 | I1 POST | `{ name: string; oneLineConcept: string; proposedSolution?: string }`（値は design-spec 6.0.8） | `201 IdeaDetail` | 最新の公開済みの検証のテンプレートの版で検証を作り、費用の初期行を Empty で作る（履歴は作成の記録だけ: アイデアの作成と、費用の初期行それぞれの作成を1行ずつ。`manual`）。公開済みの版が無ければ `409 TEMPLATE_NOT_PUBLISHED`（運営者がまだテンプレートを取り込んでいない。AD10）。`proposedSolution` は空白だけなら null |
 | I2 GET | — | `200 IdeaDetail` | |
@@ -1540,7 +1545,7 @@ interface HistoryEntry {
   action: "create" | "update" | "delete" | "restore";
   source: HistorySource;   // 作成の取り消しの行は source が revert、action が delete、target.type が idea か business_plan の組み合わせ。画面はこの組み合わせで「作成の取り消し」と出す（design-spec 6.0.5）
   before: unknown | null; after: unknown | null;   // 本文・数字・F/A/U・確信度・根拠の id の一覧など（差分の強調はクライアント）
-  changedBy: UserRef; changedAt: DateTime;
+  changedBy: UserRef; changedAt: DateTime;   // 同じ人が続けて手で直した変更をまとめた行（ADR-020。2026-10-29 のユーザーの決定）は、最後の変更の時刻
   revertible: boolean;   // 呼んだ人がこの行を戻せる（Viewer・アーカイブ済みは false）。`template_version` の行は H2 では戻せないが、H3 で操作全体を戻せるとき（その移行がまだ戻されていない、または戻したことが取り消されている）は true。`duplicate`・`plan_draft` の行は作成の取り消し（H3）の対象で、条件を満たすかは確かめずに true（呼んだ人の権限だけで決める）。作成の取り消しで書いた行（下の「作成の取り消し」）は false
 }
 interface Notification {
@@ -1570,7 +1575,7 @@ interface RevertedItem {   // H2 の後の項目
 | C2 DELETE | — | `204` | 「deleted」として残す。本文を空にしてメンションを外す（消した本文を残さない）。削除済みをもう一度消しても `204`。C2 は、書いた人なら今のロールにかかわらずできる（7.1。自己分析へのコメントで、書いた後に Viewer になった人も）。自己分析へのコメントの C2・C3 は、C1 POST と同じくメンバーの変更の lock を共有で取り、所属（無ければ `403 NO_ACCESS`）と共有の行（`FOR SHARE`。無ければ `404 NOT_FOUND`）を確かめ直してから書く |
 | C3 | — | `200 Comment` | スレッドの最初のコメントだけ（返信は `422 VALIDATION_FAILED`、`details[0].path` は `commentId`）。すでにその状態なら何も変えない。自己分析へのコメントは Viewer なら `403 FORBIDDEN`（ロックの後にも確かめる） |
 | H1 | 項目: `?targetType=&targetId=&targetKey=&cursor=`。画面全体: `?containerType=self_analysis|validation|business_plan|idea&containerId=&sectionKeys=&cursor=`（`sectionKeys` はカンマ区切り。画面と節の対応は 6.3 の末尾。省くと画面全体） | `200 Page<HistoryEntry>` | 新しい順。`containerType=idea`（13）は、アイデア自身の行に加え、そのアイデアの検証のテンプレートの版の行（テンプレートの移行。design-spec 6.0.7）と、作成の取り消しの行も返す。項目の指定と `sectionKeys` の指定では、テンプレートの版の行を返さない（項目に `template_version` を指定すると空の一覧）。同じ時刻の行は id の降順。項目の指定は削除した行の履歴も返す（削除を取り消すため）。`limit` も受け付ける（5.1「一覧」）。自己分析の履歴は持ち主以外 `403 FORBIDDEN`（無い自己分析は `404 NOT_FOUND`） |
-| H2 | — | `200 { entry: HistoryEntry | null; target: RevertedItem }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す）。戻したことも履歴 `revert` で残す（`batchId` は持たず、`revertedFromId` は戻した元の行。削除した行を戻すと `action` は `restore` で `before` は null）。項目がすでにその状態なら何も書かず、`entry` は null（値を変えない保存と同じ。ADR-020）。衝突の検査はしない（戻すのは意図した上書き）。`template_version` の行は `422 VALIDATION_FAILED`（H3 で戻す）。作成の取り消しで書いた行も `422 VALIDATION_FAILED`（取り消したものは戻さない）。自己分析の回答を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落）。案の名前がほかの案で使われていれば `409 NAME_TAKEN`（P2 PATCH と同じ）。実行管理の担当が今は Owner / Member でなければ、W3 と同じくその人の表示名に置き換えて戻す。行が無くなっていれば `404 NOT_FOUND` |
+| H2 | — | `200 { entry: HistoryEntry | null; target: RevertedItem }` | その項目を、その変更の直後の状態に戻す（`delete` の行は削除を取り消す。同じ人が続けて手で直した変更をまとめた行（ADR-020。2026-10-29 のユーザーの決定）は最後の変更の直後の状態で、まとめた途中の状態には戻せない）。戻したことも履歴 `revert` で残す（`batchId` は持たず、`revertedFromId` は戻した元の行。削除した行を戻すと `action` は `restore` で `before` は null）。項目がすでにその状態なら何も書かず、`entry` は null（値を変えない保存と同じ。ADR-020）。衝突の検査はしない（戻すのは意図した上書き）。`template_version` の行は `422 VALIDATION_FAILED`（H3 で戻す）。作成の取り消しで書いた行も `422 VALIDATION_FAILED`（取り消したものは戻さない）。自己分析の回答を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落）。案の名前がほかの案で使われていれば `409 NAME_TAKEN`（P2 PATCH と同じ）。実行管理の担当が今は Owner / Member でなければ、W3 と同じくその人の表示名に置き換えて戻す。行が無くなっていれば `404 NOT_FOUND` |
 | H3 | — | `200 { reverted: number; batchId: UUID }` | AI 取り込み・テンプレートの移行・元に戻す操作を、1回の操作の単位でまとめて戻す。すでに戻した操作は、戻したことを取り消すまで `409 ALREADY_REVERTED`。複製（`duplicate`）と下書き作成（`plan_draft`）は、戻すのではなく作ったものを論理削除する「作成の取り消し」になる（下の「作成の取り消し」）。自己分析の操作を戻すときは、自己分析の行をロックしてから書き、状態を進める（5.8 の表の下の段落）。各項目は、その操作の最初の行の `before` の状態に戻す（`before` が null の行は、一覧の行なら論理削除、回答・数字なら空にする。テンプレートの版は `before` の版に戻す）。戻した操作は `revert` の新しい `batchId` で書く。応答の `reverted` は戻した項目の数（すでに操作の前の状態だった項目は数えない）、`batchId` はその新しい `batchId`（H3 でさらに戻せる）。戻す項目が無ければ何も書かず、`reverted` は 0（このとき `batchId` の行は無く、元の操作は戻していない扱いのまま） |
 | N1 | `?filter=all|unread&cursor=&limit=` | `200 Page<Notification>` | ワークスペースをまたいで新しい順 |
 | N2 | — | `200 { total: number }` | クライアントは画面を開いたとき・前面に戻ったとき・60秒ごとに呼ぶ |
@@ -1709,7 +1714,7 @@ self_analyses / validations / business_plans ─ N:1 template_versions（作成�
 | 版を持つ項目のテーブル | `updated_by_id` を足す | 衝突のときに「Paolo updated this answer…」を出す（design-spec 6.0.2） |
 | `template_questions` | `template_version_id` を足す | 版の中で設問 ID を一意にする制約のため |
 | `evidence_links` | `validation_id`・`target_key`・`deleted_at` を足す | 回答・数字を「検証の id ＋ キー」で指す（5.1 TargetRef）。根拠の付け外しを履歴から戻せるようにする |
-| `change_history` | `container_type`・`container_id`・`section_key`・`batch_id`・`client` を足す | 画面全体の履歴（design-spec 6.0.5）、1回の操作の単位で戻す（AI 取り込み・移行）、スマホの幅の画面からの入力の割合（PRD の K-08・K-16。5.1「クライアントの種類」） |
+| `change_history` | `container_type`・`container_id`・`section_key`・`batch_id`・`client`・`first_changed_at` を足す | 画面全体の履歴（design-spec 6.0.5）、1回の操作の単位で戻す（AI 取り込み・移行）、スマホの幅の画面からの入力の割合（PRD の K-08・K-16。5.1「クライアントの種類」）、同じ人が続けて手で直した変更をまとめた行の最初の時刻（ADR-020。D4 が最近の動きの間を測る） |
 | `risks.sort_order` | null を許す | null は自動の並び（Impact → Probability） |
 | `workspaces` | ユーザーが作るチームのワークスペースは `is_personal = false` | M7 の「New workspace」（Phase 3 で追加） |
 | `ideas`・`business_plans` | `deleted_at` を足す | 作成の取り消し（5.11）で論理削除する。戻さない |
@@ -2339,7 +2344,8 @@ export const changeHistory = pgTable("change_history", {
   client: clientKind().notNull().default("unknown"),   // 保存したときの画面の幅（5.1「クライアントの種類」。K-08・K-16）
   revertedFromId: uuid().references((): AnyPgColumn => changeHistory.id),
   changedById: uuid().notNull().references(() => users.id),
-  changedAt: ts().notNull().defaultNow(),
+  changedAt: ts().notNull().defaultNow(),         // まとめた行（ADR-020）は最後の変更の時刻
+  firstChangedAt: ts(),                           // まとめた行の最初の変更の時刻。1回の変更だけの行は null
 }, (t) => [
   index("change_history_target_idx").on(t.targetType, t.targetId, t.targetKey, t.changedAt),
   index().on(t.containerType, t.containerId, t.changedAt),
@@ -2385,7 +2391,7 @@ export const changeHistory = pgTable("change_history", {
 
 検証の回答の `section_key` は設問 ID の節（`V.04.SURVIVOR_PATTERNS` なら `04`）。
 
-**`change_history` の列の決め方**（ADR-020 の `withHistory`）: `workspace_id` と `owner_user_id` は画面（`container`）から決める（自己分析は `workspace_id` が null で `owner_user_id` が持ち主、それ以外は `workspace_id` が画面のワークスペースで `owner_user_id` は null）。`container_type`・`container_id` は呼び出し元が画面として渡し、`withHistory` が対象と合うかを確かめる（対象の種類がその画面に出るか。回答・数字・プランのヘッダ・テンプレートの版は、対象の id が画面の id と同じか。アイデアの概要も同じだが、作成の取り消しの行（5.11）だけは元の側のアイデアの画面に書く。Pitch Deck は変更履歴を持たない）。`section_key` は対象から決める（上の表）。`action`（作成・更新・論理削除・削除の取り消し）・`source`・`batch_id`・`client`・`changed_by_id` は呼び出し元が渡す。`reverted_from_id` は H2・H3 だけが渡す（戻した元の行）。`before`・`after` は本体を変える処理が返した値。
+**`change_history` の列の決め方**（ADR-020 の `withHistory`）: `workspace_id` と `owner_user_id` は画面（`container`）から決める（自己分析は `workspace_id` が null で `owner_user_id` が持ち主、それ以外は `workspace_id` が画面のワークスペースで `owner_user_id` は null）。`container_type`・`container_id` は呼び出し元が画面として渡し、`withHistory` が対象と合うかを確かめる（対象の種類がその画面に出るか。回答・数字・プランのヘッダ・テンプレートの版は、対象の id が画面の id と同じか。アイデアの概要も同じだが、作成の取り消しの行（5.11）だけは元の側のアイデアの画面に書く。Pitch Deck は変更履歴を持たない）。`section_key` は対象から決める（上の表）。`action`（作成・更新・論理削除・削除の取り消し）・`source`・`batch_id`・`client`・`changed_by_id` は呼び出し元が渡す。`reverted_from_id` は H2・H3 だけが渡す（戻した元の行）。`before`・`after` は本体を変える処理が返した値。同じ人が続けて手で直した変更を最新の行にまとめるとき（ADR-020。2026-10-29 のユーザーの決定）は、`after`・`changed_at`・`client` を最新の変更のものにし、`before` はそのまま、`first_changed_at` を最初の変更の時刻（まとめる前の `first_changed_at`、無ければ `changed_at`）にする。
 
 ### 6.4 保存しないもの（毎回計算・生成する）
 
@@ -2587,7 +2593,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`・`fitPitchDeck()`・`pitchNumbersBreak()`・`pitchTemplateOverflows()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
 | DB のスキーマとマイグレーション（`packages/db`・`scripts/db-check.ts`） | Bun test ＋ 実際の PostgreSQL（`db-check` は一時的な Git のリポジトリ） | — | 6.3 のコードと `schema.ts` がコメントと整形を除いて同じこと、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB の列・制約・インデックス・列挙が `schema.ts` から作った一時的なテーブルと PostgreSQL の表記で一致すること、`relations()` が外部キーと1対1に対応し、名前が `relations.ts` の先頭に書いた規則に従うこと、テスト用の DB の作り直しが `_test` で終わらない名前とクエリ文字列を拒むこと、`db-check` が2章の失敗の場合をすべて捕まえること |
-| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012）、P12 の数字の列の組み方（`figureColumns`）が PDF の数字の列の位置と同じであること（ADR-012）、上限の件数の素材で Pitch Deck のどのスライドも本文の下端で切れないこと（英語の文と日本語の文、1分版と5分版、計算した指標が 6.14 の大きな表示でも計算できない主要指標の理由の文でも。PDF と同じフォントで測る。design-spec 6.14）、6.14 の範囲の金額と計算した指標で数字が折り返さないことと、範囲の外で 6.14 のとおりに折り返し、折り返しただけでは注意を出さないこと、6.14 が本文に収まるとする金額の外で5分版の Economics が本文の下端で切れて注意を出すこと、公開の前の検査（AD6 の `pitch_deck_overflow`）が、§20 に文章の小項目を足した版と小項目のタイトルを長くした版を、英語の文で溢れる場合も日本語の文だけで溢れる場合も断り、BCDX のプランのテンプレートとシードを通すこと |
+| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること（同じ人が続けて手で直した変更は1件にまとまり、すべての欄が元に戻ると消えること。ADR-020）、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012）、P12 の数字の列の組み方（`figureColumns`）が PDF の数字の列の位置と同じであること（ADR-012）、上限の件数の素材で Pitch Deck のどのスライドも本文の下端で切れないこと（英語の文と日本語の文、1分版と5分版、計算した指標が 6.14 の大きな表示でも計算できない主要指標の理由の文でも。PDF と同じフォントで測る。design-spec 6.14）、6.14 の範囲の金額と計算した指標で数字が折り返さないことと、範囲の外で 6.14 のとおりに折り返し、折り返しただけでは注意を出さないこと、6.14 が本文に収まるとする金額の外で5分版の Economics が本文の下端で切れて注意を出すこと、公開の前の検査（AD6 の `pitch_deck_overflow`）が、§20 に文章の小項目を足した版と小項目のタイトルを長くした版を、英語の文で溢れる場合も日本語の文だけで溢れる場合も断り、BCDX のプランのテンプレートとシードを通すこと |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作（axe の検査は E2E で行う。ADR-022） |
 | Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |
 | E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査。部品の確認用ページ（`/dev/components`）を3つの幅・ライトとダーク・2つのスケールで開き、design-spec 4.5 の部品が描かれ、横にスクロールせず、自前の書体（woff2）が読まれ、axe の検査が通ること。Popover とトレイが幅で切り替わること。happy-dom では確かめられない部品のキーボード操作（`packages/ui-web/README.md`） |
@@ -2616,4 +2622,4 @@ Cloud Monitoring のアラート（死活・エラー率・レイテンシ・メ
 | メール | Resend のダッシュボード | 送信の失敗と戻り（バウンス）。API のログにも送信の失敗を出す |
 | 無料枠の使用量（手で見る。頻度は 05_operation-runbook.md 6.1。アラートは付けない） | 各サービスのダッシュボード | 次の目安を超えたら、05_operation-runbook.md の手順で原因を探し、有料プランか構成の見直しを検討する: Sentry 月4,000件（無料枠の80%）、Neon の計算時間 80%、Resend 1日80通・月2,400通、Cloud Run の無料枠 80%（静的ファイルのリクエストも数える。ADR-004） |
 | 費用 | Google Cloud の予算アラート（Terraform） | 月 $5 と $10 でメール |
-| KPI（01_prd.md） | `packages/db/queries/kpi.sql` と GitHub Actions の `kpi.yml` | 件数だけを数える SQL（回答の中身は読まない）。K-08・K-16（スマホの幅の画面からの入力の割合）は、回答の手入力の変更履歴（`change_history` の `target_type` が `self_analysis_answer`・`validation_answer`・`plan_answer` で `source = manual` の行）のうち、`client = web_mobile` の行の割合（5.1「クライアントの種類」）。`kpi.yml` が毎月1回と手で動かしたときに、GitHub の環境 `production-backup` の読み取り専用の接続で `make kpi ENV=production` を動かし、件数を実行の要約に出す（ワークフローは 04_deployment-procedure.md 2章）。本番の接続を手元に持たない。結果を見て運営者に渡す手順は 05_operation-runbook.md 6.1 |
+| KPI（01_prd.md） | `packages/db/queries/kpi.sql` と GitHub Actions の `kpi.yml` | 件数だけを数える SQL（回答の中身は読まない）。K-08・K-16（スマホの幅の画面からの入力の割合）は、回答の手入力の変更履歴（`change_history` の `target_type` が `self_analysis_answer`・`validation_answer`・`plan_answer` で `source = manual` の行）のうち、`client = web_mobile` の行の割合（5.1「クライアントの種類」。同じ人が続けて手で直した保存は1行にまとまる（ADR-020。2026-10-29 のユーザーの決定）ので、まとまった1行を1回と数え、入力元はその行の最後の変更のもの）。`kpi.yml` が毎月1回と手で動かしたときに、GitHub の環境 `production-backup` の読み取り専用の接続で `make kpi ENV=production` を動かし、件数を実行の要約に出す（ワークフローは 04_deployment-procedure.md 2章）。本番の接続を手元に持たない。結果を見て運営者に渡す手順は 05_operation-runbook.md 6.1 |

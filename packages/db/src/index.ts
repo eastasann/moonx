@@ -1,4 +1,5 @@
 export * from "./client";
+export * from "./history-merge";
 export * from "./history-values";
 export * from "./invitations";
 export * from "./migrate";

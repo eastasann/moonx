@@ -52,8 +52,10 @@ import { loadUserRefs } from "./user-refs";
 /** How many moves Recent activity shows (design-spec 6.9). */
 const ACTIVITY_LIMIT = 20;
 /**
- * Saves of one item by one person this close after each other read as one move
- * (design-spec 6.9): autosave writes a history row each time typing stops.
+ * Changes of one item by one person this close after each other read as one move
+ * (design-spec 6.9). A history row already holds a person's manual edits in a row
+ * (ADR-020); this also joins what it keeps apart, such as adding a row and then filling
+ * it in.
  */
 const ACTIVITY_MERGE_MS = 10 * 60 * 1000;
 /** The history rows read at a time while gathering Recent activity. */
@@ -118,7 +120,8 @@ export function dashboardRoutes({ access, db, now }: DashboardRoutesOptions) {
    * {@link ACTIVITY_LIMIT}. One operation is one move: the rows of one batch, or else
    * the rows one request wrote (one person, one moment, one idea), such as an idea and
    * its cost rows. An operation on one item joins the run of saves of that item by the
-   * same person, each within {@link ACTIVITY_MERGE_MS} of the next, shown at the last.
+   * same person, each within {@link ACTIVITY_MERGE_MS} of the next, shown at the last. A
+   * row that merged several edits (ADR-020) spans from its first to its last.
    * Moves are made newest first, so the first ones made are the newest; older
    * operations only join them.
    */
@@ -135,6 +138,10 @@ export function dashboardRoutes({ access, db, now }: DashboardRoutesOptions) {
     const lastAt = sql<Date>`max(${changeHistory.changedAt})`.mapWith(
       changeHistory.changedAt,
     );
+    const firstAt =
+      sql<Date>`min(coalesce(${changeHistory.firstChangedAt}, ${changeHistory.changedAt}))`.mapWith(
+        changeHistory.changedAt,
+      );
     const moves: PendingActivity[] = [];
     /** The latest move on each item, which an earlier save may still join. */
     const runs = new Map<string, PendingActivity | null>();
@@ -145,6 +152,7 @@ export function dashboardRoutes({ access, db, now }: DashboardRoutesOptions) {
         .select({
           key: operation,
           at: lastAt,
+          firstAt,
           atText: sql<string>`max(${changeHistory.changedAt})::text`,
           actorId: sql<string>`min(${changeHistory.changedById}::text)`,
           ideaId: sql<string>`min(${ideaOf}::text)`,
@@ -215,12 +223,12 @@ export function dashboardRoutes({ access, db, now }: DashboardRoutesOptions) {
           run.at.getTime() - op.at.getTime() <= ACTIVITY_MERGE_MS
         ) {
           // The run is shown at its last save; it now starts here.
-          runs.set(item, { ...run, at: op.at });
+          runs.set(item, { ...run, at: op.firstAt });
           continue;
         }
         if (moves.length === ACTIVITY_LIMIT) return moves;
         moves.push({ ...move, target });
-        runs.set(item, { ...move, target });
+        runs.set(item, { ...move, target, at: op.firstAt });
       }
       const last = operations.at(-1);
       if (last === undefined || operations.length < HISTORY_BATCH) return moves;

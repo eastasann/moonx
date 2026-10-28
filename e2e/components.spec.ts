@@ -714,6 +714,134 @@ test.describe("keyboard in a real browser", () => {
   });
 });
 
+/**
+ * The middle of each line the words of `text` take, top to bottom (the boxes of one line
+ * as one). Only its text counts, not an icon's box in it.
+ */
+const lineMiddles = (text: Locator) =>
+  text.evaluate((element) => {
+    const words = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    const rects: DOMRect[] = [];
+    for (let node = words.nextNode(); node !== null; node = words.nextNode()) {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      rects.push(...range.getClientRects());
+    }
+    const middles = rects
+      .filter((rect) => rect.height > 0)
+      .map((rect) => rect.top + rect.height / 2)
+      .sort((a, b) => a - b);
+    return middles.filter(
+      (middle, index) => index === 0 || middle - (middles[index - 1] ?? 0) > 2,
+    );
+  });
+
+/** How far the middle of `icon` is from the middle of the first line of `text`, in px. */
+async function offFirstLine(icon: Locator, text: Locator) {
+  const box = await icon.boundingBox();
+  if (box === null) throw new Error("The icon is not on screen");
+  const [first] = await lineMiddles(text);
+  if (first === undefined) throw new Error("The text has no line");
+  return Math.abs(box.y + box.height / 2 - first);
+}
+
+test.describe("an icon before a text sits at the middle of its first line (design-spec 4.5)", () => {
+  for (const [width, scale] of [
+    ["desktop", "medium"],
+    ["mobile", "large"],
+  ] as const) {
+    test(`${width}, ${scale}`, async ({ page }) => {
+      await openGallery(page, width);
+      await choose(page, "Scale", scale);
+      /** A text and the row it stands in, whose one icon goes with it. */
+      const rows: [Locator, Locator][] = [];
+      const inRow = (text: Locator) => {
+        rows.push([text, text.locator("xpath=..")]);
+      };
+      const fields = region(page, "TextField and TextArea");
+      for (const words of [
+        "Enter an email address.",
+        "Changing the currency does not convert amounts you already entered, so check them after you change it.",
+        "Enter a web address that starts with https://, such as https://example.com.",
+      ]) {
+        inRow(fields.getByText(words, { exact: true }));
+      }
+      for (const words of [
+        "Choose a time zone.",
+        "Only Owners and Members of this workspace can be assigned.",
+      ]) {
+        inRow(
+          region(page, "SearchField, Picker and ComboBox").getByText(words, {
+            exact: true,
+          }),
+        );
+      }
+      inRow(
+        region(page, "MetricTile and MetricGroup").getByText(
+          "Contribution margin is zero or negative",
+          { exact: true },
+        ),
+      );
+      const alerts = region(page, "InlineAlert");
+      for (const title of [
+        "A new template is available",
+        "Gross margin is negative",
+        "Couldn't save",
+      ]) {
+        const text = alerts.getByText(title, { exact: true });
+        rows.push([
+          text,
+          alerts
+            .getByRole("alert")
+            .filter({ has: page.getByText(title, { exact: true }) }),
+        ]);
+      }
+      const banners = region(
+        page,
+        "AlertBanner, DiffTextArea and SettingsList",
+      );
+      for (const words of [
+        "A newer template is available.",
+        "You're offline. Changes can't be saved until you reconnect.",
+        "A new version of moonx is available.",
+      ]) {
+        const text = banners.getByText(words, { exact: true });
+        rows.push([
+          text,
+          banners
+            .getByRole("alert")
+            .filter({ has: page.getByText(words, { exact: true }) }),
+        ]);
+      }
+      for (const [text, row] of rows) {
+        const icon = row.locator("svg").first();
+        expect(
+          await offFirstLine(icon, text),
+          await text.innerText(),
+        ).toBeLessThanOrEqual(1);
+      }
+      // The long ones wrap, so the icon is on the first of several lines.
+      const wrapped = fields.getByText(
+        "Enter a web address that starts with https://, such as https://example.com.",
+        { exact: true },
+      );
+      expect((await lineMiddles(wrapped)).length).toBeGreaterThan(1);
+
+      await region(page, "Dialog and AlertDialog")
+        .getByRole("button", { name: "Show conflict" })
+        .click();
+      const dialog = page.getByRole("alertdialog");
+      await settled(frameOf(dialog));
+      const title = dialog.getByText("Paolo updated this answer 3m ago", {
+        exact: true,
+      });
+      expect(
+        await offFirstLine(dialog.getByRole("img").locator("svg"), title),
+      ).toBeLessThanOrEqual(1);
+    });
+  }
+});
+
 // Dialog, Popover, Tray, Menu and ContextualHelp: how each opens at each width, where focus
 // goes, and what closes it.
 
@@ -1389,9 +1517,23 @@ test.describe("data and moonx's own components in a real browser (design-spec 4.
       const trigger = page.getByRole("button", { name: "Open comments" });
       await trigger.click();
       const viewport = widths[width];
+      /** The PanelFooter's box ends where the panel does, less its padding. */
+      const footerAtBottom = async (frame: Locator) => {
+        const box = await frame
+          .getByRole("textbox", { name: "Add a comment" })
+          .boundingBox();
+        const panel = await frame.boundingBox();
+        const gap =
+          (panel?.y ?? 0) +
+          (panel?.height ?? 0) -
+          ((box?.y ?? 0) + (box?.height ?? 0));
+        expect(gap).toBeGreaterThan(0);
+        expect(gap).toBeLessThan(48);
+      };
       if (form === "column") {
         const panel = page.getByRole("complementary", { name: "Comments" });
         await expect(panel).toBeFocused();
+        await footerAtBottom(panel);
         await expect(page.getByRole("dialog")).toHaveCount(0);
         expect((await panel.boundingBox())?.width).toBe(360);
         await page.keyboard.press("Escape");
@@ -1414,6 +1556,7 @@ test.describe("data and moonx's own components in a real browser (design-spec 4.
       } else {
         expect(await placement(dialog, "mobile")).toBe("tray");
       }
+      await footerAtBottom(sheet);
       await page.keyboard.press("Escape");
       await expect(dialog).toBeHidden();
       await expect(trigger).toBeFocused();

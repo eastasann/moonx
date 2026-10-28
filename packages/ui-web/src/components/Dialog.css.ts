@@ -40,7 +40,7 @@ export const title = style({
   flex: "1 1 auto",
   minWidth: 0,
   display: "flex",
-  alignItems: "center",
+  alignItems: "flex-start",
   gap: vars.space["100"],
 });
 
@@ -67,10 +67,21 @@ export const footer = style({
   paddingBlockEnd: padding,
 });
 
-/** The AlertDialog's sign before the title: red for error, amber for warning (4.4). */
+const alertIconBox = {
+  display: "inline-flex",
+  alignItems: "center",
+  flexShrink: 0,
+  height: "1lh",
+} as const;
+
+/**
+ * The AlertDialog's sign before the title: red for error, amber for warning (4.4). One
+ * line of the title tall with the sign in its middle, so it sits on the first line if
+ * the title wraps (4.5).
+ */
 export const alertIcon = styleVariants({
-  error: { display: "inline-flex", color: vars.color.negative.strong },
-  warning: { display: "inline-flex", color: vars.color.notice.strong },
+  error: { ...alertIconBox, color: vars.color.negative.strong },
+  warning: { ...alertIconBox, color: vars.color.notice.strong },
 });
 
 /** Hears Escape around the dialog without a box of its own. */

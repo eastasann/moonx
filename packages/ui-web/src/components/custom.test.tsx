@@ -20,7 +20,7 @@ import { type FauChange, FauPicker, useFauLabel } from "./FauPicker";
 import { type MentionCandidate, MentionTextArea } from "./MentionTextArea";
 import { MetricGroup, MetricTile } from "./MetricTile";
 import * as metricStyles from "./MetricTile.css";
-import { Panel } from "./Panel";
+import { Panel, PanelFooter } from "./Panel";
 import { QuestionCard } from "./QuestionCard";
 import { Radio, RadioGroup } from "./RadioGroup";
 import { RowList, RowListItem } from "./RowList";
@@ -1256,6 +1256,43 @@ describe("Panel", () => {
     await user.click(screen.getByRole("button", { name: "Comments" }));
     dialog = screen.getByRole("dialog", { name: "Comments" });
     expect(dialog).toBeTruthy();
+  });
+
+  test("a PanelFooter's content goes under the part that scrolls, after it; without one the footer is empty", async () => {
+    for (const width of [1280, 820, 390]) {
+      window.happyDOM.setViewport({ width, height: 900 });
+      const { unmount } = render(
+        <Panel title="Comments" isOpen onOpenChange={() => {}}>
+          <p>Thread</p>
+          <PanelFooter>
+            <label>
+              Add a comment
+              <textarea />
+            </label>
+          </PanelFooter>
+        </Panel>,
+      );
+      const thread = screen.getByText("Thread");
+      const box = screen.getByRole("textbox", { name: "Add a comment" });
+      const scrolling = thread.parentElement;
+      const footer = box.closest("label")?.parentElement;
+      expect(scrolling?.contains(box)).toBe(false);
+      expect(footer?.parentElement).toBe(scrolling?.parentElement);
+      // After it in the document, so Tab reaches the box after the threads.
+      expect(
+        thread.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      unmount();
+    }
+    render(
+      <Panel title="History" isOpen onOpenChange={() => {}}>
+        <p>Changes</p>
+      </Panel>,
+    );
+    const body = screen.getByText("Changes").parentElement;
+    const footer = body?.nextElementSibling;
+    expect(footer).not.toBeNull();
+    expect(footer?.childElementCount).toBe(0);
   });
 });
 

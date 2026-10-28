@@ -16,7 +16,7 @@ import {
 } from "../components/MentionTextArea";
 import { MetricGroup, MetricTile } from "../components/MetricTile";
 import { MoonGlyph } from "../components/MoonGlyph";
-import { Panel } from "../components/Panel";
+import { Panel, PanelFooter } from "../components/Panel";
 import { QuestionCard } from "../components/QuestionCard";
 import { RowList, RowListItem } from "../components/RowList";
 import { Slide } from "../components/Slide";
@@ -261,7 +261,7 @@ export function PanelSection() {
   const [isOpen, setOpen] = useState(false);
   return (
     <Section title="Panel">
-      <Specimen name="a column on a desktop, a drawer on a tablet, a tray on a phone">
+      <Specimen name="a column on a desktop, a drawer on a tablet, a tray on a phone; PanelFooter stays at the bottom">
         <Flex gap="space-300" alignItems="start" wrap>
           <Button variant="secondary" onPress={() => setOpen(!isOpen)}>
             {isOpen ? "Close comments" : "Open comments"}
@@ -274,6 +274,9 @@ export function PanelSection() {
               <Text variant="body-sm" tone="secondary">
                 No comments yet on the other answers.
               </Text>
+              <PanelFooter>
+                <TextArea label="Add a comment" width="full" size="S" />
+              </PanelFooter>
             </Panel>
           </div>
         </Flex>

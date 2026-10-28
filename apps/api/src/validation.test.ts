@@ -399,7 +399,7 @@ describe("V2 GET /api/v1/validations/{validationId}/questions/{sectionKey}", () 
 });
 
 describe("V3 PUT /api/v1/validations/{validationId}/answers/{questionKey}", () => {
-  test("creates the answer at version 1, then saves under the optimistic lock with a history row each", async () => {
+  test("creates the answer at version 1, then saves under the optimistic lock with its history", async () => {
     const team = await teamWithIdea();
     const first = await saved(
       await saveAnswer(team, "V.01.WHO", {
@@ -489,6 +489,8 @@ describe("V3 PUT /api/v1/validations/{validationId}/answers/{questionKey}", () =
           evidenceIds: [],
         },
       ],
+      // Overwriting the same person's save of a moment before keeps a row of its own,
+      // so what it overwrote stays in the history (ADR-019, ADR-020).
       [
         "update",
         {
@@ -1074,7 +1076,14 @@ describe("V5 DELETE /api/v1/evidence/{evidenceId}", () => {
       first.evidence.id,
     ]);
     const last = evidenceRemovalSchema.parse(
-      await (await remove(team, first.evidence.id, "?lockVersion=4")).json(),
+      await (
+        await remove(
+          team,
+          first.evidence.id,
+          "?lockVersion=4",
+          team.memberCookie,
+        )
+      ).json(),
     );
     expect(last).toMatchObject({
       lockVersion: 5,
@@ -1085,15 +1094,12 @@ describe("V5 DELETE /api/v1/evidence/{evidenceId}", () => {
       .from(evidenceLinks)
       .where(eq(evidenceLinks.id, first.evidence.id));
     expect(link?.deletedAt).not.toBeNull();
+    // The owner's evidence and first removal are one row (ADR-020); the member's
+    // removal is a row of its own.
     const rows = (await historyOf(team, "V.01.WHO")).slice(-2);
     expect(rows.map((row) => [row.before, row.after])).toEqual([
       [
-        {
-          text: "HR",
-          fau: "fact",
-          confidence: null,
-          evidenceIds: [first.evidence.id, second.evidence.id],
-        },
+        { text: "HR", fau: null, confidence: null, evidenceIds: [] },
         {
           text: "HR",
           fau: "fact",

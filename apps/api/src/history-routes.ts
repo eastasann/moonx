@@ -768,10 +768,6 @@ export function historyRoutes({ access, db, now }: HistoryRoutesOptions) {
             "What an undone creation removed does not come back",
           );
         }
-        const restoration: Restoration =
-          entry.action === "delete"
-            ? { kind: "undelete" }
-            : { kind: "content", content: entry.after };
         const container = containerOfRow(entry);
         const workspaceId = entry.workspaceId;
         const at = new Date(now());
@@ -781,6 +777,19 @@ export function historyRoutes({ access, db, now }: HistoryRoutesOptions) {
           container,
           at,
           async (tx, when) => {
+            // The same person's next save may have merged into the row, or removed it,
+            // since it was read (ADR-020). Those saves take the scope's locks this
+            // revert now holds, so the row read here stays as it is until the end.
+            const [current] = await tx
+              .select()
+              .from(changeHistory)
+              .where(eq(changeHistory.id, entry.id));
+            if (current === undefined)
+              throw new ApiError("NOT_FOUND", "No such change");
+            const restoration: Restoration =
+              current.action === "delete"
+                ? { kind: "undelete" }
+                : { kind: "content", content: current.after };
             const { change, item } = await restoreItem(
               {
                 tx,

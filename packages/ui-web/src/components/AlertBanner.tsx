@@ -43,24 +43,26 @@ export function AlertBanner({
   const { t } = useTranslation(["components"]);
   return (
     <div role="alert" className={styles.banner}>
-      {variant !== "neutral" && (
-        // Named, as InlineAlert's, so the kind is not told by colour alone.
-        <span
-          role="img"
-          aria-label={t(`components:inlineAlert.${variant}`)}
-          className={styles.icon[variant]}
-        >
-          <IconSlot size="S">{icons[variant]}</IconSlot>
-        </span>
-      )}
-      <p className={styles.message}>
-        {title !== undefined && (
-          <>
-            <span className={styles.title}>{title}</span>{" "}
-          </>
+      <div className={styles.lead}>
+        {variant !== "neutral" && (
+          // Named, as InlineAlert's, so the kind is not told by colour alone.
+          <span
+            role="img"
+            aria-label={t(`components:inlineAlert.${variant}`)}
+            className={styles.icon[variant]}
+          >
+            <IconSlot size="S">{icons[variant]}</IconSlot>
+          </span>
         )}
-        {children}
-      </p>
+        <p className={styles.message}>
+          {title !== undefined && (
+            <>
+              <span className={styles.title}>{title}</span>{" "}
+            </>
+          )}
+          {children}
+        </p>
+      </div>
       {action !== undefined && <span className={styles.action}>{action}</span>}
       {onDismiss !== undefined && (
         <span className={styles.close}>

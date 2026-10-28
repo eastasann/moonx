@@ -16,7 +16,7 @@ import {
   ideaDetailSchema,
   ideaDuplicateResultSchema,
 } from "@moonx/schemas";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { buildTestApp, connectTestDatabase, uniqueIp } from "./test-app";
 import { apiRequest, signIn, testFixtures } from "./test-fixtures";
 
@@ -274,6 +274,34 @@ describe("D4 GET .../dashboard/activity", () => {
     await saveWho(team, team.ownerCookie, "HR and admin", 2);
     minute(20);
     await saveWho(team, team.memberCookie, "Admins", 3);
+    // The owner's saves at 4 and 13 are one history row from 4 to 13 (ADR-020): only
+    // from its first change is it near enough to the answer added at 1.
+    const who = await db
+      .select({
+        changedAt: changeHistory.changedAt,
+        firstChangedAt: changeHistory.firstChangedAt,
+      })
+      .from(changeHistory)
+      .where(
+        and(
+          eq(changeHistory.targetId, team.idea.validationId),
+          eq(changeHistory.targetKey, "V.01.WHO"),
+        ),
+      )
+      .orderBy(changeHistory.changedAt);
+    expect(
+      who
+        .filter((row) => row.changedAt.getTime() < start + 20 * MINUTE)
+        .map((row) => [
+          (row.changedAt.getTime() - start) / MINUTE,
+          row.firstChangedAt === null
+            ? null
+            : (row.firstChangedAt.getTime() - start) / MINUTE,
+        ]),
+    ).toEqual([
+      [1, null],
+      [13, 4],
+    ]);
     const [rival] = await db
       .insert(competitors)
       .values({
@@ -370,7 +398,8 @@ describe("D4 GET .../dashboard/activity", () => {
       ["decision", team.member.id, 30, "hold", "Piaya boxes"],
       ["comment", team.viewer.id, 25, "01 WHO", "Piaya boxes"],
       ["change", team.member.id, 20, "01 WHO", "Piaya boxes"],
-      // 13 is 9 minutes after 4, which is 3 after 1: one run, shown at its last save.
+      // The saves at 4 and 13 are one history row from 4 to 13 (ADR-020), 3 minutes
+      // after the answer was added at 1: one run, shown at its last save.
       ["change", team.owner.id, 13, "01 WHO", "Piaya boxes"],
       ["change", team.owner.id, 0, "Piaya boxes", "Piaya boxes"],
     ]);

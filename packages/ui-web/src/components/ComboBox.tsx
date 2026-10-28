@@ -33,6 +33,7 @@ import {
 import { FixedLocale } from "../internal/FixedLocale";
 import * as styles from "../internal/field.css";
 import { IconSlot } from "../internal/IconSlot";
+import { lineIcon } from "../internal/lineIcon.css";
 import * as overlay from "../internal/overlay.css";
 import { useFieldWidth, useSize } from "../internal/size";
 import { useControlledState } from "../internal/useControlledState";
@@ -374,9 +375,11 @@ function TrayComboBox({
             id={descriptionId}
             className={`${styles.description} ${styles.noticeDescription}`}
           >
-            <IconSlot size="XS">
-              <TriangleAlert />
-            </IconSlot>
+            <span className={lineIcon}>
+              <IconSlot size="XS">
+                <TriangleAlert />
+              </IconSlot>
+            </span>
             <span>{description}</span>
           </span>
         ) : (
@@ -386,9 +389,11 @@ function TrayComboBox({
         ))}
       {invalid && shownError != null && (
         <span id={errorId} className={styles.error}>
-          <IconSlot size="XS">
-            <CircleAlert />
-          </IconSlot>
+          <span className={lineIcon}>
+            <IconSlot size="XS">
+              <CircleAlert />
+            </IconSlot>
+          </span>
           <span>{shownError}</span>
         </span>
       )}

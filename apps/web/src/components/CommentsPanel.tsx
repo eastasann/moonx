@@ -19,6 +19,7 @@ import {
   type MentionCandidate,
   MentionTextArea,
   MenuItem,
+  PanelFooter,
   Picker,
   Stack,
   Text,
@@ -400,7 +401,8 @@ function CommentEntry({
         name={comment.author.displayName}
         src={comment.author.avatarUrl}
       />
-      <Stack gap="space-100">
+      {/* The panel's width, not the words': each ⋯ sits at the same edge (6.0.4). */}
+      <Stack gap="space-100" grow>
         <Flex gap="space-100" alignItems="start" justifyContent="space-between">
           <Stack gap="space-25">
             <Text variant="label">
@@ -724,52 +726,55 @@ export function CommentsPanelBody({
         </Text>
       )}
       {threads}
-      {canWrite &&
-        query.data !== undefined &&
-        newTarget !== undefined &&
-        (postIn === undefined ? (
-          // Shared nowhere: no one could read a thread (6.0.4).
-          <Text variant="body-sm" tone="secondary" elementType="p">
-            {t("panels:comments.noNewThread")}
-          </Text>
-        ) : (
-          <Stack gap="space-100">
-            {postIn.id !== workspace.id && (
-              <Picker
-                label={t("panels:comments.postTo")}
-                items={destinations.map(({ id, name }) => ({
-                  id,
-                  label: name,
-                }))}
-                value={postIn.id}
-                onChange={(id) => setChosenId(id)}
-                size="S"
-                width="full"
+      {canWrite && query.data !== undefined && newTarget !== undefined && (
+        // Under the threads, which scroll above it: it stays in view however many
+        // there are (6.0.4).
+        <PanelFooter>
+          {postIn === undefined ? (
+            // Shared nowhere: no one could read a thread (6.0.4).
+            <Text variant="body-sm" tone="secondary" elementType="p">
+              {t("panels:comments.noNewThread")}
+            </Text>
+          ) : (
+            <Stack gap="space-100">
+              {postIn.id !== workspace.id && (
+                <Picker
+                  label={t("panels:comments.postTo")}
+                  items={destinations.map(({ id, name }) => ({
+                    id,
+                    label: name,
+                  }))}
+                  value={postIn.id}
+                  onChange={(id) => setChosenId(id)}
+                  size="S"
+                  width="full"
+                />
+              )}
+              <CommentBox
+                label={
+                  target.kind === "item" || idea === undefined
+                    ? t("panels:comments.new")
+                    : t("panels:comments.newOnIdea", { idea: idea.name })
+                }
+                workspaceId={postIn.id}
+                target={newTarget}
+                submitLabel={t("panels:comments.post")}
+                send={(body, mentionUserIds) =>
+                  unwrap(
+                    api().api.v1.comments.post({
+                      workspaceId: postIn.id,
+                      target: commentTarget(newTarget),
+                      body,
+                      mentionUserIds,
+                    }),
+                  ).finally(changed)
+                }
+                onArchived={onArchived}
               />
-            )}
-            <CommentBox
-              label={
-                target.kind === "item" || idea === undefined
-                  ? t("panels:comments.new")
-                  : t("panels:comments.newOnIdea", { idea: idea.name })
-              }
-              workspaceId={postIn.id}
-              target={newTarget}
-              submitLabel={t("panels:comments.post")}
-              send={(body, mentionUserIds) =>
-                unwrap(
-                  api().api.v1.comments.post({
-                    workspaceId: postIn.id,
-                    target: commentTarget(newTarget),
-                    body,
-                    mentionUserIds,
-                  }),
-                ).finally(changed)
-              }
-              onArchived={onArchived}
-            />
-          </Stack>
-        ))}
+            </Stack>
+          )}
+        </PanelFooter>
+      )}
     </Stack>
   );
 }

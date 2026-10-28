@@ -22,7 +22,22 @@ export const banner = style({
   },
 });
 
-/** The icon in its status colour: informative is the secondary ink (06 *.fg). */
+/**
+ * The icon and the message, centred in the band as one, the icon at the middle of the
+ * message's first line however it wraps (design-spec 4.5).
+ */
+export const lead = style({
+  display: "flex",
+  alignItems: "flex-start",
+  gap: vars.layout.band.gap,
+  flex: "1 1 auto",
+  minWidth: 0,
+});
+
+/**
+ * The icon in its status colour (informative is the secondary ink, 06 *.fg), in a box
+ * one line of the message tall.
+ */
 export const icon = styleVariants(
   Object.fromEntries(statusVariants.map((v) => [v, v])) as Record<
     (typeof statusVariants)[number],
@@ -30,7 +45,9 @@ export const icon = styleVariants(
   >,
   (variant) => ({
     display: "inline-flex",
+    alignItems: "center",
     flexShrink: 0,
+    height: "1lh",
     color: vars.color[variant].fg,
   }),
 );

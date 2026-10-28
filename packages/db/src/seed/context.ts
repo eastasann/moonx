@@ -1,5 +1,6 @@
 import type { HistorySource } from "@moonx/schemas";
 import type { DatabaseTransaction } from "../client";
+import { type HistoryMergeFacts, mergesIntoLatest } from "../history-merge";
 import type { changeHistory } from "../schema";
 import type { SeedClock } from "./clock";
 import { seedId } from "./ids";
@@ -46,14 +47,21 @@ export interface HistoryInput {
   client?: ClientKind;
 }
 
+type HistoryRow = typeof changeHistory.$inferInsert;
+
 /** Collects change_history rows as the seed writes the rows they describe. */
 export class HistoryLog {
-  readonly rows: (typeof changeHistory.$inferInsert)[] = [];
+  readonly rows: HistoryRow[] = [];
   private readonly counts = new Map<string, number>();
+  /** Each item's rows so far, oldest first, as the API's merge rule reads them. */
+  private readonly byItem = new Map<string, HistoryMergeFacts[]>();
 
   /**
    * Adds a row and returns its id, for a later revert to point at. The id names the row
    * by its target and its place among that target's rows.
+   *
+   * @throws when the API would have merged the row with the one before or after it in
+   *   time (ADR-020): the demo's history keeps the shape the API writes.
    */
   add(input: HistoryInput): string {
     const target = [
@@ -65,7 +73,7 @@ export class HistoryLog {
     const index = this.counts.get(target) ?? 0;
     this.counts.set(target, index + 1);
     const id = seedId("history", target, index);
-    this.rows.push({
+    const row: HistoryRow = {
       id,
       workspaceId: input.container.workspaceId,
       ownerUserId: input.container.ownerUserId,
@@ -84,7 +92,32 @@ export class HistoryLog {
       revertedFromId: input.revertedFromId ?? null,
       changedById: userId(input.by),
       changedAt: input.at,
+    };
+    const itemKey = [
+      input.target.type,
+      input.target.id,
+      input.target.key ?? "",
+    ].join("/");
+    const item = [
+      ...(this.byItem.get(itemKey) ?? []),
+      {
+        action: input.action,
+        source: input.source,
+        batchId: row.batchId ?? null,
+        changedById: row.changedById,
+        changedAt: input.at,
+      },
+    ].sort((a, b) => a.changedAt.getTime() - b.changedAt.getTime());
+    item.forEach((later, place) => {
+      const earlier = item[place - 1];
+      if (earlier !== undefined && mergesIntoLatest(earlier, later)) {
+        throw new Error(
+          `The API would merge two history rows of ${itemKey} (ADR-020)`,
+        );
+      }
     });
+    this.byItem.set(itemKey, item);
+    this.rows.push(row);
     return id;
   }
 }

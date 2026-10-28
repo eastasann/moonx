@@ -143,7 +143,7 @@ export {
 } from "./components/MoonGlyph";
 export { NumberField, type NumberFieldProps } from "./components/NumberField";
 export { PageFrame, type PageFrameProps } from "./components/PageFrame";
-export { Panel, type PanelProps } from "./components/Panel";
+export { Panel, PanelFooter, type PanelProps } from "./components/Panel";
 export { PhaseRoute, type PhaseRouteProps } from "./components/PhaseRoute";
 export { Picker, type PickerProps } from "./components/Picker";
 export { Popover, type PopoverProps } from "./components/Popover";

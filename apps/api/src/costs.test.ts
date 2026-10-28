@@ -670,7 +670,16 @@ describe("V13 and V14 cost rows", () => {
     for (const [id, body, code] of alone) {
       expect((await errorOf(await editRow(team, id, body))).code).toBe(code);
     }
-    expect(await historyOf(delivery.id)).toHaveLength(3);
+    // The row's creation, then the member's two saves as one row (ADR-020), which ends
+    // at the last accepted save: the refused requests wrote nothing.
+    const rows = await historyOf(delivery.id);
+    expect(rows.map((row) => row.action)).toEqual(["create", "update"]);
+    expect(rows[1]?.before).toEqual(rows[0]?.after);
+    expect(rows[1]?.after).toMatchObject({
+      inputMode: "percent_of_price",
+      percent: null,
+      fau: "unknown",
+    });
   });
 
   test("a -0 over a stored 0 changes nothing", async () => {

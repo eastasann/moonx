@@ -1,6 +1,7 @@
 import { type Database, type DatabaseTransaction, users } from "@moonx/db";
 import { eq, sql } from "drizzle-orm";
 import { ApiError } from "./errors";
+import { noteOverwrite } from "./history";
 import { loadUserRefs } from "./user-refs";
 
 /** An item under the optimistic lock as it is stored now (ADR-019). */
@@ -49,27 +50,26 @@ export async function conflictError(
 
 /**
  * Lets a save through when it read the stored version, or overwrites on purpose with
- * `force` (ADR-019). Read `current` with `FOR UPDATE` in the saving transaction, so no
- * other save slips in between. An item not stored yet (an unanswered question) has
+ * `force` (ADR-019), which keeps the overwritten version in the history
+ * ({@link noteOverwrite}). Read `current` with `FOR UPDATE` in the saving transaction,
+ * so no other save slips in between. An item not stored yet (an unanswered question) has
  * nothing to lose and lets every save through; two first saves of the same keyed item
  * race at the insert instead ({@link createKeyedItem}).
  *
  * @throws {ApiError} CONFLICT
  */
 export async function checkLockVersion(
-  db: Database | DatabaseTransaction,
+  tx: DatabaseTransaction,
   current: LockedItem | null,
   claim: LockClaim,
   workspaceId: string | null,
 ): Promise<void> {
-  if (
-    current === null ||
-    claim.force === true ||
-    claim.lockVersion === current.lockVersion
-  ) {
+  if (current === null || claim.lockVersion === current.lockVersion) return;
+  if (claim.force === true) {
+    noteOverwrite(tx);
     return;
   }
-  throw await conflictError(db, current, workspaceId);
+  throw await conflictError(tx, current, workspaceId);
 }
 
 /**
@@ -82,15 +82,15 @@ export async function checkLockVersion(
  * @throws {ApiError} CONFLICT
  */
 export async function checkKeyedLockVersion(
-  db: Database | DatabaseTransaction,
+  tx: DatabaseTransaction,
   current: LockedItem | null,
   claim: LockClaim,
   workspaceId: string | null,
 ): Promise<void> {
   if (current !== null && claim.lockVersion === 0) {
-    throw await conflictError(db, current, workspaceId);
+    throw await conflictError(tx, current, workspaceId);
   }
-  await checkLockVersion(db, current, claim, workspaceId);
+  await checkLockVersion(tx, current, claim, workspaceId);
 }
 
 /**

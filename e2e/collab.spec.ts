@@ -202,6 +202,111 @@ async function personalIdea(page: Page, me: Me, name: string) {
   return { workspace, idea: (await created.json()) as IdeaDetail };
 }
 
+/** A comment on WHO of `idea` (C1), or a reply to `parentId`, mentioning no one. */
+async function commentOnWho(
+  page: Page,
+  workspaceId: string,
+  idea: IdeaDetail,
+  body: string,
+  parentId?: string,
+) {
+  const posted = await page.request.post("/api/v1/comments", {
+    data: {
+      workspaceId,
+      target: {
+        type: "validation_answer",
+        id: idea.validationId,
+        key: "V.01.WHO",
+      },
+      body,
+      mentionUserIds: [],
+      ...(parentId === undefined ? {} : { parentId }),
+    },
+    headers: { Origin: WEB_ORIGIN },
+  });
+  expect(posted.status(), await posted.text()).toBe(201);
+  return ((await posted.json()) as { id: string }).id;
+}
+
+/** WHO of a new idea of the user's own, with a thread of a comment and 11 replies of differing lengths. */
+async function longThread(page: Page, me: Me) {
+  const { workspace, idea } = await personalIdea(
+    page,
+    me,
+    `Long Thread ${Date.now() % 1_000_000}`,
+  );
+  const root = await commentOnWho(
+    page,
+    workspace.id,
+    idea,
+    "Which offices do we start with?",
+  );
+  for (let n = 1; n <= 11; n++) {
+    await commentOnWho(
+      page,
+      workspace.id,
+      idea,
+      `Reply ${n}:${" more".repeat(n % 4 === 0 ? 12 : n % 3)}`,
+      root,
+    );
+  }
+  return { workspace, idea };
+}
+
+test.describe("PNL-1's box for a new thread under a long thread", () => {
+  for (const [width, viewport, role] of [
+    ["desktop", desktop.viewport, "complementary"],
+    ["tablet", { width: 820, height: 1180 }, "dialog"],
+  ] as const) {
+    test(`${width}: stays in view while the thread scrolls; each ⋯ at the same edge`, async ({
+      page,
+      signIn,
+      account,
+    }) => {
+      await page.setViewportSize(viewport);
+      const me = await signIn(account.email, account.password);
+      const { workspace, idea } = await longThread(page, me);
+      await page.goto(
+        `/w/${workspace.id}/ideas/${idea.id}/questions/01?q=V.01.WHO`,
+      );
+      await page
+        .getByRole("region", { name: "WHO", exact: true })
+        .getByRole("button", { name: /^Comments on 01 WHO/ })
+        .click();
+      const panel = page.getByRole(role, { name: "Comments" });
+      const box = panel.getByRole("textbox", { name: "Add a comment" });
+      const last = panel.getByText(/^Reply 11:/);
+      await expect(last).toBeAttached();
+      // The thread is longer than the panel: it scrolls.
+      expect(
+        await last.evaluate((element) => {
+          let node = element.parentElement;
+          while (node !== null && getComputedStyle(node).overflowY !== "auto")
+            node = node.parentElement;
+          return node !== null && node.scrollHeight > node.clientHeight;
+        }),
+      ).toBe(true);
+      await expect(box).toBeInViewport({ ratio: 1 });
+      await last.scrollIntoViewIfNeeded();
+      await expect(last).toBeInViewport();
+      await expect(box).toBeInViewport({ ratio: 1 });
+
+      // The comment's column takes the panel's width, not its words', replies too (6.0.4).
+      const menus = panel.getByRole("button", {
+        name: /^More for .*'s comment$/,
+      });
+      await expect(menus).toHaveCount(12);
+      const rights = await menus.evaluateAll((buttons) =>
+        buttons.map((button) =>
+          Math.round(button.getBoundingClientRect().right),
+        ),
+      );
+      expect(new Set(rights).size, rights.join(", ")).toBe(1);
+      await expectNoAxeViolations(page);
+    });
+  }
+});
+
 test.describe("PNL-2 History on a desktop", () => {
   test.use(desktop);
 
@@ -260,6 +365,54 @@ test.describe("PNL-2 History on a desktop", () => {
       .click();
     await expect(panel.getByText("On 01 WHO")).toHaveCount(0);
     await expect(panel.getByText("01 WHO", { exact: true })).toHaveCount(3);
+  });
+
+  test("an answer typed again three times, a pause between, is one change from before the first to after the last", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const me = await signIn(account.email, account.password);
+    const { workspace, idea } = await personalIdea(
+      page,
+      me,
+      `Halo Cart ${Date.now() % 1_000_000}`,
+    );
+    await page.goto(
+      `/w/${workspace.id}/ideas/${idea.id}/questions/01?q=V.01.WHO`,
+    );
+    const answer = page.getByRole("textbox", { name: "Answer to WHO" });
+    // Each is saved on its own, after the pause of autosave (6.0.2).
+    for (const text of [
+      "Offices",
+      "Offices in Bacolod",
+      "Offices in Bacolod and Iloilo",
+      "HR officers in Bacolod and Iloilo",
+    ]) {
+      const save = page.waitForResponse(
+        (response) =>
+          response.request().method() === "PUT" &&
+          response.url().includes("/answers/V.01.WHO") &&
+          response.ok(),
+      );
+      await answer.fill(text);
+      await save;
+    }
+
+    const who = page.getByRole("region", { name: "WHO", exact: true });
+    await who.getByRole("button", { name: "History of 01 WHO" }).click();
+    const panel = page.getByRole("complementary", { name: "History" });
+    // The first save added the answer; the three after it are one change (6.0.5).
+    await expect(panel.getByText("Manual · Added")).toHaveCount(1);
+    const changed = panel.getByText("Manual · Changed");
+    await expect(changed).toHaveCount(1);
+    await expect(
+      panel.getByRole("button", { name: "Revert to this point, 01 WHO" }),
+    ).toHaveCount(2);
+    const entry = changed.locator("xpath=..");
+    await expect(entry.locator("del")).toHaveText(["Offices"]);
+    await expect(entry).toContainText("HR officers in Bacolod and Iloilo");
+    await expect(entry).not.toContainText("Offices in Bacolod");
   });
 
   test("a copy's creation is undone from its 🕘, and the idea it came from keeps a line of it", async ({
@@ -367,6 +520,91 @@ test.describe("7 Decision Log on a desktop", () => {
 
 test.describe("on a phone", () => {
   test.use(phone);
+
+  test("PNL-1's tray keeps the box for a new thread in view under a long thread, and above the keyboard", async ({
+    page,
+    signIn,
+    account,
+  }) => {
+    const me = await signIn(account.email, account.password);
+    const { workspace, idea } = await longThread(page, me);
+    await page.goto(
+      `/w/${workspace.id}/ideas/${idea.id}/questions/01?q=V.01.WHO`,
+    );
+    await page
+      .getByRole("region", { name: "WHO", exact: true })
+      .getByRole("button", { name: /^Comments on 01 WHO/ })
+      .tap();
+    const tray = page.getByRole("dialog", { name: "Comments" });
+    const box = tray.getByRole("textbox", { name: "Add a comment" });
+    const last = tray.getByText(/^Reply 11:/);
+    await expect(last).toBeAttached();
+    // The thread is longer than the tray: it scrolls.
+    expect(
+      await last.evaluate((element) => {
+        let node = element.parentElement;
+        while (node !== null && getComputedStyle(node).overflowY !== "auto")
+          node = node.parentElement;
+        return node !== null && node.scrollHeight > node.clientHeight;
+      }),
+    ).toBe(true);
+    await expect(box).toBeInViewport({ ratio: 1 });
+    await last.scrollIntoViewIfNeeded();
+    await expect(last).toBeInViewport();
+    await expect(box).toBeInViewport({ ratio: 1 });
+    const rights = await tray
+      .getByRole("button", { name: /^More for .*'s comment$/ })
+      .evaluateAll((buttons) =>
+        buttons.map((button) =>
+          Math.round(button.getBoundingClientRect().right),
+        ),
+      );
+    expect(rights).toHaveLength(12);
+    expect(new Set(rights).size, rights.join(", ")).toBe(1);
+
+    await box.tap();
+    await expect(box).toBeFocused();
+    // The on-screen keyboard shrinks only the visible part of the window, as on an
+    // iPhone (4.3): the tray rises above it with the box.
+    await page.evaluate(() => {
+      const visible = window.visualViewport;
+      if (visible === null) throw new Error("No visualViewport");
+      Object.defineProperty(visible, "height", { get: () => 460 });
+      visible.dispatchEvent(new Event("resize"));
+    });
+    await expect
+      .poll(() =>
+        tray.evaluate((dialog) =>
+          Math.round(dialog.parentElement?.getBoundingClientRect().bottom ?? 0),
+        ),
+      )
+      .toBe(460);
+    const field = await box.boundingBox();
+    expect((field?.y ?? 0) + (field?.height ?? 0)).toBeLessThanOrEqual(460);
+    expect(field?.y ?? -1).toBeGreaterThanOrEqual(0);
+
+    // A long comment grows the box only so far: the thread keeps room above it, and
+    // Post can still be reached.
+    await box.fill(
+      Array.from({ length: 40 }, (_, n) => `Line ${n + 1}`).join("\n"),
+    );
+    const thread = await last.evaluate((element) => {
+      let node = element.parentElement;
+      while (node !== null && getComputedStyle(node).overflowY !== "auto")
+        node = node.parentElement;
+      return node?.clientHeight ?? 0;
+    });
+    expect(thread).toBeGreaterThan(40);
+    const post = tray.getByRole("button", { name: "Post" });
+    await post.scrollIntoViewIfNeeded();
+    const button = await post.boundingBox();
+    const sheet = await tray.evaluate(
+      (dialog) => dialog.parentElement?.getBoundingClientRect().bottom ?? 0,
+    );
+    expect((button?.y ?? 0) + (button?.height ?? 0)).toBeLessThanOrEqual(
+      sheet + 1,
+    );
+  });
 
   test("8 is a tab; 7 opens from More with ← More", async ({
     page,

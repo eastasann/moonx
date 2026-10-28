@@ -132,6 +132,7 @@ describe("H1 GET /api/v1/history", () => {
   test("lists an item's changes newest first, revertible by Owners and Members", async () => {
     const team = await teamWithNewIdea(app, fixtures);
     await saveAnswer(team, "V.01.WHO", { text: "Offices" });
+    later();
     await saveAnswer(team, "V.01.WHO", { text: "HR officers" });
     const query = `targetType=validation_answer&targetId=${team.validationId}&targetKey=V.01.WHO`;
     const page = await history(team.memberCookie, query);
@@ -164,7 +165,8 @@ describe("H1 GET /api/v1/history", () => {
     const team = await teamWithNewIdea(app, fixtures);
     await saveAnswer(team, "V.01.WHO", { text: "Offices" });
     await saveAnswer(team, "V.02.OCEAN", { text: "Red" });
-    tick();
+    // Apart from the idea's addition, which the owner's rename would join (ADR-020).
+    later();
     await call("PATCH", `/api/v1/ideas/${team.idea.id}`, team.ownerCookie, {
       name: "Piaya gift boxes",
       lockVersion: 0,
@@ -386,7 +388,7 @@ describe("H2 POST /api/v1/history/{entryId}/revert", () => {
       { name: "Bongbong's" },
     );
     const { id } = (await created.json()) as { id: string };
-    tick();
+    later();
     await call("PATCH", `/api/v1/competitors/${id}`, team.memberCookie, {
       name: "Bongbong's Bakeshop",
       lockVersion: 0,
@@ -1190,6 +1192,173 @@ describe("a person's manual edits in a row are one change (ADR-020)", () => {
     });
     const [, merged] = await rowsOf(team.validationId, "V.01.WHO");
     expect(merged?.firstChangedAt?.getTime()).toBe(first);
+  });
+
+  test("folds a new answer's next saves into its addition: one Added, ending at the last", async () => {
+    const team = await teamWithNewIdea(app, fixtures);
+    const first = clock + 1000;
+    await saveAnswer(team, "V.01.WHO", { text: "Offices" });
+    clock += 4 * 60_000;
+    await saveAnswer(team, "V.01.WHO", { text: "Offices in Bacolod" });
+    clock += 9 * 60_000;
+    await saveAnswer(team, "V.01.WHO", {
+      text: "HR officers in Bacolod",
+      classification: { fau: "assumption", confidence: "low" },
+    });
+
+    const page = await history(team.memberCookie, who(team));
+    expect(
+      page.items.map((entry) => [entry.action, entry.before, entry.after]),
+    ).toEqual([
+      [
+        "create",
+        null,
+        confident("HR officers in Bacolod", "assumption", "low"),
+      ],
+    ]);
+    expect(page.items[0]).toMatchObject({
+      source: "manual",
+      changedBy: { id: team.member.id },
+      changedAt: new Date(clock).toISOString(),
+    });
+    const [added] = await rowsOf(team.validationId, "V.01.WHO");
+    expect(added?.firstChangedAt?.getTime()).toBe(first);
+  });
+
+  test("folds a new row's edits into its addition", async () => {
+    const team = await teamWithNewIdea(app, fixtures);
+    tick();
+    const created = await call(
+      "POST",
+      `/api/v1/validations/${team.validationId}/competitors`,
+      team.memberCookie,
+      { name: "Bongbong's" },
+    );
+    const { id } = (await created.json()) as { id: string };
+    for (const [lockVersion, edit] of [
+      { name: "Bongbong's Bakeshop" },
+      { typicalPrice: 120 },
+    ].entries()) {
+      tick();
+      const saved = await call(
+        "PATCH",
+        `/api/v1/competitors/${id}`,
+        team.memberCookie,
+        { ...edit, lockVersion },
+      );
+      expect(saved.status).toBe(200);
+    }
+
+    const rows = await rowsOf(id);
+    expect(rows.map((row) => [row.action, row.before])).toEqual([
+      ["create", null],
+    ]);
+    expect(rows[0]?.after).toMatchObject({
+      name: "Bongbong's Bakeshop",
+      typicalPrice: 120,
+    });
+  });
+
+  test("keeps an addition whose value goes back to empty, or to what it was added as", async () => {
+    const team = await teamWithNewIdea(app, fixtures);
+    await saveAnswer(team, "V.01.WHO", { text: "Offices" });
+    await saveAnswer(team, "V.01.WHO", { text: "" });
+    expect(
+      (await history(team.memberCookie, who(team))).items.map((entry) => [
+        entry.action,
+        entry.before,
+        entry.after,
+      ]),
+    ).toEqual([["create", null, content(null)]]);
+
+    // The owner added the rent row with the idea (I1) a moment before.
+    const [rent] = await db
+      .select()
+      .from(costItems)
+      .where(
+        and(
+          eq(costItems.validationId, team.validationId),
+          eq(costItems.templateKey, "monthly.rent"),
+        ),
+      );
+    const [addition] = await rowsOf(rent?.id ?? "");
+    for (const [lockVersion, amount] of [15_000, null].entries()) {
+      tick();
+      const saved = await call(
+        "PATCH",
+        `/api/v1/cost-items/${rent?.id}`,
+        team.ownerCookie,
+        { amount, lockVersion },
+      );
+      expect(saved.status).toBe(200);
+    }
+    const rows = await rowsOf(rent?.id ?? "");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: addition?.id,
+      action: "create",
+      before: null,
+      after: addition?.after,
+      changedAt: new Date(clock),
+    });
+  });
+
+  test("an addition and an edit more than the window after it are Added and Changed", async () => {
+    const team = await teamWithNewIdea(app, fixtures);
+    await saveAnswer(team, "V.01.WHO", { text: "Offices" });
+    clock += HISTORY_MERGE_WINDOW_MS;
+    await saveAnswer(team, "V.01.WHO", { text: "HR officers" });
+
+    const page = await history(team.memberCookie, who(team));
+    expect(
+      page.items.map((entry) => [entry.action, entry.before, entry.after]),
+    ).toEqual([
+      ["update", content("Offices"), content("HR officers")],
+      ["create", null, content("Offices")],
+    ]);
+  });
+
+  test("keeps someone else's edit of a new answer apart, and what comes after it", async () => {
+    const team = await teamWithNewIdea(app, fixtures);
+    await saveAnswer(team, "V.01.WHO", { text: "Offices" });
+    await saveAnswer(team, "V.01.WHO", { text: "HR" }, team.ownerCookie);
+    await saveAnswer(team, "V.01.WHO", { text: "HR officers" });
+
+    const page = await history(team.memberCookie, who(team));
+    expect(
+      page.items.map((entry) => [
+        entry.action,
+        entry.changedBy.id,
+        entry.before,
+        entry.after,
+      ]),
+    ).toEqual([
+      ["update", team.member.id, content("HR"), content("HR officers")],
+      ["update", team.owner.id, content("Offices"), content("HR")],
+      ["create", team.member.id, null, content("Offices")],
+    ]);
+  });
+
+  test("H2 puts a merged addition's last value back", async () => {
+    const team = await teamWithNewIdea(app, fixtures);
+    await saveAnswer(team, "V.01.WHO", { text: "Offices" });
+    await saveAnswer(team, "V.01.WHO", { text: "HR officers" });
+    const [added] = await rowsOf(team.validationId, "V.01.WHO");
+    later();
+    await saveAnswer(team, "V.01.WHO", { text: "Anyone" }, team.ownerCookie);
+
+    const response = await revert(added?.id ?? "", team.ownerCookie);
+    expect(response.status).toBe(200);
+    const result = historyRevertResultSchema.parse(await response.json());
+    expect(result.target.value).toEqual(content("HR officers"));
+    expect(result.entry).toMatchObject({
+      action: "update",
+      source: "revert",
+      before: content("Anyone"),
+      after: content("HR officers"),
+    });
+    const last = (await rowsOf(team.validationId, "V.01.WHO")).at(-1);
+    expect(last?.revertedFromId).toBe(added?.id ?? "");
   });
 
   test("starts a new row once more than the window has passed", async () => {

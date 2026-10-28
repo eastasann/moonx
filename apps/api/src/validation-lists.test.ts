@@ -517,7 +517,7 @@ describe("V10 and V11 assumptions and risks", () => {
     ]);
   });
 
-  test("V11 saves under the optimistic lock with a history row each; a deleted row is 404", async () => {
+  test("V11 saves under the optimistic lock, its adder's save joining the addition; a deleted row is 404", async () => {
     const team = await newTeam();
     const assumption = await addAssumption(team, {
       statement: "Offices order monthly",
@@ -529,15 +529,19 @@ describe("V10 and V11 assumptions and risks", () => {
         path: `/api/v1/assumptions/${assumption.id}`,
         first: { nextCheck: "Ask HR" },
         second: { nextCheck: "Call HR" },
+        // The member added it, so their save right after is part of the addition
+        // (ADR-020).
+        addedByMember: true,
       },
       {
         id: risk.id,
         path: `/api/v1/risks/${risk.id}`,
         first: { mitigation: "Tents" },
         second: { mitigation: "Indoor stalls" },
+        addedByMember: false,
       },
     ];
-    for (const { id, path, first, second } of cases) {
+    for (const { id, path, first, second, addedByMember } of cases) {
       const saved = await call("PATCH", path, team.memberCookie, {
         ...first,
         lockVersion: 0,
@@ -576,13 +580,14 @@ describe("V10 and V11 assumptions and risks", () => {
         history.map((row) => [row.action, row.sectionKey, row.source]),
       ).toEqual([
         ["create", "assumptions_risks", "manual"],
-        ["update", "assumptions_risks", "manual"],
+        ...(addedByMember ? [] : [["update", "assumptions_risks", "manual"]]),
         ["update", "assumptions_risks", "manual"],
         ["delete", "assumptions_risks", "manual"],
       ]);
-      expect(history[2]?.before).toMatchObject(first);
-      expect(history[2]?.after).toMatchObject(second);
-      expect(history[3]).toMatchObject({ before: second, after: null });
+      expect(history.at(-3)?.after).toMatchObject(first);
+      expect(history.at(-2)?.before).toMatchObject(first);
+      expect(history.at(-2)?.after).toMatchObject(second);
+      expect(history.at(-1)).toMatchObject({ before: second, after: null });
     }
   });
 });

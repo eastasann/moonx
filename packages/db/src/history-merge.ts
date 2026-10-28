@@ -19,19 +19,23 @@ export interface HistoryMergeFacts {
 
 /**
  * Whether `change` updates `latest`, the latest history row of the same item, instead of
- * adding a row (ADR-020): both change the item's content by hand (`manual`, in no batch),
- * by the same person, `change` at most {@link HISTORY_MERGE_WINDOW_MS} after `latest`.
- * Adding, deleting and restoring a row never merge, nor does anything after a revert, an
- * AI import, a template migration, a duplicate or a plan draft. A `change` dated before
- * `latest` (the clocks of two instances) counts as within the window.
+ * adding a row (ADR-020): `change` is a manual update (`manual`, in no batch) and
+ * `latest` the same person's manual addition or update of the item, `change` at most
+ * {@link HISTORY_MERGE_WINDOW_MS} after `latest`. An addition folds in the edits that
+ * follow it, so a new answer typed in several saves is one Added. Deleting and restoring
+ * a row never merge, nor does anything after a revert, an AI import, a template
+ * migration, a duplicate or a plan draft. A `change` dated before `latest` (the clocks
+ * of two instances) counts as within the window.
  */
 export function mergesIntoLatest(
   latest: HistoryMergeFacts,
   change: HistoryMergeFacts,
 ): boolean {
   const byHand = (row: HistoryMergeFacts) =>
-    row.action === "update" && row.source === "manual" && row.batchId === null;
+    row.source === "manual" && row.batchId === null;
   return (
+    (latest.action === "create" || latest.action === "update") &&
+    change.action === "update" &&
     byHand(latest) &&
     byHand(change) &&
     latest.changedById === change.changedById &&

@@ -186,10 +186,11 @@ const asStored = (value: unknown): unknown =>
 
 /**
  * Folds a manual update into the item's latest history row when it merges
- * ({@link mergesIntoLatest}): the row keeps its `before` and the time of its first
- * change, takes the change's `after`, time and client, and goes when its `after` is its
- * `before` again (a save that changes nothing writes no row either). Returns the row
- * folded into, `"removed"`, or null when the change takes a row of its own.
+ * ({@link mergesIntoLatest}): the row keeps its action, its `before` and the time of its
+ * first change, and takes the change's `after`, time and client. An update row goes when
+ * its `after` is its `before` again (a save that changes nothing writes no row either);
+ * an addition stays even when emptied, as the row it added does. Returns the row folded
+ * into, `"removed"`, or null when the change takes a row of its own.
  *
  * The item's own row is already locked by the work that changed it, so another write to
  * the item waits for this transaction and then reads the row this one left. The row
@@ -256,7 +257,7 @@ async function mergeIntoLatest(
     ),
   );
   const after = asStored(change.after);
-  if (isDeepStrictEqual(latest.before, after)) {
+  if (latest.action === "update" && isDeepStrictEqual(latest.before, after)) {
     const removed = await tx
       .delete(changeHistory)
       .where(stillLatest)
@@ -286,9 +287,9 @@ async function mergeIntoLatest(
  * equal `before` and `after` or not at all: an update whose values are equal writes no
  * row, as a save that changes nothing raises no version either (SDD 5.1「同時編集」).
  * Creations, deletions and restorations are always written. A manual update merges into
- * the item's latest row when that is the same person's manual update of the last
- * `HISTORY_MERGE_WINDOW_MS` (ADR-020, {@link mergeIntoLatest}), unless it overwrites a
- * version it did not read ({@link noteOverwrite}); any other change adds a row. A
+ * the item's latest row when that is the same person's manual addition or update of the
+ * last `HISTORY_MERGE_WINDOW_MS` (ADR-020, {@link mergeIntoLatest}), unless it overwrites
+ * a version it did not read ({@link noteOverwrite}); any other change adds a row. A
  * recorded change counts for the last activity ({@link recordChange}), merged or not.
  *
  * @returns The rows written or merged into, in the order of the changes.

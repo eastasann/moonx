@@ -312,62 +312,75 @@ test.describe("PNL-2 History on a desktop", () => {
 
   test("an answer goes back to an earlier change from its 🕘, and 11 shows it", async ({
     page,
+    browser,
     signIn,
     account,
-  }) => {
-    const me = await signIn(account.email, account.password);
-    const { workspace, idea } = await personalIdea(
-      page,
-      me,
-      `Taho Cart ${Date.now() % 1_000_000}`,
-    );
-    await page.goto(
-      `/w/${workspace.id}/ideas/${idea.id}/questions/01?q=V.01.WHO`,
-    );
-    const answer = page.getByRole("textbox", { name: "Answer to WHO" });
-    const saved = () =>
-      page.waitForResponse(
+  }, testInfo) => {
+    await signIn(account.email, account.password);
+    const other = await otherBrowser(browser, testInfo.workerIndex);
+    try {
+      const { workspace, idea } = await teamWithIdea(
+        page,
+        other.page,
+        testInfo.workerIndex,
+      );
+      await page.goto(
+        `/w/${workspace.id}/ideas/${idea.id}/questions/01?q=V.01.WHO`,
+      );
+      const answer = page.getByRole("textbox", { name: "Answer to WHO" });
+      const save = page.waitForResponse(
         (response) =>
           response.request().method() === "PUT" &&
           response.url().includes("/answers/V.01.WHO") &&
           response.ok(),
       );
-    let save = saved();
-    await answer.fill("Office workers in Bacolod");
-    await save;
-    save = saved();
-    await answer.fill("Office workers in Iloilo");
-    await save;
+      await answer.fill("Office workers in Bacolod");
+      await save;
+      // Bea changes it on her own device: someone else's change is one of its own,
+      // where the page's user's next saves would join their addition (6.0.5).
+      const changed = await other.page.request.put(
+        `/api/v1/validations/${idea.validationId}/answers/V.01.WHO`,
+        {
+          data: { text: "Office workers in Iloilo", lockVersion: 1 },
+          headers: { Origin: WEB_ORIGIN },
+        },
+      );
+      expect(changed.status(), await changed.text()).toBe(200);
+      await page.reload();
+      await expect(answer).toHaveValue("Office workers in Iloilo");
 
-    const who = page.getByRole("region", { name: "WHO", exact: true });
-    await who.getByRole("button", { name: "History of 01 WHO" }).click();
-    const panel = page.getByRole("complementary", { name: "History" });
-    await expect(panel.getByText("On 01 WHO")).toBeVisible();
-    const reverts = panel.getByRole("button", {
-      name: "Revert to this point, 01 WHO",
-    });
-    await expect(reverts).toHaveCount(2);
-    // Newest first.
-    await expect(panel.locator("del").first()).toHaveText("Bacolod");
-    await expect(panel.locator("ins").first()).toHaveText("Iloilo");
-    await expectNoAxeViolations(page);
+      const who = page.getByRole("region", { name: "WHO", exact: true });
+      await who.getByRole("button", { name: "History of 01 WHO" }).click();
+      const panel = page.getByRole("complementary", { name: "History" });
+      await expect(panel.getByText("On 01 WHO")).toBeVisible();
+      const reverts = panel.getByRole("button", {
+        name: "Revert to this point, 01 WHO",
+      });
+      await expect(reverts).toHaveCount(2);
+      // Newest first.
+      await expect(panel.locator("del").first()).toHaveText("Bacolod");
+      await expect(panel.locator("ins").first()).toHaveText("Iloilo");
+      await expectNoAxeViolations(page);
 
-    // Back to just after the first change: the answer reads it, and the revert is a
-    // change of its own.
-    await reverts.nth(1).click();
-    await expect(answer).toHaveValue("Office workers in Bacolod");
-    await expect(panel.getByText("Revert · Changed")).toBeVisible();
-    await expect(reverts).toHaveCount(3);
+      // Back to just after the first change: the answer reads it, and the revert is a
+      // change of its own.
+      await reverts.nth(1).click();
+      await expect(answer).toHaveValue("Office workers in Bacolod");
+      await expect(panel.getByText("Revert · Changed")).toBeVisible();
+      await expect(reverts).toHaveCount(3);
 
-    await page
-      .getByRole("banner")
-      .getByRole("button", { name: "History" })
-      .click();
-    await expect(panel.getByText("On 01 WHO")).toHaveCount(0);
-    await expect(panel.getByText("01 WHO", { exact: true })).toHaveCount(3);
+      await page
+        .getByRole("banner")
+        .getByRole("button", { name: "History" })
+        .click();
+      await expect(panel.getByText("On 01 WHO")).toHaveCount(0);
+      await expect(panel.getByText("01 WHO", { exact: true })).toHaveCount(3);
+    } finally {
+      await other.context.close();
+    }
   });
 
-  test("an answer typed again three times, a pause between, is one change from before the first to after the last", async ({
+  test("a new answer typed three times, a pause between, is one Added from empty to the last", async ({
     page,
     signIn,
     account,
@@ -386,7 +399,6 @@ test.describe("PNL-2 History on a desktop", () => {
     for (const text of [
       "Offices",
       "Offices in Bacolod",
-      "Offices in Bacolod and Iloilo",
       "HR officers in Bacolod and Iloilo",
     ]) {
       const save = page.waitForResponse(
@@ -402,16 +414,21 @@ test.describe("PNL-2 History on a desktop", () => {
     const who = page.getByRole("region", { name: "WHO", exact: true });
     await who.getByRole("button", { name: "History of 01 WHO" }).click();
     const panel = page.getByRole("complementary", { name: "History" });
-    // The first save added the answer; the three after it are one change (6.0.5).
-    await expect(panel.getByText("Manual · Added")).toHaveCount(1);
-    const changed = panel.getByText("Manual · Changed");
-    await expect(changed).toHaveCount(1);
+    // The first save added the answer, and the two after it are part of the addition
+    // (6.0.5).
+    const added = panel.getByText("Manual · Added");
+    await expect(added).toHaveCount(1);
+    await expect(panel.getByText("Manual · Changed")).toHaveCount(0);
     await expect(
       panel.getByRole("button", { name: "Revert to this point, 01 WHO" }),
-    ).toHaveCount(2);
-    const entry = changed.locator("xpath=..");
-    await expect(entry.locator("del")).toHaveText(["Offices"]);
-    await expect(entry).toContainText("HR officers in Bacolod and Iloilo");
+    ).toHaveCount(1);
+    const entry = added.locator("xpath=..");
+    await expect(entry.locator("del")).toHaveCount(0);
+    // The F/A/U shows too: a value makes it Unclassified (6.0.5).
+    await expect(entry.locator("ins")).toHaveText([
+      "HR officers in Bacolod and Iloilo",
+      "Unclassified",
+    ]);
     await expect(entry).not.toContainText("Offices in Bacolod");
   });
 

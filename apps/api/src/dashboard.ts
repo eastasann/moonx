@@ -54,8 +54,8 @@ const ACTIVITY_LIMIT = 20;
 /**
  * Changes of one item by one person this close after each other read as one move
  * (design-spec 6.9). A history row already holds a person's manual edits in a row
- * (ADR-020); this also joins what it keeps apart, such as adding a row and then filling
- * it in.
+ * (ADR-020); this also joins what it keeps apart, such as an overwrite, a revert, or
+ * deleting a row and undoing that.
  */
 const ACTIVITY_MERGE_MS = 10 * 60 * 1000;
 /** The history rows read at a time while gathering Recent activity. */
@@ -121,7 +121,8 @@ export function dashboardRoutes({ access, db, now }: DashboardRoutesOptions) {
    * the rows one request wrote (one person, one moment, one idea), such as an idea and
    * its cost rows. An operation on one item joins the run of saves of that item by the
    * same person, each within {@link ACTIVITY_MERGE_MS} of the next, shown at the last. A
-   * row that merged several edits (ADR-020) spans from its first to its last.
+   * row that merged several edits (ADR-020) spans from its first to its last, and counts
+   * with the request of its last (SDD D4).
    * Moves are made newest first, so the first ones made are the newest; older
    * operations only join them.
    */

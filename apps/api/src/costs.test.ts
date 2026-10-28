@@ -270,7 +270,7 @@ describe("V13 and V14 cost rows", () => {
     expect((await errorOf(tooLong)).details?.[0]?.path).toBe("name");
   });
 
-  test("saves an amount, then F/A/U, under the lock, with a history row each", async () => {
+  test("saves an amount, then F/A/U, under the lock; the amount joins the row's addition", async () => {
     const team = await newTeam();
     const rent = await rowOf(team, "monthly.rent");
     const first = await savedRow(
@@ -330,14 +330,17 @@ describe("V13 and V14 cost rows", () => {
         )
       ).lockVersion,
     ).toBe(3);
+    // The owner added the row with the idea (I1) a moment before, so their amount is
+    // part of the addition (ADR-020); the member's save and the overwrite are rows of
+    // their own.
     const history = await historyOf(rent.id);
     expect(history.map((row) => row.action)).toEqual([
       "create",
       "update",
       "update",
-      "update",
     ]);
-    expect(history[2]?.after).toMatchObject({
+    expect(history[0]?.after).toMatchObject({ amount: 15_000 });
+    expect(history[1]?.after).toMatchObject({
       amount: 15_000,
       fau: "assumption",
       confidence: "medium",
@@ -688,6 +691,7 @@ describe("V13 and V14 cost rows", () => {
     await savedRow(
       await editRow(team, labor.id, { amount: 0, lockVersion: 0 }),
     );
+    const history = await historyOf(labor.id);
     const again = await savedRow(
       await app.handle(
         withRawBody(
@@ -700,7 +704,8 @@ describe("V13 and V14 cost rows", () => {
       ),
     );
     expect(again).toMatchObject({ amount: 0, lockVersion: 1 });
-    expect(await historyOf(labor.id)).toHaveLength(2);
+    // Not even folded into the row of the 0 (ADR-020).
+    expect(await historyOf(labor.id)).toEqual(history);
   });
 
   test("a Viewer may not change rows, and an archived idea refuses with 409 ARCHIVED", async () => {

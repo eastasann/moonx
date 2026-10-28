@@ -2453,7 +2453,7 @@ make lint・make typecheck・make doc-lint・make db-check BASE=main・make test
 
 ## Step 35g: 変更履歴のまとめに最初の保存（Added）を含める
 
-Status:
+Status: done 2026-10-29
 
 ```
 Step 35f の変更履歴のまとめ（2026-10-29 のユーザーの決定）を、ユーザーに見せた形に合わせてください。ユーザーが合意した例は、

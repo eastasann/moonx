@@ -756,12 +756,13 @@ describe("V4 POST /api/v1/validations/{validationId}/evidence", () => {
       action: "create",
       sectionKey: "research_log",
     });
-    const answer = history.filter(
-      (row) => row.targetKey === "V.01.WHO" && row.action === "update",
-    );
-    expect(answer.map((row) => [row.before, row.after])).toEqual([
+    // The same person answered a moment before, so the evidence is part of the
+    // answer's addition (ADR-020).
+    const answer = history.filter((row) => row.targetKey === "V.01.WHO");
+    expect(answer.map((row) => [row.action, row.before, row.after])).toEqual([
       [
-        { text: "HR", fau: null, confidence: null, evidenceIds: [] },
+        "create",
+        null,
         {
           text: "HR",
           fau: "fact",
@@ -1094,12 +1095,13 @@ describe("V5 DELETE /api/v1/evidence/{evidenceId}", () => {
       .from(evidenceLinks)
       .where(eq(evidenceLinks.id, first.evidence.id));
     expect(link?.deletedAt).not.toBeNull();
-    // The owner's evidence and first removal are one row (ADR-020); the member's
-    // removal is a row of its own.
-    const rows = (await historyOf(team, "V.01.WHO")).slice(-2);
-    expect(rows.map((row) => [row.before, row.after])).toEqual([
+    // The owner's answer, evidence and first removal are one row, the answer's
+    // addition (ADR-020); the member's removal is a row of its own.
+    const rows = await historyOf(team, "V.01.WHO");
+    expect(rows.map((row) => [row.action, row.before, row.after])).toEqual([
       [
-        { text: "HR", fau: null, confidence: null, evidenceIds: [] },
+        "create",
+        null,
         {
           text: "HR",
           fau: "fact",
@@ -1108,6 +1110,7 @@ describe("V5 DELETE /api/v1/evidence/{evidenceId}", () => {
         },
       ],
       [
+        "update",
         {
           text: "HR",
           fau: "fact",

@@ -29,7 +29,40 @@ describe("mergesIntoLatest (ADR-020)", () => {
     );
   });
 
-  test("keeps apart what is past the window, someone else's, or not a manual update", () => {
+  test("folds the same person's manual update into their manual addition, never the other way", () => {
+    const added: HistoryMergeFacts = { ...edit, action: "create" };
+    const next = { ...edit, changedAt: later(60_000) };
+    expect(mergesIntoLatest(added, next)).toBe(true);
+    expect(
+      mergesIntoLatest(added, {
+        ...edit,
+        changedAt: later(HISTORY_MERGE_WINDOW_MS),
+      }),
+    ).toBe(true);
+    expect(mergesIntoLatest(edit, { ...next, action: "create" })).toBe(false);
+    expect(mergesIntoLatest(added, { ...next, action: "create" })).toBe(false);
+    expect(
+      mergesIntoLatest(added, {
+        ...next,
+        changedAt: later(HISTORY_MERGE_WINDOW_MS + 1),
+      }),
+    ).toBe(false);
+    expect(mergesIntoLatest(added, { ...next, changedById: "paolo" })).toBe(
+      false,
+    );
+    for (const source of [
+      "ai_import",
+      "revert",
+      "template_migration",
+      "duplicate",
+      "plan_draft",
+    ] as const) {
+      expect(mergesIntoLatest({ ...added, source }, next)).toBe(false);
+    }
+    expect(mergesIntoLatest({ ...added, batchId: "b" }, next)).toBe(false);
+  });
+
+  test("keeps apart what is past the window, someone else's, or not a manual addition or update", () => {
     const next = { ...edit, changedAt: later(60_000) };
     expect(
       mergesIntoLatest(edit, {
@@ -40,7 +73,7 @@ describe("mergesIntoLatest (ADR-020)", () => {
     expect(mergesIntoLatest(edit, { ...next, changedById: "paolo" })).toBe(
       false,
     );
-    for (const action of ["create", "delete", "restore"] as const) {
+    for (const action of ["delete", "restore"] as const) {
       expect(mergesIntoLatest({ ...edit, action }, next)).toBe(false);
       expect(mergesIntoLatest(edit, { ...next, action })).toBe(false);
     }
@@ -89,6 +122,11 @@ describe("the seed's history (HistoryLog)", () => {
     const backwards = new HistoryLog();
     backwards.add(input(30));
     expect(() => backwards.add(input(25))).toThrow(
+      "The API would merge two history rows",
+    );
+    const added = new HistoryLog();
+    added.add({ ...input(0), action: "create", before: null });
+    expect(() => added.add(input(5))).toThrow(
       "The API would merge two history rows",
     );
   });

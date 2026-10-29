@@ -19,8 +19,6 @@
       "set": "Set password",
       "changed": "Password changed",
       "setDone": "Password set. You can log in with your email too.",
-      "wrong": "Password is incorrect",
-      "reauth": "Log in again to set a password",
       "logInAgain": "Log in again"
     },
     "preferences": {
@@ -41,8 +39,7 @@
       "list": "Your workspaces",
       "personal": "Personal",
       "leave": "Leave",
-      "leaveOf": "Leave {{workspace}}",
-      "lastOwner": "Make someone else Owner first"
+      "leaveOf": "Leave {{workspace}}"
     },
     "logOut": {
       "title": "Log out",
@@ -69,10 +66,6 @@
       "password": "Password",
       "confirm": "Delete account",
       "cancel": "Cancel",
-      "emailMismatch": "The email doesn't match your account",
-      "wrongPassword": "Password is incorrect",
-      "reauth": "Log in again to delete your account",
-      "lastOwner": "Make someone else Owner of {{workspace}} first",
       "toSettings": "Open Workspace Settings of {{workspace}}"
     }
   },
@@ -87,16 +80,14 @@
     },
     "members": {
       "title": "Members",
-      "lead_one": "{{count}} person. Owners can invite and change roles.",
-      "lead_other": "{{count}} people. Owners can invite and change roles.",
+      "lead_one": "{{count, integer}} person. Owners can invite and change roles.",
+      "lead_other": "{{count, integer}} people. Owners can invite and change roles.",
       "list": "Members",
       "you": "(you)",
       "role": "Role of {{name}}",
       "actions": "Member actions of {{name}}",
       "remove": "Remove",
-      "leave": "Leave",
-      "lastOwner": "This workspace needs at least one Owner",
-      "personalOwner": "Owner of this personal workspace"
+      "leave": "Leave"
     },
     "invitations": {
       "title": "Invitations",
@@ -121,12 +112,9 @@
       "cancelTo": "Cancel invitation to {{email}}",
       "none": "No pending invitations",
       "noneAll": "No invitations yet",
-      "alreadyMember": "{{email}} is already a member of this workspace",
-      "alreadyPending": "An invitation to {{email}} is already pending",
       "sent": "Invitation sent to {{email}}",
       "resent": "Invitation sent again to {{email}}",
-      "cancelled": "Invitation to {{email}} cancelled",
-      "wasCancelled": "The invitation to {{email}} was cancelled"
+      "cancelled": "Invitation to {{email}} cancelled"
     }
   },
   "confirm": {
@@ -136,7 +124,7 @@
     "leave": "Leave",
     "left": "You left {{workspace}}",
     "removeTitle": "Remove {{name}}?",
-    "removeBody": "They lose access to this workspace. Their self analysis stops being shared with it, and the execution items assigned to them keep their name as text.",
+    "removeBody": "They lose access to this workspace. Their self analysis stops being shared with it and stays unshared if they join again, and the execution items assigned to them keep their name as text. Their name stays on what they added and wrote here, marked “(former member)”. Their notifications from this workspace stay, but open “You no longer have access”.",
     "remove": "Remove",
     "removed": "{{name}} was removed",
     "viewerTitle": "Make {{name}} a Viewer?",

@@ -33,7 +33,7 @@ export function PhotoField({
   me: Me;
   canRemove?: boolean;
 }) {
-  const { t } = useTranslation(["auth"]);
+  const { t } = useTranslation(["auth", "errors"]);
   const isOnline = useIsOnline();
   const queryClient = useQueryClient();
   const sendThrough = useSendThrough();
@@ -117,7 +117,9 @@ export function PhotoField({
       </Flex>
       {problem !== null && (
         <InlineAlert variant="negative">
-          {t(`auth:photo.${problem}`)}
+          {problem === "tooLarge"
+            ? t("errors:PAYLOAD_TOO_LARGE", { context: "photo" })
+            : t("auth:photo.format")}
         </InlineAlert>
       )}
       {failure !== null && (

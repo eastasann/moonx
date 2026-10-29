@@ -1,6 +1,6 @@
 import { hasText, isQuestionShown } from "@moonx/domain";
-import { formatCount } from "@moonx/i18n";
 import type {
+  ConditionAnswer,
   TemplateQuestion,
   TemplateSection,
   ValidationAnswer,
@@ -94,6 +94,8 @@ function SectionForm({
   home,
   section,
   answers,
+  conditionAnswers,
+  decidesElsewhere,
   sectionKey,
   focusKey,
   modal,
@@ -102,6 +104,10 @@ function SectionForm({
   home: ValidationHome;
   section: TemplateSection;
   answers: readonly ValidationAnswer[];
+  /** V2's answers in other sections that this one's display conditions read. */
+  conditionAnswers: readonly ConditionAnswer[];
+  /** V2's questions here that decide a question in another section. */
+  decidesElsewhere: readonly string[];
   sectionKey: QuestionSection;
   focusKey: string | undefined;
   modal: string | undefined;
@@ -135,7 +141,7 @@ function SectionForm({
       queryClient
         .getQueryData(questionsKey)
         ?.answers.find((answer) => answer.questionKey === questionKey),
-    update: (questionKey, change) =>
+    update: (questionKey, change) => {
       putSaved<{ section: TemplateSection; answers: ValidationAnswer[] }>(
         queryClient,
         questionsKey,
@@ -148,7 +154,14 @@ function SectionForm({
                   answer.questionKey === questionKey ? change(answer) : answer,
                 ),
               },
-      ),
+      );
+      // Another section's display conditions may read this answer. A save sent on
+      // leaving lands after the next section was read: it is read again.
+      void queryClient.invalidateQueries({
+        queryKey: questionsKey.slice(0, -1),
+        predicate: (query) => query.queryKey.at(-1) !== sectionKey,
+      });
+    },
     reload: () =>
       void queryClient.invalidateQueries({ queryKey: questionsKey }),
   };
@@ -170,8 +183,15 @@ function SectionForm({
     return editing.viewOf(question, answer);
   };
   const views = section.questions.map(viewOf);
-  const texts = new Map(views.map((view) => [view.question.key, view]));
-  // 02 OCEAN's answer decides which questions show, as it is typed (6.2).
+  const byQuestion = new Map(views.map((view) => [view.question.key, view]));
+  // 02 OCEAN's answer decides which questions show, as it is typed (6.2); a condition
+  // naming another section's question reads its answer as 13 does.
+  const texts = new Map<string, { text: string | null }>([
+    ...conditionAnswers.map(
+      ({ questionKey, text }) => [questionKey, { text }] as const,
+    ),
+    ...byQuestion,
+  ]);
   const shown = views.filter((view) => isQuestionShown(view.question, texts));
   const shownIds = shown.map((view) => view.question.key);
   const answered = shown.filter((view) => view.isAnswered).length;
@@ -248,9 +268,10 @@ function SectionForm({
   /** The questions whose answer decides others (02 OCEAN), while unanswered (6.2). */
   const decidesOthers = (view: AnswerView) =>
     !hasText(view.text) &&
-    section.questions.some(
-      (other) => other.displayCondition?.[view.question.key] !== undefined,
-    );
+    (decidesElsewhere.includes(view.question.key) ||
+      section.questions.some(
+        (other) => other.displayCondition?.[view.question.key] !== undefined,
+      ));
 
   const renderAnswer = (view: AnswerView) => (
     <AnswerFields
@@ -290,8 +311,8 @@ function SectionForm({
           <Text tone="secondary">
             <Text variant="number" tone="secondary">
               {t("validation:questions.progress", {
-                answered: formatCount(answered),
-                total: formatCount(shown.length),
+                answered,
+                total: shown.length,
               })}
             </Text>
             {t("validation:questions.progressSuffix")}
@@ -338,7 +359,7 @@ function SectionForm({
           setChosen(id);
         }}
         isReadOnly={!canEdit}
-        isAnswered={(id) => texts.get(id)?.isAnswered === true}
+        isAnswered={(id) => byQuestion.get(id)?.isAnswered === true}
         onEnd={() => setAtEnd(true)}
         end={
           isAtEnd ? (
@@ -347,8 +368,8 @@ function SectionForm({
                 <Heading level={2}>
                   {t("validation:questions.complete", {
                     section: sectionKey,
-                    answered: formatCount(answered),
-                    total: formatCount(shown.length),
+                    answered,
+                    total: shown.length,
                   })}
                 </Heading>
                 <Flex gap="space-200" wrap>
@@ -397,7 +418,7 @@ function SectionForm({
           )
         }
         renderQuestion={(id, mode) => {
-          const view = texts.get(id);
+          const view = byQuestion.get(id);
           if (view === undefined) return null;
           const { question } = view;
           return (
@@ -513,6 +534,8 @@ function QuestionFormBody({
         home={home.data}
         section={questions.data.section}
         answers={questions.data.answers}
+        conditionAnswers={questions.data.conditionAnswers}
+        decidesElsewhere={questions.data.decidesElsewhere}
         sectionKey={sectionKey}
         focusKey={focusKey}
         modal={modal}

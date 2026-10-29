@@ -1,5 +1,5 @@
 import { hasText } from "@moonx/domain";
-import { formatCount, formatMoney } from "@moonx/i18n";
+import { formatCount, formatInputMoney } from "@moonx/i18n";
 import type {
   CheckState,
   Competitor,
@@ -67,12 +67,16 @@ import {
 } from "../components/CompetitorFields";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { ItemHistoryButton } from "../components/HistoryPanel";
-import { toastFailure } from "../components/ideaActions";
+import { useToastFailure } from "../components/ideaActions";
 import { dotState } from "../components/ideaParts";
 import { ModalSendFailure } from "../components/ModalFailure";
 import { ReorderDialog } from "../components/ReorderDialog";
 import { RowEvidence, RowEvidenceSheet } from "../components/RowEvidence";
-import { isRowValid, useRowFields } from "../components/RowFields";
+import {
+  isRowValid,
+  refusedFieldsOf,
+  useRowFields,
+} from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
 import { SectionTitle } from "../components/SectionTitle";
 import {
@@ -112,6 +116,13 @@ import { useDocumentTitle } from "../lib/title";
 import { CompetitorsSkeleton } from "./CompetitorsSkeleton";
 
 export type { CompetitorsSearch };
+
+declare module "@tanstack/react-router" {
+  interface HistoryState {
+    /** 15's New competitor is open, in the entry it added: Back closes it. */
+    addingCompetitor?: boolean;
+  }
+}
 
 type CompetitorList = z.infer<typeof competitorListSchema>;
 
@@ -188,9 +199,9 @@ function useRange(guidance: CompetitorList["guidance"]) {
 const checkStateOf = (count: number, min: number): CheckState =>
   count >= min ? "done" : count > 0 ? "partial" : "not_started";
 
-/** A competitor's price ("₱240"), with cents only where it has them. */
+/** A competitor's price as typed ("₱240", "₱149.50"; 6.4「端数」). */
 const priceText = (price: number, currency: string) =>
-  formatMoney(price, currency, { cents: !Number.isInteger(price) });
+  formatInputMoney(price, currency);
 
 /** "1 source", "No sources": the evidence that counts (6.0.3). */
 function useSources() {
@@ -340,18 +351,9 @@ function NewCompetitorDialog({
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) }),
   });
-  // A 422 naming a field (SDD 8.2's last guard) puts "Check the format" under it.
   const failure = create.error;
-  const details =
-    failure instanceof ApiError && failure.code === "VALIDATION_FAILED"
-      ? failure.detail.details
-      : undefined;
   const fields = Object.keys(values) as (keyof typeof values)[];
-  const refusedFields = fields.filter(
-    (field) =>
-      Array.isArray(details) &&
-      (details as { path?: unknown }[]).some(({ path }) => path === field),
-  );
+  const refusedFields = refusedFieldsOf(failure, fields);
   const errors = Object.fromEntries(
     fields.flatMap((field) => {
       const error =
@@ -414,7 +416,7 @@ function NewCompetitorDialog({
             setTouched((current) => ({ ...current, [field]: true }));
           }}
         />
-        {failure !== null && refusedFields.length === 0 && (
+        {failure !== null && (
           <ModalSendFailure
             error={failure}
             onRetry={submit}
@@ -671,21 +673,34 @@ function CompetitorsBody({
   search,
   modal,
   about,
+  isAdding,
   onSearch,
   onOpenRow,
   onCloseRow,
+  onOpenNew,
+  onCloseNew,
+  onCreated,
 }: {
   home: ValidationHome;
   search: CompetitorsSearch;
   modal: string | undefined;
   about: string | undefined;
+  /** Whether New competitor is open: the history entry it added says so. */
+  isAdding: boolean;
   /** Replaces the URL's search (the view). */
   onSearch: (next: CompetitorsSearch) => void;
   /** Opens a competitor's dialog: Back closes it. */
   onOpenRow: (competitorId: string) => void;
   /** Closes the competitor's dialog, going back if it was opened here. */
   onCloseRow: () => void;
+  /** Opens New competitor in a history entry of its own: Back closes it. */
+  onOpenNew: () => void;
+  /** Closes New competitor, going back past its entry. */
+  onCloseNew: () => void;
+  /** Puts the competitor New competitor made in its entry's place: Back leaves it too. */
+  onCreated: (competitorId: string) => void;
 }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["validation", "common", "app", "panels"]);
   const { me, workspace, role } = useWorkspace();
   const queryClient = useQueryClient();
@@ -700,7 +715,6 @@ function CompetitorsBody({
   const list = competitorsQuery(idea.id, validationId);
   const query = useQuery(list);
   const isSlow = useIsSlow(query.isPending);
-  const [isAdding, setAdding] = useState(false);
   const [isReordering, setReordering] = useState(false);
   const [deleting, setDeleting] = useState<Competitor | null>(null);
   const empty = useRange(query.data?.guidance ?? { min: 0, max: 0 });
@@ -798,7 +812,6 @@ function CompetitorsBody({
     home.sections.find(({ key }) => key === "04")?.title ??
     t("validation:competitors.title");
   const view = search.view ?? "cards";
-  const openNew = () => setAdding(true);
   const emptyState = (
     <IllustratedMessage
       headingLevel={2}
@@ -807,7 +820,7 @@ function CompetitorsBody({
       heading={t("validation:competitors.empty", { range: empty })}
       actions={
         canEdit ? (
-          <Button variant="primary" onPress={openNew}>
+          <Button variant="primary" onPress={onOpenNew}>
             {t("validation:competitors.add")}
           </Button>
         ) : undefined
@@ -862,7 +875,7 @@ function CompetitorsBody({
       onAction={(key) => onOpenRow(String(key))}
       addItem={
         canEdit
-          ? { label: t("validation:competitors.add"), onAction: openNew }
+          ? { label: t("validation:competitors.add"), onAction: onOpenNew }
           : undefined
       }
       renderEmptyState={() => emptyState}
@@ -953,7 +966,7 @@ function CompetitorsBody({
         }
         primaryAction={
           canEdit ? (
-            <Button variant="secondary" onPress={openNew}>
+            <Button variant="secondary" onPress={onOpenNew}>
               <Plus />
               {t("validation:competitors.add")}
             </Button>
@@ -1024,10 +1037,9 @@ function CompetitorsBody({
           onCreated={(created) => {
             // In the list before its dialog opens: no "Not found" while it is read again.
             putCompetitor(queryClient, list.queryKey, created);
-            setAdding(false);
-            onOpenRow(created.id);
+            onCreated(created.id);
           }}
-          onClose={() => setAdding(false)}
+          onClose={onCloseNew}
         />
       )}
       {isReordering && canEdit && (
@@ -1213,6 +1225,9 @@ export function CompetitorsScreen({
   const openedHere = useRouterState({
     select: (state) => state.location.state.openedDetail === true,
   });
+  const isAdding = useRouterState({
+    select: (state) => state.location.state.addingCompetitor === true,
+  });
   const to = (next: CompetitorsSearch, replace: boolean) =>
     void navigate({
       href: panel.keep(competitorsHref(workspace.id, ideaId, next)),
@@ -1233,11 +1248,39 @@ export function CompetitorsScreen({
         modal={modal}
         about={about}
         onSearch={(next) => to(next, true)}
+        isAdding={isAdding}
         onOpenRow={(row) => to({ ...search, row }, false)}
         onCloseRow={() => {
           if (openedHere) router.history.back();
           else to({ ...search, row: undefined }, true);
         }}
+        // The same URL in an entry of its own (design-spec 6.10「+ Add competitor」):
+        // Back closes it instead of leaving 15, as a phone's full sheet looks like a
+        // screen. The competitor it makes takes the entry, so closing that dialog goes
+        // back too.
+        onOpenNew={() =>
+          void navigate({
+            href: panel.keep(competitorsHref(workspace.id, ideaId, search)),
+            state: (previous) => ({
+              ...previous,
+              addingCompetitor: true,
+              openedDetail: true,
+            }),
+          })
+        }
+        onCloseNew={() => router.history.back()}
+        onCreated={(row) =>
+          void navigate({
+            href: panel.keep(
+              competitorsHref(workspace.id, ideaId, { ...search, row }),
+            ),
+            replace: true,
+            state: (previous) => ({
+              ...previous,
+              addingCompetitor: undefined,
+            }),
+          })
+        }
       />
     );
   } else if (home.isError) {

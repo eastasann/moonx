@@ -9,6 +9,7 @@ import {
   useMoreMenu,
 } from "@moonx/ui-web";
 import { useQuery } from "@tanstack/react-query";
+import { useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Compass,
@@ -34,7 +35,7 @@ import {
   type ScreenComments,
   screenAccepts,
 } from "./CommentsPanel";
-import { ModalBoundary } from "./ErrorBoundary";
+import { ModalBoundary, ScreenBoundary } from "./ErrorBoundary";
 import {
   HistoryPanelBody,
   historyAccepts,
@@ -97,7 +98,8 @@ export interface WorkspaceFrameProps
  * Account and Log out in the sidebar's account menu or in More, the header's save state
  * with its Retry, 💬 and 🕘 with their panels, and the bands: offline, the app's new
  * version, iPhone Safari's hint to add it to the Home Screen, then the screen's newer
- * template. Logging out with unsaved input asks first (5章「共通ナビ」). The pages
+ * template. Logging out with unsaved input asks first (5章「共通ナビ」). A screen that
+ * fails to render says so in its body's place, and the frame stays (SDD 8.2). The pages
  * appear here as their screens are built (docs/claude-code-prompts.md: no way into a
  * screen before it exists).
  */
@@ -128,6 +130,9 @@ export function WorkspaceFrame({
   const autosave = useAutosave();
   const saveState = useSaveState(saveScope);
   const { requestLogOut, confirmation } = useLogOutRequest();
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
   const openSwitch = () => modal.open("switch-workspace");
   const pages: NavItem[] = [
     {
@@ -345,7 +350,7 @@ export function WorkspaceFrame({
         template: templateBanner,
       }}
     >
-      {children}
+      <ScreenBoundary path={pathname}>{children}</ScreenBoundary>
       {confirmation}
     </AppFrame>
   );

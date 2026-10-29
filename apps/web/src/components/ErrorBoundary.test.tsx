@@ -1,8 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import * as sentry from "../lib/sentry";
-import { BlockBoundary, ModalBoundary } from "./ErrorBoundary";
+import { BlockBoundary, ModalBoundary, ScreenBoundary } from "./ErrorBoundary";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -49,6 +50,82 @@ describe("BlockBoundary (SDD 8.2)", () => {
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(screen.getByText("Ideas")).toBeTruthy();
     expect(screen.queryByText("Something went wrong")).toBeNull();
+  });
+});
+
+describe("ScreenBoundary (SDD 8.2, design-spec 6.0.6)", () => {
+  test("a screen that fails: Something went wrong in the body's place, its Ref and Retry; the frame stays", async () => {
+    quietConsole();
+    vi.spyOn(sentry, "reportError").mockReturnValue(
+      "3f2a9c1d0b8e4f5aa1b2c3d4e5f6a7b8",
+    );
+    const user = userEvent.setup();
+    render(
+      <>
+        <nav aria-label="Main" />
+        <ScreenBoundary path="/w/1/ideas">
+          <Breakable label="Ideas" />
+        </ScreenBoundary>
+      </>,
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Something went wrong" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Ref: 3f2a9c1d")).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "Main" })).toBeTruthy();
+    isBroken = false;
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(screen.getByText("Ideas")).toBeTruthy();
+  });
+
+  test("once failed, another path renders the screen again; a screen that renders is left as it is", () => {
+    quietConsole();
+    vi.spyOn(sentry, "reportError").mockReturnValue(null);
+    const mounts = vi.fn();
+    function Counted() {
+      useEffect(mounts, []);
+      return <Breakable label="Plan B" />;
+    }
+    const { rerender } = render(
+      <ScreenBoundary path="/plans/a">
+        <Counted />
+      </ScreenBoundary>,
+    );
+    expect(screen.getByText("Something went wrong")).toBeTruthy();
+    isBroken = false;
+    rerender(
+      <ScreenBoundary path="/plans/b">
+        <Counted />
+      </ScreenBoundary>,
+    );
+    expect(screen.getByText("Plan B")).toBeTruthy();
+    expect(mounts).toHaveBeenCalledOnce();
+    rerender(
+      <ScreenBoundary path="/plans/c">
+        <Counted />
+      </ScreenBoundary>,
+    );
+    // Not drawn afresh: what the screen holds (focus, what is typed) stays.
+    expect(mounts).toHaveBeenCalledOnce();
+  });
+
+  test("a failure that comes with a new path is caught there once, not tried again for it", () => {
+    quietConsole();
+    vi.spyOn(sentry, "reportError").mockReturnValue(null);
+    isBroken = false;
+    const { rerender } = render(
+      <ScreenBoundary path="/items/1">
+        <Breakable label="Item 1" />
+      </ScreenBoundary>,
+    );
+    isBroken = true;
+    rerender(
+      <ScreenBoundary path="/items/2">
+        <Breakable label="Item 2" />
+      </ScreenBoundary>,
+    );
+    expect(screen.getByText("Something went wrong")).toBeTruthy();
+    expect(sentry.reportError).toHaveBeenCalledOnce();
   });
 });
 

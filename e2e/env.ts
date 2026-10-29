@@ -25,6 +25,13 @@ export const PWA_API_LOG = fileURLToPath(
 );
 
 /**
+ * The Web's Sentry DSN the API on PWA_PORT writes into its pages (SDD 2章 WEB_SENTRY_DSN),
+ * so the build reports as on staging and production. Its host is under .invalid, which
+ * never resolves (RFC 6761): an event no test receives through page.route goes nowhere.
+ */
+export const PWA_SENTRY_DSN = "https://e2e@sentry.invalid/1";
+
+/**
  * The copy of make build-web's output that API serves (WEB_DIST_DIR), made afresh as it
  * starts: pwa.spec.ts changes its sw.js to stand for a new version, which must not touch
  * the build itself.

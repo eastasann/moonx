@@ -19,6 +19,7 @@ import {
   useAutosaveState,
   useSaveItem,
 } from "../lib/autosave-react";
+import { unexpectedReference } from "../lib/failure";
 import { meQuery } from "../lib/queries";
 import { ModalBoundary } from "./ErrorBoundary";
 
@@ -28,7 +29,7 @@ function rejectionWords(item: SaveItem, t: TFunction<["app"]>): string | null {
   const reason = rejectionReason(item.failure);
   if (reason !== null) return t(`app:save.reason.${reason}`);
   // A refusal no rule names: unexpected, with the Ref someone asking for help quotes.
-  const ref = item.failure.requestId;
+  const ref = unexpectedReference(item.failure);
   return ref === null
     ? t("app:state.unexpected")
     : t("app:state.unexpectedRef", { ref: ref.slice(0, 8) });

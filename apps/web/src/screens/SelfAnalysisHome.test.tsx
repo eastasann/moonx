@@ -2,7 +2,15 @@ import type { Me, SelfAnalysisHome } from "@moonx/schemas";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import * as sentry from "../lib/sentry";
+import {
+  ana,
+  apiError,
+  type Call,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   answer,
@@ -19,6 +27,7 @@ import {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const path = `/w/${workspaceId}/self-analysis`;
@@ -86,6 +95,24 @@ describe("10 Self Analysis (design-spec 6.11)", () => {
       expect(router.state.location.pathname).toBe(`${path}/WHY`),
     );
     expect(router.state.location.search).toMatchObject({ q: "SA.WHY.2" });
+  });
+
+  test("counts of a hundred or more are written in full, the thousands grouped (design-spec 1.2)", async () => {
+    homeApi({
+      home: selfHome({
+        answered: 120,
+        total: 1234,
+        sections: [{ key: "WHY", title: "WHY", answered: 100, total: 1001 }],
+      }),
+    });
+    renderApp(path);
+    expect(
+      await screen.findByText("In progress · 120 / 1,234 answered"),
+    ).toBeTruthy();
+    const status = screen.getByRole("region", { name: "Status" });
+    expect(within(status).getByText("120 / 1,234 answered")).toBeTruthy();
+    const sections = screen.getByRole("list", { name: "Sections" });
+    expect(within(sections).getByText("100/1,001")).toBeTruthy();
   });
 
   test("not started: what it is for, and Start", async () => {
@@ -192,6 +219,49 @@ describe("10 Self Analysis (design-spec 6.11)", () => {
       "My Self Analysis",
     );
     expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+  });
+
+  test("a block that fails to render says so alone: the other block and the navigation stay (SDD 8.2)", async () => {
+    // React logs what a boundary catches; the failure is the test's point.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(sentry, "reportError").mockReturnValue(
+      "3f2a9c1d0b8e4f5aa1b2c3d4e5f6a7b8",
+    );
+    homeApi({
+      home: selfHome({
+        // A section's title that is no text: what S1 never sends (SDD 5.8).
+        sections: [
+          {
+            key: "WHY",
+            title: {} as unknown as string,
+            answered: 1,
+            total: 2,
+          },
+        ],
+      }),
+    });
+    renderApp(path);
+    expect(
+      await screen.findByRole("heading", {
+        level: 3,
+        name: "Something went wrong",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText("Ref: 3f2a9c1d")).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "Sections" })).toBeNull();
+    const status = screen.getByRole("region", { name: "Status" });
+    expect(within(status).getByText("1 / 3 answered")).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "My Self Analysis" }),
+    ).toBeTruthy();
+    // The side navigation and the TabBar alike (the width picks one).
+    for (const nav of screen.getAllByRole("navigation", { name: "Main" })) {
+      expect(
+        within(nav)
+          .getByRole("link", { name: "Self Analysis" })
+          .getAttribute("aria-current"),
+      ).toBe("page");
+    }
   });
 
   test("Team opens 12; AI ▼ comes back to 10", async () => {
@@ -326,6 +396,117 @@ describe("10 Self Analysis (design-spec 6.11)", () => {
       ),
     ).toBe(true);
   });
+});
+
+describe("10's Mark as done and Reopen failures (design-spec 6.0.6)", () => {
+  const done = selfHome({ status: "done", answered: 3, firstUnanswered: null });
+  const allAnswered = selfHome({ answered: 3, firstUnanswered: null });
+
+  test.each([
+    {
+      failure: "500: Something went wrong with its Ref",
+      answer: () => apiError(500, "INTERNAL"),
+      words: "Something went wrong. Ref: 8f14e45f",
+    },
+    {
+      failure: "429: the wait",
+      answer: () => apiError(429, "RATE_LIMITED", { retryAfterSeconds: 60 }),
+      words: "Too many attempts. Try again in 1 minute.",
+    },
+  ])(
+    "Mark as done answered $failure in a toast; Retry sends it again",
+    async ({ answer, words }) => {
+      const user = userEvent.setup();
+      let attempts = 0;
+      const calls = homeApi({
+        home: allAnswered,
+        write: (call) => {
+          if (call.path !== `${api}/complete`) return undefined;
+          attempts += 1;
+          return attempts === 1 ? answer() : Response.json(done);
+        },
+      });
+      renderApp(path);
+      const markDone = await screen.findByRole("button", {
+        name: "Mark as done",
+      });
+      const toast = await toastAfter(words, () => user.click(markDone));
+      // Still not done: the press can be made again, and Retry makes it.
+      expect(screen.getByRole("button", { name: "Mark as done" })).toBeTruthy();
+      await user.click(within(toast).getByRole("button", { name: "Retry" }));
+      expect(
+        await screen.findByRole("button", { name: "Reopen" }),
+      ).toBeTruthy();
+      expect(
+        sent(calls, "POST", `${api}/complete`).map(({ body }) => body),
+      ).toEqual([{}, {}]);
+    },
+  );
+
+  test("Mark as done after asking: Retry sends it as asked, empty questions and all", async () => {
+    const user = userEvent.setup();
+    let attempts = 0;
+    const calls = homeApi({
+      write: (call) => {
+        if (call.path !== `${api}/complete`) return undefined;
+        attempts += 1;
+        return attempts === 1
+          ? apiError(500, "INTERNAL")
+          : Response.json(selfHome({ status: "done" }));
+      },
+    });
+    renderApp(path);
+    await user.click(
+      await screen.findByRole("button", { name: "Mark as done" }),
+    );
+    const dialog = await screen.findByRole("alertdialog", {
+      name: "2 questions are empty. Mark as done anyway?",
+    });
+    const toast = await toastAfter("Something went wrong. Ref: 8f14e45f", () =>
+      user.click(within(dialog).getByRole("button", { name: "Mark as done" })),
+    );
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("button", { name: "Reopen" })).toBeTruthy();
+    expect(
+      sent(calls, "POST", `${api}/complete`).map(({ body }) => body),
+    ).toEqual([{ confirmEmpty: true }, { confirmEmpty: true }]);
+  });
+
+  test.each([
+    {
+      failure: "500: Something went wrong with its Ref",
+      answer: () => apiError(500, "INTERNAL"),
+      words: "Something went wrong. Ref: 8f14e45f",
+    },
+    {
+      failure: "429: the wait",
+      answer: () => apiError(429, "RATE_LIMITED", { retryAfterSeconds: 2700 }),
+      words: "Too many attempts. Try again in 45 minutes.",
+    },
+  ])(
+    "Reopen answered $failure in a toast; Retry sends it again",
+    async ({ answer, words }) => {
+      const user = userEvent.setup();
+      let attempts = 0;
+      const calls = homeApi({
+        home: done,
+        write: (call) => {
+          if (call.path !== `${api}/reopen`) return undefined;
+          attempts += 1;
+          return attempts === 1 ? answer() : Response.json(allAnswered);
+        },
+      });
+      renderApp(path);
+      const reopen = await screen.findByRole("button", { name: "Reopen" });
+      const toast = await toastAfter(words, () => user.click(reopen));
+      expect(screen.getByRole("button", { name: "Reopen" })).toBeTruthy();
+      await user.click(within(toast).getByRole("button", { name: "Retry" }));
+      expect(
+        await screen.findByRole("button", { name: "Mark as done" }),
+      ).toBeTruthy();
+      expect(sent(calls, "POST", `${api}/reopen`)).toHaveLength(2);
+    },
+  );
 });
 
 describe("PNL-2 on 10 (design-spec 6.0.5)", () => {

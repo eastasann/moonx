@@ -296,12 +296,15 @@ type MemberQuestion =
   | { kind: "remove"; member: Member }
   | { kind: "leave" };
 
-/** Why a member's role and ⋯ cannot be used (design-spec 1.3・6.16 9), or null. */
+/**
+ * Why a member's role and ⋯ cannot be used (design-spec 1.3・6.16 9): the code the API
+ * would refuse a change with, whose words say why. Null when they can.
+ */
 const lockOf = (member: Member, owners: number) =>
   member.isPersonalOwner
-    ? ("personalOwner" as const)
+    ? ("PERSONAL_OWNER" as const)
     : member.role === "owner" && owners <= 1
-      ? ("lastOwner" as const)
+      ? ("LAST_OWNER" as const)
       : null;
 
 /**
@@ -311,7 +314,7 @@ const lockOf = (member: Member, owners: number) =>
  * oneself less than Owner and removing ask first, for what they undo (6.16's table).
  */
 function MemberList() {
-  const { t } = useTranslation(["settings", "common", "app"]);
+  const { t } = useTranslation(["settings", "common", "app", "errors"]);
   const { me, workspace } = useWorkspace();
   const workspaceId = workspace.id;
   const queryClient = useQueryClient();
@@ -488,11 +491,7 @@ function MemberList() {
                     : undefined
               }
               description={member.email ?? undefined}
-              note={
-                lock === null
-                  ? undefined
-                  : t(`settings:workspace.members.${lock}`)
-              }
+              note={lock === null ? undefined : t(`errors:${lock}`)}
               control={
                 <Picker
                   aria-label={t("settings:workspace.members.role", { name })}
@@ -531,8 +530,8 @@ function MemberList() {
         <SendFailure
           error={failure.error}
           messages={{
-            LAST_OWNER: t("settings:workspace.members.lastOwner"),
-            PERSONAL_OWNER: t("settings:workspace.members.personalOwner"),
+            LAST_OWNER: t("errors:LAST_OWNER"),
+            PERSONAL_OWNER: t("errors:PERSONAL_OWNER"),
           }}
           transient="couldNotSave"
           withSaveReasons
@@ -982,9 +981,7 @@ function InviteForm({
           <InlineAlert variant="negative">
             <Flex gap="space-200" wrap alignItems="center">
               <Text>
-                {t("settings:workspace.invitations.alreadyPending", {
-                  email: failure.email,
-                })}
+                {t("errors:INVITATION_PENDING", { email: failure.email })}
               </Text>
               <Button
                 variant="secondary"
@@ -1000,19 +997,16 @@ function InviteForm({
           <SendFailure
             error={failure.error}
             messages={{
-              ALREADY_MEMBER: t(
-                "settings:workspace.invitations.alreadyMember",
-                {
-                  email: failure.email,
-                },
-              ),
+              ALREADY_MEMBER: t("errors:ALREADY_MEMBER", {
+                email: failure.email,
+              }),
               INVITATION_ALREADY_ACCEPTED: t(
                 "errors:INVITATION_ALREADY_ACCEPTED",
               ),
-              INVITATION_INVALID: t(
-                "settings:workspace.invitations.wasCancelled",
-                { email: failure.email },
-              ),
+              INVITATION_INVALID: t("errors:INVITATION_INVALID", {
+                context: "cancelled",
+                email: failure.email,
+              }),
             }}
             transient="couldNotSave"
             withSaveReasons

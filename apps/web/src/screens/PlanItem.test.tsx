@@ -1,3 +1,4 @@
+import { conditionAnswersOutside, planItemProgress } from "@moonx/domain";
 import type {
   ExecutionItem,
   HistoryEntry,
@@ -163,6 +164,7 @@ const summary: PlanItem = {
     }),
     answer("P.01.2"),
   ],
+  conditionAnswers: [],
   metrics,
   costRowNames: {},
   scenarios: [],
@@ -197,6 +199,7 @@ const ownership = (rows: PlanAnswer["rows"]): PlanItem => ({
     }),
   ],
   answers: [answer("P.13.1", { rows, lockVersion: rows === null ? 0 : 3 })],
+  conditionAnswers: [],
   metrics: {},
   costRowNames: {},
   scenarios: [],
@@ -224,6 +227,7 @@ const milestones = (execution: ExecutionItem[]): PlanItem => ({
     }),
   ],
   answers: [],
+  conditionAnswers: [],
   metrics: {},
   costRowNames: {},
   scenarios: [],
@@ -260,6 +264,7 @@ const market: PlanItem = {
     }),
   ],
   answers: [answer("P.06.1")],
+  conditionAnswers: [],
   metrics: {},
   costRowNames: {},
   scenarios: [],
@@ -322,9 +327,11 @@ function itemApi({
   home = planHome(),
   ideaArchived = false,
   created,
+  create,
   history = [],
   members = true,
   patch,
+  beforeSave,
 }: {
   me?: Me;
   items: PlanItem[];
@@ -332,17 +339,22 @@ function itemApi({
   home?: ReturnType<typeof planHome>;
   ideaArchived?: boolean;
   created?: ExecutionItem;
+  /** Answers P9 POST instead of `created`. */
+  create?: () => Response;
   history?: HistoryEntry[];
   /** Whether W2 answers; else it fails as not found. */
   members?: boolean;
   /** Answers P10 PATCH instead of keeping what it sends. */
   patch?: () => Response;
+  /** Holds a save back before the fake applies it, as a slow P5 would. */
+  beforeSave?: () => Promise<void>;
 }) {
   const answers = new Map(
     items.flatMap((item) =>
       item.answers.map((saved) => [saved.questionKey, saved] as const),
     ),
   );
+  const prompts = items.flatMap((item) => item.prompts);
   return stubApi((call: Call) => {
     const { method, path } = call;
     if (method === "GET" && path === "/api/v1/me") return Response.json(me);
@@ -367,7 +379,20 @@ function itemApi({
       const [no, search] = (path.split("/items/")[1] ?? "").split("?");
       const list = search === `versionId=${versionId}` ? version : items;
       const item = list?.find(({ itemNo }) => itemNo === Number(no));
-      return item === undefined ? undefined : Response.json(item);
+      if (item === undefined) return undefined;
+      // What P4 reads of the other items, from what this fake holds now.
+      return Response.json(
+        list === items
+          ? {
+              ...item,
+              conditionAnswers: conditionAnswersOutside(
+                item.prompts,
+                prompts,
+                answers,
+              ),
+            }
+          : item,
+      );
     }
     if (
       method === "GET" &&
@@ -385,23 +410,27 @@ function itemApi({
       });
     }
     if (method === "PUT" && path.startsWith(`${api}/answers/`)) {
-      const key = decodeURIComponent(path.split("/answers/")[1] ?? "");
-      const body = call.body as {
-        text?: string;
-        rows?: PlanAnswer["rows"];
-        lockVersion: number;
+      const apply = () => {
+        const key = decodeURIComponent(path.split("/answers/")[1] ?? "");
+        const body = call.body as {
+          text?: string;
+          rows?: PlanAnswer["rows"];
+          lockVersion: number;
+        };
+        const before = answers.get(key) ?? answer(key);
+        const after = {
+          ...before,
+          ...(body.text === undefined ? {} : { text: body.text }),
+          ...(body.rows === undefined ? {} : { rows: body.rows }),
+          lockVersion: body.lockVersion + 1,
+        };
+        answers.set(key, after);
+        return Response.json(after);
       };
-      const before = answers.get(key) ?? answer(key);
-      const after = {
-        ...before,
-        ...(body.text === undefined ? {} : { text: body.text }),
-        ...(body.rows === undefined ? {} : { rows: body.rows }),
-        lockVersion: body.lockVersion + 1,
-      };
-      answers.set(key, after);
-      return Response.json(after);
+      return beforeSave === undefined ? apply() : beforeSave().then(apply);
     }
     if (method === "POST" && path === `${api}/execution-items`) {
+      if (create !== undefined) return create();
       return created === undefined
         ? undefined
         : Response.json(created, { status: 201 });
@@ -661,6 +690,7 @@ describe("21 Plan item (design-spec 6.12)", () => {
         }),
       ],
       answers: [answer("P.08.11")],
+      conditionAnswers: [],
       // Payroll is not in the validation: the API leaves it out and names it as the
       // template does (P4 `costRowNames`).
       metrics: {
@@ -770,6 +800,93 @@ describe("21 Plan item (design-spec 6.12)", () => {
     itemApi({ items: [summary] });
     renderApp(itemPath(31));
     expect(await screen.findByText("Not found. Check the link.")).toBeTruthy();
+  });
+});
+
+describe("a display condition naming another item's sub-item (design-spec 6.12・6.2)", () => {
+  /** §1's invoicing, which §2's first sub-item shows on. */
+  const invoicing = (text: string | null): PlanItem => ({
+    itemNo: 1,
+    title: "Executive Summary",
+    guidance: null,
+    readOnly: false,
+    prompts: [prompt("P.01.5", "Do offices pay by invoice")],
+    answers: [answer("P.01.5", { text, lockVersion: text === null ? 0 : 1 })],
+    conditionAnswers: [],
+    metrics: {},
+    costRowNames: {},
+    scenarios: [],
+    execution: [],
+    references: [],
+  });
+  const vision: PlanItem = {
+    itemNo: 2,
+    title: "Vision & Purpose",
+    guidance: null,
+    readOnly: false,
+    prompts: [
+      prompt("P.02.1", "How do invoices reach offices", {
+        displayCondition: { "P.01.5": ["Yes"] },
+      }),
+      prompt("P.02.2", "Why does this business exist"),
+    ],
+    answers: [answer("P.02.1"), answer("P.02.2")],
+    conditionAnswers: [],
+    metrics: {},
+    costRowNames: {},
+    scenarios: [],
+    execution: [],
+    references: [],
+  };
+
+  test.each([
+    ["Yes", true],
+    ["No", false],
+  ])(
+    "§2 shows a sub-item by §1's answer (%s) and counts as 20 does",
+    async (text, isShown) => {
+      itemApi({ items: [invoicing(text), vision] });
+      renderApp(itemPath(2));
+      await screen.findByRole("region", {
+        name: "Why does this business exist",
+      });
+      // 20 counts on all of the plan's answers (packages/domain, as P2 does).
+      const hub = planItemProgress(vision.prompts, {
+        answers: new Map([["P.01.5", { text, rows: null }]]),
+        executionCounts: new Map(),
+      });
+      expect(hub.total).toBe(isShown ? 2 : 1);
+      expect(screen.getByText(`${hub.filled}/${hub.total}`)).toBeTruthy();
+      expect(
+        screen.queryByRole("region", {
+          name: "How do invoices reach offices",
+        }) !== null,
+      ).toBe(isShown);
+    },
+  );
+
+  test("a save sent on leaving reads the next item again, whose condition names it", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls = itemApi({
+      items: [invoicing(null), vision],
+      beforeSave: () => held,
+    });
+    const router = renderApp(itemPath(1, "?q=P.01.5"));
+    const field = await screen.findByRole("textbox", {
+      name: "Answer to Do offices pay by invoice",
+    });
+    await user.type(field, "Yes");
+    await router.navigate({ href: itemPath(2) });
+    // Read before the save of §1 landed: what it shows is not shown yet.
+    expect(await screen.findByText("0/1")).toBeTruthy();
+    release();
+    expect(await screen.findByText("0/2")).toBeTruthy();
+    expect(card("How do invoices reach offices")).toBeTruthy();
+    expect(sent(calls, "GET", `${api}/items/2`)).toHaveLength(2);
   });
 });
 
@@ -908,6 +1025,85 @@ describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
     dueDate: "2026-09-30",
     overdue: true,
     commentCount: 2,
+  });
+
+  test("a new item refused as the plan is archived meanwhile: 21 reads as archived; the dialog keeps what was typed and why (6.13)", async () => {
+    const user = userEvent.setup();
+    const home = planHome();
+    const item = milestones([]);
+    itemApi({
+      items: [item],
+      home,
+      create: () => {
+        // Archived meanwhile: P2 and P4 read it so from now on.
+        Object.assign(home, planHome({ archived: true }));
+        item.readOnly = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(itemPath(23));
+    const card23 = await screen.findByRole("region", {
+      name: "Pre-launch Milestones",
+    });
+    await user.click(
+      within(card23).getByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Milestone/ }),
+      "Sign the lease",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "New milestone" })).toBeTruthy();
+    const title = within(dialog).getByRole("textbox", { name: /Milestone/ });
+    expect((title as HTMLInputElement).value).toBe("Sign the lease");
+    expect(title.hasAttribute("readonly")).toBe(true);
+    expect(within(dialog).getByRole("alert").textContent).toContain(
+      "It's archived",
+    );
+  });
+
+  test("a new item refused as gone (404): the dialog locks at once, with what was typed and why; nothing more is sent (6.10・6.13)", async () => {
+    const user = userEvent.setup();
+    const calls = itemApi({
+      items: [milestones([])],
+      create: () => apiError(404, "NOT_FOUND"),
+    });
+    renderApp(itemPath(23));
+    const card23 = await screen.findByRole("region", {
+      name: "Pre-launch Milestones",
+    });
+    await user.click(
+      within(card23).getByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Milestone/ }),
+      "Sign the lease",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("It no longer exists");
+    // Read again, 21 still lets the user add: the refusal itself locks the dialog.
+    const title = within(dialog).getByRole("textbox", { name: /Milestone/ });
+    expect((title as HTMLInputElement).value).toBe("Sign the lease");
+    expect(title.hasAttribute("readonly")).toBe(true);
+    expect(
+      within(alert)
+        .getByRole("button", { name: "Retry" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    const add = within(dialog).getByRole("button", { name: "Add" });
+    expect(add.hasAttribute("disabled")).toBe(true);
+    await user.click(add);
+    expect(
+      calls.filter(
+        ({ method, path }) =>
+          method === "POST" && path === `${api}/execution-items`,
+      ),
+    ).toHaveLength(1);
   });
 
   test("Nothing yet, then + Add makes one: Add waits for its first column", async () => {

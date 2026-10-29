@@ -13,11 +13,12 @@ import {
   TriangleAlert,
   WifiOff,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../lib/api";
+import { useUnexpectedReference } from "../lib/failure";
 import { useIsOnline } from "../lib/online";
-import { reportError } from "../lib/sentry";
+import { rateLimitWords } from "./SendFailure";
 import { StandaloneFrame } from "./StandaloneFrame";
 
 /** Where a state stands: a whole page, or one block of a screen (its heading's level). */
@@ -142,22 +143,46 @@ export function UnexpectedState({
   );
 }
 
-// An error is reported once, though React may render its state more than once.
-const reported = new WeakMap<object, string | null>();
-
 /**
- * Sends a failure of the Web itself to Sentry, once per error, and returns the event id.
- * Failures of the API are not sent: the API reports its own (SDD 8.3).
+ * "Too many attempts. Try again in …" and Retry, in the place of the content (6.0.6
+ * 「回数の上限」, SDD 8.2「回数制限」): the rate limit of a load, not an unexpected error.
  */
-export function reportOnce(error: unknown): string | null {
-  if (typeof error !== "object" || error === null) return reportError(error);
-  if (!reported.has(error)) reported.set(error, reportError(error));
-  return reported.get(error) ?? null;
+function RateLimitedState({
+  words,
+  onRetry,
+  ...placement
+}: StatePlacement & { words: string; onRetry: () => void }) {
+  const { t } = useTranslation(["app"]);
+  return (
+    <IllustratedMessage
+      {...placed(placement)}
+      icon={<Hourglass />}
+      heading={words}
+      actions={
+        <Button variant="secondary" onPress={onRetry}>
+          {t("app:state.retry")}
+        </Button>
+      }
+    />
+  );
+}
+
+/** The state of 6.0.6 a failure to load takes (SDD 8.2). */
+function failureKind(error: unknown) {
+  if (!(error instanceof ApiError)) return "unexpected";
+  if (error.status === null) return "network";
+  if (error.code === "UPSTREAM_UNAVAILABLE") return "loadError";
+  if (error.status === 401) return "signedOut";
+  if (error.status === 403) return "noAccess";
+  if (error.status === 404) return "notFound";
+  return "unexpected";
 }
 
 /**
  * The state of 6.0.6 for a failure to load (SDD 8.2): the network (offline or not), an
- * API that is not up, no access, nothing there, or else unexpected.
+ * API that is not up, no access, nothing there, a rate limit with its wait, or else
+ * unexpected. A lost session shows nothing: the app is on its way to M9 or the sign-in
+ * screen (router.tsx).
  */
 export function FailureState({
   error,
@@ -170,40 +195,41 @@ export function FailureState({
   dashboardHref?: string;
 }) {
   const isOnline = useIsOnline();
-  // Reported as it is rendered, so its id is there to show; once per error, however
-  // often it is rendered, and again for the next error a Retry may bring.
-  const eventId = useMemo(
-    () => (error instanceof ApiError ? null : reportOnce(error)),
-    [error],
-  );
-  if (error instanceof ApiError) {
-    if (error.status === null) {
+  const kind = failureKind(error);
+  const rateLimited = rateLimitWords(error);
+  const isUnexpected = kind === "unexpected" && rateLimited === null;
+  // Once per error, however often it is rendered, and again for the next error a Retry
+  // may bring.
+  const reference = useUnexpectedReference(error, isUnexpected);
+  if (rateLimited !== null) {
+    return (
+      <RateLimitedState {...placement} words={rateLimited} onRetry={onRetry} />
+    );
+  }
+  switch (kind) {
+    case "network":
       return isOnline ? (
         <LoadErrorState {...placement} onRetry={onRetry} />
       ) : (
         <OfflineState {...placement} />
       );
-    }
-    if (error.code === "UPSTREAM_UNAVAILABLE") {
+    case "loadError":
       return <LoadErrorState {...placement} onRetry={onRetry} />;
-    }
-    if (error.status === 403) {
+    case "signedOut":
+      return null;
+    case "noAccess":
       return <NoAccessState {...placement} dashboardHref={dashboardHref} />;
-    }
-    if (error.status === 404) {
+    case "notFound":
       return <NotFoundState {...placement} dashboardHref={dashboardHref} />;
-    }
-    return (
-      <UnexpectedState
-        {...placement}
-        reference={error.requestId}
-        onRetry={onRetry}
-      />
-    );
+    case "unexpected":
+      return (
+        <UnexpectedState
+          {...placement}
+          reference={reference}
+          onRetry={onRetry}
+        />
+      );
   }
-  return (
-    <UnexpectedState {...placement} reference={eventId} onRetry={onRetry} />
-  );
 }
 
 /** How long loading may take before the screen says so (6.0.6). */

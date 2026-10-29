@@ -435,6 +435,40 @@ describe("the export (design-spec 6.6)", () => {
     );
   });
 
+  test("writes a typed price in Key numbers as typed, and the calculated amounts as 6.4 rounds them", () => {
+    const metrics = Object.fromEntries(
+      KEY_METRIC_KEYS.map((key) => [key, exact(10)]),
+    );
+    const keyNumbersOf = (price: number) =>
+      exportOf(
+        validationInput({
+          reference: {
+            kind: "validation",
+            keyMetrics: {
+              ...metrics,
+              selling_price: exact(price),
+              variable_cost_per_unit: exact(77),
+              initial_cost_total: exact(85000.5),
+            },
+            checks: [],
+            competitors: [],
+            researchLog: [],
+            assumptions: [],
+            risks: [],
+          },
+        }),
+      );
+    const { markdown, json } = keyNumbersOf(149.5);
+    expect(json.reference?.keyNumbers.selling_price).toEqual({
+      label: "Price",
+      value: "₱149.50",
+    });
+    expect(markdown).toContain("- Price: ₱149.50");
+    expect(markdown).toContain("- Variable cost / sale: ₱77.00");
+    expect(markdown).toContain("- Startup cost: ₱85,001");
+    expect(keyNumbersOf(150).markdown).toContain("- Price: ₱150\n");
+  });
+
   test("writes evidence on one line, whatever its texts hold", () => {
     const { markdown } = exportOf(
       validationInput({

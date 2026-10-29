@@ -9,7 +9,6 @@ import { SwitchWorkspaceDialog } from "../../../../components/SwitchWorkspaceDia
 import {
   NoAccessState,
   NotFoundState,
-  reportOnce,
   StatePage,
 } from "../../../../components/states";
 import {
@@ -18,8 +17,8 @@ import {
   WorkspaceContext,
 } from "../../../../components/workspace";
 import { ApiError, api, unwrap } from "../../../../lib/api";
+import { isTransient, unexpectedReference } from "../../../../lib/failure";
 import { meQuery } from "../../../../lib/queries";
-import { isTransient } from "../../../../lib/query";
 
 const isMemberOf = (me: Me, workspaceId: string) =>
   me.memberships.some(({ workspace }) => workspace.id === workspaceId);
@@ -66,7 +65,7 @@ export const Route = createFileRoute("/_signedIn/w/$workspaceId")({
  * Records the workspace as the one last opened (U2), where the next sign-in lands
  * (design-spec 5章「ログイン後」). Nothing on screen waits for it: if it fails, the
  * previous one stays and the next visit writes it again. The API reports its own 5xx;
- * a failure of the Web's code goes to Sentry.
+ * a failure of the Web's code, or a 4xx that should not come, goes to Sentry.
  */
 function useRecordLastWorkspace(me: Me, workspaceId: string | null) {
   const queryClient = useQueryClient();
@@ -80,7 +79,13 @@ function useRecordLastWorkspace(me: Me, workspaceId: string | null) {
         me === undefined ? me : { ...me, lastWorkspaceId },
       ),
     onError: (error) => {
-      if (!(error instanceof ApiError)) reportOnce(error);
+      // A membership lost since `me` was read makes U2 refuse the workspace (422), and
+      // the next visit records another; anything else unexpected goes to Sentry, though
+      // nothing on screen shows it (SDD 11章).
+      const isExpected =
+        error instanceof ApiError &&
+        (error.code === "VALIDATION_FAILED" || error.status === 429);
+      if (!isExpected) unexpectedReference(error);
     },
   });
   const last = me.lastWorkspaceId;

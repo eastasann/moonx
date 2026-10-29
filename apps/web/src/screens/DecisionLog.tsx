@@ -46,7 +46,7 @@ import {
   SlowLoadingState,
   useIsSlow,
 } from "../components/states";
-import { UserName } from "../components/UserName";
+import { UserName, userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
 import {
@@ -232,7 +232,7 @@ function Filters({
           .filter(({ role }) => role !== "viewer")
           .map(({ user }) => user),
         ...(everyEntry.data ?? []).map(({ recordedBy }) => recordedBy),
-      ].map(({ id, displayName }) => [id, { id, label: displayName }]),
+      ].map((user) => [user.id, { id: user.id, label: userNameText(user) }]),
     ).values(),
   ].sort((a, b) => a.label.localeCompare(b.label));
   const today = formatIsoDate(new Date(), { timeZone: me.timezone });
@@ -673,7 +673,7 @@ function DecisionLogBody({
                 <Text variant="caption" tone="secondary">
                   {t("decisions:row.meta", {
                     kind: t(`decisions:kind.${entry.kind}`),
-                    name: entry.recordedBy.displayName,
+                    name: userNameText(entry.recordedBy),
                   })}
                 </Text>
                 {entry.reasonExcerpt !== null && (

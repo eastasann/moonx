@@ -313,7 +313,7 @@ describe("fieldChanges", () => {
     ).toEqual(
       [
         { label: "Entered as", before: "Amount", after: "% of price" },
-        { label: "Amount", before: "₱12.00", after: "" },
+        { label: "Amount", before: "₱12", after: "" },
         { label: "% of price", before: "", after: "35%" },
         {
           label: "F/A/U",
@@ -322,6 +322,50 @@ describe("fieldChanges", () => {
         },
       ].filter(({ before, after }) => before !== after),
     );
+  });
+
+  test("a typed price and a typed variable cost read as typed, never rounded (6.4「端数」)", () => {
+    const price = (value: number) => ({
+      value,
+      fau: null,
+      confidence: null,
+      evidenceIds: [],
+    });
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "economics_input", id, key: "selling_price" },
+          before: price(150),
+          after: price(149.5),
+        }),
+        context,
+      ),
+    ).toEqual([{ label: "Value", before: "₱150", after: "₱149.50" }]);
+    const cost = (amount: number) => ({
+      category: "variable",
+      templateKey: null,
+      name: "Box",
+      inputMode: "amount",
+      amount,
+      percent: null,
+      isLumpSum: false,
+      whyNeeded: null,
+      canReduce: null,
+      notes: null,
+      fau: null,
+      confidence: null,
+      evidenceIds: [],
+    });
+    expect(
+      fieldChanges(
+        entry({
+          target: { type: "cost_item", id, key: null },
+          before: cost(77),
+          after: cost(77.25),
+        }),
+        context,
+      ),
+    ).toEqual([{ label: "Amount", before: "₱77", after: "₱77.25" }]);
   });
 
   test("a research log entry's date, source and checks read as 14 shows them", () => {

@@ -1210,7 +1210,7 @@ test.describe("what the mockups show at a glance (Step 22i, design-spec 4.5)", (
       name: "F/A/U of Working Capital Buffer: Empty",
     });
     await expect(empty).toHaveText("\u2014Empty");
-    expect(await isMono(page.getByText("· ₱77.00"))).toBe(true);
+    expect(await isMono(page.getByText("· ₱77", { exact: true }))).toBe(true);
     await expect(page.getByText(/^Subtotal/).first()).toBeVisible();
 
     await open(page, "s17-costs", phone);

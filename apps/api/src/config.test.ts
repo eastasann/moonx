@@ -211,6 +211,28 @@ describe("every environment", () => {
     ]);
   });
 
+  // Its origin goes into the CSP (SDD 7.2), where a `;` would end connect-src.
+  test.each([
+    "o1.ingest.us.sentry.io/2",
+    "ftp://web@sentry.example/2",
+    "https://web@sentry;script-src*/2",
+    "https://web@[::1]:9000/2",
+  ])("rejects the WEB_SENTRY_DSN %s", (dsn) => {
+    expect(problemsOf({ ...local, WEB_SENTRY_DSN: dsn })).toEqual([
+      `WEB_SENTRY_DSN must be an http or https URL whose host is letters, digits, hyphens and dots, got "${dsn}"`,
+    ]);
+  });
+
+  test.each([
+    "https://web@o1.ingest.us.sentry.io/2",
+    "https://web@o1.ingest.de.sentry.io/2",
+    "http://web@localhost:9000/2",
+  ])("accepts the WEB_SENTRY_DSN %s", (dsn) => {
+    expect(loadConfig({ ...local, WEB_SENTRY_DSN: dsn }).webSentryDsn).toBe(
+      dsn,
+    );
+  });
+
   test("reports every problem at once", () => {
     expect(
       problemsOf({

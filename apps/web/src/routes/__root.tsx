@@ -59,17 +59,22 @@ function RootDocument({ children }: { children: ReactNode }) {
   );
 }
 
-/** The screens of a workspace, which show the TabBar on a phone (design-spec 6.0.1). */
-const WORKSPACE_ROUTE = "/_signedIn/w/$workspaceId";
+/**
+ * The signed-in screens, which are drawn in AppFrame with the TabBar on a phone (design-
+ * spec 6.0.1): a workspace's, and 4, 8 and 26–28 in the one last opened. Not 3, which
+ * stands without the frame (`isStandalone`).
+ */
+const SIGNED_IN_ROUTE = "/_signedIn";
 
 /**
  * Every screen, and the one place their toasts appear (design-spec 4.5 Toast): above the
- * TabBar where a workspace's screen shows one.
+ * TabBar where a screen shows one.
  */
 function RootLayout() {
   const hasTabBar = useRouterState({
     select: (state) =>
-      state.matches.some((match) => match.routeId === WORKSPACE_ROUTE),
+      state.matches.some((match) => match.routeId === SIGNED_IN_ROUTE) &&
+      !state.matches.some((match) => match.staticData.isStandalone === true),
   });
   const hasOwnToasts = useRouterState({
     select: (state) =>

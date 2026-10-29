@@ -336,15 +336,17 @@ function TemplateDetail({ template }: { template: Template }) {
     } else {
       problemNote = (
         <InlineAlert variant="negative">
-          {problem.kind !== "otherKind"
-            ? t(`admin:templates.importErrors.${problem.kind}`)
-            : problem.fileKind === null
-              ? t("admin:templates.importErrors.notThisKind", {
-                  kind: kindLabel,
-                })
-              : t("admin:templates.importErrors.otherKind", {
-                  kind: t(`admin:kind.${problem.fileKind}`),
-                })}
+          {problem.kind === "draftExists"
+            ? t("errors:DRAFT_EXISTS")
+            : problem.kind !== "otherKind"
+              ? t(`admin:templates.importErrors.${problem.kind}`)
+              : problem.fileKind === null
+                ? t("admin:templates.importErrors.notThisKind", {
+                    kind: kindLabel,
+                  })
+                : t("admin:templates.importErrors.otherKind", {
+                    kind: t(`admin:kind.${problem.fileKind}`),
+                  })}
         </InlineAlert>
       );
     }

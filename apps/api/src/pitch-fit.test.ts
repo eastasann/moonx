@@ -274,10 +274,16 @@ interface Amounts {
   perSale: number;
   /** Variable cost a lower bound ("+"), contribution and its margin upper ones ("≤"). */
   perSaleBounded?: boolean;
+  /**
+   * The price typed with cents, which it then shows as the calculated amounts per sale
+   * always do ("₱99,999.99"; design-spec 6.4「端数」); else a whole price ("₱99,999").
+   */
+  priceWithCents?: boolean;
   /** A lower bound ("+"), as with an Unknown cost row. */
   startup: number;
   /** Each scenario's revenue, and its operating profit as a loss with "≤". */
   revenue: number;
+  /** Typed, so a price with cents shows them (design-spec 6.4「端数」). */
   competitorPrice: number;
 }
 
@@ -291,7 +297,7 @@ const withAmounts = (
     ...input,
     keyMetrics: {
       ...input.keyMetrics,
-      selling_price: metric(amounts.perSale),
+      selling_price: metric(amounts.priceWithCents ? cents : amounts.perSale),
       variable_cost_per_unit: metric(cents, bounded ? "lower" : "exact"),
       contribution_margin: metric(cents, bounded ? "upper" : "exact"),
       contribution_margin_rate: metric(0.999, bounded ? "upper" : "exact"),
@@ -392,14 +398,17 @@ const BREAKING = new Set([
   "AD6's figures 1",
 ]);
 
-/** A loss per sale as large as the price: contribution margin "−100.0%". */
+/**
+ * A loss per sale as large as the price: contribution margin "−100.0%". The price is
+ * whole, or typed with cents.
+ */
 const withLoss =
-  (perSale: number, bounded: boolean) =>
+  (perSale: number, bounded: boolean, priceWithCents = false) =>
   (input: PitchDeckInput): PitchDeckInput => ({
     ...input,
     keyMetrics: {
       ...input.keyMetrics,
-      selling_price: metric(perSale),
+      selling_price: metric(priceWithCents ? perSale + 0.99 : perSale),
       variable_cost_per_unit: metric(
         2 * perSale + 0.99,
         bounded ? "lower" : "exact",
@@ -477,6 +486,35 @@ describe("the amounts of design-spec 6.14's range", () => {
         "five.business_model: numbers break",
       ]);
     });
+
+    test(`${language}: a price with cents takes the range one digit lower`, () => {
+      const withCents =
+        (amounts: Partial<Amounts>) => (input: PitchDeckInput) =>
+          withAmounts(input, { ...RANGE, ...amounts, priceWithCents: true });
+      const breaks = ["five.business_model: numbers break"];
+      // Up to ₱99,999, or ₱999 with the marks.
+      expect(flagged(language, withCents({ perSale: 99_999 }))).toEqual([]);
+      expect(
+        flagged(language, withCents({ perSale: 999, perSaleBounded: true })),
+      ).toEqual([]);
+      expect(flagged(language, withCents({ perSale: 100_000 }))).toEqual(
+        breaks,
+      );
+      expect(
+        flagged(language, withCents({ perSale: 1_000, perSaleBounded: true })),
+      ).toEqual(breaks);
+      // A loss per sale: up to ₱9,999, or ₱999 with the marks.
+      expect(flagged(language, withLoss(9_999, false, true))).toEqual([]);
+      expect(flagged(language, withLoss(999, true, true))).toEqual([]);
+      expect(flagged(language, withLoss(10_000, false, true))).toEqual(breaks);
+      expect(flagged(language, withLoss(1_000, true, true))).toEqual(breaks);
+      // The one-minute deck's three figures do not break at the whole range's top.
+      expect(
+        flagged(language, withCents({ perSale: 999_999 })).filter((flag) =>
+          flag.startsWith("one."),
+        ),
+      ).toEqual([]);
+    });
   }
 
   test("the cells of the range do not break at their largest size, and past it they do", () => {
@@ -488,6 +526,19 @@ describe("the amounts of design-spec 6.14's range", () => {
       cellsBreakAtLargest(
         "competition",
         at({ ...RANGE, competitorPrice: 10_000_000 }),
+      ),
+    ).toBe(true);
+    // A competitor's price with cents: up to ₱99,999.99, and from ₱100,000 it breaks.
+    expect(
+      cellsBreakAtLargest(
+        "competition",
+        at({ ...RANGE, competitorPrice: 99_999.99 }),
+      ),
+    ).toBe(false);
+    expect(
+      cellsBreakAtLargest(
+        "competition",
+        at({ ...RANGE, competitorPrice: 100_000.5 }),
       ),
     ).toBe(true);
     expect(
@@ -604,15 +655,28 @@ describe("the amounts of design-spec 6.14's range", () => {
 
   for (const language of ["en", "ja"] as const) {
     test(`${language}: far past it, up to 6.14's bounds, every slide still fits its body unwarned`, () => {
-      for (const [name, figures] of [
-        ["as they are", {}] as [string, KeyMetrics],
-        ...FIGURES,
+      // The prices at their input limit, or just under it with cents, their widest.
+      for (const amounts of [
+        FAR,
+        {
+          ...FAR,
+          perSale: 999_999_999_999,
+          priceWithCents: true,
+          competitorPrice: 999_999_999_999.99,
+        },
       ]) {
-        const flags = flagged(language, withFigures(figures, FAR));
-        expect({
-          name,
-          warnedOrCut: flags.filter((flag) => !flag.endsWith("numbers break")),
-        }).toEqual({ name, warnedOrCut: [] });
+        for (const [name, figures] of [
+          ["as they are", {}] as [string, KeyMetrics],
+          ...FIGURES,
+        ]) {
+          const flags = flagged(language, withFigures(figures, amounts));
+          expect({
+            name,
+            warnedOrCut: flags.filter(
+              (flag) => !flag.endsWith("numbers break"),
+            ),
+          }).toEqual({ name, warnedOrCut: [] });
+        }
       }
     });
   }
@@ -631,6 +695,58 @@ describe("the amounts of design-spec 6.14's range", () => {
       ]);
     }
   });
+});
+
+describe("typed amounts in the PDF (design-spec 6.4「端数」)", () => {
+  test("a price with cents is printed as typed, a whole one without them", async () => {
+    const pageOf = async (price: number, variant: PitchVariant) => {
+      const input = fullest(variant, LANGUAGES.en.short);
+      const deck = fitPitchDeck(
+        buildPitchDeck({
+          ...input,
+          keyMetrics: {
+            ...input.keyMetrics,
+            selling_price: metric(price),
+            variable_cost_per_unit: metric(77),
+          },
+        }),
+        fit,
+      );
+      const index = deck.slides.findIndex(
+        (slide) => slide.key === "business_model",
+      );
+      const pages = await pdfOf(deck);
+      return pageText(pages[index] ?? { texts: [] });
+    };
+    const five = await pageOf(149.5, "five");
+    expect(five).toContain("₱149.50");
+    // The calculated variable cost keeps its cents, whole or not.
+    expect(five).toContain("₱77.00");
+    expect(await pageOf(149.5, "one")).toContain("₱149.50");
+    const whole = await pageOf(150, "one");
+    expect(whole).toContain("₱150");
+    expect(whole).not.toContain("₱150.00");
+  }, 30_000);
+
+  test("a competitor's price with cents is printed as typed, a whole one without them", async () => {
+    const input = fullest("five", LANGUAGES.en.short);
+    const deck = fitPitchDeck(
+      buildPitchDeck({
+        ...input,
+        competitors: input.competitors.map((competitor, index) => ({
+          ...competitor,
+          typicalPrice: index === 0 ? 149.5 : 150,
+        })),
+      }),
+      fit,
+    );
+    const index = deck.slides.findIndex((slide) => slide.key === "competition");
+    const pages = await pdfOf(deck);
+    const prices = (pages[index]?.texts ?? [])
+      .map((text) => text.str)
+      .filter((text) => text.startsWith("₱"));
+    expect(prices).toEqual(["₱149.50", "₱150", "₱150", "₱150", "₱150"]);
+  }, 30_000);
 });
 
 /** The slides cut at the bottom of their body on the most material in `language`. */

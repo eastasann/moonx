@@ -578,12 +578,16 @@ async function sharedSections(
         .filter((section) => sectionKeys.includes(section.key))
         .map(({ questions, ...section }) => ({
           ...section,
-          answers: questions.map((candidate) => ({
-            questionKey: candidate.key,
-            title: candidate.title,
-            text: mine.get(candidate.key)?.text ?? null,
-            amount: mine.get(candidate.key)?.amount ?? null,
-          })),
+          // As 12 shows the analysis: a question its display condition hides, read
+          // with all of the analysis's answers, is left out (design-spec 6.2).
+          answers: questions
+            .filter((candidate) => isQuestionShown(candidate, mine))
+            .map((candidate) => ({
+              questionKey: candidate.key,
+              title: candidate.title,
+              text: mine.get(candidate.key)?.text ?? null,
+              amount: mine.get(candidate.key)?.amount ?? null,
+            })),
         })),
     };
   });

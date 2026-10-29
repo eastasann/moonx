@@ -43,9 +43,10 @@ interface ListDetailBase {
   listNote?: ReactNode;
   /**
    * The new item ("New idea"): a primary Button at the end of the title's line from the
-   * tablet breakpoint up, a floating "+" at the bottom right on a phone (4.1 D).
+   * tablet breakpoint up, a floating "+" at the bottom right on a phone (4.1 D). With
+   * `isDisabled` both stay in place, unpressable (offline, 6.0.6).
    */
-  newItem?: { label: string; onPress: () => void };
+  newItem?: { label: string; onPress: () => void; isDisabled?: boolean };
   /**
    * Lists switched in place under the title (16's Assumptions / Risks; design-spec 4.5
    * Tabs): the tabs, then the selected one's filters and list in its panel. The detail
@@ -310,7 +311,11 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
               <div className={styles.listHead}>
                 <div className={styles.listTitle}>{header}</div>
                 {!isNarrow && newItem !== undefined && (
-                  <Button variant="primary" onPress={newItem.onPress}>
+                  <Button
+                    variant="primary"
+                    onPress={newItem.onPress}
+                    isDisabled={newItem.isDisabled}
+                  >
                     <Plus />
                     {newItem.label}
                   </Button>
@@ -373,7 +378,11 @@ export function ListDetailPattern(props: ListDetailPatternProps) {
         )}
       </div>
       {isNarrow && showsList && newItem !== undefined && (
-        <FloatingAction label={newItem.label} onPress={newItem.onPress} />
+        <FloatingAction
+          label={newItem.label}
+          onPress={newItem.onPress}
+          isDisabled={newItem.isDisabled}
+        />
       )}
     </div>
   );

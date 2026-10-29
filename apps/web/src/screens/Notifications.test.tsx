@@ -1,15 +1,36 @@
 import type { Notification } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  type Call,
+  renderApp,
+  stubApi,
+  toastAfter,
+  toastPlacements,
+  toastRegion,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import { home, validationId } from "../test/validation";
 
 // 8 Notifications and the navigation's unread count (design-spec 6.15・5章, SDD 5.11 N1–N3).
 
+/** happy-dom's window, whose viewport a test sets. */
+const setViewport = (width: number) =>
+  act(() =>
+    (
+      window as unknown as {
+        happyDOM: {
+          setViewport: (size: { width: number; height: number }) => void;
+        };
+      }
+    ).happyDOM.setViewport({ width, height: 900 }),
+  );
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  setViewport(1024);
 });
 
 const paolo = {
@@ -175,6 +196,27 @@ describe("8 Notifications (design-spec 6.15)", () => {
     await user.click(within(list).getByText("Paolo Gonzaga mentioned you"));
     expect(await screen.findByText("You no longer have access")).toBeTruthy();
     expect(router.state.location.pathname).toBe("/notifications");
+  });
+
+  test("on a phone, its toast sits above the TabBar, as on a workspace's screen (4.5 Toast)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    notificationsApi({ items: [gone] });
+    renderApp("/notifications");
+    // 8 stands in the workspace last opened, with its TabBar (6.16).
+    expect(
+      await screen.findAllByRole("link", { name: "Notifications, 1 unread" }),
+    ).not.toHaveLength(0);
+    const list = await screen.findByRole("grid", { name: "Notifications" });
+    const toast = await toastAfter("You no longer have access", () =>
+      user.click(within(list).getByText("Paolo Gonzaga mentioned you")),
+    );
+    expect(toastRegion().contains(toast)).toBe(true);
+    const placed = toastRegion().className;
+    cleanup();
+    const placements = toastPlacements();
+    expect(placements.aboveTabBar).not.toBe(placements.atBottom);
+    expect(placed).toBe(placements.aboveTabBar);
   });
 
   test("Unread shows the unread only; Mark all as read reads them all", async () => {

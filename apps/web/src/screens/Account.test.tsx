@@ -484,6 +484,93 @@ describe("4 Account (design-spec 6.16)", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
     expect(screen.queryByText("Something went wrong")).toBeNull();
   });
+
+  test("Leave refused as the only Owner, W2 unread: the API's words in the question", async () => {
+    const user = userEvent.setup();
+    accountApi({
+      answer: ({ method, path }) =>
+        method === "DELETE" &&
+        path === `/api/v1/workspaces/${bcdx.id}/members/me`
+          ? apiError(409, "LAST_OWNER")
+          : method === "GET" && path === `/api/v1/workspaces/${bcdx.id}/members`
+            ? apiError(500, "INTERNAL")
+            : undefined,
+    });
+    renderApp("/account");
+    const list = await workspaces();
+    await user.click(
+      within(list).getByRole("button", { name: `Leave ${bcdx.name}` }),
+    );
+    const question = await screen.findByRole("alertdialog", {
+      name: `Leave ${bcdx.name}?`,
+    });
+    await user.click(within(question).getByRole("button", { name: "Leave" }));
+    expect(
+      await within(question).findByText("Make someone else Owner first"),
+    ).toBeTruthy();
+    expect(within(question).queryByText("Something went wrong")).toBeNull();
+  });
+
+  test("Delete account refused by the API: another email or a wrong password under its field", async () => {
+    const user = userEvent.setup();
+    let refusal: "CONFIRMATION_MISMATCH" | "INVALID_PASSWORD" =
+      "CONFIRMATION_MISMATCH";
+    accountApi({
+      answer: ({ method, path }) =>
+        method === "POST" && path === "/api/v1/me/delete"
+          ? apiError(refusal === "INVALID_PASSWORD" ? 403 : 422, refusal)
+          : undefined,
+    });
+    renderApp("/account");
+    await user.click(
+      await screen.findByRole("button", { name: "Delete account" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Delete your account?",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Your email/ }),
+      ana.email,
+    );
+    const password = within(dialog).getByLabelText(/^Password/);
+    await user.type(password, "moonx-demo-2026");
+    const confirm = within(dialog).getByRole("button", {
+      name: "Delete account",
+    });
+    await user.click(confirm);
+    expect(
+      await within(dialog).findByText("The email doesn't match your account"),
+    ).toBeTruthy();
+    refusal = "INVALID_PASSWORD";
+    await user.type(password, "!");
+    await user.click(confirm);
+    expect(
+      await within(dialog).findByText("Password is incorrect"),
+    ).toBeTruthy();
+    expect(within(dialog).queryByText("Something went wrong")).toBeNull();
+  });
+
+  test("a photo the API finds too large: its words under the photo", async () => {
+    accountApi({
+      answer: ({ method, path }) =>
+        method === "PUT" && path === "/api/v1/me/avatar"
+          ? apiError(413, "PAYLOAD_TOO_LARGE")
+          : undefined,
+    });
+    renderApp("/account");
+    await screen.findByRole("button", { name: "Add photo" });
+    const photo =
+      document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (photo === null) throw new Error("no file input");
+    await userEvent.upload(
+      photo,
+      new File(["small"], "a.png", { type: "image/png" }),
+    );
+    expect(
+      await screen.findByText("This photo is too large. Use one under 5 MB."),
+    ).toBeTruthy();
+    expect(screen.queryByText("Something went wrong")).toBeNull();
+  });
 });
 
 describe("4 while its route loads (design-spec 6.0.6「ローディング」)", () => {

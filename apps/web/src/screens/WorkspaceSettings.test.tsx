@@ -321,6 +321,10 @@ describe("9 Workspace Settings (design-spec 6.16)", () => {
     const question = await screen.findByRole("alertdialog", {
       name: "Remove Kenji Mori?",
     });
+    // What being removed undoes, as 6.16's table has it.
+    expect(question.textContent).toContain(
+      "They lose access to this workspace. Their self analysis stops being shared with it and stays unshared if they join again, and the execution items assigned to them keep their name as text. Their name stays on what they added and wrote here, marked “(former member)”. Their notifications from this workspace stay, but open “You no longer have access”.",
+    );
     await user.click(within(question).getByRole("button", { name: "Remove" }));
     await waitFor(() =>
       expect(
@@ -460,6 +464,40 @@ describe("9 Workspace Settings (design-spec 6.16)", () => {
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/w/${workspaceId}`),
     );
+  });
+
+  test("a change the API refuses for the only Owner or the personal workspace's owner: its words under the list, the list read again", async () => {
+    const user = userEvent.setup();
+    const otherOwner = { ...kenji, role: "owner" as const };
+    let refusal: "LAST_OWNER" | "PERSONAL_OWNER" = "LAST_OWNER";
+    const calls = settingsApi({
+      members: [anaMember, otherOwner],
+      answer: ({ method, path }) =>
+        method === "PATCH" && path === `${membersPath}/${kenji.user.id}`
+          ? apiError(409, refusal)
+          : undefined,
+    });
+    renderApp(base);
+    const list = await membersList();
+    const reads = () =>
+      calls.filter(
+        ({ method, path }) => method === "GET" && path === membersPath,
+      ).length;
+    for (const [code, words] of [
+      ["LAST_OWNER", "This workspace needs at least one Owner"],
+      ["PERSONAL_OWNER", "Owner of this personal workspace"],
+    ] as const) {
+      refusal = code;
+      const before = reads();
+      await user.click(
+        within(list).getByRole("button", { name: /Role of Kenji Mori/ }),
+      );
+      await user.click(await screen.findByRole("option", { name: "Member" }));
+      const alert = (await screen.findByText(words)).closest('[role="alert"]');
+      expect(alert).not.toBeNull();
+      expect(alert?.textContent).not.toContain("Something went wrong");
+      await waitFor(() => expect(reads()).toBeGreaterThan(before));
+    }
   });
 
   test("Leave from one's own ⋯ asks first, then opens the personal 5", async () => {

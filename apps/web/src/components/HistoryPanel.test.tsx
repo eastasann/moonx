@@ -4,7 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
-import { answer, home, section01, validationId } from "../test/validation";
+import {
+  answer,
+  home,
+  questionsRead,
+  section01,
+  validationId,
+} from "../test/validation";
 
 // PNL-2, the history panel, on 11 (design-spec 6.0.5・6.0.1, SDD 4章・5.11 H1–H3).
 
@@ -92,10 +98,7 @@ function panelApi({
       return Response.json({ ...home, idea: { ...home.idea, archived } });
     }
     if (method === "GET" && path === `${validationPath}/questions/01`) {
-      return Response.json({
-        section: section01,
-        answers: section01.questions.map(({ key }) => answer(key)),
-      });
+      return Response.json(questionsRead(section01));
     }
     if (method === "GET" && path.startsWith("/api/v1/comments?")) {
       return Response.json({ threads: [], unresolvedCount: 0 });

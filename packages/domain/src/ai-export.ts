@@ -1,11 +1,11 @@
 import {
   formatCheckName,
+  formatInputMoney,
   formatInputNumber,
   formatInputPercent,
   formatIsoDate,
   formatIsoDateTime,
   formatList,
-  formatMoney,
   i18n,
 } from "@moonx/i18n";
 import {
@@ -248,10 +248,6 @@ const quote = (text: string) =>
 /** One line: a value written in a heading, a list item or a table cell. */
 const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();
 
-/** An amount as typed: whole units, or with its cents when it has them. */
-export const formatAmount = (amount: number, currency: string) =>
-  formatMoney(amount, currency, { cents: !Number.isInteger(amount) });
-
 const isEmptyAnswer = (
   question: TemplateQuestion,
   answer: AiAnswerInput | undefined,
@@ -274,7 +270,7 @@ function currentAnswerLines(
   const amount =
     answer?.amount == null
       ? labels.empty
-      : formatAmount(answer.amount, currency);
+      : formatInputMoney(answer.amount, currency);
   const reason = hasText(answer?.text ?? null)
     ? (answer?.text as string)
     : labels.empty;
@@ -428,7 +424,7 @@ const cellText = (
   if (typeof value === "string") return value;
   switch (type) {
     case "money":
-      return formatAmount(value, currency);
+      return formatInputMoney(value, currency);
     case "percent":
       return formatInputPercent(value);
     default:
@@ -478,7 +474,7 @@ function buildReference(
         [
           row.typicalPrice === null
             ? null
-            : formatAmount(row.typicalPrice, currency),
+            : formatInputMoney(row.typicalPrice, currency),
           row.priceNote,
         ]
           .filter((part) => hasText(part))

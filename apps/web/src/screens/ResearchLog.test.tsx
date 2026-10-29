@@ -3,7 +3,14 @@ import type { Me, ResearchLogEntry, Role } from "@moonx/schemas";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import { entry, home, prices, survey, validationId } from "../test/validation";
 
@@ -57,23 +64,44 @@ function logApi({
   archived = false,
   create,
   remove,
+  hiddenUsageCount = 2,
+  holdReads,
 }: {
-  me?: Me;
+  /** A function is asked at each call: the user may change behind the screen. */
+  me?: Me | (() => Me);
   entries?: ResearchLogEntry[];
-  archived?: boolean;
-  create?: (call: Call) => Response | Promise<Response>;
-  remove?: () => Promise<Response>;
+  /** A function is asked at each call: the idea may be archived behind the screen. */
+  archived?: boolean | (() => boolean);
+  /** Answers Add entry; undefined makes the entry and keeps it. */
+  create?: (call: Call) => Response | Promise<Response> | undefined;
+  remove?: () => Response | Promise<Response>;
+  /** The answers hidden by a template update that cite the survey. */
+  hiddenUsageCount?: number;
+  /** While it returns true, every read waits for good: the screen is not read again. */
+  holdReads?: () => boolean;
 } = {}) {
   const held = [...entries];
+  const meNow = () => (typeof me === "function" ? me() : me);
+  const archivedNow = () =>
+    typeof archived === "function" ? archived() : archived;
   return stubApi((call) => {
     const { method, path } = call;
-    if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
+    if (method === "GET" && holdReads?.() === true) {
+      return new Promise<Response>(() => {});
+    }
+    if (method === "GET" && path === "/api/v1/me")
+      return Response.json(meNow());
+    if (method === "PATCH" && path === "/api/v1/me") {
+      return Response.json(meNow());
+    }
     if (
       method === "GET" &&
       path === `/api/v1/ideas/${home.idea.id}/validation`
     ) {
-      return Response.json({ ...home, idea: { ...home.idea, archived } });
+      return Response.json({
+        ...home,
+        idea: { ...home.idea, archived: archivedNow() },
+      });
     }
     if (method === "GET" && path.startsWith(logPath)) {
       const query = new URL(path, "http://localhost").searchParams;
@@ -90,7 +118,8 @@ function logApi({
       });
     }
     if (method === "POST" && path === logPath) {
-      if (create !== undefined) return create(call);
+      const answered = create?.(call);
+      if (answered !== undefined) return answered;
       const made = entry(madeId, (call.body as { topic: string }).topic);
       held.unshift(made);
       return Response.json(made, { status: 201 });
@@ -102,7 +131,7 @@ function logApi({
         return Response.json({
           ...found,
           usages: found.id === survey.id ? [usage] : [],
-          hiddenUsageCount: found.id === survey.id ? 2 : 0,
+          hiddenUsageCount: found.id === survey.id ? hiddenUsageCount : 0,
         });
       }
       if (method === "PATCH") {
@@ -458,5 +487,289 @@ describe("14 Research log (design-spec 6.10)", () => {
         target: `research_log_entry:${prices.id}`,
       }),
     );
+  });
+  /**
+   * The new entry once the screen read again after a refusal for good (6.10): still
+   * there, read only, with what was typed and Couldn't save with `reason`; nothing sends.
+   */
+  const expectKeptReadOnly = async (reason: string) => {
+    await waitFor(() =>
+      expect(
+        screen.queryAllByRole("button", { name: "Add entry" }).length,
+      ).toBe(1),
+    );
+    await expectLocked(reason);
+  };
+
+  /**
+   * The new entry refused for good (6.10): read only, with what was typed and Couldn't
+   * save with `reason`; its Add entry and Retry cannot send again.
+   */
+  const expectLocked = async (reason: string) => {
+    expect(screen.getByRole("heading", { name: "New entry" })).toBeTruthy();
+    const topic = screen.getByRole("textbox", { name: /Topic/ });
+    expect((topic as HTMLInputElement).value).toBe("Asked the city hall");
+    expect(topic.hasAttribute("readonly")).toBe(true);
+    // The archived notice and a toast left from an earlier test are alerts too: the
+    // form's has its Retry.
+    const alert = screen
+      .getAllByRole("alert")
+      .find(
+        (each) =>
+          each.textContent?.includes("Couldn't save") === true &&
+          within(each).queryByRole("button", { name: "Retry" }) !== null,
+      );
+    if (alert === undefined) throw new Error("no Couldn't save");
+    expect(alert.textContent).toContain(reason);
+    expect(
+      within(alert)
+        .getByRole("button", { name: "Retry" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    // The form's own, after the list's + Add entry while the screen still shows it.
+    expect(
+      screen
+        .getAllByRole("button", { name: "Add entry" })
+        .at(-1)
+        ?.hasAttribute("disabled"),
+    ).toBe(true);
+  };
+
+  /** Types a topic into the new entry and presses Add entry. */
+  const addEntry = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(
+      await screen.findByRole("textbox", { name: /Topic/ }),
+      "Asked the city hall",
+    );
+    await user.click(
+      screen
+        .getAllByRole("button", { name: "Add entry" })
+        .at(-1) as HTMLElement,
+    );
+  };
+
+  test("a new entry and the network: Couldn't save and Retry, which sends what is typed again", async () => {
+    const user = userEvent.setup();
+    let tries = 0;
+    const calls = logApi({
+      create: () => {
+        tries += 1;
+        if (tries === 1) throw new TypeError("Failed to fetch");
+        return undefined;
+      },
+    });
+    renderApp(`${base}?new=1`);
+    await addEntry(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).not.toContain("Something went wrong");
+    expect(alert.textContent).not.toContain("Ref:");
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Asked the city hall",
+      }),
+    ).toBeTruthy();
+    const [first, again] = calls.filter(({ method }) => method === "POST");
+    expect(first?.body).toMatchObject({ topic: "Asked the city hall" });
+    expect(again?.body).toEqual(first?.body);
+  });
+
+  test("a new entry over the rate limit: the wait, and what is typed stays", async () => {
+    const user = userEvent.setup();
+    logApi({
+      create: () => apiError(429, "RATE_LIMITED", { retryAfterSeconds: 120 }),
+    });
+    renderApp(`${base}?new=1`);
+    await addEntry(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(
+      "Too many attempts. Try again in 2 minutes.",
+    );
+    expect(
+      (screen.getByRole("textbox", { name: /Topic/ }) as HTMLInputElement)
+        .value,
+    ).toBe("Asked the city hall");
+  });
+
+  test("a new entry and an unexpected failure: Something went wrong with its Ref, and Retry in place", async () => {
+    const user = userEvent.setup();
+    let tries = 0;
+    const calls = logApi({
+      create: () => {
+        tries += 1;
+        return tries === 1 ? apiError(500, "INTERNAL") : undefined;
+      },
+    });
+    renderApp(`${base}?new=1`);
+    await addEntry(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Something went wrong");
+    // The request id's first 8 characters (SDD 8.2), not the whole id.
+    expect(alert.textContent).toContain("Ref: 8f14e45f");
+    expect(alert.textContent).not.toContain("8f14e45f-");
+    // In place, not in a small dialog: 14 is a screen (6.10).
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(calls.filter(({ method }) => method === "POST")).toHaveLength(2),
+    );
+    const [first, again] = calls.filter(({ method }) => method === "POST");
+    expect(again?.body).toEqual(first?.body);
+  });
+
+  test("a new entry the API refused for a field: Couldn't save with the reason, and Check the format under the field", async () => {
+    const user = userEvent.setup();
+    logApi({
+      create: () =>
+        apiError(422, "VALIDATION_FAILED", {
+          details: [{ path: "sourceUrl", message: "Invalid url" }],
+        }),
+    });
+    renderApp(`${base}?new=1`);
+    await addEntry(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("Check the format");
+    const url = screen.getByRole("textbox", { name: "Source URL" });
+    const described = (url.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toContain("Check the format");
+  });
+
+  test("a new entry refused as the idea is archived meanwhile: 14 reads again, archived", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    logApi({
+      archived: () => archived,
+      create: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    const router = renderApp(`${base}?new=1`);
+    await addEntry(user);
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    await expectKeptReadOnly("It's archived");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "New entry" })).toBeNull(),
+    );
+    expect(router.state.location.search).not.toHaveProperty("new");
+    expect(screen.queryAllByRole("textbox")).toEqual([]);
+  });
+
+  test("a new entry refused once the user is a Viewer: 14 reads again, read only", async () => {
+    const user = userEvent.setup();
+    let me = ana;
+    logApi({
+      me: () => me,
+      create: () => {
+        me = as("viewer");
+        return apiError(403, "FORBIDDEN");
+      },
+    });
+    renderApp(`${base}?new=1`);
+    await addEntry(user);
+    // Read again as a Viewer: the list's + Add entry goes, the form stays to read.
+    await expectKeptReadOnly("You don't have access to this");
+    expect(screen.queryByText("This idea is archived")).toBeNull();
+  });
+
+  test("a delete refused as the idea is archived: the reason without Retry, then 14 reads as archived (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    logApi({
+      archived: () => archived,
+      remove: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(`${base}?entry=${prices.id}`);
+    await screen.findByRole("heading", { level: 2, name: "Prices downtown" });
+    await user.click(
+      screen.getByRole("button", { name: "More for Prices downtown" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const ask = await screen.findByRole("alertdialog", {
+      name: "Delete this entry?",
+    });
+    const toast = await toastAfter("Couldn't save. It's archived.", () =>
+      user.click(within(ask).getByRole("button", { name: "Delete" })),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /More for/ })).toBeNull(),
+    );
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Prices downtown" }),
+    ).toBeTruthy();
+  });
+
+  test("counts of a thousand and more are grouped (SDD 9章 書式)", async () => {
+    const user = userEvent.setup();
+    logApi({
+      entries: [{ ...survey, usedAsEvidenceCount: 1234 }, prices],
+      hiddenUsageCount: 1234,
+    });
+    renderApp(`${base}?entry=${survey.id}`);
+    const list = await screen.findByRole("grid", { name: "Research Log" });
+    expect(list.textContent).toContain("Evidence for 1,234 items");
+    await screen.findByRole("list", { name: "Used as evidence" });
+    await user.click(
+      screen.getByRole("button", { name: "More for Lunch survey" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const ask = await screen.findByRole("alertdialog", {
+      name: "Delete this entry?",
+    });
+    expect(ask.textContent).toContain(
+      "Also evidence for 1,234 answers hidden by a template update.",
+    );
+  });
+  test("a new entry refused as gone (404): locked at once, with what was typed and why; nothing more is sent", async () => {
+    const user = userEvent.setup();
+    const calls = logApi({ create: () => apiError(404, "NOT_FOUND") });
+    renderApp(`${base}?new=1`);
+    await addEntry(user);
+    expect(await screen.findByText("It no longer exists")).toBeTruthy();
+    // Read again, the screen still lets the user add: the refusal itself locks the form.
+    await expectLocked("It no longer exists");
+    await user.click(
+      screen
+        .getAllByRole("button", { name: "Add entry" })
+        .at(-1) as HTMLElement,
+    );
+    expect(calls.filter(({ method }) => method === "POST")).toHaveLength(1);
+  });
+
+  test("a new entry refused as archived: locked at once, before the screen read again answers", async () => {
+    const user = userEvent.setup();
+    let refused = false;
+    const calls = logApi({
+      holdReads: () => refused,
+      create: () => {
+        refused = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(`${base}?new=1`);
+    await addEntry(user);
+    expect(await screen.findByText("It's archived")).toBeTruthy();
+    await expectLocked("It's archived");
+    // The read again has not answered: the screen does not show it archived yet.
+    expect(screen.queryByText("This idea is archived")).toBeNull();
+    expect(
+      calls.filter(
+        ({ method, path }) =>
+          method === "GET" &&
+          path === `/api/v1/ideas/${home.idea.id}/validation`,
+      ).length,
+    ).toBeGreaterThan(1);
+    expect(calls.filter(({ method }) => method === "POST")).toHaveLength(1);
   });
 });

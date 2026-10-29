@@ -4,9 +4,9 @@ import {
   isQuestionShown,
   keyMetricOf,
   PITCH_SPEAKER_NOTE_KEYS,
+  type PlanAnswerContent,
   planItemProgress,
 } from "@moonx/domain";
-import { formatCount } from "@moonx/i18n";
 import {
   type ExecutionItem,
   type ExecutionType,
@@ -468,7 +468,7 @@ function ItemForm({
     });
   };
   const answersCache: PlanAnswersCache = {
-    put: (answer) =>
+    put: (answer) => {
       putSaved<PlanItem>(queryClient, queryKey, (data) =>
         data === undefined
           ? undefined
@@ -478,7 +478,17 @@ function ItemForm({
                 current.questionKey === answer.questionKey ? answer : current,
               ),
             },
-      ),
+      );
+      // Another item's display conditions may read this answer. A save sent on leaving
+      // lands after the next item was read: it is read again. A version's items read
+      // its snapshot.
+      void queryClient.invalidateQueries({
+        queryKey: [...planKey(home.ideaId, home.id), "items"],
+        predicate: (query) =>
+          query.queryKey.at(-2) !== item.itemNo &&
+          query.queryKey.at(-1) === null,
+      });
+    },
     reload: () => void queryClient.invalidateQueries({ queryKey }),
   };
   const executionCache: ExecutionCache = {
@@ -519,22 +529,23 @@ function ItemForm({
     if (answer !== undefined)
       views.set(question.key, answers.viewOf(question, answer));
   }
-  const values = new Map(
-    [...views].map(([key, view]) => [key, { text: view.value }]),
-  );
-  // A display condition hides a sub-item as 11 hides a question (6.2).
+  // A display condition hides a sub-item as 11 hides a question (6.2); one naming
+  // another item's sub-item reads its answer (P4 `conditionAnswers`), as 20 counts.
+  const values = new Map<string, PlanAnswerContent>([
+    ...item.conditionAnswers.map(
+      ({ questionKey, text }) => [questionKey, { text, rows: null }] as const,
+    ),
+    ...[...views].map(
+      ([key, view]) => [key, { text: view.value, rows: view.rows }] as const,
+    ),
+  ]);
   const shown = item.prompts.filter((question) =>
     isQuestionShown(question, values),
   );
   const executionOf = (type: ExecutionType): ExecutionItem[] =>
     item.execution.filter((entry) => entry.type === type);
-  const progress = planItemProgress(shown, {
-    answers: new Map(
-      [...views].map(([key, view]) => [
-        key,
-        { text: view.value, rows: view.rows },
-      ]),
-    ),
+  const progress = planItemProgress(item.prompts, {
+    answers: values,
     executionCounts: new Map(
       executionTypesOf(shown).map((type) => [type, executionOf(type).length]),
     ),
@@ -700,8 +711,8 @@ function ItemForm({
           <Text tone="secondary">
             <Text variant="number" tone="secondary">
               {t("validation:questions.progress", {
-                answered: formatCount(progress.filled),
-                total: formatCount(progress.total),
+                answered: progress.filled,
+                total: progress.total,
               })}
             </Text>
             {t("validation:questions.progressSuffix")}
@@ -802,8 +813,8 @@ function ItemForm({
               <Heading level={2}>
                 {t("plans:item.complete", {
                   item: itemKey,
-                  answered: formatCount(progress.filled),
-                  total: formatCount(progress.total),
+                  answered: progress.filled,
+                  total: progress.total,
                 })}
               </Heading>
               <Flex gap="space-200" wrap>

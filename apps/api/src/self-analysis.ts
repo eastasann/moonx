@@ -10,7 +10,11 @@ import {
   selfAnalysisShares,
   workspaces,
 } from "@moonx/db";
-import { selfAnalysisProgress } from "@moonx/domain";
+import {
+  conditionAnswersOutside,
+  decidesElsewhere,
+  selfAnalysisProgress,
+} from "@moonx/domain";
 import {
   countChars,
   errorBodySchema,
@@ -550,6 +554,7 @@ export function selfAnalysisRoutes({
         if (section === undefined) {
           throw new ApiError("NOT_FOUND", "No such section");
         }
+        const version = sections.flatMap((s) => s.questions);
         return {
           section,
           answers: await answerViews(
@@ -557,6 +562,12 @@ export function selfAnalysisRoutes({
             analysis,
             section.questions.map((question) => question.key),
           ),
+          conditionAnswers: conditionAnswersOutside(
+            section.questions,
+            version,
+            await answerRows(db, analysis.id),
+          ),
+          decidesElsewhere: decidesElsewhere(section.questions, version),
         };
       },
       {
@@ -570,7 +581,7 @@ export function selfAnalysisRoutes({
         detail: {
           summary: "S2 A section of the caller's self-analysis (11)",
           description:
-            "One answer per question, unanswered ones included, with its comment count in each workspace it is shared with.",
+            "One answer per question, unanswered ones included, with its comment count in each workspace it is shared with. conditionAnswers are the texts of other sections' answers this section's display conditions name; decidesElsewhere the questions here a condition in another section names.",
         },
       },
     )

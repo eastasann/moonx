@@ -46,6 +46,7 @@ import {
   SlowLoadingState,
   useIsSlow,
 } from "../components/states";
+import { userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
 import { inputIssueMessage } from "../lib/input-issues";
@@ -256,7 +257,7 @@ function IdeaRow({ idea }: { idea: IdeaSummary }) {
     ...(idea.archived ? [t("ideas:row.archived")] : []),
     t("ideas:row.meta", {
       stage: t(`common:stage.${idea.stage}`),
-      proposer: idea.proposer.displayName,
+      proposer: userNameText(idea.proposer),
       when: formatRelativeTime(idea.lastActivityAt, { timeZone: me.timezone }),
     }),
   ].join(t("app:separator"));
@@ -346,7 +347,7 @@ function IdeaDetailPane({ ideaId }: { ideaId: string }) {
   const timeZone = me.timezone;
   const meta = t("ideas:detail.meta", {
     stage: t(`common:stage.${idea.stage}`),
-    proposer: idea.proposer.displayName,
+    proposer: userNameText(idea.proposer),
   });
   const plans =
     idea.plans.length === 0

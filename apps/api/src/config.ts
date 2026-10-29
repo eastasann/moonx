@@ -1,3 +1,5 @@
+import { sentryConnectSource } from "./security-headers";
+
 /**
  * Where the API runs. `test` exists only for integration tests, which build a
  * {@link Config} directly; {@link loadConfig} never accepts it from the environment.
@@ -217,6 +219,17 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     problems.push(`AVATAR_BUCKET is required on ${appEnv}`);
   }
 
+  // Its origin is the CSP's connect-src (SDD 7.2), where the Web's events go.
+  const webSentryDsn = read("WEB_SENTRY_DSN");
+  if (
+    webSentryDsn !== undefined &&
+    sentryConnectSource(webSentryDsn) === null
+  ) {
+    problems.push(
+      `WEB_SENTRY_DSN must be an http or https URL whose host is letters, digits, hyphens and dots, got "${webSentryDsn}"`,
+    );
+  }
+
   let logLevel: LogLevel = deployed ? "info" : LOCAL_DEFAULTS.logLevel;
   const rawLogLevel = read("LOG_LEVEL");
   if (rawLogLevel !== undefined) {
@@ -250,7 +263,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     mail: { transport: mailTransport, resendApiKey, from: mailFrom, allowlist },
     avatarBucket,
     sentryDsn: read("SENTRY_DSN"),
-    webSentryDsn: read("WEB_SENTRY_DSN"),
+    webSentryDsn,
     logLevel,
   };
 }

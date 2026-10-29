@@ -1,7 +1,8 @@
 import { i18n } from "@moonx/i18n";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
+import { GridList, GridListItem } from "react-aria-components";
 import { describe, expect, test, vi } from "vitest";
 import { setPhoneWidth, setTabletWidth, settle } from "../test/helpers";
 import { Avatar, initialsOf } from "./Avatar";
@@ -912,6 +913,124 @@ describe("Card and CardView", () => {
       ),
     ).toThrow("needs an id and a textValue");
     vi.restoreAllMocks();
+  });
+});
+
+describe("React Aria's English in the selection announcements", () => {
+  // SDD 9章「React Aria の文言」: what React Aria announces when a row is chosen comes from
+  // its own words, which no prop reaches. The parts hold it to English whatever the
+  // browser speaks; a bare GridList beside them shows that it would follow the browser.
+
+  /** The newest message of React Aria's live region, which outlives each test's render. */
+  const announced = () =>
+    document
+      .querySelector('[data-live-announcer] [aria-live="assertive"]')
+      ?.lastElementChild?.textContent?.trim();
+  const clearAnnouncements = () => {
+    for (const log of document.querySelectorAll(
+      "[data-live-announcer] [role=log]",
+    ))
+      log.replaceChildren();
+  };
+
+  /**
+   * Renders `part` beside a bare GridList while the browser speaks Japanese, checks the
+   * bare list announces in it, then runs `check` on the part.
+   */
+  async function inJapanese(part: ReactNode, check: () => Promise<void>) {
+    const user = userEvent.setup();
+    const language = vi
+      .spyOn(navigator, "language", "get")
+      .mockReturnValue("ja-JP");
+    try {
+      render(
+        <div>
+          <GridList aria-label="Unfixed" selectionMode="single">
+            <GridListItem id="bare" textValue="Bare">
+              Bare
+            </GridListItem>
+          </GridList>
+          {part}
+        </div>,
+      );
+      // React Aria reads the language again when the browser announces a change.
+      act(() => {
+        window.dispatchEvent(new Event("languagechange"));
+      });
+      clearAnnouncements();
+      await user.click(screen.getByText("Bare"));
+      await waitFor(() => expect(announced()).toContain("Bare"));
+      expect(announced()).not.toBe("Bare selected.");
+      await check();
+    } finally {
+      language.mockRestore();
+      act(() => {
+        window.dispatchEvent(new Event("languagechange"));
+      });
+    }
+  }
+
+  /** Chooses the row showing `name`, then lets it go, as React Aria announces both. */
+  async function chooseAndRelease(name: string) {
+    const user = userEvent.setup();
+    await user.click(screen.getByText(name));
+    await waitFor(() => expect(announced()).toBe(`${name} selected.`));
+    await user.click(screen.getByText(name));
+    await waitFor(() => expect(announced()).toBe(`${name} not selected.`));
+  }
+
+  test("TableView, as a table and as a phone's rows", async () => {
+    await inJapanese(
+      <TableView
+        aria-label="Decisions"
+        columns={columns}
+        items={rows}
+        selectionMode="single"
+        renderCell={(row, column) => row[column as "name" | "amount"]}
+      />,
+      async () => {
+        expect(screen.getAllByRole("columnheader")).toHaveLength(2);
+        await chooseAndRelease("Power");
+        setPhoneWidth();
+        expect(screen.queryAllByRole("columnheader")).toHaveLength(0);
+        await chooseAndRelease("Rent");
+      },
+    );
+  });
+
+  test("ListView", async () => {
+    await inJapanese(
+      <ListView
+        aria-label="Ideas"
+        items={[{ id: "a", name: "Health Bowl" }]}
+        selectionMode="single"
+      >
+        {(idea) => (
+          <ListViewItem id={idea.id} textValue={idea.name}>
+            {idea.name}
+          </ListViewItem>
+        )}
+      </ListView>,
+      () => chooseAndRelease("Health Bowl"),
+    );
+  });
+
+  test("CardView", async () => {
+    await inJapanese(
+      <CardView aria-label="Slides" selectionMode="single">
+        <Card id="s1" textValue="Slide 1" title="Slide 1" />
+      </CardView>,
+      () => chooseAndRelease("Slide 1"),
+    );
+  });
+
+  test("Tree", async () => {
+    await inJapanese(
+      <Tree aria-label="Template" selectionMode="single">
+        <TreeItem id="02" textValue="02 Market" title="02 Market" />
+      </Tree>,
+      () => chooseAndRelease("02 Market"),
+    );
   });
 });
 

@@ -2,6 +2,7 @@ import type { Me, Role } from "@moonx/schemas";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import * as sentry from "../lib/sentry";
 import {
   ana,
   apiError,
@@ -17,6 +18,7 @@ import { validationHome, workspaceId } from "../test/ideas";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const home = validationHome();
@@ -309,6 +311,122 @@ describe("13 Validation home (design-spec 6.1)", () => {
         ),
       ).toBe(true),
     );
+  });
+});
+
+describe("13's blocks and counts (design-spec 6.1・6.0.3, SDD 8.2)", () => {
+  test("a block that fails to render says so alone: the other blocks and the navigation stay", async () => {
+    // React logs what a boundary catches; the failure is the test's point.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(sentry, "reportError").mockReturnValue(
+      "3f2a9c1d0b8e4f5aa1b2c3d4e5f6a7b8",
+    );
+    homeApi({
+      data: {
+        ...home,
+        // A check's Next step without its check: what V1 never sends (SDD 5.2).
+        nextSteps: [
+          {
+            kind: "check",
+            count: null,
+            checkKey: null,
+            sectionKey: null,
+            link: null,
+          },
+        ],
+      },
+    });
+    renderApp(path);
+    expect(
+      await screen.findByRole("heading", {
+        level: 3,
+        name: "Something went wrong",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText("Ref: 3f2a9c1d")).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "Next steps" })).toBeNull();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Bacolod Health Bowl" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Checks" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Sections" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Key numbers" })).toBeTruthy();
+    // The side navigation and the TabBar alike (the width picks one).
+    for (const nav of screen.getAllByRole("navigation", { name: "Main" })) {
+      expect(
+        within(nav)
+          .getByRole("link", { name: "Ideas" })
+          .getAttribute("aria-current"),
+      ).toBe("page");
+    }
+  });
+
+  test("the F/A/U legend counts a Fact without evidence among the Facts and says how many", async () => {
+    homeApi();
+    renderApp(path);
+    const fau = await screen.findByRole("figure", {
+      name: "Items by Fact, Assumption and Unknown",
+    });
+    const entries = within(fau)
+      .getAllByRole("listitem")
+      .map((entry) => entry.textContent);
+    expect(entries[0]).toBe("Fact5(1 without evidence)");
+    expect(entries[1]).toBe("Assumption37L6 M17 H14");
+    cleanup();
+    vi.unstubAllGlobals();
+    homeApi({ data: { ...home, fau: { ...home.fau, factNoEvidence: 0 } } });
+    renderApp(path);
+    const none = await screen.findByRole("figure", {
+      name: "Items by Fact, Assumption and Unknown",
+    });
+    expect(within(none).getAllByRole("listitem")[0]?.textContent).toBe("Fact5");
+  });
+
+  test("a proposer who left reads as a former member (design-spec 6.16)", async () => {
+    homeApi({
+      data: validationHome({
+        proposer: {
+          ...home.idea.proposer,
+          displayName: "Kenji Mori",
+          badge: "former_member",
+        },
+      }),
+    });
+    renderApp(path);
+    expect(
+      await screen.findByText("— Kenji Mori (former member)"),
+    ).toBeTruthy();
+  });
+
+  test("counts past a thousand group their thousands (design-spec 1.2)", async () => {
+    homeApi({
+      data: {
+        ...home,
+        fau: {
+          fact: 1200,
+          factNoEvidence: 1001,
+          assumption: { total: 3000, low: 1000, medium: 1000, high: 1000 },
+          unknown: 1500,
+          unclassified: 0,
+          empty: 0,
+        },
+        sections: home.sections.map((section) =>
+          section.key === "09"
+            ? { ...section, count: 1234, countB: 1500 }
+            : section,
+        ),
+      },
+    });
+    renderApp(path);
+    const fau = await screen.findByRole("figure", {
+      name: "Items by Fact, Assumption and Unknown",
+    });
+    expect(fau.textContent).toContain("(1,001 without evidence)");
+    expect(fau.textContent).toContain("L1,000 M1,000 H1,000");
+    expect(screen.getByText("5,700 items")).toBeTruthy();
+    expect(
+      screen.getByRole("list", { name: "Sections" }).textContent,
+    ).toContain("1,234 · 1,500");
   });
 });
 

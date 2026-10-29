@@ -37,7 +37,7 @@ import { useTranslation } from "react-i18next";
 import { AiMenu } from "../components/AiMenu";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import type { ScreenComments } from "../components/CommentsPanel";
-import { ModalBoundary } from "../components/ErrorBoundary";
+import { BlockBoundary, ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
 import { EditSummaryDialog } from "../components/IdeaDialogs";
 import { useIdeaActions } from "../components/ideaActions";
@@ -61,7 +61,7 @@ import {
   useOpenTemplateUpdate,
   useTemplateBanner,
 } from "../components/TemplateUpdate";
-import { UserName } from "../components/UserName";
+import { UserName, userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
 import {
@@ -220,6 +220,13 @@ function FauBlock({ fau }: { fau: FauBreakdown }) {
             state: "fact" as const,
             label: t("common:fauState.fact"),
             count: fau.fact,
+            // Facts whose research log was deleted count as Facts, with how many (6.0.3).
+            detail:
+              fau.factNoEvidence > 0
+                ? t("common:fauLabel.noEvidenceCount", {
+                    count: fau.factNoEvidence,
+                  })
+                : undefined,
           },
           {
             state: "assumption" as const,
@@ -590,7 +597,7 @@ function Header({ home }: { home: ValidationHome }) {
       <Text tone="secondary">
         {`${idea.oneLineConcept} `}
         <Text tone="tertiary">
-          {t("validation:home.by", { name: idea.proposer.displayName })}
+          {t("validation:home.by", { name: userNameText(idea.proposer) })}
         </Text>
       </Text>
       {idea.duplicatedFrom !== null && (
@@ -686,7 +693,7 @@ function ValidationHub({
     validationTarget(home),
     canEdit,
   );
-  const blocks: HubBlockSpec[] = [
+  const contents: HubBlockSpec[] = [
     { id: "next", column: "main", content: <NextSteps home={home} /> },
     {
       id: "checks",
@@ -733,10 +740,19 @@ function ValidationHub({
       ),
     },
   ];
+  // Each block fails alone (SDD 8.2): the others, the frame and its navigation stay.
+  const blocks = contents.map((block) => ({
+    ...block,
+    content: <BlockBoundary>{block.content}</BlockBoundary>,
+  }));
   return (
     <>
       <HubPattern
-        header={<Header home={home} />}
+        header={
+          <BlockBoundary>
+            <Header home={home} />
+          </BlockBoundary>
+        }
         actions={
           canWrite ? (
             <Tools home={home} onEdit={() => setEditing(true)} />
@@ -755,17 +771,19 @@ function ValidationHub({
           ) : undefined
         }
         metrics={
-          <KeyMetrics
-            metrics={home.keyMetrics}
-            currency={workspace.currency}
-            variant="band"
-            marginWarningHref={
-              home.economicsWarnings.includes("margin_not_positive")
-                ? economicsHref(workspace.id, home.idea.id)
-                : undefined
-            }
-            aria-label={t("validation:home.keyNumbers")}
-          />
+          <BlockBoundary>
+            <KeyMetrics
+              metrics={home.keyMetrics}
+              currency={workspace.currency}
+              variant="band"
+              marginWarningHref={
+                home.economicsWarnings.includes("margin_not_positive")
+                  ? economicsHref(workspace.id, home.idea.id)
+                  : undefined
+              }
+              aria-label={t("validation:home.keyNumbers")}
+            />
+          </BlockBoundary>
         }
         blocks={blocks}
       />

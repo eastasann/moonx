@@ -31,10 +31,11 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { rejectionReason } from "../lib/autosave";
+import { isTransient } from "../lib/failure";
 import { ruleErrorOf } from "../lib/input-issues";
 import { useIsOnline } from "../lib/online";
 import {
@@ -48,11 +49,11 @@ import {
   mentionCandidatesQuery,
 } from "../lib/queries";
 import { isSessionLost } from "../lib/send";
-import { toastFailure } from "./ideaActions";
-import { rateLimitWords } from "./SendFailure";
-import { FailureState, LoadingBlock, reportOnce } from "./states";
-import { UserName } from "./UserName";
-import { dashboardHref, useWorkspace } from "./workspace";
+import { ModalSendFailure } from "./ModalFailure";
+import { failureCode } from "./SendFailure";
+import { FailureState, LoadingBlock } from "./states";
+import { UserName, userNameText } from "./UserName";
+import { dashboardHref, usePanel, useWorkspace } from "./workspace";
 
 /**
  * What a screen tells its comments panel (PNL-1, design-spec 6.0.4): the screen as C1
@@ -155,40 +156,39 @@ function useCommentsChanged(dataKey: QueryKey) {
 }
 
 /**
- * Why a post failed, under its box (design-spec 6.0.4「書き込みに失敗したら」): "Couldn't
- * post" and Retry, with the reason of a refusal for good (6.0.2) or the Ref of an
- * unexpected failure; "Too many attempts…" for a rate limit. The text stays typed.
+ * Why a post failed (design-spec 6.0.4「書き込みに失敗したら」), the text left as typed: under
+ * its box, "Couldn't post" and Retry for the network or an API that is down, with the
+ * reason of a refusal for good (6.0.2) or of a mention refused; the wait of a rate limit;
+ * anything else in the small dialog of 6.0.6 with its Ref, Retry and Close. Close
+ * dismisses only the dialog (`onDismiss`): the panel and the box with its text stay.
  */
 function PostFailure({
   error,
   onRetry,
+  onDismiss,
+  isRetryDisabled,
 }: {
   error: unknown;
   onRetry: () => void;
+  onDismiss: () => void;
+  isRetryDisabled: boolean;
 }) {
-  const { t } = useTranslation(["panels", "app"]);
-  const rateLimited = rateLimitWords(error);
+  const { t } = useTranslation(["panels", "app", "errors"]);
   // Someone mentioned left, or became unable to read the item, since the box listed them.
-  const isMentionRefused =
-    error instanceof ApiError && error.code === "INVALID_MENTION";
+  const isMentionRefused = failureCode(error) === "INVALID_MENTION";
   const reason =
     error instanceof ApiError && !isMentionRefused
       ? rejectionReason(error)
       : null;
-  const isTransient =
-    error instanceof ApiError &&
-    (error.status === null || error.code === "UPSTREAM_UNAVAILABLE");
-  const reference = useMemo(
-    () =>
-      rateLimited !== null || reason !== null || isTransient || isMentionRefused
-        ? null
-        : error instanceof ApiError
-          ? error.requestId
-          : reportOnce(error),
-    [error, rateLimited, reason, isTransient, isMentionRefused],
-  );
-  if (rateLimited !== null) {
-    return <InlineAlert variant="negative">{rateLimited}</InlineAlert>;
+  if (!isMentionRefused && reason === null && !isTransient(error)) {
+    return (
+      <ModalSendFailure
+        error={error}
+        onRetry={onRetry}
+        isRetryDisabled={isRetryDisabled}
+        onClose={onDismiss}
+      />
+    );
   }
   return (
     <InlineAlert variant="negative">
@@ -198,18 +198,45 @@ function PostFailure({
           <Text tone="secondary">{t(`app:save.reason.${reason}`)}</Text>
         )}
         {isMentionRefused && (
-          <Text tone="secondary">{t("panels:comments.invalidMention")}</Text>
+          <Text tone="secondary">{t("errors:INVALID_MENTION")}</Text>
         )}
-        {reference !== null && (
-          <Text variant="caption" tone="secondary">
-            {t("app:state.ref", { ref: reference.slice(0, 8) })}
-          </Text>
-        )}
-        <Button variant="secondary" size="S" onPress={onRetry}>
+        <Button
+          variant="secondary"
+          size="S"
+          onPress={onRetry}
+          isDisabled={isRetryDisabled}
+        >
           {t("app:state.retry")}
         </Button>
       </Flex>
     </InlineAlert>
+  );
+}
+
+/**
+ * Why a delete, a resolve or a reopen failed, where it was pressed (design-spec 6.0.4):
+ * as a send inside a panel (6.0.6「モーダルの共通の決まり」), "Couldn't save" with Retry
+ * or with the reason of a refusal for good, the wait of a rate limit, or the small dialog
+ * whose Close closes the panel. ARCHIVED turns the panel read-only instead.
+ */
+function ActionFailure({
+  error,
+  onRetry,
+  isRetryDisabled,
+}: {
+  error: unknown;
+  onRetry: () => void;
+  isRetryDisabled: boolean;
+}) {
+  const panel = usePanel();
+  if (error instanceof ApiError && error.code === "ARCHIVED") return null;
+  return (
+    <ModalSendFailure
+      error={error}
+      onRetry={onRetry}
+      isRetryDisabled={isRetryDisabled}
+      onClose={panel.close}
+    />
   );
 }
 
@@ -323,7 +350,15 @@ function CommentBox({
           </Button>
         </Flex>
       )}
-      {failure !== null && <PostFailure error={failure} onRetry={submit} />}
+      {failure !== null && (
+        <PostFailure
+          error={failure}
+          onRetry={submit}
+          // The typed text is state of this box: closing the panel would lose it.
+          onDismiss={() => post.reset()}
+          isRetryDisabled={!isOnline || post.isPending}
+        />
+      )}
       <Flex gap="space-100" justifyContent="end">
         {onCancel !== undefined && (
           <Button variant="secondary" isQuiet size="S" onPress={onCancel}>
@@ -376,6 +411,7 @@ function CommentEntry({
 }) {
   const { t } = useTranslation(["panels", "app"]);
   const { me } = useWorkspace();
+  const isOnline = useIsOnline();
   const changed = useCommentsChanged(dataKey);
   const [isEditing, setEditing] = useState(false);
   const [isDeleting, setDeleting] = useState(false);
@@ -385,7 +421,6 @@ function CommentEntry({
     onSettled: changed,
     onError: (error) => {
       if (error instanceof ApiError && error.code === "ARCHIVED") onArchived();
-      else toastFailure(error, () => remove.mutate());
     },
   });
   const isOwn = comment.author.id === me.id && !comment.deleted;
@@ -451,6 +486,13 @@ function CommentEntry({
         ) : (
           <Text variant="body-long">{comment.body}</Text>
         )}
+        {remove.error !== null && (
+          <ActionFailure
+            error={remove.error}
+            onRetry={() => remove.mutate()}
+            isRetryDisabled={!isOnline || remove.isPending}
+          />
+        )}
         {children}
       </Stack>
       {isDeleting && (
@@ -494,18 +536,21 @@ function ThreadView({
 }) {
   const { t } = useTranslation(["panels"]);
   const { root, replies } = thread;
+  const isOnline = useIsOnline();
   const changed = useCommentsChanged(dataKey);
   const [isReplying, setReplying] = useState(false);
   const calls = commentCalls(root.id);
   const resolved = root.resolvedAt !== null;
+  // Which it was is kept with the send: Retry sends the same one, whatever the thread
+  // reads as once it is read again.
   const toggle = useMutation({
-    mutationFn: () => (resolved ? calls.reopen() : calls.resolve()),
+    mutationFn: (action: "resolve" | "reopen") => calls[action](),
     onSettled: changed,
     onError: (error) => {
       if (error instanceof ApiError && error.code === "ARCHIVED") onArchived();
-      else toastFailure(error, () => toggle.mutate());
     },
   });
+  const failedAction = toggle.error === null ? undefined : toggle.variables;
   const content = (
     <Stack gap="space-200">
       {label !== undefined && (
@@ -531,7 +576,7 @@ function ThreadView({
         {resolved && root.resolvedBy !== null && (
           <Text variant="caption" tone="secondary">
             {t("panels:comments.resolvedBy", {
-              name: root.resolvedBy.displayName,
+              name: userNameText(root.resolvedBy),
             })}
           </Text>
         )}
@@ -539,7 +584,7 @@ function ThreadView({
           (isReplying ? (
             <CommentBox
               label={t("panels:comments.replyTo", {
-                name: root.author.displayName,
+                name: userNameText(root.author),
               })}
               workspaceId={root.workspace.id}
               target={root.target}
@@ -577,7 +622,7 @@ function ThreadView({
                 isQuiet
                 size="S"
                 isPending={toggle.isPending}
-                onPress={() => toggle.mutate()}
+                onPress={() => toggle.mutate(resolved ? "reopen" : "resolve")}
               >
                 {resolved
                   ? t("panels:comments.reopen")
@@ -585,6 +630,13 @@ function ThreadView({
               </Button>
             </Flex>
           ))}
+        {failedAction !== undefined && (
+          <ActionFailure
+            error={toggle.error}
+            onRetry={() => toggle.mutate(failedAction)}
+            isRetryDisabled={!isOnline || toggle.isPending}
+          />
+        )}
       </CommentEntry>
     </Stack>
   );
@@ -599,10 +651,10 @@ function ThreadView({
         <Text variant="label" maxLines={1}>
           {root.deleted
             ? t("panels:comments.resolvedDeleted", {
-                name: root.author.displayName,
+                name: userNameText(root.author),
               })
             : t("panels:comments.resolvedThread", {
-                name: root.author.displayName,
+                name: userNameText(root.author),
                 excerpt: root.body,
               })}
         </Text>

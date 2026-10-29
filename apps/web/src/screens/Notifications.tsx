@@ -27,7 +27,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { CheckCheck, SearchX } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { toastFailure } from "../components/ideaActions";
+import { useToastFailure } from "../components/ideaActions";
 import {
   FailureState,
   SlowLoadingState,
@@ -124,6 +124,7 @@ function NotificationRow({ notification }: { notification: Notification }) {
  * happened, in its workspace; one the user can no longer read says so.
  */
 function NotificationsBody({ search }: { search: NotificationsSearch }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["notifications"]);
   const { me } = useWorkspace();
   const navigate = useNavigate();

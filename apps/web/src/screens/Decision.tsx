@@ -32,7 +32,7 @@ import {
 } from "@moonx/ui-web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import {
@@ -44,14 +44,15 @@ import { rateLimitWords } from "../components/SendFailure";
 import {
   FailureState,
   NoAccessState,
-  reportOnce,
   SlowLoadingState,
   useIsSlow,
 } from "../components/states";
+import { userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { rejectionReason } from "../lib/autosave";
+import { isTransient, useUnexpectedReference } from "../lib/failure";
 import { inputIssueMessage } from "../lib/input-issues";
 import { decisionsHref, ideaHref, ideasHref } from "../lib/links";
 import { useIsOnline } from "../lib/online";
@@ -61,6 +62,7 @@ import {
   validationHomeQuery,
   workspaceKey,
 } from "../lib/queries";
+import { isSessionLost } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
 import { DecisionSkeleton, MaterialSkeleton } from "./DecisionSkeleton";
 
@@ -159,7 +161,7 @@ function Material({ context }: { context: DecisionContext }) {
                   date: formatDate(lastDecision.recordedAt, {
                     timeZone: me.timezone,
                   }),
-                  name: lastDecision.recordedBy.displayName,
+                  name: userNameText(lastDecision.recordedBy),
                 })}
               </Link>
             </Text>
@@ -172,7 +174,8 @@ function Material({ context }: { context: DecisionContext }) {
 
 /**
  * "Couldn't record" with Retry (design-spec 6.5「記録の失敗」): the reason a refusal
- * names, the wait of a rate limit, or the Ref of an unexpected failure.
+ * names, the wait of a rate limit, or the Ref of an unexpected failure. A lost session
+ * takes the app's way (M9 or the sign-in screen) and shows nothing here (SDD 8.2).
  */
 function RecordFailure({
   error,
@@ -186,19 +189,12 @@ function RecordFailure({
   const { t } = useTranslation(["validation", "app"]);
   const rateLimited = rateLimitWords(error);
   const reason = error instanceof ApiError ? rejectionReason(error) : null;
-  const isTransient =
-    error instanceof ApiError &&
-    (error.status === null || error.code === "UPSTREAM_UNAVAILABLE");
-  const isUnexpected = rateLimited === null && reason === null && !isTransient;
-  const reference = useMemo(
-    () =>
-      !isUnexpected
-        ? null
-        : error instanceof ApiError
-          ? error.requestId
-          : reportOnce(error),
-    [isUnexpected, error],
-  );
+  const isTemporary = isTransient(error);
+  const isSignedOut = isSessionLost(error);
+  const isUnexpected =
+    !isSignedOut && rateLimited === null && reason === null && !isTemporary;
+  const reference = useUnexpectedReference(error, isUnexpected);
+  if (isSignedOut) return null;
   return (
     <InlineAlert variant="negative">
       <Flex gap="space-200" wrap alignItems="center">
@@ -450,8 +446,8 @@ function DecisionBody({ home }: { home: ValidationHome }) {
           isOpen
           variant="confirmation"
           size="S"
-          title={t("validation:decision.newer.title", {
-            name: newer.recordedBy.displayName,
+          title={t("errors:DECISION_CHANGED", {
+            name: userNameText(newer.recordedBy),
             value: t(`common:decision.${newer.value}` as never),
             when: formatRelativeTime(newer.recordedAt, {
               timeZone: me.timezone,
@@ -470,7 +466,7 @@ function DecisionBody({ home }: { home: ValidationHome }) {
             void context.refetch();
           }}
         >
-          {t("validation:decision.newer.body")}
+          {t("errors:DECISION_CHANGED", { context: "body" })}
         </AlertDialog>
       )}
     </>

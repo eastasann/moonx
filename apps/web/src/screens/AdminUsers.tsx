@@ -1,4 +1,9 @@
-import { formatDate, formatList, formatRelativeTime } from "@moonx/i18n";
+import {
+  formatDate,
+  formatInteger,
+  formatList,
+  formatRelativeTime,
+} from "@moonx/i18n";
 import {
   type AdminUser,
   type AdminWorkspace,
@@ -48,6 +53,7 @@ import {
   useAdminTabs,
   useDetailHistory,
 } from "../components/admin";
+import { ModalSendFailure } from "../components/ModalFailure";
 import { failureCode, SendFailure } from "../components/SendFailure";
 import {
   FailureState,
@@ -258,7 +264,7 @@ function useOneAction() {
  * suspended by themselves.
  */
 function UserDetail({ user }: { user: AdminUser }) {
-  const { t } = useTranslation(["admin"]);
+  const { t } = useTranslation(["admin", "errors"]);
   const { me } = useWorkspace();
   const queryClient = useQueryClient();
   const isOnline = useIsOnline();
@@ -319,7 +325,7 @@ function UserDetail({ user }: { user: AdminUser }) {
           </Text>
         </DescriptionListItem>
         <DescriptionListItem label={t("admin:users.workspaces")}>
-          <Text variant="number-sm">{String(user.workspaceCount)}</Text>
+          <Text variant="number-sm">{formatInteger(user.workspaceCount)}</Text>
         </DescriptionListItem>
       </DescriptionList>
       {user.status === "deleted" ? (
@@ -353,7 +359,7 @@ function UserDetail({ user }: { user: AdminUser }) {
             )}
             {isMe && (
               <Text variant="caption" tone="secondary">
-                {t("admin:users.notSelf")}
+                {t("errors:CANNOT_SUSPEND_SELF")}
               </Text>
             )}
           </Flex>
@@ -361,8 +367,8 @@ function UserDetail({ user }: { user: AdminUser }) {
             <SendFailure
               error={action.failure.error}
               messages={{
-                CANNOT_SUSPEND_SELF: t("admin:users.notSelf"),
-                NOT_FOUND: t("admin:users.gone"),
+                CANNOT_SUSPEND_SELF: t("errors:CANNOT_SUSPEND_SELF"),
+                NOT_FOUND: t("errors:NOT_FOUND", { context: "account" }),
               }}
               transient="couldNotSave"
               withSaveReasons
@@ -488,7 +494,8 @@ function useUsersTab(
           if (column === "lastActive") {
             return lastActive(user.lastActiveAt, me.timezone, t);
           }
-          if (column === "workspaces") return String(user.workspaceCount);
+          if (column === "workspaces")
+            return formatInteger(user.workspaceCount);
           return t(`admin:userStatus.${user.status}`);
         }}
       />
@@ -523,10 +530,12 @@ function WorkspaceDetail({ workspace }: { workspace: AdminWorkspace }) {
           <Text variant="body-compact">{ownersOf(workspace, t)}</Text>
         </DescriptionListItem>
         <DescriptionListItem label={t("admin:workspaces.members")}>
-          <Text variant="number-sm">{String(workspace.memberCount)}</Text>
+          <Text variant="number-sm">
+            {formatInteger(workspace.memberCount)}
+          </Text>
         </DescriptionListItem>
         <DescriptionListItem label={t("admin:workspaces.ideas")}>
-          <Text variant="number-sm">{String(workspace.ideaCount)}</Text>
+          <Text variant="number-sm">{formatInteger(workspace.ideaCount)}</Text>
         </DescriptionListItem>
         <DescriptionListItem label={t("admin:workspaces.lastActive")}>
           <Text variant="body-compact">
@@ -605,8 +614,8 @@ function useWorkspacesTab(
               </Stack>
             );
           }
-          if (column === "members") return String(workspace.memberCount);
-          return String(workspace.ideaCount);
+          if (column === "members") return formatInteger(workspace.memberCount);
+          return formatInteger(workspace.ideaCount);
         }}
       />
     );
@@ -653,10 +662,13 @@ function invitationMessages(
   t: TFunction<["admin", "errors"]>,
 ): Partial<Record<string, string>> {
   return {
-    ALREADY_MEMBER: t("admin:invitations.alreadyMember", { email }),
+    ALREADY_MEMBER: t("errors:ALREADY_MEMBER", { email }),
     INVITATION_ALREADY_ACCEPTED: t("errors:INVITATION_ALREADY_ACCEPTED"),
-    INVITATION_INVALID: t("admin:invitations.wasCancelled", { email }),
-    NOT_FOUND: t("admin:invitations.workspaceGone"),
+    INVITATION_INVALID: t("errors:INVITATION_INVALID", {
+      context: "cancelled",
+      email,
+    }),
+    NOT_FOUND: t("errors:NOT_FOUND", { context: "workspace" }),
   };
 }
 
@@ -670,18 +682,22 @@ const pendingIdOf = (error: unknown) =>
 
 /**
  * "An invitation to {email} is already pending" with its Resend, or the failure of the
- * send in words (design-spec 6.16 9, which 28's invitations follow).
+ * send in words (design-spec 6.16 9, which 28's invitations follow). Inside Invite
+ * someone (`onClose`, which closes it), a failure that neither these words nor a reason
+ * of 6.0.2 explains is shown as the modals' unexpected failure (6.0.6).
  */
 function InvitationFailureNote({
   failure,
   email,
   onResend,
   isBusy,
+  onClose,
 }: {
   failure: ActionFailure;
   email: string;
   onResend: (invitationId: string) => void;
   isBusy: boolean;
+  onClose?: () => void;
 }) {
   const { t } = useTranslation(["admin", "errors"]);
   const isOnline = useIsOnline();
@@ -690,7 +706,7 @@ function InvitationFailureNote({
     return (
       <InlineAlert variant="negative">
         <Flex gap="space-200" wrap alignItems="center">
-          <Text>{t("admin:invitations.alreadyPending", { email })}</Text>
+          <Text>{t("errors:INVITATION_PENDING", { email })}</Text>
           <Button
             variant="secondary"
             size="S"
@@ -703,10 +719,25 @@ function InvitationFailureNote({
       </InlineAlert>
     );
   }
+  const messages = invitationMessages(email, t);
+  const code = failureCode(failure.error);
+  if (
+    onClose !== undefined &&
+    (code === null || messages[code] === undefined)
+  ) {
+    return (
+      <ModalSendFailure
+        error={failure.error}
+        onRetry={failure.retry}
+        isRetryDisabled={!isOnline || isBusy}
+        onClose={onClose}
+      />
+    );
+  }
   return (
     <SendFailure
       error={failure.error}
-      messages={invitationMessages(email, t)}
+      messages={messages}
       transient="couldNotSave"
       withSaveReasons
       onRetry={failure.retry}
@@ -940,6 +971,21 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
     id: role,
     label: t(`common:role.${role}`),
   }));
+  /** W5 for the pending invitation the send found; its Retry sends W5 again. */
+  const resend = (invitationId: string, email: string) => {
+    setResending(true);
+    void sendThrough(() => resendTo(invitationId, email))
+      .then(onClose, (error: unknown) => {
+        if (!isSessionLost(error)) {
+          setFailure({
+            error,
+            email,
+            retry: () => resend(invitationId, email),
+          });
+        }
+      })
+      .finally(() => setResending(false));
+  };
 
   if (sentTo !== null) {
     return (
@@ -1069,21 +1115,9 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
             <InvitationFailureNote
               failure={failure}
               email={failure.email}
-              onResend={(invitationId) => {
-                setResending(true);
-                void sendThrough(() => resendTo(invitationId, failure.email))
-                  .then(onClose, (error: unknown) => {
-                    if (!isSessionLost(error)) {
-                      setFailure({
-                        error,
-                        email: failure.email,
-                        retry: () => void form.handleSubmit(),
-                      });
-                    }
-                  })
-                  .finally(() => setResending(false));
-              }}
+              onResend={(invitationId) => resend(invitationId, failure.email)}
               isBusy={isResending}
+              onClose={onClose}
             />
           )}
         </Form>

@@ -5,6 +5,7 @@ import {
 } from "@moonx/schemas";
 import type { SaveState } from "@moonx/ui-tokens";
 import { ApiError } from "./api";
+import { isTransient } from "./failure";
 
 /** The fields of one item that wait to be saved, by name. */
 export type SaveFields = Readonly<Record<string, unknown>>;
@@ -85,9 +86,15 @@ export const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16_000, 30_000];
  */
 export const UNREACHABLE_AFTER = 3;
 
-/** Codes whose refusal no second send changes (ADR-021「恒久的な失敗」). */
-const isTransient = (error: ApiError) =>
-  error.status === null || error.status >= 500 || error.status === 429;
+/**
+ * A failed save that is sent again by itself (ADR-021「一時的な失敗」, SDD 8.2): what may
+ * pass next time ({@link isTransient}), any other 5xx too, and a rate limit after its
+ * wait. Any other refusal no second send changes (ADR-021「恒久的な失敗」).
+ */
+const resendsByItself = (error: ApiError) =>
+  isTransient(error) ||
+  (error.status !== null && error.status >= 500) ||
+  error.status === 429;
 
 const retryAfterMs = (error: ApiError): number | null => {
   const seconds = error.detail.retryAfterSeconds;
@@ -318,7 +325,7 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
       }
     }
     item.failure = apiError;
-    if (isTransient(apiError)) {
+    if (resendsByItself(apiError)) {
       item.status = "retrying";
       if (apiError.status === null) {
         networkFailures += 1;

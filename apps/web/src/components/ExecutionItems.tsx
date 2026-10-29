@@ -50,10 +50,16 @@ import { useOneAtATime } from "../lib/form";
 import { ruleErrorOf } from "../lib/input-issues";
 import { useIsOnline } from "../lib/online";
 import { membersQuery } from "../lib/queries";
-import { toastFailure } from "./ideaActions";
-import { type RowFieldsSpec, useRowFields } from "./RowFields";
+import { useToastFailure } from "./ideaActions";
+import { ModalSendFailure } from "./ModalFailure";
+import {
+  isRefusedForGood,
+  type RowFieldsSpec,
+  refusedFieldsOf,
+  useReadAgainWhenRefused,
+  useRowFields,
+} from "./RowFields";
 import { SaveFailureNote } from "./SaveFeedback";
-import { SendFailure } from "./SendFailure";
 import { UserName } from "./UserName";
 import { usePanel, useWorkspace } from "./workspace";
 
@@ -705,21 +711,32 @@ function createBody(
 
 /**
  * A new item of `type` (design-spec 6.13 "+ Add"): its fields, then Add, which makes it
- * last in its type. The first column is required (6.0.8); failures as 16's new row.
+ * last in its type. The first column is required (6.0.8). A dialog in every width (6.12・
+ * 6.13), it says why a send failed as a modal does (6.0.6), and a refusal for a reason
+ * 6.0.2 names reads the screen again.
  */
 export function NewExecutionItem({
   planId,
   type,
+  isReadOnly,
   onMade,
   onCreated,
+  onRefused,
   onCancel,
 }: {
   planId: string;
   type: ExecutionType;
+  /** The screen read again after a refusal reads only: what was typed stays, unsent. */
+  isReadOnly: boolean;
   /** The item is made: put it in the screen's data, even once the form is closed. */
   onMade: (item: ExecutionItem) => void;
   /** The item is made while the form is open: close it (22 shows the item). */
   onCreated: (item: ExecutionItem) => void;
+  /**
+   * Refused for good while the form is open (archived, no access, gone): keep it open,
+   * read only, past the screen's `canEdit` read again (design-spec 6.10・6.13).
+   */
+  onRefused: () => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation(["plans", "errors"]);
@@ -736,7 +753,10 @@ export function NewExecutionItem({
   latestOnCreated.current = onCreated;
   const latestOnMade = useRef(onMade);
   latestOnMade.current = onMade;
+  const latestOnRefused = useRef(onRefused);
+  latestOnRefused.current = onRefused;
   const oneAtATime = useOneAtATime();
+  const readAgainWhenRefused = useReadAgainWhenRefused();
   const create = useMutation({
     mutationFn: (body: ExecutionItemCreate) =>
       unwrap(
@@ -744,20 +764,16 @@ export function NewExecutionItem({
           .api.v1.plans({ planId: inPath(planId) })
           ["execution-items"].post(body),
       ),
-    // Here, not in `mutate`'s: it runs after a Cancel pressed while Add was on its way.
+    // Here, not in `mutate`'s: they run after a Cancel pressed while Add was on its way.
     onSuccess: (item) => latestOnMade.current(item),
+    onError: readAgainWhenRefused,
   });
   const failure = create.error;
-  const details =
-    failure instanceof ApiError && failure.code === "VALIDATION_FAILED"
-      ? failure.detail.details
-      : undefined;
+  // Refused for good, the form sends no more (design-spec 6.10): at once, before the
+  // screen read again shows why, and also where that read changes nothing (gone).
+  const isLocked = isReadOnly || isRefusedForGood(failure);
   const fields = Object.keys(values) as (keyof ExecutionValues)[];
-  const refusedFields = fields.filter(
-    (field) =>
-      Array.isArray(details) &&
-      (details as { path?: unknown }[]).some(({ path }) => path === field),
-  );
+  const refusedFields = refusedFieldsOf(failure, fields);
   const errors = Object.fromEntries(
     fields.flatMap((field) => {
       const error =
@@ -774,7 +790,7 @@ export function NewExecutionItem({
     fields.every(
       (field) => executionSpec.errorOf(field, values[field]) === undefined,
     ) && !isAssigneeInvalid;
-  const canSubmit = isOnline && isValid;
+  const canSubmit = isOnline && !isLocked && isValid;
   const submit = () =>
     void oneAtATime(
       () =>
@@ -783,6 +799,9 @@ export function NewExecutionItem({
             // Fires only while the form is still open: Cancel meanwhile keeps the user
             // where they went (the item is made all the same).
             onSuccess: (item) => latestOnCreated.current(item),
+            onError: (error) => {
+              if (isRefusedForGood(error)) latestOnRefused.current();
+            },
             onSettled: () => resolve(),
           });
         }),
@@ -827,16 +846,15 @@ export function NewExecutionItem({
             setAssigneeInvalid(change.kind === "invalid");
             if (change.kind === "value") setAssignee(change.value);
           }}
-          isReadOnly={!isOnline}
+          isReadOnly={!isOnline || isLocked}
           autoFocus
         />
-        {failure !== null && refusedFields.length === 0 && (
-          <SendFailure
+        {failure !== null && (
+          <ModalSendFailure
             error={failure}
-            transient="couldNotSave"
-            withSaveReasons
             onRetry={submit}
             isRetryDisabled={!canSubmit}
+            onClose={onCancel}
           />
         )}
       </Stack>
@@ -1042,6 +1060,7 @@ export function useDeleteExecutionItem(
   cache: ExecutionCache,
   onSaved: () => void,
 ) {
+  const toastFailure = useToastFailure();
   const [deleting, setDeleting] = useState<ExecutionItem | null>(null);
   const remove = useMutation({
     mutationFn: (itemId: string) =>
@@ -1107,6 +1126,10 @@ export function ExecutionList({
   const isOnline = useIsOnline();
   const [openId, setOpenId] = useState<string | null>(null);
   const [isAdding, setAdding] = useState(false);
+  // New refused as archived or no longer allowed stays, read only, with what was typed
+  // and why, until it is closed (design-spec 6.10・6.13): the plan read again hides
+  // + Add.
+  const [isAddingKept, setAddingKept] = useState(false);
   const deletion = useDeleteExecutionItem(cache, onSaved);
   const open = items.find((item) => item.id === openId);
   const groups = executionGroups(
@@ -1196,16 +1219,24 @@ export function ExecutionList({
           )}
         </Dialog>
       )}
-      {isAdding && canEdit && (
+      {isAdding && (canEdit || isAddingKept) && (
         <NewExecutionItem
           planId={planId}
           type={type}
+          isReadOnly={!canEdit}
           onMade={(item) => {
             cache.put(item);
             onSaved();
           }}
-          onCreated={() => setAdding(false)}
-          onCancel={() => setAdding(false)}
+          onCreated={() => {
+            setAdding(false);
+            setAddingKept(false);
+          }}
+          onRefused={() => setAddingKept(true)}
+          onCancel={() => {
+            setAdding(false);
+            setAddingKept(false);
+          }}
         />
       )}
       {deletion.question}

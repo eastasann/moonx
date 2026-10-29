@@ -137,10 +137,15 @@ export function startSentry(
 /**
  * Reports an unexpected error of the Web (SDD 8.3) and returns its event id, which the
  * screen shows as `Ref` (8.2). Null when Sentry is off: there is no event to refer to.
+ *
+ * @param tags The event's tags: `requestId` for an answer of the API's (SDD 11章).
  */
-export function reportError(error: unknown): string | null {
+export function reportError(
+  error: unknown,
+  tags: Record<string, string> = {},
+): string | null {
   if (getClient() === undefined) return null;
-  return captureException(error);
+  return captureException(error, { tags });
 }
 
 /** Ties the events that follow to the signed-in user by id alone, or to nobody. */

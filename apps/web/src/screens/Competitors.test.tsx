@@ -1,8 +1,15 @@
 import type { Competitor, Me, Role, ValidationAnswer } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   answer,
@@ -85,8 +92,11 @@ function competitorsApi({
   ],
   order,
   evidence,
+  create,
+  remove,
 }: {
-  me?: Me;
+  /** A function is asked at each call: the user may change behind the screen. */
+  me?: Me | (() => Me);
   items?: Competitor[];
   archived?: boolean;
   guidance?: { min: number; max: number };
@@ -94,13 +104,21 @@ function competitorsApi({
   order?: () => Response;
   /** V5's answer to an attachment. */
   evidence?: (call: Call) => Response;
+  /** Answers New competitor's send; undefined makes the competitor and keeps it. */
+  create?: () => Response | undefined;
+  /** Answers a delete; undefined deletes. */
+  remove?: () => Response | undefined;
 } = {}) {
   // The test's own array, so it can change the list behind the screen.
   const held = items;
+  const meNow = () => (typeof me === "function" ? me() : me);
   return stubApi((call: Call) => {
     const { method, path } = call;
-    if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
+    if (method === "GET" && path === "/api/v1/me")
+      return Response.json(meNow());
+    if (method === "PATCH" && path === "/api/v1/me") {
+      return Response.json(meNow());
+    }
     if (
       method === "GET" &&
       path === `/api/v1/ideas/${home.idea.id}/validation`
@@ -111,6 +129,8 @@ function competitorsApi({
       return Response.json({ items: held, patterns, guidance });
     }
     if (method === "POST" && path === listPath) {
+      const answered = create?.();
+      if (answered !== undefined) return answered;
       const made = competitor(madeId, (call.body as { name: string }).name, {
         ...(call.body as Partial<Competitor>),
         sortOrder: held.length,
@@ -165,6 +185,8 @@ function competitorsApi({
         });
       }
       if (method === "DELETE") {
+        const refused = remove?.();
+        if (refused !== undefined) return refused;
         held.splice(held.indexOf(found), 1);
         return new Response(null, { status: 204 });
       }
@@ -590,5 +612,235 @@ describe("15 Competitors (design-spec 6.10)", () => {
         target: expect.stringMatching(/^competitor:/),
       }),
     );
+  });
+  /** Opens New competitor from the title row's button. */
+  const openNew = async (user: ReturnType<typeof userEvent.setup>) => {
+    await screen.findByText("2 competitors · aim for 3–5");
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "Add competitor",
+      })[0] as HTMLElement,
+    );
+    return screen.findByRole("dialog", { name: "New competitor" });
+  };
+
+  /** Types a name into New competitor and presses Add competitor. */
+  const addBowl = async (
+    user: ReturnType<typeof userEvent.setup>,
+    dialog: HTMLElement,
+  ) => {
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Name/ }),
+      "Bowl & Co",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add competitor" }),
+    );
+  };
+
+  test("New competitor adds a history entry: Back closes it and stays on 15", async () => {
+    const user = userEvent.setup();
+    competitorsApi();
+    const router = renderApp(base);
+    await screen.findByText("2 competitors · aim for 3–5");
+    const entries = router.history.length;
+    const dialog = await openNew(user);
+    expect(router.history.length).toBe(entries + 1);
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Name/ }),
+      "Bowl & Co",
+    );
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New competitor" }),
+      ).toBeNull(),
+    );
+    expect(router.state.location.pathname).toBe(base);
+    expect(screen.getByText("2 competitors · aim for 3–5")).toBeTruthy();
+  });
+
+  test("Cancel goes back past New competitor's entry", async () => {
+    const user = userEvent.setup();
+    competitorsApi();
+    const router = renderApp(base);
+    await screen.findByText("2 competitors · aim for 3–5");
+    const key = router.state.location.state.key;
+    const dialog = await openNew(user);
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New competitor" }),
+      ).toBeNull(),
+    );
+    // Back at the entry 15 was opened in, not on a new one.
+    expect(router.state.location.state.key).toBe(key);
+  });
+
+  test("the competitor made replaces New competitor's entry with its row: Back from it is the list", async () => {
+    const user = userEvent.setup();
+    competitorsApi();
+    const router = renderApp(base);
+    await screen.findByText("2 competitors · aim for 3–5");
+    const entries = router.history.length;
+    const dialog = await openNew(user);
+    await addBowl(user, dialog);
+    expect(
+      await screen.findByRole("dialog", { name: "Edit competitor" }),
+    ).toBeTruthy();
+    expect(router.state.location.search).toMatchObject({ row: madeId });
+    expect(router.history.length).toBe(entries + 1);
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.search).not.toHaveProperty("row"),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("3 competitors · aim for 3–5")).toBeTruthy();
+  });
+
+  test("New competitor and the network: Couldn't save and Retry in the dialog, which sends what is typed again", async () => {
+    const user = userEvent.setup();
+    let tries = 0;
+    const calls = competitorsApi({
+      create: () => {
+        tries += 1;
+        if (tries === 1) throw new TypeError("Failed to fetch");
+        return undefined;
+      },
+    });
+    renderApp(base);
+    const dialog = await openNew(user);
+    await addBowl(user, dialog);
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).not.toContain("Something went wrong");
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    expect(
+      await screen.findByRole("dialog", { name: "Edit competitor" }),
+    ).toBeTruthy();
+    const [first, again] = calls.filter(({ method }) => method === "POST");
+    expect(first?.body).toMatchObject({ name: "Bowl & Co" });
+    expect(again?.body).toEqual(first?.body);
+  });
+
+  test("New competitor refused for good: Couldn't save and its reason in the dialog", async () => {
+    const user = userEvent.setup();
+    competitorsApi({ create: () => apiError(409, "ARCHIVED") });
+    renderApp(base);
+    const dialog = await openNew(user);
+    await addBowl(user, dialog);
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("It's archived");
+    expect(
+      (
+        within(dialog).getByRole("textbox", {
+          name: /Name/,
+        }) as HTMLInputElement
+      ).value,
+    ).toBe("Bowl & Co");
+  });
+
+  test("New competitor over the rate limit: the wait in the dialog", async () => {
+    const user = userEvent.setup();
+    competitorsApi({
+      create: () => apiError(429, "RATE_LIMITED", { retryAfterSeconds: 60 }),
+    });
+    renderApp(base);
+    const dialog = await openNew(user);
+    await addBowl(user, dialog);
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toBe("Too many attempts. Try again in 1 minute.");
+  });
+
+  test("New competitor and an unexpected failure: the small dialog with its Ref; Retry sends again, Close closes New competitor", async () => {
+    const user = userEvent.setup();
+    const calls = competitorsApi({ create: () => apiError(500, "INTERNAL") });
+    const router = renderApp(base);
+    await screen.findByText("2 competitors · aim for 3–5");
+    const key = router.state.location.state.key;
+    const dialog = await openNew(user);
+    await addBowl(user, dialog);
+    const small = await screen.findByRole("alertdialog", {
+      name: /Something went wrong/,
+    });
+    // The request id's first 8 characters (SDD 8.2), not the whole id.
+    expect(small.textContent).toContain("Ref: 8f14e45f");
+    expect(small.textContent).not.toContain("8f14e45f-");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    await user.click(within(small).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(calls.filter(({ method }) => method === "POST")).toHaveLength(2),
+    );
+    const [first, again] = calls.filter(({ method }) => method === "POST");
+    expect(first?.body).toMatchObject({ name: "Bowl & Co" });
+    expect(again?.body).toEqual(first?.body);
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: /Something went wrong/,
+        }),
+      ).getByRole("button", { name: "Close" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New competitor" }),
+      ).toBeNull(),
+    );
+    expect(router.state.location.state.key).toBe(key);
+  });
+
+  test("New competitor refused for a field: Couldn't save with the reason, and Check the format under the field", async () => {
+    const user = userEvent.setup();
+    competitorsApi({
+      create: () =>
+        apiError(422, "VALIDATION_FAILED", {
+          details: [{ path: "priceNote", message: "Too long" }],
+        }),
+    });
+    renderApp(base);
+    const dialog = await openNew(user);
+    await addBowl(user, dialog);
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("Check the format");
+    const note = within(dialog).getByRole("textbox", { name: "Price note" });
+    const described = (note.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toContain("Check the format");
+  });
+
+  test("a delete refused once the user is a Viewer: the reason without Retry, then 15 reads only (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let me = ana;
+    competitorsApi({
+      me: () => me,
+      remove: () => {
+        me = as("viewer");
+        return apiError(403, "FORBIDDEN");
+      },
+    });
+    renderApp(base);
+    await screen.findByText("2 competitors · aim for 3–5");
+    await user.click(
+      screen.getByRole("button", { name: "More for Salad Station" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const question = await screen.findByRole("alertdialog", {
+      name: "Delete this competitor?",
+    });
+    const toast = await toastAfter(
+      "Couldn't save. You don't have access to this.",
+      () =>
+        user.click(within(question).getByRole("button", { name: "Delete" })),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Add competitor" }),
+      ).toBeNull(),
+    );
+    expect(cardsOf()).toHaveLength(2);
   });
 });

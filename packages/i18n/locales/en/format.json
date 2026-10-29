@@ -1,16 +1,16 @@
 {
   "relative": {
     "justNow": "just now",
-    "minutesAgo": "{{count}}m ago",
-    "hoursAgo": "{{count}}h ago"
+    "minutesAgo": "{{count, integer}}m ago",
+    "hoursAgo": "{{count, integer}}h ago"
   },
-  "overdue": "overdue {{count}}d",
+  "overdue": "overdue {{count, integer}}d",
   "months": "{{value}} months",
   "currency": "{{code}} · {{name}}",
   "wait": {
-    "minute_one": "{{count}} minute",
-    "minute_other": "{{count}} minutes",
-    "hour_one": "{{count}} hour",
-    "hour_other": "{{count}} hours"
+    "minute_one": "{{count, integer}} minute",
+    "minute_other": "{{count, integer}} minutes",
+    "hour_one": "{{count, integer}} hour",
+    "hour_other": "{{count, integer}} hours"
   }
 }

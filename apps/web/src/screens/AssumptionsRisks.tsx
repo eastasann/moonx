@@ -57,13 +57,16 @@ import {
 } from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { ItemHistoryButton } from "../components/HistoryPanel";
-import { toastFailure } from "../components/ideaActions";
+import { useToastFailure } from "../components/ideaActions";
 import { useKeepShownItem } from "../components/keepShownItem";
 import { ReorderDialog } from "../components/ReorderDialog";
 import { RowEvidence, RowEvidenceSheet } from "../components/RowEvidence";
 import {
+  isRefusedForGood,
   isRowValid,
   type RowFieldsSpec,
+  refusedFieldsOf,
+  useReadAgainWhenRefused,
   useRowFields,
 } from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
@@ -505,14 +508,20 @@ function NewRow({
   validationId,
   tab,
   isSheet,
+  isReadOnly,
   onCreated,
+  onRefused,
   onCancel,
 }: {
   ideaId: string;
   validationId: string;
   tab: AssumptionsTab;
   isSheet: boolean;
+  /** The screen read again after a refusal reads only: what was typed stays, unsent. */
+  isReadOnly: boolean;
   onCreated: (row: Row) => void;
+  /** Refused for good while the form is open (archived, no access, gone). */
+  onRefused: () => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation(["validation", "errors"]);
@@ -526,7 +535,10 @@ function NewRow({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const latestOnCreated = useRef(onCreated);
   latestOnCreated.current = onCreated;
+  const latestOnRefused = useRef(onRefused);
+  latestOnRefused.current = onRefused;
   const oneAtATime = useOneAtATime();
+  const readAgainWhenRefused = useReadAgainWhenRefused();
   const create = useMutation({
     mutationFn: async (input: AssumptionValues | RiskValues): Promise<Row> => {
       const lists = api().api.v1.validations({
@@ -538,19 +550,14 @@ function NewRow({
     },
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) }),
+    onError: readAgainWhenRefused,
   });
-  // A 422 naming a field (SDD 8.2's last guard) puts "Check the format" under it.
   const failure = create.error;
-  const details =
-    failure instanceof ApiError && failure.code === "VALIDATION_FAILED"
-      ? failure.detail.details
-      : undefined;
-  const fields = Object.keys(values) as (keyof typeof values)[];
-  const refusedFields = fields.filter(
-    (field) =>
-      Array.isArray(details) &&
-      (details as { path?: unknown }[]).some(({ path }) => path === field),
-  );
+  // Refused for good, the form sends no more (design-spec 6.10): at once, before the
+  // screen read again shows why, and also where that read changes nothing (gone).
+  const isLocked = isReadOnly || isRefusedForGood(failure);
+  const fields = Object.keys(values) as (keyof typeof values & string)[];
+  const refusedFields = refusedFieldsOf(failure, fields);
   const errors = Object.fromEntries(
     fields.flatMap((field) => {
       const error =
@@ -563,7 +570,7 @@ function NewRow({
       return shown === undefined ? [] : [[field, shown]];
     }),
   );
-  const canSubmit = isOnline && isRowValid(spec, values);
+  const canSubmit = isOnline && !isLocked && isRowValid(spec, values);
   const submit = () =>
     void oneAtATime(
       () =>
@@ -572,12 +579,15 @@ function NewRow({
             // Fires only while the form is still open: Cancel or leaving meanwhile keeps
             // the user where they went (the row is made all the same).
             onSuccess: (row) => latestOnCreated.current(row),
+            onError: (error) => {
+              if (isRefusedForGood(error)) latestOnRefused.current();
+            },
             onSettled: () => resolve(),
           });
         }),
     );
   const change = (field: string, value: unknown) => {
-    if (refusedFields.includes(field as keyof typeof values)) create.reset();
+    if ((refusedFields as string[]).includes(field)) create.reset();
     setValues((current) => ({ ...current, [field]: value }));
     setTouched((current) => ({ ...current, [field]: true }));
   };
@@ -588,7 +598,7 @@ function NewRow({
           values={values as AssumptionValues}
           errors={errors}
           onChange={change}
-          isReadOnly={!isOnline}
+          isReadOnly={!isOnline || isLocked}
           autoFocus
         />
       ) : (
@@ -596,11 +606,11 @@ function NewRow({
           values={values as RiskValues}
           errors={errors}
           onChange={change}
-          isReadOnly={!isOnline}
+          isReadOnly={!isOnline || isLocked}
           autoFocus
         />
       )}
-      {failure !== null && refusedFields.length === 0 && (
+      {failure !== null && (
         <SendFailure
           error={failure}
           transient="couldNotSave"
@@ -719,6 +729,7 @@ function AssumptionsBody({
   /** Leaves what `onOpen` showed for `next`, going back if it was opened here. */
   onClose: (next: AssumptionsSearch) => void;
 }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["validation", "common"]);
   const { me, role } = useWorkspace();
   const queryClient = useQueryClient();
@@ -736,7 +747,13 @@ function AssumptionsBody({
   const [isReordering, setReordering] = useState(false);
   const [deleting, setDeleting] = useState<Row | null>(null);
   const items: Row[] = query.data?.items ?? [];
-  const isNew = search.new === 1 && canEdit;
+  // A new row refused as archived or no longer allowed stays, read only, with what was
+  // typed and why, until it is closed (design-spec 6.10, as 14's new entry).
+  const [isNewKept, setNewKept] = useState(false);
+  useEffect(() => {
+    if (search.new !== 1) setNewKept(false);
+  }, [search.new]);
+  const isNew = search.new === 1 && (canEdit || isNewKept);
   const shownFirst =
     search.row === undefined && isTwoColumns && !isNew
       ? items[0]?.id
@@ -903,6 +920,8 @@ function AssumptionsBody({
       validationId={validationId}
       tab={tab}
       isSheet={isSheet}
+      isReadOnly={!canEdit}
+      onRefused={() => setNewKept(true)}
       onCreated={(row) => {
         // In the list before it is shown: no "Not found" while the list is read again.
         putRow(queryClient, idea.id, validationId, tab, row);

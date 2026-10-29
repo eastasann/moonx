@@ -3,7 +3,15 @@ import { focusManager } from "@tanstack/react-query";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import * as sentry from "../lib/sentry";
+import {
+  ana,
+  apiError,
+  type Call,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   anaRef,
@@ -22,6 +30,7 @@ import { home as ideaHome } from "../test/validation";
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const api = `/api/v1/plans/${planId}`;
@@ -45,19 +54,23 @@ const goNoGoContext = {
 
 /**
  * The API of 20: `home` answers P2 GET (a version's when asked), `write` the writes,
- * `history` H1 and `threads` C1.
+ * `history` H1 and `threads` C1. `me` and `read` may change what U1 and P2 GET answer
+ * while the test runs.
  */
 function planApi({
   me = ana,
   home = planHome(),
+  read,
   version,
   ideaArchived = false,
   history = [],
   threads = [],
   write = (_call: Call): Response | Promise<Response> | undefined => undefined,
 }: {
-  me?: Me;
+  me?: Me | (() => Me);
   home?: PlanHome;
+  /** P2 GET of the plan as it is now, in place of `home` and its saves. */
+  read?: () => PlanHome;
   version?: PlanHome;
   ideaArchived?: boolean;
   history?: HistoryEntry[];
@@ -75,8 +88,9 @@ function planApi({
         return answered ?? new Response(null, { status: 404 });
       })();
     }
-    if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
+    const user = typeof me === "function" ? me() : me;
+    if (method === "GET" && path === "/api/v1/me") return Response.json(user);
+    if (method === "PATCH" && path === "/api/v1/me") return Response.json(user);
     if (method === "GET" && path === `/api/v1/ideas/${ideaId}/validation`) {
       return Response.json({
         ...ideaHome,
@@ -89,7 +103,9 @@ function planApi({
     ) {
       return Response.json({ items: plans });
     }
-    if (method === "GET" && path === api) return Response.json(current);
+    if (method === "GET" && path === api) {
+      return Response.json(read?.() ?? current);
+    }
     if (method === "GET" && path === `${api}?versionId=${versionId}`) {
       return Response.json(version ?? home);
     }
@@ -503,6 +519,143 @@ describe("20 Plan home (design-spec 6.12)", () => {
     expect(
       await screen.findByText("You don't have access to this"),
     ).toBeTruthy();
+  });
+});
+
+describe("20 when something fails (design-spec 6.0.6, SDD 8.2)", () => {
+  /** The side navigation and the TabBar alike (the width picks one), on Ideas. */
+  const expectNavigation = () => {
+    const navs = screen.getAllByRole("navigation", { name: "Main" });
+    expect(navs).not.toHaveLength(0);
+    for (const nav of navs) {
+      expect(
+        within(nav)
+          .getByRole("link", { name: "Ideas" })
+          .getAttribute("aria-current"),
+      ).toBe("page");
+    }
+  };
+
+  test("a block that fails to render says so alone: the other blocks and the navigation stay", async () => {
+    // React logs what a boundary catches; the failure is the test's point.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(sentry, "reportError").mockReturnValue(
+      "3f2a9c1d0b8e4f5aa1b2c3d4e5f6a7b8",
+    );
+    const [saved] = planHome().versions;
+    planApi({
+      home: planHome({
+        // A version's name that is no text: what P2 never sends (SDD 5.9).
+        versions: saved === undefined ? [] : [{ ...saved, name: {} as string }],
+      }),
+    });
+    renderApp(planPath());
+    expect(
+      await screen.findByRole("heading", {
+        level: 3,
+        name: "Something went wrong",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText("Ref: 3f2a9c1d")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Versions" })).toBeNull();
+    for (const block of [
+      "Key numbers",
+      "Part A: Business Case",
+      "Part B: Execution Plan",
+      "Go / No-Go",
+      "Execution",
+    ]) {
+      expect(screen.getByRole("region", { name: block })).toBeTruthy();
+    }
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Plan A" }),
+    ).toBeTruthy();
+    expectNavigation();
+  });
+
+  test("a screen that fails to render keeps the frame and its navigation, with the Ref", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(sentry, "reportError").mockReturnValue(
+      "9d2b7c1a0b8e4f5aa1b2c3d4e5f6a7b8",
+    );
+    // No parts: what P2 never sends (SDD 5.9), and the hub cannot be drawn.
+    planApi({
+      home: planHome({ parts: null as unknown as PlanHome["parts"] }),
+    });
+    renderApp(planPath());
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Something went wrong",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText("Ref: 9d2b7c1a")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(sentry.reportError).toHaveBeenCalledOnce();
+    expectNavigation();
+    // The frame's header keeps its way back and the breadcrumbs.
+    expect(
+      screen
+        .getAllByRole("link", { name: "Ideas" })
+        .some(
+          (link) => link.getAttribute("href") === `/w/${workspaceId}/ideas`,
+        ),
+    ).toBe(true);
+  });
+
+  test("Archive plan refused as archived: says why without Retry, and 20 reads it again as archived", async () => {
+    const user = userEvent.setup();
+    let isArchived = false;
+    const calls = planApi({
+      read: () => planHome({ archived: isArchived }),
+      write: (call) => {
+        if (call.path !== `${api}/archive`) return undefined;
+        // Archived elsewhere since 20 was read.
+        isArchived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(planPath());
+    await user.click(
+      await screen.findByRole("button", { name: "More for Plan A" }),
+    );
+    const reads = sent(calls, "GET", api).length;
+    const toast = await toastAfter("Couldn't save. It's archived.", () =>
+      user.click(screen.getByRole("menuitem", { name: "Archive plan" })),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(sent(calls, "GET", api).length).toBeGreaterThan(reads);
+    expect(screen.queryByRole("button", { name: "Save version" })).toBeNull();
+    expect(sent(calls, "POST", `${api}/archive`)).toHaveLength(1);
+  });
+
+  test("Restore refused once the role is Viewer: says why without Retry, and 20 reads it again read only", async () => {
+    const user = userEvent.setup();
+    let me: Me = ana;
+    const calls = planApi({
+      me: () => me,
+      home: planHome({ archived: true }),
+      write: (call) => {
+        if (call.path !== `${api}/restore`) return undefined;
+        // Made a Viewer since 20 was read.
+        me = as("viewer");
+        return apiError(403, "FORBIDDEN");
+      },
+    });
+    renderApp(planPath());
+    const restore = await screen.findByRole("button", { name: "Restore" });
+    const toast = await toastAfter(
+      "Couldn't save. You don't have access to this.",
+      () => user.click(restore),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    // A Viewer has no Restore (6.12「案のアーカイブ」).
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Restore" })).toBeNull(),
+    );
+    expect(screen.getByText("This plan is archived")).toBeTruthy();
+    expect(sent(calls, "POST", `${api}/restore`)).toHaveLength(1);
   });
 });
 

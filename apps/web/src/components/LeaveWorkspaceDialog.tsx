@@ -32,7 +32,7 @@ export function LeaveWorkspaceDialog({
   personalId: string | undefined;
   onClose: () => void;
 }) {
-  const { t } = useTranslation(["settings"]);
+  const { t } = useTranslation(["settings", "errors"]);
   const isOnline = useIsOnline();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -115,7 +115,7 @@ export function LeaveWorkspaceDialog({
           <SendFailure
             error={failure}
             messages={{
-              LAST_OWNER: t("settings:account.workspaces.lastOwner"),
+              LAST_OWNER: t("errors:LAST_OWNER", { context: "leave" }),
             }}
             transient="couldNotSave"
             withSaveReasons

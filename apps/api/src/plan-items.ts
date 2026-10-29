@@ -7,6 +7,7 @@ import {
 } from "@moonx/db";
 import {
   COST_ROW_METRIC_PREFIX,
+  conditionAnswersOutside,
   keyMetricOf,
   type PlanAnswerContent,
   type PlanQuestion,
@@ -167,6 +168,12 @@ async function loadPlanItem(
         users,
         comments,
       }),
+    ),
+    // From the version viewed, as P2 counts it (design-spec 6.12「項目の状態」).
+    conditionAnswers: conditionAnswersOutside(
+      prompts,
+      sections.flatMap((candidate) => candidate.questions),
+      answers,
     ),
     metrics: Object.fromEntries(
       metricKeys
@@ -475,7 +482,7 @@ export function planItemRoutes({ access, db, now }: PlanItemRoutesOptions) {
         detail: {
           summary: "P4 A plan item (21)",
           description:
-            "itemNo is 1–30. With versionId, the answers, numbers and execution items are that saved version's; the references are always the validation's now. The shared self-analyses only for Owners and Members.",
+            "itemNo is 1–30. With versionId, the answers, numbers and execution items are that saved version's; the references are always the validation's now. The shared self-analyses only for Owners and Members. conditionAnswers are the texts of other items' answers its display conditions name.",
         },
       },
     )

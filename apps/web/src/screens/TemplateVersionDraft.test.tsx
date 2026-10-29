@@ -3,7 +3,7 @@ import type {
   TemplateCheckResult,
   TemplateVersionDetail,
 } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { operator } from "../test/admin";
@@ -262,6 +262,43 @@ function draftApi(
   return { calls, current: () => version };
 }
 
+const itemId = "1a2b3c4d-0000-4000-8000-000000000030";
+const promptId = "1a2b3c4d-0000-4000-8000-000000000031";
+
+/** A plan's draft with one item, Team, holding `prompts` (its first is `promptId`). */
+const plan = (...prompts: Question[]): TemplateVersionDetail => ({
+  ...validation(),
+  kind: "business_plan",
+  checkRules: [],
+  costDefaults: [],
+  costRows: [{ key: "monthly.salaries", name: "Salaries" }],
+  sections: [
+    {
+      id: itemId,
+      key: "18",
+      part: "b",
+      title: "Team",
+      subtitle: null,
+      guidance: null,
+      sortOrder: 0,
+      questions: prompts,
+    },
+  ],
+});
+
+/** A number sub-item of the plan, showing `metricKeys` (null: none chosen yet). */
+const numbers = (
+  id: string,
+  key: string,
+  title: string,
+  metricKeys: string[] | null,
+) =>
+  question(id, key, title, {
+    hasFau: false,
+    answerType: "linked_metric",
+    options: metricKeys === null ? null : { kind: "linked_metric", metricKeys },
+  });
+
 const open = (node?: string) =>
   renderApp(
     `/admin/templates/versions/${draftId}${node === undefined ? "" : `?node=${node}`}`,
@@ -272,6 +309,11 @@ const field = (role: "textbox" | "spinbutton", name: string) =>
   screen.getByRole(role, {
     name: new RegExp(`^${name.replace(/[()/]/g, "\\$&")}`),
   }) as HTMLInputElement;
+
+const treeOf = () =>
+  screen.findByRole("treegrid", {
+    name: "Sections and questions of Validation",
+  });
 
 const sent = (calls: Call[], method: string, ending: string) =>
   calls.filter((call) => call.method === method && call.path.endsWith(ending));
@@ -327,18 +369,24 @@ describe("27: a draft's nodes, saved as they are typed (design-spec 6.17)", () =
     expect(sent(calls, "PATCH", `/template-questions/${oceanId}`)).toEqual([]);
   });
 
-  test("a published question ID only shows, with why", async () => {
+  test("a published question ID only shows, with why and its kind's form", async () => {
     draftApi();
     open(whoId);
     const key = (await screen.findByRole("textbox", {
       name: /^Question ID/,
     })) as HTMLInputElement;
     expect(key.readOnly).toBe(true);
-    expect(
-      screen.getByText(
-        "This question ID is in a published version, so it can't change.",
-      ),
-    ).toBeTruthy();
+    const why =
+      "This question ID is in a published version, so it can't change.";
+    const form =
+      "V, the section (01, 02, 04, 08 or 10) and a key in capitals, digits and _, like V.01.WHO";
+    expect(screen.getByText(why)).toBeTruthy();
+    expect(screen.getByText(form)).toBeTruthy();
+    // Both read out with the field.
+    const described = (key.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toEqual(expect.arrayContaining([why, form]));
   });
 
   test("a new answer type asks first when it drops the choices, then sends both", async () => {
@@ -709,36 +757,14 @@ describe("27: each kind's own fields (design-spec 6.17)", () => {
 
   test("a plan's key numbers: chosen by name from 6.4's and the published cost rows, each once", async () => {
     const user = userEvent.setup();
-    const itemId = "1a2b3c4d-0000-4000-8000-000000000030";
-    const promptId = "1a2b3c4d-0000-4000-8000-000000000031";
-    const { calls } = draftApi({
-      ...validation(),
-      kind: "business_plan",
-      checkRules: [],
-      costDefaults: [],
-      costRows: [{ key: "monthly.salaries", name: "Salaries" }],
-      sections: [
-        {
-          id: itemId,
-          key: "18",
-          part: "b",
-          title: "Team",
-          subtitle: null,
-          guidance: null,
-          sortOrder: 0,
-          questions: [
-            question(promptId, "P.18.3", "Expected monthly payroll", {
-              hasFau: false,
-              answerType: "linked_metric",
-              options: {
-                kind: "linked_metric",
-                metricKeys: ["selling_price", "sellng_price"],
-              },
-            }),
-          ],
-        },
-      ],
-    });
+    const { calls } = draftApi(
+      plan(
+        numbers(promptId, "P.18.3", "Expected monthly payroll", [
+          "selling_price",
+          "sellng_price",
+        ]),
+      ),
+    );
     open(promptId);
     await screen.findByRole("heading", {
       level: 2,
@@ -770,6 +796,47 @@ describe("27: each kind's own fields (design-spec 6.17)", () => {
         },
       }),
     );
+  });
+
+  test("a plan's key numbers emptied: not sent, and why under the list (6.0.8: one at least)", async () => {
+    const user = userEvent.setup();
+    const { calls } = draftApi(
+      plan(
+        numbers(promptId, "P.18.3", "Expected monthly payroll", [
+          "selling_price",
+        ]),
+      ),
+    );
+    open(promptId);
+    const publish = await screen.findByRole("button", {
+      name: "Publish as v3",
+    });
+    await waitFor(() =>
+      expect((publish as HTMLButtonElement).disabled).toBe(false),
+    );
+    await user.click(screen.getByRole("button", { name: "Remove Price" }));
+    const list = screen.getByRole("group", { name: "Key numbers" });
+    expect(await within(list).findByText("Can't be empty")).toBeTruthy();
+    expect(within(list).getByText("No key numbers yet")).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(sent(calls, "PATCH", `/template-questions/${promptId}`)).toEqual([]);
+    // Not saved, so not published (design-spec 6.17).
+    expect((publish as HTMLButtonElement).disabled).toBe(true);
+    // One chosen again is sent, and the reason goes.
+    await user.click(screen.getByRole("button", { name: "Add key number" }));
+    // The row's Picker; its Move and Remove are named after the row too.
+    await user.click(
+      screen.getByRole("button", { name: /^(?!Move|Remove).*Key number 1$/ }),
+    );
+    await user.click(await screen.findByRole("option", { name: "Price" }));
+    await waitFor(() =>
+      expect(
+        sent(calls, "PATCH", `/template-questions/${promptId}`).at(-1)?.body,
+      ).toEqual({
+        options: { kind: "linked_metric", metricKeys: ["selling_price"] },
+      }),
+    );
+    expect(within(list).queryByText("Can't be empty")).toBeNull();
   });
 
   test("a self analysis: the AI prompt, and a subtitle", async () => {
@@ -948,6 +1015,40 @@ describe("27: adding, deleting and reordering in the tree (design-spec 6.17)", (
     );
   });
 
+  test("Delete of a version published meanwhile says so (errors:PUBLISHED_READ_ONLY) and keeps the question", async () => {
+    const user = userEvent.setup();
+    const { calls } = draftApi(validation(), {
+      answer: (call) =>
+        call.method === "DELETE"
+          ? apiError(409, "PUBLISHED_READ_ONLY")
+          : undefined,
+    });
+    open(oceanId);
+    await screen.findByRole("heading", { level: 2, name: "OCEAN" });
+    await user.click(
+      screen.getByRole("button", { name: "More actions for V.01.OCEAN OCEAN" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Delete question" }),
+    );
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: "Delete V.01.OCEAN OCEAN?",
+        }),
+      ).getByRole("button", { name: "Delete" }),
+    );
+    expect(
+      await screen.findByText("This version was already published"),
+    ).toBeTruthy();
+    expect(
+      sent(calls, "DELETE", `/template-questions/${oceanId}`),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "OCEAN" }),
+    ).toBeTruthy();
+  });
+
   test("Delete section says its questions go with it", async () => {
     const user = userEvent.setup();
     draftApi();
@@ -1085,6 +1186,101 @@ describe("27: adding, deleting and reordering in the tree (design-spec 6.17)", (
     );
   });
 
+  test("offline, the ⋯ of a section and a question offers nothing to press; Preview still opens", async () => {
+    const user = userEvent.setup();
+    draftApi();
+    open(oceanId);
+    await screen.findByRole("heading", { level: 2, name: "OCEAN" });
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    try {
+      window.dispatchEvent(new Event("offline"));
+      const disabled = async (more: string, items: string[]) => {
+        await user.click(screen.getByRole("button", { name: more }));
+        const menu = await screen.findByRole("menu");
+        expect(
+          within(menu)
+            .getAllByRole("menuitem")
+            .map((item) => [
+              item.textContent,
+              item.getAttribute("aria-disabled"),
+            ]),
+        ).toEqual(items.map((item) => [item, "true"]));
+        await user.keyboard("{Escape}");
+        await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+      };
+      await disabled("More actions for V.01.OCEAN OCEAN", [
+        "Add question",
+        "Reorder questions",
+        "Delete question",
+      ]);
+      await user.click(within(await treeOf()).getByText("Customer & Problem"));
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Customer & Problem",
+      });
+      await disabled("More actions for 01 Customer & Problem", [
+        "Add question",
+        "Reorder sections",
+        "Reorder questions",
+        "Delete section",
+      ]);
+      await user.click(screen.getByRole("button", { name: "Preview" }));
+      expect(
+        await screen.findByRole("dialog", {
+          name: "Preview: Customer & Problem",
+        }),
+      ).toBeTruthy();
+    } finally {
+      onLine.mockRestore();
+    }
+  });
+
+  test("a phone's floating + (Add section) opens the dialog online, and offline cannot be pressed (6.17)", async () => {
+    const user = userEvent.setup();
+    const setViewport = (width: number) =>
+      act(() =>
+        (
+          window as unknown as {
+            happyDOM: {
+              setViewport: (size: { width: number; height: number }) => void;
+            };
+          }
+        ).happyDOM.setViewport({ width, height: 900 }),
+      );
+    setViewport(390);
+    const onLine = vi.spyOn(navigator, "onLine", "get");
+    try {
+      draftApi();
+      open();
+      await treeOf();
+      // In one pane the list stands alone, its new item floating over it.
+      const add = screen.getByRole("button", { name: "Add section" });
+      await user.click(add);
+      const dialog = await screen.findByRole("dialog", {
+        name: "Add section",
+      });
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "Add section" }),
+        ).toBeNull(),
+      );
+      onLine.mockReturnValue(false);
+      act(() => {
+        window.dispatchEvent(new Event("offline"));
+      });
+      const offline = screen.getByRole("button", { name: "Add section" });
+      await waitFor(() =>
+        expect((offline as HTMLButtonElement).disabled).toBe(true),
+      );
+      await user.click(offline);
+      expect(screen.queryByRole("dialog", { name: "Add section" })).toBeNull();
+    } finally {
+      onLine.mockRestore();
+      setViewport(1024);
+    }
+  });
+
   test("a list changed while ordering is read again, as 6.10 does", async () => {
     const user = userEvent.setup();
     let refused = false;
@@ -1149,6 +1345,43 @@ describe("27: the preview (design-spec 6.17「プレビュー」)", () => {
         .getAllByRole("radio")
         .map((radio) => (radio as HTMLInputElement).value),
     ).toEqual(["Red", "Blue", "Mixed"]);
+  });
+
+  test("a plan's key numbers by their names, or the line while none is chosen", async () => {
+    const user = userEvent.setup();
+    draftApi(
+      plan(
+        numbers(promptId, "P.18.3", "Expected monthly payroll", [
+          "selling_price",
+          "scenario:expected",
+          "cost_row:monthly.salaries",
+        ]),
+        numbers(
+          "1a2b3c4d-0000-4000-8000-000000000032",
+          "P.18.4",
+          "Hiring cost",
+          null,
+        ),
+      ),
+    );
+    open(promptId);
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "Expected monthly payroll",
+    });
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Preview: Team",
+    });
+    expect(
+      within(dialog).getByText(
+        "Shows the key numbers Price, Expected scenario, Cost row: Salaries",
+      ),
+    ).toBeTruthy();
+    expect(
+      within(dialog).getByText("Shows key numbers once they are chosen"),
+    ).toBeTruthy();
+    expect(within(dialog).queryByText(/selling_price|cost_row:/)).toBeNull();
   });
 
   test("a published version: Preview, and no ⋯ or fields", async () => {

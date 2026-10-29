@@ -1,9 +1,9 @@
 import { hasText } from "@moonx/domain";
 import {
   formatCount,
+  formatInputMoney,
   formatInputNumber,
   formatInputPercent,
-  formatMoney,
   i18n,
 } from "@moonx/i18n";
 import {
@@ -75,7 +75,7 @@ import {
 } from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { EvidenceSheet } from "../components/EvidenceSheet";
-import { toastFailure } from "../components/ideaActions";
+import { useToastFailure } from "../components/ideaActions";
 import { ReorderDialog } from "../components/ReorderDialog";
 import { type RowFieldsSpec, useRowFields } from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
@@ -343,15 +343,10 @@ function useNameOf() {
     hasText(view.name) ? view.name : t("common:itemLabel.untitled");
 }
 
-/** An amount as 17 shows it: cents for variable costs and for amounts that have them. */
-const amountText = (view: CostRowView, amount: number, currency: string) =>
-  formatMoney(amount, currency, {
-    cents: view.row.category === "variable" || !Number.isInteger(amount),
-  });
-
 /**
  * A row's value (design-spec 6.3): its amount, or its % of the price with what that comes
- * to ("35% · ₱77.00", or "Needs price"); "Unknown" or "Empty" when it has none.
+ * to ("35% · ₱77", "35% · ₱52.33", or "Needs price"); "Unknown" or "Empty" when it has
+ * none.
  */
 function ValueText({
   view,
@@ -363,8 +358,9 @@ function ValueText({
 }) {
   const { t } = useTranslation(["validation", "common"]);
   const { workspace } = useWorkspace();
+  // As typed, never rounded, and what a % comes to in the same form (6.4「端数」).
   if (view.amount !== null) {
-    return <>{amountText(view, view.amount, workspace.currency)}</>;
+    return <>{formatInputMoney(view.amount, workspace.currency)}</>;
   }
   if (view.percent !== null) {
     return (
@@ -375,9 +371,7 @@ function ValueText({
             amount:
               price === null
                 ? t("common:metricReason.needs_price")
-                : formatMoney(price * view.percent, workspace.currency, {
-                    cents: true,
-                  }),
+                : formatInputMoney(price * view.percent, workspace.currency),
           })}
         </Text>
       </>
@@ -852,7 +846,7 @@ function SwitchModeQuestion({
   const next = view.inputMode === "amount" ? "percent_of_price" : "amount";
   const value =
     view.amount !== null
-      ? amountText(view, view.amount, workspace.currency)
+      ? formatInputMoney(view.amount, workspace.currency)
       : view.percent !== null
         ? formatInputPercent(view.percent)
         : "";
@@ -976,9 +970,7 @@ function Totals({
           supplement={
             breakEven.value !== null && price !== null
               ? t("validation:costs.atPrice", {
-                  price: formatMoney(price, currency, {
-                    cents: !Number.isInteger(price),
-                  }),
+                  price: formatInputMoney(price, currency),
                 })
               : undefined
           }
@@ -1048,6 +1040,7 @@ function CostsBody({
   modal: string | undefined;
   about: string | undefined;
 }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["validation", "common", "app"]);
   const { me, workspace, role } = useWorkspace();
   const queryClient = useQueryClient();

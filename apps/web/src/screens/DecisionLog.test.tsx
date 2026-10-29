@@ -64,7 +64,7 @@ const holdEntry: DecisionLogEntry = {
     },
     fau: {
       fact: 12,
-      factNoEvidence: 0,
+      factNoEvidence: 2,
       assumption: { total: 9, low: 2, medium: 4, high: 3 },
       unknown: 2,
       unclassified: 3,
@@ -178,6 +178,13 @@ describe("7 Decision Log (design-spec 6.15)", () => {
       await screen.findByText("Costs are not in yet. Permits are unknown."),
     ).toBeTruthy();
     expect(screen.getByText("Checks missing then")).toBeTruthy();
+    // The F/A/U then, a Fact whose research log was deleted among the Facts (6.0.3).
+    const fau = screen.getByRole("heading", {
+      name: "Fact / Assumption / Unknown then",
+    });
+    expect(fau.parentElement?.textContent).toContain(
+      "Fact 12 (2 without evidence)",
+    );
     expect(
       screen.getByRole("group", { name: "Key numbers then" }),
     ).toBeTruthy();

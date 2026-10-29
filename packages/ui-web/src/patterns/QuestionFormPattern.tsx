@@ -1,4 +1,3 @@
-import { formatCount } from "@moonx/i18n";
 import type { QuestionCardMode } from "@moonx/ui-tokens";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import {
@@ -298,10 +297,7 @@ export function QuestionFormPattern({
                           answered
                             ? "components:questionFormPattern.dotAnswered"
                             : "components:questionFormPattern.dot",
-                          {
-                            number: formatCount(index + 1),
-                            total: formatCount(questionIds.length),
-                          },
+                          { number: index + 1, total: questionIds.length },
                         )}
                         aria-current={
                           id === currentId && !isAtEnd ? "step" : undefined

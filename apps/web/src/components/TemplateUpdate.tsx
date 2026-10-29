@@ -1,4 +1,4 @@
-import { formatCount, formatList } from "@moonx/i18n";
+import { formatInteger, formatList } from "@moonx/i18n";
 import type {
   TemplateKind,
   TemplateMigrationPreview,
@@ -177,10 +177,10 @@ function PreviewBody({
       </Text>
       <DescriptionList>
         <DescriptionListItem label={t("app:templateUpdate.carried")}>
-          {formatCount(preview.carried)}
+          {formatInteger(preview.carried)}
         </DescriptionListItem>
         <DescriptionListItem label={t("app:templateUpdate.added")}>
-          {formatCount(preview.addedQuestions)}
+          {formatInteger(preview.addedQuestions)}
         </DescriptionListItem>
         {kind === "validation" && (
           <DescriptionListItem label={t("app:templateUpdate.addedCostRows")}>
@@ -264,7 +264,7 @@ export function TemplateUpdateDialog({
   dataKeys: readonly QueryKey[];
   onClose: () => void;
 }) {
-  const { t } = useTranslation(["app"]);
+  const { t } = useTranslation(["app", "errors"]);
   const { me, workspace } = useWorkspace();
   const queryClient = useQueryClient();
   const isOnline = useIsOnline();
@@ -347,7 +347,7 @@ export function TemplateUpdateDialog({
       : migrate.error;
   let body: ReactNode;
   if (isLatest) {
-    body = <Text elementType="p">{t("app:templateUpdate.latest")}</Text>;
+    body = <Text elementType="p">{t("errors:ALREADY_LATEST")}</Text>;
   } else if (preview.isError) {
     // Before the preview it had, which no longer says what a move would do.
     body = (
@@ -364,7 +364,7 @@ export function TemplateUpdateDialog({
       <Stack gap="space-400">
         {isChanged && (
           <InlineAlert variant="notice">
-            {t("app:templateUpdate.changed")}
+            {t("errors:VALIDATION_FAILED", { context: "templateChanged" })}
           </InlineAlert>
         )}
         <PreviewBody kind={target.kind} preview={preview.data} />

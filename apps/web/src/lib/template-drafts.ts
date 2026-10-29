@@ -274,9 +274,18 @@ export const hasOptions = (options: QuestionOptions | null) => {
   }
 };
 
-/** The issues of a question's settings, at their paths inside the options. */
-export const optionsIssues = (options: QuestionOptions | null): Issue[] =>
-  options === null ? [] : schemaIssues(templateFileOptionsSchema, options);
+/**
+ * The issues of a question's settings, at their paths inside the options. The key numbers
+ * shown are required, one at least (6.0.8 for 27): emptied, the list is not sent. This is
+ * 27's own rule; a template file may hold none, for AD6 to flag before publishing.
+ */
+export const optionsIssues = (options: QuestionOptions | null): Issue[] => {
+  if (options === null) return [];
+  const issues = schemaIssues(templateFileOptionsSchema, options);
+  return options.kind === "linked_metric" && options.metricKeys.length === 0
+    ? [...issues, custom("required")]
+    : issues;
+};
 
 /** One condition of "Shown when" as 27 edits it (design-spec 6.17). */
 export interface ConditionRow {

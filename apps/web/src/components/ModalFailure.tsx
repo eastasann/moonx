@@ -1,11 +1,9 @@
 import { AlertDialog, Button, Flex, InlineAlert, Text } from "@moonx/ui-web";
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../lib/api";
 import { rejectionReason } from "../lib/autosave";
-import { isTransient } from "../lib/query";
+import { isTransient, useUnexpectedReference } from "../lib/failure";
 import { rateLimitWords } from "./SendFailure";
-import { reportOnce } from "./states";
 
 /**
  * A send that failed inside a modal (design-spec 6.0.6「モーダルの共通の決まり」, 6.0.2),
@@ -37,10 +35,7 @@ export function ModalSendFailure({
     reason === null &&
     !isTransient(error);
   // The API's request id, or the Sentry event of the Web's own failure (SDD 8.2).
-  const reference = useMemo(
-    () => (!isUnexpected ? null : isApi ? error.requestId : reportOnce(error)),
-    [isUnexpected, isApi, error],
-  );
+  const reference = useUnexpectedReference(error, isUnexpected);
   if (isSignedOut) return null;
   if (isUnexpected) {
     return (

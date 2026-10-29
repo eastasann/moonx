@@ -1,4 +1,4 @@
-import { formatList, formatRelativeTime } from "@moonx/i18n";
+import { formatInteger, formatList, formatRelativeTime } from "@moonx/i18n";
 import {
   type TemplateCheckResult,
   type TemplateKind,
@@ -38,7 +38,7 @@ import { MousePointerClick, Plus } from "lucide-react";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { adminToast, useDetailHistory } from "../components/admin";
-import { toastFailure } from "../components/ideaActions";
+import { useToastFailure } from "../components/ideaActions";
 import {
   ReorderDialog,
   ReorderGroupedDialog,
@@ -227,7 +227,9 @@ function SectionFacts({
             : t("admin:version.section.questions")
         }
       >
-        <Text variant="number-sm">{String(section.questions.length)}</Text>
+        <Text variant="number-sm">
+          {formatInteger(section.questions.length)}
+        </Text>
       </DescriptionListItem>
     </DescriptionList>
   );
@@ -408,7 +410,7 @@ function SettingsFacts({
                   end={
                     value === undefined
                       ? t("admin:version.none")
-                      : String(value)
+                      : formatInteger(value)
                   }
                   isEndNumeric={value !== undefined}
                 >
@@ -549,6 +551,7 @@ function NodeDetail({
 }) {
   const { t } = useTranslation(["admin"]);
   const isPhone = useIsNarrow();
+  const isOnline = useIsOnline();
   const [isEditing, setEditing] = useState(false);
   const isDraft = version.status === "draft";
   const words = version.kind === "business_plan" ? "plan" : "other";
@@ -588,6 +591,17 @@ function NodeDetail({
             {isDraft && (
               <ActionMenu
                 aria-label={t("admin:version.more", { name })}
+                // Each of them changes the draft: offline, none can be sent (6.0.6).
+                disabledKeys={
+                  isOnline
+                    ? []
+                    : [
+                        "add-question",
+                        "reorder-sections",
+                        "reorder-questions",
+                        "delete",
+                      ]
+                }
                 onAction={(key) => {
                   if (key === "add-question") {
                     onAction({ kind: "add-question", section });
@@ -1023,6 +1037,7 @@ function VersionBody({
   version: TemplateVersionDetail;
   search: TemplateVersionSearch;
 }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["admin", "errors"]);
   const { me } = useWorkspace();
   const isTwoColumns = useTwoColumns();
@@ -1154,7 +1169,7 @@ function VersionBody({
       const code = failureCode(error);
       if (code === "PUBLISHED_READ_ONLY") {
         void queryClient.invalidateQueries({ queryKey: versionKey });
-        adminToast(t("admin:version.alreadyPublished"));
+        adminToast(t("errors:PUBLISHED_READ_ONLY"));
         return;
       }
       if (code !== "NOT_FOUND") {
@@ -1247,9 +1262,11 @@ function VersionBody({
         label: questionLabel(question),
       })),
     }));
+  // Offline it cannot be sent: under the tree and as a phone's "+" (6.17).
   const addSection = {
     label: t(`admin:version.add.section.${words}`),
     onPress: () => setDialog({ kind: "add-section" }),
+    isDisabled: !isOnline,
   };
   let listNote: ReactNode;
   if (isDraft && tab === "check") {
@@ -1265,7 +1282,7 @@ function VersionBody({
           variant="secondary"
           isQuiet
           onPress={addSection.onPress}
-          isDisabled={!isOnline}
+          isDisabled={addSection.isDisabled}
         >
           <Plus />
           {addSection.label}
@@ -1290,8 +1307,8 @@ function VersionBody({
               <SendFailure
                 error={failure}
                 messages={{
-                  TEMPLATE_INVALID: t("admin:version.publishInvalid"),
-                  PUBLISHED_READ_ONLY: t("admin:version.alreadyPublished"),
+                  TEMPLATE_INVALID: t("errors:TEMPLATE_INVALID"),
+                  PUBLISHED_READ_ONLY: t("errors:PUBLISHED_READ_ONLY"),
                 }}
                 transient="couldNotSave"
                 withSaveReasons

@@ -50,8 +50,8 @@
   },
   "toast": {
     "close": "Close",
-    "region_one": "{{count}} notification.",
-    "region_other": "{{count}} notifications."
+    "region_one": "{{count, integer}} notification.",
+    "region_other": "{{count, integer}} notifications."
   },
   "breadcrumbs": {
     "label": "Breadcrumbs",
@@ -122,15 +122,15 @@
     "focus": "Focus",
     "previous": "Previous question",
     "next": "Next question",
-    "dot": "Question {{number}} of {{total}}",
-    "dotAnswered": "Question {{number}} of {{total}}, answered"
+    "dot": "Question {{number, integer}} of {{total, integer}}",
+    "dotAnswered": "Question {{number, integer}} of {{total, integer}}, answered"
   },
   "listDetailPattern": {
     "back": "Back to {{label}}"
   },
   "presentationPattern": {
     "slides": "Slides",
-    "position": "{{number}} / {{total}}",
+    "position": "{{number, integer}} / {{total, integer}}",
     "previous": "Previous slide",
     "next": "Next slide"
   },

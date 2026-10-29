@@ -1,5 +1,12 @@
 import type { Classification, ImportContext, Me, Role } from "@moonx/schemas";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
@@ -110,6 +117,19 @@ const reply = [
 ].join("\n");
 
 const item = (code: RegExp) => screen.getByRole("region", { name: code });
+
+/** ③: replaces the imported answer to 01 · WHO with `text`, as typed. */
+async function editImported(
+  user: ReturnType<typeof userEvent.setup>,
+  text: string,
+) {
+  const field = (await screen.findByRole("textbox", {
+    name: "Imported answer to 01 · WHO",
+  })) as HTMLTextAreaElement;
+  await user.clear(field);
+  await user.type(field, text);
+  return field;
+}
 
 describe("25 Import from AI (design-spec 6.7)", () => {
   test("① → ② → ③: changes beside the answers, F/A/U set again, applied at once, back with the count", async () => {
@@ -653,14 +673,147 @@ describe("25 Import from AI (design-spec 6.7)", () => {
     renderApp(importPath());
     await paste(user, "## [V.01.WHO]\nBPO staff.");
     await user.click(await screen.findByRole("button", { name: "Next" }));
-    await user.click(
-      await screen.findByRole("button", { name: "Apply 1 change" }),
-    );
+    const field = await editImported(user, "BPO staff in Bacolod.");
+    await user.click(screen.getByRole("button", { name: "Apply 1 change" }));
     expect(await screen.findByText("Couldn't apply")).toBeTruthy();
     expect(screen.getByText("Ref: 8f14e45f")).toBeTruthy();
+    expect(field.value).toBe("BPO staff in Bacolod.");
     failing = false;
     await user.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(applyCalls(calls)).toHaveLength(2));
+    expect(applyCalls(calls)[1]?.body).toMatchObject({
+      changes: [{ questionKey: "V.01.WHO", text: "BPO staff in Bacolod." }],
+    });
+  });
+
+  test("an apply over the rate limit: Couldn't apply with the wait, and Retry applies again", async () => {
+    const user = userEvent.setup();
+    let limited = true;
+    const calls = importApi({
+      applyCall: () =>
+        limited
+          ? apiError(429, "RATE_LIMITED", { retryAfterSeconds: 60 })
+          : undefined,
+    });
+    renderApp(importPath());
+    await paste(user, "## [V.01.WHO]\nBPO staff.");
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    const field = await editImported(user, "BPO staff in Bacolod.");
+    await user.click(screen.getByRole("button", { name: "Apply 1 change" }));
+    expect(await screen.findByText("Couldn't apply")).toBeTruthy();
+    expect(
+      screen.getByText("Too many attempts. Try again in 1 minute."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/^Ref:/)).toBeNull();
+    // What was edited stays.
+    expect(field.value).toBe("BPO staff in Bacolod.");
+    // Offline, Retry waits for the connection (6.7「状態」).
+    const retry = screen.getByRole("button", { name: "Retry" });
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    try {
+      act(() => {
+        window.dispatchEvent(new Event("offline"));
+      });
+      await waitFor(() => expect(retry.hasAttribute("disabled")).toBe(true));
+    } finally {
+      online.mockRestore();
+    }
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await waitFor(() => expect(retry.hasAttribute("disabled")).toBe(false));
+    limited = false;
+    await user.click(retry);
+    await waitFor(() => expect(applyCalls(calls)).toHaveLength(2));
+    expect(applyCalls(calls)[1]?.body).toEqual(applyCalls(calls)[0]?.body);
+    expect(applyCalls(calls)[1]?.body).toMatchObject({
+      changes: [{ questionKey: "V.01.WHO", text: "BPO staff in Bacolod." }],
+    });
+  });
+
+  test("an apply that changed nothing (someone saved the same first): No answers changed, and back", async () => {
+    const user = userEvent.setup();
+    importApi({
+      applyCall: () =>
+        Response.json({
+          applied: 0,
+          needsClassification: 0,
+          batchId: "4f3e2d1c-0000-4000-8000-000000000002",
+        }),
+    });
+    const router = renderApp(
+      importPath(
+        `target=validation&id=${validationId}&returnTo=${encodeURIComponent(questionsHref)}`,
+      ),
+    );
+    await paste(user, "## [V.01.WHO]\nBPO staff.");
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Apply 1 change" }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(questionsHref),
+    );
+    expect(
+      (await screen.findAllByText("No answers changed")).length,
+    ).toBeGreaterThan(0);
+  });
+
+  test("offline on ③: Apply cannot be pressed, and the imported text, amount and F/A/U are read only", async () => {
+    const user = userEvent.setup();
+    const online = vi.spyOn(navigator, "onLine", "get");
+    try {
+      for (const [path, context, text] of [
+        [importPath(), validationContext, "## [V.01.WHO]\nBPO staff."],
+        [
+          importPath("target=self_analysis"),
+          selfAnalysisContext,
+          "## [SA.INCOME.1]\n### Amount\n32000\n\n### Why this amount?\nRent.",
+        ],
+      ] as const) {
+        online.mockReturnValue(true);
+        const calls = importApi({ context });
+        renderApp(path);
+        await paste(user, text);
+        await user.click(await screen.findByRole("button", { name: "Next" }));
+        const apply = await screen.findByRole("button", {
+          name: "Apply 1 change",
+        });
+        expect(apply.hasAttribute("disabled")).toBe(false);
+        online.mockReturnValue(false);
+        act(() => {
+          window.dispatchEvent(new Event("offline"));
+        });
+        await waitFor(() => expect(apply.hasAttribute("disabled")).toBe(true));
+        await user.click(apply);
+        expect(applyCalls(calls)).toHaveLength(0);
+        const fields =
+          context === validationContext
+            ? [
+                screen.getByRole("textbox", {
+                  name: "Imported answer to 01 · WHO",
+                }),
+              ]
+            : [
+                screen.getByRole("textbox", { name: "Amount" }),
+                screen.getByRole("textbox", { name: "Why this amount?" }),
+              ];
+        for (const field of fields) {
+          expect(field.hasAttribute("readonly")).toBe(true);
+        }
+        if (context === validationContext) {
+          const fau = within(item(/01 · WHO/)).getAllByRole("radio");
+          expect(fau.length).toBeGreaterThan(0);
+          for (const button of fau) {
+            expect(button.hasAttribute("disabled")).toBe(true);
+          }
+        }
+        cleanup();
+        vi.unstubAllGlobals();
+      }
+    } finally {
+      online.mockRestore();
+    }
   });
 
   test("nothing different from the answers now: No changes found and Close", async () => {

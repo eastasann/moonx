@@ -49,10 +49,13 @@ export const Route = createFileRoute("/_signedIn")({
   }),
   beforeLoad: async ({ context }) => {
     // What is cached shows at once and is asked again behind it (ADR-011).
-    await context.queryClient.ensureQueryData({
+    const me = await context.queryClient.ensureQueryData({
       ...meQuery(),
       revalidateIfStale: true,
     });
+    // Before the screen renders, so a failure of its first render carries the user
+    // too (SDD 11章); SignedIn follows a change and lets go of the user on leaving.
+    setReportedUser(me.id);
   },
   pendingComponent: PendingScreen,
   errorComponent: SignedInError,

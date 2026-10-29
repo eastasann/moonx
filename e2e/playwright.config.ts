@@ -8,6 +8,7 @@ import {
   PWA_API_LOG,
   PWA_ORIGIN,
   PWA_PORT,
+  PWA_SENTRY_DSN,
   PWA_WEB_DIR,
   WEB_ORIGIN,
   WEB_PORT,
@@ -131,6 +132,7 @@ export default defineConfig({
       env: {
         PORT: String(PWA_PORT),
         WEB_DIST_DIR: PWA_WEB_DIR,
+        WEB_SENTRY_DSN: PWA_SENTRY_DSN,
         BETTER_AUTH_URL: PWA_ORIGIN,
         TRUSTED_ORIGINS: PWA_ORIGIN,
         DATABASE_URL: testDatabase,

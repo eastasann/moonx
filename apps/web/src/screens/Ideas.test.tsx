@@ -1,8 +1,8 @@
 import type { Me, Role } from "@moonx/schemas";
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, renderApp, stubApi } from "../test/api";
+import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { ideaSummary, validationHome, workspaceId } from "../test/ideas";
 
 // 6 Ideas and M1 (design-spec 6.8・3.8).
@@ -135,6 +135,39 @@ describe("6 Ideas (design-spec 6.8)", () => {
     );
   });
 
+  test("in one pane, a link with ?selected= opens that idea's summary; ← goes back to the list (design-spec 6.8)", async () => {
+    for (const width of [820, 390]) {
+      setViewport(width);
+      ideasApi();
+      const router = renderApp(`/w/${workspaceId}/ideas?selected=${bowl.id}`);
+      expect(
+        await screen.findByRole("heading", {
+          level: 2,
+          name: "Bacolod Health Bowl",
+        }),
+      ).toBeTruthy();
+      // One pane: the summary in place of the list.
+      expect(screen.queryByRole("grid", { name: "Ideas" })).toBeNull();
+      expect(
+        screen.getByRole("button", { name: "Open validation" }),
+      ).toBeTruthy();
+      // The pattern's ← on a tablet, the header's on a phone (4.1 D).
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: "Back to Ideas" }));
+      expect(await screen.findByRole("grid", { name: "Ideas" })).toBeTruthy();
+      expect(router.state.location.search).not.toHaveProperty("selected");
+      expect(
+        screen.queryByRole("heading", {
+          level: 2,
+          name: "Bacolod Health Bowl",
+        }),
+      ).toBeNull();
+      cleanup();
+      vi.unstubAllGlobals();
+    }
+  });
+
   test("beside the list, the first idea until a row is chosen; then the row's, in the URL", async () => {
     setViewport(1440);
     ideasApi();
@@ -157,6 +190,50 @@ describe("6 Ideas (design-spec 6.8)", () => {
     expect(screen.getByText(/Latest decision: Hold on Oct 10/)).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Open validation" }),
+    ).toBeTruthy();
+  });
+
+  test("a proposer who left reads as a former member, in the row and beside the list (design-spec 6.16)", async () => {
+    setViewport(1440);
+    const former = {
+      ...bowl.proposer,
+      displayName: "Kenji Mori",
+      badge: "former_member" as const,
+    };
+    stubApi(({ method, path }) => {
+      if (path === "/api/v1/me") return Response.json(ana);
+      if (
+        method === "GET" &&
+        path.startsWith(`/api/v1/workspaces/${workspaceId}/ideas?`)
+      ) {
+        return Response.json({
+          items: [{ ...bowl, proposer: former }],
+          nextCursor: null,
+          hiddenDroppedCount: 0,
+        });
+      }
+      if (path === `/api/v1/workspaces/${workspaceId}/members`) {
+        return Response.json({ items: [] });
+      }
+      if (path === `/api/v1/ideas/${bowl.id}/validation`) {
+        const data = validationHome();
+        return Response.json({
+          ...data,
+          idea: { ...data.idea, proposer: former },
+        });
+      }
+      return undefined;
+    });
+    renderApp(`/w/${workspaceId}/ideas`);
+    const [row] = await screen.findAllByRole("row");
+    expect(row?.textContent).toContain(
+      "Validation · Kenji Mori (former member) ·",
+    );
+    expect(
+      await screen.findByText(
+        "Stage: Validation · Kenji Mori (former member)",
+        { exact: false },
+      ),
     ).toBeTruthy();
   });
 
@@ -210,6 +287,141 @@ describe("M1 New idea (design-spec 3.8・6.8)", () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  /** Types the required fields of M1 and presses Create. */
+  async function create(dialog: HTMLElement) {
+    const user = userEvent.setup();
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Name/ }),
+      "Taho",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^One-line concept/ }),
+      "Taho by bike.",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Create" }));
+    return user;
+  }
+
+  const posts = (calls: Call[]) =>
+    calls.filter(
+      ({ method, path }) =>
+        method === "POST" && path === `/api/v1/workspaces/${workspaceId}/ideas`,
+    );
+
+  const typed = { name: "Taho", oneLineConcept: "Taho by bike." };
+
+  test("the network or an API that is down: Couldn't save and Retry in M1, what was typed kept; Retry sends it again", async () => {
+    for (const fail of [
+      (): Response => {
+        throw new TypeError("Failed to fetch");
+      },
+      // A bare 503 from the front of Cloud Run (SDD 8.1).
+      () => new Response(null, { status: 503 }),
+    ]) {
+      let tries = 0;
+      const calls = ideasApi({
+        create: () => {
+          tries += 1;
+          return tries === 1 ? fail() : apiError(500, "INTERNAL");
+        },
+      });
+      renderApp(`/w/${workspaceId}/ideas?modal=new-idea`);
+      const dialog = await screen.findByRole("dialog", { name: "New idea" });
+      const user = await create(dialog);
+      expect(await within(dialog).findByText("Couldn't save")).toBeTruthy();
+      expect(
+        within(dialog).getByRole("textbox", { name: /^Name/ }),
+      ).toHaveProperty("value", "Taho");
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      await user.click(within(dialog).getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(posts(calls)).toHaveLength(2));
+      expect(posts(calls).map(({ body }) => body)).toEqual([
+        { ...typed, proposedSolution: "" },
+        { ...typed, proposedSolution: "" },
+      ]);
+      cleanup();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("an unexpected failure: the small dialog with its Ref; Retry sends again, Close closes M1", async () => {
+    const calls = ideasApi({ create: () => apiError(500, "INTERNAL") });
+    const router = renderApp(`/w/${workspaceId}/ideas?modal=new-idea`);
+    const dialog = await screen.findByRole("dialog", { name: "New idea" });
+    const user = await create(dialog);
+    const failed = await screen.findByRole("alertdialog", {
+      name: /Something went wrong/,
+    });
+    // The request id's first 8 characters, not all of it (design-spec 6.0.6).
+    expect(within(failed).getByText("Ref: 8f14e45f")).toBeTruthy();
+    await user.click(within(failed).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posts(calls)).toHaveLength(2));
+    expect(posts(calls)[1]?.body).toEqual(posts(calls)[0]?.body);
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: /Something went wrong/,
+        }),
+      ).getByRole("button", { name: "Close" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "New idea" })).toBeNull(),
+    );
+    expect(router.state.location.search).not.toHaveProperty("modal");
+  });
+
+  test("too many attempts: the wait in M1, what was typed kept", async () => {
+    ideasApi({
+      create: () => apiError(429, "RATE_LIMITED", { retryAfterSeconds: 60 }),
+    });
+    renderApp(`/w/${workspaceId}/ideas?modal=new-idea`);
+    const dialog = await screen.findByRole("dialog", { name: "New idea" });
+    await create(dialog);
+    expect(
+      await within(dialog).findByText(
+        "Too many attempts. Try again in 1 minute.",
+      ),
+    ).toBeTruthy();
+    expect(
+      within(dialog).getByRole("textbox", { name: /^One-line concept/ }),
+    ).toHaveProperty("value", "Taho by bike.");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  test("refused for good: Couldn't save and 6.0.2's reason in M1; a 422 naming a field says so under it too", async () => {
+    ideasApi({ create: () => apiError(403, "FORBIDDEN") });
+    renderApp(`/w/${workspaceId}/ideas?modal=new-idea`);
+    let dialog = await screen.findByRole("dialog", { name: "New idea" });
+    await create(dialog);
+    expect(await within(dialog).findByText("Couldn't save")).toBeTruthy();
+    expect(
+      within(dialog).getByText("You don't have access to this"),
+    ).toBeTruthy();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    cleanup();
+    vi.unstubAllGlobals();
+    ideasApi({
+      create: () =>
+        apiError(422, "VALIDATION_FAILED", {
+          details: [{ path: "name", message: "too long" }],
+        }),
+    });
+    renderApp(`/w/${workspaceId}/ideas?modal=new-idea`);
+    dialog = await screen.findByRole("dialog", { name: "New idea" });
+    await create(dialog);
+    expect(await within(dialog).findByText("Couldn't save")).toBeTruthy();
+    const name = within(dialog).getByRole("textbox", { name: /^Name/ });
+    expect(name.getAttribute("aria-invalid")).toBe("true");
+    expect(within(dialog).getAllByText("Check the format")).toHaveLength(2);
+    // Changing the refused field asks the API again: the send's failure goes with it.
+    await userEvent.setup().type(name, "s");
+    await waitFor(() =>
+      expect(within(dialog).queryByText("Check the format")).toBeNull(),
+    );
+    expect(within(dialog).queryByText("Couldn't save")).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
   test("a Viewer opening M1's URL sees no dialog", async () => {

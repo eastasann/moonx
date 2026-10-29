@@ -3,8 +3,9 @@ import {
   isQuestionShown,
   isSelfAnalysisAnswered,
 } from "@moonx/domain";
-import { formatCount, formatInputNumber, formatMoney, i18n } from "@moonx/i18n";
+import { formatInputMoney, formatInputNumber, i18n } from "@moonx/i18n";
 import {
+  type ConditionAnswer,
   longTextSchema,
   moneySchema,
   numberTextSchema,
@@ -87,7 +88,12 @@ export interface SelfAnalysisFormSearch {
   q?: string;
 }
 
-type SectionData = { section: TemplateSection; answers: SelfAnalysisAnswer[] };
+type SectionData = {
+  section: TemplateSection;
+  answers: SelfAnalysisAnswer[];
+  conditionAnswers: ConditionAnswer[];
+  decidesElsewhere: string[];
+};
 
 const isAmountQuestion = (question: TemplateQuestion) =>
   question.answerType === "amount_with_reason";
@@ -154,6 +160,12 @@ function answerTarget(
               ),
             },
       );
+      // Another section's display conditions may read this answer. A save sent on
+      // leaving lands after the next section was read: it is read again.
+      void queryClient.invalidateQueries({
+        queryKey: queryKey.slice(0, -1),
+        predicate: (query) => query.queryKey.at(-1) !== sectionKey,
+      });
       return saved.lockVersion;
     },
     loadTheirs: () => void queryClient.invalidateQueries({ queryKey }),
@@ -418,9 +430,7 @@ function excerptOf(view: AnswerView, currency: string): string | null {
   const { text, amount } = view.value;
   const words = hasText(text) ? (text ?? "") : null;
   if (!isAmountQuestion(view.question) || amount === null) return words;
-  const money = formatMoney(amount, currency, {
-    cents: !Number.isInteger(amount),
-  });
+  const money = formatInputMoney(amount, currency);
   return words === null ? money : [money, words].join(i18n.t("app:separator"));
 }
 
@@ -432,11 +442,17 @@ function SectionForm({
   home,
   section,
   answers,
+  conditionAnswers,
+  decidesElsewhere,
   focusKey,
 }: {
   home: SelfAnalysisHome;
   section: TemplateSection;
   answers: readonly SelfAnalysisAnswer[];
+  /** S2's answers in other sections that this one's display conditions read. */
+  conditionAnswers: readonly ConditionAnswer[];
+  /** S2's questions here that decide a question in another section. */
+  decidesElsewhere: readonly string[];
   focusKey: string | undefined;
 }) {
   const { t } = useTranslation(["validation", "selfAnalysis"]);
@@ -462,9 +478,15 @@ function SectionForm({
     return editing.viewOf(question, answer);
   });
   const byQuestion = new Map(views.map((view) => [view.question.key, view]));
-  const shownValues = new Map(
-    views.map((view) => [view.question.key, { text: view.value.text }]),
-  );
+  // A condition naming another section's question reads its answer as 10 does.
+  const shownValues = new Map([
+    ...conditionAnswers.map(
+      ({ questionKey, text }) => [questionKey, { text }] as const,
+    ),
+    ...views.map(
+      (view) => [view.question.key, { text: view.value.text }] as const,
+    ),
+  ]);
   // A question its display condition hides is neither asked nor counted (6.2).
   const shown = views.filter((view) =>
     isQuestionShown(view.question, shownValues),
@@ -544,9 +566,10 @@ function SectionForm({
   /** The questions whose answer decides others, while unanswered (6.2). */
   const decidesOthers = (view: AnswerView) =>
     !hasText(view.value.text) &&
-    section.questions.some(
-      (other) => other.displayCondition?.[view.question.key] !== undefined,
-    );
+    (decidesElsewhere.includes(view.question.key) ||
+      section.questions.some(
+        (other) => other.displayCondition?.[view.question.key] !== undefined,
+      ));
 
   const header = (
     <Stack gap="space-100">
@@ -569,8 +592,8 @@ function SectionForm({
           <Text tone="secondary">
             <Text variant="number" tone="secondary">
               {t("validation:questions.progress", {
-                answered: formatCount(answered),
-                total: formatCount(shown.length),
+                answered,
+                total: shown.length,
               })}
             </Text>
             {t("validation:questions.progressSuffix")}
@@ -609,8 +632,8 @@ function SectionForm({
                 {t("validation:questions.complete", {
                   // Its name: a self-analysis's keys are not shown anywhere else.
                   section: section.title,
-                  answered: formatCount(answered),
-                  total: formatCount(shown.length),
+                  answered,
+                  total: shown.length,
                 })}
               </Heading>
               <Flex gap="space-200" wrap>
@@ -732,6 +755,8 @@ function SectionBody({
         home={home}
         section={query.data.section}
         answers={query.data.answers}
+        conditionAnswers={query.data.conditionAnswers}
+        decidesElsewhere={query.data.decidesElsewhere}
         focusKey={focusKey}
       />
     );

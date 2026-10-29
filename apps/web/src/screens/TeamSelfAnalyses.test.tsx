@@ -283,6 +283,74 @@ describe("12 Team Self Analyses (design-spec 6.11)", () => {
     expect(screen.queryByText("Only when Q2 is Yes")).toBeNull();
   });
 
+  test("a condition naming another section's question reads its answer there (6.2)", async () => {
+    stubApi((call: Call) => {
+      const { method, path } = call;
+      if (method === "GET" && path === "/api/v1/me") return Response.json(ana);
+      if (method === "PATCH" && path === "/api/v1/me")
+        return Response.json(ana);
+      if (method === "GET" && path === list) {
+        return Response.json({ items: members.items });
+      }
+      if (method === "GET" && path === `${list}/${people.paolo.id}`) {
+        const [why, income] = paolosShared.sections;
+        if (why === undefined || income === undefined) {
+          throw new Error("No WHY or INCOME");
+        }
+        const shownOn = (key: string, prompt: string, value: string) => ({
+          ...income.questions[0],
+          key,
+          answerType: "long_text" as const,
+          title: key,
+          prompt,
+          displayCondition: { "SA.WHY.1": [value] },
+        });
+        return Response.json({
+          ...paolosShared,
+          sections: [
+            why,
+            {
+              ...income,
+              questions: [
+                ...income.questions,
+                shownOn(
+                  "SA.INCOME.2",
+                  "Shown on WHY's Q1",
+                  "To run a café students can afford.",
+                ),
+                shownOn("SA.INCOME.3", "Hidden by WHY's Q1", "Something else"),
+              ],
+              answers: [
+                ...income.answers,
+                {
+                  questionKey: "SA.INCOME.2",
+                  text: "Weekend stalls first.",
+                  amount: null,
+                  commentCount: 0,
+                },
+                {
+                  questionKey: "SA.INCOME.3",
+                  text: "Kept but hidden.",
+                  amount: null,
+                  commentCount: 0,
+                },
+              ],
+            },
+          ],
+        });
+      }
+      return undefined;
+    });
+    renderApp(`${base}/${people.paolo.id}`);
+    const income = await screen.findByRole("region", {
+      name: "PERSONAL INCOME",
+    });
+    expect(within(income).getByText("Shown on WHY's Q1")).toBeTruthy();
+    expect(within(income).getByText("Weekend stalls first.")).toBeTruthy();
+    expect(within(income).queryByText("Hidden by WHY's Q1")).toBeNull();
+    expect(within(income).queryByText("Kept but hidden.")).toBeNull();
+  });
+
   test("a Viewer has no access, and no Self Analysis in the navigation", async () => {
     const calls = teamApi({ me: as("viewer") });
     renderApp(base);

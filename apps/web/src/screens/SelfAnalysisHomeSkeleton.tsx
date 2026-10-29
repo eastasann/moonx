@@ -11,7 +11,10 @@ export function SelfAnalysisHomeSkeleton() {
   const rows = (
     <RowList aria-label={t("selfAnalysis:home.sections.title")}>
       {[0, 1, 2, 3].map((row) => (
-        <RowListItem key={row} end={t("selfAnalysis:home.sections.count")}>
+        <RowListItem
+          key={row}
+          end={t("selfAnalysis:home.sections.count", { answered: 0, total: 0 })}
+        >
           {t("selfAnalysis:home.sections.title")}
         </RowListItem>
       ))}

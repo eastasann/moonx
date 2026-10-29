@@ -2,7 +2,14 @@ import type { Assumption, Me, Risk, Role } from "@moonx/schemas";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import { assumption, home, risk, validationId } from "../test/validation";
 
@@ -51,23 +58,37 @@ function listsApi({
   archived = false,
   assumptions = [believe, costs],
   risks = [prices, rain],
+  create,
   remove,
 }: {
-  me?: Me;
-  archived?: boolean;
+  /** A function is asked at each call: the user may change behind the screen. */
+  me?: Me | (() => Me);
+  /** A function is asked at each call: the idea may be archived behind the screen. */
+  archived?: boolean | (() => boolean);
+  /** Answers a new assumption or risk; undefined makes it and keeps it. */
+  create?: () => Response | undefined;
   remove?: () => Response | undefined;
   assumptions?: Assumption[];
   risks?: Risk[];
 } = {}) {
+  const meNow = () => (typeof me === "function" ? me() : me);
+  const archivedNow = () =>
+    typeof archived === "function" ? archived() : archived;
   return stubApi((call: Call) => {
     const { method, path } = call;
-    if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
+    if (method === "GET" && path === "/api/v1/me")
+      return Response.json(meNow());
+    if (method === "PATCH" && path === "/api/v1/me") {
+      return Response.json(meNow());
+    }
     if (
       method === "GET" &&
       path === `/api/v1/ideas/${home.idea.id}/validation`
     ) {
-      return Response.json({ ...home, idea: { ...home.idea, archived } });
+      return Response.json({
+        ...home,
+        idea: { ...home.idea, archived: archivedNow() },
+      });
     }
     if (method === "GET" && path === listPath("assumptions")) {
       return Response.json({ items: assumptions });
@@ -76,6 +97,10 @@ function listsApi({
       return Response.json({ items: risks });
     }
     if (method === "POST" && path === listPath("assumptions")) {
+      if (create !== undefined) {
+        const answered = create();
+        if (answered !== undefined) return answered;
+      }
       const made = assumption(
         madeId,
         (call.body as { statement: string }).statement,
@@ -85,6 +110,21 @@ function listsApi({
         },
       );
       assumptions.push(made);
+      return Response.json(made, { status: 201 });
+    }
+    if (method === "POST" && path === listPath("risks")) {
+      if (create !== undefined) {
+        const answered = create();
+        if (answered !== undefined) return answered;
+      }
+      const made = risk(
+        madeId,
+        (call.body as { statement: string }).statement,
+        {
+          ...(call.body as Partial<Risk>),
+        },
+      );
+      risks.push(made);
       return Response.json(made, { status: 201 });
     }
     const one = path.match(/^\/api\/v1\/(assumptions|risks)\/([\w-]+)$/);
@@ -407,5 +447,265 @@ describe("16 Assumptions & Risks (design-spec 6.10)", () => {
         target: `assumption:${believe.id}`,
       }),
     );
+  });
+  /** Types an assumption into the new row and presses Add assumption. */
+  const addAssumption = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(
+      await screen.findByRole("textbox", { name: /Assumption/ }),
+      "Gift buyers come back monthly.",
+    );
+    await user.click(
+      screen
+        .getAllByRole("button", { name: "Add assumption" })
+        .at(-1) as HTMLElement,
+    );
+  };
+
+  test("a new row and the network: Couldn't save and Retry, which sends what is typed again", async () => {
+    const user = userEvent.setup();
+    let tries = 0;
+    const calls = listsApi({
+      create: () => {
+        tries += 1;
+        if (tries === 1) throw new TypeError("Failed to fetch");
+        return undefined;
+      },
+    });
+    renderApp(`${base}?new=1`);
+    await addAssumption(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).not.toContain("Something went wrong");
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Gift buyers come back monthly.",
+      }),
+    ).toBeTruthy();
+    const [first, again] = calls.filter(({ method }) => method === "POST");
+    expect(first?.body).toMatchObject({
+      statement: "Gift buyers come back monthly.",
+    });
+    expect(again?.body).toEqual(first?.body);
+  });
+
+  test("a new row over the rate limit: the wait, and what is typed stays", async () => {
+    const user = userEvent.setup();
+    listsApi({
+      create: () => apiError(429, "RATE_LIMITED", { retryAfterSeconds: 60 }),
+    });
+    renderApp(`${base}?new=1`);
+    await addAssumption(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Too many attempts. Try again in 1 minute.");
+    expect(
+      (
+        screen.getByRole("textbox", {
+          name: /Assumption/,
+        }) as HTMLTextAreaElement
+      ).value,
+    ).toBe("Gift buyers come back monthly.");
+  });
+
+  test("a new row and an unexpected failure: Something went wrong with its Ref, and Retry in place", async () => {
+    const user = userEvent.setup();
+    let tries = 0;
+    const calls = listsApi({
+      create: () => {
+        tries += 1;
+        return tries === 1 ? apiError(500, "INTERNAL") : undefined;
+      },
+    });
+    renderApp(`${base}?new=1`);
+    await addAssumption(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Something went wrong");
+    // The request id's first 8 characters (SDD 8.2), not the whole id.
+    expect(alert.textContent).toContain("Ref: 8f14e45f");
+    expect(alert.textContent).not.toContain("8f14e45f-");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(calls.filter(({ method }) => method === "POST")).toHaveLength(2),
+    );
+    const [first, again] = calls.filter(({ method }) => method === "POST");
+    expect(again?.body).toEqual(first?.body);
+  });
+
+  test("a new row the API refused for a field: Couldn't save with the reason, and Check the format under the field", async () => {
+    const user = userEvent.setup();
+    listsApi({
+      create: () =>
+        apiError(422, "VALIDATION_FAILED", {
+          details: [{ path: "nextCheck", message: "Too long" }],
+        }),
+    });
+    renderApp(`${base}?new=1`);
+    await addAssumption(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("Check the format");
+    const next = screen.getByRole("textbox", { name: "Next Check" });
+    const described = (next.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toContain("Check the format");
+  });
+
+  test("a new row refused as the idea is archived meanwhile: 16 reads again, archived", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    listsApi({
+      archived: () => archived,
+      create: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    const router = renderApp(`${base}?new=1`);
+    await addAssumption(user);
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    // The list's + Add goes; the form stays to read, with what was typed and why.
+    await waitFor(() =>
+      expect(
+        screen.queryAllByRole("button", { name: "Add assumption" }),
+      ).toHaveLength(1),
+    );
+    expect(
+      screen.getByRole("heading", { name: "New assumption" }),
+    ).toBeTruthy();
+    const statement = screen.getByRole("textbox", { name: /Assumption/ });
+    expect((statement as HTMLTextAreaElement).value).toBe(
+      "Gift buyers come back monthly.",
+    );
+    expect(statement.hasAttribute("readonly")).toBe(true);
+    const alert = screen
+      .getAllByRole("alert")
+      .find(
+        (each) =>
+          each.textContent?.includes("Couldn't save") === true &&
+          within(each).queryByRole("button", { name: "Retry" }) !== null,
+      );
+    if (alert === undefined) throw new Error("no Couldn't save");
+    expect(alert.textContent).toContain("It's archived");
+    expect(
+      within(alert)
+        .getByRole("button", { name: "Retry" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole("button", { name: "Add assumption" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { name: "New assumption" }),
+      ).toBeNull(),
+    );
+    expect(router.state.location.search).not.toHaveProperty("new");
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  test("a new risk the API refused for a field: Couldn't save with the reason, and Check the format under the field", async () => {
+    const user = userEvent.setup();
+    listsApi({
+      create: () =>
+        apiError(422, "VALIDATION_FAILED", {
+          details: [{ path: "mitigation", message: "Too long" }],
+        }),
+    });
+    renderApp(`${base}?tab=risks&new=1`);
+    await user.type(
+      await screen.findByRole("textbox", { name: /Risk/ }),
+      "The landlord raises the rent.",
+    );
+    await user.click(
+      screen.getAllByRole("button", { name: "Add risk" }).at(-1) as HTMLElement,
+    );
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("Check the format");
+    const mitigation = screen.getByRole("textbox", { name: "Mitigation" });
+    const described = (mitigation.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toContain("Check the format");
+  });
+
+  test("a delete refused once the user is a Viewer: the reason without Retry, then 16 reads only (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let me = ana;
+    listsApi({
+      me: () => me,
+      remove: () => {
+        me = as("viewer");
+        return apiError(403, "FORBIDDEN");
+      },
+    });
+    renderApp(`${base}?row=${believe.id}`);
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "Workers order twice a week.",
+    });
+    const detail = screen.getAllByRole("button", {
+      name: "More for Workers order twice a week.",
+    });
+    await user.click(detail.at(-1) as HTMLElement);
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const question = await screen.findByRole("alertdialog", {
+      name: "Delete this assumption?",
+    });
+    const toast = await toastAfter(
+      "Couldn't save. You don't have access to this.",
+      () =>
+        user.click(within(question).getByRole("button", { name: "Delete" })),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /More for/ })).toBeNull(),
+    );
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Workers order twice a week.",
+      }),
+    ).toBeTruthy();
+  });
+  test("a new row refused as gone (404): locked at once, with what was typed and why; nothing more is sent", async () => {
+    const user = userEvent.setup();
+    const calls = listsApi({ create: () => apiError(404, "NOT_FOUND") });
+    renderApp(`${base}?new=1`);
+    await addAssumption(user);
+    expect(await screen.findByText("It no longer exists")).toBeTruthy();
+    // Read again, the screen still lets the user add: the refusal itself locks the form.
+    const statement = screen.getByRole("textbox", { name: /Assumption/ });
+    expect((statement as HTMLTextAreaElement).value).toBe(
+      "Gift buyers come back monthly.",
+    );
+    expect(statement.hasAttribute("readonly")).toBe(true);
+    const alert = screen
+      .getAllByRole("alert")
+      .find(
+        (each) =>
+          each.textContent?.includes("Couldn't save") === true &&
+          within(each).queryByRole("button", { name: "Retry" }) !== null,
+      );
+    if (alert === undefined) throw new Error("no Couldn't save");
+    expect(alert.textContent).toContain("It no longer exists");
+    expect(
+      within(alert)
+        .getByRole("button", { name: "Retry" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    const add = screen
+      .getAllByRole("button", { name: "Add assumption" })
+      .at(-1) as HTMLElement;
+    expect(add.hasAttribute("disabled")).toBe(true);
+    await user.click(add);
+    expect(calls.filter(({ method }) => method === "POST")).toHaveLength(1);
   });
 });

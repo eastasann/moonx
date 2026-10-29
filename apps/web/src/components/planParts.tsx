@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { api, inPath, unwrap } from "../lib/api";
 import { ideaKey, workspaceKey } from "../lib/queries";
 import { useSendThrough } from "../lib/send";
-import { toastFailure } from "./ideaActions";
+import { useToastFailure } from "./ideaActions";
 import { useWorkspace } from "./workspace";
 
 // What 20 and 21 share of a plan (design-spec 6.12「案のアーカイブ」).
@@ -16,6 +16,7 @@ import { useWorkspace } from "./workspace";
  * failure says so in a toast with Retry. 13, 5 and 6 read the plans and stage again.
  */
 export function usePlanActions() {
+  const toastFailure = useToastFailure();
   const { workspace } = useWorkspace();
   const queryClient = useQueryClient();
   const pending = useRef(false);
@@ -41,7 +42,7 @@ export function usePlanActions() {
         pending.current = false;
       }
     },
-    [queryClient, sendThrough, workspace.id],
+    [queryClient, sendThrough, toastFailure, workspace.id],
   );
   return {
     archive: (plan: PlanHome) => void setArchived(plan, true),

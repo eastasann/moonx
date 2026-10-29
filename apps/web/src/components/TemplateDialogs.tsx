@@ -46,6 +46,7 @@ import {
   titleSchema,
 } from "../lib/template-drafts";
 import { ModalSendFailure } from "./ModalFailure";
+import { metricLabel } from "./TemplateEditors";
 import { useWorkspace } from "./workspace";
 
 // The dialogs of 27's draft (design-spec 6.17「追加」「削除」「プレビュー」).
@@ -456,7 +457,10 @@ export function PreviewDialog({
                   mode="open"
                   headingLevel={4}
                 >
-                  <PreviewAnswer question={question} />
+                  <PreviewAnswer
+                    question={question}
+                    costRows={version.costRows}
+                  />
                 </QuestionCard>
               </QuestionListItem>
             ))}
@@ -467,9 +471,18 @@ export function PreviewDialog({
   );
 }
 
-/** A question's answer as 11 lays it out, read only (design-spec 6.2's table of types). */
-function PreviewAnswer({ question }: { question: Question }) {
-  const { t } = useTranslation(["admin", "validation"]);
+/**
+ * A question's answer as 11 lays it out, read only (design-spec 6.2's table of types); a
+ * plan's key numbers by the names 27 chooses them by.
+ */
+function PreviewAnswer({
+  question,
+  costRows,
+}: {
+  question: Question;
+  costRows: TemplateVersionDetail["costRows"];
+}) {
+  const { t } = useTranslation(["admin", "common", "validation"]);
   const { workspace } = useWorkspace();
   const answerLabel = t("validation:questions.answerLabel", {
     title: question.title,
@@ -544,17 +557,21 @@ function PreviewAnswer({ question }: { question: Question }) {
         );
       break;
     }
-    case "linked_metric":
+    case "linked_metric": {
+      const keys = options?.kind === "linked_metric" ? options.metricKeys : [];
       field = (
         <Text tone="secondary">
-          {t("admin:version.preview.metrics", {
-            metrics: formatList(
-              options?.kind === "linked_metric" ? options.metricKeys : [],
-            ),
-          })}
+          {keys.length === 0
+            ? t("admin:version.preview.metricsNone")
+            : t("admin:version.preview.metrics", {
+                metrics: formatList(
+                  keys.map((key) => metricLabel(key, costRows, t)),
+                ),
+              })}
         </Text>
       );
       break;
+    }
     case "execution_view":
       field = (
         <Text tone="secondary">

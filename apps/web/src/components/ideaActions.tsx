@@ -12,11 +12,18 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
+import { AuthError } from "../lib/auth";
+import { rejectionReason } from "../lib/autosave";
+import { isTransient, unexpectedReference } from "../lib/failure";
 import { ideaHref, ideasHref } from "../lib/links";
-import { historyKey, ideaKey, workspaceKey } from "../lib/queries";
-import { useSendThrough } from "../lib/send";
+import {
+  historyKey,
+  ideaKey,
+  validationHomeQuery,
+  workspaceKey,
+} from "../lib/queries";
+import { isSessionLost, useSendThrough } from "../lib/send";
 import { failureCode, rateLimitWords } from "./SendFailure";
-import { reportOnce } from "./states";
 import { useWorkspace } from "./workspace";
 
 /**
@@ -63,25 +70,73 @@ const UNDO_REFUSALS = new Set([
 ]);
 
 /**
- * Says why a send failed, in a toast with Retry (design-spec 6.0.6): the rate limit's
- * words, or "Something went wrong" with the Ref someone asking for help quotes. A lost
- * session has its own way (M9 or the sign-in screen) and says nothing here.
+ * Says why a send failed, in a toast (design-spec 6.0.6, SDD 8.2): the network or an API
+ * that is down as "Couldn't save" and Retry, with the Ref of the API's answer when one
+ * came (a 5xx, which the API reports itself); a refusal for good that 6.0.2 names
+ * (archived, no access, gone) as "Couldn't save" with its reason and no Retry, the
+ * screen's queries read again so it shows why (archived, read only), as for a refused
+ * save; the rate limit's words and Retry; else "Something went wrong" with the Ref
+ * someone asking for help quotes, and Retry. A lost session has its own way (M9 or the
+ * sign-in screen) and says nothing here.
  */
-export function toastFailure(error: unknown, retry: () => void) {
-  if (error instanceof ApiError && error.status === 401) return;
-  const reference =
-    error instanceof ApiError ? error.requestId : reportOnce(error);
-  ToastQueue.neutral(
-    rateLimitWords(error) ??
-      (reference === null
-        ? i18n.t("app:state.unexpected")
-        : i18n.t("app:state.unexpectedRef", { ref: reference.slice(0, 8) })),
-    {
-      actionLabel: i18n.t("app:state.retry"),
-      onAction: retry,
-      shouldCloseOnAction: true,
+export function useToastFailure(): (error: unknown, retry: () => void) => void {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (error, retry) => {
+      if (isSessionLost(error)) return;
+      const reason = refusalReason(error);
+      if (reason !== null) {
+        ToastQueue.neutral(
+          i18n.t("app:state.couldNotSaveReason", {
+            reason: i18n.t(`app:save.reason.${reason}`),
+          }),
+          { timeout: TOAST_MS },
+        );
+        void queryClient.invalidateQueries();
+        return;
+      }
+      const rateLimited = rateLimitWords(error);
+      const transient = isTransient(error);
+      const reference =
+        rateLimited !== null
+          ? null
+          : transient
+            ? requestIdOf(error)
+            : unexpectedReference(error);
+      const ref = reference?.slice(0, 8);
+      ToastQueue.neutral(
+        rateLimited ??
+          (transient
+            ? ref === undefined
+              ? i18n.t("app:state.couldNotSave")
+              : i18n.t("app:state.couldNotSaveRef", { ref })
+            : ref === undefined
+              ? i18n.t("app:state.unexpected")
+              : i18n.t("app:state.unexpectedRef", { ref })),
+        {
+          actionLabel: i18n.t("app:state.retry"),
+          onAction: retry,
+          shouldCloseOnAction: true,
+        },
+      );
     },
+    [queryClient],
   );
+}
+
+/** The request id of an answer of the API's, or null (no answer came). */
+const requestIdOf = (error: unknown) =>
+  error instanceof ApiError || error instanceof AuthError
+    ? error.requestId
+    : null;
+
+/** The refusals for good a toast names (6.0.2): a send of the format is the screen's. */
+function refusalReason(error: unknown) {
+  if (!(error instanceof ApiError)) return null;
+  const reason = rejectionReason(error);
+  return reason === "archived" || reason === "noAccess" || reason === "gone"
+    ? reason
+    : null;
 }
 
 /**
@@ -96,6 +151,7 @@ export function CreationUndoProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [creation, setCreation] = useState<CreationToUndo | null>(null);
+  const toastFailure = useToastFailure();
   const [isPending, setPending] = useState(false);
   // What was undone is gone: its panel would find nothing if read before the move.
   const sendThrough = useSendThrough({ readsHistoryAgain: false });
@@ -114,6 +170,32 @@ export function CreationUndoProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: historyKey }),
       queryClient.invalidateQueries({ queryKey: ideaKey(target.ideaId) }),
     ]);
+  // Archived since the screen read it (6.0.5): H3 refuses so for the idea and for the
+  // draft's plan alike, so the idea read again tells which. Reading them again makes the
+  // screen and its panels read-only.
+  const sayArchived = async (target: CreationToUndo) => {
+    await refresh(target);
+    let isIdeaArchived = true;
+    if (target.kind === "plan_draft") {
+      try {
+        const home = await queryClient.fetchQuery({
+          ...validationHomeQuery(target.ideaId),
+          // Read just now if a screen shows it; read here if not, or if that read failed.
+          staleTime: Number.POSITIVE_INFINITY,
+        });
+        isIdeaArchived = home.idea.archived;
+      } catch (readError) {
+        toastFailure(readError, () => void undo(target));
+        return;
+      }
+    }
+    ToastQueue.neutral(
+      t("errors:ARCHIVED", {
+        context: isIdeaArchived ? "undoIdea" : "undoPlan",
+      }),
+      { timeout: TOAST_MS },
+    );
+  };
   const undo = async (target: CreationToUndo) => {
     setPending(true);
     try {
@@ -130,12 +212,12 @@ export function CreationUndoProvider({ children }: { children: ReactNode }) {
         toastFailure(error, () => void undo(target));
         return;
       }
-      // Archived since the screen read it: reading it again makes the screen and its
-      // panels read-only (6.8).
+      if (code === "ARCHIVED") {
+        await sayArchived(target);
+        return;
+      }
       ToastQueue.neutral(
-        code === "ARCHIVED"
-          ? t("panels:comments.archived.idea")
-          : t(`errors:${code as "UNDO_BLOCKED" | "ALREADY_REVERTED" | "BUSY"}`),
+        t(`errors:${code as "UNDO_BLOCKED" | "ALREADY_REVERTED" | "BUSY"}`),
         { timeout: TOAST_MS },
       );
       // Taken back elsewhere first: it is gone, as after an undo of one's own.
@@ -191,6 +273,7 @@ export function useIdeaActions() {
   const requestUndo = useCreationUndo();
   const pending = useRef(false);
   const sendThrough = useSendThrough();
+  const toastFailure = useToastFailure();
 
   const refresh = useCallback(
     async (ideaId: string) => {
@@ -214,7 +297,7 @@ export function useIdeaActions() {
         pending.current = false;
       }
     },
-    [sendThrough],
+    [sendThrough, toastFailure],
   );
 
   const duplicate = (idea: { id: string; name: string }) =>

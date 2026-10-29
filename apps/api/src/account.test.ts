@@ -15,11 +15,11 @@ import {
   verifications,
   workspaces,
 } from "@moonx/db";
+import { i18n } from "@moonx/i18n";
 import { errorBodySchema, meSchema } from "@moonx/schemas";
 import { and, eq } from "drizzle-orm";
 import sharp from "sharp";
 import { DELETION_PASSWORD_LIMIT } from "./account";
-import { DELETED_USER_NAME } from "./account-deletion";
 import type { AvatarStore } from "./avatars";
 import { ApiError } from "./errors";
 import { lockMembers } from "./membership";
@@ -38,6 +38,9 @@ import {
 
 const database = connectTestDatabase();
 const { db } = database;
+
+/** The words a deleted account's records show, from the catalog (SDD 5.4 U7). */
+const DELETED_USER = i18n.t("app:userBadge.deleted");
 afterAll(() => database.close());
 
 const fixtures = testFixtures(db);
@@ -849,7 +852,7 @@ describe("U7 POST /api/v1/me/delete", () => {
     ).toBe(true);
     expect(await userRow(user.id)).toMatchObject({
       email: `deleted+${user.id}@deleted.invalid`,
-      displayName: DELETED_USER_NAME,
+      displayName: DELETED_USER,
       avatarUrl: null,
       status: "deleted",
       lastWorkspaceId: null,
@@ -966,7 +969,7 @@ describe("U7 POST /api/v1/me/delete", () => {
       .where(eq(executionItems.id, item?.id ?? ""));
     expect(assigned).toMatchObject({
       assigneeUserId: null,
-      assigneeName: DELETED_USER_NAME,
+      assigneeName: DELETED_USER,
     });
     const [history] = await db
       .select()
@@ -1137,6 +1140,6 @@ describe("U7 POST /api/v1/me/delete", () => {
       .select()
       .from(users)
       .where(and(eq(users.id, user.id), eq(users.status, "deleted")));
-    expect(row?.displayName).toBe(DELETED_USER_NAME);
+    expect(row?.displayName).toBe(DELETED_USER);
   });
 });

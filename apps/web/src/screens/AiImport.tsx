@@ -1,13 +1,12 @@
 import {
   type AiScope,
-  formatAmount,
   hasText,
   type MatchedBlock,
   matchBlocks,
   parseAiReply,
   type ReplyBody,
 } from "@moonx/domain";
-import { formatRelativeTime } from "@moonx/i18n";
+import { formatInputMoney, formatRelativeTime } from "@moonx/i18n";
 import {
   AI_FILE_MAX_BYTES,
   AI_PASTE_MAX_CHARS,
@@ -45,21 +44,13 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, FileCheck, FileUp } from "lucide-react";
-import {
-  type ReactNode,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type AiTarget, AiTargetScreen } from "../components/AiTargetScreen";
 import { answerKey, moonOf } from "../components/AnswerFields";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { EvidenceSheet } from "../components/EvidenceSheet";
-import { rateLimitWords } from "../components/SendFailure";
-import { reportOnce } from "../components/states";
+import { failureCode, rateLimitWords } from "../components/SendFailure";
 import { useModal, useWorkspace } from "../components/workspace";
 import { parseScope } from "../lib/ai";
 import {
@@ -79,9 +70,11 @@ import {
 import { ApiError, api, unwrap } from "../lib/api";
 import { rejectionReason } from "../lib/autosave";
 import { countingEvidence } from "../lib/evidence";
+import { isTransient, useUnexpectedReference } from "../lib/failure";
 import { readUtf8 } from "../lib/files";
 import { useIsOnline } from "../lib/online";
 import { importContextQuery } from "../lib/queries";
+import { isSessionLost } from "../lib/send";
 import {
   AiImportSkeleton,
   Header,
@@ -228,8 +221,10 @@ function BlockRow({
 }
 
 /**
- * "Couldn't apply" with Retry (design-spec 6.7「反映の失敗」): the reason a refusal names,
- * the wait of a rate limit, or the Ref of an unexpected failure. What was edited stays.
+ * "Couldn't apply" with Retry (design-spec 6.7「反映の失敗」): with why some questions can
+ * no longer be imported, the reason of a refusal for good (6.0.2), the wait of a rate
+ * limit, or the Ref of an unexpected failure. What was edited stays. A lost session takes
+ * the app's way (M9 or the sign-in screen) and shows nothing here.
  */
 function ApplyFailure({
   error,
@@ -240,33 +235,30 @@ function ApplyFailure({
   onRetry: () => void;
   isRetryDisabled: boolean;
 }) {
-  const { t } = useTranslation(["ai", "app"]);
+  const { t } = useTranslation(["ai", "app", "errors"]);
   const rateLimited = rateLimitWords(error);
-  const code = error instanceof ApiError ? error.code : null;
-  const changed = code === "NOT_IMPORTABLE" || code === "QUESTION_NOT_FOUND";
+  const code = failureCode(error);
+  // A question hidden or gone since ③ read them: the words of its code.
+  const changed =
+    code === "NOT_IMPORTABLE" || code === "QUESTION_NOT_FOUND" ? code : null;
   const reason =
-    error instanceof ApiError && !changed ? rejectionReason(error) : null;
-  const isTransient =
-    error instanceof ApiError &&
-    (error.status === null || error.code === "UPSTREAM_UNAVAILABLE");
+    error instanceof ApiError && changed === null
+      ? rejectionReason(error)
+      : null;
   const isUnexpected =
-    rateLimited === null && reason === null && !changed && !isTransient;
-  const reference = useMemo(
-    () =>
-      !isUnexpected
-        ? null
-        : error instanceof ApiError
-          ? error.requestId
-          : reportOnce(error),
-    [isUnexpected, error],
-  );
+    rateLimited === null &&
+    reason === null &&
+    changed === null &&
+    !isTransient(error);
+  const reference = useUnexpectedReference(error, isUnexpected);
+  if (isSessionLost(error)) return null;
   return (
     <InlineAlert variant="negative">
       <Flex gap="space-200" wrap alignItems="center">
         <Text>{t("ai:import.review.couldNotApply")}</Text>
         {rateLimited !== null && <Text tone="secondary">{rateLimited}</Text>}
-        {changed && (
-          <Text tone="secondary">{t("ai:import.review.questionsChanged")}</Text>
+        {changed !== null && (
+          <Text tone="secondary">{t(`errors:${changed}`)}</Text>
         )}
         {reason !== null && (
           <Text tone="secondary">{t(`app:save.reason.${reason}`)}</Text>
@@ -595,7 +587,7 @@ function ImportFlow({
     const amountShown = (amount: number | null | undefined) =>
       amount === null || amount === undefined || currency === null
         ? ""
-        : formatAmount(amount, currency);
+        : formatInputMoney(amount, currency);
     const importedText = draft.text ?? current.text ?? "";
     const chosen = draft.classification?.fau ?? null;
     const afterState =
@@ -929,7 +921,7 @@ function ImportFlow({
       <Stack gap="space-200">
         {conflict && (
           <InlineAlert variant="notice">
-            {t("ai:import.review.conflict")}
+            {t("errors:CONFLICT_MULTI", { context: "import" })}
           </InlineAlert>
         )}
         <Text variant="body-sm" tone="secondary">
@@ -960,7 +952,7 @@ function ImportFlow({
                   question.current.amount !== null &&
                   currency !== null
                     ? [
-                        formatAmount(question.current.amount, currency),
+                        formatInputMoney(question.current.amount, currency),
                         question.current.text ?? "",
                       ]
                         .filter((part) => part !== "")

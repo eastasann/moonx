@@ -5,19 +5,24 @@ import type {
   Role,
   ValidationAnswer,
 } from "@moonx/schemas";
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, type Call, renderApp, stubApi } from "../test/api";
+import { ApiError } from "../lib/api";
+import * as sentry from "../lib/sentry";
+import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   answer,
   assumed,
   costItem,
   economicsInputs,
+  evidenceOf,
   home,
+  prices,
   question,
   resultOf,
+  survey,
   validationId,
 } from "../test/validation";
 
@@ -37,6 +42,7 @@ const setViewport = (width: number) =>
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   setViewport(1024);
 });
 
@@ -93,17 +99,32 @@ function economicsApi({
   costs = piayaCosts,
   inputs = economicsInputs(piayaNumbers),
   worth = answer("V.08.WORTH"),
+  evidence,
+  recordLast = () => Response.json(me),
 }: {
   me?: Me;
   costs?: CostItem[];
   inputs?: EconomicsInput[];
   worth?: ValidationAnswer;
+  /** V5's answer to a removal of evidence. */
+  evidence?: (call: Call) => Response;
+  /** U2's answer to the record of the workspace last opened. */
+  recordLast?: () => Response;
 } = {}) {
   const held = [...inputs];
   return stubApi((call: Call) => {
     const { method, path } = call;
+    if (
+      method === "GET" &&
+      path.startsWith(`/api/v1/validations/${validationId}/research-log`)
+    ) {
+      return Response.json({ items: [survey, prices], nextCursor: null });
+    }
+    if (method === "DELETE" && path.startsWith("/api/v1/evidence/")) {
+      return evidence?.(call);
+    }
     if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
+    if (method === "PATCH" && path === "/api/v1/me") return recordLast();
     if (
       method === "GET" &&
       path === `/api/v1/ideas/${home.idea.id}/validation`
@@ -454,5 +475,104 @@ describe("18 Unit Economics & Scenarios (design-spec 6.4)", () => {
         target: `economics_input:${validationId}:selling_price`,
       }),
     );
+  });
+  test("the price as typed (6.4「端数」): ₱149.50 with its cents, a whole price without", async () => {
+    economicsApi({
+      inputs: economicsInputs({ ...piayaNumbers, selling_price: 149.5 }),
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Inputs" });
+    expect(rowOf("Price").textContent).toContain("₱149.50");
+    vi.unstubAllGlobals();
+    cleanup();
+    economicsApi();
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Inputs" });
+    expect(rowOf("Price").textContent).toContain("₱450");
+    expect(rowOf("Price").textContent).not.toContain("₱450.00");
+  });
+
+  test("removing a Fact number's last evidence asks with its noun: number (6.0.3)", async () => {
+    const user = userEvent.setup();
+    const link = evidenceOf("7d0f0000-0000-4000-8000-000000000021", survey);
+    const calls = economicsApi({
+      inputs: economicsInputs(piayaNumbers).map((input) =>
+        input.fieldKey === "selling_price"
+          ? {
+              ...input,
+              classification: {
+                fau: "fact",
+                confidence: null,
+                state: "fact",
+                evidence: [link],
+              },
+            }
+          : input,
+      ),
+      evidence: () =>
+        Response.json({
+          classification: {
+            fau: null,
+            confidence: null,
+            state: "unclassified",
+            evidence: [],
+          },
+          lockVersion: 2,
+        }),
+    });
+    renderApp(
+      `${base}?modal=evidence&about=economics_input:${validationId}:selling_price`,
+    );
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    await user.click(
+      await within(sheet).findByRole("button", { name: /Remove/ }),
+    );
+    const ask = await screen.findByRole("alertdialog", {
+      name: "Remove the last evidence?",
+    });
+    expect(ask.textContent).toContain("This number will become Unclassified.");
+    await user.click(within(ask).getByRole("button", { name: "Remove" }));
+    await waitFor(() =>
+      expect(calls.find(({ method }) => method === "DELETE")?.path).toBe(
+        `/api/v1/evidence/${link.id}?lockVersion=1`,
+      ),
+    );
+  });
+});
+
+describe("the record of the workspace last opened (U2, SDD 11章)", () => {
+  const unrecorded = { ...ana, lastWorkspaceId: null };
+
+  test("a 4xx it should not get goes to Sentry with its request id, though nothing shows it", async () => {
+    const report = vi.spyOn(sentry, "reportError").mockReturnValue(null);
+    economicsApi({
+      me: unrecorded,
+      recordLast: () => apiError(400, "BAD_REQUEST"),
+    });
+    renderApp(base);
+    await waitFor(() =>
+      expect(report).toHaveBeenCalledWith(expect.any(ApiError), {
+        requestId: "8f14e45f-0000",
+      }),
+    );
+    expect(screen.queryByText("Something went wrong")).toBeNull();
+  });
+
+  test("a membership lost meanwhile (422) is not reported: the next visit records another", async () => {
+    const report = vi.spyOn(sentry, "reportError").mockReturnValue(null);
+    const calls = economicsApi({
+      me: unrecorded,
+      recordLast: () => apiError(422, "VALIDATION_FAILED"),
+    });
+    renderApp(base);
+    await waitFor(() =>
+      expect(
+        calls.some(
+          ({ method, path }) => method === "PATCH" && path === "/api/v1/me",
+        ),
+      ).toBe(true),
+    );
+    await screen.findByRole("grid", { name: "Inputs" });
+    expect(report).not.toHaveBeenCalled();
   });
 });

@@ -239,14 +239,17 @@ export const ListPaneContext = createContext(false);
 
 /**
  * The phone's floating new-item button of a list (4.1 D, s06-ideas.html .fab): "+" alone,
- * named by `label`, above the TabBar and the keyboard.
+ * named by `label`, above the TabBar and the keyboard. `isDisabled` keeps it in place,
+ * unpressable, in a disabled Button's colours (offline, 6.0.6).
  */
 export function FloatingAction({
   label,
   onPress,
+  isDisabled = false,
 }: {
   label: string;
   onPress: () => void;
+  isDisabled?: boolean;
 }) {
   const inset = useKeyboardInset();
   return (
@@ -257,6 +260,7 @@ export function FloatingAction({
       <AriaButton
         aria-label={label}
         onPress={onPress}
+        isDisabled={isDisabled}
         className={styles.floatingButton}
       >
         <IconSlot size="L">

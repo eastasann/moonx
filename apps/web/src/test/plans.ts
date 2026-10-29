@@ -187,6 +187,7 @@ export function planItem(itemNo: number): PlanItem {
     readOnly: false,
     prompts,
     answers: [],
+    conditionAnswers: [],
     metrics: {},
     costRowNames: {},
     scenarios: [],

@@ -1,4 +1,4 @@
-import { formatCount, formatList } from "@moonx/i18n";
+import { formatList } from "@moonx/i18n";
 import type { SelfAnalysisHome, TemplateQuestion } from "@moonx/schemas";
 import {
   ActionMenu,
@@ -27,9 +27,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AiMenu } from "../components/AiMenu";
 import type { ScreenComments } from "../components/CommentsPanel";
-import { ModalBoundary } from "../components/ErrorBoundary";
+import { BlockBoundary, ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
-import { toastFailure } from "../components/ideaActions";
+import { useToastFailure } from "../components/ideaActions";
 import { CurrencyDialog, ShareDialog } from "../components/SelfAnalysisDialogs";
 import {
   SelfAnalysisBody,
@@ -94,8 +94,8 @@ function StatusBlock({ home }: { home: SelfAnalysisHome }) {
         <DescriptionList>
           <DescriptionListItem label={t("selfAnalysis:home.state.answered")}>
             {t("selfAnalysis:home.state.answeredCount", {
-              answered: formatCount(home.answered),
-              total: formatCount(home.total),
+              answered: home.answered,
+              total: home.total,
             })}
           </DescriptionListItem>
           <DescriptionListItem label={t("selfAnalysis:home.state.sharedWith")}>
@@ -136,8 +136,8 @@ function SectionsBlock({ home }: { home: SelfAnalysisHome }) {
               />
             }
             end={t("selfAnalysis:home.sections.count", {
-              answered: formatCount(section.answered),
-              total: formatCount(section.total),
+              answered: section.answered,
+              total: section.total,
             })}
             isEndNumeric
           >
@@ -154,6 +154,7 @@ function SectionsBlock({ home }: { home: SelfAnalysisHome }) {
  * while questions are empty, and Reopen. The answer is 10's data.
  */
 function useCompletion() {
+  const toastFailure = useToastFailure();
   const queryClient = useQueryClient();
   const sendThrough = useSendThrough();
   const [emptyCount, setEmptyCount] = useState<number | null>(null);
@@ -218,12 +219,13 @@ function MarkDoneConfirmation({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const { t } = useTranslation(["selfAnalysis"]);
+  const { t } = useTranslation(["selfAnalysis", "errors"]);
   return (
     <AlertDialog
       isOpen
       size="S"
-      title={t("selfAnalysis:home.markDoneConfirm.title", { count })}
+      // The words of HAS_EMPTY_QUESTIONS, which 10 asks with before it sends too (6.11).
+      title={t("errors:HAS_EMPTY_QUESTIONS", { count })}
       primaryActionLabel={t("selfAnalysis:home.markDoneConfirm.confirm")}
       cancelLabel={t("selfAnalysis:home.markDoneConfirm.cancel")}
       onPrimaryAction={onConfirm}
@@ -283,8 +285,8 @@ function SelfAnalysisHub({
             <Text tone="secondary">
               {t("selfAnalysis:home.status", {
                 status: t(`common:selfAnalysisStatus.${home.status}`),
-                answered: formatCount(home.answered),
-                total: formatCount(home.total),
+                answered: home.answered,
+                total: home.total,
               })}
             </Text>
           </>
@@ -353,12 +355,20 @@ function SelfAnalysisHub({
           {
             id: "status",
             column: "main",
-            content: <StatusBlock home={home} />,
+            content: (
+              <BlockBoundary>
+                <StatusBlock home={home} />
+              </BlockBoundary>
+            ),
           },
           {
             id: "sections",
             column: "aside",
-            content: <SectionsBlock home={home} />,
+            content: (
+              <BlockBoundary>
+                <SectionsBlock home={home} />
+              </BlockBoundary>
+            ),
           },
         ]}
       />
@@ -413,11 +423,13 @@ function HomeNotReady() {
           id: "status",
           column: "main",
           content: (
-            <HubBlock title={t("selfAnalysis:home.state.title")}>
-              <Text tone="secondary" elementType="p">
-                {t("errors:TEMPLATE_NOT_PUBLISHED")}
-              </Text>
-            </HubBlock>
+            <BlockBoundary>
+              <HubBlock title={t("selfAnalysis:home.state.title")}>
+                <Text tone="secondary" elementType="p">
+                  {t("errors:TEMPLATE_NOT_PUBLISHED")}
+                </Text>
+              </HubBlock>
+            </BlockBoundary>
           ),
         },
       ]}

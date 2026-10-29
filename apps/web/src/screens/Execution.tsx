@@ -461,6 +461,10 @@ function ExecutionBody({
   const type = EXECUTION_TABS[tab];
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [isAdding, setAdding] = useState(false);
+  // New refused as archived or no longer allowed stays, read only, with what was typed
+  // and why, until it is closed (design-spec 6.10・6.13): the plan read again hides
+  // + Add.
+  const [isAddingKept, setAddingKept] = useState(false);
   const [reordering, setReordering] = useState<ExecutionItem | null>(null);
   const hasFilters = type === "next_action";
   const ofType = all.filter((item) => item.type === type);
@@ -765,18 +769,21 @@ function ExecutionBody({
         listLabel={t(`plans:execution.list.${type}`)}
         onBack={() => onClose({ ...current, item: undefined })}
       />
-      {isAdding && canEdit && (
+      {isAdding && (canEdit || isAddingKept) && (
         <NewExecutionItem
           // Each tab's form is its own.
           key={type}
           planId={home.id}
           type={type}
+          isReadOnly={!canEdit}
+          onRefused={() => setAddingKept(true)}
           onMade={(item) => {
             cache.put(item);
             onSaved();
           }}
           onCreated={(item) => {
             setAdding(false);
+            setAddingKept(false);
             // Filters that leave it out are cleared, so the new item shows in the list.
             const isListed = passesFilters(item, search, overdueOnly, me.id);
             if (!isListed) setOverdueOnly(false);
@@ -786,7 +793,10 @@ function ExecutionBody({
             if (isTwoColumns) onSearch(next);
             else onOpen(next);
           }}
-          onCancel={() => setAdding(false)}
+          onCancel={() => {
+            setAdding(false);
+            setAddingKept(false);
+          }}
         />
       )}
       {reordering !== null && canEdit && (

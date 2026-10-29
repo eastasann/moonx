@@ -1,11 +1,7 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { ApiError, onWrite } from "./api";
+import { isTransient } from "./failure";
 import { historyKey, isList } from "./queries";
-
-/** Tries again only what may pass next time: the network, and an API that is not up. */
-export const isTransient = (error: unknown) =>
-  error instanceof ApiError &&
-  (error.status === null || error.code === "UPSTREAM_UNAVAILABLE");
 
 /**
  * The client's cache of API data (ADR-011): a screen shows what it has at once and takes
@@ -42,6 +38,7 @@ export function createQueryClient(onUnauthenticated: () => void): QueryClient {
       // out later, after its screen is gone.
       queries: {
         networkMode: "always",
+        // Tries again only what may pass next time (SDD 8.2「一時的な失敗」).
         retry: (failures, error) => failures < 2 && isTransient(error),
       },
       mutations: { networkMode: "always", retry: false },

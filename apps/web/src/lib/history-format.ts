@@ -1,10 +1,10 @@
 import { fauState, hasText } from "@moonx/domain";
 import {
   formatDate,
+  formatInputMoney,
   formatInputNumber,
   formatInputPercent,
   formatList,
-  formatMoney,
   i18n,
 } from "@moonx/i18n";
 import {
@@ -159,7 +159,7 @@ function economicsValue(
 ): string {
   if (value === null) return "";
   if (field === "selling_price") {
-    return formatMoney(value, currency, { cents: !Number.isInteger(value) });
+    return formatInputMoney(value, currency);
   }
   if (field === "target_margin") return formatInputPercent(value);
   return formatInputNumber(value);
@@ -336,9 +336,7 @@ function fieldsOf(
             const amount = number(content.amount);
             return amount === null
               ? ""
-              : formatMoney(amount, context.currency, {
-                  cents: !Number.isInteger(amount),
-                });
+              : formatInputMoney(amount, context.currency);
           },
         },
       ];
@@ -415,9 +413,7 @@ function fieldsOf(
             const price = number(content.typicalPrice);
             return price === null
               ? ""
-              : formatMoney(price, context.currency, {
-                  cents: !Number.isInteger(price),
-                });
+              : formatInputMoney(price, context.currency);
           },
         },
         textField(
@@ -499,10 +495,7 @@ function fieldsOf(
         const amount = number(content[key]);
         return amount === null
           ? ""
-          : formatMoney(amount, context.currency, {
-              cents:
-                content.category === "variable" || !Number.isInteger(amount),
-            });
+          : formatInputMoney(amount, context.currency);
       };
       return [
         textField(i18n.t("validation:costs.field.name"), "name"),

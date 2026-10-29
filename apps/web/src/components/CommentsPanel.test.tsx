@@ -4,7 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
-import { answer, home, section01, validationId } from "../test/validation";
+import {
+  answer,
+  home,
+  questionsRead,
+  section01,
+  validationId,
+} from "../test/validation";
 
 // PNL-1, the comments panel, on 11 (design-spec 6.0.4・6.0.1, SDD 4章・5.11 C1–C3).
 
@@ -84,12 +90,14 @@ function panelApi({
       return Response.json({ ...home, idea: { ...home.idea, archived } });
     }
     if (method === "GET" && path === `${validationPath}/questions/01`) {
-      return Response.json({
-        section: section01,
-        answers: section01.questions.map(({ key }) =>
-          answer(key, key === "V.01.WHO" ? { commentCount: 2 } : {}),
+      return Response.json(
+        questionsRead(
+          section01,
+          section01.questions.map(({ key }) =>
+            answer(key, key === "V.01.WHO" ? { commentCount: 2 } : {}),
+          ),
         ),
-      });
+      );
     }
     if (method === "GET" && path.startsWith("/api/v1/comments?")) {
       return Response.json({
@@ -389,35 +397,283 @@ describe("PNL-1 Comments (design-spec 6.0.4)", () => {
     expect(region.textContent).not.toContain("Yes, from 9 to 5.");
   });
 
-  test("a post that fails keeps the text, with Couldn't post and Retry", async () => {
-    const user = userEvent.setup();
-    let attempts = 0;
-    panelApi({
-      threads: [],
-      write: () => {
-        attempts += 1;
-        return attempts === 1
-          ? apiError(500, "INTERNAL")
-          : Response.json(comment("c0000000-0000-4000-8000-000000000011"), {
-              status: 201,
-            });
-      },
+  describe("a write that fails (6.0.4: in place, or the small dialog of 6.0.6)", () => {
+    const itemPath = `${base}?panel=comments&target=validation_answer:${validationId}:V.01.WHO`;
+    const posted = () =>
+      Response.json(comment("c0000000-0000-4000-8000-000000000011"), {
+        status: 201,
+      });
+    const offline = () => Promise.reject(new TypeError("Failed to fetch"));
+
+    /** Types into the new thread's box and presses Post. */
+    async function post(user: ReturnType<typeof userEvent.setup>) {
+      const region = await findPanel();
+      const box = await within(region).findByRole("textbox", {
+        name: "Add a comment",
+      });
+      await user.type(box, "Sunday hours?");
+      await user.click(within(region).getByRole("button", { name: "Post" }));
+      return { region, box };
+    }
+
+    const postCalls = (calls: Call[]) =>
+      calls.filter(
+        ({ method, path }) => method === "POST" && path === "/api/v1/comments",
+      );
+
+    test("the network: Couldn't post and Retry under the box, the text kept; Retry posts it", async () => {
+      const user = userEvent.setup();
+      let attempts = 0;
+      const calls = panelApi({
+        threads: [],
+        write: () => {
+          attempts += 1;
+          return attempts === 1 ? offline() : posted();
+        },
+      });
+      renderApp(itemPath);
+      const { region, box } = await post(user);
+      await within(region).findByText("Couldn't post");
+      expect(box).toHaveProperty("value", "Sunday hours?");
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      await user.click(within(region).getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(box).toHaveProperty("value", ""));
+      expect(postCalls(calls).map(({ body }) => body)).toEqual([
+        expect.objectContaining({ body: "Sunday hours?" }),
+        expect.objectContaining({ body: "Sunday hours?" }),
+      ]);
     });
-    renderApp(
-      `${base}?panel=comments&target=validation_answer:${validationId}:V.01.WHO`,
-    );
-    const region = await findPanel();
-    const box = await within(region).findByRole("textbox", {
-      name: "Add a comment",
+
+    test("unexpected: the small dialog with the Ref; Retry posts the same text", async () => {
+      const user = userEvent.setup();
+      let attempts = 0;
+      const calls = panelApi({
+        threads: [],
+        write: () => {
+          attempts += 1;
+          return attempts === 1 ? apiError(500, "INTERNAL") : posted();
+        },
+      });
+      renderApp(itemPath);
+      const { region, box } = await post(user);
+      const failed = await screen.findByRole("alertdialog", {
+        name: /Something went wrong/,
+      });
+      expect(failed.textContent).toContain("Ref: 8f14e45f");
+      expect(region.textContent).not.toContain("Couldn't post");
+      expect(box).toHaveProperty("value", "Sunday hours?");
+      await user.click(within(failed).getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(box).toHaveProperty("value", ""));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(postCalls(calls)).toHaveLength(2);
+      expect(postCalls(calls)[1]?.body).toEqual(postCalls(calls)[0]?.body);
     });
-    await user.type(box, "Sunday hours?");
-    await user.click(within(region).getByRole("button", { name: "Post" }));
-    await within(region).findByText("Couldn't post");
-    expect(box).toHaveProperty("value", "Sunday hours?");
-    expect(region.textContent).toContain("Ref: 8f14e45f");
-    await user.click(within(region).getByRole("button", { name: "Retry" }));
-    await waitFor(() => expect(box).toHaveProperty("value", ""));
-    expect(attempts).toBe(2);
+
+    test("unexpected: Close closes only the dialog; the panel and the typed text stay", async () => {
+      const user = userEvent.setup();
+      let attempts = 0;
+      const calls = panelApi({
+        threads: [],
+        write: () => {
+          attempts += 1;
+          return attempts === 1 ? apiError(500, "INTERNAL") : posted();
+        },
+      });
+      const router = renderApp(itemPath);
+      const { region, box } = await post(user);
+      const failed = await screen.findByRole("alertdialog", {
+        name: /Something went wrong/,
+      });
+      await user.click(within(failed).getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      expect(router.state.location.search).toMatchObject({
+        panel: "comments",
+      });
+      expect(panel()).toBe(region);
+      expect(box).toHaveProperty("value", "Sunday hours?");
+      // The text goes as it was typed when Post is pressed again.
+      await user.click(within(region).getByRole("button", { name: "Post" }));
+      await waitFor(() => expect(box).toHaveProperty("value", ""));
+      expect(postCalls(calls)).toHaveLength(2);
+      expect(postCalls(calls)[1]?.body).toEqual(postCalls(calls)[0]?.body);
+    });
+
+    test("refused for good: Couldn't post with the reason in place", async () => {
+      const user = userEvent.setup();
+      panelApi({ threads: [], write: () => apiError(403, "NO_ACCESS") });
+      renderApp(itemPath);
+      const { region, box } = await post(user);
+      await within(region).findByText("Couldn't post");
+      expect(region.textContent).toContain("You don't have access to this");
+      expect(region.textContent).not.toContain("Ref:");
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(box).toHaveProperty("value", "Sunday hours?");
+    });
+
+    test("a mention refused: its own words in place, and who can be mentioned is read again", async () => {
+      const user = userEvent.setup();
+      const calls = panelApi({
+        threads: [],
+        write: () => apiError(422, "INVALID_MENTION"),
+      });
+      renderApp(itemPath);
+      const candidates = () =>
+        calls.filter(({ path }) => path.includes("/mention-candidates?"))
+          .length;
+      await within(await findPanel()).findByRole("textbox", {
+        name: "Add a comment",
+      });
+      await waitFor(() => expect(candidates()).toBeGreaterThan(0));
+      const before = candidates();
+      const { region } = await post(user);
+      await within(region).findByText(
+        "Someone you mentioned can't be mentioned here. Remove the mention and post again.",
+      );
+      expect(region.textContent).toContain("Couldn't post");
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      await waitFor(() => expect(candidates()).toBeGreaterThan(before));
+    });
+
+    test("the rate limit: the wait in place, the text kept", async () => {
+      const user = userEvent.setup();
+      panelApi({
+        threads: [],
+        write: () => apiError(429, "RATE_LIMITED", { retryAfterSeconds: 60 }),
+      });
+      renderApp(itemPath);
+      const { region, box } = await post(user);
+      await within(region).findByText(
+        "Too many attempts. Try again in 1 minute.",
+      );
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(box).toHaveProperty("value", "Sunday hours?");
+    });
+
+    /** Opens Ana's reply's ⋯ and deletes it after asking. */
+    async function deleteReply(user: ReturnType<typeof userEvent.setup>) {
+      const region = await findPanel();
+      await within(region).findByText("Yes, from 9 to 5.");
+      await user.click(
+        within(region).getByRole("button", {
+          name: "More for Ana Villanueva's comment",
+        }),
+      );
+      await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+      const ask = await screen.findByRole("alertdialog", {
+        name: "Delete this comment?",
+      });
+      await user.click(within(ask).getByRole("button", { name: "Delete" }));
+      return region;
+    }
+
+    const replyId = "c0000000-0000-4000-8000-000000000002";
+    const deletes = (calls: Call[]) =>
+      calls.filter(
+        ({ method, path }) =>
+          method === "DELETE" && path === `/api/v1/comments/${replyId}`,
+      );
+
+    test("Delete, unexpected: the small dialog, not a toast; Retry deletes again", async () => {
+      const user = userEvent.setup();
+      let attempts = 0;
+      const calls = panelApi({
+        write: (call) => {
+          if (call.method !== "DELETE") return undefined;
+          attempts += 1;
+          return attempts === 1
+            ? apiError(500, "INTERNAL")
+            : new Response(null, { status: 204 });
+        },
+      });
+      renderApp(itemPath);
+      await deleteReply(user);
+      const failed = await screen.findByRole("alertdialog", {
+        name: /Something went wrong/,
+      });
+      expect(failed.textContent).toContain("Ref: 8f14e45f");
+      expect(screen.queryByText(/Something went wrong\. Ref/)).toBeNull();
+      await user.click(within(failed).getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(deletes(calls)).toHaveLength(2));
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    });
+
+    test("Delete over the rate limit: the wait under the comment", async () => {
+      const user = userEvent.setup();
+      panelApi({
+        write: (call) =>
+          call.method === "DELETE"
+            ? apiError(429, "RATE_LIMITED", { retryAfterSeconds: 60 })
+            : undefined,
+      });
+      renderApp(itemPath);
+      const region = await deleteReply(user);
+      await within(region).findByText(
+        "Too many attempts. Try again in 1 minute.",
+      );
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    test("Resolve on the network: Couldn't save and Retry under the thread; Retry resolves it", async () => {
+      const user = userEvent.setup();
+      let attempts = 0;
+      const calls = panelApi({
+        write: (call) => {
+          if (!call.path.endsWith("/resolve")) return undefined;
+          attempts += 1;
+          return attempts === 1 ? offline() : Response.json(thread.root);
+        },
+      });
+      renderApp(itemPath);
+      const region = await findPanel();
+      await within(region).findByText("Yes, from 9 to 5.");
+      await user.click(within(region).getByRole("button", { name: "Resolve" }));
+      await within(region).findByText("Couldn't save");
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      await user.click(within(region).getByRole("button", { name: "Retry" }));
+      await waitFor(() =>
+        expect(
+          calls.filter(
+            ({ method, path }) =>
+              method === "POST" &&
+              path === `/api/v1/comments/${rootId}/resolve`,
+          ),
+        ).toHaveLength(2),
+      );
+      await waitFor(() =>
+        expect(region.textContent).not.toContain("Couldn't save"),
+      );
+    });
+
+    test("Reopen refused as gone: Couldn't save with the reason in place", async () => {
+      const user = userEvent.setup();
+      panelApi({
+        threads: [
+          {
+            ...thread,
+            root: {
+              ...thread.root,
+              resolvedAt: "2026-10-21T01:00:00Z",
+              resolvedBy: anaRef,
+            },
+          },
+        ],
+        write: (call) =>
+          call.path.endsWith("/resolve")
+            ? apiError(404, "NOT_FOUND")
+            : undefined,
+      });
+      renderApp(itemPath);
+      const region = await findPanel();
+      await user.click(
+        await within(region).findByRole("button", {
+          name: "Resolved · Paolo Gonzaga: Is the airport kiosk open on Sundays?",
+        }),
+      );
+      await user.click(within(region).getByRole("button", { name: "Reopen" }));
+      await within(region).findByText("Couldn't save");
+      expect(region.textContent).toContain("It no longer exists");
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
   });
 
   test("an archived idea reads its threads with the notice and no way to write", async () => {
@@ -454,6 +710,58 @@ describe("PNL-1 Comments (design-spec 6.0.4)", () => {
     );
     expect(within(region).queryByRole("textbox")).toBeNull();
     expect(region.textContent).not.toContain("Couldn't post");
+  });
+
+  test("a former member's names keep their name with “(former member)” (6.16)", async () => {
+    const user = userEvent.setup();
+    const former = (person: UserRef): UserRef => ({
+      ...person,
+      badge: "former_member",
+    });
+    const resolved: CommentThread = {
+      ...thread,
+      root: {
+        ...thread.root,
+        author: former(paolo),
+        resolvedAt: "2026-10-21T01:00:00Z",
+        resolvedBy: former(kenji),
+      },
+    };
+    panelApi({
+      threads: [
+        resolved,
+        {
+          ...thread,
+          root: {
+            ...thread.root,
+            id: "c0000000-0000-4000-8000-000000000020",
+            author: former(paolo),
+          },
+        },
+      ],
+    });
+    renderApp(
+      `${base}?panel=comments&target=validation_answer:${validationId}:V.01.WHO`,
+    );
+    const region = await findPanel();
+    const fold = await within(region).findByRole("button", {
+      name: "Resolved · Paolo Gonzaga (former member): Is the airport kiosk open on Sundays?",
+    });
+    await user.click(fold);
+    expect(region.textContent).toContain(
+      "Resolved by Kenji Mori (former member)",
+    );
+    // The writer's line: the name with its badge.
+    expect(
+      within(region).getAllByText("(former member)").length,
+    ).toBeGreaterThan(0);
+    const replies = within(region).getAllByRole("button", { name: "Reply" });
+    await user.click(replies.at(-1) as HTMLElement);
+    expect(
+      within(region).getByRole("textbox", {
+        name: "Reply to Paolo Gonzaga (former member)",
+      }),
+    ).toBeTruthy();
   });
 
   describe("the panel in the history (SDD 4章)", () => {

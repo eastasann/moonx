@@ -2,6 +2,7 @@ import { computeEconomics } from "@moonx/domain";
 import {
   type Assumption,
   type Competitor,
+  type ConditionAnswer,
   type CostItem,
   type EconomicsField,
   type EconomicsInput,
@@ -160,6 +161,26 @@ export const answer = (
   updatedAt: null,
   updatedBy: null,
   ...extra,
+});
+
+/**
+ * V2 of `section` (SDD 5.7): one answer per question, and what it reads of the other
+ * sections' display conditions (none unless `outside` says so).
+ */
+export const questionsRead = (
+  section: TemplateSection,
+  answers: readonly ValidationAnswer[] = section.questions.map(({ key }) =>
+    answer(key),
+  ),
+  outside: {
+    conditionAnswers?: ConditionAnswer[];
+    decidesElsewhere?: string[];
+  } = {},
+) => ({
+  section,
+  answers,
+  conditionAnswers: outside.conditionAnswers ?? [],
+  decidesElsewhere: outside.decidesElsewhere ?? [],
 });
 
 /** A competitor as V8 returns it. */

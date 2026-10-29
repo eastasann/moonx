@@ -53,7 +53,7 @@ import {
   type ScreenComments,
 } from "../components/CommentsPanel";
 import { ItemHistoryButton } from "../components/HistoryPanel";
-import { toastFailure } from "../components/ideaActions";
+import { useToastFailure } from "../components/ideaActions";
 import { useKeepShownItem } from "../components/keepShownItem";
 import {
   inputOf,
@@ -66,6 +66,11 @@ import {
   valuesOf,
   wireValue,
 } from "../components/ResearchLogFields";
+import {
+  isRefusedForGood,
+  refusedFieldsOf,
+  useReadAgainWhenRefused,
+} from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
 import { SectionTitle } from "../components/SectionTitle";
 import { SendFailure } from "../components/SendFailure";
@@ -439,6 +444,7 @@ function EntryDetail({
   /** The entry was deleted while it was still shown. */
   onDeleted: () => void;
 }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["validation", "app"]);
   const { me } = useWorkspace();
   const queryClient = useQueryClient();
@@ -637,14 +643,20 @@ function NewEntry({
   validationId,
   presetSupports,
   isSheet,
+  isReadOnly,
   onCreated,
+  onRefused,
   onCancel,
 }: {
   ideaId: string;
   validationId: string;
   presetSupports: readonly SupportsCheck[];
   isSheet: boolean;
+  /** The screen read again after a refusal reads only: what was typed stays, unsent. */
+  isReadOnly: boolean;
   onCreated: (entry: ResearchLogEntry) => void;
+  /** Refused for good while the form is open (archived, no access, gone). */
+  onRefused: () => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation(["validation", "errors"]);
@@ -664,7 +676,10 @@ function NewEntry({
   >({});
   const latestOnCreated = useRef(onCreated);
   latestOnCreated.current = onCreated;
+  const latestOnRefused = useRef(onRefused);
+  latestOnRefused.current = onRefused;
   const oneAtATime = useOneAtATime();
+  const readAgainWhenRefused = useReadAgainWhenRefused();
   const create = useMutation({
     mutationFn: (input: ResearchLogValues) =>
       unwrap(
@@ -674,18 +689,15 @@ function NewEntry({
       ),
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) }),
+    onError: readAgainWhenRefused,
   });
-  // A 422 naming a field (SDD 8.2's last guard) puts "Check the format" under it; one
-  // naming none says it beside Couldn't save.
   const failure = create.error;
-  const details =
-    failure instanceof ApiError && failure.code === "VALIDATION_FAILED"
-      ? failure.detail.details
-      : undefined;
-  const refusedFields = (Object.keys(values) as ResearchLogField[]).filter(
-    (field) =>
-      Array.isArray(details) &&
-      (details as { path?: unknown }[]).some(({ path }) => path === field),
+  // Refused for good, the form sends no more (design-spec 6.10): at once, before the
+  // screen read again shows why, and also where that read changes nothing (gone).
+  const isLocked = isReadOnly || isRefusedForGood(failure);
+  const refusedFields = refusedFieldsOf(
+    failure,
+    Object.keys(values) as ResearchLogField[],
   );
   const errors = Object.fromEntries(
     (Object.keys(values) as ResearchLogField[]).flatMap((field) => {
@@ -709,19 +721,22 @@ function NewEntry({
             // the user where they went (the entry is made all the same).
             onSuccess: (entry) => latestOnCreated.current(entry),
             // A failure shows from the mutation's state below.
+            onError: (error) => {
+              if (isRefusedForGood(error)) latestOnRefused.current();
+            },
             onSettled: () => resolve(),
           });
         }),
     );
   // Not disabled while it is on its way: Add entry keeps its focus, and `oneAtATime`
   // sends once.
-  const canSubmit = isOnline && isValid(values);
+  const canSubmit = isOnline && !isLocked && isValid(values);
   const fields = (
     <Stack gap="space-300">
       <ResearchLogFields
         values={values}
         errors={errors}
-        isReadOnly={!isOnline}
+        isReadOnly={!isOnline || isLocked}
         autoFocus
         onChange={(field, value) => {
           if (refusedFields.includes(field)) create.reset();
@@ -729,7 +744,7 @@ function NewEntry({
           setTouched((current) => ({ ...current, [field]: true }));
         }}
       />
-      {failure !== null && refusedFields.length === 0 && (
+      {failure !== null && (
         <SendFailure
           error={failure}
           transient="couldNotSave"
@@ -918,7 +933,14 @@ function ResearchBody({
   const items = query.data ?? [];
   const isFiltered =
     search.supports !== undefined || search.source !== undefined;
-  const isNew = search.new === 1 && canEdit;
+  // A new entry refused as archived or no longer allowed stays, read only, with what was
+  // typed and why, until it is closed (design-spec 6.10): the screen read again no
+  // longer lets the user add one.
+  const [isNewKept, setNewKept] = useState(false);
+  useEffect(() => {
+    if (search.new !== 1) setNewKept(false);
+  }, [search.new]);
+  const isNew = search.new === 1 && (canEdit || isNewKept);
   const isPhone = useIsNarrow();
   const shownFirst =
     search.entry === undefined && isTwoColumns && !isNew
@@ -1038,6 +1060,8 @@ function ResearchBody({
       validationId={validationId}
       presetSupports={search.presetSupports ?? []}
       isSheet={isSheet}
+      isReadOnly={!canEdit}
+      onRefused={() => setNewKept(true)}
       onCreated={(entry) =>
         onSearch({
           ...search,

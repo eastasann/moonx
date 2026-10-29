@@ -1,9 +1,16 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { ApiError } from "../lib/api";
 import { AuthError } from "../lib/auth";
+import * as sentry from "../lib/sentry";
 import { SendFailure } from "./SendFailure";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+const requestId = "8f14e45f-ea9e-4c5b-9a1f-2c7e1d5a3b6c";
 
 const alertText = () => screen.getByRole("alert").textContent;
 
@@ -84,7 +91,9 @@ describe("SendFailure: why a send failed (design-spec 6.0.6, SDD 8.2)", () => {
       />,
     );
     expect(alertText()).toContain("Something went wrong");
-    expect(alertText()).toContain("Ref: 8f14e45f");
+    expect(
+      within(screen.getByRole("alert")).getByText("Ref: 8f14e45f"),
+    ).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
@@ -123,5 +132,60 @@ describe("SendFailure: why a send failed (design-spec 6.0.6, SDD 8.2)", () => {
     expect(alertText()).toContain("Couldn't save");
     expect(alertText()).toContain("It's archived");
     expect(alertText()).not.toContain("Ref:");
+  });
+
+  test("a lost session shows nothing: no Something went wrong, no Ref (M9 or 2 takes it)", () => {
+    const report = vi.spyOn(sentry, "reportError");
+    const { container } = render(
+      <SendFailure
+        error={
+          new ApiError({ status: 401, code: "UNAUTHENTICATED", requestId })
+        }
+        transient="couldNotSave"
+        withSaveReasons
+        onRetry={() => {}}
+      />,
+    );
+    expect(container.textContent).toBe("");
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  test("an API 4xx shown as unexpected goes to Sentry once, tagged with its request id (SDD 8.2・11章)", () => {
+    const report = vi.spyOn(sentry, "reportError").mockReturnValue("event");
+    const error = new ApiError({ status: 409, code: "BUSY", requestId });
+    const { rerender } = render(
+      <SendFailure error={error} onRetry={() => {}} />,
+    );
+    rerender(<SendFailure error={error} onRetry={() => {}} />);
+    expect(alertText()).toContain("Something went wrong");
+    expect(
+      within(screen.getByRole("alert")).getByText("Ref: 8f14e45f"),
+    ).toBeTruthy();
+    expect(report).toHaveBeenCalledOnce();
+    expect(report).toHaveBeenCalledWith(error, { requestId });
+  });
+
+  test("not sent: a 500 (the API sends it), the network, a rate limit, a refusal with its reason, a code with words", () => {
+    const report = vi.spyOn(sentry, "reportError");
+    const cases = [
+      new ApiError({ status: 500, code: "INTERNAL", requestId }),
+      new ApiError({ status: null, code: null, requestId: null }),
+      new ApiError({ status: 429, code: "RATE_LIMITED", requestId }),
+      new ApiError({ status: 403, code: "FORBIDDEN", requestId }),
+      new ApiError({ status: 404, code: "NOT_FOUND", requestId }),
+      new ApiError({ status: 409, code: "NAME_TAKEN", requestId }),
+    ];
+    for (const error of cases) {
+      render(
+        <SendFailure
+          error={error}
+          messages={{ NAME_TAKEN: "This name is already used" }}
+          transient="couldNotSave"
+          withSaveReasons
+          onRetry={() => {}}
+        />,
+      ).unmount();
+    }
+    expect(report).not.toHaveBeenCalled();
   });
 });

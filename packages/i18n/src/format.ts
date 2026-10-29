@@ -4,13 +4,10 @@ import {
   groupedNumberPattern,
   type MetricBound,
 } from "@moonx/schemas";
-import { i18n } from "./i18n";
+import { i18n, LOCALE } from "./i18n";
 
 // The display formats of design-spec 1.2 (locale and dates) and 6.4 (rounding, lower and
 // upper bounds). Screens, PDF and AI export all format through these (SDD 9章).
-
-/** Fixed for the first release (design-spec 1.2). */
-export const LOCALE = "en-PH";
 
 // A true minus sign, put before the currency symbol: "−₱5,586".
 const MINUS = "−";
@@ -87,6 +84,18 @@ export const formatMoney = (
     }),
     options.bound,
   );
+};
+
+/**
+ * An amount as it was typed (a price, a cost row's amount), or a cost row's amount per
+ * sale at a % of the price (design-spec 6.4「端数」): whole units when it has no cents
+ * ("₱150", "₱15"), else two decimals ("₱149.50"). Whether it has cents is read from the
+ * amount at 15 significant digits, as Intl rounds it, so float noise reads as it prints:
+ * 150 × 0.1 = 15.000000000000002 is whole, and 2.01 × 0.5 = 1.005 shows "₱1.01".
+ */
+export const formatInputMoney = (amount: number, currency: string) => {
+  const cents = Math.round(Number((Math.abs(amount) * 100).toPrecision(15)));
+  return formatMoney(amount, currency, { cents: cents % 100 !== 0 });
 };
 
 /** A calculated count of units: one decimal, without a trailing ".0" ("6.9", "13"). */
@@ -181,6 +190,10 @@ export const formatMonths = (
     ? value
     : i18n.t("format:months", { value });
 };
+
+/** A whole count, its thousands grouped ("1,234"); `{{count, integer}}` in the catalogs. */
+export const formatInteger = (count: number) =>
+  numberFormat({ maximumFractionDigits: 0 }).format(count);
 
 /** A badge count: above 99 it shows "99+". */
 export const formatCount = (count: number) =>

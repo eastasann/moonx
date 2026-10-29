@@ -212,6 +212,9 @@ test.describe("on a desktop", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: personal.name }),
     ).toBeVisible();
+    // A read or the record of the workspace last opened (U2) still on its way would
+    // meet the ended session first and leave for 2 before the move this test makes.
+    await page.waitForLoadState("networkidle");
     await signOutBehind(page);
     const ideas = `/w/${personal.id}/ideas`;
 

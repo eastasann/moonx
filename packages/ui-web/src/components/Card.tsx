@@ -17,6 +17,7 @@ import {
   VisuallyHidden,
 } from "react-aria-components";
 import { useTranslation } from "react-i18next";
+import { FixedLocale } from "../internal/FixedLocale";
 import { IconSlot } from "../internal/IconSlot";
 import * as styles from "./Card.css";
 
@@ -249,56 +250,58 @@ export function CardView<T extends object>({
   const showsAdd =
     addItem !== undefined && !(isEmpty && props.renderEmptyState !== undefined);
   return (
-    <CardViewContext.Provider
-      value={{
-        size,
-        isActionable: onAction !== undefined || selectionMode !== "none",
-      }}
-    >
-      <GridList
-        {...props}
-        layout="grid"
-        // The add tile's own action runs alone: the cards' action skips its key.
-        onAction={
-          onAction === undefined
-            ? undefined
-            : (key) => {
-                if (key !== ADD_KEY) onAction(key);
-              }
-        }
-        selectionMode={selectionMode}
-        // The add tile is an action, never a choice: it stays pressable.
-        disabledKeys={
-          showsAdd && selectionMode !== "none" ? [ADD_KEY] : undefined
-        }
-        disabledBehavior="selection"
-        onSelectionChange={
-          onSelectionChange
-            ? (selection: Selection) =>
-                onSelectionChange(
-                  selection === "all" ? new Set() : new Set(selection),
-                )
-            : undefined
-        }
-        className={styles.view[size]}
+    <FixedLocale>
+      <CardViewContext.Provider
+        value={{
+          size,
+          isActionable: onAction !== undefined || selectionMode !== "none",
+        }}
       >
-        {cards}
-        {showsAdd && (
-          <GridListItem
-            id={ADD_KEY}
-            textValue={addItem.label}
-            onAction={addItem.onAction}
-            className={styles.addTile}
-          >
-            <span className={styles.addTileLabel}>
-              <IconSlot size="S">
-                <Plus />
-              </IconSlot>
-              {addItem.label}
-            </span>
-          </GridListItem>
-        )}
-      </GridList>
-    </CardViewContext.Provider>
+        <GridList
+          {...props}
+          layout="grid"
+          // The add tile's own action runs alone: the cards' action skips its key.
+          onAction={
+            onAction === undefined
+              ? undefined
+              : (key) => {
+                  if (key !== ADD_KEY) onAction(key);
+                }
+          }
+          selectionMode={selectionMode}
+          // The add tile is an action, never a choice: it stays pressable.
+          disabledKeys={
+            showsAdd && selectionMode !== "none" ? [ADD_KEY] : undefined
+          }
+          disabledBehavior="selection"
+          onSelectionChange={
+            onSelectionChange
+              ? (selection: Selection) =>
+                  onSelectionChange(
+                    selection === "all" ? new Set() : new Set(selection),
+                  )
+              : undefined
+          }
+          className={styles.view[size]}
+        >
+          {cards}
+          {showsAdd && (
+            <GridListItem
+              id={ADD_KEY}
+              textValue={addItem.label}
+              onAction={addItem.onAction}
+              className={styles.addTile}
+            >
+              <span className={styles.addTileLabel}>
+                <IconSlot size="S">
+                  <Plus />
+                </IconSlot>
+                {addItem.label}
+              </span>
+            </GridListItem>
+          )}
+        </GridList>
+      </CardViewContext.Provider>
+    </FixedLocale>
   );
 }

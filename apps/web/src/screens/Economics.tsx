@@ -4,9 +4,9 @@ import {
   hasText,
 } from "@moonx/domain";
 import {
+  formatInputMoney,
   formatInputNumber,
   formatInputPercent,
-  formatMoney,
   formatPercent,
   i18n,
 } from "@moonx/i18n";
@@ -334,9 +334,10 @@ function NumberInput({
 }
 
 /**
- * A number as 18 shows it (design-spec 6.4「入力」): the price as an amount, the target
- * margin as the % typed, daily sales as typed; the default of operating days and the
- * target margin faintly while they have no value; "Unknown" or "Empty".
+ * A number as 18 shows it (design-spec 6.4「入力」・「端数」): the price as the amount typed,
+ * never rounded, the target margin as the % typed, daily sales as typed; the default of
+ * operating days and the target margin faintly while they have no value; "Unknown" or
+ * "Empty".
  */
 function NumberText({ view }: { view: NumberView }) {
   const { t } = useTranslation(["validation", "common"]);
@@ -345,13 +346,7 @@ function NumberText({ view }: { view: NumberView }) {
   if (view.value !== null) {
     switch (field) {
       case "selling_price":
-        return (
-          <>
-            {formatMoney(view.value, workspace.currency, {
-              cents: !Number.isInteger(view.value),
-            })}
-          </>
-        );
+        return <>{formatInputMoney(view.value, workspace.currency)}</>;
       case "target_margin":
         return <>{formatInputPercent(view.value)}</>;
       default:

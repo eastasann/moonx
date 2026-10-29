@@ -28,7 +28,6 @@
     "resolvedThread": "Resolved · {{name}}: {{excerpt}}",
     "resolvedDeleted": "Resolved · {{name}}",
     "couldNotPost": "Couldn't post",
-    "invalidMention": "Someone you mentioned can't be mentioned here. Remove the mention and post again.",
     "noCandidates": "Couldn't load who you can mention.",
     "archived": {
       "idea": "This idea is archived. Restore it to make changes.",

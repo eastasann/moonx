@@ -1,3 +1,8 @@
+import {
+  conditionAnswersOutside,
+  decidesElsewhere,
+  isQuestionShown,
+} from "@moonx/domain";
 import type {
   Me,
   Role,
@@ -14,6 +19,8 @@ import {
   evidenceOf,
   home,
   prices,
+  question,
+  questionsRead,
   section01,
   section02,
   survey,
@@ -40,6 +47,9 @@ function formApi({
   me = ana,
   section = section01,
   answers = section.questions.map(({ key }) => answer(key)),
+  others = [],
+  elsewhere = [],
+  beforeSave,
   archived = false,
   put,
   evidence = (_call: Call): Response | Promise<Response> | undefined =>
@@ -48,12 +58,37 @@ function formApi({
   me?: Me;
   section?: TemplateSection;
   answers?: ValidationAnswer[];
+  /** The version's other sections V2 reads too, their display conditions included. */
+  others?: TemplateSection[];
+  /** The answers to the questions of `others`. */
+  elsewhere?: ValidationAnswer[];
+  /** Holds a save back before the fake applies it, as a slow V3 would. */
+  beforeSave?: () => Promise<void>;
   archived?: boolean;
   put?: (call: Call) => Response;
   evidence?: (call: Call) => Response | Promise<Response> | undefined;
 } = {}) {
   // What the fake API holds of each answer, so a later save sees the earlier ones.
-  const saved = new Map(answers.map((item) => [item.questionKey, item]));
+  const saved = new Map(
+    [...answers, ...elsewhere].map((item) => [item.questionKey, item]),
+  );
+  const version = [section, ...others].flatMap(({ questions }) => questions);
+  /** V2 of `read`: `answers` for the section opened, what the fake holds for others. */
+  const questionsOf = (read: TemplateSection) =>
+    questionsRead(
+      read,
+      read === section
+        ? answers
+        : read.questions.map(({ key }) => saved.get(key) ?? answer(key)),
+      {
+        conditionAnswers: conditionAnswersOutside(
+          read.questions,
+          version,
+          saved,
+        ),
+        decidesElsewhere: decidesElsewhere(read.questions, version),
+      },
+    );
   const save =
     put ??
     ((call: Call) => {
@@ -93,14 +128,16 @@ function formApi({
     if (method === "GET" && path === `${ideaPath}/validation`) {
       return Response.json({ ...home, idea: { ...home.idea, archived } });
     }
-    if (
-      method === "GET" &&
-      path === `${validationPath}/questions/${section.key}`
-    ) {
-      return Response.json({ section, answers });
+    const read = [section, ...others].find(
+      ({ key }) => path === `${validationPath}/questions/${key}`,
+    );
+    if (method === "GET" && read !== undefined) {
+      return Response.json(questionsOf(read));
     }
     if (method === "PUT" && path.startsWith(`${validationPath}/answers/`)) {
-      return save(call);
+      return beforeSave === undefined
+        ? save(call)
+        : beforeSave().then(() => save(call));
     }
     if (method === "GET" && path.startsWith(`${validationPath}/research-log`)) {
       return Response.json({ items: [survey, prices], nextCursor: null });
@@ -310,6 +347,88 @@ describe("11 Question form (design-spec 6.2)", () => {
     expect(screen.queryByRole("region", { name: "BLUE: GAP" })).toBeNull();
     await user.click(screen.getByRole("radio", { name: "Mixed" }));
     expect(screen.getByText("1/4")).toBeTruthy();
+  });
+
+  /** 10 with a question shown once 01 WHO is "Offices": a condition on another section. */
+  const section10: TemplateSection = {
+    key: "10",
+    part: null,
+    title: "Synthesis",
+    subtitle: null,
+    guidance: null,
+    questions: [
+      question("V.10.WHY_WORK", "WHY WORK", "Why would this work?"),
+      question("V.10.OFFICES", "OFFICE ORDERS", "How do offices order?", {
+        displayCondition: { "V.01.WHO": ["Offices"] },
+      }),
+    ],
+  };
+
+  test.each([
+    ["Offices", true],
+    ["Students", false],
+  ])(
+    "10 shows a question by 01 WHO's answer (%s) and counts as 13 does",
+    async (who, isShown) => {
+      formApi({
+        section: section10,
+        others: [section01],
+        elsewhere: [answer("V.01.WHO", { text: who, lockVersion: 1 })],
+      });
+      renderApp(`${base}/10`);
+      await screen.findByRole("region", { name: "WHY WORK" });
+      // 13 counts the questions shown on all of the validation's answers (6.1・6.2).
+      const hub = section10.questions.filter((item) =>
+        isQuestionShown(item, new Map([["V.01.WHO", { text: who }]])),
+      );
+      expect(hub).toHaveLength(isShown ? 2 : 1);
+      expect(screen.getByText(`0/${hub.length}`)).toBeTruthy();
+      expect(
+        screen.queryByRole("region", { name: "OFFICE ORDERS" }) !== null,
+      ).toBe(isShown);
+    },
+  );
+
+  test("a question another section's condition names says how to reveal it while unanswered", async () => {
+    const user = userEvent.setup();
+    const calls = formApi({ others: [section10] });
+    renderApp(`${base}/01?q=V.01.WHO`);
+    const who = await screen.findByRole("textbox", { name: "Answer to WHO" });
+    expect(card("WHO").textContent).toContain(
+      "Answer WHO to see the next questions",
+    );
+    expect(card("PROBLEM").textContent).not.toContain("to see the next");
+    await user.type(who, "Offices");
+    expect(card("WHO").textContent).not.toContain("to see the next");
+    await waitFor(
+      () =>
+        expect(calls.filter(({ method }) => method === "PUT")).toHaveLength(1),
+      { timeout: 3000 },
+    );
+  });
+
+  test("a save sent on leaving reads the next section again, whose condition names it", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls = formApi({ others: [section10], beforeSave: () => held });
+    const router = renderApp(`${base}/01?q=V.01.WHO`);
+    const who = await screen.findByRole("textbox", { name: "Answer to WHO" });
+    await user.type(who, "Offices");
+    await router.navigate({ href: `${base}/10` });
+    // Read before the save of WHO landed: what it shows is not shown yet.
+    expect(await screen.findByText("0/1")).toBeTruthy();
+    release();
+    expect(await screen.findByText("0/2")).toBeTruthy();
+    expect(card("OFFICE ORDERS")).toBeTruthy();
+    expect(
+      calls.filter(
+        ({ method, path }) =>
+          method === "GET" && path === `${validationPath}/questions/10`,
+      ),
+    ).toHaveLength(2);
   });
 
   test("a Viewer reads every question open, F/A/U as labels, without Focus or a way to add research", async () => {

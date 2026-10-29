@@ -242,7 +242,7 @@ const routeOf = (request: Request, route: string | undefined) =>
   route === undefined || route === "" ? null : `${request.method} ${route}`;
 
 export interface EntryOptions {
-  config: Pick<Config, "appEnv" | "trustedOrigins">;
+  config: Pick<Config, "appEnv" | "trustedOrigins" | "webSentryDsn">;
   log: Logger;
   reporter: ErrorReporter;
   limiter: RateLimiter;
@@ -270,7 +270,7 @@ export function entryPlugin({
   const limitOf = limitFinder(ipLimits);
   const headers = {
     "cache-control": "no-store",
-    ...securityHeaders(config.appEnv),
+    ...securityHeaders(config),
   };
 
   return new Elysia()

@@ -26,7 +26,7 @@ import {
 } from "@moonx/ui-web";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { type ReactNode, useId, useMemo, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import {
@@ -39,13 +39,13 @@ import {
   FailureState,
   NoAccessState,
   NotFoundState,
-  reportOnce,
   SlowLoadingState,
   useIsSlow,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
-import { ApiError, api, inPath, unwrap } from "../lib/api";
+import { api, inPath, unwrap } from "../lib/api";
+import { useUnexpectedReference } from "../lib/failure";
 import { attachmentName, downloadBlob } from "../lib/files";
 import {
   costsHref,
@@ -65,6 +65,7 @@ import {
   planHomeQuery,
   validationHomeQuery,
 } from "../lib/queries";
+import { isSessionLost } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
 import {
   BlankSlide,
@@ -175,15 +176,8 @@ function PdfFailure({
   const { t } = useTranslation(["plans", "app"]);
   const rateLimited = rateLimitWords(error);
   // The network fails without a request to quote; anything else is unexpected (8.2).
-  const reference = useMemo(
-    () =>
-      rateLimited !== null
-        ? null
-        : error instanceof ApiError
-          ? error.requestId
-          : reportOnce(error),
-    [rateLimited, error],
-  );
+  const reference = useUnexpectedReference(error, rateLimited === null);
+  if (isSessionLost(error)) return null;
   return (
     <InlineAlert variant="negative" title={t("plans:pitch.pdfFailed")}>
       <Flex gap="space-200" wrap alignItems="center">

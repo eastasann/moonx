@@ -484,6 +484,174 @@ describe("28 Admin: Users & Workspaces (design-spec 6.17)", () => {
     });
   });
 
+  test("Invite someone: an unexpected failure (500) shows the small dialog; Retry sends again, Close closes Invite someone", async () => {
+    const actor = userEvent.setup();
+    const calls = usersApi({
+      answer: (call) =>
+        call.method === "POST" && call.path === "/api/v1/admin/invitations"
+          ? apiError(500, "INTERNAL")
+          : undefined,
+    });
+    renderApp("/admin/users?tab=invitations");
+    await screen.findByRole("grid", { name: "Invitations" });
+    await actor.click(
+      screen.getAllByRole("button", {
+        name: "Invite someone",
+      })[0] as HTMLElement,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Invite someone",
+    });
+    const email = within(dialog).getByRole("textbox", {
+      name: /^Email/,
+    }) as HTMLInputElement;
+    await actor.type(email, "solo@e2e.example");
+    await actor.click(
+      within(dialog).getByRole("button", { name: "Send invitation" }),
+    );
+    const failure = await screen.findByRole("alertdialog", {
+      name: /Something went wrong/,
+    });
+    expect(within(failure).getByText("Ref: 8f14e45f")).toBeTruthy();
+    // Not in place, as a fixed reason would be (design-spec 6.0.6).
+    expect(within(dialog).queryByText("Something went wrong")).toBeNull();
+    expect(email.value).toBe("solo@e2e.example");
+    const posts = () =>
+      calls.filter(
+        (call) =>
+          call.method === "POST" && call.path === "/api/v1/admin/invitations",
+      );
+    await actor.click(within(failure).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posts()).toHaveLength(2));
+    expect(posts()[1]?.body).toEqual({ email: "solo@e2e.example" });
+    await actor.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: /Something went wrong/,
+        }),
+      ).getByRole("button", { name: "Close" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Invite someone" }),
+      ).toBeNull(),
+    );
+    expect(
+      screen.queryByRole("alertdialog", { name: /Something went wrong/ }),
+    ).toBeNull();
+  });
+
+  test("Invite someone: the refusals 9 shares stay in place, in their words (errors:<CODE>)", async () => {
+    const actor = userEvent.setup();
+    let refusal = apiError(409, "ALREADY_MEMBER");
+    usersApi({
+      answer: (call) =>
+        call.method === "POST" && call.path === "/api/v1/admin/invitations"
+          ? refusal
+          : undefined,
+    });
+    renderApp("/admin/users?tab=invitations");
+    await screen.findByRole("grid", { name: "Invitations" });
+    await actor.click(
+      screen.getAllByRole("button", {
+        name: "Invite someone",
+      })[0] as HTMLElement,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Invite someone",
+    });
+    await actor.type(
+      within(dialog).getByRole("textbox", { name: /^Email/ }),
+      "ana@bcdx.example",
+    );
+    const send = within(dialog).getByRole("button", {
+      name: "Send invitation",
+    });
+    await actor.click(send);
+    expect(
+      await within(dialog).findByText(
+        "ana@bcdx.example is already a member of this workspace",
+      ),
+    ).toBeTruthy();
+    refusal = apiError(404, "NOT_FOUND");
+    await actor.click(send);
+    expect(
+      await within(dialog).findByText("This workspace no longer exists"),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("alertdialog", { name: /Something went wrong/ }),
+    ).toBeNull();
+  });
+
+  test("Resend of a cancelled invitation and Suspend of a deleted account say so (errors:<CODE>)", async () => {
+    const actor = userEvent.setup();
+    usersApi({
+      answer: (call) => {
+        if (call.path === `/api/v1/invitations/${pending.id}/resend`) {
+          return apiError(410, "INVITATION_INVALID");
+        }
+        if (call.path === `/api/v1/admin/users/${ana.id}/suspend`) {
+          return apiError(404, "NOT_FOUND");
+        }
+        return undefined;
+      },
+    });
+    renderApp("/admin/users?tab=invitations");
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "new.member@bcdx.example",
+    });
+    await actor.click(screen.getByRole("button", { name: "Resend" }));
+    expect(
+      await screen.findByText(
+        "The invitation to new.member@bcdx.example was cancelled",
+      ),
+    ).toBeTruthy();
+    await actor.click(screen.getByRole("tab", { name: "Users" }));
+    await actor.keyboard("{Enter}");
+    await screen.findByRole("heading", { level: 2, name: "Ana Villanueva" });
+    await actor.click(screen.getByRole("button", { name: "Suspend" }));
+    await actor.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: "Suspend Ana Villanueva?",
+        }),
+      ).getByRole("button", { name: "Suspend" }),
+    );
+    expect(
+      await screen.findByText("This account no longer exists"),
+    ).toBeTruthy();
+  });
+
+  test("counts group their thousands: 1234 shows as 1,234 (design-spec 1.2)", async () => {
+    const actor = userEvent.setup();
+    usersApi({
+      answer: (call) => {
+        if (call.path.startsWith("/api/v1/admin/users?")) {
+          return page([{ ...anaUser, workspaceCount: 1234 }]);
+        }
+        if (call.path.startsWith("/api/v1/admin/workspaces?")) {
+          return page([{ ...bcdx, memberCount: 1234, ideaCount: 12345 }]);
+        }
+        return undefined;
+      },
+    });
+    renderApp("/admin/users");
+    const users = await screen.findByRole("grid", { name: "Users" });
+    expect(within(users).getByText("1,234")).toBeTruthy();
+    // The detail beside the list says it the same way.
+    await screen.findByRole("heading", { level: 2, name: "Ana Villanueva" });
+    expect(screen.getAllByText("1,234")).toHaveLength(2);
+    await actor.click(screen.getByRole("tab", { name: "Workspaces" }));
+    await actor.keyboard("{Enter}");
+    const workspaces = await screen.findByRole("grid", { name: "Workspaces" });
+    expect(within(workspaces).getByText("1,234")).toBeTruthy();
+    expect(within(workspaces).getByText("12,345")).toBeTruthy();
+    await screen.findByRole("heading", { level: 2, name: "BCDX" });
+    expect(screen.getAllByText("1,234")).toHaveLength(2);
+    expect(screen.getAllByText("12,345")).toHaveLength(2);
+  });
+
   test("anyone but an operator: no access, nothing read", async () => {
     const calls = usersApi({ me: ana });
     renderApp("/admin/users");

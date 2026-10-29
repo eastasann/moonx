@@ -127,7 +127,7 @@ function ExportFlow({
   target: AiTarget;
   scopeParam: string | undefined;
 }) {
-  const { t } = useTranslation(["ai", "app"]);
+  const { t } = useTranslation(["ai", "app", "errors"]);
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
   const { kind, id } = target;
@@ -164,7 +164,8 @@ function ExportFlow({
           : { kind: "sections", keys: ordered };
   }
   // A scope with nothing an AI can answer is refused by X1 (422 EMPTY_SCOPE), so it is
-  // not sent: Next waits for a section or item with a question.
+  // not sent: Next waits for a section or item with a question, saying so in that
+  // refusal's words.
   const scopeError =
     scope === null
       ? t(isPlan ? "ai:export.chooseItem" : "ai:export.chooseSection")
@@ -173,7 +174,7 @@ function ExportFlow({
               section.importable && isInScope(scope, section.key, sections),
           )
         ? undefined
-        : t(isPlan ? "ai:export.noQuestionsPlan" : "ai:export.noQuestions");
+        : t("errors:EMPTY_SCOPE", { context: isPlan ? "plan" : undefined });
   const has = (option: Option) => options.includes(option);
   const exported = useQuery({
     ...aiExportQuery(kind, id, {

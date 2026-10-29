@@ -4,7 +4,7 @@ import type {
   Me,
   Role,
 } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
@@ -75,15 +75,23 @@ const context: DecisionContext = {
   lastDecision: hold,
 };
 
-/** The API of 19; `record` answers V19 in place of a recorded decision. */
+/**
+ * The API of 19, answering V18 with `material`; `record` answers V19 in place of a
+ * recorded decision.
+ */
 function decisionApi({
   me = ana,
   archived = false,
+  material = context,
   record,
+  patch,
 }: {
   me?: Me;
   archived?: boolean;
+  material?: DecisionContext;
   record?: (call: Call) => Response | undefined;
+  /** Answers 13's Edit summary (I2 PATCH). */
+  patch?: () => Promise<Response>;
 } = {}) {
   return stubApi((call: Call) => {
     const { method, path } = call;
@@ -96,7 +104,10 @@ function decisionApi({
       return Response.json({ ...home, idea: { ...home.idea, archived } });
     }
     if (method === "GET" && path === contextPath) {
-      return Response.json(context);
+      return Response.json(material);
+    }
+    if (method === "PATCH" && path === `/api/v1/ideas/${home.idea.id}`) {
+      return patch?.();
     }
     if (method === "POST" && path === recordPath) {
       const answered = record?.(call);
@@ -156,6 +167,8 @@ describe("19 Decision (design-spec 6.5)", () => {
     ).getAllByRole("listitem");
     expect(missing[0]?.textContent).toContain("1 row is Empty");
     expect(missing[0]?.textContent).toContain("Partial");
+    // A Fact whose research log was deleted is a Fact, with how many said (6.0.3).
+    expect(shown).toContain("Fact 5 (1 without evidence)");
     expect(shown).toContain("Unknown 4");
     expect(shown).toContain("Unclassified 3");
     expect(shown).toContain("Empty 13");
@@ -177,6 +190,35 @@ describe("19 Decision (design-spec 6.5)", () => {
     expect(
       screen.getByRole("link", { name: home.idea.name }).getAttribute("href"),
     ).toBe(`/w/${workspaceId}/ideas/${home.idea.id}`);
+  });
+
+  test("F/A/U counts past a thousand group their thousands; no Facts without evidence, no words for them", async () => {
+    decisionApi({
+      material: {
+        ...context,
+        fau: {
+          fact: 1234,
+          factNoEvidence: 0,
+          assumption: { total: 2000, low: 1000, medium: 500, high: 500 },
+          unknown: 1500,
+          unclassified: 100,
+          empty: 99999,
+        },
+      },
+    });
+    renderApp(base);
+    await screen.findByText("Healthy bowls for office lunches.");
+    const shown = material().textContent ?? "";
+    for (const count of [
+      "Fact 1,234",
+      "Assumption 2,000",
+      "Unknown 1,500",
+      "Unclassified 100",
+      "Empty 99,999",
+    ]) {
+      expect(shown).toContain(count);
+    }
+    expect(shown).not.toContain("without evidence");
   });
 
   test("a choice and a reason are needed; the notes follow the choice", async () => {
@@ -268,6 +310,9 @@ describe("19 Decision (design-spec 6.5)", () => {
       name: /Kenji Mori recorded Drop .* Record yours as well\?/,
     });
     expect(refused).toBe(true);
+    expect(question.textContent).toContain(
+      "Both decisions stay in the log, and yours becomes the latest.",
+    );
     await user.click(
       within(question).getByRole("button", { name: "Record mine" }),
     );
@@ -345,6 +390,65 @@ describe("19 Decision (design-spec 6.5)", () => {
         `/w/${workspaceId}/ideas/${home.idea.id}`,
       ),
     );
+  });
+
+  test("a record that meets an ended session says nothing on 19: M9 asks to sign in again", async () => {
+    const user = userEvent.setup();
+    decisionApi({
+      // 13's summary still on its way: input unsaved, so the lost session opens M9.
+      patch: () => new Promise<Response>(() => {}),
+      record: () => apiError(401, "UNAUTHENTICATED"),
+    });
+    const router = renderApp(`/w/${workspaceId}/ideas/${home.idea.id}`);
+    await user.click(
+      await screen.findByRole("button", { name: "Edit summary" }),
+    );
+    const sheet = await screen.findByRole("dialog", { name: "Edit summary" });
+    await user.type(
+      within(sheet).getByRole("textbox", { name: /One-line concept/ }),
+      "!",
+    );
+    await user.tab();
+    await act(() => router.navigate({ href: base }));
+    await screen.findByText("Healthy bowls for office lunches.");
+    await user.click(screen.getByRole("radio", { name: /Hold/ }));
+    await user.type(screen.getByRole("textbox", { name: /Why\?/ }), "Later.");
+    await user.click(screen.getByRole("button", { name: "Record decision" }));
+    expect(
+      await screen.findByRole("dialog", { name: "Sign in again" }),
+    ).toBeTruthy();
+    expect(router.state.location.pathname).toBe(base);
+    expect(screen.queryByText("Couldn't record")).toBeNull();
+    expect(screen.queryByText(/^Ref:/)).toBeNull();
+  });
+
+  test("a recorder who left reads as a former member, in the last decision and the question (design-spec 6.16)", async () => {
+    const user = userEvent.setup();
+    const former = { ...kenji, badge: "former_member" as const };
+    decisionApi({
+      material: { ...context, lastDecision: { ...hold, recordedBy: former } },
+      record: () =>
+        apiError(409, "DECISION_CHANGED", {
+          latest: {
+            ...hold,
+            recordedBy: former,
+            recordedAt: new Date().toISOString(),
+          },
+        }),
+    });
+    renderApp(base);
+    await screen.findByText("Healthy bowls for office lunches.");
+    expect(material().textContent).toContain(
+      "Last decision: Hold · Oct 2 · Kenji Mori (former member)",
+    );
+    await user.click(screen.getByRole("radio", { name: /Hold/ }));
+    await user.type(screen.getByRole("textbox", { name: /Why\?/ }), "Later.");
+    await user.click(screen.getByRole("button", { name: "Record decision" }));
+    expect(
+      await screen.findByRole("alertdialog", {
+        name: /^Kenji Mori \(former member\) recorded Hold/,
+      }),
+    ).toBeTruthy();
   });
 
   test("a Viewer cannot open it", async () => {

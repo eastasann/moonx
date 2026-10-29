@@ -416,7 +416,7 @@ function ChangePasswordForm() {
             <field.TextField
               rejection={
                 refused === "currentPassword"
-                  ? t("settings:account.password.wrong")
+                  ? t("errors:INVALID_PASSWORD")
                   : undefined
               }
               label={t("settings:account.password.current")}
@@ -578,7 +578,9 @@ function SetPasswordForm() {
           )}
         </form.AppField>
         {needsSignIn && (
-          <LogInAgain message={t("settings:account.password.reauth")} />
+          <LogInAgain
+            message={t("errors:REAUTH_REQUIRED", { context: "setPassword" })}
+          />
         )}
         {failure !== null && (
           <SendFailure
@@ -644,7 +646,7 @@ function MembershipList({
   me: Me;
   ownerships: ReadonlyMap<string, Ownership>;
 }) {
-  const { t } = useTranslation(["settings", "common", "app"]);
+  const { t } = useTranslation(["settings", "common", "app", "errors"]);
   const { workspace: current } = useWorkspace();
   const isOnline = useIsOnline();
   const own = ownPersonalId(me);
@@ -671,7 +673,7 @@ function MembershipList({
               }
               note={
                 isOnlyOwner
-                  ? t("settings:account.workspaces.lastOwner")
+                  ? t("errors:LAST_OWNER", { context: "leave" })
                   : undefined
               }
               actions={
@@ -771,7 +773,7 @@ function lastOwnerWorkspaces(error: unknown): { id: string; name: string }[] {
  * that workspace's 9. Deleted, the user is logged out and on 1.
  */
 function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
-  const { t } = useTranslation(["settings"]);
+  const { t } = useTranslation(["settings", "errors"]);
   const formId = useId();
   const isOnline = useIsOnline();
   const queryClient = useQueryClient();
@@ -896,7 +898,7 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
                 <field.TextField
                   rejection={
                     wrong === "confirmEmail"
-                      ? t("settings:account.delete.emailMismatch")
+                      ? t("errors:CONFIRMATION_MISMATCH")
                       : undefined
                   }
                   label={t("settings:account.delete.email")}
@@ -919,7 +921,7 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
                   <field.TextField
                     rejection={
                       wrong === "password"
-                        ? t("settings:account.delete.wrongPassword")
+                        ? t("errors:INVALID_PASSWORD")
                         : undefined
                     }
                     label={t("settings:account.delete.password")}
@@ -934,7 +936,9 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
           </Form>
         </form.AppForm>
         {refusal?.kind === "reauth" && (
-          <LogInAgain message={t("settings:account.delete.reauth")} />
+          <LogInAgain
+            message={t("errors:REAUTH_REQUIRED", { context: "deleteAccount" })}
+          />
         )}
         {refusal?.kind === "lastOwner" && (
           <LastOwnerRefusal workspaces={refusal.workspaces} />
@@ -961,17 +965,19 @@ function LastOwnerRefusal({
   /** `notice` before Delete account is pressed; `negative` when the API refused it. */
   variant?: "notice" | "negative";
 }) {
-  const { t } = useTranslation(["settings"]);
+  const { t } = useTranslation(["settings", "errors"]);
   if (workspaces.length === 0) {
     return (
       <InlineAlert variant={variant}>
-        {t("settings:account.workspaces.lastOwner")}
+        {t("errors:LAST_OWNER", { context: "leave" })}
       </InlineAlert>
     );
   }
   const lines: ReactNode[] = workspaces.map(({ id, name }) => (
     <Stack key={id} gap="space-75">
-      <Text>{t("settings:account.delete.lastOwner", { workspace: name })}</Text>
+      <Text>
+        {t("errors:LAST_OWNER", { context: "deleteAccount", workspace: name })}
+      </Text>
       <Link href={settingsHref(id)}>
         {t("settings:account.delete.toSettings", { workspace: name })}
       </Link>

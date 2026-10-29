@@ -141,6 +141,76 @@ describe("FailureState (design-spec 6.0.6, SDD 8.2)", () => {
     ).toBeTruthy();
     expect(screen.queryByText(/^Ref:/)).toBeNull();
   });
+
+  test("a lost session shows nothing: no Something went wrong, no Ref (M9 or 2 takes it)", () => {
+    const report = vi.spyOn(sentry, "reportError");
+    const { container } = render(
+      <FailureState
+        error={
+          new ApiError({ status: 401, code: "UNAUTHENTICATED", requestId })
+        }
+        onRetry={() => {}}
+      />,
+    );
+    expect(container.textContent).toBe("");
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  test("a rate limit: its wait and Retry, not unexpected (SDD 8.2「回数制限」)", () => {
+    const report = vi.spyOn(sentry, "reportError");
+    const onRetry = vi.fn();
+    render(
+      <FailureState
+        error={
+          new ApiError({
+            status: 429,
+            code: "RATE_LIMITED",
+            requestId,
+            detail: { retryAfterSeconds: 2700 },
+          })
+        }
+        onRetry={onRetry}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", {
+        name: "Too many attempts. Try again in 45 minutes.",
+      }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/^Ref:/)).toBeNull();
+    screen.getByRole("button", { name: "Retry" }).click();
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  test("an API 4xx shown as unexpected goes to Sentry once, tagged with its request id (SDD 8.2・11章)", () => {
+    const report = vi.spyOn(sentry, "reportError").mockReturnValue("event");
+    const error = new ApiError({ status: 409, code: "BUSY", requestId });
+    const { rerender } = render(
+      <FailureState error={error} onRetry={() => {}} />,
+    );
+    rerender(<FailureState error={error} onRetry={() => {}} />);
+    expect(
+      screen.getByRole("heading", { name: "Something went wrong" }),
+    ).toBeTruthy();
+    // The Ref is the request's, which finds the API's log line too.
+    expect(screen.getByText("Ref: 8f14e45f")).toBeTruthy();
+    expect(report).toHaveBeenCalledOnce();
+    expect(report).toHaveBeenCalledWith(error, { requestId });
+  });
+
+  test("what is not shown as unexpected is not sent: the network, an API down, no access, not found", () => {
+    const report = vi.spyOn(sentry, "reportError");
+    for (const error of [
+      new ApiError({ status: null, code: null, requestId: null }),
+      new ApiError({ status: 503, code: "UPSTREAM_UNAVAILABLE", requestId }),
+      new ApiError({ status: 403, code: "FORBIDDEN", requestId }),
+      new ApiError({ status: 404, code: "NOT_FOUND", requestId }),
+    ]) {
+      render(<FailureState error={error} onRetry={() => {}} />).unmount();
+    }
+    expect(report).not.toHaveBeenCalled();
+  });
 });
 
 function Loading({ isLoading }: { isLoading: boolean }) {

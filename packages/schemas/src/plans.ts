@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  conditionAnswerSchema,
   confidenceSchema,
   costCategorySchema,
   dateOnlySchema,
@@ -554,6 +555,11 @@ export const planItemSchema = z.object({
   prompts: z.array(templateQuestionSchema),
   /** One per prompt that takes an answer (text, choice, table), unanswered ones included. */
   answers: z.array(planAnswerSchema),
+  /**
+   * The answers in other items that the display conditions of its prompts name, in
+   * template order (a viewed version's): 21 shows and counts with them as 20 does.
+   */
+  conditionAnswers: z.array(conditionAnswerSchema),
   /**
    * The single-value key metrics the number sub-items show (a viewed version's). A
    * `cost_row:*` the validation does not have (had not) is left out.

@@ -1,5 +1,5 @@
 import { hasText, tableTotals } from "@moonx/domain";
-import { formatInputPercent, formatMoney } from "@moonx/i18n";
+import { formatInputMoney, formatInputPercent } from "@moonx/i18n";
 import {
   longTextSchema,
   type PlanAnswer,
@@ -672,9 +672,7 @@ export function PlanTableField({
             }),
             t("plans:table.cell", {
               label: t("plans:item.capital"),
-              value: formatMoney(totals.capital, workspace.currency, {
-                cents: !Number.isInteger(totals.capital),
-              }),
+              value: formatInputMoney(totals.capital, workspace.currency),
             }),
           ].join(t("app:separator"))}
         </Text>

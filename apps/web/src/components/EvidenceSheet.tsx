@@ -28,7 +28,7 @@ import {
 } from "@moonx/ui-web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import {
@@ -42,10 +42,11 @@ import {
   evidenceLabel,
   researchLogLabel,
 } from "../lib/evidence";
+import { isTransient, useUnexpectedReference } from "../lib/failure";
 import { inputIssueMessage } from "../lib/input-issues";
 import { useIsOnline } from "../lib/online";
 import { researchLogKey, researchLogQuery } from "../lib/queries";
-import { isTransient } from "../lib/query";
+
 import {
   inputOf,
   isValid,
@@ -57,7 +58,7 @@ import {
 } from "./ResearchLogFields";
 import { ConflictAlert, SaveFailureNote } from "./SaveFeedback";
 import { rateLimitWords } from "./SendFailure";
-import { FailureState, LoadingBlock, reportOnce } from "./states";
+import { FailureState, LoadingBlock } from "./states";
 import { useWorkspace } from "./workspace";
 
 /** The items M2 attaches evidence to (SDD 5.7 V4). */
@@ -470,15 +471,7 @@ export function EvidenceSheet({
       : null;
   const isUnexpected = kind === "unexpected";
   // The API's request id, or the Sentry event of the Web's own failure (SDD 8.2).
-  const reference = useMemo(
-    () =>
-      !isUnexpected
-        ? null
-        : failure instanceof ApiError
-          ? failure.requestId
-          : reportOnce(failure),
-    [isUnexpected, failure],
-  );
+  const reference = useUnexpectedReference(failure, isUnexpected);
   // A retry sends the fields as they are now: they must keep their rules, as for Add.
   const lastKind = send.variables?.change.kind;
   const canRetry =

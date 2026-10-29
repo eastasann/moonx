@@ -9,6 +9,7 @@ import {
   planVersionSummarySchema,
 } from "@moonx/schemas";
 import { print } from "@moonx/ui-tokens/print";
+import { eq } from "drizzle-orm";
 import { PITCH_PDF_LIMIT } from "./pitch-deck";
 import { buildTestApp, connectTestDatabase } from "./test-app";
 import { apiRequest, teamWithProceedIdea, testFixtures } from "./test-fixtures";
@@ -104,6 +105,13 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
         sortOrder: 0,
         type: "direct",
       },
+      // A typed price is never rounded (design-spec 6.4「端数」).
+      {
+        validationId: team.validationId,
+        name: "Third",
+        sortOrder: 2,
+        typicalPrice: 149.5,
+      },
     ]);
     const pitch = await deck(plan.id, team.memberCookie, "variant=five");
 
@@ -125,6 +133,7 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
     expect(slideOf(pitch, "competition").table?.rows).toEqual([
       ["First", "Direct Competitor", null, null],
       ["Second", null, "₱380", null],
+      ["Third", null, "₱149.50", null],
     ]);
     // The draft's starting milestones, by deadline (none have one: in their order).
     expect(
@@ -155,9 +164,15 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
     const team = await newTeam();
     const plan = await draft(team);
     await setAnswer(plan.id, "P.04.1", "As saved");
-    await db
+    const [kept] = await db
       .insert(competitors)
-      .values({ validationId: team.validationId, name: "Kept", sortOrder: 0 });
+      .values({
+        validationId: team.validationId,
+        name: "Kept",
+        sortOrder: 0,
+        typicalPrice: 149.5,
+      })
+      .returning({ id: competitors.id });
     clock += 60_000;
     const saved = await call(
       "POST",
@@ -170,6 +185,10 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
     expect(saved.status).toBe(201);
     const version = planVersionSummarySchema.parse(await saved.json());
     await setAnswer(plan.id, "P.04.1", "Changed since");
+    await db
+      .update(competitors)
+      .set({ typicalPrice: 150 })
+      .where(eq(competitors.id, kept?.id ?? ""));
     await db.insert(competitors).values({
       validationId: team.validationId,
       name: "Added later",
@@ -206,15 +225,17 @@ describe("P12 GET /api/v1/plans/{planId}/pitch-deck", () => {
       team.memberCookie,
       `variant=five&versionId=${version.id}`,
     );
-    expect(
-      slideOf(five, "competition").table?.rows.map((row) => row[0]),
-    ).toEqual(["Kept"]);
+    // The snapshot's price, typed, as the latest deck shows its own.
+    expect(slideOf(five, "competition").table?.rows).toEqual([
+      ["Kept", null, "₱149.50", null],
+    ]);
 
     const latest = await deck(plan.id, team.memberCookie, "variant=five");
     expect(slideOf(latest, "problem").bullets[0]?.text).toBe("Changed since");
-    expect(
-      slideOf(latest, "competition").table?.rows.map((row) => row[0]),
-    ).toEqual(["Added later", "Kept"]);
+    expect(slideOf(latest, "competition").table?.rows).toEqual([
+      ["Added later", null, null, null],
+      ["Kept", null, "₱150", null],
+    ]);
   });
 
   test("no edit links for a Viewer or an archived idea; an archived plan keeps Edit in validation", async () => {

@@ -1,4 +1,9 @@
-import { formatCheckName, formatCount, formatMonths, i18n } from "@moonx/i18n";
+import {
+  formatCheckName,
+  formatInteger,
+  formatMonths,
+  i18n,
+} from "@moonx/i18n";
 import type { CheckResult, FauBreakdown, MetricValue } from "@moonx/schemas";
 import {
   Flex,
@@ -121,7 +126,8 @@ export function MissingCheckRows({
 
 /**
  * The F/A/U of every item in one line (design-spec 6.5, s19-decision.html): each kind's
- * moon, name and count, Unknown and Unclassified in amber, Empty too.
+ * moon, name and count, Unknown and Unclassified in amber, Empty too. The Facts whose
+ * research log was deleted are counted among the Facts, and how many follows (6.0.3).
  */
 export function FauCounts({ fau }: { fau: FauBreakdown }) {
   const { t } = useTranslation(["common"]);
@@ -150,8 +156,11 @@ export function FauCounts({ fau }: { fau: FauBreakdown }) {
           <Text variant="body-sm" tone={count.notice ? "notice" : "secondary"}>
             {`${t(`common:fauState.${count.label}`)} `}
             <Text variant="number" tone={count.notice ? "notice" : "primary"}>
-              {formatCount(count.value)}
+              {formatInteger(count.value)}
             </Text>
+            {count.state === "fact" &&
+              fau.factNoEvidence > 0 &&
+              ` ${t("common:fauLabel.noEvidenceCount", { count: fau.factNoEvidence })}`}
           </Text>
         </Flex>
       ))}

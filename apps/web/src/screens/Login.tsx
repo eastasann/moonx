@@ -47,13 +47,12 @@ interface Failure {
 /** The screen's words for a code (design-spec 6.16 2「状態とエラー」, SDD 5.4). */
 function useLoginMessages(): Partial<Record<string, string>> {
   const { t } = useTranslation(["errors"]);
-  const invalidInvitation = t("errors:INVITATION_INVALID");
   return {
     INVALID_EMAIL_OR_PASSWORD: t("errors:INVALID_EMAIL_OR_PASSWORD"),
     ACCOUNT_SUSPENDED: t("errors:ACCOUNT_SUSPENDED"),
     // A Google sign-up refused by the API, or a Google account with no moonx account.
-    INVITATION_REQUIRED: invalidInvitation,
-    signup_disabled: invalidInvitation,
+    INVITATION_REQUIRED: t("errors:INVITATION_REQUIRED"),
+    signup_disabled: t("errors:signup_disabled"),
   };
 }
 

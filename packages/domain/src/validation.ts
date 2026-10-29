@@ -3,6 +3,7 @@ import {
   type CheckMissing,
   type CheckResult,
   type CheckState,
+  type ConditionAnswer,
   type Confidence,
   costCategorySchema,
   type EconomicsField,
@@ -194,6 +195,58 @@ export const isQuestionShown = (
     const text = answerText(answers, key);
     return text !== null && values.includes(text);
   });
+};
+
+type ConditionQuestion = Pick<TemplateQuestion, "key" | "displayCondition">;
+
+/**
+ * The answers outside `own` (a section of 11, an item of 21) that the display conditions
+ * of its questions name, one per question ID: in the order of `version` (all the
+ * questions of the version, in template order), then any the version lacks by ID. A form
+ * shows and counts with these beside its own answers, as its hub reads all of them
+ * (design-spec 6.2).
+ */
+export const conditionAnswersOutside = (
+  own: readonly ConditionQuestion[],
+  version: readonly ConditionQuestion[],
+  answers: ShownAnswers,
+): ConditionAnswer[] => {
+  const ownKeys = new Set(own.map((question) => question.key));
+  const named = new Set(
+    own.flatMap((question) =>
+      Object.keys(question.displayCondition ?? {}).filter(
+        (key) => !ownKeys.has(key),
+      ),
+    ),
+  );
+  const inVersion = version
+    .map((question) => question.key)
+    .filter((key) => named.has(key));
+  const elsewhere = [...named]
+    .filter((key) => !inVersion.includes(key))
+    .toSorted();
+  return [...inVersion, ...elsewhere].map((key) => ({
+    questionKey: key,
+    text: answers.get(key)?.text ?? null,
+  }));
+};
+
+/**
+ * The questions of `own` (a section of 11) that a display condition of a question outside
+ * it names, in template order: 11 shows "Answer {title} to see the next questions" under
+ * them too (design-spec 6.2).
+ */
+export const decidesElsewhere = (
+  own: readonly ConditionQuestion[],
+  version: readonly ConditionQuestion[],
+): string[] => {
+  const ownKeys = new Set(own.map((question) => question.key));
+  const named = new Set(
+    version
+      .filter((question) => !ownKeys.has(question.key))
+      .flatMap((question) => Object.keys(question.displayCondition ?? {})),
+  );
+  return own.map((question) => question.key).filter((key) => named.has(key));
 };
 
 const questionItems = (

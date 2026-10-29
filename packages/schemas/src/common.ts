@@ -391,6 +391,17 @@ export const templateSectionSchema = z.object({
 });
 export type TemplateSection = z.infer<typeof templateSectionSchema>;
 
+/**
+ * An answer outside a section of 11 (an item of 21) that a display condition of one of
+ * its questions names: only the text the condition reads, null when unanswered (SDD 5.7
+ * ConditionAnswer).
+ */
+export const conditionAnswerSchema = z.object({
+  questionKey: z.string(),
+  text: z.string().nullable(),
+});
+export type ConditionAnswer = z.infer<typeof conditionAnswerSchema>;
+
 const templateVersionRefSchema = z.object({
   versionId: uuidSchema,
   versionNumber: z.int().positive(),

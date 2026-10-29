@@ -14,12 +14,14 @@ import {
   researchLogEntries,
   templateVersions,
   validationAnswers,
+  validations,
 } from "@moonx/db";
 import {
   errorBodySchema,
   evidenceRemovalSchema,
   evidenceResultSchema,
   ideaDetailSchema,
+  type TemplateFile,
   validationAnswerSchema,
   validationHomeSchema,
   validationQuestionsSchema,
@@ -394,6 +396,96 @@ describe("V2 GET /api/v1/validations/{validationId}/questions/{sectionKey}", () 
         ),
       );
       expect({ key, status: response.status }).toEqual({ key, status: 404 });
+    }
+  });
+
+  test("reads the answers in other sections its display conditions name, as 13 counts them", async () => {
+    const team = await teamWithIdea();
+    const file: TemplateFile = await Bun.file(
+      new URL("../../../data/templates/bcdx/validation.json", import.meta.url),
+    ).json();
+    // 01 PROOF shows once 02 OCEAN is Red; 10 WHY_WORK once 01 WHO is "Offices".
+    const condition: Record<string, Record<string, string[]>> = {
+      "V.01.PROOF": { "V.02.OCEAN": ["Red"] },
+      "V.10.WHY_WORK": { "V.01.WHO": ["Offices"] },
+    };
+    const imported = await importTemplateFile(db, "validation", {
+      ...file,
+      sections: file.sections.map((section) => ({
+        ...section,
+        questions: section.questions.map((question) => ({
+          ...question,
+          displayCondition:
+            condition[question.key] ?? question.displayCondition,
+        })),
+      })),
+    });
+    const [pinned] = await db
+      .select({ templateVersionId: validations.templateVersionId })
+      .from(validations)
+      .where(eq(validations.id, team.validationId));
+    if (pinned === undefined) throw new Error("No validation");
+    await db
+      .update(validations)
+      .set({ templateVersionId: imported.versionId })
+      .where(eq(validations.id, team.validationId));
+    const read = async (sectionKey: string) => {
+      const response = await app.handle(
+        apiRequest(
+          "GET",
+          `/api/v1/validations/${team.validationId}/questions/${sectionKey}`,
+          { cookie: team.viewerCookie },
+        ),
+      );
+      expect(response.status).toBe(200);
+      return validationQuestionsSchema.parse(await response.json());
+    };
+    const hubOf = async (sectionKey: string) =>
+      (await home(team)).sections.find((s) => s.key === sectionKey);
+    const hiddenOf = (view: Awaited<ReturnType<typeof read>>, key: string) =>
+      view.answers.find((a) => a.questionKey === key)?.hidden;
+    try {
+      await saved(
+        await saveAnswer(team, "V.01.WHO", { text: "Offices", lockVersion: 0 }),
+      );
+      const before = await read("01");
+      // Unanswered: null, which shows nothing on the condition.
+      expect(before.conditionAnswers).toEqual([
+        { questionKey: "V.02.OCEAN", text: null },
+      ]);
+      // 01 WHO decides 10 WHY_WORK: 11 shows "Answer WHO to see …" under it.
+      expect(before.decidesElsewhere).toEqual(["V.01.WHO"]);
+      expect(hiddenOf(before, "V.01.PROOF")).toBe(true);
+      expect(await hubOf("01")).toMatchObject({ answered: 1, total: 9 });
+
+      await saved(
+        await saveAnswer(team, "V.02.OCEAN", { text: "Red", lockVersion: 0 }),
+      );
+      const after = await read("01");
+      expect(after.conditionAnswers).toEqual([
+        { questionKey: "V.02.OCEAN", text: "Red" },
+      ]);
+      expect(hiddenOf(after, "V.01.PROOF")).toBe(false);
+      expect(await hubOf("01")).toMatchObject({ answered: 1, total: 10 });
+
+      const market = await read("02");
+      expect(market.conditionAnswers).toEqual([]);
+      expect(market.decidesElsewhere).toEqual(["V.02.OCEAN"]);
+      const last = await read("10");
+      expect(last.conditionAnswers).toEqual([
+        { questionKey: "V.01.WHO", text: "Offices" },
+      ]);
+      expect(last.decidesElsewhere).toEqual([]);
+      expect(hiddenOf(last, "V.10.WHY_WORK")).toBe(false);
+      expect(await hubOf("10")).toMatchObject({ total: 6 });
+    } finally {
+      await db
+        .update(validations)
+        .set({ templateVersionId: pinned.templateVersionId })
+        .where(eq(validations.id, team.validationId));
+      await db
+        .delete(templateVersions)
+        .where(eq(templateVersions.id, imported.versionId));
     }
   });
 });

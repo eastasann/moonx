@@ -1,5 +1,5 @@
 import { hasText, isQuestionShown } from "@moonx/domain";
-import { formatMoney } from "@moonx/i18n";
+import { formatInputMoney } from "@moonx/i18n";
 import type { SharedSelfAnalysis } from "@moonx/schemas";
 import {
   Avatar,
@@ -87,9 +87,7 @@ function AnswerText({
           empty
         ) : (
           <Text variant="number" elementType="p">
-            {formatMoney(amount, currency, {
-              cents: !Number.isInteger(amount),
-            })}
+            {formatInputMoney(amount, currency)}
           </Text>
         )}
       </Stack>
@@ -147,6 +145,13 @@ function SharedDetail({ userId }: { userId: string }) {
     );
   }
   const shared = query.data;
+  // A display condition may name a question of another section: it reads every answer,
+  // as 10 and 11 count (6.2).
+  const allAnswers = new Map(
+    shared.sections.flatMap((section) =>
+      section.answers.map((answer) => [answer.questionKey, answer] as const),
+    ),
+  );
   return (
     <Stack gap="space-400">
       <Flex gap="space-200" alignItems="center">
@@ -161,12 +166,9 @@ function SharedDetail({ userId }: { userId: string }) {
         </Stack>
       </Flex>
       {shared.sections.map((section) => {
-        const answers = new Map(
-          section.answers.map((answer) => [answer.questionKey, answer]),
-        );
         // A question its display condition hides is not read, as on 11 (6.2).
         const questions = section.questions.filter((question) =>
-          isQuestionShown(question, answers),
+          isQuestionShown(question, allAnswers),
         );
         return (
           <section key={section.key} aria-label={section.title}>
@@ -181,7 +183,7 @@ function SharedDetail({ userId }: { userId: string }) {
                 )}
               </Stack>
               {questions.map((question) => {
-                const answer = answers.get(question.key);
+                const answer = allAnswers.get(question.key);
                 const label = questionLabel(question.key, question.title);
                 const count = answer?.commentCount ?? 0;
                 return (

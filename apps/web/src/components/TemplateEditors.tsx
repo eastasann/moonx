@@ -27,7 +27,7 @@ import {
 } from "@moonx/ui-web";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { z } from "zod";
 import {
@@ -397,6 +397,7 @@ export function QuestionEditor({
     drops: QuestionOptions["kind"];
   } | null>(null);
   const isReadOnly = !isOnline;
+  const publishedNoteId = useId();
   const { values } = fields;
   const setType = (answerType: AnswerType) =>
     // Sent with the settings cleared: AD4 drops the old type's (design-spec 6.17). The
@@ -405,16 +406,22 @@ export function QuestionEditor({
   return (
     <Stack gap="space-300">
       <SaveFailureNote itemKey={target.key} />
-      <TextField
-        {...textProps(fields, "key", isReadOnly || question.isKeyPublished)}
-        label={t("admin:version.question.key")}
-        isRequired
-        description={
-          question.isKeyPublished
-            ? t("admin:version.question.keyPublished")
-            : t(`admin:version.question.keyForm.${version.kind}`)
-        }
-      />
+      <Stack gap="space-50">
+        <TextField
+          {...textProps(fields, "key", isReadOnly || question.isKeyPublished)}
+          label={t("admin:version.question.key")}
+          isRequired
+          description={t(`admin:version.question.keyForm.${version.kind}`)}
+          aria-describedby={
+            question.isKeyPublished ? publishedNoteId : undefined
+          }
+        />
+        {question.isKeyPublished && (
+          <Text id={publishedNoteId} variant="caption" tone="secondary">
+            {t("admin:version.question.keyPublished")}
+          </Text>
+        )}
+      </Stack>
       <TextField
         {...textProps(fields, "title", isReadOnly)}
         label={t("admin:version.question.title")}

@@ -13,6 +13,7 @@ import {
   type Key,
   type Selection,
 } from "react-aria-components";
+import { FixedLocale } from "../internal/FixedLocale";
 import { ListPaneContext } from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
 import * as styles from "./ListView.css";
@@ -96,21 +97,24 @@ export function ListView<T extends object>({
     />
   );
   return (
-    <ItemContext.Provider
-      value={{
-        isActionable: props.onAction !== undefined || selectionMode !== "none",
-        isCard,
-      }}
-    >
-      {title === undefined ? (
-        list
-      ) : (
-        <div className={`${styles.titled} ${insets}`}>
-          <div className={styles.title}>{title}</div>
-          {list}
-        </div>
-      )}
-    </ItemContext.Provider>
+    <FixedLocale>
+      <ItemContext.Provider
+        value={{
+          isActionable:
+            props.onAction !== undefined || selectionMode !== "none",
+          isCard,
+        }}
+      >
+        {title === undefined ? (
+          list
+        ) : (
+          <div className={`${styles.titled} ${insets}`}>
+            <div className={styles.title}>{title}</div>
+            {list}
+          </div>
+        )}
+      </ItemContext.Provider>
+    </FixedLocale>
   );
 }
 

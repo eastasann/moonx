@@ -2,8 +2,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { IdeaDetail, Me } from "@moonx/schemas";
 import { devices, type Page } from "@playwright/test";
-import { PWA_ORIGIN, PWA_WEB_DIR } from "./env";
-import { expect, operatorInvited, test } from "./fixtures";
+import { PWA_ORIGIN, PWA_SENTRY_DSN, PWA_WEB_DIR } from "./env";
+import { DEMO_PASSWORD, demo, expect, operatorInvited, test } from "./fixtures";
 
 // SDD 10章「PWA と配信」 in the browser, against the API serving make build-web's output
 // (playwright.config.ts, project pwa). What the API answers is apps/api/src/web.test.ts.
@@ -178,8 +178,11 @@ test.describe("the manifest and the icons (ADR-031)", () => {
     const page = await request.get("/w/0b6e4f0e-3c9a-4b8e-9d55-6a1f0c2b7e11");
     expect(page.headers()["content-type"]).toBe("text/html; charset=utf-8");
     expect(page.headers()["cache-control"]).toBe("no-cache");
-    expect(page.headers()["content-security-policy"]).toContain(
-      "script-src 'self'",
+    const csp = page.headers()["content-security-policy"]?.split("; ") ?? [];
+    expect(csp).toContain("script-src 'self'");
+    // Where the Web's Sentry sends its events: the origin of WEB_SENTRY_DSN.
+    expect(csp).toContain(
+      `connect-src 'self' ${new URL(PWA_SENTRY_DSN).origin}`,
     );
     expect(page.headers()["x-content-type-options"]).toBe("nosniff");
     const html = await page.text();
@@ -253,6 +256,168 @@ test.describe("the CSP of SDD 7.2 on the Web's pages", () => {
     await page.goto(`/w/${workspace.id}`);
     await expect(dashboard(page)).toBeVisible();
     expect(await refused()).toEqual([]);
+  });
+});
+
+/** What the checks read of an event the Web's Sentry sends (an envelope's `event` item). */
+interface SentryEvent {
+  event_id: string;
+  environment?: string;
+  release?: string;
+  request?: { url?: string };
+  user?: { id?: string };
+  exception?: { values?: { type?: string }[] };
+}
+
+/**
+ * Receives what the page's Sentry sends to PWA_SENTRY_DSN, answered as Sentry's ingest
+ * answers, and returns the events as they arrive. A request the CSP refuses never gets
+ * this far, so each event here also passed connect-src (SDD 7.2).
+ */
+async function sentryEvents(page: Page) {
+  const events: SentryEvent[] = [];
+  await page.route(`${new URL(PWA_SENTRY_DSN).origin}/**`, async (route) => {
+    // An envelope: its header, then each item's header and payload, a line each.
+    const [, ...lines] = (route.request().postData() ?? "").split("\n");
+    for (let i = 0; i + 1 < lines.length; i += 2) {
+      const item = JSON.parse(lines[i] ?? "") as { type?: string };
+      if (item.type === "event") {
+        events.push(JSON.parse(lines[i + 1] ?? "") as SentryEvent);
+      }
+    }
+    await route.fulfill({
+      json: {},
+      headers: { "access-control-allow-origin": "*" },
+    });
+  });
+  return events;
+}
+
+/**
+ * The event whose Ref the page shows, once it has arrived: a Ref is the first 8
+ * characters of the event's id (SDD 8.2).
+ */
+async function eventShown(page: Page, events: SentryEvent[]) {
+  const ref = page.getByText(/^Ref: [0-9a-f]{8}$/);
+  await expect(ref).toBeVisible();
+  const id = ((await ref.textContent()) ?? "").slice("Ref: ".length);
+  const shown = () => events.find(({ event_id }) => event_id.startsWith(id));
+  await expect.poll(shown).toBeDefined();
+  return shown() as SentryEvent;
+}
+
+// client.tsx starts Sentry before the first render (SDD 11章), in the build the API
+// serves: happy-dom cannot run that entry (SDD 10章). Each screen fails on an answer of
+// the API's it cannot read, so the Web's own code throws, as a defect of it would. One
+// failure is one event: the screen shows the Ref of each one sent.
+test.describe("Sentry from the first screen (SDD 11章)", () => {
+  test("a failure to render arrives with the environment, the release and the URL bare, and the screen shows its Ref", async ({
+    page,
+  }) => {
+    const events = await sentryEvents(page);
+    const token = "e2eSecretInvitationToken";
+    await page.route(`**/api/v1/invitations/by-token/${token}`, (route) =>
+      route.fulfill({ contentType: "application/json", body: "null" }),
+    );
+    await page.goto(`/invite/${token}?from=mail#sign-up`);
+
+    const event = await eventShown(page, events);
+    expect(event).toMatchObject({
+      // The pwa API's APP_ENV (the root .env) and make test-e2e's build-web SHA=dev.
+      environment: "local",
+      release: "dev",
+      request: { url: `${PWA_ORIGIN}/invite/[redacted]` },
+      exception: { values: [{ type: "TypeError" }] },
+    });
+    expect(event.user).toBeUndefined();
+    // Not in the URL nor anywhere else (SDD 7.2「個人情報」).
+    expect(JSON.stringify(event)).not.toContain(token);
+    expect(JSON.stringify(event)).not.toContain("from=mail");
+    expect(events.map(({ event_id }) => event_id)).toEqual([event.event_id]);
+  });
+
+  test("while signed in an event names the user by id alone, and after Log out nobody", async ({
+    page,
+    signIn,
+  }) => {
+    const events = await sentryEvents(page);
+    // A demo user of 8.1: every account this suite invites counts against the
+    // operator's hourly limit on invitations (SDD 7.2), and Log out ends only the
+    // session of this page. Their last workspace (else BCDX, where they land), so
+    // that U2 records nothing that moves where other tests signing in as them land.
+    const me = await signIn(demo.otherMember, DEMO_PASSWORD);
+    const workspace = (
+      me.memberships.find(
+        ({ workspace }) => workspace.id === me.lastWorkspaceId,
+      ) ?? me.memberships.find(({ workspace }) => !workspace.isPersonal)
+    )?.workspace;
+    if (workspace === undefined) throw new Error("No workspace");
+    await page.route(
+      `**/api/v1/workspaces/${workspace.id}/dashboard/ideas`,
+      (route) => route.fulfill({ json: {} }),
+    );
+    await page.goto(`/w/${workspace.id}`);
+
+    // The Ideas block fails alone (BlockBoundary); the screen stays.
+    const signedIn = await eventShown(page, events);
+    await expect(
+      page.getByRole("heading", { level: 1, name: workspace.name }),
+    ).toBeVisible();
+    expect(signedIn.user).toEqual({ id: me.id });
+    expect(events.map(({ event_id }) => event_id)).toEqual([signedIn.event_id]);
+
+    // 1 asks who is signed in, and fails on an answer it cannot read.
+    await page.route("**/api/v1/me", (route) =>
+      route.request().method() === "GET"
+        ? route.fulfill({ json: {} })
+        : route.continue(),
+    );
+    await page
+      .getByRole("button", { name: me.displayName, exact: true })
+      .click();
+    await page.getByRole("menuitem", { name: "Log out" }).click();
+    await expect(page).toHaveURL(`${PWA_ORIGIN}/`);
+
+    const signedOut = await eventShown(page, events);
+    expect(signedOut.request).toEqual({ url: `${PWA_ORIGIN}/` });
+    expect(signedOut.user).toBeUndefined();
+    expect(events.map(({ event_id }) => event_id)).toEqual([
+      signedIn.event_id,
+      signedOut.event_id,
+    ]);
+  });
+
+  test("a signed-in page that fails as it first renders names the user too", async ({
+    page,
+    signIn,
+  }) => {
+    const events = await sentryEvents(page);
+    // A demo user of 8.1: every account this suite invites counts against the
+    // operator's hourly limit on invitations (SDD 7.2), and Log out ends only the
+    // session of this page. Their last workspace (else BCDX, where they land), so
+    // that U2 records nothing that moves where other tests signing in as them land.
+    const me = await signIn(demo.viewer, DEMO_PASSWORD);
+    const workspace = (
+      me.memberships.find(
+        ({ workspace }) => workspace.id === me.lastWorkspaceId,
+      ) ?? me.memberships.find(({ workspace }) => !workspace.isPersonal)
+    )?.workspace;
+    if (workspace === undefined) throw new Error("No workspace");
+    // The user, read before anything of the workspace renders, with a name the frame
+    // cannot draw: the failure comes in the page's first render with the user known.
+    await page.route("**/api/v1/me", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      const response = await route.fetch();
+      await route.fulfill({
+        response,
+        json: { ...((await response.json()) as Me), displayName: null },
+      });
+    });
+    await page.goto(`/w/${workspace.id}`);
+
+    const event = await eventShown(page, events);
+    expect(event.user).toEqual({ id: me.id });
+    expect(events.map(({ event_id }) => event_id)).toEqual([event.event_id]);
   });
 });
 

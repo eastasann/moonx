@@ -4,7 +4,14 @@ import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { SLOW_LOADING_MS } from "../components/states";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import { anaRef, executionItem, ideaId, planHome, planId } from "../test/plans";
 import { home as ideaHome } from "../test/validation";
@@ -107,32 +114,54 @@ function executionApi({
   items = everything(),
   archived = false,
   patch,
+  create,
+  remove,
   history = [],
   members = true,
+  holdReads,
 }: {
-  me?: Me;
+  /** A function is asked at each call: the user may change behind the screen. */
+  me?: Me | (() => Me);
   items?: ExecutionItem[];
-  archived?: boolean;
+  /** A function is asked at each call: the plan may be archived behind the screen. */
+  archived?: boolean | (() => boolean);
   /** Answers P10 PATCH instead of keeping what it sends. */
   patch?: () => Response;
+  /** Answers P9 POST; undefined makes the item and keeps it. */
+  create?: () => Response | undefined;
+  /** Answers P10 DELETE; undefined deletes. */
+  remove?: () => Response | undefined;
   history?: HistoryEntry[];
   /** Whether W2 answers; else it never does. */
   members?: boolean;
+  /** While it returns true, every read waits for good: the screen is not read again. */
+  holdReads?: () => boolean;
 } = {}) {
+  const meNow = () => (typeof me === "function" ? me() : me);
+  const archivedNow = () =>
+    typeof archived === "function" ? archived() : archived;
   return stubApi((call: Call) => {
     const { method, path } = call;
-    if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
+    if (method === "GET" && holdReads?.() === true) {
+      return new Promise<Response>(() => {});
+    }
+    if (method === "GET" && path === "/api/v1/me")
+      return Response.json(meNow());
+    if (method === "PATCH" && path === "/api/v1/me") {
+      return Response.json(meNow());
+    }
     if (method === "GET" && path === `/api/v1/ideas/${ideaId}/validation`) {
       return Response.json(ideaHome);
     }
     if (method === "GET" && path === api) {
-      return Response.json(planHome({ archived }));
+      return Response.json(planHome({ archived: archivedNow() }));
     }
     if (method === "GET" && path === `${api}/execution-items`) {
       return Response.json({ items });
     }
     if (method === "POST" && path === `${api}/execution-items`) {
+      const answered = create?.();
+      if (answered !== undefined) return answered;
       const body = call.body as Partial<ExecutionItem> & {
         type: ExecutionItem["type"];
         title: string;
@@ -165,6 +194,8 @@ function executionApi({
           });
     }
     if (one !== null && method === "DELETE") {
+      const refused = remove?.();
+      if (refused !== undefined) return refused;
       const index = items.findIndex(({ id }) => id === one[1]);
       if (index === -1) return undefined;
       items.splice(index, 1);
@@ -703,5 +734,238 @@ describe("22 Execution (design-spec 6.13)", () => {
         target: `execution_item:${decision.id}`,
       }),
     );
+  });
+  /** Opens New open question on its tab and types one. */
+  const newQuestion = async (user: ReturnType<typeof userEvent.setup>) => {
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "Write down what you still need to find out, and why it matters.",
+    });
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "Add open question",
+      })[0] as Element,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "New open question",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Open Question/ }),
+      "Is the plaza busy on Sundays?",
+    );
+    return dialog;
+  };
+
+  test("a new item and an unexpected failure: the small dialog with its Ref (a dialog's rule, 6.0.6); Close closes New", async () => {
+    const user = userEvent.setup();
+    executionApi({ create: () => apiError(500, "INTERNAL") });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    const small = await screen.findByRole("alertdialog", {
+      name: /Something went wrong/,
+    });
+    // The request id's first 8 characters (SDD 8.2), not the whole id.
+    expect(small.textContent).toContain("Ref: 8f14e45f");
+    expect(small.textContent).not.toContain("8f14e45f-");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    await user.click(within(small).getByRole("button", { name: "Close" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New open question" }),
+      ).toBeNull(),
+    );
+  });
+
+  test("a new item refused for a field: Couldn't save with the reason, and Check the format under the field", async () => {
+    const user = userEvent.setup();
+    executionApi({
+      create: () =>
+        apiError(422, "VALIDATION_FAILED", {
+          details: [{ path: "whyItMatters", message: "Too long" }],
+        }),
+    });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("Check the format");
+    const why = within(dialog).getByRole("textbox", { name: "Why It Matters" });
+    const described = (why.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toContain("Check the format");
+  });
+
+  test("a new item refused once the user is a Viewer: 22 reads again, read only", async () => {
+    const user = userEvent.setup();
+    let me = ana;
+    executionApi({
+      me: () => me,
+      create: () => {
+        me = as("viewer");
+        return apiError(403, "FORBIDDEN");
+      },
+    });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    // Read again as a Viewer: + Add goes; the dialog stays to read, with what was typed
+    // and why (design-spec 6.10・6.13), until it is closed.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Add open question" }),
+      ).toBeNull(),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "New open question" }),
+    ).toBeTruthy();
+    const question = within(dialog).getByRole("textbox", {
+      name: /Open Question/,
+    });
+    expect((question as HTMLInputElement).value).toBe(
+      "Is the plaza busy on Sundays?",
+    );
+    expect(question.hasAttribute("readonly")).toBe(true);
+    const alert = within(dialog).getByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("You don't have access to this");
+    expect(
+      within(alert)
+        .getByRole("button", { name: "Retry" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      within(dialog)
+        .getByRole("button", { name: "Add" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New open question" }),
+      ).toBeNull(),
+    );
+  });
+
+  test("a new item refused as the plan is archived meanwhile: 22 reads as archived; the dialog keeps what was typed and why", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    executionApi({
+      archived: () => archived,
+      create: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(
+      screen.getByRole("dialog", { name: "New open question" }),
+    ).toBeTruthy();
+    const question = within(dialog).getByRole("textbox", {
+      name: /Open Question/,
+    });
+    expect((question as HTMLInputElement).value).toBe(
+      "Is the plaza busy on Sundays?",
+    );
+    expect(question.hasAttribute("readonly")).toBe(true);
+    expect(within(dialog).getByRole("alert").textContent).toContain(
+      "It's archived",
+    );
+  });
+
+  test("a delete refused as the plan is archived: the reason without Retry, then 22 reads as archived (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    executionApi({
+      archived: () => archived,
+      remove: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(`${base}?item=${setup.id}`);
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "Legal / company setup",
+    });
+    const detailMenu = screen.getAllByRole("button", {
+      name: "More for Legal / company setup",
+    });
+    await user.click(detailMenu.at(-1) as Element);
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const question = await screen.findByRole("alertdialog", {
+      name: "Delete this milestone?",
+    });
+    const toast = await toastAfter("Couldn't save. It's archived.", () =>
+      user.click(within(question).getByRole("button", { name: "Delete" })),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: "Goal" })).toBeNull(),
+    );
+    expect(screen.queryByRole("button", { name: "Add milestone" })).toBeNull();
+  });
+  /**
+   * New open question refused for good: still open, read only, with what was typed and
+   * Couldn't save with `reason`; its Add and Retry cannot send again.
+   */
+  const expectLocked = (dialog: HTMLElement, reason: string) => {
+    const question = within(dialog).getByRole("textbox", {
+      name: /Open Question/,
+    });
+    expect((question as HTMLInputElement).value).toBe(
+      "Is the plaza busy on Sundays?",
+    );
+    expect(question.hasAttribute("readonly")).toBe(true);
+    const alert = within(dialog).getByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain(reason);
+    expect(
+      within(alert)
+        .getByRole("button", { name: "Retry" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      within(dialog)
+        .getByRole("button", { name: "Add" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  };
+
+  test("a new item refused as gone (404): the dialog locks at once, with what was typed and why; nothing more is sent", async () => {
+    const user = userEvent.setup();
+    const calls = executionApi({ create: () => apiError(404, "NOT_FOUND") });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(await within(dialog).findByText("It no longer exists")).toBeTruthy();
+    expectLocked(dialog, "It no longer exists");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(sent(calls, "POST", `${api}/execution-items`)).toHaveLength(1);
+  });
+
+  test("a new item refused as archived: the dialog locks at once, before the screen read again answers", async () => {
+    const user = userEvent.setup();
+    let refused = false;
+    const calls = executionApi({
+      holdReads: () => refused,
+      create: () => {
+        refused = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(await within(dialog).findByText("It's archived")).toBeTruthy();
+    expectLocked(dialog, "It's archived");
+    expect(screen.queryByText("This plan is archived")).toBeNull();
+    expect(sent(calls, "POST", `${api}/execution-items`)).toHaveLength(1);
   });
 });

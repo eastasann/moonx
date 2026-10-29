@@ -1,4 +1,5 @@
 import type {
+  ConditionAnswer,
   Me,
   SelfAnalysisAnswer,
   SelfAnalysisHome,
@@ -84,6 +85,24 @@ export const answer = (
   updatedBy: null,
   commentCounts: [],
   ...extra,
+});
+
+/**
+ * S2 of `section` (SDD 5.8): `answers` in its questions' order, and what it reads of the
+ * other sections' display conditions (none unless `outside` says so).
+ */
+export const sectionRead = (
+  section: TemplateSection,
+  answers: readonly SelfAnalysisAnswer[],
+  outside: {
+    conditionAnswers?: ConditionAnswer[];
+    decidesElsewhere?: string[];
+  } = {},
+) => ({
+  section,
+  answers,
+  conditionAnswers: outside.conditionAnswers ?? [],
+  decidesElsewhere: outside.decidesElsewhere ?? [],
 });
 
 /** S1 for Ana: in progress, 1 of 3 answered, shared with BCDX. */

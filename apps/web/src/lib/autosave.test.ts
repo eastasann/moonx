@@ -152,6 +152,47 @@ describe("when a save fails", () => {
     expect(statusOf()).toBe("saved");
   });
 
+  test("a rate limit (429): nothing goes before its retryAfterSeconds, then it is sent", async () => {
+    let limited = true;
+    const { target, sent } = targetOf(async () => {
+      if (limited) {
+        limited = false;
+        throw refused(429, "RATE_LIMITED", { retryAfterSeconds: 45 });
+      }
+      return 2;
+    });
+    autosave.change(target, 1, { name: "A" });
+    autosave.flush("idea:a");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statusOf()).toBe("retrying");
+    // Longer than every backoff step but the wait: only the answer's wait counts.
+    await vi.advanceTimersByTimeAsync(45_000 - 1);
+    expect(sent).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(sent).toHaveLength(2);
+    expect(statusOf()).toBe("saved");
+  });
+
+  test("a 500 is sent again by itself, as for the network (ADR-021, SDD 8.2)", async () => {
+    let failures = 1;
+    const onRejected = vi.fn();
+    autosave = createAutosave({ onRejected, isBrowserOnline: () => online });
+    stop();
+    stop = autosave.start();
+    const { target, sent } = targetOf(async () => {
+      if (failures-- > 0) throw refused(500, "INTERNAL");
+      return 2;
+    });
+    autosave.change(target, 1, { name: "A" });
+    autosave.flush("idea:a");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statusOf()).toBe("retrying");
+    await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[0] ?? 0);
+    expect(sent).toHaveLength(2);
+    expect(statusOf()).toBe("saved");
+    expect(onRejected).not.toHaveBeenCalled();
+  });
+
   test("on the network again and again: unreachable, as offline, until one passes", async () => {
     let failing = true;
     const { target } = targetOf(async () => {

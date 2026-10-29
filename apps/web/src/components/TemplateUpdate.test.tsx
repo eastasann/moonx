@@ -438,6 +438,25 @@ describe("M8 Update template (design-spec 6.0.7)", () => {
     ).toBe("None");
   });
 
+  test("its counts group their thousands and are never cut to a badge's 99+ (design-spec 1.2)", async () => {
+    migrationApi({
+      t1: () =>
+        Response.json({ ...preview, carried: 1234, addedQuestions: 120 }),
+    });
+    renderApp(ideaPath(`?modal=update-template&about=${about}`));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Update template",
+    });
+    await within(dialog).findByText("Move from v1 to v3 of the template.");
+    expect(
+      within(dialog).getByText("Answers carried over").nextElementSibling
+        ?.textContent,
+    ).toBe("1,234");
+    expect(
+      within(dialog).getByText("New questions").nextElementSibling?.textContent,
+    ).toBe("120");
+  });
+
   test.each([
     [
       "a self-analysis",

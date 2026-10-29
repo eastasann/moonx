@@ -1,6 +1,7 @@
 import type { Me } from "@moonx/schemas";
+import { ToastContainer, ToastQueue } from "@moonx/ui-web";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 import { createAppRouter } from "../router";
 
@@ -97,4 +98,53 @@ export function renderApp(path: string) {
   });
   render(<RouterProvider router={router} />, { container: document });
   return router;
+}
+
+/**
+ * The toast saying `text` that `act` brings up. Toasts outlive the test that showed them
+ * (the queue is the app's own, and a toast stays for seconds), so one an earlier test
+ * left is not taken for it.
+ */
+export async function toastAfter(
+  text: string,
+  act: () => Promise<unknown>,
+): Promise<HTMLElement> {
+  const before = new Set(screen.queryAllByText(text));
+  await act();
+  const words = await waitFor(() => {
+    const added = screen
+      .queryAllByText(text)
+      .find((element) => !before.has(element));
+    if (added === undefined) throw new Error(`No new toast says "${text}"`);
+    return added;
+  });
+  const toast = words.closest<HTMLElement>('[role="alertdialog"]');
+  if (toast === null) throw new Error(`"${text}" is not in a toast`);
+  return toast;
+}
+
+/** The page's toast region, named by how many toasts it holds (design-spec 4.5 Toast). */
+export const toastRegion = () =>
+  screen.getByRole("region", { name: /^\d+ notifications?\.$/ });
+
+/**
+ * The class of the toast region placed above the TabBar, and of one at the bottom edge
+ * (design-spec 4.5 Toast): happy-dom applies no style sheet, so the placement shows as
+ * the class. Probe after the screen under test is gone (`cleanup`): the probe's own
+ * region leaves the presses on a page rendered after it dead.
+ */
+export function toastPlacements() {
+  let close = () => {};
+  act(() => {
+    close = ToastQueue.neutral("Placement");
+  });
+  const classOf = (aboveTabBar: boolean) => {
+    const { unmount } = render(<ToastContainer aboveTabBar={aboveTabBar} />);
+    const { className } = toastRegion();
+    unmount();
+    return className;
+  };
+  const placements = { aboveTabBar: classOf(true), atBottom: classOf(false) };
+  act(close);
+  return placements;
 }

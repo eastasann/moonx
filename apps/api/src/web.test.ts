@@ -54,10 +54,13 @@ const BUILD = {
   ".DS_Store": "finder",
 };
 
-const CSP =
-  "default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'";
+/** SDD 7.2's CSP, `connect` its connect-src after 'self'. */
+const csp = (connect: string) =>
+  `default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self'${connect}; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'`;
 
-const DSN = "https://key@o1.ingest.sentry.io/2";
+// An ingest host of a region, as Sentry writes an organization's DSN.
+const DSN = "https://key@o1.ingest.us.sentry.io/2";
+const CSP = csp(" https://o1.ingest.us.sentry.io");
 
 function webApp(config: Partial<Config> = {}) {
   return buildTestApp(database, {
@@ -132,24 +135,47 @@ describe("the Web's pages (ADR-004)", () => {
   });
 
   test("escapes the values it writes into the meta elements", async () => {
-    const odd = webApp({ webSentryDsn: `https://x"><script>&$'` });
-    const html = await (
-      await odd.handle(new Request("http://localhost/login"))
-    ).text();
+    const odd = webApp({
+      webSentryDsn: `https://x@o1.ingest.us.sentry.io/2?"><script>&$'`,
+    });
+    const response = await odd.handle(new Request("http://localhost/login"));
 
-    expect(html).toContain(
-      `<meta name="moonx-sentry-dsn" content="https://x&quot;&gt;&lt;script&gt;&amp;$'">`,
+    expect(await response.text()).toContain(
+      `<meta name="moonx-sentry-dsn" content="https://x@o1.ingest.us.sentry.io/2?&quot;&gt;&lt;script&gt;&amp;$'">`,
     );
+    // The CSP takes the DSN's origin alone.
+    expect(response.headers.get("content-security-policy")).toBe(CSP);
   });
 
-  test("writes an empty Sentry DSN where the Web reports nowhere", async () => {
+  test("writes an empty Sentry DSN where the Web reports nowhere, and connects to itself alone", async () => {
     const quiet = webApp({ webSentryDsn: undefined });
-    const html = await (
-      await quiet.handle(new Request("http://localhost/"))
-    ).text();
+    const response = await quiet.handle(new Request("http://localhost/"));
 
-    expect(html).toContain('<meta name="moonx-sentry-dsn" content="">');
+    expect(await response.text()).toContain(
+      '<meta name="moonx-sentry-dsn" content="">',
+    );
+    expect(response.headers.get("content-security-policy")).toBe(csp(""));
   });
+
+  // Sentry's SDK posts a DSN's events to its origin, port included.
+  for (const [dsn, connect] of [
+    ["https://key@o1.ingest.de.sentry.io/2", " https://o1.ingest.de.sentry.io"],
+    [
+      "https://key@sentry.example.com:8443/2",
+      " https://sentry.example.com:8443",
+    ],
+    ["http://key@localhost:9000/2", " http://localhost:9000"],
+  ] as const) {
+    test(`connects to ${connect.trim()} as well for the DSN ${dsn}`, async () => {
+      const response = await webApp({ webSentryDsn: dsn }).handle(
+        new Request("http://localhost/"),
+      );
+
+      expect(response.headers.get("content-security-policy")).toBe(
+        csp(connect),
+      );
+    });
+  }
 
   test("answers HEAD with the headers of GET", async () => {
     const response = await get("/login", { method: "HEAD" });

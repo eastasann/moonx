@@ -24,6 +24,7 @@ import {
   TableStateContext,
   VisuallyHidden,
 } from "react-aria-components";
+import { FixedLocale } from "../internal/FixedLocale";
 import { ListPaneContext } from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
 import { TableCellContext } from "../internal/tableCell";
@@ -178,17 +179,24 @@ export function TableView<T extends { id: Key }>({
     <GridTable {...tableProps} columns={shown} density={density} />
   );
   const total = lines ? null : footerTotal;
-  if (footerAction == null && total == null) return table;
   return (
-    <div className={styles.withFooter}>
-      {table}
-      <div className={styles.footer({ lines })}>
-        {footerAction != null && (
-          <div className={styles.footerAction({ lines })}>{footerAction}</div>
-        )}
-        {total != null && <div className={styles.footerTotal}>{total}</div>}
-      </div>
-    </div>
+    <FixedLocale>
+      {footerAction == null && total == null ? (
+        table
+      ) : (
+        <div className={styles.withFooter}>
+          {table}
+          <div className={styles.footer({ lines })}>
+            {footerAction != null && (
+              <div className={styles.footerAction({ lines })}>
+                {footerAction}
+              </div>
+            )}
+            {total != null && <div className={styles.footerTotal}>{total}</div>}
+          </div>
+        </div>
+      )}
+    </FixedLocale>
   );
 }
 

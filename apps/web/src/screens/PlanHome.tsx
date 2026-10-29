@@ -42,7 +42,7 @@ import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import type { ScreenComments } from "../components/CommentsPanel";
-import { ModalBoundary } from "../components/ErrorBoundary";
+import { BlockBoundary, ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
 import { KeyMetrics } from "../components/ideaParts";
 import {
@@ -111,8 +111,6 @@ const headerValueSchema = z.object({
 });
 
 type HeaderField = "businessName" | "preparedBy";
-
-/** The autosave key of a plan's header (P2 PATCH, design-spec 6.0.2's items). */
 
 /**
  * The save of the plan's header (P2 PATCH): the answer is the plan home as it is now, and
@@ -752,10 +750,12 @@ function PlanHub({
       id: "numbers",
       column: "main",
       content: (
-        <KeyNumbersBlock
-          home={home}
-          canEditValidation={isMember && !home.ideaArchived}
-        />
+        <BlockBoundary>
+          <KeyNumbersBlock
+            home={home}
+            canEditValidation={isMember && !home.ideaArchived}
+          />
+        </BlockBoundary>
       ),
     },
     ...[partA, partB].flatMap((part) =>
@@ -765,16 +765,40 @@ function PlanHub({
             {
               id: `part-${part.part}`,
               column: "aside" as const,
-              content: <PartBlock home={home} part={part} />,
+              content: (
+                <BlockBoundary>
+                  <PartBlock home={home} part={part} />
+                </BlockBoundary>
+              ),
             },
           ],
     ),
-    { id: "go-no-go", column: "main", content: <GoNoGoBlock home={home} /> },
-    { id: "versions", column: "main", content: <VersionsBlock home={home} /> },
+    {
+      id: "go-no-go",
+      column: "main",
+      content: (
+        <BlockBoundary>
+          <GoNoGoBlock home={home} />
+        </BlockBoundary>
+      ),
+    },
+    {
+      id: "versions",
+      column: "main",
+      content: (
+        <BlockBoundary>
+          <VersionsBlock home={home} />
+        </BlockBoundary>
+      ),
+    },
     {
       id: "execution",
       column: "main",
-      content: <ExecutionBlock home={home} />,
+      content: (
+        <BlockBoundary>
+          <ExecutionBlock home={home} />
+        </BlockBoundary>
+      ),
     },
   ];
   return (

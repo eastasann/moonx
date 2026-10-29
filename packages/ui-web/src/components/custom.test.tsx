@@ -581,6 +581,25 @@ describe("MetricTile", () => {
     expect(placeholder?.className).not.toBe(value?.className);
     expect(supplement?.querySelector("svg")).not.toBeNull();
   });
+
+  test("supplementHref makes the supplement a link, beside the sign", () => {
+    render(
+      <MetricTile
+        label="Break-even"
+        value="Needs price"
+        isPlaceholder
+        supplement="Contribution margin is zero or negative"
+        supplementHref="/w/1/ideas/2/economics"
+        supplementTone="notice"
+      />,
+    );
+    const link = screen.getByRole("link", {
+      name: "Contribution margin is zero or negative",
+    });
+    expect(link.getAttribute("href")).toBe("/w/1/ideas/2/economics");
+    expect(link.className).toBe(metricStyles.supplementLink);
+    expect(link.closest("dd")?.querySelector("svg")).not.toBeNull();
+  });
 });
 
 describe("MetricGroup", () => {

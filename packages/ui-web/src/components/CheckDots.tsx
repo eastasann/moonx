@@ -1,4 +1,4 @@
-import { LOCALE } from "@moonx/i18n";
+import { formatList } from "@moonx/i18n";
 import type { MoonGlyphSize } from "@moonx/ui-tokens";
 import { useTranslation } from "react-i18next";
 import * as styles from "./CheckDots.css";
@@ -29,10 +29,7 @@ export interface CheckDotsProps {
  */
 export function CheckDots({ checks, size = "M" }: CheckDotsProps) {
   const { t } = useTranslation(["components", "common"]);
-  const label = new Intl.ListFormat(LOCALE, {
-    style: "long",
-    type: "unit",
-  }).format(
+  const label = formatList(
     checks.map(({ name, state }) =>
       t("components:checkDots.check", {
         name,

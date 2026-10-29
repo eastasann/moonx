@@ -67,6 +67,7 @@ import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
 import {
   decideHref,
   decisionsHref,
+  economicsHref,
   hrefOf,
   ideaHref,
   ideasHref,
@@ -758,9 +759,11 @@ function ValidationHub({
             metrics={home.keyMetrics}
             currency={workspace.currency}
             variant="band"
-            hasMarginWarning={home.economicsWarnings.includes(
-              "margin_not_positive",
-            )}
+            marginWarningHref={
+              home.economicsWarnings.includes("margin_not_positive")
+                ? economicsHref(workspace.id, home.idea.id)
+                : undefined
+            }
             aria-label={t("validation:home.keyNumbers")}
           />
         }

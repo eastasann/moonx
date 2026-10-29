@@ -32,6 +32,8 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ZodType } from "zod";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
+import type { SaveStatus } from "../lib/autosave";
+import { useSaveItem } from "../lib/autosave-react";
 import { useOneAtATime } from "../lib/form";
 import { inputIssueMessage } from "../lib/input-issues";
 import { planHref } from "../lib/links";
@@ -308,10 +310,19 @@ function CreatePlanForm({
   );
 }
 
+/** The autosave key of 20's header (Business Name and Prepared by), which Rename plan also writes. */
+export const planHeaderKey = (planId: string) => `plan:${planId}`;
+
+const SAVE_ON_ITS_WAY: readonly SaveStatus[] = [
+  "waiting",
+  "saving",
+  "retrying",
+];
+
 /**
  * Rename plan from 20's ⋯ (design-spec 6.12, 6.0.8 案の名前): the name, unique within the
- * idea, saved with Save (P2 PATCH). Someone else's change to the header since 20 read it
- * asks as 6.0.2 does: overwrite (only the name is sent) or load theirs. Small; a tray on a
+ * idea, saved with Save (P2 PATCH). Someone else's change to the header since the dialog
+ * opened asks as 6.0.2 does: overwrite (only the name is sent) or load theirs. Small; a tray on a
  * phone.
  */
 export function RenamePlanDialog({
@@ -327,7 +338,23 @@ export function RenamePlanDialog({
   const isOpen = useIsOpen();
   const formId = useId();
   const changed = usePlansChanged();
+  const { me } = useWorkspace();
   const name = useCheckedField(planNameSchema, home.name);
+  // Save waits for the header's own save on its way, so it sends the version that save
+  // leaves (the effect below), not one this user's save has already moved past.
+  const headerSave = useSaveItem(planHeaderKey(home.id));
+  const isHeaderSaving =
+    headerSave !== undefined && SAVE_ON_ITS_WAY.includes(headerSave.status);
+  // The header as the dialog opened on it: 20 may read the plan again while it is open,
+  // and another person's change since then must still ask (6.0.2). This user's own saves
+  // (Business Name and Prepared by on this page or in another tab) while it is open, one
+  // version at a time, move it on.
+  const [openedOn, setOpenedOn] = useState(home.lockVersion);
+  useEffect(() => {
+    if (home.updatedBy?.id === me.id && home.lockVersion === openedOn + 1) {
+      setOpenedOn(home.lockVersion);
+    }
+  }, [home.lockVersion, home.updatedBy?.id, me.id, openedOn]);
   const [force, setForce] = useState(false);
   const rename = useMutation({
     mutationFn: ({ value, overwrite }: { value: string; overwrite: boolean }) =>
@@ -336,7 +363,7 @@ export function RenamePlanDialog({
           .api.v1.plans({ planId: inPath(home.id) })
           .patch({
             name: value,
-            lockVersion: home.lockVersion,
+            lockVersion: openedOn,
             ...(overwrite ? { force: true } : {}),
           }),
       ),
@@ -356,7 +383,7 @@ export function RenamePlanDialog({
     error instanceof ApiError && code === "CONFLICT" ? error : null;
   const oneAtATime = useOneAtATime();
   const send = (overwrite: boolean) => {
-    if (!name.isValid) return;
+    if (!name.isValid || isHeaderSaving) return;
     setForce(overwrite);
     void oneAtATime(() =>
       rename.mutateAsync({ value: name.value, overwrite }).then(
@@ -393,7 +420,7 @@ export function RenamePlanDialog({
             type="submit"
             form={formId}
             isPending={rename.isPending}
-            isDisabled={!isOnline || !name.isValid}
+            isDisabled={!isOnline || !name.isValid || isHeaderSaving}
           >
             {t("plans:rename.save")}
           </Button>

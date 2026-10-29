@@ -2624,7 +2624,7 @@ Step 38 で分かったこと（`make build-web SHA=dev` の結果を `WEB_DIST_
 
 ## Step 39: 仕上げ（3）: docs との突き合わせと README
 
-Status:
+Status: done 2026-10-29
 
 ```
 実装全体を docs と突き合わせ、欠けや食い違いを閉じてください。
@@ -2655,6 +2655,330 @@ Status:
 
 ---
 
+## Step 39b: 突き合わせの直し（1）: Web のエラーの出し方と Sentry
+
+Status:
+
+```
+Step 39 の突き合わせで見つかった、エラーの出し方（SDD 8.2・design-spec 6.0.6）と Sentry（SDD 8.3・11章）の欠けを閉じてください。
+Step 39 が大きすぎたので分けた残り。書いてあるファイルの場所は Step 39 の時点のもので、ずれていることがある。
+
+参照:
+- docs/02-01_system-design-doc.md 7.2（セキュリティヘッダー）・8.1・8.2・8.3・9章（カタログ）・10章（Web）・11章（Web のエラー）・ADR-021・ADR-023
+- docs/design-spec.md 6.0.2・6.0.4・6.0.5・6.0.6・3.8（M9）・6.8・6.10（14〜16）・6.16（4・9）・6.17（28）
+
+直すもの（振る舞いの欠け）:
+1. ブロックごとのエラーの境界: BlockBoundary（apps/web/src/components/ErrorBoundary.tsx）は 5 だけが使い、ほかの画面の描画の失敗は
+   _signedIn の SignedInError まで上がって枠とナビごと消える。ハブの画面（13・20 など）の各ブロックに境界を置き、WorkspaceFrame の
+   本文にも境界を置いて（または workspace のルートの errorComponent を枠の中に描いて）、ナビを残す。1つのブロックが投げても
+   ほかのブロックとナビが残るテストを足す
+2. 断られた書き込みの後の表示: ideaActions.tsx の toastFailure を通る送信（14・15・16・17・22 の行の削除、17 の行の追加、アイデアの
+   操作、プランのアーカイブと復元）は、409 ARCHIVED と 403 FORBIDDEN / NO_ACCESS でも「Something went wrong」と Ref と Retry を出し、
+   画面を読み直さない。6.0.2 の理由（「It's archived」など）を Retry なしで出し、自動保存の onRejected と同じく画面のクエリを
+   読み直して、アーカイブ済み・読み取りの表示に変える。14・16・22 の新しい行の入力も、これらのコードで読み直す。
+   行の削除・新しい行・自動保存のそれぞれで、ARCHIVED と（ロールが Viewer に変わった後の）FORBIDDEN のテストを足す。
+   自動保存のテストは、409 ARCHIVED で断られた後に API がアイデアをアーカイブ済みと返すと、アーカイブの知らせと読み取りの欄に
+   なること、403 FORBIDDEN で断られた後に me が Viewer を返すと、読み取りの欄になることを確かめる（QuestionForm か Costs）
+3. 401 で文言を出さない: states.tsx の FailureState と SendFailure.tsx は 401 にも想定外のエラーを出す（M9 の後ろに
+   「Something went wrong · Ref」が出る）。ModalSendFailure と同じく 401 では何も出さない。テストを足す
+4. 業務の決まりの文言のキー: 8.2・9章の `errors:<CODE>` に合わせる。今は多くのコードが画面のキー（例: LAST_OWNER →
+   settings:workspace.members.lastOwner ほか2つ、PERSONAL_OWNER、ALREADY_MEMBER、CANNOT_SUSPEND_SELF、DRAFT_EXISTS、EMAIL_TAKEN、
+   PASSWORD_ALREADY_SET、REAUTH_REQUIRED など）から引いている。packages/i18n/locales/en/errors.json に無いコードで画面が文言を
+   出しているものを、apps/web の failureCode・error.code の分岐からすべて洗い出して移す（Step 39 で見つかったものは、上のほかに
+   INVITATION_PENDING・CONFIRMATION_MISMATCH・INVALID_PASSWORD・DECISION_CHANGED・HAS_EMPTY_QUESTIONS・EMPTY_SCOPE・NOT_IMPORTABLE・
+   INVALID_MENTION・TEMPLATE_INVALID・ALREADY_LATEST）。8.1 の表のコードの文言が `errors:` の下にあることを確かめるテストを足すdesign-spec が画面ごとに違う文を持つコード（LAST_OWNER は3画面で3つ）は、
+   `errors:` の下で i18next の context などで分ける。docs を「画面のキーでもよい」に書き換えて決まりを緩めない
+5. 500 の扱い: 8.2 は 500 INTERNAL を「通信・サーバーエラー」と「想定外のエラー」の両方の行に入れていて、実装は読み込み・自動保存・
+   フォームの送信で3通りに扱う（lib/autosave.ts・states.tsx・SendFailure.tsx・ModalFailure.tsx・lib/query.ts の isTransient）。
+   8.2 で、読み込み・自動保存・フォームの送信のそれぞれで 500（UPSTREAM_UNAVAILABLE 以外の 5xx）がどの行かを決めて書き、
+   isTransient の定義をそろえる。design-spec 6.0.6 のモーダルの共通の決まり（「送信に失敗したら…「Couldn't save」と Retry」）にも、
+   一時的な失敗と想定外の失敗の分け方を同じ決め方で書く（7・8 と Step 39g の 2・3 はこの分け方を使う）。今の利用者に見えるもの
+   （Ref・自動の再送）を減らす決め方は弱める変更なので選ばない
+6. 想定外の 4xx を Sentry に送る: 8.2「業務の決まり」のふつうは返らないコードは「想定外のエラー（下）として出す」で、その行は
+   「Sentry に送る」、8.3 は「Sentry に送るのは 5xx とクライアントの想定外のエラー」。今の Web は ApiError をどれも送らない
+   （states.tsx・ModalFailure.tsx・SendFailure.tsx・ideaActions.tsx・IdeaDialogs.tsx・SwitchWorkspaceDialog.tsx・CommentsPanel.tsx・
+   EvidenceSheet.tsx・Decision.tsx・AiImport.tsx・PitchDeck.tsx・routes/_signedIn/w/$workspaceId/route.tsx）。想定外として出す 4xx を、
+   requestId をタグにして送る（Ref は requestId のまま）。5xx は API が送るので送り直さない。SDD 11章の Web のエラーの行に、
+   タグに requestId を入れることを書く（05 の 4章「Sentry」がタグの名前を 11章で引く）
+7. PNL-1 の失敗の出し方: 6.0.6 はモーダル・パネルの中の想定外の失敗を小さなダイアログに出すが、コメントのパネルは Post の想定外を
+   その場の「Couldn't post」と Ref、Delete・Resolve・Reopen をトーストで出す。6.0.5 と同じく 6.0.4 に分け方を書き（一時的な失敗と
+   6.0.2 の理由はその場、想定外は小さなダイアログ。打った文は残す）、合わせる。テストを足し、今の CommentsPanel.test.tsx の
+   「Couldn't post」と Ref を確かめるテストも直す
+8. M9 の失敗: 通信の失敗が「Something went wrong」になり、想定外はその場に出る。6.0.6 のモーダルの決まり（一時的な失敗は
+   「Couldn't save」と Retry、想定外は小さなダイアログ。Close は cancelSignIn）に合わせ、M9 だけの文（パスワード違い・回数の上限・
+   停止）は残す。テストを足す
+9. 28 の Invite someone の想定外の失敗を ModalSendFailure に通す（決まった理由の文はその場のまま）。500 のテストを足す
+10. 14・15・16 の新しい行の入力: 欄を名指す 422 では「Couldn't save」と理由の行が消え、欄の下の「Check the format」だけになる
+    （refusedFields.length === 0 のときだけ出している）。EvidenceSheet と同じく両方出す
+11. CSP の connect-src: `https://*.ingest.sentry.io` は、地域のホスト（`o<id>.ingest.us.sentry.io`・`o<id>.ingest.de.sentry.io`）に
+    合わないので、Web のイベントが送れない恐れがある。Sentry の今の DSN のホストの形を一次情報で確かめ、合わないなら、
+    connect-src に `WEB_SENTRY_DSN` のオリジンを入れる形（DSN が無ければ 'self' だけ）にして、SDD 7.2 の値とテスト
+    （app.test.ts・web.test.ts・e2e/pwa.spec.ts の CSP）を直す
+
+足りないテスト（振る舞いはあるが、確かめていない）:
+12. client.tsx の Sentry（SDD 10章は E2E で確かめると決めている）: pwa のプロジェクト（WEB_DIST_DIR のビルド）で偽の WEB_SENTRY_DSN を
+    与え、page.route でイベントを受け、最初の画面の描画を失敗させて、イベントが届くこと・environment と release・URL の伏せ字・
+    画面の Ref がイベント ID の先頭8文字であることを確かめる。ログインしている間はイベントの user が本人の id だけで、ログアウトの
+    後は付かないこと（routes/_signedIn.tsx の setReportedUser。SDD 11章・05 の 4章「Sentry」が使う）も確かめる
+
+まだ作らないもの: Step 40〜44 の対象。失敗の表示のテストのうち、上の直しの対象でないもの（Step 39g）。
+
+上の 1〜12 がすべて閉じ、make test・make test-e2e・make typecheck・make lint・make doc-lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 39c: 突き合わせの直し（2）: 表示・i18n・振る舞いの残り
+
+Status:
+
+```
+Step 39 の突き合わせで見つかった、表示・i18n・画面の振る舞いの食い違いを閉じてください。
+Step 39 が大きすぎたので分けた残り。書いてあるファイルの場所は Step 39 の時点のもので、ずれていることがある。
+
+参照:
+- docs/02-01_system-design-doc.md 5.2（UserRef）・5.9（P2）・9章・ADR-026
+- docs/design-spec.md 1.2・4.5（Toast・D の並びの変わり方）・6.0.3・6.1・6.4（主要指標・端数）・6.5・6.8・6.10（15）・6.12（項目の状態）・6.16（9 の Members と表）・6.17（27）
+
+直すもの:
+1. React Aria の英語: TableView・ListView・CardView（Card.tsx）・Tree は FixedLocale の外で、選んだときの読み上げがブラウザの言語に
+   なる（SDD 9章は React Aria の英語）。FixedLocale で包み、navigator.language を ja-JP にしても英語のままのテストを足す
+   （overlayfields.test.tsx の同じ形のテストを参考にする）
+2. 生の文字列の検査: scripts/check-screens.ts は alt・aria-*・children・description・errorMessage・label・placeholder・title だけを
+   見ていて、部品の文言の props（primaryActionLabel・secondaryActionLabel・cancelLabel・actionLabel・heading・unit・caption・detail・
+   header・notice・aside など）の生の文字列を通す。部品の文言の props を全部見る（または、識別子の props 以外の文字列を全部見る）
+   形にし、テストを足す
+3. 入力をそのまま出す主要指標の金額: 6.4 は selling_price・cost_row:* を「入力をそのまま出す指標」とするが、書き方が画面で違う。
+   21・23・PDF・AI 書き出しは整数に丸め（packages/domain/src/pitch.ts の formatAs("money")。₱149.50 が ₱150）、18 は打った
+   小数を出し、17 は変動費の行をいつも小数2桁で出す（₱77.00）。打った金額を主要指標として出すときの書き方を 6.4「端数」に1つに
+   決めて書き（丸めると入力と違う値に見えるので、丸めない形にする）、すべての画面・PDF・AI 書き出しをそれに合わせる。小数のある
+   価格と変動費の行のテストを足す
+4. 件数の書式: 約70の `{{count}}` の文言と String(n) のセル（AdminUsers.tsx・TemplateVersion.tsx など）が、1,000 以上を区切らない。
+   packages/i18n の書式（formatCount などの整数の書式か、i18next の数の書式を LOCALE で）に通す。1,234 件のテストを足す
+5. 「Deleted user」: UserRef の badge が deleted のとき、Web は displayName の英語をそのまま出す。UserName でカタログの文を出す。
+   置き換えた担当の自由記述（account-deletion.ts の assignee_name）をカタログに通す方法を docs で決めて実装する。DB の形を変えるなら
+   ADR-016 の expand / contract に従う。仕様の決定が要るなら止める（blocked と理由）
+6. 根拠の消えた Fact の警告の件数: 6.0.3 は F/A/U の内訳で Fact に数え「警告の件数を添える」が、13 の F/A/U の凡例と、19・7 の
+   FauCounts（decisionParts.tsx）は factNoEvidence を出さない。添える文を 6.1・6.5 とカタログに書いて出し、テストを足す
+7. 15 の New competitor: 6.10 の「履歴は1つ足し、戻るで閉じる」を New competitor の Dialog にもかかると読む（かからないと読むと、
+   スマホの全画面のシートで戻ると 15 を離れて入力を失い、14・16 の新しい行の入力（`new=1`）とも食い違う。かからない読み方は弱める
+   方なので採らない）。この読み方を 6.10 に書く。今は状態だけで開く。開くときに履歴を足し、戻るで閉じ、作ったら `row=<id>` に
+   置き換える。テストを足す
+8. プランの隠れた小項目: 21 は表示条件で隠れた小項目を数えないが、20 の P2（apps/api/src/plan-views.ts → packages/domain/src/plan.ts）と
+   Part の進み具合は数える。6.12「項目の状態」に、隠れた小項目を数えない（6.2 と同じ）と書き、P2 の今の回答と版の回答の両方で
+   同じに数える。表示条件のあるプランのテンプレートでテストする
+9. スマホのトースト: 4・8・26〜28 も TabBar を出すが、トーストを TabBar の上に出すのは /w/$workspaceId の下だけ（routes/__root.tsx）。
+   TabBar を出す画面すべてで aboveTabBar にし、4 か 8 のスマホでトーストが TabBar の上に出るテストを足す
+10. 9 の Remove の確認の本文を 6.16 の表の外れたときの扱いに合わせる（入り直しても共有は戻らない・名前に「(former member)」・通知は
+    残り「You no longer have access」で開く）。本文のテストを足す
+11. 27: 公開済みの設問 ID でも書式の行を出す。プレビューの主要指標を表示の名前（metricLabel）で出し、何も選んでいないときの1行を
+    足す。表示する主要指標を空にしたときは、送らずに欄の下に理由を出す（下書きの側の検査。取り込みのファイルと AD6 の検査は今の
+    まま）。オフラインでは ⋯ の操作（設問の追加・並べ替え・削除）を押せなくする。それぞれテストを足す
+12. 17・18 の最後の根拠を外す確認の文（6.0.3 の {項目}: cost row・number）のテストを足す（11 の answer はある）
+13. 6 の1ペインで `?selected=` の付いた URL を開くと、その要約を出し、← で一覧へ戻る（6.8）。テストを足す
+
+まだ作らないもの: Step 40〜44 の対象。
+
+上の 1〜13 がすべて閉じ、make test・make test-e2e・make typecheck・make lint・make doc-lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 39d: 突き合わせの直し（3）: API と domain の足りないテスト
+
+Status:
+
+```
+Step 39 の突き合わせで見つかった、API と domain の、振る舞いはあるが確かめていない決まりにテストを足してください。
+Step 39 が大きすぎたので分けた残り。テストを書いて実装の誤りが見つかったら、根本原因を直す。
+
+参照:
+- docs/02-01_system-design-doc.md 5.7（V1・V3・V4・V18）・5.8（S3）・5.9（P2・P5・P8）・5.11（H3・N1 の accessible）・7.2（CSRF）・11章（API のエラー）
+- docs/design-spec.md 6.0.7・6.1（Decisions）・6.12（項目の状態・+ changes）
+
+足すテスト:
+1. V3: F/A/U を持たない検証の設問への `classification.fau`（unknown・fact・assumption）が 422 VALIDATION_FAILED（path は
+   classification.fau）で何も保存しない。`fau: null` は通る（hasFau: false の設問を持つ検証のテンプレートの版を作る）
+2. V4: 論理削除した費用の行・競合・前提とリスクへの根拠は 404 NOT_FOUND で何も残さない。固定した版に無い設問 ID は
+   422 QUESTION_NOT_FOUND。数字の key が EconomicsField でなければ 422 VALIDATION_FAILED（target.key）
+3. V1・V18 の summary: テンプレートの移行で版に無くなった設問の回答と、表示条件で隠れた回答は null（validation.ts の quotedAnswer）
+4. V1 の Decisions は新しい順に最大5件（6件入れて5件）
+5. N1 の accessible: 自己分析へのコメントの通知で、Viewer に下がったメンバーと、共有を外した後の持ち主自身は false で、題に場所が
+   無く excerpt が null
+6. P5: 選択肢の小項目を持つプランのテンプレートで、選択肢に無い値は 422 INVALID_CHOICE、ある値は 200
+7. H3: 戻す項目が無ければ `{ reverted: 0 }` で、その batchId の行を書かず、後の H3 も ALREADY_REVERTED にならない
+8. `/api/auth/*` の CSRF: セッションの Cookie を持った change-password と sign-out の POST が、信頼しない Origin と `Origin: null` で
+   Better Auth の形の 403 になり何も変えない。信頼する Origin では通る
+9. S3: 回答をすべて消しても自己分析は in_progress のまま（answered は 0）
+10. P2 の Part の進み具合（completeItems）: 1つの項目の数える小項目をすべて埋めると、その Part の数が 0 から 1 になる
+11. P2 の hasChangesSinceVersion: 版を保存した後、検証の費用の行を変えても false のまま、実行管理の項目を変えると true。回答を
+    直した後の P8 は、決定の planVersion が直前に保存した版を指す
+12. ログインした人のリクエストの 5xx を Sentry に送るとき、user が本人の userId だけになる（apps/api/src/sentry.test.ts の関数の
+    テストはあるが、入口を通した結合のテストが無い。SDD 11章）
+
+まだ作らないもの: Step 40〜44 の対象。
+
+上の 1〜12 のテストがあり、make test・make typecheck・make lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 39e: 突き合わせの直し（4）: 画面の足りないテスト（検証・AI・自己分析・プラン・実行管理・Pitch Deck）
+
+Status:
+
+```
+Step 39 の突き合わせで見つかった、検証・AI 往復・自己分析・プラン・実行管理・Pitch Deck の画面の、振る舞いはあるが確かめていない
+決まりにテストを足してください。Step 39 が大きすぎたので分けた残り。テストを書いて実装の誤りが見つかったら、根本原因を直す。
+happy-dom の日付の欄に Tab で入れない（入れるとスタックがあふれる）。
+
+参照:
+- docs/design-spec.md 6.0.3・6.0.4・6.0.8・6.1・6.2・6.4・6.5・6.6・6.10・6.11（12）・6.12・6.13・6.14
+
+足すテスト:
+1. 11: アーカイブ中のアイデアの Owner / Member は読み取りの表示（回答の欄・F/A/U・Focus・「Mark it Fact」・Log research・
+   Add evidence が無く、Restore がある）。保存エラーの「Couldn't save」と Retry がカードの中に出て、入力が残り、Retry で送る。
+   全部回答済みなら最初の設問にフォーカス。OCEAN を変えると隠れた回答を数えず、戻すと出て数える（ヒントは OCEAN に値があると
+   消える）。「Related research ({件数})」の数（削除した調査ログは数えない）。前後のセクションの順と端（01 に前が無く、10 に次が
+   無い）とスマホの完了カードの「Next:」
+2. M2: 「Search research」で大文字と小文字を区別せずに絞り、0件で「No entries match your search」
+3. 13: 作ったばかりの状態（主要指標がすべて Empty・確認項目がすべて Not started・F/A/U は Empty だけ・Next steps の最初が
+   「Start with 01 Customer & Problem」・Decisions と Plans が「No decisions yet」）と、判定はあるがプランが無いときの Plans の
+   「No plans yet. A plan can start after a Proceed decision.」
+4. 14・15・16: 欄の理由は欄を変えてから出す（離れただけでは出さない）。Viewer の空の状態は説明だけで追加のボタンが無い。15・16 の
+   送っている間の Cancel（作るが開かない）。16 のタブを切り替えると選んでいた行と新しい行の入力を閉じる。並べ替えの Dialog は送って
+   いる間 Cancel・Esc・外側のタップで閉じず、500 や通信の失敗では並びを残して 6.0.6 のモーダルの決まりのとおりに出す。15 の題の行の印（0件で新月・1件以上で半月・基準値以上で満月）
+5. 17・18: Viewer・アーカイブ中・about の合わない `?modal=evidence` で何も開かない。スマホでシートの ⋯・💬・🕘 を押すとシートを
+   閉じてからパネルを開く（6.0.4 のコメントと 6.0.5 の変更履歴の両方）
+6. 18: 「Break-even is above capacity」「This margin is not reachable…」「Not recovered…」「using default 30 days」の文。アーカイブ中は
+   読み取り（入力欄が無く、F/A/U は読み取り、V.08.WORTH の設問は開いたまま読み取り、知らせと Restore がある）
+7. 19: 新しい判定の確認の Cancel（送らず、判断材料を読み直し、その判定を Last decision と次の basedOnDecisionId にする）。判断材料が
+   空（各欄 Empty・「6 missing」・記録できる）と「All 6 checks done」
+8. 24: 範囲と Options が同じあいだは X1 を送り直さない（Next・Back・Next で1回、Options を変えると2回目）
+9. 12: S7 が 403 NOT_SHARED のとき、詳細に「You don't have access to this」を出し、一覧は残る
+10. 20・21・M5: M5 の既定の名前（間の空き・26個使ったら「Plan AA」・名前を変えたプランの古い名前）。Hold・アーカイブ中のプラン・
+    アーカイブ中のアイデアで Add plan と `?modal=create-plan` が出ない。P1 の 409 TEMPLATE_NOT_PUBLISHED の文と押せない Create draft。
+    §24 の注意は Owner / Member だけで、開いた版とアーカイブ中のプランでは出さない。表の小項目で 2,000 文字を超えたセルは、
+    下に「Too long. Shorten to 2,000 characters.」を出したまま残り、ほかのセルの変更と行の追加ができて、送る本文にそのセルの値が
+    残る。短くすると送る
+11. 22: Viewer とアーカイブ中のプランの空のタブは説明だけで Add が無い。アーカイブ中のアイデアの注意（This idea is archived）と読み取り（+ Add・⋯ の Reorder と Delete・編集できる欄が無い）。絞り込みに合わない
+    項目を足すと絞り込みを外す。タブを変えると絞り込みと選んでいた項目を外して履歴を置き換える。知らない担当の id は「A former member」
+12. 23: オフラインで Download PDF と失敗の後の Retry を押せず、オンラインで戻る。「What to say」が空のときの「Not written yet」・最初の
+    スケルトン・10秒の「Taking longer than usual」・PDF の失敗はその長さと元のときだけ出る・ファイル名の「Pitch Deck.pdf」・履歴を
+    置き換えてパネルを残す。Economics・Execution plan・Risks のスライドの列の幅（packages/domain/src/pitch.ts の columns 全体）
+
+まだ作らないもの: Step 40〜44 の対象。
+
+上の 1〜12 のテストがあり、make test・make test-e2e・make typecheck・make lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 39f: 突き合わせの直し（5）: 画面の足りないテスト（共通・入口・ワークスペース・運営者）
+
+Status:
+
+```
+Step 39 の突き合わせで見つかった、共通の部品・入口・アカウント・ワークスペース・運営者の画面の、振る舞いはあるが確かめていない
+決まりにテストを足してください。Step 39 が大きすぎたので分けた残り。テストを書いて実装の誤りが見つかったら、根本原因を直す。
+
+参照:
+- docs/design-spec.md 3.8（M9）・6.0.4・6.0.5・6.0.6・6.0.8・6.8・6.15・6.16・6.17
+
+足すテスト:
+1. PNL-2: 戻す操作は一度に1つ（送っている間はほかの Revert・Undo を押せない）、オフラインでは押せない、429 は待ち時間をその行の下に出す
+2. PNL-1: Post は何か打つまで押せず、5,000 文字を超えると押せずに入力欄の下に理由を出し、送っている間は二度送らない
+3. 6: 空の状態（Owner は + New idea、Viewer は説明だけ）。絞り込みを変えても履歴を足さない（戻るで 5 に戻る）
+4. 7: Choose dates で To が From より前なら文を出して適用できない。URL の日付がどの選択肢にも合わなければその範囲を選択肢に出す。
+   絞り込みを変えると選んでいた記録を外して最初を出す
+5. 8: 50件ずつ読み、Show more で続きを読んで足す
+6. 4: Leave の LAST_OWNER・もう抜けている（404・NO_ACCESS も抜けたものとして扱う）・送っている間の Cancel（答えが来てから閉じる）・
+   今開いていないワークスペース（4 に残り、行が消え、トースト「You left {ワークスペース名}」）。Set password の
+   PASSWORD_ALREADY_SET で文言なしに Change password の形に変わる。アカウントの削除のパスワード違い「Password is incorrect」
+7. 2・3: 新規登録の途中で同じメールのアカウントができたら（EMAIL_TAKEN と accountExists）`/login?next=/invite/<token>` へ移る。
+   3 の Log out は招待のリンクを開き直す
+8. M9 の 429（待ち時間を M9 の中に出して開いたまま、Esc で閉じない）とログアウトの 429（トーストの待ち時間）
+9. 9: 役割の Picker が失敗で元に戻り、一覧の下に「Couldn't save」と Retry。LAST_OWNER と PERSONAL_OWNER の文と読み直し。招待の
+   Resend と Cancel が受諾済みの招待に当たったときの「Already accepted」と読み直し。送信の一時的な失敗（「Couldn't save」と Retry、
+   メールは残る）。期限切れの招待の Resend への ALREADY_MEMBER と INVITATION_PENDING。「Invitation sent again to {email}」の
+   トースト。All で0件の「No invitations yet」
+10. 26・28: 28 のタブの切り替えは履歴を足さず（Users → Invitations → 戻るで 28 を離れる）、26 と 28 の間の移動は足す（28 →
+    Templates → 戻るで 28）。スマホで `/admin/templates?kind=validation` を直接開くと、← で一覧へ、続く戻るで離れる。デスクトップの
+    2列で2つ選んでも履歴を足さない（戻るで 26 を離れる）。スマホで 28 の行を開くと、ブラウザの戻るでも ← でも一覧へ戻る（選んだ行は
+    履歴の項目に持つ）。26 の取り込みの検査（「At the top of the file」・「And {n} more」・5件まで・UTF-8 でないファイルは送らない）
+11. 27: 公開済みの下書きへの保存の PUBLISHED_READ_ONLY（「It's published」と「Couldn't save」、Retry まで送らない）。保存の失敗・断られた
+    入力・検査の読み込み中は Publish を押せず、警告だけなら押せる。26・27 の読み込みエラーとオフライン（27 の欄は読み取り、Import・
+    New draft・Publish を押せない）
+
+まだ作らないもの: Step 40〜44 の対象。
+
+上の 1〜11 のテストがあり、make test・make test-e2e・make typecheck・make lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 39g: 突き合わせの直し（6）: 失敗の表示の足りないテスト
+
+Status:
+
+```
+Step 39 の突き合わせで見つかった、送信や読み込みの失敗の表示の、振る舞いはあるが確かめていない決まりにテストを足してください。
+Step 39 が大きすぎたので分けた残り（Step 39b の後に行う。39b が失敗の出し方を直すので、その後の形で確かめる）。
+テストを書いて実装の誤りが見つかったら、根本原因を直す。
+
+参照:
+- docs/02-01_system-design-doc.md 8.2・ADR-021
+- docs/design-spec.md 3.8（M1・M7）・6.0.2・6.0.3（M2）・6.0.6・6.1（13）・6.2（11）・6.7（25）・6.8・6.10（14〜16）・6.11（10）
+
+足すテスト:
+1. 自動保存の 429: retryAfterSeconds の前には送り直さず、後で送る（apps/web/src/lib/autosave.test.ts）
+2. 14・15・16 の新しい行の送信の失敗: 14 は通信の失敗（「Couldn't save」と Retry）・回数の上限（待ち時間）・想定外（「Something went
+   wrong」と Ref と Retry）・欄を名指す 422（「Couldn't save」と理由と、欄の下の「Check the format」）。15 の New competitor は 6.0.6 の
+   モーダルの決まり（通信の失敗は「Couldn't save」と Retry、断られたら理由、回数の上限は待ち時間、想定外は小さなダイアログの Ref・
+   Retry・Close）。16 は 14 と同じ
+3. M2 の送信の失敗: 429 の待ち時間、500 の小さなダイアログ（Retry で送り直し、Close で M2 を閉じる）、409 ARCHIVED の「Couldn't save」と
+   「It's archived」
+4. 6・13 の複製・アーカイブ・Restore・トーストの取り消しの失敗（500 は Ref と Retry、429 は待ち時間。Retry で同じ要求を送る）。作成の
+   取り消しの ALREADY_REVERTED（複製は 6、下書きは 13 へ移る）と ARCHIVED（トーストと読み直し）
+5. M1 の失敗: 通信・503・500・429 のそれぞれの文。入力が残り、Retry で送り直す。500 の小さなダイアログの Close で M1 を閉じる
+6. M7 の新しいワークスペースの失敗: 通信はその場の「Couldn't save」と Retry（Retry で同じ名前を送る）。500 は小さなダイアログの
+   「Something went wrong」と「Ref: …」で、Retry で送り直し、Close で M7 を閉じる
+7. 10 の Mark as done・Reopen の失敗のトースト（500 は Ref、429 は待ち時間。Retry で送り直す）。11（自己分析）で S1 が
+   409 TEMPLATE_NOT_PUBLISHED のとき「Templates aren't ready yet. Ask your administrator.」
+8. 25 の反映の失敗: X3 の 429 は「Couldn't apply」と「Too many attempts. Try again in …」と Retry。`applied: 0` はトースト
+   「No answers changed」と returnTo への移動。オフラインでは Apply を押せず、取り込んだ文・金額・F/A/U の欄は読み取り
+
+まだ作らないもの: Step 40〜44 の対象。
+
+上の 1〜8 のテストがあり、make test・make test-e2e・make typecheck・make lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
 ## Step 40: インフラ（Dockerfile と Terraform）
 
 Status:
@@ -2672,7 +2996,9 @@ Web と API を1つにしたイメージと、Google Cloud の資源を Terrafor
 
 やること:
 1. apps/api の Dockerfile（oven/bun。Web のビルドを入れる。WEB_DIST_DIR・APP_VERSION）と make build-web（release の SHA）・
-   make build-api-image（イメージを上げ、ソースマップを Sentry に上げる。SENTRY_AUTH_TOKEN）
+   make build-api-image（イメージを上げ、ソースマップを Sentry に上げる。SENTRY_AUTH_TOKEN）。
+   Step 39 の時点の make build-web（apps/web/vite.config.ts）はソースマップを出さないので、Makefile の moonx-web への
+   sourcemaps upload は何も上げない。Web のソースマップも作って上げ、配る静的ファイルには入れない（SDD 11章「Web のエラー」）
 2. infra/terraform/modules/ と envs/{shared,staging,production}/: Artifact Registry（古いイメージを消す決まり）・
    Workload Identity Federation（このリポジトリの main だけ）・バックアップと写真のバケット・予算アラート・
    Cloud Run（image と traffic の変更を無視する）・Secret Manager の入れ物・サービスアカウント・ドメインマッピング・

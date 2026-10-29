@@ -58,6 +58,18 @@ export function MetricTileSection() {
           <MetricTile label="ROI" value="130.9%" />
         </MetricGroup>
       </Specimen>
+      <Specimen name="supplementHref: the notice supplement as a link (13 → 18)">
+        <MetricGroup aria-label="Key numbers linked supplement" variant="pair">
+          <MetricTile
+            label="Break-even"
+            value="Contribution margin is zero or negative. Review price or variable costs."
+            isPlaceholder
+            supplement="Contribution margin is zero or negative"
+            supplementHref="#economics"
+            supplementTone="notice"
+          />
+        </MetricGroup>
+      </Specimen>
     </Section>
   );
 }

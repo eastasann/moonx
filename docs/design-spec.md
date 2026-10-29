@@ -400,7 +400,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | Button / ButtonGroup | 主要な操作（Record decision・Apply n changes・Save version など） | primary（主要な操作。1画面に1つまで。インクの塗り）/ secondary（薄い枠 `border.default`）/ negative（削除の確認だけ）。補助の操作は quiet（枠なし）。secondary と quiet の文字は medium の太さ。S / M / L / XL（ランディングの見出しの下と最後の Log in、スマホの下部の操作は XL。上の行の Log in は M）。送信中（isPending）は ProgressCircle を出し、押せなくする | 主要な操作は 4.1 のとおり下部に固定する。固定した行では XL になり、B では quiet の Cancel も含めてボタンが行の幅を等分し、A・G では quiet でないボタンが行の幅を分け合う（G の quiet の Cancel は自分の幅。4.3） |
 | ActionButton / ActionGroup | ツールバーの操作（💬・🕘・⋯） | quiet あり（文字とアイコンは secondary、ホバーで primary。押せないときも地を付けない）。枠は薄い線（`border.default`）。S / M / L / XL | 同じ |
 | ActionMenu / Menu | 行の ⋯、アイデアの ⋯（複製・アーカイブ・移行）、AI ▼、20 の案の切替 | 項目のまとまりを見出しの下に置く `MenuSection`（Spectrum 2 の MenuSection。20 の案の切替の「Archived」。見出しは caption の secondary の文字） | トレイで開く |
-| Link | 「Edit in validation」・「See all decisions」など単独のリンクと、読み物の中の文中のリンク | 単独のリンク（primary）の下線は薄い線（`border.default`。ホバーで文字の色）。`isQuiet` は下線を付けず、ホバーで下線を出す（公開ページのフッターのリンク）。23 のスライドの上の「Edit source」などは PresentationPattern の `slideTools` が secondary の文字にし、ホバーで下線の代わりに地の色（`surface.hover`）を付ける | 同じ |
+| Link | 「Edit in validation」・「See all decisions」など単独のリンクと、読み物の中の文中のリンク | 単独のリンク（primary）の下線は薄い線（`border.default`。ホバーで文字の色）。単独の行に置いても、箱とフォーカスの外周線は文字の幅にする（タップ領域の下限より狭ければ下限）。`isQuiet` は下線を付けず、ホバーで下線を出す（公開ページのフッターのリンク）。23 のスライドの上の「Edit source」などは PresentationPattern の `slideTools` が secondary の文字にし、ホバーで下線の代わりに地の色（`surface.hover`）を付ける | 同じ |
 | TextField / TextArea | 短文・長文の回答、名前、理由 | TextArea は入力に合わせて広がる（Web フォントを読み込み終えたときにも高さを測り直す）。理由を書く欄（`isReason`。19 の「Why?」と、同じ形の M4 の理由）は 06 `field.text-area-reason-min-height` の高さから広がる（s19-decision.html の textarea）。欄の最小の高さは中の入力の場所が持ち、欄のどこを押しても入力が始まる。必須の欄（`isRequired`）はラベルの後ろに secondary の「Required」を出す（s19-decision.html の「Why? Required」。Spectrum 2 の `necessityIndicator="label"` と同じ。NumberField・SearchField・Picker・ComboBox・DatePicker・MentionTextArea・DiffTextArea も同じ）。補足（`description`）は `descriptionTone="notice"` で琥珀色の文字と印にする（9 の通貨の警告。ほかの入力欄も同じ）。設問の回答の欄（QuestionCard の中）は、文字が 06 `typography.answer`、最小の高さと内側が `layout.question-form.answer-*`、角丸が `radius.callout`、地が canvas（s11-form.html の .answer）。枠はほかの入力欄と同じ `border.strong`（枠で位置を示す入力欄は 3:1。s11 の薄い線は採らない）。フォーカスで raised の地にする（s11 の .answer:focus） | キーボードで隠れない（4.3） |
 | NumberField | 金額（通貨記号・桁区切り）、%、日数、販売数 | 書式は en-PH（1.2）。表の数字の列の中では、数字を右にそろえて通貨記号と % を数字に付けて並べ、行の編集に入っても数字の位置を変えない（s17-costs.html） | 数字のキーボード |
 | SearchField | 一覧の検索、M2 の調査ログの検索 | `width="fill"` は並んだ行の残りの幅に広げる（6 の絞り込みの行。s06-ideas.html） | 同じ |
@@ -453,7 +453,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 | 独自: MoonGlyph | 状態の印（4.4「状態の形」）。印は状態によらずインクの色（unclassified の菱形は琥珀色、empty の点線の丸は Empty のラベルの色）。CheckDots・StatusLight・19 の F/A/U の内訳・セクションの埋まり具合・F/A/U の印・11 のスマホの問いの点（回答済みは満月、未回答は点線の丸、今の問いは輪で囲む）に使う | `value`（0〜1。満ちる割合。0 は新月の輪郭、1 は満月）か `state`（not-started / partial / done / fact / assumption / unknown / unclassified / empty。unclassified は琥珀色の、角を丸めた四角を 45° 回した菱形（moon-base.css の .dot-attn）、empty は短い線を12個並べた点線の丸（.dot-empty））。S / M。`isCurrent` で輪を重ねる（11 のスマホの今の問い）。印は飾りとして読み上げず、隣のラベルで伝える | 同じ |
 | 独自: FauPicker | 表の行（17 の金額・18 の数字）の F/A/U の欄。今の状態をラベル（「Assumption · Medium」。06 `typography.body-sm` の secondary の文字で、ポインタの下と開いている間はインク。未分類は琥珀色、Empty は `fau.empty` の文字色で、表の中ではラベルの代わりに U+2014 のダッシュ1文字（s17-costs.html。読み上げは「Empty」））だけで出し、印は表の行頭の列に出す（印を二重に出さない。FauPicker を置く表は、行頭の印の列（`isMark`）に状態の MoonGlyph を置く）。編集中の行はラベルに ▾ を付ける（「Assumption · Medium ▾」）。押すと Popover で F/A/U と確信度を選ぶ（中身は下の補足と 6.0.3）。表の外に置いたときは印とラベルを出す | — | 行の編集シートの中に、印とラベルの下にボタンで並べる（6.0.3） |
 | 独自: FauButtons | 検証の設問の回答（11・15・18）と、25 ③ の取り込む内容の F/A/U。回答の欄の下に3つのボタン（ToggleButtonGroup。各ボタンに MoonGlyph）を並べ、内容があって F/A/U の無い回答は、その横に琥珀色の「Not classified yet」を出す（s11-form.html の .classify と .attn-note）。25 ③ では代わりにボタンの前に「◆ Unclassified」（StatusLight。取り込む内容が戻る状態の名前。s25-import.html の .fau-row）を出す（`unclassified="label"`）。Assumption を押すか Assumption の回答では、下に小見出し「Confidence」と確信度（SegmentedControl）を出す。決まりは 6.0.3（Fact は M2 を開く呼び出しだけ、Assumption は確信度を選ぶまで決めない、同じボタンをもう一度押すと外れる）。文章の回答は値を残したまま Unknown にできるので、Unknown で確認しない（数字の FauPicker と違う） | — | 同じ |
-| 独自: MetricTile / MetricGroup | 主要指標の1つ（13・19 の損益分岐・初期費用など）。ラベル・大きな数字と単位（`unit`。「/ day」「months」）・補足（理由や警告）を縦に並べる。MetricGroup が並べる: `band`（13 の数字の帯。上に薄い線（`border.default`）、下に hairline、指標の間に縦の hairline の横一列。デスクトップでパネルが本文の領域を `semantic.layout.two-column-min-width` より狭くしている間は、スマホと同じ 2×2（4.1 の A）。d1-moon.html）と `compact`（19 の判断材料の中の詰めた形。ラベルは 06 `typography.caption-sm`、数字は `metric-sm`、線なしで指標の数だけの列。s19-decision.html）と `column`（F の結果のカードの縦の並び。数字は `metric-column` と小さな等幅の単位、合計の間に hairline。s17-costs.html の .tot）と `pair`（D の詳細の 2×2。上に薄い線、下と十字に hairline、ラベルは `caption-sm`、数字と単位は `metric-pair`。s06-ideas.html の .nums） | 補足は任意。数字は途中で折り返さない（単位は数字の前で次の行へ送る。タイルの幅より広い数字だけ折り返し、横にはみ出させない。4.3） | `band` は 2×2 で十字の hairline、`compact` は2列、`column`・`pair` は同じ |
+| 独自: MetricTile / MetricGroup | 主要指標の1つ（13・19 の損益分岐・初期費用など）。ラベル・大きな数字と単位（`unit`。「/ day」「months」）・補足（理由や警告）を縦に並べる。MetricGroup が並べる: `band`（13 の数字の帯。上に薄い線（`border.default`）、下に hairline、指標の間に縦の hairline の横一列。デスクトップでパネルが本文の領域を `semantic.layout.two-column-min-width` より狭くしている間は、スマホと同じ 2×2（4.1 の A）。d1-moon.html）と `compact`（19 の判断材料の中の詰めた形。ラベルは 06 `typography.caption-sm`、数字は `metric-sm`、線なしで指標の数だけの列。s19-decision.html）と `column`（F の結果のカードの縦の並び。数字は `metric-column` と小さな等幅の単位、合計の間に hairline。s17-costs.html の .tot）と `pair`（D の詳細の 2×2。上に薄い線、下と十字に hairline、ラベルは `caption-sm`、数字と単位は `metric-pair`。s06-ideas.html の .nums） | 補足は任意。補足は `supplementHref` でその補足を直す画面へのリンクにできる（13 の粗利の警告から 18。補足の色と大きさのまま下線を付け、行の高さは変えずに押せる範囲をタップ領域の下限まで広げる）。数字は途中で折り返さない（単位は数字の前で次の行へ送る。タイルの幅より広い数字だけ折り返し、横にはみ出させない。4.3） | `band` は 2×2 で十字の hairline、`compact` は2列、`column`・`pair` は同じ |
 | 独自: RowList / RowListItem | 区切り線つきの静的な行の並び（10・13・20 のセクションの一覧、13 の確認項目・Next steps・Decisions・Plans、6 の詳細と 19 の確認項目）。`ordered` で番号付き。押せる行は行全体が移動先で、右端に › を置く（下線のリンクにしない。4.4。ホバーで名前に下線を出す）。一覧の上と最後の行の下にも hairline を引く。印（`start`）は 06 `component.row-list.mark-width` の列に置き、印のある行がある一覧では印の無い行もその列を空けて名前の頭をそろえる。番号は `row-list.number-width` の列の tertiary の等幅（`typography.number-emphasis` の太さで、大きさは `caption`）、名前は `typography.label`、右端の文字（`end`）は `caption`（件数と日付（「7/10」「5 entries」「Oct 14」）は `isEndNumeric` で等幅の `typography.number-sm`）、› は tertiary。2行目（`description`）のある行は、印・右端の文字・› を1行目に並べる（d1-moon.html）。5 の Ideas のように行に印の並び（`marks`。CheckDots）と札（`badge`。Badge）を持つ行は、名前の後ろに `marks`、その後ろに `badge` を、どの行でも同じ幅の列（06 `row-list.badge-width`。札は列の右端にそろえる。列の間は `row-list.status-gap`）に置き、行の高さの中央にそろえて、印の位置を行ごとにそろえる（s05-dashboard.html の .ideas）。まだ終わっていない実行管理の項目の行頭には `TaskMark`（☐。大きさ・角丸・線の太さは 06 `row-list.task-mark-*` の、tertiary の線の飾り。5 の Due soon。s05-dashboard.html の .due .box）を置く | ordered。`isEmphasized`（13 の Next steps の1件目: 薄い線（`border.default`）の枠と左のインクの線（`border-width.selected-indicator`）、角丸は `radius.callout`、影なし、番号はインクの semibold、名前は `typography.label-emphasis`、理由の行は `caption`） | 行の高さは 06 `row-list.narrow-min-height` 以上。`badge` は名前の行の右端、`marks` は2行目の下の行に置く（s05-dashboard.html の 390px） |
 | 独自: DescriptionList / DescriptionListItem | ラベルと値の並び（13 の Summary・19 の判断材料の Summary）。ラベルは 06 `component.description-list.label-width` の列（spacious の密度では `label-width-spacious`。s19-decision.html の .sum）の `typography.caption` の secondary、値は `body-compact`、行を hairline で区切る（d1-moon.html・s19-decision.html） | — | ラベルを値の上に置く |
 | 独自: Slide | Pitch Deck のスライドの4つの型（6.14） | `headingLevel`（2 か 3、既定 3）: スライドの題が画面の見出しの階層で占める位置。h1 の直下にスライドが続く画面だけ 2 にする。地は白（PDF と同じ）、角丸（06 `radius.slide`）、柔らかい影（`semantic.shadow.*.slide-edge`・`slide`。s23-deck.html）。サムネイル（`isThumbnail`）は白の地だけ同じで、角丸と影を付けない（枠は置く側の PresentationPattern が持つ。PDF のページと同じ hairline と角丸（`layout.presentation.thumbnail-radius`）。s23-deck.html の .mini） | 幅に合わせる |
@@ -645,7 +645,7 @@ Admin:     26 テンプレート一覧 →（ファイルから取り込み）�
 - 「調査ログから選ぶ」: このアイデアの調査ログを検索して複数選べる。
 - 「新しく記録する」: 14 と同じ入力欄（日付・トピック・発見・出典の種類・URL・裏付ける確認項目・何を裏付けるか）で調査ログを1件作り、そのまま根拠に付ける。作った項目は 14 にも残る。
 - 「URL」: 調査ログを作らずに URL とメモだけを付ける（原本の実例で、外部の Google Doc へのリンクを根拠にしていたため）。
-- 付いている根拠は × で外せる。Fact から最後の1件を外そうとすると「Remove the last evidence? This answer will become Unclassified.」と確認し、外すと未分類に戻す（利用者の操作で「Fact（根拠なし）」は作らない）。
+- 付いている根拠は × で外せる。Fact から最後の1件を外そうとすると「Remove the last evidence? This {項目} will become Unclassified.」と確認し（{項目} は根拠を付けた項目の名前で、設問の回答（11・25）は「answer」、17 は「cost row」、18 は「number」）、外すと未分類に戻す（利用者の操作で「Fact（根拠なし）」は作らない）。
 - 根拠に使われている調査ログを 14 で削除しようとすると、使っている項目の一覧を出して確認する。テンプレートの移行で隠れた回答（6.0.7）は一覧に出さず、「Also evidence for {n} answers hidden by a template update.」と数だけを添える。削除（論理削除）しても根拠の紐づけ自体は消さず、削除済みの調査ログを指す紐づけは数えない。その根拠しかなかった Fact は「Fact（根拠なし）」になり、13 の Next steps に出る。調査ログを変更履歴から戻すと、紐づけも有効に戻る。
 - F/A/U を持たない行（15 の競合のカード、16 の前提の Evidence）で M2 を開いたとき: 根拠を付けても外しても行の状態は変わらない。最後の1件を外すときも確認を出さない。その行が根拠に使っている調査ログを 14 で削除するときは、確認の一覧にこの行も出す。削除した調査ログはこの行の根拠の一覧から消える（「Fact（根拠なし）」にあたる状態は作らない）。
 - 並びと文言（上の図の和文は説明用）: 題「Evidence」の下に対象（「01 WHO · Who is the primary paying customer?」。セクションの番号・設問のタイトル・問い）。小見出し「Attached」の下に付いている根拠のタグ（調査ログは日付とトピック、URL は URL）を付けた順に並べ、× で外す。削除した調査ログを指す根拠は「{日付 トピック} (deleted)」と出し、外せる（Fact からそれを外すと数える根拠が残らず未分類に戻るので（SDD 5.7 の V5）、上の確認を出す）。無ければ「No evidence yet」。追加の手段は SegmentedControl の「Research log」「New entry」「URL」で切り替える。「Research log」は、このアイデアの調査ログ（14 と同じ並び）にチェックボックスを付けて並べ、付いているものにチェックを入れる。チェックを入れると付け、外すと外す。上の「Search research」は、トピックと発見を大文字と小文字を区別せずに絞る。調査ログが無ければ「No research logged yet. Add a new entry to attach it.」、絞って0件なら「No entries match your search」。「New entry」は 14 と同じ入力欄と「Add and attach」、「URL」は「URL」（必須）・「Note」と「Attach URL」。下に「Done」。
@@ -951,7 +951,7 @@ Viewer にも同じ Next steps を出す。ただし Viewer が入れない行�
 画面の細部:
 
 - Summary の Customer・Problem・Market type が空のとき、「Empty」の下に単独の行のリンクを置き、11 のその設問（01 WHO・01 PROBLEM・02 OCEAN）を開く。文言は Owner / Member には「Answer in {セクション名}」、Viewer とアーカイブ中のアイデアでは「Open {セクション名}」（11 は読み取り表示で開けるので、Next steps と同じくリンクのまま。入力できない人のリンクは文言だけを変える）。
-- 主要指標の補足: 値が下限・上限のときは、値の下に「Lower bound」「Upper bound」を出す（d1-moon.html の .note）。計算できない指標は値の位置に 6.4 の理由を出す。粗利が0以下（V1 の `economicsWarnings` の `margin_not_positive`）の損益分岐は、値の位置の理由（「Contribution margin is zero or negative. Review price or variable costs.」）の下に、注意の印を付けた琥珀色の補足「Contribution margin is zero or negative」を添える（MetricTile の `supplementTone="notice"`。上の「状態」の警告）。
+- 主要指標の補足: 値が下限・上限のときは、値の下に「Lower bound」「Upper bound」を出す（d1-moon.html の .note）。計算できない指標は値の位置に 6.4 の理由を出す。粗利が0以下（V1 の `economicsWarnings` の `margin_not_positive`）の損益分岐は、値の位置の理由（「Contribution margin is zero or negative. Review price or variable costs.」）の下に、注意の印を付けた琥珀色の補足「Contribution margin is zero or negative」を添える（MetricTile の `supplementTone="notice"`。上の「状態」の警告）。補足の文は 18 へのリンクにする（琥珀色と大きさは補足のまま。MetricTile の `supplementHref`）。
 - ヘッダー: 判定の札の横に「Latest decision {日付} · Stage: {工程}」（未判定は「Stage: {工程}」だけ）。一行コンセプトの後ろに、ダッシュ（U+2014）と空白に続けて提案者の名前（tertiary の文字。d1-moon.html の .by）。複製したアイデアは、その下に単独のリンク「Duplicated from {元のアイデア名}」を置き、元のアイデアの 13 を開く。アーカイブ済みの「This idea is archived」は InlineAlert でヘッダーの先頭に置き、Owner / Member には Restore のボタンを添える。アーカイブ済みでは Edit summary を出さず、⋯ は Duplicate だけにする。
 - Edit summary は M1 と同じ大きさのシート（medium。スマホは下からのトレイ）で、閉じるボタン・外側のタップ・Esc で閉じる。閉じると待っている入力を送る。Summary の Solution が空のとき、Owner / Member には「Empty」の下に Edit summary を開くリンクを置く。
 - 確認項目の行の右端は状態のラベルで、件数を持つもの（競合・需要・課題シグナル）は「Done (4)」のように件数を添える（0 件は添えない）。不足の理由の文言: 競合「None found yet」「{n} of {基準値} found」、地元の価格帯「Needs {基準値} priced competitors or {基準値} local price logs」、費用「{n} rows are Empty」（1 行は「1 row is Empty」）と「No startup or monthly cost amounts yet」「No startup cost amounts yet」「No monthly cost amounts yet」（未入力の行と金額の無い表が両方あるときは「 · 」でつなぐ）、損益分岐「Needs price」「Needs monthly costs」「Needs price and monthly costs」「Contribution margin is zero or negative」、許認可「Fill the Permits cost row, or log what you found」（Permits の初期行が無いときは「Log what you found about permits」）、需要・課題シグナル「None logged yet」「{n} of {基準値} logged」。
@@ -1382,7 +1382,7 @@ Summary は DescriptionList、判定は RadioGroup の cards。s19-decision.html
 | Cancel | 何も記録せず 13 へ |
 
 - 判定は何度でも記録し直せる。決定ログは追記だけで、記録した判定は編集・削除できない。
-- 画面を開いた後に他の人が判定を記録していたら、記録の前に「Kenji recorded Hold 2 minutes ago. Record yours as well?」と確認する（本文「Both decisions stay in the log, and yours becomes the latest.」、[Record mine] / [Cancel]。Cancel では記録せず、判断材料を読み直してその判定を直前の判定として出す）。
+- 画面を開いた後に他の人が判定を記録していたら、記録の前に「Kenji recorded Hold 2m ago. Record yours as well?」（時刻の書き方は 1.2 の相対の日時）と確認する（本文「Both decisions stay in the log, and yours becomes the latest.」、[Record mine] / [Cancel]。Cancel では記録せず、判断材料を読み直してその判定を直前の判定として出す）。
 - 判定か理由が無いまま Record decision を押すと、記録せずにそれぞれの欄の下に理由を出す（6.0.8。判定は「Choose one of the options」）。Record decision は判断材料を読み終えるまで押せない（どの判定を元に記録するかを API に送るため。System Design Doc 5.7 V19）。
 - 最新の判定が Proceed 以外に変わっても、既存のプランは消さない。20 に「Latest decision is Hold」と表示する。
 
@@ -1513,7 +1513,7 @@ Reply in Markdown. For each question you want to update, write one block:
 - 各設問の欄の順: `**Question:**`（設問の問い）、`**Example:**`（「例を含める」がオンで EXAMPLE があるときだけ）、`**Choices:**`（選択の設問。選択肢を「 / 」でつなぐ）、`**Current answer:**`、`**F/A/U:**`、`**Evidence:**`。ヒントは Markdown に書かず、JSON の `hint` にだけ入れる（「例を含める」がオフのときは JSON の `example` を null にする）。JSON の選択の設問は `choices` に選択肢を持つ。
 - `**F/A/U:**` は検証の F/A/U を持つ設問だけで、6.0.3 の状態の表示名（Assumption は「Assumption (Medium)」のように確信度を括弧で添える）。状態が Empty なら行を出さない。`**Evidence:**` は検証で根拠があるときだけで、付けた順に「Research log {日付} "{トピック}"」（日付が無ければ「Research log "{トピック}"」）か URL（メモ付きは「{URL} ({メモ})」）を「; 」でつなぐ。削除した調査ログの根拠は書かない（JSON の `evidence` も同じ。URL の根拠は `note` も持つ）。
 - 金額＋理由の金額は、通貨記号付きの金額（6.4 の書式。端数があるときだけ小数第2位まで）で書く。見出しと値のあいだに空の引用の行（`>`）を入れる。
-- 引用の外に書くテンプレートの文章（プロンプト・設問の問い・EXAMPLE）は、行頭の `#`・`##`・コードブロックの区切り（` ``` `・`~~~`）の前に `\` を付ける。書き出しをそのまま貼ったときに、取り込みが見出しやコードブロックと読み違えないため。見出し・選択肢・根拠・Reference の一覧と表のセルは、改行と続く空白を1つの空白にして1行に書く。ヘッダーのコメントの値も1行にし、コメントを閉じる `-->` は `->` にする。
+- 引用の外に書くテンプレートの文章（プロンプト・設問の問い・EXAMPLE）は、行頭の `#`・`##`・コードブロックの区切り（` ``` `・`~~~`）の前に `\` を付ける。書き出しをそのまま貼ったときに、取り込みが見出しやコードブロックと読み違えないため。見出し・選択肢・根拠・Reference の一覧と表のセルは、改行と続く空白を1つの空白にして1行に書く。ヘッダーのコメントの値も1行にし、コメントを閉じる `-->` と `--!>`（続く `-` もまとめて）は `->` にする。
 - Current answer の引用は、回答の本文の各行をそのまま引用にする（空の行は `>` だけ）。書き出しをそのまま貼れば、取り込みは本文を保存されているとおりに読み戻す（先頭と末尾の空の行、空白だけの行を含む）。
 - How to reply は、書き出した設問（0件なら範囲の書き出せる設問）から作る。例のブロックは最初の金額でない設問の ID（無ければ最初の設問）。金額の行（`For amount questions (…)`）は金額＋理由の設問があるときだけで、括弧の中はその設問 ID のセクションごとの `SA.INCOME.*` の形。JSON の `reply.example.answers` は、最初の文章の設問の例と、最初の金額の設問の例（`amount` は今の金額。無ければ 0）。
 - ファイル名の元の `{種類}` は `kind` と同じ値、`{名前}` は検証がアイデア名、プランが「アイデア名 / 案の名前」、自己分析が持ち主の表示名、`{日付}` は書き出した人のタイムゾーンの日付。ファイルに使えない文字（`\ / : * ? " < >`、縦線、制御文字）は `-` にし、続く空白は1つにする。ヘッダーの `exported:` と JSON の `exportedAt` も書き出した人のタイムゾーンの時刻（`exported:` は分まで、`exportedAt` は秒まで）。
@@ -1747,10 +1747,10 @@ Web（パターン D。題・新規作成・絞り込み・検索は左のペイ
 │ Proposer All ▾  Sort Updated ▾ [Search…]│                             │
 ├────────────────────────────────────────┤                             │
 │ Piaya Gift Box Delivery        Proceed  │                             │
-│  Planning · Ana · updated 2h ago        │ 一行コンセプト・主要指標・      │
+│  Planning · Ana · 2h ago                │ 一行コンセプト・主要指標・      │
 │  ●●●●●● Checks                           │ 確認項目・プラン・最新の判定     │
 │ Bacolod Health Bowl            Hold     │ [Open validation]            │
-│  Validation · Kenji · 1d ago            │                             │
+│  Validation · Kenji · Oct 12            │                             │
 │  ●●◐●○● Missing: permits, costs          │                             │
 │ …                                       │                             │
 │ 1 dropped idea hidden · [Show]          │                             │
@@ -1778,7 +1778,7 @@ Web（パターン D。題・新規作成・絞り込み・検索は左のペイ
 | 5 の Ideas・Due soon、工程の集計 | 対象外 |
 - 空の状態: 「No ideas yet. Write down the first one. You can have many.」と + New idea（Viewer は説明だけ）。絞り込みで0件なら「No ideas match these filters」と解除ボタン（「Clear filters」。すべての絞り込みと検索を既定に戻す）。
 - 絞り込みの Picker: 「Stage」（All・Validation・Planning・Launch prep）、「Decision」（Not dropped・All・Undecided・Proceed・Hold・Drop）、「Proposer」（All と、このワークスペースの Owner / Member を表示名の順に）、「Sort」（Updated・Created・Name）、「Archived」（Hidden・Included）。検索は打つのが 0.3 秒止まったら絞り込む。絞り込みを変えても履歴を足さない（戻るで絞り込みを1つずつ戻らず、画面を離れる）。
-- 2列の並び（デスクトップ）では、行を押すとその要約を右に出し、まだ選んでいなければ一覧の最初のアイデアの要約を出す。1ペインの並び（タブレットとスマホ）では、行を押すと 13 を開く（スマホと同じく一覧だけを出す。D のタブレットの列は「スマホと同じ」のため）。
+- 2列の並び（デスクトップ）では、行を押すとその要約を右に出し、まだ選んでいなければ一覧の最初のアイデアの要約を出す。1ペインの並び（タブレットとスマホ）では、行を押すと 13 を開く（スマホと同じく一覧だけを出す。D のタブレットの列は「スマホと同じ」のため）。2列で要約を出していたアイデア（`?selected=`）は、1ペインに変わったときは 4.5 の D の決まりに従う。1ペインで `?selected=` の付いた URL を開いたとき（デスクトップで写したリンクなど）も、その要約を出す（← で一覧へ戻る）。
 - 行の ⋯（Owner / Member。4.5 の ListView の `actions`）: Duplicate と、アーカイブしていなければ Archive、アーカイブ済みなら Restore。アーカイブ済みのアイデアの行は、2行目の先頭に「Archived」と出す。確認項目の点の横は、不足があれば 6.9 と同じ不足の名前（3つ以上は件数）、無ければ「All checks done」。
 - 右の詳細の確認項目は状態だけを出し、不足の理由は出さない（s06-ideas.html。理由は 13 で読む）。「Plans: {案名を「, 」でつないだもの}.」（無ければ「Plans: none yet.」）の後に「Latest decision: {判定} on {日付}」、ダッシュ（U+2014）、引用符で囲んだ理由の冒頭を続ける（s06-ideas.html）。
 - 「n dropped ideas hidden · Show」の Show は、判定の絞り込みを All にする。5 の同じ「Show」は、判定の絞り込みを Drop にした 6 を開く。
@@ -1896,13 +1896,13 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ My Self Analysis              In progress · 21 / 36 answered  │
-│ [Continue] [AI ▼ Export / Import] [Mark as done] [Share ▼] Team 🕘 │
+│ My Self Analysis       [AI ▼] [Mark as done] [Share] [Team] [⋯] │
+│ In progress · 21 / 36 answered                     [Continue] │
 ├───────────────────────────────┬──────────────────────────────┤
-│ 状態                           │ セクション                     │
-│  21 / 36 answered             │  ● WHY            2/2       › │
-│  Shared with: (not shared)    │  ● BE             2/2       › │
-│  Template v1                  │  ◔ DO             1/3       › │
+│ Status                        │ Sections                     │
+│  Answered     21 / 36 answered│  ● WHY            2/2       › │
+│  Shared with  Not shared      │  ● BE             2/2       › │
+│  Template     v1              │  ◔ DO             1/3       › │
 │                               │  …                            │
 │                               │  ○ ONE-SENTENCE   0/1       › │
 └───────────────────────────────┴──────────────────────────────┘
@@ -1990,7 +1990,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 - 並びと文言:
   - ヘッダ: 上から、アイデアのアーカイブの注意（6.1 と同じ。アイデアがアーカイブ済みならこちらだけ）か案のアーカイブの注意（題「This plan is archived」と Restore）、版を開いているときの「Viewing {版の名前} (read only)」と「Show the latest」のリンク（今のプランの 20）、案の名前（見出し）と ▼（案の切替。押すとメニューで、案を作った順に並べ、アーカイブした案は見出し「Archived」の下にまとめ、最後に Add plan）、「Version: {版の名前}」（変更があれば「Version: {版の名前} + changes」、版が無ければ「No version saved」）と「Updated {最終更新日}」（版を開いているときは「Saved {保存日}」）を「 · 」でつないだ1行、Business Name と Prepared by の欄（ラベル付きの小さな TextField を横に並べ、6.0.2 の自動保存で保存する。読み取りのときは「Business Name: {値} · Prepared by: {値}」の1行で、空の値は「Empty」）、最新の判定が Proceed でないときの注意「Latest decision is {判定}.」（上の図のとおりヘッダの最後の行）、空の状態の案内文。
   - 題の横の道具は Save version（M3）と ⋯（Rename plan・Export for AI（24）・Import from AI（25）・Archive plan・Update template（M8。新しい版があるときだけ。6.0.7））。主要な操作は Record Go / No-Go（M4。スマホは下部に固定。4.1 A）。どれも Owner / Member が、アイデアも案もアーカイブしておらず、版を開いていないときだけ出す。Add plan（案の切替の中）は Owner / Member に、アイデアも開いている案もアーカイブしておらず、最新の判定が Proceed のときだけ出す。Pitch Deck の入口（23）は、6.8 のとおり Viewer・アーカイブ中にも開けるので、この道具の組の条件に入れない。案の切替は、案の一覧（P1）を読み終えるまで押せず、読めなかったときはメニューに今の案と「Couldn't load the plans. Try again」を出す。
-  - Rename plan は小さな Dialog（題「Rename plan」、「Plan name」の欄、Save と Cancel。名前が空のあいだは Save を押せない）。名前の重複は欄の下に「This name is already used」を出す。開いた後にほかの人がヘッダを保存していたときは、6.0.2 の衝突の確認を出す（Overwrite with mine は名前だけを送る。Load theirs はヘッダを読み直して閉じる）。
+  - Rename plan は小さな Dialog（題「Rename plan」、「Plan name」の欄、Save と Cancel。名前が空のあいだと、この画面の Business Name・Prepared by の保存を送っているあいだは Save を押せない）。名前の重複は欄の下に「This name is already used」を出す。開いた後にほかの人がヘッダを保存していたときは、6.0.2 の衝突の確認を出す（自分の保存は衝突にしない。Overwrite with mine は名前だけを送る。Load theirs はヘッダを読み直して閉じる）。
   - 主列に「Key numbers」（題の右に「From validation」、版を開いているときは「As saved in this version」。13 と同じ4つの数字を 2×2 で出し、下に 18 を開くリンク。Owner / Member でアイデアがアーカイブされていなければ「Edit in validation」、Viewer とアーカイブ中は「Open in validation」（6.1 の Summary のリンクと同じく、入力できない人には文言だけを変える））、「Go / No-Go」（最新の値の Badge と「{日付} · {記録者}」、その下に「See all Go / No-Go decisions」（種類を Go / No-Go に、アイデアをこのアイデアに絞った 7）。記録が無ければ「Not recorded yet」）、「Versions」（新しい順に版の名前と「{保存日} · {保存した人}」。押すとその版を読み取り専用で開く。開いている版は押せず、「Viewing · …」と出す。無ければ「No versions saved yet」）、「Execution」（「{n} items overdue」（琥珀色）と「{n} items due in the next 7 days」。0 の行は出さず、どちらも 0 なら「Nothing due in the next 7 days」。その下に 22 を開く「Open Execution」）。副列に「Part A: Business Case」と「Part B: Execution Plan」（題の右に「{完了した項目の数} / {項目の数}」。各行は小項目の記入の割合だけ満ちた MoonGlyph（数える小項目の無い項目は満ちた月）・「{番号} {項目名}」・[V] と [S] の Badge（読み上げは「Uses your validation」「Refers to shared self analyses」）・コメントの数・「{記入済み}/{小項目の数}」）。
   - ヘッダーの 💬 の一覧（プラン全体のスレッドとアイデアへのコメント）は、各スレッドの上に SDD 5.11 の `HistoryEntry.label` と同じ書き方で項目の名前を出す（小項目は「{項目の番号2桁} {小項目のタイトル}」、実行管理の項目は「Execution · {1列目}」、スライドは「Pitch Deck」）。名前は C1 がスレッドごとに返す（SDD 5.11 の `label`）ので、項目ごとに読まない。20 は項目を画面に並べないので、項目の 💬・🕘 は置かない（13 と同じ）。
   - 別のアイデアの案の id を、このアイデアのパスに付けて開いたときは「見つからない」（6.0.6）を出す。
@@ -2265,7 +2265,7 @@ Web（パターン A）            スマホは Ideas → Due soon → Self anal
 |---|---|---|
 | その人の自己分析の、このワークスペースへの共有 | 自動で解除する（コメントは隠して残す）。再び Owner / Member になっても自動では戻らず、本人が共有し直す | 同じ |
 | その人が担当の実行管理の項目 | 担当を名前の自由記述（その人の表示名）に置き換える。アーカイブしたアイデア・プランの項目も置き換える（担当に選べない人を指したまま残さないため） | 同じ（Viewer は担当に選べないため） |
-| 提案者・記録者・コメント・変更履歴の名前 | 名前のまま残し、「(former member)」を添える | そのまま（メンバーのまま） |
+| 提案者・記録者・版を保存した人・コメント・変更履歴の名前 | 名前のまま残し、「(former member)」を添える | そのまま（メンバーのまま） |
 | その人に届いていたこのワークスペースの通知 | 残すが、押すと「You no longer have access」 | そのまま。自己分析へのコメントの通知だけ、押すと「You no longer have access」 |
 
 **アカウントの削除（4 の「Delete account」）**: 個人情報を預かる以上、本人がアプリの中から削除できる必要がある（Phase 3 で追加）。

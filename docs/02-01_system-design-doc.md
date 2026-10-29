@@ -2447,7 +2447,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 自分の自己分析（S1〜S5、自己分析の X1〜X3・T1・T2・H1〜H3） | × | 本人 | 本人 | 本人 | 本人 |
 | コメントを読む・書く・スレッドの解決（C1・C3。自己分析へのコメントを除く） | × | ○ | ○ | ○ | 所属していれば |
 | 自己分析へのコメントとスレッドの解決（C1・C3） | × | × | ○（共有先のワークスペースで） | ○（同左） | 所属していれば |
-| コメントの編集・削除（C2） | × | 本人 | 本人 | 本人 | 本人 |
+| コメントの編集・削除（C2） | × | 本人 | 本人 | 本人 | 所属していれば、本人 |
 | 変更履歴の閲覧（H1。自己分析の履歴は本人だけ） | × | ○ | ○ | ○ | 所属していれば |
 | 変更履歴から戻す（H2・H3） | × | × | ○ | ○ | 所属していれば |
 | 通知（N1〜N3） | × | 本人 | 本人 | 本人 | 本人 |
@@ -2576,7 +2576,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目 | 決定 |
 |---|---|
 | ライブラリ | i18next ＋ react-i18next（Web）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール）。Web の画面と `packages/ui-web` の部品は文言を `useTranslation` で引き、アプリのルートが `I18nextProvider` で `packages/i18n` の共有のインスタンスを渡す（言語が変わると描き直す）。書式関数は同じインスタンスを直接使う |
-| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。どの画面でも同じ、列挙の値（5.2）の表示名は `common` に置き、キーは `<まとまり>.<値>`（例: `common:stage.launch_prep`・`common:checkState.not_started`・`common:decision.proceed`）。キーの語は camelCase にし、API の値（列挙の値・`error.code`・セクションのキー）はそのまま使う（例: `common:check.competitorsRange`・`errors:VALIDATION_FAILED`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける）。Web も、すべてのネームスペースを入れた共有のインスタンスを同期で使い、画面ごとに後から読まない（書式関数と、ルートの `head` のような描画の外の `i18n.t()` が、待たずに引けるように） |
+| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.add_evidence`）。どの画面でも同じ、列挙の値（5.2）の表示名は `common` に置き、キーは `<まとまり>.<値>`（例: `common:stage.launch_prep`・`common:checkState.not_started`・`common:decision.proceed`）。キーの語は camelCase にし、API の値（列挙の値・`error.code`・セクションのキー）はそのまま使う（例: `common:check.competitorsRange`・`errors:VALIDATION_FAILED`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける）。Web も、すべてのネームスペースを入れた共有のインスタンスを同期で使い、画面ごとに後から読まない（書式関数と、ルートの `head` のような描画の外の `i18n.t()` が、待たずに引けるように） |
 | エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
 | 入力の検査の文言 | クライアントの Zod の検査（8.2）の issue の `code` から選ぶ。`too_small`・`too_big` は `origin`（文字数か数か）と `minimum`・`maximum`、`invalid_format` は `format`（`email`・`url`・`date`・`datetime`、テンプレートのファイルの `question_key`・`copy_source` など）、`invalid_type` は `expected`（`int` は整数でない数。ほかは型の違い）、`invalid_value` は選択肢に無い値、`packages/schemas` の自前の検査（`custom`）は `params.rule`（`InputRule` の型: `required`・`decimals`・`positive`・`nul_character`・`number_format`・`currency`・`time_zone`・`lone_surrogate`・`unique`（テンプレートのファイルで、キーや選択肢が重なる））を見て、カタログの文言を出す（キーは `errors:input.<…>`）。26 のファイルの取り込み（AD10）は、`path` が `kind` の issue を「テンプレートの種類が違う」、それ以外の issue を「書式が読めない」としてまとめ、`path` で場所を添える（design-spec 6.17）。issue の `message` は開発者向けで、画面に出さない |
 | 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatNumberText()`（NumberField に打った文字列の桁区切りを付け直す。小数の桁は打ったまま）・`formatNumberAffixes()`（NumberField が数字の横に出す通貨記号・%）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatIsoDateTime()`（AI 書き出しの時刻。タイムゾーンのオフセット付き）・`formatRelativeTime()`・`formatOverdue()`（期限切れの日数）・`formatWaitTime()`（回数制限の待ち時間）・`formatCheckName()`（確認項目の名前。競合の基準値の幅を付ける）・`formatProgress()`（ProgressCircle・ProgressBar の読み上げ。整数の %）・`formatCalendarMonth()`・`formatWeekdayInitial()`・`formatDayOfMonth()`（DatePicker のカレンダーの見出し・曜日・日）・`formatCurrencyOption()`（通貨の Picker の選択肢。「PHP · Philippine Peso」）・`formatList()`（名前を「, 」でつなぐ一覧。5 の不足の確認項目）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。部品の中で React Aria が書式を作る所も、部品から渡せるものはこれを渡す。例外は DatePicker の入力欄（design-spec 1.2）と、React Aria が作り部品から渡す口の無い読み上げ（「React Aria の文言」の行）で、React Aria が en-PH の形で出す。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
@@ -2617,7 +2617,7 @@ Cloud Monitoring のアラート（死活・エラー率・レイテンシ・メ
 | 項目 | ツール | 設定 |
 |---|---|---|
 | API のエラー | Sentry（プロジェクト `moonx-api`） | `environment` = staging / production、`release` = コミット SHA、タグに `requestId`・`route`。ユーザーは `userId` だけ。新しい issue でメール通知。ソースマップは `make build-api-image` が上げる（2章「make ターゲット」） |
-| Web のエラー | Sentry（プロジェクト `moonx-web`） | `environment` と DSN は API が HTML の meta 要素で渡す（ADR-004）。`release` = コミット SHA（`build-web` が入れる）。ソースマップは `make build-api-image` が上げる（2章「make ターゲット」）。Sentry は最初の描画の前に始め、最初の描画の失敗も送る |
+| Web のエラー | Sentry（プロジェクト `moonx-web`） | `environment` と DSN は API が HTML の meta 要素で渡す（ADR-004）。`release` = コミット SHA（`build-web` が入れる）。ユーザーはログインしている間の `userId` だけ。ソースマップは `make build-api-image` が上げ、配る静的ファイル（イメージ）には入れない（ソースを公開しないため）。Sentry は最初の描画の前に始め、最初の描画の失敗も送る |
 | API のログ | Cloud Logging | 標準出力に1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`clientIp`。8.3）。保持は既定の30日 |
 | 死活 | Cloud Monitoring の稼働時間チェック | `https://{DOMAIN}/api/health`（Z1。DB に触れない）を5分ごと、3つの地域から。2つ以上の地域で失敗が5分続いたらメール。最初の構築では、証明書ができるまで作らない（03 5.4 I・J） |
 | エラー率 | Cloud Monitoring（ログベースの指標） | 5xx が10分間で全体の1%を超える、または5分で5件を超えたらメール |

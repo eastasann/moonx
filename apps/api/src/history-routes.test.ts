@@ -66,6 +66,7 @@ async function saveAnswer(
   key: string,
   body: Record<string, unknown>,
   cookie = team.memberCookie,
+  client?: "web" | "web_mobile",
 ) {
   tick();
   const [row] = await db
@@ -77,12 +78,13 @@ async function saveAnswer(
         eq(validationAnswers.questionKey, key),
       ),
     );
-  const response = await call(
+  const request = apiRequest(
     "PUT",
     `/api/v1/validations/${team.validationId}/answers/${key}`,
-    cookie,
-    { lockVersion: row?.lockVersion ?? 0, ...body },
+    { cookie, body: { lockVersion: row?.lockVersion ?? 0, ...body } },
   );
+  if (client !== undefined) request.headers.set("x-moonx-client", client);
+  const response = await app.handle(request);
   expect(response.status).toBe(200);
 }
 
@@ -1224,6 +1226,56 @@ describe("a person's manual edits in a row are one change (ADR-020)", () => {
     const [added] = await rowsOf(team.validationId, "V.01.WHO");
     expect(added?.firstChangedAt?.getTime()).toBe(first);
   });
+
+  // K-08 and K-16 count a merged row once, by the client of its last change (SDD 11章).
+  for (const [first, last] of [
+    ["web", "web_mobile"],
+    ["web_mobile", "web"],
+  ] as const) {
+    test(`a merged row takes its last save's client: ${first}, then ${last}`, async () => {
+      const team = await teamWithNewIdea(app, fixtures);
+      await answered(team);
+      await saveAnswer(team, "V.01.WHO", { text: "HR" }, undefined, first);
+      await saveAnswer(
+        team,
+        "V.01.WHO",
+        { text: "HR officers" },
+        undefined,
+        last,
+      );
+      expect(
+        (await rowsOf(team.validationId, "V.01.WHO")).map((row) => [
+          row.action,
+          row.client,
+        ]),
+      ).toEqual([
+        ["create", "unknown"],
+        ["update", last],
+      ]);
+
+      const fresh = await teamWithNewIdea(app, fixtures);
+      await saveAnswer(
+        fresh,
+        "V.01.WHO",
+        { text: "Offices" },
+        undefined,
+        first,
+      );
+      await saveAnswer(
+        fresh,
+        "V.01.WHO",
+        { text: "Offices in Bacolod" },
+        undefined,
+        last,
+      );
+      expect(
+        (await rowsOf(fresh.validationId, "V.01.WHO")).map((row) => [
+          row.action,
+          row.client,
+        ]),
+      ).toEqual([["create", last]]);
+    });
+  }
 
   test("folds a new row's edits into its addition", async () => {
     const team = await teamWithNewIdea(app, fixtures);

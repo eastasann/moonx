@@ -1,6 +1,7 @@
 import type { MetricGroupVariant, MetricTileTone } from "@moonx/ui-tokens";
 import { TriangleAlert } from "lucide-react";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
+import { Link as AriaLink } from "react-aria-components";
 import { BodyRoomContext } from "../internal/frame";
 import { IconSlot } from "../internal/IconSlot";
 import { lineIcon } from "../internal/lineIcon.css";
@@ -63,8 +64,13 @@ export interface MetricTileProps {
    * 指標の表示」): it is set in the text size, quieter, and wraps between words.
    */
   isPlaceholder?: boolean;
-  /** A line under the value: a reason, a warning, a link to the screen that fixes it. */
+  /** A line under the value: a reason, a warning. */
   supplement?: ReactNode;
+  /**
+   * Makes the supplement a link to the screen that fixes it (13's warning to 18, design-spec
+   * 6.1), keeping the supplement's colour and size.
+   */
+  supplementHref?: string;
   /**
    * `notice` marks the supplement as a warning (zero or negative contribution margin): amber
    * with a warning sign, not colour alone (design-spec 4.4).
@@ -85,6 +91,7 @@ export function MetricTile({
   unit,
   isPlaceholder = false,
   supplement,
+  supplementHref,
   supplementTone = "neutral",
 }: MetricTileProps) {
   const group = useContext(GroupContext);
@@ -116,7 +123,15 @@ export function MetricTile({
               </IconSlot>
             </span>
           )}
-          <span>{supplement}</span>
+          <span>
+            {supplementHref === undefined ? (
+              supplement
+            ) : (
+              <AriaLink href={supplementHref} className={styles.supplementLink}>
+                {supplement}
+              </AriaLink>
+            )}
+          </span>
         </dd>
       )}
     </dl>

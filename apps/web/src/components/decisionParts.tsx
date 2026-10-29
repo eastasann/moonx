@@ -135,18 +135,18 @@ export function FauCounts({ fau }: { fau: FauBreakdown }) {
     },
     { state: "unknown", label: "unknown", value: fau.unknown, notice: true },
     {
-      state: null,
+      state: "unclassified",
       label: "unclassified",
       value: fau.unclassified,
       notice: true,
     },
-    { state: null, label: "empty", value: fau.empty, notice: false },
+    { state: "empty", label: "empty", value: fau.empty, notice: false },
   ] as const;
   return (
     <Flex gap="space-200" alignItems="center" wrap>
       {counts.map((count) => (
         <Flex key={count.label} gap="space-75" alignItems="center">
-          {count.state !== null && <MoonGlyph state={count.state} size="S" />}
+          <MoonGlyph state={count.state} size="S" />
           <Text variant="body-sm" tone={count.notice ? "notice" : "secondary"}>
             {`${t(`common:fauState.${count.label}`)} `}
             <Text variant="number" tone={count.notice ? "notice" : "primary"}>

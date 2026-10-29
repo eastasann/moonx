@@ -142,7 +142,7 @@ describe("13 Validation home (design-spec 6.1)", () => {
     expect(document.title).toBe("moonx");
   });
 
-  test("a contribution margin of zero or less: the break-even's reason and its warning", async () => {
+  test("a contribution margin of zero or less: the break-even's reason and its warning, a link to 18", async () => {
     const data = validationHome();
     homeApi({
       data: {
@@ -164,8 +164,10 @@ describe("13 Validation home (design-spec 6.1)", () => {
       "Contribution margin is zero or negative. Review price or variable costs.",
     );
     expect(
-      within(numbers).getByText("Contribution margin is zero or negative"),
-    ).toBeTruthy();
+      within(numbers)
+        .getByRole("link", { name: "Contribution margin is zero or negative" })
+        .getAttribute("href"),
+    ).toBe(`${path}/economics`);
   });
 
   test("sections open 11 and 14〜18; an empty summary answer opens its question", async () => {
@@ -263,6 +265,26 @@ describe("13 Validation home (design-spec 6.1)", () => {
     ).toBe(
       `/w/${workspaceId}/ideas/${home.idea.id}/questions/01?q=V.01.PROBLEM`,
     );
+  });
+
+  test("dropped: the Drop badge, and Edit summary and Record decision stay (6.1 状態, PRD MB-12)", async () => {
+    homeApi({
+      me: as("member"),
+      data: validationHome({ latestDecision: "drop" }),
+    });
+    renderApp(path);
+    // The badge leads the line above the name.
+    const status = (
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Bacolod Health Bowl",
+      })
+    ).previousElementSibling as HTMLElement;
+    expect(within(status).getByText("Drop")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit summary" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Record decision" }),
+    ).toBeTruthy();
   });
 
   test("archived: the notice and Restore for an Owner, and no Edit summary or AI", async () => {

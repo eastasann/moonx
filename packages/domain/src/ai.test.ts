@@ -683,6 +683,18 @@ describe("the export of a plan", () => {
       ...overrides,
     });
 
+  test("keeps the header one comment whatever the names hold (design-spec 6.6)", () => {
+    const { markdown } = exportOf(
+      input({ ideaName: "Gifts --> Boxes --!> End", planName: "Plan --->\nB" }),
+    );
+    const header = markdown.split("\n")[0] ?? "";
+    expect(header).toStartWith(
+      "<!-- moonx-export v1 | kind: business_plan | scope: 01,11 | idea: Gifts -> Boxes -> End / Plan -> B |",
+    );
+    expect(header.indexOf("-->")).toBe(header.length - 3);
+    expect(header).not.toContain("--!>");
+  });
+
   test("exports the text sub-items of the items, the tables only as Reference", () => {
     const { markdown, json, fileBaseName } = exportOf(input());
     expect(json.questions.map((q) => q.id)).toEqual(["P.01.1", "P.11.2"]);
@@ -746,7 +758,7 @@ describe("the export of a plan", () => {
     expect(
       scopeSections("business_plan", SECTIONS, { kind: "items", itemNos: [2] }),
     ).toEqual({
-      problem: { kind: "unknown", key: "2" },
+      problem: { kind: "unknown" },
     });
     expect(
       scopeSections("business_plan", SECTIONS, {
@@ -766,7 +778,7 @@ describe("the export of a plan", () => {
         kind: "sections",
         keys: ["03"],
       }),
-    ).toEqual({ problem: { kind: "unknown", key: "03" } });
+    ).toEqual({ problem: { kind: "unknown" } });
   });
 });
 

@@ -320,8 +320,14 @@ export function WorkspaceFrame({
                   {t("app:nav.workspaceSettings")}
                 </MenuItem>
               ))}
+              {/* Shield in More too (design-spec 6.17). */}
               {admin.map((item) => (
-                <MenuItem key={item.id} id={item.id} href={item.href}>
+                <MenuItem
+                  key={item.id}
+                  id={item.id}
+                  href={item.href}
+                  icon={item.icon}
+                >
                   {item.label}
                 </MenuItem>
               ))}

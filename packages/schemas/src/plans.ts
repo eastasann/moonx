@@ -37,6 +37,7 @@ import {
   planNameSchema,
   reasonSchema,
   requiredShortTextSchema,
+  requiredText,
   shortTextSchema,
   versionNameSchema,
 } from "./input-rules";
@@ -492,7 +493,7 @@ export const executionListQuerySchema = z.object({
    * An assignee typed as a name (design-spec 6.13), matched without regard to case: the
    * Picker of 22 lists names that differ only in case once.
    */
-  assigneeName: z.string().trim().min(1).max(60).optional(),
+  assigneeName: z.string().trim().pipe(requiredText(60)).optional(),
   status: executionStatusSchema.optional(),
 });
 

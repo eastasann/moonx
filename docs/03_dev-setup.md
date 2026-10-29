@@ -214,6 +214,7 @@ make infra-apply ENV=staging    # 適用
 #### A. アカウントとドメイン
 
 - [ ] 1章のアカウントを作る（本人確認と審査に数日かかるので早めに）
+- [ ] Neon・Google Cloud・Vercel のアカウントで2段階認証を必須にする（DB と本番の資源に入れるアカウントを守るため。SDD 7.2「個人情報」）
 - [ ] Vercel で `dwnfrc.app` の DNS のレコードを足せることを確かめる（ドメインは新しく取らない。ADR-013）。Vercel では、レコードの名前を `dwnfrc.app` からの相対で入れる（`.dwnfrc.app` を除いた部分だけを入れる）
 - [ ] Search Console で `dwnfrc.app` の所有を確かめる（ドメイン プロパティ）。Search Console が出す TXT のレコードを Vercel の DNS の `dwnfrc.app` に入れ、確認を押す。確かめる Google アカウントは、I で Terraform を動かし、ドメインマッピングを作るアカウントにする（所有を確かめていないアカウントではドメインマッピングを作れない）
 

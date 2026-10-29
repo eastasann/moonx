@@ -42,7 +42,6 @@
     "versions": {
       "title": "Versions",
       "none": "No versions saved yet",
-      "meta": "{{date}} · {{name}}",
       "viewing": "Viewing"
     },
     "execution": {

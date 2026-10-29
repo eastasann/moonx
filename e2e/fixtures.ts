@@ -5,6 +5,7 @@ import {
   request as apiRequest,
   test as base,
   expect,
+  type Locator,
   type Page,
 } from "@playwright/test";
 import { API_LOG, WEB_ORIGIN } from "./env";
@@ -96,6 +97,31 @@ export async function expectNoAxeViolations(page: Page) {
       targets: violation.nodes.map((node) => node.target.join(" ")),
     })),
   ).toEqual([]);
+}
+
+/**
+ * Checks that a link on its own row, focused from the keyboard, rings its words and not
+ * the row (design-spec 4.5 Link): its box is as wide as its text, or as the minimum target
+ * when the text is narrower.
+ */
+export async function expectRingAroundText(page: Page, link: Locator) {
+  await link.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(link).toBeFocused();
+  await expect(link).toHaveAttribute("data-focus-visible", "true");
+  const { box, text, minimum, row } = await link.evaluate((element) => {
+    const words = document.createRange();
+    words.selectNodeContents(element);
+    return {
+      box: element.getBoundingClientRect().width,
+      text: words.getBoundingClientRect().width,
+      minimum: Number.parseFloat(getComputedStyle(element).minWidth),
+      row: (element.parentElement as HTMLElement).getBoundingClientRect().width,
+    };
+  });
+  expect(box).toBeLessThan(row);
+  expect(box).toBeLessThanOrEqual(Math.max(text, minimum) + 1);
 }
 
 /**

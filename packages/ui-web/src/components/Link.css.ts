@@ -31,10 +31,13 @@ export const link = recipe({
       // Standalone on a row or in a list: keeps the minimum target (design-spec 4.5).
       // Its text names it, so the underline is the light line (d1-moon.html .textlink),
       // darkening on hover.
+      // As a flex or grid item of a column (a row of its own), it would be stretched across
+      // the row and its focus ring with it; fit-content keeps the box to its words.
       primary: {
         ...typography("link"),
         display: "inline-flex",
         alignItems: "center",
+        width: "fit-content",
         minHeight: atLeastTarget("0px"),
         minWidth: vars.scale.component.targetMin,
         textDecorationColor: vars.color.border.default,

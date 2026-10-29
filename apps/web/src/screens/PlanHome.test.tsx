@@ -1,5 +1,6 @@
 import type { HistoryEntry, Me, PlanHome, Role } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { focusManager } from "@tanstack/react-query";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
@@ -470,6 +471,23 @@ describe("20 Plan home (design-spec 6.12)", () => {
     expect(versions.textContent).toContain("Viewing · Sep 20 · Ana Villanueva");
   });
 
+  test("a version saved by someone who left names them with (former member) (6.16)", async () => {
+    const base = planHome();
+    planApi({
+      home: planHome({
+        versions: base.versions.map((version) => ({
+          ...version,
+          savedBy: { ...anaRef, badge: "former_member" as const },
+        })),
+      }),
+    });
+    renderApp(planPath());
+    const versions = await screen.findByRole("list", { name: "Versions" });
+    expect(versions.textContent).toContain(
+      "Sep 20 · Ana Villanueva (former member)",
+    );
+  });
+
   test("another workspace's plan, or one of another idea, is not shown under this URL", async () => {
     planApi({
       home: planHome({ ideaId: "aaaaaaaa-0000-4000-8000-000000000000" }),
@@ -752,6 +770,198 @@ describe("M3, M4, M5 and Rename plan", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Plan Z" }),
     ).toBeTruthy();
+  });
+
+  /**
+   * Opens Rename plan, lets `meanwhile` change the header the page reads, waits until the
+   * page shows it (`shown`), and saves `typed`.
+   */
+  async function renameAfter(
+    meanwhile: (home: PlanHome) => void,
+    shown: () => boolean,
+    typed: string,
+    write: (call: Call) => Response | undefined,
+  ) {
+    const user = userEvent.setup();
+    const home = planHome();
+    const calls = planApi({ home, write });
+    renderApp(planPath());
+    await user.click(
+      await screen.findByRole("button", { name: "More for Plan A" }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Rename plan" }));
+    const dialog = await screen.findByRole("dialog", { name: "Rename plan" });
+    // The window's focus reads 20 again (TanStack Query's refetch on focus).
+    meanwhile(home);
+    try {
+      act(() => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      await waitFor(() => expect(shown()).toBe(true));
+    } finally {
+      act(() => focusManager.setFocused(undefined));
+    }
+    const name = within(dialog).getByRole("textbox", { name: /Plan name/ });
+    await user.clear(name);
+    await user.type(name, typed);
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    return { user, calls };
+  }
+
+  test("Rename plan: someone else's header save since it opened asks; Overwrite sends the name alone", async () => {
+    const paolo = { ...anaRef, id: crypto.randomUUID(), displayName: "Paolo" };
+    let refused = false;
+    const { user, calls } = await renameAfter(
+      (home) =>
+        Object.assign(home, {
+          name: "Plan T",
+          lockVersion: 5,
+          updatedBy: paolo,
+        }),
+      () => document.querySelector("h1")?.textContent === "Plan T",
+      "Plan Z",
+      (call) => {
+        if (call.method !== "PATCH" || call.path !== api) return undefined;
+        if ((call.body as { force?: boolean }).force === true) {
+          return Response.json(planHome({ name: "Plan Z", lockVersion: 6 }));
+        }
+        refused = true;
+        return apiError(409, "CONFLICT", {
+          current: {
+            value: { name: "Plan T" },
+            lockVersion: 5,
+            updatedAt: new Date().toISOString(),
+            updatedBy: paolo,
+          },
+        });
+      },
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Overwrite with mine" }),
+    );
+    expect(refused).toBe(true);
+    expect(sent(calls, "PATCH", api).map(({ body }) => body)).toEqual([
+      { name: "Plan Z", lockVersion: 4 },
+      { name: "Plan Z", lockVersion: 4, force: true },
+    ]);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Rename plan" })).toBeNull(),
+    );
+  });
+
+  test("Rename plan: Load theirs closes and reads 20 again", async () => {
+    const paolo = { ...anaRef, id: crypto.randomUUID(), displayName: "Paolo" };
+    const { user, calls } = await renameAfter(
+      (home) =>
+        Object.assign(home, {
+          name: "Plan T",
+          lockVersion: 5,
+          updatedBy: paolo,
+        }),
+      () => document.querySelector("h1")?.textContent === "Plan T",
+      "Plan Y",
+      (call) =>
+        call.method === "PATCH" && call.path === api
+          ? apiError(409, "CONFLICT", {
+              current: {
+                value: { name: "Plan T" },
+                lockVersion: 5,
+                updatedAt: new Date().toISOString(),
+                updatedBy: paolo,
+              },
+            })
+          : undefined,
+    );
+    const reads = calls.filter(
+      ({ method, path }) => method === "GET" && path === api,
+    ).length;
+    await user.click(
+      await screen.findByRole("button", { name: "Load theirs" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Rename plan" })).toBeNull(),
+    );
+    await waitFor(() =>
+      expect(
+        calls.filter(({ method, path }) => method === "GET" && path === api)
+          .length,
+      ).toBeGreaterThan(reads),
+    );
+  });
+
+  test("Rename plan: the page's own header save while it is open does not ask", async () => {
+    const { calls } = await renameAfter(
+      (home) =>
+        Object.assign(home, {
+          businessName: "Health Bowl Co.",
+          lockVersion: 5,
+          updatedBy: anaRef,
+        }),
+      () =>
+        [...document.querySelectorAll("input")].some(
+          (input) => input.value === "Health Bowl Co.",
+        ),
+      "Plan Z",
+      (call) =>
+        call.method === "PATCH" && call.path === api
+          ? Response.json(planHome({ name: "Plan Z", lockVersion: 6 }))
+          : undefined,
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Rename plan" })).toBeNull(),
+    );
+    expect(sent(calls, "PATCH", api).map(({ body }) => body)).toEqual([
+      { name: "Plan Z", lockVersion: 5 },
+    ]);
+  });
+
+  test("Rename plan: Save waits for this page's header save on its way, then sends the version it left", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls = planApi({
+      write: (call) => {
+        if (call.method !== "PATCH" || call.path !== api) return undefined;
+        const body = call.body as { businessName?: string; name?: string };
+        if (body.businessName !== undefined) {
+          const businessName = body.businessName;
+          return held.then(() =>
+            Response.json(
+              planHome({ businessName, lockVersion: 5, updatedBy: anaRef }),
+            ),
+          );
+        }
+        return Response.json(planHome({ name: body.name, lockVersion: 6 }));
+      },
+    });
+    renderApp(planPath());
+    await user.type(
+      await screen.findByRole("textbox", { name: /Business Name/ }),
+      " Co.",
+    );
+    // Pressing ⋯ leaves the field, which sends it at once.
+    await user.click(screen.getByRole("button", { name: "More for Plan A" }));
+    await user.click(screen.getByRole("menuitem", { name: "Rename plan" }));
+    const dialog = await screen.findByRole("dialog", { name: "Rename plan" });
+    const name = within(dialog).getByRole("textbox", { name: /Plan name/ });
+    await user.clear(name);
+    await user.type(name, "Plan Z");
+    const save = within(dialog).getByRole("button", { name: "Save" });
+    expect(save.hasAttribute("disabled")).toBe(true);
+    act(() => release());
+    await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
+    await user.click(save);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Rename plan" })).toBeNull(),
+    );
+    expect(
+      sent(calls, "PATCH", api)
+        .map(({ body }) => body)
+        .filter((body) => "name" in (body as object)),
+    ).toEqual([{ name: "Plan Z", lockVersion: 5 }]);
   });
 
   test("Archive plan from ⋯", async () => {

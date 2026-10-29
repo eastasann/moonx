@@ -159,6 +159,20 @@ describe("19 Decision (design-spec 6.5)", () => {
     expect(shown).toContain("Unknown 4");
     expect(shown).toContain("Unclassified 3");
     expect(shown).toContain("Empty 13");
+    // Each kind leads with its moon (6.5): Unclassified's diamond, Empty's dotted ring.
+    for (const [kind, shape] of [
+      ["Unclassified 3", "rect"],
+      ["Empty 13", "circle[stroke-dasharray]"],
+    ] as const) {
+      // The kind's line: its moon, then its name and count.
+      const [label] = screen.getAllByText(
+        (_, element) =>
+          element?.textContent === kind && element.childElementCount === 1,
+      );
+      expect(
+        label?.parentElement?.querySelector(`svg ${shape}`),
+      ).not.toBeNull();
+    }
     expect(shown).toContain("Last decision: Hold · Oct 2 · Kenji Mori");
     expect(
       screen.getByRole("link", { name: home.idea.name }).getAttribute("href"),

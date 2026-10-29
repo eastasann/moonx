@@ -177,6 +177,31 @@ describe("P9 /api/v1/plans/{planId}/execution-items", () => {
       team.viewerCookie,
     );
     expect(blank.status).toBe(422);
+    // The 6.0.8 text rules: no NUL, and 60 characters, not UTF-16 units.
+    const nul = await call(
+      "GET",
+      `/api/v1/plans/${team.planId}/execution-items?assigneeName=%00`,
+      team.viewerCookie,
+    );
+    expect(nul.status).toBe(422);
+    expect((await errorOf(nul)).details?.[0]?.path).toBe("assigneeName");
+    const emoji = "\u{1F33E}".repeat(60);
+    const farmer = await add(team, {
+      type: "next_action",
+      title: "Ask the rice farmers",
+      assigneeName: emoji,
+    });
+    expect(
+      (await list(team, `?assigneeName=${encodeURIComponent(emoji)}`)).map(
+        (item) => item.id,
+      ),
+    ).toEqual([farmer.id]);
+    const tooLong = await call(
+      "GET",
+      `/api/v1/plans/${team.planId}/execution-items?assigneeName=${encodeURIComponent(`${emoji}x`)}`,
+      team.viewerCookie,
+    );
+    expect(tooLong.status).toBe(422);
     expect(
       (await list(team, "?status=resolved")).map((item) => item.id),
     ).toEqual([question.id]);

@@ -206,7 +206,10 @@ test.describe("on a phone", () => {
     await signIn(demo.operator);
     await page.goto("/");
     await page.getByRole("button", { name: "More" }).click();
-    await page.getByRole("menuitem", { name: "Admin" }).click();
+    const adminItem = page.getByRole("menuitem", { name: "Admin" });
+    // With the sidebar's Shield (design-spec 6.17).
+    await expect(adminItem.locator("svg.lucide-shield")).toHaveCount(1);
+    await adminItem.click();
     await expect(page).toHaveURL(`${WEB_ORIGIN}/admin/templates`);
     await expect(page.getByRole("button", { name: "More" })).toHaveCount(2);
     await page.getByRole("row", { name: /Validation/ }).click();

@@ -232,14 +232,17 @@ export function KeyMetrics({
   metrics,
   currency,
   variant,
-  hasMarginWarning = false,
+  marginWarningHref,
   "aria-label": label,
 }: {
   metrics: IdeaKeyMetrics;
   currency: string;
   variant: "band" | "pair";
-  /** EconomicsResult warns `margin_not_positive` (V1's `economicsWarnings`). */
-  hasMarginWarning?: boolean;
+  /**
+   * Set when EconomicsResult warns `margin_not_positive` (V1's `economicsWarnings`): the
+   * warning under the break-even links here, to 18 (6.1「状態」).
+   */
+  marginWarningHref?: string;
   "aria-label": string;
 }) {
   const { t } = useTranslation(["validation", "common"]);
@@ -249,7 +252,8 @@ export function KeyMetrics({
         const metric = metrics[key];
         const label = t(`validation:home.metric.${key}`);
         if (metric.value === null) {
-          const warns = hasMarginWarning && key === "break_even_units_day";
+          const warns =
+            marginWarningHref !== undefined && key === "break_even_units_day";
           return (
             <MetricTile
               key={key}
@@ -259,6 +263,7 @@ export function KeyMetrics({
               supplement={
                 warns ? t("validation:home.marginWarning") : undefined
               }
+              supplementHref={warns ? marginWarningHref : undefined}
               supplementTone={warns ? "notice" : undefined}
             />
           );

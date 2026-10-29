@@ -22,7 +22,7 @@
 | DB | Neon のコンソール（Monitoring・Usage） | Neon のプランによる | 接続数・容量・計算時間 |
 | デプロイ・バックアップ・KPI のワークフローの実行記録 | GitHub Actions | 90日 | `deploy.yml`・`build.yml`・`db-backup.yml`・`kpi.yml` の記録 |
 
-リクエスト ID がどこに入るかは [SDD 8.3](02-01_system-design-doc.md#83-ログとの対応)。利用者からエラーの連絡を受けたら、画面に出た `Ref`（リクエスト ID の先頭）をもらい、4章のコマンドで追う。
+リクエスト ID がどこに入るかは [SDD 8.3](02-01_system-design-doc.md#83-ログとの対応)。利用者からエラーの連絡を受けたら、画面に出た `Ref`・起きた時刻・ログインしていたアカウントのメールをもらい、4章のコマンドで追う。`Ref` はふつうリクエスト ID の先頭で、API の応答が無い画面の描画の失敗だけは `moonx-web` の Sentry のイベント ID の先頭になる（SDD 8.2「想定外のエラー」）。Cloud Logging で当たらない `Ref` は、4章「Sentry」の手順で探す。
 
 ### ログレベル
 
@@ -297,7 +297,7 @@ dig +short TXT _dmarc.{DOMAIN}
 | Google の画面に `Error 400: redirect_uri_mismatch` | OAuth クライアントのリダイレクト URI が `BETTER_AUTH_URL` ＋ `/api/auth/callback/google` と違う | 03 6章の表に合わせる |
 | `Error 403: access_denied` | 同意画面が「テスト」のまま | 「本番環境」にする（03 6章） |
 | `Error 401: invalid_client` | `GOOGLE_CLIENT_ID` と SECRET の組が違う、Google 側で SECRET を消した | `moonx-{env}-google-client-secret` と Terraform の ID を確かめ、新しいリビジョンを作る（3.14） |
-| API が起動せず、ログに `GOOGLE_CLIENT_ID is required in production`（staging も同じ形） | staging と production は、`GOOGLE_CLIENT_ID` と `GOOGLE_CLIENT_SECRET` が無いと起動しない（SDD 2章「環境変数」） | `moonx-{env}-google-client-secret` と Terraform の ID を確かめ、新しいリビジョンを作る（3.14） |
+| API が起動せず、ログに `GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required on production`（staging は `on staging`）か `GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together` | staging と production は、`GOOGLE_CLIENT_ID` と `GOOGLE_CLIENT_SECRET` の両方が無いと起動しない。片方だけ（Secret Manager の版が空など）でも起動しない（SDD 2章「環境変数」） | `moonx-{env}-google-client-secret` と Terraform の ID を確かめ、新しいリビジョンを作る（3.14） |
 | ログインの後「招待が無い」 | 招待制（ADR-010）。そのメールあての有効な招待（pending・期限内）が無い | 運営の画面で招待を確かめる。招待の画面から Google ログインを始めてもらう |
 
 ### 3.12 ログインできない・すぐにログアウトされる
@@ -473,6 +473,7 @@ gcloud run services describe moonx-api-production --region=asia-southeast1 --for
 
 - プロジェクト（`moonx-web` / `moonx-api`）と environment（`staging` / `production`）で絞る
 - Issues の検索にリクエスト ID を入れて、Cloud Logging のログとつなげる（Sentry でのタグ名は SDD 11章）
+- Cloud Logging で当たらない `Ref`（Web の描画の失敗）: `moonx-web` を、もらった時刻と利用者の ID（`user.id:<USER_ID>`。Web はログインしている人の ID を Sentry の user に入れる。SDD 11章）で絞り、イベント ID の先頭8文字が `Ref` と同じイベントを開く。利用者の ID はメールから引く（Neon の SQL Editor で `select id from users where lower(email) = lower('<EMAIL>');`）。ログインしていない画面（1・2・招待のリンクの画面・29・30）の失敗は user を持たないので、時刻だけで絞る
 
 ### その他
 
@@ -493,7 +494,7 @@ gcloud run services describe moonx-api-production --region=asia-southeast1 --for
 
 ### 流れ
 
-1. 気づく（アラート・Sentry・利用者の連絡）。利用者からはリクエスト ID と時刻をもらう
+1. 気づく（アラート・Sentry・利用者の連絡）。利用者からは画面の `Ref`・時刻・アカウントのメールをもらう（1章）
 2. 範囲を確かめる（04 6章の確認、3章の該当の項目）。外部のサービスの障害でないか下の表で見る
 3. 止める: 直前のデプロイが原因なら戻す（04 5章）
 4. S1・S2 は BCDX の窓口に知らせる

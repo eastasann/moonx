@@ -5,6 +5,7 @@ import { WEB_ORIGIN } from "./env";
 import {
   demo,
   expect,
+  expectRingAroundText,
   inviteToBcdx,
   linkMailedTo,
   mailsTo,
@@ -276,6 +277,16 @@ test.describe("on a desktop", () => {
     ).toBeVisible();
     await page.getByRole("link", { name: "Send a new link" }).click();
     await expect(page).toHaveURL(`${WEB_ORIGIN}/forgot-password`);
+  });
+
+  test("2's Forgot password? on its own row rings its words, not the row (4.5 Link)", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+    await expectRingAroundText(
+      page,
+      page.getByRole("link", { name: "Forgot password?" }),
+    );
   });
 
   test("a wrong password, and Google's sign-in from 2 and from the invitation", async ({

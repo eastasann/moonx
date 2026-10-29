@@ -49,6 +49,7 @@ import {
   CreatePlanDialog,
   emptyGoNoGoDraft,
   GoNoGoDialog,
+  planHeaderKey,
   RenamePlanDialog,
   SaveVersionDialog,
 } from "../components/PlanDialogs";
@@ -112,7 +113,6 @@ const headerValueSchema = z.object({
 type HeaderField = "businessName" | "preparedBy";
 
 /** The autosave key of a plan's header (P2 PATCH, design-spec 6.0.2's items). */
-const headerKey = (planId: string) => `plan:${planId}`;
 
 /**
  * The save of the plan's header (P2 PATCH): the answer is the plan home as it is now, and
@@ -125,7 +125,7 @@ function headerTarget(
 ): SaveTarget {
   const queryKey = planHomeQuery(home.ideaId, home.id).queryKey;
   return {
-    key: headerKey(home.id),
+    key: planHeaderKey(home.id),
     noun,
     send: async (fields, lockVersion, force) => {
       const updated = await unwrap(
@@ -560,10 +560,13 @@ function VersionsBlock({ home }: { home: PlanHome }) {
         <RowList aria-label={t("plans:home.versions.title")}>
           {home.versions.map((version) => {
             const isOpen = home.viewingVersion?.id === version.id;
-            const meta = t("plans:home.versions.meta", {
-              date: formatDate(version.savedAt, { timeZone: me.timezone }),
-              name: version.savedBy.displayName,
-            });
+            const meta = (
+              <>
+                {formatDate(version.savedAt, { timeZone: me.timezone })}
+                {t("app:separator")}
+                <UserName user={version.savedBy} />
+              </>
+            );
             return (
               <RowListItem
                 key={version.id}
@@ -575,11 +578,15 @@ function VersionsBlock({ home }: { home: PlanHome }) {
                       })
                 }
                 description={
-                  isOpen
-                    ? [t("plans:home.versions.viewing"), meta].join(
-                        t("app:separator"),
-                      )
-                    : meta
+                  isOpen ? (
+                    <>
+                      {t("plans:home.versions.viewing")}
+                      {t("app:separator")}
+                      {meta}
+                    </>
+                  ) : (
+                    meta
+                  )
                 }
               >
                 {version.name}
@@ -989,7 +996,7 @@ export function PlanHomeScreen({
   return (
     <WorkspaceFrame
       current="ideas"
-      saveScope={headerKey(planId)}
+      saveScope={planHeaderKey(planId)}
       comments={comments}
       history={comments}
       templateBanner={templateBanner}

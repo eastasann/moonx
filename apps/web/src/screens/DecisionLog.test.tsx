@@ -266,6 +266,144 @@ describe("7 Decision Log (design-spec 6.15)", () => {
     }
   });
 
+  test("Choose dates… with To before From says why and cannot apply; To on From applies both", async () => {
+    vi.useFakeTimers({
+      shouldAdvanceTime: true,
+      now: new Date("2026-10-22T04:00:00Z"),
+    });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const calls = logApi();
+      const router = renderApp(base);
+      await screen.findByRole("grid", { name: "Decisions" });
+      await user.click(screen.getByRole("button", { name: /^Period/ }));
+      await user.click(
+        await screen.findByRole("option", { name: "Choose dates…" }),
+      );
+      const dialog = await screen.findByRole("dialog", {
+        name: "Choose a period",
+      });
+      /** Picks `day` of October 2026 in the field's calendar (no Tab into a segment). */
+      const pick = async (field: "From" | "To", day: number) => {
+        await user.click(
+          within(within(dialog).getByRole("group", { name: field })).getByRole(
+            "button",
+          ),
+        );
+        const calendars = await screen.findAllByRole("dialog");
+        await user.click(
+          within(calendars.at(-1) as HTMLElement).getByRole("button", {
+            name: new RegExp(`October ${day}, 2026`),
+          }),
+        );
+      };
+      await pick("From", 20);
+      await pick("To", 10);
+      expect(
+        await within(dialog).findByText(
+          "Choose a To date on or after the From date",
+        ),
+      ).toBeTruthy();
+      const apply = within(dialog).getByRole("button", { name: "Apply" });
+      expect(apply.hasAttribute("disabled")).toBe(true);
+      await user.click(apply);
+      expect(
+        screen.getByRole("dialog", { name: "Choose a period" }),
+      ).toBeTruthy();
+      expect(router.state.location.search).toEqual({});
+      expect(calls.some(({ path }) => path.includes("from="))).toBe(false);
+      await pick("To", 20);
+      await waitFor(() => expect(apply.hasAttribute("disabled")).toBe(false));
+      expect(
+        within(dialog).queryByText(
+          "Choose a To date on or after the From date",
+        ),
+      ).toBeNull();
+      await user.click(apply);
+      await waitFor(() =>
+        expect(router.state.location.search).toMatchObject({
+          from: "2026-10-20",
+          to: "2026-10-20",
+        }),
+      );
+      expect(
+        screen.queryByRole("dialog", { name: "Choose a period" }),
+      ).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("dates of the URL no period matches show as a period of their own", async () => {
+    const calls = logApi();
+    renderApp(`${base}?from=2025-10-01&to=2025-10-15`);
+    await screen.findByRole("grid", { name: "Decisions" });
+    const period = screen.getByRole("button", { name: /^Period/ });
+    expect(period.textContent).toContain("Oct 1, 2025 – Oct 15, 2025");
+    expect(
+      calls.some(
+        ({ path }) =>
+          path.includes("decision-log?") &&
+          path.includes("from=2025-10-01") &&
+          path.includes("to=2025-10-15"),
+      ),
+    ).toBe(true);
+    const user = userEvent.setup();
+    await user.click(period);
+    const options = await screen.findAllByRole("option");
+    // One of the options and the one chosen; 6.15 does not say where among them.
+    const own = options.filter(
+      ({ textContent }) => textContent === "Oct 1, 2025 – Oct 15, 2025",
+    );
+    expect(own).toHaveLength(1);
+    expect(own[0]?.getAttribute("aria-selected")).toBe("true");
+    expect(
+      options
+        .filter((option) => !own.includes(option))
+        .map(({ textContent }) => textContent),
+    ).toEqual([
+      "Any time",
+      "Last 7 days",
+      "Last 30 days",
+      "Last 90 days",
+      "Last 12 months",
+      "Choose dates…",
+    ]);
+    cleanup();
+    vi.unstubAllGlobals();
+    logApi();
+    renderApp(`${base}?from=2025-10-01`);
+    await screen.findByRole("grid", { name: "Decisions" });
+    expect(
+      screen.getByRole("button", { name: /^Period/ }).textContent,
+    ).toContain("From Oct 1, 2025");
+  });
+
+  test("another filter lets go of the record chosen and shows the list's first beside it", async () => {
+    const user = userEvent.setup();
+    logApi();
+    const router = renderApp(`${base}?selected=${saved.id}`);
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "v1 For advisors" }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /^Idea/ }));
+    await user.click(
+      await screen.findByRole("option", { name: home.idea.name }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ idea: home.idea.id }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 2, name: home.idea.name }),
+    ).toBeTruthy();
+    expect(
+      await screen.findByText("Costs are not in yet. Permits are unknown."),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("heading", { level: 2, name: "v1 For advisors" }),
+    ).toBeNull();
+  });
+
   test("none yet, and none for the filters with Clear filters", async () => {
     const user = userEvent.setup();
     logApi([]);

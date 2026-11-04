@@ -1,5 +1,10 @@
-import type { AdminUser, AdminWorkspace, Invitation } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import type {
+  AdminTemplateList,
+  AdminUser,
+  AdminWorkspace,
+  Invitation,
+} from "@moonx/schemas";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { operator } from "../test/admin";
@@ -7,8 +12,21 @@ import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 
 // 28 Admin: Users & Workspaces (design-spec 6.17).
 
+/** happy-dom's window, whose viewport a test sets. */
+const setViewport = (width: number) =>
+  act(() =>
+    (
+      window as unknown as {
+        happyDOM: {
+          setViewport: (size: { width: number; height: number }) => void;
+        };
+      }
+    ).happyDOM.setViewport({ width, height: 900 }),
+  );
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  setViewport(1024);
 });
 
 const user = (
@@ -99,6 +117,29 @@ const rowNamed = async (grid: string, name: RegExp) =>
   within(await screen.findByRole("grid", { name: grid })).findByRole("row", {
     name,
   });
+
+/** 26's list, for the tab that opens it. */
+const noTemplates: AdminTemplateList = {
+  items: [
+    { kind: "self_analysis", name: null, versions: [] },
+    { kind: "validation", name: null, versions: [] },
+    { kind: "business_plan", name: null, versions: [] },
+  ],
+};
+const templatesToo = (call: Call) =>
+  call.method === "GET" && call.path === "/api/v1/admin/templates"
+    ? Response.json(noTemplates)
+    : undefined;
+
+/**
+ * Opens `path` from another screen (8), as a link would: Back from it has somewhere to
+ * go, so leaving it shows.
+ */
+async function openFromNotifications(path: string) {
+  const router = renderApp("/notifications");
+  await act(() => router.navigate({ href: path }));
+  return router;
+}
 
 describe("28 Admin: Users & Workspaces (design-spec 6.17)", () => {
   test("Users: names, use and state, never what they wrote; the first beside the list", async () => {
@@ -317,6 +358,108 @@ describe("28 Admin: Users & Workspaces (design-spec 6.17)", () => {
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/admin/templates"),
     );
+  });
+
+  test("28's tabs add no history entry: Users → Invitations → Workspaces, then Back leaves 28 (6.17)", async () => {
+    const actor = userEvent.setup();
+    usersApi();
+    const router = await openFromNotifications("/admin/users");
+    await screen.findByRole("grid", { name: "Users" });
+    const entries = router.history.length;
+    await actor.click(screen.getByRole("tab", { name: "Invitations" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ tab: "invitations" }),
+    );
+    await screen.findByRole("grid", { name: "Invitations" });
+    await actor.click(screen.getByRole("tab", { name: "Workspaces" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ tab: "workspaces" }),
+    );
+    expect(router.history.length).toBe(entries);
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/notifications"),
+    );
+  });
+
+  test("moving between 26 and 28 adds an entry: 28 → Templates → Back is 28, and 26 → Users → Back is 26 (6.17)", async () => {
+    const actor = userEvent.setup();
+    usersApi({ answer: templatesToo });
+    const router = renderApp("/admin/users?tab=invitations");
+    await screen.findByRole("grid", { name: "Invitations" });
+    const entries = router.history.length;
+    await actor.click(screen.getByRole("tab", { name: "Templates" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/admin/templates"),
+    );
+    await screen.findByRole("grid", { name: "Templates" });
+    expect(router.history.length).toBe(entries + 1);
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.href).toBe("/admin/users?tab=invitations"),
+    );
+    expect(
+      await screen.findByRole("grid", { name: "Invitations" }),
+    ).toBeTruthy();
+
+    act(() => router.history.forward());
+    await screen.findByRole("grid", { name: "Templates" });
+    await actor.click(screen.getByRole("tab", { name: "Users" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/admin/users"),
+    );
+    await screen.findByRole("grid", { name: "Users" });
+    expect(router.history.length).toBe(entries + 2);
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/admin/templates"),
+    );
+    expect(await screen.findByRole("grid", { name: "Templates" })).toBeTruthy();
+  });
+
+  test("on a phone, a row opens over the list: Back and ← both return to it, the row held in the entry, not the URL (6.17)", async () => {
+    const actor = userEvent.setup();
+    setViewport(390);
+    usersApi();
+    const router = renderApp("/admin/users");
+    const kenjiRow = await rowNamed("Users", /Kenji Mori/);
+    // One pane: nothing beside the list until a row is opened.
+    expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+    const entries = router.history.length;
+    await actor.click(kenjiRow);
+    expect(
+      await screen.findByRole("heading", { level: 2, name: /Kenji Mori/ }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("grid", { name: "Users" })).toBeNull();
+    expect(router.history.length).toBe(entries + 1);
+    expect(router.state.location.href).toBe("/admin/users");
+    expect(router.state.location.state.adminRow).toBe(kenji.id);
+
+    act(() => router.history.back());
+    expect(await screen.findByRole("grid", { name: "Users" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+    // Forward again, the entry still holds the row it showed.
+    act(() => router.history.forward());
+    expect(
+      await screen.findByRole("heading", { level: 2, name: /Kenji Mori/ }),
+    ).toBeTruthy();
+
+    await actor.click(screen.getByRole("button", { name: "Back to Users" }));
+    expect(await screen.findByRole("grid", { name: "Users" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+    // ← went back over the entry the row added, as Back does: Forward shows the row
+    // again, which an entry put in its place would not.
+    expect(router.history.length).toBe(entries + 1);
+    expect(router.state.location.state.adminRow).toBeUndefined();
+    act(() => router.history.forward());
+    expect(
+      await screen.findByRole("heading", { level: 2, name: /Kenji Mori/ }),
+    ).toBeTruthy();
+    act(() => router.history.back());
+    await actor.click(await rowNamed("Users", /Ana Villanueva/));
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Ana Villanueva" }),
+    ).toBeTruthy();
   });
 
   test("Invitations: the pending one beside the list, with Resend and Cancel", async () => {

@@ -49,7 +49,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import {
   AddQuestionDialog,
@@ -1475,8 +1475,11 @@ function VersionLoader({
   search: TemplateVersionSearch;
 }) {
   const { me } = useWorkspace();
-  const query = useQuery(templateVersionQuery(versionId));
-  const isSlow = useIsSlow(query.isPending);
+  const options = templateVersionQuery(versionId);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   if (query.data !== undefined) {
     return <VersionBody version={query.data} search={search} />;
   }
@@ -1492,7 +1495,7 @@ function VersionLoader({
       />
     );
   }
-  if (isSlow) return <SlowLoadingState onRetry={() => void query.refetch()} />;
+  if (isSlow) return <SlowLoadingState onRetry={retrySlow} />;
   return <TemplateVersionSkeleton />;
 }
 

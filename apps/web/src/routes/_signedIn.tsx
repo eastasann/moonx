@@ -20,6 +20,7 @@ import {
   useSaveItem,
 } from "../lib/autosave-react";
 import { meQuery } from "../lib/queries";
+import { routeQueries } from "../lib/query";
 import { setReportedUser } from "../lib/sentry";
 import { useDropOtherUsersData } from "../lib/session";
 
@@ -49,7 +50,7 @@ export const Route = createFileRoute("/_signedIn")({
   }),
   beforeLoad: async ({ context }) => {
     // What is cached shows at once and is asked again behind it (ADR-011).
-    const me = await context.queryClient.ensureQueryData({
+    const me = await routeQueries(context.queryClient).ensureQueryData({
       ...meQuery(),
       revalidateIfStale: true,
     });

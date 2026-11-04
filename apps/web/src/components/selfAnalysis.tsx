@@ -7,7 +7,7 @@ import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../lib/api";
 import { selfAnalysisHomeQuery } from "../lib/queries";
-import { FailureState, SlowLoadingState, useIsSlow } from "./states";
+import { FailureState, SlowLoadingState, useSlowLoading } from "./states";
 import { dashboardHref, ownPersonalId, useWorkspace } from "./workspace";
 
 /**
@@ -73,8 +73,11 @@ export function SelfAnalysisBody({
   children: (home: SelfAnalysisHome) => ReactNode;
 }) {
   const { me } = useWorkspace();
-  const query = useQuery(selfAnalysisHomeQuery());
-  const isSlow = useIsSlow(query.isPending);
+  const options = selfAnalysisHomeQuery();
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   if (query.data !== undefined) return children(query.data);
   if (
     query.error instanceof ApiError &&
@@ -91,6 +94,6 @@ export function SelfAnalysisBody({
       />
     );
   }
-  if (isSlow) return <SlowLoadingState onRetry={() => void query.refetch()} />;
+  if (isSlow) return <SlowLoadingState onRetry={retrySlow} />;
   return <Skeleton isLoading>{skeleton}</Skeleton>;
 }

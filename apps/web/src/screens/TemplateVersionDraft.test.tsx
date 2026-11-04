@@ -6,6 +6,7 @@ import type {
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { TYPING_PAUSE_MS } from "../lib/autosave";
 import { operator } from "../test/admin";
 import { apiError, type Call, renderApp, stubApi } from "../test/api";
 
@@ -320,6 +321,15 @@ const sent = (calls: Call[], method: string, ending: string) =>
 
 const checks = (calls: Call[]) => sent(calls, "POST", "/validate").length;
 
+/** How far past the typing pause (6.0.2) a wait goes that shows nothing was sent. */
+const PAUSE_MARGIN_MS = 200;
+
+/** Waits until a save holding out for the typing pause would have gone. */
+const pastTypingPause = () =>
+  new Promise((resolve) =>
+    setTimeout(resolve, TYPING_PAUSE_MS + PAUSE_MARGIN_MS),
+  );
+
 describe("27: a draft's nodes, saved as they are typed (design-spec 6.17)", () => {
   test("a question's title: sent when left, the check read again, Saved in the header", async () => {
     const user = userEvent.setup();
@@ -365,7 +375,7 @@ describe("27: a draft's nodes, saved as they are typed (design-spec 6.17)", () =
     await user.clear(title);
     expect(await screen.findByText("Can't be empty")).toBeTruthy();
     await user.tab();
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await pastTypingPause();
     expect(sent(calls, "PATCH", `/template-questions/${oceanId}`)).toEqual([]);
   });
 
@@ -638,6 +648,198 @@ describe("27: a draft's nodes, saved as they are typed (design-spec 6.17)", () =
       expect((publish as HTMLButtonElement).disabled).toBe(false),
     );
   });
+
+  test("a save into a version published meanwhile: Couldn't save and It's published, nothing sent until Retry, Publish waiting (6.0.2・6.17)", async () => {
+    const user = userEvent.setup();
+    let isPublished = false;
+    const { calls } = draftApi(validation(), {
+      answer: (call) => {
+        if (
+          call.method === "PATCH" &&
+          call.path.endsWith(`/template-questions/${oceanId}`)
+        ) {
+          return apiError(409, "PUBLISHED_READ_ONLY");
+        }
+        if (
+          isPublished &&
+          call.method === "GET" &&
+          call.path === `/api/v1/admin/template-versions/${draftId}`
+        ) {
+          return Response.json({ ...validation(), status: "published" });
+        }
+        return undefined;
+      },
+    });
+    open(oceanId);
+    const publish = (await screen.findByRole("button", {
+      name: "Publish as v3",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(publish.disabled).toBe(false));
+    const patches = () =>
+      sent(calls, "PATCH", `/template-questions/${oceanId}`);
+    await user.type(field("textbox", "Title"), "!");
+    await user.tab();
+    // Beside the field, with its reason, and in the header (6.0.2).
+    const note = (await screen.findByText("It's published")).closest(
+      '[role="alert"]',
+    ) as HTMLElement;
+    expect(within(note).getByText("Couldn't save")).toBeTruthy();
+    expect(screen.getAllByText("Couldn't save")).toHaveLength(2);
+    expect(publish.disabled).toBe(true);
+    // Typed on, the refused item waits for Retry.
+    await user.type(field("textbox", "Title"), "?");
+    await user.tab();
+    await pastTypingPause();
+    expect(patches()).toHaveLength(1);
+    expect(publish.disabled).toBe(true);
+    // The refusal reads the version again (6.0.6): read as published, it only shows,
+    // and what was not saved stays failed, never Saved (6.0.2).
+    isPublished = true;
+    await user.click(within(note).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(patches()).toHaveLength(2));
+    expect(patches()[1]?.body).toEqual({ title: "OCEAN!?" });
+    expect(
+      await screen.findByText(
+        "A published version can't be changed. Start a new draft from it on Templates.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Publish/ })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: /^Title/ })).toBeNull();
+    expect(screen.getByText("Couldn't save")).toBeTruthy();
+    expect(screen.queryByText("Saved")).toBeNull();
+  });
+
+  test("Publish waits while a save fails or the API refused it, and comes back once it is saved (6.17)", async () => {
+    const user = userEvent.setup();
+    let answer: () => Response | undefined = () =>
+      new Response(null, { status: 503 });
+    const { calls } = draftApi(validation(), {
+      answer: (call) =>
+        call.method === "PATCH" && call.path.includes("template-questions")
+          ? answer()
+          : undefined,
+    });
+    open(oceanId);
+    const publish = (await screen.findByRole("button", {
+      name: "Publish as v3",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(publish.disabled).toBe(false));
+    await user.type(field("textbox", "Title"), "!");
+    await user.tab();
+    // A failure that may pass: sent again by itself, Publish waiting meanwhile.
+    await waitFor(() =>
+      expect(screen.getAllByText("Couldn't save")).toHaveLength(2),
+    );
+    expect(publish.disabled).toBe(true);
+    answer = () => undefined;
+    await waitFor(
+      () =>
+        expect(
+          sent(calls, "PATCH", `/template-questions/${oceanId}`),
+        ).toHaveLength(2),
+      { timeout: 3000 },
+    );
+    await waitFor(() => expect(publish.disabled).toBe(false));
+
+    answer = () =>
+      apiError(422, "VALIDATION_FAILED", {
+        details: [{ path: "title", code: "custom" }],
+      });
+    await user.type(field("textbox", "Title"), "?");
+    await user.tab();
+    await waitFor(() =>
+      expect(screen.getAllByText("Couldn't save")).toHaveLength(2),
+    );
+    expect(publish.disabled).toBe(true);
+  });
+
+  test("Publish waits while the check is read, and warnings alone don't block it (6.17)", async () => {
+    const user = userEvent.setup();
+    const held: (() => void)[] = [];
+    const warnings: TemplateCheckResult = {
+      errors: [],
+      warnings: [{ code: "removed_keys", keys: ["V.01.WHY"] }],
+    };
+    const { calls } = draftApi(validation(), {
+      answer: (call) =>
+        call.method === "POST" && call.path.endsWith("/validate")
+          ? new Promise<Response>((resolve) => {
+              held.push(() => resolve(Response.json(warnings)));
+            })
+          : undefined,
+    });
+    open(oceanId);
+    const publish = (await screen.findByRole("button", {
+      name: "Publish as v3",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(held).toHaveLength(1));
+    expect(publish.disabled).toBe(true);
+    held[0]?.();
+    await waitFor(() => expect(publish.disabled).toBe(false));
+    expect(screen.queryByText(/Fix \d+ problems? on Check/)).toBeNull();
+    // Read again after a save: Publish waits for it once more.
+    await user.type(field("textbox", "Title"), "!");
+    await user.tab();
+    await waitFor(() => expect(checks(calls)).toBe(2));
+    await waitFor(() =>
+      expect(sent(calls, "PATCH", `/template-questions/${oceanId}`)).toEqual([
+        expect.objectContaining({ body: { title: "OCEAN!" } }),
+      ]),
+    );
+    // Saved, so only the check holds it.
+    expect(await screen.findByText("Saved")).toBeTruthy();
+    expect(publish.disabled).toBe(true);
+    for (const release of held) release();
+    await waitFor(() => expect(publish.disabled).toBe(false));
+  });
+
+  test("offline: the fields only show, and Publish and Add section can't be pressed until back online (6.0.6・6.17)", async () => {
+    const user = userEvent.setup();
+    const { calls } = draftApi();
+    open(oceanId);
+    const publish = (await screen.findByRole("button", {
+      name: "Publish as v3",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(publish.disabled).toBe(false));
+    const addSection = screen.getByRole("button", {
+      name: "Add section",
+    }) as HTMLButtonElement;
+    const fau = () =>
+      screen.getByRole("checkbox", {
+        name: "Ask for F/A/U (Fact, Assumption or Unknown)",
+      }) as HTMLInputElement;
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    try {
+      act(() => {
+        window.dispatchEvent(new Event("offline"));
+      });
+      await waitFor(() =>
+        expect(field("textbox", "Title").readOnly).toBe(true),
+      );
+      for (const name of ["Question ID", "Example", "Hint", "Choice 1"]) {
+        expect(field("textbox", name).readOnly).toBe(true);
+      }
+      expect(fau().disabled).toBe(true);
+      expect(publish.disabled).toBe(true);
+      expect(addSection.disabled).toBe(true);
+      await user.type(field("textbox", "Title"), "!");
+      expect(field("textbox", "Title").value).toBe("OCEAN");
+    } finally {
+      onLine.mockRestore();
+      act(() => {
+        window.dispatchEvent(new Event("online"));
+      });
+    }
+    await waitFor(() => expect(field("textbox", "Title").readOnly).toBe(false));
+    expect(fau().disabled).toBe(false);
+    expect(publish.disabled).toBe(false);
+    expect(addSection.disabled).toBe(false);
+    expect(
+      calls.filter(
+        (call) => call.method !== "GET" && !call.path.endsWith("/validate"),
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe("27: each kind's own fields (design-spec 6.17)", () => {
@@ -818,7 +1020,7 @@ describe("27: each kind's own fields (design-spec 6.17)", () => {
     const list = screen.getByRole("group", { name: "Key numbers" });
     expect(await within(list).findByText("Can't be empty")).toBeTruthy();
     expect(within(list).getByText("No key numbers yet")).toBeTruthy();
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await pastTypingPause();
     expect(sent(calls, "PATCH", `/template-questions/${promptId}`)).toEqual([]);
     // Not saved, so not published (design-spec 6.17).
     expect((publish as HTMLButtonElement).disabled).toBe(true);

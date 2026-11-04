@@ -484,18 +484,18 @@ describe("buildPitchDeck: the slides", () => {
     expect(none.emptySources).toEqual(["Competitors"]);
   });
 
-  test("Economics: the startup figures and the scenario table, without notes", () => {
+  test("Economics: the startup figures and the scenario table in its columns, without notes", () => {
     const slide = slideOf(buildPitchDeck(input()), "economics");
     expect(slide.table?.rows).toEqual([
       ["Conservative", "5", "₱58,500", "−₱5,586"],
       ["Expected", "10", "₱117,000", "₱18,490"],
       ["Strong", "15", "₱175,500", "₱42,565"],
     ]);
-    expect(slide.table?.columns.map((c) => [c.label, c.numeric])).toEqual([
-      ["Scenario", false],
-      ["Units / day", true],
-      ["Revenue / month", true],
-      ["Operating profit / month", true],
+    expect(slide.table?.columns).toEqual([
+      { label: "Scenario", numeric: false, width: 0.28 },
+      { label: "Units / day", numeric: true, width: 0.2 },
+      { label: "Revenue / month", numeric: true, width: 0.26 },
+      { label: "Operating profit / month", numeric: true, width: 0.26 },
     ]);
     expect(slide.numbers.map((n) => [n.label, n.metricKey])).toEqual([
       ["Startup cost", "initial_cost_total"],
@@ -556,7 +556,7 @@ describe("buildPitchDeck: the slides", () => {
     expect(pitchSlideKeys("one").some((key) => key === "funding")).toBe(false);
   });
 
-  test("Execution plan: milestones by deadline, at most six, and no notes", () => {
+  test("Execution plan: milestones by deadline in their columns, at most six, and no notes", () => {
     const milestones = Array.from({ length: 8 }, (_, index) =>
       item({
         type: "milestone",
@@ -578,6 +578,13 @@ describe("buildPitchDeck: the slides", () => {
       buildPitchDeck(input({ execution: [...milestones, launch] })),
       "execution",
     );
+    expect(slide.table?.columns).toEqual([
+      { label: "Milestone", numeric: false, width: 0.22 },
+      { label: "Goal", numeric: false, width: 0.34 },
+      { label: "Assignee", numeric: false, width: 0.16 },
+      { label: "Deadline", numeric: false, width: 0.14 },
+      { label: "Status", numeric: false, width: 0.14 },
+    ]);
     expect(slide.table?.rows.map((row) => row[0])).toEqual([
       "M7",
       "M6",
@@ -685,7 +692,7 @@ describe("buildPitchDeck: the slides", () => {
     expect(none.emptySources).toEqual(["Launch Plan"]);
   });
 
-  test("Risks: §22's top three by impact, then probability, keeping the table's order on ties", () => {
+  test("Risks: §22's top three in their columns by impact, then probability, keeping the table's order on ties", () => {
     const answers = allAnswered();
     answers.set("P.22.1", {
       text: null,
@@ -704,6 +711,12 @@ describe("buildPitchDeck: the slides", () => {
       ],
     });
     const slide = slideOf(buildPitchDeck(input({ answers })), "risks");
+    expect(slide.table?.columns).toEqual([
+      { label: "Risk", numeric: false, width: 0.34 },
+      { label: "Probability", numeric: false, width: 0.13 },
+      { label: "Impact", numeric: false, width: 0.13 },
+      { label: "Mitigation", numeric: false, width: 0.4 },
+    ]);
     expect(slide.table?.rows).toEqual([
       ["C", "Medium", "High", "c"],
       ["B", "High", "Medium", "b"],

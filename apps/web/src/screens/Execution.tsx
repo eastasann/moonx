@@ -64,7 +64,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
@@ -427,7 +427,9 @@ function ExecutionBody({
   const canEdit = role !== "viewer" && !home.ideaArchived && !home.archived;
   const listQuery = executionItemsQuery(home.ideaId, home.id);
   const query = useQuery(listQuery);
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    listQuery,
+  ]);
   const all = query.data?.items ?? [];
   // A link may name the item alone (8, 5's Recent activity): its tab is its type's, known
   // once the list is read. Until then no tab is shown, nor + Add. Once known, it is kept
@@ -569,11 +571,7 @@ function ExecutionBody({
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <ListSkeleton />
     );
@@ -876,9 +874,12 @@ export function ExecutionScreen({
   const navigate = useNavigate();
   const router = useRouter();
   const panel = usePanel();
-  const home = useQuery(planHomeQuery(ideaId, planId));
+  const homeOptions = planHomeQuery(ideaId, planId);
+  const home = useQuery(homeOptions);
   const { data: ideaData } = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.workspaceId === workspace.id && home.data.ideaId === ideaId
       ? home.data
@@ -972,7 +973,7 @@ export function ExecutionScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = <ExecutionSkeleton />;
   }

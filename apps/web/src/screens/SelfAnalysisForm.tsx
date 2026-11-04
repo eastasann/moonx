@@ -62,7 +62,7 @@ import {
   FailureState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
@@ -741,11 +741,12 @@ function SectionBody({
 }) {
   const { me } = useWorkspace();
   const isSection = home.sections.some(({ key }) => key === sectionKey);
-  const query = useQuery({
-    ...selfAnalysisSectionQuery(sectionKey),
-    enabled: isSection,
-  });
-  const isSlow = useIsSlow(isSection && query.isPending);
+  const options = selfAnalysisSectionQuery(sectionKey);
+  const query = useQuery({ ...options, enabled: isSection });
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    isSection && query.isPending,
+    [options],
+  );
   if (!isSection) return <NotFoundState dashboardHref={dashboardHref(me)} />;
   if (query.data !== undefined) {
     return (
@@ -770,7 +771,7 @@ function SectionBody({
       />
     );
   }
-  if (isSlow) return <SlowLoadingState onRetry={() => void query.refetch()} />;
+  if (isSlow) return <SlowLoadingState onRetry={retrySlow} />;
   return (
     <Skeleton isLoading>
       <QuestionFormSkeleton />

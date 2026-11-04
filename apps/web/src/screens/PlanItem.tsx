@@ -76,7 +76,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
@@ -928,17 +928,25 @@ function PlanItemBody({
   search: PlanItemSearch;
 }) {
   const { me, workspace } = useWorkspace();
-  const home = useQuery(planHomeQuery(ideaId, planId, search.version));
+  const homeOptions = planHomeQuery(ideaId, planId, search.version);
+  const home = useQuery(homeOptions);
   const isOurs =
     home.data !== undefined &&
     home.data.workspaceId === workspace.id &&
     home.data.ideaId === ideaId;
+  const itemOptions = planItemQuery(
+    ideaId,
+    planId,
+    itemNo ?? 0,
+    search.version,
+  );
   const item = useQuery({
-    ...planItemQuery(ideaId, planId, itemNo ?? 0, search.version),
+    ...itemOptions,
     enabled: itemNo !== null && isOurs,
   });
-  const isSlow = useIsSlow(
+  const { isSlow, retry: retrySlow } = useSlowLoading(
     home.isPending || (itemNo !== null && isOurs && item.isPending),
+    [homeOptions, itemOptions],
   );
   const failure = home.error ?? item.error;
   if (itemNo === null)
@@ -976,7 +984,7 @@ function PlanItemBody({
       />
     );
   }
-  if (isSlow) return <SlowLoadingState onRetry={retry} />;
+  if (isSlow) return <SlowLoadingState onRetry={retrySlow} />;
   return (
     <Skeleton isLoading>
       <PlanItemSkeleton />

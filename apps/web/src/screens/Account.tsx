@@ -43,6 +43,7 @@ import { type ReactNode, useCallback, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LeaveWorkspaceDialog } from "../components/LeaveWorkspaceDialog";
 import { useLogOutRequest } from "../components/LogOutRequest";
+import { ModalSendFailure } from "../components/ModalFailure";
 import { PhotoField } from "../components/PhotoField";
 import { type RowFieldsSpec, useRowFields } from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
@@ -466,7 +467,17 @@ function ChangePasswordForm() {
  * "Log in again" for an account without a password (design-spec 6.16 4): a Google sign-in
  * that comes back to 4, its new session inside the 10 minutes U7 and U8 ask for.
  */
-function LogInAgain({ message }: { message: string }) {
+function LogInAgain({
+  message,
+  onCloseModal,
+}: {
+  message: string;
+  /**
+   * Given inside a modal (Delete account): a failure to start follows the modals' rule
+   * (6.0.6), whose small dialog's Close closes the modal.
+   */
+  onCloseModal?: () => void;
+}) {
   const { t } = useTranslation(["settings"]);
   const isOnline = useIsOnline();
   const [failure, setFailure] = useState<unknown>(null);
@@ -494,13 +505,21 @@ function LogInAgain({ message }: { message: string }) {
           </Button>
         </Flex>
       </InlineAlert>
-      {failure !== null && (
-        <SendFailure
-          error={failure}
-          onRetry={startGoogle}
-          isRetryDisabled={!isOnline}
-        />
-      )}
+      {failure !== null &&
+        (onCloseModal === undefined ? (
+          <SendFailure
+            error={failure}
+            onRetry={startGoogle}
+            isRetryDisabled={!isOnline}
+          />
+        ) : (
+          <ModalSendFailure
+            error={failure}
+            onRetry={startGoogle}
+            isRetryDisabled={!isOnline}
+            onClose={onCloseModal}
+          />
+        ))}
     </Stack>
   );
 }
@@ -770,7 +789,8 @@ function lastOwnerWorkspaces(error: unknown): { id: string; name: string }[] {
  * Delete account (design-spec 6.16「アカウントの削除」): what goes and what stays, the
  * user's email typed again, and their password, or a sign-in in the last 10 minutes for
  * an account without one. The only Owner of a workspace with others in it is sent to
- * that workspace's 9. Deleted, the user is logged out and on 1.
+ * that workspace's 9. Deleted, the user is logged out and on 1. Any other failure follows
+ * the modals' rule (6.0.6, ModalSendFailure), whose small dialog's Close closes this.
  */
 function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
   const { t } = useTranslation(["settings", "errors"]);
@@ -938,17 +958,18 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
         {refusal?.kind === "reauth" && (
           <LogInAgain
             message={t("errors:REAUTH_REQUIRED", { context: "deleteAccount" })}
+            onCloseModal={onClose}
           />
         )}
         {refusal?.kind === "lastOwner" && (
           <LastOwnerRefusal workspaces={refusal.workspaces} />
         )}
         {failure !== null && (
-          <SendFailure
+          <ModalSendFailure
             error={failure}
-            transient="couldNotSave"
             onRetry={() => void form.handleSubmit()}
             isRetryDisabled={!isOnline}
+            onClose={onClose}
           />
         )}
       </Stack>

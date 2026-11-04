@@ -1,5 +1,5 @@
 import type { CostItem, EconomicsInput, Me, Role } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
@@ -25,8 +25,21 @@ import {
 
 // 17 Costs (design-spec 6.3).
 
+/** happy-dom's window, whose viewport a test sets. */
+const setViewport = (width: number) =>
+  act(() =>
+    (
+      window as unknown as {
+        happyDOM: {
+          setViewport: (size: { width: number; height: number }) => void;
+        };
+      }
+    ).happyDOM.setViewport({ width, height: 900 }),
+  );
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  setViewport(1024);
 });
 
 const base = `/w/${workspaceId}/ideas/${home.idea.id}/costs`;
@@ -605,6 +618,58 @@ describe("17 Costs (design-spec 6.3)", () => {
         `/api/v1/evidence/${link.id}?lockVersion=1`,
       ),
     );
+  });
+
+  test("?modal=evidence opens nothing for a Viewer, an archived idea, or an about 17 does not hold (6.0.3)", async () => {
+    const cases: [Parameters<typeof costsApi>[0], string][] = [
+      [{ me: as("viewer") }, `cost_item:${equipment.id}`],
+      [{ archived: true }, `cost_item:${equipment.id}`],
+      // A row 17 does not list, and 18's number.
+      [{}, `cost_item:${madeId}`],
+      [{}, `economics_input:${validationId}:selling_price`],
+    ];
+    for (const [api, about] of cases) {
+      cleanup();
+      vi.unstubAllGlobals();
+      costsApi(api);
+      renderApp(`${base}?modal=evidence&about=${about}`);
+      await screen.findByRole("grid", { name: "Startup costs" });
+      expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull();
+    }
+  });
+
+  test("on a phone the row's sheet closes before its ⋯ opens Comments or History in the panel (6.0.4・6.0.5)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    costsApi();
+    const router = renderApp(base);
+    await screen.findByRole("grid", { name: "Startup costs" });
+    for (const panel of ["Comments", "History"] as const) {
+      await user.click(rowOf("Equipment"));
+      const sheet = await screen.findByRole("dialog", {
+        name: "Edit cost row",
+      });
+      await user.click(
+        within(sheet).getByRole("button", {
+          name: "Row actions for Equipment",
+        }),
+      );
+      await user.click(await screen.findByRole("menuitem", { name: panel }));
+      await waitFor(() =>
+        expect(screen.getByRole("dialog", { name: panel })).toBeTruthy(),
+      );
+      expect(
+        screen.queryByRole("dialog", { name: "Edit cost row" }),
+      ).toBeNull();
+      expect(router.state.location.search).toMatchObject({
+        panel: panel.toLowerCase(),
+        target: `cost_item:${equipment.id}`,
+      });
+      await act(() => router.history.back());
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: panel })).toBeNull(),
+      );
+    }
   });
 
   test("a delete refused as the idea is archived: the reason without Retry, then 17 reads as archived (6.0.6)", async () => {

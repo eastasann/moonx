@@ -162,7 +162,11 @@ export interface Autosave {
   cancelSignIn: () => void;
   /** Leaving for the sign-in screen, or logging out: the input is dropped (ADR-021). */
   discardAll: () => void;
-  /** Follows the browser's online and offline events; returns the way to stop. */
+  /**
+   * Follows the browser's online and offline events; returns the way to stop. Stopping
+   * clears every pending send and keeps the store from scheduling or sending (a send on
+   * its way still settles) until it is started again, which sends what was held then.
+   */
   start: () => () => void;
 }
 
@@ -183,6 +187,9 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
   let isUnreachable = false;
   let isReconnecting = false;
   let needsSignIn = false;
+  // Between start's stop and the next start (the app unmounted, or React StrictMode's
+  // remount): nothing is scheduled or sent, so a retry never outlives the app it saved for.
+  let stopped = false;
   let state: AutosaveState = build();
 
   function view(item: Item): SaveItem {
@@ -230,6 +237,12 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
     if (item.sending !== null) return;
     if (isEmpty(item.unsaved)) {
       if (item.status === "waiting") item.status = "saved";
+      emit();
+      return;
+    }
+    if (stopped) {
+      // Held until start sends it.
+      if (item.status === "saving") item.status = "waiting";
       emit();
       return;
     }
@@ -283,6 +296,7 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
    */
   function sendLater(item: Item, delay: number) {
     clearTimer(item);
+    if (stopped) return;
     item.timer = setTimeout(() => {
       item.timer = null;
       if (items.get(item.target.key) === item && sendsByItself(item.status)) {
@@ -491,6 +505,11 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
       emit();
     },
     start: () => {
+      if (stopped) {
+        stopped = false;
+        // Their timers went with the stop: what was held goes out now, as once back online.
+        sendAllHeld();
+      }
       const online = () => {
         // The browser is back: the failures seen while it was away say nothing more.
         networkFailures = 0;
@@ -505,6 +524,8 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
       window.addEventListener("online", online);
       window.addEventListener("offline", offline);
       return () => {
+        stopped = true;
+        for (const item of items.values()) clearTimer(item);
         window.removeEventListener("online", online);
         window.removeEventListener("offline", offline);
       };

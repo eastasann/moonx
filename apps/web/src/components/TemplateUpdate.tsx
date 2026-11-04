@@ -39,6 +39,7 @@ import {
   templateMigrationPreviewQuery,
   workspaceKey,
 } from "../lib/queries";
+import type { WaitedQuery } from "../lib/query";
 import { ModalSendFailure } from "./ModalFailure";
 import { FailureState, LoadingBlock } from "./states";
 import { dashboardHref, useModal, useWorkspace } from "./workspace";
@@ -225,10 +226,10 @@ function PreviewBody({
 }
 
 /** M8's shape while T1 answers, then the wait's own state (design-spec 6.0.6). */
-function PreviewSkeleton({ onRetry }: { onRetry: () => void }) {
+function PreviewSkeleton({ waitsFor }: { waitsFor: readonly WaitedQuery[] }) {
   const { t } = useTranslation(["app"]);
   return (
-    <LoadingBlock onRetry={onRetry}>
+    <LoadingBlock waitsFor={waitsFor}>
       <Stack gap="space-400">
         <Text elementType="p">{t("app:templateUpdate.title")}</Text>
         <DescriptionList>
@@ -269,9 +270,8 @@ export function TemplateUpdateDialog({
   const queryClient = useQueryClient();
   const isOnline = useIsOnline();
   const isOpen = useIsOpen();
-  const preview = useQuery(
-    templateMigrationPreviewQuery(target.kind, target.id),
-  );
+  const previewOptions = templateMigrationPreviewQuery(target.kind, target.id);
+  const preview = useQuery(previewOptions);
   const changed = () =>
     Promise.all(
       [
@@ -371,7 +371,7 @@ export function TemplateUpdateDialog({
       </Stack>
     );
   } else {
-    body = <PreviewSkeleton onRetry={() => void preview.refetch()} />;
+    body = <PreviewSkeleton waitsFor={[previewOptions]} />;
   }
   return (
     <Dialog

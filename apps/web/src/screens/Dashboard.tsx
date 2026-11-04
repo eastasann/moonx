@@ -40,7 +40,7 @@ import {
 import {
   FailureState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
@@ -61,6 +61,7 @@ import {
   dashboardIdeasQuery,
   dashboardSelfAnalysesQuery,
 } from "../lib/queries";
+import type { WaitedQuery } from "../lib/query";
 import { useDocumentTitle } from "../lib/title";
 import { RowsSkeleton } from "./DashboardSkeleton";
 
@@ -71,16 +72,22 @@ import { RowsSkeleton } from "./DashboardSkeleton";
  */
 function QueryContent<T>({
   query,
+  waitsFor,
   skeleton,
   dashboard,
   children,
 }: {
   query: UseQueryResult<T>;
+  /** The query's options, which Retry on "Taking longer than usual" asks again. */
+  waitsFor: readonly WaitedQuery[];
   skeleton: ReactNode;
   dashboard: string | undefined;
   children: (data: T) => ReactNode;
 }) {
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    query.isPending,
+    waitsFor,
+  );
   const retry = () => void query.refetch();
   if (query.data !== undefined) return children(query.data);
   if (query.isError) {
@@ -95,7 +102,7 @@ function QueryContent<T>({
     );
   }
   if (isSlow) {
-    return <SlowLoadingState headingLevel={3} size="S" onRetry={retry} />;
+    return <SlowLoadingState headingLevel={3} size="S" onRetry={retrySlow} />;
   }
   return <Skeleton isLoading>{skeleton}</Skeleton>;
 }
@@ -110,7 +117,8 @@ function IdeasBlock({
   onFirstIdea: () => void;
 }) {
   const { t } = useTranslation(["dashboard", "app"]);
-  const query = useQuery(dashboardIdeasQuery(workspaceId));
+  const options = dashboardIdeasQuery(workspaceId);
+  const query = useQuery(options);
   const data = query.data;
   if (
     data !== undefined &&
@@ -131,6 +139,7 @@ function IdeasBlock({
     >
       <QueryContent
         query={query}
+        waitsFor={[options]}
         dashboard={dashboardHref(me)}
         skeleton={
           <RowsSkeleton
@@ -249,7 +258,8 @@ export function GettingStarted({
 
 function DueSoonBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
   const { t } = useTranslation(["dashboard"]);
-  const query = useQuery(dashboardDueSoonQuery(workspaceId));
+  const options = dashboardDueSoonQuery(workspaceId);
+  const query = useQuery(options);
   return (
     <Block
       title={t("dashboard:due.title")}
@@ -258,6 +268,7 @@ function DueSoonBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
     >
       <QueryContent
         query={query}
+        waitsFor={[options]}
         dashboard={dashboardHref(me)}
         skeleton={
           <RowsSkeleton
@@ -359,11 +370,13 @@ function SelfAnalysesBlock({
   workspaceId: string;
 }) {
   const { t } = useTranslation(["dashboard", "common"]);
-  const query = useQuery(dashboardSelfAnalysesQuery(workspaceId));
+  const options = dashboardSelfAnalysesQuery(workspaceId);
+  const query = useQuery(options);
   return (
     <Block title={t("dashboard:selfAnalyses.title")} isBusy={query.isPending}>
       <QueryContent
         query={query}
+        waitsFor={[options]}
         dashboard={dashboardHref(me)}
         skeleton={
           <RowsSkeleton
@@ -411,11 +424,13 @@ function SelfAnalysesBlock({
 
 function ActivityBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
   const { t } = useTranslation(["dashboard"]);
-  const query = useQuery(dashboardActivityQuery(workspaceId));
+  const options = dashboardActivityQuery(workspaceId);
+  const query = useQuery(options);
   return (
     <Block title={t("dashboard:activity.title")} isBusy={query.isPending}>
       <QueryContent
         query={query}
+        waitsFor={[options]}
         dashboard={dashboardHref(me)}
         skeleton={
           <RowsSkeleton

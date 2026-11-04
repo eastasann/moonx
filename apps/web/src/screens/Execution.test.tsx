@@ -13,7 +13,14 @@ import {
   toastAfter,
 } from "../test/api";
 import { workspaceId } from "../test/ideas";
-import { anaRef, executionItem, ideaId, planHome, planId } from "../test/plans";
+import {
+  anaRef,
+  executionItem,
+  ideaId,
+  planHome,
+  planId,
+  planPath,
+} from "../test/plans";
 import { home as ideaHome } from "../test/validation";
 
 // 22 Execution (design-spec 6.13, SDD 5.9 P9–P11).
@@ -113,6 +120,7 @@ function executionApi({
   me = ana,
   items = everything(),
   archived = false,
+  ideaArchived = false,
   patch,
   create,
   remove,
@@ -125,6 +133,7 @@ function executionApi({
   items?: ExecutionItem[];
   /** A function is asked at each call: the plan may be archived behind the screen. */
   archived?: boolean | (() => boolean);
+  ideaArchived?: boolean;
   /** Answers P10 PATCH instead of keeping what it sends. */
   patch?: () => Response;
   /** Answers P9 POST; undefined makes the item and keeps it. */
@@ -151,10 +160,13 @@ function executionApi({
       return Response.json(meNow());
     }
     if (method === "GET" && path === `/api/v1/ideas/${ideaId}/validation`) {
-      return Response.json(ideaHome);
+      return Response.json({
+        ...ideaHome,
+        idea: { ...ideaHome.idea, archived: ideaArchived },
+      });
     }
     if (method === "GET" && path === api) {
-      return Response.json(planHome({ archived: archivedNow() }));
+      return Response.json(planHome({ archived: archivedNow(), ideaArchived }));
     }
     if (method === "GET" && path === `${api}/execution-items`) {
       return Response.json({ items });
@@ -701,6 +713,176 @@ describe("22 Execution (design-spec 6.13)", () => {
     await screen.findByRole("heading", { level: 2, name: "Business decision" });
     expect(screen.queryByRole("button", { name: "Add milestone" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Goal" })).toBeNull();
+  });
+
+  test("an archived idea says so and reads only: no + Add, no Reorder or Delete, no field to change", async () => {
+    const user = userEvent.setup();
+    executionApi({ ideaArchived: true });
+    renderApp(base);
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    // The idea's notice alone (6.13: as 20's).
+    expect(screen.queryByText("This plan is archived")).toBeNull();
+    await screen.findByRole("heading", { level: 2, name: "Business decision" });
+    expect(screen.getByText("Decide to go")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Add milestone" })).toBeNull();
+    expect(screen.queryAllByRole("textbox")).toEqual([]);
+    expect(screen.queryAllByRole("combobox")).toEqual([]);
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    // The row's ⋯ alone, with what reads: the detail has none.
+    const menus = screen.getAllByRole("button", {
+      name: "More for Business decision",
+    });
+    expect(menus).toHaveLength(1);
+    await user.click(menus[0] as Element);
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((entry) => entry.textContent),
+    ).toEqual(["Comments", "History"]);
+  });
+
+  test.each([
+    ["a Viewer", { me: as("viewer") }],
+    ["an archived plan", { archived: true }],
+    ["an archived idea", { ideaArchived: true }],
+  ])(
+    "an empty tab says what it is for, and nothing more, to %s",
+    async (_, options) => {
+      executionApi(options);
+      renderApp(`${base}?tab=questions`);
+      expect(
+        await screen.findByRole("heading", {
+          level: 2,
+          name: "Write down what you still need to find out, and why it matters.",
+        }),
+      ).toBeTruthy();
+      expect(
+        within(screen.getByRole("tabpanel")).queryAllByRole("button"),
+      ).toEqual([]);
+      expect(
+        screen.queryByRole("button", { name: "Add open question" }),
+      ).toBeNull();
+    },
+  );
+
+  test("an item added that the filters leave out clears them, and shows beside the list", async () => {
+    const user = userEvent.setup();
+    executionApi();
+    const router = renderApp(`${base}?tab=actions&status=done`);
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Nothing matches these filters",
+      }),
+    ).toBeTruthy();
+    const overdueOnly = screen.getByRole("switch", { name: "Overdue only" });
+    await user.click(overdueOnly);
+    await user.click(
+      screen.getAllByRole("button", { name: "Add next action" })[0] as Element,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "New next action",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Action/ }),
+      "Call the bank",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    // To do and with no date: neither Done nor overdue.
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        tab: "actions",
+        item: "5e0c0000-0000-4000-8000-000000000099",
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Call the bank" }),
+    ).toBeTruthy();
+    expect((overdueOnly as HTMLInputElement).checked).toBe(false);
+    expect(
+      within(screen.getByRole("grid", { name: "Next Actions" })).getByRole(
+        "row",
+        { name: /Call the bank/ },
+      ),
+    ).toBeTruthy();
+  });
+
+  test("another tab lets go of the filters and the item shown, in place of the history entry", async () => {
+    const user = userEvent.setup();
+    executionApi();
+    const router = renderApp(planPath());
+    await screen.findByRole("heading", { level: 1, name: "Plan A" });
+    await act(() =>
+      router.navigate({
+        href: `${base}?tab=actions&assignee=me&item=${venue.id}`,
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Book venue" }),
+    ).toBeTruthy();
+    const entries = router.history.length;
+    await user.click(screen.getByRole("tab", { name: "Milestones" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ tab: "milestones" }),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Business decision",
+      }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("tab", { name: "Next Actions" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ tab: "actions" }),
+    );
+    // The first of the list, all of it: not the item nor the assignee of before.
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Get supplier quote",
+      }),
+    ).toBeTruthy();
+    expect(
+      within(screen.getByRole("grid", { name: "Next Actions" })).getAllByRole(
+        "row",
+      ),
+    ).toHaveLength(2);
+    // Overdue only, which the URL does not hold, goes too.
+    await user.click(screen.getByRole("switch", { name: "Overdue only" }));
+    await user.click(screen.getByRole("tab", { name: "Launch" }));
+    await user.click(await screen.findByRole("tab", { name: "Next Actions" }));
+    expect(
+      (
+        (await screen.findByRole("switch", {
+          name: "Overdue only",
+        })) as HTMLInputElement
+      ).checked,
+    ).toBe(false);
+    expect(router.history.length).toBe(entries);
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(planPath()),
+    );
+  });
+
+  test("an assignee id the members do not have is A former member", async () => {
+    executionApi();
+    renderApp(
+      `${base}?tab=actions&assignee=0f8fad5b-d9cb-469f-a165-708677289999`,
+    );
+    const filters = await screen.findByRole("tabpanel");
+    await waitFor(() =>
+      expect(
+        within(filters).getByRole("button", { name: /Assignee/ }).textContent,
+      ).toContain("A former member"),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Nothing matches these filters",
+      }),
+    ).toBeTruthy();
   });
 
   test("the header's 💬 and 🕘 read the screen's `execution`, the items' from their 💬 and 🕘", async () => {

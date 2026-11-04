@@ -5,6 +5,7 @@ import {
   changeHistory,
   comments,
   competitors,
+  costItems,
   decisionLogEntries,
   evidenceLinks,
   executionItems,
@@ -595,6 +596,34 @@ describe("P1 GET, P2 and P3", () => {
     expect(after.draftOnly).toBe(false);
     expect(itemOf(after, 29)).toMatchObject({ filled: 1, total: 1 });
   });
+
+  test("P2 GET counts an item in its Part once all its counted sub-items are filled", async () => {
+    const team = await newTeam();
+    const view = await draft(team);
+    const partA = (plan: PlanHome) =>
+      plan.parts.find((part) => part.part === "a");
+    expect(partA(view)).toMatchObject({ completeItems: 0, totalItems: 10 });
+    const fill = async (key: string) => {
+      const saved = await call(
+        "PUT",
+        `/api/v1/plans/${view.id}/answers/${key}`,
+        team.memberCookie,
+        { text: `Answer to ${key}`, lockVersion: 0 },
+      );
+      expect(saved.status).toBe(200);
+    };
+    // 01 has six text sub-items, the first copied from the concept, and P.01.7 (Key
+    // numbers), which shows the validation's numbers, is not counted and stays empty.
+    expect(itemOf(view, 1)).toMatchObject({ filled: 1, total: 6 });
+    for (const key of ["P.01.2", "P.01.3", "P.01.4", "P.01.5"]) await fill(key);
+    const before = await home(team, view.id);
+    expect(itemOf(before, 1)).toMatchObject({ filled: 5, total: 6 });
+    expect(partA(before)?.completeItems).toBe(0);
+    await fill("P.01.6");
+    const after = await home(team, view.id);
+    expect(itemOf(after, 1)).toMatchObject({ filled: 6, total: 6 });
+    expect(partA(after)).toMatchObject({ completeItems: 1, totalItems: 10 });
+  });
 });
 
 describe("P6 versions, P7 and P8 Go / No-Go", () => {
@@ -774,6 +803,105 @@ describe("P6 versions, P7 and P8 Go / No-Go", () => {
     const second = await save("v2");
     expect(Date.parse(second.savedAt)).toBe(clock + 1_200_001);
     expect((await home(team, view.id)).hasChangesSinceVersion).toBe(false);
+  });
+
+  test("+ changes ignores the validation's numbers but not an execution item, and P8 takes the version saved last", async () => {
+    const team = await newTeam();
+    const view = await draft(team);
+    const saveVersion = async (name: string) => {
+      clock += 60_000;
+      const response = await call(
+        "POST",
+        `/api/v1/plans/${view.id}/versions`,
+        team.memberCookie,
+        { name },
+      );
+      expect(response.status).toBe(201);
+      return planVersionSummarySchema.parse(await response.json());
+    };
+    const changes = async () => {
+      const context = await call(
+        "GET",
+        `/api/v1/plans/${view.id}/go-no-go-context`,
+        team.memberCookie,
+      );
+      expect(context.status).toBe(200);
+      return [
+        (await home(team, view.id)).hasChangesSinceVersion,
+        goNoGoContextSchema.parse(await context.json()).hasChangesSinceVersion,
+      ];
+    };
+    await saveVersion("v1");
+    expect(await changes()).toEqual([false, false]);
+
+    const [rent] = await db
+      .select()
+      .from(costItems)
+      .where(
+        and(
+          eq(costItems.validationId, team.validationId),
+          eq(costItems.templateKey, "monthly.rent"),
+        ),
+      );
+    if (rent === undefined) throw new Error("No rent row");
+    clock += 60_000;
+    const cost = await call(
+      "PATCH",
+      `/api/v1/cost-items/${rent.id}`,
+      team.memberCookie,
+      { amount: 12000, lockVersion: rent.lockVersion },
+    );
+    expect(cost.status).toBe(200);
+    expect(await changes()).toEqual([false, false]);
+
+    const [milestone] = await db
+      .select()
+      .from(executionItems)
+      .where(
+        and(
+          eq(executionItems.businessPlanId, view.id),
+          eq(executionItems.type, "milestone"),
+        ),
+      );
+    if (milestone === undefined) throw new Error("No milestone");
+    clock += 60_000;
+    const item = await call(
+      "PATCH",
+      `/api/v1/execution-items/${milestone.id}`,
+      team.memberCookie,
+      { status: "doing", lockVersion: milestone.lockVersion },
+    );
+    expect(item.status).toBe(200);
+    expect(await changes()).toEqual([true, true]);
+
+    const v2 = await saveVersion("v2");
+    clock += 60_000;
+    const edit = await call(
+      "PUT",
+      `/api/v1/plans/${view.id}/answers/P.01.5`,
+      team.memberCookie,
+      { text: "Monthly invoices", lockVersion: 0 },
+    );
+    expect(edit.status).toBe(200);
+    expect(await changes()).toEqual([true, true]);
+    clock += 60_000;
+    const recorded = await call(
+      "POST",
+      `/api/v1/plans/${view.id}/go-no-go`,
+      team.memberCookie,
+      { value: "delay", reason: "Waiting for the pilot" },
+    );
+    expect(recorded.status).toBe(201);
+    const { entry } = goNoGoResultSchema.parse(await recorded.json());
+    expect(entry).toMatchObject({
+      versionName: "v2",
+      snapshot: { planVersion: { id: v2.id, name: "v2" } },
+    });
+    const [row] = await db
+      .select({ planVersionId: decisionLogEntries.planVersionId })
+      .from(decisionLogEntries)
+      .where(eq(decisionLogEntries.id, entry.id));
+    expect(row?.planVersionId).toBe(v2.id);
   });
 
   test("counts comments on the items shown that still exist, and gives Viewers no [S]", async () => {

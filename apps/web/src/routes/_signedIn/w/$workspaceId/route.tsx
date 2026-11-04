@@ -19,6 +19,7 @@ import {
 import { ApiError, api, unwrap } from "../../../../lib/api";
 import { isTransient, unexpectedReference } from "../../../../lib/failure";
 import { meQuery } from "../../../../lib/queries";
+import { routeQueries } from "../../../../lib/query";
 
 const isMemberOf = (me: Me, workspaceId: string) =>
   me.memberships.some(({ workspace }) => workspace.id === workspaceId);
@@ -30,7 +31,8 @@ const isMemberOf = (me: Me, workspaceId: string) =>
  * found" (6.0.6): only the API can tell them apart.
  */
 export const Route = createFileRoute("/_signedIn/w/$workspaceId")({
-  loader: async ({ context: { queryClient }, params: { workspaceId } }) => {
+  loader: async ({ context, params: { workspaceId } }) => {
+    const queryClient = routeQueries(context.queryClient);
     if (isMemberOf(await queryClient.ensureQueryData(meQuery()), workspaceId)) {
       return { verdict: "member" as const };
     }

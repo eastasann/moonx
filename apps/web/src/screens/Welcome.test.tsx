@@ -2,7 +2,14 @@ import type { InvitationPreview } from "@moonx/schemas";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, authError, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  authError,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { stepsOf } from "./Welcome";
 
 afterEach(() => {
@@ -89,6 +96,41 @@ describe("3 Welcome ① (design-spec 6.16)", () => {
       within(screen.getByRole("list", { name: "Steps" })).getAllByRole(
         "listitem",
       ),
+    ).toHaveLength(1);
+  });
+
+  test("Log out of the other address opens the invitation's link again, signed out", async () => {
+    let isSignedIn = true;
+    const calls = stubApi(({ method, path }) => {
+      if (method === "POST" && path === "/api/auth/sign-out") {
+        isSignedIn = false;
+        return Response.json({ success: true });
+      }
+      if (path === "/api/v1/me") {
+        return isSignedIn
+          ? Response.json(ana)
+          : apiError(401, "UNAUTHENTICATED");
+      }
+      if (path === `/api/v1/invitations/by-token/${TOKEN}`) {
+        return Response.json(invitation);
+      }
+      return undefined;
+    });
+    const router = renderApp(`/welcome?step=invite&token=${TOKEN}`);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Log out" }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.href).toBe(`/invite/${TOKEN}`),
+    );
+    // The link of a new address: its sign-up, for the invitation's email.
+    const form = await screen.findByRole("form", { name: "Sign up" });
+    expect(
+      (within(form).getByRole("textbox", { name: /Email/ }) as HTMLInputElement)
+        .value,
+    ).toBe(invitation.email);
+    expect(
+      calls.filter(({ path }) => path === "/api/auth/sign-out"),
     ).toHaveLength(1);
   });
 
@@ -187,6 +229,51 @@ describe("2 Sign up from an invitation (design-spec 6.16)", () => {
         name: "This invitation is invalid or expired. Ask the person who invited you for a new one.",
       }),
     ).toBeTruthy();
+  });
+
+  test("an account made with the address while signing up (EMAIL_TAKEN): on to Log in and back to the link, without words", async () => {
+    const user = userEvent.setup();
+    let accountExists = false;
+    const calls = stubApi(({ method, path }) => {
+      if (path === "/api/v1/me") return apiError(401, "UNAUTHENTICATED");
+      if (
+        method === "GET" &&
+        path === `/api/v1/invitations/by-token/${TOKEN}`
+      ) {
+        return Response.json({ ...invitation, accountExists });
+      }
+      if (path === `/api/v1/invitations/by-token/${TOKEN}/sign-up`) {
+        // Google's sign-up with the same address, in another tab, came first.
+        accountExists = true;
+        return apiError(409, "EMAIL_TAKEN");
+      }
+      return undefined;
+    });
+    const router = renderApp(`/invite/${TOKEN}`);
+    const form = await screen.findByRole("form", { name: "Sign up" });
+    await user.type(
+      within(form).getByRole("textbox", { name: /Display name/ }),
+      "New Member",
+    );
+    await user.type(
+      within(form).getByLabelText(/^Password/),
+      "a-long-password",
+    );
+    const signUp = screen.getByRole("button", { name: "Sign up" });
+    await waitFor(() => expect(signUp.hasAttribute("disabled")).toBe(false));
+    await user.click(signUp);
+    await waitFor(() =>
+      expect(router.state.location.href).toBe(
+        `/login?next=${encodeURIComponent(`/invite/${TOKEN}`)}`,
+      ),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Log in" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(calls.filter(({ path }) => path.endsWith("/sign-up"))).toHaveLength(
+      1,
+    );
   });
 
   test("an account with the address: Log in, then back to the link", async () => {
@@ -426,6 +513,30 @@ describe("Log out (design-spec 5章「共通ナビ」)", () => {
     const toast = words.closest<HTMLElement>('[role="alertdialog"]');
     if (toast === null) throw new Error("not in a toast");
     expect(router.state.location.pathname).toBe(`/w/${ana.lastWorkspaceId}`);
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(
+        calls.filter(({ path }) => path === "/api/auth/sign-out"),
+      ).toHaveLength(2),
+    );
+  });
+
+  test("a rate limit: the user stays; the toast gives the wait and Retry", async () => {
+    const calls = dashboard(() =>
+      authError(429, "RATE_LIMITED", { "x-retry-after": "120" }),
+    );
+    const router = renderApp(`/w/${ana.lastWorkspaceId}`);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole("button", { name: "Ana Villanueva" }),
+    );
+    const toast = await toastAfter(
+      "Too many attempts. Try again in 2 minutes.",
+      async () =>
+        user.click(await screen.findByRole("menuitem", { name: "Log out" })),
+    );
+    expect(router.state.location.pathname).toBe(`/w/${ana.lastWorkspaceId}`);
+    expect(within(toast).queryByText(/Something went wrong/)).toBeNull();
     await user.click(within(toast).getByRole("button", { name: "Retry" }));
     await waitFor(() =>
       expect(

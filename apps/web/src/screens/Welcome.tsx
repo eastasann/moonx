@@ -32,6 +32,7 @@ import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
 import { useIsOnline } from "../lib/online";
 import { invitationQuery, isInvitationToken, meQuery } from "../lib/queries";
+import { askAgain } from "../lib/query";
 import { useDocumentTitle } from "../lib/title";
 import { WelcomeSkeleton } from "./WelcomeSkeleton";
 
@@ -85,8 +86,9 @@ export function WelcomeScreen({ step, token, new: fresh }: WelcomeSearch) {
   const queryClient = useQueryClient();
   const { data: me } = useQuery(meQuery());
   const isToken = token !== undefined && isInvitationToken(token);
+  const invitationOptions = invitationQuery(token ?? "");
   const invitation = useQuery({
-    ...invitationQuery(token ?? ""),
+    ...invitationOptions,
     enabled: isToken,
   });
   if (me === undefined) return null;
@@ -114,11 +116,7 @@ export function WelcomeScreen({ step, token, new: fresh }: WelcomeSearch) {
     if (invitation.data === undefined) {
       return (
         <StandaloneLoading
-          onRetry={() =>
-            void queryClient.invalidateQueries({
-              queryKey: ["invitations", token],
-            })
-          }
+          onRetry={() => askAgain(queryClient, [invitationOptions])}
         >
           <WelcomeSkeleton />
         </StandaloneLoading>

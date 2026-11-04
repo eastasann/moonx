@@ -49,7 +49,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
@@ -505,21 +505,23 @@ function QuestionFormBody({
   about: string | undefined;
 }) {
   const { me, workspace } = useWorkspace();
-  const home = useQuery(validationHomeQuery(ideaId));
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
   const isSection = isQuestionSection(sectionKey);
   const ready =
     home.data !== undefined &&
     home.data.idea.workspaceId === workspace.id &&
     isSection;
-  const questions = useQuery({
-    ...validationQuestionsQuery(
-      ideaId,
-      home.data?.validationId ?? "",
-      sectionKey,
-    ),
-    enabled: ready,
-  });
-  const isSlow = useIsSlow(home.isPending || (ready && questions.isPending));
+  const questionsOptions = validationQuestionsQuery(
+    ideaId,
+    home.data?.validationId ?? "",
+    sectionKey,
+  );
+  const questions = useQuery({ ...questionsOptions, enabled: ready });
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    home.isPending || (ready && questions.isPending),
+    [homeOptions, questionsOptions],
+  );
   const failure = home.error ?? questions.error;
   if (!isSection) return <NotFoundState dashboardHref={dashboardHref(me)} />;
   if (home.data !== undefined && home.data.idea.workspaceId !== workspace.id) {
@@ -556,14 +558,7 @@ function QuestionFormBody({
     );
   }
   if (isSlow) {
-    return (
-      <SlowLoadingState
-        onRetry={() => {
-          void home.refetch();
-          if (ready) void questions.refetch();
-        }}
-      />
-    );
+    return <SlowLoadingState onRetry={retrySlow} />;
   }
   return (
     <Skeleton isLoading>

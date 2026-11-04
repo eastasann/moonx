@@ -54,7 +54,7 @@ import {
   FailureState,
   LoadingBlock,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "./states";
 import { UserName } from "./UserName";
 import { dashboardHref, usePanel, useWorkspace } from "./workspace";
@@ -275,8 +275,9 @@ export function HistoryPanelBody({
   const isOnline = useIsOnline();
   const panel = usePanel();
   const saves = useAutosaveState();
+  const queryKey = [...historyKey, formatPanelTarget(target)];
   const query = useInfiniteQuery({
-    queryKey: [...historyKey, formatPanelTarget(target)],
+    queryKey,
     queryFn: ({ pageParam }) => historyPage(target, pageParam),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (last) =>
@@ -308,18 +309,18 @@ export function HistoryPanelBody({
   // A plan's changes name an execution item's assignee and a table's columns (6.0.5):
   // the members, and the items whose tables are listed, are read for their words.
   const { plan, idea } = history;
+  const membersOptions = membersQuery(workspace.id);
   const members = useQuery({
-    ...membersQuery(workspace.id),
+    ...membersOptions,
     enabled: plan !== undefined,
   });
   const tableItemNos =
     plan === undefined || idea === undefined ? [] : tableItemsOf(entries);
-  const items = useQueries({
-    queries:
-      plan === undefined || idea === undefined
-        ? []
-        : tableItemNos.map((itemNo) => planItemQuery(idea.id, plan.id, itemNo)),
-  });
+  const itemsOptions =
+    plan === undefined || idea === undefined
+      ? []
+      : tableItemNos.map((itemNo) => planItemQuery(idea.id, plan.id, itemNo));
+  const items = useQueries({ queries: itemsOptions });
   const pendingItems = new Set(
     tableItemNos.filter((_, index) => items[index]?.isPending === true),
   );
@@ -524,7 +525,10 @@ export function HistoryPanelBody({
 
   // A row's words that take over 10 seconds are a slow load like the list's (6.0.6): the
   // list's place says so, with Retry, which reads again what those rows wait for.
-  const isWordsSlow = useIsSlow(entries.some(waitsForWords));
+  const wordsLoading = useSlowLoading(entries.some(waitsForWords), [
+    membersOptions,
+    ...itemsOptions,
+  ]);
   let rows: ReactNode;
   if (query.isError || wordsFailure !== null) {
     rows = (
@@ -540,20 +544,17 @@ export function HistoryPanelBody({
         size="S"
       />
     );
-  } else if (isWordsSlow) {
+  } else if (wordsLoading.isSlow) {
     rows = (
       <SlowLoadingState
-        onRetry={() => {
-          if (members.isPending) void members.refetch();
-          for (const item of items) if (item.isPending) void item.refetch();
-        }}
+        onRetry={wordsLoading.retry}
         headingLevel={3}
         size="S"
       />
     );
   } else if (query.data === undefined) {
     rows = (
-      <LoadingBlock onRetry={() => void query.refetch()}>
+      <LoadingBlock waitsFor={[{ queryKey }]}>
         <Stack gap="space-200">
           <Text>{t("panels:history.empty")}</Text>
           <Text>{t("panels:history.empty")}</Text>

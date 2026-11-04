@@ -1,7 +1,7 @@
-import { act, cleanup, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppRouter } from "../router";
-import { ana, renderApp, stubApi } from "../test/api";
+import { ana, apiError, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
 import { PENDING_MS, SLOW_LOADING_MS } from "./states";
 
@@ -76,6 +76,150 @@ describe("PendingScreen", () => {
     expect(isSkeleton("Due soon")).toBe(true);
 
     await wait(SLOW_LOADING_MS - 4000 - PENDING_MS);
+    expect(
+      screen.getByRole("heading", { name: "Taking longer than usual" }),
+    ).toBeTruthy();
+  });
+
+  test("Retry drops the read the load waits for and asks again: the skeleton for 10 seconds more, then the screen", async () => {
+    // The first U1 is answered only after the second has been asked, and too late: it
+    // names someone else. The second does not come either; the third does.
+    let asked = 0;
+    let answerLate = () => {};
+    stubApi(({ path }) => {
+      if (path !== "/api/v1/me") return undefined;
+      asked += 1;
+      if (asked === 1) {
+        return new Promise<Response>((resolve) => {
+          answerLate = () =>
+            resolve(Response.json({ ...ana, displayName: "Someone Else" }));
+        });
+      }
+      if (asked === 2) return new Promise<Response>(() => {});
+      return Response.json(ana);
+    });
+    renderApp(`/w/${workspaceId}`);
+    await wait(SLOW_LOADING_MS);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await wait(0);
+    expect(asked).toBe(2);
+    expect(screen.queryByText("Taking longer than usual")).toBeNull();
+    expect(isSkeleton("Due soon")).toBe(true);
+
+    await wait(SLOW_LOADING_MS - PENDING_MS);
+    expect(screen.queryByText("Taking longer than usual")).toBeNull();
+    expect(isSkeleton("Due soon")).toBe(true);
+    await wait(PENDING_MS);
+    expect(
+      screen.getByRole("heading", { name: "Taking longer than usual" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "BCDX" }),
+    ).toBeTruthy();
+    expect(screen.getAllByText(ana.displayName).length).toBeGreaterThan(0);
+    await act(answerLate);
+    await wait(0);
+    expect(screen.queryByText("Someone Else")).toBeNull();
+    expect(screen.getAllByText(ana.displayName).length).toBeGreaterThan(0);
+  });
+
+  test("Retry asks again for a fresh U1 the workspace's load waits for, though one is cached", async () => {
+    // The first U1 lacks BCDX, so the workspace's route asks it again, and that answer
+    // does not come; the next one has BCDX.
+    let asked = 0;
+    stubApi(({ path }) => {
+      if (path !== "/api/v1/me") return undefined;
+      asked += 1;
+      if (asked === 1) return Response.json({ ...ana, memberships: [] });
+      if (asked === 2) return new Promise<Response>(() => {});
+      return Response.json(ana);
+    });
+    renderApp(`/w/${workspaceId}`);
+    await wait(SLOW_LOADING_MS);
+    expect(asked).toBe(2);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "BCDX" }),
+    ).toBeTruthy();
+    expect(screen.queryByText("You don't have access to this")).toBeNull();
+  });
+
+  test("a later load of the same entry counts its own 10 seconds: Retry after a failed load", async () => {
+    // U1 fails after 2 seconds; asked again, it does not come.
+    let asked = 0;
+    stubApi(({ path }) => {
+      if (path !== "/api/v1/me") return undefined;
+      asked += 1;
+      if (asked > 1) return new Promise<Response>(() => {});
+      return new Promise<Response>((resolve) =>
+        setTimeout(() => resolve(apiError(500, "INTERNAL")), 2000),
+      );
+    });
+    renderApp(`/w/${workspaceId}`);
+    await wait(2000);
+    // Long after the first load began.
+    await wait(SLOW_LOADING_MS);
+    fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    await wait(PENDING_MS);
+    expect(asked).toBe(2);
+    expect(isSkeleton("Due soon")).toBe(true);
+    expect(screen.queryByText("Taking longer than usual")).toBeNull();
+    // Its 10 seconds count from Retry, though its skeleton showed at once.
+    await wait(SLOW_LOADING_MS - PENDING_MS - 500);
+    expect(screen.queryByText("Taking longer than usual")).toBeNull();
+    await wait(500);
+    expect(
+      screen.getByRole("heading", { name: "Taking longer than usual" }),
+    ).toBeTruthy();
+  });
+
+  test.each([
+    [`/w/${workspaceId}`, "Due soon"],
+    ["/welcome", "Invitation"],
+  ])(
+    "%s: a load that failed before any skeleton showed: Retry counts its 10 seconds from the press",
+    async (url, skeletonText) => {
+      // U1 fails at once, within the pending time; asked again, it does not come.
+      let asked = 0;
+      stubApi(({ path }) => {
+        if (path !== "/api/v1/me") return undefined;
+        asked += 1;
+        return asked > 1
+          ? new Promise<Response>(() => {})
+          : apiError(500, "INTERNAL");
+      });
+      renderApp(url);
+      fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+      await wait(0);
+      expect(asked).toBe(2);
+      // Its skeleton shows at once, the route's pending time not waited again.
+      expect(isSkeleton(skeletonText)).toBe(true);
+      await wait(SLOW_LOADING_MS - 500);
+      expect(screen.queryByText("Taking longer than usual")).toBeNull();
+      await wait(500);
+      expect(
+        screen.getByRole("heading", { name: "Taking longer than usual" }),
+      ).toBeTruthy();
+    },
+  );
+
+  test("a screen without the frame: Retry asks again and shows its skeleton for 10 seconds more", async () => {
+    let asked = 0;
+    stubApi(({ path }) => {
+      if (path !== "/api/v1/me") return undefined;
+      asked += 1;
+      return new Promise<Response>(() => {});
+    });
+    renderApp("/welcome");
+    await wait(SLOW_LOADING_MS);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await wait(0);
+    expect(asked).toBe(2);
+    expect(isSkeleton("Invitation")).toBe(true);
+    await wait(SLOW_LOADING_MS - PENDING_MS);
+    expect(screen.queryByText("Taking longer than usual")).toBeNull();
+    await wait(PENDING_MS);
     expect(
       screen.getByRole("heading", { name: "Taking longer than usual" }),
     ).toBeTruthy();

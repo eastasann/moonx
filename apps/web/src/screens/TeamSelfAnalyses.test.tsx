@@ -1,8 +1,9 @@
 import type { Me, Role } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, type Call, renderApp, stubApi } from "../test/api";
+import { SLOW_LOADING_MS } from "../components/states";
+import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   members,
@@ -30,10 +31,13 @@ function teamApi({
   me = ana,
   items = members.items,
   threads = [],
+  paolo = () => Response.json(paolosShared),
 }: {
   me?: Me;
   items?: typeof members.items;
   threads?: unknown[];
+  /** Answers S7 of Paolo's, each time it is asked. */
+  paolo?: () => Response | Promise<Response>;
 } = {}) {
   return stubApi((call: Call) => {
     const { method, path } = call;
@@ -41,7 +45,10 @@ function teamApi({
     if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
     if (method === "GET" && path === list) return Response.json({ items });
     if (method === "GET" && path === `${list}/${people.paolo.id}`) {
-      return Response.json(paolosShared);
+      return paolo();
+    }
+    if (method === "GET" && path === `${list}/${people.kenji.id}`) {
+      return apiError(403, "NOT_SHARED");
     }
     if (method === "GET" && path === `${list}/${ana.id}`) {
       return Response.json({
@@ -167,6 +174,39 @@ describe("12 Team Self Analyses (design-spec 6.11)", () => {
     expect(within(panel).queryByRole("button", { name: /Post to/ })).toBeNull();
   });
 
+  test("someone not shared here, opened by URL: no access beside the list, which stays (S7 NOT_SHARED)", async () => {
+    const user = userEvent.setup();
+    const calls = teamApi();
+    const router = renderApp(`${base}/${people.kenji.id}`);
+    const noAccess = await screen.findByRole("heading", {
+      name: "You don't have access to this",
+    });
+    expect(
+      calls.some(({ path }) => path === `${list}/${people.kenji.id}`),
+    ).toBe(true);
+    const grid = screen.getByRole("grid", { name: "Members" });
+    expect(grid.contains(noAccess)).toBe(false);
+    const rows = within(grid).getAllByRole("row");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Kenji Mori"),
+      expect.stringContaining("Paolo"),
+    ]);
+    expect(
+      screen
+        .getByRole("link", { name: "Go to Dashboard" })
+        .getAttribute("href"),
+    ).toBe(`/w/${workspaceId}`);
+    // The list is still the way to the ones who did share.
+    await user.click(within(grid).getByText(people.paolo.displayName));
+    expect(
+      await screen.findByText("To run a café students can afford."),
+    ).toBeTruthy();
+    expect(router.state.location.pathname).toBe(`${base}/${people.paolo.id}`);
+    expect(
+      screen.queryByRole("heading", { name: "You don't have access to this" }),
+    ).toBeNull();
+  });
+
   test("no one shared: says so", async () => {
     teamApi({
       items: members.items.map((item) => ({
@@ -220,6 +260,49 @@ describe("12 Team Self Analyses (design-spec 6.11)", () => {
       before,
     );
     expect(before.contains(document.activeElement)).toBe(false);
+  });
+
+  test("the header's list follows the one put beside the list, though their answers come only after two Retries", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      // The first two reads never answer; the third does when the test says.
+      let asked = 0;
+      let answer = () => {};
+      teamApi({
+        paolo: () => {
+          asked += 1;
+          if (asked < 3) return new Promise<Response>(() => {});
+          return new Promise<Response>((resolve) => {
+            answer = () => resolve(Response.json(paolosShared));
+          });
+        },
+      });
+      // The list alone in the path, its panel on Ana's: Paolo, the first who shared,
+      // goes beside it, and the panel is to follow him once his answers are read.
+      const router = renderApp(
+        `${base}?panel=comments&target=container:self_analysis:${selfAnalysisId}`,
+      );
+      await screen.findByRole("grid", { name: "Members" });
+      for (const tries of [1, 2]) {
+        act(() => vi.advanceTimersByTime(SLOW_LOADING_MS));
+        await user.click(await screen.findByRole("button", { name: "Retry" }));
+        await waitFor(() => expect(asked).toBe(tries + 1));
+      }
+      act(() => answer());
+      await waitFor(() =>
+        expect(router.state.location.search).toMatchObject({
+          panel: "comments",
+          target: `container:self_analysis:${paolosShared.id}`,
+        }),
+      );
+      expect(router.state.location.pathname).toBe(`${base}/${people.paolo.id}`);
+      expect(
+        await screen.findByText("To run a café students can afford."),
+      ).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("a panel on another member's answers or list opens nothing here, and stays as linked", async () => {

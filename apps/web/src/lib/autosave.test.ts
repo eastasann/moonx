@@ -410,6 +410,61 @@ describe("a lost session (design-spec M9)", () => {
   });
 });
 
+describe("stopped with the app, started again", () => {
+  test("stopping drops the pending sends: no retry, no typing pause, no send after a failure on its way", async () => {
+    let fail: (error: unknown) => void = () => {};
+    const { target, sent } = targetOf(async () => {
+      throw refused(503, "UPSTREAM_UNAVAILABLE");
+    });
+    autosave.change(target, 1, { name: "A" });
+    autosave.flush("idea:a");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statusOf()).toBe("retrying");
+    const other = targetOf(() => new Promise((_, reject) => (fail = reject)));
+    autosave.change({ ...other.target, key: "idea:b" }, 1, { name: "B" });
+    autosave.flush("idea:b");
+    autosave.change({ ...other.target, key: "idea:c" }, 1, { name: "C" });
+    stop();
+    fail(refused(503, "UPSTREAM_UNAVAILABLE"));
+    autosave.change(target, 1, { name: "AB" });
+    autosave.retry();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sent).toHaveLength(1);
+    expect(other.sent.map(({ fields }) => fields)).toEqual([{ name: "B" }]);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(autosave.hasUnsaved()).toBe(true);
+  });
+
+  test("started again (React StrictMode: start, stop, start), it saves as before and sends what it held", async () => {
+    stop();
+    stop = autosave.start();
+    const { target, sent } = targetOf(async ({ lockVersion }) => {
+      if (sent.length === 1) throw refused(503, "UPSTREAM_UNAVAILABLE");
+      return lockVersion + 1;
+    });
+    autosave.change(target, 1, { name: "A" });
+    await vi.advanceTimersByTimeAsync(TYPING_PAUSE_MS);
+    expect(sent).toHaveLength(1);
+    expect(statusOf()).toBe("retrying");
+    stop();
+    autosave.change(target, 1, { name: "AB" });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sent).toHaveLength(1);
+    stop = autosave.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sent[1]).toEqual({
+      fields: { name: "AB" },
+      lockVersion: 1,
+      force: false,
+    });
+    expect(statusOf()).toBe("saved");
+    autosave.change(target, 1, { name: "ABC" });
+    await vi.advanceTimersByTimeAsync(TYPING_PAUSE_MS);
+    expect(sent[2]?.lockVersion).toBe(2);
+    expect(statusOf()).toBe("saved");
+  });
+});
+
 describe("the header's save state (design-spec 6.0.1・6.0.2)", () => {
   test("nothing until the screen's item saves on this visit; then Saved", async () => {
     const { target } = targetOf(async () => 2);

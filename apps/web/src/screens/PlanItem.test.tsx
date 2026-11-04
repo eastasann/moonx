@@ -11,9 +11,10 @@ import type {
   Role,
   TemplateQuestion,
 } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { TYPING_PAUSE_MS } from "../lib/autosave";
 import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
@@ -213,6 +214,69 @@ const ownership = (rows: PlanAnswer["rows"]): PlanItem => ({
     },
   ],
 });
+
+/** §21: the assumptions the draft copied from 16, as a table of text columns. */
+const assumptions = (rows: PlanAnswer["rows"]): PlanItem => ({
+  itemNo: 21,
+  title: "Key Assumptions",
+  guidance: null,
+  readOnly: false,
+  prompts: [
+    prompt("P.21.1", "Key assumptions", {
+      answerType: "table",
+      options: {
+        kind: "table",
+        columns: [
+          { key: "statement", label: "Assumption", type: "text" },
+          { key: "evidence", label: "Evidence", type: "text" },
+        ],
+      },
+    }),
+  ],
+  answers: [
+    answer("P.21.1", {
+      rows,
+      copiedFrom: {
+        source: "LIST.ASSUMPTIONS",
+        copiedAt: "2026-09-01T02:00:00.000Z",
+      },
+      lockVersion: 3,
+    }),
+  ],
+  conditionAnswers: [],
+  metrics: {},
+  costRowNames: {},
+  scenarios: [],
+  execution: [],
+  references: [],
+});
+
+/** §24: the three conditions, with the plan's Go / No-Go history to look at. */
+const goNoGo: PlanItem = {
+  itemNo: 24,
+  title: "Go / No-Go Conditions",
+  guidance: null,
+  readOnly: false,
+  prompts: [
+    prompt("P.24.1", "We proceed to launch if"),
+    prompt("P.24.2", "We delay if"),
+    prompt("P.24.3", "We stop / abandon if"),
+  ],
+  answers: [answer("P.24.1"), answer("P.24.2"), answer("P.24.3")],
+  conditionAnswers: [],
+  metrics: {},
+  costRowNames: {},
+  scenarios: [],
+  execution: [],
+  references: [
+    {
+      kind: "go_no_go_history",
+      title: "Go / No-Go decisions",
+      data: [],
+      link: { screen: 7, workspaceId, ideaId },
+    },
+  ],
+};
 
 /** §23: the plan's milestones, shown and added as 22's. */
 const milestones = (execution: ExecutionItem[]): PlanItem => ({
@@ -1017,6 +1081,95 @@ describe("21's table sub-items (design-spec 6.12・6.0.8)", () => {
       }),
     );
   });
+
+  test("a cell the draft copied over 2,000 characters keeps its reason and its value; the rest saves with it, and it is sent once short enough", async () => {
+    const user = userEvent.setup();
+    const long = "x".repeat(2001);
+    const tooLong = "Too long. Shorten to 2,000 characters.";
+    const calls = itemApi({
+      items: [assumptions([{ statement: long, evidence: "Two stalls asked" }])],
+    });
+    const puts = () => sent(calls, "PUT", `${api}/answers/P.21.1`);
+    renderApp(itemPath(21));
+    const table = await screen.findByRole("region", {
+      name: "Key assumptions",
+    });
+    // The reason under the cell's value, in the cell.
+    const reason = await within(table).findByText(tooLong);
+    expect(reason.closest("[data-column]")?.textContent).toBe(
+      `${long}${tooLong}`,
+    );
+
+    // Another cell of its row saves, the long one sent as it is.
+    await user.click(within(table).getByText("Two stalls asked"));
+    const evidence = await within(table).findByRole("textbox", {
+      name: "Evidence",
+    });
+    await user.type(evidence, " too");
+    await user.tab();
+    await waitFor(() =>
+      expect(puts().at(-1)?.body).toEqual({
+        rows: [{ statement: long, evidence: "Two stalls asked too" }],
+        lockVersion: 3,
+      }),
+    );
+    expect(within(table).getByText(tooLong)).toBeTruthy();
+
+    await user.click(
+      within(table).getByRole("button", { name: "Add row to Key assumptions" }),
+    );
+    await waitFor(() =>
+      expect(puts().at(-1)?.body).toEqual({
+        rows: [
+          { statement: long, evidence: "Two stalls asked too" },
+          { statement: null, evidence: null },
+        ],
+        lockVersion: 4,
+      }),
+    );
+    await waitFor(() => expect(within(table).getByText(tooLong)).toBeTruthy());
+
+    // Longer still, it is not sent; shortened to the limit, it is.
+    await user.click(within(table).getByText(long));
+    const statement = await waitFor(() => {
+      const field = within(table).getByRole("textbox", { name: "Assumption" });
+      expect((field as HTMLInputElement).value).toBe(long);
+      return field;
+    });
+    const before = puts().length;
+    // The typing pause (6.0.2) run out on the fake clock, not slept through: past it for
+    // sure, however slow the run.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const paused = userEvent.setup({
+        advanceTimers: vi.advanceTimersByTime,
+      });
+      await paused.type(statement, "y");
+      await act(() => vi.advanceTimersByTimeAsync(TYPING_PAUSE_MS));
+      expect(puts()).toHaveLength(before);
+      await paused.type(statement, "{Backspace}{Backspace}");
+      await paused.tab();
+      const shortened = {
+        rows: [
+          { statement: "x".repeat(2000), evidence: "Two stalls asked too" },
+          { statement: null, evidence: null },
+        ],
+        lockVersion: 5,
+      };
+      const sentSince = () =>
+        puts()
+          .slice(before)
+          .map(({ body }) => body);
+      await waitFor(() => expect(sentSince()).toEqual([shortened]));
+      await act(() => vi.advanceTimersByTimeAsync(TYPING_PAUSE_MS));
+      expect(sentSince()).toEqual([shortened]);
+      await waitFor(() =>
+        expect(within(table).queryByText(tooLong)).toBeNull(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
@@ -1353,7 +1506,11 @@ describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
     });
     const assignee = within(dialog).getByRole("combobox", { name: "Assignee" });
     await user.clear(assignee);
-    await user.type(assignee, "x".repeat(61));
+    // A name of 60 that may be saved, then the key past the limit: as typed, without 61
+    // renders of the list under load.
+    await user.paste("x".repeat(60));
+    await user.keyboard("x");
+    expect(assignee).toHaveProperty("value", "x".repeat(61));
     expect(
       await within(dialog).findByText("Too long. Shorten to 60 characters."),
     ).toBeTruthy();
@@ -1438,7 +1595,10 @@ describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
       "Lease",
     );
     const assignee = within(dialog).getByRole("combobox", { name: "Assignee" });
-    await user.type(assignee, "x".repeat(61));
+    await user.click(assignee);
+    await user.paste("x".repeat(60));
+    await user.keyboard("x");
+    expect(assignee).toHaveProperty("value", "x".repeat(61));
     const add = within(dialog).getByRole("button", { name: "Add" });
     expect(add.hasAttribute("disabled")).toBe(true);
     await user.type(assignee, "{Backspace}");
@@ -1670,5 +1830,47 @@ describe("21's references (design-spec 6.12「参照（常に最新）」)", () 
       screen.getByRole("button", { name: "Research Log · Permits" }),
     );
     expect(await screen.findByText("Nothing in it yet")).toBeTruthy();
+  });
+
+  const goNoGoNote =
+    "Record a decision with Record Go / No-Go on the plan home.";
+
+  test.each(["owner", "member"] as const)(
+    "§24 tells an %s, who can change the plan, where to record a decision",
+    async (role) => {
+      itemApi({ me: as(role), items: [goNoGo] });
+      renderApp(itemPath(24));
+      const note = await screen.findByText(goNoGoNote);
+      // Under the references.
+      expect(
+        screen
+          .getByRole("button", { name: "Go / No-Go decisions" })
+          .compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    },
+  );
+
+  test.each([
+    ["a Viewer", { me: as("viewer"), items: [{ ...goNoGo, readOnly: true }] }],
+    [
+      "a saved version open",
+      { items: [goNoGo], version: [{ ...goNoGo, readOnly: true }] },
+    ],
+    [
+      "an archived plan",
+      {
+        items: [{ ...goNoGo, readOnly: true }],
+        home: planHome({ archived: true }),
+      },
+    ],
+  ])("§24 has no such note for %s", async (_, options) => {
+    itemApi(options);
+    renderApp(
+      itemPath(24, "version" in options ? `?version=${versionId}` : undefined),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Go / No-Go decisions" }),
+    ).toBeTruthy();
+    expect(screen.queryByText(goNoGoNote)).toBeNull();
   });
 });

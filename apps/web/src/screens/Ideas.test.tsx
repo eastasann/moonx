@@ -252,13 +252,60 @@ describe("6 Ideas (design-spec 6.8)", () => {
   });
 
   test("empty: why the screen is there and New idea; a Viewer the words only", async () => {
+    const user = userEvent.setup();
+    const emptyHeading = () =>
+      screen.findByRole("heading", {
+        name: "No ideas yet. Write down the first one. You can have many.",
+      });
     ideasApi({ items: [], hidden: 0 });
     renderApp(`/w/${workspaceId}/ideas`);
+    // The message's own New idea (IllustratedMessage), besides the list header's.
+    const message = (await emptyHeading()).parentElement as HTMLElement;
+    await user.click(within(message).getByRole("button", { name: "New idea" }));
     expect(
-      await screen.findByRole("heading", {
-        name: "No ideas yet. Write down the first one. You can have many.",
-      }),
+      await screen.findByRole("dialog", { name: "New idea" }),
     ).toBeTruthy();
+    cleanup();
+    vi.unstubAllGlobals();
+    ideasApi({ me: as("viewer"), items: [], hidden: 0 });
+    renderApp(`/w/${workspaceId}/ideas`);
+    await emptyHeading();
+    expect(screen.queryByRole("button", { name: "New idea" })).toBeNull();
+  });
+
+  test("the filters and the search change the list in place: Back goes to 5", async () => {
+    const user = userEvent.setup();
+    ideasApi();
+    const router = renderApp(`/w/${workspaceId}`);
+    await act(() => router.navigate({ href: `/w/${workspaceId}/ideas` }));
+    await screen.findByRole("grid", { name: "Ideas" });
+    const entries = router.history.length;
+    await user.click(screen.getByRole("button", { name: /^Stage/ }));
+    await user.click(await screen.findByRole("option", { name: "Planning" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ stage: "planning" }),
+    );
+    await user.click(screen.getByRole("button", { name: /^Sort/ }));
+    await user.click(await screen.findByRole("option", { name: "Name" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ sort: "name" }),
+    );
+    await user.click(screen.getByRole("link", { name: "Show" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ decision: "all" }),
+    );
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search ideas" }),
+      "Piaya",
+    );
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ q: "Piaya" }),
+    );
+    expect(router.history.length).toBe(entries);
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/w/${workspaceId}`),
+    );
   });
 });
 

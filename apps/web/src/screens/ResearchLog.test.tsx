@@ -772,4 +772,37 @@ describe("14 Research log (design-spec 6.10)", () => {
     ).toBeGreaterThan(1);
     expect(calls.filter(({ method }) => method === "POST")).toHaveLength(1);
   });
+
+  test("a new entry's field says why only once it changed, not when it is only left", async () => {
+    const user = userEvent.setup();
+    logApi();
+    renderApp(`${base}?new=1`);
+    const topic = await screen.findByRole("textbox", { name: /Topic/ });
+    const url = screen.getByRole("textbox", { name: "Source URL" });
+    // Left blank on the way to another field (or to Cancel): no reason moves the buttons.
+    await user.click(topic);
+    await user.tab();
+    await user.click(url);
+    await user.tab();
+    expect(screen.queryByText("Can't be empty")).toBeNull();
+    // Changed, each says why at once, before it is left.
+    await user.type(url, "example.com");
+    expect(
+      screen.getByText("Enter a URL that starts with http:// or https://"),
+    ).toBeTruthy();
+    await user.type(topic, "A");
+    await user.clear(topic);
+    expect(screen.getByText("Can't be empty")).toBeTruthy();
+  });
+
+  test("a Viewer with no entries: what 14 is for, and no Add entry", async () => {
+    logApi({ me: as("viewer"), entries: [] });
+    renderApp(base);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Record what you observe, with sources. Others can check it later.",
+      }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Add entry" })).toBeNull();
+  });
 });

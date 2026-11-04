@@ -96,6 +96,7 @@ const worthQuestion = question(
 /** The API of 18 over `inputs` and `costs`. */
 function economicsApi({
   me = ana,
+  archived = false,
   costs = piayaCosts,
   inputs = economicsInputs(piayaNumbers),
   worth = answer("V.08.WORTH"),
@@ -103,6 +104,7 @@ function economicsApi({
   recordLast = () => Response.json(me),
 }: {
   me?: Me;
+  archived?: boolean;
   costs?: CostItem[];
   inputs?: EconomicsInput[];
   worth?: ValidationAnswer;
@@ -129,7 +131,7 @@ function economicsApi({
       method === "GET" &&
       path === `/api/v1/ideas/${home.idea.id}/validation`
     ) {
-      return Response.json(home);
+      return Response.json({ ...home, idea: { ...home.idea, archived } });
     }
     if (method === "GET" && path === dataPath) {
       return Response.json({
@@ -183,6 +185,14 @@ const results = () => screen.getByRole("group", { name: "Results" });
 const scenarios = () => screen.getByRole("grid", { name: "Scenarios" });
 const rowOf = (name: string) =>
   screen.getByRole("row", { name: new RegExp(name) });
+/** A result's value and what follows it, by its label. */
+const tileOf = (label: string) =>
+  [...results().querySelectorAll("dt")].find(
+    (term) => term.textContent === label,
+  )?.parentElement?.textContent;
+/** The panel on a phone: a sheet over the screen (4.5 Panel). */
+const phonePanel = (name: "Comments" | "History") =>
+  screen.getByRole("dialog", { name });
 
 describe("18 Unit Economics & Scenarios (design-spec 6.4)", () => {
   test("the numbers of 8.3: unit economics, break-even, target margin, scenarios, payback and ROI", async () => {
@@ -537,6 +547,130 @@ describe("18 Unit Economics & Scenarios (design-spec 6.4)", () => {
         `/api/v1/evidence/${link.id}?lockVersion=1`,
       ),
     );
+  });
+
+  test("?modal=evidence opens nothing for a Viewer, an archived idea, or an about 18 does not hold (6.0.3)", async () => {
+    const price = `economics_input:${validationId}:selling_price`;
+    const worth = `validation_answer:${validationId}:V.08.WORTH`;
+    const cases: [Parameters<typeof economicsApi>[0], string][] = [
+      [{ me: as("viewer") }, price],
+      [{ me: as("viewer") }, worth],
+      [{ archived: true }, price],
+      [{ archived: true }, worth],
+      // Another validation's number, 17's row, and a question 18 does not ask.
+      [
+        {},
+        "economics_input:0e0e0e0e-0000-4000-8000-000000000000:selling_price",
+      ],
+      [{}, `cost_item:${id(1)}`],
+      [{}, `validation_answer:${validationId}:V.01.WHO`],
+    ];
+    for (const [api, about] of cases) {
+      cleanup();
+      vi.unstubAllGlobals();
+      economicsApi({
+        ...api,
+        worth: answer("V.08.WORTH", {
+          text: "Yes, in a year.",
+          classification: assumed(),
+        }),
+      });
+      renderApp(`${base}?modal=evidence&about=${about}`);
+      await screen.findByRole("grid", { name: "Inputs" });
+      expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull();
+    }
+  });
+
+  test("on a phone a number's sheet closes before its 💬 or 🕘 opens the panel (6.0.4・6.0.5)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    economicsApi();
+    const router = renderApp(base);
+    await screen.findByRole("grid", { name: "Inputs" });
+    for (const [button, panel] of [
+      ["Comments on Unit Economics · Price", "Comments"],
+      ["History of Unit Economics · Price", "History"],
+    ] as const) {
+      await user.click(rowOf("Price"));
+      const sheet = await screen.findByRole("dialog", { name: "Edit Price" });
+      await user.click(within(sheet).getByRole("button", { name: button }));
+      await waitFor(() => expect(phonePanel(panel)).toBeTruthy());
+      expect(screen.queryByRole("dialog", { name: "Edit Price" })).toBeNull();
+      expect(router.state.location.search).toMatchObject({
+        panel: panel.toLowerCase(),
+        target: `economics_input:${validationId}:selling_price`,
+      });
+      await act(() => router.history.back());
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: panel })).toBeNull(),
+      );
+    }
+  });
+
+  test("the results' reasons: Break-even is above capacity, a margin not reachable, Not recovered, using default 30 days", async () => {
+    economicsApi({
+      inputs: economicsInputs({
+        selling_price: 450,
+        target_margin: 0.6,
+        units_conservative: 4,
+        units_expected: 5,
+        units_strong: 5,
+        units_capacity: 5,
+      }),
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Inputs" });
+    // At the default 30 days: 41,700 ÷ 231.50 = 180.1 a month, 6 a day, over 5.
+    const warnings = screen.getByText("Warnings").closest('[role="alert"]');
+    expect(warnings?.textContent).toContain("Break-even is above capacity");
+    expect(warnings?.textContent).not.toContain("exceeds capacity limit");
+    // 60% of ₱450 is ₱270, more than the ₱231.50 each sale earns.
+    expect(tileOf("Units for target margin")).toContain(
+      "This margin is not reachable: contribution margin is at or below the target",
+    );
+    // Expected: 150 a month earn ₱34,725, short of ₱41,700.
+    expect(tileOf("Expected profit")).toContain("−₱6,975");
+    expect(tileOf("Payback")).toContain(
+      "Not recovered: Expected profit is zero or negative",
+    );
+    expect(screen.getByText("using default 30 days")).toBeTruthy();
+    expect(screen.queryByText("using default 15%")).toBeNull();
+  });
+
+  test("an archived idea reads only: no field, F/A/U read, the worth question open to read, the notice and Restore", async () => {
+    const user = userEvent.setup();
+    economicsApi({
+      archived: true,
+      worth: answer("V.08.WORTH", {
+        text: "Yes, in a year.",
+        classification: assumed("high"),
+        lockVersion: 2,
+      }),
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Inputs" });
+    expect(screen.getByText("This idea is archived")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy();
+    // A number pressed opens no field.
+    await user.click(within(rowOf("Price")).getByText("₱450"));
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^F\/A\/U of/ })).toBeNull();
+    expect(rowOf("Price").textContent).toContain("Assumption · Medium");
+    // The worth question is open without being pressed, its answer and F/A/U to read.
+    const card = screen.getByRole("region", {
+      name: "Is the return worth the capital and effort?",
+    });
+    expect(
+      within(card).queryByRole("button", {
+        name: "Is the return worth the capital and effort?",
+      }),
+    ).toBeNull();
+    expect(within(card).getByText("Yes, in a year.")).toBeTruthy();
+    expect(card.textContent).toContain("Assumption · High");
+    expect(
+      within(card).queryByLabelText(/^Fact, Assumption or Unknown for/),
+    ).toBeNull();
+    expect(within(card).queryByText("Add evidence")).toBeNull();
   });
 });
 

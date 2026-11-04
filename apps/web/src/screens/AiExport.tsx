@@ -22,7 +22,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type AiTarget, AiTargetScreen } from "../components/AiTargetScreen";
 import { rateLimitWords } from "../components/SendFailure";
-import { FailureState } from "../components/states";
+import { FailureState, LoadingBlock } from "../components/states";
 import { dashboardHref, useWorkspace } from "../components/workspace";
 import { aiImportHref, parseScope, scopeParam } from "../lib/ai";
 import { copyText, downloadText } from "../lib/files";
@@ -31,7 +31,7 @@ import {
   AiExportSkeleton,
   ExportSteps,
   Header,
-  PreviewSkeleton,
+  PreviewShape,
   type Step,
 } from "./AiExportSkeleton";
 
@@ -176,14 +176,15 @@ function ExportFlow({
         ? undefined
         : t("errors:EMPTY_SCOPE", { context: isPlan ? "plan" : undefined });
   const has = (option: Option) => options.includes(option);
+  const exportOptions = aiExportQuery(kind, id, {
+    scope: scope ?? { kind: "all" },
+    includeEmpty: has("includeEmpty"),
+    includeExamples: has("includeExamples"),
+    // A self-analysis has no Reference (design-spec 6.6「範囲」).
+    includeReference: kind !== "self_analysis" && has("includeReference"),
+  });
   const exported = useQuery({
-    ...aiExportQuery(kind, id, {
-      scope: scope ?? { kind: "all" },
-      includeEmpty: has("includeEmpty"),
-      includeExamples: has("includeExamples"),
-      // A self-analysis has no Reference (design-spec 6.6「範囲」).
-      includeReference: kind !== "self_analysis" && has("includeReference"),
-    }),
+    ...exportOptions,
     enabled:
       step !== "scope" && scopeError === undefined && target.archived === null,
   });
@@ -339,7 +340,11 @@ function ExportFlow({
         />
       );
     } else if (data === undefined) {
-      content = <PreviewSkeleton />;
+      content = (
+        <LoadingBlock waitsFor={[exportOptions]} headingLevel={2}>
+          <PreviewShape />
+        </LoadingBlock>
+      );
     } else if (step === "review") {
       content = (
         <Stack gap="space-300">

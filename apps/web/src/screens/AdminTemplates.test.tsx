@@ -1,5 +1,5 @@
 import type { AdminTemplateList, Me } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { operator } from "../test/admin";
@@ -7,8 +7,21 @@ import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 
 // 26 Admin: Templates (design-spec 6.17).
 
+/** happy-dom's window, whose viewport a test sets. */
+const setViewport = (width: number) =>
+  act(() =>
+    (
+      window as unknown as {
+        happyDOM: {
+          setViewport: (size: { width: number; height: number }) => void;
+        };
+      }
+    ).happyDOM.setViewport({ width, height: 900 }),
+  );
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  setViewport(1024);
 });
 
 const by = {
@@ -106,6 +119,46 @@ const fileInput = () => {
 
 const jsonFile = (body: unknown, name = "template.json") =>
   new File([JSON.stringify(body)], name, { type: "application/json" });
+
+/**
+ * Opens `path` from another screen (8), as a link would: Back from it has somewhere to
+ * go, so leaving it shows.
+ */
+async function openFromNotifications(path: string) {
+  const router = renderApp("/notifications");
+  await act(() => router.navigate({ href: path }));
+  return router;
+}
+
+/**
+ * `find`'s answer once the waits between a read's tries (SDD 8.2: a failure that may pass
+ * is read again) have gone by on the fake clock, moved in steps: the waits pass however
+ * slow the run. For a test under `vi.useFakeTimers({ shouldAdvanceTime: true })`.
+ */
+async function afterRetries<T>(find: () => T): Promise<T> {
+  for (let waited = 0; ; waited += 100) {
+    try {
+      return find();
+    } catch (error) {
+      if (waited >= 30_000) throw error;
+      await act(() => vi.advanceTimersByTimeAsync(100));
+    }
+  }
+}
+
+/** Makes the browser say it is offline, or online again (6.0.6). */
+function goOffline() {
+  const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+  act(() => {
+    window.dispatchEvent(new Event("offline"));
+  });
+  return () => {
+    onLine.mockRestore();
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+  };
+}
 
 describe("26 Admin: Templates (design-spec 6.17)", () => {
   test("the three templates, the first beside them with its versions; the nav's Admin is current", async () => {
@@ -343,6 +396,228 @@ describe("26 Admin: Templates (design-spec 6.17)", () => {
       ),
     ).toBe(true);
   });
+
+  test("a broken file's places: the top of the file, the first 5, and how many more (6.17)", async () => {
+    const user = userEvent.setup();
+    let paths: string[] = [];
+    templatesApi({
+      answer: (call) =>
+        call.method === "POST" &&
+        call.path.startsWith("/api/v1/admin/templates/import")
+          ? apiError(422, "VALIDATION_FAILED", {
+              details: paths.map((path) => ({
+                path,
+                code: "invalid_type",
+                message: "Invalid input",
+              })),
+            })
+          : undefined,
+    });
+    renderApp("/admin/templates?kind=business_plan");
+    await screen.findByRole("button", { name: "Import from file" });
+    const placesShown = () =>
+      screen.queryAllByText(/^At /).map((place) => place.textContent);
+
+    paths = ["", ...Array.from({ length: 7 }, (_, n) => `sections.${n}`)];
+    await user.upload(fileInput(), jsonFile({ kind: "business_plan" }));
+    expect(
+      await screen.findByText(
+        "This file doesn't follow the template file format",
+      ),
+    ).toBeTruthy();
+    expect(placesShown()).toEqual([
+      "At the top of the file",
+      "At sections.0",
+      "At sections.1",
+      "At sections.2",
+      "At sections.3",
+    ]);
+    expect(screen.getByText("And 3 more")).toBeTruthy();
+
+    // Five fit: none is left to count.
+    paths = Array.from({ length: 5 }, (_, n) => `items.${n}`);
+    await user.upload(fileInput(), jsonFile({ kind: "business_plan" }));
+    await screen.findByText("At items.4");
+    expect(placesShown()).toHaveLength(5);
+    expect(screen.queryByText(/^And \d+ more$/)).toBeNull();
+  });
+
+  test("a file that is not UTF-8 is not sent, and says why (6.17)", async () => {
+    const user = userEvent.setup();
+    const calls = templatesApi();
+    renderApp("/admin/templates?kind=business_plan");
+    await screen.findByRole("button", { name: "Import from file" });
+    // {"kind":"é"} in Latin-1: a JSON object, but its é is no UTF-8.
+    const latin1 = new Uint8Array([
+      0x7b, 0x22, 0x6b, 0x69, 0x6e, 0x64, 0x22, 0x3a, 0x22, 0xe9, 0x22, 0x7d,
+    ]);
+    await user.upload(
+      fileInput(),
+      new File([latin1], "template.json", { type: "application/json" }),
+    );
+    expect(
+      await screen.findByText(
+        "This file can't be read. Choose a moonx template file (JSON).",
+      ),
+    ).toBeTruthy();
+    expect(calls.some((call) => call.method === "POST")).toBe(false);
+  });
+
+  test("on a phone, a template opened from its URL: ← puts the list in its entry, and the next Back leaves 26 (6.17)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    templatesApi();
+    const router = await openFromNotifications(
+      "/admin/templates?kind=validation",
+    );
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Validation" }),
+    ).toBeTruthy();
+    // One pane: the versions in place of the list.
+    expect(screen.queryByRole("grid", { name: "Templates" })).toBeNull();
+    const entries = router.history.length;
+    await user.click(screen.getByRole("button", { name: "Back to Templates" }));
+    expect(await templateList()).toBeTruthy();
+    expect(router.state.location.href).toBe("/admin/templates");
+    expect(router.history.length).toBe(entries);
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/notifications"),
+    );
+  });
+
+  test("on a phone, a template opened from the list adds an entry: Back returns to the list (6.17)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    templatesApi();
+    const router = renderApp("/admin/templates");
+    const list = await templateList();
+    const entries = router.history.length;
+    await user.click(within(list).getByText("Validation"));
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Validation" }),
+    ).toBeTruthy();
+    expect(router.history.length).toBe(entries + 1);
+    act(() => router.history.back());
+    expect(await templateList()).toBeTruthy();
+    expect(router.state.location.href).toBe("/admin/templates");
+    expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+  });
+
+  test("beside the list, choosing two templates adds no entry: Back leaves 26 (6.17)", async () => {
+    const user = userEvent.setup();
+    setViewport(1440);
+    templatesApi();
+    const router = await openFromNotifications("/admin/templates");
+    const list = await templateList();
+    const entries = router.history.length;
+    await user.click(within(list).getByText("Validation"));
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Validation" }),
+    ).toBeTruthy();
+    await user.click(within(list).getByText("Business Plan"));
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Business Plan" }),
+    ).toBeTruthy();
+    expect(router.state.location.search).toEqual({ kind: "business_plan" });
+    expect(router.history.length).toBe(entries);
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/notifications"),
+    );
+  });
+
+  test("a list that can't be read: Couldn't load this page and Retry, the nav still there (6.0.6)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      let fails = true;
+      templatesApi({
+        answer: (call) =>
+          call.path === "/api/v1/admin/templates" && fails
+            ? new Response(null, { status: 503 })
+            : undefined,
+      });
+      renderApp("/admin/templates");
+      expect(
+        await afterRetries(() =>
+          screen.getByRole("heading", { name: "Couldn't load this page" }),
+        ),
+      ).toBeTruthy();
+      expect(screen.getAllByRole("link", { name: "Admin" })).not.toHaveLength(
+        0,
+      );
+      fails = false;
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+      expect(await templateList()).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 15_000);
+
+  test("offline: opening 26 says so; once read, Import from file and New draft can't be pressed until back online (6.0.6)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      templatesApi({
+        answer: (call) => {
+          if (call.path === "/api/v1/admin/templates" && !navigator.onLine) {
+            throw new TypeError("Failed to fetch");
+          }
+          return undefined;
+        },
+      });
+      let online = goOffline();
+      try {
+        renderApp("/admin/templates");
+        expect(
+          await afterRetries(() =>
+            screen.getByRole("heading", {
+              name: "You're offline. Connect to the internet to open this page.",
+            }),
+          ),
+        ).toBeTruthy();
+      } finally {
+        online();
+      }
+      // Back online, Retry reads it (the state has none offline).
+      await user.click(await screen.findByRole("button", { name: "Retry" }));
+      await templateList();
+      const importButton = screen.getByRole("button", {
+        name: "Import from file",
+      }) as HTMLButtonElement;
+      expect(importButton.disabled).toBe(false);
+
+      online = goOffline();
+      try {
+        await waitFor(() => expect(importButton.disabled).toBe(true));
+        await user.click(
+          screen.getByRole("button", { name: "Actions for v1" }),
+        );
+        expect(
+          (
+            await screen.findByRole("menuitem", {
+              name: "New draft from this version",
+            })
+          ).getAttribute("aria-disabled"),
+        ).toBe("true");
+        await user.keyboard("{Escape}");
+      } finally {
+        online();
+      }
+      await waitFor(() => expect(importButton.disabled).toBe(false));
+      await user.click(screen.getByRole("button", { name: "Actions for v1" }));
+      expect(
+        (
+          await screen.findByRole("menuitem", {
+            name: "New draft from this version",
+          })
+        ).getAttribute("aria-disabled"),
+      ).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 15_000);
 
   test("anyone but an operator: no access, no way in, and nothing read from AD1", async () => {
     const calls = templatesApi({ me: ana });

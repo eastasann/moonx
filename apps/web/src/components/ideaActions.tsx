@@ -22,6 +22,7 @@ import {
   validationHomeQuery,
   workspaceKey,
 } from "../lib/queries";
+import { readThroughRetries } from "../lib/query";
 import { isSessionLost, useSendThrough } from "../lib/send";
 import { failureCode, rateLimitWords } from "./SendFailure";
 import { useWorkspace } from "./workspace";
@@ -178,11 +179,18 @@ export function CreationUndoProvider({ children }: { children: ReactNode }) {
     let isIdeaArchived = true;
     if (target.kind === "plan_draft") {
       try {
-        const home = await queryClient.fetchQuery({
-          ...validationHomeQuery(target.ideaId),
-          // Read just now if a screen shows it; read here if not, or if that read failed.
-          staleTime: Number.POSITIVE_INFINITY,
-        });
+        const homeOptions = validationHomeQuery(target.ideaId);
+        // Read just now if a screen shows it; read here if not, or if that read failed.
+        // A screen's first read may be under way, which its Retry may drop.
+        const home = await readThroughRetries(
+          queryClient,
+          homeOptions.queryKey,
+          () =>
+            queryClient.fetchQuery({
+              ...homeOptions,
+              staleTime: Number.POSITIVE_INFINITY,
+            }),
+        );
         isIdeaArchived = home.idea.archived;
       } catch (readError) {
         toastFailure(readError, () => void undo(target));

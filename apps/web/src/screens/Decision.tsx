@@ -45,7 +45,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
@@ -236,8 +236,11 @@ function DecisionBody({ home }: { home: ValidationHome }) {
   const navigate = useNavigate();
   const isOnline = useIsOnline();
   const { idea } = home;
-  const context = useQuery(decisionContextQuery(idea.id));
-  const isSlow = useIsSlow(context.isPending);
+  const contextOptions = decisionContextQuery(idea.id);
+  const context = useQuery(contextOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(context.isPending, [
+    contextOptions,
+  ]);
   const [value, setValue] = useState<DecisionValue | null>(null);
   const [reason, setReason] = useState("");
   const [isChecked, setChecked] = useState(false);
@@ -315,11 +318,7 @@ function DecisionBody({ home }: { home: ValidationHome }) {
     />
   ) : context.data === undefined ? (
     isSlow ? (
-      <SlowLoadingState
-        onRetry={() => void context.refetch()}
-        headingLevel={2}
-        size="S"
-      />
+      <SlowLoadingState onRetry={retrySlow} headingLevel={2} size="S" />
     ) : (
       <MaterialSkeleton />
     )
@@ -352,6 +351,11 @@ function DecisionBody({ home }: { home: ValidationHome }) {
       ? record.error
       : null;
   const isBusy = record.isPending;
+  // The record names the decision it is based on (SDD 5.7 V19), which only the material
+  // read to its end says, and not a read of it that failed (design-spec 6.5). A read
+  // behind the material shown leaves it pressable: a decision recorded meanwhile is the
+  // API's to refuse (DECISION_CHANGED).
+  const isMaterialRead = context.data !== undefined && !context.isError;
   return (
     <>
       <FocusPattern
@@ -365,7 +369,7 @@ function DecisionBody({ home }: { home: ValidationHome }) {
               variant="primary"
               onPress={() => send(false)}
               isPending={isBusy}
-              isDisabled={context.data === undefined || !isOnline}
+              isDisabled={!isMaterialRead || !isOnline}
             >
               {t("validation:decision.record")}
             </Button>
@@ -417,7 +421,7 @@ function DecisionBody({ home }: { home: ValidationHome }) {
             <RecordFailure
               error={failure}
               onRetry={() => send(false)}
-              isRetryDisabled={isBusy || !isOnline}
+              isRetryDisabled={isBusy || !isMaterialRead || !isOnline}
             />
           )}
         </Stack>
@@ -462,8 +466,13 @@ function DecisionBody({ home }: { home: ValidationHome }) {
           onCancel={() => {
             setNewer(null);
             record.reset();
-            // The newer decision becomes the one this is based on, shown as the last.
-            void context.refetch();
+            // The newer decision becomes the one this is based on, shown as the last:
+            // the material goes back to its skeleton until read (design-spec 6.5), and
+            // a read under way, which may predate it, is dropped.
+            const material = { queryKey: contextOptions.queryKey, exact: true };
+            void queryClient
+              .cancelQueries(material)
+              .then(() => queryClient.resetQueries(material));
           }}
         >
           {t("errors:DECISION_CHANGED", { context: "body" })}
@@ -483,8 +492,11 @@ function DecisionBody({ home }: { home: ValidationHome }) {
 export function DecisionScreen({ ideaId }: { ideaId: string }) {
   const { t } = useTranslation(["ideas", "validation"]);
   const { me, workspace, role } = useWorkspace();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   useDocumentTitle(
@@ -509,7 +521,7 @@ export function DecisionScreen({ ideaId }: { ideaId: string }) {
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = (
       <Skeleton isLoading>

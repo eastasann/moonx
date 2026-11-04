@@ -53,7 +53,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
@@ -320,8 +320,11 @@ function MemberList() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const isOnline = useIsOnline();
-  const query = useQuery(membersQuery(workspaceId));
-  const isSlow = useIsSlow(query.isPending);
+  const options = membersQuery(workspaceId);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const sendThrough = useSendThrough();
   const [question, setQuestion] = useState<MemberQuestion | null>(null);
   const [sending, setSending] = useState<{
@@ -451,13 +454,7 @@ function MemberList() {
       );
     }
     if (isSlow) {
-      return (
-        <SlowLoadingState
-          headingLevel={3}
-          size="S"
-          onRetry={() => void query.refetch()}
-        />
-      );
+      return <SlowLoadingState headingLevel={3} size="S" onRetry={retrySlow} />;
     }
     return (
       <Skeleton isLoading>
@@ -653,8 +650,11 @@ function Invitations() {
   const queryClient = useQueryClient();
   const isOnline = useIsOnline();
   const [show, setShow] = useState<"pending" | "all">("pending");
-  const query = useQuery(invitationsQuery(workspaceId, show));
-  const isSlow = useIsSlow(query.isPending);
+  const options = invitationsQuery(workspaceId, show);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const [sending, setSending] = useState<string | null>(null);
   const busy = useRef(false);
   const [failure, setFailure] = useState<InvitationFailure | null>(null);
@@ -823,13 +823,7 @@ function Invitations() {
       />
     );
   } else if (isSlow) {
-    list = (
-      <SlowLoadingState
-        headingLevel={3}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
-    );
+    list = <SlowLoadingState headingLevel={3} size="S" onRetry={retrySlow} />;
   } else {
     list = (
       <Skeleton isLoading>

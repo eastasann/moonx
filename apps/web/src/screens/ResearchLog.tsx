@@ -79,7 +79,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
@@ -924,12 +924,15 @@ function ResearchBody({
     supports: search.supports,
     sourceType: search.source,
   };
+  const options = researchLogQuery(idea.id, validationId, filters);
   const query = useQuery({
-    ...researchLogQuery(idea.id, validationId, filters),
+    ...options,
     // A new filter keeps the rows until its answer comes, not the skeleton.
     placeholderData: keepPreviousData,
   });
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const items = query.data ?? [];
   const isFiltered =
     search.supports !== undefined || search.source !== undefined;
@@ -980,11 +983,7 @@ function ResearchBody({
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <ListSkeleton />
     );
@@ -1146,8 +1145,11 @@ export function ResearchLogScreen({
   const navigate = useNavigate();
   const router = useRouter();
   const panel = usePanel();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "03")?.title;
@@ -1230,7 +1232,7 @@ export function ResearchLogScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = <ResearchLogSkeleton />;
   }

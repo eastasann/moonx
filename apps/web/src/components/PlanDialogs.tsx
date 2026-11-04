@@ -139,7 +139,8 @@ export function CreatePlanDialog({
 }) {
   const { t } = useTranslation(["plans", "errors"]);
   const { me } = useWorkspace();
-  const plans = useQuery(archivedPlansQuery(ideaId));
+  const plansOptions = archivedPlansQuery(ideaId);
+  const plans = useQuery(plansOptions);
   const changed = usePlansChanged();
   // The decision changed since the screen read it (DECISION_NOT_PROCEED): the screen reads
   // it again once M5 is gone, however it went (Cancel, Escape, Back). Read now, it would
@@ -186,7 +187,7 @@ export function CreatePlanDialog({
           size="S"
         />
       ) : (
-        <LoadingBlock onRetry={() => void plans.refetch()}>
+        <LoadingBlock waitsFor={[plansOptions]}>
           <Stack gap="space-300">
             <Text>{t("plans:create.body")}</Text>
             <Text>{t("plans:create.name")}</Text>
@@ -632,7 +633,8 @@ export function GoNoGoDialog({
   const isOnline = useIsOnline();
   const isOpen = useIsOpen();
   const changed = usePlansChanged();
-  const context = useQuery(goNoGoContextQuery(home.ideaId, home.id));
+  const contextOptions = goNoGoContextQuery(home.ideaId, home.id);
+  const context = useQuery(contextOptions);
   const { value, reason } = draft;
   const setValue = (next: GoNoGoValue) =>
     onDraftChange({ ...draft, value: next });
@@ -724,7 +726,7 @@ export function GoNoGoDialog({
     );
   } else {
     material = (
-      <LoadingBlock onRetry={() => void context.refetch()}>
+      <LoadingBlock waitsFor={[contextOptions]}>
         <Stack gap="space-300">
           <Heading level={3} variant="label">
             {t("plans:goNoGo.conditions")}

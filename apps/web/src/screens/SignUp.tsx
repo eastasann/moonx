@@ -35,6 +35,7 @@ import {
   meQuery,
   signedInQuery,
 } from "../lib/queries";
+import { askAgain } from "../lib/query";
 import { dropAllBut } from "../lib/session";
 import { useDocumentTitle } from "../lib/title";
 
@@ -64,10 +65,12 @@ export function InviteScreen({ token }: { token: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   // Asked on this visit: a cached answer may be of a session ended since.
-  const signedIn = useQuery({ ...signedInQuery(), refetchOnMount: "always" });
+  const signedInOptions = signedInQuery();
+  const signedIn = useQuery({ ...signedInOptions, refetchOnMount: "always" });
   const isToken = isInvitationToken(token);
+  const invitationOptions = invitationQuery(token);
   const invitation = useQuery({
-    ...invitationQuery(token),
+    ...invitationOptions,
     enabled: isToken,
   });
   const isSignedIn = signedIn.isFetchedAfterMount && signedIn.data != null;
@@ -93,6 +96,14 @@ export function InviteScreen({ token }: { token: string }) {
     void queryClient.invalidateQueries({ queryKey: ["invitations", token] });
     void signedIn.refetch();
   };
+  const retrySlow = () => {
+    askAgain(queryClient, [invitationOptions, signedInOptions]);
+    // A visit before's answer in the cache: this visit's, under way, is what the screen
+    // waits for, and refetch drops it and asks again.
+    if (signedIn.data !== undefined && !signedIn.isFetchedAfterMount) {
+      void signedIn.refetch();
+    }
+  };
   if (!isToken) return <InvalidInvitation />;
   if (invitation.isError) {
     const { error } = invitation;
@@ -111,7 +122,7 @@ export function InviteScreen({ token }: { token: string }) {
     (signedIn.isFetchedAfterMount && signedIn.data === null);
   if (invitation.data === undefined || !isSignedOut || toLogIn) {
     return (
-      <StandaloneLoading onRetry={retry}>
+      <StandaloneLoading onRetry={retrySlow}>
         <SignUpSkeleton />
       </StandaloneLoading>
     );

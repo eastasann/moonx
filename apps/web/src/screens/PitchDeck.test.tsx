@@ -1,7 +1,8 @@
 import type { Me, PitchDeck, PlanHome, Role } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { SLOW_LOADING_MS } from "../components/states";
 import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
@@ -50,7 +51,8 @@ function deckApi({
     }),
 }: {
   me?: Me;
-  home?: PlanHome;
+  /** P2 GET's plan; a promise holds it back. */
+  home?: PlanHome | Promise<PlanHome>;
   deck?: DeckOf;
   pdf?: (call: Call) => Response | Promise<Response>;
 } = {}) {
@@ -61,7 +63,9 @@ function deckApi({
     if (method === "GET" && path === `/api/v1/ideas/${ideaId}/validation`) {
       return Response.json(ideaHome);
     }
-    if (method === "GET" && path === api) return Response.json(home);
+    if (method === "GET" && path === api) {
+      return Promise.resolve(home).then((answer) => Response.json(answer));
+    }
     const url = new URL(path, "http://localhost");
     if (method === "GET" && url.pathname === `${api}/pitch-deck`) {
       const variant =
@@ -392,6 +396,290 @@ describe("23 Pitch Deck (design-spec 6.14)", () => {
     await waitFor(() => expect(clicked).toHaveBeenCalledTimes(1));
     expect(screen.queryByText("Couldn't make the PDF")).toBeNull();
     expect(deckCalls(calls, "pitch-deck.pdf")).toHaveLength(3);
+  });
+
+  test("a PDF named by no readable Content-Disposition is saved as Pitch Deck.pdf", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:pdf");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const names: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      names.push(this.download);
+    });
+    let dispositions: Record<string, string>[] = [
+      {},
+      { "content-disposition": "attachment" },
+    ];
+    deckApi({
+      pdf: () => {
+        const [next = {}, ...rest] = dispositions;
+        dispositions = rest;
+        return new Response(
+          new Blob(["%PDF-1.7"], { type: "application/pdf" }),
+          { headers: { "content-type": "application/pdf", ...next } },
+        );
+      },
+    });
+    renderApp(base);
+    await shownSlide("Health Bowl Co.");
+    const download = screen.getByRole("button", { name: "Download PDF" });
+    await user.click(download);
+    await waitFor(() => expect(names).toHaveLength(1));
+    await waitFor(() => expect(download.hasAttribute("disabled")).toBe(false));
+    await user.click(download);
+    await waitFor(() => expect(names).toHaveLength(2));
+    expect(names).toEqual(["Pitch Deck.pdf", "Pitch Deck.pdf"]);
+  });
+
+  test("offline, Download PDF and a failure's Retry cannot be pressed; back online they can", async () => {
+    const user = userEvent.setup();
+    const calls = deckApi({ pdf: () => apiError(500, "INTERNAL") });
+    renderApp(base);
+    await shownSlide("Health Bowl Co.");
+    const download = screen.getByRole("button", { name: "Download PDF" });
+    await user.click(download);
+    const alert = (await screen.findByText("Couldn't make the PDF")).closest(
+      "[role=alert]",
+    ) as HTMLElement;
+    const retry = within(alert).getByRole("button", { name: "Retry" });
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    try {
+      act(() => {
+        window.dispatchEvent(new Event("offline"));
+      });
+      await waitFor(() => expect(download.hasAttribute("disabled")).toBe(true));
+      expect(retry.hasAttribute("disabled")).toBe(true);
+      await user.click(download);
+      await user.click(retry);
+      expect(deckCalls(calls, "pitch-deck.pdf")).toHaveLength(1);
+    } finally {
+      onLine.mockRestore();
+    }
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await waitFor(() => expect(download.hasAttribute("disabled")).toBe(false));
+    expect(retry.hasAttribute("disabled")).toBe(false);
+    // user-event's pointer rests on the Retry it clicked while disabled; off and back,
+    // the click is a new press, as a hand's would be.
+    await user.pointer({ target: document.body });
+    await user.click(retry);
+    await waitFor(() =>
+      expect(deckCalls(calls, "pitch-deck.pdf")).toHaveLength(2),
+    );
+  });
+
+  test("a PDF's failure shows only while the length and version it failed for are open", async () => {
+    const user = userEvent.setup();
+    const calls = deckApi({ pdf: () => apiError(500, "INTERNAL") });
+    const router = renderApp(base);
+    await shownSlide("Health Bowl Co.");
+    await user.click(screen.getByRole("button", { name: "Download PDF" }));
+    expect(await screen.findByText("Couldn't make the PDF")).toBeTruthy();
+    const slideCount = () =>
+      within(screen.getByRole("listbox", { name: "Slides" })).getAllByRole(
+        "option",
+      ).length;
+    await user.click(screen.getByRole("radio", { name: "Five-minute" }));
+    await waitFor(() => expect(slideCount()).toBe(14));
+    expect(screen.queryByText("Couldn't make the PDF")).toBeNull();
+    await user.click(screen.getByRole("radio", { name: "One-minute" }));
+    await waitFor(() => expect(slideCount()).toBe(8));
+    expect(screen.getByText("Couldn't make the PDF")).toBeTruthy();
+    // The same length from a version is another deck.
+    await user.click(screen.getByRole("button", { name: /^From/ }));
+    await user.click(
+      await screen.findByRole("option", { name: "v1 For advisors" }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        variant: "one",
+        version: versionId,
+      }),
+    );
+    await waitFor(() =>
+      expect(document.querySelector("[aria-busy=true]")).toBeNull(),
+    );
+    expect(screen.queryByText("Couldn't make the PDF")).toBeNull();
+    expect(deckCalls(calls, "pitch-deck.pdf")).toHaveLength(1);
+  });
+
+  test("switching the length or the version replaces the entry and keeps the open panel", async () => {
+    const user = userEvent.setup();
+    deckApi();
+    const router = renderApp(base);
+    await shownSlide("Health Bowl Co.");
+    await user.click(screen.getByRole("button", { name: "Comments on Title" }));
+    const panel = await screen.findByRole("complementary", {
+      name: "Comments",
+    });
+    const target = `pitch_slide:${planId}:one.title`;
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        panel: "comments",
+        target,
+      }),
+    );
+    const entries = router.history.length;
+    const index = router.state.location.state.__TSR_index;
+    await user.click(screen.getByRole("radio", { name: "Five-minute" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        variant: "five",
+        panel: "comments",
+        target,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /^From/ }));
+    await user.click(
+      await screen.findByRole("option", { name: "v1 For advisors" }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        variant: "five",
+        version: versionId,
+        panel: "comments",
+        target,
+      }),
+    );
+    expect(router.history.length).toBe(entries);
+    expect(router.state.location.state.__TSR_index).toBe(index);
+    // The same panel all along, not closed and opened again.
+    expect(screen.getByRole("complementary", { name: "Comments" })).toBe(panel);
+    // Back goes to the entry before the panel opened, not to a length left.
+    act(() => router.history.back());
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+  });
+
+  test("What to say without §30 written: Not written yet", async () => {
+    deckApi({ deck: (variant) => pitchDeck(variant, { speakerNotes: null }) });
+    renderApp(base);
+    await shownSlide("Health Bowl Co.");
+    const notes = screen.getByRole("heading", {
+      level: 2,
+      name: "What to say",
+    }).parentElement as HTMLElement;
+    expect(notes.closest("[inert]")).toBeNull();
+    expect(within(notes).getByText("Not written yet")).toBeTruthy();
+    expect(
+      screen.queryByText("We sell healthy bowls to office workers at lunch."),
+    ).toBeNull();
+  });
+
+  test("opening 23: the title, the blank slides of the URL's length and What to say, as a skeleton", async () => {
+    for (const [search, count] of [
+      ["", 8],
+      ["?variant=five", 14],
+    ] as const) {
+      let release: () => void = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      deckApi({ home: held.then(() => planHome()) });
+      renderApp(`${base}${search}`);
+      const title = await screen.findByRole("heading", {
+        level: 1,
+        name: "Pitch Deck",
+      });
+      expect(title.closest("[inert]")).not.toBeNull();
+      const slides = screen.getByRole("listbox", { name: "Slides" });
+      expect(slides.closest("[inert]")).not.toBeNull();
+      expect(within(slides).getAllByRole("option")).toHaveLength(count);
+      expect(
+        within(slides).getByRole("option", { name: "1 Title" }),
+      ).toBeTruthy();
+      // The slide on screen beside its thumbnails, blank.
+      const shown = [...document.querySelectorAll("section")].filter(
+        (section) => !slides.contains(section),
+      );
+      expect(shown).toHaveLength(1);
+      expect(shown[0]?.textContent).toBe("");
+      expect(
+        screen.getByRole("heading", { level: 2, name: "What to say" }),
+      ).toBeTruthy();
+      release();
+      expect(await shownSlide("Health Bowl Co.")).toBeTruthy();
+      expect(document.querySelector("[inert]")).toBeNull();
+      cleanup();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("a load past 10 seconds, opening or of another length, says Taking longer than usual with Retry", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      // Opening, the plan held back.
+      deckApi({ home: new Promise<PlanHome>(() => {}) });
+      renderApp(base);
+      await screen.findByRole("heading", { level: 1, name: "Pitch Deck" });
+      expect(
+        screen.queryByRole("heading", { name: "Taking longer than usual" }),
+      ).toBeNull();
+      act(() => vi.advanceTimersByTime(SLOW_LOADING_MS));
+      expect(
+        await screen.findByRole("heading", {
+          name: "Taking longer than usual",
+        }),
+      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+      cleanup();
+      vi.unstubAllGlobals();
+
+      // Another length, its deck held back.
+      deckApi({
+        deck: (variant) =>
+          variant === "five"
+            ? new Promise<PitchDeck>(() => {})
+            : pitchDeck(variant),
+      });
+      renderApp(base);
+      await shownSlide("Health Bowl Co.");
+      await user.click(screen.getByRole("radio", { name: "Five-minute" }));
+      await waitFor(() =>
+        expect(document.querySelector("[aria-busy=true]")).not.toBeNull(),
+      );
+      expect(
+        screen.queryByRole("heading", { name: "Taking longer than usual" }),
+      ).toBeNull();
+      act(() => vi.advanceTimersByTime(SLOW_LOADING_MS));
+      expect(
+        await screen.findByRole("heading", {
+          name: "Taking longer than usual",
+        }),
+      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("Retry on Taking longer than usual asks again for what it waits for", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const plans = deckApi({ home: new Promise<PlanHome>(() => {}) });
+      renderApp(base);
+      await screen.findByRole("heading", { level: 1, name: "Pitch Deck" });
+      act(() => vi.advanceTimersByTime(SLOW_LOADING_MS));
+      await user.click(await screen.findByRole("button", { name: "Retry" }));
+      await waitFor(() =>
+        expect(plans.filter(({ path }) => path === api)).toHaveLength(2),
+      );
+      cleanup();
+      vi.unstubAllGlobals();
+
+      const decks = deckApi({ deck: () => new Promise<PitchDeck>(() => {}) });
+      renderApp(base);
+      await screen.findByRole("radio", { name: "Five-minute" });
+      act(() => vi.advanceTimersByTime(SLOW_LOADING_MS));
+      await user.click(await screen.findByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(deckCalls(decks)).toHaveLength(2));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("a slide's 💬 opens its thread; a link to a slide's comment opens that deck and slide", async () => {

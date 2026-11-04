@@ -644,6 +644,73 @@ describe("H3 POST /api/v1/history/batches/{batchId}/revert", () => {
     expect((await answerOf(team, "V.01.WHY_THEM"))?.text).toBeNull();
   });
 
+  test("reverts nothing and writes nothing when every item is back already, and stays revertible", async () => {
+    const team = await teamWithNewIdea(app, fixtures);
+    const batchId = await imported(team);
+    later();
+    await saveAnswer(team, "V.01.WHO", { text: "Offices" });
+    await saveAnswer(team, "V.01.WHY_THEM", { text: null });
+    const state = async () => {
+      const [idea] = await db
+        .select({ lastActivityAt: ideas.lastActivityAt })
+        .from(ideas)
+        .where(eq(ideas.id, team.idea.id));
+      const [workspace] = await db
+        .select({ lastActiveAt: workspaces.lastActiveAt })
+        .from(workspaces)
+        .where(eq(workspaces.id, team.workspace.id));
+      const answers = await Promise.all(
+        ["V.01.WHO", "V.01.WHY_THEM"].map((key) => answerOf(team, key)),
+      );
+      return {
+        idea,
+        workspace,
+        answers: answers.map((row) => [row?.text, row?.lockVersion]),
+        history: (
+          await db
+            .select({ id: changeHistory.id })
+            .from(changeHistory)
+            .where(eq(changeHistory.containerId, team.validationId))
+        ).length,
+      };
+    };
+    const before = await state();
+    expect(before.answers).toEqual([
+      ["Offices", 3],
+      [null, 2],
+    ]);
+
+    for (const attempt of [1, 2]) {
+      const response = await revertBatch(batchId, team.memberCookie);
+      expect({ attempt, status: response.status }).toEqual({
+        attempt,
+        status: 200,
+      });
+      const result = historyBatchRevertResultSchema.parse(
+        await response.json(),
+      );
+      expect(result.reverted).toBe(0);
+      expect(result.batchId).not.toBe(batchId);
+      expect(
+        await db
+          .select()
+          .from(changeHistory)
+          .where(eq(changeHistory.batchId, result.batchId)),
+      ).toEqual([]);
+      expect(await state()).toEqual(before);
+    }
+
+    // The import was never undone, so once an item moves again H3 puts it back.
+    later();
+    await saveAnswer(team, "V.01.WHO", { text: "HR officers" });
+    const response = await revertBatch(batchId, team.memberCookie);
+    expect(response.status).toBe(200);
+    expect(
+      historyBatchRevertResultSchema.parse(await response.json()).reverted,
+    ).toBe(1);
+    expect((await answerOf(team, "V.01.WHO"))?.text).toBe("Offices");
+  });
+
   test("puts back the pinned version and removes the cost rows of a template migration", async () => {
     const team = await teamWithNewIdea(app, fixtures);
     const [validation] = await db

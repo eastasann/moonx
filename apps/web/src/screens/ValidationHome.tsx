@@ -52,7 +52,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import {
   type TemplateTarget,
@@ -820,8 +820,11 @@ function ValidationHomeBody({
   about: string | undefined;
 }) {
   const { me, workspace } = useWorkspace();
-  const query = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(query.isPending);
+  const options = validationHomeQuery(ideaId);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   if (query.data !== undefined) {
     // Another workspace's idea under this one's URL (SDD 4章): its role is not this one's.
     return query.data.idea.workspaceId === workspace.id ? (
@@ -839,7 +842,7 @@ function ValidationHomeBody({
       />
     );
   }
-  if (isSlow) return <SlowLoadingState onRetry={() => void query.refetch()} />;
+  if (isSlow) return <SlowLoadingState onRetry={retrySlow} />;
   return (
     <Skeleton isLoading>
       <ValidationHomeSkeleton />

@@ -1,4 +1,10 @@
-import type { HistoryEntry, Me, PlanHome, Role } from "@moonx/schemas";
+import type {
+  HistoryEntry,
+  Me,
+  PlanHome,
+  PlanSummary,
+  Role,
+} from "@moonx/schemas";
 import { focusManager } from "@tanstack/react-query";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -53,15 +59,16 @@ const goNoGoContext = {
 };
 
 /**
- * The API of 20: `home` answers P2 GET (a version's when asked), `write` the writes,
- * `history` H1 and `threads` C1. `me` and `read` may change what U1 and P2 GET answer
- * while the test runs.
+ * The API of 20: `home` answers P2 GET (a version's when asked), `ideaPlans` P1 GET,
+ * `write` the writes, `history` H1 and `threads` C1. `me` and `read` may change what U1
+ * and P2 GET answer while the test runs.
  */
 function planApi({
   me = ana,
   home = planHome(),
   read,
   version,
+  ideaPlans = plans,
   ideaArchived = false,
   history = [],
   threads = [],
@@ -72,6 +79,8 @@ function planApi({
   /** P2 GET of the plan as it is now, in place of `home` and its saves. */
   read?: () => PlanHome;
   version?: PlanHome;
+  /** The idea's plans, the archived ones included (P1 GET `includeArchived=true`). */
+  ideaPlans?: PlanSummary[];
   ideaArchived?: boolean;
   history?: HistoryEntry[];
   threads?: unknown[];
@@ -101,7 +110,7 @@ function planApi({
       method === "GET" &&
       path === `/api/v1/ideas/${ideaId}/plans?includeArchived=true`
     ) {
-      return Response.json({ items: plans });
+      return Response.json({ items: ideaPlans });
     }
     if (method === "GET" && path === api) {
       return Response.json(read?.() ?? current);
@@ -362,6 +371,36 @@ describe("20 Plan home (design-spec 6.12)", () => {
     await user.click(screen.getByRole("button", { name: "Switch plan" }));
     expect(screen.queryByRole("menuitem", { name: "Add plan" })).toBeNull();
   });
+
+  test.each([
+    ["the latest decision is Hold", { latestDecision: "hold" as const }],
+    ["the plan is archived", { archived: true }],
+    ["the idea is archived", { ideaArchived: true }],
+  ])(
+    "no Add plan, and ?modal=create-plan opens no M5, when %s",
+    async (_, extra) => {
+      const user = userEvent.setup();
+      planApi({
+        home: planHome(extra),
+        ideaArchived: "ideaArchived" in extra,
+      });
+      renderApp(planPath("?modal=create-plan"));
+      const toggle = await screen.findByRole("button", { name: "Switch plan" });
+      // 20 and its plans are read: an M5 the URL asked for would be open by now.
+      await waitFor(() => expect(toggle.hasAttribute("disabled")).toBe(false));
+      expect(
+        screen.queryByRole("dialog", { name: "Create plan draft" }),
+      ).toBeNull();
+      await user.click(toggle);
+      const menu = screen.getByRole("menu");
+      expect(
+        within(menu).getByRole("menuitem", { name: "Plan A" }),
+      ).toBeTruthy();
+      expect(
+        within(menu).queryByRole("menuitem", { name: "Add plan" }),
+      ).toBeNull();
+    },
+  );
 
   test("Pitch Deck opens 23 for every role, on the version open", async () => {
     const user = userEvent.setup();
@@ -881,6 +920,77 @@ describe("M3, M4, M5 and Rename plan", () => {
       expect(calls.filter(({ path }) => path === api).length).toBeGreaterThan(
         reads,
       ),
+    );
+  });
+
+  /** P1's plans by these names, the first being 20's, none archived. */
+  const named = (names: string[]): PlanSummary[] =>
+    names.map((name, index) => ({
+      id:
+        index === 0
+          ? planId
+          : `3d6f0a2c-5b1e-4c8d-9a7f-${String(index).padStart(12, "0")}`,
+      name,
+      archived: false,
+      latestVersion: null,
+      hasChangesSinceVersion: false,
+      latestGoNoGo: null,
+    }));
+  const alphabet = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map(
+    (letter) => `Plan ${letter}`,
+  );
+
+  test.each([
+    ["the first letter left free between two", ["Plan A", "Plan C"], "Plan B"],
+    ["AA once A to Z are used", alphabet, "Plan AA"],
+    ["AB after AA", [...alphabet, "Plan AA"], "Plan AB"],
+    // Plan A was renamed Main: its old name is free again.
+    ["a renamed plan's old name", ["Main", "Plan B"], "Plan A"],
+  ])("M5's name before it is typed is %s", async (_, names, expected) => {
+    planApi({
+      home: planHome({ name: names[0] }),
+      ideaPlans: named(names),
+    });
+    renderApp(planPath("?modal=create-plan"));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Create plan draft",
+    });
+    const name = await within(dialog).findByRole("textbox", {
+      name: /Plan name/,
+    });
+    expect((name as HTMLInputElement).value).toBe(expected);
+  });
+
+  test("M5 with no published plan template says 6.0.6's words above Create draft, which can no longer be pressed", async () => {
+    const user = userEvent.setup();
+    const calls = planApi({
+      write: (call) =>
+        call.path === `/api/v1/ideas/${ideaId}/plans`
+          ? apiError(409, "TEMPLATE_NOT_PUBLISHED")
+          : undefined,
+    });
+    renderApp(planPath("?modal=create-plan"));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Create plan draft",
+    });
+    const name = await within(dialog).findByRole("textbox", {
+      name: /Plan name/,
+    });
+    const create = within(dialog).getByRole("button", { name: "Create draft" });
+    await user.click(create);
+    const words = await within(dialog).findByText(
+      "Templates aren't ready yet. Ask your administrator.",
+    );
+    expect(
+      words.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(create.hasAttribute("disabled")).toBe(true);
+    // Another name does not make a template: Create draft stays off.
+    await user.type(name, " 2");
+    expect(create.hasAttribute("disabled")).toBe(true);
+    await user.click(create);
+    expect(sent(calls, "POST", `/api/v1/ideas/${ideaId}/plans`)).toHaveLength(
+      1,
     );
   });
 

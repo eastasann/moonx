@@ -44,7 +44,7 @@ import {
 import {
   FailureState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
@@ -312,8 +312,11 @@ function IdeaDetailPane({ ideaId }: { ideaId: string }) {
   const { t } = useTranslation(["ideas", "common", "app", "validation"]);
   const { me, workspace } = useWorkspace();
   const navigate = useNavigate();
-  const query = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(query.isPending);
+  const options = validationHomeQuery(ideaId);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   if (query.isError) {
     return (
       <FailureState
@@ -327,11 +330,7 @@ function IdeaDetailPane({ ideaId }: { ideaId: string }) {
   }
   if (query.data === undefined) {
     return isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <Stack gap="space-300">
@@ -479,12 +478,15 @@ function IdeasBody({
   const navigate = useNavigate();
   const isTwoColumns = useTwoColumns();
   const canWrite = role !== "viewer";
+  const options = ideasQuery(workspace.id, filtersOf(search));
   const query = useQuery({
-    ...ideasQuery(workspace.id, filtersOf(search)),
+    ...options,
     // A new filter keeps the rows until its answer comes, not the skeleton.
     placeholderData: keepPreviousData,
   });
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const items = query.data?.items ?? [];
   const selected =
     items.find(({ id }) => id === search.selected)?.id ??
@@ -505,11 +507,7 @@ function IdeasBody({
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <IdeasListSkeleton />
     );

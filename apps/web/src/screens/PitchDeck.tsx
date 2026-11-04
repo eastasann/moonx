@@ -40,7 +40,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
@@ -245,8 +245,11 @@ function DeckBody({
   const downloadId = useId();
   const variant = search.variant ?? DEFAULT_VARIANT;
   const versionId = search.version;
-  const deck = useQuery(pitchDeckQuery(ideaId, planId, variant, versionId));
-  const isSlow = useIsSlow(deck.isPending);
+  const deckOptions = pitchDeckQuery(ideaId, planId, variant, versionId);
+  const deck = useQuery(deckOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(deck.isPending, [
+    deckOptions,
+  ]);
   // A link to a slide's comment opens on that slide; otherwise the first.
   const [current, setCurrent] = useState<PitchSlideKey | null>(() => {
     const open = panel.open?.target;
@@ -332,7 +335,7 @@ function DeckBody({
   const data: PitchDeck | undefined = deck.data;
   if (data === undefined) {
     if (isSlow) {
-      return <SlowLoadingState onRetry={() => void deck.refetch()} />;
+      return <SlowLoadingState onRetry={retrySlow} />;
     }
     return (
       <PresentationPattern
@@ -484,9 +487,12 @@ export function PitchDeckScreen({
   const { me, workspace } = useWorkspace();
   const navigate = useNavigate();
   const panel = usePanel();
-  const home = useQuery(planHomeQuery(ideaId, planId));
+  const homeOptions = planHomeQuery(ideaId, planId);
+  const home = useQuery(homeOptions);
   const { data: ideaData } = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.workspaceId === workspace.id && home.data.ideaId === ideaId
       ? home.data
@@ -559,7 +565,7 @@ export function PitchDeckScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = <PitchDeckSkeleton variant={search.variant ?? DEFAULT_VARIANT} />;
   }

@@ -1,3 +1,4 @@
+import type { ResearchLogEntry } from "@moonx/schemas";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -5,6 +6,7 @@ import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   answer,
+  entry,
   evidenceOf,
   home,
   prices,
@@ -51,8 +53,14 @@ const attached = () =>
     { status: 201 },
   );
 
-/** The API of 11 with WHO answered; `evidence` answers M2's sends (V4). */
-function m2Api(evidence: (call: Call) => Response) {
+/**
+ * The API of 11 with WHO answered; `evidence` answers M2's sends (V4), `logs` is the
+ * idea's research log (V6).
+ */
+function m2Api(
+  evidence: (call: Call) => Response,
+  logs: ResearchLogEntry[] = [survey, prices],
+) {
   return stubApi((call) => {
     const { method, path } = call;
     if (method === "GET" && path === "/api/v1/me") return Response.json(ana);
@@ -73,7 +81,7 @@ function m2Api(evidence: (call: Call) => Response) {
       );
     }
     if (method === "GET" && path.startsWith(`${validationPath}/research-log`)) {
-      return Response.json({ items: [survey, prices], nextCursor: null });
+      return Response.json({ items: logs, nextCursor: null });
     }
     if (method === "POST" && path === `${validationPath}/evidence`) {
       return evidence(call);
@@ -178,5 +186,37 @@ describe("M2's failed sends (design-spec 6.0.6)", () => {
     expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
     expect(within(sheet).getByText("It's archived")).toBeTruthy();
     expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+});
+
+describe("M2's Search research (design-spec 6.0.3)", () => {
+  test("narrows the research log by topic and finding, whatever their case; nothing left says so", async () => {
+    const user = userEvent.setup();
+    m2Api(attached, [
+      survey,
+      prices,
+      entry("5e8c1d2a-0000-4000-8000-000000000003", "Mall visit", {
+        observation: "Kiosks at SM City sell at ₱45",
+      }),
+    ]);
+    renderApp(openM2);
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    const search = await within(sheet).findByRole("searchbox", {
+      name: "Search research",
+    });
+    const listed = () =>
+      within(sheet)
+        .queryAllByRole("checkbox")
+        .map((box) => box.closest("label")?.textContent);
+    expect(listed()).toHaveLength(3);
+    await user.type(search, "LUNCH");
+    expect(listed()).toEqual([expect.stringContaining("Lunch survey")]);
+    await user.clear(search);
+    await user.type(search, "sm city");
+    expect(listed()).toEqual([expect.stringContaining("Mall visit")]);
+    await user.clear(search);
+    await user.type(search, "bakery");
+    expect(listed()).toEqual([]);
+    expect(sheet.textContent).toContain("No entries match your search");
   });
 });

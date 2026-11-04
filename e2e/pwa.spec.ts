@@ -55,6 +55,28 @@ async function chooseReload(page: Page) {
   await reloaded;
 }
 
+/**
+ * Chooses Reload on the band with input unsaved and answers the browser's question
+ * about leaving, returning its type. It is answered as it comes, the click maybe still
+ * in progress: a click waits for a navigation the page starts during it, and the reload
+ * waits for the answer. Whether the question comes before or after the click returns is
+ * a race between the browser and the test's process, which load decides.
+ */
+async function reloadAnswering(page: Page, answer: "accept" | "dismiss") {
+  const [question] = await Promise.all([
+    page.waitForEvent("dialog").then(async (dialog) => {
+      await (answer === "accept" ? dialog.accept() : dialog.dismiss());
+      return dialog.type();
+    }),
+    page
+      .getByRole("alert")
+      .filter({ hasText: NEW_VERSION })
+      .getByRole("button", { name: "Reload" })
+      .click(),
+  ]);
+  return question;
+}
+
 /** The Japanese font files the service worker keeps (ADR-031). */
 async function japaneseFonts(page: Page) {
   return (await cachedUrls(page)).filter((url) =>
@@ -628,26 +650,16 @@ test.describe("a new version (design-spec 6.0.6「新しい版がある」)", ()
       const band = page.getByRole("alert").filter({ hasText: NEW_VERSION });
       await expect(band).toBeVisible();
 
-      const asked = page.waitForEvent("dialog");
-      await band.getByRole("button", { name: "Reload" }).click();
-      const question = await asked;
-      expect(question.type()).toBe("beforeunload");
-      await question.dismiss();
+      // The waiting version takes over first, then the page reloads.
+      expect(await reloadAnswering(page, "dismiss")).toBe("beforeunload");
       // Staying keeps the page and the band, whose Reload asks again.
       await expect(page).toHaveURL(new RegExp(`/ideas/${idea.id}$`));
       await expect(band).toBeVisible();
 
-      // This time the page reloads at once, so the question comes while Reload is
-      // still being pressed: answered as it comes.
-      const askedAgain: string[] = [];
-      page.once("dialog", async (dialog) => {
-        askedAgain.push(dialog.type());
-        await dialog.accept();
-      });
+      // This time no version waits, so the page reloads at once.
       const reloaded = page.waitForEvent("load");
-      await band.getByRole("button", { name: "Reload" }).click();
+      expect(await reloadAnswering(page, "accept")).toBe("beforeunload");
       await reloaded;
-      expect(askedAgain).toEqual(["beforeunload"]);
       await expect(
         page.getByRole("heading", { level: 1, name: "Puto Stand" }),
       ).toBeVisible();

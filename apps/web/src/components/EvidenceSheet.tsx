@@ -272,7 +272,8 @@ export function EvidenceSheet({
     current: ConflictCurrent;
   } | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
-  const log = useQuery(researchLogQuery(ideaId, validationId, {}));
+  const logOptions = researchLogQuery(ideaId, validationId, {});
+  const log = useQuery(logOptions);
   const ownSave = useSaveItem(saveKey);
   const isOwnSaveHeld = isHeld(ownSave?.status);
   // Once what was typed went out and the fields emptied, they start again with focus on
@@ -586,7 +587,7 @@ export function EvidenceSheet({
                 size="S"
               />
             ) : log.data === undefined ? (
-              <LoadingBlock onRetry={() => void log.refetch()}>
+              <LoadingBlock waitsFor={[logOptions]}>
                 <Stack gap="space-100">
                   <Text>{t("validation:evidence.source.log")}</Text>
                   <Text>{t("validation:evidence.source.log")}</Text>

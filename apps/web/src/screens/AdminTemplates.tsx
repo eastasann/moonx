@@ -40,7 +40,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
@@ -485,8 +485,11 @@ function TemplatesBody({ search }: { search: AdminTemplatesSearch }) {
   const isTwoColumns = useTwoColumns();
   const detailHistory = useDetailHistory();
   const tabs = useAdminTabs("templates");
-  const query = useQuery(adminTemplatesQuery());
-  const isSlow = useIsSlow(query.isPending);
+  const options = adminTemplatesQuery();
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const items = query.data?.items ?? [];
   const selected =
     items.find(({ kind }) => kind === search.kind) ??
@@ -508,13 +511,7 @@ function TemplatesBody({ search }: { search: AdminTemplatesSearch }) {
         />
       );
     } else if (isSlow) {
-      list = (
-        <SlowLoadingState
-          headingLevel={2}
-          size="S"
-          onRetry={() => void query.refetch()}
-        />
-      );
+      list = <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />;
     } else {
       list = <TemplatesListSkeleton />;
     }

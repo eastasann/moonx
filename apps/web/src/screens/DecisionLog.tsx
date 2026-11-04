@@ -44,7 +44,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { UserName, userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
@@ -366,17 +366,20 @@ function Filters({
 function EntryDetail({ entryId }: { entryId: string }) {
   const { t } = useTranslation(["decisions", "app"]);
   const { me, workspace } = useWorkspace();
-  const query = useQuery(decisionLogEntryQuery(entryId));
+  const entryOptions = decisionLogEntryQuery(entryId);
+  const query = useQuery(entryOptions);
   // L2 finds an entry by its id alone: one of another workspace is not this screen's to
   // show (SDD 4章), which its idea, not among this workspace's, tells.
-  const ideas = useQuery(
-    ideasQuery(workspace.id, {
-      decision: "all",
-      includeArchived: true,
-      sort: "name",
-    }),
+  const ideasOptions = ideasQuery(workspace.id, {
+    decision: "all",
+    includeArchived: true,
+    sort: "name",
+  });
+  const ideas = useQuery(ideasOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    query.isPending || ideas.isPending,
+    [entryOptions, ideasOptions],
   );
-  const isSlow = useIsSlow(query.isPending || ideas.isPending);
   if (
     query.data !== undefined &&
     ideas.data !== undefined &&
@@ -405,14 +408,7 @@ function EntryDetail({ entryId }: { entryId: string }) {
   // Shown once it is known to be this workspace's.
   if (query.data === undefined || ideas.data === undefined) {
     return isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => {
-          void query.refetch();
-          void ideas.refetch();
-        }}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <Stack gap="space-300">
@@ -579,18 +575,21 @@ function DecisionLogBody({
   const { t } = useTranslation(["decisions"]);
   const { me, workspace } = useWorkspace();
   const isTwoColumns = useTwoColumns();
+  const options = decisionLogQuery(workspace.id, {
+    kind: search.kind,
+    ideaId: search.idea,
+    recordedBy: search.recordedBy,
+    from: search.from,
+    to: search.to,
+  });
   const query = useQuery({
-    ...decisionLogQuery(workspace.id, {
-      kind: search.kind,
-      ideaId: search.idea,
-      recordedBy: search.recordedBy,
-      from: search.from,
-      to: search.to,
-    }),
+    ...options,
     // A new filter keeps the rows until its answer comes, not the skeleton.
     placeholderData: keepPreviousData,
   });
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const items = query.data ?? [];
   const selected =
     items.find(({ id }) => id === search.selected)?.id ??
@@ -620,11 +619,7 @@ function DecisionLogBody({
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <ListSkeleton />
     );

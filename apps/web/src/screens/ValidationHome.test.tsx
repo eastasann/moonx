@@ -1,4 +1,9 @@
-import type { Me, Role } from "@moonx/schemas";
+import {
+  type CostRowState,
+  evaluateValidation,
+  keyMetricOf,
+} from "@moonx/domain";
+import type { Me, Role, ValidationHome } from "@moonx/schemas";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -12,6 +17,7 @@ import {
   stubApi,
 } from "../test/api";
 import { validationHome, workspaceId } from "../test/ideas";
+import { section01, section02 } from "../test/validation";
 
 // 13 Validation home (design-spec 6.1) and the input mechanism its Edit summary uses
 // (6.0.2, M9, SDD ADR-019・ADR-021).
@@ -56,6 +62,97 @@ function homeApi({
     }
     return undefined;
   });
+}
+
+/**
+ * V1's titles of the sections (SDD 5.7): 01 and 02 the template's, 03〜09 fixed. The
+ * template below has no 10, which V1 then names by its key.
+ */
+const sectionTitles: Record<string, string> = {
+  "01": "01 Customer & Problem",
+  "02": "02 Market",
+  "03": "03 Research Log",
+  "04": "04 Competitors",
+  "05": "05 Costs",
+  "06-08": "06–08 Unit Economics",
+  "09": "09 Assumptions & Risks",
+};
+
+/** A row of the template's cost table, without an amount, as a new validation has it. */
+const emptyRow = (
+  category: CostRowState["category"],
+  templateKey: string,
+  sortOrder: number,
+): CostRowState => ({
+  id: `8a1c0000-0000-4000-8000-00000000000${sortOrder}`,
+  sortOrder,
+  category,
+  templateKey,
+  inputMode: "amount",
+  amount: null,
+  percent: null,
+  fau: null,
+  confidence: null,
+  activeEvidenceCount: 0,
+});
+
+/**
+ * 13 of an idea just created (SDD 5.7 V1), evaluated as the API does: nothing answered,
+ * the template's cost rows without amounts, no number, research, decision or plan.
+ */
+function createdHome(): ValidationHome {
+  const fresh = validationHome({ latestDecision: null });
+  const evaluation = evaluateValidation(
+    {
+      sections: [section01, section02],
+      thresholds: {
+        competitors: { min: 3 },
+        local_price: { pricedCompetitors: 2, researchLogs: 1 },
+        permits: { researchLogs: 1 },
+        demand_signal: { researchLogs: 1 },
+      },
+      answers: [],
+      researchLogs: [],
+      competitors: [],
+      assumptionCount: 0,
+      riskCount: 0,
+      costRows: [
+        emptyRow("initial", "initial.permits", 0),
+        emptyRow("monthly_fixed", "monthly.rent", 1),
+      ],
+      economicsInputs: [],
+    },
+    { workspaceId, ideaId: fresh.idea.id, canWrite: true },
+  );
+  const metric = (key: keyof ValidationHome["keyMetrics"]) =>
+    keyMetricOf(evaluation.keyMetrics, key);
+  return {
+    ...fresh,
+    summary: {
+      customer: null,
+      problem: null,
+      solution: null,
+      marketType: null,
+    },
+    keyMetrics: {
+      initial_cost_total: metric("initial_cost_total"),
+      break_even_units_day: metric("break_even_units_day"),
+      expected_operating_profit: metric("expected_operating_profit"),
+      payback_months: metric("payback_months"),
+    },
+    economicsWarnings: evaluation.economics.warnings,
+    nextSteps: evaluation.nextSteps,
+    checks: evaluation.checks,
+    fau: evaluation.fau,
+    sections: evaluation.sections.map((section) => ({
+      ...section,
+      title: sectionTitles[section.key] ?? section.key,
+    })),
+    decisions: [],
+    plans: [],
+    archivedPlanCount: 0,
+    canAddPlan: false,
+  };
 }
 
 async function openEditSummary() {
@@ -123,6 +220,52 @@ describe("13 Validation home (design-spec 6.1)", () => {
         `/w/${workspaceId}/ideas/${home.idea.id}/decide`,
       ),
     );
+  });
+
+  test("just created: every number Empty, every check Not started, F/A/U Empty alone, Start with 01, no decisions", async () => {
+    const created = createdHome();
+    homeApi({ data: created });
+    renderApp(path);
+    const numbers = await screen.findByRole("group", { name: "Key numbers" });
+    expect(within(numbers).getAllByText("Empty")).toHaveLength(4);
+    const checks = within(screen.getByRole("list", { name: "Checks" }))
+      .getAllByRole("listitem")
+      .map((check) => check.textContent);
+    expect(checks).toHaveLength(6);
+    for (const check of checks) {
+      expect(check).toContain("Not started");
+      expect(check).not.toMatch(/Done|Partial/);
+    }
+    const fau = screen.getByRole("figure", {
+      name: "Items by Fact, Assumption and Unknown",
+    });
+    expect(
+      within(fau)
+        .getAllByRole("listitem")
+        .map((entry) => entry.textContent),
+    ).toEqual([`Empty${created.fau.empty}`]);
+    const [first] = within(screen.getByRole("list", { name: "Next steps" }))
+      .getAllByRole("listitem")
+      .map((step) => step.textContent);
+    expect(first).toContain("Start with 01 Customer & Problem");
+    expect(first).toContain("Nothing is filled in yet.");
+    expect(
+      screen.getByRole("region", { name: "Decisions" }).textContent,
+    ).toContain("No decisions yet");
+    expect(screen.getByRole("region", { name: "Plans" }).textContent).toContain(
+      "No decisions yet",
+    );
+  });
+
+  test("a decision but no plan: Plans says a plan starts after Proceed", async () => {
+    // The fixture's idea is on Hold, with no plan.
+    homeApi();
+    renderApp(path);
+    const plans = await screen.findByRole("region", { name: "Plans" });
+    expect(plans.textContent).toContain(
+      "No plans yet. A plan can start after a Proceed decision.",
+    );
+    expect(plans.textContent).not.toContain("No decisions yet");
   });
 
   test("another workspace's idea under this one's URL: no access, no tools", async () => {
@@ -491,6 +634,35 @@ describe("13's plans (design-spec 6.1・6.12)", () => {
       screen.queryByRole("dialog", { name: "Create plan draft" }),
     ).toBeNull();
   });
+
+  test.each([
+    [
+      "the latest decision is Hold",
+      { ...proceeded, idea: { ...proceeded.idea, latestDecision: "hold" } },
+    ],
+    [
+      "the idea is archived, after Proceed",
+      { ...proceeded, idea: { ...proceeded.idea, archived: true } },
+    ],
+  ] as const)(
+    "%s: an Owner has no Add plan, and M5's URL opens nothing (6.1・6.8)",
+    async (_, data) => {
+      homeApi({ data });
+      renderApp(path);
+      const plans = await screen.findByRole("list", { name: "Plans" });
+      expect(within(plans).getByRole("link", { name: /Plan A/ })).toBeTruthy();
+      expect(screen.queryByRole("link", { name: "Add plan" })).toBeNull();
+      cleanup();
+      vi.unstubAllGlobals();
+      homeApi({ data });
+      renderApp(`${path}?modal=create-plan`);
+      await screen.findByRole("list", { name: "Plans" });
+      expect(
+        screen.queryByRole("dialog", { name: "Create plan draft" }),
+      ).toBeNull();
+      expect(screen.queryByRole("link", { name: "Add plan" })).toBeNull();
+    },
+  );
 });
 
 test("a lost session met by an action of ⋯ leaves for the sign-in screen (SDD 8.2)", async () => {

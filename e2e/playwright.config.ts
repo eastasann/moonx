@@ -54,11 +54,14 @@ export default defineConfig({
       ],
     },
     // The PWA and the serving of ADR-004 and ADR-031 (SDD 10章): against the API that
-    // serves make build-web's output, which make test-e2e builds first.
+    // serves make build-web's output, which make test-e2e builds first. One test at a
+    // time, --repeat-each included: a test stands for a deploy by changing the sw.js of
+    // the one copy of the build that API serves to every test (pwa.spec.ts).
     {
       name: "pwa",
       use: { ...devices["Desktop Chrome"], baseURL: PWA_ORIGIN },
       testMatch: "pwa.spec.ts",
+      workers: 1,
     },
     // A published template version is what every new self analysis, idea and plan takes
     // from then on (design-spec 6.0.7): publishing waits until the others are done.

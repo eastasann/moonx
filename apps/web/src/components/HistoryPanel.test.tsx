@@ -1,5 +1,5 @@
 import type { HistoryEntry, Me, Role, UserRef } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
@@ -551,6 +551,152 @@ describe("PNL-2 History (design-spec 6.0.5)", () => {
       ),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe(base);
+  });
+
+  describe("one revert at a time, online only (6.0.5「操作のボタン」)", () => {
+    const importId = "a0000000-0000-4000-8000-00000000000b";
+    const deletedId = "a0000000-0000-4000-8000-00000000000c";
+    /**
+     * An AI import's change of 01 WHY_THEM, Paolo's of 01 WHO and a deleted 01 BEHAVIOR:
+     * Revert and Undo the whole operation, Revert, Undo delete.
+     */
+    const entries = [
+      row(importId, {
+        batchId,
+        source: "ai_import",
+        label: "01 WHY_THEM",
+        target: {
+          ...whoTarget,
+          key: "V.01.WHY_THEM",
+        } as HistoryEntry["target"],
+      }),
+      row(manualId),
+      row(deletedId, {
+        action: "delete",
+        after: null,
+        label: "01 BEHAVIOR",
+        target: {
+          ...whoTarget,
+          key: "V.01.BEHAVIOR",
+        } as HistoryEntry["target"],
+      }),
+    ];
+    const reverted = () =>
+      Response.json({
+        entry: null,
+        target: {
+          value: null,
+          deleted: false,
+          lockVersion: 3,
+          updatedAt: null,
+          updatedBy: null,
+        },
+      });
+    const reverts = (calls: Call[]) =>
+      calls
+        .filter(
+          ({ method, path }) =>
+            method === "POST" && path.startsWith("/api/v1/history/"),
+        )
+        .map(({ path }) => path);
+
+    /** Opens the screen's changes and finds the rows' buttons. */
+    async function buttons(user: ReturnType<typeof userEvent.setup>) {
+      renderApp(base);
+      await user.click(await screen.findByRole("button", { name: "History" }));
+      const body = await findPanel();
+      const who = await within(body).findByRole("button", {
+        name: "Revert to this point, 01 WHO",
+      });
+      const whyThem = within(body).getByRole("button", {
+        name: "Revert to this point, 01 WHY_THEM",
+      });
+      /** Whether each of the four buttons is disabled, in the list's order. */
+      const states = () =>
+        within(body)
+          .getAllByRole("button", { name: /^(Revert|Undo)/ })
+          .map((button) => button.hasAttribute("disabled"));
+      expect(states()).toEqual([false, false, false, false]);
+      return { body, who, whyThem, states };
+    }
+
+    test("while one sends, the other Revert and Undo cannot be pressed, nor it again", async () => {
+      const user = userEvent.setup();
+      let answer: (response: Response) => void = () => {};
+      const calls = panelApi({
+        entries,
+        write: (call) =>
+          call.path === `/api/v1/history/${manualId}/revert`
+            ? new Promise((resolve) => {
+                answer = resolve;
+              })
+            : undefined,
+      });
+      const { body, who, states } = await buttons(user);
+      await user.click(who);
+      // Its own shows it sends (isPending), the others are disabled.
+      await waitFor(() => expect(states()).toEqual([true, true, false, true]));
+      for (const button of within(body).getAllByRole("button", {
+        name: /^(Revert|Undo)/,
+      })) {
+        await user.click(button);
+      }
+      expect(reverts(calls)).toEqual([`/api/v1/history/${manualId}/revert`]);
+      answer(reverted());
+      await waitFor(() =>
+        expect(states()).toEqual([false, false, false, false]),
+      );
+    });
+
+    test("offline none can be pressed; back online they can", async () => {
+      const user = userEvent.setup();
+      const onLine = vi.spyOn(navigator, "onLine", "get");
+      try {
+        const calls = panelApi({ entries, write: reverted });
+        const { who, states } = await buttons(user);
+        onLine.mockReturnValue(false);
+        act(() => {
+          window.dispatchEvent(new Event("offline"));
+        });
+        await waitFor(() => expect(states()).toEqual([true, true, true, true]));
+        await user.click(who);
+        expect(reverts(calls)).toEqual([]);
+        onLine.mockReturnValue(true);
+        act(() => {
+          window.dispatchEvent(new Event("online"));
+        });
+        await waitFor(() =>
+          expect(states()).toEqual([false, false, false, false]),
+        );
+      } finally {
+        onLine.mockRestore();
+      }
+    });
+
+    test("over the rate limit, the wait shows under the row pressed, without Retry", async () => {
+      const user = userEvent.setup();
+      panelApi({
+        entries,
+        write: () => apiError(429, "RATE_LIMITED", { retryAfterSeconds: 60 }),
+      });
+      const { body, who, whyThem } = await buttons(user);
+      await user.click(whyThem);
+      const wait = await within(body).findByText(
+        "Too many attempts. Try again in 1 minute.",
+      );
+      // Under 01 WHY_THEM's buttons, before the next row's (document order).
+      expect(
+        whyThem.compareDocumentPosition(wait) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        wait.compareDocumentPosition(who) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(within(body).queryByRole("button", { name: "Retry" })).toBeNull();
+      expect(
+        screen.queryByRole("alertdialog", { name: /Something went wrong/ }),
+      ).toBeNull();
+    });
   });
 
   test("a network failure says Couldn't save with Retry under the row", async () => {

@@ -1,5 +1,5 @@
 import type { Assumption, Me, Risk, Role } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
@@ -60,14 +60,17 @@ function listsApi({
   risks = [prices, rain],
   create,
   remove,
+  order,
 }: {
   /** A function is asked at each call: the user may change behind the screen. */
   me?: Me | (() => Me);
   /** A function is asked at each call: the idea may be archived behind the screen. */
   archived?: boolean | (() => boolean);
-  /** Answers a new assumption or risk; undefined makes it and keeps it. */
-  create?: () => Response | undefined;
+  /** Answers a new assumption or risk, later when it is a promise; undefined makes it and keeps it. */
+  create?: () => Response | Promise<Response> | undefined;
   remove?: () => Response | undefined;
+  /** Answers Save order, later when it is a promise; undefined orders the list. */
+  order?: () => Response | Promise<Response> | undefined;
   assumptions?: Assumption[];
   risks?: Risk[];
 } = {}) {
@@ -126,6 +129,20 @@ function listsApi({
       );
       risks.push(made);
       return Response.json(made, { status: 201 });
+    }
+    const ordered = path.match(
+      new RegExp(
+        `^/api/v1/validations/${validationId}/(assumptions|risks)/order$`,
+      ),
+    );
+    if (method === "PUT" && ordered !== null) {
+      const answered = order?.();
+      if (answered !== undefined) return answered;
+      const { ids } = call.body as { ids: string[] };
+      const rows: (Assumption | Risk)[] =
+        ordered[1] === "assumptions" ? assumptions : risks;
+      rows.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+      return new Response(null, { status: 204 });
     }
     const one = path.match(/^\/api\/v1\/(assumptions|risks)\/([\w-]+)$/);
     if (one !== null && method === "DELETE") {
@@ -707,5 +724,234 @@ describe("16 Assumptions & Risks (design-spec 6.10)", () => {
     expect(add.hasAttribute("disabled")).toBe(true);
     await user.click(add);
     expect(calls.filter(({ method }) => method === "POST")).toHaveLength(1);
+  });
+
+  test("a new row's field says why only once it changed, not when it is only left", async () => {
+    const user = userEvent.setup();
+    for (const [url, name] of [
+      [`${base}?new=1`, /Assumption/],
+      [`${base}?tab=risks&new=1`, /Risk/],
+    ] as const) {
+      listsApi();
+      renderApp(url);
+      const statement = await screen.findByRole("textbox", { name });
+      // Left blank on the way to another field (or to Cancel): no reason moves the
+      // buttons.
+      await user.click(statement);
+      await user.tab();
+      expect(screen.queryByText("Can't be empty")).toBeNull();
+      // Changed, it says why at once, before it is left.
+      await user.type(statement, "A");
+      await user.clear(statement);
+      expect(screen.getByText("Can't be empty")).toBeTruthy();
+      cleanup();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("a Viewer with empty lists: each tab says what it is for, with nothing to add", async () => {
+    const user = userEvent.setup();
+    listsApi({ me: as("viewer"), assumptions: [], risks: [] });
+    renderApp(base);
+    expect(
+      await screen.findByText(
+        "List what has to be true for this idea to work, and why you believe it.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Add assumption/ })).toBeNull();
+    await user.click(screen.getByRole("tab", { name: "Risks" }));
+    expect(
+      await screen.findByText(
+        "List what could go wrong, how likely it is and how much it would hurt.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Add risk/ })).toBeNull();
+  });
+
+  test("Cancel while a new row is on its way: it is made, and the user is not taken to it", async () => {
+    const user = userEvent.setup();
+    const listed = [believe, costs];
+    let release = () => {};
+    const calls = listsApi({
+      assumptions: listed,
+      create: () =>
+        new Promise<Response>((resolve) => {
+          release = () => {
+            const made = assumption(madeId, "Gift buyers come back monthly.", {
+              sortOrder: 2,
+            });
+            listed.push(made);
+            resolve(Response.json(made, { status: 201 }));
+          };
+        }),
+    });
+    const router = renderApp(`${base}?new=1`);
+    await addAssumption(user);
+    await waitFor(() =>
+      expect(calls.some(({ method }) => method === "POST")).toBe(true),
+    );
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { name: "New assumption" }),
+      ).toBeNull(),
+    );
+    release();
+    // Made: the list is read again with it; the user stays where they went.
+    const list = screen.getByRole("grid", { name: "Assumptions" });
+    await waitFor(() =>
+      expect(within(list).getAllByRole("row")).toHaveLength(3),
+    );
+    expect(
+      screen.queryByRole("heading", {
+        level: 2,
+        name: "Gift buyers come back monthly.",
+      }),
+    ).toBeNull();
+    expect(router.state.location.search).not.toHaveProperty("row");
+  });
+
+  test("switching tabs closes the row chosen and the new row's input", async () => {
+    const user = userEvent.setup();
+    listsApi();
+    const router = renderApp(`${base}?row=${costs.id}`);
+    await screen.findByRole("heading", { level: 2, name: costs.statement });
+    await user.click(screen.getByRole("tab", { name: "Risks" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ tab: "risks" }),
+    );
+    expect(router.state.location.search).not.toHaveProperty("row");
+    expect(
+      screen.queryByRole("heading", { level: 2, name: costs.statement }),
+    ).toBeNull();
+    // Back on Assumptions, the first is beside the list, not the row chosen before.
+    await user.click(screen.getByRole("tab", { name: "Assumptions" }));
+    expect(
+      await screen.findByRole("heading", { level: 2, name: believe.statement }),
+    ).toBeTruthy();
+    expect(router.state.location.search).not.toHaveProperty("row");
+
+    await user.click(
+      screen.getByRole("button", { name: "Add assumption" }) as HTMLElement,
+    );
+    await user.type(
+      await screen.findByRole("textbox", { name: /Assumption/ }),
+      "Gift buyers come back monthly.",
+    );
+    await user.click(screen.getByRole("tab", { name: "Risks" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { name: "New assumption" }),
+      ).toBeNull(),
+    );
+    expect(screen.queryByRole("heading", { name: "New risk" })).toBeNull();
+    expect(router.state.location.search).not.toHaveProperty("new");
+    await user.click(screen.getByRole("tab", { name: "Assumptions" }));
+    expect(
+      await screen.findByRole("heading", { level: 2, name: believe.statement }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("heading", { name: "New assumption" }),
+    ).toBeNull();
+    expect(
+      screen
+        .queryAllByRole("textbox")
+        .some(
+          (field) =>
+            (field as HTMLTextAreaElement).value ===
+            "Gift buyers come back monthly.",
+        ),
+    ).toBe(false);
+  });
+
+  /** Opens Reorder from Costs' ⋯ and moves it up: Save order can send. */
+  const openReorder = async (user: ReturnType<typeof userEvent.setup>) => {
+    const list = await screen.findByRole("grid", { name: "Assumptions" });
+    await user.click(
+      within(list).getByRole("button", { name: `More for ${costs.statement}` }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Reorder" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Reorder assumptions",
+    });
+    await user.click(
+      within(dialog).getByRole("button", {
+        name: `Move ${costs.statement} up`,
+      }),
+    );
+    return dialog;
+  };
+
+  test("Reorder while Save order is on its way stays open; a failure keeps the order: Couldn't save, then the small dialog for the unexpected", async () => {
+    const user = userEvent.setup();
+    let fail = () => {};
+    let tries = 0;
+    const calls = listsApi({
+      order: () => {
+        tries += 1;
+        if (tries === 2) return apiError(500, "INTERNAL");
+        return new Promise<Response>((_resolve, reject) => {
+          fail = () => reject(new TypeError("Failed to fetch"));
+        });
+      },
+    });
+    renderApp(base);
+    // The press outside reaches the dialog: with nothing on its way, it closes Reorder.
+    await openReorder(user);
+    await user.click(document.body);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Reorder assumptions" }),
+      ).toBeNull(),
+    );
+    const dialog = await openReorder(user);
+    const kept = [costs.statement, believe.statement];
+    const orderIn = () =>
+      within(dialog)
+        .getAllByRole("listitem")
+        .map((row) => row.textContent);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Save order" }),
+    );
+    // On its way: Cancel, ×, Escape and a press outside do not close it.
+    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+    await waitFor(() => expect(cancel.hasAttribute("disabled")).toBe(true));
+    await user.click(cancel);
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await user.keyboard("{Escape}");
+    await user.click(document.body);
+    expect(
+      screen.getByRole("dialog", { name: "Reorder assumptions" }),
+    ).toBeTruthy();
+    // The network: Couldn't save and Retry in the dialog, the order as it was moved.
+    fail();
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(orderIn()).toEqual(kept);
+    // Unexpected (500): the small dialog with its Ref, over the order kept.
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    const small = await screen.findByRole("alertdialog", {
+      name: /Something went wrong/,
+    });
+    expect(small.textContent).toContain("Ref: 8f14e45f");
+    expect(orderIn()).toEqual(kept);
+    const [first, again] = calls.filter(({ method }) => method === "PUT");
+    expect(first?.body).toEqual({ ids: [costs.id, believe.id] });
+    expect(again?.body).toEqual(first?.body);
+    // Close closes Reorder too; the list keeps its order.
+    await user.click(within(small).getByRole("button", { name: "Close" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Reorder assumptions" }),
+      ).toBeNull(),
+    );
+    expect(
+      within(screen.getByRole("grid", { name: "Assumptions" }))
+        .getAllByRole("row")
+        .map((row) => row.textContent),
+    ).toEqual([
+      expect.stringContaining(believe.statement),
+      expect.stringContaining(costs.statement),
+    ]);
   });
 });

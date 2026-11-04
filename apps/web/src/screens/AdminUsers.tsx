@@ -59,7 +59,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
@@ -76,6 +76,7 @@ import {
   adminUsersQuery,
   adminWorkspacesQuery,
 } from "../lib/queries";
+import type { WaitedQuery } from "../lib/query";
 import { isSessionLost, useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
 import { ListSkeleton } from "./AdminUsersSkeleton";
@@ -168,6 +169,7 @@ function lastActive(
 /** The state of 6.0.6 a list shows in its place while it is not read. */
 function ListState({
   query,
+  waitsFor,
 }: {
   query: {
     isError: boolean;
@@ -175,9 +177,14 @@ function ListState({
     isPending: boolean;
     refetch: () => unknown;
   };
+  /** The list's options, which Retry on "Taking longer than usual" asks again. */
+  waitsFor: readonly WaitedQuery[];
 }) {
   const { me } = useWorkspace();
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    query.isPending,
+    waitsFor,
+  );
   if (query.isError) {
     return (
       <FailureState
@@ -190,13 +197,7 @@ function ListState({
     );
   }
   if (isSlow) {
-    return (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
-    );
+    return <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />;
   }
   return <ListSkeleton />;
 }
@@ -409,8 +410,9 @@ function useUsersTab(
   const { me } = useWorkspace();
   const isTwoColumns = useTwoColumns();
   const [filters, setFilters] = useState<AdminUserFilters>({});
+  const options = adminUsersQuery(filters);
   const query = useQuery({
-    ...adminUsersQuery(filters),
+    ...options,
     placeholderData: (previous) => previous,
     enabled: isShown,
   });
@@ -462,7 +464,7 @@ function useUsersTab(
   );
   let list: ReactNode;
   if (query.data === undefined) {
-    list = <ListState query={query} />;
+    list = <ListState query={query} waitsFor={[options]} />;
   } else if (items.length === 0 && isFiltered) {
     list = <NoMatch onClear={() => setFilters({})} />;
   } else {
@@ -556,8 +558,9 @@ function useWorkspacesTab(
   const { t } = useTranslation(["admin", "app"]);
   const isTwoColumns = useTwoColumns();
   const [q, setQ] = useState("");
+  const options = adminWorkspacesQuery(q === "" ? undefined : q);
   const query = useQuery({
-    ...adminWorkspacesQuery(q === "" ? undefined : q),
+    ...options,
     placeholderData: (previous) => previous,
     enabled: isShown,
   });
@@ -582,7 +585,7 @@ function useWorkspacesTab(
   ];
   let list: ReactNode;
   if (query.data === undefined) {
-    list = <ListState query={query} />;
+    list = <ListState query={query} waitsFor={[options]} />;
   } else if (items.length === 0 && q !== "") {
     list = <NoMatch onClear={() => setQ("")} />;
   } else {
@@ -1136,8 +1139,9 @@ function useInvitationsTab(
   const [isInviting, setInviting] = useState(false);
   const isTwoColumns = useTwoColumns();
   const [show, setShow] = useState<"pending" | "all">("pending");
+  const options = adminInvitationsQuery(show);
   const query = useQuery({
-    ...adminInvitationsQuery(show),
+    ...options,
     placeholderData: (previous) => previous,
     enabled: isShown,
   });
@@ -1151,7 +1155,7 @@ function useInvitationsTab(
   ];
   let list: ReactNode;
   if (query.data === undefined) {
-    list = <ListState query={query} />;
+    list = <ListState query={query} waitsFor={[options]} />;
   } else {
     list = (
       <TableView

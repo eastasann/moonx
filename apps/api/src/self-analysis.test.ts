@@ -873,6 +873,46 @@ describe("S3 PUT /api/v1/me/self-analysis/answers/{questionKey}", () => {
     expect(await open(caller)).toMatchObject({ status: "done", answered: 2 });
   });
 
+  test("stays in progress with every answer cleared", async () => {
+    const caller = await signedInUser();
+    const home = await open(caller);
+    await saved(await save(caller, "SA.WHY.1", { text: "a", lockVersion: 0 }));
+    await saved(
+      await save(caller, "SA.INCOME.1", {
+        text: "Rent",
+        amount: 50000,
+        lockVersion: 0,
+      }),
+    );
+    expect(await open(caller)).toMatchObject({
+      status: "in_progress",
+      answered: 2,
+    });
+    await saved(await save(caller, "SA.WHY.1", { text: null, lockVersion: 1 }));
+    await saved(
+      await save(caller, "SA.INCOME.1", {
+        text: "",
+        amount: null,
+        lockVersion: 1,
+      }),
+    );
+    expect(await open(caller)).toMatchObject({
+      status: "in_progress",
+      completedAt: null,
+      answered: 0,
+      sections: [
+        { key: "WHY", answered: 0 },
+        { key: "INCOME", answered: 0 },
+      ],
+      firstUnanswered: { sectionKey: "WHY", questionKey: "SA.WHY.1" },
+    });
+    const [row] = await db
+      .select({ status: selfAnalyses.status })
+      .from(selfAnalyses)
+      .where(eq(selfAnalyses.id, home.id));
+    expect(row?.status).toBe("in_progress");
+  });
+
   test("saves nothing for an account deleted while the request waits", async () => {
     const caller = await signedInUser();
     const home = await open(caller);

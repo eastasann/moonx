@@ -84,7 +84,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
@@ -714,7 +714,7 @@ function CompetitorsBody({
   const canEdit = role !== "viewer" && !idea.archived;
   const list = competitorsQuery(idea.id, validationId);
   const query = useQuery(list);
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [list]);
   const [isReordering, setReordering] = useState(false);
   const [deleting, setDeleting] = useState<Competitor | null>(null);
   const empty = useRange(query.data?.guidance ?? { min: 0, max: 0 });
@@ -799,7 +799,7 @@ function CompetitorsBody({
   }
   if (query.data === undefined) {
     return isSlow ? (
-      <SlowLoadingState onRetry={() => void query.refetch()} />
+      <SlowLoadingState onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <CompetitorsSkeleton />
@@ -1162,8 +1162,11 @@ export function CompetitorsScreen({
   const navigate = useNavigate();
   const router = useRouter();
   const panel = usePanel();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "04")?.title;
@@ -1292,7 +1295,7 @@ export function CompetitorsScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = (
       <Skeleton isLoading>

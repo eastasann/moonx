@@ -1,5 +1,5 @@
 import type { Competitor, Me, Role, ValidationAnswer } from "@moonx/schemas";
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
@@ -101,11 +101,12 @@ function competitorsApi({
   archived?: boolean;
   guidance?: { min: number; max: number };
   patterns?: { question: typeof survivor; answer: ValidationAnswer }[];
-  order?: () => Response;
+  /** Answers Save order, later when it is a promise; undefined orders the list. */
+  order?: () => Response | Promise<Response> | undefined;
   /** V5's answer to an attachment. */
   evidence?: (call: Call) => Response;
   /** Answers New competitor's send; undefined makes the competitor and keeps it. */
-  create?: () => Response | undefined;
+  create?: () => Response | Promise<Response> | undefined;
   /** Answers a delete; undefined deletes. */
   remove?: () => Response | undefined;
 } = {}) {
@@ -152,7 +153,8 @@ function competitorsApi({
       return evidence(call);
     }
     if (method === "PUT" && path === `${listPath}/order`) {
-      if (order !== undefined) return order();
+      const answered = order?.();
+      if (answered !== undefined) return answered;
       const { ids } = call.body as { ids: string[] };
       held.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
       return new Response(null, { status: 204 });
@@ -842,5 +844,253 @@ describe("15 Competitors (design-spec 6.10)", () => {
       ).toBeNull(),
     );
     expect(cardsOf()).toHaveLength(2);
+  });
+
+  test("New competitor: a field says why only once it changed, not when it is only left", async () => {
+    const user = userEvent.setup();
+    competitorsApi();
+    renderApp(base);
+    const dialog = await openNew(user);
+    const name = within(dialog).getByRole("textbox", { name: /Name/ });
+    // Left blank on the way to another field (or to Cancel): no reason moves the buttons.
+    await user.click(name);
+    await user.tab();
+    const price = within(dialog).getByRole("textbox", {
+      name: "Typical Price",
+    });
+    await user.click(price);
+    await user.tab();
+    expect(within(dialog).queryByText("Can't be empty")).toBeNull();
+    expect(
+      within(dialog).queryByText("Enter a number such as 1,500.50"),
+    ).toBeNull();
+    // Changed, each says why at once, before it is left.
+    await user.type(price, "1,5");
+    expect(
+      within(dialog).getByText("Enter a number such as 1,500.50"),
+    ).toBeTruthy();
+    await user.type(name, "B");
+    await user.clear(name);
+    expect(within(dialog).getByText("Can't be empty")).toBeTruthy();
+  });
+
+  test("a Viewer with no competitors: what 15 is for, and nothing to add", async () => {
+    const user = userEvent.setup();
+    competitorsApi({ me: as("viewer"), items: [] });
+    renderApp(base);
+    const words =
+      "List 3–5 competitors or substitutes. Include what people do today instead.";
+    expect(await screen.findByText(words)).toBeTruthy();
+    expect(screen.queryByText(/Add competitor/)).toBeNull();
+    // The table's place says the same, without the button too.
+    await user.click(screen.getByRole("radio", { name: "Table" }));
+    expect(await screen.findByText(words)).toBeTruthy();
+    expect(screen.queryByText(/Add competitor/)).toBeNull();
+  });
+
+  test("Cancel while New competitor is on its way: the competitor is made, and its dialog does not open", async () => {
+    const user = userEvent.setup();
+    const listed = [salad, prep];
+    let release = () => {};
+    const calls = competitorsApi({
+      items: listed,
+      create: () =>
+        new Promise<Response>((resolve) => {
+          release = () => {
+            const made = competitor(madeId, "Bowl & Co", { sortOrder: 2 });
+            listed.push(made);
+            resolve(Response.json(made, { status: 201 }));
+          };
+        }),
+    });
+    const router = renderApp(base);
+    const dialog = await openNew(user);
+    await addBowl(user, dialog);
+    await waitFor(() =>
+      expect(calls.some(({ method }) => method === "POST")).toBe(true),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New competitor" }),
+      ).toBeNull(),
+    );
+    release();
+    // Made: the list is read again with it; the user stays on the cards.
+    await waitFor(() =>
+      expect(screen.getByText("3 competitors · aim for 3–5")).toBeTruthy(),
+    );
+    expect(cardsOf().map((card) => card.textContent)).toContainEqual(
+      expect.stringContaining("Bowl & Co"),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(router.state.location.search).not.toHaveProperty("row");
+  });
+
+  /** Opens Reorder from Home meal prep's ⋯ and moves it up: Save order can send. */
+  const openReorder = async (user: ReturnType<typeof userEvent.setup>) => {
+    await screen.findByText("2 competitors · aim for 3–5");
+    await user.click(
+      screen.getByRole("button", { name: "More for Home meal prep" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Reorder" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Reorder competitors",
+    });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Move Home meal prep up" }),
+    );
+    return dialog;
+  };
+
+  /** The rows of the Reorder dialog, in the order it holds. */
+  const orderIn = (dialog: HTMLElement) =>
+    within(dialog)
+      .getAllByRole("listitem")
+      .map((row) => row.textContent);
+
+  test("Reorder while Save order is on its way: Cancel, ×, Escape and a press outside leave it open", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    competitorsApi({
+      order: () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(new Response(null, { status: 204 }));
+        }),
+    });
+    renderApp(base);
+    // The press outside reaches the dialog: with nothing on its way, it closes Reorder.
+    await openReorder(user);
+    await user.click(document.body);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Reorder competitors" }),
+      ).toBeNull(),
+    );
+    const dialog = await openReorder(user);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Save order" }),
+    );
+    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+    await waitFor(() => expect(cancel.hasAttribute("disabled")).toBe(true));
+    await user.click(cancel);
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await user.keyboard("{Escape}");
+    await user.click(document.body);
+    expect(
+      screen.getByRole("dialog", { name: "Reorder competitors" }),
+    ).toBeTruthy();
+    expect(orderIn(dialog)).toEqual(["Home meal prep", "Salad Station"]);
+    release();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Reorder competitors" }),
+      ).toBeNull(),
+    );
+    expect(cardsOf()[0]?.textContent).toContain("Home meal prep");
+  });
+
+  test("Reorder and the network: Couldn't save and Retry in the dialog, the order kept; Retry sends it again", async () => {
+    const user = userEvent.setup();
+    let tries = 0;
+    const calls = competitorsApi({
+      order: () => {
+        tries += 1;
+        if (tries === 1) throw new TypeError("Failed to fetch");
+        return undefined;
+      },
+    });
+    renderApp(base);
+    const dialog = await openReorder(user);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Save order" }),
+    );
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).not.toContain("Something went wrong");
+    expect(orderIn(dialog)).toEqual(["Home meal prep", "Salad Station"]);
+    expect(cardsOf()[0]?.textContent).toContain("Salad Station");
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Reorder competitors" }),
+      ).toBeNull(),
+    );
+    const [first, again] = calls.filter(({ method }) => method === "PUT");
+    expect(first?.body).toEqual({ ids: [prep.id, salad.id] });
+    expect(again?.body).toEqual(first?.body);
+    expect(cardsOf()[0]?.textContent).toContain("Home meal prep");
+  });
+
+  test("Reorder and an unexpected failure: the small dialog with its Ref over the order kept; Retry sends again, Close closes Reorder", async () => {
+    const user = userEvent.setup();
+    const calls = competitorsApi({ order: () => apiError(500, "INTERNAL") });
+    renderApp(base);
+    const dialog = await openReorder(user);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Save order" }),
+    );
+    const small = await screen.findByRole("alertdialog", {
+      name: /Something went wrong/,
+    });
+    expect(small.textContent).toContain("Ref: 8f14e45f");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    expect(orderIn(dialog)).toEqual(["Home meal prep", "Salad Station"]);
+    await user.click(within(small).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(calls.filter(({ method }) => method === "PUT")).toHaveLength(2),
+    );
+    const [first, again] = calls.filter(({ method }) => method === "PUT");
+    expect(again?.body).toEqual(first?.body);
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: /Something went wrong/,
+        }),
+      ).getByRole("button", { name: "Close" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Reorder competitors" }),
+      ).toBeNull(),
+    );
+    expect(cardsOf()[0]?.textContent).toContain("Salad Station");
+  });
+
+  test("the title row's moon: new at none, half from one, full at the template's threshold", async () => {
+    const third = competitor(madeId, "Bowl & Co", { sortOrder: 2 });
+    /**
+     * The moon beside the count: full is ring and disc, half the ring and a lit path, new
+     * the ring alone. Empty's dashed ring and Unclassified's diamond are none of them.
+     */
+    const shapeOf = (count: string) => {
+      const mark = screen.getByText(count).querySelector("svg");
+      if (mark === null) throw new Error(`no moon beside "${count}"`);
+      if (mark.querySelector("[stroke-dasharray]") !== null) return "other";
+      const parts = [...mark.children].map(({ tagName }) =>
+        tagName.toLowerCase(),
+      );
+      const shapes: Record<string, string> = {
+        "circle,circle": "full",
+        "circle,path": "half",
+        circle: "new",
+      };
+      return shapes[parts.join()] ?? "other";
+    };
+    for (const [items, min, count, shape] of [
+      [[], 3, "0 competitors · aim for 3–5", "new"],
+      [[salad], 3, "1 competitor · aim for 3–5", "half"],
+      [[salad, prep], 3, "2 competitors · aim for 3–5", "half"],
+      [[salad, prep, third], 3, "3 competitors · aim for 3–5", "full"],
+      // The template's threshold decides it, not a fixed 3.
+      [[salad, prep], 2, "2 competitors · aim for 2–5", "full"],
+    ] as const) {
+      competitorsApi({ items: [...items], guidance: { min, max: 5 } });
+      renderApp(base);
+      await screen.findByText(count);
+      expect(shapeOf(count)).toBe(shape);
+      cleanup();
+      vi.unstubAllGlobals();
+    }
   });
 });

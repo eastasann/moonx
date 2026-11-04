@@ -683,7 +683,8 @@ export function CommentsPanelBody({
   const { idea, dataKey, fromWorkspaces } = comments;
   const queryClient = useQueryClient();
   const changed = useCommentsChanged(dataKey);
-  const query = useQuery(commentsQuery(workspace.id, target));
+  const options = commentsQuery(workspace.id, target);
+  const query = useQuery(options);
   // A write the API refused as archived (the screen did not know): read-only from then on,
   // and the screen reads again to learn what is archived.
   const [refusedArchived, setRefusedArchived] = useState(false);
@@ -742,7 +743,7 @@ export function CommentsPanelBody({
     );
   } else if (query.data === undefined) {
     threads = (
-      <LoadingBlock onRetry={() => void query.refetch()}>
+      <LoadingBlock waitsFor={[options]}>
         <Stack gap="space-200">
           <Text>{t("panels:comments.empty")}</Text>
           <Text>{t("panels:comments.placeholder")}</Text>

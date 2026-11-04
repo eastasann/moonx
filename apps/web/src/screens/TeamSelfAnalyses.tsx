@@ -30,7 +30,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
@@ -43,6 +43,7 @@ import {
   memberSelfAnalysesQuery,
   memberSelfAnalysisQuery,
 } from "../lib/queries";
+import { readThroughRetries } from "../lib/query";
 import { useDocumentTitle } from "../lib/title";
 import { ListSkeleton } from "./TeamSelfAnalysesSkeleton";
 
@@ -115,8 +116,11 @@ function SharedDetail({ userId }: { userId: string }) {
   const { t } = useTranslation(["selfAnalysis", "common"]);
   const { me, workspace } = useWorkspace();
   const panel = usePanel();
-  const query = useQuery(memberSelfAnalysisQuery(workspace.id, userId));
-  const isSlow = useIsSlow(query.isPending);
+  const options = memberSelfAnalysisQuery(workspace.id, userId);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   if (query.isError) {
     return (
       <FailureState
@@ -130,11 +134,7 @@ function SharedDetail({ userId }: { userId: string }) {
   }
   if (query.data === undefined) {
     return isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <Stack gap="space-300">
@@ -248,8 +248,11 @@ function TeamBody({
   const { t } = useTranslation(["selfAnalysis", "common"]);
   const { me, workspace } = useWorkspace();
   const isTwoColumns = useTwoColumns();
-  const query = useQuery(memberSelfAnalysesQuery(workspace.id));
-  const isSlow = useIsSlow(query.isPending);
+  const options = memberSelfAnalysesQuery(workspace.id);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const items = query.data?.items ?? [];
   const sharedIds = items
     .filter(({ shared }) => shared)
@@ -304,11 +307,7 @@ function TeamBody({
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <ListSkeleton />
     );
@@ -455,9 +454,13 @@ export function TeamSelfAnalysesScreen({ userId }: { userId?: string }) {
     ) {
       return panel.keep(href);
     }
-    const next = await queryClient
-      .ensureQueryData(memberSelfAnalysisQuery(workspace.id, id))
-      .catch(() => undefined);
+    const nextOptions = memberSelfAnalysisQuery(workspace.id, id);
+    // The detail's first read of it, which its Retry may drop, may be under way.
+    const next = await readThroughRetries(
+      queryClient,
+      nextOptions.queryKey,
+      () => queryClient.ensureQueryData(nextOptions),
+    ).catch(() => undefined);
     if (next === undefined) return panel.keep(href);
     const search = new URLSearchParams({
       panel: "comments",

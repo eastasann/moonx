@@ -6,6 +6,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { watchLoads } from "./components/PendingScreen";
 import { PENDING_MS } from "./components/states";
 import { createAutosave } from "./lib/autosave";
 import { AutosaveProvider } from "./lib/autosave-react";
@@ -89,6 +90,8 @@ export function createAppRouter({ history }: { history?: RouterHistory } = {}) {
       </QueryClientProvider>
     ),
   });
+  // From before its first load, so every skeleton counts from its own load's start.
+  watchLoads(router);
   return router;
 }
 

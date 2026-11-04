@@ -161,6 +161,34 @@ describe("M9's failed sign-in (design-spec 3.8・6.0.6 モーダルの共通の�
     expect(screen.getByRole("dialog", { name: "Sign in again" })).toBeTruthy();
   });
 
+  test("a rate limit: the wait inside M9 without Retry; M9 stays open, Esc too, the password kept", async () => {
+    const calls = lostSessionApi(() =>
+      authError(429, "RATE_LIMITED", { "x-retry-after": "2700" }),
+    );
+    const router = renderApp("/account");
+    const { user, m9 } = await signInFromM9();
+    expect(
+      await within(m9).findByText(
+        "Too many attempts. Try again in 45 minutes.",
+      ),
+    ).toBeTruthy();
+    expect(within(m9).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    // Escape from inside M9, where a dismissable dialog would take it.
+    expect(m9.contains(document.activeElement)).toBe(true);
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "Sign in again" })).toBe(m9);
+    expect(
+      within(m9).getByText("Too many attempts. Try again in 45 minutes."),
+    ).toBeTruthy();
+    expect(within(m9).getByLabelText(/^Password/)).toHaveProperty(
+      "value",
+      "the-right-password",
+    );
+    expect(router.state.location.pathname).toBe("/account");
+    expect(signIns(calls)).toHaveLength(1);
+  });
+
   test("a suspended account: the input dropped, on to 2 with its words", async () => {
     lostSessionApi(() => authError(403, "ACCOUNT_SUSPENDED"));
     const router = renderApp("/account");

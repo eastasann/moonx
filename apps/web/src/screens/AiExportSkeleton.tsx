@@ -44,19 +44,17 @@ export function ExportSteps({ current }: { current: Step }) {
   );
 }
 
-/** The preview's shape while X1 answers (design-spec 6.6「ローディング」). */
-export function PreviewSkeleton() {
+/** The preview's shape, a skeleton's bars while X1 answers (design-spec 6.6「ローディング」). */
+export function PreviewShape() {
   const { t } = useTranslation(["ai"]);
   return (
-    <Skeleton isLoading>
-      <Well>
-        <Stack gap="space-100">
-          {[0, 1, 2, 3, 4].map((line) => (
-            <Text key={line}>{t("ai:export.preview")}</Text>
-          ))}
-        </Stack>
-      </Well>
-    </Skeleton>
+    <Well>
+      <Stack gap="space-100">
+        {[0, 1, 2, 3, 4].map((line) => (
+          <Text key={line}>{t("ai:export.preview")}</Text>
+        ))}
+      </Stack>
+    </Well>
   );
 }
 
@@ -68,7 +66,9 @@ export function AiExportSkeleton() {
       header={<Header eyebrow={t("ai:export.preview")} />}
       steps={<ExportSteps current="scope" />}
     >
-      <PreviewSkeleton />
+      <Skeleton isLoading>
+        <PreviewShape />
+      </Skeleton>
     </StepsPattern>
   );
 }

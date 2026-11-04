@@ -31,7 +31,7 @@ import { useToastFailure } from "../components/ideaActions";
 import {
   FailureState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
@@ -130,8 +130,9 @@ function NotificationsBody({ search }: { search: NotificationsSearch }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const filter = search.filter ?? "all";
+  const queryKey = listKey(filter);
   const query = useInfiniteQuery({
-    queryKey: listKey(filter),
+    queryKey,
     queryFn: ({ pageParam }) => notificationsPage(filter, pageParam),
     ...asList,
     initialPageParam: undefined as number | undefined,
@@ -139,7 +140,9 @@ function NotificationsBody({ search }: { search: NotificationsSearch }) {
       last.nextCursor === null ? undefined : Number(last.nextCursor),
   });
   const unread = useQuery(unreadCountQuery());
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    { queryKey },
+  ]);
   const settle = () =>
     void queryClient.invalidateQueries({ queryKey: notificationsKey });
 
@@ -210,11 +213,7 @@ function NotificationsBody({ search }: { search: NotificationsSearch }) {
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <NotificationsListSkeleton />
     );

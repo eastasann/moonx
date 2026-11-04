@@ -220,6 +220,100 @@ describe("PNL-1 Comments (design-spec 6.0.4)", () => {
     ).toBeNull();
   });
 
+  describe("Post (6.0.4「スレッドの形」・6.0.8 PNL-1)", () => {
+    const itemPath = `${base}?panel=comments&target=validation_answer:${validationId}:V.01.WHO`;
+    const posts = (calls: Call[]) =>
+      calls.filter(
+        ({ method, path }) => method === "POST" && path === "/api/v1/comments",
+      );
+
+    /** The new thread's box and its Post, on 01 WHO with no threads yet. */
+    async function box() {
+      const region = await findPanel();
+      const field = await within(region).findByRole("textbox", {
+        name: "Add a comment",
+      });
+      return {
+        region,
+        field,
+        post: within(region).getByRole("button", { name: "Post" }),
+      };
+    }
+
+    test("Post waits until something is typed; spaces alone are nothing", async () => {
+      const user = userEvent.setup();
+      const calls = panelApi({ threads: [] });
+      renderApp(itemPath);
+      const { field, post } = await box();
+      expect(post.hasAttribute("disabled")).toBe(true);
+      await user.type(field, "   ");
+      expect(post.hasAttribute("disabled")).toBe(true);
+      await user.click(post);
+      expect(posts(calls)).toHaveLength(0);
+      await user.type(field, "Sundays?");
+      await waitFor(() => expect(post.hasAttribute("disabled")).toBe(false));
+    });
+
+    test("over 5,000 characters Post cannot be pressed and the field says why; 5,000 can", async () => {
+      const user = userEvent.setup();
+      const calls = panelApi({ threads: [] });
+      renderApp(itemPath);
+      const { region, field, post } = await box();
+      await user.click(field);
+      await user.paste("a".repeat(5001));
+      const reason = await within(region).findByText(
+        "Too long. Shorten to 5,000 characters.",
+      );
+      // Under the field, above its Post (document order).
+      expect(
+        field.compareDocumentPosition(reason) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        reason.compareDocumentPosition(post) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(field.getAttribute("aria-invalid")).toBe("true");
+      expect(post.hasAttribute("disabled")).toBe(true);
+      await user.click(post);
+      expect(posts(calls)).toHaveLength(0);
+      await user.type(field, "{Backspace}");
+      await waitFor(() => expect(post.hasAttribute("disabled")).toBe(false));
+      expect(
+        within(region).queryByText("Too long. Shorten to 5,000 characters."),
+      ).toBeNull();
+      expect(field.getAttribute("aria-invalid")).not.toBe("true");
+    });
+
+    test("while it sends, a second press sends nothing", async () => {
+      const user = userEvent.setup();
+      let answer: (response: Response) => void = () => {};
+      const calls = panelApi({
+        threads: [],
+        write: (call) =>
+          call.method === "POST"
+            ? new Promise((resolve) => {
+                answer = resolve;
+              })
+            : undefined,
+      });
+      renderApp(itemPath);
+      const { field, post } = await box();
+      await user.type(field, "Sundays?");
+      await user.click(post);
+      await waitFor(() => expect(posts(calls)).toHaveLength(1));
+      await user.click(post);
+      await user.click(post);
+      expect(posts(calls)).toHaveLength(1);
+      answer(
+        Response.json(comment("c0000000-0000-4000-8000-000000000012"), {
+          status: 201,
+        }),
+      );
+      await waitFor(() => expect(field).toHaveProperty("value", ""));
+      expect(posts(calls)).toHaveLength(1);
+    });
+  });
+
   test("Reply answers the thread; Resolve sends C3", async () => {
     const user = userEvent.setup();
     const calls = panelApi({

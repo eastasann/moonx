@@ -84,7 +84,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
@@ -1058,7 +1058,7 @@ function CostsBody({
   const canEdit = role !== "viewer" && !idea.archived;
   const list = costsQuery(idea.id, validationId);
   const query = useQuery(list);
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [list]);
   const { rows, numbers, result } = useWorksheet(
     validationId,
     query.data?.items ?? NO_ITEMS,
@@ -1267,7 +1267,7 @@ function CostsBody({
 
   if (query.data === undefined) {
     return isSlow ? (
-      <SlowLoadingState onRetry={() => void query.refetch()} />
+      <SlowLoadingState onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <WorksheetPattern
@@ -1623,8 +1623,11 @@ export function CostsScreen({
 }) {
   const { t } = useTranslation(["ideas", "validation"]);
   const { me, workspace } = useWorkspace();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "05")?.title;
@@ -1684,7 +1687,7 @@ export function CostsScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = (
       <Skeleton isLoading>

@@ -1572,6 +1572,66 @@ describe("password change (A8)", () => {
   });
 });
 
+describe("CSRF on /api/auth/* (SDD 7.2「CSRF」)", () => {
+  test("refuses a session's password change and sign-out from an untrusted or null Origin, changing nothing", async () => {
+    const user = await createUser();
+    const { app } = buildTestApp(database);
+    const cookie = cookiesOf(await signIn(app, user.email));
+    const change = (origin: string) =>
+      app.handle(
+        call("POST", "/change-password", {
+          cookie,
+          origin,
+          body: {
+            currentPassword: PASSWORD,
+            newPassword: "a brand new password",
+          },
+        }),
+      );
+    const signOut = (origin: string) =>
+      app.handle(call("POST", "/sign-out", { cookie, origin, body: {} }));
+
+    for (const origin of ["https://evil.example", "null"]) {
+      for (const [path, send] of [
+        ["/change-password", change],
+        ["/sign-out", signOut],
+      ] as const) {
+        const response = await send(origin);
+        expect({ origin, path, status: response.status }).toEqual({
+          origin,
+          path,
+          status: 403,
+        });
+        expect(await response.json()).toEqual({
+          code: expect.any(String),
+          message: expect.any(String),
+        });
+      }
+    }
+
+    expect(await sessionUserId(app, cookie)).toBe(user.id);
+    expect(
+      await db.select().from(sessions).where(eq(sessions.userId, user.id)),
+    ).toHaveLength(1);
+    expect((await signIn(app, user.email, "a brand new password")).status).toBe(
+      401,
+    );
+    expect((await signIn(app, user.email)).status).toBe(200);
+
+    const changed = await change(ORIGIN);
+    expect(changed.status).toBe(200);
+    expect((await signIn(app, user.email, "a brand new password")).status).toBe(
+      200,
+    );
+    const session = cookiesOf(changed);
+    const signedOut = await app.handle(
+      call("POST", "/sign-out", { cookie: session, origin: ORIGIN, body: {} }),
+    );
+    expect(signedOut.status).toBe(200);
+    expect(await sessionUserId(app, session)).toBeNull();
+  });
+});
+
 describe("rate limits (ADR-029, SDD 7.2「レート制限」)", () => {
   test("counts the six secret paths per IP in one window of 10 a minute", async () => {
     const { app } = buildTestApp(database);

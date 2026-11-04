@@ -77,7 +77,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
@@ -743,7 +743,9 @@ function AssumptionsBody({
   const risks = useQuery(risksQuery(idea.id, validationId));
   const query = tab === "assumptions" ? assumptions : risks;
   const listKey = listOf(idea.id, validationId, tab).queryKey;
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    { queryKey: listKey },
+  ]);
   const [isReordering, setReordering] = useState(false);
   const [deleting, setDeleting] = useState<Row | null>(null);
   const items: Row[] = query.data?.items ?? [];
@@ -837,11 +839,7 @@ function AssumptionsBody({
     }
     if (data.data === undefined) {
       return isSlow ? (
-        <SlowLoadingState
-          headingLevel={2}
-          size="S"
-          onRetry={() => void data.refetch()}
-        />
+        <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
       ) : (
         <ListSkeleton />
       );
@@ -1127,8 +1125,11 @@ export function AssumptionsScreen({
   const navigate = useNavigate();
   const router = useRouter();
   const panel = usePanel();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "09")?.title;
@@ -1228,7 +1229,7 @@ export function AssumptionsScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = <AssumptionsSkeleton />;
   }

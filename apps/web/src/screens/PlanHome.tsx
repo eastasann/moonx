@@ -60,7 +60,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import {
   type TemplateTarget,
@@ -894,9 +894,14 @@ function PlanHomeBody({
   about: string | undefined;
 }) {
   const { me, workspace } = useWorkspace();
-  const home = useQuery(planHomeQuery(ideaId, planId, versionId));
-  const idea = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending || idea.isPending);
+  const homeOptions = planHomeQuery(ideaId, planId, versionId);
+  const ideaOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const idea = useQuery(ideaOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    home.isPending || idea.isPending,
+    [homeOptions, ideaOptions],
+  );
   const failure = home.error ?? idea.error;
   if (home.data !== undefined && home.data.workspaceId !== workspace.id) {
     // Another workspace's plan under this one's URL (SDD 4章).
@@ -930,14 +935,7 @@ function PlanHomeBody({
     );
   }
   if (isSlow) {
-    return (
-      <SlowLoadingState
-        onRetry={() => {
-          void home.refetch();
-          void idea.refetch();
-        }}
-      />
-    );
+    return <SlowLoadingState onRetry={retrySlow} />;
   }
   return (
     <Skeleton isLoading>

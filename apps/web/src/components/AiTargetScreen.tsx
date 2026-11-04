@@ -1,11 +1,12 @@
 import type { ImportContext, TemplateKind } from "@moonx/schemas";
 import { Breadcrumb, Breadcrumbs, Skeleton } from "@moonx/ui-web";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { safeReturnTo } from "../lib/ai";
 import { hrefOf, ideaHref, ideasHref, selfAnalysisHref } from "../lib/links";
 import { importContextQuery, validationHomeQuery } from "../lib/queries";
+import { askAgain } from "../lib/query";
 import { useDocumentTitle } from "../lib/title";
 import { useMovesToPersonal } from "./selfAnalysis";
 import {
@@ -13,7 +14,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowRetry,
 } from "./states";
 import { WorkspaceFrame } from "./WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "./workspace";
@@ -80,15 +81,17 @@ export function AiTargetScreen({
   // of a visit before stays in the cache when this one fails, so what counts is when
   // the data came, not whether a read was tried.
   const [openedAt] = useState(() => Date.now());
+  const contextOptions = importContextQuery(kind ?? "validation", id);
   const context = useQuery({
-    ...importContextQuery(kind ?? "validation", id),
+    ...contextOptions,
     enabled: canEnter,
     refetchOnMount: "always",
   });
   const ideaId = context.data?.target.ideaId ?? null;
   // A plan's idea name and whether the idea, not only the plan, is archived (6.6「状態」).
+  const ideaHomeOptions = validationHomeQuery(ideaId ?? "");
   const ideaHome = useQuery({
-    ...validationHomeQuery(ideaId ?? ""),
+    ...ideaHomeOptions,
     enabled: kind === "business_plan" && ideaId !== null,
   });
   const isOther =
@@ -104,7 +107,15 @@ export function AiTargetScreen({
       : context.data;
   const isPending =
     canEnter && loaded === undefined && !context.isError && !ideaHome.isError;
-  const isSlow = useIsSlow(isPending);
+  const queryClient = useQueryClient();
+  const { isSlow, retry: retrySlow } = useSlowRetry(isPending, () => {
+    askAgain(queryClient, [contextOptions, ideaHomeOptions]);
+    // A visit before's read in the cache: this opening's, under way, is what the screen
+    // waits for, and refetch drops it and asks again.
+    if (context.data !== undefined && context.dataUpdatedAt < openedAt) {
+      void context.refetch();
+    }
+  });
 
   const ideaName =
     kind === "validation"
@@ -178,14 +189,7 @@ export function AiTargetScreen({
       />
     );
   } else if (isSlow) {
-    body = (
-      <SlowLoadingState
-        onRetry={() => {
-          void context.refetch();
-          if (ideaId !== null) void ideaHome.refetch();
-        }}
-      />
-    );
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = <Skeleton isLoading>{skeleton}</Skeleton>;
   }

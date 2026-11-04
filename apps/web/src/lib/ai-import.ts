@@ -8,7 +8,7 @@ import {
   readChoice,
   readImportedAnswer,
 } from "@moonx/domain";
-import { formatInputNumber, i18n } from "@moonx/i18n";
+import { formatInputNumber, formatList, i18n } from "@moonx/i18n";
 import {
   type ClassificationInput,
   type ImportChange,
@@ -244,7 +244,7 @@ export function review(
       text = blank ? null : (choice ?? draft.text);
       if (!blank && choice === null) {
         textError = i18n.t("ai:import.review.choice", {
-          choices: choices.join(", "),
+          choices: formatList(choices),
         });
       }
     } else {

@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   QuestionFormScreen,
   type QuestionFormSearch,
-  QuestionFormSkeleton,
 } from "../../../../../../screens/QuestionForm";
+import { QuestionFormSkeleton } from "../../../../../../screens/QuestionFormSkeleton";
 
 /**
  * `/w/$workspaceId/ideas/$ideaId/questions/$sectionKey`: 11 Question form for a

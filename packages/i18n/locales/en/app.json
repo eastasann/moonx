@@ -16,7 +16,9 @@
   "separator": " · ",
   "userBadge": {
     "former_member": "(former member)",
-    "suspended": "(suspended)"
+    "suspended": "(suspended)",
+    "deleted": "Deleted user",
+    "withName": "{{name}} {{badge}}"
   },
   "state": {
     "loading": "Loading",
@@ -29,10 +31,15 @@
     "retry": "Retry",
     "close": "Close",
     "couldNotSave": "Couldn't save",
+    "couldNotSaveReason": "Couldn't save. {{reason}}.",
+    "couldNotSaveRef": "Couldn't save. Ref: {{ref}}",
     "toDashboard": "Go to Dashboard",
     "toHome": "Go to Home",
     "offline": "You're offline. Changes can't be saved until you reconnect.",
     "offlinePage": "You're offline. Connect to the internet to open this page.",
+    "newVersion": "A new version of moonx is available.",
+    "reload": "Reload",
+    "addToHomeScreen": "Add moonx to your Home Screen: tap Share, then Add to Home Screen.",
     "unexpectedRef": "Something went wrong. Ref: {{ref}}"
   },
   "switchWorkspace": {
@@ -74,8 +81,7 @@
     "lead": "Your session ended. Sign in to save your changes.",
     "googleLead": "Your session ended. You sign in with Google, so sign in on the login page.",
     "submit": "Sign in",
-    "loginPage": "Sign in on the login page",
-    "wrongPassword": "Password is incorrect"
+    "loginPage": "Sign in on the login page"
   },
   "unsaved": {
     "message": "Unsaved changes on this page will be lost.",
@@ -100,8 +106,6 @@
     "notAnswered": "No answer",
     "cancel": "Cancel",
     "close": "Close",
-    "latest": "You're already on the latest template",
-    "changed": "The template changed since this opened. Check what moves now, then update again.",
     "updated": "Template updated to v{{version}}"
   }
 }

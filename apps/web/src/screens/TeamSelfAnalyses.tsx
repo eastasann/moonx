@@ -1,5 +1,5 @@
 import { hasText, isQuestionShown } from "@moonx/domain";
-import { formatMoney } from "@moonx/i18n";
+import { formatInputMoney } from "@moonx/i18n";
 import type { SharedSelfAnalysis } from "@moonx/schemas";
 import {
   Avatar,
@@ -30,7 +30,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
@@ -43,7 +43,9 @@ import {
   memberSelfAnalysesQuery,
   memberSelfAnalysisQuery,
 } from "../lib/queries";
+import { readThroughRetries } from "../lib/query";
 import { useDocumentTitle } from "../lib/title";
+import { ListSkeleton } from "./TeamSelfAnalysesSkeleton";
 
 type Section = SharedSelfAnalysis["sections"][number];
 type Answer = Section["answers"][number];
@@ -86,9 +88,7 @@ function AnswerText({
           empty
         ) : (
           <Text variant="number" elementType="p">
-            {formatMoney(amount, currency, {
-              cents: !Number.isInteger(amount),
-            })}
+            {formatInputMoney(amount, currency)}
           </Text>
         )}
       </Stack>
@@ -116,8 +116,11 @@ function SharedDetail({ userId }: { userId: string }) {
   const { t } = useTranslation(["selfAnalysis", "common"]);
   const { me, workspace } = useWorkspace();
   const panel = usePanel();
-  const query = useQuery(memberSelfAnalysisQuery(workspace.id, userId));
-  const isSlow = useIsSlow(query.isPending);
+  const options = memberSelfAnalysisQuery(workspace.id, userId);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   if (query.isError) {
     return (
       <FailureState
@@ -131,11 +134,7 @@ function SharedDetail({ userId }: { userId: string }) {
   }
   if (query.data === undefined) {
     return isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <Stack gap="space-300">
@@ -146,6 +145,13 @@ function SharedDetail({ userId }: { userId: string }) {
     );
   }
   const shared = query.data;
+  // A display condition may name a question of another section: it reads every answer,
+  // as 10 and 11 count (6.2).
+  const allAnswers = new Map(
+    shared.sections.flatMap((section) =>
+      section.answers.map((answer) => [answer.questionKey, answer] as const),
+    ),
+  );
   return (
     <Stack gap="space-400">
       <Flex gap="space-200" alignItems="center">
@@ -160,12 +166,9 @@ function SharedDetail({ userId }: { userId: string }) {
         </Stack>
       </Flex>
       {shared.sections.map((section) => {
-        const answers = new Map(
-          section.answers.map((answer) => [answer.questionKey, answer]),
-        );
         // A question its display condition hides is not read, as on 11 (6.2).
         const questions = section.questions.filter((question) =>
-          isQuestionShown(question, answers),
+          isQuestionShown(question, allAnswers),
         );
         return (
           <section key={section.key} aria-label={section.title}>
@@ -180,7 +183,7 @@ function SharedDetail({ userId }: { userId: string }) {
                 )}
               </Stack>
               {questions.map((question) => {
-                const answer = answers.get(question.key);
+                const answer = allAnswers.get(question.key);
                 const label = questionLabel(question.key, question.title);
                 const count = answer?.commentCount ?? 0;
                 return (
@@ -227,23 +230,6 @@ function SharedDetail({ userId }: { userId: string }) {
   );
 }
 
-/** 12's list while it loads: rows of names and their sharing. */
-function ListSkeleton() {
-  const { t } = useTranslation(["selfAnalysis"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text>{t("selfAnalysis:team.members")}</Text>
-            <Text variant="caption">{t("selfAnalysis:team.notShared")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 function TeamBody({
   userId,
   fallbackId,
@@ -262,8 +248,11 @@ function TeamBody({
   const { t } = useTranslation(["selfAnalysis", "common"]);
   const { me, workspace } = useWorkspace();
   const isTwoColumns = useTwoColumns();
-  const query = useQuery(memberSelfAnalysesQuery(workspace.id));
-  const isSlow = useIsSlow(query.isPending);
+  const options = memberSelfAnalysesQuery(workspace.id);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const items = query.data?.items ?? [];
   const sharedIds = items
     .filter(({ shared }) => shared)
@@ -318,11 +307,7 @@ function TeamBody({
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <ListSkeleton />
     );
@@ -388,24 +373,6 @@ function TeamBody({
       }
       listLabel={t("selfAnalysis:team.title")}
       onBack={onBack}
-    />
-  );
-}
-
-/** 12's shape while its route loads (design-spec 6.0.6). */
-export function TeamSelfAnalysesSkeleton() {
-  const { t } = useTranslation(["selfAnalysis"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("selfAnalysis:team.title")}
-        </Heading>
-      }
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("selfAnalysis:team.title")}
-      onBack={() => {}}
     />
   );
 }
@@ -487,9 +454,13 @@ export function TeamSelfAnalysesScreen({ userId }: { userId?: string }) {
     ) {
       return panel.keep(href);
     }
-    const next = await queryClient
-      .ensureQueryData(memberSelfAnalysisQuery(workspace.id, id))
-      .catch(() => undefined);
+    const nextOptions = memberSelfAnalysisQuery(workspace.id, id);
+    // The detail's first read of it, which its Retry may drop, may be under way.
+    const next = await readThroughRetries(
+      queryClient,
+      nextOptions.queryKey,
+      () => queryClient.ensureQueryData(nextOptions),
+    ).catch(() => undefined);
     if (next === undefined) return panel.keep(href);
     const search = new URLSearchParams({
       panel: "comments",

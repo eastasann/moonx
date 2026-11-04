@@ -4,9 +4,9 @@ import {
   hasText,
 } from "@moonx/domain";
 import {
+  formatInputMoney,
   formatInputNumber,
   formatInputPercent,
-  formatMoney,
   formatPercent,
   i18n,
 } from "@moonx/i18n";
@@ -16,6 +16,7 @@ import {
   type EconomicsResult,
   economicsFieldSchema,
   type economicsSchema,
+  type FauState,
   numberTextSchema,
   operatingDaysSchema,
   percentToRate,
@@ -69,6 +70,7 @@ import {
   AnswerEvidenceSheet,
   AnswerFields,
   type AnswersCache,
+  type AnswerView,
   answerKey,
   moonOf,
   useAnswers,
@@ -88,7 +90,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
@@ -102,6 +104,7 @@ import {
   dashboardHref,
   useModal,
   usePanel,
+  useSearchModalAbout,
   useWorkspace,
 } from "../components/workspace";
 import { api, inPath, unwrap } from "../lib/api";
@@ -128,10 +131,12 @@ import {
   economicsQuery,
   ideaKey,
   putSaved,
+  useIsValidationRead,
   validationHomeQuery,
   workspaceKey,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { EconomicsSkeleton } from "./EconomicsSkeleton";
 
 export type { EconomicsSearch };
 
@@ -157,6 +162,11 @@ const SALES_FIELDS = [
 /** M2's `about` for a number (SDD 4章): the validation, keyed by the field. */
 const aboutOf = (validationId: string, field: EconomicsField) =>
   `economics_input:${validationId}:${field}`;
+
+/** What M2 is about on 18: a number, or the answer to WORTH. */
+type EvidenceTarget =
+  | { kind: "number"; view: NumberView }
+  | { kind: "worth"; view: AnswerView & { state: FauState } };
 
 /** Puts a number, as saved, in 18's data. */
 function putNumber(
@@ -333,9 +343,10 @@ function NumberInput({
 }
 
 /**
- * A number as 18 shows it (design-spec 6.4「入力」): the price as an amount, the target
- * margin as the % typed, daily sales as typed; the default of operating days and the
- * target margin faintly while they have no value; "Unknown" or "Empty".
+ * A number as 18 shows it (design-spec 6.4「入力」・「端数」): the price as the amount typed,
+ * never rounded, the target margin as the % typed, daily sales as typed; the default of
+ * operating days and the target margin faintly while they have no value; "Unknown" or
+ * "Empty".
  */
 function NumberText({ view }: { view: NumberView }) {
   const { t } = useTranslation(["validation", "common"]);
@@ -344,13 +355,7 @@ function NumberText({ view }: { view: NumberView }) {
   if (view.value !== null) {
     switch (field) {
       case "selling_price":
-        return (
-          <>
-            {formatMoney(view.value, workspace.currency, {
-              cents: !Number.isInteger(view.value),
-            })}
-          </>
-        );
+        return <>{formatInputMoney(view.value, workspace.currency)}</>;
       case "target_margin":
         return <>{formatInputPercent(view.value)}</>;
       default:
@@ -799,7 +804,7 @@ function EconomicsBody({
   const canEdit = role !== "viewer" && !idea.archived;
   const data = economicsQuery(idea.id, validationId);
   const query = useQuery(data);
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [data]);
   const { numbers, result } = useWorksheet(
     validationId,
     query.data?.costItems ?? NO_ROWS,
@@ -866,6 +871,32 @@ function EconomicsBody({
       forFact: isFact,
     }),
   );
+  const worthView =
+    query.data === undefined ||
+    query.data.worthQuestion === null ||
+    query.data.worth.hidden
+      ? null
+      : answers.viewOf(query.data.worthQuestion, query.data.worth);
+
+  // M2 opens on a number, or on WORTH while it has F/A/U (6.0.3), for someone who may
+  // edit. One target for both: a call for each would take off the URL the other names.
+  const aboutNumber = numbers.find(
+    ({ input }) => aboutOf(validationId, input.fieldKey) === about,
+  );
+  const isEvidenceDecided = useIsValidationRead(home.idea.id, query);
+  const evidence = useSearchModalAbout<EvidenceTarget>(
+    modal,
+    "evidence",
+    aboutNumber !== undefined
+      ? { kind: "number", view: aboutNumber }
+      : about === `validation_answer:${validationId}:${WORTH}` &&
+          worthView !== null &&
+          worthView.state !== null
+        ? { kind: "worth", view: { ...worthView, state: worthView.state } }
+        : undefined,
+    canEdit,
+    isEvidenceDecided,
+  );
 
   // A link to a number (`?field=`) opens it, and one to the worth question (`?q=`) opens
   // and focuses it, once the numbers are read.
@@ -931,7 +962,7 @@ function EconomicsBody({
 
   if (query.data === undefined) {
     return isSlow ? (
-      <SlowLoadingState onRetry={() => void query.refetch()} />
+      <SlowLoadingState onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <EconomicsSkeleton header={header} />
@@ -1075,10 +1106,6 @@ function EconomicsBody({
   );
 
   const { worth, worthQuestion } = query.data;
-  const worthView =
-    worthQuestion === null || worth.hidden
-      ? null
-      : answers.viewOf(worthQuestion, worth);
   const worthMode = !canEdit ? "open" : isWorthOpen ? "focused" : "quiet";
   const worthItem = {
     kind: "item",
@@ -1116,19 +1143,8 @@ function EconomicsBody({
 
   const sheetView = sheetField === null ? undefined : viewOf(sheetField);
   const evidenceNumber =
-    modal === "evidence" && canEdit
-      ? numbers.find(
-          ({ input }) => aboutOf(validationId, input.fieldKey) === about,
-        )
-      : undefined;
-  const evidenceWorth =
-    modal === "evidence" &&
-    canEdit &&
-    about === `validation_answer:${validationId}:${WORTH}` &&
-    worthView !== null &&
-    worthView.state !== null
-      ? { ...worthView, state: worthView.state }
-      : null;
+    evidence?.kind === "number" ? evidence.view : undefined;
+  const evidenceWorth = evidence?.kind === "worth" ? evidence.view : undefined;
 
   return (
     <>
@@ -1281,7 +1297,7 @@ function EconomicsBody({
           />
         </ModalBoundary>
       )}
-      {evidenceWorth !== null && worthQuestion !== null && (
+      {evidenceWorth !== undefined && (
         <ModalBoundary key="evidence" onClose={modals.close}>
           <AnswerEvidenceSheet
             ideaId={idea.id}
@@ -1290,9 +1306,9 @@ function EconomicsBody({
             label={[
               t("common:itemLabel.question", {
                 section: "08",
-                title: worthQuestion.title,
+                title: evidenceWorth.question.title,
               }),
-              worthQuestion.prompt,
+              evidenceWorth.question.prompt,
             ].join(t("app:separator"))}
             cache={cache}
             answers={answers}
@@ -1302,41 +1318,6 @@ function EconomicsBody({
         </ModalBoundary>
       )}
     </>
-  );
-}
-
-/**
- * 18's shape while it loads (design-spec 6.0.6). Drawn inside a `Skeleton`, its words are
- * bars.
- */
-export function EconomicsSkeleton({ header }: { header?: ReactNode } = {}) {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <WorksheetPattern
-      header={
-        header ?? <Heading level={1}>{t("validation:economics.title")}</Heading>
-      }
-      inputs={
-        <Stack gap="space-500">
-          {[
-            t("validation:economics.inputs"),
-            t("validation:economics.dailySales"),
-          ].map((label) => (
-            <Stack key={label} gap="space-100">
-              <Heading level={2} variant="heading-4">
-                {label}
-              </Heading>
-              {[0, 1, 2].map((row) => (
-                <Text key={row}>{label}</Text>
-              ))}
-            </Stack>
-          ))}
-        </Stack>
-      }
-      resultsTitle={t("validation:economics.results")}
-      results={null}
-      summary={null}
-    />
   );
 }
 
@@ -1359,8 +1340,11 @@ export function EconomicsScreen({
 }) {
   const { t } = useTranslation(["ideas", "validation"]);
   const { me, workspace } = useWorkspace();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title =
@@ -1430,7 +1414,7 @@ export function EconomicsScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = (
       <Skeleton isLoading>

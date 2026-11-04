@@ -1,8 +1,14 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { IdeaDetail, Me } from "@moonx/schemas";
 import type { Page } from "@playwright/test";
 import { WEB_ORIGIN } from "./env";
-import { demo, expect, newAccount, test, workspaceOf } from "./fixtures";
+import {
+  demo,
+  expect,
+  expectNoAxeViolations,
+  newAccount,
+  test,
+  workspaceOf,
+} from "./fixtures";
 
 // 6 Ideas, M1, 13 Validation home and the input mechanism of design-spec 6.0.2 (autosave,
 // conflicts, offline, M9, X-Moonx-Client), against the seeded BCDX (read only) and, for
@@ -25,23 +31,6 @@ async function ideasList(page: Page) {
   const list = page.getByRole("grid", { name: "Ideas" });
   await expect(list.getByRole("row").first()).toBeVisible();
   return list;
-}
-
-async function expectNoAxeViolations(page: Page) {
-  // A Button pending as its screen went (Create) left React Aria's announcement of its
-  // spinner in the live region, which React Aria clears after 7 seconds (entry.spec.ts).
-  await expect(
-    page.locator("[data-live-announcer] [aria-labelledby]"),
-  ).toHaveCount(0, { timeout: 10_000 });
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(
-    violations.map((violation) => ({
-      id: violation.id,
-      targets: violation.nodes.map((node) => node.target.join(" ")),
-    })),
-  ).toEqual([]);
 }
 
 /** A user of their own, signed in, and their personal workspace (no one else's ideas). */
@@ -577,6 +566,7 @@ test.describe("Edit summary: saved as typed (design-spec 6.0.2)", () => {
     await m9.getByLabel(/^Password/).fill("not-the-password-1");
     await m9.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(m9.getByText("Password is incorrect")).toBeVisible();
+    await expectNoAxeViolations(page);
     await m9.getByLabel(/^Password/).fill(account.password);
     await m9.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(m9).toBeHidden();

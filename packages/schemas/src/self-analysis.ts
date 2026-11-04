@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  conditionAnswerSchema,
   dateTimeSchema,
   lockClaimShape,
   templateRefSchema,
@@ -84,6 +85,13 @@ export const selfAnalysisSectionParamsSchema = z.object({
 export const selfAnalysisSectionSchema = z.object({
   section: templateSectionSchema,
   answers: z.array(selfAnalysisAnswerSchema),
+  /**
+   * The answers in other sections that the display conditions of this section's
+   * questions name, in template order: 11 shows and counts with them as 10 does.
+   */
+  conditionAnswers: z.array(conditionAnswerSchema),
+  /** This section's questions a display condition in another section names. */
+  decidesElsewhere: z.array(z.string()),
 });
 
 /** The path of S3. */

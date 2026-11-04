@@ -3,6 +3,7 @@ import {
   checkResultSchema,
   classificationInputSchema,
   classificationSchema,
+  conditionAnswerSchema,
   decisionValueSchema,
   economicsWarningSchema,
   evidenceSchema,
@@ -107,6 +108,13 @@ export const validationQuestionsParamsSchema = z.object({
 export const validationQuestionsSchema = z.object({
   section: templateSectionSchema,
   answers: z.array(validationAnswerSchema),
+  /**
+   * The answers in other sections that the display conditions of this section's
+   * questions name, in template order: 11 shows and counts with them as 13 does.
+   */
+  conditionAnswers: z.array(conditionAnswerSchema),
+  /** This section's questions a display condition in another section names. */
+  decidesElsewhere: z.array(z.string()),
 });
 
 /** The body of V3 `PUT /api/v1/validations/{validationId}/answers/{questionKey}`. */

@@ -29,8 +29,9 @@ afterAll(async () => {
 const get = (path: string, headers: Record<string, string> = {}) =>
   new Request(`http://localhost${path}`, { headers });
 
+// testConfig has no WEB_SENTRY_DSN: the pages connect to their own origin alone.
 const CSP =
-  "default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'";
+  "default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'";
 
 describe("GET /api/health (Z1)", () => {
   test("returns ok with the version and environment", async () => {
@@ -79,6 +80,19 @@ describe("headers on every response (SDD 5.1, 7.2, 8.3)", () => {
       expect(response.headers.get("access-control-allow-origin")).toBeNull();
     });
   }
+
+  test("the CSP lets the Web's pages send to the origin of WEB_SENTRY_DSN", async () => {
+    const response = await buildTestApp(database, {
+      config: { webSentryDsn: "https://key@o1.ingest.us.sentry.io/2" },
+    }).app.handle(get("/api/health"));
+
+    expect(response.headers.get("content-security-policy")).toBe(
+      CSP.replace(
+        "connect-src 'self'",
+        "connect-src 'self' https://o1.ingest.us.sentry.io",
+      ),
+    );
+  });
 
   const hsts: [AppEnv, string | null][] = [
     ["local", null],

@@ -1,4 +1,9 @@
-import { formatCheckName, formatCount, formatMonths, i18n } from "@moonx/i18n";
+import {
+  formatCheckName,
+  formatInteger,
+  formatMonths,
+  i18n,
+} from "@moonx/i18n";
 import type { CheckResult, FauBreakdown, MetricValue } from "@moonx/schemas";
 import {
   Flex,
@@ -121,7 +126,8 @@ export function MissingCheckRows({
 
 /**
  * The F/A/U of every item in one line (design-spec 6.5, s19-decision.html): each kind's
- * moon, name and count, Unknown and Unclassified in amber, Empty too.
+ * moon, name and count, Unknown and Unclassified in amber, Empty too. The Facts whose
+ * research log was deleted are counted among the Facts, and how many follows (6.0.3).
  */
 export function FauCounts({ fau }: { fau: FauBreakdown }) {
   const { t } = useTranslation(["common"]);
@@ -135,23 +141,26 @@ export function FauCounts({ fau }: { fau: FauBreakdown }) {
     },
     { state: "unknown", label: "unknown", value: fau.unknown, notice: true },
     {
-      state: null,
+      state: "unclassified",
       label: "unclassified",
       value: fau.unclassified,
       notice: true,
     },
-    { state: null, label: "empty", value: fau.empty, notice: false },
+    { state: "empty", label: "empty", value: fau.empty, notice: false },
   ] as const;
   return (
     <Flex gap="space-200" alignItems="center" wrap>
       {counts.map((count) => (
         <Flex key={count.label} gap="space-75" alignItems="center">
-          {count.state !== null && <MoonGlyph state={count.state} size="S" />}
+          <MoonGlyph state={count.state} size="S" />
           <Text variant="body-sm" tone={count.notice ? "notice" : "secondary"}>
             {`${t(`common:fauState.${count.label}`)} `}
             <Text variant="number" tone={count.notice ? "notice" : "primary"}>
-              {formatCount(count.value)}
+              {formatInteger(count.value)}
             </Text>
+            {count.state === "fact" &&
+              fau.factNoEvidence > 0 &&
+              ` ${t("common:fauLabel.noEvidenceCount", { count: fau.factNoEvidence })}`}
           </Text>
         </Flex>
       ))}

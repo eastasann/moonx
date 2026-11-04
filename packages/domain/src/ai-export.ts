@@ -1,10 +1,11 @@
 import {
   formatCheckName,
+  formatInputMoney,
   formatInputNumber,
   formatInputPercent,
   formatIsoDate,
   formatIsoDateTime,
-  formatMoney,
+  formatList,
   i18n,
 } from "@moonx/i18n";
 import {
@@ -85,10 +86,11 @@ export const isInScope = (
   }
 };
 
-/** Why a scope cannot be exported: a key the template lacks, or no question to write. */
-export type AiScopeProblem =
-  | { kind: "unknown"; key: string }
-  | { kind: "empty" };
+/**
+ * Why a scope cannot be exported: a key the template lacks, or no question to write. The
+ * key itself is not kept: X1's refusal does not repeat what was sent (SDD 8.1).
+ */
+export type AiScopeProblem = { kind: "unknown" } | { kind: "empty" };
 
 /**
  * The sections of `sections` that `scope` covers, in template order, or why it covers
@@ -106,14 +108,8 @@ export function scopeSections(
       : scope.kind === "items"
         ? scope.itemNos.map((itemNo) => String(itemNo).padStart(2, "0"))
         : [];
-  const missing = wanted.find((key) => !sections.some((s) => s.key === key));
-  if (missing !== undefined) {
-    return {
-      problem: {
-        kind: "unknown",
-        key: scope.kind === "items" ? String(Number(missing)) : missing,
-      },
-    };
+  if (wanted.some((key) => !sections.some((s) => s.key === key))) {
+    return { problem: { kind: "unknown" } };
   }
   const covered = sections.filter((section) =>
     isInScope(scope, section.key, sections),
@@ -252,10 +248,6 @@ const quote = (text: string) =>
 /** One line: a value written in a heading, a list item or a table cell. */
 const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();
 
-/** An amount as typed: whole units, or with its cents when it has them. */
-export const formatAmount = (amount: number, currency: string) =>
-  formatMoney(amount, currency, { cents: !Number.isInteger(amount) });
-
 const isEmptyAnswer = (
   question: TemplateQuestion,
   answer: AiAnswerInput | undefined,
@@ -278,7 +270,7 @@ function currentAnswerLines(
   const amount =
     answer?.amount == null
       ? labels.empty
-      : formatAmount(answer.amount, currency);
+      : formatInputMoney(answer.amount, currency);
   const reason = hasText(answer?.text ?? null)
     ? (answer?.text as string)
     : labels.empty;
@@ -432,7 +424,7 @@ const cellText = (
   if (typeof value === "string") return value;
   switch (type) {
     case "money":
-      return formatAmount(value, currency);
+      return formatInputMoney(value, currency);
     case "percent":
       return formatInputPercent(value);
     default:
@@ -482,7 +474,7 @@ function buildReference(
         [
           row.typicalPrice === null
             ? null
-            : formatAmount(row.typicalPrice, currency),
+            : formatInputMoney(row.typicalPrice, currency),
           row.priceNote,
         ]
           .filter((part) => hasText(part))
@@ -553,7 +545,7 @@ function referenceMarkdown(reference: AiReference): string {
   list(
     i18n.t("ai:reference.researchLog"),
     (reference.researchLog ?? []).map((row) =>
-      item(row.date, row.sourceType, row.topic, row.supports.join(", ")),
+      item(row.date, row.sourceType, row.topic, formatList(row.supports)),
     ),
   );
   list(
@@ -709,8 +701,12 @@ const UNSAFE_IN_FILE_NAME = /[\\/:*?"<>|\p{Cc}]/gu;
 const fileNamePart = (text: string) =>
   text.replace(UNSAFE_IN_FILE_NAME, "-").replace(/\s+/gu, " ").trim();
 
-/** A value in the header comment, which must stay one comment on one line. */
-const headerValue = (text: string) => oneLine(text).replaceAll("-->", "->");
+/**
+ * A value in the header comment, which must stay one comment on one line. A run of
+ * hyphens before `>` goes as a whole (replacing `-->` alone leaves `-->` of `--->`), and
+ * `--!>`, which also ends an HTML comment, goes with them.
+ */
+const headerValue = (text: string) => oneLine(text).replace(/-{2,}!?>/gu, "->");
 
 /**
  * The export of 24 (design-spec 6.6, SDD 5.10 X1) for a scope `scopeSections` accepted:

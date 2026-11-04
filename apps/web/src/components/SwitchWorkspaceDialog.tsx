@@ -6,27 +6,25 @@ import {
   workspaceNameSchema,
 } from "@moonx/schemas";
 import {
-  AlertDialog,
   Button,
   ButtonGroup,
   Dialog,
-  Flex,
   Form,
-  InlineAlert,
   RowList,
   RowListItem,
-  Text,
 } from "@moonx/ui-web";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError, api, unwrap } from "../lib/api";
-import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
+import { api, unwrap } from "../lib/api";
+import { useAppForm, useOneAtATime } from "../lib/form";
 import { useIsOnline } from "../lib/online";
-import { isTransient } from "../lib/query";
-import { reportOnce } from "./states";
+import { useSendThrough } from "../lib/send";
+import { useFailureOnceClosed } from "./ideaActions";
+import { ModalSendFailure } from "./ModalFailure";
+import { refusedFieldsOf } from "./RowFields";
 import { useWorkspace } from "./workspace";
 
 /** W0's currency when the user picks none (design-spec 5章「ワークスペースの作成」). */
@@ -106,10 +104,15 @@ function WorkspaceList() {
 
 /**
  * New workspace: a name and a currency (design-spec 6.0.8), sent with W0. While the name
- * is empty or too long, Create cannot be pressed. A failure keeps what was typed: one of
- * the network or of an API that is down offers Retry in place; any other is unexpected,
- * in the small dialog with its Ref, whose Close closes M7 (6.0.6 モーダルの共通の決まり,
- * SDD 8.2).
+ * is empty or too long, Create cannot be pressed. A failure keeps what was typed and takes
+ * the modals' rule (3.8 M7, 6.0.6 モーダルの共通の決まり, SDD 8.2): the network or an API
+ * that is down as "Couldn't save" and Retry in place, a name the API refuses as "Couldn't
+ * save" with 6.0.2's reason and under the field too until it changes, and anything else
+ * unexpected, in the small dialog with its Ref, whose Close closes M7. Either Retry sends
+ * what is typed again. Cancel, or M7 closed, while Create is on its way: the workspace is
+ * made all the same if the send goes through, without opening it, and a failure says so
+ * in a toast, whose Retry sends the same name and currency again and opens nothing either
+ * (6.0.6「送っている間に閉じた送信の失敗」).
  */
 function NewWorkspaceForm({
   onCancel,
@@ -118,10 +121,9 @@ function NewWorkspaceForm({
   onCancel: () => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation(["app"]);
+  const { t } = useTranslation(["app", "errors"]);
   // Offline, nothing can be sent: the fields stop taking input (6.0.6「オフライン」).
   const isOnline = useIsOnline();
-  const formId = useId();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const currencies = useMemo(
@@ -132,59 +134,59 @@ function NewWorkspaceForm({
       })),
     [],
   );
+  const sendThrough = useSendThrough();
+  const post = (values: WorkspaceCreate) =>
+    unwrap(api().api.v1.workspaces.post(values));
+  // W0 made the user its Owner and its last workspace (SDD 5.5): M7's list, if open,
+  // shows it.
+  const made = () => queryClient.invalidateQueries({ queryKey: ["me"] });
+  const failedOnceClosed = useFailureOnceClosed((values: WorkspaceCreate) =>
+    sendThrough(() => post(values)).then(made),
+  );
   const create = useMutation({
-    mutationFn: (values: WorkspaceCreate) =>
-      unwrap(api().api.v1.workspaces.post(values)),
-    onSuccess: async (workspace) => {
-      // W0 made the user its Owner and its last workspace (SDD 5.5).
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
-      await navigate({
-        to: "/w/$workspaceId",
-        params: { workspaceId: workspace.id },
-      });
-    },
+    mutationFn: post,
+    // Here, not in `mutate`'s: they run after Cancel pressed while it was on its way.
+    onSuccess: made,
+    onError: failedOnceClosed,
   });
   // A second W0 would make a second workspace: a second submit waits for the first, so
   // the form stays submitting (Create keeps its spinner).
   const oneAtATime = useOneAtATime();
-  const rejections = useRejectedFields(["name"] as const);
+  const send = (values: WorkspaceCreate) =>
+    oneAtATime(
+      () =>
+        new Promise<void>((resolve) => {
+          create.mutate(values, {
+            // Fires only while the form is still open: made after Cancel, or after M7
+            // closed, the workspace does not open, and the user stays where they are
+            // (6.0.6「送っている間に閉じた送信の失敗」). Create stays pending until its
+            // 5 opens.
+            onSuccess: (workspace) =>
+              void navigate({
+                to: "/w/$workspaceId",
+                params: { workspaceId: workspace.id },
+              }).finally(resolve),
+            // The failure shows from the mutation's state below; a 401 has left the page.
+            onError: () => resolve(),
+          });
+        }),
+    );
+  const failure = create.error;
+  const isNameRefused = refusedFieldsOf(failure, ["name"]).length > 0;
   const form = useAppForm({
     defaultValues: { name: "", currency: DEFAULT_CURRENCY },
     listeners: {
-      onChange: ({ fieldApi }) => rejections.clear(fieldApi.name),
+      // The refusal was of the name as it was: once it changes, the failure is gone.
+      // The form takes each render's options, so this reads the failure shown now.
+      onChange: ({ fieldApi }) => {
+        if (fieldApi.name === "name" && isNameRefused) create.reset();
+      },
     },
-    onSubmit: ({ value }) =>
-      oneAtATime(async () => {
-        rejections.clear();
-        await create.mutateAsync(value).catch((error: unknown) => {
-          // Shown from the mutation's state below, or under the field the API refused,
-          // which then is the failure's only trace; a 401 has left the page already.
-          if (rejections.reject(error)) create.reset();
-        });
-      }),
+    onSubmit: ({ value }) => send(value),
   });
-  const failure = create.error;
-  const isUnexpected =
-    failure !== null &&
-    !(
-      failure instanceof ApiError &&
-      (isTransient(failure) || failure.status === 401)
-    );
-  // The API's request id, or the Sentry event of the Web's own failure (SDD 8.2).
-  const reference = useMemo(
-    () =>
-      !isUnexpected
-        ? null
-        : failure instanceof ApiError
-          ? failure.requestId
-          : reportOnce(failure),
-    [isUnexpected, failure],
-  );
-  const canRetry = isOnline && !create.isPending;
   return (
     <form.AppForm>
       <Form
-        id={formId}
         onSubmit={() => {
           void form.handleSubmit();
         }}
@@ -198,7 +200,7 @@ function NewWorkspaceForm({
         >
           {(field) => (
             <field.TextField
-              rejection={rejections.rejectionOf("name")}
+              rejection={isNameRefused ? t("errors:input.format") : undefined}
               label={t("app:newWorkspace.name")}
               isRequired
               isReadOnly={!isOnline}
@@ -219,21 +221,13 @@ function NewWorkspaceForm({
             />
           )}
         </form.AppField>
-        {failure !== null && !isUnexpected && (
-          <InlineAlert variant="negative">
-            <Flex gap="space-200" wrap alignItems="center">
-              <Text>{t("app:state.couldNotSave")}</Text>
-              <Button
-                variant="secondary"
-                size="S"
-                type="submit"
-                form={formId}
-                isDisabled={!canRetry}
-              >
-                {t("app:state.retry")}
-              </Button>
-            </Flex>
-          </InlineAlert>
+        {failure !== null && (
+          <ModalSendFailure
+            error={failure}
+            onRetry={() => void form.handleSubmit()}
+            isRetryDisabled={!isOnline || create.isPending}
+            onClose={onClose}
+          />
         )}
         <ButtonGroup align="end">
           <Button variant="secondary" onPress={onCancel}>
@@ -244,23 +238,6 @@ function NewWorkspaceForm({
           </form.SubmitButton>
         </ButtonGroup>
       </Form>
-      {isUnexpected && (
-        <AlertDialog
-          isOpen
-          variant="error"
-          size="S"
-          title={t("app:state.unexpected")}
-          primaryActionLabel={t("app:state.retry")}
-          cancelLabel={t("app:state.close")}
-          onPrimaryAction={() => void form.handleSubmit()}
-          isPrimaryActionDisabled={!canRetry}
-          onCancel={onClose}
-        >
-          {reference === null
-            ? ""
-            : t("app:state.ref", { ref: reference.slice(0, 8) })}
-        </AlertDialog>
-      )}
     </form.AppForm>
   );
 }

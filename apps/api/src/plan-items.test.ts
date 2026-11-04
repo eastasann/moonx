@@ -5,9 +5,12 @@ import {
   competitors,
   costItems,
   ideas,
+  importTemplateFile,
   planAnswers,
   researchLogEntries,
   selfAnalysisAnswers,
+  templateQuestions,
+  templateVersions,
 } from "@moonx/db";
 import {
   errorBodySchema,
@@ -16,6 +19,7 @@ import {
   planHomeSchema,
   planItemSchema,
   planVersionSummarySchema,
+  type TemplateFile,
 } from "@moonx/schemas";
 import { and, eq } from "drizzle-orm";
 import { buildTestApp, connectTestDatabase } from "./test-app";
@@ -316,6 +320,47 @@ describe("P4 GET /api/v1/plans/{planId}/items/{itemNo}", () => {
     });
   });
 
+  test("a shared self-analysis leaves out the questions its display conditions hide, as 12 does", async () => {
+    const team = await teamWithPlan();
+    const analysis = await fixtures.createSelfAnalysis(team.member.id, [
+      team.workspace.id,
+    ]);
+    await db.insert(selfAnalysisAnswers).values([
+      {
+        selfAnalysisId: analysis.id,
+        questionKey: "SA.WHY.1",
+        text: "To stay home",
+      },
+      { selfAnalysisId: analysis.id, questionKey: "SA.WHY.2", text: "Family" },
+    ]);
+    const conditionOn = (displayCondition: Record<string, string[]> | null) =>
+      db
+        .update(templateQuestions)
+        .set({ displayCondition })
+        .where(
+          and(
+            eq(templateQuestions.templateVersionId, analysis.templateVersionId),
+            eq(templateQuestions.questionKey, "SA.WHY.2"),
+          ),
+        );
+    const keysShown = async () => {
+      const shared = refOf(await item(team, 2), "self_analysis")?.data as
+        | { sections: { answers: { questionKey: string }[] }[] }[]
+        | undefined;
+      return shared?.[0]?.sections[0]?.answers.map(
+        ({ questionKey }) => questionKey,
+      );
+    };
+    try {
+      await conditionOn({ "SA.WHY.1": ["Something else"] });
+      expect(await keysShown()).toEqual(["SA.WHY.1"]);
+      await conditionOn({ "SA.WHY.1": ["To stay home"] });
+      expect(await keysShown()).toEqual(["SA.WHY.1", "SA.WHY.2"]);
+    } finally {
+      await conditionOn(null);
+    }
+  });
+
   test("shows a saved version's answers, numbers and items, read only", async () => {
     const team = await teamWithPlan();
     await save(team, "P.01.5", { text: "Monthly invoices", lockVersion: 0 });
@@ -368,6 +413,91 @@ describe("P4 GET /api/v1/plans/{planId}/items/{itemNo}", () => {
       `?versionId=${version.id}`,
     );
     expect(refOf(before, "totals")?.data).toEqual({ ownership: 0, capital: 0 });
+  });
+
+  test("reads the answers in other items its display conditions name, now and of a version, as 20 counts them", async () => {
+    const team = await teamWithPlan();
+    const file: TemplateFile = await Bun.file(
+      new URL("../../../data/templates/bcdx/plan.json", import.meta.url),
+    ).json();
+    // §2's first sub-item shows once §1's fifth is "Yes".
+    const imported = await importTemplateFile(db, "business_plan", {
+      ...file,
+      sections: file.sections.map((section) => ({
+        ...section,
+        questions: section.questions.map((question) =>
+          question.key === "P.02.1"
+            ? { ...question, displayCondition: { "P.01.5": ["Yes"] } }
+            : question,
+        ),
+      })),
+    });
+    const [pinned] = await db
+      .select({ templateVersionId: businessPlans.templateVersionId })
+      .from(businessPlans)
+      .where(eq(businessPlans.id, team.planId));
+    if (pinned === undefined) throw new Error("No plan");
+    await db
+      .update(businessPlans)
+      .set({ templateVersionId: imported.versionId })
+      .where(eq(businessPlans.id, team.planId));
+    const hubOf = async (query = "") => {
+      const response = await call(
+        "GET",
+        `/api/v1/plans/${team.planId}${query}`,
+        team.memberCookie,
+      );
+      expect(response.status).toBe(200);
+      return planHomeSchema
+        .parse(await response.json())
+        .parts.flatMap((part) => part.items)
+        .find((entry) => entry.itemNo === 2);
+    };
+    try {
+      expect((await item(team, 2)).conditionAnswers).toEqual([
+        { questionKey: "P.01.5", text: null },
+      ]);
+      expect(await hubOf()).toMatchObject({ filled: 0, total: 3 });
+      expect((await item(team, 1)).conditionAnswers).toEqual([]);
+
+      await save(team, "P.01.5", { text: "Yes", lockVersion: 0 });
+      const version = planVersionSummarySchema.parse(
+        await (
+          await call(
+            "POST",
+            `/api/v1/plans/${team.planId}/versions`,
+            team.memberCookie,
+            { name: "v1" },
+          )
+        ).json(),
+      );
+      await save(team, "P.01.5", { text: "No", lockVersion: 1 });
+
+      expect((await item(team, 2)).conditionAnswers).toEqual([
+        { questionKey: "P.01.5", text: "No" },
+      ]);
+      expect(await hubOf()).toMatchObject({ total: 3 });
+      const then = await item(
+        team,
+        2,
+        team.memberCookie,
+        `?versionId=${version.id}`,
+      );
+      expect(then.conditionAnswers).toEqual([
+        { questionKey: "P.01.5", text: "Yes" },
+      ]);
+      expect(await hubOf(`?versionId=${version.id}`)).toMatchObject({
+        total: 4,
+      });
+    } finally {
+      await db
+        .update(businessPlans)
+        .set({ templateVersionId: pinned.templateVersionId })
+        .where(eq(businessPlans.id, team.planId));
+      await db
+        .delete(templateVersions)
+        .where(eq(templateVersions.id, imported.versionId));
+    }
   });
 });
 
@@ -504,6 +634,95 @@ describe("P5 PUT /api/v1/plans/{planId}/answers/{questionKey}", () => {
       lockVersion: 0,
     });
     expect((await errorOf(ideaArchived)).code).toBe("ARCHIVED");
+  });
+
+  test("takes a choice sub-item's value only among its choices", async () => {
+    const team = await teamWithPlan();
+    const file: TemplateFile = await Bun.file(
+      new URL("../../../data/templates/bcdx/plan.json", import.meta.url),
+    ).json();
+    const imported = await importTemplateFile(db, "business_plan", {
+      ...file,
+      sections: file.sections.map((section) => ({
+        ...section,
+        questions: section.questions.map((question) =>
+          question.key === "P.01.5"
+            ? {
+                ...question,
+                answerType: "choice",
+                options: { kind: "choice", choices: ["Yes", "No"] },
+              }
+            : question,
+        ),
+      })),
+    });
+    const [pinned] = await db
+      .select({ templateVersionId: businessPlans.templateVersionId })
+      .from(businessPlans)
+      .where(eq(businessPlans.id, team.planId));
+    if (pinned === undefined) throw new Error("No plan");
+    await db
+      .update(businessPlans)
+      .set({ templateVersionId: imported.versionId })
+      .where(eq(businessPlans.id, team.planId));
+    const stored = async () =>
+      (
+        await db
+          .select()
+          .from(planAnswers)
+          .where(
+            and(
+              eq(planAnswers.businessPlanId, team.planId),
+              eq(planAnswers.questionKey, "P.01.5"),
+            ),
+          )
+      )[0];
+    const historyRows = () =>
+      db
+        .select()
+        .from(changeHistory)
+        .where(
+          and(
+            eq(changeHistory.targetId, team.planId),
+            eq(changeHistory.targetKey, "P.01.5"),
+          ),
+        );
+    try {
+      const unknown = await save(team, "P.01.5", {
+        text: "Maybe",
+        lockVersion: 0,
+      });
+      expect(unknown.status).toBe(422);
+      expect((await errorOf(unknown)).code).toBe("INVALID_CHOICE");
+      expect(await stored()).toBeUndefined();
+      expect(await historyRows()).toEqual([]);
+
+      const chosen = await save(team, "P.01.5", {
+        text: "Yes",
+        lockVersion: 0,
+      });
+      expect(chosen.status).toBe(200);
+      expect(planAnswerSchema.parse(await chosen.json())).toMatchObject({
+        text: "Yes",
+        lockVersion: 1,
+      });
+      const other = await save(team, "P.01.5", {
+        text: "Maybe",
+        lockVersion: 1,
+      });
+      expect(other.status).toBe(422);
+      expect((await errorOf(other)).code).toBe("INVALID_CHOICE");
+      expect(await stored()).toMatchObject({ text: "Yes", lockVersion: 1 });
+      expect(await historyRows()).toHaveLength(1);
+    } finally {
+      await db
+        .update(businessPlans)
+        .set({ templateVersionId: pinned.templateVersionId })
+        .where(eq(businessPlans.id, team.planId));
+      await db
+        .delete(templateVersions)
+        .where(eq(templateVersions.id, imported.versionId));
+    }
   });
 
   test("saves table rows in the template's columns and checks each cell", async () => {

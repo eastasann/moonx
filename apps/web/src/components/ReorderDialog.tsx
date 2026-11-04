@@ -17,6 +17,7 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../lib/api";
 import { useIsOnline } from "../lib/online";
+import { failsOnAbort, heldSendSignal, useHoldWhileSending } from "../lib/send";
 import { ModalSendFailure } from "./ModalFailure";
 
 /** A row of the list being ordered: its id and the words it is known by. */
@@ -36,6 +37,11 @@ const refusesIds = (error: unknown, listPath: string) =>
   (error.detail.details as { path?: unknown }[]).some(
     ({ path }) => path === listPath,
   );
+
+/** What `sent` answers, or the network's failure once the held send's limit passes. */
+function withinLimit<T>(sent: Promise<T>): Promise<T> {
+  return Promise.race([sent, failsOnAbort(heldSendSignal())]);
+}
 
 /**
  * "Reorder" of a row's ⋯ (design-spec 6.10: 15's cards, 16's assumptions and risks, 27's
@@ -74,7 +80,7 @@ export function ReorderDialog({
   const [wasReloaded, setReloaded] = useState(false);
   const [reloadFailure, setReloadFailure] = useState<unknown>(null);
   const save = useMutation({
-    mutationFn: send,
+    mutationFn: (ids: string[]) => withinLimit(send(ids)),
     onSuccess: onClose,
     onError: (error) => {
       if (!isListChanged(error)) return;
@@ -91,6 +97,9 @@ export function ReorderDialog({
       );
     },
   });
+  // Save order holds the dialog open (design-spec 6.10「送っている間は閉じない」): Cancel, ×,
+  // Esc and a press outside wait already.
+  useHoldWhileSending(save.isPending);
   const failure =
     reloadFailure ??
     (save.error !== null && !isListChanged(save.error) ? save.error : null);
@@ -264,7 +273,7 @@ export function ReorderGroupedDialog({
   const [reloadFailure, setReloadFailure] = useState<unknown>(null);
   const isListChanged = (error: unknown) => refusesIds(error, listPath);
   const save = useMutation({
-    mutationFn: send,
+    mutationFn: (next: GroupOrder) => withinLimit(send(next)),
     onSuccess: onClose,
     onError: (error) => {
       if (!isListChanged(error)) return;
@@ -276,6 +285,9 @@ export function ReorderGroupedDialog({
       }, setReloadFailure);
     },
   });
+  // Save order holds the dialog open (design-spec 6.10「送っている間は閉じない」): Cancel, ×,
+  // Esc and a press outside wait already.
+  useHoldWhileSending(save.isPending);
   const failure =
     reloadFailure ??
     (save.error !== null && !isListChanged(save.error) ? save.error : null);

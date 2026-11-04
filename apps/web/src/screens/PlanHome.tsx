@@ -42,13 +42,14 @@ import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import type { ScreenComments } from "../components/CommentsPanel";
-import { ModalBoundary } from "../components/ErrorBoundary";
+import { BlockBoundary, ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
 import { KeyMetrics } from "../components/ideaParts";
 import {
   CreatePlanDialog,
   emptyGoNoGoDraft,
   GoNoGoDialog,
+  planHeaderKey,
   RenamePlanDialog,
   SaveVersionDialog,
 } from "../components/PlanDialogs";
@@ -59,7 +60,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import {
   type TemplateTarget,
@@ -70,7 +71,12 @@ import {
 } from "../components/TemplateUpdate";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  useSearchModal,
+  useWorkspace,
+} from "../components/workspace";
 import { aiExportHref, aiImportHref } from "../lib/ai";
 import { api, inPath, unwrap } from "../lib/api";
 import type { SaveTarget } from "../lib/autosave";
@@ -94,6 +100,7 @@ import {
   validationHomeQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { PlanHomeSkeleton } from "./PlanHomeSkeleton";
 
 /** `/w/$workspaceId/ideas/$ideaId/plans/$planId`'s own search (SDD 4章). */
 export interface PlanHomeSearch {
@@ -110,9 +117,6 @@ const headerValueSchema = z.object({
 
 type HeaderField = "businessName" | "preparedBy";
 
-/** The autosave key of a plan's header (P2 PATCH, design-spec 6.0.2's items). */
-const headerKey = (planId: string) => `plan:${planId}`;
-
 /**
  * The save of the plan's header (P2 PATCH): the answer is the plan home as it is now, and
  * someone else's save, loaded, takes the place of what was typed.
@@ -124,7 +128,7 @@ function headerTarget(
 ): SaveTarget {
   const queryKey = planHomeQuery(home.ideaId, home.id).queryKey;
   return {
-    key: headerKey(home.id),
+    key: planHeaderKey(home.id),
     noun,
     send: async (fields, lockVersion, force) => {
       const updated = await unwrap(
@@ -559,10 +563,13 @@ function VersionsBlock({ home }: { home: PlanHome }) {
         <RowList aria-label={t("plans:home.versions.title")}>
           {home.versions.map((version) => {
             const isOpen = home.viewingVersion?.id === version.id;
-            const meta = t("plans:home.versions.meta", {
-              date: formatDate(version.savedAt, { timeZone: me.timezone }),
-              name: version.savedBy.displayName,
-            });
+            const meta = (
+              <>
+                {formatDate(version.savedAt, { timeZone: me.timezone })}
+                {t("app:separator")}
+                <UserName user={version.savedBy} />
+              </>
+            );
             return (
               <RowListItem
                 key={version.id}
@@ -574,11 +581,15 @@ function VersionsBlock({ home }: { home: PlanHome }) {
                       })
                 }
                 description={
-                  isOpen
-                    ? [t("plans:home.versions.viewing"), meta].join(
-                        t("app:separator"),
-                      )
-                    : meta
+                  isOpen ? (
+                    <>
+                      {t("plans:home.versions.viewing")}
+                      {t("app:separator")}
+                      {meta}
+                    </>
+                  ) : (
+                    meta
+                  )
                 }
               >
                 {version.name}
@@ -703,15 +714,30 @@ function PlanHub({
   home,
   modal,
   about,
+  isDecided,
 }: {
   home: PlanHome;
   modal: string | undefined;
   about: string | undefined;
+  /**
+   * Whether `home` is what P2 answers now, not a cached read being read again: what
+   * decides whether a modal of the URL may open (SDD 4章).
+   */
+  isDecided: boolean;
 }) {
   const { t } = useTranslation(["plans"]);
   const { role } = useWorkspace();
   const modals = useModal();
   const [isRenaming, setRenaming] = useState(false);
+  // Rename plan is the plan's as it is now, and lives in the hub, not in the entry: another
+  // entry of 20 (Back from the latest plan to a saved version, or the other way), which
+  // keeps the hub, closes it, rather than carrying it over onto that entry.
+  const viewing = home.viewingVersion?.id ?? null;
+  const [lastViewing, setLastViewing] = useState(viewing);
+  if (lastViewing !== viewing) {
+    setLastViewing(viewing);
+    setRenaming(false);
+  }
   // M4's choice and reason, kept while M3 opens from it (6.12 M4); emptied when Record
   // Go / No-Go opens M4 anew.
   const [goNoGoDraft, setGoNoGoDraft] = useState(emptyGoNoGoDraft);
@@ -728,11 +754,37 @@ function PlanHub({
     !home.ideaArchived &&
     !home.archived &&
     home.latestDecision === "proceed";
+  // M4's Save a version opens M3 over it, and closing M3 opens M4 again (6.12 M4). M4 stays
+  // until it is closed (SDD 4章), so while the user goes between the two, both open even
+  // if the plan can no longer be edited meanwhile; their sends then say why.
+  const [isFromGoNoGo, setFromGoNoGo] = useState(false);
+  if (isFromGoNoGo && modal !== "save-version" && modal !== "go-no-go") {
+    setFromGoNoGo(false);
+  }
+  const isSavingVersion = useSearchModal(
+    modal,
+    "save-version",
+    canEdit || isFromGoNoGo,
+    isDecided,
+  );
+  const isRecordingGoNoGo = useSearchModal(
+    modal,
+    "go-no-go",
+    canEdit || isFromGoNoGo,
+    isDecided,
+  );
+  const isCreatingPlan = useSearchModal(
+    modal,
+    "create-plan",
+    canAddPlan,
+    isDecided,
+  );
   const isUpdatingTemplate = useIsTemplateUpdateOpen(
     modal,
     about,
     planTarget(home),
     canEdit,
+    isDecided,
   );
   const [partA, partB] = [
     home.parts.find((part) => part.part === "a"),
@@ -744,10 +796,12 @@ function PlanHub({
       id: "numbers",
       column: "main",
       content: (
-        <KeyNumbersBlock
-          home={home}
-          canEditValidation={isMember && !home.ideaArchived}
-        />
+        <BlockBoundary>
+          <KeyNumbersBlock
+            home={home}
+            canEditValidation={isMember && !home.ideaArchived}
+          />
+        </BlockBoundary>
       ),
     },
     ...[partA, partB].flatMap((part) =>
@@ -757,16 +811,40 @@ function PlanHub({
             {
               id: `part-${part.part}`,
               column: "aside" as const,
-              content: <PartBlock home={home} part={part} />,
+              content: (
+                <BlockBoundary>
+                  <PartBlock home={home} part={part} />
+                </BlockBoundary>
+              ),
             },
           ],
     ),
-    { id: "go-no-go", column: "main", content: <GoNoGoBlock home={home} /> },
-    { id: "versions", column: "main", content: <VersionsBlock home={home} /> },
+    {
+      id: "go-no-go",
+      column: "main",
+      content: (
+        <BlockBoundary>
+          <GoNoGoBlock home={home} />
+        </BlockBoundary>
+      ),
+    },
+    {
+      id: "versions",
+      column: "main",
+      content: (
+        <BlockBoundary>
+          <VersionsBlock home={home} />
+        </BlockBoundary>
+      ),
+    },
     {
       id: "execution",
       column: "main",
-      content: <ExecutionBlock home={home} />,
+      content: (
+        <BlockBoundary>
+          <ExecutionBlock home={home} />
+        </BlockBoundary>
+      ),
     },
   ];
   return (
@@ -807,12 +885,12 @@ function PlanHub({
         }
         blocks={blocks}
       />
-      {modal === "save-version" && canEdit && (
+      {isSavingVersion && (
         <ModalBoundary key={modal} onClose={modals.close}>
           <SaveVersionDialog home={home} onClose={modals.close} />
         </ModalBoundary>
       )}
-      {modal === "go-no-go" && canEdit && (
+      {isRecordingGoNoGo && (
         <ModalBoundary key={modal} onClose={modals.close}>
           <GoNoGoDialog
             home={home}
@@ -821,16 +899,20 @@ function PlanHub({
             // The draft is emptied when M4 is opened anew, not here: emptied before M4
             // has gone, it would show cleared for a moment.
             onClose={modals.close}
-            onSaveVersion={() => modals.open("save-version")}
+            onSaveVersion={() => {
+              setFromGoNoGo(true);
+              modals.open("save-version");
+            }}
           />
         </ModalBoundary>
       )}
-      {modal === "create-plan" && canAddPlan && (
+      {isCreatingPlan && (
         <ModalBoundary key={modal} onClose={modals.close}>
           <CreatePlanDialog ideaId={home.ideaId} onClose={modals.close} />
         </ModalBoundary>
       )}
-      {isRenaming && canEdit && (
+      {/* Opened only while it may be; then until closed, so a refused Save says why in it. */}
+      {isRenaming && (
         <ModalBoundary onClose={() => setRenaming(false)}>
           <RenamePlanDialog home={home} onClose={() => setRenaming(false)} />
         </ModalBoundary>
@@ -848,55 +930,6 @@ function PlanHub({
   );
 }
 
-/**
- * 20's shape while it loads (design-spec 6.0.6): the name, the key numbers and the items.
- * Drawn inside a `Skeleton`, its words are bars.
- */
-export function PlanHomeSkeleton() {
-  const { t } = useTranslation(["plans"]);
-  const rows = (label: string) => (
-    <RowList aria-label={label}>
-      {[0, 1, 2, 3].map((row) => (
-        <RowListItem
-          key={row}
-          end={t("plans:home.filled", { filled: 0, total: 0 })}
-        >
-          {label}
-        </RowListItem>
-      ))}
-    </RowList>
-  );
-  return (
-    <HubPattern
-      header={
-        <Heading level={1} variant="heading-1-hub">
-          {t("plans:home.keyNumbers.title")}
-        </Heading>
-      }
-      blocks={[
-        {
-          id: "numbers",
-          column: "main",
-          content: (
-            <HubBlock title={t("plans:home.keyNumbers.title")}>
-              {rows(t("plans:home.keyNumbers.title"))}
-            </HubBlock>
-          ),
-        },
-        {
-          id: "part-a",
-          column: "aside",
-          content: (
-            <HubBlock title={t("plans:home.part.a")}>
-              {rows(t("plans:home.part.a"))}
-            </HubBlock>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
 function PlanHomeBody({
   ideaId,
   planId,
@@ -911,9 +944,14 @@ function PlanHomeBody({
   about: string | undefined;
 }) {
   const { me, workspace } = useWorkspace();
-  const home = useQuery(planHomeQuery(ideaId, planId, versionId));
-  const idea = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending || idea.isPending);
+  const homeOptions = planHomeQuery(ideaId, planId, versionId);
+  const ideaOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const idea = useQuery(ideaOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    home.isPending || idea.isPending,
+    [homeOptions, ideaOptions],
+  );
   const failure = home.error ?? idea.error;
   if (home.data !== undefined && home.data.workspaceId !== workspace.id) {
     // Another workspace's plan under this one's URL (SDD 4章).
@@ -931,6 +969,7 @@ function PlanHomeBody({
         home={home.data}
         modal={modal}
         about={about}
+        isDecided={!home.isFetching}
       />
     );
   }
@@ -947,14 +986,7 @@ function PlanHomeBody({
     );
   }
   if (isSlow) {
-    return (
-      <SlowLoadingState
-        onRetry={() => {
-          void home.refetch();
-          void idea.refetch();
-        }}
-      />
-    );
+    return <SlowLoadingState onRetry={retrySlow} />;
   }
   return (
     <Skeleton isLoading>
@@ -1037,7 +1069,7 @@ export function PlanHomeScreen({
   return (
     <WorkspaceFrame
       current="ideas"
-      saveScope={headerKey(planId)}
+      saveScope={planHeaderKey(planId)}
       comments={comments}
       history={comments}
       templateBanner={templateBanner}

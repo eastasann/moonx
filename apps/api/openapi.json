@@ -6981,7 +6981,7 @@
     "/api/v1/validations/{validationId}/questions/{sectionKey}": {
       "get": {
         "summary": "V2 The questions of a section (11)",
-        "description": "sectionKey is 01, 02 or 10. One answer per question, unanswered and hidden ones included.",
+        "description": "sectionKey is 01, 02 or 10. One answer per question, unanswered and hidden ones included. conditionAnswers are the texts of other sections' answers this section's display conditions name; decidesElsewhere the questions here a condition in another section names.",
         "parameters": [
           {
             "name": "validationId",
@@ -7330,9 +7330,30 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "conditionAnswers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "questionKey": { "type": "string" },
+                          "text": { "type": ["string", "null"] }
+                        },
+                        "required": ["questionKey", "text"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "decidesElsewhere": {
+                      "type": "array",
+                      "items": { "type": "string" }
                     }
                   },
-                  "required": ["section", "answers"],
+                  "required": [
+                    "section",
+                    "answers",
+                    "conditionAnswers",
+                    "decidesElsewhere"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -16790,7 +16811,7 @@
     "/api/v1/me/self-analysis/sections/{sectionKey}": {
       "get": {
         "summary": "S2 A section of the caller's self-analysis (11)",
-        "description": "One answer per question, unanswered ones included, with its comment count in each workspace it is shared with.",
+        "description": "One answer per question, unanswered ones included, with its comment count in each workspace it is shared with. conditionAnswers are the texts of other sections' answers this section's display conditions name; decidesElsewhere the questions here a condition in another section names.",
         "parameters": [
           {
             "name": "sectionKey",
@@ -17056,9 +17077,30 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "conditionAnswers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "questionKey": { "type": "string" },
+                          "text": { "type": ["string", "null"] }
+                        },
+                        "required": ["questionKey", "text"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "decidesElsewhere": {
+                      "type": "array",
+                      "items": { "type": "string" }
                     }
                   },
-                  "required": ["section", "answers"],
+                  "required": [
+                    "section",
+                    "answers",
+                    "conditionAnswers",
+                    "decidesElsewhere"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -21313,7 +21355,7 @@
     "/api/v1/plans/{planId}/items/{itemNo}": {
       "get": {
         "summary": "P4 A plan item (21)",
-        "description": "itemNo is 1–30. With versionId, the answers, numbers and execution items are that saved version's; the references are always the validation's now. The shared self-analyses only for Owners and Members.",
+        "description": "itemNo is 1–30. With versionId, the answers, numbers and execution items are that saved version's; the references are always the validation's now. The shared self-analyses only for Owners and Members. conditionAnswers are the texts of other items' answers its display conditions name.",
         "parameters": [
           {
             "name": "planId",
@@ -21578,6 +21620,18 @@
                           "copiedFrom",
                           "commentCount"
                         ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "conditionAnswers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "questionKey": { "type": "string" },
+                          "text": { "type": ["string", "null"] }
+                        },
+                        "required": ["questionKey", "text"],
                         "additionalProperties": false
                       }
                     },
@@ -23959,6 +24013,7 @@
                     "readOnly",
                     "prompts",
                     "answers",
+                    "conditionAnswers",
                     "metrics",
                     "costRowNames",
                     "scenarios",
@@ -24227,7 +24282,7 @@
             "name": "assigneeName",
             "in": "query",
             "required": false,
-            "schema": { "type": "string", "minLength": 1, "maxLength": 60 }
+            "schema": { "type": "string" }
           },
           {
             "name": "status",

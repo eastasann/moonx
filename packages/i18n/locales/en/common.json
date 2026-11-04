@@ -18,9 +18,10 @@
     "unknown": "Unknown"
   },
   "fauLabel": {
-    "fact_one": "Fact · {{count}} source",
-    "fact_other": "Fact · {{count}} sources",
-    "assumption": "Assumption · {{confidence}}"
+    "fact_one": "Fact · {{count, integer}} source",
+    "fact_other": "Fact · {{count, integer}} sources",
+    "assumption": "Assumption · {{confidence}}",
+    "noEvidenceCount": "({{count, integer}} without evidence)"
   },
   "confidence": {
     "low": "Low",
@@ -54,8 +55,8 @@
     "done": "Done"
   },
   "check": {
-    "competitorsRange": "Competitors ({{min}}–{{max}})",
-    "competitorsAtLeast": "Competitors ({{min}}+)",
+    "competitorsRange": "Competitors ({{min, integer}}–{{max, integer}})",
+    "competitorsAtLeast": "Competitors ({{min, integer}}+)",
     "local_price": "Local price range",
     "costs": "Startup & monthly costs",
     "break_even": "Break-even volume",

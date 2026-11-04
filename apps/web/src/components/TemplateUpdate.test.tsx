@@ -7,10 +7,20 @@ import type {
   TemplateRef,
   ValidationHome,
 } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import * as sentry from "../lib/sentry";
+import {
+  ana,
+  apiError,
+  type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { validationHome, workspaceId } from "../test/ideas";
 import { planHome, planId, planPath, plans, versionId } from "../test/plans";
 import { selfAnalysisId, selfHome } from "../test/selfAnalysis";
@@ -19,8 +29,9 @@ import { selfAnalysisId, selfHome } from "../test/selfAnalysis";
 // `?modal=update-template&about=`, 5.12 T1・T2).
 
 afterEach(() => {
-  cleanup();
+  cleanupThenRestoreFocus();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const newer: TemplateRef = {
@@ -86,7 +97,8 @@ interface World {
 /**
  * The API of 13, 20 and 10 with T1 and T2: `t1` and `t2` answer them (a promise holds T2
  * back) and may change `world`, which the screens' reads follow; a T2 that goes through
- * moves the template.
+ * moves the template, and Restore on 13 takes the idea out of the archive. `held` holds
+ * 13's next read back while it is set.
  */
 function migrationApi({
   me = ana,
@@ -95,6 +107,7 @@ function migrationApi({
   self = selfHome({ template: newer }),
   t1 = () => Response.json(preview),
   t2 = migrated,
+  archived = false,
 }: {
   me?: Me;
   home?: ValidationHome;
@@ -102,8 +115,10 @@ function migrationApi({
   self?: SelfAnalysisHome;
   t1?: (call: Call, world: World) => Response | Promise<Response>;
   t2?: (call: Call, world: World) => Response | Promise<Response>;
+  /** Whether the idea is archived when the test starts (`world.archived`). */
+  archived?: boolean;
 } = {}) {
-  const world: World = { moved: false, archived: false };
+  const world: World & { held?: Promise<void> } = { moved: false, archived };
   const now = <T extends { template: TemplateRef }>(data: T): T =>
     world.moved ? { ...data, template: moved } : data;
   const calls = stubApi((call) => {
@@ -111,12 +126,19 @@ function migrationApi({
     if (method === "GET" && path === "/api/v1/me") return Response.json(me);
     if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
     if (method === "GET" && path === `/api/v1/ideas/${ideaId}/validation`) {
-      const read = now(home);
-      return Response.json(
-        world.archived
-          ? { ...read, idea: { ...read.idea, archived: true } }
-          : read,
-      );
+      return (async () => {
+        await world.held;
+        const read = now(home);
+        return Response.json(
+          world.archived
+            ? { ...read, idea: { ...read.idea, archived: true } }
+            : read,
+        );
+      })();
+    }
+    if (method === "POST" && path === `/api/v1/ideas/${ideaId}/restore`) {
+      world.archived = false;
+      return Response.json({});
     }
     if (
       method === "GET" &&
@@ -241,23 +263,27 @@ describe("the band (design-spec 6.0.7)", () => {
     ).toBeTruthy();
   });
 
-  test("13: a Viewer has none, and the URL opens no M8 for them", async () => {
+  test("13: a Viewer has none, and the URL opens no M8 for them: it comes off in place once 13 is read", async () => {
     const { calls } = migrationApi({ me: as("viewer") });
-    renderApp(ideaPath(`?modal=update-template&about=${about}`));
+    const router = renderApp(ideaPath(`?modal=update-template&about=${about}`));
     await ideaHeading();
     expect(band()).toBeUndefined();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(previews(calls)).toEqual([]);
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(router.history.length).toBe(1);
   });
 
-  test("13: an archived idea has none, not in ⋯ either, and the URL opens no M8", async () => {
+  test("13: an archived idea has none, not in ⋯ either, and the URL opens no M8 and comes off; Restore then opens none", async () => {
     const user = userEvent.setup();
-    const { calls } = migrationApi({ home: idea(newer, true) });
-    renderApp(ideaPath(`?modal=update-template&about=${about}`));
+    const { calls } = migrationApi({ archived: true });
+    const router = renderApp(ideaPath(`?modal=update-template&about=${about}`));
     await screen.findByText("This idea is archived");
     expect(band()).toBeUndefined();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(previews(calls)).toEqual([]);
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(router.history.length).toBe(1);
     await user.click(
       screen.getByRole("button", { name: "More for Bacolod Health Bowl" }),
     );
@@ -268,6 +294,14 @@ describe("the band (design-spec 6.0.7)", () => {
     expect(
       within(menu).queryByRole("menuitem", { name: "Update template" }),
     ).toBeNull();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    await user.click(screen.getByRole("button", { name: "Restore" }));
+    // Read again as it is now: the band is back, and no M8 with it.
+    await waitFor(() => expect(band()).toBeDefined());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(previews(calls)).toEqual([]);
   });
 
   test("20: the band and ⋯ Update template open M8 about the plan", async () => {
@@ -335,10 +369,10 @@ describe("the band (design-spec 6.0.7)", () => {
     ],
     ["a saved version", {}, `version=${versionId}&`],
   ])(
-    "20: none for %s, and the URL opens no M8",
+    "20: none for %s, and the URL opens no M8: it comes off in place once 20 is read",
     async (_, options, version) => {
       const { calls } = migrationApi(options);
-      renderApp(
+      const router = renderApp(
         planPath(
           `?${version}modal=update-template&about=business_plan:${planId}`,
         ),
@@ -350,8 +384,47 @@ describe("the band (design-spec 6.0.7)", () => {
         screen.queryByRole("button", { name: "More for Plan A" }),
       ).toBeNull();
       expect(previews(calls)).toEqual([]);
+      // The saved version's parameter stays.
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual(
+          version === "" ? {} : { version: versionId },
+        ),
+      );
+      expect(router.history.length).toBe(1);
     },
   );
+
+  test("13: M8's URL while a cached read of an archived 13 is read again: kept until that read answers, which then opens M8", async () => {
+    const { world } = migrationApi({ archived: true });
+    const router = renderApp(ideaPath());
+    await screen.findByText("This idea is archived");
+    let release = () => {};
+    world.held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    world.archived = false;
+    readAgainOnFocus();
+    await act(() =>
+      router.navigate({
+        href: ideaPath(`?modal=update-template&about=${about}`),
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(router.state.location.search).toEqual({
+      modal: "update-template",
+      about,
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    world.held = undefined;
+    release();
+    expect(
+      await screen.findByRole("dialog", { name: "Update template" }),
+    ).toBeTruthy();
+    expect(router.state.location.search).toEqual({
+      modal: "update-template",
+      about,
+    });
+  });
 
   test("10: the owner's band opens M8 about their self-analysis", async () => {
     const user = userEvent.setup();
@@ -436,6 +509,25 @@ describe("M8 Update template (design-spec 6.0.7)", () => {
       within(dialog).getByText("Cost rows added").nextElementSibling
         ?.textContent,
     ).toBe("None");
+  });
+
+  test("its counts group their thousands and are never cut to a badge's 99+ (design-spec 1.2)", async () => {
+    migrationApi({
+      t1: () =>
+        Response.json({ ...preview, carried: 1234, addedQuestions: 120 }),
+    });
+    renderApp(ideaPath(`?modal=update-template&about=${about}`));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Update template",
+    });
+    await within(dialog).findByText("Move from v1 to v3 of the template.");
+    expect(
+      within(dialog).getByText("Answers carried over").nextElementSibling
+        ?.textContent,
+    ).toBe("1,234");
+    expect(
+      within(dialog).getByText("New questions").nextElementSibling?.textContent,
+    ).toBe("120");
   });
 
   test.each([
@@ -668,6 +760,151 @@ describe("M8 Update template (design-spec 6.0.7)", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(attempts).toBe(2);
   });
+
+  test.each([
+    [
+      "a failure that may pass",
+      (): Response => {
+        throw new TypeError("Failed to fetch");
+      },
+      "Couldn't save",
+      true,
+    ],
+    [
+      "refused as archived",
+      () => apiError(409, "ARCHIVED"),
+      "Couldn't save. It's archived.",
+      false,
+    ],
+    [
+      "unexpected",
+      () => apiError(500, "INTERNAL"),
+      "Something went wrong. Ref: 8f14e45f",
+      true,
+    ],
+  ] as const)(
+    "Back while Update template is on its way, then %s: a toast says so, and its Retry (where it may pass) moves it again",
+    async (_, fail, words, retries) => {
+      vi.spyOn(sentry, "reportError").mockReturnValue(null);
+      const user = userEvent.setup();
+      let release = () => {};
+      let attempts = 0;
+      const { calls } = migrationApi({
+        t2: () => {
+          attempts += 1;
+          if (attempts > 1) return migrated();
+          return new Promise<Response>((resolve, reject) => {
+            release = () => {
+              try {
+                resolve(fail());
+              } catch (error) {
+                reject(error);
+              }
+            };
+          });
+        },
+      });
+      const router = renderApp(ideaPath());
+      const dialog = await openFromBand(user);
+      await within(dialog).findByText("Move from v1 to v3 of the template.");
+      await user.click(
+        within(dialog).getByRole("button", { name: "Update template" }),
+      );
+      await waitFor(() => expect(sends(calls)).toHaveLength(1));
+      act(() => router.history.back());
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      const reads = calls.filter((call) => call.method === "GET").length;
+      const toast = await toastAfter(words, async () => {
+        act(release);
+      });
+      const retry = within(toast).queryByRole("button", { name: "Retry" });
+      if (!retries) {
+        expect(retry).toBeNull();
+        await waitFor(() =>
+          expect(
+            calls.filter((call) => call.method === "GET").length,
+          ).toBeGreaterThan(reads),
+        );
+        return;
+      }
+      await user.click(retry as HTMLElement);
+      await waitFor(() => expect(sends(calls)).toHaveLength(2));
+      expect(sends(calls)[1]?.body).toEqual(sends(calls)[0]?.body);
+      expect(
+        (await screen.findAllByText("Template updated to v3")).length,
+      ).toBeGreaterThan(0);
+      await waitFor(() => expect(band()).toBeUndefined());
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
+
+  test.each([
+    [
+      "moved by someone else first",
+      (world: World) => {
+        world.moved = true;
+        return apiError(409, "ALREADY_LATEST");
+      },
+      "You're already on the latest template",
+      true,
+    ],
+    [
+      "a newer version published and moved to meanwhile",
+      () =>
+        apiError(422, "VALIDATION_FAILED", {
+          details: [{ path: "toVersionId", code: "custom" }],
+        }),
+      "The template changed since this opened. Check what moves now, then update again.",
+      false,
+    ],
+  ] as const)(
+    "Back while Update template is on its way, then %s: M8's words alone, without Retry, and 13 read again",
+    async (_, fail, words, bandGoes) => {
+      vi.spyOn(sentry, "reportError").mockReturnValue(null);
+      const user = userEvent.setup();
+      let release = () => {};
+      const { calls, world } = migrationApi({
+        t2: () =>
+          new Promise<Response>((resolve) => {
+            release = () => resolve(fail(world));
+          }),
+      });
+      const router = renderApp(ideaPath());
+      const dialog = await openFromBand(user);
+      await within(dialog).findByText("Move from v1 to v3 of the template.");
+      await user.click(
+        within(dialog).getByRole("button", { name: "Update template" }),
+      );
+      await waitFor(() => expect(sends(calls)).toHaveLength(1));
+      act(() => router.history.back());
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      const reads = calls.filter(
+        (call) =>
+          call.method === "GET" &&
+          call.path === `/api/v1/ideas/${ideaId}/validation`,
+      ).length;
+      const toast = await toastAfter(words, async () => {
+        act(release);
+      });
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      await waitFor(() =>
+        expect(
+          calls.filter(
+            (call) =>
+              call.method === "GET" &&
+              call.path === `/api/v1/ideas/${ideaId}/validation`,
+          ).length,
+        ).toBeGreaterThan(reads),
+      );
+      if (bandGoes) {
+        await waitFor(() => expect(band()).toBeUndefined());
+      } else {
+        expect(band()).toBeDefined();
+      }
+      expect(sends(calls)).toHaveLength(1);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
 
   test("its skeleton while T1 answers, Update template off until then", async () => {
     migrationApi({ t1: () => new Promise<Response>(() => {}) });

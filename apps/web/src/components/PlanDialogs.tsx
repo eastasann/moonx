@@ -1,4 +1,5 @@
 import {
+  type ConflictCurrent,
   conflictCurrentSchema,
   type GoNoGoValue,
   goNoGoValueSchema,
@@ -32,9 +33,12 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ZodType } from "zod";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
+import type { SaveStatus } from "../lib/autosave";
+import { useSaveItem } from "../lib/autosave-react";
 import { useOneAtATime } from "../lib/form";
 import { inputIssueMessage } from "../lib/input-issues";
 import { planHref } from "../lib/links";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import {
   archivedPlansQuery,
@@ -43,27 +47,17 @@ import {
   planHomeQuery,
   workspaceKey,
 } from "../lib/queries";
+import { useSendThrough } from "../lib/send";
 import { DecisionKeyNumbers } from "./decisionParts";
+import { useFailureOnceClosed } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
-import { ConflictAlert } from "./SaveFeedback";
+import { ConflictAlert, conflictTitle } from "./SaveFeedback";
 import { failureCode } from "./SendFailure";
 import { FailureState, LoadingBlock } from "./states";
 import { dashboardHref, useWorkspace } from "./workspace";
 
 /** How long a toast without an action stays: the shortest 4.5 Toast allows. */
 const TOAST_MS = 5000;
-
-/** Whether the component is still on screen, for what settles after it may have gone. */
-function useIsOpen() {
-  const isOpen = useRef(true);
-  useEffect(() => {
-    isOpen.current = true;
-    return () => {
-      isOpen.current = false;
-    };
-  }, []);
-  return isOpen;
-}
 
 /**
  * A field and its rule (design-spec 6.0.8): why it breaks the rule shows once it has been
@@ -126,7 +120,8 @@ function usePlansChanged() {
  * not used, and Create draft, which copies the validation into a draft on the latest
  * plan template and opens its 20 in place of the dialog. Small; a tray on a phone. A
  * name in use says so under the field; a decision no longer Proceed, or no published
- * template, where Create is (6.0.6).
+ * template, where Create is (6.0.6). Closed while Create draft is on its way, the draft
+ * is still made, but its 20 does not open (6.0.6「送っている間に閉じた送信の失敗」).
  */
 export function CreatePlanDialog({
   ideaId,
@@ -137,20 +132,8 @@ export function CreatePlanDialog({
 }) {
   const { t } = useTranslation(["plans", "errors"]);
   const { me } = useWorkspace();
-  const plans = useQuery(archivedPlansQuery(ideaId));
-  const changed = usePlansChanged();
-  // The decision changed since the screen read it (DECISION_NOT_PROCEED): the screen reads
-  // it again once M5 is gone, however it went (Cancel, Escape, Back). Read now, it would
-  // take M5, and its reason, off the screen.
-  const isRefused = useRef(false);
-  const readAgain = useRef(() => changed(ideaId));
-  readAgain.current = () => changed(ideaId);
-  useEffect(
-    () => () => {
-      if (isRefused.current) void readAgain.current();
-    },
-    [],
-  );
+  const plansOptions = archivedPlansQuery(ideaId);
+  const plans = useQuery(plansOptions);
   // A send on its way finishes first: closing then would leave twice (useModal).
   const isSending = useRef(false);
   return (
@@ -168,9 +151,6 @@ export function CreatePlanDialog({
           ideaId={ideaId}
           initialName={defaultPlanName(plans.data.items)}
           onClose={onClose}
-          onRefused={() => {
-            isRefused.current = true;
-          }}
           onSending={(sending) => {
             isSending.current = sending;
           }}
@@ -184,7 +164,7 @@ export function CreatePlanDialog({
           size="S"
         />
       ) : (
-        <LoadingBlock onRetry={() => void plans.refetch()}>
+        <LoadingBlock waitsFor={[plansOptions]}>
           <Stack gap="space-300">
             <Text>{t("plans:create.body")}</Text>
             <Text>{t("plans:create.name")}</Text>
@@ -197,37 +177,59 @@ export function CreatePlanDialog({
 
 const CREATE_REFUSALS = ["DECISION_NOT_PROCEED", "TEMPLATE_NOT_PUBLISHED"];
 
+/** The codes M5 has its own words for: a name in use, and its refusals. */
+const CREATE_WORDED = ["NAME_TAKEN", ...CREATE_REFUSALS];
+
 function CreatePlanForm({
   ideaId,
   initialName,
   onClose,
-  onRefused,
   onSending,
 }: {
   ideaId: string;
   initialName: string;
   onClose: () => void;
-  /** The latest decision is no longer Proceed: 13 or 20 reads it again on closing. */
-  onRefused: () => void;
   /** Whether Create draft is on its way, while the dialog must stay. */
   onSending: (sending: boolean) => void;
 }) {
   const { t } = useTranslation(["plans", "errors"]);
   const { workspace } = useWorkspace();
   const isOnline = useIsOnline();
+  const isOpen = useIsMounted();
   const navigate = useNavigate();
   const formId = useId();
   const changed = usePlansChanged();
   const name = useCheckedField(planNameSchema, initialName);
+  const post = (value: string) =>
+    unwrap(
+      api()
+        .api.v1.ideas({ ideaId: inPath(ideaId) })
+        .plans.post({ name: value }),
+    );
+  // Back closes M5 while Create draft is on its way (Cancel and Escape wait for it): its
+  // failure then says so in a toast, whose Retry makes the draft by the same name. M5's
+  // own words say so alone, as sending the same name again meets the same refusal; a
+  // decision no longer Proceed reads the screen again, as it does while M5 is open.
+  const sendThrough = useSendThrough();
+  const failedOnceClosed = useFailureOnceClosed(
+    (value: string) =>
+      sendThrough(() => post(value)).then(() => changed(ideaId)),
+    (error) => {
+      const worded = CREATE_WORDED.find(
+        (candidate) => candidate === failureCode(error),
+      );
+      if (worded === undefined) return null;
+      if (worded === "DECISION_NOT_PROCEED") void changed(ideaId);
+      return t(`errors:${worded as "NAME_TAKEN"}`);
+    },
+  );
   const create = useMutation({
-    mutationFn: (value: string) =>
-      unwrap(
-        api()
-          .api.v1.ideas({ ideaId: inPath(ideaId) })
-          .plans.post({ name: value }),
-      ),
+    mutationFn: post,
     onSuccess: async (plan) => {
       await changed(ideaId);
+      // Closed meanwhile: the user stays where closing took them, and the entry they are
+      // on now is not replaced.
+      if (!isOpen.current) return;
       // In place of M5's entry: Back from 20 leads to the screen under it, not to M5.
       await navigate({
         href: planHref(workspace.id, ideaId, plan.id),
@@ -236,8 +238,14 @@ function CreatePlanForm({
     },
     onMutate: () => onSending(true),
     onSettled: () => onSending(false),
-    onError: (error) => {
-      if (failureCode(error) === "DECISION_NOT_PROCEED") onRefused();
+    onError: (error, value) => {
+      // The decision changed since the screen read it: the screen reads it again behind
+      // M5, which stays open with the reason until it is closed (SDD 4章). Once closed,
+      // the toast's words read it again.
+      if (isOpen.current && failureCode(error) === "DECISION_NOT_PROCEED") {
+        void changed(ideaId);
+      }
+      failedOnceClosed(error, value);
     },
   });
   // A second press before the first answer would make a second plan.
@@ -308,10 +316,25 @@ function CreatePlanForm({
   );
 }
 
+/** The autosave key of 20's header (Business Name and Prepared by), which Rename plan also writes. */
+export const planHeaderKey = (planId: string) => `plan:${planId}`;
+
+const SAVE_ON_ITS_WAY: readonly SaveStatus[] = [
+  "waiting",
+  "saving",
+  "retrying",
+];
+
+/** The header someone else saved first, from a P2 PATCH's CONFLICT (6.0.2), if it says. */
+const theirHeader = (error: unknown): ConflictCurrent | undefined =>
+  error instanceof ApiError && error.code === "CONFLICT"
+    ? conflictCurrentSchema.safeParse(error.detail.current).data
+    : undefined;
+
 /**
  * Rename plan from 20's ⋯ (design-spec 6.12, 6.0.8 案の名前): the name, unique within the
- * idea, saved with Save (P2 PATCH). Someone else's change to the header since 20 read it
- * asks as 6.0.2 does: overwrite (only the name is sent) or load theirs. Small; a tray on a
+ * idea, saved with Save (P2 PATCH). Someone else's change to the header since the dialog
+ * opened asks as 6.0.2 does: overwrite (only the name is sent) or load theirs. Small; a tray on a
  * phone.
  */
 export function RenamePlanDialog({
@@ -321,55 +344,97 @@ export function RenamePlanDialog({
   home: PlanHome;
   onClose: () => void;
 }) {
-  const { t } = useTranslation(["plans", "errors"]);
+  const { t } = useTranslation(["plans", "errors", "app"]);
   const queryClient = useQueryClient();
   const isOnline = useIsOnline();
-  const isOpen = useIsOpen();
+  const isOpen = useIsMounted();
   const formId = useId();
   const changed = usePlansChanged();
+  const { me } = useWorkspace();
   const name = useCheckedField(planNameSchema, home.name);
+  // Save waits for the header's own save on its way, so it sends the version that save
+  // leaves (the effect below), not one this user's save has already moved past.
+  const headerSave = useSaveItem(planHeaderKey(home.id));
+  const isHeaderSaving =
+    headerSave !== undefined && SAVE_ON_ITS_WAY.includes(headerSave.status);
+  // The header as the dialog opened on it: 20 may read the plan again while it is open,
+  // and another person's change since then must still ask (6.0.2). This user's own saves
+  // (Business Name and Prepared by on this page or in another tab) while it is open, one
+  // version at a time, move it on.
+  const [openedOn, setOpenedOn] = useState(home.lockVersion);
+  useEffect(() => {
+    if (home.updatedBy?.id === me.id && home.lockVersion === openedOn + 1) {
+      setOpenedOn(home.lockVersion);
+    }
+  }, [home.lockVersion, home.updatedBy?.id, me.id, openedOn]);
   const [force, setForce] = useState(false);
+  const post = ({
+    value,
+    overwrite,
+    lockVersion,
+  }: {
+    value: string;
+    overwrite: boolean;
+    lockVersion: number;
+  }) =>
+    unwrap(
+      api()
+        .api.v1.plans({ planId: inPath(home.id) })
+        .patch({
+          name: value,
+          lockVersion,
+          ...(overwrite ? { force: true } : {}),
+        }),
+    );
+  const renamed = async (updated: Awaited<ReturnType<typeof post>>) => {
+    queryClient.setQueryData(
+      planHomeQuery(home.ideaId, home.id).queryKey,
+      updated,
+    );
+    await changed(home.ideaId);
+  };
+  // Back leaves 20, or opens another of its entries, while Save is on its way (Cancel and
+  // Escape wait for it): its failure then says so in a toast, whose Retry sends the same
+  // name on the same version. A name in use says so alone, as sending it again meets the
+  // same refusal; so does someone else's header saved first, in the words of the question
+  // it would have asked (the ConflictAlert below), with 20 read again to show theirs.
+  const sendThrough = useSendThrough();
+  const failedOnceClosed = useFailureOnceClosed(
+    (input: Parameters<typeof post>[0]) =>
+      sendThrough(() => post(input)).then(renamed),
+    (failure) => {
+      if (failureCode(failure) === "NAME_TAKEN") return t("errors:NAME_TAKEN");
+      const theirs = theirHeader(failure);
+      if (theirs === undefined) return null;
+      void changed(home.ideaId);
+      return conflictTitle(t("plans:home.headerNoun"), theirs, me.timezone);
+    },
+  );
   const rename = useMutation({
-    mutationFn: ({ value, overwrite }: { value: string; overwrite: boolean }) =>
-      unwrap(
-        api()
-          .api.v1.plans({ planId: inPath(home.id) })
-          .patch({
-            name: value,
-            lockVersion: home.lockVersion,
-            ...(overwrite ? { force: true } : {}),
-          }),
-      ),
+    mutationFn: post,
     onSuccess: async (updated) => {
-      queryClient.setQueryData(
-        planHomeQuery(home.ideaId, home.id).queryKey,
-        updated,
-      );
-      await changed(home.ideaId);
+      await renamed(updated);
       if (isOpen.current) onClose();
     },
+    onError: (error, input) => failedOnceClosed(error, input),
   });
   const error = rename.error;
-  const code = failureCode(error);
-  const nameTaken = code === "NAME_TAKEN";
-  const conflict =
-    error instanceof ApiError && code === "CONFLICT" ? error : null;
+  const nameTaken = failureCode(error) === "NAME_TAKEN";
   const oneAtATime = useOneAtATime();
   const send = (overwrite: boolean) => {
-    if (!name.isValid) return;
+    if (!name.isValid || isHeaderSaving) return;
     setForce(overwrite);
     void oneAtATime(() =>
-      rename.mutateAsync({ value: name.value, overwrite }).then(
-        () => {},
-        // Shown from the mutation's state.
-        () => {},
-      ),
+      rename
+        .mutateAsync({ value: name.value, overwrite, lockVersion: openedOn })
+        .then(
+          () => {},
+          // Shown from the mutation's state.
+          () => {},
+        ),
     );
   };
-  const current =
-    conflict === null
-      ? undefined
-      : conflictCurrentSchema.safeParse(conflict.detail.current).data;
+  const current = theirHeader(error);
   return (
     <Dialog
       isOpen
@@ -393,7 +458,7 @@ export function RenamePlanDialog({
             type="submit"
             form={formId}
             isPending={rename.isPending}
-            isDisabled={!isOnline || !name.isValid}
+            isDisabled={!isOnline || !name.isValid || isHeaderSaving}
           >
             {t("plans:rename.save")}
           </Button>
@@ -456,26 +521,37 @@ export function SaveVersionDialog({
 }) {
   const { t } = useTranslation(["plans"]);
   const isOnline = useIsOnline();
-  const isOpen = useIsOpen();
+  const isOpen = useIsMounted();
   const formId = useId();
   const changed = usePlansChanged();
   const next = (home.versions[0]?.versionNumber ?? 0) + 1;
   const name = useCheckedField(versionNameSchema, `v${next}`);
+  const post = (value: string) =>
+    unwrap(
+      api()
+        .api.v1.plans({ planId: inPath(home.id) })
+        .versions.post({ name: value }),
+    );
+  const saved = async (version: Awaited<ReturnType<typeof post>>) => {
+    // 20's Version and Versions, 13's plans, 7 and 5's activity.
+    await changed(home.ideaId);
+    ToastQueue.neutral(t("plans:version.saved", { name: version.name }), {
+      timeout: TOAST_MS,
+    });
+  };
+  // Back closes M3 while Save version is on its way (Cancel and Escape wait for it): its
+  // failure then says so in a toast, whose Retry saves the version by the same name.
+  const sendThrough = useSendThrough();
+  const failedOnceClosed = useFailureOnceClosed((value: string) =>
+    sendThrough(() => post(value)).then(saved),
+  );
   const save = useMutation({
-    mutationFn: (value: string) =>
-      unwrap(
-        api()
-          .api.v1.plans({ planId: inPath(home.id) })
-          .versions.post({ name: value }),
-      ),
+    mutationFn: post,
     onSuccess: async (version) => {
-      // 20's Version and Versions, 13's plans, 7 and 5's activity.
-      await changed(home.ideaId);
-      ToastQueue.neutral(t("plans:version.saved", { name: version.name }), {
-        timeout: TOAST_MS,
-      });
+      await saved(version);
       if (isOpen.current) onClose();
     },
+    onError: (error, value) => failedOnceClosed(error, value),
   });
   // A second press before the first answer would save a second version.
   const oneAtATime = useOneAtATime();
@@ -603,9 +679,10 @@ export function GoNoGoDialog({
   const { t } = useTranslation(["plans", "common", "errors"]);
   const { me, workspace } = useWorkspace();
   const isOnline = useIsOnline();
-  const isOpen = useIsOpen();
+  const isOpen = useIsMounted();
   const changed = usePlansChanged();
-  const context = useQuery(goNoGoContextQuery(home.ideaId, home.id));
+  const contextOptions = goNoGoContextQuery(home.ideaId, home.id);
+  const context = useQuery(contextOptions);
   const { value, reason } = draft;
   const setValue = (next: GoNoGoValue) =>
     onDraftChange({ ...draft, value: next });
@@ -614,19 +691,32 @@ export function GoNoGoDialog({
     onDraftChange({ ...draft, reason: next });
   };
   const [isReasonTouched, setReasonTouched] = useState(draft.reason !== "");
+  const post = (input: { value: GoNoGoValue; reason: string }) =>
+    unwrap(
+      api()
+        .api.v1.plans({ planId: inPath(home.id) })
+        ["go-no-go"].post(input),
+    );
+  const recorded = async () => {
+    // The idea's stage may move to Launch prep (6.12): 13, 5 and 6 follow.
+    await changed(home.ideaId);
+    ToastQueue.neutral(t("plans:goNoGo.recorded"), { timeout: TOAST_MS });
+  };
+  // Back closes M4 while Record is on its way (Cancel and Escape wait for it), as does
+  // its Save a version: its failure then says so in a toast, whose Retry records the
+  // same choice and reason.
+  const sendThrough = useSendThrough();
+  const failedOnceClosed = useFailureOnceClosed(
+    (input: Parameters<typeof post>[0]) =>
+      sendThrough(() => post(input)).then(recorded),
+  );
   const record = useMutation({
-    mutationFn: (chosen: GoNoGoValue) =>
-      unwrap(
-        api()
-          .api.v1.plans({ planId: inPath(home.id) })
-          ["go-no-go"].post({ value: chosen, reason }),
-      ),
+    mutationFn: post,
     onSuccess: async () => {
-      // The idea's stage may move to Launch prep (6.12): 13, 5 and 6 follow.
-      await changed(home.ideaId);
-      ToastQueue.neutral(t("plans:goNoGo.recorded"), { timeout: TOAST_MS });
+      await recorded();
       if (isOpen.current) onClose();
     },
+    onError: (error, input) => failedOnceClosed(error, input),
   });
   const reasonIssue = reasonSchema.safeParse(reason).error?.issues[0];
   // Both are required: Record waits for them (6.0.6「モーダルの共通の決まり」).
@@ -636,7 +726,7 @@ export function GoNoGoDialog({
   const submit = () => {
     if (value === null || reasonIssue !== undefined) return;
     void oneAtATime(() =>
-      record.mutateAsync(value).then(
+      record.mutateAsync({ value, reason }).then(
         () => {},
         // Shown from the mutation's state.
         () => {},
@@ -697,7 +787,7 @@ export function GoNoGoDialog({
     );
   } else {
     material = (
-      <LoadingBlock onRetry={() => void context.refetch()}>
+      <LoadingBlock waitsFor={[contextOptions]}>
         <Stack gap="space-300">
           <Heading level={3} variant="label">
             {t("plans:goNoGo.conditions")}

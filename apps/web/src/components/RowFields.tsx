@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { SaveTarget } from "../lib/autosave";
+import { ApiError } from "../lib/api";
+import { rejectionReason, type SaveTarget } from "../lib/autosave";
 import { useAutosave, useSaveItem } from "../lib/autosave-react";
 
 /** How a row's fields are checked and carried (design-spec 6.0.8, SDD 5.7). */
@@ -23,6 +25,51 @@ export const isRowValid = <V extends object>(
   (Object.keys(values) as (keyof V)[]).every(
     (field) => spec.errorOf(field, values[field]) === undefined,
   );
+
+/**
+ * The fields of a new row a refused send names (SDD 8.2's last guard: a 422
+ * `VALIDATION_FAILED` whose `details` give their paths), which show "Check the format"
+ * under them while "Couldn't save" and its reason show by the form's buttons (6.0.2).
+ */
+export function refusedFieldsOf<F extends string>(
+  error: unknown,
+  fields: readonly F[],
+): F[] {
+  const details =
+    error instanceof ApiError && error.code === "VALIDATION_FAILED"
+      ? error.detail.details
+      : undefined;
+  if (!Array.isArray(details)) return [];
+  const paths = (details as { path?: unknown }[]).map(({ path }) => path);
+  return fields.filter((field) => paths.includes(field));
+}
+
+/**
+ * Whether a send was refused for a reason 6.0.2 names that the screen shows once it is
+ * read again: archived, no access, gone.
+ */
+export function isRefusedForGood(error: unknown): boolean {
+  const reason = error instanceof ApiError ? rejectionReason(error) : null;
+  return reason === "archived" || reason === "noAccess" || reason === "gone";
+}
+
+/**
+ * Reads the screen again once a new row's send is {@link isRefusedForGood refused for
+ * good}, as a refused save and a refused row action do (design-spec 6.0.6): the screen
+ * then shows why, archived or read only. Call it from `mutate`'s `onError`, which runs
+ * only while the form is open: once it is closed, its failure goes to a toast that reads
+ * the screen again itself (useFailureOnceClosed). The form itself stays, read only,
+ * until it is closed (6.10): the screen keeps it open past the `canEdit` it read again.
+ */
+export function useReadAgainWhenRefused(): (error: unknown) => void {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (error) => {
+      if (isRefusedForGood(error)) void queryClient.invalidateQueries();
+    },
+    [queryClient],
+  );
+}
 
 /**
  * A row's fields saved as they are typed (design-spec 6.0.2, an item per row; 15's

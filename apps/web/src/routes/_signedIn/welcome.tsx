@@ -2,9 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   WelcomeScreen,
   type WelcomeSearch,
-  WelcomeSkeleton,
   type WelcomeStep,
 } from "../../screens/Welcome";
+import { WelcomeSkeleton } from "../../screens/WelcomeSkeleton";
 
 const STEPS: readonly WelcomeStep[] = ["invite", "profile", "done"];
 

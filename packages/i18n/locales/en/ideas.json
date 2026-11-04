@@ -25,8 +25,8 @@
     "archived": "Archived",
     "menu": "More for {{name}}"
   },
-  "hiddenDropped_one": "{{count}} dropped idea hidden",
-  "hiddenDropped_other": "{{count}} dropped ideas hidden",
+  "hiddenDropped_one": "{{count, integer}} dropped idea hidden",
+  "hiddenDropped_other": "{{count, integer}} dropped ideas hidden",
   "show": "Show",
   "empty": "No ideas yet. Write down the first one. You can have many.",
   "emptyFiltered": "No ideas match these filters",

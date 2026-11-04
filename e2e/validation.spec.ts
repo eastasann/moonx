@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { IdeaDetail, Me } from "@moonx/schemas";
 import type { Page } from "@playwright/test";
 import { WEB_ORIGIN } from "./env";
@@ -6,6 +5,7 @@ import {
   test as base,
   demo,
   expect,
+  expectNoAxeViolations,
   newAccount,
   workspaceOf,
 } from "./fixtures";
@@ -56,34 +56,6 @@ const press = (control: ReturnType<Page["getByRole"]>) =>
 /** A question of 11 by its title ("WHO"). */
 const question = (page: Page, title: string) =>
   page.getByRole("region", { name: title, exact: true });
-
-async function expectNoAxeViolations(page: Page) {
-  await expect(
-    page.locator("[data-live-announcer] [aria-labelledby]"),
-  ).toHaveCount(0, { timeout: 10_000 });
-  // A dialog or popover fading in or out has its words part-transparent, which axe reads
-  // as low contrast: the page is checked once overlays have settled, and colours that
-  // change on a press (a SegmentedControl's segments) have finished changing.
-  await expect(page.locator("[data-entering], [data-exiting]")).toHaveCount(0);
-  await page.waitForFunction(() =>
-    document
-      .getAnimations()
-      .every(
-        (animation) =>
-          !(animation instanceof CSSTransition) ||
-          animation.playState !== "running",
-      ),
-  );
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(
-    violations.map((violation) => ({
-      id: violation.id,
-      targets: violation.nodes.map((node) => node.target.join(" ")),
-    })),
-  ).toEqual([]);
-}
 
 /** The worker's account, signed in, with a new idea in its personal workspace. */
 async function ownIdea(

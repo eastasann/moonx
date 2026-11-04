@@ -1,11 +1,9 @@
 import { formatDate, formatList, formatRelativeTime } from "@moonx/i18n";
-import {
-  type IdeaDecisionFilter,
-  type IdeaSort,
-  type IdeaSummary,
-  plainText,
-  type Stage,
-  TEXT_LIMITS,
+import type {
+  IdeaDecisionFilter,
+  IdeaSort,
+  IdeaSummary,
+  Stage,
 } from "@moonx/schemas";
 import {
   ActionMenu,
@@ -46,12 +44,18 @@ import {
 import {
   FailureState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
+import { userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  useSearchModal,
+  useWorkspace,
+} from "../components/workspace";
 import { inputIssueMessage } from "../lib/input-issues";
-import { ideaHref } from "../lib/links";
+import { ideaHref, ideasSearchSchema } from "../lib/links";
 import {
   type IdeaFilters,
   ideasQuery,
@@ -59,6 +63,7 @@ import {
   validationHomeQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { IdeasListSkeleton } from "./IdeasSkeleton";
 
 /** `/w/$workspaceId/ideas`'s search parameters (SDD 4章). */
 export interface IdeasSearch {
@@ -73,9 +78,6 @@ export interface IdeasSearch {
   /** The idea shown beside the list. */
   selected?: string;
 }
-
-/** The search as I1 takes it (SDD 5.6 `q`). */
-export const searchSchema = plainText(TEXT_LIMITS.short);
 
 /** How long typing in the search pauses before the list asks again. */
 const SEARCH_PAUSE_MS = 300;
@@ -119,7 +121,7 @@ function Filters({
   // The URL's search, set elsewhere (Clear filters), shows in the field.
   useEffect(() => setText(search.q ?? ""), [search.q]);
   // The search's rules are I1's (6.0.8 短文): text that breaks them says why, unsent.
-  const [issue] = searchSchema.safeParse(text).error?.issues ?? [];
+  const [issue] = ideasSearchSchema.safeParse(text).error?.issues ?? [];
   const textError = issue === undefined ? undefined : inputIssueMessage(issue);
   useEffect(() => {
     if (text === (search.q ?? "") || textError !== undefined) return;
@@ -260,7 +262,7 @@ function IdeaRow({ idea }: { idea: IdeaSummary }) {
     ...(idea.archived ? [t("ideas:row.archived")] : []),
     t("ideas:row.meta", {
       stage: t(`common:stage.${idea.stage}`),
-      proposer: idea.proposer.displayName,
+      proposer: userNameText(idea.proposer),
       when: formatRelativeTime(idea.lastActivityAt, { timeZone: me.timezone }),
     }),
   ].join(t("app:separator"));
@@ -315,8 +317,11 @@ function IdeaDetailPane({ ideaId }: { ideaId: string }) {
   const { t } = useTranslation(["ideas", "common", "app", "validation"]);
   const { me, workspace } = useWorkspace();
   const navigate = useNavigate();
-  const query = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(query.isPending);
+  const options = validationHomeQuery(ideaId);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   if (query.isError) {
     return (
       <FailureState
@@ -330,11 +335,7 @@ function IdeaDetailPane({ ideaId }: { ideaId: string }) {
   }
   if (query.data === undefined) {
     return isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <Stack gap="space-300">
@@ -350,7 +351,7 @@ function IdeaDetailPane({ ideaId }: { ideaId: string }) {
   const timeZone = me.timezone;
   const meta = t("ideas:detail.meta", {
     stage: t(`common:stage.${idea.stage}`),
-    proposer: idea.proposer.displayName,
+    proposer: userNameText(idea.proposer),
   });
   const plans =
     idea.plans.length === 0
@@ -482,12 +483,15 @@ function IdeasBody({
   const navigate = useNavigate();
   const isTwoColumns = useTwoColumns();
   const canWrite = role !== "viewer";
+  const options = ideasQuery(workspace.id, filtersOf(search));
   const query = useQuery({
-    ...ideasQuery(workspace.id, filtersOf(search)),
+    ...options,
     // A new filter keeps the rows until its answer comes, not the skeleton.
     placeholderData: keepPreviousData,
   });
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const items = query.data?.items ?? [];
   const selected =
     items.find(({ id }) => id === search.selected)?.id ??
@@ -508,11 +512,7 @@ function IdeasBody({
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <IdeasListSkeleton />
     );
@@ -588,41 +588,6 @@ function IdeasBody({
   );
 }
 
-/** Rows of placeholder words in the shape of the list (design-spec 6.0.6). */
-function IdeasListSkeleton() {
-  const { t } = useTranslation(["ideas"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("ideas:newIdea")}</Text>
-            <Text variant="caption">{t("ideas:empty")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
-/** 6 Ideas' shape while its route loads (design-spec 6.0.6). */
-export function IdeasSkeleton() {
-  const { t } = useTranslation(["ideas"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("ideas:title")}
-        </Heading>
-      }
-      list={<IdeasListSkeleton />}
-      detail={null}
-      listLabel={t("ideas:title")}
-      onBack={() => {}}
-    />
-  );
-}
-
 /**
  * 6 Ideas (design-spec 6.8, s06-ideas.html): pattern D. The ideas under the filters and
  * the search, the selected one's summary beside them on a desktop; New idea (M1) for the
@@ -640,6 +605,8 @@ export function IdeasScreen({
   const modals = useModal();
   const navigate = useNavigate();
   useDocumentTitle(t("ideas:title"), workspace.name);
+  // M1 is not a Viewer's (design-spec 2.2).
+  const isNewIdeaOpen = useSearchModal(modal, "new-idea", role !== "viewer");
   const onSearch = (next: IdeasSearch) =>
     void navigate({
       to: ".",
@@ -662,7 +629,7 @@ export function IdeasScreen({
       }
     >
       <IdeasBody search={search} onSearch={onSearch} />
-      {modal === "new-idea" && role !== "viewer" && (
+      {isNewIdeaOpen && (
         <ModalBoundary key={modal} onClose={modals.close}>
           <NewIdeaDialog onClose={modals.close} />
         </ModalBoundary>

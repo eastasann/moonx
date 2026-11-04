@@ -12,7 +12,6 @@ import {
   ListView,
   ListViewItem,
   Picker,
-  Skeleton,
   Stack,
   Text,
   ToastQueue,
@@ -28,22 +27,24 @@ import { useNavigate } from "@tanstack/react-router";
 import { CheckCheck, SearchX } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { toastFailure } from "../components/ideaActions";
+import { useToastFailure } from "../components/ideaActions";
 import {
   FailureState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
 import { api, inPath, unwrap } from "../lib/api";
 import { hrefOf, notificationsHref } from "../lib/links";
 import {
+  asList,
   notificationsKey,
   notificationsPage,
   unreadCountQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { NotificationsListSkeleton } from "./NotificationsSkeleton";
 
 /** `/notifications`'s search parameters (SDD 4章). */
 export interface NotificationsSearch {
@@ -123,20 +124,25 @@ function NotificationRow({ notification }: { notification: Notification }) {
  * happened, in its workspace; one the user can no longer read says so.
  */
 function NotificationsBody({ search }: { search: NotificationsSearch }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["notifications"]);
   const { me } = useWorkspace();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const filter = search.filter ?? "all";
+  const queryKey = listKey(filter);
   const query = useInfiniteQuery({
-    queryKey: listKey(filter),
+    queryKey,
     queryFn: ({ pageParam }) => notificationsPage(filter, pageParam),
+    ...asList,
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (last) =>
       last.nextCursor === null ? undefined : Number(last.nextCursor),
   });
   const unread = useQuery(unreadCountQuery());
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    { queryKey },
+  ]);
   const settle = () =>
     void queryClient.invalidateQueries({ queryKey: notificationsKey });
 
@@ -207,11 +213,7 @@ function NotificationsBody({ search }: { search: NotificationsSearch }) {
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <NotificationsListSkeleton />
     );
@@ -317,39 +319,6 @@ function NotificationsBody({ search }: { search: NotificationsSearch }) {
           </Flex>
         ) : undefined
       }
-    />
-  );
-}
-
-/** Rows of placeholder words in the shape of the list (design-spec 6.0.6). */
-function NotificationsListSkeleton() {
-  const { t } = useTranslation(["notifications"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("notifications:screen.markAllRead")}</Text>
-            <Text variant="caption">{t("notifications:screen.empty")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
-/** 8 Notifications' shape while its route loads (design-spec 6.0.6). */
-export function NotificationsSkeleton() {
-  const { t } = useTranslation(["notifications"]);
-  return (
-    <ListDetailPattern
-      hasDetail={false}
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("notifications:screen.title")}
-        </Heading>
-      }
-      list={<NotificationsListSkeleton />}
     />
   );
 }

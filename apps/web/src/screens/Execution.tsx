@@ -20,10 +20,8 @@ import {
   ListViewItem,
   MenuItem,
   Picker,
-  Skeleton,
   Stack,
   Switch,
-  Text,
   useIsNarrow,
   useTwoColumns,
 } from "@moonx/ui-web";
@@ -66,7 +64,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
@@ -93,6 +91,7 @@ import {
   validationHomeQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { ExecutionSkeleton, ListSkeleton } from "./ExecutionSkeleton";
 
 export type { ExecutionSearch };
 
@@ -349,7 +348,9 @@ function ItemDetail({
           )}
         </Stack>
       )}
-      {isEditing && canEdit && (
+      {/* Opened by an editor's Edit; it stays until closed, past a `canEdit` read again,
+          and its fields' saves say why they are refused. */}
+      {isEditing && (
         <Dialog
           isOpen
           onOpenChange={(isOpen) => {
@@ -363,24 +364,6 @@ function ItemDetail({
         </Dialog>
       )}
     </Stack>
-  );
-}
-
-function ListSkeleton() {
-  const { t } = useTranslation(["plans"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("plans:execution.title")}</Text>
-            <Text variant="caption">
-              {t("plans:execution.empty.milestones")}
-            </Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
   );
 }
 
@@ -446,7 +429,9 @@ function ExecutionBody({
   const canEdit = role !== "viewer" && !home.ideaArchived && !home.archived;
   const listQuery = executionItemsQuery(home.ideaId, home.id);
   const query = useQuery(listQuery);
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    listQuery,
+  ]);
   const all = query.data?.items ?? [];
   // A link may name the item alone (8, 5's Recent activity): its tab is its type's, known
   // once the list is read. Until then no tab is shown, nor + Add. Once known, it is kept
@@ -584,11 +569,7 @@ function ExecutionBody({
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <ListSkeleton />
     );
@@ -784,7 +765,9 @@ function ExecutionBody({
         listLabel={t(`plans:execution.list.${type}`)}
         onBack={() => onClose({ ...current, item: undefined })}
       />
-      {isAdding && canEdit && (
+      {/* Only an editor opens these; once open they stay until closed, past a `canEdit`
+          read again meanwhile, so a send from them says why it was refused (SDD 4章). */}
+      {isAdding && (
         <NewExecutionItem
           // Each tab's form is its own.
           key={type}
@@ -808,7 +791,7 @@ function ExecutionBody({
           onCancel={() => setAdding(false)}
         />
       )}
-      {reordering !== null && canEdit && (
+      {reordering !== null && (
         <ReorderDialog
           title={t(
             `plans:execution.reorderTitle.${reordering.type as Exclude<ExecutionType, "next_action">}`,
@@ -863,24 +846,6 @@ function ExecutionBody({
   );
 }
 
-/** 22's shape while its route loads (design-spec 6.0.6). */
-export function ExecutionSkeleton() {
-  const { t } = useTranslation(["plans"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("plans:execution.title")}
-        </Heading>
-      }
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("plans:execution.title")}
-      onBack={() => {}}
-    />
-  );
-}
-
 /**
  * 22 Execution (design-spec 6.13): pattern D with a tab per type (Milestones, Launch,
  * KPIs, Open Questions, Next Actions). Launch steps under their phases and KPIs under
@@ -903,9 +868,12 @@ export function ExecutionScreen({
   const navigate = useNavigate();
   const router = useRouter();
   const panel = usePanel();
-  const home = useQuery(planHomeQuery(ideaId, planId));
+  const homeOptions = planHomeQuery(ideaId, planId);
+  const home = useQuery(homeOptions);
   const { data: ideaData } = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.workspaceId === workspace.id && home.data.ideaId === ideaId
       ? home.data
@@ -999,7 +967,7 @@ export function ExecutionScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = <ExecutionSkeleton />;
   }

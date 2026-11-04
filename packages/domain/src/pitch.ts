@@ -1,5 +1,6 @@
 import {
   formatDate,
+  formatInputMoney,
   formatInputNumber,
   formatMoney,
   formatMonths,
@@ -112,6 +113,7 @@ export interface PitchDeckInput {
 type MetricFormat =
   | "money"
   | "cents"
+  | "typedMoney"
   | "percent"
   | "units"
   | "input"
@@ -122,7 +124,7 @@ const METRIC_FORMATS: Record<KeyMetricKey, MetricFormat> = {
   initial_cost_total: "money",
   monthly_fixed_total: "money",
   variable_cost_per_unit: "cents",
-  selling_price: "money",
+  selling_price: "typedMoney",
   contribution_margin: "cents",
   contribution_margin_rate: "percent",
   break_even_units_month: "units",
@@ -151,6 +153,9 @@ const formatAs = (
       return formatMoney(metric.value, currency, bound);
     case "cents":
       return formatMoney(metric.value, currency, { ...bound, cents: true });
+    case "typedMoney":
+      // An amount as typed is exact: it has no bound to show.
+      return formatInputMoney(metric.value, currency);
     case "percent":
       return formatPercent(metric.value, bound);
     case "units":
@@ -164,7 +169,9 @@ const formatAs = (
 
 /**
  * A key metric as design-spec 6.4 shows it, as the deck's figures are printed: the value
- * in its format with its bound, or why it has none.
+ * in its format with its bound, or why it has none. An amount the user typed (the price,
+ * a cost row's amount, or its amount per sale at a % of the price) is never rounded:
+ * "₱150", "₱149.50" (6.4「端数」).
  *
  * @throws {Error} for a key that is not a single-value key metric
  */
@@ -174,7 +181,7 @@ export const formatMetric = (
   currency: string,
 ): string => {
   if (key.startsWith(COST_ROW_METRIC_PREFIX)) {
-    return formatAs("money", metric, currency);
+    return formatAs("typedMoney", metric, currency);
   }
   const format = METRIC_FORMATS[key as KeyMetricKey] as
     | MetricFormat
@@ -596,9 +603,10 @@ class DeckBuilder {
               competitor.type === null
                 ? null
                 : i18n.t(`common:competitorType.${competitor.type}`),
+              // Typed, so never rounded (design-spec 6.4「端数」), as 15 shows it.
               competitor.typicalPrice === null
                 ? null
-                : formatMoney(competitor.typicalPrice, currency),
+                : formatInputMoney(competitor.typicalPrice, currency),
               cellText(competitor.strength),
             ]),
           },

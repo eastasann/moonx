@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   PlanHomeScreen,
   type PlanHomeSearch,
-  PlanHomeSkeleton,
 } from "../../../../../../../../screens/PlanHome";
+import { PlanHomeSkeleton } from "../../../../../../../../screens/PlanHomeSkeleton";
 
 /**
  * `/w/$workspaceId/ideas/$ideaId/plans/$planId`: 20 Plan home (SDD 4章). A `version` that

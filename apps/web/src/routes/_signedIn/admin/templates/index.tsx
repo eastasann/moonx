@@ -4,8 +4,8 @@ import { OutsideWorkspace } from "../../../../components/OutsideWorkspace";
 import {
   AdminTemplatesScreen,
   type AdminTemplatesSearch,
-  AdminTemplatesSkeleton,
 } from "../../../../screens/AdminTemplates";
+import { AdminTemplatesSkeleton } from "../../../../screens/AdminTemplatesSkeleton";
 
 /** `/admin/templates`: 26 Admin: Templates (SDD 4章). A kind it cannot read is left out. */
 export const Route = createFileRoute("/_signedIn/admin/templates/")({

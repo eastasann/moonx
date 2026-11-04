@@ -1,9 +1,10 @@
 import { hasText } from "@moonx/domain";
-import { formatCount, formatMoney } from "@moonx/i18n";
+import { formatCount, formatInputMoney } from "@moonx/i18n";
 import type {
   CheckState,
   Competitor,
   competitorListSchema,
+  FauState,
   ValidationHome,
 } from "@moonx/schemas";
 import {
@@ -48,6 +49,7 @@ import {
   AnswerFields,
   type Answers,
   type AnswersCache,
+  type AnswerView,
   answerKey,
   moonOf,
   useAnswers,
@@ -67,12 +69,19 @@ import {
 } from "../components/CompetitorFields";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { ItemHistoryButton } from "../components/HistoryPanel";
-import { toastFailure } from "../components/ideaActions";
+import {
+  useFailureOnceClosed,
+  useToastFailure,
+} from "../components/ideaActions";
 import { dotState } from "../components/ideaParts";
 import { ModalSendFailure } from "../components/ModalFailure";
 import { ReorderDialog } from "../components/ReorderDialog";
 import { RowEvidence, RowEvidenceSheet } from "../components/RowEvidence";
-import { isRowValid, useRowFields } from "../components/RowFields";
+import {
+  isRowValid,
+  refusedFieldsOf,
+  useRowFields,
+} from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
 import { SectionTitle } from "../components/SectionTitle";
 import {
@@ -80,13 +89,15 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
   dashboardHref,
+  useAskedOpen,
   useModal,
   usePanel,
+  useSearchModalAbout,
   useWorkspace,
 } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
@@ -106,11 +117,21 @@ import {
   competitorsQuery,
   ideaKey,
   putSaved,
+  useIsValidationRead,
   validationHomeQuery,
 } from "../lib/queries";
+import { useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
+import { CompetitorsSkeleton } from "./CompetitorsSkeleton";
 
 export type { CompetitorsSearch };
+
+declare module "@tanstack/react-router" {
+  interface HistoryState {
+    /** 15's New competitor is open, in the entry it added: Back closes it. */
+    addingCompetitor?: boolean;
+  }
+}
 
 type CompetitorList = z.infer<typeof competitorListSchema>;
 
@@ -119,6 +140,11 @@ const competitorKey = (competitorId: string) => `competitor:${competitorId}`;
 
 /** M2's `about` for a competitor (SDD 4章). */
 const aboutOf = (competitorId: string) => `competitor:${competitorId}`;
+
+/** What M2 on 15 is about: a competitor, or a pattern question's answer with F/A/U. */
+type EvidenceTarget =
+  | { kind: "competitor"; competitor: Competitor }
+  | { kind: "pattern"; view: AnswerView & { state: FauState } };
 
 /** Puts a competitor, as saved, in 15's list: in its place, or last when it is new. */
 function putCompetitor(
@@ -187,9 +213,9 @@ function useRange(guidance: CompetitorList["guidance"]) {
 const checkStateOf = (count: number, min: number): CheckState =>
   count >= min ? "done" : count > 0 ? "partial" : "not_started";
 
-/** A competitor's price ("₱240"), with cents only where it has them. */
+/** A competitor's price as typed ("₱240", "₱149.50"; 6.4「端数」). */
 const priceText = (price: number, currency: string) =>
-  formatMoney(price, currency, { cents: !Number.isInteger(price) });
+  formatInputMoney(price, currency);
 
 /** "1 source", "No sources": the evidence that counts (6.0.3). */
 function useSources() {
@@ -215,7 +241,8 @@ function CompetitorEditor({
   ideaId: string;
   listKey: CompetitorListKey;
   competitor: Competitor;
-  onOpenEvidence: () => void;
+  /** Opens M2; none once the screen, read again, no longer lets the user edit. */
+  onOpenEvidence: (() => void) | undefined;
 }) {
   const { t } = useTranslation(["validation"]);
   const { workspace } = useWorkspace();
@@ -304,7 +331,10 @@ function CompetitorFacts({ competitor }: { competitor: Competitor }) {
  * A new competitor (design-spec 6.10「+ Add competitor」): a large dialog, a full sheet on
  * a phone, with the fields, Cancel and Add competitor. Adding hands the competitor to the
  * screen, which opens its own dialog, where evidence is attached (M2 needs the
- * competitor). A failure keeps what was typed, as a modal's does (6.0.6).
+ * competitor). A failure keeps what was typed, as a modal's does (6.0.6). Closed while
+ * Add competitor is on its way (Cancel, Back, the screen left), the competitor is made
+ * all the same, and a send that fails says so in a toast (6.0.6), whose Retry sends it
+ * again.
  */
 function NewCompetitorDialog({
   ideaId,
@@ -329,28 +359,27 @@ function NewCompetitorDialog({
   const latestOnCreated = useRef(onCreated);
   latestOnCreated.current = onCreated;
   const oneAtATime = useOneAtATime();
-  const create = useMutation({
-    mutationFn: (input: typeof values) =>
-      unwrap(
-        api()
-          .api.v1.validations({ validationId: inPath(validationId) })
-          .competitors.post(competitorInput(input)),
-      ),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) }),
+  const sendThrough = useSendThrough();
+  const post = (input: typeof values) =>
+    unwrap(
+      api()
+        .api.v1.validations({ validationId: inPath(validationId) })
+        .competitors.post(competitorInput(input)),
+    );
+  const readAgain = () =>
+    queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) });
+  const failOnceClosed = useFailureOnceClosed(async (input: typeof values) => {
+    await sendThrough(() => post(input));
+    await readAgain();
   });
-  // A 422 naming a field (SDD 8.2's last guard) puts "Check the format" under it.
+  const create = useMutation({
+    mutationFn: post,
+    onSuccess: () => void readAgain(),
+    onError: failOnceClosed,
+  });
   const failure = create.error;
-  const details =
-    failure instanceof ApiError && failure.code === "VALIDATION_FAILED"
-      ? failure.detail.details
-      : undefined;
   const fields = Object.keys(values) as (keyof typeof values)[];
-  const refusedFields = fields.filter(
-    (field) =>
-      Array.isArray(details) &&
-      (details as { path?: unknown }[]).some(({ path }) => path === field),
-  );
+  const refusedFields = refusedFieldsOf(failure, fields);
   const errors = Object.fromEntries(
     fields.flatMap((field) => {
       const error =
@@ -413,7 +442,7 @@ function NewCompetitorDialog({
             setTouched((current) => ({ ...current, [field]: true }));
           }}
         />
-        {failure !== null && refusedFields.length === 0 && (
+        {failure !== null && (
           <ModalSendFailure
             error={failure}
             onRetry={submit}
@@ -523,6 +552,31 @@ function CompareTable({ items }: { items: readonly Competitor[] }) {
       }}
     />
   );
+}
+
+/**
+ * What `about` names for M2 on 15, if it takes evidence (SDD 4章): one of the
+ * competitors, or a pattern question's answer with F/A/U (design-spec 6.0.3).
+ */
+function evidenceTargetOf(
+  list: CompetitorList | undefined,
+  about: string | undefined,
+  validationId: string,
+  answers: Answers,
+): EvidenceTarget | undefined {
+  if (list === undefined || about === undefined) return undefined;
+  const competitor = list.items.find(({ id }) => aboutOf(id) === about);
+  if (competitor !== undefined) return { kind: "competitor", competitor };
+  const prefix = `validation_answer:${validationId}:`;
+  if (!about.startsWith(prefix)) return undefined;
+  const pattern = list.patterns.find(
+    ({ question }) => question.key === about.slice(prefix.length),
+  );
+  if (pattern === undefined) return undefined;
+  const view = answers.viewOf(pattern.question, pattern.answer);
+  return view.state === null
+    ? undefined
+    : { kind: "pattern", view: { ...view, state: view.state } };
 }
 
 /** The element of a pattern question, for `?q=` to focus. */
@@ -665,41 +719,42 @@ function PatternQuestions({
   );
 }
 
-/** The shape of 15 while its list loads (design-spec 6.0.6). */
-function CardsSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <Stack gap="space-300">
-      {[0, 1, 2].map((card) => (
-        <Stack key={card} gap="space-100">
-          <Text variant="label">{t("validation:competitors.title")}</Text>
-          <Text>{t("validation:competitors.empty", { range: "" })}</Text>
-        </Stack>
-      ))}
-    </Stack>
-  );
-}
-
 function CompetitorsBody({
   home,
+  isDecided,
   search,
   modal,
   about,
+  isAdding,
   onSearch,
   onOpenRow,
   onCloseRow,
+  onOpenNew,
+  onCloseNew,
+  onCreated,
 }: {
   home: ValidationHome;
+  /** `home` has been read and is not being read again: whether the idea is archived. */
+  isDecided: boolean;
   search: CompetitorsSearch;
   modal: string | undefined;
   about: string | undefined;
+  /** Whether New competitor is open: the history entry it added says so. */
+  isAdding: boolean;
   /** Replaces the URL's search (the view). */
   onSearch: (next: CompetitorsSearch) => void;
   /** Opens a competitor's dialog: Back closes it. */
   onOpenRow: (competitorId: string) => void;
   /** Closes the competitor's dialog, going back if it was opened here. */
   onCloseRow: () => void;
+  /** Opens New competitor in a history entry of its own: Back closes it. */
+  onOpenNew: () => void;
+  /** Closes New competitor, going back past its entry. */
+  onCloseNew: () => void;
+  /** Puts the competitor New competitor made in its entry's place: Back leaves it too. */
+  onCreated: (competitorId: string) => void;
 }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["validation", "common", "app", "panels"]);
   const { me, workspace, role } = useWorkspace();
   const queryClient = useQueryClient();
@@ -713,8 +768,7 @@ function CompetitorsBody({
   const canEdit = role !== "viewer" && !idea.archived;
   const list = competitorsQuery(idea.id, validationId);
   const query = useQuery(list);
-  const isSlow = useIsSlow(query.isPending);
-  const [isAdding, setAdding] = useState(false);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [list]);
   const [isReordering, setReordering] = useState(false);
   const [deleting, setDeleting] = useState<Competitor | null>(null);
   const empty = useRange(query.data?.guidance ?? { min: 0, max: 0 });
@@ -746,6 +800,36 @@ function CompetitorsBody({
       forFact: isFact,
     }),
   );
+  const isEvidenceDecided = useIsValidationRead(idea.id, query);
+  // One ask for both kinds: the kind not found would take the URL from under the other.
+  const evidenceFound = evidenceTargetOf(
+    query.data,
+    about,
+    validationId,
+    answers,
+  );
+  const evidence = useSearchModalAbout(
+    modal,
+    "evidence",
+    evidenceFound,
+    canEdit,
+    isEvidenceDecided,
+  );
+  // New competitor, asked by its history entry, opens as `?modal=` opens a modal (SDD
+  // 4章): once shown it stays until it is closed, though the screen read again no longer
+  // lets the user add one, so its send shows the refusal in it (design-spec 6.0.6); for
+  // someone who may not add one (its entry reached again by Forward or a reload) it opens
+  // nothing and the entry loses its mark, so a Restore or a role changed later opens none.
+  const isAddingShown = useAskedOpen(isAdding, canEdit, isDecided, {
+    state: (previous) => ({ ...previous, addingCompetitor: undefined }),
+  });
+  // So does a competitor's dialog opened to edit: its fields, with a refused save and what
+  // was typed, until it is closed.
+  const [editedRow, setEditedRow] = useState<string | undefined>(undefined);
+  const isRowEditor =
+    search.row !== undefined && (canEdit || editedRow === search.row);
+  const nowEdited = isRowEditor ? search.row : undefined;
+  if (nowEdited !== editedRow) setEditedRow(nowEdited);
 
   // What the screen shows when a delete settles, which may be later: a user who left or
   // moved on meanwhile is not taken back.
@@ -788,18 +872,21 @@ function CompetitorsBody({
     },
   });
 
-  if (query.isError) {
-    return (
-      <FailureState
-        error={query.error}
-        onRetry={() => void query.refetch()}
-        dashboardHref={dashboardHref(me)}
-      />
-    );
-  }
+  // A read again that failed leaves what was read on screen (as 13 does), and with it what
+  // is open over it (M2, New competitor, Reorder) and what was typed there: only a list
+  // never read shows the failure.
   if (query.data === undefined) {
+    if (query.isError) {
+      return (
+        <FailureState
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          dashboardHref={dashboardHref(me)}
+        />
+      );
+    }
     return isSlow ? (
-      <SlowLoadingState onRetry={() => void query.refetch()} />
+      <SlowLoadingState onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <CompetitorsSkeleton />
@@ -812,7 +899,6 @@ function CompetitorsBody({
     home.sections.find(({ key }) => key === "04")?.title ??
     t("validation:competitors.title");
   const view = search.view ?? "cards";
-  const openNew = () => setAdding(true);
   const emptyState = (
     <IllustratedMessage
       headingLevel={2}
@@ -821,7 +907,7 @@ function CompetitorsBody({
       heading={t("validation:competitors.empty", { range: empty })}
       actions={
         canEdit ? (
-          <Button variant="primary" onPress={openNew}>
+          <Button variant="primary" onPress={onOpenNew}>
             {t("validation:competitors.add")}
           </Button>
         ) : undefined
@@ -876,7 +962,7 @@ function CompetitorsBody({
       onAction={(key) => onOpenRow(String(key))}
       addItem={
         canEdit
-          ? { label: t("validation:competitors.add"), onAction: openNew }
+          ? { label: t("validation:competitors.add"), onAction: onOpenNew }
           : undefined
       }
       renderEmptyState={() => emptyState}
@@ -926,20 +1012,11 @@ function CompetitorsBody({
       ? undefined
       : items.find(({ id }) => id === search.row);
   const evidenceCompetitor =
-    modal === "evidence" && canEdit
-      ? items.find(({ id }) => aboutOf(id) === about)
-      : undefined;
-  const evidencePattern = (() => {
-    if (modal !== "evidence" || !canEdit || about === undefined) return null;
-    const prefix = `validation_answer:${validationId}:`;
-    if (!about.startsWith(prefix)) return null;
-    const pattern = patterns.find(
-      ({ question }) => question.key === about.slice(prefix.length),
-    );
-    if (pattern === undefined) return null;
-    const view = answers.viewOf(pattern.question, pattern.answer);
-    return view.state === null ? null : { ...view, state: view.state };
-  })();
+    evidence?.kind === "competitor" ? evidence.competitor : undefined;
+  // Open on a competitor no longer listed (deleted meanwhile), M2 stays with it as it was.
+  const isEvidenceGone =
+    evidenceCompetitor !== undefined && evidenceFound === undefined;
+  const evidencePattern = evidence?.kind === "pattern" ? evidence.view : null;
 
   return (
     <>
@@ -967,7 +1044,7 @@ function CompetitorsBody({
         }
         primaryAction={
           canEdit ? (
-            <Button variant="secondary" onPress={openNew}>
+            <Button variant="secondary" onPress={onOpenNew}>
               <Plus />
               {t("validation:competitors.add")}
             </Button>
@@ -1014,16 +1091,19 @@ function CompetitorsBody({
             isDismissable
             size="L"
             title={
-              canEdit ? t("validation:competitors.editTitle") : opened.name
+              isRowEditor ? t("validation:competitors.editTitle") : opened.name
             }
           >
-            {canEdit ? (
+            {isRowEditor ? (
               <CompetitorEditor
                 ideaId={idea.id}
                 listKey={list.queryKey}
                 competitor={opened}
-                onOpenEvidence={() =>
-                  modals.open("evidence", { about: aboutOf(opened.id) })
+                onOpenEvidence={
+                  canEdit
+                    ? () =>
+                        modals.open("evidence", { about: aboutOf(opened.id) })
+                    : undefined
                 }
               />
             ) : (
@@ -1031,20 +1111,21 @@ function CompetitorsBody({
             )}
           </Dialog>
         ))}
-      {isAdding && canEdit && (
+      {isAddingShown && (
         <NewCompetitorDialog
           ideaId={idea.id}
           validationId={validationId}
           onCreated={(created) => {
             // In the list before its dialog opens: no "Not found" while it is read again.
             putCompetitor(queryClient, list.queryKey, created);
-            setAdding(false);
-            onOpenRow(created.id);
+            onCreated(created.id);
           }}
-          onClose={() => setAdding(false)}
+          onClose={onCloseNew}
         />
       )}
-      {isReordering && canEdit && (
+      {/* Opened from an editor's ⋯; once open it stays until closed, so a refused
+          Save order shows in it (design-spec 6.0.6's modals). */}
+      {isReordering && (
         <ReorderDialog
           title={t("validation:competitors.reorderTitle")}
           items={items.map(({ id, name }) => ({ id, label: name }))}
@@ -1113,6 +1194,7 @@ function CompetitorsBody({
             onReload={() =>
               void queryClient.invalidateQueries({ queryKey: list.queryKey })
             }
+            isGone={isEvidenceGone}
             onClose={modals.close}
           />
         </ModalBoundary>
@@ -1142,23 +1224,6 @@ function CompetitorsBody({
 }
 
 /**
- * 15's shape while it loads (design-spec 6.0.6). Drawn inside a `Skeleton`, its words are
- * bars and its Cards / Table switch is inert.
- */
-export function CompetitorsSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <CardComparePattern
-      header={<Heading level={1}>{t("validation:competitors.title")}</Heading>}
-      view="cards"
-      onViewChange={() => {}}
-      cards={<CardsSkeleton />}
-      table={null}
-    />
-  );
-}
-
-/**
  * 15 Competitors (design-spec 6.10, s15-competitors.html): pattern E. The idea's
  * competitors and substitutes as cards in their order (Cards / Table on a desktop and a
  * tablet), each opening its dialog to edit (to read, for a Viewer and an archived idea);
@@ -1181,8 +1246,11 @@ export function CompetitorsScreen({
   const navigate = useNavigate();
   const router = useRouter();
   const panel = usePanel();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "04")?.title;
@@ -1244,6 +1312,9 @@ export function CompetitorsScreen({
   const openedHere = useRouterState({
     select: (state) => state.location.state.openedDetail === true,
   });
+  const isAdding = useRouterState({
+    select: (state) => state.location.state.addingCompetitor === true,
+  });
   const to = (next: CompetitorsSearch, replace: boolean) =>
     void navigate({
       href: panel.keep(competitorsHref(workspace.id, ideaId, next)),
@@ -1260,15 +1331,44 @@ export function CompetitorsScreen({
     body = (
       <CompetitorsBody
         home={data}
+        isDecided={!home.isFetching}
         search={search}
         modal={modal}
         about={about}
         onSearch={(next) => to(next, true)}
+        isAdding={isAdding}
         onOpenRow={(row) => to({ ...search, row }, false)}
         onCloseRow={() => {
           if (openedHere) router.history.back();
           else to({ ...search, row: undefined }, true);
         }}
+        // The same URL in an entry of its own (design-spec 6.10「+ Add competitor」):
+        // Back closes it instead of leaving 15, as a phone's full sheet looks like a
+        // screen. The competitor it makes takes the entry, so closing that dialog goes
+        // back too.
+        onOpenNew={() =>
+          void navigate({
+            href: panel.keep(competitorsHref(workspace.id, ideaId, search)),
+            state: (previous) => ({
+              ...previous,
+              addingCompetitor: true,
+              openedDetail: true,
+            }),
+          })
+        }
+        onCloseNew={() => router.history.back()}
+        onCreated={(row) =>
+          void navigate({
+            href: panel.keep(
+              competitorsHref(workspace.id, ideaId, { ...search, row }),
+            ),
+            replace: true,
+            state: (previous) => ({
+              ...previous,
+              addingCompetitor: undefined,
+            }),
+          })
+        }
       />
     );
   } else if (home.isError) {
@@ -1280,7 +1380,7 @@ export function CompetitorsScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = (
       <Skeleton isLoading>

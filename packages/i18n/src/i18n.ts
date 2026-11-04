@@ -49,6 +49,9 @@ export const resources = {
   },
 } as const;
 
+/** Fixed for the first release (design-spec 1.2). */
+export const LOCALE = "en-PH";
+
 export const defaultNS = "common";
 export const namespaces = Object.keys(
   resources.en,
@@ -83,8 +86,20 @@ export const createI18n = (): I18n => {
     initAsync: false,
     interpolation: { escapeValue: false },
   });
+  // A count in a sentence ("{{count, integer}}") groups its thousands as the counts that
+  // stand alone do (design-spec 1.2「ロケールと日付」): "1,234 ideas". A value that is not a
+  // whole number is left as it is.
+  instance.services.formatter?.add("integer", (value) =>
+    typeof value === "number" && Number.isInteger(value)
+      ? integerFormat.format(value)
+      : value,
+  );
   return instance;
 };
+
+const integerFormat = new Intl.NumberFormat(LOCALE, {
+  maximumFractionDigits: 0,
+});
 
 /** The instance the formatters use, shared by every caller in a process. */
 export const i18n = createI18n();

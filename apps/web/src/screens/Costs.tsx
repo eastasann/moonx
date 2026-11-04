@@ -1,9 +1,9 @@
 import { hasText } from "@moonx/domain";
 import {
   formatCount,
+  formatInputMoney,
   formatInputNumber,
   formatInputPercent,
-  formatMoney,
   i18n,
 } from "@moonx/i18n";
 import {
@@ -11,7 +11,6 @@ import {
   type CostCategory,
   type CostItem,
   canReduceSchema,
-  costCategorySchema,
   costRowNameSchema,
   type costsSchema,
   type EconomicsResult,
@@ -76,7 +75,7 @@ import {
 } from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { EvidenceSheet } from "../components/EvidenceSheet";
-import { toastFailure } from "../components/ideaActions";
+import { useToastFailure } from "../components/ideaActions";
 import { ReorderDialog } from "../components/ReorderDialog";
 import { type RowFieldsSpec, useRowFields } from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
@@ -85,7 +84,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
@@ -98,6 +97,7 @@ import {
   dashboardHref,
   useModal,
   usePanel,
+  useSearchModalAbout,
   useWorkspace,
 } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
@@ -112,23 +112,23 @@ import {
   ideasHref,
 } from "../lib/links";
 import { costGapText, costTotalText, metricText } from "../lib/metrics";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import {
   costsQuery,
   ideaKey,
   putSaved,
+  useIsValidationRead,
   validationHomeQuery,
   workspaceKey,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { CATEGORIES, CostsSkeleton, TablesSkeleton } from "./CostsSkeleton";
 
 export type { CostsSearch };
 
 type CostList = z.infer<typeof costsSchema>;
 type CostListKey = ReturnType<typeof costsQuery>["queryKey"];
-
-/** The three tables in the order 17 shows them (design-spec 6.3「表と列」). */
-const CATEGORIES = costCategorySchema.options;
 
 /** M2's `about` for a cost row (SDD 4章). */
 const aboutOf = (costItemId: string) => `cost_item:${costItemId}`;
@@ -346,15 +346,10 @@ function useNameOf() {
     hasText(view.name) ? view.name : t("common:itemLabel.untitled");
 }
 
-/** An amount as 17 shows it: cents for variable costs and for amounts that have them. */
-const amountText = (view: CostRowView, amount: number, currency: string) =>
-  formatMoney(amount, currency, {
-    cents: view.row.category === "variable" || !Number.isInteger(amount),
-  });
-
 /**
  * A row's value (design-spec 6.3): its amount, or its % of the price with what that comes
- * to ("35% · ₱77.00", or "Needs price"); "Unknown" or "Empty" when it has none.
+ * to ("35% · ₱77", "35% · ₱52.33", or "Needs price"); "Unknown" or "Empty" when it has
+ * none.
  */
 function ValueText({
   view,
@@ -366,8 +361,9 @@ function ValueText({
 }) {
   const { t } = useTranslation(["validation", "common"]);
   const { workspace } = useWorkspace();
+  // As typed, never rounded, and what a % comes to in the same form (6.4「端数」).
   if (view.amount !== null) {
-    return <>{amountText(view, view.amount, workspace.currency)}</>;
+    return <>{formatInputMoney(view.amount, workspace.currency)}</>;
   }
   if (view.percent !== null) {
     return (
@@ -378,9 +374,7 @@ function ValueText({
             amount:
               price === null
                 ? t("common:metricReason.needs_price")
-                : formatMoney(price * view.percent, workspace.currency, {
-                    cents: true,
-                  }),
+                : formatInputMoney(price * view.percent, workspace.currency),
           })}
         </Text>
       </>
@@ -855,7 +849,7 @@ function SwitchModeQuestion({
   const next = view.inputMode === "amount" ? "percent_of_price" : "amount";
   const value =
     view.amount !== null
-      ? amountText(view, view.amount, workspace.currency)
+      ? formatInputMoney(view.amount, workspace.currency)
       : view.percent !== null
         ? formatInputPercent(view.percent)
         : "";
@@ -979,9 +973,7 @@ function Totals({
           supplement={
             breakEven.value !== null && price !== null
               ? t("validation:costs.atPrice", {
-                  price: formatMoney(price, currency, {
-                    cents: !Number.isInteger(price),
-                  }),
+                  price: formatInputMoney(price, currency),
                 })
               : undefined
           }
@@ -1037,25 +1029,6 @@ function TotalsSummary({ result }: { result: EconomicsResult }) {
   );
 }
 
-/** The tables' shape while the rows load (design-spec 6.0.6). */
-function TablesSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <Stack gap="space-500">
-      {CATEGORIES.map((category) => (
-        <Stack key={category} gap="space-100">
-          <Heading level={2} variant="heading-4">
-            {t(`validation:costs.table.${category}`)}
-          </Heading>
-          {[0, 1, 2, 3].map((row) => (
-            <Text key={row}>{t(`validation:costs.table.${category}`)}</Text>
-          ))}
-        </Stack>
-      ))}
-    </Stack>
-  );
-}
-
 const NO_ITEMS: CostItem[] = [];
 const NO_INPUTS: CostList["economicsInputs"] = [];
 
@@ -1070,6 +1043,7 @@ function CostsBody({
   modal: string | undefined;
   about: string | undefined;
 }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["validation", "common", "app"]);
   const { me, workspace, role } = useWorkspace();
   const queryClient = useQueryClient();
@@ -1087,7 +1061,7 @@ function CostsBody({
   const canEdit = role !== "viewer" && !idea.archived;
   const list = costsQuery(idea.id, validationId);
   const query = useQuery(list);
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [list]);
   const { rows, numbers, result } = useWorksheet(
     validationId,
     query.data?.items ?? NO_ITEMS,
@@ -1104,6 +1078,18 @@ function CostsBody({
   const [reordering, setReordering] = useState<CostCategory | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
+  // M2 opens on a row 17 lists, for someone who may edit; once open it stays with the
+  // row as it last was if the row is deleted meanwhile (`isEvidenceGone`).
+  const aboutRow = rows.find((view) => aboutOf(view.row.id) === about);
+  const isEvidenceDecided = useIsValidationRead(home.idea.id, query);
+  const evidenceView = useSearchModalAbout(
+    modal,
+    "evidence",
+    aboutRow,
+    canEdit,
+    isEvidenceDecided,
+  );
+  const isEvidenceGone = evidenceView !== undefined && aboutRow === undefined;
 
   const targetOf = (costItemId: string) =>
     costTarget(
@@ -1191,13 +1177,7 @@ function CostsBody({
   });
 
   // Whether 17 is still open when a delete settles, which may be later.
-  const isOpen = useRef(true);
-  useEffect(() => {
-    isOpen.current = true;
-    return () => {
-      isOpen.current = false;
-    };
-  }, []);
+  const isOpen = useIsMounted();
   const remove = useMutation({
     mutationFn: (costItemId: string) =>
       unwrap(
@@ -1296,7 +1276,7 @@ function CostsBody({
 
   if (query.data === undefined) {
     return isSlow ? (
-      <SlowLoadingState onRetry={() => void query.refetch()} />
+      <SlowLoadingState onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <WorksheetPattern
@@ -1500,10 +1480,6 @@ function CostsBody({
   const sheetView = sheetRowId === null ? undefined : viewOf(sheetRowId);
   const deletingView = deleting === null ? undefined : viewOf(deleting);
   const switchingView = switching === null ? undefined : viewOf(switching);
-  const evidenceView =
-    modal === "evidence" && canEdit
-      ? rows.find((view) => aboutOf(view.row.id) === about)
-      : undefined;
   const reorderItems = (category: CostCategory, items: readonly CostItem[]) =>
     items
       .filter((row) => row.category === category)
@@ -1537,7 +1513,7 @@ function CostsBody({
           onClose={() => setSheetRowId(null)}
         />
       )}
-      {reordering !== null && canEdit && (
+      {reordering !== null && (
         <ReorderDialog
           title={t(`validation:costs.reorderTitle.${reordering}`)}
           items={reorderItems(reordering, query.data.items)}
@@ -1613,11 +1589,23 @@ function CostsBody({
             saveKey={costKey(evidenceView.row.id)}
             forFact={forFact}
             onChanged={(change) =>
-              putCostRow(queryClient, list.queryKey, {
-                id: evidenceView.row.id,
-                classification: change.classification,
-                lockVersion: change.lockVersion,
-              })
+              // In its place only: a row deleted meanwhile is not listed again.
+              putSaved<CostList>(queryClient, list.queryKey, (data) =>
+                data === undefined
+                  ? undefined
+                  : {
+                      ...data,
+                      items: data.items.map((row) =>
+                        row.id === evidenceView.row.id
+                          ? {
+                              ...row,
+                              classification: change.classification,
+                              lockVersion: change.lockVersion,
+                            }
+                          : row,
+                      ),
+                    },
+              )
             }
             onMarkFact={() =>
               classify(evidenceView, { fau: "fact", confidence: null })
@@ -1625,28 +1613,12 @@ function CostsBody({
             onReload={() =>
               void queryClient.invalidateQueries({ queryKey: list.queryKey })
             }
+            isGone={isEvidenceGone}
             onClose={modals.close}
           />
         </ModalBoundary>
       )}
     </>
-  );
-}
-
-/**
- * 17's shape while its route loads (design-spec 6.0.6). Drawn inside a `Skeleton`, its
- * words are bars.
- */
-export function CostsSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <WorksheetPattern
-      header={<Heading level={1}>{t("validation:costs.title")}</Heading>}
-      inputs={<TablesSkeleton />}
-      resultsTitle={t("validation:costs.totals")}
-      results={null}
-      summary={null}
-    />
   );
 }
 
@@ -1669,8 +1641,11 @@ export function CostsScreen({
 }) {
   const { t } = useTranslation(["ideas", "validation"]);
   const { me, workspace } = useWorkspace();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "05")?.title;
@@ -1730,7 +1705,7 @@ export function CostsScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = (
       <Skeleton isLoading>

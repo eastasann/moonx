@@ -17,8 +17,11 @@ import {
 import {
   buildDecisionSnapshot,
   type CostRowState,
+  conditionAnswersOutside,
+  decidesElsewhere,
   type EconomicsInputState,
   evaluateValidation,
+  isQuestionShown,
   orderRisks,
   type ValidationAnswerInput,
   type ValidationState,
@@ -386,6 +389,83 @@ describe("02 OCEAN shows its questions (design-spec 6.1・6.2)", () => {
     );
     expect(result.sections.find((s) => s.key === "02")?.answered).toBe(0);
     expect(result.fau.assumption.total).toBe(0);
+  });
+});
+
+describe("a display condition naming a question of another section (design-spec 6.2)", () => {
+  const who = question("V.01.WHO");
+  const proof = question("V.01.PROOF", { "V.02.OCEAN": ["Red"] });
+  const ocean = question("V.02.OCEAN");
+  const red = question("V.02.RED_1", { "V.01.WHO": ["Offices"] });
+  const both = question("V.02.RED_2", {
+    "V.01.WHO": ["Offices"],
+    "V.02.OCEAN": ["Red"],
+  });
+  const version = [who, proof, ocean, red, both];
+  const answers = new Map([
+    ["V.01.WHO", { text: " Offices " }],
+    ["V.02.OCEAN", { text: "Blue" }],
+  ]);
+
+  test("the form reads the answers its conditions name outside it, in template order", () => {
+    expect(
+      conditionAnswersOutside([ocean, red, both], version, answers),
+    ).toEqual([{ questionKey: "V.01.WHO", text: " Offices " }]);
+    expect(conditionAnswersOutside([who, proof], version, answers)).toEqual([
+      { questionKey: "V.02.OCEAN", text: "Blue" },
+    ]);
+    // Unanswered: null, so the condition hides what it shows on.
+    expect(conditionAnswersOutside([who, proof], version, new Map())).toEqual([
+      { questionKey: "V.02.OCEAN", text: null },
+    ]);
+    expect(conditionAnswersOutside([who], version, answers)).toEqual([]);
+  });
+
+  test("with them, the form shows what the hub shows", () => {
+    const own = [ocean, red, both];
+    const formAnswers = new Map([
+      ...conditionAnswersOutside(own, version, answers).map(
+        ({ questionKey, text }) => [questionKey, { text }] as const,
+      ),
+      ["V.02.OCEAN", { text: "Red" }],
+    ]);
+    const hubAnswers = new Map([...answers, ["V.02.OCEAN", { text: "Red" }]]);
+    expect(own.map((q) => isQuestionShown(q, formAnswers))).toEqual(
+      own.map((q) => isQuestionShown(q, hubAnswers)),
+    );
+    expect(own.map((q) => isQuestionShown(q, formAnswers))).toEqual([
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  test("a condition naming a key the version lacks still reads its answer, after the version's", () => {
+    const odd = question("V.02.ODD", {
+      "V.01.GONE": ["Yes"],
+      "V.01.WHO": ["Offices"],
+    });
+    expect(
+      conditionAnswersOutside(
+        [odd],
+        [who, odd],
+        new Map([["V.01.GONE", { text: "Yes" }]]),
+      ),
+    ).toEqual([
+      { questionKey: "V.01.WHO", text: null },
+      { questionKey: "V.01.GONE", text: "Yes" },
+    ]);
+  });
+
+  test("names the questions of a section whose answer decides one in another", () => {
+    expect(decidesElsewhere([who, proof], version)).toEqual(["V.01.WHO"]);
+    expect(decidesElsewhere([ocean, red, both], version)).toEqual([
+      "V.02.OCEAN",
+    ]);
+    // 02 OCEAN deciding 02's own questions alone is not "elsewhere".
+    expect(decidesElsewhere([ocean, red, both], [ocean, red, both])).toEqual(
+      [],
+    );
   });
 });
 

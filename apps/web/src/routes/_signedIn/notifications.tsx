@@ -3,8 +3,8 @@ import { OutsideWorkspace } from "../../components/OutsideWorkspace";
 import {
   NotificationsScreen,
   type NotificationsSearch,
-  NotificationsSkeleton,
 } from "../../screens/Notifications";
+import { NotificationsSkeleton } from "../../screens/NotificationsSkeleton";
 
 /**
  * `/notifications`: 8 Notifications (SDD 4章), across the workspaces. `filter` other than

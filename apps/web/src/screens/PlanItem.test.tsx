@@ -1,3 +1,4 @@
+import { conditionAnswersOutside, planItemProgress } from "@moonx/domain";
 import type {
   ExecutionItem,
   HistoryEntry,
@@ -10,10 +11,21 @@ import type {
   Role,
   TemplateQuestion,
 } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { focusManager } from "@tanstack/react-query";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import { TYPING_PAUSE_MS } from "../lib/autosave";
+import {
+  ana,
+  apiError,
+  type Call,
+  readAgainOnFocus,
+  renderApp,
+  setViewport,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   anaRef,
@@ -163,6 +175,7 @@ const summary: PlanItem = {
     }),
     answer("P.01.2"),
   ],
+  conditionAnswers: [],
   metrics,
   costRowNames: {},
   scenarios: [],
@@ -197,6 +210,7 @@ const ownership = (rows: PlanAnswer["rows"]): PlanItem => ({
     }),
   ],
   answers: [answer("P.13.1", { rows, lockVersion: rows === null ? 0 : 3 })],
+  conditionAnswers: [],
   metrics: {},
   costRowNames: {},
   scenarios: [],
@@ -211,6 +225,69 @@ const ownership = (rows: PlanAnswer["rows"]): PlanItem => ({
   ],
 });
 
+/** §21: the assumptions the draft copied from 16, as a table of text columns. */
+const assumptions = (rows: PlanAnswer["rows"]): PlanItem => ({
+  itemNo: 21,
+  title: "Key Assumptions",
+  guidance: null,
+  readOnly: false,
+  prompts: [
+    prompt("P.21.1", "Key assumptions", {
+      answerType: "table",
+      options: {
+        kind: "table",
+        columns: [
+          { key: "statement", label: "Assumption", type: "text" },
+          { key: "evidence", label: "Evidence", type: "text" },
+        ],
+      },
+    }),
+  ],
+  answers: [
+    answer("P.21.1", {
+      rows,
+      copiedFrom: {
+        source: "LIST.ASSUMPTIONS",
+        copiedAt: "2026-09-01T02:00:00.000Z",
+      },
+      lockVersion: 3,
+    }),
+  ],
+  conditionAnswers: [],
+  metrics: {},
+  costRowNames: {},
+  scenarios: [],
+  execution: [],
+  references: [],
+});
+
+/** §24: the three conditions, with the plan's Go / No-Go history to look at. */
+const goNoGo: PlanItem = {
+  itemNo: 24,
+  title: "Go / No-Go Conditions",
+  guidance: null,
+  readOnly: false,
+  prompts: [
+    prompt("P.24.1", "We proceed to launch if"),
+    prompt("P.24.2", "We delay if"),
+    prompt("P.24.3", "We stop / abandon if"),
+  ],
+  answers: [answer("P.24.1"), answer("P.24.2"), answer("P.24.3")],
+  conditionAnswers: [],
+  metrics: {},
+  costRowNames: {},
+  scenarios: [],
+  execution: [],
+  references: [
+    {
+      kind: "go_no_go_history",
+      title: "Go / No-Go decisions",
+      data: [],
+      link: { screen: 7, workspaceId, ideaId },
+    },
+  ],
+};
+
 /** §23: the plan's milestones, shown and added as 22's. */
 const milestones = (execution: ExecutionItem[]): PlanItem => ({
   itemNo: 23,
@@ -224,6 +301,7 @@ const milestones = (execution: ExecutionItem[]): PlanItem => ({
     }),
   ],
   answers: [],
+  conditionAnswers: [],
   metrics: {},
   costRowNames: {},
   scenarios: [],
@@ -260,6 +338,7 @@ const market: PlanItem = {
     }),
   ],
   answers: [answer("P.06.1")],
+  conditionAnswers: [],
   metrics: {},
   costRowNames: {},
   scenarios: [],
@@ -322,9 +401,11 @@ function itemApi({
   home = planHome(),
   ideaArchived = false,
   created,
+  create,
   history = [],
   members = true,
   patch,
+  beforeSave,
 }: {
   me?: Me;
   items: PlanItem[];
@@ -332,17 +413,22 @@ function itemApi({
   home?: ReturnType<typeof planHome>;
   ideaArchived?: boolean;
   created?: ExecutionItem;
+  /** Answers P9 POST instead of `created`; a promise holds the answer back. */
+  create?: () => Response | Promise<Response>;
   history?: HistoryEntry[];
   /** Whether W2 answers; else it fails as not found. */
   members?: boolean;
   /** Answers P10 PATCH instead of keeping what it sends. */
   patch?: () => Response;
+  /** Holds a save back before the fake applies it, as a slow P5 would. */
+  beforeSave?: () => Promise<void>;
 }) {
   const answers = new Map(
     items.flatMap((item) =>
       item.answers.map((saved) => [saved.questionKey, saved] as const),
     ),
   );
+  const prompts = items.flatMap((item) => item.prompts);
   return stubApi((call: Call) => {
     const { method, path } = call;
     if (method === "GET" && path === "/api/v1/me") return Response.json(me);
@@ -367,7 +453,20 @@ function itemApi({
       const [no, search] = (path.split("/items/")[1] ?? "").split("?");
       const list = search === `versionId=${versionId}` ? version : items;
       const item = list?.find(({ itemNo }) => itemNo === Number(no));
-      return item === undefined ? undefined : Response.json(item);
+      if (item === undefined) return undefined;
+      // What P4 reads of the other items, from what this fake holds now.
+      return Response.json(
+        list === items
+          ? {
+              ...item,
+              conditionAnswers: conditionAnswersOutside(
+                item.prompts,
+                prompts,
+                answers,
+              ),
+            }
+          : item,
+      );
     }
     if (
       method === "GET" &&
@@ -385,23 +484,27 @@ function itemApi({
       });
     }
     if (method === "PUT" && path.startsWith(`${api}/answers/`)) {
-      const key = decodeURIComponent(path.split("/answers/")[1] ?? "");
-      const body = call.body as {
-        text?: string;
-        rows?: PlanAnswer["rows"];
-        lockVersion: number;
+      const apply = () => {
+        const key = decodeURIComponent(path.split("/answers/")[1] ?? "");
+        const body = call.body as {
+          text?: string;
+          rows?: PlanAnswer["rows"];
+          lockVersion: number;
+        };
+        const before = answers.get(key) ?? answer(key);
+        const after = {
+          ...before,
+          ...(body.text === undefined ? {} : { text: body.text }),
+          ...(body.rows === undefined ? {} : { rows: body.rows }),
+          lockVersion: body.lockVersion + 1,
+        };
+        answers.set(key, after);
+        return Response.json(after);
       };
-      const before = answers.get(key) ?? answer(key);
-      const after = {
-        ...before,
-        ...(body.text === undefined ? {} : { text: body.text }),
-        ...(body.rows === undefined ? {} : { rows: body.rows }),
-        lockVersion: body.lockVersion + 1,
-      };
-      answers.set(key, after);
-      return Response.json(after);
+      return beforeSave === undefined ? apply() : beforeSave().then(apply);
     }
     if (method === "POST" && path === `${api}/execution-items`) {
+      if (create !== undefined) return create();
       return created === undefined
         ? undefined
         : Response.json(created, { status: 201 });
@@ -661,6 +764,7 @@ describe("21 Plan item (design-spec 6.12)", () => {
         }),
       ],
       answers: [answer("P.08.11")],
+      conditionAnswers: [],
       // Payroll is not in the validation: the API leaves it out and names it as the
       // template does (P4 `costRowNames`).
       metrics: {
@@ -773,6 +877,93 @@ describe("21 Plan item (design-spec 6.12)", () => {
   });
 });
 
+describe("a display condition naming another item's sub-item (design-spec 6.12・6.2)", () => {
+  /** §1's invoicing, which §2's first sub-item shows on. */
+  const invoicing = (text: string | null): PlanItem => ({
+    itemNo: 1,
+    title: "Executive Summary",
+    guidance: null,
+    readOnly: false,
+    prompts: [prompt("P.01.5", "Do offices pay by invoice")],
+    answers: [answer("P.01.5", { text, lockVersion: text === null ? 0 : 1 })],
+    conditionAnswers: [],
+    metrics: {},
+    costRowNames: {},
+    scenarios: [],
+    execution: [],
+    references: [],
+  });
+  const vision: PlanItem = {
+    itemNo: 2,
+    title: "Vision & Purpose",
+    guidance: null,
+    readOnly: false,
+    prompts: [
+      prompt("P.02.1", "How do invoices reach offices", {
+        displayCondition: { "P.01.5": ["Yes"] },
+      }),
+      prompt("P.02.2", "Why does this business exist"),
+    ],
+    answers: [answer("P.02.1"), answer("P.02.2")],
+    conditionAnswers: [],
+    metrics: {},
+    costRowNames: {},
+    scenarios: [],
+    execution: [],
+    references: [],
+  };
+
+  test.each([
+    ["Yes", true],
+    ["No", false],
+  ])(
+    "§2 shows a sub-item by §1's answer (%s) and counts as 20 does",
+    async (text, isShown) => {
+      itemApi({ items: [invoicing(text), vision] });
+      renderApp(itemPath(2));
+      await screen.findByRole("region", {
+        name: "Why does this business exist",
+      });
+      // 20 counts on all of the plan's answers (packages/domain, as P2 does).
+      const hub = planItemProgress(vision.prompts, {
+        answers: new Map([["P.01.5", { text, rows: null }]]),
+        executionCounts: new Map(),
+      });
+      expect(hub.total).toBe(isShown ? 2 : 1);
+      expect(screen.getByText(`${hub.filled}/${hub.total}`)).toBeTruthy();
+      expect(
+        screen.queryByRole("region", {
+          name: "How do invoices reach offices",
+        }) !== null,
+      ).toBe(isShown);
+    },
+  );
+
+  test("a save sent on leaving reads the next item again, whose condition names it", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls = itemApi({
+      items: [invoicing(null), vision],
+      beforeSave: () => held,
+    });
+    const router = renderApp(itemPath(1, "?q=P.01.5"));
+    const field = await screen.findByRole("textbox", {
+      name: "Answer to Do offices pay by invoice",
+    });
+    await user.type(field, "Yes");
+    await router.navigate({ href: itemPath(2) });
+    // Read before the save of §1 landed: what it shows is not shown yet.
+    expect(await screen.findByText("0/1")).toBeTruthy();
+    release();
+    expect(await screen.findByText("0/2")).toBeTruthy();
+    expect(card("How do invoices reach offices")).toBeTruthy();
+    expect(sent(calls, "GET", `${api}/items/2`)).toHaveLength(2);
+  });
+});
+
 describe("21's table sub-items (design-spec 6.12・6.0.8)", () => {
   test("No rows, then Add row sends a row of empty cells", async () => {
     const user = userEvent.setup();
@@ -793,6 +984,56 @@ describe("21's table sub-items (design-spec 6.12・6.0.8)", () => {
         lockVersion: 0,
       }),
     );
+  });
+
+  test("on a phone, a row's sheet stays open when 21 reads the plan as archived meanwhile, until it is closed; Restore does not open it again (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    try {
+      const home = planHome();
+      const item = ownership([
+        { name: "Ana", initial_ownership: 0.4, initial_capital: 50000 },
+      ]);
+      itemApi({ items: [item], home });
+      renderApp(itemPath(13));
+      const table = await screen.findByRole("region", {
+        name: "Ownership and capital",
+      });
+      const row = within(table)
+        .getAllByRole("row")
+        .find((each) => each.textContent?.includes("Ana"));
+      await user.click(row as HTMLElement);
+      const sheet = await screen.findByRole("dialog", { name: "Row 1" });
+      Object.assign(home, planHome({ archived: true }));
+      item.readOnly = true;
+      readAgainOnFocus();
+      // Read again as archived: the table behind reads only, without Add row.
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", {
+            name: "Add row to Ownership and capital",
+            hidden: true,
+          }),
+        ).toBeNull(),
+      );
+      expect(screen.getByRole("dialog", { name: "Row 1" })).toBe(sheet);
+      await user.keyboard("{Escape}");
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Row 1" })).toBeNull(),
+      );
+      Object.assign(home, planHome());
+      item.readOnly = false;
+      readAgainOnFocus();
+      expect(
+        await screen.findByRole("button", {
+          name: "Add row to Ownership and capital",
+        }),
+      ).toBeTruthy();
+      expect(screen.queryByRole("dialog")).toBeNull();
+    } finally {
+      act(() => focusManager.setFocused(undefined));
+      setViewport(1024);
+    }
   });
 
   test("a % is shown as typed and kept as its rate; the totals under the table, no warning", async () => {
@@ -900,6 +1141,95 @@ describe("21's table sub-items (design-spec 6.12・6.0.8)", () => {
       }),
     );
   });
+
+  test("a cell the draft copied over 2,000 characters keeps its reason and its value; the rest saves with it, and it is sent once short enough", async () => {
+    const user = userEvent.setup();
+    const long = "x".repeat(2001);
+    const tooLong = "Too long. Shorten to 2,000 characters.";
+    const calls = itemApi({
+      items: [assumptions([{ statement: long, evidence: "Two stalls asked" }])],
+    });
+    const puts = () => sent(calls, "PUT", `${api}/answers/P.21.1`);
+    renderApp(itemPath(21));
+    const table = await screen.findByRole("region", {
+      name: "Key assumptions",
+    });
+    // The reason under the cell's value, in the cell.
+    const reason = await within(table).findByText(tooLong);
+    expect(reason.closest("[data-column]")?.textContent).toBe(
+      `${long}${tooLong}`,
+    );
+
+    // Another cell of its row saves, the long one sent as it is.
+    await user.click(within(table).getByText("Two stalls asked"));
+    const evidence = await within(table).findByRole("textbox", {
+      name: "Evidence",
+    });
+    await user.type(evidence, " too");
+    await user.tab();
+    await waitFor(() =>
+      expect(puts().at(-1)?.body).toEqual({
+        rows: [{ statement: long, evidence: "Two stalls asked too" }],
+        lockVersion: 3,
+      }),
+    );
+    expect(within(table).getByText(tooLong)).toBeTruthy();
+
+    await user.click(
+      within(table).getByRole("button", { name: "Add row to Key assumptions" }),
+    );
+    await waitFor(() =>
+      expect(puts().at(-1)?.body).toEqual({
+        rows: [
+          { statement: long, evidence: "Two stalls asked too" },
+          { statement: null, evidence: null },
+        ],
+        lockVersion: 4,
+      }),
+    );
+    await waitFor(() => expect(within(table).getByText(tooLong)).toBeTruthy());
+
+    // Longer still, it is not sent; shortened to the limit, it is.
+    await user.click(within(table).getByText(long));
+    const statement = await waitFor(() => {
+      const field = within(table).getByRole("textbox", { name: "Assumption" });
+      expect((field as HTMLInputElement).value).toBe(long);
+      return field;
+    });
+    const before = puts().length;
+    // The typing pause (6.0.2) run out on the fake clock, not slept through: past it for
+    // sure, however slow the run.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const paused = userEvent.setup({
+        advanceTimers: vi.advanceTimersByTime,
+      });
+      await paused.type(statement, "y");
+      await act(() => vi.advanceTimersByTimeAsync(TYPING_PAUSE_MS));
+      expect(puts()).toHaveLength(before);
+      await paused.type(statement, "{Backspace}{Backspace}");
+      await paused.tab();
+      const shortened = {
+        rows: [
+          { statement: "x".repeat(2000), evidence: "Two stalls asked too" },
+          { statement: null, evidence: null },
+        ],
+        lockVersion: 5,
+      };
+      const sentSince = () =>
+        puts()
+          .slice(before)
+          .map(({ body }) => body);
+      await waitFor(() => expect(sentSince()).toEqual([shortened]));
+      await act(() => vi.advanceTimersByTimeAsync(TYPING_PAUSE_MS));
+      expect(sentSince()).toEqual([shortened]);
+      await waitFor(() =>
+        expect(within(table).queryByText(tooLong)).toBeNull(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
@@ -908,6 +1238,261 @@ describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
     dueDate: "2026-09-30",
     overdue: true,
     commentCount: 2,
+  });
+
+  test("a new item refused as the plan is archived meanwhile: 21 reads as archived; the dialog keeps what was typed and why (6.13)", async () => {
+    const user = userEvent.setup();
+    const home = planHome();
+    const item = milestones([]);
+    itemApi({
+      items: [item],
+      home,
+      create: () => {
+        // Archived meanwhile: P2 and P4 read it so from now on.
+        Object.assign(home, planHome({ archived: true }));
+        item.readOnly = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(itemPath(23));
+    const card23 = await screen.findByRole("region", {
+      name: "Pre-launch Milestones",
+    });
+    await user.click(
+      within(card23).getByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Milestone/ }),
+      "Sign the lease",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "New milestone" })).toBeTruthy();
+    const title = within(dialog).getByRole("textbox", { name: /Milestone/ });
+    expect((title as HTMLInputElement).value).toBe("Sign the lease");
+    expect(title.hasAttribute("readonly")).toBe(true);
+    expect(within(dialog).getByRole("alert").textContent).toContain(
+      "It's archived",
+    );
+  });
+
+  test("a new item refused as gone (404): the dialog locks at once, with what was typed and why; nothing more is sent (6.10・6.13)", async () => {
+    const user = userEvent.setup();
+    const calls = itemApi({
+      items: [milestones([])],
+      create: () => apiError(404, "NOT_FOUND"),
+    });
+    renderApp(itemPath(23));
+    const card23 = await screen.findByRole("region", {
+      name: "Pre-launch Milestones",
+    });
+    await user.click(
+      within(card23).getByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Milestone/ }),
+      "Sign the lease",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("It no longer exists");
+    // Read again, 21 still lets the user add: the refusal itself locks the dialog.
+    const title = within(dialog).getByRole("textbox", { name: /Milestone/ });
+    expect((title as HTMLInputElement).value).toBe("Sign the lease");
+    expect(title.hasAttribute("readonly")).toBe(true);
+    expect(
+      within(alert)
+        .getByRole("button", { name: "Retry" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    const add = within(dialog).getByRole("button", { name: "Add" });
+    expect(add.hasAttribute("disabled")).toBe(true);
+    await user.click(add);
+    expect(
+      calls.filter(
+        ({ method, path }) =>
+          method === "POST" && path === `${api}/execution-items`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  const signed = milestone(
+    "5e0c0000-0000-4000-8000-000000000009",
+    "Sign the lease",
+    { fromPreset: false },
+  );
+
+  /**
+   * New milestone sent with Add and Cancel pressed while it is on its way, its answer
+   * held until `answerAdd`; then `answer` answers it, and any Retry.
+   */
+  async function cancelWhileAdding(answer: () => Response) {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    let isFirst = true;
+    const calls = itemApi({
+      items: [milestones([])],
+      create: () => {
+        if (!isFirst) return answer();
+        isFirst = false;
+        return new Promise<Response>((resolve) => {
+          answerAdd = () => resolve(answer());
+        });
+      },
+    });
+    const router = renderApp(itemPath(23));
+    const card23 = await screen.findByRole("region", {
+      name: "Pre-launch Milestones",
+    });
+    await user.click(
+      within(card23).getByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Milestone/ }),
+      "Sign the lease",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    const posts = () => sent(calls, "POST", `${api}/execution-items`);
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New milestone" }),
+      ).toBeNull(),
+    );
+    return { user, router, posts, answerAdd: async () => answerAdd() };
+  }
+
+  const isListed = () =>
+    within(screen.getByRole("grid", { name: "Milestones" })).queryByText(
+      "Sign the lease",
+    ) !== null;
+
+  test("Cancel while Add is on its way, and it goes through: the item is made, New stays closed, and the user stays where they are", async () => {
+    const { router, answerAdd } = await cancelWhileAdding(() =>
+      Response.json(signed, { status: 201 }),
+    );
+    const at = router.state.location.href;
+    const entries = router.history.length;
+    await answerAdd();
+    await waitFor(() => expect(isListed()).toBe(true));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(router.state.location.href).toBe(at);
+    expect(router.history.length).toBe(entries);
+  });
+
+  test("Cancel while Add is on its way, and the API is down: a toast with Couldn't save and its Ref; its Retry sends the same item, which is made (6.0.6)", async () => {
+    let isFailing = true;
+    const { user, posts, answerAdd } = await cancelWhileAdding(() =>
+      isFailing
+        ? apiError(503, "UPSTREAM_UNAVAILABLE")
+        : Response.json(signed, { status: 201 }),
+    );
+    const toast = await toastAfter("Couldn't save. Ref: 8f14e45f", answerAdd);
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posts()).toHaveLength(2));
+    expect(posts()[1]?.body).toEqual(posts()[0]?.body);
+    await waitFor(() => expect(isListed()).toBe(true));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("Cancel while Add is on its way, and it fails unexpectedly (500): Something went wrong with its Ref and Retry, in a toast", async () => {
+    const { answerAdd } = await cancelWhileAdding(() =>
+      apiError(500, "INTERNAL"),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      answerAdd,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(
+      screen.queryByRole("alertdialog", { name: "Alert Something went wrong" }),
+    ).toBeNull();
+  });
+
+  test("Cancel while Add is on its way, and it is refused as the plan is archived: the reason in a toast without Retry, and 21 reads as archived", async () => {
+    const user = userEvent.setup();
+    const home = planHome();
+    const item = milestones([]);
+    let answerAdd = () => {};
+    const calls = itemApi({
+      items: [item],
+      home,
+      create: () =>
+        new Promise<Response>((resolve) => {
+          answerAdd = () => {
+            Object.assign(home, planHome({ archived: true }));
+            item.readOnly = true;
+            resolve(apiError(409, "ARCHIVED"));
+          };
+        }),
+    });
+    renderApp(itemPath(23));
+    const card23 = await screen.findByRole("region", {
+      name: "Pre-launch Milestones",
+    });
+    await user.click(
+      within(card23).getByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Milestone/ }),
+      "Sign the lease",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    const planReads = () =>
+      calls.filter(({ method, path }) => method === "GET" && path === api)
+        .length;
+    const readsBefore = planReads();
+    const toast = await toastAfter("Couldn't save. It's archived.", async () =>
+      answerAdd(),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // The toast reads the screen again, once: the closed form reads nothing itself.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(planReads()).toBe(readsBefore + 1);
+  });
+
+  test("New stays open when 21 reads the plan as archived meanwhile, and Add shows the refusal in it (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    const home = planHome();
+    const item = milestones([]);
+    itemApi({
+      items: [item],
+      home,
+      create: () => apiError(409, "ARCHIVED"),
+    });
+    renderApp(itemPath(23));
+    const card23 = await screen.findByRole("region", {
+      name: "Pre-launch Milestones",
+    });
+    await user.click(
+      within(card23).getByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Milestone/ }),
+      "Sign the lease",
+    );
+    Object.assign(home, planHome({ archived: true }));
+    item.readOnly = true;
+    // The window's focus reads the plan again (TanStack Query's refetch on focus).
+    readAgainOnFocus();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "New milestone" })).toBe(dialog);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toContain(
+      "It's archived",
+    );
+    act(() => focusManager.setFocused(undefined));
   });
 
   test("Nothing yet, then + Add makes one: Add waits for its first column", async () => {
@@ -1157,7 +1742,11 @@ describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
     });
     const assignee = within(dialog).getByRole("combobox", { name: "Assignee" });
     await user.clear(assignee);
-    await user.type(assignee, "x".repeat(61));
+    // A name of 60 that may be saved, then the key past the limit: as typed, without 61
+    // renders of the list under load.
+    await user.paste("x".repeat(60));
+    await user.keyboard("x");
+    expect(assignee).toHaveProperty("value", "x".repeat(61));
     expect(
       await within(dialog).findByText("Too long. Shorten to 60 characters."),
     ).toBeTruthy();
@@ -1242,7 +1831,10 @@ describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
       "Lease",
     );
     const assignee = within(dialog).getByRole("combobox", { name: "Assignee" });
-    await user.type(assignee, "x".repeat(61));
+    await user.click(assignee);
+    await user.paste("x".repeat(60));
+    await user.keyboard("x");
+    expect(assignee).toHaveProperty("value", "x".repeat(61));
     const add = within(dialog).getByRole("button", { name: "Add" });
     expect(add.hasAttribute("disabled")).toBe(true);
     await user.type(assignee, "{Backspace}");
@@ -1474,5 +2066,47 @@ describe("21's references (design-spec 6.12「参照（常に最新）」)", () 
       screen.getByRole("button", { name: "Research Log · Permits" }),
     );
     expect(await screen.findByText("Nothing in it yet")).toBeTruthy();
+  });
+
+  const goNoGoNote =
+    "Record a decision with Record Go / No-Go on the plan home.";
+
+  test.each(["owner", "member"] as const)(
+    "§24 tells an %s, who can change the plan, where to record a decision",
+    async (role) => {
+      itemApi({ me: as(role), items: [goNoGo] });
+      renderApp(itemPath(24));
+      const note = await screen.findByText(goNoGoNote);
+      // Under the references.
+      expect(
+        screen
+          .getByRole("button", { name: "Go / No-Go decisions" })
+          .compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    },
+  );
+
+  test.each([
+    ["a Viewer", { me: as("viewer"), items: [{ ...goNoGo, readOnly: true }] }],
+    [
+      "a saved version open",
+      { items: [goNoGo], version: [{ ...goNoGo, readOnly: true }] },
+    ],
+    [
+      "an archived plan",
+      {
+        items: [{ ...goNoGo, readOnly: true }],
+        home: planHome({ archived: true }),
+      },
+    ],
+  ])("§24 has no such note for %s", async (_, options) => {
+    itemApi(options);
+    renderApp(
+      itemPath(24, "version" in options ? `?version=${versionId}` : undefined),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Go / No-Go decisions" }),
+    ).toBeTruthy();
+    expect(screen.queryByText(goNoGoNote)).toBeNull();
   });
 });

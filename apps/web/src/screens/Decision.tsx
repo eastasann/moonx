@@ -32,7 +32,7 @@ import {
 } from "@moonx/ui-web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import {
@@ -40,20 +40,23 @@ import {
   FauCounts,
   MissingCheckRows,
 } from "../components/decisionParts";
+import { useFailureOnceClosed } from "../components/ideaActions";
 import { rateLimitWords } from "../components/SendFailure";
 import {
   FailureState,
   NoAccessState,
-  reportOnce,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
+import { userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { rejectionReason } from "../lib/autosave";
+import { isTransient, useUnexpectedReference } from "../lib/failure";
 import { inputIssueMessage } from "../lib/input-issues";
 import { decisionsHref, ideaHref, ideasHref } from "../lib/links";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import {
   decisionContextQuery,
@@ -61,7 +64,9 @@ import {
   validationHomeQuery,
   workspaceKey,
 } from "../lib/queries";
+import { isSessionLost, useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
+import { DecisionSkeleton, MaterialSkeleton } from "./DecisionSkeleton";
 
 /** How long "Decision recorded" stays: the shortest 4.5 Toast allows. */
 const TOAST_MS = 5000;
@@ -158,7 +163,7 @@ function Material({ context }: { context: DecisionContext }) {
                   date: formatDate(lastDecision.recordedAt, {
                     timeZone: me.timezone,
                   }),
-                  name: lastDecision.recordedBy.displayName,
+                  name: userNameText(lastDecision.recordedBy),
                 })}
               </Link>
             </Text>
@@ -169,34 +174,10 @@ function Material({ context }: { context: DecisionContext }) {
   );
 }
 
-/** The material's shape while it loads (design-spec 6.5: the fields come first). */
-function MaterialSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <Skeleton isLoading>
-      <Well density="spacious">
-        <Stack gap="space-300">
-          {[
-            t("validation:decision.summary"),
-            t("validation:decision.keyNumbers"),
-            t("validation:decision.checks"),
-          ].map((label) => (
-            <Stack key={label} gap="space-100">
-              <Heading level={2} variant="label">
-                {label}
-              </Heading>
-              <Text>{t("validation:decision.material")}</Text>
-            </Stack>
-          ))}
-        </Stack>
-      </Well>
-    </Skeleton>
-  );
-}
-
 /**
  * "Couldn't record" with Retry (design-spec 6.5「記録の失敗」): the reason a refusal
- * names, the wait of a rate limit, or the Ref of an unexpected failure.
+ * names, the wait of a rate limit, or the Ref of an unexpected failure. A lost session
+ * takes the app's way (M9 or the sign-in screen) and shows nothing here (SDD 8.2).
  */
 function RecordFailure({
   error,
@@ -210,19 +191,12 @@ function RecordFailure({
   const { t } = useTranslation(["validation", "app"]);
   const rateLimited = rateLimitWords(error);
   const reason = error instanceof ApiError ? rejectionReason(error) : null;
-  const isTransient =
-    error instanceof ApiError &&
-    (error.status === null || error.code === "UPSTREAM_UNAVAILABLE");
-  const isUnexpected = rateLimited === null && reason === null && !isTransient;
-  const reference = useMemo(
-    () =>
-      !isUnexpected
-        ? null
-        : error instanceof ApiError
-          ? error.requestId
-          : reportOnce(error),
-    [isUnexpected, error],
-  );
+  const isTemporary = isTransient(error);
+  const isSignedOut = isSessionLost(error);
+  const isUnexpected =
+    !isSignedOut && rateLimited === null && reason === null && !isTemporary;
+  const reference = useUnexpectedReference(error, isUnexpected);
+  if (isSignedOut) return null;
   return (
     <InlineAlert variant="negative">
       <Flex gap="space-200" wrap alignItems="center">
@@ -257,6 +231,15 @@ function newerOf(error: unknown): DecisionLogSummary | null {
   return decisionLogSummarySchema.safeParse(error.detail.latest).data ?? null;
 }
 
+/** A record as V19 is sent it: the decision, why, and the one it is based on. */
+interface RecordInput {
+  chosen: DecisionValue;
+  /** Recorded over a decision someone recorded meanwhile, as asked (DECISION_CHANGED). */
+  confirmNewer: boolean;
+  reason: string;
+  basedOnDecisionId: string | null;
+}
+
 function DecisionBody({ home }: { home: ValidationHome }) {
   const { t } = useTranslation(["validation", "common", "errors", "app"]);
   const { me, workspace } = useWorkspace();
@@ -264,8 +247,11 @@ function DecisionBody({ home }: { home: ValidationHome }) {
   const navigate = useNavigate();
   const isOnline = useIsOnline();
   const { idea } = home;
-  const context = useQuery(decisionContextQuery(idea.id));
-  const isSlow = useIsSlow(context.isPending);
+  const contextOptions = decisionContextQuery(idea.id);
+  const context = useQuery(contextOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(context.isPending, [
+    contextOptions,
+  ]);
   const [value, setValue] = useState<DecisionValue | null>(null);
   const [reason, setReason] = useState("");
   const [isChecked, setChecked] = useState(false);
@@ -275,48 +261,76 @@ function DecisionBody({ home }: { home: ValidationHome }) {
   const toHome = () => void navigate({ href: ideaHref(workspace.id, idea.id) });
   // Whether 19 is still open when a record settles, which may be later: a user who left
   // meanwhile is not taken back to 13.
-  const isOpen = useRef(true);
-  useEffect(() => {
-    isOpen.current = true;
-    return () => {
-      isOpen.current = false;
-    };
-  }, []);
+  const isOpen = useIsMounted();
 
-  const record = useMutation({
-    mutationFn: ({
-      chosen,
-      confirmNewer,
-    }: {
-      chosen: DecisionValue;
-      confirmNewer: boolean;
-    }) =>
-      unwrap(
-        api()
-          .api.v1.ideas({ ideaId: inPath(idea.id) })
-          .decisions.post({
-            value: chosen,
-            reason,
-            basedOnDecisionId: context.data?.lastDecision?.id ?? null,
-            ...(confirmNewer ? { confirmNewer } : {}),
-          }),
-      ),
-    onSuccess: (_entry, { chosen }) => {
-      // 13's latest decision and history, the lists of ideas and the dashboard.
+  const post = (input: RecordInput) =>
+    unwrap(
+      api()
+        .api.v1.ideas({ ideaId: inPath(idea.id) })
+        .decisions.post({
+          value: input.chosen,
+          reason: input.reason,
+          basedOnDecisionId: input.basedOnDecisionId,
+          ...(input.confirmNewer ? { confirmNewer: true } : {}),
+        }),
+    );
+  const recorded = () => {
+    // 13's latest decision and history, the lists of ideas and the dashboard.
+    void queryClient.invalidateQueries({ queryKey: ideaKey(idea.id) });
+    void queryClient.invalidateQueries({
+      queryKey: workspaceKey(workspace.id),
+    });
+    ToastQueue.neutral(t("validation:decision.recorded"), {
+      timeout: TOAST_MS,
+    });
+  };
+  /** The question's title on someone's newer decision: who recorded what, and when. */
+  const newerTitle = (
+    latest: Pick<DecisionLogSummary, "recordedBy" | "recordedAt">,
+    value: NonNullable<DecisionLogSummary["value"]>,
+    // "closed": in a toast once 19 is gone, which has no question left to ask.
+    context?: "closed",
+  ) =>
+    t("errors:DECISION_CHANGED", {
+      context,
+      name: userNameText(latest.recordedBy),
+      value: t(`common:decision.${value}` as never),
+      when: formatRelativeTime(latest.recordedAt, { timeZone: me.timezone }),
+    });
+  const sendThrough = useSendThrough();
+  // Cancel pressed (or 19 left) while Record was on its way: a failure says so in a toast
+  // (design-spec 6.0.6「送っている間に閉じた送信の失敗」), whose Retry records it as it was
+  // sent, on the decision it was based on. Someone's newer decision has no question left
+  // to ask: its title says so alone, as recording the same again is refused the same,
+  // and what shows the last decision is read again.
+  const failedOnceClosed = useFailureOnceClosed(
+    (input: RecordInput) => sendThrough(() => post(input)).then(recorded),
+    (error) => {
+      const latest = newerOf(error);
+      if (latest === null || latest.value === null) return null;
       void queryClient.invalidateQueries({ queryKey: ideaKey(idea.id) });
       void queryClient.invalidateQueries({
         queryKey: workspaceKey(workspace.id),
       });
-      ToastQueue.neutral(t("validation:decision.recorded"), {
-        timeout: TOAST_MS,
-      });
+      return newerTitle(latest, latest.value, "closed");
+    },
+    "record",
+  );
+  const record = useMutation({
+    mutationFn: post,
+    onSuccess: (_entry, { chosen }) => {
+      recorded();
       if (!isOpen.current) return;
       if (chosen === "proceed") setAsksPlan(true);
       else toHome();
     },
-    onError: (error) => {
+    onError: (error, input) => {
       const latest = newerOf(error);
-      if (latest !== null) setNewer(latest);
+      if (latest !== null && isOpen.current) {
+        setNewer(latest);
+        return;
+      }
+      failedOnceClosed(error, input);
     },
   });
 
@@ -330,7 +344,12 @@ function DecisionBody({ home }: { home: ValidationHome }) {
   const send = (confirmNewer: boolean) => {
     setChecked(true);
     if (value === null || reasonIssue !== undefined) return;
-    record.mutate({ chosen: value, confirmNewer });
+    record.mutate({
+      chosen: value,
+      confirmNewer,
+      reason,
+      basedOnDecisionId: context.data?.lastDecision?.id ?? null,
+    });
   };
 
   const material = context.isError ? (
@@ -343,11 +362,7 @@ function DecisionBody({ home }: { home: ValidationHome }) {
     />
   ) : context.data === undefined ? (
     isSlow ? (
-      <SlowLoadingState
-        onRetry={() => void context.refetch()}
-        headingLevel={2}
-        size="S"
-      />
+      <SlowLoadingState onRetry={retrySlow} headingLevel={2} size="S" />
     ) : (
       <MaterialSkeleton />
     )
@@ -380,6 +395,11 @@ function DecisionBody({ home }: { home: ValidationHome }) {
       ? record.error
       : null;
   const isBusy = record.isPending;
+  // The record names the decision it is based on (SDD 5.7 V19), which only the material
+  // read to its end says, and not a read of it that failed (design-spec 6.5). A read
+  // behind the material shown leaves it pressable: a decision recorded meanwhile is the
+  // API's to refuse (DECISION_CHANGED).
+  const isMaterialRead = context.data !== undefined && !context.isError;
   return (
     <>
       <FocusPattern
@@ -393,7 +413,7 @@ function DecisionBody({ home }: { home: ValidationHome }) {
               variant="primary"
               onPress={() => send(false)}
               isPending={isBusy}
-              isDisabled={context.data === undefined || !isOnline}
+              isDisabled={!isMaterialRead || !isOnline}
             >
               {t("validation:decision.record")}
             </Button>
@@ -445,7 +465,7 @@ function DecisionBody({ home }: { home: ValidationHome }) {
             <RecordFailure
               error={failure}
               onRetry={() => send(false)}
-              isRetryDisabled={isBusy || !isOnline}
+              isRetryDisabled={isBusy || !isMaterialRead || !isOnline}
             />
           )}
         </Stack>
@@ -474,13 +494,7 @@ function DecisionBody({ home }: { home: ValidationHome }) {
           isOpen
           variant="confirmation"
           size="S"
-          title={t("validation:decision.newer.title", {
-            name: newer.recordedBy.displayName,
-            value: t(`common:decision.${newer.value}` as never),
-            when: formatRelativeTime(newer.recordedAt, {
-              timeZone: me.timezone,
-            }),
-          })}
+          title={newerTitle(newer, newer.value)}
           primaryActionLabel={t("validation:decision.newer.record")}
           cancelLabel={t("validation:decision.newer.cancel")}
           onPrimaryAction={() => {
@@ -490,26 +504,19 @@ function DecisionBody({ home }: { home: ValidationHome }) {
           onCancel={() => {
             setNewer(null);
             record.reset();
-            // The newer decision becomes the one this is based on, shown as the last.
-            void context.refetch();
+            // The newer decision becomes the one this is based on, shown as the last:
+            // the material goes back to its skeleton until read (design-spec 6.5), and
+            // a read under way, which may predate it, is dropped.
+            const material = { queryKey: contextOptions.queryKey, exact: true };
+            void queryClient
+              .cancelQueries(material)
+              .then(() => queryClient.resetQueries(material));
           }}
         >
-          {t("validation:decision.newer.body")}
+          {t("errors:DECISION_CHANGED", { context: "body" })}
         </AlertDialog>
       )}
     </>
-  );
-}
-
-/** 19's shape while its route loads (design-spec 6.0.6・6.5「ローディング」). */
-export function DecisionSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <FocusPattern
-      header={<Heading level={1}>{t("validation:decision.title")}</Heading>}
-    >
-      <MaterialSkeleton />
-    </FocusPattern>
   );
 }
 
@@ -523,8 +530,11 @@ export function DecisionSkeleton() {
 export function DecisionScreen({ ideaId }: { ideaId: string }) {
   const { t } = useTranslation(["ideas", "validation"]);
   const { me, workspace, role } = useWorkspace();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   useDocumentTitle(
@@ -549,7 +559,7 @@ export function DecisionScreen({ ideaId }: { ideaId: string }) {
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = (
       <Skeleton isLoading>

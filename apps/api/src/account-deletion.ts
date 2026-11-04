@@ -14,6 +14,7 @@ import {
   verifications,
   workspaces,
 } from "@moonx/db";
+import { i18n } from "@moonx/i18n";
 import { and, asc, eq, inArray, like } from "drizzle-orm";
 import type { ClientKind } from "./entry";
 import { ApiError } from "./errors";
@@ -51,8 +52,13 @@ async function lockContent(
     .for("update");
 }
 
-/** The name a deleted account shows wherever its records remain (SDD 5.4 U7). */
-export const DELETED_USER_NAME = "Deleted user";
+/**
+ * The name a deleted account shows wherever its records remain, in the catalog's words
+ * (SDD 5.4 U7): its row's display name, and the free-text assignee of the execution items
+ * it had, which from then on are a written name like any other (shown and matched as
+ * written).
+ */
+export const DELETED_USER_NAME: string = i18n.t("app:userBadge.deleted");
 
 /**
  * Deletes `userId`'s account as design-spec 6.16「アカウントの削除」and SDD 5.4 U7 say, in

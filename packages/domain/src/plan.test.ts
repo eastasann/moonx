@@ -165,6 +165,41 @@ describe("plan items", () => {
     expect(progress(1, 6)).toEqual({ filled: 3, total: 4 });
   });
 
+  test("leaves out a sub-item its display condition hides, filled or not (6.12, as 6.2)", () => {
+    const shownOn = (key: string, values: string[]) => ({
+      displayCondition: { [key]: values },
+    });
+    const questions = [
+      question("P.06.1", "choice", {
+        kind: "choice",
+        choices: ["Red", "Blue", "Mixed"],
+      }),
+      { ...question("P.06.2"), ...shownOn("P.06.1", ["Red", "Mixed"]) },
+      {
+        ...question("P.06.3", "table", founders),
+        ...shownOn("P.06.1", ["Blue"]),
+      },
+      // A condition on another item's answer reads it as well.
+      { ...question("P.06.4"), ...shownOn("P.05.1", ["Yes"]) },
+    ];
+    const progress = (market: string | null, launch: string | null) =>
+      planItemProgress(questions, {
+        answers: new Map([
+          ["P.05.1", { text: launch, rows: null }],
+          ["P.06.1", { text: market, rows: null }],
+          ["P.06.2", { text: "Many sellers", rows: null }],
+          ["P.06.3", { text: null, rows: [{ name: "Ana" }] }],
+        ]),
+        executionCounts: new Map(),
+      });
+    // Red: the table for Blue is hidden, its row kept but not counted.
+    expect(progress("Red", null)).toEqual({ filled: 2, total: 2 });
+    expect(progress("Blue", null)).toEqual({ filled: 2, total: 2 });
+    // Not answered yet: both of its conditional sub-items are hidden.
+    expect(progress(null, null)).toEqual({ filled: 0, total: 1 });
+    expect(progress("Mixed", "Yes")).toEqual({ filled: 2, total: 3 });
+  });
+
   test("marks V for copies and numbers, S for self-analyses, nothing for starting rows", () => {
     expect(
       planItemMarks([{ ...question("P.01.1"), copyFrom: ["V.01.WHO"] }]),

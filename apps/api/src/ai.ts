@@ -1128,10 +1128,13 @@ export function aiRoutes({ access, db, limiter, now }: AiRoutesOptions) {
           if (scoped.problem.kind === "empty") {
             throw new ApiError("EMPTY_SCOPE", "The scope holds no question");
           }
+          // The key named stays out of the message: a response repeats no input (8.1).
           throw invalid(
             aiScope.kind === "items" ? "items" : "sections",
             "invalid_value",
-            `The template has no ${scoped.problem.key}`,
+            aiScope.kind === "items"
+              ? "The template has no such item"
+              : "The template has no such section",
           );
         }
         // Refusals before this are not counted, as P13 counts only what it makes.

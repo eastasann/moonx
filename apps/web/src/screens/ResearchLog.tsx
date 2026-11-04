@@ -53,7 +53,10 @@ import {
   type ScreenComments,
 } from "../components/CommentsPanel";
 import { ItemHistoryButton } from "../components/HistoryPanel";
-import { toastFailure } from "../components/ideaActions";
+import {
+  useFailureOnceClosed,
+  useToastFailure,
+} from "../components/ideaActions";
 import { useKeepShownItem } from "../components/keepShownItem";
 import {
   inputOf,
@@ -66,6 +69,11 @@ import {
   valuesOf,
   wireValue,
 } from "../components/ResearchLogFields";
+import {
+  isRefusedForGood,
+  refusedFieldsOf,
+  useReadAgainWhenRefused,
+} from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
 import { SectionTitle } from "../components/SectionTitle";
 import { SendFailure } from "../components/SendFailure";
@@ -74,11 +82,16 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useAskedOpen,
+  usePanel,
+  useWorkspace,
+} from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import type { SaveFields, SaveTarget } from "../lib/autosave";
 import { useAutosave, useSaveItem } from "../lib/autosave-react";
@@ -100,7 +113,9 @@ import {
   researchLogQuery,
   validationHomeQuery,
 } from "../lib/queries";
+import { useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
+import { ListSkeleton, ResearchLogSkeleton } from "./ResearchLogSkeleton";
 
 export type { ResearchSearch };
 
@@ -438,6 +453,7 @@ function EntryDetail({
   /** The entry was deleted while it was still shown. */
   onDeleted: () => void;
 }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["validation", "app"]);
   const { me } = useWorkspace();
   const queryClient = useQueryClient();
@@ -601,7 +617,10 @@ function EntryDetail({
           </RowList>
         )}
       </Stack>
-      {isEditing && canEdit && (
+      {/* Only an editor opens it; once open it stays until closed, though the screen
+          read again no longer lets them edit, so a refused save shows in it
+          (design-spec 6.0.6's modals). */}
+      {isEditing && (
         <Dialog
           isOpen
           onOpenChange={(isOpen) => {
@@ -630,12 +649,15 @@ function EntryDetail({
  * A new entry (design-spec 6.10「+ Add entry」): the fields, the date today and the tags
  * the link asked for (SDD 4章 `presetSupports`), then Add entry, which records it and
  * shows it. In the detail's place from the tablet breakpoint up, in a sheet on a phone.
+ * Closed while Add entry is on its way (Cancel, the screen left), the entry is made all
+ * the same, and a send that fails says so in a toast (6.0.6), whose Retry sends it again.
  */
 function NewEntry({
   ideaId,
   validationId,
   presetSupports,
   isSheet,
+  isReadOnly,
   onCreated,
   onCancel,
 }: {
@@ -643,6 +665,8 @@ function NewEntry({
   validationId: string;
   presetSupports: readonly SupportsCheck[];
   isSheet: boolean;
+  /** The screen read again no longer lets the user add one: what was typed stays, unsent. */
+  isReadOnly: boolean;
   onCreated: (entry: ResearchLogEntry) => void;
   onCancel: () => void;
 }) {
@@ -664,27 +688,34 @@ function NewEntry({
   const latestOnCreated = useRef(onCreated);
   latestOnCreated.current = onCreated;
   const oneAtATime = useOneAtATime();
+  const readAgainWhenRefused = useReadAgainWhenRefused();
+  const sendThrough = useSendThrough();
+  const post = (input: ResearchLogValues) =>
+    unwrap(
+      api()
+        .api.v1.validations({ validationId: inPath(validationId) })
+        ["research-log"].post(inputOf(input)),
+    );
+  const readAgain = () =>
+    queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) });
+  const failOnceClosed = useFailureOnceClosed(
+    async (input: ResearchLogValues) => {
+      await sendThrough(() => post(input));
+      await readAgain();
+    },
+  );
   const create = useMutation({
-    mutationFn: (input: ResearchLogValues) =>
-      unwrap(
-        api()
-          .api.v1.validations({ validationId: inPath(validationId) })
-          ["research-log"].post(inputOf(input)),
-      ),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) }),
+    mutationFn: post,
+    onSuccess: () => void readAgain(),
+    onError: failOnceClosed,
   });
-  // A 422 naming a field (SDD 8.2's last guard) puts "Check the format" under it; one
-  // naming none says it beside Couldn't save.
   const failure = create.error;
-  const details =
-    failure instanceof ApiError && failure.code === "VALIDATION_FAILED"
-      ? failure.detail.details
-      : undefined;
-  const refusedFields = (Object.keys(values) as ResearchLogField[]).filter(
-    (field) =>
-      Array.isArray(details) &&
-      (details as { path?: unknown }[]).some(({ path }) => path === field),
+  // Refused for good, the form sends no more (design-spec 6.10): at once, before the
+  // screen read again shows why, and also where that read changes nothing (gone).
+  const isLocked = isReadOnly || isRefusedForGood(failure);
+  const refusedFields = refusedFieldsOf(
+    failure,
+    Object.keys(values) as ResearchLogField[],
   );
   const errors = Object.fromEntries(
     (Object.keys(values) as ResearchLogField[]).flatMap((field) => {
@@ -707,20 +738,22 @@ function NewEntry({
             // Fires only while the form is still open: Cancel or leaving meanwhile keeps
             // the user where they went (the entry is made all the same).
             onSuccess: (entry) => latestOnCreated.current(entry),
-            // A failure shows from the mutation's state below.
+            // As does this: a failure shows from the mutation's state below. Once the
+            // form is closed, its toast reads the screen again instead.
+            onError: readAgainWhenRefused,
             onSettled: () => resolve(),
           });
         }),
     );
   // Not disabled while it is on its way: Add entry keeps its focus, and `oneAtATime`
   // sends once.
-  const canSubmit = isOnline && isValid(values);
+  const canSubmit = isOnline && !isLocked && isValid(values);
   const fields = (
     <Stack gap="space-300">
       <ResearchLogFields
         values={values}
         errors={errors}
-        isReadOnly={!isOnline}
+        isReadOnly={!isOnline || isLocked}
         autoFocus
         onChange={(field, value) => {
           if (refusedFields.includes(field)) create.reset();
@@ -728,7 +761,7 @@ function NewEntry({
           setTouched((current) => ({ ...current, [field]: true }));
         }}
       />
-      {failure !== null && refusedFields.length === 0 && (
+      {failure !== null && (
         <SendFailure
           error={failure}
           transient="couldNotSave"
@@ -883,30 +916,17 @@ function EntryRow({ entry }: { entry: ResearchLogEntry }) {
   );
 }
 
-function ListSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("validation:research.title")}</Text>
-            <Text variant="caption">{t("validation:research.empty")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 function ResearchBody({
   home,
+  isDecided,
   search,
   onSearch,
   onOpen,
   onClose,
 }: {
   home: ValidationHome;
+  /** `home` has been read and is not being read again: whether the idea is archived. */
+  isDecided: boolean;
   search: ResearchSearch;
   /** Replaces the URL's search: filters, and what is beside the list. */
   onSearch: (next: ResearchSearch) => void;
@@ -924,16 +944,26 @@ function ResearchBody({
     supports: search.supports,
     sourceType: search.source,
   };
+  const options = researchLogQuery(idea.id, validationId, filters);
   const query = useQuery({
-    ...researchLogQuery(idea.id, validationId, filters),
+    ...options,
     // A new filter keeps the rows until its answer comes, not the skeleton.
     placeholderData: keepPreviousData,
   });
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const items = query.data ?? [];
   const isFiltered =
     search.supports !== undefined || search.source !== undefined;
-  const isNew = search.new === 1 && canEdit;
+  // `new=1` opens the new entry as `?modal=` opens a modal (SDD 4章): once shown it stays
+  // until it is closed, read only once the screen read again no longer lets the user add
+  // one (refused as archived or no longer allowed, design-spec 6.10, or read so
+  // meanwhile), what was typed and why with it; for someone who may not add one it opens
+  // nothing and comes off the URL with its tags.
+  const isNew = useAskedOpen(search.new === 1, canEdit, isDecided, {
+    search: ({ new: _, presetSupports: __, ...rest }) => rest,
+  });
   const isPhone = useIsNarrow();
   const shownFirst =
     search.entry === undefined && isTwoColumns && !isNew
@@ -961,8 +991,10 @@ function ResearchBody({
     onClose({ ...search, new: undefined, presetSupports: undefined });
 
   let list: ReactNode;
-  if (query.isError) {
-    list = (
+  // A read again that failed leaves what was read on screen (as 13 does): only a list
+  // never read shows the failure.
+  if (query.data === undefined) {
+    list = query.isError ? (
       <FailureState
         error={query.error}
         onRetry={() => void query.refetch()}
@@ -970,14 +1002,8 @@ function ResearchBody({
         headingLevel={2}
         size="S"
       />
-    );
-  } else if (query.data === undefined) {
-    list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+    ) : isSlow ? (
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <ListSkeleton />
     );
@@ -1053,6 +1079,7 @@ function ResearchBody({
       validationId={validationId}
       presetSupports={search.presetSupports ?? []}
       isSheet={isSheet}
+      isReadOnly={!canEdit}
       onCreated={(entry) =>
         onSearch({
           ...search,
@@ -1119,24 +1146,6 @@ function ResearchBody({
   );
 }
 
-/** 14's shape while its route loads (design-spec 6.0.6). */
-export function ResearchLogSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("validation:research.title")}
-        </Heading>
-      }
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("validation:research.title")}
-      onBack={() => {}}
-    />
-  );
-}
-
 /**
  * 14 Research log (design-spec 6.10): pattern D. The idea's entries, newest observation
  * first, filtered by the check they support and their source; the selected one beside
@@ -1155,8 +1164,11 @@ export function ResearchLogScreen({
   const navigate = useNavigate();
   const router = useRouter();
   const panel = usePanel();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "03")?.title;
@@ -1220,6 +1232,7 @@ export function ResearchLogScreen({
     body = (
       <ResearchBody
         home={data}
+        isDecided={!home.isFetching}
         search={search}
         // Filters and what is beside the list replace the entry: Back leaves the screen.
         onSearch={(next) => to(next, true)}
@@ -1239,7 +1252,7 @@ export function ResearchLogScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = <ResearchLogSkeleton />;
   }

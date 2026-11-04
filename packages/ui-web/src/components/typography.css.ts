@@ -96,7 +96,7 @@ export const text = recipe({
         ...typography("number"),
         fontVariantNumeric: "tabular-nums",
       },
-      // A figure at the caption's size: "62 items", "· ₱77.00" (06 typography.number-sm).
+      // A figure at the caption's size: "62 items", "· ₱77" (06 typography.number-sm).
       "number-sm": {
         ...typography("numberSm"),
         fontVariantNumeric: "tabular-nums",

@@ -398,6 +398,104 @@ describe("S2 GET /api/v1/me/self-analysis/sections/{sectionKey}", () => {
     expect(response.status).toBe(404);
     expect((await errorOf(response)).code).toBe("NOT_FOUND");
   });
+
+  test("reads the answers in other sections its display conditions name, as 10 counts them", async () => {
+    const caller = await signedInUser();
+    const home = await open(caller);
+    const [template] = await db
+      .select()
+      .from(templates)
+      .where(eq(templates.kind, "self_analysis"));
+    if (template === undefined) throw new Error("No template");
+    const [version] = await db
+      .insert(templateVersions)
+      .values({ templateId: template.id, versionNumber: 904 })
+      .returning();
+    if (version === undefined) throw new Error("No version");
+    try {
+      const [now, later] = await db
+        .insert(templateSections)
+        .values([
+          {
+            templateVersionId: version.id,
+            key: "NOW",
+            title: "Now",
+            sortOrder: 0,
+          },
+          {
+            templateVersionId: version.id,
+            key: "LATER",
+            title: "Later",
+            sortOrder: 1,
+          },
+        ])
+        .returning();
+      if (now === undefined || later === undefined) {
+        throw new Error("No sections");
+      }
+      const asked = (
+        sectionId: string,
+        questionKey: string,
+        sortOrder: number,
+        extra = {},
+      ) => ({
+        templateVersionId: version.id,
+        templateSectionId: sectionId,
+        questionKey,
+        title: questionKey,
+        prompt: `${questionKey}?`,
+        answerType: "long_text" as const,
+        sortOrder,
+        ...extra,
+      });
+      await db.insert(templateQuestions).values([
+        asked(now.id, "SA.NOW.1", 0, {
+          answerType: "choice",
+          options: { kind: "choice", choices: ["Yes", "No"] },
+        }),
+        asked(later.id, "SA.LATER.1", 0, {
+          displayCondition: { "SA.NOW.1": ["Yes"] },
+        }),
+        asked(later.id, "SA.LATER.2", 1),
+      ]);
+      await db
+        .update(selfAnalyses)
+        .set({ templateVersionId: version.id })
+        .where(eq(selfAnalyses.id, home.id));
+      const read = async (sectionKey: string) => {
+        const response = await call(caller, "GET", `/sections/${sectionKey}`);
+        expect(response.status).toBe(200);
+        return selfAnalysisSectionSchema.parse(await response.json());
+      };
+      const hubOf = async (sectionKey: string) =>
+        (await open(caller)).sections.find((s) => s.key === sectionKey);
+
+      const before = await read("LATER");
+      // Unanswered: null, which shows nothing on the condition.
+      expect(before.conditionAnswers).toEqual([
+        { questionKey: "SA.NOW.1", text: null },
+      ]);
+      expect(before.decidesElsewhere).toEqual([]);
+      expect(await hubOf("LATER")).toMatchObject({ answered: 0, total: 1 });
+
+      await saved(
+        await save(caller, "SA.NOW.1", { text: "Yes", lockVersion: 0 }),
+      );
+      expect((await read("LATER")).conditionAnswers).toEqual([
+        { questionKey: "SA.NOW.1", text: "Yes" },
+      ]);
+      expect(await hubOf("LATER")).toMatchObject({ answered: 0, total: 2 });
+      // NOW's answer decides LATER: 11 shows "Answer SA.NOW.1 to see …" under it.
+      const first = await read("NOW");
+      expect(first.decidesElsewhere).toEqual(["SA.NOW.1"]);
+      expect(first.conditionAnswers).toEqual([]);
+    } finally {
+      await db.delete(selfAnalyses).where(eq(selfAnalyses.id, home.id));
+      await db
+        .delete(templateVersions)
+        .where(eq(templateVersions.id, version.id));
+    }
+  });
 });
 
 describe("S3 PUT /api/v1/me/self-analysis/answers/{questionKey}", () => {
@@ -773,6 +871,46 @@ describe("S3 PUT /api/v1/me/self-analysis/answers/{questionKey}", () => {
     await doneSelfAnalysis(caller);
     await saved(await save(caller, "SA.WHY.1", { text: "", lockVersion: 1 }));
     expect(await open(caller)).toMatchObject({ status: "done", answered: 2 });
+  });
+
+  test("stays in progress with every answer cleared", async () => {
+    const caller = await signedInUser();
+    const home = await open(caller);
+    await saved(await save(caller, "SA.WHY.1", { text: "a", lockVersion: 0 }));
+    await saved(
+      await save(caller, "SA.INCOME.1", {
+        text: "Rent",
+        amount: 50000,
+        lockVersion: 0,
+      }),
+    );
+    expect(await open(caller)).toMatchObject({
+      status: "in_progress",
+      answered: 2,
+    });
+    await saved(await save(caller, "SA.WHY.1", { text: null, lockVersion: 1 }));
+    await saved(
+      await save(caller, "SA.INCOME.1", {
+        text: "",
+        amount: null,
+        lockVersion: 1,
+      }),
+    );
+    expect(await open(caller)).toMatchObject({
+      status: "in_progress",
+      completedAt: null,
+      answered: 0,
+      sections: [
+        { key: "WHY", answered: 0 },
+        { key: "INCOME", answered: 0 },
+      ],
+      firstUnanswered: { sectionKey: "WHY", questionKey: "SA.WHY.1" },
+    });
+    const [row] = await db
+      .select({ status: selfAnalyses.status })
+      .from(selfAnalyses)
+      .where(eq(selfAnalyses.id, home.id));
+    expect(row?.status).toBe("in_progress");
   });
 
   test("saves nothing for an account deleted while the request waits", async () => {

@@ -25,6 +25,18 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       // What the tab reads where a screen names itself no further (useDocumentTitle).
       { title: i18n.t("app:name") },
     ],
+    // The manifest and icons of ADR-031, which the build copies from packages/ui-tokens.
+    links: [
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      {
+        rel: "icon",
+        href: "/icons/favicon.png",
+        type: "image/png",
+        sizes: "32x32",
+      },
+      { rel: "icon", href: "/icons/icon.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
+    ],
   }),
   shellComponent: RootDocument,
   component: RootLayout,
@@ -47,17 +59,22 @@ function RootDocument({ children }: { children: ReactNode }) {
   );
 }
 
-/** The screens of a workspace, which show the TabBar on a phone (design-spec 6.0.1). */
-const WORKSPACE_ROUTE = "/_signedIn/w/$workspaceId";
+/**
+ * The signed-in screens, which are drawn in AppFrame with the TabBar on a phone (design-
+ * spec 6.0.1): a workspace's, and 4, 8 and 26–28 in the one last opened. Not 3, which
+ * stands without the frame (`isStandalone`).
+ */
+const SIGNED_IN_ROUTE = "/_signedIn";
 
 /**
  * Every screen, and the one place their toasts appear (design-spec 4.5 Toast): above the
- * TabBar where a workspace's screen shows one.
+ * TabBar where a screen shows one.
  */
 function RootLayout() {
   const hasTabBar = useRouterState({
     select: (state) =>
-      state.matches.some((match) => match.routeId === WORKSPACE_ROUTE),
+      state.matches.some((match) => match.routeId === SIGNED_IN_ROUTE) &&
+      !state.matches.some((match) => match.staticData.isStandalone === true),
   });
   const hasOwnToasts = useRouterState({
     select: (state) =>

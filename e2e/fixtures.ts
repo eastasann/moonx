@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
+import AxeBuilder from "@axe-core/playwright";
 import type { Me, Workspace } from "@moonx/schemas";
 import {
   request as apiRequest,
   test as base,
   expect,
+  type Locator,
   type Page,
 } from "@playwright/test";
 import { API_LOG, WEB_ORIGIN } from "./env";
@@ -46,12 +48,12 @@ export const test = base.extend<{
     });
     await use(context);
   },
-  signIn: async ({ page }, use) => {
+  signIn: async ({ page, baseURL }, use) => {
     await use(async (email, password = DEMO_PASSWORD) => {
       // The page's request context shares its cookies, so the page is signed in too.
       const signedIn = await page.request.post("/api/auth/sign-in/email", {
         data: { email, password },
-        headers: { Origin: WEB_ORIGIN },
+        headers: { Origin: baseURL ?? WEB_ORIGIN },
       });
       expect(signedIn.ok(), await signedIn.text()).toBe(true);
       const me = await page.request.get("/api/v1/me");
@@ -62,6 +64,65 @@ export const test = base.extend<{
 });
 
 export { expect };
+
+/**
+ * Checks the page with axe against WCAG 2.2 A and AA (SDD 10章, ADR-022), once what moves
+ * on it has settled. It checks the page where it is scrolled: axe counts a target the
+ * fold cuts under a fixed bar (a phone's TabBar) as too small, so callers scroll first.
+ */
+export async function expectNoAxeViolations(page: Page) {
+  // A Button pending as its screen went left React Aria's announcement of its spinner in
+  // the live region, which React Aria clears after 7 seconds.
+  await expect(
+    page.locator("[data-live-announcer] [aria-labelledby]"),
+  ).toHaveCount(0, { timeout: 10_000 });
+  // A dialog or popover fading in or out has its words part-transparent, which axe reads
+  // as low contrast, as are colours still changing after a press.
+  await expect(page.locator("[data-entering], [data-exiting]")).toHaveCount(0);
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          !(animation instanceof CSSTransition) ||
+          animation.playState !== "running",
+      ),
+  );
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(
+    violations.map((violation) => ({
+      id: violation.id,
+      targets: violation.nodes.map((node) => node.target.join(" ")),
+    })),
+  ).toEqual([]);
+}
+
+/**
+ * Checks that a link on its own row, focused from the keyboard, rings its words and not
+ * the row (design-spec 4.5 Link): its box is as wide as its text, or as the minimum target
+ * when the text is narrower.
+ */
+export async function expectRingAroundText(page: Page, link: Locator) {
+  await link.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(link).toBeFocused();
+  await expect(link).toHaveAttribute("data-focus-visible", "true");
+  const { box, text, minimum, row } = await link.evaluate((element) => {
+    const words = document.createRange();
+    words.selectNodeContents(element);
+    return {
+      box: element.getBoundingClientRect().width,
+      text: words.getBoundingClientRect().width,
+      minimum: Number.parseFloat(getComputedStyle(element).minWidth),
+      row: (element.parentElement as HTMLElement).getBoundingClientRect().width,
+    };
+  });
+  expect(box).toBeLessThan(row);
+  expect(box).toBeLessThanOrEqual(Math.max(text, minimum) + 1);
+}
 
 /**
  * The workspace of `me` named `name`, as the seed names them.

@@ -449,6 +449,13 @@ describe("buildPitchDeck: the slides", () => {
               strength: "Known brand",
             },
             { name: "Cookies", type: null, typicalPrice: null, strength: null },
+            // Typed, so shown as typed: never rounded (6.4「端数」).
+            {
+              name: "Piaya stall",
+              type: "substitute",
+              typicalPrice: 149.5,
+              strength: null,
+            },
           ],
         }),
       ),
@@ -464,6 +471,7 @@ describe("buildPitchDeck: the slides", () => {
       rows: [
         ["Bongbong's", "Direct Competitor", "₱380", "Known brand"],
         ["Cookies", null, null, null],
+        ["Piaya stall", "Substitute", "₱149.50", null],
       ],
     });
     expect(slide.bullets.map((b) => b.label)).toEqual([
@@ -476,18 +484,18 @@ describe("buildPitchDeck: the slides", () => {
     expect(none.emptySources).toEqual(["Competitors"]);
   });
 
-  test("Economics: the startup figures and the scenario table, without notes", () => {
+  test("Economics: the startup figures and the scenario table in its columns, without notes", () => {
     const slide = slideOf(buildPitchDeck(input()), "economics");
     expect(slide.table?.rows).toEqual([
       ["Conservative", "5", "₱58,500", "−₱5,586"],
       ["Expected", "10", "₱117,000", "₱18,490"],
       ["Strong", "15", "₱175,500", "₱42,565"],
     ]);
-    expect(slide.table?.columns.map((c) => [c.label, c.numeric])).toEqual([
-      ["Scenario", false],
-      ["Units / day", true],
-      ["Revenue / month", true],
-      ["Operating profit / month", true],
+    expect(slide.table?.columns).toEqual([
+      { label: "Scenario", numeric: false, width: 0.28 },
+      { label: "Units / day", numeric: true, width: 0.2 },
+      { label: "Revenue / month", numeric: true, width: 0.26 },
+      { label: "Operating profit / month", numeric: true, width: 0.26 },
     ]);
     expect(slide.numbers.map((n) => [n.label, n.metricKey])).toEqual([
       ["Startup cost", "initial_cost_total"],
@@ -548,7 +556,7 @@ describe("buildPitchDeck: the slides", () => {
     expect(pitchSlideKeys("one").some((key) => key === "funding")).toBe(false);
   });
 
-  test("Execution plan: milestones by deadline, at most six, and no notes", () => {
+  test("Execution plan: milestones by deadline in their columns, at most six, and no notes", () => {
     const milestones = Array.from({ length: 8 }, (_, index) =>
       item({
         type: "milestone",
@@ -570,6 +578,13 @@ describe("buildPitchDeck: the slides", () => {
       buildPitchDeck(input({ execution: [...milestones, launch] })),
       "execution",
     );
+    expect(slide.table?.columns).toEqual([
+      { label: "Milestone", numeric: false, width: 0.22 },
+      { label: "Goal", numeric: false, width: 0.34 },
+      { label: "Assignee", numeric: false, width: 0.16 },
+      { label: "Deadline", numeric: false, width: 0.14 },
+      { label: "Status", numeric: false, width: 0.14 },
+    ]);
     expect(slide.table?.rows.map((row) => row[0])).toEqual([
       "M7",
       "M6",
@@ -677,7 +692,7 @@ describe("buildPitchDeck: the slides", () => {
     expect(none.emptySources).toEqual(["Launch Plan"]);
   });
 
-  test("Risks: §22's top three by impact, then probability, keeping the table's order on ties", () => {
+  test("Risks: §22's top three in their columns by impact, then probability, keeping the table's order on ties", () => {
     const answers = allAnswered();
     answers.set("P.22.1", {
       text: null,
@@ -696,6 +711,12 @@ describe("buildPitchDeck: the slides", () => {
       ],
     });
     const slide = slideOf(buildPitchDeck(input({ answers })), "risks");
+    expect(slide.table?.columns).toEqual([
+      { label: "Risk", numeric: false, width: 0.34 },
+      { label: "Probability", numeric: false, width: 0.13 },
+      { label: "Impact", numeric: false, width: 0.13 },
+      { label: "Mitigation", numeric: false, width: 0.4 },
+    ]);
     expect(slide.table?.rows).toEqual([
       ["C", "Medium", "High", "c"],
       ["B", "High", "Medium", "b"],
@@ -881,6 +902,72 @@ describe("formatMetric", () => {
 
   test("throws on a key that is not a single-value key metric", () => {
     expect(() => formatMetric("scenario:expected", exact(1), "PHP")).toThrow();
+  });
+
+  test("a typed amount is never rounded: whole, or with its cents (6.4「端数」)", () => {
+    expect(formatMetric("selling_price", exact(149.5), "PHP")).toBe("₱149.50");
+    expect(formatMetric("selling_price", exact(150), "PHP")).toBe("₱150");
+    expect(formatMetric("selling_price", exact(1499.99), "PHP")).toBe(
+      "₱1,499.99",
+    );
+    // A variable cost row entered as an amount, as 17 shows it.
+    expect(
+      formatMetric("cost_row:variable.packaging", exact(77.25), "PHP"),
+    ).toBe("₱77.25");
+    expect(
+      formatMetric("cost_row:variable.packaging", exact(77.5), "PHP"),
+    ).toBe("₱77.50");
+    expect(formatMetric("cost_row:variable.packaging", exact(77), "PHP")).toBe(
+      "₱77",
+    );
+    // Calculated amounts keep their own formats beside it.
+    expect(formatMetric("variable_cost_per_unit", exact(77), "PHP")).toBe(
+      "₱77.00",
+    );
+    expect(formatMetric("initial_cost_total", exact(149.5), "PHP")).toBe(
+      "₱150",
+    );
+  });
+
+  test("a cost row entered as a % of the price shows its amount per sale as a typed amount does", () => {
+    expect(
+      formatMetric("cost_row:variable.packaging", exact(150 * 0.1), "PHP"),
+    ).toBe("₱15");
+    expect(
+      formatMetric("cost_row:variable.packaging", exact(14.9475), "PHP"),
+    ).toBe("₱14.95");
+    expect(
+      formatMetric(
+        "cost_row:variable.packaging",
+        { value: null, bound: "exact", reason: "needs_price" },
+        "PHP",
+      ),
+    ).toBe("Needs price");
+  });
+
+  test("the Business model slide prints a price with cents as typed", () => {
+    const deck = fitPitchDeck(
+      buildPitchDeck(
+        input({
+          variant: "one",
+          keyMetrics: {
+            selling_price: exact(149.5),
+            contribution_margin: exact(72.25),
+            break_even_units_day: exact(6.94),
+          },
+        }),
+      ),
+      fit,
+    );
+    expect(
+      fittedFigureColumns(slideOf(deck, "business_model"), fit).map(
+        ({ label, text }) => [label, text],
+      ),
+    ).toEqual([
+      ["Price", "₱149.50"],
+      ["Contribution / sale", "₱72.25"],
+      ["Break-even / day", "6.9"],
+    ]);
   });
 });
 

@@ -1,9 +1,27 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
-import { API_LOG, API_ORIGIN, API_PORT, WEB_ORIGIN, WEB_PORT } from "./env";
+import {
+  API_LOG,
+  API_ORIGIN,
+  API_PORT,
+  PWA_API_LOG,
+  PWA_ORIGIN,
+  PWA_PORT,
+  PWA_SENTRY_DSN,
+  PWA_WEB_DIR,
+  WEB_ORIGIN,
+  WEB_PORT,
+} from "./env";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
+
+/**
+ * make first-paint: SDD 7.3's first display estimated against the PWA checks' build,
+ * alone (first-paint.spec.ts). Its timings follow the host's CPU, so make test-e2e and
+ * CI leave it out.
+ */
+const firstPaint = process.env.MOONX_FIRST_PAINT === "1";
 
 const testDatabase = process.env.DATABASE_URL_TEST?.trim();
 if (!testDatabase) {
@@ -28,7 +46,22 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: ["admin-publish.spec.ts", "template-migration.spec.ts"],
+      testIgnore: [
+        "admin-publish.spec.ts",
+        "template-migration.spec.ts",
+        "pwa.spec.ts",
+        "first-paint.spec.ts",
+      ],
+    },
+    // The PWA and the serving of ADR-004 and ADR-031 (SDD 10章): against the API that
+    // serves make build-web's output, which make test-e2e builds first. One test at a
+    // time, --repeat-each included: a test stands for a deploy by changing the sw.js of
+    // the one copy of the build that API serves to every test (pwa.spec.ts).
+    {
+      name: "pwa",
+      use: { ...devices["Desktop Chrome"], baseURL: PWA_ORIGIN },
+      testMatch: "pwa.spec.ts",
+      workers: 1,
     },
     // A published template version is what every new self analysis, idea and plan takes
     // from then on (design-spec 6.0.7): publishing waits until the others are done.
@@ -36,7 +69,7 @@ export default defineConfig({
       name: "after-the-others",
       use: { ...devices["Desktop Chrome"] },
       testMatch: "admin-publish.spec.ts",
-      dependencies: ["chromium"],
+      dependencies: ["chromium", "pwa"],
     },
     // Moving to a newer version (M8) needs the ones published: the self analysis v2
     // admin-publish.spec.ts publishes, and the versions this one publishes itself.
@@ -46,34 +79,82 @@ export default defineConfig({
       testMatch: "template-migration.spec.ts",
       dependencies: ["after-the-others"],
     },
+    // No trace, screenshot or video: recording them runs on the page's slowed CPU.
+    ...(firstPaint
+      ? [
+          {
+            name: "first-paint",
+            use: {
+              baseURL: PWA_ORIGIN,
+              trace: "off" as const,
+              screenshot: "off" as const,
+              video: "off" as const,
+            },
+            testMatch: "first-paint.spec.ts",
+          },
+        ]
+      : []),
   ],
   webServer: [
+    // The estimate needs only the API that serves the build.
+    ...(firstPaint
+      ? []
+      : [
+          {
+            // Its log goes to API_LOG, where the tests read the mails it sends (env.ts).
+            command: `mkdir -p "${dirname(API_LOG)}" && exec bun src/index.ts > "${API_LOG}"`,
+            cwd: `${root}apps/api`,
+            url: `${API_ORIGIN}/api/health`,
+            reuseExistingServer: false,
+            timeout: 120_000,
+            // SDD 2章「環境変数」: the e2e values over the root .env, which make passes in.
+            env: {
+              PORT: String(API_PORT),
+              BETTER_AUTH_URL: WEB_ORIGIN,
+              TRUSTED_ORIGINS: WEB_ORIGIN,
+              DATABASE_URL: testDatabase,
+              // The mails go to the log at info, where the tests read them.
+              MAIL_TRANSPORT: "console",
+              LOG_LEVEL: "info",
+            },
+          },
+        ]),
     {
-      // Its log goes to API_LOG, where the tests read the mails it sends (env.ts).
-      command: `mkdir -p "${dirname(API_LOG)}" && exec bun src/index.ts > "${API_LOG}"`,
+      // The build is copied, so the tests may change the copy (env.ts PWA_WEB_DIR).
+      command: [
+        `rm -rf "${PWA_WEB_DIR}"`,
+        `mkdir -p "${dirname(PWA_WEB_DIR)}"`,
+        `cp -R "${root}apps/web/dist/client" "${PWA_WEB_DIR}"`,
+        `exec bun src/index.ts > "${PWA_API_LOG}"`,
+      ].join(" && "),
       cwd: `${root}apps/api`,
-      url: `${API_ORIGIN}/api/health`,
+      url: `${PWA_ORIGIN}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,
-      // SDD 2章「環境変数」: the e2e values over the root .env, which make passes in.
+      // SDD 2章「環境変数」: the PWA checks' values over the root .env.
       env: {
-        PORT: String(API_PORT),
-        BETTER_AUTH_URL: WEB_ORIGIN,
-        TRUSTED_ORIGINS: WEB_ORIGIN,
+        PORT: String(PWA_PORT),
+        WEB_DIST_DIR: PWA_WEB_DIR,
+        WEB_SENTRY_DSN: PWA_SENTRY_DSN,
+        BETTER_AUTH_URL: PWA_ORIGIN,
+        TRUSTED_ORIGINS: PWA_ORIGIN,
         DATABASE_URL: testDatabase,
-        // The mails go to the log at info, where the tests read them.
         MAIL_TRANSPORT: "console",
         LOG_LEVEL: "info",
       },
     },
-    {
-      command: `bun --bun x --no-install vite dev --port ${WEB_PORT} --strictPort`,
-      cwd: `${root}apps/web`,
-      url: `${WEB_ORIGIN}/dev/components`,
-      reuseExistingServer: false,
-      timeout: 120_000,
-      // Vite forwards /api/ to PORT (vite.config.ts): the e2e API's port.
-      env: { PORT: String(API_PORT) },
-    },
+    ...(firstPaint
+      ? []
+      : [
+          {
+            command: `bun --bun x --no-install vite dev --port ${WEB_PORT} --strictPort`,
+            cwd: `${root}apps/web`,
+            url: `${WEB_ORIGIN}/dev/components`,
+            reuseExistingServer: false,
+            timeout: 120_000,
+            // Vite forwards /api/ to PORT (vite.config.ts): the e2e API's port.
+            env: { PORT: String(API_PORT) },
+          },
+        ]),
   ],
 });

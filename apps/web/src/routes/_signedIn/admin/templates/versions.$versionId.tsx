@@ -3,8 +3,8 @@ import { OutsideWorkspace } from "../../../../components/OutsideWorkspace";
 import {
   TemplateVersionScreen,
   type TemplateVersionSearch,
-  TemplateVersionSkeleton,
 } from "../../../../screens/TemplateVersion";
+import { TemplateVersionSkeleton } from "../../../../screens/TemplateVersionSkeleton";
 
 /**
  * `/admin/templates/versions/$versionId`: 27 Admin: Edit Template (SDD 4章). `node` is

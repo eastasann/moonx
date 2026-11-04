@@ -146,7 +146,7 @@ describe("2 Log in (design-spec 6.16)", () => {
     );
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Something went wrong");
-    expect(alert.textContent).toContain("Ref: 0a1b2c3d");
+    expect(within(alert).getByText("Ref: 0a1b2c3d")).toBeTruthy();
     // Google's sign-in starts again from Retry (A2), and goes back to next after.
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign });

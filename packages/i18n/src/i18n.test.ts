@@ -85,6 +85,33 @@ test("plural forms follow i18next", () => {
   expect(i18n.t("format:wait.minute", { count: 2 })).toBe("2 minutes");
 });
 
+test("a count in a sentence groups its thousands, plural and all (design-spec 1.2)", () => {
+  expect(i18n.t("dashboard:ideas.missingCount", { count: 1234 })).toBe(
+    "Missing: 1,234 checks",
+  );
+  expect(i18n.t("dashboard:ideas.missingCount", { count: 1 })).toBe(
+    "Missing: 1 check",
+  );
+  expect(
+    i18n.t("components:presentationPattern.position", {
+      number: 1000,
+      total: 1200,
+    }),
+  ).toBe("1,000 / 1,200");
+});
+
+test("every count of the catalogs is formatted: no bare {{count}} is left", () => {
+  const bare =
+    /\{\{(count|total|answered|number|complete|filled|n|min|max)\}\}/;
+  const strings = (value: unknown): string[] =>
+    typeof value === "string"
+      ? [value]
+      : typeof value === "object" && value !== null
+        ? Object.values(value).flatMap(strings)
+        : [];
+  expect(strings(resources.en).filter((text) => bare.test(text))).toEqual([]);
+});
+
 test("interpolated values are not HTML-escaped", () => {
   expect(i18n.t("format:months", { value: "<9.2>" })).toBe("<9.2> months");
 });

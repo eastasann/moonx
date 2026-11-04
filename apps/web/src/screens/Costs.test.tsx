@@ -1,22 +1,37 @@
 import type { CostItem, EconomicsInput, Me, Role } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
+  renderApp,
+  setViewport,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   assumed,
   costItem,
   economicsInputs,
+  evidenceOf,
   home,
+  prices,
   resultOf,
+  survey,
   validationId,
 } from "../test/validation";
 
 // 17 Costs (design-spec 6.3).
 
 afterEach(() => {
+  cleanupThenRestoreFocus();
   vi.unstubAllGlobals();
+  setViewport(1024);
 });
 
 const base = `/w/${workspaceId}/ideas/${home.idea.id}/costs`;
@@ -59,35 +74,76 @@ const packaging = costItem(id(5), "variable", "Packaging", {
 /** The id the fake API gives a new row. */
 const madeId = id(9);
 
-/** The API of 17 over `items` and 18's numbers. */
+/**
+ * The API of 17 over `items` and 18's numbers. `me` and `archived` may change behind the
+ * screen (a function is asked at each call); `refuse` answers a write first when it
+ * returns a Response.
+ */
 function costsApi({
   me = ana,
   items = [equipment, permits, rent, materials, packaging],
   inputs = economicsInputs({ selling_price: 220, operating_days: 26 }),
   archived = false,
+  refuse,
+  evidence,
+  listed = (rows) => rows,
+  beforeList,
 }: {
-  me?: Me;
+  me?: Me | (() => Me);
   items?: CostItem[];
   inputs?: EconomicsInput[];
-  archived?: boolean;
+  archived?: boolean | (() => boolean);
+  refuse?: (call: Call) => Response | undefined;
+  /** V5's answer to a removal of evidence. */
+  evidence?: (call: Call) => Response;
+  /** The rows V13 lists of those held: fewer once one is deleted behind the screen. */
+  listed?: (rows: CostItem[]) => CostItem[];
+  /** Holds V13's answer back, as a slow read would. */
+  beforeList?: () => Promise<void>;
 } = {}) {
   const held = [...items];
+  const meNow = () => (typeof me === "function" ? me() : me);
+  const archivedNow = () =>
+    typeof archived === "function" ? archived() : archived;
   return stubApi((call: Call) => {
     const { method, path } = call;
-    if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
+    if (method === "GET" && path === "/api/v1/me")
+      return Response.json(meNow());
+    if (method === "PATCH" && path === "/api/v1/me") {
+      return Response.json(meNow());
+    }
     if (
       method === "GET" &&
       path === `/api/v1/ideas/${home.idea.id}/validation`
     ) {
-      return Response.json({ ...home, idea: { ...home.idea, archived } });
+      return Response.json({
+        ...home,
+        idea: { ...home.idea, archived: archivedNow() },
+      });
+    }
+    if (method !== "GET") {
+      const refused = refuse?.(call);
+      if (refused !== undefined) return refused;
+    }
+    if (
+      method === "GET" &&
+      path.startsWith(`/api/v1/validations/${validationId}/research-log`)
+    ) {
+      return Response.json({ items: [survey, prices], nextCursor: null });
+    }
+    if (method === "DELETE" && path.startsWith("/api/v1/evidence/")) {
+      return evidence?.(call);
     }
     if (method === "GET" && path === listPath) {
-      return Response.json({
-        items: held,
-        result: resultOf(held, inputs),
-        economicsInputs: inputs,
-      });
+      const read = () => {
+        const rows = listed(held);
+        return Response.json({
+          items: rows,
+          result: resultOf(rows, inputs),
+          economicsInputs: inputs,
+        });
+      };
+      return beforeList === undefined ? read() : beforeList().then(read);
     }
     if (
       method === "POST" &&
@@ -160,10 +216,14 @@ describe("17 Costs (design-spec 6.3)", () => {
     await screen.findByRole("grid", { name: "Startup costs" });
     expect(table("Startup costs").textContent).toContain("₱60,000");
     expect(rowOf("Permits").textContent).toContain("Empty");
-    // A % of the price shows what it comes to at 18's price.
+    // A % of the price shows what it comes to at 18's price, in a typed amount's form:
+    // no cents when it has none (6.4「端数」).
     expect(rowOf("Core Product").textContent).toContain("35%");
-    expect(rowOf("Core Product").textContent).toContain("· ₱77.00");
-    expect(rowOf("Packaging").textContent).toContain("₱12.00");
+    expect(rowOf("Core Product").textContent).toContain("· ₱77");
+    expect(rowOf("Core Product").textContent).not.toContain("₱77.00");
+    // Typed amounts as typed (6.4「端数」): ₱12, not ₱12.00.
+    expect(rowOf("Packaging").textContent).toContain("₱12");
+    expect(rowOf("Packaging").textContent).not.toContain("₱12.00");
     expect(screen.getAllByText(/^Subtotal/)).toHaveLength(2);
     expect(screen.getByText(/^Per sale/)).toBeTruthy();
     expect(totals().textContent).toContain("₱60,000+");
@@ -337,7 +397,7 @@ describe("17 Costs (design-spec 6.3)", () => {
     const question = await screen.findByRole("alertdialog", {
       name: "Enter Packaging as a % of the price?",
     });
-    expect(question.textContent).toContain("₱12.00 is cleared");
+    expect(question.textContent).toContain("₱12 is cleared");
     await user.click(within(question).getByRole("button", { name: "Switch" }));
     await waitFor(() =>
       expect(calls.find(({ method }) => method === "PATCH")?.body).toEqual({
@@ -471,5 +531,487 @@ describe("17 Costs (design-spec 6.3)", () => {
         name: "Amount of Permits / Registration",
       }),
     ).toBeTruthy();
+  });
+  test("typed amounts show as typed (6.4「端数」): cents only where typed; what a % comes to in cents", async () => {
+    const user = userEvent.setup();
+    const delivery = costItem(id(6), "variable", "Delivery / Fulfilment", {
+      templateKey: "variable.delivery",
+      amount: 7.25,
+      classification: assumed(),
+      sortOrder: 2,
+    });
+    const deposit = costItem(id(7), "initial", "Lease Deposit / Advance", {
+      templateKey: "initial.lease_deposit",
+      amount: 30000.5,
+      classification: assumed(),
+      sortOrder: 2,
+    });
+    costsApi({
+      items: [equipment, deposit, rent, materials, packaging, delivery],
+      inputs: economicsInputs({ selling_price: 149.5, operating_days: 26 }),
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Startup costs" });
+    expect(rowOf("Packaging").textContent).toContain("₱12");
+    expect(rowOf("Packaging").textContent).not.toContain("₱12.00");
+    expect(rowOf("Delivery").textContent).toContain("₱7.25");
+    expect(rowOf("Equipment").textContent).toContain("₱60,000");
+    expect(rowOf("Equipment").textContent).not.toContain("₱60,000.00");
+    expect(rowOf("Lease Deposit").textContent).toContain("₱30,000.50");
+    // 35% of ₱149.50 is calculated: ₱52.325 in cents.
+    expect(rowOf("Core Product").textContent).toContain("· ₱52.33");
+    // The price 18 holds, as typed.
+    expect(totals().textContent).toContain("At ₱149.50 a sale");
+    // Asked before switching, the value reads as typed too.
+    await user.click(
+      screen.getByRole("button", {
+        name: "Row actions for Delivery / Fulfilment",
+      }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Use % of price" }),
+    );
+    const question = await screen.findByRole("alertdialog", {
+      name: "Enter Delivery / Fulfilment as a % of the price?",
+    });
+    expect(question.textContent).toContain("₱7.25 is cleared");
+  });
+
+  test("removing a Fact row's last evidence asks with its noun: cost row (6.0.3)", async () => {
+    const user = userEvent.setup();
+    const link = evidenceOf("7d0f0000-0000-4000-8000-000000000011", survey);
+    const calls = costsApi({
+      items: [
+        {
+          ...equipment,
+          classification: {
+            fau: "fact",
+            confidence: null,
+            state: "fact",
+            evidence: [link],
+          },
+        },
+      ],
+      evidence: () =>
+        Response.json({
+          classification: {
+            fau: null,
+            confidence: null,
+            state: "unclassified",
+            evidence: [],
+          },
+          lockVersion: 2,
+        }),
+    });
+    renderApp(`${base}?modal=evidence&about=cost_item:${equipment.id}`);
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    await user.click(
+      await within(sheet).findByRole("button", { name: /Remove/ }),
+    );
+    const ask = await screen.findByRole("alertdialog", {
+      name: "Remove the last evidence?",
+    });
+    expect(ask.textContent).toContain(
+      "This cost row will become Unclassified.",
+    );
+    await user.click(within(ask).getByRole("button", { name: "Remove" }));
+    await waitFor(() =>
+      expect(calls.find(({ method }) => method === "DELETE")?.path).toBe(
+        `/api/v1/evidence/${link.id}?lockVersion=1`,
+      ),
+    );
+  });
+
+  test("?modal=evidence opens nothing for a Viewer, an archived idea, or an about 17 does not hold, and comes off the URL (6.0.3, SDD 4章)", async () => {
+    const cases: [Parameters<typeof costsApi>[0], string][] = [
+      [{ me: as("viewer") }, `cost_item:${equipment.id}`],
+      [{ archived: true }, `cost_item:${equipment.id}`],
+      // A row 17 does not list, and 18's number.
+      [{}, `cost_item:${madeId}`],
+      [{}, `economics_input:${validationId}:selling_price`],
+    ];
+    for (const [api, about] of cases) {
+      cleanup();
+      vi.unstubAllGlobals();
+      costsApi(api);
+      const router = renderApp(
+        `${base}?tab=monthly_fixed&modal=evidence&about=${about}`,
+      );
+      await screen.findByRole("grid", { name: "Startup costs" });
+      // In place of the entry: Back does not lead to it again.
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ tab: "monthly_fixed" }),
+      );
+      expect(router.history.length).toBe(1);
+      expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull();
+    }
+  });
+
+  test("M2's URL taken off is not opened by a Restore or a role read again later (SDD 4章)", async () => {
+    let archived = true;
+    let me = as("viewer");
+    costsApi({ archived: () => archived, me: () => me });
+    const router = renderApp(
+      `${base}?modal=evidence&about=cost_item:${equipment.id}`,
+    );
+    await screen.findByText("This idea is archived");
+    await waitFor(() =>
+      expect(router.state.location.search).not.toHaveProperty("modal"),
+    );
+    archived = false;
+    me = ana;
+    readAgainOnFocus();
+    expect(
+      await screen.findAllByRole(
+        "button",
+        { name: "Add row" },
+        { timeout: 3000 },
+      ),
+    ).not.toHaveLength(0);
+    expect(screen.queryByText("This idea is archived")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull();
+  });
+
+  test("while the rows are still read, M2's URL stays and M2 opens once they are (SDD 4章)", async () => {
+    let release = () => {};
+    const calls = costsApi({
+      beforeList: () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    });
+    const router = renderApp(
+      `${base}?modal=evidence&about=cost_item:${equipment.id}`,
+    );
+    await waitFor(() =>
+      expect(calls.some(({ path }) => path === listPath)).toBe(true),
+    );
+    expect(router.state.location.search).toMatchObject({
+      modal: "evidence",
+      about: `cost_item:${equipment.id}`,
+    });
+    release();
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    expect(sheet.textContent).toContain("Equipment");
+  });
+
+  test("archived while M2 is open: it stays, says why a send is refused, and closing takes it off the URL (SDD 4章, 6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    const calls = costsApi({
+      archived: () => archived,
+      refuse: ({ method, path }) =>
+        method === "POST" && path.endsWith("/evidence")
+          ? apiError(409, "ARCHIVED")
+          : undefined,
+    });
+    const router = renderApp(
+      `${base}?modal=evidence&about=cost_item:${equipment.id}`,
+    );
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    archived = true;
+    readAgainOnFocus();
+    expect(
+      await screen.findByText("This idea is archived", {}, { timeout: 3000 }),
+    ).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Evidence" })).toBe(sheet);
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(within(sheet).getByText("It's archived")).toBeTruthy();
+    expect(
+      calls.filter(({ method }) => method === "POST").map(({ body }) => body),
+    ).toEqual([
+      {
+        target: { type: "cost_item", id: equipment.id, key: null },
+        lockVersion: 1,
+        researchLogEntryId: survey.id,
+      },
+    ]);
+    await user.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull(),
+    );
+    expect(router.state.location.search).not.toHaveProperty("modal");
+    expect(router.state.location.search).not.toHaveProperty("about");
+  });
+
+  test("its row deleted while M2 is open: M2 stays with it, and attaching or removing says It no longer exists (SDD 4章, 6.0.6)", async () => {
+    const user = userEvent.setup();
+    const link = evidenceOf("7d0f0000-0000-4000-8000-000000000012", prices);
+    let deleted = false;
+    const calls = costsApi({
+      items: [
+        {
+          ...equipment,
+          classification: { ...assumed("high"), evidence: [link] },
+        },
+        rent,
+      ],
+      listed: (rows) =>
+        deleted ? rows.filter(({ id }) => id !== equipment.id) : rows,
+      // V4 and V5 find no such item in this validation (SDD 5.7).
+      refuse: ({ method, path }) =>
+        method === "POST" && path.endsWith("/evidence")
+          ? apiError(404, "NOT_FOUND")
+          : undefined,
+      evidence: () => apiError(404, "NOT_FOUND"),
+    });
+    renderApp(`${base}?modal=evidence&about=cost_item:${equipment.id}`);
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    deleted = true;
+    readAgainOnFocus();
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByRole("row", { name: /Equipment/, hidden: true }),
+        ).toBeNull(),
+      { timeout: 3000 },
+    );
+    expect(screen.getByRole("dialog", { name: "Evidence" })).toBe(sheet);
+    expect(sheet.textContent).toContain("Equipment");
+    await user.click(within(sheet).getByRole("button", { name: /Remove/ }));
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(within(sheet).getByText("It no longer exists")).toBeTruthy();
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    await waitFor(() =>
+      expect(calls.filter(({ method }) => method === "POST")).toHaveLength(1),
+    );
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(within(sheet).getByText("It no longer exists")).toBeTruthy();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  test("Reorder open when the idea is archived stays, and Save order says why it is refused (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    costsApi({
+      archived: () => archived,
+      refuse: ({ method }) =>
+        method === "PUT" ? apiError(409, "ARCHIVED") : undefined,
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Startup costs" });
+    await user.click(
+      screen.getByRole("button", { name: "Row actions for Equipment" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Reorder" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Reorder startup costs",
+    });
+    archived = true;
+    readAgainOnFocus();
+    expect(
+      await screen.findByText("This idea is archived", {}, { timeout: 3000 }),
+    ).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Reorder startup costs" })).toBe(
+      dialog,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Move Equipment down" }),
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Save order" }),
+    );
+    expect(await within(dialog).findByText("Couldn't save")).toBeTruthy();
+    expect(within(dialog).getByText("It's archived")).toBeTruthy();
+  });
+
+  test("on a phone the row's sheet closes before its ⋯ opens Comments or History in the panel (6.0.4・6.0.5)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    costsApi();
+    const router = renderApp(base);
+    await screen.findByRole("grid", { name: "Startup costs" });
+    for (const panel of ["Comments", "History"] as const) {
+      await user.click(rowOf("Equipment"));
+      const sheet = await screen.findByRole("dialog", {
+        name: "Edit cost row",
+      });
+      await user.click(
+        within(sheet).getByRole("button", {
+          name: "Row actions for Equipment",
+        }),
+      );
+      await user.click(await screen.findByRole("menuitem", { name: panel }));
+      await waitFor(() =>
+        expect(screen.getByRole("dialog", { name: panel })).toBeTruthy(),
+      );
+      expect(
+        screen.queryByRole("dialog", { name: "Edit cost row" }),
+      ).toBeNull();
+      expect(router.state.location.search).toMatchObject({
+        panel: panel.toLowerCase(),
+        target: `cost_item:${equipment.id}`,
+      });
+      await act(() => router.history.back());
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: panel })).toBeNull(),
+      );
+    }
+  });
+
+  test("a delete refused as the idea is archived: the reason without Retry, then 17 reads as archived (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    costsApi({
+      archived: () => archived,
+      refuse: ({ method }) => {
+        if (method !== "DELETE") return undefined;
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Startup costs" });
+    await user.click(
+      screen.getByRole("button", { name: "Row actions for Rent" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const question = await screen.findByRole("alertdialog", {
+      name: "Delete this cost row?",
+    });
+    const toast = await toastAfter("Couldn't save. It's archived.", () =>
+      user.click(within(question).getByRole("button", { name: "Delete" })),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Add row" })).toBeNull(),
+    );
+    expect(rowOf("Rent")).toBeTruthy();
+  });
+
+  test("a delete refused once the user is a Viewer: the reason without Retry, then 17 reads only (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let me = ana;
+    costsApi({
+      me: () => me,
+      refuse: ({ method }) => {
+        if (method !== "DELETE") return undefined;
+        me = as("viewer");
+        return apiError(403, "FORBIDDEN");
+      },
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Startup costs" });
+    await user.click(
+      screen.getByRole("button", { name: "Row actions for Rent" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const question = await screen.findByRole("alertdialog", {
+      name: "Delete this cost row?",
+    });
+    const toast = await toastAfter(
+      "Couldn't save. You don't have access to this.",
+      () =>
+        user.click(within(question).getByRole("button", { name: "Delete" })),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Add row" })).toBeNull(),
+    );
+    expect(screen.queryByRole("button", { name: /^F\/A\/U of/ })).toBeNull();
+  });
+
+  test("+ Add row refused as the idea is archived: the reason, then 17 reads as archived", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    costsApi({
+      archived: () => archived,
+      refuse: ({ method }) => {
+        if (method !== "POST") return undefined;
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Startup costs" });
+    const [add] = screen.getAllByRole("button", { name: "Add row" });
+    const toast = await toastAfter("Couldn't save. It's archived.", () =>
+      user.click(add as HTMLElement),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Add row" })).toBeNull(),
+    );
+  });
+
+  test("an autosave refused as the idea is archived: once the idea reads archived, the notice and the fields read only", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    costsApi({
+      archived: () => archived,
+      refuse: ({ method }) => {
+        if (method !== "PATCH") return undefined;
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Startup costs" });
+    await user.click(
+      within(rowOf("Permits")).getAllByText("Empty")[0] as HTMLElement,
+    );
+    await user.type(
+      await screen.findByRole("textbox", {
+        name: "Amount of Permits / Registration",
+      }),
+      "8,500",
+    );
+    await user.tab();
+    expect(
+      await screen.findByText("This idea is archived", {}, { timeout: 3000 }),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("textbox", {
+          name: "Amount of Permits / Registration",
+        }),
+      ).toBeNull(),
+    );
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add row" })).toBeNull();
+  });
+
+  test("an autosave refused once the user is a Viewer: once me reads Viewer, the fields read only", async () => {
+    const user = userEvent.setup();
+    let me = ana;
+    costsApi({
+      me: () => me,
+      refuse: ({ method }) => {
+        if (method !== "PATCH") return undefined;
+        me = as("viewer");
+        return apiError(403, "FORBIDDEN");
+      },
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Startup costs" });
+    await user.click(
+      within(rowOf("Permits")).getAllByText("Empty")[0] as HTMLElement,
+    );
+    await user.type(
+      await screen.findByRole("textbox", {
+        name: "Amount of Permits / Registration",
+      }),
+      "8,500",
+    );
+    await user.tab();
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByRole("textbox", {
+            name: "Amount of Permits / Registration",
+          }),
+        ).toBeNull(),
+      { timeout: 3000 },
+    );
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add row" })).toBeNull();
+    expect(screen.queryByText("This idea is archived")).toBeNull();
   });
 });

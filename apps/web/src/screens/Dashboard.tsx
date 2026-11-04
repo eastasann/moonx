@@ -40,11 +40,16 @@ import {
 import {
   FailureState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  useSearchModal,
+  useWorkspace,
+} from "../components/workspace";
 import {
   executionHref,
   executionTabOf,
@@ -61,7 +66,9 @@ import {
   dashboardIdeasQuery,
   dashboardSelfAnalysesQuery,
 } from "../lib/queries";
+import type { WaitedQuery } from "../lib/query";
 import { useDocumentTitle } from "../lib/title";
+import { RowsSkeleton } from "./DashboardSkeleton";
 
 /**
  * What a block shows of its query (6.9: each block loads on its own, and one failing
@@ -70,16 +77,22 @@ import { useDocumentTitle } from "../lib/title";
  */
 function QueryContent<T>({
   query,
+  waitsFor,
   skeleton,
   dashboard,
   children,
 }: {
   query: UseQueryResult<T>;
+  /** The query's options, which Retry on "Taking longer than usual" asks again. */
+  waitsFor: readonly WaitedQuery[];
   skeleton: ReactNode;
   dashboard: string | undefined;
   children: (data: T) => ReactNode;
 }) {
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    query.isPending,
+    waitsFor,
+  );
   const retry = () => void query.refetch();
   if (query.data !== undefined) return children(query.data);
   if (query.isError) {
@@ -94,22 +107,9 @@ function QueryContent<T>({
     );
   }
   if (isSlow) {
-    return <SlowLoadingState headingLevel={3} size="S" onRetry={retry} />;
+    return <SlowLoadingState headingLevel={3} size="S" onRetry={retrySlow} />;
   }
   return <Skeleton isLoading>{skeleton}</Skeleton>;
-}
-
-/** Rows of placeholder words in the shape of a block's list. */
-function RowsSkeleton({ line, detail }: { line: string; detail: string }) {
-  return (
-    <RowList>
-      {[0, 1, 2].map((row) => (
-        <RowListItem key={row} description={<Text>{detail}</Text>}>
-          <Text>{line}</Text>
-        </RowListItem>
-      ))}
-    </RowList>
-  );
 }
 
 function IdeasBlock({
@@ -122,7 +122,8 @@ function IdeasBlock({
   onFirstIdea: () => void;
 }) {
   const { t } = useTranslation(["dashboard", "app"]);
-  const query = useQuery(dashboardIdeasQuery(workspaceId));
+  const options = dashboardIdeasQuery(workspaceId);
+  const query = useQuery(options);
   const data = query.data;
   if (
     data !== undefined &&
@@ -143,6 +144,7 @@ function IdeasBlock({
     >
       <QueryContent
         query={query}
+        waitsFor={[options]}
         dashboard={dashboardHref(me)}
         skeleton={
           <RowsSkeleton
@@ -261,7 +263,8 @@ export function GettingStarted({
 
 function DueSoonBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
   const { t } = useTranslation(["dashboard"]);
-  const query = useQuery(dashboardDueSoonQuery(workspaceId));
+  const options = dashboardDueSoonQuery(workspaceId);
+  const query = useQuery(options);
   return (
     <Block
       title={t("dashboard:due.title")}
@@ -270,6 +273,7 @@ function DueSoonBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
     >
       <QueryContent
         query={query}
+        waitsFor={[options]}
         dashboard={dashboardHref(me)}
         skeleton={
           <RowsSkeleton
@@ -371,11 +375,13 @@ function SelfAnalysesBlock({
   workspaceId: string;
 }) {
   const { t } = useTranslation(["dashboard", "common"]);
-  const query = useQuery(dashboardSelfAnalysesQuery(workspaceId));
+  const options = dashboardSelfAnalysesQuery(workspaceId);
+  const query = useQuery(options);
   return (
     <Block title={t("dashboard:selfAnalyses.title")} isBusy={query.isPending}>
       <QueryContent
         query={query}
+        waitsFor={[options]}
         dashboard={dashboardHref(me)}
         skeleton={
           <RowsSkeleton
@@ -423,11 +429,13 @@ function SelfAnalysesBlock({
 
 function ActivityBlock({ me, workspaceId }: { me: Me; workspaceId: string }) {
   const { t } = useTranslation(["dashboard"]);
-  const query = useQuery(dashboardActivityQuery(workspaceId));
+  const options = dashboardActivityQuery(workspaceId);
+  const query = useQuery(options);
   return (
     <Block title={t("dashboard:activity.title")} isBusy={query.isPending}>
       <QueryContent
         query={query}
+        waitsFor={[options]}
         dashboard={dashboardHref(me)}
         skeleton={
           <RowsSkeleton
@@ -516,47 +524,6 @@ function ActivityRow({
 }
 
 /**
- * 5 Dashboard's shape while its route loads (design-spec 6.0.6): the title, and the four
- * blocks' headings over rows of bars. Drawn inside a `Skeleton`, its words are bars.
- */
-export function DashboardSkeleton() {
-  const { t } = useTranslation(["dashboard"]);
-  const rows = (
-    <RowsSkeleton
-      line={t("dashboard:gettingStarted.firstIdea")}
-      detail={t("dashboard:due.window")}
-    />
-  );
-  const skeletonBlock = (
-    id: string,
-    column: HubBlock["column"],
-    title: string,
-  ): HubBlock => ({
-    id,
-    column,
-    content: <Block title={title}>{rows}</Block>,
-  });
-  return (
-    <HubPattern
-      header={
-        <>
-          <Heading level={1} variant="heading-1-hub">
-            {t("dashboard:ideas.title")}
-          </Heading>
-          <Text tone="secondary">{t("dashboard:lead")}</Text>
-        </>
-      }
-      blocks={[
-        skeletonBlock("ideas", "main", t("dashboard:ideas.title")),
-        skeletonBlock("due", "aside", t("dashboard:due.title")),
-        skeletonBlock("self", "main", t("dashboard:selfAnalyses.title")),
-        skeletonBlock("activity", "aside", t("dashboard:activity.title")),
-      ]}
-    />
-  );
-}
-
-/**
  * 5 Dashboard (design-spec 6.9, s05-dashboard.html): pattern A without numbers. Ideas
  * and Self analyses in the main column, Due soon and Recent activity beside them; on a
  * phone Ideas, Due soon, Self analyses, Recent activity. A Viewer has no Self analyses.
@@ -567,6 +534,8 @@ export function DashboardScreen({ modal: openModal }: { modal?: string }) {
   const modal = useModal();
   useDocumentTitle(t("app:nav.dashboard"), workspace.name);
   const isViewer = role === "viewer";
+  // M1 is not a Viewer's (design-spec 2.2).
+  const isNewIdeaOpen = useSearchModal(openModal, "new-idea", !isViewer);
   const blocks: HubBlock[] = [
     {
       id: "ideas",
@@ -639,7 +608,7 @@ export function DashboardScreen({ modal: openModal }: { modal?: string }) {
         }
         blocks={blocks}
       />
-      {openModal === "new-idea" && !isViewer && (
+      {isNewIdeaOpen && (
         <ModalBoundary key={openModal} onClose={modal.close}>
           <NewIdeaDialog onClose={modal.close} />
         </ModalBoundary>

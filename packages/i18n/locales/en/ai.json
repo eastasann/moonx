@@ -110,9 +110,7 @@
     "copied": "Copied",
     "copyFailed": "Couldn't copy. Use Download instead.",
     "then": "Next: paste into your AI, then",
-    "couldNotExport": "Couldn't export",
-    "noQuestions": "Choose at least one section with a question to answer",
-    "noQuestionsPlan": "Choose at least one item with a question to answer"
+    "couldNotExport": "Couldn't export"
   },
   "import": {
     "title": "Import from AI",
@@ -156,8 +154,8 @@
       "truncated": "{{text}}…"
     },
     "review": {
-      "changes_one": "{{count}} change",
-      "changes_other": "{{count}} changes",
+      "changes_one": "{{count, integer}} change",
+      "changes_other": "{{count, integer}} changes",
       "toApply": " to apply.",
       "toApplyFau": " to apply. Changed answers go back to Unclassified so you can check them.",
       "apply": "Apply the change to {{question}}",
@@ -173,30 +171,30 @@
       "unreadableAmount": "Couldn't read the amount",
       "choice": "Use one of: {{choices}}",
       "applyFirst": "Apply first, then attach evidence in the question",
-      "unchanged_one": "{{count}} unchanged answer",
-      "unchanged_other": "{{count}} unchanged answers",
+      "unchanged_one": "{{count, integer}} unchanged answer",
+      "unchanged_other": "{{count, integer}} unchanged answers",
       "noChanges": "No changes found",
       "noChangesBody": "The reply holds the answers as they are now.",
       "close": "Close",
       "note": "Each change is saved in history as an AI import.",
       "cancel": "Cancel",
-      "applyCount_one": "Apply {{count}} change",
-      "applyCount_other": "Apply {{count}} changes",
-      "conflict": "Some answers changed while you were reviewing",
+      "applyCount_one": "Apply {{count, integer}} change",
+      "applyCount_other": "Apply {{count, integer}} changes",
       "couldNotApply": "Couldn't apply",
+      "couldNotApplyReason": "Couldn't apply. {{reason}}.",
+      "couldNotApplyRef": "Couldn't apply. Ref: {{ref}}",
       "code": "{{section}} · {{title}}",
-      "questionsChanged": "Some questions can no longer be imported. Uncheck them and apply again.",
       "hidden": "This question is hidden now",
       "fau": "Fact, Assumption or Unknown for {{question}}",
       "noun": "answer",
       "gone": "This question is no longer in the template"
     },
     "applied": {
-      "updated_one": "{{count}} answer updated",
-      "updated_other": "{{count}} answers updated",
+      "updated_one": "{{count, integer}} answer updated",
+      "updated_other": "{{count, integer}} answers updated",
       "nothing": "No answers changed",
-      "needsFau_one": "{{count}} needs F/A/U",
-      "needsFau_other": "{{count}} need F/A/U"
+      "needsFau_one": "{{count, integer}} needs F/A/U",
+      "needsFau_other": "{{count, integer}} need F/A/U"
     },
     "exampleHeading": "## [{{id}}]"
   }

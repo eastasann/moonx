@@ -17,6 +17,7 @@ import {
   TreeItemContent,
 } from "react-aria-components";
 import { useTranslation } from "react-i18next";
+import { FixedLocale } from "../internal/FixedLocale";
 import { IconSlot } from "../internal/IconSlot";
 import * as styles from "./Tree.css";
 
@@ -62,33 +63,35 @@ export function Tree<T extends object>({
   ...props
 }: TreeProps<T>) {
   return (
-    <OpensContext.Provider
-      value={props.onAction !== undefined || selectionMode !== "none"}
-    >
-      <AriaTree
-        {...props}
-        selectionMode={selectionMode}
-        onSelectionChange={
-          onSelectionChange
-            ? (selection: Selection) =>
-                onSelectionChange(
-                  selection === "all" ? new Set() : new Set(selection),
-                )
-            : undefined
-        }
-        onExpandedChange={
-          onExpandedChange
-            ? (keys) => onExpandedChange(new Set(keys))
-            : undefined
-        }
-        renderEmptyState={
-          renderEmptyState
-            ? () => <div className={styles.empty}>{renderEmptyState()}</div>
-            : undefined
-        }
-        className={`${styles.tree} ${styles.density[density]}`}
-      />
-    </OpensContext.Provider>
+    <FixedLocale>
+      <OpensContext.Provider
+        value={props.onAction !== undefined || selectionMode !== "none"}
+      >
+        <AriaTree
+          {...props}
+          selectionMode={selectionMode}
+          onSelectionChange={
+            onSelectionChange
+              ? (selection: Selection) =>
+                  onSelectionChange(
+                    selection === "all" ? new Set() : new Set(selection),
+                  )
+              : undefined
+          }
+          onExpandedChange={
+            onExpandedChange
+              ? (keys) => onExpandedChange(new Set(keys))
+              : undefined
+          }
+          renderEmptyState={
+            renderEmptyState
+              ? () => <div className={styles.empty}>{renderEmptyState()}</div>
+              : undefined
+          }
+          className={`${styles.tree} ${styles.density[density]}`}
+        />
+      </OpensContext.Provider>
+    </FixedLocale>
   );
 }
 

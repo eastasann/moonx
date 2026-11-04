@@ -1,4 +1,4 @@
-import { formatRelativeTime } from "@moonx/i18n";
+import { formatRelativeTime, i18n } from "@moonx/i18n";
 import type { ConflictCurrent } from "@moonx/schemas";
 import {
   AlertDialog,
@@ -19,6 +19,7 @@ import {
   useAutosaveState,
   useSaveItem,
 } from "../lib/autosave-react";
+import { unexpectedReference } from "../lib/failure";
 import { meQuery } from "../lib/queries";
 import { ModalBoundary } from "./ErrorBoundary";
 
@@ -28,7 +29,7 @@ function rejectionWords(item: SaveItem, t: TFunction<["app"]>): string | null {
   const reason = rejectionReason(item.failure);
   if (reason !== null) return t(`app:save.reason.${reason}`);
   // A refusal no rule names: unexpected, with the Ref someone asking for help quotes.
-  const ref = item.failure.requestId;
+  const ref = unexpectedReference(item.failure);
   return ref === null
     ? t("app:state.unexpected")
     : t("app:state.unexpectedRef", { ref: ref.slice(0, 8) });
@@ -115,6 +116,26 @@ function ConflictQuestion({
 }
 
 /**
+ * The question's title on someone's save made first (design-spec 6.0.2「衝突の確認の文言」):
+ * "{name} updated this {noun} {when}", or "Someone updated this …" when who is not known.
+ * Also the words of a toast once the form that met it has closed (6.0.6).
+ */
+export function conflictTitle(
+  noun: string,
+  current: Pick<ConflictCurrent, "updatedBy" | "updatedAt">,
+  timeZone: string,
+): string {
+  const when = formatRelativeTime(current.updatedAt, { timeZone });
+  return current.updatedBy === null
+    ? i18n.t("app:save.conflict.titleSomeone", { noun, when })
+    : i18n.t("app:save.conflict.title", {
+        name: current.updatedBy.displayName,
+        noun,
+        when,
+      });
+}
+
+/**
  * The words and choices of design-spec 6.0.2's conflict question: "{name} updated this
  * {noun} {when}", Overwrite with mine or Load theirs, and Copy my input with the input
  * Load theirs drops (`input`, as text; null for a send that dropped nothing typed). No
@@ -137,9 +158,6 @@ export function ConflictAlert({
   const { t } = useTranslation(["app"]);
   const { data: me } = useQuery(meQuery());
   const [copied, setCopied] = useState<"copied" | "failed" | null>(null);
-  const when = formatRelativeTime(current.updatedAt, {
-    timeZone: me?.timezone ?? "UTC",
-  });
   const copy = () => {
     // No clipboard (not offered outside a secure page, or not allowed): the input then
     // shows here to be selected, the field being behind the question.
@@ -155,15 +173,7 @@ export function ConflictAlert({
       isOpen
       variant="warning"
       size="S"
-      title={
-        current.updatedBy === null
-          ? t("app:save.conflict.titleSomeone", { noun, when })
-          : t("app:save.conflict.title", {
-              name: current.updatedBy.displayName,
-              noun,
-              when,
-            })
-      }
+      title={conflictTitle(noun, current, me?.timezone ?? "UTC")}
       primaryActionLabel={t("app:save.conflict.overwrite")}
       secondaryActionLabel={t("app:save.conflict.loadTheirs")}
       onPrimaryAction={onOverwrite}

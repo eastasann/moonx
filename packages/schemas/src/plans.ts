@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  conditionAnswerSchema,
   confidenceSchema,
   costCategorySchema,
   dateOnlySchema,
@@ -37,6 +38,7 @@ import {
   planNameSchema,
   reasonSchema,
   requiredShortTextSchema,
+  requiredText,
   shortTextSchema,
   versionNameSchema,
 } from "./input-rules";
@@ -492,7 +494,7 @@ export const executionListQuerySchema = z.object({
    * An assignee typed as a name (design-spec 6.13), matched without regard to case: the
    * Picker of 22 lists names that differ only in case once.
    */
-  assigneeName: z.string().trim().min(1).max(60).optional(),
+  assigneeName: z.string().trim().pipe(requiredText(60)).optional(),
   status: executionStatusSchema.optional(),
 });
 
@@ -553,6 +555,11 @@ export const planItemSchema = z.object({
   prompts: z.array(templateQuestionSchema),
   /** One per prompt that takes an answer (text, choice, table), unanswered ones included. */
   answers: z.array(planAnswerSchema),
+  /**
+   * The answers in other items that the display conditions of its prompts name, in
+   * template order (a viewed version's): 21 shows and counts with them as 20 does.
+   */
+  conditionAnswers: z.array(conditionAnswerSchema),
   /**
    * The single-value key metrics the number sub-items show (a viewed version's). A
    * `cost_row:*` the validation does not have (had not) is left out.

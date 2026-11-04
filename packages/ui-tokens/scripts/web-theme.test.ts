@@ -255,7 +255,7 @@ describe("themeOverrides", () => {
   });
 });
 
-test("vars.ts gives the sizes code reads as numbers in px", () => {
+test("vars.css.ts gives the sizes code reads as numbers in px", () => {
   const source = varsSource(tree);
   expect(source).toContain(`"tablet": 768,`);
   expect(source).toContain("export const popoverMaxHeight = 384;");

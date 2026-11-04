@@ -16,10 +16,25 @@ import {
   type QueryKey,
   queryOptions,
   skipToken,
+  useIsFetching,
 } from "@tanstack/react-query";
 import { scopeParam } from "./ai";
 import { ApiError, api, inPath, unwrap } from "./api";
 import { formatPanelTarget, type PanelTarget } from "./panel-target";
+
+/**
+ * What a list query of SDD 7.3「クライアントのデータ」 takes: coming back to the list within
+ * 30 seconds of reading it shows it from the cache without asking again. Every change
+ * made from this page makes the lists stale at once (query.ts), so the user's own change
+ * shows on the next list they see. The lists are those of 5, 6, 7, 8, 12, 13's archived
+ * plans and the operator's 26 and 28; the screens that edit what they list in place (9's
+ * members and invitations, 14, 15, 16, 17, 22) keep their data by the save responses.
+ */
+export const asList = { staleTime: 30_000, meta: { list: true } } as const;
+
+/** Whether a query is one of {@link asList}'s lists. */
+export const isList = (query: { meta?: Record<string, unknown> }) =>
+  query.meta?.list === true;
 
 /** U1: the signed-in user, their memberships and last workspace (SDD 5.4). */
 export const meQuery = () =>
@@ -72,6 +87,7 @@ export const workspaceKey = (workspaceId: string) => [
 export const dashboardIdeasQuery = (workspaceId: string) =>
   queryOptions({
     queryKey: [...workspaceKey(workspaceId), "dashboard", "ideas"],
+    ...asList,
     queryFn: () =>
       unwrap(api().api.v1.workspaces({ workspaceId }).dashboard.ideas.get()),
   });
@@ -80,6 +96,7 @@ export const dashboardIdeasQuery = (workspaceId: string) =>
 export const dashboardSelfAnalysesQuery = (workspaceId: string) =>
   queryOptions({
     queryKey: [...workspaceKey(workspaceId), "dashboard", "self-analyses"],
+    ...asList,
     queryFn: () =>
       unwrap(
         api()
@@ -128,6 +145,7 @@ export const memberSelfAnalysesKey = (workspaceId: string) => [
 export const memberSelfAnalysesQuery = (workspaceId: string) =>
   queryOptions({
     queryKey: [...memberSelfAnalysesKey(workspaceId), "list"],
+    ...asList,
     queryFn: () =>
       unwrap(api().api.v1.workspaces({ workspaceId })["self-analyses"].get()),
   });
@@ -149,6 +167,7 @@ export const memberSelfAnalysisQuery = (workspaceId: string, userId: string) =>
 export const dashboardDueSoonQuery = (workspaceId: string) =>
   queryOptions({
     queryKey: [...workspaceKey(workspaceId), "dashboard", "due-soon"],
+    ...asList,
     queryFn: () =>
       unwrap(
         api().api.v1.workspaces({ workspaceId }).dashboard["due-soon"].get(),
@@ -159,6 +178,7 @@ export const dashboardDueSoonQuery = (workspaceId: string) =>
 export const dashboardActivityQuery = (workspaceId: string) =>
   queryOptions({
     queryKey: [...workspaceKey(workspaceId), "dashboard", "activity"],
+    ...asList,
     queryFn: () =>
       unwrap(api().api.v1.workspaces({ workspaceId }).dashboard.activity.get()),
   });
@@ -173,8 +193,8 @@ export interface IdeaFilters {
   q?: string;
 }
 
-/** The most I1 gives at once (SDD 5.1「一覧」). */
-const IDEAS_PAGE = 200;
+/** I1's page (SDD 7.3: a hub's list goes in pages of 50, so each answer stays small). */
+const IDEAS_PAGE = 50;
 
 /**
  * I1 GET: the workspace's ideas under `filters`, every page of them (a workspace holds a
@@ -183,6 +203,7 @@ const IDEAS_PAGE = 200;
 export const ideasQuery = (workspaceId: string, filters: IdeaFilters) =>
   queryOptions({
     queryKey: [...workspaceKey(workspaceId), "ideas", filters],
+    ...asList,
     queryFn: async () => {
       const query = {
         ...(filters.stage === undefined ? {} : { stage: filters.stage }),
@@ -251,10 +272,30 @@ export const validationHomeQuery = (ideaId: string) =>
       ),
   });
 
+/**
+ * Whether what decides `?modal=evidence` over a validation screen's rows, numbers or
+ * answers has been read (SDD 4章, useSearchModalAbout's `isDecided`, which waits for the
+ * user's role itself): whether the idea is archived (V1) and `list`, where M2's `about`
+ * is looked for, each read and neither being read again. A read that brings stale cached
+ * data up to date (on opening the screen, after a change) may still let M2 open.
+ */
+export function useIsValidationRead(
+  ideaId: string,
+  list: { data: unknown; isFetching: boolean },
+): boolean {
+  const isHomeFetching =
+    useIsFetching({
+      queryKey: validationHomeQuery(ideaId).queryKey,
+      exact: true,
+    }) > 0;
+  return list.data !== undefined && !list.isFetching && !isHomeFetching;
+}
+
 /** P1 GET with the archived plans, which 13 lists once "Show" is pressed (6.1). */
 export const archivedPlansQuery = (ideaId: string) =>
   queryOptions({
     queryKey: [...ideaKey(ideaId), "plans", "with-archived"],
+    ...asList,
     queryFn: () =>
       unwrap(
         api()
@@ -609,6 +650,7 @@ export const adminKey = ["admin"];
 export const adminTemplatesQuery = () =>
   queryOptions({
     queryKey: [...adminKey, "templates"],
+    ...asList,
     queryFn: () => unwrap(api().api.v1.admin.templates.get()),
   });
 
@@ -679,6 +721,7 @@ export interface AdminUserFilters {
 export const adminUsersQuery = (filters: AdminUserFilters) =>
   queryOptions({
     queryKey: [...adminKey, "users", filters],
+    ...asList,
     queryFn: () =>
       everyPage((cursor) =>
         unwrap(
@@ -693,6 +736,7 @@ export const adminUsersQuery = (filters: AdminUserFilters) =>
 export const adminWorkspacesQuery = (q?: string) =>
   queryOptions({
     queryKey: [...adminKey, "workspaces", q ?? ""],
+    ...asList,
     queryFn: () =>
       everyPage((cursor) =>
         unwrap(
@@ -714,6 +758,7 @@ export const adminWorkspacesQuery = (q?: string) =>
 export const adminInvitationsQuery = (status: "pending" | "all") =>
   queryOptions({
     queryKey: [...adminKey, "invitations", status],
+    ...asList,
     queryFn: () =>
       everyPage((cursor) =>
         unwrap(
@@ -876,6 +921,7 @@ export const decisionLogQuery = (
 ) =>
   queryOptions({
     queryKey: [...workspaceKey(workspaceId), "decision-log", filters],
+    ...asList,
     queryFn: () =>
       everyPage((cursor) =>
         unwrap(

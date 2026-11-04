@@ -1,6 +1,7 @@
 import { i18n } from "@moonx/i18n";
+import { ToastQueue } from "@moonx/ui-web";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import i18next from "i18next";
 import { setI18n } from "react-i18next";
 import {
@@ -12,6 +13,7 @@ import {
   vi,
 } from "vitest";
 import { createAppRouter } from "../router";
+import { ana, toastPlacements, toastRegion } from "../test/api";
 
 // Signed out: a page outside the workspaces asks the API who is signed in.
 beforeEach(() => {
@@ -124,4 +126,22 @@ test("a path that is no screen: signed in, the way to the dashboard (6.0.6)", as
   });
   expect(dashboard.getAttribute("href")).toBe(`/w/${workspace.id}`);
   expect(screen.queryByRole("link", { name: "Go to Home" })).toBeNull();
+});
+
+test("signed in without the frame (3), a toast stays at the bottom edge: no TabBar to sit above (4.5 Toast)", async () => {
+  vi.mocked(fetch).mockImplementation(async () => Response.json(ana));
+  // A token that is no token: 3 says so without asking the API (6.16).
+  renderApp("/welcome?step=invite&token=..");
+  await screen.findByRole("heading", {
+    level: 1,
+    name: "This invitation is invalid or expired. Ask the person who invited you for a new one.",
+  });
+  let close = () => {};
+  act(() => {
+    close = ToastQueue.neutral("Copied");
+  });
+  const placed = (await waitFor(toastRegion)).className;
+  act(close);
+  cleanup();
+  expect(placed).toBe(toastPlacements().atBottom);
 });

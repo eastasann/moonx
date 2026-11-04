@@ -6,10 +6,10 @@
     "legend": "Checks: ● done · ◐ partial · ○ not started",
     "updated": "{{stage}} · updated {{when}}",
     "missing": "Missing: {{names}}",
-    "missingCount_one": "Missing: {{count}} check",
-    "missingCount_other": "Missing: {{count}} checks",
-    "dropped_one": "{{count}} dropped idea hidden",
-    "dropped_other": "{{count}} dropped ideas hidden",
+    "missingCount_one": "Missing: {{count, integer}} check",
+    "missingCount_other": "Missing: {{count, integer}} checks",
+    "dropped_one": "{{count, integer}} dropped idea hidden",
+    "dropped_other": "{{count, integer}} dropped ideas hidden",
     "show": "Show"
   },
   "gettingStarted": {

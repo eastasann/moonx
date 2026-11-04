@@ -39,10 +39,13 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
 import { type ReactNode, useCallback, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useFailureOnceClosed } from "../components/ideaActions";
 import { LeaveWorkspaceDialog } from "../components/LeaveWorkspaceDialog";
 import { useLogOutRequest } from "../components/LogOutRequest";
+import { ModalSendFailure } from "../components/ModalFailure";
 import { PhotoField } from "../components/PhotoField";
 import { type RowFieldsSpec, useRowFields } from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
@@ -125,43 +128,6 @@ const preferenceSpec: RowFieldsSpec<PreferenceValues> = {
       : String(value ?? "")) as never,
   isChoice: () => true,
 };
-
-/** 4's skeleton: the groups' names and the shapes of their fields. */
-export function AccountSkeleton() {
-  const { t } = useTranslation(["settings"]);
-  const field = (label: string) => <TextField label={label} />;
-  return (
-    <SettingsPattern
-      header={
-        <Heading level={1} variant="heading-1-settings">
-          {t("settings:account.title")}
-        </Heading>
-      }
-      groups={[
-        {
-          id: "profile",
-          title: t("settings:account.profile.title"),
-          content: (
-            <>
-              {field(t("settings:account.profile.displayName"))}
-              {field(t("settings:account.profile.email"))}
-            </>
-          ),
-        },
-        {
-          id: "password",
-          title: t("settings:account.password.title"),
-          content: field(t("settings:account.password.new")),
-        },
-        {
-          id: "preferences",
-          title: t("settings:account.preferences.title"),
-          content: field(t("settings:account.preferences.timeZone")),
-        },
-      ]}
-    />
-  );
-}
 
 /**
  * 4 Account (design-spec 6.16, pattern H): the profile, saved as it is typed (6.0.2), the
@@ -397,11 +363,29 @@ function PreferenceFields({ me }: { me: Me }) {
 }
 
 /**
+ * "Couldn't save. Check the format.": a new password Better Auth refused by its rule
+ * (6.0.8), in a toast once 4 is gone, where its field said "Check the format" (6.0.6「送っ
+ * ている間に閉じた送信の失敗」: the screen's words, without Retry). The API's own refusals
+ * of the format read so already (useFailureOnceClosed); Better Auth's are not the API's.
+ */
+const formatRefusalWords = (t: TFunction<["settings", "errors", "app"]>) =>
+  t("app:state.couldNotSaveReason", { reason: t("app:save.reason.format") });
+
+/** What A8 changes the password with. */
+interface PasswordChange {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/**
  * Change password (A8, design-spec 6.16 4): the current password and a new one (6.0.8).
  * A wrong current password says so under its field; the other devices are logged out.
+ * Once 4 is left while it is on its way, a failure says so in a toast, in the form's
+ * words for a refusal or else as a row's send does, whose Retry sends the same passwords
+ * again (6.0.6「送っている間に閉じた送信の失敗」).
  */
 function ChangePasswordForm() {
-  const { t } = useTranslation(["settings", "errors"]);
+  const { t } = useTranslation(["settings", "errors", "app"]);
   const formId = useId();
   const isOnline = useIsOnline();
   const [failure, setFailure] = useState<unknown>(null);
@@ -410,6 +394,20 @@ function ChangePasswordForm() {
   >(null);
   const oneAtATime = useOneAtATime();
   const sendThrough = useSendThrough();
+  const change = (input: PasswordChange) =>
+    sendThrough(() => changePassword(input.currentPassword, input.newPassword));
+  const changed = () =>
+    ToastQueue.neutral(t("settings:account.password.changed"), {
+      timeout: TOAST_MS,
+    });
+  const failedOnceLeft = useFailureOnceClosed(
+    (input: PasswordChange) => change(input).then(changed),
+    (error) => {
+      const code = failureCode(error);
+      if (code === "INVALID_PASSWORD") return t("errors:INVALID_PASSWORD");
+      return code === "VALIDATION_FAILED" ? formatRefusalWords(t) : null;
+    },
+  );
   const form = useAppForm({
     defaultValues: { currentPassword: "", newPassword: "" },
     listeners: {
@@ -420,11 +418,14 @@ function ChangePasswordForm() {
       oneAtATime(async () => {
         setFailure(null);
         setRefused(null);
+        const input: PasswordChange = {
+          currentPassword: value.currentPassword,
+          newPassword: value.newPassword,
+        };
         try {
-          await sendThrough(() =>
-            changePassword(value.currentPassword, value.newPassword),
-          );
+          await change(input);
         } catch (cause) {
+          failedOnceLeft(cause, input);
           const code = failureCode(cause);
           if (isSessionLost(cause)) return;
           if (code === "INVALID_PASSWORD") setRefused("currentPassword");
@@ -433,9 +434,7 @@ function ChangePasswordForm() {
           return;
         }
         formApi.reset();
-        ToastQueue.neutral(t("settings:account.password.changed"), {
-          timeout: TOAST_MS,
-        });
+        changed();
       }),
   });
   return (
@@ -453,7 +452,7 @@ function ChangePasswordForm() {
             <field.TextField
               rejection={
                 refused === "currentPassword"
-                  ? t("settings:account.password.wrong")
+                  ? t("errors:INVALID_PASSWORD")
                   : undefined
               }
               label={t("settings:account.password.current")}
@@ -503,7 +502,18 @@ function ChangePasswordForm() {
  * "Log in again" for an account without a password (design-spec 6.16 4): a Google sign-in
  * that comes back to 4, its new session inside the 10 minutes U7 and U8 ask for.
  */
-function LogInAgain({ message }: { message: string }) {
+function LogInAgain({
+  message,
+  onCloseModal,
+}: {
+  message: string;
+  /**
+   * Given inside a modal (Delete account): a failure to start follows the modals' rule
+   * (6.0.6), whose small dialog's Close closes the modal. The network or an API that is
+   * down shows there too, as unexpected: the start saves nothing (6.16 4, SDD 8.2).
+   */
+  onCloseModal?: () => void;
+}) {
   const { t } = useTranslation(["settings"]);
   const isOnline = useIsOnline();
   const [failure, setFailure] = useState<unknown>(null);
@@ -531,13 +541,22 @@ function LogInAgain({ message }: { message: string }) {
           </Button>
         </Flex>
       </InlineAlert>
-      {failure !== null && (
-        <SendFailure
-          error={failure}
-          onRetry={startGoogle}
-          isRetryDisabled={!isOnline}
-        />
-      )}
+      {failure !== null &&
+        (onCloseModal === undefined ? (
+          <SendFailure
+            error={failure}
+            onRetry={startGoogle}
+            isRetryDisabled={!isOnline}
+          />
+        ) : (
+          <ModalSendFailure
+            error={failure}
+            transient="unexpected"
+            onRetry={startGoogle}
+            isRetryDisabled={!isOnline}
+            onClose={onCloseModal}
+          />
+        ))}
     </Stack>
   );
 }
@@ -545,10 +564,12 @@ function LogInAgain({ message }: { message: string }) {
 /**
  * Set password (U8, design-spec 6.16 4) for an account made with Google: once set, the
  * email and password log in too. Without a sign-in in the last 10 minutes, the way to
- * log in again.
+ * log in again. Once 4 is left while it is on its way, a failure says so in a toast, in
+ * the form's words for a refusal or else as a row's send does, whose Retry sends the same
+ * password again (6.0.6「送っている間に閉じた送信の失敗」).
  */
 function SetPasswordForm() {
-  const { t } = useTranslation(["settings", "errors"]);
+  const { t } = useTranslation(["settings", "errors", "app"]);
   const formId = useId();
   const isOnline = useIsOnline();
   const queryClient = useQueryClient();
@@ -557,6 +578,33 @@ function SetPasswordForm() {
   const [isRefused, setRefused] = useState(false);
   const oneAtATime = useOneAtATime();
   const sendThrough = useSendThrough();
+  const readMeAgain = () =>
+    queryClient.invalidateQueries({ queryKey: meQuery().queryKey });
+  /**
+   * Sets the password. One set meanwhile (another tab, a reset mail) is no failure to
+   * show, on 4 or once it is left: the form to change it takes over once the user is read
+   * again, without words (6.16 4).
+   */
+  const set = async (newPassword: string) => {
+    try {
+      await sendThrough(() =>
+        unwrap(api().api.v1.me.password.post({ newPassword })),
+      );
+    } catch (cause) {
+      if (failureCode(cause) !== "PASSWORD_ALREADY_SET") throw cause;
+      await readMeAgain();
+      return;
+    }
+    await readMeAgain();
+    ToastQueue.neutral(t("settings:account.password.setDone"), {
+      timeout: TOAST_MS,
+    });
+  };
+  const failedOnceLeft = useFailureOnceClosed(set, (error) =>
+    failureCode(error) === "REAUTH_REQUIRED"
+      ? t("errors:REAUTH_REQUIRED", { context: "setPassword" })
+      : null,
+  );
   const form = useAppForm({
     defaultValues: { newPassword: "" },
     listeners: { onChange: () => setRefused(false) },
@@ -566,30 +614,15 @@ function SetPasswordForm() {
         setNeedsSignIn(false);
         setRefused(false);
         try {
-          await sendThrough(() =>
-            unwrap(
-              api().api.v1.me.password.post({
-                newPassword: value.newPassword,
-              }),
-            ),
-          );
+          await set(value.newPassword);
         } catch (cause) {
+          failedOnceLeft(cause, value.newPassword);
           const code = failureCode(cause);
           if (isSessionLost(cause)) return;
           if (code === "REAUTH_REQUIRED") setNeedsSignIn(true);
           else if (code === "VALIDATION_FAILED") setRefused(true);
-          else if (code === "PASSWORD_ALREADY_SET") {
-            // Set meanwhile (another tab, a reset mail): the form to change it takes over.
-            await queryClient.invalidateQueries({
-              queryKey: meQuery().queryKey,
-            });
-          } else setFailure(cause);
-          return;
+          else setFailure(cause);
         }
-        await queryClient.invalidateQueries({ queryKey: meQuery().queryKey });
-        ToastQueue.neutral(t("settings:account.password.setDone"), {
-          timeout: TOAST_MS,
-        });
       }),
   });
   return (
@@ -615,7 +648,9 @@ function SetPasswordForm() {
           )}
         </form.AppField>
         {needsSignIn && (
-          <LogInAgain message={t("settings:account.password.reauth")} />
+          <LogInAgain
+            message={t("errors:REAUTH_REQUIRED", { context: "setPassword" })}
+          />
         )}
         {failure !== null && (
           <SendFailure
@@ -681,7 +716,7 @@ function MembershipList({
   me: Me;
   ownerships: ReadonlyMap<string, Ownership>;
 }) {
-  const { t } = useTranslation(["settings", "common", "app"]);
+  const { t } = useTranslation(["settings", "common", "app", "errors"]);
   const { workspace: current } = useWorkspace();
   const isOnline = useIsOnline();
   const own = ownPersonalId(me);
@@ -708,7 +743,7 @@ function MembershipList({
               }
               note={
                 isOnlyOwner
-                  ? t("settings:account.workspaces.lastOwner")
+                  ? t("errors:LAST_OWNER", { context: "leave" })
                   : undefined
               }
               actions={
@@ -788,6 +823,12 @@ type DeleteRefusal =
 
 const confirmEmailSchema = requiredText(EMAIL_MAX);
 
+/** What U7 deletes the account with: the email typed again, and the password if it has one. */
+interface DeleteInput {
+  confirmEmail: string;
+  password?: string;
+}
+
 /** The workspaces of a LAST_OWNER refusal (SDD 5.4 U7 `error.workspaces`). */
 function lastOwnerWorkspaces(error: unknown): { id: string; name: string }[] {
   if (!(error instanceof ApiError) || !Array.isArray(error.detail.workspaces)) {
@@ -805,10 +846,15 @@ function lastOwnerWorkspaces(error: unknown): { id: string; name: string }[] {
  * Delete account (design-spec 6.16「アカウントの削除」): what goes and what stays, the
  * user's email typed again, and their password, or a sign-in in the last 10 minutes for
  * an account without one. The only Owner of a workspace with others in it is sent to
- * that workspace's 9. Deleted, the user is logged out and on 1.
+ * that workspace's 9. Deleted, the user is logged out and on 1. Any other failure follows
+ * the modals' rule (6.0.6, ModalSendFailure), whose small dialog's Close closes this.
+ * Cancel while the deletion is on its way closes it: the account is deleted all the same
+ * if the send goes through, and a failure says so in a toast, in the words the dialog has
+ * for it or else as a row's send does, whose Retry sends the same deletion again (6.0.6
+ * 「送っている間に閉じた送信の失敗」).
  */
 function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
-  const { t } = useTranslation(["settings"]);
+  const { t } = useTranslation(["settings", "errors", "app"]);
   const formId = useId();
   const isOnline = useIsOnline();
   const queryClient = useQueryClient();
@@ -819,6 +865,42 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
   const [wrong, setWrong] = useState<"confirmEmail" | "password" | null>(null);
   const oneAtATime = useOneAtATime();
   const sendThrough = useSendThrough();
+  const post = (input: DeleteInput) =>
+    sendThrough(() => unwrap(api().api.v1.me.delete.post(input)));
+  const leaveDeleted = async () => {
+    // The session is gone with the account: nothing of it stays on the page.
+    autosave.discardAll();
+    queryClient.clear();
+    await navigate({ href: "/", replace: true });
+  };
+  const failedOnceClosed = useFailureOnceClosed(
+    (input: DeleteInput) => post(input).then(leaveDeleted),
+    (error) => {
+      switch (failureCode(error)) {
+        case "CONFIRMATION_MISMATCH":
+          return t("errors:CONFIRMATION_MISMATCH");
+        case "INVALID_PASSWORD":
+          return t("errors:INVALID_PASSWORD");
+        case "REAUTH_REQUIRED":
+          return t("errors:REAUTH_REQUIRED", { context: "deleteAccount" });
+        case "LAST_OWNER": {
+          const workspaces = lastOwnerWorkspaces(error);
+          return workspaces.length === 0
+            ? t("errors:LAST_OWNER", { context: "leave" })
+            : workspaces
+                .map(({ name }) =>
+                  t("errors:LAST_OWNER", {
+                    context: "deleteAccount",
+                    workspace: name,
+                  }),
+                )
+                .join(t("app:separator"));
+        }
+        default:
+          return null;
+      }
+    },
+  );
   const form = useAppForm({
     defaultValues: { confirmEmail: "", password: "" },
     listeners: {
@@ -834,16 +916,15 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
           setWrong("confirmEmail");
           return;
         }
+        const input: DeleteInput = {
+          confirmEmail: value.confirmEmail.trim(),
+          ...(me.hasPassword ? { password: value.password } : {}),
+        };
         try {
-          await sendThrough(() =>
-            unwrap(
-              api().api.v1.me.delete.post({
-                confirmEmail: value.confirmEmail.trim(),
-                ...(me.hasPassword ? { password: value.password } : {}),
-              }),
-            ),
-          );
+          await post(input);
         } catch (cause) {
+          // Closed meanwhile (Cancel while on its way): said in a toast instead.
+          failedOnceClosed(cause, input);
           const code = failureCode(cause);
           if (isSessionLost(cause)) return;
           if (code === "CONFIRMATION_MISMATCH") setWrong("confirmEmail");
@@ -861,10 +942,7 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
           } else setFailure(cause);
           return;
         }
-        // The session is gone with the account: nothing of it stays on the page.
-        autosave.discardAll();
-        queryClient.clear();
-        await navigate({ href: "/", replace: true });
+        await leaveDeleted();
       }),
   });
   const deleted = [
@@ -933,7 +1011,7 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
                 <field.TextField
                   rejection={
                     wrong === "confirmEmail"
-                      ? t("settings:account.delete.emailMismatch")
+                      ? t("errors:CONFIRMATION_MISMATCH")
                       : undefined
                   }
                   label={t("settings:account.delete.email")}
@@ -956,7 +1034,7 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
                   <field.TextField
                     rejection={
                       wrong === "password"
-                        ? t("settings:account.delete.wrongPassword")
+                        ? t("errors:INVALID_PASSWORD")
                         : undefined
                     }
                     label={t("settings:account.delete.password")}
@@ -971,17 +1049,20 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
           </Form>
         </form.AppForm>
         {refusal?.kind === "reauth" && (
-          <LogInAgain message={t("settings:account.delete.reauth")} />
+          <LogInAgain
+            message={t("errors:REAUTH_REQUIRED", { context: "deleteAccount" })}
+            onCloseModal={onClose}
+          />
         )}
         {refusal?.kind === "lastOwner" && (
           <LastOwnerRefusal workspaces={refusal.workspaces} />
         )}
         {failure !== null && (
-          <SendFailure
+          <ModalSendFailure
             error={failure}
-            transient="couldNotSave"
             onRetry={() => void form.handleSubmit()}
             isRetryDisabled={!isOnline}
+            onClose={onClose}
           />
         )}
       </Stack>
@@ -998,17 +1079,19 @@ function LastOwnerRefusal({
   /** `notice` before Delete account is pressed; `negative` when the API refused it. */
   variant?: "notice" | "negative";
 }) {
-  const { t } = useTranslation(["settings"]);
+  const { t } = useTranslation(["settings", "errors"]);
   if (workspaces.length === 0) {
     return (
       <InlineAlert variant={variant}>
-        {t("settings:account.workspaces.lastOwner")}
+        {t("errors:LAST_OWNER", { context: "leave" })}
       </InlineAlert>
     );
   }
   const lines: ReactNode[] = workspaces.map(({ id, name }) => (
     <Stack key={id} gap="space-75">
-      <Text>{t("settings:account.delete.lastOwner", { workspace: name })}</Text>
+      <Text>
+        {t("errors:LAST_OWNER", { context: "deleteAccount", workspace: name })}
+      </Text>
       <Link href={settingsHref(id)}>
         {t("settings:account.delete.toSettings", { workspace: name })}
       </Link>

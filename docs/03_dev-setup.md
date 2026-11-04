@@ -81,7 +81,7 @@ Claude Code で実装するときの決まり（2026-10-12 のユーザーの決
 
 - 仕様を弱める変更は、エージェントが自分で決めない。無人ループ（`/draft:implement loop`）でも同じ。機能・検査・制約・文言を減らす・緩める変更と、docs の記述を実装に合わせて弱める書き換えがこれにあたる。エージェントは手を止めて、弱める点・理由・選択肢を示す（無人ループではそのステップを `blocked` にする）。弱めずに直せる docs の欠けや食い違いは、`/draft:implement` の決まりどおりに扱う。ステップを分けて残りを新しいステップに書き出すのは、弱める変更にあたらない
 - エージェントが docs に書かれていない細部を決めたら、完了報告とコミットの本文に、決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所をすべて書く。自分で決めてよいのは、画面と API の外から見える振る舞い（応答・状態・権限・文言の意味）を変えない細部だけ。変えるものは設計の不備として扱う
-- 手元の Docker の DB（`moonx`・`moonx_test`）を消す make ターゲット（`db-seed`・`db-reset`、`test-api`・`test-e2e` のテスト用の DB の作り直しと、それらを呼ぶ `setup`・`test`）は、確認なしで動かしてよい。ほかの破壊的な操作は、実行の前にユーザーの確認を取る
+- 手元の Docker の DB（`moonx`・`moonx_test`）を消す make ターゲット（`db-seed`・`db-reset`、`test-api`・`test-e2e`・`first-paint` のテスト用の DB の作り直しと、それらを呼ぶ `setup`・`test`・`coverage`）は、確認なしで動かしてよい。ほかの破壊的な操作は、実行の前にユーザーの確認を取る
 
 ---
 
@@ -214,6 +214,7 @@ make infra-apply ENV=staging    # 適用
 #### A. アカウントとドメイン
 
 - [ ] 1章のアカウントを作る（本人確認と審査に数日かかるので早めに）
+- [ ] Neon・Google Cloud・Vercel のアカウントで2段階認証を必須にする（DB と本番の資源に入れるアカウントを守るため。SDD 7.2「個人情報」）
 - [ ] Vercel で `dwnfrc.app` の DNS のレコードを足せることを確かめる（ドメインは新しく取らない。ADR-013）。Vercel では、レコードの名前を `dwnfrc.app` からの相対で入れる（`.dwnfrc.app` を除いた部分だけを入れる）
 - [ ] Search Console で `dwnfrc.app` の所有を確かめる（ドメイン プロパティ）。Search Console が出す TXT のレコードを Vercel の DNS の `dwnfrc.app` に入れ、確認を押す。確かめる Google アカウントは、I で Terraform を動かし、ドメインマッピングを作るアカウントにする（所有を確かめていないアカウントではドメインマッピングを作れない）
 
@@ -508,22 +509,26 @@ Google Auth Platform → クライアント → クライアントを作成 → 
 ## 7. テスト実行
 
 ```bash
-make db-up         # test-api・test-e2e の前に（DB が起動していなければ）
+make db-up         # test-api・test-e2e・coverage・first-paint の前に（DB が起動していなければ）
 
 make test
 make test-domain
 make test-api
 make test-web
 make test-e2e
+make coverage
+make first-paint
 
 make lint
 make format
 make typecheck
 ```
 
-`make test-e2e` は `e2e/playwright.config.ts` の `webServer` で、API（ポート 3100）と Web（ポート 5273）を専用に起動する。開発サーバー（3000・5173）は止めなくてよい。実行のたびに `DATABASE_URL_TEST` の DB を作り直してデモデータを入れる（`e2e/global-setup.ts`）。この API はメールを送らずにログ（`.data/e2e/api.log`）に書き、テストは招待とパスワード再設定のリンクをそこから読む。入口のプラグインがログインの回数を IP ごとに数える（SDD ADR-029）ので、テストは `X-Forwarded-For` の値をテストごとに変えて送る（`e2e/fixtures.ts`）。local と e2e には前に立つプロキシが無いので、送った値がそのまま右端の値になる（呼び出し元の IP の決め方は SDD 7.2）。
+`make test-e2e` は、開発サーバーとは別のポートで API と Web を専用に起動するので、開発サーバー（3000・5173）は止めなくてよい。実行のたびにテスト用の DB を作り直してデモデータを入れる。起動するサーバーとポート、上書きする値、ログの置き場所（テストがメールのリンクを読むログ、PWA の検査の API のログ）は SDD 2章「環境変数」にある。入口のプラグインがログインの回数を IP ごとに数える（SDD ADR-029）ので、テストは `X-Forwarded-For` の値をテストごとに変えて送る（`e2e/fixtures.ts`）。local と e2e には前に立つプロキシが無いので、送った値がそのまま右端の値になる（呼び出し元の IP の決め方は SDD 7.2）。
 
-各ターゲットが何を動かすかは [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)、テスト用の DB（`DATABASE_URL_TEST`）は SDD 2章「環境変数」、ツールの選定は ADR-022、テストの方針は SDD 10章。PR では CI が同じターゲットを動かす（04 2章）。
+カバレッジ（SDD 10章の目標）は `make coverage` で測る（`make test` は測らない）。結果は `coverage/`（`.gitignore` で外してある）。Web の最初の表示（SDD 7.3）は `make first-paint` で見積もる。CPU を遅くして測るので、ほかの重い処理（`make test-e2e` など）と同時に動かさない。どちらも、何を測ってどう比べるかは SDD 2章「make ターゲット」と 10章にある。
+
+各ターゲットが何を動かすかは [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)、テスト用の DB（`DATABASE_URL_TEST`）は SDD 2章「環境変数」、ツールの選定は ADR-022、テストの方針は SDD 10章。PR では CI が同じターゲットを動かす（`coverage` と `first-paint` を除く。04 2章）。
 
 ---
 

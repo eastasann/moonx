@@ -6,9 +6,9 @@ import {
 import { createFileRoute } from "@tanstack/react-router";
 import {
   DecisionLogScreen,
-  DecisionLogSkeleton,
   type DecisionsSearch,
 } from "../../../../screens/DecisionLog";
+import { DecisionLogSkeleton } from "../../../../screens/DecisionLogSkeleton";
 
 /**
  * `/w/$workspaceId/decisions`: 7 Decision Log (SDD 4章). Values it cannot read are left

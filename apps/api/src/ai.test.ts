@@ -376,6 +376,7 @@ describe("X1 GET /api/v1/ai/export", () => {
       const error = await errorOf(response);
       expect(error.code).toBe(code);
       if (path !== undefined) expect(error.details?.[0]?.path).toBe(path);
+      return error;
     };
     await refused(
       `source=validation&id=${validationId}&sections=`,
@@ -407,11 +408,16 @@ describe("X1 GET /api/v1/ai/export", () => {
       `source=business_plan&id=${plan.id}&items=1&part=a`,
       "VALIDATION_FAILED",
     );
-    await refused(
+    const noItem = await refused(
       `source=business_plan&id=${plan.id}&items=31`,
       "VALIDATION_FAILED",
       "items",
     );
+    // The response does not repeat the key asked for (SDD 8.1).
+    expect([noItem.message, noItem.details?.[0]?.message]).toEqual([
+      "The template has no such item",
+      "The template has no such item",
+    ]);
 
     const viewer = await call(
       "GET",

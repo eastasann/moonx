@@ -1,11 +1,11 @@
 import { formatWaitTime, i18n } from "@moonx/i18n";
 import { Button, Flex, InlineAlert, Text } from "@moonx/ui-web";
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../lib/api";
 import { AuthError } from "../lib/auth";
 import { rejectionReason } from "../lib/autosave";
-import { reportOnce } from "./states";
+import { isTransient, useUnexpectedReference } from "../lib/failure";
+import { isSessionLost } from "../lib/send";
 
 /** The code of a failed call to the API or to Better Auth, or null. */
 export function failureCode(error: unknown): string | null {
@@ -13,11 +13,6 @@ export function failureCode(error: unknown): string | null {
     ? error.code
     : null;
 }
-
-/** The network, or an API that is not up: a send that may pass next time. */
-const isTransient = (error: unknown) =>
-  (error instanceof ApiError || error instanceof AuthError) &&
-  (error.status === null || error.code === "UPSTREAM_UNAVAILABLE");
 
 /** The wait of a 429: `retryAfterSeconds` on the API's paths, `X-Retry-After` on Better Auth's (SDD 8.2). */
 function retryAfterOf(error: unknown): number | null {
@@ -90,15 +85,9 @@ export function SendFailure({
     reason === null &&
     !(transient === "couldNotSave" && isTransient(error));
   // The API's request id, or the Sentry event of the Web's own failure (SDD 8.2).
-  const reference = useMemo(
-    () =>
-      !isUnexpected
-        ? null
-        : error instanceof ApiError || error instanceof AuthError
-          ? error.requestId
-          : reportOnce(error),
-    [isUnexpected, error],
-  );
+  const reference = useUnexpectedReference(error, isUnexpected);
+  // The app is on its way to M9 or the sign-in screen (router.tsx).
+  if (isSessionLost(error)) return null;
   if (expected !== undefined) {
     return <InlineAlert variant="negative">{expected}</InlineAlert>;
   }

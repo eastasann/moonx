@@ -2,7 +2,7 @@
 // packages/ui-tokens/scripts/ and run make tokens (ADR-018, ADR-025).
 
 import { globalStyle } from "@vanilla-extract/css";
-import { vars } from "./vars";
+import { vars } from "./vars.css";
 
 const dark = {
   [vars.color.surface.canvas]: "#0e1120",

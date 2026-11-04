@@ -1,22 +1,34 @@
-import type { Me, Role } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import {
+  type CostRowState,
+  evaluateValidation,
+  keyMetricOf,
+} from "@moonx/domain";
+import type { Me, Role, ValidationHome } from "@moonx/schemas";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import * as sentry from "../lib/sentry";
 import {
   ana,
   apiError,
   authError,
   type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
   renderApp,
   stubApi,
+  toastAfter,
 } from "../test/api";
 import { validationHome, workspaceId } from "../test/ideas";
+import { planHome } from "../test/plans";
+import { section01, section02 } from "../test/validation";
 
 // 13 Validation home (design-spec 6.1) and the input mechanism its Edit summary uses
 // (6.0.2, M9, SDD ADR-019・ADR-021).
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const home = validationHome();
@@ -54,6 +66,97 @@ function homeApi({
     }
     return undefined;
   });
+}
+
+/**
+ * V1's titles of the sections (SDD 5.7): 01 and 02 the template's, 03〜09 fixed. The
+ * template below has no 10, which V1 then names by its key.
+ */
+const sectionTitles: Record<string, string> = {
+  "01": "01 Customer & Problem",
+  "02": "02 Market",
+  "03": "03 Research Log",
+  "04": "04 Competitors",
+  "05": "05 Costs",
+  "06-08": "06–08 Unit Economics",
+  "09": "09 Assumptions & Risks",
+};
+
+/** A row of the template's cost table, without an amount, as a new validation has it. */
+const emptyRow = (
+  category: CostRowState["category"],
+  templateKey: string,
+  sortOrder: number,
+): CostRowState => ({
+  id: `8a1c0000-0000-4000-8000-00000000000${sortOrder}`,
+  sortOrder,
+  category,
+  templateKey,
+  inputMode: "amount",
+  amount: null,
+  percent: null,
+  fau: null,
+  confidence: null,
+  activeEvidenceCount: 0,
+});
+
+/**
+ * 13 of an idea just created (SDD 5.7 V1), evaluated as the API does: nothing answered,
+ * the template's cost rows without amounts, no number, research, decision or plan.
+ */
+function createdHome(): ValidationHome {
+  const fresh = validationHome({ latestDecision: null });
+  const evaluation = evaluateValidation(
+    {
+      sections: [section01, section02],
+      thresholds: {
+        competitors: { min: 3 },
+        local_price: { pricedCompetitors: 2, researchLogs: 1 },
+        permits: { researchLogs: 1 },
+        demand_signal: { researchLogs: 1 },
+      },
+      answers: [],
+      researchLogs: [],
+      competitors: [],
+      assumptionCount: 0,
+      riskCount: 0,
+      costRows: [
+        emptyRow("initial", "initial.permits", 0),
+        emptyRow("monthly_fixed", "monthly.rent", 1),
+      ],
+      economicsInputs: [],
+    },
+    { workspaceId, ideaId: fresh.idea.id, canWrite: true },
+  );
+  const metric = (key: keyof ValidationHome["keyMetrics"]) =>
+    keyMetricOf(evaluation.keyMetrics, key);
+  return {
+    ...fresh,
+    summary: {
+      customer: null,
+      problem: null,
+      solution: null,
+      marketType: null,
+    },
+    keyMetrics: {
+      initial_cost_total: metric("initial_cost_total"),
+      break_even_units_day: metric("break_even_units_day"),
+      expected_operating_profit: metric("expected_operating_profit"),
+      payback_months: metric("payback_months"),
+    },
+    economicsWarnings: evaluation.economics.warnings,
+    nextSteps: evaluation.nextSteps,
+    checks: evaluation.checks,
+    fau: evaluation.fau,
+    sections: evaluation.sections.map((section) => ({
+      ...section,
+      title: sectionTitles[section.key] ?? section.key,
+    })),
+    decisions: [],
+    plans: [],
+    archivedPlanCount: 0,
+    canAddPlan: false,
+  };
 }
 
 async function openEditSummary() {
@@ -123,6 +226,52 @@ describe("13 Validation home (design-spec 6.1)", () => {
     );
   });
 
+  test("just created: every number Empty, every check Not started, F/A/U Empty alone, Start with 01, no decisions", async () => {
+    const created = createdHome();
+    homeApi({ data: created });
+    renderApp(path);
+    const numbers = await screen.findByRole("group", { name: "Key numbers" });
+    expect(within(numbers).getAllByText("Empty")).toHaveLength(4);
+    const checks = within(screen.getByRole("list", { name: "Checks" }))
+      .getAllByRole("listitem")
+      .map((check) => check.textContent);
+    expect(checks).toHaveLength(6);
+    for (const check of checks) {
+      expect(check).toContain("Not started");
+      expect(check).not.toMatch(/Done|Partial/);
+    }
+    const fau = screen.getByRole("figure", {
+      name: "Items by Fact, Assumption and Unknown",
+    });
+    expect(
+      within(fau)
+        .getAllByRole("listitem")
+        .map((entry) => entry.textContent),
+    ).toEqual([`Empty${created.fau.empty}`]);
+    const [first] = within(screen.getByRole("list", { name: "Next steps" }))
+      .getAllByRole("listitem")
+      .map((step) => step.textContent);
+    expect(first).toContain("Start with 01 Customer & Problem");
+    expect(first).toContain("Nothing is filled in yet.");
+    expect(
+      screen.getByRole("region", { name: "Decisions" }).textContent,
+    ).toContain("No decisions yet");
+    expect(screen.getByRole("region", { name: "Plans" }).textContent).toContain(
+      "No decisions yet",
+    );
+  });
+
+  test("a decision but no plan: Plans says a plan starts after Proceed", async () => {
+    // The fixture's idea is on Hold, with no plan.
+    homeApi();
+    renderApp(path);
+    const plans = await screen.findByRole("region", { name: "Plans" });
+    expect(plans.textContent).toContain(
+      "No plans yet. A plan can start after a Proceed decision.",
+    );
+    expect(plans.textContent).not.toContain("No decisions yet");
+  });
+
   test("another workspace's idea under this one's URL: no access, no tools", async () => {
     homeApi({
       data: validationHome({
@@ -142,7 +291,7 @@ describe("13 Validation home (design-spec 6.1)", () => {
     expect(document.title).toBe("moonx");
   });
 
-  test("a contribution margin of zero or less: the break-even's reason and its warning", async () => {
+  test("a contribution margin of zero or less: the break-even's reason and its warning, a link to 18", async () => {
     const data = validationHome();
     homeApi({
       data: {
@@ -164,8 +313,10 @@ describe("13 Validation home (design-spec 6.1)", () => {
       "Contribution margin is zero or negative. Review price or variable costs.",
     );
     expect(
-      within(numbers).getByText("Contribution margin is zero or negative"),
-    ).toBeTruthy();
+      within(numbers)
+        .getByRole("link", { name: "Contribution margin is zero or negative" })
+        .getAttribute("href"),
+    ).toBe(`${path}/economics`);
   });
 
   test("sections open 11 and 14〜18; an empty summary answer opens its question", async () => {
@@ -265,6 +416,26 @@ describe("13 Validation home (design-spec 6.1)", () => {
     );
   });
 
+  test("dropped: the Drop badge, and Edit summary and Record decision stay (6.1 状態, PRD MB-12)", async () => {
+    homeApi({
+      me: as("member"),
+      data: validationHome({ latestDecision: "drop" }),
+    });
+    renderApp(path);
+    // The badge leads the line above the name.
+    const status = (
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Bacolod Health Bowl",
+      })
+    ).previousElementSibling as HTMLElement;
+    expect(within(status).getByText("Drop")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit summary" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Record decision" }),
+    ).toBeTruthy();
+  });
+
   test("archived: the notice and Restore for an Owner, and no Edit summary or AI", async () => {
     const calls = homeApi({
       data: validationHome({ archived: true }),
@@ -287,6 +458,122 @@ describe("13 Validation home (design-spec 6.1)", () => {
         ),
       ).toBe(true),
     );
+  });
+});
+
+describe("13's blocks and counts (design-spec 6.1・6.0.3, SDD 8.2)", () => {
+  test("a block that fails to render says so alone: the other blocks and the navigation stay", async () => {
+    // React logs what a boundary catches; the failure is the test's point.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(sentry, "reportError").mockReturnValue(
+      "3f2a9c1d0b8e4f5aa1b2c3d4e5f6a7b8",
+    );
+    homeApi({
+      data: {
+        ...home,
+        // A check's Next step without its check: what V1 never sends (SDD 5.2).
+        nextSteps: [
+          {
+            kind: "check",
+            count: null,
+            checkKey: null,
+            sectionKey: null,
+            link: null,
+          },
+        ],
+      },
+    });
+    renderApp(path);
+    expect(
+      await screen.findByRole("heading", {
+        level: 3,
+        name: "Something went wrong",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText("Ref: 3f2a9c1d")).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "Next steps" })).toBeNull();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Bacolod Health Bowl" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Checks" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Sections" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Key numbers" })).toBeTruthy();
+    // The side navigation and the TabBar alike (the width picks one).
+    for (const nav of screen.getAllByRole("navigation", { name: "Main" })) {
+      expect(
+        within(nav)
+          .getByRole("link", { name: "Ideas" })
+          .getAttribute("aria-current"),
+      ).toBe("page");
+    }
+  });
+
+  test("the F/A/U legend counts a Fact without evidence among the Facts and says how many", async () => {
+    homeApi();
+    renderApp(path);
+    const fau = await screen.findByRole("figure", {
+      name: "Items by Fact, Assumption and Unknown",
+    });
+    const entries = within(fau)
+      .getAllByRole("listitem")
+      .map((entry) => entry.textContent);
+    expect(entries[0]).toBe("Fact5(1 without evidence)");
+    expect(entries[1]).toBe("Assumption37L6 M17 H14");
+    cleanup();
+    vi.unstubAllGlobals();
+    homeApi({ data: { ...home, fau: { ...home.fau, factNoEvidence: 0 } } });
+    renderApp(path);
+    const none = await screen.findByRole("figure", {
+      name: "Items by Fact, Assumption and Unknown",
+    });
+    expect(within(none).getAllByRole("listitem")[0]?.textContent).toBe("Fact5");
+  });
+
+  test("a proposer who left reads as a former member (design-spec 6.16)", async () => {
+    homeApi({
+      data: validationHome({
+        proposer: {
+          ...home.idea.proposer,
+          displayName: "Kenji Mori",
+          badge: "former_member",
+        },
+      }),
+    });
+    renderApp(path);
+    expect(
+      await screen.findByText("— Kenji Mori (former member)"),
+    ).toBeTruthy();
+  });
+
+  test("counts past a thousand group their thousands (design-spec 1.2)", async () => {
+    homeApi({
+      data: {
+        ...home,
+        fau: {
+          fact: 1200,
+          factNoEvidence: 1001,
+          assumption: { total: 3000, low: 1000, medium: 1000, high: 1000 },
+          unknown: 1500,
+          unclassified: 0,
+          empty: 0,
+        },
+        sections: home.sections.map((section) =>
+          section.key === "09"
+            ? { ...section, count: 1234, countB: 1500 }
+            : section,
+        ),
+      },
+    });
+    renderApp(path);
+    const fau = await screen.findByRole("figure", {
+      name: "Items by Fact, Assumption and Unknown",
+    });
+    expect(fau.textContent).toContain("(1,001 without evidence)");
+    expect(fau.textContent).toContain("L1,000 M1,000 H1,000");
+    expect(screen.getByText("5,700 items")).toBeTruthy();
+    expect(
+      screen.getByRole("list", { name: "Sections" }).textContent,
+    ).toContain("1,234 · 1,500");
   });
 });
 
@@ -350,6 +637,243 @@ describe("13's plans (design-spec 6.1・6.12)", () => {
     expect(
       screen.queryByRole("dialog", { name: "Create plan draft" }),
     ).toBeNull();
+  });
+
+  test.each([
+    [
+      "the latest decision is Hold",
+      { ...proceeded, idea: { ...proceeded.idea, latestDecision: "hold" } },
+    ],
+    [
+      "the idea is archived, after Proceed",
+      { ...proceeded, idea: { ...proceeded.idea, archived: true } },
+    ],
+  ] as const)(
+    "%s: an Owner has no Add plan, and M5's URL opens nothing (6.1・6.8)",
+    async (_, data) => {
+      homeApi({ data });
+      renderApp(path);
+      const plans = await screen.findByRole("list", { name: "Plans" });
+      expect(within(plans).getByRole("link", { name: /Plan A/ })).toBeTruthy();
+      expect(screen.queryByRole("link", { name: "Add plan" })).toBeNull();
+      cleanup();
+      vi.unstubAllGlobals();
+      homeApi({ data });
+      renderApp(`${path}?modal=create-plan`);
+      await screen.findByRole("list", { name: "Plans" });
+      expect(
+        screen.queryByRole("dialog", { name: "Create plan draft" }),
+      ).toBeNull();
+      expect(screen.queryByRole("link", { name: "Add plan" })).toBeNull();
+    },
+  );
+});
+
+describe("13's M5 and Edit summary while they may not open (SDD 4章, design-spec 6.0.6)", () => {
+  afterEach(cleanupThenRestoreFocus);
+
+  const proceeded = validationHome({ latestDecision: "proceed" });
+
+  /**
+   * 13's API whose V1 answers `read()` each time (a promise holds it back), with the plans
+   * M5 reads and `write` for what is sent (a promise holds it back too).
+   */
+  function changingApi(
+    read: () => ValidationHome | Promise<ValidationHome>,
+    write: (call: Call) => Response | Promise<Response> | undefined = () =>
+      undefined,
+  ) {
+    return stubApi((call) => {
+      const { method, path: called } = call;
+      if (method === "GET" && called === "/api/v1/me") {
+        return Response.json(ana);
+      }
+      if (method === "PATCH" && called === "/api/v1/me") {
+        return Response.json(ana);
+      }
+      if (method === "GET" && called === `${ideaPath}/validation`) {
+        return (async () => Response.json(await read()))();
+      }
+      if (
+        method === "GET" &&
+        called === `${ideaPath}/plans?includeArchived=true`
+      ) {
+        return Response.json({ items: [] });
+      }
+      return write(call);
+    });
+  }
+
+  const reads = (calls: Call[]) =>
+    calls.filter(
+      ({ method, path: called }) =>
+        method === "GET" && called === `${ideaPath}/validation`,
+    ).length;
+
+  test("M5's URL before Proceed: nothing opens, and once 13 is read the URL drops it in place; a Proceed read later opens nothing", async () => {
+    let data = home;
+    changingApi(() => data);
+    const router = renderApp(`${path}?modal=create-plan`);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Bacolod Health Bowl",
+    });
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(router.history.length).toBe(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    data = proceeded;
+    readAgainOnFocus();
+    expect(await screen.findByRole("link", { name: "Add plan" })).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("19's Proceed: M5's URL over a cached 13 still without Proceed waits for 13 read again, and that read opens M5", async () => {
+    let read: () => ValidationHome | Promise<ValidationHome> = () => home;
+    changingApi(() => read());
+    const router = renderApp(path);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Bacolod Health Bowl",
+    });
+    let release = () => {};
+    const afterProceed = new Promise<ValidationHome>((resolve) => {
+      release = () => resolve(proceeded);
+    });
+    read = () => afterProceed;
+    readAgainOnFocus();
+    await act(() => router.navigate({ href: `${path}?modal=create-plan` }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(router.state.location.search).toEqual({ modal: "create-plan" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    release();
+    expect(
+      await screen.findByRole("dialog", { name: "Create plan draft" }),
+    ).toBeTruthy();
+    expect(router.state.location.search).toEqual({ modal: "create-plan" });
+  });
+
+  test("M5 opened, then 13 read again as archived: M5 stays until closed, and Create draft says why in it", async () => {
+    const user = userEvent.setup();
+    let data = proceeded;
+    const calls = changingApi(
+      () => data,
+      ({ method, path: called }) =>
+        method === "POST" && called === `${ideaPath}/plans`
+          ? apiError(409, "ARCHIVED")
+          : undefined,
+    );
+    const router = renderApp(`${path}?modal=create-plan`);
+    const dialog = await screen.findByRole("dialog", {
+      name: "Create plan draft",
+    });
+    await within(dialog).findByRole("textbox", { name: /Plan name/ });
+    data = validationHome({ latestDecision: "proceed", archived: true });
+    const before = reads(calls);
+    readAgainOnFocus();
+    await screen.findByText("This idea is archived");
+    expect(reads(calls)).toBeGreaterThan(before);
+    expect(screen.getByRole("dialog", { name: "Create plan draft" })).toBe(
+      dialog,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Create draft" }),
+    );
+    expect(await within(dialog).findByText("Couldn't save")).toBeTruthy();
+    expect(within(dialog).getByText("It's archived")).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(router.state.location.search).toEqual({});
+  });
+
+  /**
+   * Opens M5 from 13's Add plan, presses Create draft with P1 POST held, then Back.
+   * `answer` then answers it.
+   */
+  async function backFromM5() {
+    const user = userEvent.setup();
+    let release: (answer: () => Response) => void = () => {};
+    const sends: Call[] = [];
+    const calls = changingApi(
+      () => proceeded,
+      (call) => {
+        if (call.method !== "POST" || call.path !== `${ideaPath}/plans`) {
+          return undefined;
+        }
+        sends.push(call);
+        return new Promise<Response>((resolve) => {
+          release = (answer) => resolve(answer());
+        });
+      },
+    );
+    const router = renderApp(path);
+    await user.click(await screen.findByRole("link", { name: "Add plan" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Create plan draft",
+    });
+    await user.click(
+      await within(dialog).findByRole("button", { name: "Create draft" }),
+    );
+    await waitFor(() => expect(sends).toHaveLength(1));
+    act(() => router.history.back());
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    return {
+      calls,
+      sends,
+      router,
+      answer: (response: () => Response) => act(() => release(response)),
+    };
+  }
+
+  test("M5 closed by Back while Create draft is on its way: the draft it makes reads 13 again, and its 20 does not open", async () => {
+    const { calls, router, answer } = await backFromM5();
+    const before = reads(calls);
+    answer(() =>
+      Response.json(
+        planHome({
+          id: "3d6f0a2c-5b1e-4c8d-9a7f-2e4b6c8d0a40",
+          name: "Plan A",
+        }),
+        { status: 201 },
+      ),
+    );
+    await waitFor(() => expect(reads(calls)).toBeGreaterThan(before));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(router.state.location.pathname).toBe(path);
+    expect(router.state.location.search).toEqual({});
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("M5 closed by Back while Create draft is on its way, then the decision is no longer Proceed: its words alone, and 13 read again", async () => {
+    const { calls, sends, answer } = await backFromM5();
+    const before = reads(calls);
+    const toast = await toastAfter(
+      "The latest decision is no longer Proceed.",
+      async () => answer(() => apiError(409, "DECISION_NOT_PROCEED")),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() => expect(reads(calls)).toBeGreaterThan(before));
+    expect(sends).toHaveLength(1);
+  });
+
+  test("Edit summary opened, then 13 read again as archived: it stays, and what is typed is refused in it", async () => {
+    let data = home;
+    changingApi(
+      () => data,
+      ({ method, path: called }) =>
+        method === "PATCH" && called === ideaPath
+          ? apiError(409, "ARCHIVED")
+          : undefined,
+    );
+    renderApp(path);
+    const { user, sheet } = await openEditSummary();
+    data = validationHome({ archived: true });
+    readAgainOnFocus();
+    await screen.findByText("This idea is archived");
+    expect(screen.getByRole("dialog", { name: "Edit summary" })).toBe(sheet);
+    await user.type(concept(sheet), "!");
+    await user.tab();
+    expect(await within(sheet).findByText("It's archived")).toBeTruthy();
   });
 });
 

@@ -1,8 +1,22 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { sessions } from "@moonx/db";
 import { createTransport, type ErrorEvent } from "@sentry/bun";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createErrorReporter, redactUrl, scrubEvent } from "./sentry";
-import { buildTestApp, connectTestDatabase, testConfig } from "./test-app";
+import {
+  buildTestApp,
+  connectTestDatabase,
+  testConfig,
+  uniqueIp,
+} from "./test-app";
+import {
+  apiRequest,
+  photoForm,
+  signIn,
+  testFixtures,
+  testPng,
+  uniqueEmail,
+} from "./test-fixtures";
 
 const database = connectTestDatabase();
 afterAll(() => database.close());
@@ -219,6 +233,52 @@ describe("createErrorReporter", () => {
       type: "PostgresError",
       value: "PostgreSQL error 22P02",
     });
+  });
+
+  test("sends a signed-in caller's failure through the app with only their id as the user (11章)", async () => {
+    const { reporter, envelopes, events } = capturingReporter();
+    const user = await testFixtures(database.db).createUser({
+      email: uniqueEmail("sentry-user"),
+      displayName: "Rosario Villanueva",
+    });
+    const { app } = buildTestApp(database, {
+      reporter,
+      avatars: {
+        save: () => Promise.reject(new Error("the disk is full")),
+        remove: async () => {},
+      },
+    });
+    const cookie = await signIn(app, user.email, uniqueIp());
+    const request = apiRequest("PUT", "/api/v1/me/avatar", {
+      cookie,
+      body: photoForm(await testPng()),
+    });
+    const ip = request.headers.get("x-forwarded-for") ?? "";
+
+    const response = await app.handle(request);
+
+    expect(response.status).toBe(500);
+    expect(envelopes).toHaveLength(1);
+    const [event] = events();
+    expect(event?.user).toEqual({ id: user.id });
+    expect(event?.tags).toMatchObject({
+      requestId: response.headers.get("x-request-id"),
+      route: "PUT /api/v1/me/avatar",
+    });
+    const raw = envelopes.join("\n");
+    const [session] = await database.db
+      .select({ token: sessions.token })
+      .from(sessions)
+      .where(eq(sessions.userId, user.id));
+    for (const secret of [
+      user.email,
+      "Rosario Villanueva",
+      ip,
+      session?.token ?? "",
+    ]) {
+      expect(secret).not.toBe("");
+      expect(raw).not.toContain(secret);
+    }
   });
 
   test("sends the user's id, and nothing else about them, once authentication sets it", async () => {

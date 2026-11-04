@@ -33,7 +33,7 @@
     "view": "View",
     "newDraft": "New draft from this version",
     "draftLine": "Not published yet",
-    "usage": "{{count}} in use",
+    "usage": "{{count, integer}} in use",
     "publishedLine": "Published {{date}} by {{name}} · {{usage}}",
     "publishedLineNoName": "Published {{date}} · {{usage}}",
     "draftOpen": "Draft v{{version}} is open. Publish it before importing a file or starting another draft.",
@@ -48,8 +48,7 @@
       "format": "This file doesn't follow the template file format",
       "at": "At {{path}}",
       "atTop": "At the top of the file",
-      "more": "And {{count}} more",
-      "draftExists": "This template already has a draft. Publish it first."
+      "more": "And {{count, integer}} more"
     }
   },
   "version": {
@@ -112,7 +111,7 @@
         "business_plan": "P, the item number (01 to 30) and a number, like P.01.1"
       },
       "askFau": "Ask for F/A/U (Fact, Assumption or Unknown)",
-      "sourceN": "Source {{n}}",
+      "sourceN": "Source {{n, integer}}",
       "addSource": "Add source",
       "copiesNothing": "Copies nothing",
       "copyFromForm": "Validation question IDs like V.01.WHO, or IDEA.ONE_LINE_CONCEPT, IDEA.PROPOSED_SOLUTION, LIST.ASSUMPTIONS or LIST.RISKS. Several are joined in this order.",
@@ -124,8 +123,8 @@
         "linked_metric": "Its key numbers are removed.",
         "execution_view": "Its execution list is removed."
       },
-      "choiceN": "Choice {{n}}",
-      "metricN": "Key number {{n}}",
+      "choiceN": "Choice {{n, integer}}",
+      "metricN": "Key number {{n, integer}}",
       "addChoice": "Add choice",
       "addMetric": "Add key number",
       "noChoices": "No choices yet",
@@ -133,13 +132,13 @@
       "metricScenario": "{{scenario}} scenario",
       "metricCostRow": "Cost row: {{name}}",
       "metricUnknown": "{{key}} (not a key number)",
-      "columnN": "Column {{n}}",
+      "columnN": "Column {{n, integer}}",
       "columnKey": "Key",
       "columnLabel": "Name",
       "columnType": "Type",
       "addColumn": "Add column",
       "noColumns": "No columns yet",
-      "conditionN": "Condition {{n}}",
+      "conditionN": "Condition {{n, integer}}",
       "conditionQuestion": "Question",
       "notInTemplate": "{{key}} (not in this template)",
       "conditionValues": "When the answer is",
@@ -150,13 +149,13 @@
       "label": "Template",
       "contents": "Contents",
       "check": "Check",
-      "checkCount": "Check ({{count}})"
+      "checkCount": "Check ({{count, integer}})"
     },
     "check": {
       "list": "Problems before publishing",
       "ready": "No problems. Ready to publish as v{{version}}.",
       "blocked_one": "Fix 1 problem on Check to publish",
-      "blocked_other": "Fix {{count}} problems on Check to publish",
+      "blocked_other": "Fix {{count, integer}} problems on Check to publish",
       "in": "In {{node}}",
       "whole": "In the whole template",
       "warning": "Warning. It doesn't block publishing.",
@@ -183,8 +182,6 @@
     "publishAction": "Publish",
     "cancel": "Cancel",
     "published": "{{kind}} v{{version}} is published",
-    "publishInvalid": "This version has problems. Fix them on Check, then publish.",
-    "alreadyPublished": "This version was already published",
     "publishedUnknown": "Couldn't load when it was published.",
     "retry": "Retry",
     "nameNote": "It's the template's name, shared by all its versions. Only operators see it.",
@@ -192,7 +189,7 @@
     "edit": "Edit",
     "editTitle": "Edit {{name}}",
     "more": "More actions for {{name}}",
-    "rowN": "Row {{n}}",
+    "rowN": "Row {{n, integer}}",
     "addRow": "Add row",
     "costKey": "Key",
     "costName": "Name",
@@ -257,10 +254,10 @@
       "sectionBody": {
         "plan_zero": "This can't be undone.",
         "plan_one": "Its prompt is deleted with it. This can't be undone.",
-        "plan_other": "Its {{count}} prompts are deleted with it. This can't be undone.",
+        "plan_other": "Its {{count, integer}} prompts are deleted with it. This can't be undone.",
         "other_zero": "This can't be undone.",
         "other_one": "Its question is deleted with it. This can't be undone.",
-        "other_other": "Its {{count}} questions are deleted with it. This can't be undone."
+        "other_other": "Its {{count, integer}} questions are deleted with it. This can't be undone."
       },
       "questionBody": "This can't be undone. Published versions keep it."
     },
@@ -274,12 +271,13 @@
       "amount": "Amount",
       "why": "Why this amount?",
       "metrics": "Shows the key numbers {{metrics}}",
+      "metricsNone": "Shows key numbers once they are chosen",
       "execution": "Shows {{list}} from Execution",
       "executionNone": "Shows an execution list once one is chosen",
       "shownWhen": "Shown when {{condition}}",
       "noColumns": "A table with no columns yet"
     },
-    "fieldInRow": "{{field}}, row {{n}}"
+    "fieldInRow": "{{field}}, row {{n, integer}}"
   },
   "answerType": {
     "long_text": "Long text",
@@ -352,8 +350,6 @@
     "suspendNote": "Suspending logs them out and stops them logging in. Their workspaces, shares and assignments stay.",
     "suspendedNote": "They can't log in. Resume them to let them back in, with everything as it was.",
     "deletedNote": "This account was deleted. Nothing about it can be changed.",
-    "notSelf": "You can't suspend yourself",
-    "gone": "This account no longer exists",
     "suspendTitle": "Suspend {{name}}?",
     "suspendBody": "They're logged out everywhere and can't log in until you resume them. Their workspaces, shares and assignments stay, and no one is notified.",
     "cancel": "Cancel",
@@ -412,10 +408,6 @@
     },
     "resend": "Resend",
     "cancel": "Cancel invitation",
-    "alreadyMember": "{{email}} is already a member of this workspace",
-    "alreadyPending": "An invitation to {{email}} is already pending",
-    "wasCancelled": "The invitation to {{email}} was cancelled",
-    "workspaceGone": "This workspace no longer exists",
     "resent": "Invitation sent again to {{email}}",
     "cancelled": "Invitation to {{email}} cancelled"
   },

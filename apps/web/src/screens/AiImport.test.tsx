@@ -1,5 +1,12 @@
 import type { Classification, ImportContext, Me, Role } from "@moonx/schemas";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
@@ -9,13 +16,23 @@ import {
   survey,
   validationContext,
 } from "../test/ai";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import { home, validationId } from "../test/validation";
 
 // 25 Import from AI (design-spec 6.7, s25-import.html).
 
 afterEach(() => {
+  cleanupThenRestoreFocus();
   vi.unstubAllGlobals();
 });
 
@@ -34,12 +51,15 @@ const as = (role: Role): Me => ({
 function importApi({
   me = ana,
   context = () => validationContext(),
+  beforeContext,
   applyCall,
   evidence,
 }: {
   me?: Me;
   context?: () => ImportContext;
-  applyCall?: (call: Call) => Response | undefined;
+  /** Holds X2's answer back, as a slow read would. */
+  beforeContext?: () => Promise<void>;
+  applyCall?: (call: Call) => Response | Promise<Response> | undefined;
   /** M2's sends (V4 POST, V5 DELETE). */
   evidence?: (call: Call) => Response | undefined;
 } = {}) {
@@ -48,7 +68,9 @@ function importApi({
     if (method === "GET" && path === "/api/v1/me") return Response.json(me);
     if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
     if (method === "GET" && path.startsWith("/api/v1/ai/import/context?")) {
-      return Response.json(context());
+      return beforeContext === undefined
+        ? Response.json(context())
+        : beforeContext().then(() => Response.json(context()));
     }
     if (
       method === "GET" &&
@@ -110,6 +132,19 @@ const reply = [
 ].join("\n");
 
 const item = (code: RegExp) => screen.getByRole("region", { name: code });
+
+/** ③: replaces the imported answer to 01 · WHO with `text`, as typed. */
+async function editImported(
+  user: ReturnType<typeof userEvent.setup>,
+  text: string,
+) {
+  const field = (await screen.findByRole("textbox", {
+    name: "Imported answer to 01 · WHO",
+  })) as HTMLTextAreaElement;
+  await user.clear(field);
+  await user.type(field, text);
+  return field;
+}
 
 describe("25 Import from AI (design-spec 6.7)", () => {
   test("① → ② → ③: changes beside the answers, F/A/U set again, applied at once, back with the count", async () => {
@@ -653,14 +688,147 @@ describe("25 Import from AI (design-spec 6.7)", () => {
     renderApp(importPath());
     await paste(user, "## [V.01.WHO]\nBPO staff.");
     await user.click(await screen.findByRole("button", { name: "Next" }));
-    await user.click(
-      await screen.findByRole("button", { name: "Apply 1 change" }),
-    );
+    const field = await editImported(user, "BPO staff in Bacolod.");
+    await user.click(screen.getByRole("button", { name: "Apply 1 change" }));
     expect(await screen.findByText("Couldn't apply")).toBeTruthy();
     expect(screen.getByText("Ref: 8f14e45f")).toBeTruthy();
+    expect(field.value).toBe("BPO staff in Bacolod.");
     failing = false;
     await user.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(applyCalls(calls)).toHaveLength(2));
+    expect(applyCalls(calls)[1]?.body).toMatchObject({
+      changes: [{ questionKey: "V.01.WHO", text: "BPO staff in Bacolod." }],
+    });
+  });
+
+  test("an apply over the rate limit: Couldn't apply with the wait, and Retry applies again", async () => {
+    const user = userEvent.setup();
+    let limited = true;
+    const calls = importApi({
+      applyCall: () =>
+        limited
+          ? apiError(429, "RATE_LIMITED", { retryAfterSeconds: 60 })
+          : undefined,
+    });
+    renderApp(importPath());
+    await paste(user, "## [V.01.WHO]\nBPO staff.");
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    const field = await editImported(user, "BPO staff in Bacolod.");
+    await user.click(screen.getByRole("button", { name: "Apply 1 change" }));
+    expect(await screen.findByText("Couldn't apply")).toBeTruthy();
+    expect(
+      screen.getByText("Too many attempts. Try again in 1 minute."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/^Ref:/)).toBeNull();
+    // What was edited stays.
+    expect(field.value).toBe("BPO staff in Bacolod.");
+    // Offline, Retry waits for the connection (6.7「状態」).
+    const retry = screen.getByRole("button", { name: "Retry" });
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    try {
+      act(() => {
+        window.dispatchEvent(new Event("offline"));
+      });
+      await waitFor(() => expect(retry.hasAttribute("disabled")).toBe(true));
+    } finally {
+      online.mockRestore();
+    }
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await waitFor(() => expect(retry.hasAttribute("disabled")).toBe(false));
+    limited = false;
+    await user.click(retry);
+    await waitFor(() => expect(applyCalls(calls)).toHaveLength(2));
+    expect(applyCalls(calls)[1]?.body).toEqual(applyCalls(calls)[0]?.body);
+    expect(applyCalls(calls)[1]?.body).toMatchObject({
+      changes: [{ questionKey: "V.01.WHO", text: "BPO staff in Bacolod." }],
+    });
+  });
+
+  test("an apply that changed nothing (someone saved the same first): No answers changed, and back", async () => {
+    const user = userEvent.setup();
+    importApi({
+      applyCall: () =>
+        Response.json({
+          applied: 0,
+          needsClassification: 0,
+          batchId: "4f3e2d1c-0000-4000-8000-000000000002",
+        }),
+    });
+    const router = renderApp(
+      importPath(
+        `target=validation&id=${validationId}&returnTo=${encodeURIComponent(questionsHref)}`,
+      ),
+    );
+    await paste(user, "## [V.01.WHO]\nBPO staff.");
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Apply 1 change" }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(questionsHref),
+    );
+    expect(
+      (await screen.findAllByText("No answers changed")).length,
+    ).toBeGreaterThan(0);
+  });
+
+  test("offline on ③: Apply cannot be pressed, and the imported text, amount and F/A/U are read only", async () => {
+    const user = userEvent.setup();
+    const online = vi.spyOn(navigator, "onLine", "get");
+    try {
+      for (const [path, context, text] of [
+        [importPath(), validationContext, "## [V.01.WHO]\nBPO staff."],
+        [
+          importPath("target=self_analysis"),
+          selfAnalysisContext,
+          "## [SA.INCOME.1]\n### Amount\n32000\n\n### Why this amount?\nRent.",
+        ],
+      ] as const) {
+        online.mockReturnValue(true);
+        const calls = importApi({ context });
+        renderApp(path);
+        await paste(user, text);
+        await user.click(await screen.findByRole("button", { name: "Next" }));
+        const apply = await screen.findByRole("button", {
+          name: "Apply 1 change",
+        });
+        expect(apply.hasAttribute("disabled")).toBe(false);
+        online.mockReturnValue(false);
+        act(() => {
+          window.dispatchEvent(new Event("offline"));
+        });
+        await waitFor(() => expect(apply.hasAttribute("disabled")).toBe(true));
+        await user.click(apply);
+        expect(applyCalls(calls)).toHaveLength(0);
+        const fields =
+          context === validationContext
+            ? [
+                screen.getByRole("textbox", {
+                  name: "Imported answer to 01 · WHO",
+                }),
+              ]
+            : [
+                screen.getByRole("textbox", { name: "Amount" }),
+                screen.getByRole("textbox", { name: "Why this amount?" }),
+              ];
+        for (const field of fields) {
+          expect(field.hasAttribute("readonly")).toBe(true);
+        }
+        if (context === validationContext) {
+          const fau = within(item(/01 · WHO/)).getAllByRole("radio");
+          expect(fau.length).toBeGreaterThan(0);
+          for (const button of fau) {
+            expect(button.hasAttribute("disabled")).toBe(true);
+          }
+        }
+        cleanup();
+        vi.unstubAllGlobals();
+      }
+    } finally {
+      online.mockRestore();
+    }
   });
 
   test("nothing different from the answers now: No changes found and Close", async () => {
@@ -850,6 +1018,73 @@ describe("25 Import from AI (design-spec 6.7)", () => {
     ]);
   });
 
+  test("M2's URL opens nothing on 25 (not from Fact): kept while X2 is read, then taken off; ③ opens none", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    importApi({
+      beforeContext: () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    });
+    const about = `validation_answer:${validationId}:V.01.WHO`;
+    const router = renderApp(
+      importPath(
+        `target=validation&id=${validationId}&returnTo=${encodeURIComponent(questionsHref)}&modal=evidence&about=${about}`,
+      ),
+    );
+    await screen.findByRole("heading", { level: 1 });
+    expect(router.state.location.search).toMatchObject({
+      modal: "evidence",
+      about,
+    });
+    release();
+    await screen.findByRole("textbox", { name: /Reply from your AI/ });
+    // In place of the entry: Back does not lead to it again.
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        target: "validation",
+        id: validationId,
+        returnTo: questionsHref,
+      }),
+    );
+    expect(router.history.length).toBe(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await paste(user, "## [V.01.WHO]\nBPO staff.");
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    await screen.findByRole("region", { name: /01 · WHO/ });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("archived while M2 from Fact is open: it stays over the notice and says why a send is refused (SDD 4章, 6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    importApi({
+      context: () => validationContext({ archived }),
+      evidence: () => apiError(409, "ARCHIVED"),
+    });
+    const router = renderApp(importPath());
+    await paste(user, "## [V.01.WHO]\nBPO staff.");
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    const who = await screen.findByRole("region", { name: /01 · WHO/ });
+    await user.click(within(who).getByRole("radio", { name: /Fact/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    archived = true;
+    readAgainOnFocus();
+    expect(
+      await screen.findByText("This idea is archived", {}, { timeout: 3000 }),
+    ).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Evidence" })).toBe(sheet);
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(within(sheet).getByText("It's archived")).toBeTruthy();
+    await user.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(router.state.location.search).not.toHaveProperty("modal");
+  });
+
   test("an archived idea: the notice and no field to paste into", async () => {
     importApi({ context: () => validationContext({ archived: true }) });
     renderApp(importPath());
@@ -870,6 +1105,115 @@ describe("25 Import from AI (design-spec 6.7)", () => {
     expect(calls.some(({ path }) => path.startsWith("/api/v1/ai/"))).toBe(
       false,
     );
+  });
+});
+
+describe("Cancel while Apply is on its way (design-spec 6.0.6「送っている間に閉じた送信の失敗」)", () => {
+  /**
+   * ③ with one change, Apply pressed and held, then Cancel: 25 is left for 11 before
+   * X3 answers `first`. Returns the calls and the apply's release.
+   */
+  async function cancelWhileApplying(first: Response) {
+    const user = userEvent.setup();
+    let release = () => {};
+    let tries = 0;
+    const calls = importApi({
+      applyCall: () => {
+        tries += 1;
+        if (tries > 1) return undefined;
+        return new Promise<Response>((resolve) => {
+          release = () => resolve(first);
+        });
+      },
+    });
+    const router = renderApp(
+      importPath(
+        `target=validation&id=${validationId}&returnTo=${encodeURIComponent(questionsHref)}`,
+      ),
+    );
+    await paste(user, "## [V.01.WHO]\nBPO staff.");
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Apply 1 change" }),
+    );
+    await waitFor(() => expect(applyCalls(calls)).toHaveLength(1));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(questionsHref),
+    );
+    return { user, calls, router, release: () => act(async () => release()) };
+  }
+
+  test("failed for now: Couldn't apply and Retry, which applies the same again and says so", async () => {
+    const { user, calls, router, release } = await cancelWhileApplying(
+      new Response(null, { status: 503 }),
+    );
+    const toast = await toastAfter("Couldn't apply", release);
+    const applied = await toastAfter("1 answer updated · 1 needs F/A/U", () =>
+      user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    expect(applied).toBeTruthy();
+    expect(applyCalls(calls)).toHaveLength(2);
+    expect(applyCalls(calls)[1]?.body).toEqual(applyCalls(calls)[0]?.body);
+    // Not taken back to 25.
+    expect(router.state.location.pathname).toBe(questionsHref);
+  });
+
+  test("refused as the idea is archived: the reason without Retry, and the screens read again", async () => {
+    const { calls, release } = await cancelWhileApplying(
+      apiError(409, "ARCHIVED"),
+    );
+    const homeReads = () =>
+      calls.filter(
+        ({ method, path }) =>
+          method === "GET" &&
+          path === `/api/v1/ideas/${home.idea.id}/validation`,
+      ).length;
+    const before = homeReads();
+    const toast = await toastAfter("Couldn't apply. It's archived.", release);
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() => expect(homeReads()).toBeGreaterThan(before));
+  });
+
+  test("an unexpected failure: Something went wrong with its Ref, and Retry", async () => {
+    const { release } = await cancelWhileApplying(apiError(500, "INTERNAL"));
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      release,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+
+  test("answers changed meanwhile, or a question gone: 25's words for it, without Retry", async () => {
+    const changed = await cancelWhileApplying(apiError(409, "CONFLICT_MULTI"));
+    const conflict = await toastAfter(
+      "Some answers changed while you were reviewing",
+      changed.release,
+    );
+    expect(
+      within(conflict).queryByRole("button", { name: "Retry" }),
+    ).toBeNull();
+    cleanup();
+    vi.unstubAllGlobals();
+
+    const gone = await cancelWhileApplying(apiError(422, "NOT_IMPORTABLE"));
+    const hidden = await toastAfter(
+      "Couldn't apply. Some questions can no longer be imported.",
+      gone.release,
+    );
+    expect(within(hidden).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  test("applied after Cancel: says so, without taking the user back", async () => {
+    const { router, release } = await cancelWhileApplying(
+      Response.json({
+        applied: 1,
+        needsClassification: 1,
+        batchId: "4f3e2d1c-0000-4000-8000-000000000001",
+      }),
+    );
+    await toastAfter("1 answer updated · 1 needs F/A/U", release);
+    expect(router.state.location.pathname).toBe(questionsHref);
   });
 });
 

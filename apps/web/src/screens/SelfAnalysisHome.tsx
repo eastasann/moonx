@@ -1,4 +1,4 @@
-import { formatCount, formatList } from "@moonx/i18n";
+import { formatList } from "@moonx/i18n";
 import type { SelfAnalysisHome, TemplateQuestion } from "@moonx/schemas";
 import {
   ActionMenu,
@@ -10,12 +10,10 @@ import {
   DescriptionListItem,
   Heading,
   HubPattern,
-  IllustratedMessage,
   MenuItem,
   MoonGlyph,
   RowList,
   RowListItem,
-  Skeleton,
   Text,
 } from "@moonx/ui-web";
 import {
@@ -25,21 +23,18 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Hourglass } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AiMenu } from "../components/AiMenu";
 import type { ScreenComments } from "../components/CommentsPanel";
-import { ModalBoundary } from "../components/ErrorBoundary";
+import { BlockBoundary, ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
-import { toastFailure } from "../components/ideaActions";
+import { useToastFailure } from "../components/ideaActions";
 import { CurrencyDialog, ShareDialog } from "../components/SelfAnalysisDialogs";
-import { useMovesToPersonal } from "../components/selfAnalysis";
 import {
-  FailureState,
-  SlowLoadingState,
-  useIsSlow,
-} from "../components/states";
+  SelfAnalysisBody,
+  useMovesToPersonal,
+} from "../components/selfAnalysis";
 import {
   type TemplateTarget,
   TemplateUpdateDialog,
@@ -48,9 +43,9 @@ import {
 } from "../components/TemplateUpdate";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
-  dashboardHref,
   useModal,
   usePanel,
+  useSearchModal,
   useWorkspace,
 } from "../components/workspace";
 import { ApiError, api, unwrap } from "../lib/api";
@@ -69,6 +64,7 @@ import {
 } from "../lib/queries";
 import { useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
+import { SelfAnalysisHomeSkeleton } from "./SelfAnalysisHomeSkeleton";
 
 /** Where 11 opens to go on (design-spec 6.11「Continue」): the first question not answered. */
 function continueHref(workspaceId: string, home: SelfAnalysisHome): string {
@@ -103,8 +99,8 @@ function StatusBlock({ home }: { home: SelfAnalysisHome }) {
         <DescriptionList>
           <DescriptionListItem label={t("selfAnalysis:home.state.answered")}>
             {t("selfAnalysis:home.state.answeredCount", {
-              answered: formatCount(home.answered),
-              total: formatCount(home.total),
+              answered: home.answered,
+              total: home.total,
             })}
           </DescriptionListItem>
           <DescriptionListItem label={t("selfAnalysis:home.state.sharedWith")}>
@@ -145,8 +141,8 @@ function SectionsBlock({ home }: { home: SelfAnalysisHome }) {
               />
             }
             end={t("selfAnalysis:home.sections.count", {
-              answered: formatCount(section.answered),
-              total: formatCount(section.total),
+              answered: section.answered,
+              total: section.total,
             })}
             isEndNumeric
           >
@@ -163,6 +159,7 @@ function SectionsBlock({ home }: { home: SelfAnalysisHome }) {
  * while questions are empty, and Reopen. The answer is 10's data.
  */
 function useCompletion() {
+  const toastFailure = useToastFailure();
   const queryClient = useQueryClient();
   const sendThrough = useSendThrough();
   const [emptyCount, setEmptyCount] = useState<number | null>(null);
@@ -227,12 +224,13 @@ function MarkDoneConfirmation({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const { t } = useTranslation(["selfAnalysis"]);
+  const { t } = useTranslation(["selfAnalysis", "errors"]);
   return (
     <AlertDialog
       isOpen
       size="S"
-      title={t("selfAnalysis:home.markDoneConfirm.title", { count })}
+      // The words of HAS_EMPTY_QUESTIONS, which 10 asks with before it sends too (6.11).
+      title={t("errors:HAS_EMPTY_QUESTIONS", { count })}
       primaryActionLabel={t("selfAnalysis:home.markDoneConfirm.confirm")}
       cancelLabel={t("selfAnalysis:home.markDoneConfirm.cancel")}
       onPrimaryAction={onConfirm}
@@ -253,10 +251,13 @@ function SelfAnalysisHub({
   home,
   modal,
   about,
+  isRead,
 }: {
   home: SelfAnalysisHome;
   modal: string | undefined;
   about: string | undefined;
+  /** Whether `home` is the API's latest answer, not a cached one being read again. */
+  isRead: boolean;
 }) {
   const { t } = useTranslation(["selfAnalysis", "common"]);
   const { workspace } = useWorkspace();
@@ -269,17 +270,16 @@ function SelfAnalysisHub({
   const here = selfAnalysisHref(workspace.id);
   // Shared with nowhere yet, it is shared once done; a share is taken off at any time.
   const canShare = isDone || home.shares.length > 0;
-  // Whether M6 may open is decided as it opens: reopened elsewhere meanwhile, it stays to
-  // say why its Save was refused.
-  const [wasSharing, setSharing] = useState(false);
-  const isSharing = modal === "share" && (canShare || wasSharing);
-  if (isSharing !== wasSharing) setSharing(isSharing);
+  // Decided as it opens: reopened elsewhere meanwhile, it stays to say why its Save was
+  // refused.
+  const isSharing = useSearchModal(modal, "share", canShare, isRead);
   // The self-analysis here is always the user's own, which only they migrate (2.2).
   const isUpdatingTemplate = useIsTemplateUpdateOpen(
     modal,
     about,
     selfAnalysisTarget(home),
     true,
+    isRead,
   );
   return (
     <>
@@ -292,8 +292,8 @@ function SelfAnalysisHub({
             <Text tone="secondary">
               {t("selfAnalysis:home.status", {
                 status: t(`common:selfAnalysisStatus.${home.status}`),
-                answered: formatCount(home.answered),
-                total: formatCount(home.total),
+                answered: home.answered,
+                total: home.total,
               })}
             </Text>
           </>
@@ -362,12 +362,20 @@ function SelfAnalysisHub({
           {
             id: "status",
             column: "main",
-            content: <StatusBlock home={home} />,
+            content: (
+              <BlockBoundary>
+                <StatusBlock home={home} />
+              </BlockBoundary>
+            ),
           },
           {
             id: "sections",
             column: "aside",
-            content: <SectionsBlock home={home} />,
+            content: (
+              <BlockBoundary>
+                <SectionsBlock home={home} />
+              </BlockBoundary>
+            ),
           },
         ]}
       />
@@ -405,71 +413,21 @@ function SelfAnalysisHub({
 }
 
 /**
- * 10's shape while it loads (design-spec 6.0.6): the title, the status and the sections.
- * Drawn inside a `Skeleton`, its words are bars.
- */
-export function SelfAnalysisHomeSkeleton() {
-  const { t } = useTranslation(["selfAnalysis"]);
-  const rows = (
-    <RowList aria-label={t("selfAnalysis:home.sections.title")}>
-      {[0, 1, 2, 3].map((row) => (
-        <RowListItem key={row} end={t("selfAnalysis:home.sections.count")}>
-          {t("selfAnalysis:home.sections.title")}
-        </RowListItem>
-      ))}
-    </RowList>
-  );
-  return (
-    <HubPattern
-      header={
-        <Heading level={1} variant="heading-1-hub">
-          {t("selfAnalysis:home.title")}
-        </Heading>
-      }
-      blocks={[
-        {
-          id: "status",
-          column: "main",
-          content: (
-            <HubBlock title={t("selfAnalysis:home.state.title")}>
-              {rows}
-            </HubBlock>
-          ),
-        },
-        {
-          id: "sections",
-          column: "aside",
-          content: (
-            <HubBlock title={t("selfAnalysis:home.sections.title")}>
-              {rows}
-            </HubBlock>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
-/**
- * 11 when no self-analysis can be made yet (design-spec 6.0.6「公開済みのテンプレートが
- * 無い」): the form has nothing to ask.
- */
-function TemplatesNotReadyState() {
-  const { t } = useTranslation(["errors"]);
-  return (
-    <IllustratedMessage
-      headingLevel={1}
-      icon={<Hourglass />}
-      heading={t("errors:TEMPLATE_NOT_PUBLISHED")}
-    />
-  );
-}
-
-/**
  * 10 when no self-analysis can be made yet (design-spec 6.0.6): its title, and the words
- * in the place of Start, where the Status block would be.
+ * in the place of Start, where the Status block would be. With no self-analysis to share
+ * or migrate, `?modal=share` and `?modal=update-template` open nothing and come off the
+ * URL (SDD 4章).
  */
-function HomeNotReady() {
+function HomeNotReady({
+  modal,
+  isRead,
+}: {
+  modal: string | undefined;
+  /** Whether that answer is the API's latest, not a cached one being read again. */
+  isRead: boolean;
+}) {
+  useSearchModal(modal, "share", false, isRead);
+  useSearchModal(modal, "update-template", false, isRead);
   const { t } = useTranslation(["selfAnalysis", "errors"]);
   return (
     <HubPattern
@@ -483,53 +441,18 @@ function HomeNotReady() {
           id: "status",
           column: "main",
           content: (
-            <HubBlock title={t("selfAnalysis:home.state.title")}>
-              <Text tone="secondary" elementType="p">
-                {t("errors:TEMPLATE_NOT_PUBLISHED")}
-              </Text>
-            </HubBlock>
+            <BlockBoundary>
+              <HubBlock title={t("selfAnalysis:home.state.title")}>
+                <Text tone="secondary" elementType="p">
+                  {t("errors:TEMPLATE_NOT_PUBLISHED")}
+                </Text>
+              </HubBlock>
+            </BlockBoundary>
           ),
         },
       ]}
     />
   );
-}
-
-/**
- * Reads the self-analysis first (S1 GET makes it, SDD 5.8) and shows `children` with it,
- * or the state it is in (6.0.6): `notReady` while no template is published. 10 and 11
- * open through it.
- */
-export function SelfAnalysisBody({
-  skeleton,
-  notReady = <TemplatesNotReadyState />,
-  children,
-}: {
-  skeleton: ReactNode;
-  notReady?: ReactNode;
-  children: (home: SelfAnalysisHome) => ReactNode;
-}) {
-  const { me } = useWorkspace();
-  const query = useQuery(selfAnalysisHomeQuery());
-  const isSlow = useIsSlow(query.isPending);
-  if (query.data !== undefined) return children(query.data);
-  if (
-    query.error instanceof ApiError &&
-    query.error.code === "TEMPLATE_NOT_PUBLISHED"
-  ) {
-    return notReady;
-  }
-  if (query.isError) {
-    return (
-      <FailureState
-        error={query.error}
-        onRetry={() => void query.refetch()}
-        dashboardHref={dashboardHref(me)}
-      />
-    );
-  }
-  if (isSlow) return <SlowLoadingState onRetry={() => void query.refetch()} />;
-  return <Skeleton isLoading>{skeleton}</Skeleton>;
 }
 
 /**
@@ -573,10 +496,10 @@ export function SelfAnalysisHomeScreen({
   const { workspace } = useWorkspace();
   const panel = usePanel();
   const moves = useMovesToPersonal();
-  const { data: home } = useQuery({
-    ...selfAnalysisHomeQuery(),
-    enabled: !moves,
-  });
+  const homeQuery = useQuery({ ...selfAnalysisHomeQuery(), enabled: !moves });
+  const home = homeQuery.data;
+  // A cached 10 shows at once while it is read again (ADR-011); what it may open waits.
+  const isRead = !homeQuery.isFetching;
   // The self-analysis is always the user's own here: only its owner migrates it (2.2).
   const templateBanner = useTemplateBanner(
     home?.template,
@@ -634,10 +557,15 @@ export function SelfAnalysisHomeScreen({
       {moves ? null : (
         <SelfAnalysisBody
           skeleton={<SelfAnalysisHomeSkeleton />}
-          notReady={<HomeNotReady />}
+          notReady={<HomeNotReady modal={modal} isRead={isRead} />}
         >
           {(loaded) => (
-            <SelfAnalysisHub home={loaded} modal={modal} about={about} />
+            <SelfAnalysisHub
+              home={loaded}
+              modal={modal}
+              about={about}
+              isRead={isRead}
+            />
           )}
         </SelfAnalysisBody>
       )}

@@ -247,6 +247,78 @@ describe("N1 GET /api/v1/notifications", () => {
       (await inbox(team.memberCookie)).items.map((item) => item.title),
     ).toEqual(["Owner mentioned you", "Owner mentioned you"]);
   });
+
+  test("closes a self-analysis comment to a member made a Viewer, and to its owner once unshared", async () => {
+    const team = await teamWithNewIdea(app, fixtures);
+    const analysis = await fixtures.createSelfAnalysis(team.owner.id, [
+      team.workspace.id,
+    ]);
+    const target = {
+      type: "self_analysis_answer",
+      id: analysis.id,
+      key: "SA.WHY.1",
+    };
+    tick();
+    const mention = await call("POST", "/api/v1/comments", team.ownerCookie, {
+      workspaceId: team.workspace.id,
+      target,
+      body: "@Member does this read well?",
+      mentionUserIds: [team.member.id],
+    });
+    expect(mention.status).toBe(201);
+    tick();
+    const reply = await call("POST", "/api/v1/comments", team.memberCookie, {
+      workspaceId: team.workspace.id,
+      target,
+      body: "Say why the recipe matters",
+      mentionUserIds: [],
+    });
+    expect(reply.status).toBe(201);
+    const only = async (cookie: string) => {
+      const { items } = await inbox(cookie);
+      expect(items).toHaveLength(1);
+      return items[0];
+    };
+    expect(await only(team.memberCookie)).toMatchObject({
+      kind: "mention",
+      title: "Owner mentioned you on WHY SA.WHY.1 · Owner's self-analysis",
+      excerpt: "@Member does this read well?",
+      accessible: true,
+    });
+    expect(await only(team.ownerCookie)).toMatchObject({
+      kind: "comment",
+      title: "Member commented on WHY SA.WHY.1 · your self-analysis",
+      excerpt: "Say why the recipe matters",
+      accessible: true,
+    });
+
+    // Only Owners and Members read a self-analysis shared with them (SDD 5.11).
+    await db
+      .update(memberships)
+      .set({ role: "viewer" })
+      .where(
+        and(
+          eq(memberships.workspaceId, team.workspace.id),
+          eq(memberships.userId, team.member.id),
+        ),
+      );
+    expect(await only(team.memberCookie)).toMatchObject({
+      title: "Owner mentioned you",
+      excerpt: null,
+      accessible: false,
+    });
+    expect((await only(team.ownerCookie))?.accessible).toBe(true);
+
+    // Ending the share closes the workspace's comments to the owner too (SDD 5.11).
+    await db
+      .delete(selfAnalysisShares)
+      .where(eq(selfAnalysisShares.selfAnalysisId, analysis.id));
+    expect(await only(team.ownerCookie)).toMatchObject({
+      title: "Member commented",
+      excerpt: null,
+      accessible: false,
+    });
+  });
 });
 
 describe("N2 and N3", () => {

@@ -20,6 +20,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { InvalidInvitation } from "../components/InvalidInvitation";
+import { useFailureOnceClosed } from "../components/ideaActions";
 import { useLogOut } from "../components/logOut";
 import { PhotoField } from "../components/PhotoField";
 import { failureCode, SendFailure } from "../components/SendFailure";
@@ -27,12 +28,16 @@ import { StandaloneFrame } from "../components/StandaloneFrame";
 import { StandaloneLoading } from "../components/StandaloneLoading";
 import { FailureState } from "../components/states";
 import { dashboardHref } from "../components/workspace";
+import { deviceTimeZone } from "../lib/account";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import { invitationQuery, isInvitationToken, meQuery } from "../lib/queries";
+import { askAgain } from "../lib/query";
+import { useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
-import { deviceTimeZone } from "./SignUp";
+import { WelcomeSkeleton } from "./WelcomeSkeleton";
 
 /** 3's steps (design-spec 6.16): ① the invitation, ② the profile, ③ done. */
 export type WelcomeStep = "invite" | "profile" | "done";
@@ -74,19 +79,6 @@ function dashboardAfter(me: Me, invitation: InvitationPreview | undefined) {
     : (dashboardHref(me) ?? "/");
 }
 
-/** The skeleton of 3, shown while the user or the invitation loads. */
-export function WelcomeSkeleton() {
-  const { t } = useTranslation(["auth"]);
-  return (
-    <StepsPattern
-      header={<Heading level={1}>{t("auth:welcome.title")}</Heading>}
-      steps={<Text>{t("auth:welcome.step.invite")}</Text>}
-    >
-      <Text>{t("auth:welcome.join")}</Text>
-    </StepsPattern>
-  );
-}
-
 /**
  * 3 Welcome (design-spec 6.16, pattern G): accepting the invitation, the profile, and the
  * way to 5. The steps shown are only those of this visit.
@@ -97,8 +89,9 @@ export function WelcomeScreen({ step, token, new: fresh }: WelcomeSearch) {
   const queryClient = useQueryClient();
   const { data: me } = useQuery(meQuery());
   const isToken = token !== undefined && isInvitationToken(token);
+  const invitationOptions = invitationQuery(token ?? "");
   const invitation = useQuery({
-    ...invitationQuery(token ?? ""),
+    ...invitationOptions,
     enabled: isToken,
   });
   if (me === undefined) return null;
@@ -126,11 +119,7 @@ export function WelcomeScreen({ step, token, new: fresh }: WelcomeSearch) {
     if (invitation.data === undefined) {
       return (
         <StandaloneLoading
-          onRetry={() =>
-            void queryClient.invalidateQueries({
-              queryKey: ["invitations", token],
-            })
-          }
+          onRetry={() => askAgain(queryClient, [invitationOptions])}
         >
           <WelcomeSkeleton />
         </StandaloneLoading>
@@ -250,7 +239,10 @@ function useInvitationLine(invitation: InvitationPreview): string {
 /**
  * ① The invitation (U4) and Join (U6). Signed in with another address, the invitation's
  * address and Log out, which comes back to the link (design-spec 6.16 3「状態とエラー」).
- * Accepted already, or a member already: the toast says so and 5 opens.
+ * Accepted already, or a member already: the toast says so and 5 opens. Once 3 is left
+ * while Join is on its way, a join that goes through moves nowhere (a member already
+ * still says so), and a failure says so in a toast: ①'s words for a refusal, else as a
+ * row's send does, whose Retry joins again (6.0.6「送っている間に閉じた送信の失敗」).
  */
 function InviteStep({
   me,
@@ -279,6 +271,8 @@ function InviteStep({
   );
   const [isInvalid, setInvalid] = useState(false);
   const line = useInvitationLine(invitation);
+  const isShown = useIsMounted();
+  const sendThrough = useSendThrough();
   /**
    * The user as the API has them now, to tell where 5 is; the one known already if the
    * API cannot say. Joining has happened by then and is not repeated.
@@ -287,31 +281,84 @@ function InviteStep({
     queryClient
       .fetchQuery({ ...meQuery(), staleTime: 0 })
       .catch(() => queryClient.getQueryData(meQuery().queryKey) ?? me);
-  /** Opens 5 in place of 3 (Back must not offer to join again), with the toast. */
+  /**
+   * Opens 5 in place of 3 (Back must not offer to join again), with the toast; once 3 is
+   * gone, the toast alone.
+   */
   const toDashboard = async (user: Me, message: string | null) => {
     if (message !== null) {
       ToastQueue.neutral(message, { timeout: TOAST_MS });
     }
+    if (!isShown.current) return;
     await navigate({ href: dashboardAfter(user, invitation), replace: true });
   };
+  /** The address the invitation went to, as a refusal of another one names it. */
+  const invitedEmailOf = (error: unknown) =>
+    error instanceof ApiError && typeof error.detail.invitedEmail === "string"
+      ? error.detail.invitedEmail
+      : invitation.email;
   /**
-   * Joins (U6). The workspace joined becomes the one the next sign-in opens (5章
-   * 「ログイン後」: the invitation's at first), though the user may stop before its 5.
+   * Joins (U6), and the user as the API has them then. The workspace joined becomes the
+   * one the next sign-in opens (5章「ログイン後」: the invitation's at first), though the
+   * user may stop before its 5.
    */
+  const accept = async () => {
+    const { workspaceId, alreadyMember } = await sendThrough(() =>
+      unwrap(
+        api()
+          .api.v1.invitations["by-token"]({ token: inPath(token) })
+          .accept.post(),
+      ),
+    );
+    const user =
+      workspaceId === null || alreadyMember
+        ? await freshMe()
+        : await unwrap(api().api.v1.me.patch({ lastWorkspaceId: workspaceId }))
+            .then((updated) => {
+              queryClient.setQueryData(meQuery().queryKey, updated);
+              return updated;
+            })
+            .catch(freshMe);
+    return { user, alreadyMember };
+  };
+  const failedOnceLeft = useFailureOnceClosed(
+    async () => {
+      const { alreadyMember } = await accept();
+      if (alreadyMember) {
+        ToastQueue.neutral(t("auth:welcome.alreadyMember"), {
+          timeout: TOAST_MS,
+        });
+      }
+    },
+    (error) => {
+      switch (failureCode(error)) {
+        case "INVITATION_ALREADY_ACCEPTED":
+          // Accepted, so the user may be in the workspace by now.
+          void queryClient.invalidateQueries({ queryKey: meQuery().queryKey });
+          return t("errors:INVITATION_ALREADY_ACCEPTED");
+        case "INVITATION_EMAIL_MISMATCH":
+          return t("errors:INVITATION_EMAIL_MISMATCH", {
+            email: invitedEmailOf(error),
+          });
+        case "INVITATION_INVALID":
+          return t("errors:INVITATION_INVALID");
+        default:
+          return null;
+      }
+    },
+  );
   const join = async () => {
     if (busy.current) return;
     busy.current = true;
     setJoining(true);
     setFailure(null);
     try {
-      let result: { workspaceId: string | null; alreadyMember: boolean };
+      let joined: Awaited<ReturnType<typeof accept>>;
       try {
-        result = await unwrap(
-          api()
-            .api.v1.invitations["by-token"]({ token: inPath(token) })
-            .accept.post(),
-        );
+        joined = await accept();
       } catch (cause) {
+        failedOnceLeft(cause, undefined);
+        if (!isShown.current) return;
         const code = failureCode(cause);
         if (code === "INVITATION_ALREADY_ACCEPTED") {
           await toDashboard(
@@ -319,12 +366,7 @@ function InviteStep({
             t("errors:INVITATION_ALREADY_ACCEPTED"),
           );
         } else if (code === "INVITATION_EMAIL_MISMATCH") {
-          setMismatch(
-            cause instanceof ApiError &&
-              typeof cause.detail.invitedEmail === "string"
-              ? cause.detail.invitedEmail
-              : invitation.email,
-          );
+          setMismatch(invitedEmailOf(cause));
         } else if (code === "INVITATION_INVALID") {
           setInvalid(true);
         } else {
@@ -332,20 +374,9 @@ function InviteStep({
         }
         return;
       }
-      const { workspaceId, alreadyMember } = result;
-      const user =
-        workspaceId === null || alreadyMember
-          ? await freshMe()
-          : await unwrap(
-              api().api.v1.me.patch({ lastWorkspaceId: workspaceId }),
-            )
-              .then((updated) => {
-                queryClient.setQueryData(meQuery().queryKey, updated);
-                return updated;
-              })
-              .catch(freshMe);
+      const { user, alreadyMember } = joined;
       if (onJoined !== undefined && !alreadyMember) {
-        onJoined();
+        if (isShown.current) onJoined();
       } else {
         await toDashboard(
           user,
@@ -364,9 +395,12 @@ function InviteStep({
   useEffect(() => {
     if (!isAccepted || leftAccepted.current) return;
     leftAccepted.current = true;
-    void freshMe().then((user) =>
-      toDashboard(user, t("errors:INVITATION_ALREADY_ACCEPTED")),
-    );
+    // Nothing was sent: left meanwhile, 3 says nothing more.
+    void freshMe().then((user) => {
+      if (isShown.current) {
+        void toDashboard(user, t("errors:INVITATION_ALREADY_ACCEPTED"));
+      }
+    });
   });
   if (isInvalid) return <InvalidInvitation />;
   return (
@@ -408,10 +442,18 @@ function InviteStep({
   );
 }
 
+/** What ② saves with Continue (U2). */
+interface ProfileInput {
+  displayName: string;
+  timezone: string;
+}
+
 /**
  * ② The profile (design-spec 6.16 3): the display name, which sign-up gave, and an
  * optional photo (U3, saved as soon as it is chosen); the time zone is the device's. Continue
- * saves the name and the zone (U2).
+ * saves the name and the zone (U2). Once 3 is left while Continue is on its way, a save
+ * that goes through moves nowhere, and a failure says so in a toast, whose Retry sends the
+ * same name and zone again (6.0.6「送っている間に閉じた送信の失敗」).
  */
 function ProfileStep({
   me,
@@ -422,13 +464,24 @@ function ProfileStep({
   steps: ReactNode;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation(["auth", "app"]);
+  const { t } = useTranslation(["auth"]);
   const formId = useId();
   const isOnline = useIsOnline();
   const queryClient = useQueryClient();
   const [failure, setFailure] = useState<unknown>(null);
   const rejections = useRejectedFields(["displayName"] as const);
   const oneAtATime = useOneAtATime();
+  const isShown = useIsMounted();
+  const sendThrough = useSendThrough();
+  const save = async (input: ProfileInput) => {
+    const updated = await sendThrough(() =>
+      unwrap(api().api.v1.me.patch(input)),
+    );
+    queryClient.setQueryData(meQuery().queryKey, updated);
+  };
+  // The name refused by its rule (6.0.8), whose field said "Check the format", reads
+  // "Couldn't save. Check the format." as any refusal of the format does.
+  const failedOnceLeft = useFailureOnceClosed(save);
   const form = useAppForm({
     defaultValues: { displayName: me.displayName },
     listeners: {
@@ -438,18 +491,18 @@ function ProfileStep({
       oneAtATime(async () => {
         setFailure(null);
         rejections.clear();
+        const input: ProfileInput = {
+          displayName: value.displayName,
+          timezone: deviceTimeZone(),
+        };
         try {
-          const updated = await unwrap(
-            api().api.v1.me.patch({
-              displayName: value.displayName,
-              timezone: deviceTimeZone(),
-            }),
-          );
-          queryClient.setQueryData(meQuery().queryKey, updated);
-          onSaved();
+          await save(input);
         } catch (cause) {
+          failedOnceLeft(cause, input);
           if (!rejections.reject(cause)) setFailure(cause);
+          return;
         }
+        if (isShown.current) onSaved();
       }),
   });
   return (

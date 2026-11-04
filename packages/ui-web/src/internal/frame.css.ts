@@ -232,6 +232,12 @@ export const floatingButton = style({
   selectors: {
     "&[data-pressed]": { background: vars.color.control.primaryPressed },
     "&[data-focus-visible]": focusRing,
+    // As a disabled Button (Button.css), still floating over the list.
+    "&[data-disabled]": {
+      background: vars.color.control.disabled,
+      color: vars.color.text.disabled,
+      cursor: "not-allowed",
+    },
   },
 });
 

@@ -1,7 +1,8 @@
 import type { ImportContext, Me, Role } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { SLOW_LOADING_MS } from "../components/states";
 import {
   exported,
   planContext,
@@ -35,7 +36,7 @@ function exportApi({
 }: {
   me?: Me;
   context?: ImportContext;
-  exportCall?: (call: Call) => Response | undefined;
+  exportCall?: (call: Call) => Response | Promise<Response> | undefined;
 } = {}) {
   return stubApi((call) => {
     const { method, path } = call;
@@ -138,6 +139,33 @@ describe("24 Export for AI (design-spec 6.6)", () => {
     // In template order, whatever order they were ticked in.
     expect(exportCalls(calls)[0]?.path).toContain(
       "sections=01&sections=10&includeEmpty=false",
+    );
+  });
+
+  test("X1 is sent once while the scope and Options stay the same; another option sends it again (SDD 7.2)", async () => {
+    const user = userEvent.setup();
+    const calls = exportApi();
+    renderApp(exportPath(`source=validation&id=${validationId}&scope=01`));
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    await screen.findByRole("region", { name: "Preview" });
+    await waitFor(() => expect(exportCalls(calls)).toHaveLength(1));
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    const preview = await screen.findByRole("region", { name: "Preview" });
+    expect(preview.textContent).toContain("## [V.01.WHO] WHO");
+    // On to ③ and back to ② is the same export too.
+    await user.click(nextButton());
+    await user.click(await screen.findByRole("button", { name: "Back" }));
+    await screen.findByRole("region", { name: "Preview" });
+    expect(exportCalls(calls)).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(
+      await screen.findByRole("checkbox", { name: "Include examples" }),
+    );
+    await user.click(nextButton());
+    await waitFor(() => expect(exportCalls(calls)).toHaveLength(2));
+    expect(exportCalls(calls)[1]?.path).toBe(
+      `/api/v1/ai/export?source=validation&id=${validationId}&sections=01&includeEmpty=true&includeExamples=false&includeReference=true`,
     );
   });
 
@@ -244,6 +272,51 @@ describe("24 Export for AI (design-spec 6.6)", () => {
     await user.click(screen.getByRole("button", { name: "Retry" }));
     await screen.findByRole("region", { name: "Preview" });
     expect(exportCalls(calls)).toHaveLength(2);
+  });
+
+  test("② while X1 answers: the preview's skeleton, after 10 seconds Taking longer than usual, whose Retry asks again (6.0.6)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      // The first two exports never answer; the third does.
+      const calls = exportApi({
+        exportCall: () =>
+          exportCalls(calls).length < 3
+            ? new Promise<Response>(() => {})
+            : undefined,
+      });
+      renderApp(exportPath(`source=validation&id=${validationId}`));
+      await user.click(await screen.findByRole("button", { name: "Next" }));
+      await waitFor(() => expect(exportCalls(calls)).toHaveLength(1));
+      expect(screen.queryByRole("region", { name: "Preview" })).toBeNull();
+      expect(document.querySelector("[inert]")?.textContent).toContain(
+        "Preview",
+      );
+      act(() => vi.advanceTimersByTime(SLOW_LOADING_MS - 1000));
+      expect(screen.queryByText("Taking longer than usual")).toBeNull();
+      act(() => vi.advanceTimersByTime(1000));
+      expect(
+        await screen.findByRole("heading", {
+          level: 2,
+          name: "Taking longer than usual",
+        }),
+      ).toBeTruthy();
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(exportCalls(calls)).toHaveLength(2));
+      // The skeleton again, for another 10 seconds.
+      expect(document.querySelector("[inert]")?.textContent).toContain(
+        "Preview",
+      );
+      act(() => vi.advanceTimersByTime(SLOW_LOADING_MS - 1000));
+      expect(screen.queryByText("Taking longer than usual")).toBeNull();
+      act(() => vi.advanceTimersByTime(1000));
+      await user.click(await screen.findByRole("button", { name: "Retry" }));
+      const preview = await screen.findByRole("region", { name: "Preview" });
+      expect(preview.textContent).toContain("## [V.01.WHO] WHO");
+      expect(exportCalls(calls)).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("a plan: the whole, a part or items; items need one with a question to answer", async () => {

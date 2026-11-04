@@ -37,7 +37,7 @@ import { useTranslation } from "react-i18next";
 import { AiMenu } from "../components/AiMenu";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import type { ScreenComments } from "../components/CommentsPanel";
-import { ModalBoundary } from "../components/ErrorBoundary";
+import { BlockBoundary, ModalBoundary } from "../components/ErrorBoundary";
 import { HubBlock } from "../components/HubBlock";
 import { EditSummaryDialog } from "../components/IdeaDialogs";
 import { useIdeaActions } from "../components/ideaActions";
@@ -52,7 +52,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import {
   type TemplateTarget,
@@ -61,12 +61,18 @@ import {
   useOpenTemplateUpdate,
   useTemplateBanner,
 } from "../components/TemplateUpdate";
-import { UserName } from "../components/UserName";
+import { UserName, userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  useSearchModal,
+  useWorkspace,
+} from "../components/workspace";
 import {
   decideHref,
   decisionsHref,
+  economicsHref,
   hrefOf,
   ideaHref,
   ideasHref,
@@ -80,6 +86,7 @@ import {
   validationHomeQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { ValidationHomeSkeleton } from "./ValidationHomeSkeleton";
 
 type Section = ValidationHome["sections"][number];
 
@@ -218,6 +225,13 @@ function FauBlock({ fau }: { fau: FauBreakdown }) {
             state: "fact" as const,
             label: t("common:fauState.fact"),
             count: fau.fact,
+            // Facts whose research log was deleted count as Facts, with how many (6.0.3).
+            detail:
+              fau.factNoEvidence > 0
+                ? t("common:fauLabel.noEvidenceCount", {
+                    count: fau.factNoEvidence,
+                  })
+                : undefined,
           },
           {
             state: "assumption" as const,
@@ -588,7 +602,7 @@ function Header({ home }: { home: ValidationHome }) {
       <Text tone="secondary">
         {`${idea.oneLineConcept} `}
         <Text tone="tertiary">
-          {t("validation:home.by", { name: idea.proposer.displayName })}
+          {t("validation:home.by", { name: userNameText(idea.proposer) })}
         </Text>
       </Text>
       {idea.duplicatedFrom !== null && (
@@ -664,10 +678,17 @@ function ValidationHub({
   home,
   modal,
   about,
+  isDecided,
 }: {
   home: ValidationHome;
   modal: string | undefined;
   about: string | undefined;
+  /**
+   * Whether `home` is what V1 answers now, not a cached read being read again: what
+   * decides whether a modal of the URL may open (SDD 4章). 19's Proceed opens 13 with
+   * M5's URL while the 13 cached from before it still has no Proceed.
+   */
+  isDecided: boolean;
 }) {
   const { t } = useTranslation(["validation"]);
   const { workspace, role } = useWorkspace();
@@ -678,13 +699,20 @@ function ValidationHub({
   const canEdit = canWrite && !home.idea.archived;
   // M5 only after Proceed (design-spec 6.12「M5」, 6.1「操作」).
   const canAddPlan = canEdit && home.idea.latestDecision === "proceed";
+  const isCreatingPlan = useSearchModal(
+    modal,
+    "create-plan",
+    canAddPlan,
+    isDecided,
+  );
   const isUpdatingTemplate = useIsTemplateUpdateOpen(
     modal,
     about,
     validationTarget(home),
     canEdit,
+    isDecided,
   );
-  const blocks: HubBlockSpec[] = [
+  const contents: HubBlockSpec[] = [
     { id: "next", column: "main", content: <NextSteps home={home} /> },
     {
       id: "checks",
@@ -731,10 +759,19 @@ function ValidationHub({
       ),
     },
   ];
+  // Each block fails alone (SDD 8.2): the others, the frame and its navigation stay.
+  const blocks = contents.map((block) => ({
+    ...block,
+    content: <BlockBoundary>{block.content}</BlockBoundary>,
+  }));
   return (
     <>
       <HubPattern
-        header={<Header home={home} />}
+        header={
+          <BlockBoundary>
+            <Header home={home} />
+          </BlockBoundary>
+        }
         actions={
           canWrite ? (
             <Tools home={home} onEdit={() => setEditing(true)} />
@@ -753,24 +790,29 @@ function ValidationHub({
           ) : undefined
         }
         metrics={
-          <KeyMetrics
-            metrics={home.keyMetrics}
-            currency={workspace.currency}
-            variant="band"
-            hasMarginWarning={home.economicsWarnings.includes(
-              "margin_not_positive",
-            )}
-            aria-label={t("validation:home.keyNumbers")}
-          />
+          <BlockBoundary>
+            <KeyMetrics
+              metrics={home.keyMetrics}
+              currency={workspace.currency}
+              variant="band"
+              marginWarningHref={
+                home.economicsWarnings.includes("margin_not_positive")
+                  ? economicsHref(workspace.id, home.idea.id)
+                  : undefined
+              }
+              aria-label={t("validation:home.keyNumbers")}
+            />
+          </BlockBoundary>
         }
         blocks={blocks}
       />
-      {isEditing && canEdit && (
+      {/* Opened only while it may be; then until closed, so a refused save says why in it. */}
+      {isEditing && (
         <ModalBoundary onClose={() => setEditing(false)}>
           <EditSummaryDialog home={home} onClose={() => setEditing(false)} />
         </ModalBoundary>
       )}
-      {modal === "create-plan" && canAddPlan && (
+      {isCreatingPlan && (
         <ModalBoundary key={modal} onClose={modals.close}>
           <CreatePlanDialog ideaId={home.idea.id} onClose={modals.close} />
         </ModalBoundary>
@@ -788,53 +830,6 @@ function ValidationHub({
   );
 }
 
-/**
- * 13 Validation home's shape while it loads (design-spec 6.0.6・6.1「ローディング」): the
- * title, the key numbers, the checks and the sections. Drawn inside a `Skeleton`, its
- * words are bars.
- */
-export function ValidationHomeSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  const rows = (label: string) => (
-    <RowList aria-label={label}>
-      {[0, 1, 2, 3].map((row) => (
-        <RowListItem key={row} end={t("validation:home.summary.empty")}>
-          {label}
-        </RowListItem>
-      ))}
-    </RowList>
-  );
-  return (
-    <HubPattern
-      header={
-        <Heading level={1} variant="heading-1-hub">
-          {t("validation:home.keyNumbers")}
-        </Heading>
-      }
-      blocks={[
-        {
-          id: "checks",
-          column: "main",
-          content: (
-            <HubBlock title={t("validation:home.checks.title")}>
-              {rows(t("validation:home.checks.title"))}
-            </HubBlock>
-          ),
-        },
-        {
-          id: "sections",
-          column: "aside",
-          content: (
-            <HubBlock title={t("validation:home.sections.title")}>
-              {rows(t("validation:home.sections.title"))}
-            </HubBlock>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
 function ValidationHomeBody({
   ideaId,
   modal,
@@ -845,12 +840,20 @@ function ValidationHomeBody({
   about: string | undefined;
 }) {
   const { me, workspace } = useWorkspace();
-  const query = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(query.isPending);
+  const options = validationHomeQuery(ideaId);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   if (query.data !== undefined) {
     // Another workspace's idea under this one's URL (SDD 4章): its role is not this one's.
     return query.data.idea.workspaceId === workspace.id ? (
-      <ValidationHub home={query.data} modal={modal} about={about} />
+      <ValidationHub
+        home={query.data}
+        modal={modal}
+        about={about}
+        isDecided={!query.isFetching}
+      />
     ) : (
       <NoAccessState dashboardHref={dashboardHref(me)} />
     );
@@ -864,7 +867,7 @@ function ValidationHomeBody({
       />
     );
   }
-  if (isSlow) return <SlowLoadingState onRetry={() => void query.refetch()} />;
+  if (isSlow) return <SlowLoadingState onRetry={retrySlow} />;
   return (
     <Skeleton isLoading>
       <ValidationHomeSkeleton />

@@ -140,7 +140,7 @@ GitHub の環境は3つとも `main` からだけ使える。Google Cloud への
 | `APP_ENV` | api | `local` / `staging` / `production`（結合テストは設定を直接組み立てて `test` を使うが、環境変数からは読まない）。必須で、無い値や知らない値では起動しない（local の動作はデプロイした環境では安全でないため、既定値を持たない）。staging・production では `WEB_DIST_DIR`・`MAIL_TRANSPORT=resend`・`BETTER_AUTH_URL`・`MAIL_FROM`・`TRUSTED_ORIGINS` も必須。Web へは、API が返す HTML の meta 要素で渡す（ADR-004） | `local` | Cloud Run の環境変数 |
 | `APP_VERSION` | api | `/api/health` の `version`（コミット SHA） | 未設定なら `dev` | API の Dockerfile が `build-api-image` の build-arg から環境変数に入れる |
 | `PORT` | api, web（開発サーバー） | 待ち受けるポート（未設定なら `3000`。1〜65535 の整数でなければ起動しない）。API は、local では `127.0.0.1` だけで待ち受け（同じネットワークのほかの端末からは開けない）、staging・production ではすべてのインターフェースで待ち受ける。local と e2e では、Vite の開発サーバーが `/api/` で始まるパスをこのポートへ転送する（API と同じ値を、Makefile が `.env` から、e2e は Playwright の `webServer` が渡す） | `3000` | Cloud Run が `8080` を渡す |
-| `WEB_DIST_DIR` | api | Web のビルドの出力の置き場所。ここにあるファイルを API が `/*` で返す（ADR-004） | 未設定（静的ファイルを返さない。Web は Vite の開発サーバーが返す） | API の Dockerfile が入れる（イメージの中のパス） |
+| `WEB_DIST_DIR` | api | Web のビルドの出力の置き場所。ここにあるファイルを API が `/*` で返す（ADR-004）。置き場所が読めないとき、`_shell.html` か `index.html` が無いとき、HTML に `</head>` が無いときは起動しない | 未設定（静的ファイルを返さない。Web は Vite の開発サーバーが返す） | API の Dockerfile が入れる（イメージの中のパス） |
 | `DATABASE_URL` | api, db | PostgreSQL の接続文字列（API は無ければ起動しない） | `postgres://moonx:moonx@localhost:5432/moonx` | Secret Manager `moonx-{env}-database-url`（Neon のプール接続） |
 | `DATABASE_URL_DIRECT` | db（マイグレーション・バックアップ） | プールを通さない接続文字列 | `DATABASE_URL` と同じ | GitHub Actions の環境のシークレット |
 | `DATABASE_URL_TEST` | api（`make test-api`・`make test-e2e`） | テスト用の DB（テストのたびに作り直してマイグレーションを当てる。作り直しはテーブルを全部消すので、DB の名前は `_test` で終わり、URL にクエリ文字列を付けないこと。作り直しは同じサーバーの `postgres` の DB につなぎ、その DB への接続を切って消してから作るので、ロールに CREATEDB の権限が要り、テスト用の DB の持ち主かスーパーユーザーでなければならない。local の Docker と CI のサービスコンテナのロールはスーパーユーザー） | `postgres://moonx:moonx@localhost:5432/moonx_test` | CI はサービスコンテナの DB |
@@ -154,14 +154,14 @@ GitHub の環境は3つとも `main` からだけ使える。Google Cloud への
 | `MAIL_ALLOWLIST` | api | staging でだけ使う送信先の許可リスト（カンマ区切り。大文字小文字を区別しない）。staging では、ここに無い宛先にメールを送らない。空なら誰にも送らない（扱いは ADR-013）。local と production では読まない | 空 | staging だけ設定 |
 | `AVATAR_BUCKET` | api | プロフィール写真のバケット（staging・production は空なら起動しない） | 空（local はディスク `./.data/avatars`。API が `/api/avatars/{name}` で返す。U9） | `{GCP_PROJECT_ID}-moonx-{env}-avatars` |
 | `SENTRY_DSN` | api | Sentry（API。プロジェクト `moonx-api`） | 空 | Cloud Run の環境変数（Terraform の環境ごとの変数で入れる。DSN は秘密ではないので Secret Manager に置かない） |
-| `WEB_SENTRY_DSN` | api | Sentry（Web。プロジェクト `moonx-web`）。API が Web の HTML の meta 要素 `moonx-sentry-dsn` で渡す（ADR-004） | 空（local の Web は Sentry に送らない） | Cloud Run の環境変数（`SENTRY_DSN` と同じく Terraform の環境ごとの変数で入れる） |
+| `WEB_SENTRY_DSN` | api | Sentry（Web。プロジェクト `moonx-web`）。API が Web の HTML の meta 要素 `moonx-sentry-dsn` で渡し、そのオリジンを CSP の `connect-src` に入れる（ADR-004・7.2）。http か https の URL でないとき、ホストに英数字・ハイフン・ドット以外の文字があるときは起動しない | 空（local の Web は Sentry に送らない） | Cloud Run の環境変数（`SENTRY_DSN` と同じく Terraform の環境ごとの変数で入れる） |
 | `LOG_LEVEL` | api | `debug` / `info` / `warn` / `error`（それ以外の値では起動しない） | `debug` | `info` |
 
 API は値の前後の空白を除き、空の値（空白だけの値を含む）を未設定として扱う。local で未設定の `BETTER_AUTH_URL`・`TRUSTED_ORIGINS`・`MAIL_TRANSPORT`・`MAIL_FROM`・`LOG_LEVEL` には、上の表の「local の値」を使う。staging・production で未設定の `LOG_LEVEL` は `info` にする（ほかの4つは必須）。
 
 `.env` はリポジトリの直下に1つ置く。`make setup` が `.env.example` をコピーする。直下の `.env` は Makefile が読み込んで各コマンドに渡し、Vite は `envDir` をリポジトリの直下にする。Web はビルドに環境ごとの値を持たない（環境名と Sentry の DSN は、API が返す HTML から読む。local の Vite の開発サーバーでは meta 要素が無いので、環境名は `local`、Sentry は使わない）。
 
-e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100）と Web（ポート 5273）を起動し、次の値を上書きする: `PORT=3100`、`BETTER_AUTH_URL=http://localhost:5273`、`TRUSTED_ORIGINS=http://localhost:5273`、`DATABASE_URL` は `DATABASE_URL_TEST` の値、`MAIL_TRANSPORT=console`、`LOG_LEVEL=info`（`e2e/playwright.config.ts` の `webServer`）。この API のログは `.data/e2e/api.log` に書き、テストは送ったメール（招待とパスワード再設定のリンク）をそこから読む。PWA の検査（10章）は、`make build-web` の結果を `WEB_DIST_DIR` で渡した API（ポート 3200。`BETTER_AUTH_URL`・`TRUSTED_ORIGINS` は `http://localhost:3200`）に対して行う。
+e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100）と Web（ポート 5273）を起動し、次の値を上書きする: `PORT=3100`、`BETTER_AUTH_URL=http://localhost:5273`、`TRUSTED_ORIGINS=http://localhost:5273`、`DATABASE_URL` は `DATABASE_URL_TEST` の値、`MAIL_TRANSPORT=console`、`LOG_LEVEL=info`（`e2e/playwright.config.ts` の `webServer`）。この API のログは `.data/e2e/api.log` に書き、テストは送ったメール（招待とパスワード再設定のリンク）をそこから読む。PWA の検査（10章）は、`make build-web` の結果を `WEB_DIST_DIR` で渡した API（ポート 3200。`BETTER_AUTH_URL`・`TRUSTED_ORIGINS` は `http://localhost:3200`、`WEB_SENTRY_DSN` は偽の `https://e2e@sentry.invalid/1`、`DATABASE_URL`・`MAIL_TRANSPORT`・`LOG_LEVEL` は 3100 の API と同じ。ログは `.data/e2e/api-pwa.log`）に対して行う。偽の DSN で、ビルドは staging・production と同じく Sentry を始める。`.invalid` の名前は引けない（RFC 6761）ので、テストが Playwright の `page.route` で受けないイベントはどこにも届かない。テストが `sw.js` を書き換えて新しい版を作るので、この API に渡すのはビルドを `.data/e2e/web` に写したもの。
 
 **CI（GitHub Actions）のシークレットと変数**: 環境ごとに値が違うものは GitHub の環境（`staging` / `production` / `production-backup`）に、環境をまたいで同じものはリポジトリに置く。
 
@@ -180,11 +180,13 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `dev` | API と Web を同時に起動（`dev-api` と `dev-web`） |
 | `dev-api` / `dev-web` | それぞれを単独で起動 |
 | `build` | 全パッケージの型チェックとビルド |
-| `build-web SHA=...` | Web をビルドする。環境ごとの値は入れないので、1回のビルドを両方の環境で使う。入れるのは Sentry の `release` に使う版（SHA。省くと `dev`）だけ。`build-api-image` が使う |
+| `build-web SHA=...` | Web をビルドする。環境ごとの値は入れないので、1回のビルドを両方の環境で使う。入れるのは Sentry の `release` に使う版（SHA。省くと `dev`）だけ。`build-api-image` が使う。ルートごとの分割を検査し、殻の画面（`_shell.html`）から `/login` のルートの分の読み込みを外す（7.3） |
 | `build-api-image SHA=...` | `build-web` の結果と API を1つの Docker イメージにまとめて Artifact Registry に上げ、Web と API のソースマップを Sentry の `moonx-web`・`moonx-api` に上げる（`release` = SHA）。`build.yml` が `make test` の後に使う（04_deployment-procedure.md 2章） |
 | `test` | `test-domain`・`test-api`・`test-web` をまとめて実行 |
 | `test-domain` / `test-api` / `test-web` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査・`db-check`・`promote`・`promote-check`）、`test-api` は `apps/api` と `packages/db`（どちらも `DATABASE_URL_TEST` の DB を作り直し、マイグレーションを当てて使う）、`test-web` は `apps/web`・`packages/ui-web` |
-| `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して。PWA の検査は、先に `build-web SHA=dev` でビルドした Web を API から返す形で起動する）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
+| `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して。DB は実行のたびに作り直してデモデータを入れる（`e2e/global-setup.ts`）。PWA の検査（`e2e/pwa.spec.ts`）は、先に `build-web SHA=dev` でビルドした Web を API から返す形で起動する）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
+| `coverage` | 10章のカバレッジの目標を測って比べる。`test-domain` と `test-api` を Bun のカバレッジを付けて動かし（lcov を `coverage/` に書く）、`apps/web` の Vitest を `--coverage` で動かし、`scripts/coverage-check.ts` で `packages/domain/src` と `apps/api/src` のファイルの行と関数を合計して目標と比べる（どのテストも読み込まないファイルがあれば失敗。テストが別のプロセスで動かす入口と再エクスポートだけのファイルは除く）。Web はファイルごとの下限を Vitest が比べる（`apps/web/vitest.config.ts`）。どれかが目標に届かなければ、届かない層と、どのテストも読み込まないファイルを出して失敗する。CI は動かさない |
+| `first-paint` | 7.3「Web の最初の表示」を手元で見積もる（10章）。ブラウザ（Chromium）が無ければ先に取得し、`build-web SHA=dev` でビルドし、Playwright で `e2e/first-paint.spec.ts` を、`test-e2e` の PWA の検査と同じ形（ビルドを `WEB_DIST_DIR` で返すポート 3200 の API だけを起動する）で動かし、ページごとに LCP の中央値を出す。テスト用の DB を作り直してデモデータを入れるのは `test-e2e` と同じ。CPU を手元の機械の4分の1の速さにして測るので、結果は機械で変わる。CI は動かさない |
 | `lint` / `format` / `typecheck` | Biome の検査・整形（`lint` は画面の検査スクリプト `scripts/check-screens.ts` も動かす）、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
@@ -285,14 +287,15 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 
 ### ADR-004: Web は「静的ファイル＋/api」の形で、API と同じ Cloud Run のサービスから配る
 
-**状態・日付:** 採用（2026-10-03 に置き換えた。ユーザーの決定。ドキュメントへの反映は 2026-10-11）。前の決定（2026-10-01）は、Cloudflare の Worker の静的アセットで Web を配り、`/api/*` を Cloud Run へ転送し、Cloud Run を共有シークレットで守る、だった。
+**状態・日付:** 採用（2026-10-03 に置き換えた。ユーザーの決定。ドキュメントへの反映は 2026-10-11。2026-10-29 にテキストの圧縮を足した。Cloud Run が圧縮せず、初回の表示で約 2.9 MB をそのまま送っていたため。実装のエージェントの判断）。前の決定（2026-10-01）は、Cloudflare の Worker の静的アセットで Web を配り、`/api/*` を Cloud Run へ転送し、Cloud Run を共有シークレットで守る、だった。
 
 **決定:**
 
 - 配信の形は「`/*` は静的ファイル、`/api/*` は API」に固定する（前と同じ）。
-- 置き場所は API と同じ Cloud Run のサービス `moonx-api-{env}`。イメージに Web のビルドの出力を入れ（ADR-016）、API が `WEB_DIST_DIR` のファイルを返す。返し方: `/` はビルド時に作るランディング（`index.html`。ADR-002）、`/privacy`・`/support` はビルド時に作る HTML、ビルドの出力にあるファイルはそのまま、それ以外の GET の画面のパス（`/api/` で始まらず、`/assets/` の下でも拡張子の付いたパスでもないもの）は SPA の殻の `_shell.html`（200）。見つからないファイル（`/assets/` の下か拡張子の付いたパス）は 404。`WEB_DIST_DIR` の無い local では静的ファイルを返さない（Web は Vite の開発サーバーが返し、`/api` を API へ転送する）。
+- 置き場所は API と同じ Cloud Run のサービス `moonx-api-{env}`。イメージに Web のビルドの出力を入れ（ADR-016）、API が `WEB_DIST_DIR` のファイルを返す。返し方: `/` はビルド時に作るランディング（`index.html`。ADR-002）、`/privacy`・`/support` はビルド時に作る HTML、ビルドの出力にあるファイルはそのまま、それ以外の GET の画面のパス（`/api/` で始まらず、ファイルの置き場所でもないもの）は SPA の殻の `_shell.html`（200）。ファイルの置き場所は、ビルドがファイルを置く所（`/assets/`・`/icons/` の下と、トップの階層の拡張子の付いた名前。`/sw.js` など）で、そこで見つからないファイルは 404（本文は API の 404 と同じ 8.1 の形の `NOT_FOUND`、キャッシュの見出しは API の応答と同じ `no-store`）。それより下の階層の拡張子では見分けない（画面のパスの下の階層にはテンプレートが自由に決めるセクションのキーが入り、`.` を含みうるため。5.13）。`WEB_DIST_DIR` の無い local では静的ファイルを返さない（Web は Vite の開発サーバーが返し、`/api` を API へ転送する）。
 - キャッシュの見出し: ファイル名にハッシュの付いたアセットは `Cache-Control: public, max-age=31536000, immutable`。HTML・マニフェスト・Service Worker のファイルは `no-cache`（ADR-031）。アイコンなどハッシュの無いファイルは `public, max-age=86400`。API の応答は `no-store`（ADR-011）。
-- 環境ごとに違う値はイメージに焼き込まない（staging で確かめたイメージをそのまま production に出すため。ADR-016）。API は起動のときに HTML のファイルを読み、`<head>` に `<meta name="moonx-app-env" content="{APP_ENV}">` と `<meta name="moonx-sentry-dsn" content="{WEB_SENTRY_DSN}">` を入れて返す。Web はこの2つを読んで環境名と Sentry を決める。インラインのスクリプトを使わないので、CSP の `script-src 'self'` を保てる（7.2）。
+- 圧縮: Cloud Run は応答を圧縮しないので、API が圧縮する。テキストのファイル（HTML・JS・CSS・マニフェスト・SVG・テキスト）には `Vary: Accept-Encoding` を付け、`Accept-Encoding` の Brotli と gzip のうち重み（`q`）の大きい方で返す（同じなら Brotli。`q=0` と、`*;q=0` で外れたものは受け入れないとみなす）。どちらも受け入れないとき、圧縮しても小さくならないときは、そのまま返す。画像とフォントは圧縮済みなので、そのまま返し `Vary` も付けない。各ファイルは、プロセスで最初に求められたときに圧縮して持っておく。HTML 以外のファイルは、ディスクのファイルが変わったら（更新時刻か大きさ）圧縮し直す（HTML は起動のときに読んだものを返す）。API の応答は圧縮しない（7.3 の目安は小さい応答で届いていて、利用者のデータと入力を含む応答の圧縮は BREACH のような攻撃の手がかりになりうる）。
+- 環境ごとに違う値はイメージに焼き込まない（staging で確かめたイメージをそのまま production に出すため。ADR-016）。API は起動のときに HTML のファイルを読み、`<head>` に `<meta name="moonx-app-env" content="{APP_ENV}">` と `<meta name="moonx-sentry-dsn" content="{WEB_SENTRY_DSN}">` を入れて返す。Web はこの2つを読んで環境名と Sentry を決める。インラインのスクリプトを使わないので、CSP の `script-src 'self'` を保てる（7.2）。TanStack Start がプリレンダーした HTML に書くスクリプト（スクロールの復元とルーターの起動）は、`build-web` が `assets/` の下のファイル（ハッシュ付きの名前）に移し、同じ位置の `<script src>` で読ませる。Web のビルドの Zod は、パーサーを `new Function` で作れるかを試さない設定（`jitless`）で動かす（試すと CSP が拒んで違反を報告する。拒まれても解析の結果は同じ。API は CSP の外なので作る）。
 - セキュリティヘッダー（CSP・HSTS など）は API が付ける（7.2）。
 - 独自ドメインは Cloud Run のドメインマッピングで付ける（production は `{DOMAIN}`、staging は `stg.{DOMAIN}`）。DNS は Vercel にあり、CNAME（`ghs.googlehosted.com`）を手で入れる（2章「インフラ管理」）。ドメインマッピングを作る Google のアカウントは、Search Console で `dwnfrc.app` の所有を確認しておく。
 - Cloud Run は IAM の認証をかけない（誰でも呼べる設定）。前段のプロキシが無いので、共有シークレットは持たない。
@@ -311,6 +314,7 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 - Cloud Run のドメインマッピングは Preview の機能で、Google は遅延の問題から本番向けではないとしている。ユーザーはこれを承知で選んだ。問題が出たら、外部アプリケーション ロードバランサ（サーバーレス NEG）に乗り換える。配信の形は同じなので、アプリのコードは変わらない。
 - Cloud Run が0台のときは、最初の画面の表示も API の起動を待つ（数秒。7.3）。最小の台数は ADR-007 のまま（0台）で、遅く感じたら ADR-007 の手順で1台にする。
 - CDN を通さないので、静的ファイルも asia-southeast1 から返る（利用者はフィリピンにいるので遅れは小さい）。静的ファイルのリクエストも Cloud Run の無料枠に数えられる。2回目からはブラウザと Service Worker のキャッシュから出る（ADR-031）。
+- 圧縮はリクエストの中で同期で行うので、新しいインスタンスで各ファイルが最初に求められたときだけ、その分（いちばん大きいチャンクで手元で約 25 ms）応答が遅れ、その間ほかのリクエストも待つ。ビルドの時に圧縮したファイルを作る案（`build-web` に手順とスクリプトが増え、Brotli の最高の品質でも1割ほどしか小さくならない）と、起動の時にすべて圧縮する案（0台からの起動が延びる。7.3）は採らなかった。
 - Cloud Run の URL（`*.run.app`）も公開のまま残る。ドメインの外から呼ばれても、認証・認可・回数制限は同じにかかり、ログインの Cookie は `{DOMAIN}` にしか送られない。
 
 ### ADR-005: API は ElysiaJS（Bun）（ユーザー指定）
@@ -395,7 +399,7 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 
 **状態・日付:** 採用（2026-10-01。2026-10-11 に、M9 でログインし直したときはキャッシュを残すと変えた）
 
-**決定:** Redis などのサーバー側のキャッシュは置かない。クライアントは TanStack Query でデータを持ち（画面の移動ではキャッシュを先に出し、裏で取り直す。保存したら関係するキーを無効にする。ログインの画面へ移るとき（401 で M9 を開かないときと、M9 から移るとき）、ログアウト、ログイン・新規登録・パスワードの再設定で別のセッションに入ったときは、キャッシュをすべて捨てる。キャッシュは1人の利用者のデータなので、次の人に見せない。M9 で同じアカウントにログインし直したときは残す（8.2。2026-10-11 に変えた））、API の応答は `Cache-Control: no-store`（個人のデータのため）。静的アセットは、ファイル名にハッシュを付けて長期キャッシュの見出しで返し（ADR-004）、ブラウザと Service Worker（ADR-031）が持つ。Better Auth の回数制限は DB に記録する。
+**決定:** Redis などのサーバー側のキャッシュは置かない。クライアントは TanStack Query でデータを持ち（画面の移動ではキャッシュを先に出し、裏で取り直す。一覧をいつ取り直すかは 7.3「クライアントのデータ」。保存したら関係するキーを無効にする。ログインの画面へ移るとき（401 で M9 を開かないときと、M9 から移るとき）、ログアウト、ログイン・新規登録・パスワードの再設定で別のセッションに入ったときは、キャッシュをすべて捨てる。キャッシュは1人の利用者のデータなので、次の人に見せない。M9 で同じアカウントにログインし直したときは残す（8.2。2026-10-11 に変えた））、API の応答は `Cache-Control: no-store`（個人のデータのため）。静的アセットは、ファイル名にハッシュを付けて長期キャッシュの見出しで返し（ADR-004）、ブラウザと Service Worker（ADR-031）が持つ。Better Auth の回数制限は DB に記録する。
 
 **理由:** 利用者は BCDX の数人で、データ量も小さい。複数人が同じアイデアを編集するので、サーバー側のキャッシュは古い内容を見せる危険の方が大きい。重く見える計算（損益分岐・確認項目）は純粋関数で一瞬で終わる。
 
@@ -492,21 +496,21 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 ### ADR-018: デザインシステムは Adobe Spectrum の仕組み、見た目は月相（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテーマの生成を外し、PWA のアイコンとマニフェストの生成を足した。2026-10-12 に見た目を Hermes Teal から月相に替え、06 からネイティブ向けの値を外し、書体の読み込みを決めた。2026-10-17 に値を `docs/mockups` に合わせ、文字の大きさを画面の幅で切り替えるようにした。2026-10-18 にタッチの端末の入力欄の文字の下限と、モックアップと並べて確かめる範囲を足した）
+**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテーマの生成を外し、PWA のアイコンとマニフェストの生成を足した。2026-10-12 に見た目を Hermes Teal から月相に替え、06 からネイティブ向けの値を外し、書体の読み込みを決めた。2026-10-17 に値を `docs/mockups` に合わせ、文字の大きさを画面の幅で切り替えるようにした。2026-10-18 にタッチの端末の入力欄の文字の下限と、モックアップと並べて確かめる範囲を足した。2026-10-29 にテーマの契約を `.css.ts` のファイルに移した（7.3。実装のエージェントの判断））
 
 **決定:**
 
 - **参考にするもの**: Adobe Spectrum（Spectrum 2）の仕組みを取り入れ（ユーザーと合意、2026-10-01）、見た目は design-spec 4.4 の月相にする（2026-10-12 にユーザーと決めた）。取り入れる範囲は design-spec 4.4「デザインシステムの参考」、部品の一覧は design-spec 4.5 が正。この ADR は、それを実装する方法（トークンの階層・生成・ライト / ダーク）を決める。
 - **トークン**: 正は `docs/06_design-tokens.json`（DTCG 形式）。Spectrum の3つの階層を、DRAFT の2層に次のように対応させる: Spectrum の global → `primitive`、alias（用途の名前）→ `semantic`、component（部品ごとの寸法）→ `semantic.scale.{medium,large}.component`。実装が参照してよいのは `semantic` だけ。`semantic` の値はエイリアスだけで、たどると必ず `primitive` に着く（密度は `semantic.scale.medium` を参照し、生成のときに large へ差し替える。書体のスタイルと入力欄の文字は `semantic.font-size.wide` を参照し、生成のときに narrow へ差し替える）。06 は、`docs/mockups`（2026-10-11 にユーザーと合意した見た目）から取った値を持ち、モックアップが示さないものは Spectrum 2 の値を持つ（取り方は design-spec 4.5）。画面を作るときと直すときは、06 から作った画面をモックアップと並べて確かめる（`docs/mockups/README.md`）。モックアップは見た目のイメージで、ピクセル単位では合わせず、並べて見れば測らなくても分かる違いを残さない（2026-10-18 のユーザーの決定。合わせるものと追わないものは design-spec 4.5）。
 - **生成**: `make tokens` が `packages/ui-tokens` に次を生成する（変換は自前の小さなスクリプト。Style Dictionary は使わない）。
-  - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク・medium / large・wide / narrow の値。CSS 変数として出る。1つの変数はこの3つの切り替えのうち1つでだけ値が変わる）。画面のスライド表示（Slide）は `semantic.print`（ライト固定）を参照する
+  - Web: vanilla-extract のテーマ（`createGlobalThemeContract` の型付きの契約と、ライト / ダーク・medium / large・wide / narrow の値。CSS 変数として出る。1つの変数はこの3つの切り替えのうち1つでだけ値が変わる）。契約（`vars`）も `.css.ts` のファイルに置き、Web のビルドの時に実行して値だけを残す（ブラウザは `@vanilla-extract/css` を読まない。読むのは `recipe()` と `createSprinkles()` の小さな実行時の関数だけ。7.3）。画面のスライド表示（Slide）は `semantic.print`（ライト固定）を参照する
   - PDF: react-pdf 用の定数（常にライト。`semantic.print`）
   - PWA: アイコン（SVG と PNG）とマニフェスト（ADR-031）
   - 06 はネイティブ向けの値を持たない（2026-10-12 に外した。ネイティブの feature で要るものを足す）
 - **ライト / ダーク**: セマンティック層の `light` / `dark` で切り替える。Web は 4 アカウント設定の System / Light / Dark に従い、Light と Dark は `<html data-theme="light|dark">` で固定し、System は属性を置かずに `prefers-color-scheme` に従う。
 - **スケール（Web）**: 既定は `medium`。タッチ操作が主の端末（`@media (pointer: coarse)`）は `large` にする。`<html data-scale="medium|large">` で固定でき、固定が優先される。タッチパネル付きのノート PC も `pointer: coarse` に当たるときは `large` になる。large が変えるのは押せる部品の高さと target-min だけで、文字の大きさは変えない（2026-10-17 のユーザーの決定）。唯一の例外は入力欄の文字の下限で、large では入力欄の文字を幅によらず 06 `component.field.font-size-min` 以上にする（2026-10-18 のユーザーの決定。iOS は 16px より小さい入力欄を押すと画面を拡大し、入力のあとも拡大したままになるので、下限はその 16px。横向きのスマホは `semantic.breakpoint.tablet` より広く、narrow の入力欄の文字が効かない。タッチの端末の入力欄は、モックアップの入力欄の文字より大きくなる（M と L は 1〜2px、S は 3px）。design-spec 4.3）。
 - **文字の幅（Web）**: 文字の大きさは画面の幅で切り替える。既定は `wide`、`semantic.breakpoint.tablet` より狭い幅（`@media not all and (min-width: …)`）は `narrow`（`semantic.font-size.narrow`。design-spec 4.3）。ランディングの題は `semantic.fluid-type` の clamp() で幅に合わせて滑らかに変える。
-- **書体**: 書体の名前の正は 06 の `primitive.font.family`（self-host する書体はどれも SIL OFL 1.1。並びの残りは配らない OS の書体）。Web は npm の `@fontsource/ibm-plex-sans`・`@fontsource/ibm-plex-mono`・`@fontsource/ibm-plex-sans-jp` を依存に入れて self-host する（外部の CDN からは読まない）。読み込むのは 06 の `primitive.font.weight` の太さだけで、ファイルは woff2 だけを使う。日本語の書体は字の範囲（`unicode-range`）ごとに分かれたファイルのまま使い、画面に出た字のファイルだけをブラウザが読む。Service Worker でのキャッシュの仕方は ADR-031、PDF の書体は ADR-012。
+- **書体**: 書体の名前の正は 06 の `primitive.font.family`（self-host する書体はどれも SIL OFL 1.1。並びの残りは配らない OS の書体）。Web は npm の `@fontsource/ibm-plex-sans`・`@fontsource/ibm-plex-mono`・`@fontsource/ibm-plex-sans-jp` を依存に入れて self-host する（外部の CDN からは読まない）。読み込むのは 06 の `primitive.font.weight` の太さだけで、ファイルは woff2 だけを使う（Vite は小さなファイルもデータ URL に埋め込まず、ファイルのまま出す。CSP の `font-src 'self'` がデータ URL を拒むため。7.2）。日本語の書体は字の範囲（`unicode-range`）ごとに分かれたファイルのまま使い、画面に出た字のファイルだけをブラウザが読む。Service Worker でのキャッシュの仕方は ADR-031、PDF の書体は ADR-012。
 - **アイコン**: Lucide（`lucide-react`）にそろえる。大きさは `semantic.scale.{medium,large}.component.icon.size`、線の太さは `semantic.icon` のトークン。
 
 **理由:** ユーザーがデザインシステムの参考に Adobe Spectrum を指定し、見た目は moonx 独自のもの（2026-10-12 に月相に決めた）にすることを選んだ。Spectrum は部品・大きさ・スケール・密度・アクセシビリティの決まりが体系化されていて、のちのネイティブでも同じ考え方を使える。React Aria（ADR-025）は Spectrum を作っている Adobe の headless の部品なので、振る舞いの決まりがそのまま合う。スケールと密度の考え方で、design-spec 4.4 の「画面で密度を使い分け、スマホは押せる部品を一段高く」をそのまま表せる。文字の大きさをスケールでなく幅で切り替えるのは、合意したモックアップがスマホの幅で本文を 15px から 16px にするだけで、タッチの端末のタブレットでは文字を大きくしないため（2026-10-17）。入力欄の文字の下限だけをスケールで決めるのは、iOS の拡大が画面の幅ではなくタッチの端末で起きるため（2026-10-18）。Lucide はネイティブ（`lucide-react-native`）にも同じ絵柄の版があり、線の太さと大きさを props で変えられる。変換を自前のスクリプトにするのは、出力が限られ（vanilla-extract・react-pdf・PWA のアイコン）、Spectrum の階層（scale・density・light/dark）の差し替えを素直に書けるため。
@@ -555,7 +559,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 **決定:**
 
 - 自動保存（design-spec 6.0.2）は、項目ごとに、まだ保存できていない最新の値を1つだけメモリに持つ。端末の保存先（IndexedDB・localStorage など）には書かない。持つのはページ（タブ）を開いている間で、アプリの中で画面を移っても消えない。
-- 一時的な失敗（通信の断・5xx・`UPSTREAM_UNAVAILABLE`）は、間隔を伸ばしながら自動で再送する。再送は持っている `lockVersion` で送り、衝突したら ADR-019 の選択を出す。
+- 一時的な失敗（通信の断と `UPSTREAM_UNAVAILABLE`。8.2）と、ほかの 5xx は、間隔を伸ばしながら自動で再送する（回数の上限（429）は待ち時間の後に送る）。再送は持っている `lockVersion` で送り、衝突したら ADR-019 の選択を出す。
 - オフラインになったら（ブラウザが `offline` を知らせたとき、または通信の失敗が続いたとき）、入力欄を読み取り専用にして入力を止める。戻ったら、持っている値を送ってから入力を戻す。表示と文言は design-spec 6.0.2・6.0.6 に従う。
 - 恒久的な失敗（アーカイブ済み・権限がない・対象が無い）は、再送しても結果が同じなので自動では再送しない。Retry を押したときだけ送り直す。表示は design-spec 6.0.2 に従う。
 - まだ保存できていない値があるまま、ページを閉じる・再読み込みする・アプリの外へ移るときは、ブラウザの離脱の確認（`beforeunload`）を出す。
@@ -696,11 +700,12 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 - **マニフェスト**（`/manifest.webmanifest`）: `name` と `short_name` は下の「名前」、`display` は `standalone`、`start_url` と `scope` は `/`、`theme_color` と `background_color` はトークン（`semantic` の地の色）から作る。`make tokens` が生成する（ADR-018）。
 - **アイコン**: 形と色は design-spec 4.4「アプリのアイコン」に従う。ここは作り方だけを持つ: `make tokens` がトークンから SVG を作り、PNG（favicon 32、`apple-touch-icon` 180、192、512、maskable 512）は SVG から sharp で作る。生成物（`packages/ui-tokens/src/generated/pwa/`）は手で直さず、Web のビルドが `/icons/` に出す。
 - **Service Worker**（`/sw.js`。`apps/web` の Service Worker のソースに、ビルドしたアセットの一覧を vite-plugin-pwa の `injectManifest` で埋め込む）:
-  - キャッシュするのは画面の外側だけ: `_shell.html`、ビルドしたアセット、フォント、アイコン。ランディング（`index.html`）と 29・30 の HTML はキャッシュしない。フォントのうち事前にキャッシュする（インストールのときに取る）のは欧文と等幅の書体の woff2 だけ。日本語の書体の字の範囲ごとのファイル（1つの太さで100を超える）は事前にキャッシュせず、使われたときに実行時にキャッシュする（CacheFirst。ADR-018）。
+  - キャッシュするのは画面の外側だけ: `_shell.html`、ビルドしたアセット、フォント、アイコン。ランディング（`index.html`）と 29・30 の HTML はキャッシュしない。フォントのうち事前にキャッシュする（インストールのときに取る）のは欧文と等幅の書体の woff2 だけ。日本語の書体の字の範囲ごとのファイル（1つの太さで100を超える）は事前にキャッシュせず、使われたときに実行時にキャッシュする（CacheFirst。ADR-018）。新しい版が切り替わったら、そのビルドに無い日本語の書体のファイルをキャッシュから消す。
   - `/api/*` はキャッシュせず、必ずネットワークに出す（オフラインでも代わりの応答を返さない）。
   - 画面のパスへのナビゲーションはネットワークを先に使い、オフラインのときだけキャッシュした `_shell.html` を返す（API が meta を入れた最新の HTML を使うため）。
   - 入力をオフラインで受けて後で送る仕組みは作らない（入力には接続が要る。ADR-021）。
-  - 新しい版の Service Worker が待っているときは、design-spec の表示で再読み込みを促し、利用者が選んだときだけ切り替える（`skipWaiting` を自動では呼ばない）。
+  - 新しい版の Service Worker が待っているときは、design-spec の表示で再読み込みを促し、利用者が選んだときだけ切り替える（`skipWaiting` を自動では呼ばない）。選んだら、待っている版に切り替えてから画面を読み込み直す。表示を出すとき（別のタブで切り替わったときと、離脱の確認で留まったときを含む）は design-spec 6.0.6。
+  - 開いている画面は、表に戻ったときと1時間ごとに新しい版を問い合わせる（画面の移動ではページを読み込まないので、ブラウザ任せでは開いたままの画面が新しい版を見つけない）。
   - 登録は本番のビルドだけで行い、Vite の開発サーバーでは登録しない。
 - **パスと見出し**（API が返す。ADR-004）:
 
@@ -729,10 +734,11 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 - 自己分析（10・11）は本人のもので、どのワークスペースのパスから開いても中身は同じ。Viewer として開いているワークスペースの `/w/$workspaceId/self-analysis...` を開いたら、自分の個人用ワークスペースの同じパスへ移す（design-spec 6.11）。
 - 作成の取り消し（5.11）で論理削除したアイデア・プランのパスは、無いものとして design-spec 6.0.6「見つからない」を出す。
 - モーダル（M1〜M8）とパネル（PNL-1・PNL-2）はルートを作らず、検索パラメータで開く: `?modal=new-idea|evidence|save-version|go-no-go|create-plan|share|switch-workspace|update-template`、`?panel=comments|history&target=<targetType>:<targetId>[:<targetKey>]`。モーダルを開くと履歴に1つ足し、ブラウザの戻る（スマホの戻るの操作）でモーダルが閉じる。閉じる操作（×・Esc・Cancel など）は、その画面で開いたモーダルなら足した1つを戻り、URL から直接開いたモーダルなら今の履歴の項目から `modal` を外す（どちらも、閉じた後の戻るで同じモーダルが開き直さない）。パネルも同じく、閉じた状態から開くと履歴に1つ足し、閉じるとその1つを戻る（URL から開いたパネルは `panel`・`target` を外す）。開いたまま別のパネルや別の対象に替えるときは、今の履歴の項目を書き換える。画面の中の移動（一覧の項目を選ぶ・絞り込みを変える）は、開いているパネルの `panel`・`target` を引き継ぐ。開いた後に画面の中で移ってから閉じるときは、戻らずに今の履歴の項目から `panel`・`target` を外す（戻ると移動まで取り消すため。移る前の履歴の項目は、パネルを開いた状態のまま残る）。
+- 検索パラメータで開くモーダルは、開ける人と状態だけに出す（どのモーダルを誰がどの状態で開けるかは design-spec 3.8・6.x）。開けない人・状態の画面で `?modal=` を開いたら、何も出さず、判断に要るデータを読み終えた時点で、今の履歴の項目から `modal` と `about` を外す（置き換える。履歴は足さない）。URL に残すと、後で開ける状態に変わったとき（Restore、ほかの人が記録した Proceed の読み直し、Viewer からの役割の変更など）に、押していないモーダルが開くため。読み込み中には外さない。キャッシュにある古いデータを読み直している間も読み込み中とみなす（読み終えると開けるモーダルを消さないため。例: 19 で Proceed を記録した後の 13 の `?modal=create-plan`）。開いた後は、開いている間に開けなくなっても URL から外さない（閉じるまで残すことと、送ったときに断られた理由を出すことは design-spec 6.0.6 のモーダルの決まり）。画面そのものを出さないとき（「権限がない」「見つからない」、25 を Viewer として開いたなど）は、モーダルの判断をしないので URL から外さない（出ていたモーダルが画面と一緒に消えることは design-spec 6.0.6）。役割の変更で別のワークスペースの同じ画面へ移ったとき（10・11 と自己分析の 24・25。design-spec 2.2・6.11）は、移った先で判断し直す。design-spec 3.8・6.x がモーダルごとに別の決まりを持つときは、そちらに従う。検索パラメータで開く入力（14・16 の `new=1` と 14 の `presetSupports`）と、履歴の項目の state で開く入力（15 の New competitor）も、モーダルと同じく扱う（新しい行を足せない人・状態では開かずに URL か state から外し、開いた後は閉じるまで残す）。
 - M9（ログインし直し）は 401 のときにだけ開くので、ルートも検索パラメータも持たない（8.2）。
 - `target` の書式は2つ。項目は `<targetType>:<targetId>[:<targetKey>]`（`targetKey` に `:` を含んでもよい）で、その項目のコメントのスレッド（C1）と項目の履歴（H1 の `targetType`・`targetId`・`targetKey`）に使う。画面全体は `container:<containerType>:<containerId>[:<sectionKey>,...]`（`containerType` は `self_analysis` / `validation` / `business_plan` / `idea`。`sectionKey` は画面が持つ節のキーで、複数ならカンマでつなぐ。21 の `execution:{種類}` のように `:` を含んでもよい。画面と節の対応は 6.3 の末尾）で、画面全体の履歴（H1）と、画面のコメントの一覧（C1）に使う。画面のコメントの一覧は、その画面の項目のスレッドと、アイデアの中の画面ではアイデアへのコメント（対象 `idea:<ideaId>`）をまとめて出す（ヘッダーの 💬。design-spec 6.0.1・6.0.4）。どちらにも当てはまらない値は、パネルを開かない。
 - モーダルが対象の項目を持つとき（M2 の根拠シート）は `?modal=evidence&about=<targetType>:<targetId>[:<targetKey>]` とする。`about` の書式は `target` の項目と同じで、パネルの `target` と同時に使える（パネルを開いたまま根拠シートを開ける）。M2 を Fact のボタンから開いたこと（付けた根拠で Fact にする。design-spec 6.0.3）は、URL ではなく、開いたときに足した履歴の項目の state に持つ（戻る・進む・再読み込みでも保たれる。URL から開いた M2 は Fact から開いたものとして扱わない）。
-- M8 は `?modal=update-template&about=<templateKind>:<targetId>`（`templateKind` は `self_analysis` / `validation` / `business_plan`、`targetId` は自己分析・検証・プランの id）で開く。`about` が無いとき、画面の対象と食い違うとき、操作できない人が開いたとき、アーカイブ済みのアイデア・案と、保存した版を開いている 20（どちらも読み取り専用。design-spec 6.0.7）では、何も出さない。開いた後は、開いている間に操作できなくなっても（アーカイブされたなど）閉じるまで残す（断られた理由を M8 の中に出すため。URL に残って Restore で開き直すこともない）。
+- M8 は `?modal=update-template&about=<templateKind>:<targetId>`（`templateKind` は `self_analysis` / `validation` / `business_plan`、`targetId` は自己分析・検証・プランの id）で開く。`about` が無いとき、画面の対象と食い違うとき、操作できない人が開いたとき、アーカイブ済みのアイデア・案と、保存した版を開いている 20（どちらも読み取り専用。design-spec 6.0.7）では開けない。開けないときと開いた後の扱いは、上の検索パラメータで開くモーダルの決まりのとおり（何も出さずに URL から外し、Restore で開き直さない。開いた後の M8 は design-spec 6.0.6・6.0.7）。
 - 認証が要るルートで未ログインなら `/login?next=<元のパス>` へ移る。
 - `/dev/components` は部品の確認用ページ。開発サーバー（`import.meta.env.DEV`）だけで開き、本番のビルドには入らず、開くと Not Found になる。
 
@@ -850,7 +856,7 @@ interface Page<T> { items: T[]; nextCursor: string | null; }
 
 interface UserRef {
   id: UUID; displayName: string; avatarUrl: string | null;
-  badge: null | "former_member" | "suspended" | "deleted";   // 名前に添える表示（design-spec 6.16・6.17）。deleted のとき displayName は "Deleted user"。重なれば deleted、former_member（そのワークスペースにもういない）、suspended の順に1つ。表示がワークスペースに属さないとき（自己分析の変更履歴と衝突の相手、運営者の画面）は former_member を付けない
+  badge: null | "former_member" | "suspended" | "deleted";   // 名前に添える表示（design-spec 6.16・6.17）。deleted のとき displayName は "Deleted user"（U7 が書いたカタログの `app:userBadge.deleted` の文。Web の UserName は deleted なら displayName でなく、カタログのこの文を出す）。重なれば deleted、former_member（そのワークスペースにもういない）、suspended の順に1つ。表示がワークスペースに属さないとき（自己分析の変更履歴と衝突の相手、運営者の画面）は former_member を付けない
 }
 
 interface Versioned { lockVersion: number; updatedAt: DateTime | null; updatedBy: UserRef | null; }
@@ -1143,7 +1149,7 @@ interface InvitationPreview {
 **U7 `POST /api/v1/me/delete`**（アカウントの削除。design-spec 6.16）本体 `{ confirmEmail: string; password?: string }` → `204`（セッションの Cookie を消す）。
 - `confirmEmail` が自分のメールと違えば `422 CONFIRMATION_MISMATCH`。パスワードがある人は `password` が必須で、違えば `403 INVALID_PASSWORD`（ユーザーごとに10分5回まで。超えたら `429 RATE_LIMITED`）。パスワードが無い人（Google だけ）は、セッションが design-spec 6.16 の再認証の時間の中で作られたものでなければ `403 REAUTH_REQUIRED`。
 - ほかにメンバーのいるワークスペースで最後の Owner なら `409 LAST_OWNER`（`error.workspaces: { id; name }[]`）。ロールは、W3 と同じメンバーの lock（5.5 W3）を取ってから読む（待つあいだにほかの Owner が変えたロールで決める）。
-- 何を消し何を残すかは design-spec 6.16 の表のとおり。1つのトランザクションで行い、この文書に固有の扱いは次のとおり（中身ごと消す個人用ワークスペースは、7.1「実装」の順にアイデア、プランの行をロックしてから消す。ワークスペースの行を先に押さえると、中身への書き込みとデッドロックする）: `users` の行は残して列を置き換える（`email` を `deleted+{id}@deleted.invalid`、`display_name` を `Deleted user`、`avatar_url` を null、`status` を `deleted`）。`sessions`・`accounts`・パスワード再設定のトークン（`verifications`）は行を消す。所属を外す処理は W3 DELETE と同じ。トランザクションをコミットしてから、保存した写真を消す（Cloud Storage または local のディスク）。
+- 何を消し何を残すかは design-spec 6.16 の表のとおり。1つのトランザクションで行い、この文書に固有の扱いは次のとおり（中身ごと消す個人用ワークスペースは、7.1「実装」の順にアイデア、プランの行をロックしてから消す。ワークスペースの行を先に押さえると、中身への書き込みとデッドロックする）: `users` の行は残して列を置き換える（`email` を `deleted+{id}@deleted.invalid`、`display_name` をカタログの `app:userBadge.deleted` の文（`Deleted user`）、`avatar_url` を null、`status` を `deleted`）。`sessions`・`accounts`・パスワード再設定のトークン（`verifications`）は行を消す。所属を外す処理は W3 DELETE と同じで、担当を置き換える名前の自由記述（design-spec 6.16）も `display_name` と同じカタログの文にする。置き換えた後の担当は、人が書いた名前と同じ自由記述として扱う（書いた文のまま返し、P9 の `assigneeName` もその文で当てる。UserRef と違い、Web はカタログの文に置き換えない）。トランザクションをコミットしてから、保存した写真を消す（Cloud Storage または local のディスク）。
 - Better Auth の `deleteUser`（行ごと消す）は使わない（チームの記録が `users` を参照しているため）。
 
 ### 5.5 ワークスペース・メンバー・招待
@@ -1245,6 +1251,7 @@ interface ValidationAnswer extends Versioned {
   hidden: boolean;                           // 02 OCEAN の出し分け・テンプレートの移行で隠れている
   commentCount: number;
 }
+interface ConditionAnswer { questionKey: string; text: string | null; }   // 表示条件が読む回答（本文だけ。未回答は null）。V2・S2・P4 の conditionAnswers
 interface ResearchLogInput {
   observedOn?: DateOnly | null; topic: string; observation?: string | null;
   sourceType?: SourceType | null; sourceUrl?: string | null;
@@ -1293,7 +1300,7 @@ interface EconomicsInput extends Versioned {
 | API | 本体・クエリ | 応答 | エラー・副作用 |
 |---|---|---|---|
 | V1 | — | `200 ValidationHome` | 確認項目・Next steps・F/A/U・主要指標は `packages/domain` で計算する。`summary` は 01 WHO・01 PROBLEM・アイデアの提案する解決策・02 OCEAN（空白だけ・固定している版に無い・出し分けで隠れている回答は null）。`decisions` は判定（`validation_decision`）だけ。`plans` は作った順。`sections[].title` は番号を含む名前。出どころの決まりは design-spec 6.1（設問のセクションはテンプレートの版の題、画面のセクションはカタログ `validation:sections.<key>` の固定のラベル） |
-| V2 | — | `200 { section: TemplateSection; answers: ValidationAnswer[] }` | `sectionKey` は `01` / `02` / `10`（`04` のパターンと `08` は V8・V15 が返す。それ以外の値は `404 NOT_FOUND`）。設問ごとに必ず1件返す（未回答は `text: null`, `lockVersion: 0`。出し分けで隠れる設問も `hidden: true` で返す）。`classification.evidence` は付けた順。`commentCount` はその項目の削除していないコメント（返信を含む）の数（ほかの型の `commentCount` も同じ） |
+| V2 | — | `200 { section: TemplateSection; answers: ValidationAnswer[]; conditionAnswers: ConditionAnswer[]; decidesElsewhere: string[] }` | `sectionKey` は `01` / `02` / `10`（`04` のパターンと `08` は V8・V15 が返す。それ以外の値は `404 NOT_FOUND`）。設問ごとに必ず1件返す（未回答は `text: null`, `lockVersion: 0`。出し分けで隠れる設問も `hidden: true` で返す）。`conditionAnswers` は、このセクションの設問の表示条件が名指す、ほかのセクションの設問の回答（名指された設問ごとに1件、テンプレートの順。未回答も `text: null` で返す）。11 はこのセクションの回答（打っている値）とこれで出し分けを決め、13 と同じに数える（design-spec 6.2）。`decidesElsewhere` は、ほかのセクションの設問の表示条件が名指す、このセクションの設問 ID（テンプレートの順。11 はその設問にも「Answer {タイトル} to see the next questions」を出す）。`classification.evidence` は付けた順。`commentCount` はその項目の削除していないコメント（返信を含む）の数（ほかの型の `commentCount` も同じ） |
 | V3 | `{ text?: string | null; classification?: ClassificationInput; lockVersion: number; force?: boolean }` | `200 ValidationAnswer` | `422 FACT_REQUIRES_EVIDENCE`（有効な根拠が無いのに `fact`。Fact は V4 の `setFact` で付ける）、`422 CONFIDENCE_REQUIRED`、`422 INVALID_CHOICE`（選択の設問）、`422 QUESTION_NOT_FOUND`（テンプレートの版に無い設問 ID。`V.04.SURVIVOR_PATTERNS`・`V.04.FAILURE_PATTERNS`・`V.08.WORTH` も V3 で答える）。`text` の長さは design-spec 6.0.8（超えたら `422 VALIDATION_FAILED`。短文の型の上限は設問を引いてから確かめる）。`text` を null か空白にすると F/A/U も外す（`unknown` を除く）。`FACT_REQUIRES_EVIDENCE` は Fact にするときだけ確かめる（すでに Fact の回答は、根拠の調査ログが削除されていても保存できる。6.5）。F/A/U を持たない設問への `fau`、Assumption 以外への `confidence`、値の無い回答を Fact か Assumption にする送信は `422 VALIDATION_FAILED`（`details[0].path` は `classification.fau` / `classification.confidence`）。長文・短文・選択以外の型の設問は `422 NOT_EDITABLE`。答えの行を作るときの `lockVersion` は 0 で、作られた行は 1 から始まる。履歴 `manual` |
 | V4 | `{ target: TargetRef; researchLogEntryId?: UUID; newResearchLog?: ResearchLogInput; url?: string; note?: string; setFact?: boolean; lockVersion: number; force?: boolean }` | `201 { evidence: Evidence; classification: Classification; lockVersion: number }` | `researchLogEntryId` / `newResearchLog` / `url` のどれか1つ。`setFact: true` なら対象を Fact にする（Fact のボタンから開いた M2 で根拠を付けたとき。design-spec 6.0.3）。対象は `validation_answer` / `economics_input` / `cost_item` / `competitor` / `assumption`（`lockVersion` は対象の項目の版）。同じ調査ログを同じ対象に2回付けると `422 VALIDATION_FAILED`。値の無い対象や F/A/U を持たない対象（競合・前提）への `setFact` も `422 VALIDATION_FAILED`（`details[0].path` は `setFact`）。`url` と `note` の値は design-spec 6.0.8。対象の版が食い違えば `409 CONFLICT`、`force: true` で上書きする（ADR-019）。対象がこの検証に無い・論理削除した行なら `404 NOT_FOUND`、回答の設問 ID が固定している版に無ければ `422 QUESTION_NOT_FOUND`、数字の `key` が `EconomicsField` でなければ `422 VALIDATION_FAILED`（`target.key`）。`researchLogEntryId` がこの検証の削除していない調査ログでなければ `422 VALIDATION_FAILED`（`researchLogEntryId`）。まだ行の無い回答・数字に付けると、その行を版 1 で作る（履歴は作成の1行）。応答の `lockVersion` は付けた後の版。F/A/U を持たない対象（競合・前提）の `classification` は `fau: null`・`state: "unclassified"`。履歴は対象の項目に1行（`newResearchLog` のときは調査ログの作成も1行）。`manual` |
 | V5 | `?lockVersion=` | `200 { classification: Classification; lockVersion: number }` | Fact の最後の根拠を外すと未分類に戻す（クライアントは事前に確認を出す）。最後かどうかは数える根拠（削除した調査ログを指すものを除く）で決め、外した後に数える根拠が残らない Fact は未分類に戻す（「Fact（根拠なし）」の項目から、削除した調査ログを指す根拠を外したときも）。固定している版に無い設問の回答（移行で隠れたもの）の根拠も外せる。すでに外した根拠は `404 NOT_FOUND`。`?force=true` で版の食い違いを上書きする。履歴は対象の項目に1行（`manual`） |
@@ -1352,7 +1359,7 @@ interface SelfAnalysisAnswer extends Versioned {
 |---|---|---|---|
 | S1 GET | — | `200 SelfAnalysisHome` | 初めて開いたときに自己分析を作る（最新の公開済みの版、`not_started`）。運営者も同じ（design-spec 2.1）。公開済みの版が無ければ `409 TEMPLATE_NOT_PUBLISHED`。自己分析を作るのは S1 GET だけで、作る前の S1 PATCH・S2〜S5 は `404 NOT_FOUND`（10 も 11 も、開いたときに先に S1 GET を呼ぶ。design-spec 6.11） |
 | S1 PATCH | `{ currency: string }` | `200 SelfAnalysisHome` | 換算しない。通貨は設定なので履歴を書かない（design-spec 6.0.5） |
-| S2 | — | `200 { section: TemplateSection; answers: SelfAnalysisAnswer[] }` | 固定している版に無いセクションは `404 NOT_FOUND`。設問ごとに必ず1件返す（未回答は `text: null`・`amount: null`・`lockVersion: 0`） |
+| S2 | — | `200 { section: TemplateSection; answers: SelfAnalysisAnswer[]; conditionAnswers: ConditionAnswer[]; decidesElsewhere: string[] }` | 固定している版に無いセクションは `404 NOT_FOUND`。設問ごとに必ず1件返す（未回答は `text: null`・`amount: null`・`lockVersion: 0`）。`conditionAnswers`・`decidesElsewhere` は V2 と同じ（`ConditionAnswer.text` は金額＋理由の設問なら理由）。11 は 10 と同じに数える（design-spec 6.11） |
 | S3 | `{ text?: string | null; amount?: number | null; lockVersion; force? }`（値は design-spec 6.0.8） | `200 SelfAnalysisAnswer` | 最初の回答で `not_started` を `in_progress` にする（下の段落）。金額を送れるのは金額＋理由の設問だけ（それ以外の設問に null でない `amount` を送ると `422 VALIDATION_FAILED`、`details[0].path` は `amount`）。金額＋理由の `text` は理由。存在しない設問（固定している版に無い設問）は `422 QUESTION_NOT_FOUND`。設問の型の決まりは V3 と同じ（長文・短文・選択・金額＋理由以外は `422 NOT_EDITABLE`、選択は `422 INVALID_CHOICE`、短文の上限は設問を引いてから確かめる）。キーで決まる項目で、最初の保存で版 1 になる（5.1）。値の変わらない保存は版を上げず、履歴も書かない。履歴 `manual`（本人だけが見られる）。409 の `current.value` と履歴の値は `{ text, amount }` |
 | S4 complete | `{ confirmEmpty?: boolean }`（本体が無い（API は null として読む）ときは `{}` と同じ） | `200 SelfAnalysisHome` | 未回答があり `confirmEmpty` が true でなければ `409 HAS_EMPTY_QUESTIONS`（`error.emptyCount` は未回答の数。数え方は design-spec 6.11）。すでに `done` なら何も変えずに返す（`completedAt` も変えない） |
 | S4 reopen | — | `200 SelfAnalysisHome` | `in_progress` に戻し、`completedAt` を null にする。共有は続く。`done` でなければ何も変えずに返す |
@@ -1407,7 +1414,7 @@ interface PlanReference {
 // cost_rows: { id; category; templateKey; name; inputMode; amount; percent; value: MetricValue }[]（CostItem の一部と、計算した金額。keys の順。value は主要指標 cost_row:{key}）。検証にそのキーの行が無い（削除した・検証のテンプレートの版に無い）キーは、id・inputMode・amount・percent を null にした1件にし、name と category は、そのキーを持つ公開済みの検証のテンプレートの版のうち最新のものの初期行から入れる（どの版にも無ければ null）。21 はこの行に「Not in validation」を出す（design-spec 6.0.7）
 // research_log: { id; observedOn; topic; observation; sourceType; sourceUrl }[]（14 の順）
 // decision_log・go_no_go_history: DecisionLogSummary[]（新しい順。アイデアの全件、プランの Go / No-Go）
-// self_analysis: { selfAnalysisId; user: UserRef; currency; sections: { key; part; title; subtitle; guidance; answers: { questionKey; title; text; amount }[] }[] }[]（このワークスペースに共有された自己分析を持ち主の名前の順。sections は指定のセクション）
+// self_analysis: { selfAnalysisId; user: UserRef; currency; sections: { key; part; title; subtitle; guidance; answers: { questionKey; title; text; amount }[] }[] }[]（このワークスペースに共有された自己分析を持ち主の名前の順。sections は指定のセクション。answers は、その自己分析のすべての回答で読んだ表示条件で隠れた設問を除く（12 と同じ。design-spec 6.2））
 // metrics: { key; value: MetricValue }[]
 // assumptions: { id; statement; whyBelieve; evidence; confidence; disproveCondition }[]（evidence は §21 に写すときと同じ文。6.3 末尾の copy_from）
 // risks: { id; statement; probability; impact; mitigation }[]（16 の順）
@@ -1416,6 +1423,7 @@ interface PlanItem {
   itemNo: number; title: string; guidance: string | null; readOnly: boolean;   // 版の表示中・アーカイブ・Viewer
   prompts: TemplateQuestion[];
   answers: PlanAnswer[];                        // 回答を持つ小項目（文章・選択・表）ごとに1つ。未回答は lockVersion 0。版の表示中はスナップショットの値で、lockVersion 0・updatedAt と updatedBy と copiedFrom は null
+  conditionAnswers: ConditionAnswer[];          // 小項目の表示条件が名指す、ほかの項目の小項目の回答（5.7。名指された小項目ごとに1件、テンプレートの順。版の表示中はスナップショットの回答）。21 は項目の回答とこれで出し分けを決め、20 の P2 と同じに数える（design-spec 6.12「項目の状態」）
   metrics: KeyMetrics;                          // linked_metric の小項目が使う主要指標（scenario:* を除くキーだけ。版の表示中はスナップショットの値）。検証に無い費用行の cost_row:*（主要指標が持たないキー）は入れない（21 は「Not in validation」と出す。design-spec 6.4）
   costRowNames: Record<string, string | null>;  // linked_metric の小項目の cost_row:* の費用行の名前（キーはテンプレートのキー）。検証の行の名前（版の表示中も今の検証から。references と同じ）、検証に無ければ references の cost_rows と同じく、そのキーを持つ最新の公開済みの検証のテンプレートの初期行の名前。どちらも無ければ null
   scenarios: ScenarioColumn[];                  // `scenario:*` の小項目が使うシナリオ表の列（metrics は1つの値だけを持つため。同上）
@@ -1587,7 +1595,7 @@ interface RevertedItem {   // H2 の後の項目
 - 履歴の扱い: 取り消しは `withHistory` を通して書く（ADR-020 の例外を作らない）。書く先は元の側の画面で、複製はコピー元のアイデア、下書き作成はそのプランのアイデア（どちらも `containerType = idea`）。対象は作ったアイデア（`idea`）かプラン（`business_plan`）、`action` は `delete`、`source` は `revert`、`revertedFromId` は取り消した操作の作成の行。この行は `batchId` を持たず（H3 で戻せる操作ではない）、H2 でも戻せない（`revertible: false`）。その操作の `batchId` の行はそのまま残る。同じ `batchId` をもう一度呼ぶと `409 ALREADY_REVERTED`。
 - 応答: `reverted` は取り消した操作の履歴の行の数（行は消さない）、`batchId` は取り消した操作の `batchId`。
 - 実行: 1つのトランザクションで、`batchId` の advisory lock、アイデアの行（プランの取り消しはそのプランの行も）の `FOR UPDATE NOWAIT`（複製の取り消しは、取り消しを書くコピー元のアイデアの行も `FOR NO KEY UPDATE NOWAIT` で取る）、条件の確認、論理削除と履歴の書き込みの順に行う。ロックを持ったまま別のロックを待たないので、進行中の書き込みがデッドロックの犠牲になることはない。ほかの書き込みがその行を持っていれば、取り消しはすぐに `409 BUSY`（文言は design-spec 6.0.5）を返す。取り消しの完了を待っていた書き込みは、`resolveScope` と書き込みの最後の確認（アーカイブの確認と同じ場所。7.1）で親の `deleted_at` を見て `404 NOT_FOUND` になり、足されたものは残らない。履歴を書いた元の側のアイデアの `last_activity_at` と、ワークスペースの最終更新を更新する（7.1「実装」）。
-- 権限: 戻す操作の `need` と同じ（Owner / Member。アーカイブ済みのアイデアの中身は `409 ARCHIVED`）。作ったアイデア自身がアーカイブ済みなら取り消せない。
+- 権限: 戻す操作の `need` と同じ（Owner / Member。アーカイブ済みのアイデアの中身は `409 ARCHIVED`）。作ったアイデア自身がアーカイブ済みなら取り消せない。下書きの取り消しは、そのアイデアか下書きのプランのどちらかがアーカイブ済みなら `409 ARCHIVED` を返す（どちらがアーカイブ済みかは返さないので、画面はアイデアを読み直して見分ける。design-spec 6.0.5）。
 
 ### 5.12 テンプレートの移行（M8）
 
@@ -2427,7 +2435,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | リソース / 操作（API） | 未認証 | Viewer | Member | Owner | Admin（運営者） |
 |---|---|---|---|---|---|
 | ログイン・パスワード再設定・招待の内容・招待からの新規登録（A1〜A3・A6・A7・U4・U5） | ○ | ○ | ○ | ○ | ○ |
-| 死活確認（Z1）・local の写真の配信（U9）・API の仕様書（Z3。staging だけ） | ○ | ○ | ○ | ○ | ○ |
+| 死活確認（Z1）・local の写真の配信（U9）・API の仕様書（Z3。staging だけ）・Web のファイル（ADR-004。`WEB_DIST_DIR` があるときだけ） | ○ | ○ | ○ | ○ | ○ |
 | 自分のアカウント（U1〜U3・U7・U8・A4・A5・A8）・招待の受諾（U6。招待のメールと同じ人だけ） | × | 本人 | 本人 | 本人 | 本人 |
 | ワークスペースの作成（W0） | × | ○ | ○ | ○ | ○ |
 | ワークスペースの閲覧・メンバー一覧（W1 GET・W2） | × | ○ | ○ | ○ | 所属していれば、そのロールのとおり |
@@ -2442,7 +2450,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 自分の自己分析（S1〜S5、自己分析の X1〜X3・T1・T2・H1〜H3） | × | 本人 | 本人 | 本人 | 本人 |
 | コメントを読む・書く・スレッドの解決（C1・C3。自己分析へのコメントを除く） | × | ○ | ○ | ○ | 所属していれば |
 | 自己分析へのコメントとスレッドの解決（C1・C3） | × | × | ○（共有先のワークスペースで） | ○（同左） | 所属していれば |
-| コメントの編集・削除（C2） | × | 本人 | 本人 | 本人 | 本人 |
+| コメントの編集・削除（C2） | × | 本人 | 本人 | 本人 | 所属していれば、本人 |
 | 変更履歴の閲覧（H1。自己分析の履歴は本人だけ） | × | ○ | ○ | ○ | 所属していれば |
 | 変更履歴から戻す（H2・H3） | × | × | ○ | ○ | 所属していれば |
 | 通知（N1〜N3） | × | 本人 | 本人 | 本人 | 本人 |
@@ -2468,7 +2476,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 呼び出し元の IP | 入口のプラグインが、リクエストごとに1回だけ決める: `X-Forwarded-For` の右端の値。無ければ接続元のアドレス。決めた値は、回数制限（ADR-029）・Better Auth（`X-Moonx-Client-Ip` に付け直して読ませる。クライアントが同じ名前のヘッダーを送っても上書きする。決まらないときはヘッダーを消す。決まらないのは接続の無い呼び出し（テストの `app.handle`）だけ）・アクセスログの `clientIp`（8.3）・セッションの IP のすべてが使う。セッションの IP は、Better Auth が回数制限のキーと同じ形で持つ（IPv6 は先頭の /64 にまとめ、残りを 0 にする）。左側の値はクライアントが自由に書けるので使わない。Google は公式の説明（Cloud Run functions のリクエストのヘッダー）で「`X-Forwarded-For` は経路の IP の一覧で、最初の値はふつうクライアント」とだけ書き、クライアントが送った値に Cloud Run が足すのかは書いていない。右端の値は、Cloud Run が足す場合も置き換える場合も、Cloud Run が見た接続元になる。インフラを作るステップで、staging に偽の `X-Forwarded-For` を付けたリクエストを送り、ログの `clientIp` が偽の値でないことを確かめてから使う（04_deployment-procedure.md）。local と e2e は前段が無く、Vite の転送も値を足さない（`xfwd` を付けない）ので、送った `X-Forwarded-For` の右端の値がそのまま使われる。e2e はテストごとに値を変えて送り、別の IP として数えさせる（03_dev-setup.md） |
 | セッション | HttpOnly・Secure・SameSite=Lax の Cookie。パスワードの再設定・変更、停止、アカウントの削除でセッションを消す。ログアウトしたら、まだ保存できていない値（ADR-021）も捨てる |
 | アップロード | プロフィール写真だけ。種類はファイルの中身で確かめ（拡張子を信じない）、形式と大きさは design-spec 6.0.8。sharp で 512×512 の WebP に変換し、位置情報などのメタデータを落とす |
-| セキュリティヘッダー | API が、静的ファイルを含むすべての応答に付ける（ADR-004）: `Content-Security-Policy`（`default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' https://*.ingest.sentry.io; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy: camera=(), geolocation=(), microphone=(), payment=(), usb=()`（アプリが使わない機能を止める。写真はファイルの選択で受け取るので、カメラの API は使わない）、`Strict-Transport-Security: max-age=31536000; includeSubDomains`（staging・production だけ。local は HTTP なので付けない）。環境ごとの値は meta 要素で渡し、インラインのスクリプトを使わない（ADR-004） |
+| セキュリティヘッダー | API が、静的ファイルを含むすべての応答に付ける（ADR-004）: `Content-Security-Policy`（`default-src 'self'; script-src 'self'; img-src 'self' data: https://storage.googleapis.com; connect-src 'self' {WEB_SENTRY_DSN のオリジン}; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'`。`connect-src` の2つ目は Web の Sentry がイベントを送る先で、SDK は DSN のオリジンの `/api/<プロジェクト ID>/envelope/` に送る。`WEB_SENTRY_DSN` が空なら書かず、`'self'` だけにする。Sentry は組織の DSN のホストを地域ごとに分けて発行する（`o<number>.ingest.us.sentry.io`・`o<number>.ingest.de.sentry.io`）。CSP の `*.` はその後ろの文字列で終わるホストだけに合うので、`https://*.ingest.sentry.io` はこれらに合わない。`WEB_SENTRY_DSN` が http か https の URL でないとき、ホストに英数字・ハイフン・ドット以外の文字があるときは、ヘッダーの区切りを壊さないよう API は起動しない（2章「環境変数」））、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Permissions-Policy: camera=(), geolocation=(), microphone=(), payment=(), usb=()`（アプリが使わない機能を止める。写真はファイルの選択で受け取るので、カメラの API は使わない）、`Strict-Transport-Security: max-age=31536000; includeSubDomains`（staging・production だけ。local は HTTP なので付けない）。環境ごとの値は meta 要素で渡し、インラインのスクリプトを使わない（ADR-004） |
 | 個人情報 | 持つもの: メール・表示名・写真・タイムゾーン・セッションの IP と User-Agent・アクセスログの呼び出し元の IP（Cloud Logging。保持は30日。11章）・自己分析の回答（収入の希望額など、本人にとって機微な内容）・事業のアイデアと数字。通信は TLS、保存時の暗号化は Neon と Google Cloud の標準に任せ、列ごとの暗号化はしない（Google のログインのトークンは持たない。5.4「Google」。運営者も、ワークスペースに所属していなければアプリから中身を見られない。自分あての招待で所属できることは 7.1「運営者」。DB に入れるのは開発者1〜2人に限り、Neon・Google Cloud・Vercel（DNS）のアカウントは2段階認証を必須にする）。ログと Sentry には本文・回答・メールを出さない（`userId` だけ。Sentry は、利用者の情報・Cookie・ヘッダー・本文・クエリ・DB の値・スタックの変数をすべて集めない設定にする（設定の名前は使う版のドキュメントに合わせる）。さらにブレッドクラム（画面遷移の URL を記録する）はすべて捨て、イベントのリクエストのヘッダー・Cookie・クエリ文字列は消す。イベントに載る URL は、クエリ・フラグメント・招待のトークン（`/invite/<token>` のパス）を持たない）。アカウントの削除は U7。バックアップは30日で消える（ADR-028）ので、削除した情報は30日以内にバックアップからも消える |
 | 依存の脆弱性 | GitHub の Dependabot のアラートを有効にする。Better Auth・Elysia・Drizzle のセキュリティ修正は速やかに取り込む（05_operation-runbook.md） |
 
@@ -2481,10 +2489,10 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目の保存（V3・V14・V16 など） | p95 300ms 以内（コールドスタートを除く） | 1項目＋変更履歴の1トランザクション。クライアントは表示を先に変え（楽観的更新）、design-spec 6.0.2 の保存のタイミングで送る |
 | ハブの画面（V1・P2・D1） | p95 800ms 以内 | 検証1件分のデータを決まった数のクエリでまとめて読み（N+1 をしない）、`packages/domain` でメモリ上で計算する。アイデアの一覧は検証ごとのデータを `IN (...)` でまとめて読む。一覧はページに分ける（I1 は50件） |
 | 0台からの最初の応答 | 5秒以内（Cloud Run の起動＋Neon の起動） | Bun で起動を速くし、Cloud Run の起動時の CPU ブーストを有効にする。死活確認（Z1）は DB に触れない |
-| Web の最初の表示 | 4G のミドルクラスのスマホで LCP 2.5秒以内（Cloud Run が0台のときは、上の「0台からの最初の応答」の分を足す） | ランディングはプリレンダー。アプリはルートごとにコードを分割し、静的アセットはハッシュ付きのファイル名で長期キャッシュ（ADR-004）。2回目からは Service Worker のキャッシュから画面の外側を出す（ADR-031） |
+| Web の最初の表示 | 4G のミドルクラスのスマホで LCP 2.5秒以内（Cloud Run が0台のときは、上の「0台からの最初の応答」の分を足す） | ランディングはプリレンダー。アプリはルートごとにコードを分割する: 画面のルートのファイル（親のルートを除く）が `component` の外で読むのは、その画面の骨組み（design-spec 6.0.6。`screens/` の `*Skeleton.tsx`）と、検索パラメータの検査に使う軽いモジュールだけにする。画面のモジュール（`screens/` の `*Skeleton.tsx` 以外）を読むのはルートのファイルだけにする（画面どうしで共有するものは `components/`・`lib/` に置く）。ルートのファイル以外が画面のモジュールを読んだとき、画面のモジュールが入口のチャンクかそれが静的に読むチャンクに入ったときは、`build-web` が失敗する。殻の画面（`_shell.html`）が先に読むのは、入口のチャンクと、それが静的に読むチャンクと CSS だけにし、ルートのチャンクは開いたルートの分をそのときに読む（殻の画面は `/login` で作るので、`build-web` がそのルートの分を外す）。入口で読むままにするもの: Sentry（最初の描画の失敗も送るため、描画の前に始める。11章「Web のエラー」）、i18n のカタログ（9章「カタログ」）、CSS（1つのファイルで、JS より先に届く。Brotli で圧縮した大きさの約半分は日本語の書体の字の範囲ごとの `@font-face` で、ADR-018 の読み込み方に要る。部品の CSS と JS を部品ごとに分けても、殻の画面が読む骨組み・枠・状態の表示の部品で大半が残り、ファイルの数が増えて手元の見積もりは遅くなった。手元の見積もりはリクエストごとに遅延がかかり HTTP/1.1 で返すので、ファイルの数が増えると本物の回線より遅く出る）。テキストのファイルは圧縮して返し、静的アセットはハッシュ付きのファイル名で長期キャッシュする（ADR-004）。2回目からは Service Worker のキャッシュから画面の外側を出す（ADR-031）。手元の見積もりは `make first-paint`（10章） |
 | PDF の作成（P13） | 5秒以内（14枚） | react-pdf をサーバーで実行。フォントは起動時に読み込んでおく |
 | DB の接続 | Neon のプールの上限を超えない | postgres.js のプールはインスタンスごとに最大5。Cloud Run は最大3台なので最大15接続 |
-| クライアントのデータ | 画面の移動を速くする | TanStack Query。一覧は `staleTime` 30秒、編集中の画面は保存の応答で該当のキャッシュだけを更新する。通知の未読数は60秒ごと |
+| クライアントのデータ | 画面の移動を速くする | TanStack Query。一覧（5・6・7・8・12 の一覧、13 のアーカイブ済みのプラン、26・28）は `staleTime` 30秒（読んでから30秒のうちは、画面に戻ってもウィンドウに戻っても取り直さない）。このページから API への GET 以外のリクエストが通ったら（保存を含む）、読んでいる途中の一覧の読み込みを捨て、すべての一覧を古いものにし、画面にある一覧はすぐ取り直す（自分の変更は次に見る一覧に出る）。ほかの人の変更は、自分の変更の後か、読んでから30秒を過ぎて画面かウィンドウに戻ったときに出る。編集中の画面（9 のメンバーと招待、14・15・16・17・22 のような、並べたものをその場で直す画面を含む）は保存の応答で該当のキャッシュだけを更新する。通知の未読数は60秒ごと |
 
 インデックスは 6.3 のスキーマに書いたもの。遅いクエリが見つかったら、Cloud Logging の `latencyMs` とクエリの実行計画で確かめてから足す。
 
@@ -2545,14 +2553,28 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | バリデーションエラー（422 `VALIDATION_FAILED` など） | 入力欄の下に理由を出し、保存しない（design-spec 6.0.6「入力値が範囲外」）。クライアントの Zod の検査で送る前に止めるのが基本で、API の 422 は最後の守り |
 | 業務の決まり（409・422 の個別のコード） | コードごとに design-spec の各画面の「状態」の文言を出す。対応はカタログのキー `errors:<CODE>`（9章）。`TEMPLATE_NOT_PUBLISHED` は design-spec 6.0.6 の文言を出す。画面が送る前に防いでいて、ふつうは返らないコードが返ったら、想定外のエラー（下）として出す |
 | 同時編集の衝突（409 `CONFLICT` / `CONFLICT_MULTI`） | design-spec 6.0.2 の確認 |
-| 通信・サーバーエラー（ネットワーク断・5xx・`UPSTREAM_UNAVAILABLE`） | 保存: design-spec 6.0.2 の保存エラー（ページを開いている間、まだ保存できていない値を自動で再送する。オフラインなら入力を止める。ADR-021）。読み込み: design-spec 6.0.6「読み込みエラー」（ブロックごと） |
+| 通信・サーバーエラー（ネットワーク断・5xx・`UPSTREAM_UNAVAILABLE`） | 保存: design-spec 6.0.2 の保存エラー（ページを開いている間、まだ保存できていない値を自動で再送する。オフラインなら入力を止める。ADR-021）。読み込み: design-spec 6.0.6「読み込みエラー」（ブロックごと）。何かを保存するフォーム・モーダル・パネル・トーストの送信: design-spec 6.0.6 の決まりと各画面の文と Retry（保存しない送信は下の「一時的な失敗」）。500 `INTERNAL` など `UPSTREAM_UNAVAILABLE` でない 5xx は、自動保存だけがこの行で、読み込みと送信では下の「想定外のエラー」の行にする（下の「一時的な失敗」） |
 | 認証エラー（401） | まだ保存できていない値があれば、design-spec M9 を開く。M9 は今のアカウントのメールで Better Auth のメールのログインを呼び、成功したらキャッシュを残したまま保存できていない値を送る（ADR-021）。値が無いとき、M9 から 2 へ移るとき、Google でログインするときは、クライアントのクエリのキャッシュと保存できていない値をすべて捨ててから `/login?next=<今のパス>` へ移る（アカウントの停止で移るときは `&error=ACCOUNT_SUSPENDED` を付ける）（design-spec 5章「認証」。ログイン・新規登録・パスワードの再設定でも同じく捨てる。次に入るのが別の人でも、前の人のデータが残らない） |
 | 認可エラー（403 `FORBIDDEN` / `NO_ACCESS`） | design-spec 6.0.6「権限がない」。編集の途中で権限が変わったときは、読み取りの表示に切り替える |
 | 見つからない（404） | design-spec 6.0.6「見つからない」 |
 | アーカイブ（409 `ARCHIVED`） | design-spec 6.1「アーカイブ済み」の表示に切り替える |
 | 回数制限（429） | design-spec 6.0.6「回数の上限」。待ち時間は応答の `retryAfterSeconds`（Better Auth のパスは `X-Retry-After`）から `packages/i18n` の書式で出す（上限の時間の幅は 7.2 で操作ごとに違うため）。どちらも無い 429 は、待ち時間の無い文言を出す |
 | モーダル・パネルの中の失敗（描画エラー、想定外のエラー） | 枠・ナビ・背後の画面は残し、モーダルやパネルの代わりに小さなダイアログ「Something went wrong」を出す。`Ref`（下の行と同じ番号）、Retry（描画をやり直す）、Close（閉じる）を持つ（design-spec 6.0.6）。モーダルとパネルのそれぞれにエラーの境界を置き、開くものが変わったら境界も作り直す |
-| 想定外のエラー（500 など） | design-spec 6.0.6「想定外のエラー」。`Ref` には `requestId` の先頭8文字を出す。画面の描画が失敗したとき（API の応答が無いとき）は `requestId` が無いので、Sentry のイベント ID の先頭8文字を出す。画面のブロックごとにエラーの境界（Error Boundary）を置き、1つの失敗で全体を壊さない。Sentry に送る |
+| 想定外のエラー（500 など） | design-spec 6.0.6「想定外のエラー」。`Ref` には `requestId` の先頭8文字を出す。API の答えが無い Web 自身の失敗（画面の描画の失敗など）は `requestId` が無いので、Sentry のイベント ID の先頭8文字を出す。画面のブロックごとにエラーの境界（Error Boundary）を置き、1つの失敗で全体を壊さない。Sentry に送る（API の 4xx は Web が `requestId` をタグにして送り、5xx は API が送るので Web は送らない。8.3・11章） |
+
+**一時的な失敗:** 応答の無い通信の失敗と `UPSTREAM_UNAVAILABLE`（Cloud Run の前段の 502・503・504 を含む）を「一時的な失敗」と呼ぶ。読み込みはこれだけを自動で読み直し、何かを保存する送信（フォーム・モーダル・パネル・トースト）はこれを design-spec 6.0.6 の一時的な失敗の文と Retry で出す（Web の `isTransient`）。保存しない送信（2 のログイン・新規登録・パスワードの再設定の依頼と設定・Continue with Google の開始、4 の Log in again）の文は design-spec 6.16 の 2・4 が持つ。500 `INTERNAL` と、ほかの `UPSTREAM_UNAVAILABLE` でない 5xx は、送り方で行を分ける:
+
+- 自動保存: 一時的な失敗と同じく自動で再送する（ADR-021。回数の上限（429）も待ち時間の後に再送する）。項目の横とヘッダーに「Couldn't save」と Retry を出す
+- 読み込み: 想定外のエラー（`Ref` と Retry）。自動では読み直さない
+- フォーム・モーダル・パネル・トーストの送信: 想定外のエラー（`Ref` と Retry。モーダル・パネルの中では小さなダイアログ）。自動では送り直さない
+
+401 はどの送り方でも文言を出さない（上の「認証エラー」の行のとおり M9 かログインの画面へ移る）。
+
+**`errors:` に文言を持たないコード:** 8.1 のコードは、次の3つの組を除いて、すべてカタログの `errors:<CODE>` に文言を持つ（design-spec が画面ごとに違う文を持つコードは、i18next の context で `errors:<CODE>_<context>` に分ける）。`packages/i18n` のテストが `packages/schemas` の `errorCodeSchema` とこの3つの組を突き合わせる。
+
+- 表のほかの行で出すコード: `VALIDATION_FAILED`・`OUT_OF_RANGE`（バリデーションエラー。文言は 9章の `errors:input.<…>`）、`CONFLICT`・`CONFLICT_MULTI`（同時編集の衝突）、`UNAUTHENTICATED`（認証エラー）、`FORBIDDEN`・`NO_ACCESS`・`NOT_SHARED`（認可エラー。`NOT_SHARED` は design-spec 6.11 のとおり「権限がない」）、`NOT_FOUND`（見つからない）、`ARCHIVED`（アーカイブ）、`BAD_REQUEST`・`INTERNAL`・`UPSTREAM_UNAVAILABLE`（通信・サーバーエラーと想定外のエラー）。その行の文言を出すので、`errors:` には置かなくてよい。design-spec が画面に別の文を持たせるときだけ、その文を context で置く
+- 文言を出さずに画面を変えるコード: `EMAIL_TAKEN`（2 の新規登録がログインへ移る）・`PASSWORD_ALREADY_SET`（4 が Change password の形に変わる）。design-spec 6.16 のとおり文言を持たないので、`errors:` にも置かない
+- 画面が送る前に防いでいて、ふつうは返らないので想定外のエラーとして出すコード: `CANNOT_LEAVE_PERSONAL`（自分の個人用ワークスペースには Leave を出さない）・`FACT_REQUIRES_EVIDENCE`（Fact は M2 で根拠を付けて選ぶ）・`CONFIDENCE_REQUIRED`（確信度を選ぶまで Assumption を送らない）・`INVALID_CHOICE`・`INVALID_STATUS`・`INVALID_ASSIGNEE`・`PERCENT_ONLY_FOR_VARIABLE`（画面が出す選択肢・状態・担当・行の種類から選ぶ）・`NOT_EDITABLE`（編集できない項目に入力欄を出さない）・`REPLY_DEPTH`（Reply はスレッドの最初のコメントの下だけ）・`INVALID_QUESTION_KEY`（27 の設問 ID は入力の規則で確かめる）。`errors:` に置かない
 
 ### 8.3 ログとの対応
 
@@ -2560,7 +2582,7 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 - **アクセスログ**: 1リクエストに1行（`message: "request"`）。項目は ADR-023 のとおりで、`clientIp` は入口のプラグインが決めた呼び出し元の IP（7.2「呼び出し元の IP」）、`client` は 5.1「クライアントの種類」の値。
 - **レベル**: 4xx は `info`、5xx は `error`。ただし同じ IP からの 401・403 が1分に10回を超えたら、その後の 401・403 のアクセスログの行は `warn` にする（その応答を含めて直近の1分の数で決める。IP は 7.2「レート制限」と同じくまとめる。Cloud Run のインスタンスごとに数える。ログの水準を決めるだけなので、インスタンス間で数は合わせない）。5xx は、アクセスログの行（`message: "request"`）とは別に、`message: "request failed"` の行を `requestId`・`errorCode`・`errorName`・`errorMessage`・`stack` 付きで書く。DB のエラーは `pgCode` と `constraint` だけを出し、SQL とパラメーターは出さない（利用者の入力が入るため）。Sentry に送るのは 5xx とクライアントの想定外のエラーだけ。Better Auth が自分で 5xx を返したとき（Better Auth の 5xx の `APIError`）も、入口のプラグインが `INTERNAL` として同じく扱い、その `APIError` を原因として失敗のログと Sentry に入れる。Better Auth の中で投げられた、Better Auth の応答でないエラーも同じく 500 `INTERNAL` になる。Better Auth が転送の応答に変えて返す失敗（Google の新規登録の後の処理の失敗は `/login?error=unable_to_create_user` への転送になる）は 5xx でないので Sentry に送らず、下の「Better Auth のログ」の行に `error` で残る。
 - **Better Auth のログ**: Better Auth の `logger` を API のロガーに通し、1行1つの JSON で `requestId` を付け、`message` を `better-auth: ` で始める。引数のエラーは `request failed` の行と同じ項目だけを出し、ほかの引数は出さない（利用者の値やメールが入りうるため）。
-- **探し方**: 利用者の画面の `Ref` → Cloud Logging で `jsonPayload.requestId` を検索 → 同じ ID の Sentry のイベント。手順は 05_operation-runbook.md。
+- **探し方**: 利用者の画面の `Ref` → Cloud Logging で `jsonPayload.requestId` を検索 → 同じ ID の Sentry のイベント。API の答えが無い Web 自身の失敗（描画の失敗など）の `Ref` は `moonx-web` の Sentry のイベント ID の先頭で（8.2「想定外のエラー」）、Cloud Logging には無いので、Sentry の `moonx-web` で探す。手順は 05_operation-runbook.md。
 
 ---
 
@@ -2571,10 +2593,10 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 項目 | 決定 |
 |---|---|
 | ライブラリ | i18next ＋ react-i18next（Web）。API も同じカタログを使う（通知の文・PDF の見出し・AI 書き出しの見出し・メール）。Web の画面と `packages/ui-web` の部品は文言を `useTranslation` で引き、アプリのルートが `I18nextProvider` で `packages/i18n` の共有のインスタンスを渡す（言語が変わると描き直す）。書式関数は同じインスタンスを直接使う |
-| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.addEvidence`）。どの画面でも同じ、列挙の値（5.2）の表示名は `common` に置き、キーは `<まとまり>.<値>`（例: `common:stage.launch_prep`・`common:checkState.not_started`・`common:decision.proceed`）。キーの語は camelCase にし、API の値（列挙の値・`error.code`・セクションのキー）はそのまま使う（例: `common:check.competitorsRange`・`errors:VALIDATION_FAILED`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける） |
-| エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く |
+| カタログ | `packages/i18n/locales/en/*.json`。ファイル名がネームスペースで、画面と部品のまとまりごとに分ける（例: `validation`・`errors`・`mail`）。キーは画面と部品ごと（例: `validation:home.nextSteps.add_evidence`）。どの画面でも同じ、列挙の値（5.2）の表示名は `common` に置き、キーは `<まとまり>.<値>`（例: `common:stage.launch_prep`・`common:checkState.not_started`・`common:decision.proceed`）。キーの語は camelCase にし、API の値（列挙の値・`error.code`・セクションのキー）はそのまま使う（例: `common:check.competitorsRange`・`errors:VALIDATION_FAILED`）。複数形は i18next の複数形の規則。UI の文言はすべてカタログに置き、コードに直接書かない（JSX の中の生の文字列は lint で見つける）。Web も、すべてのネームスペースを入れた共有のインスタンスを同期で使い、画面ごとに後から読まない（書式関数と、ルートの `head` のような描画の外の `i18n.t()` が、待たずに引けるように） |
+| エラーの文言 | API の `error.code`（8.1）からカタログのキー `errors:<CODE>` を引く（文言を持たないコードは 8.2「`errors:` に文言を持たないコード」） |
 | 入力の検査の文言 | クライアントの Zod の検査（8.2）の issue の `code` から選ぶ。`too_small`・`too_big` は `origin`（文字数か数か）と `minimum`・`maximum`、`invalid_format` は `format`（`email`・`url`・`date`・`datetime`、テンプレートのファイルの `question_key`・`copy_source` など）、`invalid_type` は `expected`（`int` は整数でない数。ほかは型の違い）、`invalid_value` は選択肢に無い値、`packages/schemas` の自前の検査（`custom`）は `params.rule`（`InputRule` の型: `required`・`decimals`・`positive`・`nul_character`・`number_format`・`currency`・`time_zone`・`lone_surrogate`・`unique`（テンプレートのファイルで、キーや選択肢が重なる））を見て、カタログの文言を出す（キーは `errors:input.<…>`）。26 のファイルの取り込み（AD10）は、`path` が `kind` の issue を「テンプレートの種類が違う」、それ以外の issue を「書式が読めない」としてまとめ、`path` で場所を添える（design-spec 6.17）。issue の `message` は開発者向けで、画面に出さない |
-| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatUnits()`・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatNumberText()`（NumberField に打った文字列の桁区切りを付け直す。小数の桁は打ったまま）・`formatNumberAffixes()`（NumberField が数字の横に出す通貨記号・%）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatIsoDateTime()`（AI 書き出しの時刻。タイムゾーンのオフセット付き）・`formatRelativeTime()`・`formatOverdue()`（期限切れの日数）・`formatWaitTime()`（回数制限の待ち時間）・`formatCheckName()`（確認項目の名前。競合の基準値の幅を付ける）・`formatProgress()`（ProgressCircle・ProgressBar の読み上げ。整数の %）・`formatCalendarMonth()`・`formatWeekdayInitial()`・`formatDayOfMonth()`（DatePicker のカレンダーの見出し・曜日・日）・`formatCurrencyOption()`（通貨の Picker の選択肢。「PHP · Philippine Peso」）・`formatList()`（名前を「, 」でつなぐ一覧。5 の不足の確認項目）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。部品の中で React Aria が書式を作る所も、部品から渡せるものはこれを渡す。例外は DatePicker の入力欄（design-spec 1.2）と、React Aria が作り部品から渡す口の無い読み上げ（「React Aria の文言」の行）で、React Aria が en-PH の形で出す。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
+| 書式 | 書式と端数の規則の正は design-spec 1.2（ロケールと日付）と 6.4（端数・下限と上限の記号）。`packages/i18n` の書式関数（`formatMoney(amount, currency)`・`formatInputMoney()`（打った金額。丸めない）・`formatUnits()`・`formatInteger()`（件数。千の位で区切る。カタログの文言に入れる件数は `{{count, integer}}` と書き、`createI18n` が足す同じ書式の `integer` を通す）・`formatCount()`（バッジの件数。99 を超えたら「99+」）・`formatMonths()`・`formatPercent()`（計算した率）・`formatInputPercent()`・`formatInputNumber()`（入力どおりに出す値）・`formatNumberText()`（NumberField に打った文字列の桁区切りを付け直す。小数の桁は打ったまま）・`formatNumberAffixes()`（NumberField が数字の横に出す通貨記号・%）・`formatDate()`・`formatTime()`・`formatIsoDate()`・`formatIsoDateTime()`（AI 書き出しの時刻。タイムゾーンのオフセット付き）・`formatRelativeTime()`・`formatOverdue()`（期限切れの日数）・`formatWaitTime()`（回数制限の待ち時間）・`formatCheckName()`（確認項目の名前。競合の基準値の幅を付ける）・`formatProgress()`（ProgressCircle・ProgressBar の読み上げ。整数の %）・`formatCalendarMonth()`・`formatWeekdayInitial()`・`formatDayOfMonth()`（DatePicker のカレンダーの見出し・曜日・日）・`formatCurrencyOption()`（通貨の Picker の選択肢。「PHP · Philippine Peso」）・`formatList()`（名前を「, 」でつなぐ一覧。5 の不足の確認項目）に集め、画面・PDF・AI 書き出しのすべてがこれを使う。部品の中で React Aria が書式を作る所も、部品から渡せるものはこれを渡す。例外は DatePicker の入力欄（design-spec 1.2）と、React Aria が作り部品から渡す口の無い読み上げ（「React Aria の文言」の行）で、React Aria が en-PH の形で出す。相対時刻を使う範囲、年を省く条件、負の金額の形は design-spec 1.2 |
 | タイムゾーン | 表示は `users.timezone`（既定は登録時に端末から取ったもの）。DB は UTC。期限は日付だけで持つ |
 | 実行環境 | `Intl.NumberFormat` / `Intl.DateTimeFormat` を使う（ブラウザと Bun） |
 | 文字の表示 | 日本語・タガログ語・Hiligaynon の混在を表示できるフォント（06_design-tokens.json の代替フォント。PDF にも埋め込む。ADR-012） |
@@ -2595,9 +2617,10 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | DB のスキーマとマイグレーション（`packages/db`・`scripts/db-check.ts`） | Bun test ＋ 実際の PostgreSQL（`db-check` は一時的な Git のリポジトリ） | — | 6.3 のコードと `schema.ts` がコメントと整形を除いて同じこと、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB の列・制約・インデックス・列挙が `schema.ts` から作った一時的なテーブルと PostgreSQL の表記で一致すること、`relations()` が外部キーと1対1に対応し、名前が `relations.ts` の先頭に書いた規則に従うこと、テスト用の DB の作り直しが `_test` で終わらない名前とクエリ文字列を拒むこと、`db-check` が2章の失敗の場合をすべて捕まえること |
 | API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること（同じ人が続けて手で直した変更は1件にまとまり、更新の行はすべての欄が元に戻ると消え、追加の行は空に戻っても残ること。ADR-020）、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012）、P12 の数字の列の組み方（`figureColumns`）が PDF の数字の列の位置と同じであること（ADR-012）、上限の件数の素材で Pitch Deck のどのスライドも本文の下端で切れないこと（英語の文と日本語の文、1分版と5分版、計算した指標が 6.14 の大きな表示でも計算できない主要指標の理由の文でも。PDF と同じフォントで測る。design-spec 6.14）、6.14 の範囲の金額と計算した指標で数字が折り返さないことと、範囲の外で 6.14 のとおりに折り返し、折り返しただけでは注意を出さないこと、6.14 が本文に収まるとする金額の外で5分版の Economics が本文の下端で切れて注意を出すこと、公開の前の検査（AD6 の `pitch_deck_overflow`）が、§20 に文章の小項目を足した版と小項目のタイトルを長くした版を、英語の文で溢れる場合も日本語の文だけで溢れる場合も断り、BCDX のプランのテンプレートとシードを通すこと |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作（axe の検査は E2E で行う。ADR-022） |
-| Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上 | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |
-| E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査。部品の確認用ページ（`/dev/components`）を3つの幅・ライトとダーク・2つのスケールで開き、design-spec 4.5 の部品が描かれ、横にスクロールせず、自前の書体（woff2）が読まれ、axe の検査が通ること。Popover とトレイが幅で切り替わること。happy-dom では確かめられない部品のキーボード操作（`packages/ui-web/README.md`） |
-| PWA と配信（`apps/web`・`apps/api`） | Playwright（Chromium。`make build-web` の結果を `WEB_DIST_DIR` で渡した API に対して。2章「環境変数」）と Bun test（API の静的ファイルの配信） | — | マニフェストの中身（ADR-031）、Service Worker が `/api/*` をキャッシュしないこと、新しい版の再読み込みの表示、iPhone の追加の案内が iPhone の Safari のときだけ出ること（User-Agent を変えて確かめる）、CDP の `Page.getInstallabilityErrors` が空であること。API が返すもの: 画面のパスに `_shell.html`、見つからないファイルに 404、ADR-004 と ADR-031 の Content-Type とキャッシュの見出し、7.2 のセキュリティヘッダー、HTML の meta 要素の値、`X-Forwarded-For` の左側を偽っても回数制限を逃れられないこと |
+| Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上（`apps/web/src` のどのファイルも行 60% 以上。テストの補助・生成したルートの木と、happy-dom で動かせない入口の `client.tsx` と Service Worker の `sw.ts` を除く。この2つは E2E で確かめる。`make coverage`） | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |
+| E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査（主要な画面は design-spec 3章の全画面と 3.8 のモーダル・シート・パネルとし、どれもアプリの画面で少なくとも1回確かめる。規則は WCAG 2.2 の A と AA を使う（axe のタグ `wcag2a`・`wcag2aa`・`wcag21a`・`wcag21aa`・`wcag22aa`）。ライトとダークの両方は、次の部品の確認用ページで確かめる）。部品の確認用ページ（`/dev/components`）を3つの幅・ライトとダーク・2つのスケールで開き、design-spec 4.5 の部品が描かれ、横にスクロールせず、自前の書体（woff2）が読まれ、axe の検査が通ること。Popover とトレイが幅で切り替わること。happy-dom では確かめられない部品のキーボード操作（`packages/ui-web/README.md`） |
+| PWA と配信（`apps/web`・`apps/api`） | Playwright（Chromium。`make build-web` の結果を `WEB_DIST_DIR` で渡した API に対して。2章「環境変数」）と Bun test（API の静的ファイルの配信） | — | マニフェストの中身（ADR-031）、Service Worker が `/api/*` をキャッシュしないこと、新しい版の再読み込みの表示、iPhone の追加の案内が iPhone の Safari のときだけ出ること（User-Agent を変えて確かめる）、CDP の `Page.getInstallabilityErrors` が空であること。`client.tsx` の Sentry（偽の `WEB_SENTRY_DSN`（2章「環境変数」）に送るイベントを Playwright の `page.route` で受け、最初の画面が頼る API の答えを読めない形にして描画を失敗させる）: イベントが CSP の `connect-src` を通って届くこと、`environment` と `release`、URL がクエリ・フラグメント・招待のトークンを持たないこと、画面の `Ref` がイベント ID の先頭8文字で、1つの失敗で送るイベントはその1つだけであること、ログインしている間のイベント（ページの最初の描画での失敗を含む）の user が本人の id だけで、同じページでログアウトした後のイベントは user を持たないこと。API が返すもの: 画面のパスに `_shell.html`、見つからないファイルに 404、ADR-004 と ADR-031 の Content-Type とキャッシュの見出し、テキストの圧縮（`Accept-Encoding` による Brotli と gzip の選び方・`Vary`・画像とフォントはそのまま）、7.2 のセキュリティヘッダー、HTML の meta 要素の値、`X-Forwarded-For` の左側を偽っても回数制限を逃れられないこと |
+| Web の最初の表示（7.3） | Playwright（Chromium。`make first-paint`。PWA と配信の行と同じく、`make build-web` の結果を返す API に対して） | — | ランディング（1）・殻の画面（2 Log in）・シードの BCDX の 5 ダッシュボードを、何もキャッシュしていない初回に、スマホの画面（Playwright の Pixel 7）で、Chromium の通信の制限に WebPageTest の 4G の値（上り下りとも 9 Mbps、遅延 170 ms）を入れ、CPU を4倍遅くして開き、3回の LCP の中央値が 2.5秒以内であること（各回で、ページの応答が遅延の分だけ遅れたことも確かめる）。手元の見積もりで、7.3 の目標（本物のスマホと 4G の回線での値）そのものではない: 遅延はリクエストごとに1回かかり、接続の確立（TCP・TLS）と slow start の往復は入らず、手元の API は TLS の無い HTTP/1.1 で返す。Service Worker は止める（Playwright の `serviceWorkers: "block"`）: Chromium の制限は Service Worker に効かないので、止めないと `load` の後すぐにビルドをキャッシュして画面を受け持ち、そのあとに読むルートのチャンクを制限なしで返してしまう（本物の初回では、事前のキャッシュも同じ回線で読むので、最初の画面には間に合わない）。そのため、事前のキャッシュが最初の画面と回線を取り合う分は見積もりに入らない。CPU が手元の機械の速さに比例するので、CI は動かさない。ルートごとの分割（7.3）は `make build-web` が毎回検査する |
 | デザイントークン | Bun test（`make test-domain`）と `make tokens` の検査 | — | エイリアスの参照先が実在すること・循環しないこと・`semantic` がエイリアスだけであること、意味色のコントラスト（WCAG AA。検査の対象に無い色の組が増えたら失敗）、生成物が 06 と一致すること、Web のテーマが vanilla-extract でコンパイルできること、`packages/ui-tokens/src/types.ts` の値が 06 と合っていること |
 
 CI（GitHub Actions）が PR ごとに動かすターゲットは 04_deployment-procedure.md 2章（`ci.yml`）が正。`main` への取り込みは、すべて通ったときだけ。
@@ -2611,7 +2634,7 @@ Cloud Monitoring のアラート（死活・エラー率・レイテンシ・メ
 | 項目 | ツール | 設定 |
 |---|---|---|
 | API のエラー | Sentry（プロジェクト `moonx-api`） | `environment` = staging / production、`release` = コミット SHA、タグに `requestId`・`route`。ユーザーは `userId` だけ。新しい issue でメール通知。ソースマップは `make build-api-image` が上げる（2章「make ターゲット」） |
-| Web のエラー | Sentry（プロジェクト `moonx-web`） | `environment` と DSN は API が HTML の meta 要素で渡す（ADR-004）。`release` = コミット SHA（`build-web` が入れる）。ソースマップは `make build-api-image` が上げる（2章「make ターゲット」） |
+| Web のエラー | Sentry（プロジェクト `moonx-web`） | `environment` と DSN は API が HTML の meta 要素で渡す（ADR-004）。`release` = コミット SHA（`build-web` が入れる）。送るのは Web 自身の失敗と、画面が想定外として出した API の 4xx（8.2）と、画面に出さない送信（U2 で最後に開いたワークスペースを記録する送信。所属が外れた後の 422 と 429 を除く）のふつうは返らない 4xx で、4xx はタグに `requestId` を入れる（画面の `Ref` と同じ値で、API のログと Sentry の `moonx-api` の検索に使う）。ユーザーはログインしている間の `userId` だけ。ソースマップは `make build-api-image` が上げ、配る静的ファイル（イメージ）には入れない（ソースを公開しないため）。Sentry は最初の描画の前に始め、最初の描画の失敗も送る |
 | API のログ | Cloud Logging | 標準出力に1行1つの JSON（`severity`・`message`・`requestId`・`userId`・`route`・`status`・`latencyMs`・`client`・`clientIp`。8.3）。保持は既定の30日 |
 | 死活 | Cloud Monitoring の稼働時間チェック | `https://{DOMAIN}/api/health`（Z1。DB に触れない）を5分ごと、3つの地域から。2つ以上の地域で失敗が5分続いたらメール。最初の構築では、証明書ができるまで作らない（03 5.4 I・J） |
 | エラー率 | Cloud Monitoring（ログベースの指標） | 5xx が10分間で全体の1%を超える、または5分で5件を超えたらメール |

@@ -1,5 +1,4 @@
 import { readFile } from "node:fs/promises";
-import AxeBuilder from "@axe-core/playwright";
 import type { IdeaDetail, Me, ValidationHome } from "@moonx/schemas";
 import type { Page } from "@playwright/test";
 import { WEB_ORIGIN } from "./env";
@@ -7,6 +6,7 @@ import {
   test as base,
   demo,
   expect,
+  expectNoAxeViolations,
   newAccount,
   workspaceOf,
 } from "./fixtures";
@@ -37,33 +37,6 @@ const phone = {
   hasTouch: true,
   isMobile: true,
 };
-
-async function expectNoAxeViolations(page: Page) {
-  await expect(
-    page.locator("[data-live-announcer] [aria-labelledby]"),
-  ).toHaveCount(0, { timeout: 10_000 });
-  // Overlays fading and colours changing on a press or a hover read as low contrast
-  // to axe: the page is checked once they have settled (as validation.spec.ts does).
-  await expect(page.locator("[data-entering], [data-exiting]")).toHaveCount(0);
-  await page.waitForFunction(() =>
-    document
-      .getAnimations()
-      .every(
-        (animation) =>
-          !(animation instanceof CSSTransition) ||
-          animation.playState !== "running",
-      ),
-  );
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(
-    violations.map((violation) => ({
-      id: violation.id,
-      targets: violation.nodes.map((node) => node.target.join(" ")),
-    })),
-  ).toEqual([]);
-}
 
 /** The worker's account signed in, with a new idea whose WHO is answered. */
 async function ideaWithAnswer(

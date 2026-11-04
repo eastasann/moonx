@@ -6,8 +6,10 @@ import {
   formatCurrencyOption,
   formatDate,
   formatDayOfMonth,
+  formatInputMoney,
   formatInputNumber,
   formatInputPercent,
+  formatInteger,
   formatIsoDate,
   formatIsoDateTime,
   formatList,
@@ -160,6 +162,24 @@ describe("counts, rates and months (design-spec 6.4 端数)", () => {
     expect(formatMonths(9.1671, { bound: "lower", withUnit: false })).toBe(
       "9.2+",
     );
+  });
+
+  test("formatInputMoney shows a typed amount unrounded (6.4「端数」)", () => {
+    expect(formatInputMoney(150, "PHP")).toBe("₱150");
+    expect(formatInputMoney(149.5, "PHP")).toBe("₱149.50");
+    expect(formatInputMoney(77.25, "PHP")).toBe("₱77.25");
+    expect(formatInputMoney(1500, "PHP")).toBe("₱1,500");
+    expect(formatInputMoney(150 * 0.1, "PHP")).toBe("₱15");
+    expect(formatInputMoney(149.5 * 0.35, "PHP")).toBe("₱52.33");
+    // 1.005 is 1.00499… in binary: read at the digits Intl prints, it has cents.
+    expect(formatInputMoney(2.01 * 0.5, "PHP")).toBe("₱1.01");
+    expect(formatInputMoney(-77.25, "PHP")).toBe("−₱77.25");
+  });
+
+  test("formatInteger groups the thousands of a count", () => {
+    expect(formatInteger(7)).toBe("7");
+    expect(formatInteger(1234)).toBe("1,234");
+    expect(formatInteger(1_000_000)).toBe("1,000,000");
   });
 
   test("badge counts stop at 99+", () => {

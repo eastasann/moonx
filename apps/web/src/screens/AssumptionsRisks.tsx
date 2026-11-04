@@ -23,7 +23,6 @@ import {
   ListView,
   ListViewItem,
   MenuItem,
-  Skeleton,
   Stack,
   Text,
   useIsNarrow,
@@ -58,13 +57,19 @@ import {
 } from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { ItemHistoryButton } from "../components/HistoryPanel";
-import { toastFailure } from "../components/ideaActions";
+import {
+  useFailureOnceClosed,
+  useToastFailure,
+} from "../components/ideaActions";
 import { useKeepShownItem } from "../components/keepShownItem";
 import { ReorderDialog } from "../components/ReorderDialog";
 import { RowEvidence, RowEvidenceSheet } from "../components/RowEvidence";
 import {
+  isRefusedForGood,
   isRowValid,
   type RowFieldsSpec,
+  refusedFieldsOf,
+  useReadAgainWhenRefused,
   useRowFields,
 } from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
@@ -75,13 +80,15 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
   dashboardHref,
+  useAskedOpen,
   useModal,
   usePanel,
+  useSearchModalAbout,
   useWorkspace,
 } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
@@ -102,9 +109,12 @@ import {
   ideaKey,
   putSaved,
   risksQuery,
+  useIsValidationRead,
   validationHomeQuery,
 } from "../lib/queries";
+import { useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
+import { AssumptionsSkeleton, ListSkeleton } from "./AssumptionsRisksSkeleton";
 
 export type { AssumptionsSearch };
 
@@ -233,7 +243,8 @@ function RowEditor({
   tab: AssumptionsTab;
   row: Row;
   autoFocus?: boolean;
-  onOpenEvidence: () => void;
+  /** Opens M2; none once the screen, read again, no longer lets the user edit. */
+  onOpenEvidence: (() => void) | undefined;
 }) {
   const { t } = useTranslation(["validation"]);
   const queryClient = useQueryClient();
@@ -471,7 +482,10 @@ function RowDetail({
           )}
         </Stack>
       )}
-      {isEditing && canEdit && (
+      {/* Only an editor opens it; once open it stays until closed, though the screen
+          read again no longer lets them edit, so a refused save shows in it
+          (design-spec 6.0.6's modals). */}
+      {isEditing && (
         <Dialog
           isOpen
           onOpenChange={(isOpen) => {
@@ -487,7 +501,7 @@ function RowDetail({
             tab={tab}
             row={row}
             autoFocus
-            onOpenEvidence={onOpenEvidence}
+            onOpenEvidence={canEdit ? onOpenEvidence : undefined}
           />
         </Dialog>
       )}
@@ -497,14 +511,15 @@ function RowDetail({
 
 /**
  * A new row (design-spec 6.10「+ Add」): its fields, then Add, which makes it and shows it.
- * In the detail's place from the tablet breakpoint up, in a sheet on a phone; failures as
- * 14's new entry.
+ * In the detail's place from the tablet breakpoint up, in a sheet on a phone; failures,
+ * and a send that fails once the form is closed (in a toast, 6.0.6), as 14's new entry.
  */
 function NewRow({
   ideaId,
   validationId,
   tab,
   isSheet,
+  isReadOnly,
   onCreated,
   onCancel,
 }: {
@@ -512,6 +527,8 @@ function NewRow({
   validationId: string;
   tab: AssumptionsTab;
   isSheet: boolean;
+  /** The screen read again no longer lets the user add one: what was typed stays, unsent. */
+  isReadOnly: boolean;
   onCreated: (row: Row) => void;
   onCancel: () => void;
 }) {
@@ -527,30 +544,35 @@ function NewRow({
   const latestOnCreated = useRef(onCreated);
   latestOnCreated.current = onCreated;
   const oneAtATime = useOneAtATime();
-  const create = useMutation({
-    mutationFn: async (input: AssumptionValues | RiskValues): Promise<Row> => {
-      const lists = api().api.v1.validations({
-        validationId: inPath(validationId),
-      });
-      return tab === "assumptions"
-        ? unwrap(lists.assumptions.post(input as AssumptionValues))
-        : unwrap(lists.risks.post(input as RiskValues));
+  const readAgainWhenRefused = useReadAgainWhenRefused();
+  const sendThrough = useSendThrough();
+  const post = async (input: AssumptionValues | RiskValues): Promise<Row> => {
+    const lists = api().api.v1.validations({
+      validationId: inPath(validationId),
+    });
+    return tab === "assumptions"
+      ? unwrap(lists.assumptions.post(input as AssumptionValues))
+      : unwrap(lists.risks.post(input as RiskValues));
+  };
+  const readAgain = () =>
+    queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) });
+  const failOnceClosed = useFailureOnceClosed(
+    async (input: AssumptionValues | RiskValues) => {
+      await sendThrough(() => post(input));
+      await readAgain();
     },
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) }),
-  });
-  // A 422 naming a field (SDD 8.2's last guard) puts "Check the format" under it.
-  const failure = create.error;
-  const details =
-    failure instanceof ApiError && failure.code === "VALIDATION_FAILED"
-      ? failure.detail.details
-      : undefined;
-  const fields = Object.keys(values) as (keyof typeof values)[];
-  const refusedFields = fields.filter(
-    (field) =>
-      Array.isArray(details) &&
-      (details as { path?: unknown }[]).some(({ path }) => path === field),
   );
+  const create = useMutation({
+    mutationFn: post,
+    onSuccess: () => void readAgain(),
+    onError: failOnceClosed,
+  });
+  const failure = create.error;
+  // Refused for good, the form sends no more (design-spec 6.10): at once, before the
+  // screen read again shows why, and also where that read changes nothing (gone).
+  const isLocked = isReadOnly || isRefusedForGood(failure);
+  const fields = Object.keys(values) as (keyof typeof values & string)[];
+  const refusedFields = refusedFieldsOf(failure, fields);
   const errors = Object.fromEntries(
     fields.flatMap((field) => {
       const error =
@@ -563,7 +585,7 @@ function NewRow({
       return shown === undefined ? [] : [[field, shown]];
     }),
   );
-  const canSubmit = isOnline && isRowValid(spec, values);
+  const canSubmit = isOnline && !isLocked && isRowValid(spec, values);
   const submit = () =>
     void oneAtATime(
       () =>
@@ -572,12 +594,14 @@ function NewRow({
             // Fires only while the form is still open: Cancel or leaving meanwhile keeps
             // the user where they went (the row is made all the same).
             onSuccess: (row) => latestOnCreated.current(row),
+            // As does this. Once the form is closed, its toast reads the screen again.
+            onError: readAgainWhenRefused,
             onSettled: () => resolve(),
           });
         }),
     );
   const change = (field: string, value: unknown) => {
-    if (refusedFields.includes(field as keyof typeof values)) create.reset();
+    if ((refusedFields as string[]).includes(field)) create.reset();
     setValues((current) => ({ ...current, [field]: value }));
     setTouched((current) => ({ ...current, [field]: true }));
   };
@@ -588,7 +612,7 @@ function NewRow({
           values={values as AssumptionValues}
           errors={errors}
           onChange={change}
-          isReadOnly={!isOnline}
+          isReadOnly={!isOnline || isLocked}
           autoFocus
         />
       ) : (
@@ -596,11 +620,11 @@ function NewRow({
           values={values as RiskValues}
           errors={errors}
           onChange={change}
-          isReadOnly={!isOnline}
+          isReadOnly={!isOnline || isLocked}
           autoFocus
         />
       )}
-      {failure !== null && refusedFields.length === 0 && (
+      {failure !== null && (
         <SendFailure
           error={failure}
           transient="couldNotSave"
@@ -699,26 +723,9 @@ function RowLine({ tab, row }: { tab: AssumptionsTab; row: Row }) {
   );
 }
 
-function ListSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("validation:assumptions.title")}</Text>
-            <Text variant="caption">
-              {t("validation:assumptions.empty.assumptions")}
-            </Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 function AssumptionsBody({
   home,
+  isDecided,
   search,
   modal,
   about,
@@ -727,6 +734,8 @@ function AssumptionsBody({
   onClose,
 }: {
   home: ValidationHome;
+  /** `home` has been read and is not being read again: whether the idea is archived. */
+  isDecided: boolean;
   search: AssumptionsSearch;
   modal: string | undefined;
   about: string | undefined;
@@ -737,6 +746,7 @@ function AssumptionsBody({
   /** Leaves what `onOpen` showed for `next`, going back if it was opened here. */
   onClose: (next: AssumptionsSearch) => void;
 }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["validation", "common"]);
   const { me, role } = useWorkspace();
   const queryClient = useQueryClient();
@@ -750,11 +760,16 @@ function AssumptionsBody({
   const risks = useQuery(risksQuery(idea.id, validationId));
   const query = tab === "assumptions" ? assumptions : risks;
   const listKey = listOf(idea.id, validationId, tab).queryKey;
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    { queryKey: listKey },
+  ]);
   const [isReordering, setReordering] = useState(false);
   const [deleting, setDeleting] = useState<Row | null>(null);
   const items: Row[] = query.data?.items ?? [];
-  const isNew = search.new === 1 && canEdit;
+  // `new=1` opens the new row as 14's opens its new entry (SDD 4章, design-spec 6.10).
+  const isNew = useAskedOpen(search.new === 1, canEdit, isDecided, {
+    search: ({ new: _, ...rest }) => rest,
+  });
   const shownFirst =
     search.row === undefined && isTwoColumns && !isNew
       ? items[0]?.id
@@ -825,24 +840,22 @@ function AssumptionsBody({
 
   const listFor = (list: AssumptionsTab): ReactNode => {
     const data = list === "assumptions" ? assumptions : risks;
-    if (data.isError) {
-      return (
-        <FailureState
-          error={data.error}
-          onRetry={() => void data.refetch()}
-          dashboardHref={dashboardHref(me)}
-          headingLevel={2}
-          size="S"
-        />
-      );
-    }
+    // A read again that failed leaves what was read on screen (as 13 does): only a list
+    // never read shows the failure.
     if (data.data === undefined) {
+      if (data.isError) {
+        return (
+          <FailureState
+            error={data.error}
+            onRetry={() => void data.refetch()}
+            dashboardHref={dashboardHref(me)}
+            headingLevel={2}
+            size="S"
+          />
+        );
+      }
       return isSlow ? (
-        <SlowLoadingState
-          headingLevel={2}
-          size="S"
-          onRetry={() => void data.refetch()}
-        />
+        <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
       ) : (
         <ListSkeleton />
       );
@@ -921,6 +934,7 @@ function AssumptionsBody({
       validationId={validationId}
       tab={tab}
       isSheet={isSheet}
+      isReadOnly={!canEdit}
       onCreated={(row) => {
         // In the list before it is shown: no "Not found" while the list is read again.
         putRow(queryClient, idea.id, validationId, tab, row);
@@ -960,10 +974,20 @@ function AssumptionsBody({
       />
     );
 
-  const evidenceRow =
-    modal === "evidence" && canEdit
-      ? assumptions.data?.items.find(({ id }) => aboutOf(id) === about)
-      : undefined;
+  const isEvidenceDecided = useIsValidationRead(idea.id, assumptions);
+  // M2 is an assumption's alone: a risk takes no evidence (design-spec 6.10).
+  const aboutRow = assumptions.data?.items.find(
+    ({ id }) => aboutOf(id) === about,
+  );
+  const evidenceRow = useSearchModalAbout(
+    modal,
+    "evidence",
+    aboutRow,
+    canEdit,
+    isEvidenceDecided,
+  );
+  // Open on an assumption no longer listed (deleted meanwhile), M2 stays with it as it was.
+  const isEvidenceGone = evidenceRow !== undefined && aboutRow === undefined;
   const title =
     home.sections.find(({ key }) => key === "09")?.title ??
     t("validation:assumptions.title");
@@ -1010,7 +1034,9 @@ function AssumptionsBody({
         onBack={() => onClose({ ...search, row: undefined, new: undefined })}
       />
       {isNew && isPhone && newRow(true)}
-      {isReordering && canEdit && (
+      {/* Opened from an editor's ⋯; once open it stays until closed, so a refused
+          Save order shows in it (design-spec 6.0.6's modals). */}
+      {isReordering && (
         <ReorderDialog
           title={t(`validation:assumptions.reorderTitle.${tab}`)}
           items={items.map(({ id, statement }) => ({ id, label: statement }))}
@@ -1095,29 +1121,12 @@ function AssumptionsBody({
                 queryKey: assumptionsQuery(idea.id, validationId).queryKey,
               })
             }
+            isGone={isEvidenceGone}
             onClose={modals.close}
           />
         </ModalBoundary>
       )}
     </>
-  );
-}
-
-/** 16's shape while its route loads (design-spec 6.0.6). */
-export function AssumptionsSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("validation:assumptions.title")}
-        </Heading>
-      }
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("validation:assumptions.title")}
-      onBack={() => {}}
-    />
   );
 }
 
@@ -1144,8 +1153,11 @@ export function AssumptionsScreen({
   const navigate = useNavigate();
   const router = useRouter();
   const panel = usePanel();
-  const home = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.idea.workspaceId === workspace.id ? home.data : undefined;
   const title = data?.sections.find(({ key }) => key === "09")?.title;
@@ -1224,6 +1236,7 @@ export function AssumptionsScreen({
     body = (
       <AssumptionsBody
         home={data}
+        isDecided={!home.isFetching}
         search={search}
         modal={modal}
         about={about}
@@ -1245,7 +1258,7 @@ export function AssumptionsScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = <AssumptionsSkeleton />;
   }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ApiError, api, apiErrorOf, unwrap } from "./api";
+import { ApiError, api, apiErrorOf, onWrite, unwrap } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -173,5 +173,27 @@ describe("the client (ADR-006)", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBeNull();
     expect((error as ApiError).code).toBeNull();
+  });
+});
+
+describe("the changes the API accepts (SDD 7.3「クライアントのデータ」)", () => {
+  test("a change that succeeds is told; a read or a refused change is not", async () => {
+    const told = vi.fn();
+    onWrite(told);
+    stubFetch(() => json(200, { items: [], nextCursor: null }));
+    await unwrap(
+      api().api.v1.notifications.get({ query: { limit: 50, filter: "all" } }),
+    );
+    stubFetch(() =>
+      json(409, { error: { code: "CONFLICT", message: "", requestId: "r" } }),
+    );
+    await expect(
+      unwrap(api().api.v1.notifications["read-all"].post()),
+    ).rejects.toBeInstanceOf(ApiError);
+    expect(told).not.toHaveBeenCalled();
+
+    stubFetch(() => new Response(null, { status: 204 }));
+    await unwrap(api().api.v1.notifications["read-all"].post());
+    expect(told).toHaveBeenCalledOnce();
   });
 });

@@ -10,7 +10,7 @@
     "startupCosts": "Startup costs",
     "breakEven": "Break-even",
     "perDay": "{{units}} / day",
-    "doneCount": "Done ({{count}})",
+    "doneCount": "Done ({{count, integer}})",
     "caption": "An example idea in validation."
   },
   "phases": {

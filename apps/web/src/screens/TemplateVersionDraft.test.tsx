@@ -3,11 +3,21 @@ import type {
   TemplateCheckResult,
   TemplateVersionDetail,
 } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { focusManager } from "@tanstack/react-query";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { TYPING_PAUSE_MS } from "../lib/autosave";
 import { operator } from "../test/admin";
-import { apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  apiError,
+  type Call,
+  readAgainOnFocus,
+  renderApp,
+  setViewport,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 
 // 27 Admin: Edit Template, a draft's editing (design-spec 6.17「下書きの編集」): each
 // node's fields saved as typed, the kind's settings, adding, deleting and reordering in
@@ -262,6 +272,43 @@ function draftApi(
   return { calls, current: () => version };
 }
 
+const itemId = "1a2b3c4d-0000-4000-8000-000000000030";
+const promptId = "1a2b3c4d-0000-4000-8000-000000000031";
+
+/** A plan's draft with one item, Team, holding `prompts` (its first is `promptId`). */
+const plan = (...prompts: Question[]): TemplateVersionDetail => ({
+  ...validation(),
+  kind: "business_plan",
+  checkRules: [],
+  costDefaults: [],
+  costRows: [{ key: "monthly.salaries", name: "Salaries" }],
+  sections: [
+    {
+      id: itemId,
+      key: "18",
+      part: "b",
+      title: "Team",
+      subtitle: null,
+      guidance: null,
+      sortOrder: 0,
+      questions: prompts,
+    },
+  ],
+});
+
+/** A number sub-item of the plan, showing `metricKeys` (null: none chosen yet). */
+const numbers = (
+  id: string,
+  key: string,
+  title: string,
+  metricKeys: string[] | null,
+) =>
+  question(id, key, title, {
+    hasFau: false,
+    answerType: "linked_metric",
+    options: metricKeys === null ? null : { kind: "linked_metric", metricKeys },
+  });
+
 const open = (node?: string) =>
   renderApp(
     `/admin/templates/versions/${draftId}${node === undefined ? "" : `?node=${node}`}`,
@@ -273,10 +320,24 @@ const field = (role: "textbox" | "spinbutton", name: string) =>
     name: new RegExp(`^${name.replace(/[()/]/g, "\\$&")}`),
   }) as HTMLInputElement;
 
+const treeOf = () =>
+  screen.findByRole("treegrid", {
+    name: "Sections and questions of Validation",
+  });
+
 const sent = (calls: Call[], method: string, ending: string) =>
   calls.filter((call) => call.method === method && call.path.endsWith(ending));
 
 const checks = (calls: Call[]) => sent(calls, "POST", "/validate").length;
+
+/** How far past the typing pause (6.0.2) a wait goes that shows nothing was sent. */
+const PAUSE_MARGIN_MS = 200;
+
+/** Waits until a save holding out for the typing pause would have gone. */
+const pastTypingPause = () =>
+  new Promise((resolve) =>
+    setTimeout(resolve, TYPING_PAUSE_MS + PAUSE_MARGIN_MS),
+  );
 
 describe("27: a draft's nodes, saved as they are typed (design-spec 6.17)", () => {
   test("a question's title: sent when left, the check read again, Saved in the header", async () => {
@@ -323,22 +384,28 @@ describe("27: a draft's nodes, saved as they are typed (design-spec 6.17)", () =
     await user.clear(title);
     expect(await screen.findByText("Can't be empty")).toBeTruthy();
     await user.tab();
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await pastTypingPause();
     expect(sent(calls, "PATCH", `/template-questions/${oceanId}`)).toEqual([]);
   });
 
-  test("a published question ID only shows, with why", async () => {
+  test("a published question ID only shows, with why and its kind's form", async () => {
     draftApi();
     open(whoId);
     const key = (await screen.findByRole("textbox", {
       name: /^Question ID/,
     })) as HTMLInputElement;
     expect(key.readOnly).toBe(true);
-    expect(
-      screen.getByText(
-        "This question ID is in a published version, so it can't change.",
-      ),
-    ).toBeTruthy();
+    const why =
+      "This question ID is in a published version, so it can't change.";
+    const form =
+      "V, the section (01, 02, 04, 08 or 10) and a key in capitals, digits and _, like V.01.WHO";
+    expect(screen.getByText(why)).toBeTruthy();
+    expect(screen.getByText(form)).toBeTruthy();
+    // Both read out with the field.
+    const described = (key.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toEqual(expect.arrayContaining([why, form]));
   });
 
   test("a new answer type asks first when it drops the choices, then sends both", async () => {
@@ -590,6 +657,198 @@ describe("27: a draft's nodes, saved as they are typed (design-spec 6.17)", () =
       expect((publish as HTMLButtonElement).disabled).toBe(false),
     );
   });
+
+  test("a save into a version published meanwhile: Couldn't save and It's published, nothing sent until Retry, Publish waiting (6.0.2・6.17)", async () => {
+    const user = userEvent.setup();
+    let isPublished = false;
+    const { calls } = draftApi(validation(), {
+      answer: (call) => {
+        if (
+          call.method === "PATCH" &&
+          call.path.endsWith(`/template-questions/${oceanId}`)
+        ) {
+          return apiError(409, "PUBLISHED_READ_ONLY");
+        }
+        if (
+          isPublished &&
+          call.method === "GET" &&
+          call.path === `/api/v1/admin/template-versions/${draftId}`
+        ) {
+          return Response.json({ ...validation(), status: "published" });
+        }
+        return undefined;
+      },
+    });
+    open(oceanId);
+    const publish = (await screen.findByRole("button", {
+      name: "Publish as v3",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(publish.disabled).toBe(false));
+    const patches = () =>
+      sent(calls, "PATCH", `/template-questions/${oceanId}`);
+    await user.type(field("textbox", "Title"), "!");
+    await user.tab();
+    // Beside the field, with its reason, and in the header (6.0.2).
+    const note = (await screen.findByText("It's published")).closest(
+      '[role="alert"]',
+    ) as HTMLElement;
+    expect(within(note).getByText("Couldn't save")).toBeTruthy();
+    expect(screen.getAllByText("Couldn't save")).toHaveLength(2);
+    expect(publish.disabled).toBe(true);
+    // Typed on, the refused item waits for Retry.
+    await user.type(field("textbox", "Title"), "?");
+    await user.tab();
+    await pastTypingPause();
+    expect(patches()).toHaveLength(1);
+    expect(publish.disabled).toBe(true);
+    // The refusal reads the version again (6.0.6): read as published, it only shows,
+    // and what was not saved stays failed, never Saved (6.0.2).
+    isPublished = true;
+    await user.click(within(note).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(patches()).toHaveLength(2));
+    expect(patches()[1]?.body).toEqual({ title: "OCEAN!?" });
+    expect(
+      await screen.findByText(
+        "A published version can't be changed. Start a new draft from it on Templates.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Publish/ })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: /^Title/ })).toBeNull();
+    expect(screen.getByText("Couldn't save")).toBeTruthy();
+    expect(screen.queryByText("Saved")).toBeNull();
+  });
+
+  test("Publish waits while a save fails or the API refused it, and comes back once it is saved (6.17)", async () => {
+    const user = userEvent.setup();
+    let answer: () => Response | undefined = () =>
+      new Response(null, { status: 503 });
+    const { calls } = draftApi(validation(), {
+      answer: (call) =>
+        call.method === "PATCH" && call.path.includes("template-questions")
+          ? answer()
+          : undefined,
+    });
+    open(oceanId);
+    const publish = (await screen.findByRole("button", {
+      name: "Publish as v3",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(publish.disabled).toBe(false));
+    await user.type(field("textbox", "Title"), "!");
+    await user.tab();
+    // A failure that may pass: sent again by itself, Publish waiting meanwhile.
+    await waitFor(() =>
+      expect(screen.getAllByText("Couldn't save")).toHaveLength(2),
+    );
+    expect(publish.disabled).toBe(true);
+    answer = () => undefined;
+    await waitFor(
+      () =>
+        expect(
+          sent(calls, "PATCH", `/template-questions/${oceanId}`),
+        ).toHaveLength(2),
+      { timeout: 3000 },
+    );
+    await waitFor(() => expect(publish.disabled).toBe(false));
+
+    answer = () =>
+      apiError(422, "VALIDATION_FAILED", {
+        details: [{ path: "title", code: "custom" }],
+      });
+    await user.type(field("textbox", "Title"), "?");
+    await user.tab();
+    await waitFor(() =>
+      expect(screen.getAllByText("Couldn't save")).toHaveLength(2),
+    );
+    expect(publish.disabled).toBe(true);
+  });
+
+  test("Publish waits while the check is read, and warnings alone don't block it (6.17)", async () => {
+    const user = userEvent.setup();
+    const held: (() => void)[] = [];
+    const warnings: TemplateCheckResult = {
+      errors: [],
+      warnings: [{ code: "removed_keys", keys: ["V.01.WHY"] }],
+    };
+    const { calls } = draftApi(validation(), {
+      answer: (call) =>
+        call.method === "POST" && call.path.endsWith("/validate")
+          ? new Promise<Response>((resolve) => {
+              held.push(() => resolve(Response.json(warnings)));
+            })
+          : undefined,
+    });
+    open(oceanId);
+    const publish = (await screen.findByRole("button", {
+      name: "Publish as v3",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(held).toHaveLength(1));
+    expect(publish.disabled).toBe(true);
+    held[0]?.();
+    await waitFor(() => expect(publish.disabled).toBe(false));
+    expect(screen.queryByText(/Fix \d+ problems? on Check/)).toBeNull();
+    // Read again after a save: Publish waits for it once more.
+    await user.type(field("textbox", "Title"), "!");
+    await user.tab();
+    await waitFor(() => expect(checks(calls)).toBe(2));
+    await waitFor(() =>
+      expect(sent(calls, "PATCH", `/template-questions/${oceanId}`)).toEqual([
+        expect.objectContaining({ body: { title: "OCEAN!" } }),
+      ]),
+    );
+    // Saved, so only the check holds it.
+    expect(await screen.findByText("Saved")).toBeTruthy();
+    expect(publish.disabled).toBe(true);
+    for (const release of held) release();
+    await waitFor(() => expect(publish.disabled).toBe(false));
+  });
+
+  test("offline: the fields only show, and Publish and Add section can't be pressed until back online (6.0.6・6.17)", async () => {
+    const user = userEvent.setup();
+    const { calls } = draftApi();
+    open(oceanId);
+    const publish = (await screen.findByRole("button", {
+      name: "Publish as v3",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(publish.disabled).toBe(false));
+    const addSection = screen.getByRole("button", {
+      name: "Add section",
+    }) as HTMLButtonElement;
+    const fau = () =>
+      screen.getByRole("checkbox", {
+        name: "Ask for F/A/U (Fact, Assumption or Unknown)",
+      }) as HTMLInputElement;
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    try {
+      act(() => {
+        window.dispatchEvent(new Event("offline"));
+      });
+      await waitFor(() =>
+        expect(field("textbox", "Title").readOnly).toBe(true),
+      );
+      for (const name of ["Question ID", "Example", "Hint", "Choice 1"]) {
+        expect(field("textbox", name).readOnly).toBe(true);
+      }
+      expect(fau().disabled).toBe(true);
+      expect(publish.disabled).toBe(true);
+      expect(addSection.disabled).toBe(true);
+      await user.type(field("textbox", "Title"), "!");
+      expect(field("textbox", "Title").value).toBe("OCEAN");
+    } finally {
+      onLine.mockRestore();
+      act(() => {
+        window.dispatchEvent(new Event("online"));
+      });
+    }
+    await waitFor(() => expect(field("textbox", "Title").readOnly).toBe(false));
+    expect(fau().disabled).toBe(false);
+    expect(publish.disabled).toBe(false);
+    expect(addSection.disabled).toBe(false);
+    expect(
+      calls.filter(
+        (call) => call.method !== "GET" && !call.path.endsWith("/validate"),
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe("27: each kind's own fields (design-spec 6.17)", () => {
@@ -709,36 +968,14 @@ describe("27: each kind's own fields (design-spec 6.17)", () => {
 
   test("a plan's key numbers: chosen by name from 6.4's and the published cost rows, each once", async () => {
     const user = userEvent.setup();
-    const itemId = "1a2b3c4d-0000-4000-8000-000000000030";
-    const promptId = "1a2b3c4d-0000-4000-8000-000000000031";
-    const { calls } = draftApi({
-      ...validation(),
-      kind: "business_plan",
-      checkRules: [],
-      costDefaults: [],
-      costRows: [{ key: "monthly.salaries", name: "Salaries" }],
-      sections: [
-        {
-          id: itemId,
-          key: "18",
-          part: "b",
-          title: "Team",
-          subtitle: null,
-          guidance: null,
-          sortOrder: 0,
-          questions: [
-            question(promptId, "P.18.3", "Expected monthly payroll", {
-              hasFau: false,
-              answerType: "linked_metric",
-              options: {
-                kind: "linked_metric",
-                metricKeys: ["selling_price", "sellng_price"],
-              },
-            }),
-          ],
-        },
-      ],
-    });
+    const { calls } = draftApi(
+      plan(
+        numbers(promptId, "P.18.3", "Expected monthly payroll", [
+          "selling_price",
+          "sellng_price",
+        ]),
+      ),
+    );
     open(promptId);
     await screen.findByRole("heading", {
       level: 2,
@@ -770,6 +1007,47 @@ describe("27: each kind's own fields (design-spec 6.17)", () => {
         },
       }),
     );
+  });
+
+  test("a plan's key numbers emptied: not sent, and why under the list (6.0.8: one at least)", async () => {
+    const user = userEvent.setup();
+    const { calls } = draftApi(
+      plan(
+        numbers(promptId, "P.18.3", "Expected monthly payroll", [
+          "selling_price",
+        ]),
+      ),
+    );
+    open(promptId);
+    const publish = await screen.findByRole("button", {
+      name: "Publish as v3",
+    });
+    await waitFor(() =>
+      expect((publish as HTMLButtonElement).disabled).toBe(false),
+    );
+    await user.click(screen.getByRole("button", { name: "Remove Price" }));
+    const list = screen.getByRole("group", { name: "Key numbers" });
+    expect(await within(list).findByText("Can't be empty")).toBeTruthy();
+    expect(within(list).getByText("No key numbers yet")).toBeTruthy();
+    await pastTypingPause();
+    expect(sent(calls, "PATCH", `/template-questions/${promptId}`)).toEqual([]);
+    // Not saved, so not published (design-spec 6.17).
+    expect((publish as HTMLButtonElement).disabled).toBe(true);
+    // One chosen again is sent, and the reason goes.
+    await user.click(screen.getByRole("button", { name: "Add key number" }));
+    // The row's Picker; its Move and Remove are named after the row too.
+    await user.click(
+      screen.getByRole("button", { name: /^(?!Move|Remove).*Key number 1$/ }),
+    );
+    await user.click(await screen.findByRole("option", { name: "Price" }));
+    await waitFor(() =>
+      expect(
+        sent(calls, "PATCH", `/template-questions/${promptId}`).at(-1)?.body,
+      ).toEqual({
+        options: { kind: "linked_metric", metricKeys: ["selling_price"] },
+      }),
+    );
+    expect(within(list).queryByText("Can't be empty")).toBeNull();
   });
 
   test("a self analysis: the AI prompt, and a subtitle", async () => {
@@ -907,6 +1185,470 @@ describe("27: adding, deleting and reordering in the tree (design-spec 6.17)", (
     expect(router.state.location.search.node).toMatch(/^1a2b3c4d/);
   });
 
+  /**
+   * Add section sent with 10 Judgment and Cancel pressed while it is on its way, its
+   * answer held until `answerAdd`: `first` answers it (null: no answer comes), and any
+   * Retry is answered by `later`, which makes it unless it answers itself.
+   */
+  async function cancelWhileAddingSection(
+    first: (draft: TemplateVersionDetail) => Response | null,
+    later: (draft: TemplateVersionDetail) => Response | undefined = () =>
+      undefined,
+  ) {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    let isFirst = true;
+    let draft = () => validation();
+    const api = draftApi(validation(), {
+      answer: (call) => {
+        if (call.method !== "POST" || !call.path.endsWith("/sections"))
+          return undefined;
+        if (!isFirst) return later(draft());
+        isFirst = false;
+        return new Promise<Response>((resolve, reject) => {
+          answerAdd = () => {
+            const answered = first(draft());
+            if (answered === null) reject(new TypeError("Failed to fetch"));
+            else resolve(answered);
+          };
+        });
+      },
+    });
+    draft = api.current;
+    const router = open();
+    await user.click(
+      await screen.findByRole("button", { name: "Add section" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Add section" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Key/ }),
+      "10",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Title/ }),
+      "Judgment",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add section" }),
+    );
+    const posts = () => sent(api.calls, "POST", "/sections");
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Add section" })).toBeNull(),
+    );
+    return { user, router, posts, answerAdd: async () => answerAdd() };
+  }
+
+  test("Cancel while Add section is on its way, and no answer comes: a toast says Couldn't save, and its Retry sends the same section, which joins the tree (6.0.6)", async () => {
+    const { user, router, posts, answerAdd } = await cancelWhileAddingSection(
+      () => null,
+    );
+    const toast = await toastAfter("Couldn't save", answerAdd);
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posts()).toHaveLength(2));
+    expect(posts()[1]?.body).toEqual({ key: "10", title: "Judgment" });
+    expect(await within(await treeOf()).findByText(/Judgment/)).toBeTruthy();
+    // Made, not chosen: the user is where they were.
+    expect(router.state.location.search).not.toHaveProperty("node");
+  });
+
+  test("Cancel while Add section is on its way, and the draft was published meanwhile: 27's words in a toast, without Retry, and 27 reads it as published", async () => {
+    const { user, answerAdd } = await cancelWhileAddingSection((draft) => {
+      draft.status = "published";
+      return apiError(409, "PUBLISHED_READ_ONLY");
+    });
+    const toast = await toastAfter(
+      "This version was already published",
+      answerAdd,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Add section" })).toBeNull(),
+    );
+    // Toasts outlive the test (test/api.tsx): the later ones look for these words too.
+    await user.click(within(toast).getByRole("button", { name: "Close" }));
+  });
+
+  test("Cancel while Add section is on its way, no answer comes, and the toast's Retry finds the draft published meanwhile: 27's words in a toast, and 27 reads it as published", async () => {
+    const { user, posts, answerAdd } = await cancelWhileAddingSection(
+      () => null,
+      (draft) => {
+        draft.status = "published";
+        return apiError(409, "PUBLISHED_READ_ONLY");
+      },
+    );
+    const toast = await toastAfter("Couldn't save", answerAdd);
+    const refused = await toastAfter("This version was already published", () =>
+      user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    expect(posts()).toHaveLength(2);
+    expect(within(refused).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Add section" })).toBeNull(),
+    );
+    // Toasts outlive the test (test/api.tsx): the later ones look for these words too.
+    await user.click(within(refused).getByRole("button", { name: "Close" }));
+  });
+
+  test("Cancel while Add section is on its way, and it fails unexpectedly (500): Something went wrong with its Ref and Retry, in a toast", async () => {
+    const { answerAdd } = await cancelWhileAddingSection(() =>
+      apiError(500, "INTERNAL"),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      answerAdd,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(
+      screen.queryByRole("alertdialog", { name: "Alert Something went wrong" }),
+    ).toBeNull();
+  });
+
+  test("Cancel while Add question is on its way, and the API is down: a toast with Couldn't save and its Ref; its Retry sends the same question", async () => {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    let isFirst = true;
+    let isFailing = true;
+    const { calls } = draftApi(validation(), {
+      answer: (call) => {
+        if (call.method !== "POST" || !call.path.endsWith("/questions"))
+          return undefined;
+        if (!isFirst)
+          return isFailing ? apiError(503, "UPSTREAM_UNAVAILABLE") : undefined;
+        isFirst = false;
+        return new Promise<Response>((resolve) => {
+          answerAdd = () => resolve(apiError(503, "UPSTREAM_UNAVAILABLE"));
+        });
+      },
+    });
+    open(secondId);
+    await screen.findByRole("heading", { level: 2, name: "Return" });
+    await user.click(
+      screen.getByRole("button", { name: "More actions for 08 Return" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Add question" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add a question to Return",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Question ID/ }),
+      "PAYBACK",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Title/ }),
+      "PAYBACK",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Question(?! ID)/ }),
+      "How soon does it pay back?",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add question" }),
+    );
+    const posts = () =>
+      sent(calls, "POST", `/template-sections/${secondId}/questions`);
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    const toast = await toastAfter("Couldn't save. Ref: 8f14e45f", async () =>
+      answerAdd(),
+    );
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posts()).toHaveLength(2));
+    expect(posts()[1]?.body).toEqual(posts()[0]?.body);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  /** Section 10 Judgment, made in `draft` as AD4 makes it, and the draft answered. */
+  const judgmentMade = (draft: TemplateVersionDetail) => {
+    draft.sections.push({
+      id: newId(),
+      key: "10",
+      title: "Judgment",
+      part: null,
+      subtitle: null,
+      guidance: null,
+      sortOrder: draft.sections.length,
+      questions: [],
+    });
+    return Response.json(draft, { status: 201 });
+  };
+
+  /** Lets what settles after an answer settle: a move it would make has been made. */
+  const settled = () =>
+    act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+
+  /** Where 27 is left for, mid-send: 26 on another template. */
+  const elsewhere = "/admin/templates?kind=self_analysis";
+
+  test("Cancel while Add section is on its way, and it goes through: the section joins the tree, unchosen, and the entry stays (6.0.6)", async () => {
+    const { router, answerAdd } = await cancelWhileAddingSection(judgmentMade);
+    const entries = router.history.length;
+    await answerAdd();
+    expect(await within(await treeOf()).findByText(/Judgment/)).toBeTruthy();
+    await settled();
+    expect(router.state.location.search).not.toHaveProperty("node");
+    expect(router.history.length).toBe(entries);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("27 left while Add section is on its way, and it goes through: the screen gone to takes no node", async () => {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    const api = draftApi(validation(), {
+      answer: (call) =>
+        call.method === "POST" && call.path.endsWith("/sections")
+          ? new Promise<Response>((resolve) => {
+              answerAdd = () => resolve(judgmentMade(api.current()));
+            })
+          : undefined,
+    });
+    const router = open();
+    await user.click(
+      await screen.findByRole("button", { name: "Add section" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Add section" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Key/ }),
+      "10",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Title/ }),
+      "Judgment",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add section" }),
+    );
+    await waitFor(() =>
+      expect(sent(api.calls, "POST", "/sections")).toHaveLength(1),
+    );
+    await act(() => router.navigate({ href: elsewhere }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Add section" })).toBeNull(),
+    );
+    const entries = router.history.length;
+    answerAdd();
+    await settled();
+    expect(router.state.location.href).toBe(elsewhere);
+    expect(router.history.length).toBe(entries);
+  });
+
+  test("Cancel while Add question is on its way, and it goes through: the question is made, and the node chosen stays", async () => {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    const api = draftApi(validation(), {
+      answer: (call) => {
+        if (call.method !== "POST" || !call.path.endsWith("/questions")) {
+          return undefined;
+        }
+        return new Promise<Response>((resolve) => {
+          answerAdd = () => {
+            const draft = api.current();
+            draft.sections[1]?.questions.push(
+              question(newId(), "V.08.PAYBACK", "PAYBACK", { hasFau: false }),
+            );
+            resolve(Response.json(draft, { status: 201 }));
+          };
+        });
+      },
+    });
+    const router = open(secondId);
+    await screen.findByRole("heading", { level: 2, name: "Return" });
+    await user.click(
+      screen.getByRole("button", { name: "More actions for 08 Return" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Add question" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add a question to Return",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Question ID/ }),
+      "PAYBACK",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Title/ }),
+      "PAYBACK",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Question(?! ID)/ }),
+      "How soon does it pay back?",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add question" }),
+    );
+    await waitFor(() =>
+      expect(
+        sent(api.calls, "POST", `/template-sections/${secondId}/questions`),
+      ).toHaveLength(1),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const entries = router.history.length;
+    answerAdd();
+    await settled();
+    expect(router.state.location.search).toEqual({ node: secondId });
+    expect(router.history.length).toBe(entries);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Return" }),
+    ).toBeTruthy();
+  });
+
+  /**
+   * Publish as v3 pressed and 27 left for {@link elsewhere} while it is on its way, its
+   * answer held until `answerPublish`: `first` answers it (null: no answer comes), and
+   * `later` any Retry.
+   */
+  async function leaveWhilePublishing(
+    first: () => Response | null,
+    later: () => Response = () => publishedNow(),
+  ) {
+    const user = userEvent.setup();
+    let answerPublish = () => {};
+    let isFirst = true;
+    const { calls } = draftApi(validation(), {
+      answer: (call) => {
+        if (
+          call.method !== "POST" ||
+          !call.path.endsWith(`${draftId}/publish`)
+        ) {
+          return undefined;
+        }
+        if (!isFirst) return later();
+        isFirst = false;
+        return new Promise<Response>((resolve, reject) => {
+          answerPublish = () => {
+            const answered = first();
+            if (answered === null) reject(new TypeError("Failed to fetch"));
+            else resolve(answered);
+          };
+        });
+      },
+    });
+    const router = open();
+    const publish = await screen.findByRole("button", {
+      name: "Publish as v3",
+    });
+    await waitFor(() =>
+      expect((publish as HTMLButtonElement).disabled).toBe(false),
+    );
+    await user.click(publish);
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", { name: "Publish as v3?" }),
+      ).getByRole("button", { name: "Publish" }),
+    );
+    const publishes = () => sent(calls, "POST", `${draftId}/publish`);
+    await waitFor(() => expect(publishes()).toHaveLength(1));
+    await act(() => router.navigate({ href: elsewhere }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Publish as v3" }),
+      ).toBeNull(),
+    );
+    return {
+      user,
+      router,
+      publishes,
+      answerPublish: async () => answerPublish(),
+    };
+  }
+
+  const publishedNow = () =>
+    Response.json({
+      versionNumber: 3,
+      publishedAt: "2026-10-22T02:00:00.000Z",
+    });
+
+  test("27 left while Publish is on its way, and it goes through: Validation v3 is published, and the user stays where they went (6.0.6)", async () => {
+    const { router, answerPublish } = await leaveWhilePublishing(publishedNow);
+    const entries = router.history.length;
+    await toastAfter("Validation v3 is published", answerPublish);
+    await settled();
+    expect(router.state.location.href).toBe(elsewhere);
+    expect(router.history.length).toBe(entries);
+  });
+
+  test("27 left while Publish is on its way, and no answer comes: a toast says Couldn't save, and its Retry publishes it, staying where the user went", async () => {
+    const { user, router, publishes, answerPublish } =
+      await leaveWhilePublishing(() => null);
+    const toast = await toastAfter("Couldn't save", answerPublish);
+    await toastAfter("Validation v3 is published", () =>
+      user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    expect(publishes()).toHaveLength(2);
+    await settled();
+    expect(router.state.location.href).toBe(elsewhere);
+  });
+
+  test("27 left while Publish is on its way, and the check finds problems: 27's words in a toast, without Retry", async () => {
+    const { user, answerPublish } = await leaveWhilePublishing(() =>
+      apiError(422, "TEMPLATE_INVALID"),
+    );
+    const toast = await toastAfter(
+      "This version has problems. Fix them on Check, then publish.",
+      answerPublish,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    // Toasts outlive the test (test/api.tsx): the later ones look for these words too.
+    await user.click(within(toast).getByRole("button", { name: "Close" }));
+  });
+
+  test("27 left while Publish is on its way, and it fails unexpectedly (500): Something went wrong with its Ref and Retry, in a toast", async () => {
+    const { user, answerPublish } = await leaveWhilePublishing(() =>
+      apiError(500, "INTERNAL"),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      answerPublish,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+    await user.click(within(toast).getByRole("button", { name: "Close" }));
+  });
+
+  test("27 left while Delete is on its way, and it goes through: the screen gone to keeps its URL", async () => {
+    const user = userEvent.setup();
+    let answerDelete = () => {};
+    draftApi(validation(), {
+      answer: (call) =>
+        call.method === "DELETE"
+          ? new Promise<Response>((resolve) => {
+              answerDelete = () => resolve(new Response(null, { status: 204 }));
+            })
+          : undefined,
+    });
+    const router = open(oceanId);
+    await screen.findByRole("heading", { level: 2, name: "OCEAN" });
+    await user.click(
+      screen.getByRole("button", { name: "More actions for V.01.OCEAN OCEAN" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Delete question" }),
+    );
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: "Delete V.01.OCEAN OCEAN?",
+        }),
+      ).getByRole("button", { name: "Delete" }),
+    );
+    await act(() => router.navigate({ href: elsewhere }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { level: 2, name: "OCEAN" }),
+      ).toBeNull(),
+    );
+    const entries = router.history.length;
+    answerDelete();
+    await settled();
+    expect(router.state.location.href).toBe(elsewhere);
+    expect(router.history.length).toBe(entries);
+  });
+
   test("Delete question asks, then deletes and closes its detail", async () => {
     const user = userEvent.setup();
     const { calls, current } = draftApi();
@@ -946,6 +1688,40 @@ describe("27: adding, deleting and reordering in the tree (design-spec 6.17)", (
           .contains(document.activeElement),
       ).toBe(true),
     );
+  });
+
+  test("Delete of a version published meanwhile says so (errors:PUBLISHED_READ_ONLY) and keeps the question", async () => {
+    const user = userEvent.setup();
+    const { calls } = draftApi(validation(), {
+      answer: (call) =>
+        call.method === "DELETE"
+          ? apiError(409, "PUBLISHED_READ_ONLY")
+          : undefined,
+    });
+    open(oceanId);
+    await screen.findByRole("heading", { level: 2, name: "OCEAN" });
+    await user.click(
+      screen.getByRole("button", { name: "More actions for V.01.OCEAN OCEAN" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Delete question" }),
+    );
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: "Delete V.01.OCEAN OCEAN?",
+        }),
+      ).getByRole("button", { name: "Delete" }),
+    );
+    expect(
+      await screen.findByText("This version was already published"),
+    ).toBeTruthy();
+    expect(
+      sent(calls, "DELETE", `/template-questions/${oceanId}`),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "OCEAN" }),
+    ).toBeTruthy();
   });
 
   test("Delete section says its questions go with it", async () => {
@@ -1085,6 +1861,119 @@ describe("27: adding, deleting and reordering in the tree (design-spec 6.17)", (
     );
   });
 
+  test("offline, the ⋯ of a section and a question offers nothing to press; Preview still opens", async () => {
+    const user = userEvent.setup();
+    draftApi();
+    open(oceanId);
+    await screen.findByRole("heading", { level: 2, name: "OCEAN" });
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    try {
+      window.dispatchEvent(new Event("offline"));
+      const disabled = async (more: string, items: string[]) => {
+        await user.click(screen.getByRole("button", { name: more }));
+        const menu = await screen.findByRole("menu");
+        expect(
+          within(menu)
+            .getAllByRole("menuitem")
+            .map((item) => [
+              item.textContent,
+              item.getAttribute("aria-disabled"),
+            ]),
+        ).toEqual(items.map((item) => [item, "true"]));
+        await user.keyboard("{Escape}");
+        await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+      };
+      await disabled("More actions for V.01.OCEAN OCEAN", [
+        "Add question",
+        "Reorder questions",
+        "Delete question",
+      ]);
+      await user.click(within(await treeOf()).getByText("Customer & Problem"));
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Customer & Problem",
+      });
+      await disabled("More actions for 01 Customer & Problem", [
+        "Add question",
+        "Reorder sections",
+        "Reorder questions",
+        "Delete section",
+      ]);
+      await user.click(screen.getByRole("button", { name: "Preview" }));
+      expect(
+        await screen.findByRole("dialog", {
+          name: "Preview: Customer & Problem",
+        }),
+      ).toBeTruthy();
+    } finally {
+      onLine.mockRestore();
+    }
+  });
+
+  test("on a phone, Edit's sheet stays open when 27 reads the draft as published meanwhile, until it is closed (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    try {
+      const { current } = draftApi();
+      open(secondId);
+      await screen.findByRole("heading", { level: 2, name: "Return" });
+      await user.click(screen.getByRole("button", { name: "Edit" }));
+      const sheet = await screen.findByRole("dialog", { name: /^Edit / });
+      current().status = "published";
+      readAgainOnFocus();
+      // Read again as published: the detail behind has no Edit.
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Edit", hidden: true }),
+        ).toBeNull(),
+      );
+      expect(screen.getByRole("dialog", { name: /^Edit / })).toBe(sheet);
+      await user.keyboard("{Escape}");
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: /^Edit / })).toBeNull(),
+      );
+    } finally {
+      act(() => focusManager.setFocused(undefined));
+      setViewport(1024);
+    }
+  });
+
+  test("a phone's floating + (Add section) opens the dialog online, and offline cannot be pressed (6.17)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    const onLine = vi.spyOn(navigator, "onLine", "get");
+    try {
+      draftApi();
+      open();
+      await treeOf();
+      // In one pane the list stands alone, its new item floating over it.
+      const add = screen.getByRole("button", { name: "Add section" });
+      await user.click(add);
+      const dialog = await screen.findByRole("dialog", {
+        name: "Add section",
+      });
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "Add section" }),
+        ).toBeNull(),
+      );
+      onLine.mockReturnValue(false);
+      act(() => {
+        window.dispatchEvent(new Event("offline"));
+      });
+      const offline = screen.getByRole("button", { name: "Add section" });
+      await waitFor(() =>
+        expect((offline as HTMLButtonElement).disabled).toBe(true),
+      );
+      await user.click(offline);
+      expect(screen.queryByRole("dialog", { name: "Add section" })).toBeNull();
+    } finally {
+      onLine.mockRestore();
+      setViewport(1024);
+    }
+  });
+
   test("a list changed while ordering is read again, as 6.10 does", async () => {
     const user = userEvent.setup();
     let refused = false;
@@ -1149,6 +2038,43 @@ describe("27: the preview (design-spec 6.17「プレビュー」)", () => {
         .getAllByRole("radio")
         .map((radio) => (radio as HTMLInputElement).value),
     ).toEqual(["Red", "Blue", "Mixed"]);
+  });
+
+  test("a plan's key numbers by their names, or the line while none is chosen", async () => {
+    const user = userEvent.setup();
+    draftApi(
+      plan(
+        numbers(promptId, "P.18.3", "Expected monthly payroll", [
+          "selling_price",
+          "scenario:expected",
+          "cost_row:monthly.salaries",
+        ]),
+        numbers(
+          "1a2b3c4d-0000-4000-8000-000000000032",
+          "P.18.4",
+          "Hiring cost",
+          null,
+        ),
+      ),
+    );
+    open(promptId);
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "Expected monthly payroll",
+    });
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Preview: Team",
+    });
+    expect(
+      within(dialog).getByText(
+        "Shows the key numbers Price, Expected scenario, Cost row: Salaries",
+      ),
+    ).toBeTruthy();
+    expect(
+      within(dialog).getByText("Shows key numbers once they are chosen"),
+    ).toBeTruthy();
+    expect(within(dialog).queryByText(/selling_price|cost_row:/)).toBeNull();
   });
 
   test("a published version: Preview, and no ⋯ or fields", async () => {

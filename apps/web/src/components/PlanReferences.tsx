@@ -1,5 +1,5 @@
 import { formatMetric, hasText } from "@moonx/domain";
-import { formatDate, formatMoney } from "@moonx/i18n";
+import { formatDate, formatInputMoney } from "@moonx/i18n";
 import type { DecisionLogSummary, PlanReference } from "@moonx/schemas";
 import {
   DescriptionList,
@@ -116,9 +116,7 @@ function SelfAnalyses({
                 <Stack gap="space-25">
                   {answer.amount !== null && (
                     <Text variant="number">
-                      {formatMoney(answer.amount, shared.currency, {
-                        cents: !Number.isInteger(answer.amount),
-                      })}
+                      {formatInputMoney(answer.amount, shared.currency)}
                     </Text>
                   )}
                   {(answer.amount === null || hasText(answer.text)) && (
@@ -176,12 +174,9 @@ function ReferenceBody({ reference }: { reference: PlanReference }) {
                     t("validation:competitors.field.typicalPrice"),
                     competitor.typicalPrice === null
                       ? null
-                      : formatMoney(
+                      : formatInputMoney(
                           competitor.typicalPrice,
                           workspace.currency,
-                          {
-                            cents: !Number.isInteger(competitor.typicalPrice),
-                          },
                         ),
                   ],
                   [

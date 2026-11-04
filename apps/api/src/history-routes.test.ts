@@ -66,6 +66,7 @@ async function saveAnswer(
   key: string,
   body: Record<string, unknown>,
   cookie = team.memberCookie,
+  client?: "web" | "web_mobile",
 ) {
   tick();
   const [row] = await db
@@ -77,12 +78,13 @@ async function saveAnswer(
         eq(validationAnswers.questionKey, key),
       ),
     );
-  const response = await call(
+  const request = apiRequest(
     "PUT",
     `/api/v1/validations/${team.validationId}/answers/${key}`,
-    cookie,
-    { lockVersion: row?.lockVersion ?? 0, ...body },
+    { cookie, body: { lockVersion: row?.lockVersion ?? 0, ...body } },
   );
+  if (client !== undefined) request.headers.set("x-moonx-client", client);
+  const response = await app.handle(request);
   expect(response.status).toBe(200);
 }
 
@@ -640,6 +642,73 @@ describe("H3 POST /api/v1/history/batches/{batchId}/revert", () => {
     );
     expect((await revertBatch(batchId, team.memberCookie)).status).toBe(200);
     expect((await answerOf(team, "V.01.WHY_THEM"))?.text).toBeNull();
+  });
+
+  test("reverts nothing and writes nothing when every item is back already, and stays revertible", async () => {
+    const team = await teamWithNewIdea(app, fixtures);
+    const batchId = await imported(team);
+    later();
+    await saveAnswer(team, "V.01.WHO", { text: "Offices" });
+    await saveAnswer(team, "V.01.WHY_THEM", { text: null });
+    const state = async () => {
+      const [idea] = await db
+        .select({ lastActivityAt: ideas.lastActivityAt })
+        .from(ideas)
+        .where(eq(ideas.id, team.idea.id));
+      const [workspace] = await db
+        .select({ lastActiveAt: workspaces.lastActiveAt })
+        .from(workspaces)
+        .where(eq(workspaces.id, team.workspace.id));
+      const answers = await Promise.all(
+        ["V.01.WHO", "V.01.WHY_THEM"].map((key) => answerOf(team, key)),
+      );
+      return {
+        idea,
+        workspace,
+        answers: answers.map((row) => [row?.text, row?.lockVersion]),
+        history: (
+          await db
+            .select({ id: changeHistory.id })
+            .from(changeHistory)
+            .where(eq(changeHistory.containerId, team.validationId))
+        ).length,
+      };
+    };
+    const before = await state();
+    expect(before.answers).toEqual([
+      ["Offices", 3],
+      [null, 2],
+    ]);
+
+    for (const attempt of [1, 2]) {
+      const response = await revertBatch(batchId, team.memberCookie);
+      expect({ attempt, status: response.status }).toEqual({
+        attempt,
+        status: 200,
+      });
+      const result = historyBatchRevertResultSchema.parse(
+        await response.json(),
+      );
+      expect(result.reverted).toBe(0);
+      expect(result.batchId).not.toBe(batchId);
+      expect(
+        await db
+          .select()
+          .from(changeHistory)
+          .where(eq(changeHistory.batchId, result.batchId)),
+      ).toEqual([]);
+      expect(await state()).toEqual(before);
+    }
+
+    // The import was never undone, so once an item moves again H3 puts it back.
+    later();
+    await saveAnswer(team, "V.01.WHO", { text: "HR officers" });
+    const response = await revertBatch(batchId, team.memberCookie);
+    expect(response.status).toBe(200);
+    expect(
+      historyBatchRevertResultSchema.parse(await response.json()).reverted,
+    ).toBe(1);
+    expect((await answerOf(team, "V.01.WHO"))?.text).toBe("Offices");
   });
 
   test("puts back the pinned version and removes the cost rows of a template migration", async () => {
@@ -1224,6 +1293,56 @@ describe("a person's manual edits in a row are one change (ADR-020)", () => {
     const [added] = await rowsOf(team.validationId, "V.01.WHO");
     expect(added?.firstChangedAt?.getTime()).toBe(first);
   });
+
+  // K-08 and K-16 count a merged row once, by the client of its last change (SDD 11章).
+  for (const [first, last] of [
+    ["web", "web_mobile"],
+    ["web_mobile", "web"],
+  ] as const) {
+    test(`a merged row takes its last save's client: ${first}, then ${last}`, async () => {
+      const team = await teamWithNewIdea(app, fixtures);
+      await answered(team);
+      await saveAnswer(team, "V.01.WHO", { text: "HR" }, undefined, first);
+      await saveAnswer(
+        team,
+        "V.01.WHO",
+        { text: "HR officers" },
+        undefined,
+        last,
+      );
+      expect(
+        (await rowsOf(team.validationId, "V.01.WHO")).map((row) => [
+          row.action,
+          row.client,
+        ]),
+      ).toEqual([
+        ["create", "unknown"],
+        ["update", last],
+      ]);
+
+      const fresh = await teamWithNewIdea(app, fixtures);
+      await saveAnswer(
+        fresh,
+        "V.01.WHO",
+        { text: "Offices" },
+        undefined,
+        first,
+      );
+      await saveAnswer(
+        fresh,
+        "V.01.WHO",
+        { text: "Offices in Bacolod" },
+        undefined,
+        last,
+      );
+      expect(
+        (await rowsOf(fresh.validationId, "V.01.WHO")).map((row) => [
+          row.action,
+          row.client,
+        ]),
+      ).toEqual([["create", last]]);
+    });
+  }
 
   test("folds a new row's edits into its addition", async () => {
     const team = await teamWithNewIdea(app, fixtures);

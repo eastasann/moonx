@@ -1,4 +1,4 @@
-import { formatList, formatRelativeTime } from "@moonx/i18n";
+import { formatInteger, formatList, formatRelativeTime } from "@moonx/i18n";
 import {
   type TemplateCheckResult,
   type TemplateKind,
@@ -24,7 +24,6 @@ import {
   MenuItem,
   RowList,
   RowListItem,
-  Skeleton,
   Stack,
   Text,
   Tree,
@@ -39,7 +38,10 @@ import { MousePointerClick, Plus } from "lucide-react";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { adminToast, useDetailHistory } from "../components/admin";
-import { toastFailure } from "../components/ideaActions";
+import {
+  useFailureOnceClosed,
+  useToastFailure,
+} from "../components/ideaActions";
 import {
   ReorderDialog,
   ReorderGroupedDialog,
@@ -50,7 +52,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import {
   AddQuestionDialog,
@@ -81,6 +83,7 @@ import {
   SETTINGS_NODES,
   type SettingsNode,
 } from "../lib/links";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import {
   adminTemplatesQuery,
@@ -98,6 +101,10 @@ import {
   sectionItemKey,
 } from "../lib/template-drafts";
 import { useDocumentTitle } from "../lib/title";
+import {
+  TemplateVersionSkeleton,
+  TreeSkeleton,
+} from "./TemplateVersionSkeleton";
 
 /** `/admin/templates/versions/$versionId`'s search parameters (SDD 4章). */
 export interface TemplateVersionSearch {
@@ -224,7 +231,9 @@ function SectionFacts({
             : t("admin:version.section.questions")
         }
       >
-        <Text variant="number-sm">{String(section.questions.length)}</Text>
+        <Text variant="number-sm">
+          {formatInteger(section.questions.length)}
+        </Text>
       </DescriptionListItem>
     </DescriptionList>
   );
@@ -405,7 +414,7 @@ function SettingsFacts({
                   end={
                     value === undefined
                       ? t("admin:version.none")
-                      : String(value)
+                      : formatInteger(value)
                   }
                   isEndNumeric={value !== undefined}
                 >
@@ -546,6 +555,7 @@ function NodeDetail({
 }) {
   const { t } = useTranslation(["admin"]);
   const isPhone = useIsNarrow();
+  const isOnline = useIsOnline();
   const [isEditing, setEditing] = useState(false);
   const isDraft = version.status === "draft";
   const words = version.kind === "business_plan" ? "plan" : "other";
@@ -585,6 +595,17 @@ function NodeDetail({
             {isDraft && (
               <ActionMenu
                 aria-label={t("admin:version.more", { name })}
+                // Each of them changes the draft: offline, none can be sent (6.0.6).
+                disabledKeys={
+                  isOnline
+                    ? []
+                    : [
+                        "add-question",
+                        "reorder-sections",
+                        "reorder-questions",
+                        "delete",
+                      ]
+                }
                 onAction={(key) => {
                   if (key === "add-question") {
                     onAction({ kind: "add-question", section });
@@ -638,7 +659,9 @@ function NodeDetail({
           )}
         </Stack>
       )}
-      {isDraft && isPhone && isEditing && (
+      {/* Opened by a draft's Edit; it stays until closed, past a publish read meanwhile,
+          and its fields' saves say why they are refused. */}
+      {isPhone && isEditing && (
         <Dialog
           isOpen
           onOpenChange={(isOpen) => {
@@ -989,20 +1012,6 @@ function VersionHeader({
   );
 }
 
-/** The tree's pane while the version loads (design-spec 6.0.6). */
-function TreeSkeleton() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-200">
-        {[0, 1, 2, 3].map((row) => (
-          <Text key={row}>{t("admin:version.choose")}</Text>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 /** The tabs of the tree's pane: the contents, and for a draft the check. */
 type PaneTab = "contents" | "check";
 
@@ -1034,6 +1043,7 @@ function VersionBody({
   version: TemplateVersionDetail;
   search: TemplateVersionSearch;
 }) {
+  const toastFailure = useToastFailure();
   const { t } = useTranslation(["admin", "errors"]);
   const { me } = useWorkspace();
   const isTwoColumns = useTwoColumns();
@@ -1084,34 +1094,58 @@ function VersionBody({
       staleTime: 0,
     });
 
+  // Whether 27 is still open when a send settles, which may be later: a user who left
+  // meanwhile is not taken to 26, nor is the URL or the focus of where they went touched
+  // (design-spec 6.0.6「送っている間に閉じた送信の失敗」).
+  const isOpen = useIsMounted();
+  const sendPublish = async () => {
+    const published = await sendThrough(() =>
+      unwrap(
+        api()
+          .api.v1.admin["template-versions"]({
+            versionId: inPath(version.id),
+          })
+          .publish.post(),
+      ),
+    );
+    await queryClient.invalidateQueries({
+      queryKey: adminTemplatesQuery().queryKey,
+    });
+    void queryClient.invalidateQueries({ queryKey: versionKey });
+    adminToast(
+      t("admin:version.published", {
+        kind: kindLabel,
+        version: published.versionNumber,
+      }),
+    );
+  };
+  // 27 left while Publish was on its way: a failure says so in a toast, whose Retry
+  // publishes again; a refusal 27 has words for says them alone, with the version and 26's
+  // list read again when it was published meanwhile.
+  const failedOnceLeft = useFailureOnceClosed(sendPublish, (error) => {
+    const code = failureCode(error);
+    if (code === "TEMPLATE_INVALID") return t("errors:TEMPLATE_INVALID");
+    if (code !== "PUBLISHED_READ_ONLY") return null;
+    void queryClient.invalidateQueries({ queryKey: versionKey });
+    void queryClient.invalidateQueries({
+      queryKey: adminTemplatesQuery().queryKey,
+    });
+    return t("errors:PUBLISHED_READ_ONLY");
+  });
+
   const publish = async () => {
     if (busy.current) return;
     busy.current = true;
     setPublishing(true);
     setFailure(null);
     try {
-      const published = await sendThrough(() =>
-        unwrap(
-          api()
-            .api.v1.admin["template-versions"]({
-              versionId: inPath(version.id),
-            })
-            .publish.post(),
-        ),
-      );
-      await queryClient.invalidateQueries({
-        queryKey: adminTemplatesQuery().queryKey,
-      });
-      void queryClient.invalidateQueries({ queryKey: versionKey });
-      adminToast(
-        t("admin:version.published", {
-          kind: kindLabel,
-          version: published.versionNumber,
-        }),
-      );
-      await navigate({ href: adminTemplatesHref(version.kind) });
+      await sendPublish();
+      if (isOpen.current) {
+        await navigate({ href: adminTemplatesHref(version.kind) });
+      }
     } catch (error) {
-      if (isSessionLost(error)) return;
+      failedOnceLeft(error, undefined);
+      if (!isOpen.current || isSessionLost(error)) return;
       const code = failureCode(error);
       // The check found problems since it was read, or someone published it meanwhile:
       // both are read again.
@@ -1165,7 +1199,7 @@ function VersionBody({
       const code = failureCode(error);
       if (code === "PUBLISHED_READ_ONLY") {
         void queryClient.invalidateQueries({ queryKey: versionKey });
-        adminToast(t("admin:version.alreadyPublished"));
+        adminToast(t("errors:PUBLISHED_READ_ONLY"));
         return;
       }
       if (code !== "NOT_FOUND") {
@@ -1186,6 +1220,7 @@ function VersionBody({
       if (item !== undefined) autosave.discard(key, Object.keys(item.unsaved));
     }
     void queryClient.invalidateQueries({ queryKey: versionKey });
+    if (!isOpen.current) return;
     if (search.node !== undefined && ids.includes(search.node)) {
       detailHistory.close({ search: {} });
       // The ⋯ that asked went with the node: the keyboard goes to the tree, on the row
@@ -1258,9 +1293,11 @@ function VersionBody({
         label: questionLabel(question),
       })),
     }));
+  // Offline it cannot be sent: under the tree and as a phone's "+" (6.17).
   const addSection = {
     label: t(`admin:version.add.section.${words}`),
     onPress: () => setDialog({ kind: "add-section" }),
+    isDisabled: !isOnline,
   };
   let listNote: ReactNode;
   if (isDraft && tab === "check") {
@@ -1276,7 +1313,7 @@ function VersionBody({
           variant="secondary"
           isQuiet
           onPress={addSection.onPress}
-          isDisabled={!isOnline}
+          isDisabled={addSection.isDisabled}
         >
           <Plus />
           {addSection.label}
@@ -1301,8 +1338,8 @@ function VersionBody({
               <SendFailure
                 error={failure}
                 messages={{
-                  TEMPLATE_INVALID: t("admin:version.publishInvalid"),
-                  PUBLISHED_READ_ONLY: t("admin:version.alreadyPublished"),
+                  TEMPLATE_INVALID: t("errors:TEMPLATE_INVALID"),
+                  PUBLISHED_READ_ONLY: t("errors:PUBLISHED_READ_ONLY"),
                 }}
                 transient="couldNotSave"
                 withSaveReasons
@@ -1460,26 +1497,6 @@ function VersionBody({
   );
 }
 
-/** 27's shape while its route loads (design-spec 6.0.6). */
-export function TemplateVersionSkeleton() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Skeleton isLoading>
-          <Heading level={1} variant="heading-1-list">
-            {t("admin:version.title")}
-          </Heading>
-        </Skeleton>
-      }
-      list={<TreeSkeleton />}
-      detail={null}
-      listLabel={t("admin:templates.title")}
-      onBack={() => {}}
-    />
-  );
-}
-
 /** Reads the version, then shows it; the states of 6.0.6 in its place until then. */
 function VersionLoader({
   versionId,
@@ -1489,8 +1506,11 @@ function VersionLoader({
   search: TemplateVersionSearch;
 }) {
   const { me } = useWorkspace();
-  const query = useQuery(templateVersionQuery(versionId));
-  const isSlow = useIsSlow(query.isPending);
+  const options = templateVersionQuery(versionId);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   if (query.data !== undefined) {
     return <VersionBody version={query.data} search={search} />;
   }
@@ -1506,7 +1526,7 @@ function VersionLoader({
       />
     );
   }
-  if (isSlow) return <SlowLoadingState onRetry={() => void query.refetch()} />;
+  if (isSlow) return <SlowLoadingState onRetry={retrySlow} />;
   return <TemplateVersionSkeleton />;
 }
 

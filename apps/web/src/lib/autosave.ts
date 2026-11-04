@@ -5,6 +5,7 @@ import {
 } from "@moonx/schemas";
 import type { SaveState } from "@moonx/ui-tokens";
 import { ApiError } from "./api";
+import { isTransient } from "./failure";
 
 /** The fields of one item that wait to be saved, by name. */
 export type SaveFields = Readonly<Record<string, unknown>>;
@@ -85,9 +86,15 @@ export const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16_000, 30_000];
  */
 export const UNREACHABLE_AFTER = 3;
 
-/** Codes whose refusal no second send changes (ADR-021「恒久的な失敗」). */
-const isTransient = (error: ApiError) =>
-  error.status === null || error.status >= 500 || error.status === 429;
+/**
+ * A failed save that is sent again by itself (ADR-021「一時的な失敗」, SDD 8.2): what may
+ * pass next time ({@link isTransient}), any other 5xx too, and a rate limit after its
+ * wait. Any other refusal no second send changes (ADR-021「恒久的な失敗」).
+ */
+const resendsByItself = (error: ApiError) =>
+  isTransient(error) ||
+  (error.status !== null && error.status >= 500) ||
+  error.status === 429;
 
 const retryAfterMs = (error: ApiError): number | null => {
   const seconds = error.detail.retryAfterSeconds;
@@ -155,7 +162,11 @@ export interface Autosave {
   cancelSignIn: () => void;
   /** Leaving for the sign-in screen, or logging out: the input is dropped (ADR-021). */
   discardAll: () => void;
-  /** Follows the browser's online and offline events; returns the way to stop. */
+  /**
+   * Follows the browser's online and offline events; returns the way to stop. Stopping
+   * clears every pending send and keeps the store from scheduling or sending (a send on
+   * its way still settles) until it is started again, which sends what was held then.
+   */
   start: () => () => void;
 }
 
@@ -176,6 +187,9 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
   let isUnreachable = false;
   let isReconnecting = false;
   let needsSignIn = false;
+  // Between start's stop and the next start (the app unmounted, or React StrictMode's
+  // remount): nothing is scheduled or sent, so a retry never outlives the app it saved for.
+  let stopped = false;
   let state: AutosaveState = build();
 
   function view(item: Item): SaveItem {
@@ -223,6 +237,12 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
     if (item.sending !== null) return;
     if (isEmpty(item.unsaved)) {
       if (item.status === "waiting") item.status = "saved";
+      emit();
+      return;
+    }
+    if (stopped) {
+      // Held until start sends it.
+      if (item.status === "saving") item.status = "waiting";
       emit();
       return;
     }
@@ -276,6 +296,7 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
    */
   function sendLater(item: Item, delay: number) {
     clearTimer(item);
+    if (stopped) return;
     item.timer = setTimeout(() => {
       item.timer = null;
       if (items.get(item.target.key) === item && sendsByItself(item.status)) {
@@ -318,7 +339,7 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
       }
     }
     item.failure = apiError;
-    if (isTransient(apiError)) {
+    if (resendsByItself(apiError)) {
       item.status = "retrying";
       if (apiError.status === null) {
         networkFailures += 1;
@@ -484,6 +505,11 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
       emit();
     },
     start: () => {
+      if (stopped) {
+        stopped = false;
+        // Their timers went with the stop: what was held goes out now, as once back online.
+        sendAllHeld();
+      }
       const online = () => {
         // The browser is back: the failures seen while it was away say nothing more.
         networkFailures = 0;
@@ -498,6 +524,8 @@ export function createAutosave(options: AutosaveOptions = {}): Autosave {
       window.addEventListener("online", online);
       window.addEventListener("offline", offline);
       return () => {
+        stopped = true;
+        for (const item of items.values()) clearTimer(item);
         window.removeEventListener("online", online);
         window.removeEventListener("offline", offline);
       };

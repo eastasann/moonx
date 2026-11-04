@@ -1,19 +1,45 @@
+import {
+  conditionAnswersOutside,
+  decidesElsewhere,
+  isQuestionShown,
+  VALIDATION_SECTION_KEYS,
+} from "@moonx/domain";
 import type {
+  Evidence,
   Me,
   Role,
   TemplateSection,
   ValidationAnswer,
 } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import { RETRY_DELAYS_MS } from "../lib/autosave";
+import {
+  ana,
+  apiError,
+  type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
+  renderApp,
+  setViewport,
+  stubApi,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   answer,
   evidenceOf,
   home,
   prices,
+  question,
+  questionsRead,
   section01,
   section02,
   survey,
@@ -23,37 +49,113 @@ import {
 // 11 Question form for a validation section and M2 Evidence (design-spec 6.2・6.0.3).
 
 afterEach(() => {
+  cleanupThenRestoreFocus();
   vi.unstubAllGlobals();
+  setViewport(1024);
 });
 
 const ideaPath = `/api/v1/ideas/${home.idea.id}`;
-const base = `/w/${workspaceId}/ideas/${home.idea.id}/questions`;
+const ideaBase = `/w/${workspaceId}/ideas/${home.idea.id}`;
+const base = `${ideaBase}/questions`;
 const validationPath = `/api/v1/validations/${validationId}`;
+
+const sectionOrder: readonly string[] = VALIDATION_SECTION_KEYS;
+
+/** V1 with its ten sections, as the API returns them: the fixture leaves out 02 and 10. */
+const hub = {
+  ...home,
+  sections: [
+    ...home.sections,
+    {
+      key: "02",
+      title: "02 Market",
+      answered: 0,
+      total: 8,
+      count: null,
+      fau: null,
+    },
+    {
+      key: "10",
+      title: "10 Final Assessment",
+      answered: 0,
+      total: 6,
+      count: null,
+      fau: null,
+    },
+  ].sort((a, b) => sectionOrder.indexOf(a.key) - sectionOrder.indexOf(b.key)),
+};
 
 const as = (role: Role): Me => ({
   ...ana,
   memberships: ana.memberships.map((membership) => ({ ...membership, role })),
 });
 
+/** An answer with `text` and no F/A/U yet: Unclassified. */
+const written = (key: string, text: string) =>
+  answer(key, {
+    text,
+    classification: {
+      fau: null,
+      confidence: null,
+      state: "unclassified",
+      evidence: [],
+    },
+    lockVersion: 1,
+  });
+
+const puts = (calls: Call[]) =>
+  calls.filter(({ method }) => method === "PUT").map(({ body }) => body);
+
 /** The API of 11, answering saves with `put` and M2's sends with `evidence`. */
 function formApi({
   me = ana,
   section = section01,
   answers = section.questions.map(({ key }) => answer(key)),
+  others = [],
+  elsewhere = [],
+  beforeSave,
   archived = false,
+  beforeHome,
   put,
   evidence = (_call: Call): Response | Promise<Response> | undefined =>
     undefined,
 }: {
-  me?: Me;
+  me?: Me | (() => Me);
   section?: TemplateSection;
   answers?: ValidationAnswer[];
-  archived?: boolean;
+  /** The version's other sections V2 reads too, their display conditions included. */
+  others?: TemplateSection[];
+  /** The answers to the questions of `others`. */
+  elsewhere?: ValidationAnswer[];
+  /** Holds a save back before the fake applies it, as a slow V3 would. */
+  beforeSave?: () => Promise<void>;
+  archived?: boolean | (() => boolean);
+  /** Holds V1's answer back, as a slow read would. */
+  beforeHome?: () => Promise<void> | undefined;
   put?: (call: Call) => Response;
   evidence?: (call: Call) => Response | Promise<Response> | undefined;
 } = {}) {
   // What the fake API holds of each answer, so a later save sees the earlier ones.
-  const saved = new Map(answers.map((item) => [item.questionKey, item]));
+  const saved = new Map(
+    [...answers, ...elsewhere].map((item) => [item.questionKey, item]),
+  );
+  const version = [section, ...others].flatMap(({ questions }) => questions);
+  /** V2 of `read`: `answers` for the section opened, what the fake holds for others. */
+  const questionsOf = (read: TemplateSection) =>
+    questionsRead(
+      read,
+      read === section
+        ? answers
+        : read.questions.map(({ key }) => saved.get(key) ?? answer(key)),
+      {
+        conditionAnswers: conditionAnswersOutside(
+          read.questions,
+          version,
+          saved,
+        ),
+        decidesElsewhere: decidesElsewhere(read.questions, version),
+      },
+    );
   const save =
     put ??
     ((call: Call) => {
@@ -86,21 +188,37 @@ function formApi({
       saved.set(key, after);
       return Response.json(after);
     });
+  const meNow = () => (typeof me === "function" ? me() : me);
+  const archivedNow = () =>
+    typeof archived === "function" ? archived() : archived;
   return stubApi((call) => {
     const { method, path } = call;
-    if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
-    if (method === "GET" && path === `${ideaPath}/validation`) {
-      return Response.json({ ...home, idea: { ...home.idea, archived } });
+    if (method === "GET" && path === "/api/v1/me") {
+      return Response.json(meNow());
     }
-    if (
-      method === "GET" &&
-      path === `${validationPath}/questions/${section.key}`
-    ) {
-      return Response.json({ section, answers });
+    if (method === "PATCH" && path === "/api/v1/me") {
+      return Response.json(meNow());
+    }
+    if (method === "GET" && path === `${ideaPath}/validation`) {
+      // Read as the answer goes out: a change while it is held shows in it.
+      const read = () =>
+        Response.json({
+          ...hub,
+          idea: { ...hub.idea, archived: archivedNow() },
+        });
+      const held = beforeHome?.();
+      return held === undefined ? read() : held.then(read);
+    }
+    const read = [section, ...others].find(
+      ({ key }) => path === `${validationPath}/questions/${key}`,
+    );
+    if (method === "GET" && read !== undefined) {
+      return Response.json(questionsOf(read));
     }
     if (method === "PUT" && path.startsWith(`${validationPath}/answers/`)) {
-      return save(call);
+      return beforeSave === undefined
+        ? save(call)
+        : beforeSave().then(() => save(call));
     }
     if (method === "GET" && path.startsWith(`${validationPath}/research-log`)) {
       return Response.json({ items: [survey, prices], nextCursor: null });
@@ -156,6 +274,76 @@ describe("11 Question form (design-spec 6.2)", () => {
     await waitFor(() =>
       expect(document.title).toBe("01 Customer & Problem · BCDX · moonx"),
     );
+  });
+
+  test("every question answered: it opens on the first one, its field focused", async () => {
+    formApi({
+      answers: [
+        written("V.01.WHO", "Office workers"),
+        written("V.01.PROBLEM", "No lunch nearby"),
+        written("V.01.PROOF", "Lunch survey"),
+      ],
+    });
+    renderApp(`${base}/01`);
+    const who = await screen.findByRole("textbox", { name: "Answer to WHO" });
+    await waitFor(() => expect(document.activeElement).toBe(who));
+    expect(screen.getByText("3/3")).toBeTruthy();
+  });
+
+  test("a save that failed: Couldn't save and Retry in its card, the input kept, and Retry sends it", async () => {
+    let isFailing = true;
+    let answerFirstSave: () => void = () => {};
+    const firstSaveAnswered = new Promise<void>((resolve) => {
+      answerFirstSave = resolve;
+    });
+    const calls = formApi({
+      beforeSave: () => firstSaveAnswered,
+      put: (call) =>
+        isFailing
+          ? apiError(503, "UPSTREAM_UNAVAILABLE")
+          : Response.json(
+              written("V.01.WHO", (call.body as { text: string }).text),
+            ),
+    });
+    renderApp(`${base}/01?q=V.01.WHO`);
+    await userEvent
+      .setup()
+      .type(
+        await screen.findByRole("textbox", { name: "Answer to WHO" }),
+        "Tourists",
+      );
+    await waitFor(() => expect(puts(calls)).toHaveLength(1), {
+      timeout: 3000,
+    });
+    // The store schedules its own re-send when the 503 lands: on a clock only the test
+    // moves from here, so no send but Retry's can come before RETRY_DELAYS_MS[0]. (No
+    // userEvent on it: its act waits on a timer of that clock.)
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        answerFirstSave();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(card("WHO").textContent).toContain("Couldn't save");
+      expect(
+        within(card("WHO")).getByRole("textbox", { name: "Answer to WHO" }),
+      ).toHaveProperty("value", "Tourists");
+      expect(puts(calls)).toHaveLength(1);
+      isFailing = false;
+      fireEvent.click(
+        within(card("WHO")).getByRole("button", { name: "Retry" }),
+      );
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(puts(calls)).toEqual([
+        { text: "Tourists", lockVersion: 0 },
+        { text: "Tourists", lockVersion: 0 },
+      ]);
+      expect(card("WHO").textContent).not.toContain("Couldn't save");
+      await act(() => vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[0] ?? 0));
+      expect(puts(calls)).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("?q= focuses that question; EXAMPLE opens with it, and Hint opens its help when pressed", async () => {
@@ -306,10 +494,200 @@ describe("11 Question form (design-spec 6.2)", () => {
     expect(screen.queryByRole("region", { name: "RED: SURVIVORS" })).toBeNull();
     await user.click(screen.getByRole("radio", { name: "Red" }));
     expect(screen.getByText("1/3")).toBeTruthy();
+    // OCEAN has a value: the hint is gone.
+    expect(card("OCEAN").textContent).not.toContain(
+      "to see the next questions",
+    );
     expect(screen.getByRole("region", { name: "RED: SURVIVORS" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "BLUE: GAP" })).toBeNull();
     await user.click(screen.getByRole("radio", { name: "Mixed" }));
     expect(screen.getByText("1/4")).toBeTruthy();
+  });
+
+  test("02: an answer OCEAN hides is kept but not counted, and shows and counts once chosen back", async () => {
+    const user = userEvent.setup();
+    const calls = formApi({
+      section: section02,
+      answers: [
+        written("V.02.CATEGORY", "Food delivery"),
+        written("V.02.OCEAN", "Red"),
+        written("V.02.RED_1", "Two kiosks survive on price"),
+        answer("V.02.BLUE_1"),
+      ],
+    });
+    renderApp(`${base}/02?q=V.02.OCEAN`);
+    await screen.findByRole("radiogroup", { name: "Answer to OCEAN" });
+    expect(screen.getByText("3/3")).toBeTruthy();
+    expect(card("OCEAN").textContent).not.toContain(
+      "to see the next questions",
+    );
+    await user.click(screen.getByRole("radio", { name: "Blue" }));
+    // RED's answer is hidden: BLUE's question is the only one not answered, of three.
+    expect(screen.getByText("2/3")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "RED: SURVIVORS" })).toBeNull();
+    expect(card("BLUE: GAP")).toBeTruthy();
+    await user.click(screen.getByRole("radio", { name: "Red" }));
+    expect(screen.getByText("3/3")).toBeTruthy();
+    expect(card("RED: SURVIVORS")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "BLUE: GAP" })).toBeNull();
+    // Only OCEAN was sent: the hidden answer is never cleared.
+    await waitFor(() =>
+      expect(puts(calls)).toEqual([
+        { text: "Blue", lockVersion: 1 },
+        { text: "Red", lockVersion: 2 },
+      ]),
+    );
+  });
+
+  /** 10 with a question shown once 01 WHO is "Offices": a condition on another section. */
+  const section10: TemplateSection = {
+    key: "10",
+    part: null,
+    title: "Synthesis",
+    subtitle: null,
+    guidance: null,
+    questions: [
+      question("V.10.WHY_WORK", "WHY WORK", "Why would this work?"),
+      question("V.10.OFFICES", "OFFICE ORDERS", "How do offices order?", {
+        displayCondition: { "V.01.WHO": ["Offices"] },
+      }),
+    ],
+  };
+
+  test.each([
+    ["Offices", true],
+    ["Students", false],
+  ])(
+    "10 shows a question by 01 WHO's answer (%s) and counts as 13 does",
+    async (who, isShown) => {
+      formApi({
+        section: section10,
+        others: [section01],
+        elsewhere: [answer("V.01.WHO", { text: who, lockVersion: 1 })],
+      });
+      renderApp(`${base}/10`);
+      await screen.findByRole("region", { name: "WHY WORK" });
+      // 13 counts the questions shown on all of the validation's answers (6.1・6.2).
+      const hub = section10.questions.filter((item) =>
+        isQuestionShown(item, new Map([["V.01.WHO", { text: who }]])),
+      );
+      expect(hub).toHaveLength(isShown ? 2 : 1);
+      expect(screen.getByText(`0/${hub.length}`)).toBeTruthy();
+      expect(
+        screen.queryByRole("region", { name: "OFFICE ORDERS" }) !== null,
+      ).toBe(isShown);
+    },
+  );
+
+  test("a question another section's condition names says how to reveal it while unanswered", async () => {
+    const user = userEvent.setup();
+    const calls = formApi({ others: [section10] });
+    renderApp(`${base}/01?q=V.01.WHO`);
+    const who = await screen.findByRole("textbox", { name: "Answer to WHO" });
+    expect(card("WHO").textContent).toContain(
+      "Answer WHO to see the next questions",
+    );
+    expect(card("PROBLEM").textContent).not.toContain("to see the next");
+    await user.type(who, "Offices");
+    expect(card("WHO").textContent).not.toContain("to see the next");
+    await waitFor(
+      () =>
+        expect(calls.filter(({ method }) => method === "PUT")).toHaveLength(1),
+      { timeout: 3000 },
+    );
+  });
+
+  test("a save sent on leaving reads the next section again, whose condition names it", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls = formApi({ others: [section10], beforeSave: () => held });
+    const router = renderApp(`${base}/01?q=V.01.WHO`);
+    const who = await screen.findByRole("textbox", { name: "Answer to WHO" });
+    await user.type(who, "Offices");
+    await router.navigate({ href: `${base}/10` });
+    // Read before the save of WHO landed: what it shows is not shown yet.
+    expect(await screen.findByText("0/1")).toBeTruthy();
+    release();
+    expect(await screen.findByText("0/2")).toBeTruthy();
+    expect(card("OFFICE ORDERS")).toBeTruthy();
+    expect(
+      calls.filter(
+        ({ method, path }) =>
+          method === "GET" && path === `${validationPath}/questions/10`,
+      ),
+    ).toHaveLength(2);
+  });
+
+  test("the sections run 01 → 02 → 03 (14) and 09 (16) → 10: nothing before 01, nothing after 10", async () => {
+    const user = userEvent.setup();
+    formApi({ others: [section02, section10] });
+    const router = renderApp(`${base}/01`);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "01 Customer & Problem",
+    });
+    expect(
+      screen.queryByRole("button", { name: "Previous section" }),
+    ).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Next: 02 Market" }));
+    await screen.findByRole("heading", { level: 1, name: "02 Market" });
+    expect(router.state.location.pathname).toBe(`${base}/02`);
+    await user.click(
+      screen.getByRole("button", { name: "Next: 03 Research Log" }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`${ideaBase}/research`),
+    );
+    await router.navigate({ href: `${base}/02` });
+    await user.click(
+      await screen.findByRole("button", { name: "Previous section" }),
+    );
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "01 Customer & Problem",
+    });
+    expect(router.state.location.pathname).toBe(`${base}/01`);
+    await router.navigate({ href: `${base}/10` });
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "10 Final Assessment",
+    });
+    expect(screen.queryByRole("button", { name: /^Next: / })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Previous section" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`${ideaBase}/assumptions`),
+    );
+  });
+
+  test("on a phone, → on the last question shows the section's card with Next: the next section; 10's has none", async () => {
+    setViewport(390);
+    const user = userEvent.setup();
+    formApi({ others: [section02, section10] });
+    const router = renderApp(`${base}/01?q=V.01.PROOF`);
+    await screen.findByRole("textbox", { name: "Answer to PROOF" });
+    await user.click(screen.getByRole("button", { name: "Next question" }));
+    expect(
+      await screen.findByRole("heading", { name: "01: 0/3 answered" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Back to Validation" }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Next: 02 Market" }));
+    await screen.findByRole("heading", { level: 1, name: "02 Market" });
+    expect(router.state.location.pathname).toBe(`${base}/02`);
+    await router.navigate({ href: `${base}/10` });
+    await screen.findByRole("textbox", { name: "Answer to WHY WORK" });
+    await user.click(screen.getByRole("button", { name: "Next question" }));
+    expect(
+      await screen.findByRole("heading", { name: "10: 0/1 answered" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Back to Validation" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Next: / })).toBeNull();
   });
 
   test("a Viewer reads every question open, F/A/U as labels, without Focus or a way to add research", async () => {
@@ -391,6 +769,91 @@ describe("11 Question form (design-spec 6.2)", () => {
       within(sheet).getByRole("row", { name: /Lunch survey \(deleted\)/ }),
     ).toBeTruthy();
   });
+
+  test("Related research counts the evidence that counts: not a deleted research log's", async () => {
+    const url: Evidence = {
+      id: "7d0f0000-0000-4000-8000-000000000009",
+      kind: "url",
+      researchLog: null,
+      url: "https://psa.gov.ph/report",
+      note: null,
+    };
+    formApi({
+      answers: [
+        answer("V.01.WHO", {
+          text: "Office workers",
+          classification: {
+            fau: "fact",
+            confidence: null,
+            state: "fact",
+            evidence: [
+              evidenceOf("7d0f0000-0000-4000-8000-000000000001", survey),
+              evidenceOf("7d0f0000-0000-4000-8000-000000000008", prices, true),
+              url,
+            ],
+          },
+          lockVersion: 2,
+        }),
+        answer("V.01.PROBLEM"),
+        answer("V.01.PROOF"),
+      ],
+    });
+    renderApp(`${base}/01?q=V.01.WHO`);
+    await screen.findByRole("textbox", { name: "Answer to WHO" });
+    expect(
+      within(card("WHO")).getByRole("button", { name: "Related research (2)" }),
+    ).toBeTruthy();
+    expect(card("WHO").textContent).toContain("Fact · 2 sources");
+  });
+
+  test.each(["owner", "member"] as const)(
+    "an archived idea reads only for its %s: no fields, F/A/U, Focus or ways to add research; Restore",
+    async (role) => {
+      formApi({
+        me: as(role),
+        archived: true,
+        answers: [
+          // Editable, these would offer Mark it Fact and Log research, and Add evidence.
+          written("V.01.WHO", "Office workers"),
+          answer("V.01.PROBLEM", {
+            text: "No lunch nearby",
+            classification: {
+              fau: "fact",
+              confidence: null,
+              state: "fact",
+              evidence: [
+                evidenceOf("7d0f0000-0000-4000-8000-000000000001", survey),
+              ],
+            },
+            lockVersion: 2,
+          }),
+          answer("V.01.PROOF"),
+        ],
+      });
+      renderApp(`${base}/01`);
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "01 Customer & Problem",
+      });
+      expect(screen.getByText("This idea is archived")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy();
+      expect(screen.queryAllByRole("textbox")).toEqual([]);
+      expect(screen.queryAllByRole("radio")).toEqual([]);
+      expect(screen.queryByRole("switch", { name: "Focus" })).toBeNull();
+      expect(document.body.textContent).not.toContain("Mark it Fact");
+      expect(screen.queryByRole("link", { name: "Log research" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Add evidence" })).toBeNull();
+      // Every question open, its answer as text and its F/A/U as a label.
+      expect(card("WHO").textContent).toContain("Office workers");
+      expect(card("WHO").textContent).toContain("Unclassified");
+      expect(card("WHO").textContent).toContain(
+        "No research linked to this answer.",
+      );
+      expect(card("PROBLEM").textContent).toContain("No lunch nearby");
+      expect(card("PROBLEM").textContent).toContain("Fact · 1 source");
+      expect(card("PROOF").textContent).toContain("Empty");
+    },
+  );
 
   test("an answer V2 left out is the API's fault: Something went wrong", async () => {
     formApi({ answers: [answer("V.01.WHO"), answer("V.01.PROBLEM")] });
@@ -1051,31 +1514,132 @@ describe("M2 Evidence (design-spec 6.0.3)", () => {
     );
   });
 
-  test("M2's URL about an item not on the screen opens nothing", async () => {
-    formApi();
-    renderApp(
-      `${base}/01?q=V.01.WHO&modal=evidence&about=validation_answer:${validationId}:V.02.OCEAN`,
+  test("M2's URL opens nothing and comes off it: a Viewer, an archived idea, an about 11 does not show, a question without F/A/U (6.0.3, SDD 4章)", async () => {
+    const noFau: TemplateSection = {
+      ...section01,
+      questions: section01.questions.map((question) =>
+        question.key === "V.01.PROOF"
+          ? { ...question, hasFau: false }
+          : question,
+      ),
+    };
+    const cases: [Parameters<typeof formApi>[0], string, string][] = [
+      [{ me: as("viewer") }, "01", "V.01.WHO"],
+      [{ archived: true }, "01", "V.01.WHO"],
+      // Another section's question, and one OCEAN hides while unanswered.
+      [{}, "01", "V.02.OCEAN"],
+      [{ section: section02 }, "02", "V.02.RED_1"],
+      [{ section: noFau }, "01", "V.01.PROOF"],
+    ];
+    for (const [api, sectionKey, questionKey] of cases) {
+      cleanup();
+      vi.unstubAllGlobals();
+      formApi(api);
+      const router = renderApp(
+        `${base}/${sectionKey}?q=${questionKey}&modal=evidence&about=validation_answer:${validationId}:${questionKey}`,
+      );
+      // In place of the entry, the question to focus kept: Back does not lead to it.
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ q: questionKey }),
+      );
+      expect(router.history.length).toBe(1);
+      expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+  });
+
+  test("M2's URL taken off is not opened by a Restore or a role read again later (SDD 4章)", async () => {
+    let archived = true;
+    let me = as("viewer");
+    formApi({
+      answers: [
+        withText("V.01.WHO"),
+        answer("V.01.PROBLEM"),
+        answer("V.01.PROOF"),
+      ],
+      archived: () => archived,
+      me: () => me,
+    });
+    const router = renderApp(
+      `${base}/01?q=V.01.WHO&modal=evidence&about=validation_answer:${validationId}:V.01.WHO`,
     );
-    // The editable form is in place: only then is "no dialog" an answer.
-    await screen.findByRole("textbox", { name: "Answer to WHO" });
+    await screen.findByText("This idea is archived");
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ q: "V.01.WHO" }),
+    );
+    archived = false;
+    me = ana;
+    readAgainOnFocus();
+    await screen.findByRole(
+      "textbox",
+      { name: "Answer to WHO" },
+      { timeout: 3000 },
+    );
+    expect(screen.queryByText("This idea is archived")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  test("M2's URL about a question without F/A/U opens nothing", async () => {
+  test("V1 read again when M2's URL comes keeps it: the Restore it reads opens M2 (SDD 4章)", async () => {
+    let archived = true;
+    let hold: Promise<void> | undefined;
+    let release = () => {};
     formApi({
-      section: {
-        ...section01,
-        questions: section01.questions.map((question) =>
-          question.key === "V.01.PROOF"
-            ? { ...question, hasFau: false }
-            : question,
-        ),
-      },
+      answers: [
+        withText("V.01.WHO"),
+        answer("V.01.PROBLEM"),
+        answer("V.01.PROOF"),
+      ],
+      archived: () => archived,
+      beforeHome: () => hold,
     });
-    renderApp(
-      `${base}/01?q=V.01.WHO&modal=evidence&about=validation_answer:${validationId}:V.01.PROOF`,
+    const router = renderApp(`${base}/01?q=V.01.WHO`);
+    await screen.findByText("This idea is archived");
+    // Restored elsewhere: the read that says so is on its way when the URL comes.
+    archived = false;
+    hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    readAgainOnFocus();
+    await act(() =>
+      router.navigate({
+        href: `${base}/01?q=V.01.WHO&modal=evidence&about=validation_answer:${validationId}:V.01.WHO`,
+      }),
     );
-    await screen.findByRole("textbox", { name: "Answer to WHO" });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(router.state.location.search).toMatchObject({ modal: "evidence" });
     expect(screen.queryByRole("dialog")).toBeNull();
+    release();
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    expect(sheet.textContent).toContain("01 WHO");
+  });
+
+  test("archived while M2 is open: it stays, says why a send is refused, and closing takes it off the URL (SDD 4章, 6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    formApi({
+      answers: [
+        withText("V.01.WHO"),
+        answer("V.01.PROBLEM"),
+        answer("V.01.PROOF"),
+      ],
+      archived: () => archived,
+      evidence: () => apiError(409, "ARCHIVED"),
+    });
+    const router = renderApp(openM2);
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    archived = true;
+    readAgainOnFocus();
+    expect(
+      await screen.findByText("This idea is archived", {}, { timeout: 3000 }),
+    ).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Evidence" })).toBe(sheet);
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(within(sheet).getByText("It's archived")).toBeTruthy();
+    await user.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(router.state.location.search).toEqual({ q: "V.01.WHO" });
   });
 });

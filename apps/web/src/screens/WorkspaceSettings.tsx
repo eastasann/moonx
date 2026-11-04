@@ -41,10 +41,11 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useFailureOnceClosed } from "../components/ideaActions";
 import { LeaveWorkspaceDialog } from "../components/LeaveWorkspaceDialog";
 import { type RowFieldsSpec, useRowFields } from "../components/RowFields";
 import { SaveFailureNote } from "../components/SaveFeedback";
@@ -53,7 +54,7 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
@@ -65,6 +66,8 @@ import { ApiError, api, inPath, unwrap } from "../lib/api";
 import type { SaveTarget } from "../lib/autosave";
 import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
 import { ruleErrorOf } from "../lib/input-issues";
+import { settingsHref } from "../lib/links";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import {
   invitationsQuery,
@@ -74,6 +77,7 @@ import {
 } from "../lib/queries";
 import { isSessionLost, useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
+import { MembersSkeleton } from "./WorkspaceSettingsSkeleton";
 
 /** How long the toasts of 9 stay (Spectrum's minimum). */
 const TOAST_MS = 5000;
@@ -148,70 +152,6 @@ function workspaceTarget(
     loadTheirs: () =>
       void queryClient.invalidateQueries({ queryKey: meQuery().queryKey }),
   };
-}
-
-/** 9's skeleton: its three groups in the shape of their fields and rows. */
-export function WorkspaceSettingsSkeleton() {
-  const { t } = useTranslation(["settings"]);
-  return (
-    <SettingsPattern
-      header={
-        <Heading level={1} variant="heading-1-settings">
-          {t("settings:workspace.title")}
-        </Heading>
-      }
-      groups={[
-        {
-          id: "workspace",
-          title: t("settings:workspace.workspace.title"),
-          content: (
-            <>
-              <TextField label={t("settings:workspace.workspace.name")} />
-              <TextField label={t("settings:workspace.workspace.currency")} />
-            </>
-          ),
-        },
-        {
-          id: "members",
-          title: t("settings:workspace.members.title"),
-          content: <MembersSkeleton />,
-        },
-        {
-          id: "invitations",
-          title: t("settings:workspace.invitations.title"),
-          content: (
-            <SettingsFieldRow>
-              <TextField
-                aria-label={t("settings:workspace.invitations.email")}
-              />
-              <TextField
-                aria-label={t("settings:workspace.invitations.role")}
-              />
-              <Button variant="primary">
-                {t("settings:workspace.invitations.send")}
-              </Button>
-            </SettingsFieldRow>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
-function MembersSkeleton() {
-  const { t } = useTranslation(["settings"]);
-  return (
-    <SettingsList aria-label={t("settings:workspace.members.list")}>
-      {[0, 1, 2].map((row) => (
-        <SettingsListItem
-          key={row}
-          avatar={<Avatar name="" size="M" />}
-          title={t("settings:workspace.members.title")}
-          description={t("settings:workspace.invitations.emailPlaceholder")}
-        />
-      ))}
-    </SettingsList>
-  );
 }
 
 /**
@@ -359,12 +299,48 @@ type MemberQuestion =
   | { kind: "remove"; member: Member }
   | { kind: "leave" };
 
-/** Why a member's role and ⋯ cannot be used (design-spec 1.3・6.16 9), or null. */
+/** A change to a member that 9 sends itself (Leave is LeaveWorkspaceDialog's). */
+type MemberChange = Exclude<MemberQuestion, { kind: "leave" }>;
+
+/** A send of the invitations' list: Resend or Cancel of one, to its address. */
+interface InvitationAction {
+  kind: "resend" | "cancel";
+  invitationId: string;
+  email: string;
+}
+
+/**
+ * 9's words for a refusal of an invitation's send to `email` (design-spec 6.16 9), which a
+ * toast says alone once 9 is left (6.0.6「送っている間に閉じた送信の失敗」), or null.
+ */
+function invitationRefusalWords(
+  error: unknown,
+  email: string,
+  t: TFunction<["settings", "common", "errors", "app"]>,
+): string | null {
+  switch (failureCode(error)) {
+    case "ALREADY_MEMBER":
+      return t("errors:ALREADY_MEMBER", { email });
+    case "INVITATION_PENDING":
+      return t("errors:INVITATION_PENDING", { email });
+    case "INVITATION_ALREADY_ACCEPTED":
+      return t("errors:INVITATION_ALREADY_ACCEPTED");
+    case "INVITATION_INVALID":
+      return t("errors:INVITATION_INVALID", { context: "cancelled", email });
+    default:
+      return null;
+  }
+}
+
+/**
+ * Why a member's role and ⋯ cannot be used (design-spec 1.3・6.16 9): the code the API
+ * would refuse a change with, whose words say why. Null when they can.
+ */
 const lockOf = (member: Member, owners: number) =>
   member.isPersonalOwner
-    ? ("personalOwner" as const)
+    ? ("PERSONAL_OWNER" as const)
     : member.role === "owner" && owners <= 1
-      ? ("lastOwner" as const)
+      ? ("LAST_OWNER" as const)
       : null;
 
 /**
@@ -372,16 +348,25 @@ const lockOf = (member: Member, owners: number) =>
  * own row). The only Owner and the owner of a personal workspace keep theirs, shown
  * unavailable with why. A role is saved when chosen; making someone a Viewer, making
  * oneself less than Owner and removing ask first, for what they undo (6.16's table).
+ * A change whose 9 was left while it was on its way says its failure in a toast, the
+ * list's words alone and anything else as a row's send does, whose Retry sends the same
+ * change again (6.0.6「送っている間に閉じた送信の失敗」). The sends are this list's, which
+ * stays while 9 does: its rows come and go as the members are read again.
  */
 function MemberList() {
-  const { t } = useTranslation(["settings", "common", "app"]);
+  const { t } = useTranslation(["settings", "common", "app", "errors"]);
   const { me, workspace } = useWorkspace();
   const workspaceId = workspace.id;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const router = useRouter();
   const isOnline = useIsOnline();
-  const query = useQuery(membersQuery(workspaceId));
-  const isSlow = useIsSlow(query.isPending);
+  const isShown = useIsMounted();
+  const options = membersQuery(workspaceId);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const sendThrough = useSendThrough();
   const [question, setQuestion] = useState<MemberQuestion | null>(null);
   const [sending, setSending] = useState<{
@@ -399,6 +384,10 @@ function MemberList() {
     queryClient.setQueryData(membersQuery(workspaceId).queryKey, (list) =>
       list === undefined ? list : { items: update(list.items) },
     );
+  const readMembersAgain = () =>
+    void queryClient.invalidateQueries({
+      queryKey: membersQuery(workspaceId).queryKey,
+    });
   /**
    * A refusal that means the list or the user's role is out of date: read again what it
    * concerns (another Owner left, was demoted or removed someone meanwhile).
@@ -411,90 +400,93 @@ function MemberList() {
         error.code === "LAST_OWNER" ||
         error.code === "PERSONAL_OWNER");
     if (!isStale) return;
-    void queryClient.invalidateQueries({
-      queryKey: membersQuery(workspaceId).queryKey,
-    });
+    readMembersAgain();
     if (error.status === 403) {
       void queryClient.invalidateQueries({ queryKey: meQuery().queryKey });
     }
   };
-  /** Sends one change at a time; a failure stays under the list with Retry. */
-  const send = async (
-    target: { userId: string; role?: Role },
-    request: () => Promise<void>,
-    retry: () => void,
-  ) => {
-    if (busy.current) return;
-    busy.current = true;
-    setSending(target);
-    setFailure(null);
-    try {
-      await sendThrough(request);
-    } catch (error) {
-      if (!isSessionLost(error)) setFailure({ error, retry });
-      refreshOn(error);
-    } finally {
-      busy.current = false;
-      setSending(null);
-    }
-  };
-  const changeRole = (member: Member, role: Role): Promise<void> =>
-    send(
-      { userId: member.user.id, role },
-      async () => {
-        const updated = await unwrap(
-          api()
-            .api.v1.workspaces({ workspaceId })
-            .members({ userId: member.user.id })
-            .patch({ role }),
+  /** Whether the user is on this workspace's 9 now, whichever list sent the change. */
+  const isOnSettings = () =>
+    router.state.location.pathname === settingsHref(workspaceId);
+  /**
+   * W3 for the change, and what it changes on screen. A refusal reads again what it
+   * concerns while 9 shows; once it is left, the toast reads again (`failedOnceLeft`):
+   * the list for its words, every screen's data for a refusal for good.
+   */
+  const apply = (change: MemberChange) =>
+    sendThrough(async () => {
+      const { member } = change;
+      const members = api()
+        .api.v1.workspaces({ workspaceId })
+        .members({ userId: member.user.id });
+      if (change.kind === "remove") {
+        await unwrap(members.delete());
+        putMembers((items) =>
+          items.filter((item) => item.user.id !== member.user.id),
         );
+      } else {
+        const updated = await unwrap(members.patch({ role: change.role }));
         putMembers((items) =>
           items.map((item) =>
             item.user.id === updated.user.id ? updated : item,
           ),
         );
-        // A Viewer's self analysis is no longer shared here (6.16's table).
-        void queryClient.invalidateQueries({
-          queryKey: [...workspaceKey(workspaceId), "dashboard"],
-        });
-        if (member.user.id === me.id) {
-          // No longer an Owner: 9 is not theirs to open (2.2).
-          await navigate({ href: `/w/${workspaceId}` });
-          await queryClient.invalidateQueries({ queryKey: meQuery().queryKey });
-        }
-      },
-      () => void changeRole(member, role),
-    );
-  const remove = (member: Member): Promise<void> =>
-    send(
-      { userId: member.user.id },
-      async () => {
-        await unwrap(
-          api()
-            .api.v1.workspaces({ workspaceId })
-            .members({ userId: member.user.id })
-            .delete(),
-        );
-        putMembers((items) =>
-          items.filter((item) => item.user.id !== member.user.id),
-        );
-        void queryClient.invalidateQueries({
-          queryKey: [...workspaceKey(workspaceId), "dashboard"],
-        });
+      }
+      // A Viewer's or a removed member's self analysis is no longer shared here (6.16's
+      // table).
+      void queryClient.invalidateQueries({
+        queryKey: [...workspaceKey(workspaceId), "dashboard"],
+      });
+      if (change.kind === "remove") {
         ToastQueue.neutral(
           t("settings:confirm.removed", { name: member.user.displayName }),
           { timeout: TOAST_MS },
         );
-      },
-      () => void remove(member),
-    );
+      } else if (member.user.id === me.id) {
+        // No longer an Owner: 9 is not theirs to open (2.2), so it gives way to 5 while
+        // the user is on it, also when the toast's Retry went through after they left 9
+        // and came back (6.0.6: a late success moves them off what it makes unopenable).
+        if (isOnSettings()) await navigate({ href: `/w/${workspaceId}` });
+        await queryClient.invalidateQueries({ queryKey: meQuery().queryKey });
+      }
+    }).catch((error: unknown) => {
+      if (isShown.current) refreshOn(error);
+      throw error;
+    });
+  const failedOnceLeft = useFailureOnceClosed(apply, (error) => {
+    const code = failureCode(error);
+    if (code !== "LAST_OWNER" && code !== "PERSONAL_OWNER") return null;
+    readMembersAgain();
+    return t(`errors:${code}`);
+  });
+  /** Sends one change at a time; a failure stays under the list with Retry. */
+  const send = async (change: MemberChange) => {
+    if (busy.current) return;
+    busy.current = true;
+    setSending({
+      userId: change.member.user.id,
+      ...(change.kind === "role" ? { role: change.role } : {}),
+    });
+    setFailure(null);
+    try {
+      await apply(change);
+    } catch (error) {
+      failedOnceLeft(error, change);
+      if (!isSessionLost(error)) {
+        setFailure({ error, retry: () => void send(change) });
+      }
+    } finally {
+      busy.current = false;
+      setSending(null);
+    }
+  };
   const choose = (member: Member, role: Role) => {
     if (role === member.role) return;
     const isMe = member.user.id === me.id;
     if ((isMe && role !== "owner") || role === "viewer") {
       setQuestion({ kind: "role", member, role });
     } else {
-      void changeRole(member, role);
+      void send({ kind: "role", member, role });
     }
   };
 
@@ -511,13 +503,7 @@ function MemberList() {
       );
     }
     if (isSlow) {
-      return (
-        <SlowLoadingState
-          headingLevel={3}
-          size="S"
-          onRetry={() => void query.refetch()}
-        />
-      );
+      return <SlowLoadingState headingLevel={3} size="S" onRetry={retrySlow} />;
     }
     return (
       <Skeleton isLoading>
@@ -551,11 +537,7 @@ function MemberList() {
                     : undefined
               }
               description={member.email ?? undefined}
-              note={
-                lock === null
-                  ? undefined
-                  : t(`settings:workspace.members.${lock}`)
-              }
+              note={lock === null ? undefined : t(`errors:${lock}`)}
               control={
                 <Picker
                   aria-label={t("settings:workspace.members.role", { name })}
@@ -594,8 +576,8 @@ function MemberList() {
         <SendFailure
           error={failure.error}
           messages={{
-            LAST_OWNER: t("settings:workspace.members.lastOwner"),
-            PERSONAL_OWNER: t("settings:workspace.members.personalOwner"),
+            LAST_OWNER: t("errors:LAST_OWNER"),
+            PERSONAL_OWNER: t("errors:PERSONAL_OWNER"),
           }}
           transient="couldNotSave"
           withSaveReasons
@@ -608,11 +590,7 @@ function MemberList() {
           question={question}
           onAnswer={() => {
             setQuestion(null);
-            if (question.kind === "role") {
-              void changeRole(question.member, question.role);
-            } else if (question.kind === "remove") {
-              void remove(question.member);
-            }
+            if (question.kind !== "leave") void send(question);
           }}
           onClose={() => setQuestion(null)}
         />
@@ -708,40 +686,46 @@ interface InvitationFailure {
  * The invitations (design-spec 6.16 9): an email and a role to send to, then the list,
  * the pending ones by default and every one with All, each pending or expired one with
  * Resend (a new link; the old one stops working) and the pending ones with Cancel. The
- * link goes only to the invited email: the screen never shows it.
+ * link goes only to the invited email: the screen never shows it. A Resend or Cancel
+ * whose 9 was left while it was on its way says its failure in a toast, 9's words alone
+ * and anything else as a row's send does, whose Retry sends it again (6.0.6「送っている間
+ * に閉じた送信の失敗」).
  */
 function Invitations() {
-  const { t } = useTranslation(["settings", "common", "errors"]);
+  const { t } = useTranslation(["settings", "common", "errors", "app"]);
   const { me, workspace } = useWorkspace();
   const workspaceId = workspace.id;
   const queryClient = useQueryClient();
   const isOnline = useIsOnline();
   const [show, setShow] = useState<"pending" | "all">("pending");
-  const query = useQuery(invitationsQuery(workspaceId, show));
-  const isSlow = useIsSlow(query.isPending);
+  const options = invitationsQuery(workspaceId, show);
+  const query = useQuery(options);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const [sending, setSending] = useState<string | null>(null);
   const busy = useRef(false);
   const [failure, setFailure] = useState<InvitationFailure | null>(null);
   const sendThrough = useSendThrough();
+  const isShown = useIsMounted();
   const refresh = () =>
     queryClient.invalidateQueries({
       queryKey: [...workspaceKey(workspaceId), "invitations"],
     });
-  /**
-   * Takes a failed send of the form or the list: what is out of date is read again (the
-   * invitation accepted, cancelled or gone, the user no longer an Owner), and the failure
-   * stays under the form. A lost session shows nothing: the app is leaving for M9 or 2.
-   */
-  const fail = (next: InvitationFailure | null) => {
-    if (next === null || isSessionLost(next.error)) {
-      setFailure(null);
-      return;
-    }
-    const { error } = next;
+  /** The invitation was accepted or cancelled meanwhile: 9's words say so. */
+  const isOverMeanwhile = (error: unknown) => {
     const code = failureCode(error);
+    return (
+      code === "INVITATION_ALREADY_ACCEPTED" || code === "INVITATION_INVALID"
+    );
+  };
+  /**
+   * Reads again what a failed send of the form or the list finds out of date: the
+   * invitation accepted, cancelled or gone, the user no longer an Owner.
+   */
+  const readAgainOn = (error: unknown) => {
     if (
-      code === "INVITATION_ALREADY_ACCEPTED" ||
-      code === "INVITATION_INVALID" ||
+      isOverMeanwhile(error) ||
       (error instanceof ApiError && error.status === 404)
     ) {
       void refresh();
@@ -749,72 +733,74 @@ function Invitations() {
     if (error instanceof ApiError && error.status === 403) {
       void queryClient.invalidateQueries({ queryKey: meQuery().queryKey });
     }
+  };
+  /**
+   * Takes a failed send of the form or the list while 9 shows: what is out of date is
+   * read again, and the failure stays under the form. Once 9 is left, the toast says it
+   * and reads again (useFailureOnceClosed). A lost session shows nothing: the app is
+   * leaving for M9 or 2.
+   */
+  const fail = (next: InvitationFailure | null) => {
+    if (!isShown.current) return;
+    if (next === null || isSessionLost(next.error)) {
+      setFailure(null);
+      return;
+    }
+    readAgainOn(next.error);
     setFailure(next);
   };
+  /** W5 or W7 for the action, the list read again, and the toast that says so. */
+  const apply = ({ kind, invitationId, email }: InvitationAction) =>
+    sendThrough(async () => {
+      const invitations = api().api.v1.invitations({
+        invitationId: inPath(invitationId),
+      });
+      if (kind === "resend") {
+        await unwrap(invitations.resend.post());
+      } else {
+        try {
+          await unwrap(invitations.delete());
+        } catch (error) {
+          if (failureCode(error) !== "INVITATION_INVALID") throw error;
+          // Cancelled already: done, as the list read again shows.
+          await refresh();
+          return;
+        }
+      }
+      await refresh();
+      ToastQueue.neutral(
+        kind === "resend"
+          ? t("settings:workspace.invitations.resent", { email })
+          : t("settings:workspace.invitations.cancelled", { email }),
+        { timeout: TOAST_MS },
+      );
+    });
+  // 9's words read the list again here; the toast of a refusal for good (403, 404) reads
+  // every screen's data again itself.
+  const failedOnceLeft = useFailureOnceClosed(apply, (error, { email }) => {
+    if (isOverMeanwhile(error)) void refresh();
+    return invitationRefusalWords(error, email, t);
+  });
   /** One action at a time on the list. */
-  const act = async (
-    key: string,
-    email: string,
-    request: () => Promise<void>,
-    retry: () => void,
-  ) => {
+  const act = async (action: InvitationAction) => {
     if (busy.current) return;
     busy.current = true;
-    setSending(key);
+    setSending(`${action.kind}:${action.invitationId}`);
     setFailure(null);
     try {
-      await sendThrough(request);
+      await apply(action);
     } catch (error) {
-      // Cancelling one cancelled already: done, as the list read again shows.
-      if (
-        key.startsWith("cancel:") &&
-        failureCode(error) === "INVITATION_INVALID"
-      ) {
-        void refresh();
-      } else {
-        fail({ error, email, retry });
-      }
+      failedOnceLeft(error, action);
+      fail({ error, email: action.email, retry: () => void act(action) });
     } finally {
       busy.current = false;
       setSending(null);
     }
   };
   const resend = (invitationId: string, email: string): Promise<void> =>
-    act(
-      `resend:${invitationId}`,
-      email,
-      async () => {
-        await unwrap(
-          api()
-            .api.v1.invitations({ invitationId: inPath(invitationId) })
-            .resend.post(),
-        );
-        await refresh();
-        ToastQueue.neutral(
-          t("settings:workspace.invitations.resent", { email }),
-          { timeout: TOAST_MS },
-        );
-      },
-      () => void resend(invitationId, email),
-    );
+    act({ kind: "resend", invitationId, email });
   const cancel = (invitationId: string, email: string): Promise<void> =>
-    act(
-      `cancel:${invitationId}`,
-      email,
-      async () => {
-        await unwrap(
-          api()
-            .api.v1.invitations({ invitationId: inPath(invitationId) })
-            .delete(),
-        );
-        await refresh();
-        ToastQueue.neutral(
-          t("settings:workspace.invitations.cancelled", { email }),
-          { timeout: TOAST_MS },
-        );
-      },
-      () => void cancel(invitationId, email),
-    );
+    act({ kind: "cancel", invitationId, email });
 
   let list: ReactNode;
   if (query.data !== undefined) {
@@ -887,13 +873,7 @@ function Invitations() {
       />
     );
   } else if (isSlow) {
-    list = (
-      <SlowLoadingState
-        headingLevel={3}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
-    );
+    list = <SlowLoadingState headingLevel={3} size="S" onRetry={retrySlow} />;
   } else {
     list = (
       <Skeleton isLoading>
@@ -935,7 +915,9 @@ function Invitations() {
  * Send invitation (W4 POST): an email (6.0.8) and a role, Member at first. Its failures
  * and those of the list's Resend and Cancel show under it: the address a member or a
  * pending invitation already has (that one with its Resend), the rate limit, and Retry
- * for the rest (6.16「招待の送信の失敗は再試行」).
+ * for the rest (6.16「招待の送信の失敗は再試行」). Once 9 is left while it is on its way, a
+ * failure says so in a toast, 9's words alone and anything else as a row's send does,
+ * whose Retry sends the same invitation again (6.0.6「送っている間に閉じた送信の失敗」).
  */
 function InviteForm({
   onSent,
@@ -950,13 +932,32 @@ function InviteForm({
   failure: InvitationFailure | null;
   isBusy: boolean;
 }) {
-  const { t } = useTranslation(["settings", "common", "errors"]);
+  const { t } = useTranslation(["settings", "common", "errors", "app"]);
   const { workspace } = useWorkspace();
   const isOnline = useIsOnline();
   const roles = useRoleItems();
   const rejections = useRejectedFields(["email"] as const);
   const oneAtATime = useOneAtATime();
   const sendThrough = useSendThrough();
+  const post = (input: { email: string; role: Role }) =>
+    sendThrough(() =>
+      unwrap(
+        api()
+          .api.v1.workspaces({ workspaceId: workspace.id })
+          .invitations.post(input),
+      ),
+    );
+  const sent = async (email: string) => {
+    await onSent();
+    ToastQueue.neutral(t("settings:workspace.invitations.sent", { email }), {
+      timeout: TOAST_MS,
+    });
+  };
+  const failedOnceLeft = useFailureOnceClosed(
+    (input: { email: string; role: Role }) =>
+      post(input).then(() => sent(input.email)),
+    (error, { email }) => invitationRefusalWords(error, email, t),
+  );
   const form = useAppForm({
     defaultValues: { email: "", role: "member" },
     listeners: {
@@ -966,30 +967,25 @@ function InviteForm({
       oneAtATime(async () => {
         onFailure(null);
         rejections.clear();
-        const email = value.email.trim();
-        const role = roleSchema.catch("member").parse(value.role);
+        const input = {
+          email: value.email.trim(),
+          role: roleSchema.catch("member").parse(value.role),
+        };
         try {
-          await sendThrough(() =>
-            unwrap(
-              api()
-                .api.v1.workspaces({ workspaceId: workspace.id })
-                .invitations.post({ email, role }),
-            ),
-          );
+          await post(input);
         } catch (error) {
+          failedOnceLeft(error, input);
           if (!rejections.reject(error)) {
-            onFailure({ error, email, retry: () => void form.handleSubmit() });
+            onFailure({
+              error,
+              email: input.email,
+              retry: () => void form.handleSubmit(),
+            });
           }
           return;
         }
         formApi.reset();
-        await onSent();
-        ToastQueue.neutral(
-          t("settings:workspace.invitations.sent", { email }),
-          {
-            timeout: TOAST_MS,
-          },
-        );
+        await sent(input.email);
       }),
   });
   const pendingId =
@@ -1045,9 +1041,7 @@ function InviteForm({
           <InlineAlert variant="negative">
             <Flex gap="space-200" wrap alignItems="center">
               <Text>
-                {t("settings:workspace.invitations.alreadyPending", {
-                  email: failure.email,
-                })}
+                {t("errors:INVITATION_PENDING", { email: failure.email })}
               </Text>
               <Button
                 variant="secondary"
@@ -1063,19 +1057,16 @@ function InviteForm({
           <SendFailure
             error={failure.error}
             messages={{
-              ALREADY_MEMBER: t(
-                "settings:workspace.invitations.alreadyMember",
-                {
-                  email: failure.email,
-                },
-              ),
+              ALREADY_MEMBER: t("errors:ALREADY_MEMBER", {
+                email: failure.email,
+              }),
               INVITATION_ALREADY_ACCEPTED: t(
                 "errors:INVITATION_ALREADY_ACCEPTED",
               ),
-              INVITATION_INVALID: t(
-                "settings:workspace.invitations.wasCancelled",
-                { email: failure.email },
-              ),
+              INVITATION_INVALID: t("errors:INVITATION_INVALID", {
+                context: "cancelled",
+                email: failure.email,
+              }),
             }}
             transient="couldNotSave"
             withSaveReasons

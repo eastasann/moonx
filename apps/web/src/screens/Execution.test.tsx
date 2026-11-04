@@ -4,9 +4,25 @@ import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { SLOW_LOADING_MS } from "../components/states";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  readAgainOnFocus,
+  renderApp,
+  setViewport,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
-import { anaRef, executionItem, ideaId, planHome, planId } from "../test/plans";
+import {
+  anaRef,
+  executionItem,
+  ideaId,
+  planHome,
+  planId,
+  planPath,
+} from "../test/plans";
 import { home as ideaHome } from "../test/validation";
 
 // 22 Execution (design-spec 6.13, SDD 5.9 P9–P11).
@@ -106,48 +122,84 @@ function executionApi({
   me = ana,
   items = everything(),
   archived = false,
+  ideaArchived = false,
   patch,
+  create,
+  holdCreate,
+  remove,
   history = [],
   members = true,
+  holdReads,
 }: {
-  me?: Me;
+  /** A function is asked at each call: the user may change behind the screen. */
+  me?: Me | (() => Me);
   items?: ExecutionItem[];
-  archived?: boolean;
+  /** A function is asked at each call: the plan may be archived behind the screen. */
+  archived?: boolean | (() => boolean);
+  ideaArchived?: boolean;
   /** Answers P10 PATCH instead of keeping what it sends. */
   patch?: () => Response;
+  /** Answers P9 POST; undefined makes the item and keeps it. */
+  create?: () => Response | undefined;
+  /** Asked at each P9 POST: a promise holds its answer until it settles. */
+  holdCreate?: () => Promise<void> | undefined;
+  /** Answers P10 DELETE; undefined deletes. */
+  remove?: () => Response | undefined;
   history?: HistoryEntry[];
   /** Whether W2 answers; else it never does. */
   members?: boolean;
+  /** While it returns true, every read waits for good: the screen is not read again. */
+  holdReads?: () => boolean;
 } = {}) {
+  const meNow = () => (typeof me === "function" ? me() : me);
+  const archivedNow = () =>
+    typeof archived === "function" ? archived() : archived;
   return stubApi((call: Call) => {
     const { method, path } = call;
-    if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
+    if (method === "GET" && holdReads?.() === true) {
+      return new Promise<Response>(() => {});
+    }
+    if (method === "GET" && path === "/api/v1/me")
+      return Response.json(meNow());
+    if (method === "PATCH" && path === "/api/v1/me") {
+      return Response.json(meNow());
+    }
     if (method === "GET" && path === `/api/v1/ideas/${ideaId}/validation`) {
-      return Response.json(ideaHome);
+      return Response.json({
+        ...ideaHome,
+        idea: { ...ideaHome.idea, archived: ideaArchived },
+      });
     }
     if (method === "GET" && path === api) {
-      return Response.json(planHome({ archived }));
+      return Response.json(planHome({ archived: archivedNow(), ideaArchived }));
     }
     if (method === "GET" && path === `${api}/execution-items`) {
       return Response.json({ items });
     }
     if (method === "POST" && path === `${api}/execution-items`) {
-      const body = call.body as Partial<ExecutionItem> & {
-        type: ExecutionItem["type"];
-        title: string;
+      const answer = () => {
+        const answered = create?.();
+        if (answered !== undefined) return answered;
+        const body = call.body as Partial<ExecutionItem> & {
+          type: ExecutionItem["type"];
+          title: string;
+        };
+        const made = executionItem(
+          body.type,
+          "5e0c0000-0000-4000-8000-000000000099",
+          body.title,
+          { ...body, sortOrder: items.length },
+        );
+        items.push(made);
+        return Response.json(made, { status: 201 });
       };
-      const made = executionItem(
-        body.type,
-        "5e0c0000-0000-4000-8000-000000000099",
-        body.title,
-        { ...body, sortOrder: items.length },
-      );
-      items.push(made);
-      return Response.json(made, { status: 201 });
+      const held = holdCreate?.();
+      return held === undefined ? answer() : held.then(answer);
     }
     if (method === "PUT" && path === `${api}/execution-items/order`) {
-      return new Response(null, { status: 204 });
+      return archivedNow()
+        ? apiError(409, "ARCHIVED")
+        : new Response(null, { status: 204 });
     }
     const one = path.match(/^\/api\/v1\/execution-items\/([\w-]+)$/);
     if (one !== null && method === "PATCH") {
@@ -165,6 +217,8 @@ function executionApi({
           });
     }
     if (one !== null && method === "DELETE") {
+      const refused = remove?.();
+      if (refused !== undefined) return refused;
       const index = items.findIndex(({ id }) => id === one[1]);
       if (index === -1) return undefined;
       items.splice(index, 1);
@@ -337,10 +391,7 @@ describe("22 Execution (design-spec 6.13)", () => {
     await screen.findByRole("heading", { level: 2, name: "Book venue" });
     items.splice(items.indexOf(venue), 1);
     // The window's focus reads the list again (TanStack Query's refetch on focus).
-    act(() => {
-      focusManager.setFocused(false);
-      focusManager.setFocused(true);
-    });
+    readAgainOnFocus();
     expect(
       await screen.findByRole("heading", { level: 2, name: /Not found/ }),
     ).toBeTruthy();
@@ -672,6 +723,176 @@ describe("22 Execution (design-spec 6.13)", () => {
     expect(screen.queryByRole("textbox", { name: "Goal" })).toBeNull();
   });
 
+  test("an archived idea says so and reads only: no + Add, no Reorder or Delete, no field to change", async () => {
+    const user = userEvent.setup();
+    executionApi({ ideaArchived: true });
+    renderApp(base);
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    // The idea's notice alone (6.13: as 20's).
+    expect(screen.queryByText("This plan is archived")).toBeNull();
+    await screen.findByRole("heading", { level: 2, name: "Business decision" });
+    expect(screen.getByText("Decide to go")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Add milestone" })).toBeNull();
+    expect(screen.queryAllByRole("textbox")).toEqual([]);
+    expect(screen.queryAllByRole("combobox")).toEqual([]);
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    // The row's ⋯ alone, with what reads: the detail has none.
+    const menus = screen.getAllByRole("button", {
+      name: "More for Business decision",
+    });
+    expect(menus).toHaveLength(1);
+    await user.click(menus[0] as Element);
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((entry) => entry.textContent),
+    ).toEqual(["Comments", "History"]);
+  });
+
+  test.each([
+    ["a Viewer", { me: as("viewer") }],
+    ["an archived plan", { archived: true }],
+    ["an archived idea", { ideaArchived: true }],
+  ])(
+    "an empty tab says what it is for, and nothing more, to %s",
+    async (_, options) => {
+      executionApi(options);
+      renderApp(`${base}?tab=questions`);
+      expect(
+        await screen.findByRole("heading", {
+          level: 2,
+          name: "Write down what you still need to find out, and why it matters.",
+        }),
+      ).toBeTruthy();
+      expect(
+        within(screen.getByRole("tabpanel")).queryAllByRole("button"),
+      ).toEqual([]);
+      expect(
+        screen.queryByRole("button", { name: "Add open question" }),
+      ).toBeNull();
+    },
+  );
+
+  test("an item added that the filters leave out clears them, and shows beside the list", async () => {
+    const user = userEvent.setup();
+    executionApi();
+    const router = renderApp(`${base}?tab=actions&status=done`);
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Nothing matches these filters",
+      }),
+    ).toBeTruthy();
+    const overdueOnly = screen.getByRole("switch", { name: "Overdue only" });
+    await user.click(overdueOnly);
+    await user.click(
+      screen.getAllByRole("button", { name: "Add next action" })[0] as Element,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "New next action",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Action/ }),
+      "Call the bank",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    // To do and with no date: neither Done nor overdue.
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        tab: "actions",
+        item: "5e0c0000-0000-4000-8000-000000000099",
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Call the bank" }),
+    ).toBeTruthy();
+    expect((overdueOnly as HTMLInputElement).checked).toBe(false);
+    expect(
+      within(screen.getByRole("grid", { name: "Next Actions" })).getByRole(
+        "row",
+        { name: /Call the bank/ },
+      ),
+    ).toBeTruthy();
+  });
+
+  test("another tab lets go of the filters and the item shown, in place of the history entry", async () => {
+    const user = userEvent.setup();
+    executionApi();
+    const router = renderApp(planPath());
+    await screen.findByRole("heading", { level: 1, name: "Plan A" });
+    await act(() =>
+      router.navigate({
+        href: `${base}?tab=actions&assignee=me&item=${venue.id}`,
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Book venue" }),
+    ).toBeTruthy();
+    const entries = router.history.length;
+    await user.click(screen.getByRole("tab", { name: "Milestones" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ tab: "milestones" }),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Business decision",
+      }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("tab", { name: "Next Actions" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ tab: "actions" }),
+    );
+    // The first of the list, all of it: not the item nor the assignee of before.
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Get supplier quote",
+      }),
+    ).toBeTruthy();
+    expect(
+      within(screen.getByRole("grid", { name: "Next Actions" })).getAllByRole(
+        "row",
+      ),
+    ).toHaveLength(2);
+    // Overdue only, which the URL does not hold, goes too.
+    await user.click(screen.getByRole("switch", { name: "Overdue only" }));
+    await user.click(screen.getByRole("tab", { name: "Launch" }));
+    await user.click(await screen.findByRole("tab", { name: "Next Actions" }));
+    expect(
+      (
+        (await screen.findByRole("switch", {
+          name: "Overdue only",
+        })) as HTMLInputElement
+      ).checked,
+    ).toBe(false);
+    expect(router.history.length).toBe(entries);
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(planPath()),
+    );
+  });
+
+  test("an assignee id the members do not have is A former member", async () => {
+    executionApi();
+    renderApp(
+      `${base}?tab=actions&assignee=0f8fad5b-d9cb-469f-a165-708677289999`,
+    );
+    const filters = await screen.findByRole("tabpanel");
+    await waitFor(() =>
+      expect(
+        within(filters).getByRole("button", { name: /Assignee/ }).textContent,
+      ).toContain("A former member"),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Nothing matches these filters",
+      }),
+    ).toBeTruthy();
+  });
+
   test("the header's 💬 and 🕘 read the screen's `execution`, the items' from their 💬 and 🕘", async () => {
     const user = userEvent.setup();
     const calls = executionApi();
@@ -703,5 +924,507 @@ describe("22 Execution (design-spec 6.13)", () => {
         target: `execution_item:${decision.id}`,
       }),
     );
+  });
+  /** Opens New open question on its tab and types one. */
+  const newQuestion = async (user: ReturnType<typeof userEvent.setup>) => {
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "Write down what you still need to find out, and why it matters.",
+    });
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "Add open question",
+      })[0] as Element,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "New open question",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Open Question/ }),
+      "Is the plaza busy on Sundays?",
+    );
+    return dialog;
+  };
+
+  test("a new item and an unexpected failure: the small dialog with its Ref (a dialog's rule, 6.0.6); Close closes New", async () => {
+    const user = userEvent.setup();
+    executionApi({ create: () => apiError(500, "INTERNAL") });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    const small = await screen.findByRole("alertdialog", {
+      name: /Something went wrong/,
+    });
+    // The request id's first 8 characters (SDD 8.2), not the whole id.
+    expect(small.textContent).toContain("Ref: 8f14e45f");
+    expect(small.textContent).not.toContain("8f14e45f-");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    await user.click(within(small).getByRole("button", { name: "Close" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New open question" }),
+      ).toBeNull(),
+    );
+  });
+
+  test("a new item refused for a field: Couldn't save with the reason, and Check the format under the field", async () => {
+    const user = userEvent.setup();
+    executionApi({
+      create: () =>
+        apiError(422, "VALIDATION_FAILED", {
+          details: [{ path: "whyItMatters", message: "Too long" }],
+        }),
+    });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("Check the format");
+    const why = within(dialog).getByRole("textbox", { name: "Why It Matters" });
+    const described = (why.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toContain("Check the format");
+  });
+
+  test("a new item refused once the user is a Viewer: 22 reads again, read only", async () => {
+    const user = userEvent.setup();
+    let me = ana;
+    executionApi({
+      me: () => me,
+      create: () => {
+        me = as("viewer");
+        return apiError(403, "FORBIDDEN");
+      },
+    });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    // Read again as a Viewer: + Add goes; the dialog stays to read, with what was typed
+    // and why (design-spec 6.10・6.13), until it is closed.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Add open question" }),
+      ).toBeNull(),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "New open question" }),
+    ).toBeTruthy();
+    const question = within(dialog).getByRole("textbox", {
+      name: /Open Question/,
+    });
+    expect((question as HTMLInputElement).value).toBe(
+      "Is the plaza busy on Sundays?",
+    );
+    expect(question.hasAttribute("readonly")).toBe(true);
+    const alert = within(dialog).getByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain("You don't have access to this");
+    expect(
+      within(alert)
+        .getByRole("button", { name: "Retry" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      within(dialog)
+        .getByRole("button", { name: "Add" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New open question" }),
+      ).toBeNull(),
+    );
+  });
+
+  test("a new item refused as the plan is archived meanwhile: 22 reads as archived; the dialog keeps what was typed and why", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    executionApi({
+      archived: () => archived,
+      create: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(
+      screen.getByRole("dialog", { name: "New open question" }),
+    ).toBeTruthy();
+    const question = within(dialog).getByRole("textbox", {
+      name: /Open Question/,
+    });
+    expect((question as HTMLInputElement).value).toBe(
+      "Is the plaza busy on Sundays?",
+    );
+    expect(question.hasAttribute("readonly")).toBe(true);
+    expect(within(dialog).getByRole("alert").textContent).toContain(
+      "It's archived",
+    );
+  });
+
+  test("a delete refused as the plan is archived: the reason without Retry, then 22 reads as archived (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    executionApi({
+      archived: () => archived,
+      remove: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(`${base}?item=${setup.id}`);
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "Legal / company setup",
+    });
+    const detailMenu = screen.getAllByRole("button", {
+      name: "More for Legal / company setup",
+    });
+    await user.click(detailMenu.at(-1) as Element);
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const question = await screen.findByRole("alertdialog", {
+      name: "Delete this milestone?",
+    });
+    const toast = await toastAfter("Couldn't save. It's archived.", () =>
+      user.click(within(question).getByRole("button", { name: "Delete" })),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: "Goal" })).toBeNull(),
+    );
+    expect(screen.queryByRole("button", { name: "Add milestone" })).toBeNull();
+  });
+  /**
+   * New open question refused for good: still open, read only, with what was typed and
+   * Couldn't save with `reason`; its Add and Retry cannot send again.
+   */
+  const expectLocked = (dialog: HTMLElement, reason: string) => {
+    const question = within(dialog).getByRole("textbox", {
+      name: /Open Question/,
+    });
+    expect((question as HTMLInputElement).value).toBe(
+      "Is the plaza busy on Sundays?",
+    );
+    expect(question.hasAttribute("readonly")).toBe(true);
+    const alert = within(dialog).getByRole("alert");
+    expect(alert.textContent).toContain("Couldn't save");
+    expect(alert.textContent).toContain(reason);
+    expect(
+      within(alert)
+        .getByRole("button", { name: "Retry" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      within(dialog)
+        .getByRole("button", { name: "Add" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  };
+
+  test("a new item refused as gone (404): the dialog locks at once, with what was typed and why; nothing more is sent", async () => {
+    const user = userEvent.setup();
+    const calls = executionApi({ create: () => apiError(404, "NOT_FOUND") });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(await within(dialog).findByText("It no longer exists")).toBeTruthy();
+    expectLocked(dialog, "It no longer exists");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(sent(calls, "POST", `${api}/execution-items`)).toHaveLength(1);
+  });
+
+  test("a new item refused as archived: the dialog locks at once, before the screen read again answers", async () => {
+    const user = userEvent.setup();
+    let refused = false;
+    const calls = executionApi({
+      holdReads: () => refused,
+      create: () => {
+        refused = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(await within(dialog).findByText("It's archived")).toBeTruthy();
+    expectLocked(dialog, "It's archived");
+    expect(screen.queryByText("This plan is archived")).toBeNull();
+    expect(sent(calls, "POST", `${api}/execution-items`)).toHaveLength(1);
+  });
+
+  /** An open question on the tab already: the first, shown beside the list. */
+  const boxes = executionItem(
+    "open_question",
+    "5e0c0000-0000-4000-8000-000000000041",
+    "Who supplies the boxes?",
+  );
+
+  /**
+   * New open question sent with Add and Cancel pressed while it is on its way, its answer
+   * held until `answerAdd`; `create` answers it (and any Retry), undefined making it.
+   */
+  async function cancelWhileAdding(create?: () => Response | undefined) {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    let isFirst = true;
+    const calls = executionApi({
+      items: [...everything(), boxes],
+      create,
+      holdCreate: () => {
+        if (!isFirst) return undefined;
+        isFirst = false;
+        return new Promise<void>((resolve) => {
+          answerAdd = resolve;
+        });
+      },
+    });
+    const router = renderApp(`${base}?tab=questions`);
+    await screen.findByRole("heading", { level: 2, name: boxes.title });
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "Add open question",
+      })[0] as Element,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "New open question",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Open Question/ }),
+      "Is the plaza busy on Sundays?",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    const posts = () => sent(calls, "POST", `${api}/execution-items`);
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New open question" }),
+      ).toBeNull(),
+    );
+    return { user, router, posts, answerAdd: async () => answerAdd() };
+  }
+
+  /** The titles of the Open Questions in the list. */
+  const questionTitles = () =>
+    within(screen.getByRole("grid", { name: "Open Questions" }))
+      .getAllByRole("row")
+      .map((row) => row.textContent?.split(/Open/)[0]);
+
+  test("Cancel while Add is on its way, and it goes through: the item is made, and the user is not taken to it", async () => {
+    const { router, answerAdd } = await cancelWhileAdding();
+    const entries = router.history.length;
+    await answerAdd();
+    await waitFor(() =>
+      expect(questionTitles()).toEqual([
+        "Who supplies the boxes?",
+        "Is the plaza busy on Sundays?",
+      ]),
+    );
+    expect(router.state.location.search).toEqual({ tab: "questions" });
+    expect(router.history.length).toBe(entries);
+    expect(
+      screen.getByRole("heading", { level: 2, name: boxes.title }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("Cancel while Add is on its way, and no answer comes: a toast says Couldn't save, and its Retry sends the same item, which is made (6.0.6)", async () => {
+    let isFailing = true;
+    const { user, router, posts, answerAdd } = await cancelWhileAdding(() => {
+      if (isFailing) throw new TypeError("Failed to fetch");
+      return undefined;
+    });
+    const toast = await toastAfter("Couldn't save", answerAdd);
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posts()).toHaveLength(2));
+    expect(posts()[1]?.body).toEqual(posts()[0]?.body);
+    await waitFor(() =>
+      expect(questionTitles()).toContain("Is the plaza busy on Sundays?"),
+    );
+    expect(router.state.location.search).toEqual({ tab: "questions" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("Cancel while Add is on its way, and it is refused as the plan is archived: a toast with the reason and no Retry, and 22 reads as archived", async () => {
+    let archived = false;
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    const calls = executionApi({
+      items: [...everything(), boxes],
+      archived: () => archived,
+      create: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+      holdCreate: () =>
+        new Promise<void>((resolve) => {
+          answerAdd = resolve;
+        }),
+    });
+    renderApp(`${base}?tab=questions`);
+    await screen.findByRole("heading", { level: 2, name: boxes.title });
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "Add open question",
+      })[0] as Element,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "New open question",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Open Question/ }),
+      "Is the plaza busy on Sundays?",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    const planReads = () =>
+      calls.filter(({ method, path }) => method === "GET" && path === api)
+        .length;
+    const readsBefore = planReads();
+    const toast = await toastAfter("Couldn't save. It's archived.", async () =>
+      answerAdd(),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // The toast reads the screen again, once: the closed form reads nothing itself.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(planReads()).toBe(readsBefore + 1);
+  });
+
+  test("Cancel while Add is on its way, and it fails unexpectedly (500): Something went wrong with its Ref and Retry, in a toast", async () => {
+    const { posts, answerAdd } = await cancelWhileAdding(() =>
+      apiError(500, "INTERNAL"),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      answerAdd,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(posts()).toHaveLength(1);
+    // A toast, not the small dialog of a modal's failure.
+    expect(
+      screen.queryByRole("alertdialog", { name: "Alert Something went wrong" }),
+    ).toBeNull();
+  });
+
+  test("New stays open when 22 reads the plan as archived meanwhile, and Add shows the refusal in it; Restore does not open it again (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    executionApi({
+      archived: () => archived,
+      create: () => apiError(409, "ARCHIVED"),
+    });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    archived = true;
+    // The window's focus reads the plan again (TanStack Query's refetch on focus).
+    readAgainOnFocus();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "New open question" })).toBe(
+      dialog,
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toContain(
+      "It's archived",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New open question" }),
+      ).toBeNull(),
+    );
+    archived = false;
+    readAgainOnFocus();
+    await waitFor(() =>
+      expect(screen.queryByText("This plan is archived")).toBeNull(),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    act(() => focusManager.setFocused(undefined));
+  });
+
+  test("Reorder stays open when 22 reads the plan as archived meanwhile, and Save order shows the refusal in it (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    executionApi({ archived: () => archived });
+    renderApp(`${base}?tab=launch`);
+    const phase = await screen.findByRole("grid", {
+      name: "Launch · T−30",
+    });
+    await user.click(
+      within(phase).getByRole("button", { name: "More for Print flyers" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Reorder" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Reorder launch steps",
+    });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Move Print flyers up" }),
+    );
+    archived = true;
+    readAgainOnFocus();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Reorder launch steps" })).toBe(
+      dialog,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Save order" }),
+    );
+    expect((await within(dialog).findByRole("alert")).textContent).toContain(
+      "It's archived",
+    );
+    act(() => focusManager.setFocused(undefined));
+  });
+
+  test("on a phone, Edit's sheet stays open when 22 reads the plan as archived meanwhile, and a change in it says why it is refused (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    try {
+      let archived = false;
+      executionApi({
+        archived: () => archived,
+        patch: () => apiError(409, "ARCHIVED"),
+      });
+      renderApp(`${base}?item=${setup.id}`);
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Legal / company setup",
+      });
+      await user.click(screen.getByRole("button", { name: "Edit" }));
+      const sheet = await screen.findByRole("dialog", {
+        name: "Edit milestone",
+      });
+      archived = true;
+      readAgainOnFocus();
+      // Read again as archived: the detail behind reads only, without Edit.
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Edit", hidden: true }),
+        ).toBeNull(),
+      );
+      expect(screen.getByRole("dialog", { name: "Edit milestone" })).toBe(
+        sheet,
+      );
+      await user.type(
+        within(sheet).getByRole("textbox", { name: "Goal" }),
+        "Registered",
+      );
+      expect(
+        await within(sheet).findByText("It's archived", undefined, {
+          timeout: 3000,
+        }),
+      ).toBeTruthy();
+    } finally {
+      act(() => focusManager.setFocused(undefined));
+      setViewport(1024);
+    }
   });
 });

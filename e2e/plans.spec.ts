@@ -1,5 +1,4 @@
 import { readFile } from "node:fs/promises";
-import AxeBuilder from "@axe-core/playwright";
 import type { IdeaDetail, Me, PlanSummary } from "@moonx/schemas";
 import type { Page } from "@playwright/test";
 import { WEB_ORIGIN } from "./env";
@@ -8,6 +7,7 @@ import {
   test as base,
   demo,
   expect,
+  expectNoAxeViolations,
   operatorInvited,
   workspaceOf,
 } from "./fixtures";
@@ -40,33 +40,6 @@ const block = (page: Page, name: string) =>
 /** Presses a Radio or Switch by its label: React Aria's input is hidden under it. */
 const press = (control: ReturnType<Page["getByRole"]>) =>
   control.locator("xpath=ancestor::label[1]").click();
-
-async function expectNoAxeViolations(page: Page) {
-  await expect(
-    page.locator("[data-live-announcer] [aria-labelledby]"),
-  ).toHaveCount(0, { timeout: 10_000 });
-  // A dialog fading in or out has its words part-transparent, which axe reads as low
-  // contrast: the page is checked once overlays have settled.
-  await expect(page.locator("[data-entering], [data-exiting]")).toHaveCount(0);
-  await page.waitForFunction(() =>
-    document
-      .getAnimations()
-      .every(
-        (animation) =>
-          !(animation instanceof CSSTransition) ||
-          animation.playState !== "running",
-      ),
-  );
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(
-    violations.map((violation) => ({
-      id: violation.id,
-      targets: violation.nodes.map((node) => node.target.join(" ")),
-    })),
-  ).toEqual([]);
-}
 
 /** The worker's account, signed in, with a new idea in its personal workspace. */
 async function ownIdea(

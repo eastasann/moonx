@@ -1,10 +1,23 @@
 import type { HistoryEntry, Me, Role, UserRef } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
-import { answer, home, section01, validationId } from "../test/validation";
+import {
+  answer,
+  home,
+  questionsRead,
+  section01,
+  validationId,
+} from "../test/validation";
 
 // PNL-2, the history panel, on 11 (design-spec 6.0.5・6.0.1, SDD 4章・5.11 H1–H3).
 
@@ -92,10 +105,7 @@ function panelApi({
       return Response.json({ ...home, idea: { ...home.idea, archived } });
     }
     if (method === "GET" && path === `${validationPath}/questions/01`) {
-      return Response.json({
-        section: section01,
-        answers: section01.questions.map(({ key }) => answer(key)),
-      });
+      return Response.json(questionsRead(section01));
     }
     if (method === "GET" && path.startsWith("/api/v1/comments?")) {
       return Response.json({ threads: [], unresolvedCount: 0 });
@@ -548,6 +558,324 @@ describe("PNL-2 History (design-spec 6.0.5)", () => {
       ),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe(base);
+  });
+
+  describe("one revert at a time, online only (6.0.5「操作のボタン」)", () => {
+    const importId = "a0000000-0000-4000-8000-00000000000b";
+    const deletedId = "a0000000-0000-4000-8000-00000000000c";
+    /**
+     * An AI import's change of 01 WHY_THEM, Paolo's of 01 WHO and a deleted 01 BEHAVIOR:
+     * Revert and Undo the whole operation, Revert, Undo delete.
+     */
+    const entries = [
+      row(importId, {
+        batchId,
+        source: "ai_import",
+        label: "01 WHY_THEM",
+        target: {
+          ...whoTarget,
+          key: "V.01.WHY_THEM",
+        } as HistoryEntry["target"],
+      }),
+      row(manualId),
+      row(deletedId, {
+        action: "delete",
+        after: null,
+        label: "01 BEHAVIOR",
+        target: {
+          ...whoTarget,
+          key: "V.01.BEHAVIOR",
+        } as HistoryEntry["target"],
+      }),
+    ];
+    const reverted = () =>
+      Response.json({
+        entry: null,
+        target: {
+          value: null,
+          deleted: false,
+          lockVersion: 3,
+          updatedAt: null,
+          updatedBy: null,
+        },
+      });
+    const reverts = (calls: Call[]) =>
+      calls
+        .filter(
+          ({ method, path }) =>
+            method === "POST" && path.startsWith("/api/v1/history/"),
+        )
+        .map(({ path }) => path);
+
+    /** Opens the screen's changes and finds the rows' buttons. */
+    async function buttons(user: ReturnType<typeof userEvent.setup>) {
+      renderApp(base);
+      await user.click(await screen.findByRole("button", { name: "History" }));
+      const body = await findPanel();
+      const who = await within(body).findByRole("button", {
+        name: "Revert to this point, 01 WHO",
+      });
+      const whyThem = within(body).getByRole("button", {
+        name: "Revert to this point, 01 WHY_THEM",
+      });
+      /** Whether each of the four buttons is disabled, in the list's order. */
+      const states = () =>
+        within(body)
+          .getAllByRole("button", { name: /^(Revert|Undo)/ })
+          .map((button) => button.hasAttribute("disabled"));
+      expect(states()).toEqual([false, false, false, false]);
+      return { body, who, whyThem, states };
+    }
+
+    test("while one sends, the other Revert and Undo cannot be pressed, nor it again", async () => {
+      const user = userEvent.setup();
+      let answer: (response: Response) => void = () => {};
+      const calls = panelApi({
+        entries,
+        write: (call) =>
+          call.path === `/api/v1/history/${manualId}/revert`
+            ? new Promise((resolve) => {
+                answer = resolve;
+              })
+            : undefined,
+      });
+      const { body, who, states } = await buttons(user);
+      await user.click(who);
+      // Its own shows it sends (isPending), the others are disabled.
+      await waitFor(() => expect(states()).toEqual([true, true, false, true]));
+      for (const button of within(body).getAllByRole("button", {
+        name: /^(Revert|Undo)/,
+      })) {
+        await user.click(button);
+      }
+      expect(reverts(calls)).toEqual([`/api/v1/history/${manualId}/revert`]);
+      answer(reverted());
+      await waitFor(() =>
+        expect(states()).toEqual([false, false, false, false]),
+      );
+    });
+
+    test("offline none can be pressed; back online they can", async () => {
+      const user = userEvent.setup();
+      const onLine = vi.spyOn(navigator, "onLine", "get");
+      try {
+        const calls = panelApi({ entries, write: reverted });
+        const { who, states } = await buttons(user);
+        onLine.mockReturnValue(false);
+        act(() => {
+          window.dispatchEvent(new Event("offline"));
+        });
+        await waitFor(() => expect(states()).toEqual([true, true, true, true]));
+        await user.click(who);
+        expect(reverts(calls)).toEqual([]);
+        onLine.mockReturnValue(true);
+        act(() => {
+          window.dispatchEvent(new Event("online"));
+        });
+        await waitFor(() =>
+          expect(states()).toEqual([false, false, false, false]),
+        );
+      } finally {
+        onLine.mockRestore();
+      }
+    });
+
+    test("over the rate limit, the wait shows under the row pressed, without Retry", async () => {
+      const user = userEvent.setup();
+      panelApi({
+        entries,
+        write: () => apiError(429, "RATE_LIMITED", { retryAfterSeconds: 60 }),
+      });
+      const { body, who, whyThem } = await buttons(user);
+      await user.click(whyThem);
+      const wait = await within(body).findByText(
+        "Too many attempts. Try again in 1 minute.",
+      );
+      // Under 01 WHY_THEM's buttons, before the next row's (document order).
+      expect(
+        whyThem.compareDocumentPosition(wait) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        wait.compareDocumentPosition(who) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(within(body).queryByRole("button", { name: "Retry" })).toBeNull();
+      expect(
+        screen.queryByRole("alertdialog", { name: /Something went wrong/ }),
+      ).toBeNull();
+    });
+  });
+
+  describe("a revert whose panel closed, or whose screen was left, while it was on its way (6.0.5・6.0.6)", () => {
+    const revertPath = `/api/v1/history/${manualId}/revert`;
+    const reverted = () =>
+      Response.json({
+        entry: null,
+        target: {
+          value: null,
+          deleted: false,
+          lockVersion: 3,
+          updatedAt: null,
+          updatedBy: null,
+        },
+      });
+
+    /**
+     * Opens the screen's changes, presses `button` and closes the panel (or leaves the
+     * screen) while the revert is held; `first` answers it (null: no answer comes), and
+     * `later` any Retry.
+     */
+    async function closeWhileReverting({
+      first,
+      later = () => undefined,
+      entries,
+      button = "Revert to this point, 01 WHO",
+      leave = false,
+    }: {
+      first: () => Response | null;
+      later?: () => Response | undefined;
+      entries?: HistoryEntry[];
+      button?: string | RegExp;
+      leave?: boolean;
+    }) {
+      const user = userEvent.setup();
+      let release = () => {};
+      let isFirst = true;
+      const calls = panelApi({
+        ...(entries === undefined ? {} : { entries }),
+        write: () => {
+          if (!isFirst) return later();
+          isFirst = false;
+          return new Promise<Response>((resolve, reject) => {
+            release = () => {
+              const answered = first();
+              if (answered === null) reject(new TypeError("Failed to fetch"));
+              else resolve(answered);
+            };
+          });
+        },
+      });
+      const router = renderApp(base);
+      await user.click(await screen.findByRole("button", { name: "History" }));
+      const body = await findPanel();
+      await user.click(
+        await within(body).findByRole("button", { name: button }),
+      );
+      const posts = () =>
+        calls.filter(
+          ({ method, path }) =>
+            method === "POST" && path.startsWith("/api/v1/history/"),
+        );
+      await waitFor(() => expect(posts()).toHaveLength(1));
+      if (leave) {
+        await router.navigate({ href: ideaPath });
+      } else {
+        await user.click(within(body).getByRole("button", { name: "Close" }));
+      }
+      await waitFor(() => expect(body.isConnected).toBe(false));
+      return { user, calls, router, posts, answer: async () => release() };
+    }
+
+    test("no answer comes: a toast says Couldn't save, and its Retry sends the same revert", async () => {
+      let isFailing = true;
+      const { user, posts, answer } = await closeWhileReverting({
+        first: () => null,
+        later: () => (isFailing ? undefined : reverted()),
+      });
+      const toast = await toastAfter("Couldn't save", answer);
+      isFailing = false;
+      await user.click(within(toast).getByRole("button", { name: "Retry" }));
+      await waitFor(() =>
+        expect(posts().map(({ path }) => path)).toEqual([
+          revertPath,
+          revertPath,
+        ]),
+      );
+    });
+
+    test("the screen left, then unexpected (500): Something went wrong with its Ref and Retry in a toast, not the small dialog", async () => {
+      const { user, router, answer } = await closeWhileReverting({
+        first: () => apiError(500, "INTERNAL"),
+        leave: true,
+      });
+      const toast = await toastAfter(
+        "Something went wrong. Ref: 8f14e45f",
+        answer,
+      );
+      expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+      expect(
+        screen.queryByRole("alertdialog", {
+          name: "Alert Something went wrong",
+        }),
+      ).toBeNull();
+      expect(router.state.location.pathname).toBe(ideaPath);
+      // Toasts outlive the test (test/api.tsx): the later ones look for these words too.
+      await user.click(within(toast).getByRole("button", { name: "Close" }));
+    });
+
+    test("undone elsewhere first: This was already undone in a toast, without Retry, and the screen read again", async () => {
+      const { user, calls, answer } = await closeWhileReverting({
+        first: () => apiError(409, "ALREADY_REVERTED"),
+      });
+      const questionReads = reads(calls, `${validationPath}/questions/01`);
+      const toast = await toastAfter("This was already undone", answer);
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      await waitFor(() =>
+        expect(reads(calls, `${validationPath}/questions/01`)).toBeGreaterThan(
+          questionReads,
+        ),
+      );
+      await user.click(within(toast).getByRole("button", { name: "Close" }));
+    });
+
+    test("a name taken: its words in a toast, without Retry", async () => {
+      const { user, answer } = await closeWhileReverting({
+        first: () => apiError(409, "NAME_TAKEN"),
+      });
+      const toast = await toastAfter("This name is already used", answer);
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      await user.click(within(toast).getByRole("button", { name: "Close" }));
+    });
+
+    test("Undo the whole operation meets another write: its words in a toast, without Retry", async () => {
+      const { user, posts, answer } = await closeWhileReverting({
+        entries: [row(manualId, { batchId, source: "ai_import" })],
+        button: /^Undo the whole operation/,
+        first: () => apiError(409, "BUSY"),
+      });
+      expect(posts()[0]?.path).toBe(
+        `/api/v1/history/batches/${batchId}/revert`,
+      );
+      const toast = await toastAfter(
+        "Something is being changed right now. Try again.",
+        answer,
+      );
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      await user.click(within(toast).getByRole("button", { name: "Close" }));
+    });
+
+    test("refused as archived, or as gone: Couldn't save with the reason in a toast, without Retry", async () => {
+      const archived = await closeWhileReverting({
+        first: () => apiError(409, "ARCHIVED"),
+      });
+      const toast = await toastAfter(
+        "Couldn't save. It's archived.",
+        archived.answer,
+      );
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      cleanup();
+      vi.unstubAllGlobals();
+      const gone = await closeWhileReverting({
+        first: () => apiError(404, "NOT_FOUND"),
+      });
+      const goneToast = await toastAfter(
+        "Couldn't save. It no longer exists.",
+        gone.answer,
+      );
+      expect(
+        within(goneToast).queryByRole("button", { name: "Retry" }),
+      ).toBeNull();
+    });
   });
 
   test("a network failure says Couldn't save with Retry under the row", async () => {

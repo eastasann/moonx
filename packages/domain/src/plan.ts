@@ -8,6 +8,7 @@ import type {
   TemplateQuestion,
 } from "@moonx/schemas";
 import { hasText } from "./fau";
+import { isQuestionShown } from "./validation";
 
 /** A plan sub-item with what plan templates add to a question (SDD 6.3 末尾). */
 export interface PlanQuestion extends TemplateQuestion {
@@ -148,6 +149,7 @@ export const draftAnswer = (
 
 /** What a plan item's progress reads: its answers and its execution items by type. */
 export interface PlanItemContent {
+  /** The answers by question ID: the item's, with those its display conditions name. */
   answers: ReadonlyMap<string, PlanAnswerContent>;
   /** Items not deleted, per type. */
   executionCounts: ReadonlyMap<ExecutionType, number>;
@@ -156,7 +158,9 @@ export interface PlanItemContent {
 /**
  * How many sub-items of a plan item are filled, of those counted (design-spec 6.12): a
  * text when it is not blank, a table with a row, an execution view with an item. The
- * number sub-items show the validation's numbers and are not counted.
+ * number sub-items show the validation's numbers and are not counted, nor is a sub-item
+ * its display condition hides (as 11 counts no hidden question, 6.2): 20 and 21 count
+ * alike, on the plan as it is and on a saved version.
  */
 export const planItemProgress = (
   questions: readonly TemplateQuestion[],
@@ -166,6 +170,7 @@ export const planItemProgress = (
   let total = 0;
   for (const question of questions) {
     if (question.answerType === "linked_metric") continue;
+    if (!isQuestionShown(question, content.answers)) continue;
     total += 1;
     const answer = content.answers.get(question.key);
     const done =

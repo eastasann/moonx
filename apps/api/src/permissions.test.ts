@@ -1,4 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   accounts,
   assumptions,
@@ -450,6 +453,13 @@ const ROWS: Row[] = [
     },
     app: "staging",
     call: (caller) => request("GET", "/api/docs/json", caller),
+    expected: everyone(200),
+  },
+  {
+    api: "The Web's files (ADR-004. With WEB_DIST_DIR only)",
+    routes: { "GET /*": "open" },
+    app: "staging",
+    call: (caller) => request("GET", "/login", caller),
     expected: everyone(200),
   },
   {
@@ -2408,12 +2418,23 @@ const ROWS: Row[] = [
   },
 ];
 
+/** The least of a Web build the API serves (web.ts): staging always has one. */
+const webDistDir = mkdtempSync(join(tmpdir(), "moonx-web-"));
+for (const page of ["index.html", "_shell.html"]) {
+  writeFileSync(join(webDistDir, page), "<html><head></head></html>");
+}
+afterAll(() => rmSync(webDistDir, { recursive: true }));
+
 const testApp = buildTestApp(database);
 const apps = {
   default: testApp.app,
   google: buildTestApp(database, { config: { google: GOOGLE } }).app,
   staging: buildTestApp(database, {
-    config: { appEnv: "staging", avatarBucket: "test-moonx-staging-avatars" },
+    config: {
+      appEnv: "staging",
+      avatarBucket: "test-moonx-staging-avatars",
+      webDistDir,
+    },
   }).app,
 };
 

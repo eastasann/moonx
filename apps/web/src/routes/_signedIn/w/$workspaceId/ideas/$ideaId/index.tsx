@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  ValidationHomeScreen,
-  ValidationHomeSkeleton,
-} from "../../../../../../screens/ValidationHome";
+import { ValidationHomeScreen } from "../../../../../../screens/ValidationHome";
+import { ValidationHomeSkeleton } from "../../../../../../screens/ValidationHomeSkeleton";
 
 /** `/w/$workspaceId/ideas/$ideaId`: 13 Validation home (SDD 4章). */
 export const Route = createFileRoute(

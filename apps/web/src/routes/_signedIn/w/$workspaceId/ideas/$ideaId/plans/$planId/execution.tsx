@@ -8,8 +8,8 @@ import { isExecutionTab } from "../../../../../../../../lib/links";
 import {
   ExecutionScreen,
   type ExecutionSearch,
-  ExecutionSkeleton,
 } from "../../../../../../../../screens/Execution";
+import { ExecutionSkeleton } from "../../../../../../../../screens/ExecutionSkeleton";
 
 /**
  * `/w/$workspaceId/ideas/$ideaId/plans/$planId/execution`: 22 Execution (SDD 4章). Values

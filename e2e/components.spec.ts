@@ -777,11 +777,16 @@ test.describe("an icon before a text sits at the middle of its first line (desig
         );
       }
       inRow(
-        region(page, "MetricTile and MetricGroup").getByText(
-          "Contribution margin is zero or negative",
-          { exact: true },
-        ),
+        region(page, "MetricTile and MetricGroup")
+          .getByText("Contribution margin is zero or negative", { exact: true })
+          .first(),
       );
+      // As a link (supplementHref), the words sit in the link inside the line.
+      const linked = region(page, "MetricTile and MetricGroup").getByRole(
+        "link",
+        { name: "Contribution margin is zero or negative" },
+      );
+      rows.push([linked, linked.locator("xpath=ancestor::dd")]);
       const alerts = region(page, "InlineAlert");
       for (const title of [
         "A new template is available",
@@ -3136,6 +3141,26 @@ test.describe("the parts match docs/mockups (Step 22c, design-spec 4.4・4.5)", 
       ).toEqual({ "text-decoration-color": borderDefault[theme] });
     });
   }
+
+  test("a linked notice supplement keeps the line's colour and size, its press area the minimum target (MetricTile supplementHref, 6.1)", async ({
+    page,
+  }) => {
+    await openGallery(page, "desktop");
+    const link = region(page, "MetricTile and MetricGroup").getByRole("link", {
+      name: "Contribution margin is zero or negative",
+    });
+    const { own, line, pressHeight } = await link.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const dd = getComputedStyle(element.closest("dd") as HTMLElement);
+      return {
+        own: [style.color, style.fontSize],
+        line: [dd.color, dd.fontSize],
+        pressHeight: getComputedStyle(element, "::after").height,
+      };
+    });
+    expect(own).toEqual(line);
+    expect(pressHeight).toBe("24px");
+  });
 
   test("a justified groove fills the line, no segment narrower than its label (FauPicker, 6.0.3)", async ({
     page,

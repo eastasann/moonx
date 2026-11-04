@@ -17,7 +17,7 @@ import { useAutosave } from "../lib/autosave-react";
 import { useAppForm, useOneAtATime } from "../lib/form";
 import { useIsOnline } from "../lib/online";
 import { meQuery } from "../lib/queries";
-import { SendFailure } from "./SendFailure";
+import { ModalSendFailure } from "./ModalFailure";
 
 /**
  * Leaves for the sign-in screen with the way back (SDD 8.2): the cache and the unsaved
@@ -42,9 +42,11 @@ function useLeaveForLogin() {
  * was not saved. Signing in with the password, the email fixed to the account's, keeps the
  * screen and its cache and sends what was held. Signing in on the login page (Google
  * users have no other way) first confirms that the unsaved changes will be lost. A wrong
- * password says so; a rate limit shows inside it, which stays open; a suspended account
- * drops the input and goes to the login page with its words. Shown while the saves ask
- * for it (`needsSignIn`).
+ * password says so; a suspended account drops the input and goes to the login page with
+ * its words. Any other failure takes the modals' rule (6.0.6): the network as "Couldn't
+ * save" and Retry, a rate limit with its wait, both inside it, which stays open; anything
+ * else in the small dialog, whose Close closes M9 with the input still held. Shown while
+ * the saves ask for it (`needsSignIn`).
  */
 export function SignInAgainDialog() {
   const { t } = useTranslation(["app", "auth", "errors"]);
@@ -147,7 +149,9 @@ export function SignInAgainDialog() {
                   rejection={
                     failure instanceof AuthError &&
                     failure.code === "INVALID_EMAIL_OR_PASSWORD"
-                      ? t("app:signInAgain.wrongPassword")
+                      ? t("errors:INVALID_EMAIL_OR_PASSWORD", {
+                          context: "signInAgain",
+                        })
                       : undefined
                   }
                 />
@@ -159,10 +163,11 @@ export function SignInAgainDialog() {
               failure instanceof AuthError &&
               failure.code === "INVALID_EMAIL_OR_PASSWORD"
             ) && (
-              <SendFailure
+              <ModalSendFailure
                 error={failure}
                 onRetry={() => void form.handleSubmit()}
                 isRetryDisabled={!isOnline}
+                onClose={autosave.cancelSignIn}
               />
             )}
         </Form>

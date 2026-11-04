@@ -652,6 +652,29 @@ describe("QuestionFormPattern (C)", () => {
     expect(screen.queryByText("01: 1/2 answered")).toBeNull();
   });
 
+  test("phone: a dot's place is counted as a number past 99, not as a badge's 99+", () => {
+    setPhoneWidth();
+    const many = Array.from({ length: 120 }, (_, index) => `Q${index + 1}`);
+    render(
+      <QuestionFormPattern
+        header={<h1>Section</h1>}
+        questionIds={many}
+        currentId="Q100"
+        onCurrentChange={() => {}}
+        isAnswered={(id) => id === "Q101"}
+        renderQuestion={(id) => <TextArea aria-label={`Answer ${id}`} />}
+      />,
+    );
+    expect(
+      screen
+        .getByRole("button", { name: "Question 100 of 120" })
+        .getAttribute("aria-current"),
+    ).toBe("step");
+    expect(
+      screen.getByRole("button", { name: "Question 101 of 120, answered" }),
+    ).toBeTruthy();
+  });
+
   test("phone: the footer stays under the one question", () => {
     setPhoneWidth();
     render(
@@ -889,6 +912,33 @@ describe("ListDetailPattern (D)", () => {
     await user.click(screen.getByRole("button", { name: "Back to Ideas" }));
     const action = screen.getByRole("button", { name: "New idea" });
     expect(follows(screen.getByRole("list"), action)).toBe(true);
+  });
+
+  test("a disabled new item (offline, 6.0.6) stays in place and cannot be pressed: the phone's + and the desktop's Button", async () => {
+    const user = userEvent.setup();
+    const onPress = vi.fn();
+    const ideas = (
+      <ListDetailPattern
+        header={<h1>Ideas</h1>}
+        list={<ul />}
+        detail={null}
+        listLabel="Ideas"
+        onBack={() => {}}
+        newItem={{ label: "New idea", onPress, isDisabled: true }}
+      />
+    );
+    const { unmount } = render(ideas);
+    const button = screen.getByRole("button", { name: "New idea" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    await user.click(button);
+    unmount();
+    setPhoneWidth();
+    render(ideas);
+    const floating = screen.getByRole("button", { name: "New idea" });
+    expect(floating.hasAttribute("data-disabled")).toBe(true);
+    expect((floating as HTMLButtonElement).disabled).toBe(true);
+    await user.click(floating);
+    expect(onPress).not.toHaveBeenCalled();
   });
 
   test("desktop beside a docked panel without room: one pane, as on a tablet (4.1)", async () => {
@@ -1375,6 +1425,38 @@ describe("PresentationPattern (I)", () => {
     expect(screen.getByText("2 / 3")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Next slide" }));
     expect(screen.getByText("Slide model")).toBeTruthy();
+  });
+
+  test("a slide's place is counted as a number past 99, not as a badge's 99+", () => {
+    const many = Array.from({ length: 120 }, (_, index) => ({
+      id: `s${index + 1}`,
+      title: `Slide ${index + 1}`,
+      thumbnail: null,
+    }));
+    const deck = (
+      <PresentationPattern
+        header={<h1>Pitch Deck</h1>}
+        slides={many}
+        currentId="s100"
+        onCurrentChange={() => {}}
+        slide={<p>Slide s100</p>}
+      />
+    );
+    const { unmount } = render(
+      <BodyRoomContext.Provider value={narrowBody}>
+        {deck}
+      </BodyRoomContext.Provider>,
+    );
+    expect(screen.getByText("100 / 120")).toBeTruthy();
+    unmount();
+    setTabletWidth();
+    render(deck);
+    expect(
+      within(screen.getByRole("listbox", { name: "Slides" })).getByRole(
+        "option",
+        { name: "100 Slide 100" },
+      ),
+    ).toBeTruthy();
   });
 
   test("a body with room for I but not for two columns keeps the thumbnails", () => {

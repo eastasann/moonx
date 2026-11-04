@@ -1,8 +1,16 @@
 import type { InvitationPreview } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, authError, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  authError,
+  holdFirst,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { stepsOf } from "./Welcome";
 
 afterEach(() => {
@@ -89,6 +97,41 @@ describe("3 Welcome ① (design-spec 6.16)", () => {
       within(screen.getByRole("list", { name: "Steps" })).getAllByRole(
         "listitem",
       ),
+    ).toHaveLength(1);
+  });
+
+  test("Log out of the other address opens the invitation's link again, signed out", async () => {
+    let isSignedIn = true;
+    const calls = stubApi(({ method, path }) => {
+      if (method === "POST" && path === "/api/auth/sign-out") {
+        isSignedIn = false;
+        return Response.json({ success: true });
+      }
+      if (path === "/api/v1/me") {
+        return isSignedIn
+          ? Response.json(ana)
+          : apiError(401, "UNAUTHENTICATED");
+      }
+      if (path === `/api/v1/invitations/by-token/${TOKEN}`) {
+        return Response.json(invitation);
+      }
+      return undefined;
+    });
+    const router = renderApp(`/welcome?step=invite&token=${TOKEN}`);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Log out" }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.href).toBe(`/invite/${TOKEN}`),
+    );
+    // The link of a new address: its sign-up, for the invitation's email.
+    const form = await screen.findByRole("form", { name: "Sign up" });
+    expect(
+      (within(form).getByRole("textbox", { name: /Email/ }) as HTMLInputElement)
+        .value,
+    ).toBe(invitation.email);
+    expect(
+      calls.filter(({ path }) => path === "/api/auth/sign-out"),
     ).toHaveLength(1);
   });
 
@@ -187,6 +230,51 @@ describe("2 Sign up from an invitation (design-spec 6.16)", () => {
         name: "This invitation is invalid or expired. Ask the person who invited you for a new one.",
       }),
     ).toBeTruthy();
+  });
+
+  test("an account made with the address while signing up (EMAIL_TAKEN): on to Log in and back to the link, without words", async () => {
+    const user = userEvent.setup();
+    let accountExists = false;
+    const calls = stubApi(({ method, path }) => {
+      if (path === "/api/v1/me") return apiError(401, "UNAUTHENTICATED");
+      if (
+        method === "GET" &&
+        path === `/api/v1/invitations/by-token/${TOKEN}`
+      ) {
+        return Response.json({ ...invitation, accountExists });
+      }
+      if (path === `/api/v1/invitations/by-token/${TOKEN}/sign-up`) {
+        // Google's sign-up with the same address, in another tab, came first.
+        accountExists = true;
+        return apiError(409, "EMAIL_TAKEN");
+      }
+      return undefined;
+    });
+    const router = renderApp(`/invite/${TOKEN}`);
+    const form = await screen.findByRole("form", { name: "Sign up" });
+    await user.type(
+      within(form).getByRole("textbox", { name: /Display name/ }),
+      "New Member",
+    );
+    await user.type(
+      within(form).getByLabelText(/^Password/),
+      "a-long-password",
+    );
+    const signUp = screen.getByRole("button", { name: "Sign up" });
+    await waitFor(() => expect(signUp.hasAttribute("disabled")).toBe(false));
+    await user.click(signUp);
+    await waitFor(() =>
+      expect(router.state.location.href).toBe(
+        `/login?next=${encodeURIComponent(`/invite/${TOKEN}`)}`,
+      ),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Log in" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(calls.filter(({ path }) => path.endsWith("/sign-up"))).toHaveLength(
+      1,
+    );
   });
 
   test("an account with the address: Log in, then back to the link", async () => {
@@ -434,6 +522,30 @@ describe("Log out (design-spec 5章「共通ナビ」)", () => {
     );
   });
 
+  test("a rate limit: the user stays; the toast gives the wait and Retry", async () => {
+    const calls = dashboard(() =>
+      authError(429, "RATE_LIMITED", { "x-retry-after": "120" }),
+    );
+    const router = renderApp(`/w/${ana.lastWorkspaceId}`);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole("button", { name: "Ana Villanueva" }),
+    );
+    const toast = await toastAfter(
+      "Too many attempts. Try again in 2 minutes.",
+      async () =>
+        user.click(await screen.findByRole("menuitem", { name: "Log out" })),
+    );
+    expect(router.state.location.pathname).toBe(`/w/${ana.lastWorkspaceId}`);
+    expect(within(toast).queryByText(/Something went wrong/)).toBeNull();
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(
+        calls.filter(({ path }) => path === "/api/auth/sign-out"),
+      ).toHaveLength(2),
+    );
+  });
+
   test("no session left (401) is signed out all the same: on to 1", async () => {
     dashboard(() => authError(401, "UNAUTHENTICATED"));
     const router = renderApp(`/w/${ana.lastWorkspaceId}`);
@@ -443,5 +555,161 @@ describe("Log out (design-spec 5章「共通ナビ」)", () => {
     );
     await user.click(await screen.findByRole("menuitem", { name: "Log out" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  });
+});
+
+describe("3 left while a send is on its way (design-spec 6.0.6「送っている間に閉じた送信の失敗」)", () => {
+  const bcdx = invitation.workspace?.id ?? "";
+  const member = { ...ana, email: invitation.email };
+  const acceptPath = `/api/v1/invitations/by-token/${TOKEN}/accept`;
+
+  /** Join of a new account (① ② ③) sent, its answer held, and 3 left for 8. */
+  async function joinThenLeave(answer: () => Response) {
+    const held = holdFirst("POST", acceptPath, answer);
+    const calls = stubApi((call) => {
+      const answered = held.answer(call);
+      if (answered !== undefined) return answered;
+      const { method, path } = call;
+      if (path === "/api/v1/me") {
+        return Response.json(
+          method === "PATCH" ? { ...member, lastWorkspaceId: bcdx } : member,
+        );
+      }
+      if (path === `/api/v1/invitations/by-token/${TOKEN}`) {
+        return Response.json(invitation);
+      }
+      return undefined;
+    });
+    const router = renderApp(`/welcome?step=invite&token=${TOKEN}&new=1`);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Join" }));
+    const accepts = () => calls.filter(({ path }) => path === acceptPath);
+    await waitFor(() => expect(accepts()).toHaveLength(1));
+    await act(() => router.navigate({ to: "/notifications" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Join" })).toBeNull(),
+    );
+    return { user, router, calls, accepts, release: held.release };
+  }
+
+  test("Join that goes through: the workspace recorded as the last one, and the user stays where they went, not on ②", async () => {
+    const { router, calls, release } = await joinThenLeave(() =>
+      Response.json({ workspaceId: bcdx, alreadyMember: false }),
+    );
+    await release();
+    await waitFor(() =>
+      expect(
+        calls.find(
+          ({ method, path }) => method === "PATCH" && path === "/api/v1/me",
+        )?.body,
+      ).toEqual({ lastWorkspaceId: bcdx }),
+    );
+    expect(router.state.location.pathname).toBe("/notifications");
+    expect(router.state.location.search).not.toHaveProperty("step");
+  });
+
+  test("Join, and no answer comes: Couldn't save in a toast, whose Retry joins again, staying where the user went", async () => {
+    let isFailing = true;
+    const { user, router, accepts, release } = await joinThenLeave(() => {
+      if (isFailing) throw new TypeError("Failed to fetch");
+      return Response.json({ workspaceId: bcdx, alreadyMember: false });
+    });
+    const toast = await toastAfter("Couldn't save", release);
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(accepts()).toHaveLength(2));
+    expect(accepts().map(({ body }) => body)).toEqual([null, null]);
+    expect(router.state.location.pathname).toBe("/notifications");
+  });
+
+  test("Join of an invitation accepted meanwhile: Already accepted in a toast, without Retry, and no 5 opens", async () => {
+    const { router, release } = await joinThenLeave(() =>
+      apiError(409, "INVITATION_ALREADY_ACCEPTED"),
+    );
+    const toast = await toastAfter("Already accepted", release);
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(router.state.location.pathname).toBe("/notifications");
+  });
+
+  /** ② Continue sent, its answer held, and 3 left for 8. */
+  async function continueThenLeave(answer: () => Response) {
+    const held = holdFirst("PATCH", "/api/v1/me", answer);
+    const calls = stubApi((call) => {
+      const answered = held.answer(call);
+      if (answered !== undefined) return answered;
+      return call.method === "GET" && call.path === "/api/v1/me"
+        ? Response.json(ana)
+        : undefined;
+    });
+    const router = renderApp("/welcome?step=profile");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Continue" }));
+    const saves = () => calls.filter(({ method }) => method === "PATCH");
+    await waitFor(() => expect(saves()).toHaveLength(1));
+    await act(() => router.navigate({ to: "/notifications" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Continue" })).toBeNull(),
+    );
+    return { user, router, saves, release: held.release };
+  }
+
+  test("Continue failing unexpectedly (500): Something went wrong with its Ref and Retry, in a toast; Retry saves the same name and zone, and ③ does not open", async () => {
+    let isFailing = true;
+    const { user, router, saves, release } = await continueThenLeave(() =>
+      isFailing ? apiError(500, "INTERNAL") : Response.json(ana),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      release,
+    );
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(saves()).toHaveLength(2));
+    expect(saves()[1]?.body).toEqual(saves()[0]?.body);
+    expect(router.state.location.pathname).toBe("/notifications");
+    expect(router.state.location.search).not.toHaveProperty("step");
+  });
+
+  test("Continue with a name the API refuses: Couldn't save. Check the format. in a toast, without Retry", async () => {
+    const { release } = await continueThenLeave(() =>
+      apiError(422, "VALIDATION_FAILED", {
+        details: [{ path: "displayName", code: "custom", message: "refused" }],
+      }),
+    );
+    const toast = await toastAfter("Couldn't save. Check the format.", release);
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  test("a photo the API cannot read as one, sent as 3 was left: its words in a toast, without Retry", async () => {
+    const held = holdFirst("PUT", "/api/v1/me/avatar", () =>
+      apiError(422, "VALIDATION_FAILED", {
+        details: [{ path: "file", code: "custom", message: "not an image" }],
+      }),
+    );
+    const calls = stubApi((call) => {
+      const answered = held.answer(call);
+      if (answered !== undefined) return answered;
+      return call.method === "GET" && call.path === "/api/v1/me"
+        ? Response.json(ana)
+        : undefined;
+    });
+    const router = renderApp("/welcome?step=profile");
+    await screen.findByRole("button", { name: "Continue" });
+    const photo =
+      document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (photo === null) throw new Error("no file input");
+    await userEvent.upload(
+      photo,
+      new File(["not a picture"], "a.png", { type: "image/png" }),
+    );
+    await waitFor(() =>
+      expect(calls.some(({ path }) => path === "/api/v1/me/avatar")).toBe(true),
+    );
+    await act(() => router.navigate({ to: "/notifications" }));
+    const toast = await toastAfter(
+      "Use a JPEG, PNG or WebP image.",
+      held.release,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
   });
 });

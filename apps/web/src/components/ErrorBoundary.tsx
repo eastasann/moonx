@@ -1,7 +1,8 @@
 import { AlertDialog } from "@moonx/ui-web";
 import { Component, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { reportOnce, UnexpectedState } from "./states";
+import { reportOnce } from "../lib/failure";
+import { UnexpectedState } from "./states";
 
 interface ErrorBoundaryProps {
   /** What shows instead of the children once they fail to render. */
@@ -9,12 +10,22 @@ interface ErrorBoundaryProps {
     reference: string | null;
     retry: () => void;
   }) => ReactNode;
+  /**
+   * Once failed, a change of it renders the children again, as Retry does; while they
+   * render, a change leaves them as they are.
+   */
+  resetKey?: unknown;
   children: ReactNode;
 }
+
+/** What `failedAt` holds until the failure is caught. */
+const NOT_CAUGHT = Symbol("not caught");
 
 interface ErrorBoundaryState {
   hasFailed: boolean;
   reference: string | null;
+  /** The `resetKey` the failure was caught at. */
+  failedAt: unknown;
 }
 
 /**
@@ -26,7 +37,11 @@ export class ErrorBoundary extends Component<
   ErrorBoundaryProps,
   ErrorBoundaryState
 > {
-  override state: ErrorBoundaryState = { hasFailed: false, reference: null };
+  override state: ErrorBoundaryState = {
+    hasFailed: false,
+    reference: null,
+    failedAt: NOT_CAUGHT,
+  };
 
   static getDerivedStateFromError(): Partial<ErrorBoundaryState> {
     return { hasFailed: true };
@@ -35,16 +50,59 @@ export class ErrorBoundary extends Component<
   // Reported once the failure is final: React renders again after a failure before it
   // gives up, and each attempt throws an error of its own.
   override componentDidCatch(error: unknown) {
-    this.setState({ reference: reportOnce(error) });
+    this.setState({
+      reference: reportOnce(error),
+      failedAt: this.props.resetKey,
+    });
   }
 
-  retry = () => this.setState({ hasFailed: false, reference: null });
+  // Compared with where the failure was caught, not with the last render: a failure that
+  // came with a new `resetKey` is not tried again, and reported again, for it.
+  override componentDidUpdate() {
+    const { hasFailed, failedAt } = this.state;
+    if (
+      hasFailed &&
+      failedAt !== NOT_CAUGHT &&
+      failedAt !== this.props.resetKey
+    ) {
+      this.retry();
+    }
+  }
+
+  retry = () =>
+    this.setState({ hasFailed: false, reference: null, failedAt: NOT_CAUGHT });
 
   override render() {
     const { hasFailed, reference } = this.state;
     if (!hasFailed) return this.props.children;
     return this.props.fallback({ reference, retry: this.retry });
   }
+}
+
+/**
+ * The body of a screen in its frame (SDD 8.2, design-spec 6.0.6「想定外のエラー」): a
+ * screen that fails to render shows "Something went wrong" with its Ref and Retry where
+ * its body was, and the frame and its navigation stay usable. Moving to another path
+ * (another screen, or another item of the same one) renders it again.
+ */
+export function ScreenBoundary({
+  path,
+  children,
+}: {
+  /** The path open: once failed, a move to another renders the screen again. */
+  path: string;
+  children: ReactNode;
+}) {
+  return (
+    <ErrorBoundary
+      resetKey={path}
+      fallback={({ reference, retry }) => (
+        <UnexpectedState reference={reference} onRetry={retry} />
+      )}
+    >
+      {children}
+    </ErrorBoundary>
+  );
 }
 
 /** A block of a screen that fails alone: the others stay (SDD 8.2). */

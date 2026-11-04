@@ -8,15 +8,12 @@ import {
   type ValidationHome,
 } from "@moonx/schemas";
 import {
-  AlertDialog,
   Button,
   ButtonGroup,
   Dialog,
-  Flex,
   Form,
   InlineAlert,
   Stack,
-  Text,
   TextArea,
   TextField,
 } from "@moonx/ui-web";
@@ -29,18 +26,20 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { ApiError, api, inPath, unwrap } from "../lib/api";
+import { api, inPath, unwrap } from "../lib/api";
 import type { SaveTarget } from "../lib/autosave";
 import { useAutosave, useSaveItem } from "../lib/autosave-react";
 import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
 import { inputIssueMessage } from "../lib/input-issues";
 import { ideaHref } from "../lib/links";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import { ideaKey, validationHomeQuery, workspaceKey } from "../lib/queries";
-import { isTransient } from "../lib/query";
+import { useSendThrough } from "../lib/send";
+import { useFailureOnceClosed } from "./ideaActions";
+import { ModalSendFailure } from "./ModalFailure";
 import { SaveFailureNote } from "./SaveFeedback";
-import { failureCode, rateLimitWords } from "./SendFailure";
-import { reportOnce } from "./states";
+import { failureCode } from "./SendFailure";
 import { useWorkspace } from "./workspace";
 
 /** The proposed solution as its field holds it: text, blank for none (6.0.8 長文). */
@@ -51,8 +50,9 @@ const solutionInputSchema = plainText(TEXT_LIMITS.long);
  * the proposed solution (6.0.8). Creating it makes its validation on the latest template
  * and opens its 13 in place of the dialog's history entry. Medium; a tray on a phone. A
  * failure keeps what was typed (6.0.6 モーダルの共通の決まり): no published template says
- * so where Create is; the network or an API that is down offers Retry in place; anything
- * else is unexpected, in the small dialog with its Ref, whose Close closes M1.
+ * so where Create is; the rest as every modal's send (ModalSendFailure), whose small
+ * dialog's Close closes M1. Closed while Create is on its way, the idea is still made
+ * and listed, but 13 does not open (6.0.6「送っている間に閉じた送信の失敗」).
  */
 export function NewIdeaDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation(["ideas", "app", "errors"]);
@@ -61,20 +61,35 @@ export function NewIdeaDialog({ onClose }: { onClose: () => void }) {
   const formId = useId();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const isOpen = useIsMounted();
+  const post = (values: IdeaCreate) =>
+    unwrap(
+      api().api.v1.workspaces({ workspaceId: workspace.id }).ideas.post(values),
+    );
+  const listChanged = () =>
+    queryClient.invalidateQueries({ queryKey: workspaceKey(workspace.id) });
+  // Cancel, Escape and Back close M1 while Create is on its way: its failure then says so
+  // in a toast, whose Retry makes the idea from the same input and lists it. No published
+  // template says so alone, as sending again meets the same refusal.
+  const sendThrough = useSendThrough();
+  const failedOnceClosed = useFailureOnceClosed(
+    (values: IdeaCreate) => sendThrough(() => post(values)).then(listChanged),
+    (error) =>
+      failureCode(error) === "TEMPLATE_NOT_PUBLISHED"
+        ? t("errors:TEMPLATE_NOT_PUBLISHED")
+        : null,
+  );
   const create = useMutation({
-    mutationFn: (values: IdeaCreate) =>
-      unwrap(
-        api()
-          .api.v1.workspaces({ workspaceId: workspace.id })
-          .ideas.post(values),
-      ),
+    mutationFn: post,
     onSuccess: async (idea) => {
-      await queryClient.invalidateQueries({
-        queryKey: workspaceKey(workspace.id),
-      });
+      await listChanged();
+      // Closed meanwhile: the user stays where closing took them, and the entry they are
+      // on now is not replaced.
+      if (!isOpen.current) return;
       // In place of M1's entry: Back from 13 leads to the screen under it, not to M1.
       await navigate({ href: ideaHref(workspace.id, idea.id), replace: true });
     },
+    onError: (error, values) => failedOnceClosed(error, values),
   });
   // A second I1 POST would make a second idea: a second submit waits for the first.
   const oneAtATime = useOneAtATime();
@@ -86,43 +101,24 @@ export function NewIdeaDialog({ onClose }: { onClose: () => void }) {
   const form = useAppForm({
     defaultValues: { name: "", oneLineConcept: "", proposedSolution: "" },
     listeners: {
-      onChange: ({ fieldApi }) => rejections.clear(fieldApi.name),
+      onChange: ({ fieldApi }) => {
+        // A field the API refused, changed: the API is asked again, so the send's
+        // failure goes with the reason under it.
+        if (rejections.rejectionOf(fieldApi.name) !== undefined) create.reset();
+        rejections.clear(fieldApi.name);
+      },
     },
     onSubmit: ({ value }) =>
       oneAtATime(async () => {
         rejections.clear();
         await create.mutateAsync(value).catch((error: unknown) => {
-          // Shown from the mutation's state below, or under the field the API refused.
-          if (rejections.reject(error)) create.reset();
+          // Shown from the mutation's state below; a field the API refused says so under
+          // it too (6.0.2).
+          rejections.reject(error);
         });
       }),
   });
   const failure = create.error;
-  const code = failureCode(failure);
-  const rateLimited = rateLimitWords(failure);
-  const inPlace =
-    failure === null
-      ? null
-      : code === "TEMPLATE_NOT_PUBLISHED"
-        ? t("errors:TEMPLATE_NOT_PUBLISHED")
-        : rateLimited;
-  const isUnexpected =
-    failure !== null &&
-    inPlace === null &&
-    !(
-      failure instanceof ApiError &&
-      (isTransient(failure) || failure.status === 401)
-    );
-  // The API's request id, or the Sentry event of the Web's own failure (SDD 8.2).
-  const reference = useMemo(
-    () =>
-      !isUnexpected
-        ? null
-        : failure instanceof ApiError
-          ? failure.requestId
-          : reportOnce(failure),
-    [isUnexpected, failure],
-  );
   const canRetry = isOnline && !create.isPending;
   return (
     <Dialog
@@ -197,43 +193,20 @@ export function NewIdeaDialog({ onClose }: { onClose: () => void }) {
               />
             )}
           </form.AppField>
-          {inPlace !== null && (
-            <InlineAlert variant="negative">{inPlace}</InlineAlert>
-          )}
-          {failure !== null && inPlace === null && !isUnexpected && (
-            <InlineAlert variant="negative">
-              <Flex gap="space-200" wrap alignItems="center">
-                <Text>{t("app:state.couldNotSave")}</Text>
-                <Button
-                  variant="secondary"
-                  size="S"
-                  type="submit"
-                  form={formId}
-                  isDisabled={!canRetry}
-                >
-                  {t("app:state.retry")}
-                </Button>
-              </Flex>
-            </InlineAlert>
-          )}
+          {failure !== null &&
+            (failureCode(failure) === "TEMPLATE_NOT_PUBLISHED" ? (
+              <InlineAlert variant="negative">
+                {t("errors:TEMPLATE_NOT_PUBLISHED")}
+              </InlineAlert>
+            ) : (
+              <ModalSendFailure
+                error={failure}
+                onRetry={() => void form.handleSubmit()}
+                isRetryDisabled={!canRetry}
+                onClose={onClose}
+              />
+            ))}
         </Form>
-        {isUnexpected && (
-          <AlertDialog
-            isOpen
-            variant="error"
-            size="S"
-            title={t("app:state.unexpected")}
-            primaryActionLabel={t("app:state.retry")}
-            cancelLabel={t("app:state.close")}
-            onPrimaryAction={() => void form.handleSubmit()}
-            isPrimaryActionDisabled={!canRetry}
-            onCancel={onClose}
-          >
-            {reference === null
-              ? ""
-              : t("app:state.ref", { ref: reference.slice(0, 8) })}
-          </AlertDialog>
-        )}
       </form.AppForm>
     </Dialog>
   );

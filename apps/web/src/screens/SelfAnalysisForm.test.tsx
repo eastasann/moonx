@@ -1,19 +1,27 @@
+import {
+  conditionAnswersOutside,
+  decidesElsewhere,
+  isQuestionShown,
+  selfAnalysisProgress,
+} from "@moonx/domain";
 import type {
   Me,
   SelfAnalysisAnswer,
   SelfAnalysisHome,
+  TemplateQuestion,
   TemplateSection,
 } from "@moonx/schemas";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, type Call, renderApp, stubApi } from "../test/api";
+import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   answer,
   incomeSection,
   otherTeam,
   personal,
+  sectionRead,
   selfAnalysisId,
   selfHome,
   viewerOfBcdx,
@@ -33,18 +41,24 @@ const api = "/api/v1/me/self-analysis";
 function formApi({
   me = ana,
   home = selfHome(),
+  read,
   sections = [whySection, incomeSection],
   answers = {},
   threads = [],
   write = (_call: Call): Response | undefined => undefined,
+  beforeSave,
 }: {
   me?: Me;
   home?: SelfAnalysisHome;
+  /** Answers S1 GET in place of `home`. */
+  read?: () => Response;
   sections?: TemplateSection[];
   answers?: Record<string, Partial<SelfAnalysisAnswer>>;
   threads?: unknown[];
   /** Answers the comment writes (C1 POST). */
   write?: (call: Call) => Response | undefined;
+  /** Holds a save back before the fake applies it, as a slow S3 would. */
+  beforeSave?: () => Promise<void>;
 } = {}) {
   const saved = new Map<string, SelfAnalysisAnswer>();
   for (const section of sections) {
@@ -56,32 +70,49 @@ function formApi({
     const { method, path } = call;
     if (method === "GET" && path === "/api/v1/me") return Response.json(me);
     if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
-    if (method === "GET" && path === api) return Response.json(home);
+    if (method === "GET" && path === api) {
+      return read?.() ?? Response.json(home);
+    }
     const section = sections.find(
       ({ key }) => path === `${api}/sections/${key}`,
     );
     if (method === "GET" && section !== undefined) {
-      return Response.json({
-        section,
-        answers: section.questions.map(({ key }) => saved.get(key)),
-      });
+      // What S2 reads of the other sections, from what this fake holds now.
+      const version = sections.flatMap(({ questions }) => questions);
+      return Response.json(
+        sectionRead(
+          section,
+          section.questions.map(({ key }) => saved.get(key) ?? answer(key)),
+          {
+            conditionAnswers: conditionAnswersOutside(
+              section.questions,
+              version,
+              saved,
+            ),
+            decidesElsewhere: decidesElsewhere(section.questions, version),
+          },
+        ),
+      );
     }
     if (method === "PUT" && path.startsWith(`${api}/answers/`)) {
-      const key = decodeURIComponent(path.split("/").at(-1) ?? "");
-      const before = saved.get(key) ?? answer(key);
-      const body = call.body as {
-        text?: string;
-        amount?: number | null;
-        lockVersion: number;
+      const apply = () => {
+        const key = decodeURIComponent(path.split("/").at(-1) ?? "");
+        const before = saved.get(key) ?? answer(key);
+        const body = call.body as {
+          text?: string;
+          amount?: number | null;
+          lockVersion: number;
+        };
+        const after = answer(key, {
+          ...before,
+          text: body.text ?? before.text,
+          amount: body.amount === undefined ? before.amount : body.amount,
+          lockVersion: body.lockVersion + 1,
+        });
+        saved.set(key, after);
+        return Response.json(after);
       };
-      const after = answer(key, {
-        ...before,
-        text: body.text ?? before.text,
-        amount: body.amount === undefined ? before.amount : body.amount,
-        lockVersion: body.lockVersion + 1,
-      });
-      saved.set(key, after);
-      return Response.json(after);
+      return beforeSave === undefined ? apply() : beforeSave().then(apply);
     }
     if (method === "GET" && path.startsWith("/api/v1/comments?")) {
       return Response.json({ threads, unresolvedCount: threads.length });
@@ -186,6 +217,23 @@ describe("11 Question form for a self analysis (design-spec 6.2・6.11)", () => 
         name: "Not found. Check the link.",
       }),
     ).toBeTruthy();
+  });
+
+  test("no published template: says so in the form's place, the navigation kept (6.0.6)", async () => {
+    formApi({ read: () => apiError(409, "TEMPLATE_NOT_PUBLISHED") });
+    renderApp(`${base}/WHY`);
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Templates aren't ready yet. Ask your administrator.",
+      }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(
+      screen
+        .getAllByRole("link", { name: "Self Analysis" })
+        .some((link) => link.getAttribute("aria-current") === "page"),
+    ).toBe(true);
   });
 
   test("a Viewer of this workspace is taken to their personal workspace's 11", async () => {
@@ -400,5 +448,118 @@ describe("11 Question form for a self analysis (design-spec 6.2・6.11)", () => 
       ),
     ).toBeTruthy();
     expect(within(panel).queryByRole("textbox")).toBeNull();
+  });
+});
+
+describe("a display condition naming another section's question (design-spec 6.2・6.11)", () => {
+  /** LATER, whose first question shows once WHY's Q1 is "Yes". */
+  const laterSection: TemplateSection = {
+    key: "LATER",
+    part: null,
+    title: "LATER",
+    subtitle: null,
+    guidance: null,
+    questions: [
+      {
+        ...(whySection.questions[1] as TemplateQuestion),
+        key: "SA.LATER.1",
+        sectionKey: "LATER",
+        title: "Q3",
+        prompt: "What would you do first?",
+        displayCondition: { "SA.WHY.1": ["Yes"] },
+      },
+      {
+        ...(whySection.questions[1] as TemplateQuestion),
+        key: "SA.LATER.2",
+        sectionKey: "LATER",
+        title: "Q4",
+        prompt: "Who would help?",
+      },
+    ],
+  };
+  const sections = [whySection, laterSection];
+  /** S1 as 10 counts it on all of `answers` (packages/domain, as the API does). */
+  const hubOf = (answers: Record<string, string>) =>
+    selfHome(
+      selfAnalysisProgress(
+        sections,
+        new Map(
+          Object.entries(answers).map(([key, text]) => [
+            key,
+            { text, amount: null },
+          ]),
+        ),
+      ),
+    );
+
+  test.each([
+    ["Yes", true],
+    ["No", false],
+  ])(
+    "LATER shows a question by WHY's Q1 (%s) and counts as 10 does",
+    async (why, isShown) => {
+      const home = hubOf({ "SA.WHY.1": why });
+      formApi({
+        home,
+        sections,
+        answers: { "SA.WHY.1": { text: why, lockVersion: 1 } },
+      });
+      renderApp(`${base}/LATER`);
+      await screen.findByRole("region", { name: "Q4" });
+      const hub = home.sections.find(({ key }) => key === "LATER");
+      expect(hub?.total).toBe(isShown ? 2 : 1);
+      expect(screen.getByText(`${hub?.answered}/${hub?.total}`)).toBeTruthy();
+      expect(screen.queryByRole("region", { name: "Q3" }) !== null).toBe(
+        isShown,
+      );
+      expect(
+        laterSection.questions.filter((question) =>
+          isQuestionShown(question, new Map([["SA.WHY.1", { text: why }]])),
+        ),
+      ).toHaveLength(hub?.total ?? 0);
+    },
+  );
+
+  test("a question another section's condition names says how to reveal it while unanswered", async () => {
+    const user = userEvent.setup();
+    const calls = formApi({ home: hubOf({}), sections });
+    renderApp(`${base}/WHY?q=SA.WHY.1`);
+    const first = await screen.findByRole("textbox", { name: "Answer to Q1" });
+    expect(card("Q1").textContent).toContain(
+      "Answer Q1 to see the next questions",
+    );
+    await user.type(first, "Yes");
+    expect(card("Q1").textContent).not.toContain("to see the next");
+    await waitFor(() => expect(puts(calls)).toHaveLength(1), {
+      timeout: 3000,
+    });
+  });
+
+  test("a save sent on leaving reads the next section again, whose condition names it", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls = formApi({
+      home: hubOf({}),
+      sections,
+      beforeSave: () => held,
+    });
+    const router = renderApp(`${base}/WHY?q=SA.WHY.1`);
+    const first = await screen.findByRole("textbox", { name: "Answer to Q1" });
+    await user.type(first, "Yes");
+    await router.navigate({ href: `${base}/LATER` });
+    // Read before the save of Q1 landed: what it shows is not shown yet.
+    expect(await screen.findByText("0/1")).toBeTruthy();
+    release();
+    expect(await screen.findByText("0/2")).toBeTruthy();
+    expect(card("Q3")).toBeTruthy();
+    expect(
+      calls.filter(
+        ({ method, path }) =>
+          method === "GET" && path === `${api}/sections/LATER`,
+      ),
+    ).toHaveLength(2);
   });
 });

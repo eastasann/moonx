@@ -3,10 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { AuthError, signOut } from "../lib/auth";
+import { signOut } from "../lib/auth";
 import { useAutosave } from "../lib/autosave-react";
+import { reportOnce, unexpectedReference } from "../lib/failure";
 import { rateLimitWords } from "./SendFailure";
-import { reportOnce } from "./states";
 
 /**
  * Logs out (A4) and opens 1 (design-spec 5章「共通ナビ」), the cache of the user's data
@@ -32,11 +32,12 @@ export function useLogOut(to = "/"): () => void {
       } catch (error) {
         // The API's request id, or the Sentry event of the Web's own failure; none for
         // the network, which the offline band may already tell (SDD 8.2).
+        const rateLimited = rateLimitWords(error);
         const reference =
-          error instanceof AuthError ? error.requestId : reportOnce(error);
+          rateLimited === null ? unexpectedReference(error) : null;
         // With an action the toast stays until it is pressed or closed (4.5 Toast).
         ToastQueue.neutral(
-          rateLimitWords(error) ??
+          rateLimited ??
             (reference === null
               ? t("app:state.unexpected")
               : t("app:state.unexpectedRef", { ref: reference.slice(0, 8) })),

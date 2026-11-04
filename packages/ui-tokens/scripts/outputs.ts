@@ -66,7 +66,7 @@ export async function buildOutputs(
   tree: TokenTree,
 ): Promise<Map<string, string | Uint8Array>> {
   const outputs = new Map<string, string | Uint8Array>();
-  outputs.set("vars.ts", formatGenerated("vars.ts", varsSource(tree)));
+  outputs.set("vars.css.ts", formatGenerated("vars.css.ts", varsSource(tree)));
   outputs.set(
     "theme.css.ts",
     formatGenerated("theme.css.ts", themeSource(tree)),

@@ -1,7 +1,7 @@
 import { vars } from "@moonx/ui-tokens";
 import { style, styleVariants } from "@vanilla-extract/css";
 import { recipe } from "@vanilla-extract/recipes";
-import { narrowQuery, typography } from "../styles/helpers";
+import { focusRing, narrowQuery, typography } from "../styles/helpers";
 
 const measures = vars.scale.component.metricGroup;
 const hairline = `${vars.borderWidth.hairline} solid ${vars.color.border.hairline}`;
@@ -202,4 +202,31 @@ const supplementBase = {
 export const supplement = styleVariants({
   neutral: { ...supplementBase, color: vars.color.text.tertiary },
   notice: { ...supplementBase, color: vars.color.notice.fg },
+});
+
+/**
+ * The supplement as a link: its colour and size stay the supplement's, underlined. The
+ * small line keeps its height; the area that takes a press reaches the minimum target
+ * (design-spec 4.5 Link).
+ */
+export const supplementLink = style({
+  position: "relative",
+  color: "inherit",
+  font: "inherit",
+  textDecorationLine: "underline",
+  textDecorationThickness: vars.borderWidth.hairline,
+  textUnderlineOffset: vars.space["50"],
+  borderRadius: vars.radius.chip,
+  cursor: "pointer",
+  outline: "none",
+  "::after": {
+    content: '""',
+    position: "absolute",
+    insetInline: 0,
+    top: "50%",
+    minWidth: vars.scale.component.targetMin,
+    height: vars.scale.component.targetMin,
+    transform: "translateY(-50%)",
+  },
+  selectors: { "&[data-focus-visible]": focusRing },
 });

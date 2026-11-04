@@ -1,4 +1,4 @@
-import { formatCount } from "@moonx/i18n";
+import { formatInteger } from "@moonx/i18n";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type ReactNode, useCallback, useLayoutEffect, useRef } from "react";
 import { ListBox, ListBoxItem } from "react-aria-components";
@@ -183,7 +183,7 @@ export function PresentationPattern({
                       className={deck.item}
                     >
                       <span className={deck.number}>
-                        {formatCount(item.position + 1)}
+                        {formatInteger(item.position + 1)}
                       </span>
                       <span aria-hidden="true" className={deck.mini}>
                         {item.thumbnail}
@@ -216,8 +216,8 @@ export function PresentationPattern({
                   </ActionButton>
                   <span aria-live="polite" className={styles.slidePosition}>
                     {t("components:presentationPattern.position", {
-                      number: formatCount(index + 1),
-                      total: formatCount(slides.length),
+                      number: index + 1,
+                      total: slides.length,
                     })}
                   </span>
                   <ActionButton

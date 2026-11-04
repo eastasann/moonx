@@ -5,12 +5,9 @@ import {
   uuidSchema,
 } from "@moonx/schemas";
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  IdeasScreen,
-  type IdeasSearch,
-  IdeasSkeleton,
-  searchSchema,
-} from "../../../../../screens/Ideas";
+import { ideasSearchSchema } from "../../../../../lib/links";
+import { IdeasScreen, type IdeasSearch } from "../../../../../screens/Ideas";
+import { IdeasSkeleton } from "../../../../../screens/IdeasSkeleton";
 
 /** `/w/$workspaceId/ideas`: 6 Ideas (SDD 4章). Values it cannot read are left out. */
 export const Route = createFileRoute("/_signedIn/w/$workspaceId/ideas/")({
@@ -24,7 +21,7 @@ export const Route = createFileRoute("/_signedIn/w/$workspaceId/ideas/")({
     q:
       typeof search.q === "string" &&
       search.q !== "" &&
-      searchSchema.safeParse(search.q).success
+      ideasSearchSchema.safeParse(search.q).success
         ? search.q
         : undefined,
     selected: uuidSchema.safeParse(search.selected).data,

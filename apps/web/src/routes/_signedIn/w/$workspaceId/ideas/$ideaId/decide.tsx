@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  DecisionScreen,
-  DecisionSkeleton,
-} from "../../../../../../screens/Decision";
+import { DecisionScreen } from "../../../../../../screens/Decision";
+import { DecisionSkeleton } from "../../../../../../screens/DecisionSkeleton";
 
 /** `/w/$workspaceId/ideas/$ideaId/decide`: 19 Decision (SDD 4章). */
 export const Route = createFileRoute(

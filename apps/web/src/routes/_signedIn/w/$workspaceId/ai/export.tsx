@@ -4,8 +4,8 @@ import { searchText } from "../../../../../lib/ai";
 import {
   AiExportScreen,
   type AiExportSearch,
-  AiExportSkeleton,
 } from "../../../../../screens/AiExport";
+import { AiExportSkeleton } from "../../../../../screens/AiExportSkeleton";
 
 /**
  * `/w/$workspaceId/ai/export`: 24 Export for AI (SDD 4章). Values it cannot read are left

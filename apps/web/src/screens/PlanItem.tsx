@@ -4,9 +4,9 @@ import {
   isQuestionShown,
   keyMetricOf,
   PITCH_SPEAKER_NOTE_KEYS,
+  type PlanAnswerContent,
   planItemProgress,
 } from "@moonx/domain";
-import { formatCount } from "@moonx/i18n";
 import {
   type ExecutionItem,
   type ExecutionType,
@@ -76,7 +76,7 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
@@ -107,6 +107,7 @@ import {
   validationHomeQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { PlanItemSkeleton } from "./PlanItemSkeleton";
 
 export type { PlanItemSearch };
 
@@ -467,7 +468,7 @@ function ItemForm({
     });
   };
   const answersCache: PlanAnswersCache = {
-    put: (answer) =>
+    put: (answer) => {
       putSaved<PlanItem>(queryClient, queryKey, (data) =>
         data === undefined
           ? undefined
@@ -477,7 +478,17 @@ function ItemForm({
                 current.questionKey === answer.questionKey ? answer : current,
               ),
             },
-      ),
+      );
+      // Another item's display conditions may read this answer. A save sent on leaving
+      // lands after the next item was read: it is read again. A version's items read
+      // its snapshot.
+      void queryClient.invalidateQueries({
+        queryKey: [...planKey(home.ideaId, home.id), "items"],
+        predicate: (query) =>
+          query.queryKey.at(-2) !== item.itemNo &&
+          query.queryKey.at(-1) === null,
+      });
+    },
     reload: () => void queryClient.invalidateQueries({ queryKey }),
   };
   const executionCache: ExecutionCache = {
@@ -518,22 +529,23 @@ function ItemForm({
     if (answer !== undefined)
       views.set(question.key, answers.viewOf(question, answer));
   }
-  const values = new Map(
-    [...views].map(([key, view]) => [key, { text: view.value }]),
-  );
-  // A display condition hides a sub-item as 11 hides a question (6.2).
+  // A display condition hides a sub-item as 11 hides a question (6.2); one naming
+  // another item's sub-item reads its answer (P4 `conditionAnswers`), as 20 counts.
+  const values = new Map<string, PlanAnswerContent>([
+    ...item.conditionAnswers.map(
+      ({ questionKey, text }) => [questionKey, { text, rows: null }] as const,
+    ),
+    ...[...views].map(
+      ([key, view]) => [key, { text: view.value, rows: view.rows }] as const,
+    ),
+  ]);
   const shown = item.prompts.filter((question) =>
     isQuestionShown(question, values),
   );
   const executionOf = (type: ExecutionType): ExecutionItem[] =>
     item.execution.filter((entry) => entry.type === type);
-  const progress = planItemProgress(shown, {
-    answers: new Map(
-      [...views].map(([key, view]) => [
-        key,
-        { text: view.value, rows: view.rows },
-      ]),
-    ),
+  const progress = planItemProgress(item.prompts, {
+    answers: values,
     executionCounts: new Map(
       executionTypesOf(shown).map((type) => [type, executionOf(type).length]),
     ),
@@ -699,8 +711,8 @@ function ItemForm({
           <Text tone="secondary">
             <Text variant="number" tone="secondary">
               {t("validation:questions.progress", {
-                answered: formatCount(progress.filled),
-                total: formatCount(progress.total),
+                answered: progress.filled,
+                total: progress.total,
               })}
             </Text>
             {t("validation:questions.progressSuffix")}
@@ -801,8 +813,8 @@ function ItemForm({
               <Heading level={2}>
                 {t("plans:item.complete", {
                   item: itemKey,
-                  answered: formatCount(progress.filled),
-                  total: formatCount(progress.total),
+                  answered: progress.filled,
+                  total: progress.total,
                 })}
               </Heading>
               <Flex gap="space-200" wrap>
@@ -904,29 +916,6 @@ function ItemForm({
   );
 }
 
-/**
- * 21's shape while it loads (design-spec 6.0.6): the title and the sub-items' rows.
- * Drawn inside a `Skeleton`, its words are bars.
- */
-export function PlanItemSkeleton() {
-  const { t } = useTranslation(["plans", "validation"]);
-  return (
-    <QuestionFormPattern
-      header={<Heading level={1}>{t("plans:item.references")}</Heading>}
-      questionIds={["a", "b", "c", "d"]}
-      currentId={null}
-      onCurrentChange={() => {}}
-      isReadOnly
-      renderQuestion={() => (
-        <Stack gap="space-100">
-          <Text variant="caption">{t("plans:home.empty")}</Text>
-          <Text>{t("validation:questions.placeholder")}</Text>
-        </Stack>
-      )}
-    />
-  );
-}
-
 function PlanItemBody({
   ideaId,
   planId,
@@ -939,17 +928,25 @@ function PlanItemBody({
   search: PlanItemSearch;
 }) {
   const { me, workspace } = useWorkspace();
-  const home = useQuery(planHomeQuery(ideaId, planId, search.version));
+  const homeOptions = planHomeQuery(ideaId, planId, search.version);
+  const home = useQuery(homeOptions);
   const isOurs =
     home.data !== undefined &&
     home.data.workspaceId === workspace.id &&
     home.data.ideaId === ideaId;
+  const itemOptions = planItemQuery(
+    ideaId,
+    planId,
+    itemNo ?? 0,
+    search.version,
+  );
   const item = useQuery({
-    ...planItemQuery(ideaId, planId, itemNo ?? 0, search.version),
+    ...itemOptions,
     enabled: itemNo !== null && isOurs,
   });
-  const isSlow = useIsSlow(
+  const { isSlow, retry: retrySlow } = useSlowLoading(
     home.isPending || (itemNo !== null && isOurs && item.isPending),
+    [homeOptions, itemOptions],
   );
   const failure = home.error ?? item.error;
   if (itemNo === null)
@@ -987,7 +984,7 @@ function PlanItemBody({
       />
     );
   }
-  if (isSlow) return <SlowLoadingState onRetry={retry} />;
+  if (isSlow) return <SlowLoadingState onRetry={retrySlow} />;
   return (
     <Skeleton isLoading>
       <PlanItemSkeleton />

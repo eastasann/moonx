@@ -19,7 +19,8 @@ const AutosaveContext = createContext<Autosave | null>(null);
 /**
  * Makes the page's saves (ADR-021) available to the screens, follows the browser going
  * offline and back, and asks before the page is closed or reloaded while input is not
- * saved: a move inside the app does not ask (design-spec 6.0.2).
+ * saved: a move inside the app does not ask (design-spec 6.0.2). Unmounted, it stops the
+ * saves, so none is sent again for an app that is gone.
  */
 export function AutosaveProvider({
   autosave,

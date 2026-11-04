@@ -7,5 +7,5 @@ export {
   publicStackMaxWidth,
   twoColumnMinWidth,
   vars,
-} from "./generated/vars";
+} from "./generated/vars.css";
 export * from "./types";

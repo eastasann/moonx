@@ -3,7 +3,6 @@ import {
   type InvitationPreview,
   type Me,
   passwordSchema,
-  timeZoneSchema,
 } from "@moonx/schemas";
 import {
   Button,
@@ -25,6 +24,7 @@ import { StandaloneFrame } from "../components/StandaloneFrame";
 import { StandaloneLoading } from "../components/StandaloneLoading";
 import { FailureState } from "../components/states";
 import { useGoogleStart } from "../components/useGoogleStart";
+import { deviceTimeZone } from "../lib/account";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { continueWithGoogle } from "../lib/auth";
 import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
@@ -35,17 +35,9 @@ import {
   meQuery,
   signedInQuery,
 } from "../lib/queries";
+import { askAgain } from "../lib/query";
 import { dropAllBut } from "../lib/session";
 import { useDocumentTitle } from "../lib/title";
-
-/** What `users.timezone` starts as when the device names no zone moonx knows (SDD 6.3). */
-const FALLBACK_TIME_ZONE = "Asia/Manila";
-
-/** The device's time zone, which a new account starts with (design-spec 6.16 3 ②). */
-export function deviceTimeZone(): string {
-  const zone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return timeZoneSchema.safeParse(zone).success ? zone : FALLBACK_TIME_ZONE;
-}
 
 /** Where a sign-up from the invitation goes on: 3, its steps from ① (SDD 4章 `/welcome`). */
 const welcomeHref = (token: string) =>
@@ -73,10 +65,12 @@ export function InviteScreen({ token }: { token: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   // Asked on this visit: a cached answer may be of a session ended since.
-  const signedIn = useQuery({ ...signedInQuery(), refetchOnMount: "always" });
+  const signedInOptions = signedInQuery();
+  const signedIn = useQuery({ ...signedInOptions, refetchOnMount: "always" });
   const isToken = isInvitationToken(token);
+  const invitationOptions = invitationQuery(token);
   const invitation = useQuery({
-    ...invitationQuery(token),
+    ...invitationOptions,
     enabled: isToken,
   });
   const isSignedIn = signedIn.isFetchedAfterMount && signedIn.data != null;
@@ -102,6 +96,14 @@ export function InviteScreen({ token }: { token: string }) {
     void queryClient.invalidateQueries({ queryKey: ["invitations", token] });
     void signedIn.refetch();
   };
+  const retrySlow = () => {
+    askAgain(queryClient, [invitationOptions, signedInOptions]);
+    // A visit before's answer in the cache: this visit's, under way, is what the screen
+    // waits for, and refetch drops it and asks again.
+    if (signedIn.data !== undefined && !signedIn.isFetchedAfterMount) {
+      void signedIn.refetch();
+    }
+  };
   if (!isToken) return <InvalidInvitation />;
   if (invitation.isError) {
     const { error } = invitation;
@@ -120,7 +122,7 @@ export function InviteScreen({ token }: { token: string }) {
     (signedIn.isFetchedAfterMount && signedIn.data === null);
   if (invitation.data === undefined || !isSignedOut || toLogIn) {
     return (
-      <StandaloneLoading onRetry={retry}>
+      <StandaloneLoading onRetry={retrySlow}>
         <SignUpSkeleton />
       </StandaloneLoading>
     );

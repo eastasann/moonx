@@ -44,9 +44,9 @@ import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
-import { UserName } from "../components/UserName";
+import { UserName, userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
 import {
@@ -62,6 +62,7 @@ import {
   membersQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { ListSkeleton } from "./DecisionLogSkeleton";
 
 export type { DecisionsSearch };
 
@@ -231,7 +232,7 @@ function Filters({
           .filter(({ role }) => role !== "viewer")
           .map(({ user }) => user),
         ...(everyEntry.data ?? []).map(({ recordedBy }) => recordedBy),
-      ].map(({ id, displayName }) => [id, { id, label: displayName }]),
+      ].map((user) => [user.id, { id: user.id, label: userNameText(user) }]),
     ).values(),
   ].sort((a, b) => a.label.localeCompare(b.label));
   const today = formatIsoDate(new Date(), { timeZone: me.timezone });
@@ -365,17 +366,20 @@ function Filters({
 function EntryDetail({ entryId }: { entryId: string }) {
   const { t } = useTranslation(["decisions", "app"]);
   const { me, workspace } = useWorkspace();
-  const query = useQuery(decisionLogEntryQuery(entryId));
+  const entryOptions = decisionLogEntryQuery(entryId);
+  const query = useQuery(entryOptions);
   // L2 finds an entry by its id alone: one of another workspace is not this screen's to
   // show (SDD 4章), which its idea, not among this workspace's, tells.
-  const ideas = useQuery(
-    ideasQuery(workspace.id, {
-      decision: "all",
-      includeArchived: true,
-      sort: "name",
-    }),
+  const ideasOptions = ideasQuery(workspace.id, {
+    decision: "all",
+    includeArchived: true,
+    sort: "name",
+  });
+  const ideas = useQuery(ideasOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    query.isPending || ideas.isPending,
+    [entryOptions, ideasOptions],
   );
-  const isSlow = useIsSlow(query.isPending || ideas.isPending);
   if (
     query.data !== undefined &&
     ideas.data !== undefined &&
@@ -404,14 +408,7 @@ function EntryDetail({ entryId }: { entryId: string }) {
   // Shown once it is known to be this workspace's.
   if (query.data === undefined || ideas.data === undefined) {
     return isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => {
-          void query.refetch();
-          void ideas.refetch();
-        }}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <Skeleton isLoading>
         <Stack gap="space-300">
@@ -559,23 +556,6 @@ function OpenLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-/** Rows of placeholder words in the shape of the list (design-spec 6.0.6). */
-function ListSkeleton() {
-  const { t } = useTranslation(["decisions"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("decisions:title")}</Text>
-            <Text variant="caption">{t("decisions:empty")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
-}
-
 /**
  * The list and the entry beside it (design-spec 6.15, 4.1 D): the decisions under the
  * filters, newest first, in a TableView of three columns (where and how it was recorded,
@@ -595,18 +575,21 @@ function DecisionLogBody({
   const { t } = useTranslation(["decisions"]);
   const { me, workspace } = useWorkspace();
   const isTwoColumns = useTwoColumns();
+  const options = decisionLogQuery(workspace.id, {
+    kind: search.kind,
+    ideaId: search.idea,
+    recordedBy: search.recordedBy,
+    from: search.from,
+    to: search.to,
+  });
   const query = useQuery({
-    ...decisionLogQuery(workspace.id, {
-      kind: search.kind,
-      ideaId: search.idea,
-      recordedBy: search.recordedBy,
-      from: search.from,
-      to: search.to,
-    }),
+    ...options,
     // A new filter keeps the rows until its answer comes, not the skeleton.
     placeholderData: keepPreviousData,
   });
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(query.isPending, [
+    options,
+  ]);
   const items = query.data ?? [];
   const selected =
     items.find(({ id }) => id === search.selected)?.id ??
@@ -636,11 +619,7 @@ function DecisionLogBody({
     );
   } else if (query.data === undefined) {
     list = isSlow ? (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
+      <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <ListSkeleton />
     );
@@ -689,7 +668,7 @@ function DecisionLogBody({
                 <Text variant="caption" tone="secondary">
                   {t("decisions:row.meta", {
                     kind: t(`decisions:kind.${entry.kind}`),
-                    name: entry.recordedBy.displayName,
+                    name: userNameText(entry.recordedBy),
                   })}
                 </Text>
                 {entry.reasonExcerpt !== null && (
@@ -738,24 +717,6 @@ function DecisionLogBody({
       }
       listLabel={t("decisions:title")}
       onBack={onBack}
-    />
-  );
-}
-
-/** 7's shape while its route loads (design-spec 6.0.6). */
-export function DecisionLogSkeleton() {
-  const { t } = useTranslation(["decisions"]);
-  return (
-    <ListDetailPattern
-      header={
-        <Heading level={1} variant="heading-1-list">
-          {t("decisions:title")}
-        </Heading>
-      }
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("decisions:title")}
-      onBack={() => {}}
     />
   );
 }

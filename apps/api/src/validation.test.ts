@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import {
+  assumptions,
   changeHistory,
   comments,
   competitors,
@@ -14,12 +15,15 @@ import {
   researchLogEntries,
   templateVersions,
   validationAnswers,
+  validations,
 } from "@moonx/db";
 import {
+  decisionContextSchema,
   errorBodySchema,
   evidenceRemovalSchema,
   evidenceResultSchema,
   ideaDetailSchema,
+  type TemplateFile,
   validationAnswerSchema,
   validationHomeSchema,
   validationQuestionsSchema,
@@ -127,6 +131,56 @@ const answerTarget = (team: Team, key: string) => ({
   id: team.validationId,
   key,
 });
+
+type TemplateFileQuestion =
+  TemplateFile["sections"][number]["questions"][number];
+
+/**
+ * Runs `run` with the validation of `team` pinned to a draft version of the BCDX
+ * validation template whose questions `edit` changes (null leaves a question out of the
+ * version). A draft, so I1 never makes another test's validation on it. The import needs
+ * no other draft of the validation template in the database (DRAFT_EXISTS otherwise).
+ * Puts the earlier version back and deletes the draft afterwards.
+ */
+async function onEditedTemplate(
+  team: Team,
+  edit: (question: TemplateFileQuestion) => TemplateFileQuestion | null,
+  run: () => Promise<void>,
+) {
+  const file: TemplateFile = await Bun.file(
+    new URL("../../../data/templates/bcdx/validation.json", import.meta.url),
+  ).json();
+  const imported = await importTemplateFile(db, "validation", {
+    ...file,
+    sections: file.sections.map((section) => ({
+      ...section,
+      questions: section.questions.flatMap((question) => {
+        const edited = edit(question);
+        return edited === null ? [] : [edited];
+      }),
+    })),
+  });
+  const [pinned] = await db
+    .select({ templateVersionId: validations.templateVersionId })
+    .from(validations)
+    .where(eq(validations.id, team.validationId));
+  if (pinned === undefined) throw new Error("No validation");
+  await db
+    .update(validations)
+    .set({ templateVersionId: imported.versionId })
+    .where(eq(validations.id, team.validationId));
+  try {
+    await run();
+  } finally {
+    await db
+      .update(validations)
+      .set({ templateVersionId: pinned.templateVersionId })
+      .where(eq(validations.id, team.validationId));
+    await db
+      .delete(templateVersions)
+      .where(eq(templateVersions.id, imported.versionId));
+  }
+}
 
 describe("V1 GET /api/v1/ideas/{ideaId}/validation", () => {
   test("a new idea: everything Empty, all checks not started, and Start with 01 first", async () => {
@@ -273,6 +327,105 @@ describe("V1 GET /api/v1/ideas/{ideaId}/validation", () => {
     expect(view.idea.stage).toBe("planning");
   });
 
+  test("lists the five newest decisions", async () => {
+    const team = await teamWithIdea();
+    const entries = await db
+      .insert(decisionLogEntries)
+      .values(
+        [1, 2, 3, 4, 5, 6].map((day) => ({
+          workspaceId: team.workspace.id,
+          ideaId: team.idea.id,
+          kind: "validation_decision" as const,
+          value: day % 2 === 0 ? ("hold" as const) : ("proceed" as const),
+          reason: `Reason ${day}`,
+          snapshot: {},
+          recordedById: team.owner.id,
+          recordedAt: new Date(Date.UTC(2026, 8, day)),
+        })),
+      )
+      .returning();
+    const view = await home(team);
+    expect(view.decisions.map((d) => d.id)).toEqual(
+      entries
+        .slice(1)
+        .reverse()
+        .map((entry) => entry.id),
+    );
+  });
+
+  test("V1 and V18 quote no answer the pinned version lacks or its display condition hides", async () => {
+    const team = await teamWithIdea();
+    for (const [key, text] of [
+      ["V.01.WHO", "HR officers"],
+      ["V.01.PROBLEM", "Gifts look improvised"],
+      ["V.02.OCEAN", "Red"],
+      ["V.10.BIGGEST_OPPORTUNITY", "Offices nearby"],
+      ["V.10.BIGGEST_RISK", "Stale boxes"],
+      ["V.10.BIGGEST_UNKNOWN", "Supplier price"],
+    ] as const) {
+      await saved(await saveAnswer(team, key, { text, lockVersion: 0 }));
+    }
+    const decisionContext = async () => {
+      const response = await app.handle(
+        apiRequest("GET", `/api/v1/ideas/${team.idea.id}/decision-context`, {
+          cookie: team.ownerCookie,
+        }),
+      );
+      expect(response.status).toBe(200);
+      return decisionContextSchema.parse(await response.json()).summary;
+    };
+    // The update leaves 01 PROBLEM and 10 BIGGEST_RISK out, and shows 01 WHO and
+    // 10 BIGGEST_UNKNOWN only on a Blue ocean.
+    const blueOnly = { "V.02.OCEAN": ["Blue"] };
+    await onEditedTemplate(
+      team,
+      (question) =>
+        question.key === "V.01.PROBLEM" || question.key === "V.10.BIGGEST_RISK"
+          ? null
+          : question.key === "V.01.WHO" ||
+              question.key === "V.10.BIGGEST_UNKNOWN"
+            ? { ...question, displayCondition: blueOnly }
+            : question,
+      async () => {
+        expect((await home(team)).summary).toEqual({
+          customer: null,
+          problem: null,
+          solution: null,
+          marketType: "Red",
+        });
+        expect(await decisionContext()).toMatchObject({
+          customer: null,
+          problem: null,
+          marketType: "Red",
+          biggestOpportunity: "Offices nearby",
+          biggestRisk: null,
+          biggestUnknown: null,
+        });
+
+        await saved(
+          await saveAnswer(team, "V.02.OCEAN", {
+            text: "Blue",
+            lockVersion: 1,
+          }),
+        );
+        expect((await home(team)).summary).toEqual({
+          customer: "HR officers",
+          problem: null,
+          solution: null,
+          marketType: "Blue",
+        });
+        expect(await decisionContext()).toMatchObject({
+          customer: "HR officers",
+          problem: null,
+          marketType: "Blue",
+          biggestOpportunity: "Offices nearby",
+          biggestRisk: null,
+          biggestUnknown: "Supplier price",
+        });
+      },
+    );
+  });
+
   test("names a newer published version of the template", async () => {
     // The self-analysis template, so the validation version I1 picks stays the same.
     const v1 = await fixtures.templateVersion("self_analysis");
@@ -395,6 +548,75 @@ describe("V2 GET /api/v1/validations/{validationId}/questions/{sectionKey}", () 
       );
       expect({ key, status: response.status }).toEqual({ key, status: 404 });
     }
+  });
+
+  test("reads the answers in other sections its display conditions name, as 13 counts them", async () => {
+    const team = await teamWithIdea();
+    // 01 PROOF shows once 02 OCEAN is Red; 10 WHY_WORK once 01 WHO is "Offices".
+    const condition: Record<string, Record<string, string[]>> = {
+      "V.01.PROOF": { "V.02.OCEAN": ["Red"] },
+      "V.10.WHY_WORK": { "V.01.WHO": ["Offices"] },
+    };
+    const read = async (sectionKey: string) => {
+      const response = await app.handle(
+        apiRequest(
+          "GET",
+          `/api/v1/validations/${team.validationId}/questions/${sectionKey}`,
+          { cookie: team.viewerCookie },
+        ),
+      );
+      expect(response.status).toBe(200);
+      return validationQuestionsSchema.parse(await response.json());
+    };
+    const hubOf = async (sectionKey: string) =>
+      (await home(team)).sections.find((s) => s.key === sectionKey);
+    const hiddenOf = (view: Awaited<ReturnType<typeof read>>, key: string) =>
+      view.answers.find((a) => a.questionKey === key)?.hidden;
+    await onEditedTemplate(
+      team,
+      (question) => ({
+        ...question,
+        displayCondition: condition[question.key] ?? question.displayCondition,
+      }),
+      async () => {
+        await saved(
+          await saveAnswer(team, "V.01.WHO", {
+            text: "Offices",
+            lockVersion: 0,
+          }),
+        );
+        const before = await read("01");
+        // Unanswered: null, which shows nothing on the condition.
+        expect(before.conditionAnswers).toEqual([
+          { questionKey: "V.02.OCEAN", text: null },
+        ]);
+        // 01 WHO decides 10 WHY_WORK: 11 shows "Answer WHO to see …" under it.
+        expect(before.decidesElsewhere).toEqual(["V.01.WHO"]);
+        expect(hiddenOf(before, "V.01.PROOF")).toBe(true);
+        expect(await hubOf("01")).toMatchObject({ answered: 1, total: 9 });
+
+        await saved(
+          await saveAnswer(team, "V.02.OCEAN", { text: "Red", lockVersion: 0 }),
+        );
+        const after = await read("01");
+        expect(after.conditionAnswers).toEqual([
+          { questionKey: "V.02.OCEAN", text: "Red" },
+        ]);
+        expect(hiddenOf(after, "V.01.PROOF")).toBe(false);
+        expect(await hubOf("01")).toMatchObject({ answered: 1, total: 10 });
+
+        const market = await read("02");
+        expect(market.conditionAnswers).toEqual([]);
+        expect(market.decidesElsewhere).toEqual(["V.02.OCEAN"]);
+        const last = await read("10");
+        expect(last.conditionAnswers).toEqual([
+          { questionKey: "V.01.WHO", text: "Offices" },
+        ]);
+        expect(last.decidesElsewhere).toEqual([]);
+        expect(hiddenOf(last, "V.10.WHY_WORK")).toBe(false);
+        expect(await hubOf("10")).toMatchObject({ total: 6 });
+      },
+    );
   });
 });
 
@@ -604,6 +826,73 @@ describe("V3 PUT /api/v1/validations/{validationId}/answers/{questionKey}", () =
         .from(validationAnswers)
         .where(eq(validationAnswers.validationId, team.validationId)),
     ).toEqual([]);
+  });
+
+  test("a question without F/A/U refuses any fau but null", async () => {
+    const team = await teamWithIdea();
+    const key = "V.10.WHY_FAIL";
+    const refused = [
+      { fau: "unknown" },
+      { fau: "fact" },
+      { fau: "assumption", confidence: "low" },
+    ];
+    const stored = () =>
+      db
+        .select()
+        .from(validationAnswers)
+        .where(
+          and(
+            eq(validationAnswers.validationId, team.validationId),
+            eq(validationAnswers.questionKey, key),
+          ),
+        );
+    await onEditedTemplate(
+      team,
+      (question) =>
+        question.key === key ? { ...question, hasFau: false } : question,
+      async () => {
+        const refuseEach = async (text: string, lockVersion: number) => {
+          for (const classification of refused) {
+            const response = await saveAnswer(team, key, {
+              text,
+              classification,
+              lockVersion,
+            });
+            const error = await errorOf(response);
+            expect({
+              fau: classification.fau,
+              status: response.status,
+              code: error.code,
+              path: error.details?.[0]?.path,
+            }).toEqual({
+              fau: classification.fau,
+              status: 422,
+              code: "VALIDATION_FAILED",
+              path: "classification.fau",
+            });
+          }
+        };
+        await refuseEach("Too few offices", 0);
+        expect(await stored()).toEqual([]);
+        const answer = await saved(
+          await saveAnswer(team, key, {
+            text: "Too few offices",
+            classification: { fau: null },
+            lockVersion: 0,
+          }),
+        );
+        expect(answer).toMatchObject({
+          text: "Too few offices",
+          lockVersion: 1,
+          classification: { fau: null, confidence: null, evidence: [] },
+        });
+        await refuseEach("Offices move away", 1);
+        expect(await stored()).toMatchObject([
+          { text: "Too few offices", fau: null, lockVersion: 1 },
+        ]);
+        expect(await historyOf(team, key)).toHaveLength(1);
+      },
+    );
   });
 
   test("a save that never saw the first one gets 409 CONFLICT even with force", async () => {
@@ -1020,6 +1309,117 @@ describe("V4 POST /api/v1/validations/{validationId}/evidence", () => {
       });
       expect(response.status).toBe(404);
     }
+  });
+
+  test("refuses deleted rows, a question the pinned version lacks and a key that names no number, keeping nothing", async () => {
+    const team = await teamWithIdea();
+    const gone = new Date();
+    const [cost] = await db
+      .update(costItems)
+      .set({ deletedAt: gone })
+      .where(
+        and(
+          eq(costItems.validationId, team.validationId),
+          eq(costItems.templateKey, "initial.permits"),
+        ),
+      )
+      .returning();
+    const [competitor] = await db
+      .insert(competitors)
+      .values({
+        validationId: team.validationId,
+        name: "Rival",
+        sortOrder: 0,
+        deletedAt: gone,
+      })
+      .returning();
+    const [assumption] = await db
+      .insert(assumptions)
+      .values({
+        validationId: team.validationId,
+        statement: "Offices reorder monthly",
+        sortOrder: 0,
+        deletedAt: gone,
+      })
+      .returning();
+    const history = () =>
+      db
+        .select({ id: changeHistory.id })
+        .from(changeHistory)
+        .where(eq(changeHistory.containerId, team.validationId));
+    const historyBefore = await history();
+    const cases: [Record<string, unknown>, number, string, string?][] = [
+      [{ type: "cost_item", id: cost?.id }, 404, "NOT_FOUND"],
+      [{ type: "competitor", id: competitor?.id }, 404, "NOT_FOUND"],
+      [{ type: "assumption", id: assumption?.id }, 404, "NOT_FOUND"],
+      [answerTarget(team, "V.01.RETIRED"), 422, "QUESTION_NOT_FOUND"],
+      [
+        { type: "economics_input", id: team.validationId, key: "rent" },
+        422,
+        "VALIDATION_FAILED",
+        "target.key",
+      ],
+      [
+        { type: "economics_input", id: team.validationId },
+        422,
+        "VALIDATION_FAILED",
+        "target.key",
+      ],
+    ];
+    for (const [target, status, code, path] of cases) {
+      const response = await addEvidence(team, {
+        target,
+        newResearchLog: { topic: "Visited the market" },
+        lockVersion: 0,
+      });
+      const error = await errorOf(response);
+      expect({
+        target,
+        status: response.status,
+        code: error.code as string,
+        path: error.details?.[0]?.path,
+      }).toEqual({ target, status, code, path });
+    }
+    const id = team.validationId;
+    for (const rows of [
+      await db
+        .select()
+        .from(evidenceLinks)
+        .where(eq(evidenceLinks.validationId, id)),
+      await db
+        .select()
+        .from(researchLogEntries)
+        .where(eq(researchLogEntries.validationId, id)),
+      await db
+        .select()
+        .from(validationAnswers)
+        .where(eq(validationAnswers.validationId, id)),
+      await db
+        .select()
+        .from(economicsInputs)
+        .where(eq(economicsInputs.validationId, id)),
+    ])
+      expect(rows).toEqual([]);
+    expect(await history()).toEqual(historyBefore);
+    const versions = [
+      ...(await db
+        .select({ lockVersion: costItems.lockVersion })
+        .from(costItems)
+        .where(eq(costItems.id, cost?.id ?? ""))),
+      ...(await db
+        .select({ lockVersion: competitors.lockVersion })
+        .from(competitors)
+        .where(eq(competitors.id, competitor?.id ?? ""))),
+      ...(await db
+        .select({ lockVersion: assumptions.lockVersion })
+        .from(assumptions)
+        .where(eq(assumptions.id, assumption?.id ?? ""))),
+    ];
+    expect(versions).toEqual(
+      [cost, competitor, assumption].map((row) => ({
+        lockVersion: row?.lockVersion ?? -1,
+      })),
+    );
   });
 });
 

@@ -435,6 +435,40 @@ describe("the export (design-spec 6.6)", () => {
     );
   });
 
+  test("writes a typed price in Key numbers as typed, and the calculated amounts as 6.4 rounds them", () => {
+    const metrics = Object.fromEntries(
+      KEY_METRIC_KEYS.map((key) => [key, exact(10)]),
+    );
+    const keyNumbersOf = (price: number) =>
+      exportOf(
+        validationInput({
+          reference: {
+            kind: "validation",
+            keyMetrics: {
+              ...metrics,
+              selling_price: exact(price),
+              variable_cost_per_unit: exact(77),
+              initial_cost_total: exact(85000.5),
+            },
+            checks: [],
+            competitors: [],
+            researchLog: [],
+            assumptions: [],
+            risks: [],
+          },
+        }),
+      );
+    const { markdown, json } = keyNumbersOf(149.5);
+    expect(json.reference?.keyNumbers.selling_price).toEqual({
+      label: "Price",
+      value: "₱149.50",
+    });
+    expect(markdown).toContain("- Price: ₱149.50");
+    expect(markdown).toContain("- Variable cost / sale: ₱77.00");
+    expect(markdown).toContain("- Startup cost: ₱85,001");
+    expect(keyNumbersOf(150).markdown).toContain("- Price: ₱150\n");
+  });
+
   test("writes evidence on one line, whatever its texts hold", () => {
     const { markdown } = exportOf(
       validationInput({
@@ -683,6 +717,18 @@ describe("the export of a plan", () => {
       ...overrides,
     });
 
+  test("keeps the header one comment whatever the names hold (design-spec 6.6)", () => {
+    const { markdown } = exportOf(
+      input({ ideaName: "Gifts --> Boxes --!> End", planName: "Plan --->\nB" }),
+    );
+    const header = markdown.split("\n")[0] ?? "";
+    expect(header).toStartWith(
+      "<!-- moonx-export v1 | kind: business_plan | scope: 01,11 | idea: Gifts -> Boxes -> End / Plan -> B |",
+    );
+    expect(header.indexOf("-->")).toBe(header.length - 3);
+    expect(header).not.toContain("--!>");
+  });
+
   test("exports the text sub-items of the items, the tables only as Reference", () => {
     const { markdown, json, fileBaseName } = exportOf(input());
     expect(json.questions.map((q) => q.id)).toEqual(["P.01.1", "P.11.2"]);
@@ -746,7 +792,7 @@ describe("the export of a plan", () => {
     expect(
       scopeSections("business_plan", SECTIONS, { kind: "items", itemNos: [2] }),
     ).toEqual({
-      problem: { kind: "unknown", key: "2" },
+      problem: { kind: "unknown" },
     });
     expect(
       scopeSections("business_plan", SECTIONS, {
@@ -766,7 +812,7 @@ describe("the export of a plan", () => {
         kind: "sections",
         keys: ["03"],
       }),
-    ).toEqual({ problem: { kind: "unknown", key: "03" } });
+    ).toEqual({ problem: { kind: "unknown" } });
   });
 });
 

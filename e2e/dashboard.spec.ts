@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { Me, Workspace } from "@moonx/schemas";
 import { request as apiRequest, type Page } from "@playwright/test";
 import { WEB_ORIGIN } from "./env";
@@ -8,6 +7,7 @@ import {
   DEMO_PASSWORD,
   demo,
   expect,
+  expectNoAxeViolations,
   nextAddress,
   operatorInvited,
   workspaceOf,
@@ -133,15 +133,7 @@ test.describe("the Owner's BCDX on a desktop", () => {
       (ideasBox?.x ?? 0) + (ideasBox?.width ?? 0),
     );
 
-    const { violations } = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-      .analyze();
-    expect(
-      violations.map((violation) => ({
-        id: violation.id,
-        targets: violation.nodes.map((node) => node.target.join(" ")),
-      })),
-    ).toEqual([]);
+    await expectNoAxeViolations(page);
   });
 
   test("a block that fails alone shows its state; Retry loads it", async ({
@@ -268,6 +260,7 @@ test("M7 switches workspace, and the workspace becomes the last opened", async (
   const current = dialog.getByRole("listitem").filter({ hasText: team.name });
   await expect(current).toContainText("Current");
   await expect(current.getByRole("link")).toHaveCount(0);
+  await expectNoAxeViolations(page);
   await dialog.getByRole("link", { name: /Test Person's workspace/ }).click();
   await expect(page).toHaveURL(`${WEB_ORIGIN}/w/${personal.id}`);
   await expect(dialog).toBeHidden();
@@ -306,6 +299,7 @@ test("M7's New workspace makes one with the user as Owner and opens its Getting 
   const tutoring = `Weekend tutoring ${Date.now() % 1_000_000}`;
   await name.fill(tutoring);
   await expect(create).toBeEnabled();
+  await expectNoAxeViolations(page);
   await create.click();
   await expect(page).toHaveURL(/\/w\/[0-9a-f-]{36}$/);
   await expect(

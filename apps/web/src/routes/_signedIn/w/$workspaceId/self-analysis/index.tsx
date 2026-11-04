@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  SelfAnalysisHomeScreen,
-  SelfAnalysisHomeSkeleton,
-} from "../../../../../screens/SelfAnalysisHome";
+import { SelfAnalysisHomeScreen } from "../../../../../screens/SelfAnalysisHome";
+import { SelfAnalysisHomeSkeleton } from "../../../../../screens/SelfAnalysisHomeSkeleton";
 
 /** `/w/$workspaceId/self-analysis`: 10 Self Analysis (SDD 4章). */
 export const Route = createFileRoute(

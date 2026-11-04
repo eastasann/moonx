@@ -43,17 +43,19 @@ REGION := asia-southeast1
 # Recursive, so gcloud runs only for the targets that touch Google Cloud.
 GCP_PROJECT_ID ?= $(shell gcloud config get-value project 2>/dev/null)
 IMAGE = $(REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/moonx/api
-TS_PROJECTS := . $(patsubst %/tsconfig.json,%,$(wildcard apps/*/tsconfig.json packages/*/tsconfig.json e2e/tsconfig.json))
+# The service worker has its own project: the WebWorker types and the DOM's clash.
+TS_PROJECTS := . $(patsubst %/tsconfig.json,%,$(wildcard apps/*/tsconfig.json packages/*/tsconfig.json e2e/tsconfig.json)) \
+	apps/web/tsconfig.sw.json
 
 require = $(if $($(1)),,$(error $(1) is required: make $@ $(1)=...))
 require-project = $(if $(GCP_PROJECT_ID),,$(error No Google Cloud project: run gcloud config set project, or make $@ GCP_PROJECT_ID=...))
 require-env = $(if $(and $(filter 1,$(words $(ENV))),$(filter $(1),$(ENV))),,$(error ENV must be one of: $(1)))
 
 .PHONY: install setup dev dev-api dev-web build build-web build-api-image \
-	test test-domain test-api test-web test-e2e lint format typecheck \
-	db-up db-down db-generate db-check db-migrate db-seed db-reset db-studio \
-	tokens openapi kpi doc-lint admin-create infra-plan infra-apply deploy-api \
-	promote promote-check db-backup
+	test test-domain test-api test-web test-e2e coverage first-paint lint format \
+	typecheck db-up db-down db-generate db-check db-migrate db-seed db-reset \
+	db-studio tokens openapi kpi doc-lint admin-create infra-plan infra-apply \
+	deploy-api promote promote-check db-backup
 
 install:
 	bun install --frozen-lockfile
@@ -100,20 +102,38 @@ build-api-image:
 test: test-domain test-api test-web
 
 test-domain:
-	bun test --pass-with-no-tests ./packages/domain ./packages/schemas ./packages/i18n \
-		./packages/ui-tokens ./scripts
+	bun test --pass-with-no-tests $(TEST_COVERAGE_FLAGS) ./packages/domain ./packages/schemas \
+		./packages/i18n ./packages/ui-tokens ./scripts
 
 test-api:
 	bun packages/db/src/recreate-test-database.ts
-	bun test --pass-with-no-tests ./apps/api ./packages/db
+	bun test --pass-with-no-tests $(TEST_COVERAGE_FLAGS) ./apps/api ./packages/db
+
+# SDD 10章's coverage targets: the suites above with coverage on, then each layer's own
+# files against its target. The Web's Vitest checks its own (apps/web/vitest.config.ts).
+coverage:
+	$(MAKE) test-domain TEST_COVERAGE_FLAGS="--coverage --coverage-reporter=lcov --coverage-dir=coverage/domain"
+	$(MAKE) test-api TEST_COVERAGE_FLAGS="--coverage --coverage-reporter=lcov --coverage-dir=coverage/api"
+	cd apps/web && $(BUNX) vitest run --coverage
+	bun scripts/coverage-check.ts
 
 test-web:
 	cd apps/web && $(BUNX) vitest run --passWithNoTests
 	cd packages/ui-web && $(BUNX) vitest run --passWithNoTests
 
+# The PWA checks run against the API serving this build (SDD 10章「PWA と配信」).
 test-e2e:
 	$(BUNX) playwright install chromium
+	$(MAKE) build-web SHA=dev
 	$(BUNX) playwright test --config=e2e/playwright.config.ts
+
+# SDD 7.3's first display estimated on this machine, against the same build as the PWA
+# checks. Its timings follow the host's CPU, so CI does not run it.
+first-paint:
+	$(BUNX) playwright install chromium
+	$(MAKE) build-web SHA=dev
+	MOONX_FIRST_PAINT=1 $(BUNX) playwright test --config=e2e/playwright.config.ts \
+		--project=first-paint
 
 lint:
 	$(BUNX) biome check .

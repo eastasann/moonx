@@ -1,11 +1,13 @@
 import type { Me, Role } from "@moonx/schemas";
+import { useIsFetching } from "@tanstack/react-query";
 import {
+  type HistoryState,
   useNavigate,
   useRouter,
   useRouterState,
   useSearch,
 } from "@tanstack/react-router";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   formatPanelTarget,
   isPanelName,
@@ -13,6 +15,7 @@ import {
   type PanelTarget,
   parsePanelTarget,
 } from "../lib/panel-target";
+import { meQuery } from "../lib/queries";
 
 /** The workspace a screen under `/w/$workspaceId` belongs to, as the user's membership. */
 export interface WorkspaceScope {
@@ -155,6 +158,108 @@ export function useModal(): {
       });
     },
   };
+}
+
+/**
+ * What the screen's modal `name` is open about, or undefined while it is closed (SDD
+ * 4章): the URL's `?modal=` names it, `target` is what it is about (M2's item; anything
+ * defined for a modal about the screen as a whole), and `canOpen` lets the person open
+ * it in the state the screen read. Decided as it opens: once open it stays until it is
+ * closed, though it may no longer open (archived meanwhile, another role, its item
+ * deleted), with the last `target` it had if that has gone, so a send from it shows the
+ * refusal in it (design-spec 6.0.6) instead of the modal going with what was typed. A
+ * `?modal=` naming it that may not open shows nothing, and once `isDecided` (the data
+ * deciding it has been read) its `modal` and `about` come off the URL in place of the
+ * entry: a change later (Restore, a role, a Proceed read again) then opens nothing
+ * unasked. Not while that data is still being read, which may let it open: a cached read
+ * being read again counts as being read (19's Proceed onto 13's `?modal=create-plan`).
+ * The user's own `me`, whose role every gated modal follows, counts as such data too, so
+ * a screen passes only what is its own in `isDecided`.
+ *
+ * A screen asks once for each modal name it shows, with every `target` of that name
+ * folded into one: the modal it does not find is otherwise taken off the URL under the
+ * one it would open.
+ */
+export function useSearchModalAbout<T>(
+  modal: string | undefined,
+  name: ModalName,
+  target: T | undefined,
+  canOpen: boolean,
+  isDecided: boolean,
+): T | undefined {
+  const isOpen = useAskedOpen(
+    modal === name,
+    canOpen && target !== undefined,
+    isDecided,
+    {
+      search: ({ modal: _, about: __, ...rest }) => rest,
+      // The entry stays what it was, but has no modal left to go back over.
+      state: (previous) => ({ ...previous, openedModal: false }),
+    },
+  );
+  // A ref, not state: a target is often made anew on each render, which state would loop.
+  const lastTarget = useRef<T | undefined>(undefined);
+  if (!isOpen) {
+    lastTarget.current = undefined;
+  } else if (target !== undefined) {
+    lastTarget.current = target;
+  }
+  return isOpen ? lastTarget.current : undefined;
+}
+
+/** How a refused ask comes off the current history entry: its search, its state. */
+export interface AskTakenOff {
+  search?: (search: Record<string, unknown>) => Record<string, unknown>;
+  state?: (state: HistoryState) => HistoryState;
+}
+
+/**
+ * Whether a modal or an input the URL or the history entry asks for is open, decided as
+ * {@link useSearchModalAbout} decides a modal (SDD 4章): open while asked (`isAsked`) and
+ * `canOpen`, and once open until it is no longer asked (closed). Asked where it may not
+ * open, it shows nothing, and once `isDecided` and the role (`me`) have been read the ask
+ * comes off the current entry in place (`takeOff`), so a change later opens nothing
+ * unasked. Used for `?modal=`, 14's and 16's `new=1` and 15's New competitor.
+ */
+export function useAskedOpen(
+  isAsked: boolean,
+  canOpen: boolean,
+  isDecided: boolean,
+  takeOff: AskTakenOff,
+): boolean {
+  const navigate = useNavigate();
+  const [wasOpen, setOpen] = useState(false);
+  const isOpen = isAsked && (canOpen || wasOpen);
+  if (isOpen !== wasOpen) setOpen(isOpen);
+  // The workspace's layout reads `me` again behind its cached role on each visit.
+  const isRoleRead =
+    useIsFetching({ queryKey: meQuery().queryKey, exact: true }) === 0;
+  const isRefused = isAsked && !isOpen && isDecided && isRoleRead;
+  const latestTakeOff = useRef(takeOff);
+  latestTakeOff.current = takeOff;
+  useEffect(() => {
+    if (!isRefused) return;
+    const { search = (previous) => previous, state = (previous) => previous } =
+      latestTakeOff.current;
+    void navigate({ to: ".", search, replace: true, state });
+  }, [isRefused, navigate]);
+  return isOpen;
+}
+
+/**
+ * Whether the screen's modal `name`, about the screen as a whole, is open (SDD 4章):
+ * {@link useSearchModalAbout} with nothing more to find than whether `canOpen`. Leave
+ * `isDecided` out only for a modal the role alone decides, which the hook waits for.
+ */
+export function useSearchModal(
+  modal: string | undefined,
+  name: ModalName,
+  canOpen: boolean,
+  isDecided = true,
+): boolean {
+  return (
+    useSearchModalAbout(modal, name, true as const, canOpen, isDecided) === true
+  );
 }
 
 /** Where a location is on its screen, apart from the panel: its path and other parameters. */

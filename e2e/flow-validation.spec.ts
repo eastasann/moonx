@@ -12,6 +12,7 @@ import {
   test as base,
   demo,
   expect,
+  expectRingAroundText,
   linkMailedTo,
   operatorInvited,
   signUpThroughApi,
@@ -198,7 +199,9 @@ test.describe("moving through a validation on a desktop", () => {
 
     await test.step("11 → 14 (Log research)", async () => {
       // The first question not answered, WHO, is open with its Related research.
-      await who.getByRole("link", { name: "Log research" }).click();
+      const logResearch = who.getByRole("link", { name: "Log research" });
+      await expectRingAroundText(page, logResearch);
+      await logResearch.click();
       await expect(page).toHaveURL(new RegExp(`${home}/research\\?new=1$`));
       await expect(title(page, "03 Research Log")).toBeVisible();
       await expect(

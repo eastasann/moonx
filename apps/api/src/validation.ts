@@ -18,7 +18,13 @@ import {
   validationAnswers,
   validations,
 } from "@moonx/db";
-import { hasText, isQuestionShown, rowHasValue } from "@moonx/domain";
+import {
+  conditionAnswersOutside,
+  decidesElsewhere,
+  hasText,
+  isQuestionShown,
+  rowHasValue,
+} from "@moonx/domain";
 import { i18n } from "@moonx/i18n";
 import {
   type Classification,
@@ -746,6 +752,8 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
         if (section === undefined) {
           throw new ApiError("NOT_FOUND", "No such question section");
         }
+        const { inputs } = await shownAnswers(db, params.validationId);
+        const version = sections.flatMap((s) => s.questions);
         return {
           section,
           answers: await answerViews(
@@ -755,6 +763,12 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
             sections,
             section.questions.map((question) => question.key),
           ),
+          conditionAnswers: conditionAnswersOutside(
+            section.questions,
+            version,
+            inputs,
+          ),
+          decidesElsewhere: decidesElsewhere(section.questions, version),
         };
       },
       {
@@ -764,7 +778,7 @@ export function validationRoutes({ access, db, now }: ValidationRoutesOptions) {
         detail: {
           summary: "V2 The questions of a section (11)",
           description:
-            "sectionKey is 01, 02 or 10. One answer per question, unanswered and hidden ones included.",
+            "sectionKey is 01, 02 or 10. One answer per question, unanswered and hidden ones included. conditionAnswers are the texts of other sections' answers this section's display conditions name; decidesElsewhere the questions here a condition in another section names.",
         },
       },
     )

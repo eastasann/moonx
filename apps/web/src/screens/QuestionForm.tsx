@@ -1,6 +1,6 @@
 import { hasText, isQuestionShown } from "@moonx/domain";
-import { formatCount } from "@moonx/i18n";
 import type {
+  ConditionAnswer,
   TemplateQuestion,
   TemplateSection,
   ValidationAnswer,
@@ -49,13 +49,14 @@ import {
   NoAccessState,
   NotFoundState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
   dashboardHref,
   useModal,
   usePanel,
+  useSearchModalAbout,
   useWorkspace,
 } from "../components/workspace";
 import { useAutosave } from "../lib/autosave-react";
@@ -75,6 +76,7 @@ import {
   validationQuestionsQuery,
 } from "../lib/queries";
 import { useDocumentTitle } from "../lib/title";
+import { QuestionFormSkeleton } from "./QuestionFormSkeleton";
 
 /** `/w/$workspaceId/ideas/$ideaId/questions/$sectionKey`'s own search (SDD 4章). */
 export interface QuestionFormSearch {
@@ -93,18 +95,27 @@ function SectionForm({
   home,
   section,
   answers,
+  conditionAnswers,
+  decidesElsewhere,
   sectionKey,
   focusKey,
   modal,
   about,
+  isFetching,
 }: {
   home: ValidationHome;
   section: TemplateSection;
   answers: readonly ValidationAnswer[];
+  /** V2's answers in other sections that this one's display conditions read. */
+  conditionAnswers: readonly ConditionAnswer[];
+  /** V2's questions here that decide a question in another section. */
+  decidesElsewhere: readonly string[];
   sectionKey: QuestionSection;
   focusKey: string | undefined;
   modal: string | undefined;
   about: string | undefined;
+  /** V1 or V2 is being read again: what M2 is about and who may open it may change. */
+  isFetching: boolean;
 }) {
   const { t } = useTranslation(["validation", "common", "app"]);
   const { workspace, role } = useWorkspace();
@@ -134,7 +145,7 @@ function SectionForm({
       queryClient
         .getQueryData(questionsKey)
         ?.answers.find((answer) => answer.questionKey === questionKey),
-    update: (questionKey, change) =>
+    update: (questionKey, change) => {
       putSaved<{ section: TemplateSection; answers: ValidationAnswer[] }>(
         queryClient,
         questionsKey,
@@ -147,7 +158,14 @@ function SectionForm({
                   answer.questionKey === questionKey ? change(answer) : answer,
                 ),
               },
-      ),
+      );
+      // Another section's display conditions may read this answer. A save sent on
+      // leaving lands after the next section was read: it is read again.
+      void queryClient.invalidateQueries({
+        queryKey: questionsKey.slice(0, -1),
+        predicate: (query) => query.queryKey.at(-1) !== sectionKey,
+      });
+    },
     reload: () =>
       void queryClient.invalidateQueries({ queryKey: questionsKey }),
   };
@@ -169,8 +187,15 @@ function SectionForm({
     return editing.viewOf(question, answer);
   };
   const views = section.questions.map(viewOf);
-  const texts = new Map(views.map((view) => [view.question.key, view]));
-  // 02 OCEAN's answer decides which questions show, as it is typed (6.2).
+  const byQuestion = new Map(views.map((view) => [view.question.key, view]));
+  // 02 OCEAN's answer decides which questions show, as it is typed (6.2); a condition
+  // naming another section's question reads its answer as 13 does.
+  const texts = new Map<string, { text: string | null }>([
+    ...conditionAnswers.map(
+      ({ questionKey, text }) => [questionKey, { text }] as const,
+    ),
+    ...byQuestion,
+  ]);
   const shown = views.filter((view) => isQuestionShown(view.question, texts));
   const shownIds = shown.map((view) => view.question.key);
   const answered = shown.filter((view) => view.isAnswered).length;
@@ -247,9 +272,10 @@ function SectionForm({
   /** The questions whose answer decides others (02 OCEAN), while unanswered (6.2). */
   const decidesOthers = (view: AnswerView) =>
     !hasText(view.text) &&
-    section.questions.some(
-      (other) => other.displayCondition?.[view.question.key] !== undefined,
-    );
+    (decidesElsewhere.includes(view.question.key) ||
+      section.questions.some(
+        (other) => other.displayCondition?.[view.question.key] !== undefined,
+      ));
 
   const renderAnswer = (view: AnswerView) => (
     <AnswerFields
@@ -289,8 +315,8 @@ function SectionForm({
           <Text tone="secondary">
             <Text variant="number" tone="secondary">
               {t("validation:questions.progress", {
-                answered: formatCount(answered),
-                total: formatCount(shown.length),
+                answered,
+                total: shown.length,
               })}
             </Text>
             {t("validation:questions.progressSuffix")}
@@ -313,18 +339,22 @@ function SectionForm({
   const toHome = () => void navigate({ href: ideaHref(workspace.id, idea.id) });
   const go = (href: string) => void navigate({ href });
 
-  const evidenceView = (() => {
-    if (modal !== "evidence" || !canEdit || about === undefined) return null;
-    const prefix = `validation_answer:${validationId}:`;
-    if (!about.startsWith(prefix)) return null;
-    const questionKey = about.slice(prefix.length);
-    const view = shown.find(
-      (candidate) => candidate.question.key === questionKey,
-    );
-    return view === undefined || view.state === null
-      ? null
-      : { ...view, state: view.state };
-  })();
+  // M2 opens on a question shown here with F/A/U (6.0.3), for someone who may edit; once
+  // open it follows the answer, though OCEAN hides its question meanwhile.
+  const prefix = `validation_answer:${validationId}:`;
+  const aboutKey = about?.startsWith(prefix)
+    ? about.slice(prefix.length)
+    : undefined;
+  const aboutView = views.find((view) => view.question.key === aboutKey);
+  const evidenceView = useSearchModalAbout(
+    modal,
+    "evidence",
+    aboutView === undefined || aboutView.state === null
+      ? undefined
+      : { ...aboutView, state: aboutView.state },
+    canEdit && aboutKey !== undefined && shownIds.includes(aboutKey),
+    !isFetching,
+  );
 
   return (
     <>
@@ -337,7 +367,7 @@ function SectionForm({
           setChosen(id);
         }}
         isReadOnly={!canEdit}
-        isAnswered={(id) => texts.get(id)?.isAnswered === true}
+        isAnswered={(id) => byQuestion.get(id)?.isAnswered === true}
         onEnd={() => setAtEnd(true)}
         end={
           isAtEnd ? (
@@ -346,8 +376,8 @@ function SectionForm({
                 <Heading level={2}>
                   {t("validation:questions.complete", {
                     section: sectionKey,
-                    answered: formatCount(answered),
-                    total: formatCount(shown.length),
+                    answered,
+                    total: shown.length,
                   })}
                 </Heading>
                 <Flex gap="space-200" wrap>
@@ -396,7 +426,7 @@ function SectionForm({
           )
         }
         renderQuestion={(id, mode) => {
-          const view = texts.get(id);
+          const view = byQuestion.get(id);
           if (view === undefined) return null;
           const { question } = view;
           return (
@@ -445,7 +475,7 @@ function SectionForm({
           );
         }}
       />
-      {evidenceView !== null && (
+      {evidenceView !== undefined && (
         <ModalBoundary key="evidence" onClose={modals.close}>
           <AnswerEvidenceSheet
             ideaId={idea.id}
@@ -469,29 +499,6 @@ function SectionForm({
   );
 }
 
-/**
- * 11's shape while it loads (design-spec 6.2「ローディング」): the title and the questions'
- * rows. Drawn inside a `Skeleton`, its words are bars.
- */
-export function QuestionFormSkeleton() {
-  const { t } = useTranslation(["validation"]);
-  return (
-    <QuestionFormPattern
-      header={<Heading level={1}>{t("validation:questions.empty")}</Heading>}
-      questionIds={["a", "b", "c", "d"]}
-      currentId={null}
-      onCurrentChange={() => {}}
-      isReadOnly
-      renderQuestion={() => (
-        <Stack gap="space-100">
-          <Text variant="caption">{t("validation:questions.empty")}</Text>
-          <Text>{t("validation:questions.placeholder")}</Text>
-        </Stack>
-      )}
-    />
-  );
-}
-
 function QuestionFormBody({
   ideaId,
   sectionKey,
@@ -506,21 +513,23 @@ function QuestionFormBody({
   about: string | undefined;
 }) {
   const { me, workspace } = useWorkspace();
-  const home = useQuery(validationHomeQuery(ideaId));
+  const homeOptions = validationHomeQuery(ideaId);
+  const home = useQuery(homeOptions);
   const isSection = isQuestionSection(sectionKey);
   const ready =
     home.data !== undefined &&
     home.data.idea.workspaceId === workspace.id &&
     isSection;
-  const questions = useQuery({
-    ...validationQuestionsQuery(
-      ideaId,
-      home.data?.validationId ?? "",
-      sectionKey,
-    ),
-    enabled: ready,
-  });
-  const isSlow = useIsSlow(home.isPending || (ready && questions.isPending));
+  const questionsOptions = validationQuestionsQuery(
+    ideaId,
+    home.data?.validationId ?? "",
+    sectionKey,
+  );
+  const questions = useQuery({ ...questionsOptions, enabled: ready });
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    home.isPending || (ready && questions.isPending),
+    [homeOptions, questionsOptions],
+  );
   const failure = home.error ?? questions.error;
   if (!isSection) return <NotFoundState dashboardHref={dashboardHref(me)} />;
   if (home.data !== undefined && home.data.idea.workspaceId !== workspace.id) {
@@ -535,10 +544,13 @@ function QuestionFormBody({
         home={home.data}
         section={questions.data.section}
         answers={questions.data.answers}
+        conditionAnswers={questions.data.conditionAnswers}
+        decidesElsewhere={questions.data.decidesElsewhere}
         sectionKey={sectionKey}
         focusKey={focusKey}
         modal={modal}
         about={about}
+        isFetching={home.isFetching || questions.isFetching}
       />
     );
   }
@@ -555,14 +567,7 @@ function QuestionFormBody({
     );
   }
   if (isSlow) {
-    return (
-      <SlowLoadingState
-        onRetry={() => {
-          void home.refetch();
-          if (ready) void questions.refetch();
-        }}
-      />
-    );
+    return <SlowLoadingState onRetry={retrySlow} />;
   }
   return (
     <Skeleton isLoading>

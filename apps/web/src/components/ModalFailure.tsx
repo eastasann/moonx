@@ -1,27 +1,34 @@
 import { AlertDialog, Button, Flex, InlineAlert, Text } from "@moonx/ui-web";
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../lib/api";
 import { rejectionReason } from "../lib/autosave";
-import { isTransient } from "../lib/query";
+import { isTransient, useUnexpectedReference } from "../lib/failure";
 import { rateLimitWords } from "./SendFailure";
-import { reportOnce } from "./states";
 
 /**
  * A send that failed inside a modal (design-spec 6.0.6「モーダルの共通の決まり」, 6.0.2),
- * what was typed kept: the network or an API that is down as "Couldn't save" and Retry, a
- * refusal for good with its reason, a rate limit with its wait, all where the modal's
- * fields are; anything else in the small dialog with its Ref, Retry and Close, which
- * closes the modal. A lost session takes the app's way (M9 or the sign-in screen,
+ * what was typed kept: the network or an API that is down as "Couldn't save" and Retry
+ * (`transient`), a refusal for good with its reason, a rate limit with its wait, all where
+ * the modal's fields are; anything else in the small dialog with its Ref, Retry and Close,
+ * which closes the modal. A lost session takes the app's way (M9 or the sign-in screen,
  * router.tsx) and shows nothing here.
  */
 export function ModalSendFailure({
   error,
+  transient = "couldNotSave",
   onRetry,
   isRetryDisabled = false,
   onClose,
 }: {
   error: unknown;
+  /**
+   * What the network or an API that is down reads as: "Couldn't save" where the send
+   * saves something (6.0.2, the modals' rule of 6.0.6), else an unexpected error in the
+   * small dialog, with the Ref of the API's answer when one came (a send that saves
+   * nothing, such as 4's Log in again: 6.16 4, SDD 8.2).
+   * @default "couldNotSave"
+   */
+  transient?: "couldNotSave" | "unexpected";
   onRetry: () => void;
   isRetryDisabled?: boolean;
   onClose: () => void;
@@ -35,12 +42,9 @@ export function ModalSendFailure({
     !isSignedOut &&
     rateLimited === null &&
     reason === null &&
-    !isTransient(error);
+    !(transient === "couldNotSave" && isTransient(error));
   // The API's request id, or the Sentry event of the Web's own failure (SDD 8.2).
-  const reference = useMemo(
-    () => (!isUnexpected ? null : isApi ? error.requestId : reportOnce(error)),
-    [isUnexpected, isApi, error],
-  );
+  const reference = useUnexpectedReference(error, isUnexpected);
   if (isSignedOut) return null;
   if (isUnexpected) {
     return (

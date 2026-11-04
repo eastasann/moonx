@@ -1,7 +1,7 @@
 import {
+  formatInputMoney,
   formatInputNumber,
   formatInputPercent,
-  formatMoney,
 } from "@moonx/i18n";
 import {
   moneySchema,
@@ -38,7 +38,7 @@ export function tableCellText(
     case "percent":
       return formatInputPercent(value);
     case "money":
-      return formatMoney(value, currency, { cents: !Number.isInteger(value) });
+      return formatInputMoney(value, currency);
     default:
       return formatInputNumber(value);
   }

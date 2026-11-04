@@ -1,5 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
 import { networkInterfaces, tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Subprocess } from "bun";
 
 const entry = `${import.meta.dir}/index.ts`;
@@ -70,6 +72,23 @@ test("exits with one JSON log line when the configuration is invalid", async () 
     message: expect.stringContaining(
       'APP_ENV must be one of local, staging, production, got "prod"',
     ),
+  });
+});
+
+test("exits with one JSON log line when WEB_DIST_DIR holds no build of the Web", async () => {
+  const child = start({
+    APP_ENV: "local",
+    DATABASE_URL: "postgres://nobody@127.0.0.1:1/none",
+    BETTER_AUTH_SECRET: "x".repeat(32),
+    WEB_DIST_DIR: mkdtempSync(join(tmpdir(), "moonx-web-empty-")),
+  });
+
+  expect(await child.exited).toBe(1);
+  const lines = (await new Response(child.stderr).text()).trim().split("\n");
+  expect(lines).toHaveLength(1);
+  expect(JSON.parse(lines[0] ?? "")).toEqual({
+    severity: "ERROR",
+    message: expect.stringContaining("has no /_shell.html: run make build-web"),
   });
 });
 

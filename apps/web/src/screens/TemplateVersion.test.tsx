@@ -3,7 +3,7 @@ import type {
   TemplateCheckResult,
   TemplateVersionDetail,
 } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { operator } from "../test/admin";
@@ -177,6 +177,22 @@ const treeOf = async () =>
   screen.findByRole("treegrid", {
     name: "Sections and questions of Validation",
   });
+
+/**
+ * `find`'s answer once the waits between a read's tries (SDD 8.2: a failure that may pass
+ * is read again) have gone by on the fake clock, moved in steps: the waits pass however
+ * slow the run. For a test under `vi.useFakeTimers({ shouldAdvanceTime: true })`.
+ */
+async function afterRetries<T>(find: () => T): Promise<T> {
+  for (let waited = 0; ; waited += 100) {
+    try {
+      return find();
+    } catch (error) {
+      if (waited >= 30_000) throw error;
+      await act(() => vi.advanceTimersByTimeAsync(100));
+    }
+  }
+}
 
 describe("27 Admin: Edit Template (design-spec 6.17)", () => {
   test("a draft: its sections and settings in the tree, the chosen question beside it", async () => {
@@ -394,6 +410,68 @@ describe("27 Admin: Edit Template (design-spec 6.17)", () => {
     );
   });
 
+  test("a publish someone else made first says so (errors:PUBLISHED_READ_ONLY) and reads the version again", async () => {
+    const user = userEvent.setup();
+    const calls = versionApi({
+      answer: (call) =>
+        call.method === "POST" && call.path.endsWith(`${draftId}/publish`)
+          ? apiError(409, "PUBLISHED_READ_ONLY")
+          : undefined,
+    });
+    renderApp(`/admin/templates/versions/${draftId}`);
+    const publish = await screen.findByRole("button", {
+      name: "Publish as v3",
+    });
+    await waitFor(() =>
+      expect((publish as HTMLButtonElement).disabled).toBe(false),
+    );
+    const reads = () =>
+      calls.filter(
+        (call) =>
+          call.method === "GET" &&
+          call.path === `/api/v1/admin/template-versions/${draftId}`,
+      ).length;
+    const before = reads();
+    await user.click(publish);
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", { name: "Publish as v3?" }),
+      ).getByRole("button", { name: "Publish" }),
+    );
+    expect(
+      await screen.findByText("This version was already published"),
+    ).toBeTruthy();
+    await waitFor(() => expect(reads()).toBeGreaterThan(before));
+  });
+
+  test("a section's count of questions groups its thousands: 1234 shows as 1,234", async () => {
+    const many = Array.from({ length: 1234 }, (_, index) =>
+      question(
+        `1a2b3c4d-0000-4000-8000-${String(100000 + index).padStart(12, "0")}`,
+        `V.01.Q${index}`,
+        `Q${index}`,
+      ),
+    );
+    const big: TemplateVersionDetail = {
+      ...published,
+      sections: [
+        {
+          ...(published.sections[0] as (typeof published.sections)[number]),
+          questions: many,
+        },
+      ],
+    };
+    versionApi({ versions: [draft, big] });
+    renderApp(`/admin/templates/versions/${published.id}?node=${sectionId}`);
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Customer & Problem",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText("1,234")).toBeTruthy();
+  });
+
   test("a published version only shows: no Publish, no check", async () => {
     const calls = versionApi();
     renderApp(`/admin/templates/versions/${published.id}`);
@@ -446,6 +524,58 @@ describe("27 Admin: Edit Template (design-spec 6.17)", () => {
       await screen.findByText("Published Oct 1 by Moonx Admin"),
     ).toBeTruthy();
   });
+
+  test("a version that can't be read: Couldn't load this page and Retry, the nav still there; offline, that it can't open (6.0.6)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      let fail: (() => Response) | null = () =>
+        new Response(null, { status: 503 });
+      versionApi({
+        answer: (call) =>
+          call.method === "GET" &&
+          call.path === `/api/v1/admin/template-versions/${draftId}` &&
+          fail !== null
+            ? fail()
+            : undefined,
+      });
+      renderApp(`/admin/templates/versions/${draftId}`);
+      expect(
+        await afterRetries(() =>
+          screen.getByRole("heading", { name: "Couldn't load this page" }),
+        ),
+      ).toBeTruthy();
+      expect(screen.getAllByRole("link", { name: "Admin" })).not.toHaveLength(
+        0,
+      );
+      fail = null;
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+      expect(await treeOf()).toBeTruthy();
+      cleanup();
+
+      fail = () => {
+        throw new TypeError("Failed to fetch");
+      };
+      const onLine = vi
+        .spyOn(navigator, "onLine", "get")
+        .mockReturnValue(false);
+      try {
+        renderApp(`/admin/templates/versions/${draftId}`);
+        expect(
+          await afterRetries(() =>
+            screen.getByRole("heading", {
+              name: "You're offline. Connect to the internet to open this page.",
+            }),
+          ),
+        ).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+      } finally {
+        onLine.mockRestore();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 15_000);
 
   test("anyone but an operator: no access, nothing read", async () => {
     const calls = versionApi({ me: ana });

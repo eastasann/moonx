@@ -260,6 +260,40 @@ describe("V19 POST /api/v1/ideas/{ideaId}/decisions", () => {
     ]);
   });
 
+  test("a dropped idea still takes answers and a new decision (PRD MB-12)", async () => {
+    const team = await teamWithIdea();
+    const drop = decisionResultSchema.parse(
+      await (
+        await record(team, {
+          value: "drop",
+          reason: "No demand yet",
+          basedOnDecisionId: null,
+        })
+      ).json(),
+    );
+    expect(drop.latestDecision).toBe("drop");
+    clock += 60_000;
+    const answer = await app.handle(
+      apiRequest(
+        "PUT",
+        `/api/v1/validations/${team.idea.validationId}/answers/V.01.WHO`,
+        { cookie: team.memberCookie, body: { text: "HR", lockVersion: 0 } },
+      ),
+    );
+    expect(answer.status).toBe(200);
+    clock += 60_000;
+    const again = await record(team, {
+      value: "proceed",
+      reason: "Offices asked for it",
+      basedOnDecisionId: drop.entry.id,
+    });
+    expect(again.status).toBe(201);
+    expect(decisionResultSchema.parse(await again.json())).toMatchObject({
+      latestDecision: "proceed",
+      canCreatePlan: true,
+    });
+  });
+
   test("refuses a blank reason, an unknown basis, an archived idea and a Viewer", async () => {
     const team = await teamWithIdea();
     const blank = await record(team, {

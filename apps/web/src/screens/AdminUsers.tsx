@@ -1,5 +1,11 @@
-import { formatDate, formatList, formatRelativeTime } from "@moonx/i18n";
 import {
+  formatDate,
+  formatInteger,
+  formatList,
+  formatRelativeTime,
+} from "@moonx/i18n";
+import {
+  type AdminInvitationCreate,
   type AdminUser,
   type AdminWorkspace,
   adminUserStatusSchema,
@@ -28,7 +34,6 @@ import {
   ListDetailPattern,
   Picker,
   SearchField,
-  Skeleton,
   Stack,
   type TableColumn,
   TableView,
@@ -43,16 +48,20 @@ import { SearchX, Users } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  AdminBreadcrumbs,
+  AdminHeading,
   adminToast,
   useAdminTabs,
   useDetailHistory,
 } from "../components/admin";
+import { useFailureOnceClosed } from "../components/ideaActions";
+import { ModalSendFailure } from "../components/ModalFailure";
 import { failureCode, SendFailure } from "../components/SendFailure";
 import {
   FailureState,
   NoAccessState,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, useWorkspace } from "../components/workspace";
@@ -61,6 +70,7 @@ import { copyText } from "../lib/files";
 import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
 import { inputIssueMessage } from "../lib/input-issues";
 import type { AdminUsersTab } from "../lib/links";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import {
   type AdminUserFilters,
@@ -69,9 +79,10 @@ import {
   adminUsersQuery,
   adminWorkspacesQuery,
 } from "../lib/queries";
+import type { WaitedQuery } from "../lib/query";
 import { isSessionLost, useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
-import { AdminBreadcrumbs, AdminHeading } from "./AdminTemplates";
+import { ListSkeleton } from "./AdminUsersSkeleton";
 
 /** `/admin/users`'s search parameters (SDD 4章). */
 export interface AdminUsersSearch {
@@ -161,6 +172,7 @@ function lastActive(
 /** The state of 6.0.6 a list shows in its place while it is not read. */
 function ListState({
   query,
+  waitsFor,
 }: {
   query: {
     isError: boolean;
@@ -168,9 +180,14 @@ function ListState({
     isPending: boolean;
     refetch: () => unknown;
   };
+  /** The list's options, which Retry on "Taking longer than usual" asks again. */
+  waitsFor: readonly WaitedQuery[];
 }) {
   const { me } = useWorkspace();
-  const isSlow = useIsSlow(query.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(
+    query.isPending,
+    waitsFor,
+  );
   if (query.isError) {
     return (
       <FailureState
@@ -183,32 +200,9 @@ function ListState({
     );
   }
   if (isSlow) {
-    return (
-      <SlowLoadingState
-        headingLevel={2}
-        size="S"
-        onRetry={() => void query.refetch()}
-      />
-    );
+    return <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />;
   }
   return <ListSkeleton />;
-}
-
-/** Rows of placeholder words in the shape of a list (design-spec 6.0.6). */
-function ListSkeleton() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <Skeleton isLoading>
-      <Stack gap="space-300">
-        {[0, 1, 2, 3].map((row) => (
-          <Stack key={row} gap="space-50">
-            <Text variant="label">{t("admin:users.title")}</Text>
-            <Text variant="caption">{t("admin:users.never")}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Skeleton>
-  );
 }
 
 /** "Nothing matches" a search or filter, with the way back to the whole list. */
@@ -271,38 +265,60 @@ function useOneAction() {
  * The selected user (design-spec 6.17 Users): what 28 knows of them, never what they
  * wrote, and Suspend or Resume. Suspending ends their sessions and stops their sign-in;
  * what they belong to stays. A deleted account only shows; the operator is never
- * suspended by themselves.
+ * suspended by themselves. Once the detail is gone (28 left, another row or tab chosen)
+ * while Suspend or Resume is on its way, its failure says so in a toast, the detail's
+ * words alone and anything else as a row's send does, whose Retry sends it again (6.0.6
+ * 「送っている間に閉じた送信の失敗」).
  */
 function UserDetail({ user }: { user: AdminUser }) {
-  const { t } = useTranslation(["admin"]);
+  const { t } = useTranslation(["admin", "errors"]);
   const { me } = useWorkspace();
   const queryClient = useQueryClient();
   const isOnline = useIsOnline();
   const action = useOneAction();
+  const sendThrough = useSendThrough();
   const [isAsking, setAsking] = useState(false);
   const isMe = user.id === me.id;
   const name = user.displayName;
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: [...adminKey, "users"] });
+  /** AD8, the list read again, and the toast that says so. */
+  const request = async (to: "suspend" | "reactivate") => {
+    const users = api().api.v1.admin.users({ userId: inPath(user.id) });
+    try {
+      await unwrap(
+        to === "suspend" ? users.suspend.post() : users.reactivate.post(),
+      );
+    } catch (error) {
+      // Deleted meanwhile: the list read again shows it so.
+      if (error instanceof ApiError && error.status === 404) void refresh();
+      throw error;
+    }
+    await refresh();
+    adminToast(
+      to === "suspend"
+        ? t("admin:users.suspended", { name })
+        : t("admin:users.reactivated", { name }),
+    );
+  };
+  const failedOnceGone = useFailureOnceClosed(
+    (to: "suspend" | "reactivate") => sendThrough(() => request(to)),
+    (error) => {
+      const code = failureCode(error);
+      if (code === "CANNOT_SUSPEND_SELF")
+        return t("errors:CANNOT_SUSPEND_SELF");
+      return code === "NOT_FOUND"
+        ? t("errors:NOT_FOUND", { context: "account" })
+        : null;
+    },
+  );
   const change = (to: "suspend" | "reactivate"): Promise<void> =>
     action.run(
       to,
-      async () => {
-        const users = api().api.v1.admin.users({ userId: inPath(user.id) });
-        await unwrap(
-          to === "suspend" ? users.suspend.post() : users.reactivate.post(),
-        );
-        await refresh();
-        adminToast(
-          to === "suspend"
-            ? t("admin:users.suspended", { name })
-            : t("admin:users.reactivated", { name }),
-        );
-      },
+      () => request(to),
       () => void change(to),
       (error) => {
-        // Deleted meanwhile: the list read again shows it so.
-        if (error instanceof ApiError && error.status === 404) void refresh();
+        failedOnceGone(error, to);
         return false;
       },
     );
@@ -335,7 +351,7 @@ function UserDetail({ user }: { user: AdminUser }) {
           </Text>
         </DescriptionListItem>
         <DescriptionListItem label={t("admin:users.workspaces")}>
-          <Text variant="number-sm">{String(user.workspaceCount)}</Text>
+          <Text variant="number-sm">{formatInteger(user.workspaceCount)}</Text>
         </DescriptionListItem>
       </DescriptionList>
       {user.status === "deleted" ? (
@@ -369,7 +385,7 @@ function UserDetail({ user }: { user: AdminUser }) {
             )}
             {isMe && (
               <Text variant="caption" tone="secondary">
-                {t("admin:users.notSelf")}
+                {t("errors:CANNOT_SUSPEND_SELF")}
               </Text>
             )}
           </Flex>
@@ -377,8 +393,8 @@ function UserDetail({ user }: { user: AdminUser }) {
             <SendFailure
               error={action.failure.error}
               messages={{
-                CANNOT_SUSPEND_SELF: t("admin:users.notSelf"),
-                NOT_FOUND: t("admin:users.gone"),
+                CANNOT_SUSPEND_SELF: t("errors:CANNOT_SUSPEND_SELF"),
+                NOT_FOUND: t("errors:NOT_FOUND", { context: "account" }),
               }}
               transient="couldNotSave"
               withSaveReasons
@@ -419,8 +435,9 @@ function useUsersTab(
   const { me } = useWorkspace();
   const isTwoColumns = useTwoColumns();
   const [filters, setFilters] = useState<AdminUserFilters>({});
+  const options = adminUsersQuery(filters);
   const query = useQuery({
-    ...adminUsersQuery(filters),
+    ...options,
     placeholderData: (previous) => previous,
     enabled: isShown,
   });
@@ -472,7 +489,7 @@ function useUsersTab(
   );
   let list: ReactNode;
   if (query.data === undefined) {
-    list = <ListState query={query} />;
+    list = <ListState query={query} waitsFor={[options]} />;
   } else if (items.length === 0 && isFiltered) {
     list = <NoMatch onClear={() => setFilters({})} />;
   } else {
@@ -504,7 +521,8 @@ function useUsersTab(
           if (column === "lastActive") {
             return lastActive(user.lastActiveAt, me.timezone, t);
           }
-          if (column === "workspaces") return String(user.workspaceCount);
+          if (column === "workspaces")
+            return formatInteger(user.workspaceCount);
           return t(`admin:userStatus.${user.status}`);
         }}
       />
@@ -539,10 +557,12 @@ function WorkspaceDetail({ workspace }: { workspace: AdminWorkspace }) {
           <Text variant="body-compact">{ownersOf(workspace, t)}</Text>
         </DescriptionListItem>
         <DescriptionListItem label={t("admin:workspaces.members")}>
-          <Text variant="number-sm">{String(workspace.memberCount)}</Text>
+          <Text variant="number-sm">
+            {formatInteger(workspace.memberCount)}
+          </Text>
         </DescriptionListItem>
         <DescriptionListItem label={t("admin:workspaces.ideas")}>
-          <Text variant="number-sm">{String(workspace.ideaCount)}</Text>
+          <Text variant="number-sm">{formatInteger(workspace.ideaCount)}</Text>
         </DescriptionListItem>
         <DescriptionListItem label={t("admin:workspaces.lastActive")}>
           <Text variant="body-compact">
@@ -563,8 +583,9 @@ function useWorkspacesTab(
   const { t } = useTranslation(["admin", "app"]);
   const isTwoColumns = useTwoColumns();
   const [q, setQ] = useState("");
+  const options = adminWorkspacesQuery(q === "" ? undefined : q);
   const query = useQuery({
-    ...adminWorkspacesQuery(q === "" ? undefined : q),
+    ...options,
     placeholderData: (previous) => previous,
     enabled: isShown,
   });
@@ -589,7 +610,7 @@ function useWorkspacesTab(
   ];
   let list: ReactNode;
   if (query.data === undefined) {
-    list = <ListState query={query} />;
+    list = <ListState query={query} waitsFor={[options]} />;
   } else if (items.length === 0 && q !== "") {
     list = <NoMatch onClear={() => setQ("")} />;
   } else {
@@ -621,8 +642,8 @@ function useWorkspacesTab(
               </Stack>
             );
           }
-          if (column === "members") return String(workspace.memberCount);
-          return String(workspace.ideaCount);
+          if (column === "members") return formatInteger(workspace.memberCount);
+          return formatInteger(workspace.ideaCount);
         }}
       />
     );
@@ -663,16 +684,33 @@ function invitationLine(
   });
 }
 
-/** The words 28 and 9 share for an invitation the API refuses (design-spec 6.16 9). */
+/**
+ * What a send of an invitation is: Invite someone's (AD9), or a Resend or Cancel of one
+ * (W5, W7), from its detail or from Invite someone.
+ */
+type InvitationSend = "invite" | "action";
+
+/**
+ * The words 28 and 9 share for an invitation the API refuses (design-spec 6.16 9). Only
+ * Invite someone names a workspace, which "This workspace no longer exists" is about; a
+ * Resend or Cancel that finds nothing finds the invitation gone, which 6.0.2's reason says
+ * ("Couldn't save. It no longer exists.", 6.17).
+ */
 function invitationMessages(
   email: string,
+  send: InvitationSend,
   t: TFunction<["admin", "errors"]>,
 ): Partial<Record<string, string>> {
   return {
-    ALREADY_MEMBER: t("admin:invitations.alreadyMember", { email }),
+    ALREADY_MEMBER: t("errors:ALREADY_MEMBER", { email }),
     INVITATION_ALREADY_ACCEPTED: t("errors:INVITATION_ALREADY_ACCEPTED"),
-    INVITATION_INVALID: t("admin:invitations.wasCancelled", { email }),
-    NOT_FOUND: t("admin:invitations.workspaceGone"),
+    INVITATION_INVALID: t("errors:INVITATION_INVALID", {
+      context: "cancelled",
+      email,
+    }),
+    ...(send === "invite"
+      ? { NOT_FOUND: t("errors:NOT_FOUND", { context: "workspace" }) }
+      : {}),
   };
 }
 
@@ -686,18 +724,25 @@ const pendingIdOf = (error: unknown) =>
 
 /**
  * "An invitation to {email} is already pending" with its Resend, or the failure of the
- * send in words (design-spec 6.16 9, which 28's invitations follow).
+ * send in words (design-spec 6.16 9, which 28's invitations follow). Inside Invite
+ * someone (`onClose`, which closes it), a failure that neither these words nor a reason
+ * of 6.0.2 explains is shown as the modals' unexpected failure (6.0.6).
  */
 function InvitationFailureNote({
   failure,
   email,
+  kind,
   onResend,
   isBusy,
+  onClose,
 }: {
   failure: ActionFailure;
   email: string;
+  /** The send that failed, whose words differ (invitationMessages). */
+  kind: InvitationSend;
   onResend: (invitationId: string) => void;
   isBusy: boolean;
+  onClose?: () => void;
 }) {
   const { t } = useTranslation(["admin", "errors"]);
   const isOnline = useIsOnline();
@@ -706,7 +751,7 @@ function InvitationFailureNote({
     return (
       <InlineAlert variant="negative">
         <Flex gap="space-200" wrap alignItems="center">
-          <Text>{t("admin:invitations.alreadyPending", { email })}</Text>
+          <Text>{t("errors:INVITATION_PENDING", { email })}</Text>
           <Button
             variant="secondary"
             size="S"
@@ -719,10 +764,25 @@ function InvitationFailureNote({
       </InlineAlert>
     );
   }
+  const messages = invitationMessages(email, kind, t);
+  const code = failureCode(failure.error);
+  if (
+    onClose !== undefined &&
+    (code === null || messages[code] === undefined)
+  ) {
+    return (
+      <ModalSendFailure
+        error={failure.error}
+        onRetry={failure.retry}
+        isRetryDisabled={!isOnline || isBusy}
+        onClose={onClose}
+      />
+    );
+  }
   return (
     <SendFailure
       error={failure.error}
-      messages={invitationMessages(email, t)}
+      messages={messages}
       transient="couldNotSave"
       withSaveReasons
       onRetry={failure.retry}
@@ -748,62 +808,118 @@ function useResend() {
   };
 }
 
+/** The words of 9's invitations for a refusal of a send to `email`, or null (6.16 9). */
+function invitationWordsOf(
+  error: unknown,
+  email: string,
+  send: InvitationSend,
+  t: TFunction<["admin", "errors"]>,
+): string | null {
+  const code = failureCode(error);
+  if (code === "INVITATION_PENDING") {
+    return t("errors:INVITATION_PENDING", { email });
+  }
+  return code === null
+    ? null
+    : (invitationMessages(email, send, t)[code] ?? null);
+}
+
+/** A send of the selected invitation: Resend of it or of the pending one found, or Cancel. */
+type InvitationAction =
+  | { kind: "resend"; invitationId: string }
+  | { kind: "cancel" };
+
 /**
  * The selected invitation (design-spec 6.17 Invitations): where it invites to and where
  * it stands, Resend for a pending or expired one (by mail only: the screen shows no
- * link) and Cancel for a pending one.
+ * link) and Cancel for a pending one. Once the detail is gone (28 left, another row or
+ * tab chosen) while one is on its way, its failure says so in a toast, 9's words alone
+ * and anything else as a row's send does, whose Retry sends it again (6.0.6「送っている
+ * 間に閉じた送信の失敗」).
  */
 function InvitationDetail({ invitation }: { invitation: Invitation }) {
-  const { t } = useTranslation(["admin", "common", "errors"]);
+  const { t } = useTranslation(["admin", "common", "errors", "app"]);
   const { me } = useWorkspace();
   const queryClient = useQueryClient();
   const isOnline = useIsOnline();
   const action = useOneAction();
+  const sendThrough = useSendThrough();
   const resendTo = useResend();
+  const isShown = useIsMounted();
   const { id, email, status } = invitation;
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: [...adminKey, "invitations"] });
-  /** The invitation accepted, cancelled or gone meanwhile: the list is read again. */
-  const onError = (error: unknown) => {
+  /** W5 or W7, the list read again, and the toast that says so. */
+  const send = async (sent: InvitationAction) => {
+    if (sent.kind === "resend") {
+      await resendTo(sent.invitationId, email);
+      return;
+    }
+    try {
+      await unwrap(
+        api()
+          .api.v1.invitations({ invitationId: inPath(id) })
+          .delete(),
+      );
+    } catch (error) {
+      if (failureCode(error) !== "INVITATION_INVALID") throw error;
+      // Cancelled already: done, as the list read again shows.
+      await refresh();
+      return;
+    }
+    await refresh();
+    adminToast(t("admin:invitations.cancelled", { email }));
+  };
+  /** The invitation was accepted, cancelled or deleted meanwhile: the list is read again. */
+  const isOverMeanwhile = (error: unknown) => {
     const code = failureCode(error);
-    if (
+    return (
       code === "INVITATION_ALREADY_ACCEPTED" ||
       code === "INVITATION_INVALID" ||
       (error instanceof ApiError && error.status === 404)
-    ) {
-      void refresh();
-    }
-    return false;
+    );
   };
-  const resend = (invitationId: string): Promise<void> =>
+  /**
+   * The send; the invitation over meanwhile, the list read again while the detail shows.
+   * Once it is gone, the toast reads again (`failedOnceGone`): its words, or for a 404 the
+   * toast of a refusal for good, which reads every screen's data again.
+   */
+  const request = (sent: InvitationAction) =>
+    send(sent).catch((error: unknown) => {
+      if (isShown.current && isOverMeanwhile(error)) void refresh();
+      throw error;
+    });
+  const failedOnceGone = useFailureOnceClosed(
+    (sent: InvitationAction) => sendThrough(() => request(sent)),
+    (error) => {
+      const words = invitationWordsOf(error, email, "action", t);
+      if (words !== null && isOverMeanwhile(error)) void refresh();
+      return words;
+    },
+  );
+  const run = (key: string, sent: InvitationAction): Promise<void> =>
     action.run(
-      `resend:${invitationId}`,
-      () => resendTo(invitationId, email),
-      () => void resend(invitationId),
-      onError,
-    );
-  const cancel = (): Promise<void> =>
-    action.run(
-      "cancel",
-      async () => {
-        await unwrap(
-          api()
-            .api.v1.invitations({ invitationId: inPath(id) })
-            .delete(),
-        );
-        await refresh();
-        adminToast(t("admin:invitations.cancelled", { email }));
-      },
-      () => void cancel(),
+      key,
+      () => request(sent),
+      () => void run(key, sent),
       (error) => {
-        // Cancelling one cancelled already: done, as the list read again shows.
-        if (failureCode(error) === "INVITATION_INVALID") {
-          void refresh();
-          return true;
-        }
-        return onError(error);
+        failedOnceGone(error, sent);
+        // The list read again may no longer hold the invitation (Pending), and the
+        // detail would go with its words: they show in a toast (design-spec 6.17).
+        if (!isOverMeanwhile(error)) return false;
+        if (!isShown.current) return true;
+        adminToast(
+          invitationWordsOf(error, email, "action", t) ??
+            t("app:state.couldNotSaveReason", {
+              reason: t("app:save.reason.gone"),
+            }),
+        );
+        return true;
       },
     );
+  const resend = (invitationId: string) =>
+    run(`resend:${invitationId}`, { kind: "resend", invitationId });
+  const cancel = () => run("cancel", { kind: "cancel" });
   return (
     <Stack gap="space-300">
       <Stack gap="space-100">
@@ -865,6 +981,7 @@ function InvitationDetail({ invitation }: { invitation: Invitation }) {
             <InvitationFailureNote
               failure={action.failure}
               email={email}
+              kind="action"
               onResend={(other) => void resend(other)}
               isBusy={action.sending !== null}
             />
@@ -884,7 +1001,10 @@ const ROLES = ["owner", "member", "viewer"] as const satisfies readonly Role[];
  * Invite someone (design-spec 6.17 Invitations, SDD 5.13 AD9): an email, and if wanted a
  * workspace and a role in it. Sent, it shows the link the mail carries, for the operator
  * to hand over when the mail does not arrive (2026-10-03 user decision). Its failures are
- * 9's (6.16), kept with what was typed (6.0.6 モーダルの共通の決まり).
+ * 9's (6.16), kept with what was typed (6.0.6 モーダルの共通の決まり). Cancel while it is on
+ * its way closes it: the invitation is made all the same if the send goes through, and a
+ * failure says so in a toast, in 9's words for its refusals or else as a row's send does,
+ * whose Retry sends the same invitation again (6.0.6「送っている間に閉じた送信の失敗」).
  */
 function InviteDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation(["admin", "common", "errors"]);
@@ -897,15 +1017,33 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
   // The role goes with a workspace and only then, so only the email can be refused.
   const rejections = useRejectedFields(["email"] as const);
   const workspaces = useQuery(adminWorkspacesQuery());
-  // With the address it was sent to: the field may have changed since.
+  // With the address it was sent to (the field may have changed since), and which send.
   const [failure, setFailure] = useState<
-    (ActionFailure & { email: string }) | null
+    (ActionFailure & { email: string; send: InvitationSend }) | null
   >(null);
   const [sentTo, setSentTo] = useState<{ email: string; link: string } | null>(
     null,
   );
   const [copy, setCopy] = useState<"idle" | "copied" | "failed">("idle");
   const [isResending, setResending] = useState(false);
+  const isShown = useIsMounted();
+  const invite = async (input: AdminInvitationCreate) => {
+    const sent = await sendThrough(() =>
+      unwrap(api().api.v1.admin.invitations.post(input)),
+    );
+    await queryClient.invalidateQueries({
+      queryKey: [...adminKey, "invitations"],
+    });
+    return sent;
+  };
+  const failedOnceClosed = useFailureOnceClosed(invite, (error, input) =>
+    invitationWordsOf(error, input.email, "invite", t),
+  );
+  const resendOnceClosed = useFailureOnceClosed(
+    (pending: { invitationId: string; email: string }) =>
+      sendThrough(() => resendTo(pending.invitationId, pending.email)),
+    (error, pending) => invitationWordsOf(error, pending.email, "action", t),
+  );
   const form = useAppForm({
     defaultValues: { email: "", workspaceId: NO_WORKSPACE, role: "member" },
     listeners: {
@@ -919,26 +1057,24 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
         const workspaceId =
           value.workspaceId === NO_WORKSPACE ? undefined : value.workspaceId;
         const role = roleSchema.catch("member").parse(value.role);
+        const input: AdminInvitationCreate =
+          workspaceId === undefined ? { email } : { email, workspaceId, role };
         try {
-          const sent = await sendThrough(() =>
-            unwrap(
-              api().api.v1.admin.invitations.post(
-                workspaceId === undefined
-                  ? { email }
-                  : { email, workspaceId, role },
-              ),
-            ),
-          );
-          await queryClient.invalidateQueries({
-            queryKey: [...adminKey, "invitations"],
-          });
+          const sent = await invite(input);
           setSentTo({ email, link: sent.link });
         } catch (error) {
+          // Closed meanwhile (Cancel while on its way): said in a toast instead.
+          failedOnceClosed(error, input);
           if (isSessionLost(error) || rejections.reject(error)) return;
           if (error instanceof ApiError && error.status === 404) {
             void workspaces.refetch();
           }
-          setFailure({ error, email, retry: () => void form.handleSubmit() });
+          setFailure({
+            error,
+            email,
+            send: "invite",
+            retry: () => void form.handleSubmit(),
+          });
         }
       }),
   });
@@ -956,6 +1092,32 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
     id: role,
     label: t(`common:role.${role}`),
   }));
+  /**
+   * W5 for the pending invitation the send found; its Retry sends W5 again. Closed while
+   * it is on its way, a failure says so in a toast (6.0.6「送っている間に閉じた送信の失敗」),
+   * and one that goes through closes nothing more: Invite someone may be open anew.
+   */
+  const resend = (invitationId: string, email: string) => {
+    setResending(true);
+    void sendThrough(() => resendTo(invitationId, email))
+      .then(
+        () => {
+          if (isShown.current) onClose();
+        },
+        (error: unknown) => {
+          resendOnceClosed(error, { invitationId, email });
+          if (!isSessionLost(error)) {
+            setFailure({
+              error,
+              email,
+              send: "action",
+              retry: () => resend(invitationId, email),
+            });
+          }
+        },
+      )
+      .finally(() => setResending(false));
+  };
 
   if (sentTo !== null) {
     return (
@@ -1085,21 +1247,10 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
             <InvitationFailureNote
               failure={failure}
               email={failure.email}
-              onResend={(invitationId) => {
-                setResending(true);
-                void sendThrough(() => resendTo(invitationId, failure.email))
-                  .then(onClose, (error: unknown) => {
-                    if (!isSessionLost(error)) {
-                      setFailure({
-                        error,
-                        email: failure.email,
-                        retry: () => void form.handleSubmit(),
-                      });
-                    }
-                  })
-                  .finally(() => setResending(false));
-              }}
+              kind={failure.send}
+              onResend={(invitationId) => resend(invitationId, failure.email)}
               isBusy={isResending}
+              onClose={onClose}
             />
           )}
         </Form>
@@ -1118,8 +1269,9 @@ function useInvitationsTab(
   const [isInviting, setInviting] = useState(false);
   const isTwoColumns = useTwoColumns();
   const [show, setShow] = useState<"pending" | "all">("pending");
+  const options = adminInvitationsQuery(show);
   const query = useQuery({
-    ...adminInvitationsQuery(show),
+    ...options,
     placeholderData: (previous) => previous,
     enabled: isShown,
   });
@@ -1133,7 +1285,7 @@ function useInvitationsTab(
   ];
   let list: ReactNode;
   if (query.data === undefined) {
-    list = <ListState query={query} />;
+    list = <ListState query={query} waitsFor={[options]} />;
   } else {
     list = (
       <TableView
@@ -1257,20 +1409,6 @@ function UsersBody({ tab }: { tab: AdminUsersTab }) {
       />
       {invitations.dialog}
     </>
-  );
-}
-
-/** 28's shape while its route loads (design-spec 6.0.6). */
-export function AdminUsersSkeleton() {
-  const { t } = useTranslation(["admin"]);
-  return (
-    <ListDetailPattern
-      header={<AdminHeading />}
-      list={<ListSkeleton />}
-      detail={null}
-      listLabel={t("admin:tabs.users")}
-      onBack={() => {}}
-    />
   );
 }
 

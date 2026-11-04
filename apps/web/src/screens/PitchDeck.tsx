@@ -19,16 +19,14 @@ import {
   Link,
   Picker,
   PresentationPattern,
-  type PresentationSlide,
   SegmentedControl,
   SegmentedControlItem,
-  Skeleton,
   Slide,
   Text,
 } from "@moonx/ui-web";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useNavigate, useSearch } from "@tanstack/react-router";
-import { type ReactNode, useId, useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import {
@@ -41,13 +39,13 @@ import {
   FailureState,
   NoAccessState,
   NotFoundState,
-  reportOnce,
   SlowLoadingState,
-  useIsSlow,
+  useSlowLoading,
 } from "../components/states";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
-import { ApiError, api, inPath, unwrap } from "../lib/api";
+import { api, inPath, unwrap } from "../lib/api";
+import { useUnexpectedReference } from "../lib/failure";
 import { attachmentName, downloadBlob } from "../lib/files";
 import {
   costsHref,
@@ -67,15 +65,20 @@ import {
   planHomeQuery,
   validationHomeQuery,
 } from "../lib/queries";
+import { isSessionLost } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
+import {
+  BlankSlide,
+  DEFAULT_VARIANT,
+  NotesSkeleton,
+  PitchDeckSkeleton,
+  skeletonSlides,
+} from "./PitchDeckSkeleton";
 
 export type { PitchSearch };
 
 /** The Picker's value for the plan as it is now (6.14 "Latest"). */
 const LATEST = "latest";
-
-/** The deck a URL without `variant` opens. */
-const DEFAULT_VARIANT: PitchVariant = "one";
 
 /** A slide's name: its type's ("Business model"); the title slide's is "Title". */
 const slideName = (slide: Pick<PitchSlide, "type" | "title">) =>
@@ -101,69 +104,6 @@ function slideOf(
     ? undefined
     : { variant, key: known };
 }
-
-/** A slide with nothing on it: the white page the skeleton draws. */
-const blankSlide = (key: PitchSlideKey): PitchSlide => ({
-  key,
-  type: "text",
-  title: { text: "", empty: false },
-  subtitle: null,
-  bullets: [],
-  numbers: [],
-  figureColumns: null,
-  table: null,
-  emptySources: [],
-  shrink: 0,
-  overflow: false,
-  editSource: null,
-  editInValidation: null,
-  commentCount: 0,
-});
-
-/**
- * A blank page of the skeleton: it has no figures, so no amounts for a currency to
- * write, and no footer yet.
- */
-function BlankSlide({
-  slideKey,
-  isThumbnail = false,
-}: {
-  slideKey: PitchSlideKey;
-  isThumbnail?: boolean;
-}) {
-  return (
-    <Slide
-      slide={blankSlide(slideKey)}
-      footer=""
-      currency=""
-      headingLevel={2}
-      isThumbnail={isThumbnail}
-    />
-  );
-}
-
-/** What to say on its way: its heading and a line, drawn as bars by the skeleton. */
-function NotesSkeleton() {
-  const { t } = useTranslation(["plans", "pitch"]);
-  return (
-    <>
-      <Heading level={2} variant="label">
-        {t("plans:pitch.whatToSay")}
-      </Heading>
-      <Text variant="body-long" elementType="p">
-        {t("pitch:notWrittenYet")}
-      </Text>
-    </>
-  );
-}
-
-/** The thumbnails of a deck on its way: blank pages under the slides' names. */
-const skeletonSlides = (variant: PitchVariant): PresentationSlide[] =>
-  pitchSlideKeys(variant).map((key) => ({
-    id: key,
-    title: i18n.t(`pitch:slide.${key}`),
-    thumbnail: <BlankSlide slideKey={key} isThumbnail />,
-  }));
 
 /** The length and the version the deck is made from (6.14), at the start of the tools' line. */
 function DeckTools({
@@ -236,15 +176,8 @@ function PdfFailure({
   const { t } = useTranslation(["plans", "app"]);
   const rateLimited = rateLimitWords(error);
   // The network fails without a request to quote; anything else is unexpected (8.2).
-  const reference = useMemo(
-    () =>
-      rateLimited !== null
-        ? null
-        : error instanceof ApiError
-          ? error.requestId
-          : reportOnce(error),
-    [rateLimited, error],
-  );
+  const reference = useUnexpectedReference(error, rateLimited === null);
+  if (isSessionLost(error)) return null;
   return (
     <InlineAlert variant="negative" title={t("plans:pitch.pdfFailed")}>
       <Flex gap="space-200" wrap alignItems="center">
@@ -312,8 +245,11 @@ function DeckBody({
   const downloadId = useId();
   const variant = search.variant ?? DEFAULT_VARIANT;
   const versionId = search.version;
-  const deck = useQuery(pitchDeckQuery(ideaId, planId, variant, versionId));
-  const isSlow = useIsSlow(deck.isPending);
+  const deckOptions = pitchDeckQuery(ideaId, planId, variant, versionId);
+  const deck = useQuery(deckOptions);
+  const { isSlow, retry: retrySlow } = useSlowLoading(deck.isPending, [
+    deckOptions,
+  ]);
   // A link to a slide's comment opens on that slide; otherwise the first.
   const [current, setCurrent] = useState<PitchSlideKey | null>(() => {
     const open = panel.open?.target;
@@ -399,7 +335,7 @@ function DeckBody({
   const data: PitchDeck | undefined = deck.data;
   if (data === undefined) {
     if (isSlow) {
-      return <SlowLoadingState onRetry={() => void deck.refetch()} />;
+      return <SlowLoadingState onRetry={retrySlow} />;
     }
     return (
       <PresentationPattern
@@ -533,42 +469,6 @@ function DeckBody({
 }
 
 /**
- * 23's shape while it loads (design-spec 6.0.6): the title, and the blank slides of the
- * deck the URL asks for, with What to say under them. Drawn inside a `Skeleton`.
- */
-function PitchDeckSkeleton({ variant }: { variant: PitchVariant }) {
-  const { t } = useTranslation(["plans"]);
-  return (
-    <Skeleton isLoading>
-      <PresentationPattern
-        header={
-          <Heading level={1} variant="heading-1-toolbar">
-            {t("plans:pitch.title")}
-          </Heading>
-        }
-        slides={skeletonSlides(variant)}
-        currentId="title"
-        onCurrentChange={() => {}}
-        slide={<BlankSlide slideKey="title" />}
-        notes={<NotesSkeleton />}
-      />
-    </Skeleton>
-  );
-}
-
-/** 23's skeleton while its route loads: of the length its URL names. */
-export function PitchDeckRouteSkeleton() {
-  const search = useSearch({ strict: false }) as { variant?: unknown };
-  return (
-    <PitchDeckSkeleton
-      variant={
-        pitchVariantSchema.safeParse(search.variant).data ?? DEFAULT_VARIANT
-      }
-    />
-  );
-}
-
-/**
  * 23 Pitch Deck (design-spec 6.14): the one-minute or five-minute deck, from the plan now
  * or a saved version, made again each time it opens; its PDF; PNL-1 on the slides and,
  * from the header, on the deck with the idea's comments. Every role reads it, archived
@@ -587,9 +487,12 @@ export function PitchDeckScreen({
   const { me, workspace } = useWorkspace();
   const navigate = useNavigate();
   const panel = usePanel();
-  const home = useQuery(planHomeQuery(ideaId, planId));
+  const homeOptions = planHomeQuery(ideaId, planId);
+  const home = useQuery(homeOptions);
   const { data: ideaData } = useQuery(validationHomeQuery(ideaId));
-  const isSlow = useIsSlow(home.isPending);
+  const { isSlow, retry: retrySlow } = useSlowLoading(home.isPending, [
+    homeOptions,
+  ]);
   const data =
     home.data?.workspaceId === workspace.id && home.data.ideaId === ideaId
       ? home.data
@@ -662,7 +565,7 @@ export function PitchDeckScreen({
       />
     );
   } else if (isSlow) {
-    body = <SlowLoadingState onRetry={() => void home.refetch()} />;
+    body = <SlowLoadingState onRetry={retrySlow} />;
   } else {
     body = <PitchDeckSkeleton variant={search.variant ?? DEFAULT_VARIANT} />;
   }

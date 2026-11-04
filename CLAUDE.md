@@ -94,7 +94,7 @@ CI が使うターゲット（`install`・`build-web`・`build-api-image`・`dep
 - **不要になった `.gitkeep` は削除する。** ディレクトリに実ファイルを追加したら、その中の `.gitkeep` を消す
 - **自動メモリに docs/ が所有する事実を転記しない。** MEMORY.md等、ツールがセッション外に蓄積するメモが対象。食い違ったらソースDocが正
 - **実装セッションに本番環境の資格情報を渡さない。** 本番への操作は `docs/04_deployment-procedure.md` の手順で行う（セッションが本番リソースへ直接触れる構成にしない）
-- **破壊的操作は実行前に明示して確認を取る。** DBのdrop/reset、`rm -rf`、本番リソースの変更は、対象と影響を提示してユーザーの確認を得てから実行する。例外は、手元の Docker の DB（`moonx`・`moonx_test`）を消す make ターゲット（`make db-seed`・`make db-reset`、`make test-api`・`make test-e2e` のテスト用の DB の作り直しと、それらを呼ぶ `make setup`・`make test`・`make coverage`）で、確認なしで動かしてよい（`docs/03_dev-setup.md` 1章）
+- **破壊的操作は実行前に明示して確認を取る。** DBのdrop/reset、`rm -rf`、本番リソースの変更は、対象と影響を提示してユーザーの確認を得てから実行する。例外は、手元の Docker の DB（`moonx`・`moonx_test`）を消す make ターゲット（`make db-seed`・`make db-reset`、`make test-api`・`make test-e2e`・`make first-paint` のテスト用の DB の作り直しと、それらを呼ぶ `make setup`・`make test`・`make coverage`）で、確認なしで動かしてよい（`docs/03_dev-setup.md` 1章）
 
 ## Code Style
 

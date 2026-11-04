@@ -2930,6 +2930,103 @@ Step 39 の突き合わせで見つかった、共通の部品・入口・アカ
 
 ---
 
+## Step 39d: PWA と仕上げの段階の終わりの点検の直し
+
+Status:
+
+```
+PWA と仕上げの段階（Step 36〜39c）の終わりの点検で見つかったものを、1つのステップで閉じてください。点検は3つで行った: 段階全体の
+docs の差分の監査（新しいサブエージェント1体）、make lint・typecheck・doc-lint・db-check BASE=main・build・test・test-e2e（どれも
+通り、E2E は 438 件）、main と今の画面の撮り比べ（モックアップのある画面の変化は、意図した 17 の金額の書き方と 7・19 の F/A/U の印
+だけ。ビルドした Web と開発サーバーの画面は同じ）。2 と 3 の直し方は、docs に今ある決まり（SDD 4章の M8、design-spec 6.16 の
+Leave）と同じ形にそろえると決めてある（2026-11-04）。
+
+参照:
+- docs/02-01_system-design-doc.md 2章（make ターゲット）・4章（モーダルと検索パラメータ・M8）・ADR-004・8.2・8.3・11章
+- docs/design-spec.md 3.8・6.0.2・6.0.6・6.10・6.13・6.16
+- docs/03_dev-setup.md 7章
+- docs/05_operation-runbook.md 1章（Ref の探し方）
+- docs/README.md（所有権マップ）
+
+直すもの:
+1. apps/web の依存の漏れ: apps/web/src の約30のファイルが @moonx/domain を読むのに、apps/web/package.json の dependencies に無い。
+   手元では古いリンク（apps/web/node_modules/@moonx/domain）が残っていて動くが、依存を入れ直したばかりの環境では解決できない
+   （main を git worktree で出して bun install --frozen-lockfile したら、vite dev が「Cannot find module '@moonx/domain'」で起動
+   しなかった）。Step 40 の Docker のビルドと Step 41 の CI がこれにあたる。"@moonx/domain": "workspace:*" を足して bun.lock を
+   更新する。確かめ方: このリポジトリを git worktree で別の場所に出し、.env を写して bun install --frozen-lockfile のあと
+   make build-web が通る（確かめたら作業ツリーを消す）。ほかのワークスペースのパッケージにも、読んでいるのに宣言していない
+   @moonx/* が無いことを確かめる（点検では apps/web の domain だけだった）。bun.lock を変えた直後の最初の make test-e2e は、
+   Vite の依存の最適化のやり直し（504 Outdated Optimize Dep）で落ちることがある。そのときはまず流し直す
+2. 開けない `?modal=` が URL に残り、後で開ける状態になると押していないのに開く: 画面は検索パラメータのモーダルを権限と状態で
+   出し分ける（ValidationHome.tsx と PlanHome.tsx の create-plan、PlanHome.tsx の save-version と go-no-go、Ideas.tsx の new-idea、
+   Costs・Economics・AssumptionsRisks・Competitors の evidence、TemplateUpdate.tsx の update-template など。全部を探す）が、出さない
+   ときに `modal` と `about` を URL から外さない。そのため Restore、ほかの人が記録した Proceed の読み直し、Viewer からの役割の
+   変更などで条件が変わると、そのモーダルが開く。条件が変わって開けなくなると、開いていたモーダルが入力ごと消える。SDD 4章の
+   M8 の決まり（開けない人・状態では何も出さない。開いた後は、開いている間に操作できなくなっても閉じるまで残す）を、検索
+   パラメータで開くモーダル全部の決まりとして SDD 4章に書き、実装をそろえる。次のとおり決めてある:
+   - 開けない人・状態の画面で `?modal=` を開いたら、何も出さず、判断に要るデータを読み終えた時点で、今の履歴の項目から `modal` と
+     `about` を外す（置き換える。履歴を足さない）。読み込み中には外さない（読み終えると開けるモーダルを消さないため）
+   - 開いた後に開けなくなったら、閉じるまで残す（送れば 6.0.6 のモーダルの決まりのとおり、断られた理由をモーダルの中に出す）。
+     SelfAnalysisHome.tsx の share（wasSharing）がこの形
+   - design-spec 3.8 と 6.x がモーダルごとに別の決まりを持つときは、そちらに従う（読んで、合わせた所を完了報告に挙げる）
+   モーダルごとにテストを足す（開けない状態で開くと URL から外れ、その後で開ける状態になっても開かない。読み込み中は外さない。
+   開いた後に開けなくなっても閉じるまで残る）
+3. 送っている間に Cancel で閉じた新しい行の送信が、後で失敗しても何も出ない: 14（ResearchLog.tsx の submit。onError は断られた
+   ときだけを扱う）・15（Competitors.tsx の新しい競合）・16（AssumptionsRisks.tsx。14 と同じ）。design-spec はどれも「送っている
+   間の Cancel は閉じても作る」と書くが、その送信が失敗したときを書いていない。行は作られず、打った文も消え、利用者は知らされない。
+   6.16 の Leave（送っている間に Cancel を押した後の失敗は、閉じたうえで 6.0.6 の画面の行やボタンから送る操作の失敗の決まりの
+   とおりトーストに出す。LeaveWorkspaceDialog.tsx の isCancelled と useToastFailure）と同じ形にする: 閉じた後に失敗したら、6.0.6 の
+   行やボタンの送信の決まりのとおりトーストに出す（一時的な失敗は「Couldn't save」と Retry で、Retry は同じ入力を送り直す。断られた
+   ら理由を出し、Retry を出さずに画面を読み直す。429 は待ち時間。ほかは「Something went wrong」と Ref）。6.0.6 に「送っている間に
+   Cancel で閉じた送信の失敗」の決まりを1つ書き、14・15・16 と 6.16 の Leave はそこを指す。21 と 22 の Dialog、ほかのフォームと
+   モーダルにも、送っている間に Cancel で閉じられる送信があれば同じにする（探して、見つけたものを完了報告に挙げる）。画面ごとに
+   テストを足す
+4. docs の食い違いと持ち主の直し（点検の指摘。どれも意味を変えず、弱めない）:
+   a. SDD 8.2 の「何かを保存するフォーム・モーダル・パネル・トーストの送信: 「Couldn't save」と Retry」と、一時的な失敗の段落が、
+      画面が別の文を持つとき（PNL-1 の「Couldn't post」、25 の「Couldn't apply」）を落としている。文言は design-spec が持つので、
+      8.2 は design-spec 6.0.6 の決まりと各画面の文を指す形にする
+   b. SDD 8.3 の「探し方」が、すべての Ref を Cloud Logging で探す書き方のまま。API の答えが無い Web 自身の失敗の Ref は moonx-web
+      の Sentry のイベント ID で、Cloud Logging には無い（8.2・runbook と同じ）ことを足す
+   c. 「一時的な失敗」の意味: SDD 8.2 は「応答の無い通信の失敗と UPSTREAM_UNAVAILABLE」と決めたが、design-spec 6.0.2（「通信や
+      サーバーの一時的な失敗は「Couldn't save」と Retry」と、見出しの「一時的な失敗の再送の間隔」）と 6.16（9 の役割・Remove・招待の
+      段落）は、サーバーの失敗すべての意味で使っている。8.2 の言葉に合わせ、自動保存が再送する「ほかの 5xx と 429」を書き分ける。
+      6.16 のその段落には、想定外の失敗（500）の出し方を書く
+   d. design-spec 6.16 の Leave: 「失敗はその操作の近くに出し（…Leave は確かめの中）」と、39c が足した「Cancel を押した後の失敗は
+      トースト」が並ぶ。前の文に「送っている間に Cancel で閉じた後の失敗は除く」と限定を足し、3 で 6.0.6 に書く決まりを指す
+   e. design-spec 6.13 の 22 の Dialog が、「6.0.6 のモーダルの決まりのとおり」（断られても理由と Retry を残す）と「14・16 の新しい
+      行と同じ」（断られたら読み取りにし、Add と Retry を押せなくする）の両方を指している。実装（ExecutionItems.tsx の isLocked）は
+      後者なので、後者をはっきり書く（欄を読み取りにし、決定のボタンと Retry を押せなくする）。「21 の Dialog も同じ」も実装と
+      見比べて書く
+   f. SDD 8.2 が、2 の送信（ログイン・新規登録・パスワードの再設定の依頼と設定）と 4 の Log in again の、通信の失敗の文言
+      （「Something went wrong」と Retry、503 は Ref も）を決めているが、design-spec 6.16 に無い。画面の文言は design-spec が持つので、
+      design-spec 6.16 の 2 と 4 に書き、8.2 はそこを指す
+   g. 同じ仕組みが2か所にある: SDD 2章（PWA の検査の API のポート 3200・.data/e2e/web・.data/e2e/api-pwa.log、coverage と
+      first-paint が何をするか）と 03 7章。make ターゲットの中身は SDD 2章が持つ（CLAUDE.md の Commands）。03 は使い方だけを残して
+      SDD 2章を指す
+   h. design-spec が SDD の持つ事実を書いている: 6.0.6 の「5xx は API が Sentry に送るので Web は送らない」（監視は SDD 11章・8.3）
+      と、「API は、アイデアか下書きの案のどちらかがアーカイブ済みなら返す」（API の振る舞いは SDD 5.11・7.1）。SDD を指す形にする
+      （SDD に無ければ SDD に書く）
+   i. ルートの README.md が docs/README.md の所有権マップに無く、3行目の説明が CLAUDE.md・docs/README.md と違う（「スマホと Web で
+      迷わず」が抜けた3つ目の写し）。docs/README.md に派生の入口として足し、説明を同じ文にする
+   j. runbook 1章の「API の応答が無い画面の描画の失敗だけは moonx-web の Sentry のイベント ID」: apps/web/src/lib/failure.ts の
+      unexpectedReference は、想定外として出す Web 自身の失敗すべてにイベント ID を付ける。「API の答えが無い Web 自身の失敗（描画の
+      失敗など）」に直す
+   k. design-spec 6.10（15）: New competitor を開くと Name にフォーカスする（実装は Competitors.tsx の autoFocus。M1 と 6.17 と同じ）
+      ことが書かれていない。書く
+   l. ADR-004: 見つからないファイルの 404 の本文が書かれていない（実装は 8.1 の NOT_FOUND）。書く
+
+まだ作らないもの: Step 40〜44 の対象。
+
+直すものの 1〜4 が閉じ、make test・make test-e2e・make typecheck・make lint・make doc-lint が通る状態をゴールとする。独立のレビューは
+観点ごとに分けて同時に起動し（/draft:implement）、1〜4 のどれも漏らさない。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
 ## Step 40: インフラ（Dockerfile と Terraform）
 
 Status:

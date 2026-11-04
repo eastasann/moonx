@@ -217,7 +217,7 @@ gcloud logging read \
 |---|---|---|
 | シークレットが見つからない・権限が無い | Secret Manager に値（有効な版）が無い、実行用のサービスアカウントの権限 | 値を入れる（03 5.4 I）。権限は Terraform で直す |
 | 起動のときの設定の検査で終了する | 新しい環境変数を Terraform に入れ忘れた | Terraform に入れて `make infra-apply` → `deploy.yml` を再実行（`gh run rerun <RUN_ID>`） |
-| `exec format error` | 手元（Apple シリコン）で `make build-api-image` を動かして作った arm64 のイメージ | イメージは `build.yml` が作ったものだけを使う |
+| `exec format error` | `make build-api-image`（linux/amd64 で作る）を通さずに作ったイメージ（Apple シリコンの `docker build` は既定で arm64 になる） | イメージは `build.yml` が作ったものだけを使う |
 | ポートで待ち受けていない | アプリが `PORT` を読んでいない | コードを直す |
 
 ### 3.8 DB のマイグレーションが失敗した

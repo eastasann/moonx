@@ -79,25 +79,45 @@ dev-api:
 dev-web:
 	cd apps/web && $(BUNX) vite dev
 
+# Left out of the bundle, to load from node_modules as the tests do (apps/api/Dockerfile
+# installs them): sharp loads its native binary from beside its own package, and the
+# pdfkit inside react-pdf requires its standard fonts by its own package's imports map
+# at run time, which no bundle can resolve. React goes with react-pdf, so both use one.
+API_BUNDLE = cd apps/api && bun build src/index.ts --target=bun --sourcemap=linked \
+	--external=sharp --external=@react-pdf/renderer --external=react --outdir=dist
+
 build:
 	$(MAKE) typecheck
 	$(MAKE) build-web
-	cd apps/api && bun build src/index.ts --target=bun --sourcemap=linked --outdir=dist
+	$(API_BUNDLE)
 
+# The debug IDs let Sentry find each script's hidden map (apps/web/vite.config.ts) by
+# the script's content, so the tests run the scripts the image serves.
 build-web: SHA ?= dev
 build-web:
 	cd apps/web && MOONX_RELEASE=$(SHA) $(BUNX) vite build
+	$(BUNX) @sentry/cli sourcemaps inject apps/web/dist/client/assets >/dev/null
 
+# Bun marks its bundle with a debug ID but not with the code Sentry's SDK reads the ID
+# from, and sentry-cli leaves a marked file as it is: without the mark it injects both,
+# keeping the map's ID. The image leaves every source map out (.dockerignore). The maps
+# go up before the image, so that no image goes up without them; the token is an
+# organization token, which names the organization (03_dev-setup.md 5.4 D).
 build-api-image:
 	$(call require,SHA)
 	$(call require-project)
+	$(if $(strip $(SENTRY_AUTH_TOKEN)),,$(error SENTRY_AUTH_TOKEN is required in the environment (SDD 2章「CI のシークレットと変数」)))
 	$(MAKE) build-web SHA=$(SHA)
-	cd apps/api && bun build src/index.ts --target=bun --sourcemap=linked --outdir=dist
+	$(API_BUNDLE)
+	sed -i.bak '/^\/\/# debugId=/d' apps/api/dist/index.js && rm apps/api/dist/index.js.bak
+	$(BUNX) @sentry/cli sourcemaps inject apps/api/dist >/dev/null
 	docker build --platform=linux/amd64 --file=apps/api/Dockerfile \
 		--build-arg=APP_VERSION=$(SHA) --tag=$(IMAGE):$(SHA) .
-	docker push $(IMAGE):$(SHA)
-	$(BUNX) @sentry/cli sourcemaps upload --project=moonx-web --release=$(SHA) apps/web/dist/client
+	$(BUNX) @sentry/cli sourcemaps upload --project=moonx-web --release=$(SHA) \
+		apps/web/dist/client/assets
 	$(BUNX) @sentry/cli sourcemaps upload --project=moonx-api --release=$(SHA) apps/api/dist
+	gcloud auth configure-docker $(REGION)-docker.pkg.dev --quiet
+	docker push $(IMAGE):$(SHA)
 
 test: test-domain test-api test-web
 
@@ -213,7 +233,8 @@ deploy-api:
 	$(call require,SHA)
 	$(call require-project)
 	$(MAKE) db-migrate
-	gcloud run deploy moonx-api-$(ENV) --image=$(IMAGE):$(SHA) --region=$(REGION) --quiet
+	gcloud run deploy moonx-api-$(ENV) --image=$(IMAGE):$(SHA) --project=$(GCP_PROJECT_ID) \
+		--region=$(REGION) --quiet
 
 promote:
 	$(call require-env,staging production)
@@ -223,8 +244,21 @@ promote-check:
 	$(call require,BASE)
 	bun scripts/promote-check.ts $(BASE)
 
+# The dump goes up in one request to Cloud Storage's JSON API, as the API's photos do
+# (ADR-024), which takes only the permissions to create and replace an object (ADR-028).
+# gcloud storage cp reads the object first, with the permission that also reads backups,
+# which only the operators have (05_operation-runbook.md 6.2). The dump is written to a
+# file first, so a failed one uploads nothing. The tests point STORAGE_URL elsewhere.
+STORAGE_URL := https://storage.googleapis.com
+
 db-backup:
 	$(call require-env,staging production)
 	$(call require-project)
-	set -o pipefail; pg_dump --format=custom "$$DATABASE_URL_DIRECT" \
-		| gcloud storage cp - "gs://$(GCP_PROJECT_ID)-moonx-backups/$(ENV)/$$(date -u +%Y-%m-%d).dump"
+	set -o errexit; dump="$$(mktemp)"; trap 'rm -f "$$dump"' EXIT; \
+	pg_dump --format=custom --file="$$dump" "$$DATABASE_URL_DIRECT"; \
+	token="$$(gcloud auth print-access-token)"; \
+	name="$(ENV)%2F$$(date -u +%Y-%m-%d).dump"; \
+	curl --fail-with-body --silent --show-error --request POST --upload-file "$$dump" \
+		--header 'Content-Type: application/octet-stream' \
+		--header @<(printf 'Authorization: Bearer %s\n' "$$token") \
+		"$(STORAGE_URL)/upload/storage/v1/b/$(GCP_PROJECT_ID)-moonx-backups/o?uploadType=media&name=$$name"

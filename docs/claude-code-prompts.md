@@ -3029,7 +3029,7 @@ Leave）と同じ形にそろえると決めてある（2026-11-04）。
 
 ## Step 40: インフラ（Dockerfile と Terraform）
 
-Status:
+Status: done 2026-11-04
 
 ```
 Web と API を1つにしたイメージと、Google Cloud の資源を Terraform で作ってください。
@@ -3088,7 +3088,8 @@ docs/04_deployment-procedure.md 2章のワークフローと、昇格・ロー�
 やること:
 1. .github/workflows/: ci.yml・build.yml・deploy.yml・db-backup.yml・kpi.yml を 04 2章のとおりに作る。
    ci.yml は promote-check が先で、deploy/ だけの PR はそこまで、ほかは make install の直後に make db-check（BASE は promote-check と同じ）。
-   build.yml の make test にも PostgreSQL 17 のサービスコンテナとクライアントを用意する。deploy.yml は検査のジョブとデプロイのジョブ、
+   build.yml の make test にも PostgreSQL 17 のサービスコンテナとクライアントを用意する。build.yml の make test は、id-token: write を
+   持たないジョブで動かす（04 2章の build.yml の行）。deploy.yml は検査のジョブとデプロイのジョブ、
    concurrency の queue: max、後の昇格が先に入ったときに終える処理、/api/health の版の確認。pull_request_target と workflow_run は使わない（ADR-027）
 2. make promote と make promote-check（scripts/ に TypeScript で。SDD 2章の決まりをすべて）。promote-check は make install の前に動くので、
    Bun に入っている機能だけを使う
@@ -3157,9 +3158,16 @@ docs/03_dev-setup.md 5.4 のチェックリストに沿って、staging に Web 
 - docs/02-01_system-design-doc.md 7.3（性能）・2章（プレースホルダ）
 
 やること:
-1. 始める前に、ユーザーが {GCP_PROJECT_ID} を決める。決まったら SDD 2章のプレースホルダの表に書く
+1. 始める前に、ユーザーが {GCP_PROJECT_ID} を決める。決まったら SDD 2章のプレースホルダの表に書く。
+   各 envs の terraform.tfvars（03 5.4 G・I）をコミットするかもユーザーが決める（アラートの通知先のメールと請求先アカウントの ID が
+   入るので、リポジトリを公開するならそれも公開になる。Step 40 は値の無いまま変数だけを作った）。決めたら 03 5.4 G に書く。
+   コミットしないと決めたら、変数だけの変更（I の bootstrap・api_image、J の uptime_check_enabled、K の mail_allowlist）は
+   03 5.2 の「PR に make infra-plan の結果を貼る」を通らないので、03 5.2 もそれに合わせて直す
 2. 5.4 の A〜K を staging について順に、ユーザーと一緒に進める（コマンドを示し、結果を確かめる）
-3. staging への最初の昇格（make promote ENV=staging）、運営者の作成、テンプレートの取り込みと公開、04 6章の確認
+3. staging への最初の昇格（make promote ENV=staging）、運営者の作成、テンプレートの取り込みと公開、04 6章の確認。
+   最初の昇格の後で make infra-plan ENV=staging に差分が無いことも確かめる（CI の gcloud run deploy が書き換えて Terraform が
+   戻してしまうものがあれば、modules/environment の lifecycle.ignore_changes に足し、ADR-015 の無視するものの一覧にも理由と一緒に
+   書く。Step 40 が入れたのは image・traffic・client・client_version と、gcloud がリビジョンに付ける nonce のラベル（template の labels））
 4. 手元で差し替えて確かめた外部の経路を本物で確かめる: Google ログイン、Resend のメール（許可リスト）、Cloud Storage の写真、
    Web と API の Sentry（7.2 のとおり中身が削られて届くこと。release が SHA で、ソースマップが当たって元のソースの行で読めること）
 5. 7.3 の性能の目安のうち本物の環境で測るもの（Cloud Run の0台からの起動・スマホの回線での表示）、PWA の実機での確認（03 3.5）。

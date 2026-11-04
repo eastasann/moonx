@@ -306,6 +306,10 @@ export default defineConfig({
   // One .env at the repository root serves the API and the Web (SDD 2章「環境変数」).
   envDir: fileURLToPath(new URL("../..", import.meta.url)),
   build: {
+    // Source maps for Sentry only (SDD 11章「Web のエラー」): no file names its map, and
+    // make build-api-image uploads them and leaves them out of the image, so the served
+    // files never expose the source.
+    sourcemap: "hidden",
     // A font never becomes a data: URL, which the CSP's font-src 'self' refuses (SDD 7.2):
     // each stays its own woff2 (ADR-018). Other assets keep Vite's default.
     assetsInlineLimit: (file) => (file.endsWith(".woff2") ? false : undefined),

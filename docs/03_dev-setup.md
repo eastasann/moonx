@@ -22,6 +22,7 @@
 | Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・`make promote`（イメージの確認）・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
 | Terraform | 1.x の最新 | `make infra-plan` / `make infra-apply` | インフラを触る人 |
 | GitHub CLI（gh） | 最新 | PR・`make promote`（昇格の PR の作成）・GitHub の環境の設定・ワークフローの確認 | デプロイ・運用をする人（ほかの人は任意） |
+| curl | 最近の版（7.76 以上） | `make db-backup`（`make test-api` のバックアップのテストも動かす） | 全員 |
 | PostgreSQL のクライアント（psql・pg_dump・pg_restore） | 17（サーバーと同じ版。古い版の pg_dump は 17 のサーバーに使えない） | `make test-api` のバックアップのテスト、バックアップの復元の確認（05 6.2） | 全員 |
 
 ### アカウント（デプロイ時に必要。ローカル開発は GitHub だけでよい）
@@ -196,7 +197,7 @@ make infra-apply ENV=staging    # 適用
 | 対象 | 誰が変えるか |
 |---|---|
 | `infra/terraform/`（`shared`・`staging`・`production`） | 人が PR に `make infra-plan` の結果を貼り、マージ後に `make infra-apply` を手で動かす。CI は Terraform を動かさない |
-| Cloud Run のイメージ（リビジョン）とトラフィック | イメージは CI（`deploy.yml` の `make deploy-api`）。トラフィックは、緊急時だけ人が `gcloud` で変える（04 5.2）。Terraform はどちらの変更も無視する（`lifecycle.ignore_changes`。ADR-015） |
+| Cloud Run のイメージ（リビジョン）とトラフィック | イメージは CI（`deploy.yml` の `make deploy-api`）。トラフィックは、緊急時だけ人が `gcloud` で変える（04 5.2）。Terraform はどちらの変更も無視する（`lifecycle.ignore_changes`。`gcloud run deploy` が書くほかの値も含めて、無視するものの一覧は ADR-015） |
 | Cloud Run のそれ以外の設定（環境変数・シークレットの参照・台数・メモリ） | Terraform。緊急で `gcloud` から変えたら、あとで Terraform にも同じ変更を入れる（入れないと次の apply で戻る） |
 | Web の静的ファイル | CI（`build.yml` の `make build-api-image` が Web もビルドして API のイメージに入れる。ADR-004） |
 | Cloud Run のドメインマッピング（`{DOMAIN}`・`stg.{DOMAIN}`） | Terraform（環境ごと。正は [SDD 2章「インフラ管理」](02-01_system-design-doc.md#インフラ管理)） |
@@ -268,7 +269,7 @@ make infra-apply ENV=staging    # 適用
 
 - [ ] 組織とプロジェクト `moonx-web` / `moonx-api` を作る（ADR-023）
 - [ ] 各プロジェクトの DSN を控える。どちらも Cloud Run の環境変数で、Terraform の変数として入れる（I）。`moonx-api` は API の DSN、`moonx-web` は API が画面に渡す Web の DSN（環境変数の名前の正は [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数)）
-- [ ] ソースマップのアップロード用の Auth Token を作る（`SENTRY_AUTH_TOKEN`。リポジトリのシークレット。H。置き場所の正は [SDD 2章「CI のシークレットと変数」](02-01_system-design-doc.md#環境変数)）
+- [ ] ソースマップのアップロード用の Auth Token を、組織の Auth Token（Organization Token）で作る（`SENTRY_AUTH_TOKEN`。リポジトリのシークレット。H。組織の名前はトークンに入っているので、`make build-api-image` は組織を渡さない。置き場所の正は [SDD 2章「CI のシークレットと変数」](02-01_system-design-doc.md#環境変数)）
 - [ ] 新しい issue のメール通知と、急増の抑制（Spike Protection）を ON にする
 
 #### E. Neon（コンソールで操作する）
@@ -323,7 +324,8 @@ make infra-apply ENV=staging    # 適用
 
 `shared` が作るものは [SDD 2章「インフラ管理」](02-01_system-design-doc.md#インフラ管理)（Google Cloud の共有の資源）。環境ごとの Terraform（I）より先に動かす。
 
-- [ ] `infra/terraform/envs/shared/` の変数に、秘密でない値を入れる（`{GCP_PROJECT_ID}`・請求先アカウントの ID・アラートの通知先のメール・GitHub のリポジトリ `<org>/moonx` など）
+- [ ] `infra/terraform/envs/shared/terraform.tfvars`（Terraform が自動で読む）に、秘密でない値を書く。変数は同じディレクトリの `variables.tf`: `project_id`（`{GCP_PROJECT_ID}`）・`billing_account_id`（請求先アカウントの ID）・`alert_email`（アラートと予算の通知先のメール）・`github_repository`（`<org>/moonx`）
+- [ ] 請求先アカウントの通貨が米ドルであることを確かめる（`gcloud billing accounts describe <BILLING_ACCOUNT_ID> --format='value(currencyCode)'`）。予算は SDD 11章の米ドルの金額で作り、Budget の API は請求先アカウントと違う通貨を受け付けない。米ドルでなければ、金額をユーザーと決めて SDD 11章と Terraform を直す
 - [ ] `make infra-plan ENV=shared` で差分を読み、`make infra-apply ENV=shared`
 - [ ] できたものを確かめる
 
@@ -334,14 +336,14 @@ make infra-apply ENV=staging    # 適用
 
   gcloud iam workload-identity-pools list --location=global
   gcloud iam workload-identity-pools providers list \
-    --workload-identity-pool=<POOL_ID> --location=global \
+    --workload-identity-pool=github --location=global \
     --format="value(name,attributeCondition)"
   gcloud iam service-accounts list --format="value(email)"
   ```
 
   - バックアップのバケットが公開されない設定になっていること（05 6.2）
   - 予算アラートの金額が SDD 11章のとおりであること
-  - WIF の `attributeCondition` が、このリポジトリ（`<org>/moonx`）の `main` で動くワークフローに限っていること（`assertion.repository == '<org>/moonx' && assertion.ref == 'refs/heads/main'`。ADR-027）。プロバイダの `name` とデプロイ用のサービスアカウントのメールは、リポジトリの変数 `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` に入れる（H。鍵は作らない。ADR-027）
+  - WIF の `attributeCondition` が、このリポジトリ（`<org>/moonx`）の `main` で動くワークフローに限っていること（`assertion.repository == '<org>/moonx' && assertion.ref == 'refs/heads/main'`。ADR-027）。プロバイダの `name` とデプロイ用のサービスアカウントのメール（`make infra-apply ENV=shared` が最後に出す output の `workload_identity_provider`・`deploy_service_account`）は、リポジトリの変数 `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` に入れる（H。鍵は作らない。ADR-027）
 
 - [ ] Resend の画面でドメインの確認（Verify）が通ったことを確かめる
 
@@ -405,7 +407,7 @@ make infra-apply ENV=staging    # 適用
 
 初回は API のイメージとシークレットの値がまだ無いので、2回に分ける（ADR-015）。1回目でシークレットの入れ物などを作り、値とイメージを入れてから、2回目で Cloud Run を作る。
 
-1. - [ ] `infra/terraform/envs/staging/` の変数に、秘密でない値を入れる（`{GCP_PROJECT_ID}`・`{DOMAIN}`・`GOOGLE_CLIENT_ID`・API と Web の Sentry の DSN（D）・staging の `MAIL_ALLOWLIST` など）と、`bootstrap = true`
+1. - [ ] `infra/terraform/envs/staging/terraform.tfvars` に、秘密でない値を書く（変数は同じディレクトリの `variables.tf`: `project_id`（`{GCP_PROJECT_ID}`）・`domain`（`{DOMAIN}`。staging も `stg.` を付けない）・`google_client_id`・`sentry_dsn` と `web_sentry_dsn`（D）・staging だけ `mail_allowlist`）と、`bootstrap = true`。production は `uptime_check_enabled = false` も書く（6）
 2. - [ ] 1回目: `make infra-plan ENV=staging` で差分を読み、`make infra-apply ENV=staging`（シークレットの入れ物・サービスアカウント・写真のバケットができる。Cloud Run はまだ作らない）
 3. - [ ] シークレットの値を入れる（下の「シークレットの値」）
 4. - [ ] API のイメージがあることを確かめる。H のあとで `main` にマージすると、`build.yml` が作って Artifact Registry に置く（`build.yml` はリポジトリの変数の WIF で入る。H。production は staging と同じイメージを使う）
@@ -415,7 +417,7 @@ make infra-apply ENV=staging    # 適用
      asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api --include-tags
    ```
 
-5. - [ ] 2回目: `bootstrap = false` と、変数 `api_image` に 4 のイメージを入れて `make infra-apply ENV=staging`。Cloud Run `moonx-api-staging` と、ドメインマッピング `stg.{DOMAIN}`（production は `{DOMAIN}`）ができる。ドメインマッピングは、A で `dwnfrc.app` の所有を確かめたアカウントで動かす。以後のイメージは CI が出す（ADR-015）
+5. - [ ] 2回目: `bootstrap = false` と、変数 `api_image` に 4 のイメージを入れて `make infra-apply ENV=staging`。`api_image` は以後も消さない（Cloud Run があると、空なら plan が止まる。Terraform はイメージの変更を無視するので、値は最初のイメージのままでよい）。サービスを作り直すとき（04 5.5 など）は、今出ている版のイメージに書き換えてから apply する（最初のイメージは ADR-007 の決まりで消えていることがある）。Cloud Run `moonx-api-staging` と、ドメインマッピング `stg.{DOMAIN}`（production は `{DOMAIN}`）ができる。ドメインマッピングは、A で `dwnfrc.app` の所有を確かめたアカウントで動かす。以後のイメージは CI が出す（ADR-015）
 6. - [ ] アラートを付ける環境（SDD 11章）だけ: Terraform が作った稼働時間チェックとアラートが、G の通知のチャンネル（メール）に向いていることを Cloud Monitoring の画面で確かめる（05 2章）。稼働時間チェックはドメインを開くので、J で証明書ができるまでは失敗する。最初の構築では変数 `uptime_check_enabled = false` で作らずにおき、J のあとで有効にする
 
 **シークレットの値（Secret Manager）**

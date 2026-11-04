@@ -69,8 +69,8 @@
 
 | 対象 | 管理方法 |
 |---|---|
-| Google Cloud の環境ごとの資源（Cloud Run・Cloud Run のドメインマッピング（`{DOMAIN}`・`stg.{DOMAIN}`）・Secret Manager・写真のバケット・サービスアカウント。Monitoring のアラートは production だけ。11章） | **Terraform**（`infra/terraform/envs/{staging,production}/`） |
-| Google Cloud の共有の資源（Artifact Registry のリポジトリ `moonx`・Workload Identity Federation・バックアップのバケット `{GCP_PROJECT_ID}-moonx-backups`・予算アラートと通知のチャンネル） | **Terraform**（`infra/terraform/envs/shared/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`） |
+| Google Cloud の環境ごとの資源（Cloud Run・Cloud Run のドメインマッピング（`{DOMAIN}`・`stg.{DOMAIN}`）・Secret Manager・写真のバケットと、それに書く独自のロール（ADR-024）・API のサービスアカウント。Monitoring のアラートは production だけ。11章） | **Terraform**（`infra/terraform/envs/{staging,production}/`） |
+| Google Cloud の共有の資源（Artifact Registry のリポジトリ `moonx`・Workload Identity Federation と、CI が入るデプロイ用のサービスアカウント `moonx-deploy`・バックアップのバケット `{GCP_PROJECT_ID}-moonx-backups` と、それに書く独自のロール（ADR-028）・予算アラートと通知のチャンネル） | **Terraform**（`infra/terraform/envs/shared/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`） |
 | `dwnfrc.app` の DNS のレコード（Web の CNAME 2つ（`{DOMAIN}`・`stg.{DOMAIN}` → `ghs.googlehosted.com`）、Resend の MX と TXT、DMARC の TXT、Search Console の所有の確認の TXT） | **Vercel の画面で手で入れる**（`dwnfrc.app` は Vercel で登録し、DNS も Vercel。Vercel のトークンはチームの全プロジェクトを触れるので、Terraform にも手元にも持たせない。手順は 03_dev-setup.md） |
 | Search Console での `dwnfrc.app` の所有の確認 | ドメインマッピングを作る Google のアカウント（`make infra-apply` を動かすアカウント）で確認する（03_dev-setup.md） |
 | Google の OAuth の同意画面とクライアント | Google Cloud のコンソール（Terraform では作れないため。手順は 03_dev-setup.md） |
@@ -157,6 +157,8 @@ GitHub の環境は3つとも `main` からだけ使える。Google Cloud への
 | `WEB_SENTRY_DSN` | api | Sentry（Web。プロジェクト `moonx-web`）。API が Web の HTML の meta 要素 `moonx-sentry-dsn` で渡し、そのオリジンを CSP の `connect-src` に入れる（ADR-004・7.2）。http か https の URL でないとき、ホストに英数字・ハイフン・ドット以外の文字があるときは起動しない | 空（local の Web は Sentry に送らない） | Cloud Run の環境変数（`SENTRY_DSN` と同じく Terraform の環境ごとの変数で入れる） |
 | `LOG_LEVEL` | api | `debug` / `info` / `warn` / `error`（それ以外の値では起動しない） | `debug` | `info` |
 
+`NODE_ENV` はどの環境でも設定しない（イメージにも入れない）。`production` にすると、Elysia（Bun のサーバーの開発モードと入力の検査のエラーの中身）・Better Auth・React が本番用の分岐に切り替わるが、テスト（`bun test` は `test` にする）と e2e はその分岐を通らないため、確かめた分岐のまま動かす。
+
 API は値の前後の空白を除き、空の値（空白だけの値を含む）を未設定として扱う。local で未設定の `BETTER_AUTH_URL`・`TRUSTED_ORIGINS`・`MAIL_TRANSPORT`・`MAIL_FROM`・`LOG_LEVEL` には、上の表の「local の値」を使う。staging・production で未設定の `LOG_LEVEL` は `info` にする（ほかの4つは必須）。
 
 `.env` はリポジトリの直下に1つ置く。`make setup` が `.env.example` をコピーする。直下の `.env` は Makefile が読み込んで各コマンドに渡し、Vite は `envDir` をリポジトリの直下にする。Web はビルドに環境ごとの値を持たない（環境名と Sentry の DSN は、API が返す HTML から読む。local の Vite の開発サーバーでは meta 要素が無いので、環境名は `local`、Sentry は使わない）。
@@ -180,8 +182,8 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `dev` | API と Web を同時に起動（`dev-api` と `dev-web`） |
 | `dev-api` / `dev-web` | それぞれを単独で起動 |
 | `build` | 全パッケージの型チェックとビルド |
-| `build-web SHA=...` | Web をビルドする。環境ごとの値は入れないので、1回のビルドを両方の環境で使う。入れるのは Sentry の `release` に使う版（SHA。省くと `dev`）だけ。`build-api-image` が使う。ルートごとの分割を検査し、殻の画面（`_shell.html`）から `/login` のルートの分の読み込みを外す（7.3） |
-| `build-api-image SHA=...` | `build-web` の結果と API を1つの Docker イメージにまとめて Artifact Registry に上げ、Web と API のソースマップを Sentry の `moonx-web`・`moonx-api` に上げる（`release` = SHA）。`build.yml` が `make test` の後に使う（04_deployment-procedure.md 2章） |
+| `build-web SHA=...` | Web をビルドする。環境ごとの値は入れないので、1回のビルドを両方の環境で使う。入れるのは Sentry の `release` に使う版（SHA。省くと `dev`）だけ。`build-api-image` が使う。ルートごとの分割を検査し、殻の画面（`_shell.html`）から `/login` のルートの分の読み込みを外す（7.3）。Sentry に上げるソースマップも作る（どのファイルもソースマップを指さない）。`assets/` のスクリプトには、Sentry がソースマップを中身で引き当てるための debug ID を入れる（`sentry-cli sourcemaps inject`。テストもこのスクリプトで動く） |
+| `build-api-image SHA=...` | `build-web` の結果と API を1つの Docker イメージ（`apps/api/Dockerfile`。linux/amd64）にまとめて Artifact Registry に上げ、Web と API のソースマップを Sentry の `moonx-web`・`moonx-api` に上げる（`release` = SHA。ソースマップはイメージに入れない）。API は1つのファイルにバンドルし（`make build` と同じ。debug ID を入れる）、バンドルに入れられない sharp（ネイティブのライブラリ）と react-pdf（中の pdfkit が標準の書体を実行時に自分のパッケージから読む）と React は、イメージに入れた API の本番の依存から読む。ソースマップの無いイメージを上げないよう、ソースマップを上げてからイメージを上げ（push の前に、Docker に Artifact Registry の認証を設定する。`gcloud auth configure-docker`）、`SENTRY_AUTH_TOKEN` が無ければイメージを作る前に止まる。`build.yml` が `make test` の後に使う（04_deployment-procedure.md 2章） |
 | `test` | `test-domain`・`test-api`・`test-web` をまとめて実行 |
 | `test-domain` / `test-api` / `test-web` | 単体・結合テスト。`test-domain` は `packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`（生成スクリプトと検査のテスト）・`scripts/`（画面の検査・`db-check`・`promote`・`promote-check`）、`test-api` は `apps/api` と `packages/db`（どちらも `DATABASE_URL_TEST` の DB を作り直し、マイグレーションを当てて使う）、`test-web` は `apps/web`・`packages/ui-web` |
 | `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して。DB は実行のたびに作り直してデモデータを入れる（`e2e/global-setup.ts`）。PWA の検査（`e2e/pwa.spec.ts`）は、先に `build-web SHA=dev` でビルドした Web を API から返す形で起動する）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
@@ -203,7 +205,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `deploy-api ENV=... SHA=...` | マイグレーションの後、Cloud Run に新しいリビジョンを出す（イメージに Web も入っているので、Web もこれで出る。CI が使う）。戻すときは戻し先の古い版のこのターゲットが動くので、引数と、読む環境変数・シークレットの名前を変えるときは、戻せる版でも動くように段階を分ける（04_deployment-procedure.md 4.1） |
 | `promote ENV=... [SHA=...]` | 昇格の PR（戻すときも同じ。ADR-016）を手元から作る。まず `git fetch origin` し、作業ツリーに変更が無く、`main` が `origin/main` と同じことを確かめる。`SHA` は短い形でもよく、完全な SHA に直して使う。省くと、staging は `deploy/` 以外を変えた `main` の最新のコミット、production は今の `deploy/staging/version`。省いた SHA が、今の版より古い（戻すことになる）か、その環境で前に戻した版（その環境の履歴にあって、今の版より新しい）なら、止めて `SHA` の指定を求める。確かめること: SHA が今の版と違う。その `build.yml` が成功し（gh）、イメージが Artifact Registry にある（gcloud）。production なら、その SHA を `deploy/staging/version` に書いたコミットの `deploy.yml` が成功している（gh）。そのあとブランチ `promote/{env}-<SHA の先頭7文字>` を作り（同じ名前のブランチが手元か origin に残っていれば、それを使う PR が開いているときは止め、そうでなければ消してから作る）、`deploy/{env}/version` を書いて（無ければ作る）コミットし、`promote-check BASE=origin/main` が通ったら push して PR を開く（gh）。件名は 03_dev-setup.md 9章「コミットメッセージ」の形（進めるときは promote、戻すときは roll back）。本文には、今の版と出す版の SHA・コミットの一覧・マイグレーションの一覧・戻し方（今の版の SHA で `promote` を動かす）を入れる。一覧の範囲は、いちばん先まで出した版（04_deployment-procedure.md 4.1）で決める。出す版がそれより新しいときは、コミットは今の版から出す版まで、マイグレーションはいちばん先まで出した版より後のもの（この昇格で新しく当たるもの）。古いときは、どちらも出す版から、いちばん先まで出した版まで（DB に当たっていて出す版に無いもの）とし、出す版が直前の版（同 4.1）かどうかも書く。その環境の前回の `deploy.yml`（今の版を書いたコミットのもの）が成功していなければ、本文の先頭にそう書き、Cloud Run で動いている版の SHA も出す（gcloud）。最初の昇格（今の版が無い）では、今の版は「なし」とし、コミットの一覧は省き、マイグレーションはすべて出す（04_deployment-procedure.md 4.2・5.1） |
 | `promote-check BASE=...` | `BASE` から `HEAD` までの差分のうち `deploy/` を検査する。`deploy/` を変えていなければ何もしない。変えていれば、次をすべて満たさないと失敗する: 変えたファイルは `deploy/staging/version` か `deploy/production/version` のどちらか1つだけで、ほかのファイルを一緒に変えていない（消してもいない）。中身は完全な SHA が1行で、`BASE` の時点の `main` にあるコミット。その SHA が `BASE` の時点のその環境の版より古い（戻す）なら、その環境の `deploy/{env}/version` に `BASE` までに書かれたことがある（`BASE` にその環境のファイルが無ければ、この条件は無い）。production なら、`deploy/staging/version` に `BASE` までに書かれたことがある。`ci.yml`（`BASE` は、PR を検査するマージのコミットの1つ目の親）・`deploy.yml`（`BASE` は push の前のコミット）・`promote` が使う（04_deployment-procedure.md 2章） |
-| `db-backup ENV=...` | `pg_dump -Fc` を取り、`gs://{GCP_PROJECT_ID}-moonx-backups/{env}/<日付>.dump` に上げる（バケットは30日で自動削除。定期実行の GitHub Actions が使う。05_operation-runbook.md） |
+| `db-backup ENV=...` | `pg_dump -Fc` を取り、`gs://{GCP_PROJECT_ID}-moonx-backups/{env}/<日付>.dump`（日付は UTC）に上げる（バケットは30日で自動削除。定期実行の GitHub Actions が使う。05_operation-runbook.md）。ダンプはいったんファイルに書き、取れたときだけ、Cloud Storage の JSON API に1回で上げる（`gcloud auth print-access-token` のトークン）。`gcloud storage cp` は上げる前に宛先のオブジェクトを読むので、読む権限を持たないサービスアカウント（ADR-028）では使えない |
 
 Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infra-plan`・`infra-apply`・`db-backup`）は、プロジェクトを `gcloud config` のプロジェクトから取る（`GCP_PROJECT_ID=...` で上書きできる）。空なら動かずに止まる。Terraform のプロジェクト ID は各 `envs` の変数に書き（03_dev-setup.md 5.4）、make はこの値を tfstate のバケットの名前（`{GCP_PROJECT_ID}-tfstate`）にだけ使う（backend は変数を読めないため）。
 
@@ -447,7 +449,7 @@ Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infr
 
 **状態・日付:** 採用（2026-10-01。2026-10-03 に Cloudflare の設定を外し、Cloud Run のドメインマッピングを足した。ユーザーの決定）
 
-**決定:** Google Cloud の資源を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート）、`staging` / `production` は環境ごとの資源で、Cloud Run のドメインマッピング（production は `{DOMAIN}`、staging は `stg.{DOMAIN}`）もここに含む（2章「インフラ管理」）。Cloud Run のイメージは CI が出し、緊急時はトラフィックを人が CLI で前のリビジョンに向ける（04_deployment-procedure.md 5.2）ので、Terraform は `image` と `traffic` の変更を無視する（`lifecycle.ignore_changes`。無視しないと、緊急で戻したあとの apply がトラフィックを悪い版に戻す）。初回は、イメージとシークレットの値がまだ無いので、環境ごとに変数 `bootstrap` で apply を2回に分ける。1回目（`bootstrap = true`）はシークレットの入れ物・サービスアカウント・写真のバケットだけを作り、Cloud Run とドメインマッピングは作らない。2回目（`bootstrap = false` と、最初のイメージを入れた変数 `api_image`）で Cloud Run とドメインマッピングを作る。最初のイメージも `build.yml` が作る（手元では作らない。05_operation-runbook.md）。手順は 03_dev-setup.md 5.4 の G〜I。DNS のレコードは Terraform で持たず、Vercel の画面で手で入れる（Vercel のトークンはチームの全プロジェクトを触れるので、Terraform にも手元にも持たせない）。ドメインマッピングを作るには、`make infra-apply` を動かすアカウントが Search Console で `dwnfrc.app` の所有を確認している必要がある。コンソールで管理するもの（Terraform の外）は2章「インフラ管理」の表が正。
+**決定:** Google Cloud の資源を Terraform で管理する（`infra/terraform/modules/` と `envs/{shared,staging,production}/`。状態は Cloud Storage のバケット `{GCP_PROJECT_ID}-tfstate`）。`shared` は環境をまたぐ資源（Artifact Registry・Workload Identity Federation・バックアップのバケット・予算アラート）、`staging` / `production` は環境ごとの資源で、Cloud Run のドメインマッピング（production は `{DOMAIN}`、staging は `stg.{DOMAIN}`）もここに含む（2章「インフラ管理」）。Cloud Run のイメージは CI が出し、緊急時はトラフィックを人が CLI で前のリビジョンに向ける（04_deployment-procedure.md 5.2）ので、Terraform は `image` と `traffic` の変更を無視する（`lifecycle.ignore_changes`。無視しないと、緊急で戻したあとの apply がトラフィックを悪い版に戻す）。`make deploy-api` の `gcloud run deploy` がサービスに書く `client`・`client_version` と、新しいリビジョンに付ける nonce のラベル（`client.knative.dev/nonce`）も無視する（Terraform はリビジョンのラベルを持たないので、リビジョンのラベルはすべて無視する。無視しないと、apply のたびにラベルを消した新しいリビジョンができる）。無視するものを足すときは、この段落にも理由と一緒に書く（足した分は、月1回のずれの確認（05_operation-runbook.md 6.1）でも見えなくなる）。初回は、イメージとシークレットの値がまだ無いので、環境ごとに変数 `bootstrap` で apply を2回に分ける。1回目（`bootstrap = true`）はシークレットの入れ物・サービスアカウント・写真のバケットだけを作り、Cloud Run とドメインマッピングは作らない。2回目（`bootstrap = false` と、最初のイメージを入れた変数 `api_image`）で Cloud Run とドメインマッピングを作る。最初のイメージも `build.yml` が作る（手元では作らない。05_operation-runbook.md）。手順は 03_dev-setup.md 5.4 の G〜I。DNS のレコードは Terraform で持たず、Vercel の画面で手で入れる（Vercel のトークンはチームの全プロジェクトを触れるので、Terraform にも手元にも持たせない）。ドメインマッピングを作るには、`make infra-apply` を動かすアカウントが Search Console で `dwnfrc.app` の所有を確認している必要がある。コンソールで管理するもの（Terraform の外）は2章「インフラ管理」の表が正。
 
 **理由:** ユーザーが Terraform を選んだ。環境を作り直せて、設定の変更をレビューできる。
 
@@ -599,13 +601,13 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 **状態・日付:** 採用（2026-10-01）
 
-**決定:** 4 アカウント設定の写真は、API が受け取って sharp（libvips）で 512×512 の WebP に縮め、Cloud Storage のバケット `{GCP_PROJECT_ID}-moonx-{env}-avatars`（公開読み取り、ファイル名は推測できない乱数）に置く。URL を `users.avatar_url` に入れる。API は Cloud Storage の JSON API を直接呼び、Cloud Run のサービスアカウントのトークン（メタデータサーバーから取る）で写真を書き込み、消す（Google のクライアントライブラリは使わない。呼ぶのは2つだけのため）。そのため、このバケットでは API のサービスアカウントにオブジェクトの作成と削除を許し、公開読み取りは `allUsers` にオブジェクトの閲覧だけを許す。local はバケットを使わず、ディスク（`./.data/avatars`。API の作業ディレクトリから数える）に置いて、API が `GET /api/avatars/{name}`（U9。公開）で返す。
+**決定:** 4 アカウント設定の写真は、API が受け取って sharp（libvips）で 512×512 の WebP に縮め、Cloud Storage のバケット `{GCP_PROJECT_ID}-moonx-{env}-avatars`（公開読み取り、ファイル名は推測できない乱数）に置く。URL を `users.avatar_url` に入れる。API は Cloud Storage の JSON API を直接呼び、Cloud Run のサービスアカウントのトークン（メタデータサーバーから取る）で写真を書き込み、消す（Google のクライアントライブラリは使わない。呼ぶのは2つだけのため）。そのため、このバケットでは API のサービスアカウントにオブジェクトの作成と削除だけを許し（その2つの権限の独自のロール）、公開読み取りは `allUsers` にオブジェクトの閲覧だけを許す（`roles/storage.legacyObjectReader`。`roles/storage.objectViewer` は一覧も許し、誰でも乱数のファイル名を知れてしまう）。消した写真はすぐに消えるよう、Cloud Storage の論理削除（soft delete。既定では7日残す）は使わない。local はバケットを使わず、ディスク（`./.data/avatars`。API の作業ディレクトリから数える）に置いて、API が `GET /api/avatars/{name}`（U9。公開）で返す。
 
 **理由:** 写真は任意で小さいので、費用は月 $0.1 未満（Cloud Storage の無料枠は米国の3リージョンだけなので、asia-southeast1 のバケットには少しかかる）。バケット名は全体で一意なので、ほかのバケットと同じくプロジェクト ID を前に付ける。
 
 **捨てた案:** Cloudflare R2（無料枠はあるが、API から書き込む鍵を Cloud Run に置き、もう1つの保存先を管理することになる）、クライアントだけで縮める（のちのネイティブでもう一度作ることになる）。
 
-**トレードオフ:** 公開読み取りなので、URL を知っていれば誰でも見られる（プロフィール写真なので許容する。乱数のファイル名で推測を防ぐ）。sharp はネイティブのライブラリで、Bun で動くことはプロトタイプのテストで確かめた。`oven/bun` のコンテナの中で動くことは、最初のイメージを作るときに確かめる。
+**トレードオフ:** 公開読み取りなので、URL を知っていれば誰でも見られる（プロフィール写真なので許容する。乱数のファイル名で推測を防ぐ）。sharp はネイティブのライブラリで、バンドルに入れられない（`make build-api-image` は sharp を API の本番の依存としてイメージに入れる。2章「make ターゲット」）。Bun で動くことはプロトタイプのテストで、`oven/bun` のイメージ（`apps/api/Dockerfile` の linux/amd64）の中で 512×512 の WebP に変換できることは、手元で作ったイメージで確かめた（2026-11-04）。
 
 ### ADR-025: 部品は headless の部品＋自前のスタイル。Tailwind は使わない（ユーザー指定）
 
@@ -652,7 +654,7 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 **状態・日付:** 採用（2026-10-01）
 
-**決定:** 定期実行の GitHub Actions（`db-backup.yml`。環境 `production-backup`）が毎日1回、production の DB を読み取り専用のロール `moonx_backup_ro` で `pg_dump -Fc` し、`gs://{GCP_PROJECT_ID}-moonx-backups/production/<日付>.dump` に上げる（`make db-backup ENV=production`）。バケットは30日で自動削除する。戻し方と、戻す練習（頻度を含む）は 05_operation-runbook.md。
+**決定:** 定期実行の GitHub Actions（`db-backup.yml`。環境 `production-backup`）が毎日1回、production の DB を読み取り専用のロール `moonx_backup_ro` で `pg_dump -Fc` し、`gs://{GCP_PROJECT_ID}-moonx-backups/production/<日付>.dump` に上げる（`make db-backup ENV=production`）。バケットは30日で自動削除する（Cloud Storage の論理削除（soft delete）は使わない。使うと消したファイルが既定で7日残り、7.2「個人情報」の30日を超える）。書き込みに使うサービスアカウント（`build.yml` などと同じ。2章「CI のシークレットと変数」）には、オブジェクトの作成と削除だけを許す（同じ日に手で取り直すと上書きになり、削除の権限が要る。読む権限は運用の担当だけが持つ。05_operation-runbook.md 6.2）。戻し方と、戻す練習（頻度を含む）は 05_operation-runbook.md。
 
 **理由:** 標準の `pg_dump` なら、DB を乗り換えても同じ方法で取れて戻せる（ADR-008）。
 

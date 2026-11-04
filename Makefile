@@ -51,7 +51,7 @@ require = $(if $($(1)),,$(error $(1) is required: make $@ $(1)=...))
 require-project = $(if $(GCP_PROJECT_ID),,$(error No Google Cloud project: run gcloud config set project, or make $@ GCP_PROJECT_ID=...))
 require-env = $(if $(and $(filter 1,$(words $(ENV))),$(filter $(1),$(ENV))),,$(error ENV must be one of: $(1)))
 
-.PHONY: install setup dev dev-api dev-web build build-web build-api-image \
+.PHONY: install setup env-file dev dev-api dev-web build build-web build-api-image \
 	test test-domain test-api test-web test-e2e coverage first-paint lint format \
 	typecheck db-up db-down db-generate db-check db-migrate db-seed db-reset \
 	db-studio tokens openapi kpi doc-lint admin-create infra-plan infra-apply \
@@ -61,14 +61,17 @@ install:
 	bun install --frozen-lockfile
 
 # Git hooks are wired right after .env, so they work even if a later step fails.
-setup: install
-	bun scripts/setup-env.ts
+setup: install env-file
 	git config core.hooksPath .githooks
 	$(MAKE) db-up
 	$(MAKE) db-migrate
 	$(MAKE) db-seed
 	$(MAKE) tokens
 	$(BUNX) playwright install chromium
+
+# CI uses it too, so tests there see the same local values as a developer's.
+env-file:
+	bun scripts/setup-env.ts
 
 dev:
 	$(MAKE) -j2 dev-api dev-web
@@ -155,9 +158,12 @@ first-paint:
 	MOONX_FIRST_PAINT=1 $(BUNX) playwright test --config=e2e/playwright.config.ts \
 		--project=first-paint
 
+# actionlint runs ShellCheck over the workflows' scripts when it is on PATH, as it is on
+# GitHub's runners (03_dev-setup.md 10章).
 lint:
 	$(BUNX) biome check .
 	bun scripts/check-screens.ts apps/web/src
+	$(BUNX) actionlint
 
 format:
 	$(BUNX) biome check --write --linter-enabled=false .
@@ -205,7 +211,9 @@ openapi:
 
 kpi:
 	$(call require-env,staging production)
-	psql "$$DATABASE_URL_DIRECT" --no-psqlrc --set=ON_ERROR_STOP=1 --file=packages/db/queries/kpi.sql
+	$(if $(CHECK_WORKSPACE_ID),,$(error CHECK_WORKSPACE_ID is required: the ID of the workspace kept for the post-deploy checks (03_dev-setup.md 5.4 K)))
+	psql "$$DATABASE_URL_DIRECT" --no-psqlrc --quiet --set=ON_ERROR_STOP=1 \
+		--set=check_workspace_id="$$CHECK_WORKSPACE_ID" --file=packages/db/queries/kpi.sql
 
 doc-lint:
 	scripts/doc-lint.sh --docs
@@ -236,9 +244,11 @@ deploy-api:
 	gcloud run deploy moonx-api-$(ENV) --image=$(IMAGE):$(SHA) --project=$(GCP_PROJECT_ID) \
 		--region=$(REGION) --quiet
 
+# gcloud looks for the image and, after a failed deployment, the running version.
 promote:
 	$(call require-env,staging production)
-	bun scripts/promote.ts $(ENV) $(SHA)
+	$(call require-project)
+	GCP_PROJECT_ID=$(GCP_PROJECT_ID) bun scripts/promote.ts $(ENV) $(SHA)
 
 promote-check:
 	$(call require,BASE)

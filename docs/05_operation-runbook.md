@@ -533,7 +533,7 @@ gcloud run services describe moonx-api-production --region=asia-southeast1 --for
 | DB のバックアップの確認 | 週1回 | `db-backup.yml` が毎回成功し、バケットにファイルが増えているか（6.2） |
 | バックアップを戻す練習 | 四半期に1回 | 6.2 の「戻す練習」 |
 | 使用量・無料枠・ダッシュボードの遅さの確認 | 週1回（Cloud Run の無料枠は月1回の費用の確認で見る） | 2章「定期に見るもの」 |
-| KPI の集計の確認 | 月1回 | `kpi.yml` の月1回の実行が成功しているかを見て（`gh run list --workflow=kpi.yml --limit=1`）、実行の要約の件数を運営者に渡す（04 2章・SDD 11章）。失敗していたら `gh run view <RUN_ID> --log-failed` で原因を見る（接続の失敗なら 6.2 と同じ確かめ方） |
+| KPI の集計の確認 | 月1回 | `kpi.yml` の月1回の実行が成功しているかを見て（`gh run list --workflow=kpi.yml --limit=1`）、実行の要約の件数を運営者に渡す（04 2章・SDD 11章）。失敗していたら `gh run view <RUN_ID> --log-failed` で原因を見る（接続の失敗なら 6.2 と同じ確かめ方。`CHECK_WORKSPACE_ID` が空・UUID でないと止まるので、そのときは 03 5.4 K のとおり入れ直す） |
 | `change_history` の増え方 | 月1回 | 3.3 の SQL で大きさを見る。前の月からの増え方で、無料プランの容量（ADR-008）に届く時期を見積もる。近ければ Neon の有料プランか移行を決める（ADR-008） |
 | Sentry の issue の棚卸し | 週1回 | 新しい issue・増えている issue を見て、直すか無視するかを決める |
 | Artifact Registry の整理 | 月1回 | 古いイメージが自動で消えているか確かめる（下）。`deploy/staging/version`・`deploy/production/version` の SHA と、それぞれの直前の版（いちばん使う戻し先。04 4.1）が消えていないこと |

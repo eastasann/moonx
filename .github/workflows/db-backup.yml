@@ -1,0 +1,46 @@
+# The daily pg_dump of production (ADR-028, 04_deployment-procedure.md 2章). How to check
+# and restore one: 05_operation-runbook.md 6.2.
+name: db-backup
+
+on:
+  schedule:
+    # 02:17 in Manila, after the day's use; off the hour, when scheduled runs queue less.
+    - cron: "17 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# GitHub runs bash with pipefail only when the shell is named.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    # The read-only connection (moonx_backup_ro) is this environment's DATABASE_URL_DIRECT.
+    environment: production-backup
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # PostgreSQL 17's psql, pg_dump and pg_restore first on PATH: the runner's own client
+      # is older, and an older pg_dump refuses a 17 server (SDD 10章).
+      - name: PostgreSQL 17 client
+        run: |
+          sudo apt-get install --yes --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install --yes --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - run: make db-backup ENV=production
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}

@@ -93,12 +93,13 @@ moonx/
 ├─ packages/
 │  ├─ domain/     計算・確認項目・F/A/U・工程・Pitch Deck の組み立て・AI 書き出し / 取り込みの書式（純粋関数）
 │  ├─ schemas/    Zod のスキーマ（API の入出力とフォームの入力チェック）
-│  ├─ db/         Drizzle のスキーマ・マイグレーション・シード・テンプレートの取り込みと公開（AD10・AD6）
+│  ├─ db/         Drizzle のスキーマ・マイグレーション・シード・テンプレートの取り込みと公開（AD10・AD6）・KPI の SQL（queries/kpi.sql。11章）
 │  ├─ i18n/       英語のメッセージカタログと書式（en-PH）
 │  ├─ ui-tokens/  06_design-tokens.json から生成するテーマ（vanilla-extract・react-pdf 用）と PWA のアイコン・マニフェスト（生成物）
 │  └─ ui-web/     Web の部品（React Aria Components ＋ vanilla-extract。design-spec 4.5 の部品）
 ├─ data/templates/bcdx/  BCDX のテンプレートのファイル（AD10 で取り込む。シードも使う。5.13）
 ├─ infra/terraform/  modules/ と envs/{shared,staging,production}/
+├─ .github/       workflows/（CI/CD。04_deployment-procedure.md 2章）と PULL_REQUEST_TEMPLATE.md
 ├─ deploy/{staging,production}/version   デプロイする Git のコミット SHA（環境ごとに、最初の `make promote` が作る）
 ├─ e2e/           Playwright（Web）
 ├─ docker/        ローカルの PostgreSQL の初期化 SQL（docker-compose.yml が使う）
@@ -171,6 +172,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 |---|---|---|
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT`（変数） | リポジトリ | Workload Identity Federation で Google Cloud に入る（鍵を置かない。`main` で動くワークフローだけが入れる。ADR-027）。`build.yml` のイメージの作成、各環境のデプロイ、`db-backup.yml` のバックアップのバケットへの書き込みが使う |
 | `SENTRY_AUTH_TOKEN`（シークレット） | リポジトリ | ソースマップのアップロード（Web と API。`make build-api-image` が上げる。04_deployment-procedure.md 2章） |
+| `CHECK_WORKSPACE_ID`（変数） | `production-backup` | KPI の集計（`make kpi`）から外す、デプロイ後の確認専用のワークスペース（03_dev-setup.md 5.4 K）の ID（11章「KPI の数え方」） |
 | `DATABASE_URL_DIRECT`（シークレット） | `staging` / `production`（マイグレーション）、`production-backup`（バックアップと KPI の集計。production の読み取り専用のロール `moonx_backup_ro` の接続文字列） | マイグレーション、バックアップ、KPI の集計（11章） |
 
 ### make ターゲット
@@ -178,7 +180,8 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | ターゲット | 内容 |
 |---|---|
 | `install` | 依存の取得だけ（`bun install --frozen-lockfile`）。CI が使う |
-| `setup` | `install`、`.env` の雛形のコピー（`BETTER_AUTH_SECRET` が空なら乱数を入れる）、`db-up`、`db-migrate`、`db-seed`、`tokens`、Playwright のブラウザの取得、Git のフックの配線（`git config core.hooksPath .githooks`） |
+| `setup` | `install`、`env-file`、`db-up`、`db-migrate`、`db-seed`、`tokens`、Playwright のブラウザの取得、Git のフックの配線（`git config core.hooksPath .githooks`） |
+| `env-file` | `.env` が無ければ `.env.example` をコピーし、`BETTER_AUTH_SECRET` が空なら乱数を入れる（すでにある `.env` のほかの値は変えない）。`setup` と CI（`ci.yml`・`build.yml`）が使う |
 | `dev` | API と Web を同時に起動（`dev-api` と `dev-web`） |
 | `dev-api` / `dev-web` | それぞれを単独で起動 |
 | `build` | 全パッケージの型チェックとビルド |
@@ -189,7 +192,7 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `test-e2e` | Playwright（Web。`DATABASE_URL_TEST` の DB で API と Web を起動して。DB は実行のたびに作り直してデモデータを入れる（`e2e/global-setup.ts`）。PWA の検査（`e2e/pwa.spec.ts`）は、先に `build-web SHA=dev` でビルドした Web を API から返す形で起動する）。ブラウザ（Chromium）が無ければ先に取得する（CI でも動くように） |
 | `coverage` | 10章のカバレッジの目標を測って比べる。`test-domain` と `test-api` を Bun のカバレッジを付けて動かし（lcov を `coverage/` に書く）、`apps/web` の Vitest を `--coverage` で動かし、`scripts/coverage-check.ts` で `packages/domain/src` と `apps/api/src` のファイルの行と関数を合計して目標と比べる（どのテストも読み込まないファイルがあれば失敗。テストが別のプロセスで動かす入口と再エクスポートだけのファイルは除く）。Web はファイルごとの下限を Vitest が比べる（`apps/web/vitest.config.ts`）。どれかが目標に届かなければ、届かない層と、どのテストも読み込まないファイルを出して失敗する。CI は動かさない |
 | `first-paint` | 7.3「Web の最初の表示」を手元で見積もる（10章）。ブラウザ（Chromium）が無ければ先に取得し、`build-web SHA=dev` でビルドし、Playwright で `e2e/first-paint.spec.ts` を、`test-e2e` の PWA の検査と同じ形（ビルドを `WEB_DIST_DIR` で返すポート 3200 の API だけを起動する）で動かし、ページごとに LCP の中央値を出す。テスト用の DB を作り直してデモデータを入れるのは `test-e2e` と同じ。CPU を手元の機械の4分の1の速さにして測るので、結果は機械で変わる。CI は動かさない |
-| `lint` / `format` / `typecheck` | Biome の検査・整形（`lint` は画面の検査スクリプト `scripts/check-screens.ts` も動かす）、TypeScript の型チェック |
+| `lint` / `format` / `typecheck` | Biome の検査・整形（`lint` は画面の検査スクリプト `scripts/check-screens.ts` と、GitHub Actions のワークフローの検査（actionlint）も動かす）、TypeScript の型チェック |
 | `db-up` / `db-down` | ローカルの PostgreSQL（Docker Compose）の起動・停止 |
 | `db-generate` | Drizzle のスキーマからマイグレーションを作る |
 | `db-check BASE=...` | マイグレーションが足すだけになっているかを、`BASE` から `HEAD` までの差分で検査する。`packages/db/migrations/` の既にあるファイルと `meta/_journal.json` の既にある行を変えていない・消していないこと、足した行の `when` が整数で、`BASE` のどの行よりも大きく、足した行どうしでも増えていくこと（同じ値も失敗）、足した行の `tag` がほかの行と重ならず、`BASE` の後に足した同じ名前の `.sql` のファイルを指すことを確かめる。`BASE` の journal に `when` が整数でない行があれば、比べられないので失敗する。`BASE` に journal が無ければ（最初のマイグレーション）、`when` は `BASE` と比べず、足した行どうしで増えていくことを確かめる（ADR-009）。`ci.yml` が使う（`BASE` は `promote-check` と同じ） |
@@ -198,16 +201,16 @@ e2e（`make test-e2e`）は、開発サーバーと別に API（ポート 3100�
 | `db-studio` | Drizzle Studio |
 | `tokens` | `docs/06_design-tokens.json` から `packages/ui-tokens` を生成する（テーマと、PWA のアイコン・マニフェスト。ADR-018・ADR-031） |
 | `openapi` | API の OpenAPI 仕様を `apps/api/openapi.json` に書き出す。API を変えたら作り直してコミットする。CI（`ci.yml`）が作り直して差分が無いことを確かめる（`tokens` と同じ扱い。04_deployment-procedure.md 2章） |
-| `kpi ENV=...` | `packages/db/queries/kpi.sql`（件数だけを数え、回答の中身は読まない）を `DATABASE_URL_DIRECT` の DB に流し、件数の表を出す（CI では実行の要約に書く）。書き込まないので、読み取り専用の接続で足りる。`kpi.yml` が production の読み取り専用のロールの接続で使う（11章） |
+| `kpi ENV=...` | `packages/db/queries/kpi.sql`（件数だけを数え、回答の中身は読まない）を `DATABASE_URL_DIRECT` の DB に流し、件数の表を出す（CI では実行の要約に書く）。書き込まないので、読み取り専用の接続で足りる。デプロイ後の確認専用のワークスペースの ID を環境変数 `CHECK_WORKSPACE_ID` で受け取り、そのワークスペースの行を数えない（空・UUID でないときは止まる）。`kpi.yml` が production の読み取り専用のロールの接続で使う（11章「KPI の数え方」） |
 | `doc-lint` | ドキュメントと実体の食い違いを検査する（`scripts/doc-lint.sh --docs`: ドキュメントが参照する make ターゲットの実在・`docs/README.md` のリンク切れ・`docs/features/` の命名）。コミットの前の検査（`--staged`）は `.githooks/pre-commit` が動かす |
 | `admin-create EMAIL=...` | 最初の運営者を作るための招待（ワークスペースなし、`grants_admin = true`）を発行し、リンクを表示する。同じメールあての有効な招待があれば、新しいリンクで作り直す。接続先は `DATABASE_URL`、リンクの基準は `BETTER_AUTH_URL`（staging / production では、この2つを上書きして手元から実行する。03_dev-setup.md） |
 | `infra-plan ENV=...` / `infra-apply ENV=...` | Terraform の plan / apply（`ENV` は `shared` / `staging` / `production`） |
 | `deploy-api ENV=... SHA=...` | マイグレーションの後、Cloud Run に新しいリビジョンを出す（イメージに Web も入っているので、Web もこれで出る。CI が使う）。戻すときは戻し先の古い版のこのターゲットが動くので、引数と、読む環境変数・シークレットの名前を変えるときは、戻せる版でも動くように段階を分ける（04_deployment-procedure.md 4.1） |
-| `promote ENV=... [SHA=...]` | 昇格の PR（戻すときも同じ。ADR-016）を手元から作る。まず `git fetch origin` し、作業ツリーに変更が無く、`main` が `origin/main` と同じことを確かめる。`SHA` は短い形でもよく、完全な SHA に直して使う。省くと、staging は `deploy/` 以外を変えた `main` の最新のコミット、production は今の `deploy/staging/version`。省いた SHA が、今の版より古い（戻すことになる）か、その環境で前に戻した版（その環境の履歴にあって、今の版より新しい）なら、止めて `SHA` の指定を求める。確かめること: SHA が今の版と違う。その `build.yml` が成功し（gh）、イメージが Artifact Registry にある（gcloud）。production なら、その SHA を `deploy/staging/version` に書いたコミットの `deploy.yml` が成功している（gh）。そのあとブランチ `promote/{env}-<SHA の先頭7文字>` を作り（同じ名前のブランチが手元か origin に残っていれば、それを使う PR が開いているときは止め、そうでなければ消してから作る）、`deploy/{env}/version` を書いて（無ければ作る）コミットし、`promote-check BASE=origin/main` が通ったら push して PR を開く（gh）。件名は 03_dev-setup.md 9章「コミットメッセージ」の形（進めるときは promote、戻すときは roll back）。本文には、今の版と出す版の SHA・コミットの一覧・マイグレーションの一覧・戻し方（今の版の SHA で `promote` を動かす）を入れる。一覧の範囲は、いちばん先まで出した版（04_deployment-procedure.md 4.1）で決める。出す版がそれより新しいときは、コミットは今の版から出す版まで、マイグレーションはいちばん先まで出した版より後のもの（この昇格で新しく当たるもの）。古いときは、どちらも出す版から、いちばん先まで出した版まで（DB に当たっていて出す版に無いもの）とし、出す版が直前の版（同 4.1）かどうかも書く。その環境の前回の `deploy.yml`（今の版を書いたコミットのもの）が成功していなければ、本文の先頭にそう書き、Cloud Run で動いている版の SHA も出す（gcloud）。最初の昇格（今の版が無い）では、今の版は「なし」とし、コミットの一覧は省き、マイグレーションはすべて出す（04_deployment-procedure.md 4.2・5.1） |
+| `promote ENV=... [SHA=...]` | 昇格の PR（戻すときも同じ。ADR-016）を手元から作る。まず `git fetch origin` し、作業ツリーに変更（追跡していないファイルを含む）が無く、今のブランチが `main` で、`main` が `origin/main` と同じことを確かめる。`SHA` は短い形でもよく、完全な SHA に直して使う。省くと、staging は `deploy/` 以外を変えた `main` の最新のコミット、production は今の `deploy/staging/version`。省いた SHA が、今の版より古い（戻すことになる）か、その環境で前に戻した版（その環境の履歴にあって、今の版より新しい）なら、止めて `SHA` の指定を求める。確かめること: SHA が今の版と違う。その `build.yml` が成功し（gh）、イメージが Artifact Registry にある（gcloud）。production なら、その SHA を `deploy/staging/version` に書いたコミットの `deploy.yml` のデプロイのジョブが、どれかの試行で成功している（gh。後の昇格が先に入ってデプロイの段を飛ばしたジョブは、成功してもその SHA を出していない。04_deployment-procedure.md 2章）。そのあとブランチ `promote/{env}-<SHA の先頭7文字>` を作り（同じ名前のブランチが手元か origin に残っていれば、それを使う PR が開いているときは止め、そうでなければ消してから作る）、`deploy/{env}/version` を書いて（無ければ作る）コミットし、`promote-check BASE=origin/main` が通ったら push して PR を開く（gh）。件名は 03_dev-setup.md 9章「コミットメッセージ」の形（進めるときは promote、戻すときは roll back）。本文には、今の版と出す版の SHA・コミットの一覧・マイグレーションの一覧・戻し方（今の版の SHA で `promote` を動かす）を入れる。一覧の範囲は、いちばん先まで出した版（04_deployment-procedure.md 4.1）で決める。出す版がそれより新しいときは、コミットは今の版から出す版まで、マイグレーションはいちばん先まで出した版より後のもの（この昇格で新しく当たるもの）。古いときは、どちらも出す版から、いちばん先まで出した版まで（DB に当たっていて出す版に無いもの）とし、出す版が直前の版（同 4.1）かどうかも書く。マイグレーションが当たったかもしれない版（同 4.1）があり、出す版がそれより古いときは、どちらの一覧の終わりもその版にし（出す版がいちばん先まで出した版より古くなくても、出す版からその版までのマイグレーションを出し、04 5.1 の 3 を確かめるよう書く）、その版のマイグレーションが当たったこと（デプロイの段が成功したとき）か、当たったかどうか分からないこと（失敗した・取り消された・まだ動いているとき）を本文に書く（出す版がその版より新しいときも、この昇格で当たる一覧にその版のマイグレーションが入るので書く）。その環境の前回の `deploy.yml`（今の版を書いたコミットのもの）のデプロイのジョブがどの試行でも成功していない（デプロイの段を飛ばした、終わっていないも同じ）なら、本文の先頭にそう書き、Cloud Run で動いている版の SHA も出す（gcloud。読めなければ、読めなかったことを書く）。このとき、Cloud Run がすべてのトラフィックを1つの版に流していれば、コミットの一覧と戻し方は今の版ではなくその版から出す（流し先が分かれている・読めないときは、今の版から出したことを書く）。最初の昇格（今の版が無い）では、今の版は「なし」とし、コミットの一覧は省き、マイグレーションはすべて出す（04_deployment-procedure.md 4.2・5.1） |
 | `promote-check BASE=...` | `BASE` から `HEAD` までの差分のうち `deploy/` を検査する。`deploy/` を変えていなければ何もしない。変えていれば、次をすべて満たさないと失敗する: 変えたファイルは `deploy/staging/version` か `deploy/production/version` のどちらか1つだけで、ほかのファイルを一緒に変えていない（消してもいない）。中身は完全な SHA が1行で、`BASE` の時点の `main` にあるコミット。その SHA が `BASE` の時点のその環境の版より古い（戻す）なら、その環境の `deploy/{env}/version` に `BASE` までに書かれたことがある（`BASE` にその環境のファイルが無ければ、この条件は無い）。production なら、`deploy/staging/version` に `BASE` までに書かれたことがある。`ci.yml`（`BASE` は、PR を検査するマージのコミットの1つ目の親）・`deploy.yml`（`BASE` は push の前のコミット）・`promote` が使う（04_deployment-procedure.md 2章） |
 | `db-backup ENV=...` | `pg_dump -Fc` を取り、`gs://{GCP_PROJECT_ID}-moonx-backups/{env}/<日付>.dump`（日付は UTC）に上げる（バケットは30日で自動削除。定期実行の GitHub Actions が使う。05_operation-runbook.md）。ダンプはいったんファイルに書き、取れたときだけ、Cloud Storage の JSON API に1回で上げる（`gcloud auth print-access-token` のトークン）。`gcloud storage cp` は上げる前に宛先のオブジェクトを読むので、読む権限を持たないサービスアカウント（ADR-028）では使えない |
 
-Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infra-plan`・`infra-apply`・`db-backup`）は、プロジェクトを `gcloud config` のプロジェクトから取る（`GCP_PROJECT_ID=...` で上書きできる）。空なら動かずに止まる。Terraform のプロジェクト ID は各 `envs` の変数に書き（03_dev-setup.md 5.4）、make はこの値を tfstate のバケットの名前（`{GCP_PROJECT_ID}-tfstate`）にだけ使う（backend は変数を読めないため）。
+Google Cloud を使うターゲット（`build-api-image`・`deploy-api`・`infra-plan`・`infra-apply`・`db-backup`・`promote`）は、プロジェクトを `gcloud config` のプロジェクトから取る（`GCP_PROJECT_ID=...` で上書きできる）。空なら動かずに止まる。Terraform のプロジェクト ID は各 `envs` の変数に書き（03_dev-setup.md 5.4）、make はこの値を tfstate のバケットの名前（`{GCP_PROJECT_ID}-tfstate`）にだけ使う（backend は変数を読めないため）。
 
 ---
 
@@ -575,15 +578,15 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 
 ### ADR-022: テストとリントのツール
 
-**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテスト（Jest（jest-expo）＋ React Native Testing Library、E2E の Maestro。Maestro は 2026-10-03 のユーザーの決定）を外した。ネイティブの feature で足す）
+**状態・日付:** 採用（2026-10-01。2026-10-11 にスマホのテスト（Jest（jest-expo）＋ React Native Testing Library、E2E の Maestro。Maestro は 2026-10-03 のユーザーの決定）を外した。ネイティブの feature で足す。2026-11-04 にワークフローの検査（actionlint）を足した）
 
-**決定:** Biome（リントと整形）、TypeScript の型チェック、`packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`・`scripts/`・`packages/db`・`apps/api` は Bun test（`packages/db` と API は実際の PostgreSQL に対する結合テスト）、`apps/web` と `packages/ui-web` は Vitest ＋ Testing Library（部品は `@react-aria/test-utils` も）、E2E は Playwright、アクセシビリティの検査は axe（`@axe-core/playwright`。Playwright の E2E の中だけで使い、部品のテストでは使わない）。画面にスタイルを書かない決まり（ADR-025）は Biome の `noRestrictedImports`、JSX の中の生の文字列（9章）は Biome の規則で足りない分を CI の小さな検査スクリプトで見つける。詳細は10章。
+**決定:** Biome（リントと整形）、TypeScript の型チェック、`packages/domain`・`packages/schemas`・`packages/i18n`・`packages/ui-tokens`・`scripts/`・`packages/db`・`apps/api` は Bun test（`packages/db` と API は実際の PostgreSQL に対する結合テスト）、`apps/web` と `packages/ui-web` は Vitest ＋ Testing Library（部品は `@react-aria/test-utils` も）、E2E は Playwright、アクセシビリティの検査は axe（`@axe-core/playwright`。Playwright の E2E の中だけで使い、部品のテストでは使わない）。画面にスタイルを書かない決まり（ADR-025）は Biome の `noRestrictedImports`、JSX の中の生の文字列（9章）は Biome の規則で足りない分を CI の小さな検査スクリプトで見つける。GitHub Actions のワークフローは actionlint（`concurrency` の `queue` を知っている保守のフォーク `@kjanat/actionlint`。03_dev-setup.md 10章）で `make lint` が検査する。詳細は10章。
 
 **理由:** 実行環境（Bun・Vite）ごとに標準のツールを使うのが、一番つまずきが少ない。Biome は1つのツールで速い。
 
-**捨てた案:** 比較の記録なし。
+**捨てた案:** 比較の記録なし。actionlint は、本家（rhysd/actionlint。最後の版は 2026-03 の 1.7.12）が `queue` を知らず、`deploy.yml` を誤りと報告する。その報告だけを設定で消すと、`queue` の値の誤りも見逃す。ほかのフォーク（jdx/jactionlint など）は、本家の課題のスレッドで保守のフォークとして挙がっていた `@kjanat/actionlint` より検査の範囲を広げたもので、ここでは要らない。
 
-**トレードオフ:** テストのツールが Bun test と Vitest の2つになる。テストの書き方の違いは各パッケージの README で補う。
+**トレードオフ:** テストのツールが Bun test と Vitest の2つになる。テストの書き方の違いは各パッケージの README で補う。actionlint のフォークは保守する人が1人で、本家より使う人が少ない（版は `bun.lock` で固定し、npm の provenance の付いた配布物を使う）。
 
 ### ADR-023: 監視とログは Sentry と Cloud Logging
 
@@ -2617,7 +2620,8 @@ design-spec 2.1（ロール）・2.2（権限マトリクス）・3章（認証�
 | 計算と判定（`packages/domain`） | Bun test | 行 95% 以上 | 損益分岐・シナリオ・投資回収・ROI（design-spec 8.3 の検算データを期待値どおりに再現する固定のテスト）、下限・上限の伝播、端数、確認項目6つの全状態、Next steps の優先順、F/A/U の状態と内訳、工程、`buildPitchDeck()`・`fitPitchDeck()`・`pitchNumbersBreak()`・`pitchTemplateOverflows()`、AI 書き出しの Markdown / JSON の生成と `parseAiReply()` / `matchBlocks()` |
 | 入力のスキーマ（`packages/schemas`） | Bun test | 主要なスキーマの境界値 | 範囲（金額・%・営業日数）、文字数、列挙 |
 | DB のスキーマとマイグレーション（`packages/db`・`scripts/db-check.ts`） | Bun test ＋ 実際の PostgreSQL（`db-check` は一時的な Git のリポジトリ） | — | 6.3 のコードと `schema.ts` がコメントと整形を除いて同じこと、`make db-generate` が新しいマイグレーションを作らないこと、マイグレーションを当てた DB の列・制約・インデックス・列挙が `schema.ts` から作った一時的なテーブルと PostgreSQL の表記で一致すること、`relations()` が外部キーと1対1に対応し、名前が `relations.ts` の先頭に書いた規則に従うこと、テスト用の DB の作り直しが `_test` で終わらない名前とクエリ文字列を拒むこと、`db-check` が2章の失敗の場合をすべて捕まえること |
-| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること（同じ人が続けて手で直した変更は1件にまとまり、更新の行はすべての欄が元に戻ると消え、追加の行は空に戻っても残ること。ADR-020）、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012）、P12 の数字の列の組み方（`figureColumns`）が PDF の数字の列の位置と同じであること（ADR-012）、上限の件数の素材で Pitch Deck のどのスライドも本文の下端で切れないこと（英語の文と日本語の文、1分版と5分版、計算した指標が 6.14 の大きな表示でも計算できない主要指標の理由の文でも。PDF と同じフォントで測る。design-spec 6.14）、6.14 の範囲の金額と計算した指標で数字が折り返さないことと、範囲の外で 6.14 のとおりに折り返し、折り返しただけでは注意を出さないこと、6.14 が本文に収まるとする金額の外で5分版の Economics が本文の下端で切れて注意を出すこと、公開の前の検査（AD6 の `pitch_deck_overflow`）が、§20 に文章の小項目を足した版と小項目のタイトルを長くした版を、英語の文で溢れる場合も日本語の文だけで溢れる場合も断り、BCDX のプランのテンプレートとシードを通すこと |
+| API の結合（`apps/api`） | Bun test ＋ 実際の PostgreSQL（CI はサービスコンテナ） | 行と関数がそれぞれ 80% 以上（Bun test が測れるもの。分岐は測れないため、2026-10-12 に分岐 80% から変えた。ユーザーの決定） | 全エンドポイントの正常系、**7.1 の権限マトリクスの表駆動テスト（エンドポイント × ロール → 期待するステータス）**、変更履歴が1件ずつ増えること（同じ人が続けて手で直した変更は1件にまとまり、更新の行はすべての欄が元に戻ると消え、追加の行は空に戻っても残ること。ADR-020）、楽観ロックの衝突、アーカイブ、招待（メール＋パスワード・Google のフック）、アカウントの削除、テンプレートの取り込み（AD10）・移行と戻し、作成の取り消し、バックアップ（`db-backup` と同じ `pg_dump -Fc` で PostgreSQL 17 のテスト用の DB から取れて、`pg_restore` で別の DB に戻せること。手元と CI に PostgreSQL 17 のクライアントが要る。03・04）、KPI の集計（`make kpi` を、件数の分かるデータを入れた別の DB に流し、件数の表がそのとおりであること。03 5.4 E と同じ権限の読み取り専用のロールでも同じ表が出ること。11章）、PDF が作れること（ページ数と文字の抽出）と数字の字送りが等幅であること（ADR-012）、P12 の数字の列の組み方（`figureColumns`）が PDF の数字の列の位置と同じであること（ADR-012）、上限の件数の素材で Pitch Deck のどのスライドも本文の下端で切れないこと（英語の文と日本語の文、1分版と5分版、計算した指標が 6.14 の大きな表示でも計算できない主要指標の理由の文でも。PDF と同じフォントで測る。design-spec 6.14）、6.14 の範囲の金額と計算した指標で数字が折り返さないことと、範囲の外で 6.14 のとおりに折り返し、折り返しただけでは注意を出さないこと、6.14 が本文に収まるとする金額の外で5分版の Economics が本文の下端で切れて注意を出すこと、公開の前の検査（AD6 の `pitch_deck_overflow`）が、§20 に文章の小項目を足した版と小項目のタイトルを長くした版を、英語の文で溢れる場合も日本語の文だけで溢れる場合も断り、BCDX のプランのテンプレートとシードを通すこと |
+| 昇格（`scripts/promote.ts`・`scripts/promote-check.ts`） | Bun test ＋ 一時的な Git のリポジトリ（origin も一時的なリポジトリ。gh と gcloud は、呼ばれた引数を記録して決めた答えを返す偽物に差し替える） | — | 2章の `promote-check` の失敗の場合をすべて捕まえること。`promote` が2章の確かめることで止まり、PR の件名と本文を2章のとおりに作ること: 正しい昇格、戻す（直前の版とそうでない版）、2つの環境（production は、staging の `deploy.yml` がデプロイの段まで動いたこと）、ほかのファイルとの混在、staging に無い SHA、その環境に無い戻し先、最初の昇格、省いた SHA（既定の SHA と、止まる場合）、残っているブランチ（開いた PR があれば止まり、無ければ消して作り直す）、前回の `deploy.yml` がデプロイしていないときの本文の注意 |
 | Web の部品（`packages/ui-web`） | Vitest ＋ Testing Library ＋ `@react-aria/test-utils` | 部品ごとに主要な状態 | design-spec 4.5 の各部品の種類・大きさ・状態（hover・pressed・focus-visible・disabled）、Popover と Tray の切り替え、キーボード操作（axe の検査は E2E で行う。ADR-022） |
 | Web（`apps/web`） | Vitest ＋ Testing Library | 主要な部品 60% 以上（`apps/web/src` のどのファイルも行 60% 以上。テストの補助・生成したルートの木と、happy-dom で動かせない入口の `client.tsx` と Service Worker の `sw.ts` を除く。この2つは E2E で確かめる。`make coverage`） | 設問フォームのフォーカス、F/A/U のボタンと M2、費用のワークシートの合計、自動保存と再送（ADR-021。オフラインで入力を止めること、離脱の確認）、衝突の確認、権限による表示の出し分け、保存のときの `X-Moonx-Client`（画面の幅で `web` / `web_mobile`） |
 | E2E（Web） | Playwright（Chromium。`e2e/`） | コアフローとロールの代表 | コアフロー（アイデアの作成 → 回答と根拠 → 費用 → 損益 → 判定 → プラン下書き → 版の保存 → Go / No-Go → Pitch Deck の PDF）、招待からの新規登録、Viewer の読み取り専用、AI 書き出し → 取り込み、アカウントの削除。主要な画面で axe のアクセシビリティ検査（主要な画面は design-spec 3章の全画面と 3.8 のモーダル・シート・パネルとし、どれもアプリの画面で少なくとも1回確かめる。規則は WCAG 2.2 の A と AA を使う（axe のタグ `wcag2a`・`wcag2aa`・`wcag21a`・`wcag21aa`・`wcag22aa`）。ライトとダークの両方は、次の部品の確認用ページで確かめる）。部品の確認用ページ（`/dev/components`）を3つの幅・ライトとダーク・2つのスケールで開き、design-spec 4.5 の部品が描かれ、横にスクロールせず、自前の書体（woff2）が読まれ、axe の検査が通ること。Popover とトレイが幅で切り替わること。happy-dom では確かめられない部品のキーボード操作（`packages/ui-web/README.md`） |
@@ -2647,4 +2651,25 @@ Cloud Monitoring のアラート（死活・エラー率・レイテンシ・メ
 | メール | Resend のダッシュボード | 送信の失敗と戻り（バウンス）。API のログにも送信の失敗を出す |
 | 無料枠の使用量（手で見る。頻度は 05_operation-runbook.md 6.1。アラートは付けない） | 各サービスのダッシュボード | 次の目安を超えたら、05_operation-runbook.md の手順で原因を探し、有料プランか構成の見直しを検討する: Sentry 月4,000件（無料枠の80%）、Neon の計算時間 80%、Resend 1日80通・月2,400通、Cloud Run の無料枠 80%（静的ファイルのリクエストも数える。ADR-004） |
 | 費用 | Google Cloud の予算アラート（Terraform） | 月 $5 と $10 でメール |
-| KPI（01_prd.md） | `packages/db/queries/kpi.sql` と GitHub Actions の `kpi.yml` | 件数だけを数える SQL（回答の中身は読まない）。K-08・K-16（スマホの幅の画面からの入力の割合）は、回答の手入力の変更履歴（`change_history` の `target_type` が `self_analysis_answer`・`validation_answer`・`plan_answer` で `source = manual` の行）のうち、`client = web_mobile` の行の割合（5.1「クライアントの種類」。同じ人が続けて手で直した保存は1行にまとまる（ADR-020。2026-10-29 のユーザーの決定）ので、まとまった1行を1回と数え、入力元はその行の最後の変更のもの）。`kpi.yml` が毎月1回と手で動かしたときに、GitHub の環境 `production-backup` の読み取り専用の接続で `make kpi ENV=production` を動かし、件数を実行の要約に出す（ワークフローは 04_deployment-procedure.md 2章）。本番の接続を手元に持たない。結果を見て運営者に渡す手順は 05_operation-runbook.md 6.1 |
+| KPI（01_prd.md） | `packages/db/queries/kpi.sql` と GitHub Actions の `kpi.yml` | 件数だけを数える SQL（回答の中身は読まない）。K-08・K-16（スマホの幅の画面からの入力の割合）は、回答の手入力の変更履歴（`change_history` の `target_type` が `self_analysis_answer`・`validation_answer`・`plan_answer` で `source = manual` の行）のうち、`client = web_mobile` の行の割合（5.1「クライアントの種類」。同じ人が続けて手で直した保存は1行にまとまる（ADR-020。2026-10-29 のユーザーの決定）ので、まとまった1行を1回と数え、入力元はその行の最後の変更のもの）。`kpi.yml` が毎月1回と手で動かしたときに、GitHub の環境 `production-backup` の読み取り専用の接続で `make kpi ENV=production` を動かし、件数を実行の要約に出す（ワークフローは 04_deployment-procedure.md 2章）。本番の接続を手元に持たない。結果を見て運営者に渡す手順は 05_operation-runbook.md 6.1。数え方は下の「KPI の数え方」 |
+
+**KPI の数え方**（`packages/db/queries/kpi.sql`。PRD 5章の測定方法を、保存しているデータでこう数える。表の列は KPI・期間・数えるもの・件数）:
+
+- 期間: 週（月曜から日曜。月曜の日付で表す）と月は Asia/Manila のもの（試運転の場所で、利用者の時間帯の既定値）。週ごとの行は今週とその前の12週、月ごとの行は今月とその前の3か月で、件数が0の期間も出す。`all` は全期間
+- 確認用のワークスペース: デプロイ後の確認（04_deployment-procedure.md 6章）だけに使うワークスペース（03_dev-setup.md 5.4 K）の所属・アイデア・判定・プラン・変更履歴・コメントは、どの KPI にも数えない。ID は `make kpi` が環境変数 `CHECK_WORKSPACE_ID` で受け取る（2章「CI のシークレットと変数」）。登録（K-11・K-12）は、確認だけに使うアカウントも1人として数える
+- 作成を取り消したアイデアとプラン（`deleted_at` がある行）は、作られなかったものとして数えない
+- チームのメンバー: 個人用でないワークスペースの Owner / Member。Viewer は、個人用でないワークスペースの Viewer。週や月の行では、その期間の終わりまでに加わった人を数える。ロールは今のロールで数え、加わったときから同じロールだったものとする（ロールを変えた日時は残していない）。外れた人は所属の行が消えるので、過去の期間からも消える
+- 記録を残す（K-07・K-12・K-13）: 変更履歴の行（変更元を問わない）・コメント（消したものも数える。書いたことは変わらない）・決定ログ。同じ人が続けて手で直してまとまった変更履歴の1行は、最初の変更から最後の変更までのどの期間にも数える（ADR-020）
+- K-01: 始めた（未着手でない）自己分析、アイデア、検証の回答の行を1つ以上持つアイデア
+- K-02: 月ごとに作られたアイデア
+- K-03: 所属ごとに数える（2つのチームにいる人は、完了は1回でも、共有はそれぞれのワークスペースで見る）
+- K-04・K-15: Proceed の判定（`validation_decision`）のうち、記録の時点の `snapshot.missingChecks` に `state` が `not_started` のものが無いもの
+- K-05・K-14: アーカイブしていないアイデアのうち作成から28日（K-14 は56日）たったものと、そのうち判定（`validation_decision`）が1件以上あるもの
+- K-06: Proceed の判定、そこからプランを作った判定、そこから作ったプランの数（アーカイブしたプランも数える）
+- K-07: 週ごとの、その週の終わりまでにチームのメンバーになった人（2つのチームにいても1人）と、そのうちその週に記録を残した人（どのワークスペースでも、自分の自己分析でもよい）
+- K-08・K-16: 上の表の行のとおり。月の行は、まとまった行の最後の変更の月で数える。入力元が分からない行（`unknown`）の数も出す
+- K-09: チームのメンバーと、そのうち変更元が AI 取り込みの変更履歴を1行でも持つ人（自分の自己分析への取り込みも数える）
+- K-10: その月の終わりまでに Viewer になった人と、そのうちその月に、Viewer であるワークスペースでコメントを書いた人（消したコメントも数える）
+- K-11: 運営者（`is_admin`）を除く登録者のうち登録から30日たった人を、登録の月ごとに数える。そのうち、登録から30日以内に自己分析で保存した（変更元を問わない）か、アイデアを作った（I1 の作成と I3 の複製）人。30日たっていない人は、どちらにも数えない（まだ決まっていない人を、始めなかった人として数えないため）
+- K-12: 運営者を除く登録者のうち登録から56日たった人を、登録の週ごとに数える。そのうち、登録の28日後から56日後までに記録を残した人。行は、今週の20週前から8週前までの13週（56日たった人がいる週）
+- K-13: 個人用でないワークスペースのうち、その月に2人以上が記録を残したもの（Viewer と外れた人も数える）

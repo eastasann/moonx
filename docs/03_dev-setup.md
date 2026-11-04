@@ -16,14 +16,15 @@
 |---|---|---|---|
 | Git | 最近の版 | ソースの取得 | 全員 |
 | make | OS 標準 | 実コマンドの入口（Windows は WSL2 を使う） | 全員 |
-| Bun | 1.2 以上（CI と同じ版にそろえる） | パッケージ管理・API・テスト | 全員 |
+| Bun | `package.json` の `packageManager` の版（CI もこの版を入れる） | パッケージ管理・API・テスト | 全員 |
 | Docker（Docker Desktop・OrbStack など。Compose v2） | 最近の版 | ローカルの PostgreSQL 17（`make db-up`。開発用の DB `moonx` とテスト用の DB `moonx_test`） | 全員 |
 | Playwright のブラウザ | リポジトリの Playwright に合う版 | `make test-e2e`（取得するターゲットは SDD 2章「make ターゲット」） | E2E を回す人 |
-| Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・`make promote`（イメージの確認）・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
+| Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・`make promote`（イメージの確認と、前回のデプロイが済んでいないときに Cloud Run で動いている版。プロジェクトは `gcloud config` のもの）・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
 | Terraform | 1.x の最新 | `make infra-plan` / `make infra-apply` | インフラを触る人 |
 | GitHub CLI（gh） | 最新 | PR・`make promote`（昇格の PR の作成）・GitHub の環境の設定・ワークフローの確認 | デプロイ・運用をする人（ほかの人は任意） |
 | curl | 最近の版（7.76 以上） | `make db-backup`（`make test-api` のバックアップのテストも動かす） | 全員 |
-| PostgreSQL のクライアント（psql・pg_dump・pg_restore） | 17（サーバーと同じ版。古い版の pg_dump は 17 のサーバーに使えない） | `make test-api` のバックアップのテスト、バックアップの復元の確認（05 6.2） | 全員 |
+| PostgreSQL のクライアント（psql・pg_dump・pg_restore） | 17（サーバーと同じ版。古い版の pg_dump は 17 のサーバーに使えない） | `make test-api` のバックアップと KPI の集計のテスト、バックアップの復元の確認（05 6.2） | 全員 |
+| ShellCheck | 最近の版 | `make lint` の actionlint が、ワークフローの `run:` のスクリプトを検査するのに使う（PATH に無ければ、その検査だけを省く。GitHub のランナーには入っているので、CI では必ず動く） | ワークフローを触る人 |
 
 ### アカウント（デプロイ時に必要。ローカル開発は GitHub だけでよい）
 
@@ -363,7 +364,7 @@ make infra-apply ENV=staging    # 適用
     --delete-branch-on-merge
   ```
 
-- [ ] Settings → Rules で `main` を守る（PR 必須・`ci.yml` の成功が必須・直接 push しない）
+- [ ] Settings → Rules で `main` を守る（PR 必須・`ci.yml` の成功が必須（チェックの名前は `ci`）・直接 push しない）
 - [ ] Dependabot のアラートを有効にする（ADR-027）
 - [ ] GitHub の環境を3つ作る（名前と役割は [SDD 2章「環境と命名」](02-01_system-design-doc.md#環境と命名) の「GitHub の環境」の行）。3つとも `main` からだけ使えるようにする。`production` はデプロイに承認を要する（1人で運用するときは自分を承認者にする）。`production-backup` は承認を付けない。環境・環境のシークレット・承認・ブランチの制限は、公開のリポジトリなら無料のプランで使える。非公開にすると、環境とそのシークレットとブランチの制限は Pro か Team 以上、承認は Enterprise のプランが要る（GitHub の「Deployments and environments」）
 
@@ -473,6 +474,12 @@ I の 5 でドメインマッピングができてから行う。最初の昇格
 - [ ] staging の `MAIL_ALLOWLIST` に、確かめに使うメールを入れる（Terraform の変数。`make infra-apply ENV=staging`）
 - [ ] デプロイ後の確認をする（04 6章）
 - [ ] production でも、昇格（GitHub の環境 `production` の承認が要る）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・テンプレートの取り込みと公開・確認用のワークスペースの作成・デプロイ後の確認をする
+- [ ] production の確認用のワークスペースの ID（画面の URL の `/w/<ID>`）を、GitHub の環境 `production-backup` の変数 `CHECK_WORKSPACE_ID` に入れる（KPI の集計から外す。SDD 11章「KPI の数え方」。無いと `kpi.yml` が失敗する）
+
+  ```bash
+  gh variable set CHECK_WORKSPACE_ID --env production-backup --body '<確認用のワークスペースの ID>'
+  ```
+
 - [ ] production の最初のデプロイのあとで、`db-backup.yml` を手で1回動かし、バックアップができることを確かめる（GitHub の環境 `production-backup` の確認を兼ねる。05 6.2）
 
   ```bash
@@ -538,7 +545,7 @@ make typecheck
 
 **Makefile が実コマンドの唯一の正。** ターゲットの一覧と内容は [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット) にだけ書く（ここには書き写さない）。
 
-- ドキュメント・CI・実装の指示は、ターゲット名だけを書く
+- ドキュメント・CI・実装の指示は、ターゲット名だけを書く。CI のランナーに OS のパッケージを入れる手順（PostgreSQL 17 のクライアント、Chromium が要るライブラリ）は、リポジトリのコマンドではなくランナーの用意なので、ワークフローに書く（04 2章）
 - コマンドを変えるときは Makefile だけを直す
 - ターゲットを足すときは、Makefile と SDD 2章の表を同じ PR で直す
 - makeは macOS / Linux に標準で入っている。Windows では WSL2 を使う
@@ -605,6 +612,7 @@ fix/xxx     ──squash──▶   │
 | デザイントークンの生成物 | `packages/ui-tokens`（vanilla-extract・react-pdf のテーマと、PWA のアイコンとマニフェスト）が `docs/06_design-tokens.json` と合っているか | CI が `make tokens` を動かし、差分が出たら失敗（ADR-018） | — |
 | ルートの生成物（`apps/web/src/routeTree.gen.ts`） | TanStack Router の Vite プラグインが `src/routes/` から作る生成物。手で直さず、ルートを足したら作り直したもの（`make dev-web` か `make build-web` で作られる）をコミットする。古いままだと `make typecheck` が失敗する | `make dev-web` / `make build-web` | — |
 | API の仕様の書き出し | `apps/api/openapi.json` が API と合っているか。API を変えたら `make openapi` で作り直して同じ PR に含める | CI が `make openapi` を動かし、差分が出たら失敗（04 2章） | — |
+| GitHub Actions のワークフロー | `.github/workflows/` の構文・式・権限・`run:` のスクリプト（`concurrency` の `queue` を知っている保守のフォーク `@kjanat/actionlint`。開発用の依存で版を固定する。選んだ理由は SDD ADR-022）。ステップは各ワークフローに直に書く（ローカルの composite action に置くと、actionlint はその入力しか確かめず、`run:` のスクリプトを読まない） | `make lint` | 既定の検査（設定のファイルは置かない） |
 | doc-lint | コミットの前: 先送りのマーカー・不要な `.gitkeep`・`.env` や既知の形式のトークン・ドキュメントの文体（本文の em dash・表の1列目の太字・長すぎる太字）。随時: ドキュメントと実体の食い違い（検査の中身は SDD 2章「make ターゲット」の `doc-lint`） | コミットのたびに `.githooks/pre-commit`（`make setup` が配線する）、随時 `make doc-lint` | `scripts/doc-lint.sh` |
 
 エディタは Biome の拡張を入れ、保存のときに整形する。

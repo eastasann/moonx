@@ -1,0 +1,50 @@
+# The monthly KPI counts (SDD 11章, PRD 5章, 04_deployment-procedure.md 2章). Only counts
+# reach the run's summary; what to do with them: 05_operation-runbook.md 6.1.
+name: kpi
+
+on:
+  schedule:
+    # 09:23 in Manila on the 1st, so the month before is complete.
+    - cron: "23 1 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# GitHub runs bash with pipefail only when the shell is named.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  kpi:
+    runs-on: ubuntu-latest
+    # The same read-only connection as db-backup.yml. No Google Cloud, so no id-token.
+    environment: production-backup
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # PostgreSQL 17's psql, pg_dump and pg_restore first on PATH: the runner's own client
+      # is older, and an older pg_dump refuses a 17 server (SDD 10章).
+      - name: PostgreSQL 17 client
+        run: |
+          sudo apt-get install --yes --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install --yes --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
+      # Written to a file first, so a failed run leaves no half table in the summary.
+      - run: |
+          make --silent kpi ENV=production > "$RUNNER_TEMP/kpi.txt"
+          {
+            echo "## KPI counts"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/kpi.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
+          # The workspace kept for the post-deploy checks, left out of every count (03 5.4 K).
+          CHECK_WORKSPACE_ID: ${{ vars.CHECK_WORKSPACE_ID }}

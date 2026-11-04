@@ -56,11 +56,11 @@
 
 | ワークフロー | きっかけ | やること |
 |---|---|---|
-| `ci.yml` | すべての PR | 初めに `make promote-check BASE=<PR を検査するマージのコミットの1つ目の親>` で `deploy/` の変更を検査する（依存を入れずに、`make install` の前に動く。`deploy/` を変えていない PR では何もしない）。`deploy/` の履歴を読むので、チェックアウトは全履歴（`fetch-depth: 0`）。`deploy/` だけを変える PR（昇格の PR）はここで終える（コードは変わらず、出す版はそれぞれの PR と `build.yml` でテスト済み。戻すときに待たないため）。ほかの PR は続けて `make install` → `make db-check BASE=<promote-check と同じ>` → `make lint` → `make typecheck` → `make test` → `make build` → `make test-e2e`。`DATABASE_URL_TEST` はサービスコンテナの PostgreSQL 17。ランナーに PostgreSQL 17 のクライアント（`pg_dump`）を入れる（バックアップのテストが使う。古い版の `pg_dump` は 17 のサーバーに使えない）。`make tokens` で差分が出たら失敗（ADR-018）。`make openapi` で `apps/api/openapi.json` に差分が出たら失敗（API を変えた PR は、作り直した `openapi.json` を含める） |
-| `build.yml` | `main` への push（`deploy/**` だけの変更は除く） | `make test` → `make build-api-image SHA=<SHA>`（イメージの名前は SDD 2章「環境と命名」）。`make test` には `ci.yml` と同じく、`DATABASE_URL_TEST` のサービスコンテナの PostgreSQL 17 と、ランナーの PostgreSQL 17 のクライアントを用意する（バックアップのテスト）。`make test` は `id-token: write` を持たないジョブで動かし、Workload Identity Federation で Google Cloud に入るのはイメージを作るジョブだけにする（`make test` は開発用の依存のコードを動かすので、そこで Google Cloud のトークンを作れないようにする。デプロイ用のサービスアカウントは1つで、production にも出せる。ADR-027）。E2E は PR の `ci.yml` で通っているので動かさない。`make build-api-image` は Web もビルドして同じイメージに入れ（ADR-004）、ソースマップを Sentry の `moonx-web` と `moonx-api` に上げる（`release` = SHA。`SENTRY_AUTH_TOKEN`）。GitHub の環境を使わないので、リポジトリの変数とシークレットだけを読む（3章） |
+| `ci.yml` | すべての PR | 初めに `make promote-check BASE=<PR を検査するマージのコミットの1つ目の親>` で `deploy/` の変更を検査する（依存を入れずに、`make install` の前に動く。`deploy/` を変えていない PR では何もしない）。`deploy/` の履歴を読むので、チェックアウトは全履歴（`fetch-depth: 0`）。`deploy/` だけを変える PR（昇格の PR）はここで終える（コードは変わらず、出す版はそれぞれの PR と `build.yml` でテスト済み。戻すときに待たないため）。ほかの PR は続けて `make install` → `make db-check BASE=<promote-check と同じ>` → `make lint` → `make typecheck` → `make test` → `make build` → `make test-e2e`。`DATABASE_URL_TEST` はサービスコンテナの PostgreSQL 17。`.env` は `make setup` と同じく `.env.example` から作る（`make env-file`。`DATABASE_URL_TEST` もこの値でサービスコンテナを指す）。`make test-e2e` の前に、Chromium が要るライブラリを入れる（`playwright install-deps chromium`。ブラウザは `make test-e2e` が取ってくる）。同じ PR に新しい push があれば、古い実行は取り消す。ランナーに PostgreSQL 17 のクライアント（`pg_dump`）を入れる（バックアップのテストが使う。古い版の `pg_dump` は 17 のサーバーに使えない）。`make tokens` で差分が出たら失敗（ADR-018）。`make openapi` で `apps/api/openapi.json` に差分が出たら失敗（API を変えた PR は、作り直した `openapi.json` を含める） |
+| `build.yml` | `main` への push（`deploy/**` だけの変更は除く） | `make test` → `make build-api-image SHA=<SHA>`（イメージの名前は SDD 2章「環境と命名」）。`make test` には `ci.yml` と同じく、`DATABASE_URL_TEST` のサービスコンテナの PostgreSQL 17 と、ランナーの PostgreSQL 17 のクライアントと、`.env` を用意する（バックアップと KPI の集計のテスト）。`make test` は `id-token: write` を持たないジョブで動かし、Workload Identity Federation で Google Cloud に入るのはイメージを作るジョブだけにする（`make test` は開発用の依存のコードを動かすので、そこで Google Cloud のトークンを作れないようにする。デプロイ用のサービスアカウントは1つで、production にも出せる。ADR-027）。E2E は PR の `ci.yml` で通っているので動かさない。`make build-api-image` は Web もビルドして同じイメージに入れ（ADR-004）、ソースマップを Sentry の `moonx-web` と `moonx-api` に上げる（`release` = SHA。`SENTRY_AUTH_TOKEN`）。GitHub の環境を使わないので、リポジトリの変数とシークレットだけを読む（3章） |
 | `deploy.yml` | `main` への push で `deploy/staging/version` か `deploy/production/version` が変わったとき | 下の「deploy.yml の順番」。2つのジョブに分ける。検査のジョブは GitHub の環境を使わずに動き、変わったファイルから環境を決めて、`make promote-check BASE=<push の前のコミット>` とイメージの確認をする（承認する人が検査済みの変更だけを承認するように、環境のジョブより先に動かす）。デプロイのジョブは GitHub の環境 `staging` / `production` で動き、`production` は承認されるまで待つ。環境ごとに同時に1つだけ動かし、待っているものは取り消さずに順に動かす（`concurrency` の `queue: max`。既定では待っているものが取り消される）。デプロイのジョブは初めに、`origin/main` の `deploy/$TARGET/version` がまだ `$SHA` かを確かめ、違えば（後の昇格が先に入った・古い実行を再実行した）何もせずに終える。チェックアウトは全履歴（`fetch-depth: 0`）。検査で止まった・承認されなかった・デプロイに失敗したときは、`deploy/{env}/version` が出ていない SHA を指したままになるので、正しい SHA で新しい昇格の PR を出して直す（`make promote` は本文にそのことを書く） |
 | `db-backup.yml` | 毎日（schedule）と、手で（`workflow_dispatch`。`gh workflow run db-backup.yml`） | GitHub の環境 `production-backup`（承認なし）で `make db-backup ENV=production`。`DATABASE_URL_DIRECT` は production の読み取り専用のロールの接続文字列（03 5.4 E・H）。`pg_dump` は PostgreSQL 17 のクライアントを使う（サーバーより古い版は使えない）。確かめ方と戻し方は 05 6.2 |
-| `kpi.yml` | 毎月1日（schedule）と、手で（`workflow_dispatch`。`gh workflow run kpi.yml`） | GitHub の環境 `production-backup`（承認なし）で、`db-backup.yml` と同じ読み取り専用の接続（`DATABASE_URL_DIRECT`）を使い、`make kpi ENV=production` で KPI の SQL（SDD 11章）を production に流す。件数だけを実行の要約（`$GITHUB_STEP_SUMMARY`）に出し、回答の中身は出さない。結果の見方は 05 6.1 |
+| `kpi.yml` | 毎月1日（schedule）と、手で（`workflow_dispatch`。`gh workflow run kpi.yml`） | GitHub の環境 `production-backup`（承認なし）で、`db-backup.yml` と同じ読み取り専用の接続（`DATABASE_URL_DIRECT`）を使い、`make kpi ENV=production` で KPI の SQL（SDD 11章）を production に流す。デプロイ後の確認専用のワークスペースの ID は、同じ環境の変数 `CHECK_WORKSPACE_ID` から渡す（03 5.4 K）。件数だけを実行の要約（`$GITHUB_STEP_SUMMARY`）に出し、回答の中身は出さない。結果の見方は 05 6.1 |
 | （Terraform） | — | CI では動かさない。人が `make infra-plan` / `make infra-apply`（`ENV` は `shared` / `staging` / `production`）で動かす（03 5.2） |
 
 Google Cloud へは Workload Identity Federation で入る（ADR-027）。WIF の変数はリポジトリにあるので、`build.yml`・`deploy.yml`・`db-backup.yml` のどれからも読める。入れるのは `main` で動くワークフローだけ（3章）。
@@ -79,8 +79,8 @@ gcloud artifacts docker images describe "asia-southeast1-docker.pkg.dev/{GCP_PRO
 
 # デプロイのジョブ（GitHub の環境 $TARGET。production は承認のあと）
 # 後の昇格が先に入っていたら（古い実行の再実行も）、古い版を出さずに終える
-git fetch origin main
-[ "$(git show origin/main:deploy/$TARGET/version)" = "$SHA" ] || exit 0
+# （チェックアウトにトークンを残さないので、main の今のファイルは GitHub の API で読む）
+[ "$(gh api -H 'Accept: application/vnd.github.raw' "repos/$GITHUB_REPOSITORY/contents/deploy/$TARGET/version?ref=main")" = "$SHA" ] || exit 0
 
 # 1. その SHA のコードと依存（Bun もその SHA が指定する版）で、マイグレーションと API の新しいリビジョン
 #    （DATABASE_URL_DIRECT は環境のシークレット）
@@ -150,8 +150,9 @@ DB は戻せない（ADR-016）。1回の昇格で新しく当たるマイグレ
 
 こう書いていれば、直前の版には戻せる。いちばん先まで出した版より古い版を出すとき、それが直前の版でなければ、5.1 の 3 で確かめる。
 
-- いちばん先まで出した版: その環境の `deploy/{env}/version` に書かれた SHA のうち、`main` の履歴でいちばん新しいもの。DB には、この版までのマイグレーションが当たっている
-- 直前の版: いちばん先まで出した版を出す前に、その環境に出ていた版
+- いちばん先まで出した版: その環境の `deploy/{env}/version` に書かれた SHA のうち、実際に出たもの（それを書いたコミットの `deploy.yml` のデプロイのジョブが、どれかの試行で成功した。デプロイの段を飛ばして終えたジョブは数えない。2章）で、`main` の履歴でいちばん新しいもの。DB には、この版までのマイグレーションが当たっている。書かれたが出なかった版（検査で止まった・承認されなかった・失敗した・後の昇格に追い越された）は数えない
+- 直前の版: いちばん先まで出した版を初めて出す前に、その環境に出ていた版（同じく、実際に出たもの）
+- マイグレーションが当たったかもしれない版: その環境に書かれた SHA のうち、`deploy.yml` のデプロイの段がどれかの試行で動いた（飛ばしていない）が、デプロイのジョブはどの試行でも成功しなかった（デプロイの段を飛ばして成功した試行は、成功に数えない）もので、いちばん先まで出した版より `main` の履歴で新しいもの。`make deploy-api` はマイグレーションを当ててから新しいリビジョンを出す（マイグレーションは版ごとにまとめて当たるか、まったく当たらないか）。デプロイの段が成功していればマイグレーションは当たっている（後の確認で失敗し、新しいリビジョンに流れていないことがある）。失敗した・取り消された・まだ動いているなら、当たったかどうか分からない。`make promote` は、出す版がこの版より古ければ、出す版に無いこの版までのマイグレーションを「DB に当たっているかもしれず、出す版に無いもの」として本文に出す
 
 | 変えたいこと | 1回目の昇格（expand） | 次以降の昇格（contract） |
 |---|---|---|

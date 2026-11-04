@@ -3073,7 +3073,7 @@ make test・make typecheck・make lint が通る状態をゴールとする。{G
 
 ## Step 41: CI/CD（GitHub Actions と昇格の仕組み）
 
-Status:
+Status: done 2026-11-04
 
 ```
 docs/04_deployment-procedure.md 2章のワークフローと、昇格・ロールバックの仕組みを作ってください。

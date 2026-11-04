@@ -8,7 +8,9 @@ import {
   ana,
   apiError,
   type Call,
+  readAgainOnFocus,
   renderApp,
+  setViewport,
   stubApi,
   toastAfter,
 } from "../test/api";
@@ -123,6 +125,7 @@ function executionApi({
   ideaArchived = false,
   patch,
   create,
+  holdCreate,
   remove,
   history = [],
   members = true,
@@ -138,6 +141,8 @@ function executionApi({
   patch?: () => Response;
   /** Answers P9 POST; undefined makes the item and keeps it. */
   create?: () => Response | undefined;
+  /** Asked at each P9 POST: a promise holds its answer until it settles. */
+  holdCreate?: () => Promise<void> | undefined;
   /** Answers P10 DELETE; undefined deletes. */
   remove?: () => Response | undefined;
   history?: HistoryEntry[];
@@ -172,23 +177,29 @@ function executionApi({
       return Response.json({ items });
     }
     if (method === "POST" && path === `${api}/execution-items`) {
-      const answered = create?.();
-      if (answered !== undefined) return answered;
-      const body = call.body as Partial<ExecutionItem> & {
-        type: ExecutionItem["type"];
-        title: string;
+      const answer = () => {
+        const answered = create?.();
+        if (answered !== undefined) return answered;
+        const body = call.body as Partial<ExecutionItem> & {
+          type: ExecutionItem["type"];
+          title: string;
+        };
+        const made = executionItem(
+          body.type,
+          "5e0c0000-0000-4000-8000-000000000099",
+          body.title,
+          { ...body, sortOrder: items.length },
+        );
+        items.push(made);
+        return Response.json(made, { status: 201 });
       };
-      const made = executionItem(
-        body.type,
-        "5e0c0000-0000-4000-8000-000000000099",
-        body.title,
-        { ...body, sortOrder: items.length },
-      );
-      items.push(made);
-      return Response.json(made, { status: 201 });
+      const held = holdCreate?.();
+      return held === undefined ? answer() : held.then(answer);
     }
     if (method === "PUT" && path === `${api}/execution-items/order`) {
-      return new Response(null, { status: 204 });
+      return archivedNow()
+        ? apiError(409, "ARCHIVED")
+        : new Response(null, { status: 204 });
     }
     const one = path.match(/^\/api\/v1\/execution-items\/([\w-]+)$/);
     if (one !== null && method === "PATCH") {
@@ -380,10 +391,7 @@ describe("22 Execution (design-spec 6.13)", () => {
     await screen.findByRole("heading", { level: 2, name: "Book venue" });
     items.splice(items.indexOf(venue), 1);
     // The window's focus reads the list again (TanStack Query's refetch on focus).
-    act(() => {
-      focusManager.setFocused(false);
-      focusManager.setFocused(true);
-    });
+    readAgainOnFocus();
     expect(
       await screen.findByRole("heading", { level: 2, name: /Not found/ }),
     ).toBeTruthy();
@@ -1149,5 +1157,274 @@ describe("22 Execution (design-spec 6.13)", () => {
     expectLocked(dialog, "It's archived");
     expect(screen.queryByText("This plan is archived")).toBeNull();
     expect(sent(calls, "POST", `${api}/execution-items`)).toHaveLength(1);
+  });
+
+  /** An open question on the tab already: the first, shown beside the list. */
+  const boxes = executionItem(
+    "open_question",
+    "5e0c0000-0000-4000-8000-000000000041",
+    "Who supplies the boxes?",
+  );
+
+  /**
+   * New open question sent with Add and Cancel pressed while it is on its way, its answer
+   * held until `answerAdd`; `create` answers it (and any Retry), undefined making it.
+   */
+  async function cancelWhileAdding(create?: () => Response | undefined) {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    let isFirst = true;
+    const calls = executionApi({
+      items: [...everything(), boxes],
+      create,
+      holdCreate: () => {
+        if (!isFirst) return undefined;
+        isFirst = false;
+        return new Promise<void>((resolve) => {
+          answerAdd = resolve;
+        });
+      },
+    });
+    const router = renderApp(`${base}?tab=questions`);
+    await screen.findByRole("heading", { level: 2, name: boxes.title });
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "Add open question",
+      })[0] as Element,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "New open question",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Open Question/ }),
+      "Is the plaza busy on Sundays?",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    const posts = () => sent(calls, "POST", `${api}/execution-items`);
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New open question" }),
+      ).toBeNull(),
+    );
+    return { user, router, posts, answerAdd: async () => answerAdd() };
+  }
+
+  /** The titles of the Open Questions in the list. */
+  const questionTitles = () =>
+    within(screen.getByRole("grid", { name: "Open Questions" }))
+      .getAllByRole("row")
+      .map((row) => row.textContent?.split(/Open/)[0]);
+
+  test("Cancel while Add is on its way, and it goes through: the item is made, and the user is not taken to it", async () => {
+    const { router, answerAdd } = await cancelWhileAdding();
+    const entries = router.history.length;
+    await answerAdd();
+    await waitFor(() =>
+      expect(questionTitles()).toEqual([
+        "Who supplies the boxes?",
+        "Is the plaza busy on Sundays?",
+      ]),
+    );
+    expect(router.state.location.search).toEqual({ tab: "questions" });
+    expect(router.history.length).toBe(entries);
+    expect(
+      screen.getByRole("heading", { level: 2, name: boxes.title }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("Cancel while Add is on its way, and no answer comes: a toast says Couldn't save, and its Retry sends the same item, which is made (6.0.6)", async () => {
+    let isFailing = true;
+    const { user, router, posts, answerAdd } = await cancelWhileAdding(() => {
+      if (isFailing) throw new TypeError("Failed to fetch");
+      return undefined;
+    });
+    const toast = await toastAfter("Couldn't save", answerAdd);
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posts()).toHaveLength(2));
+    expect(posts()[1]?.body).toEqual(posts()[0]?.body);
+    await waitFor(() =>
+      expect(questionTitles()).toContain("Is the plaza busy on Sundays?"),
+    );
+    expect(router.state.location.search).toEqual({ tab: "questions" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("Cancel while Add is on its way, and it is refused as the plan is archived: a toast with the reason and no Retry, and 22 reads as archived", async () => {
+    let archived = false;
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    const calls = executionApi({
+      items: [...everything(), boxes],
+      archived: () => archived,
+      create: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+      holdCreate: () =>
+        new Promise<void>((resolve) => {
+          answerAdd = resolve;
+        }),
+    });
+    renderApp(`${base}?tab=questions`);
+    await screen.findByRole("heading", { level: 2, name: boxes.title });
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "Add open question",
+      })[0] as Element,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "New open question",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Open Question/ }),
+      "Is the plaza busy on Sundays?",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    const planReads = () =>
+      calls.filter(({ method, path }) => method === "GET" && path === api)
+        .length;
+    const readsBefore = planReads();
+    const toast = await toastAfter("Couldn't save. It's archived.", async () =>
+      answerAdd(),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // The toast reads the screen again, once: the closed form reads nothing itself.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(planReads()).toBe(readsBefore + 1);
+  });
+
+  test("Cancel while Add is on its way, and it fails unexpectedly (500): Something went wrong with its Ref and Retry, in a toast", async () => {
+    const { posts, answerAdd } = await cancelWhileAdding(() =>
+      apiError(500, "INTERNAL"),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      answerAdd,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(posts()).toHaveLength(1);
+    // A toast, not the small dialog of a modal's failure.
+    expect(
+      screen.queryByRole("alertdialog", { name: "Alert Something went wrong" }),
+    ).toBeNull();
+  });
+
+  test("New stays open when 22 reads the plan as archived meanwhile, and Add shows the refusal in it; Restore does not open it again (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    executionApi({
+      archived: () => archived,
+      create: () => apiError(409, "ARCHIVED"),
+    });
+    renderApp(`${base}?tab=questions`);
+    const dialog = await newQuestion(user);
+    archived = true;
+    // The window's focus reads the plan again (TanStack Query's refetch on focus).
+    readAgainOnFocus();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "New open question" })).toBe(
+      dialog,
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toContain(
+      "It's archived",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New open question" }),
+      ).toBeNull(),
+    );
+    archived = false;
+    readAgainOnFocus();
+    await waitFor(() =>
+      expect(screen.queryByText("This plan is archived")).toBeNull(),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    act(() => focusManager.setFocused(undefined));
+  });
+
+  test("Reorder stays open when 22 reads the plan as archived meanwhile, and Save order shows the refusal in it (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    executionApi({ archived: () => archived });
+    renderApp(`${base}?tab=launch`);
+    const phase = await screen.findByRole("grid", {
+      name: "Launch · T−30",
+    });
+    await user.click(
+      within(phase).getByRole("button", { name: "More for Print flyers" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Reorder" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Reorder launch steps",
+    });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Move Print flyers up" }),
+    );
+    archived = true;
+    readAgainOnFocus();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Reorder launch steps" })).toBe(
+      dialog,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Save order" }),
+    );
+    expect((await within(dialog).findByRole("alert")).textContent).toContain(
+      "It's archived",
+    );
+    act(() => focusManager.setFocused(undefined));
+  });
+
+  test("on a phone, Edit's sheet stays open when 22 reads the plan as archived meanwhile, and a change in it says why it is refused (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    try {
+      let archived = false;
+      executionApi({
+        archived: () => archived,
+        patch: () => apiError(409, "ARCHIVED"),
+      });
+      renderApp(`${base}?item=${setup.id}`);
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Legal / company setup",
+      });
+      await user.click(screen.getByRole("button", { name: "Edit" }));
+      const sheet = await screen.findByRole("dialog", {
+        name: "Edit milestone",
+      });
+      archived = true;
+      readAgainOnFocus();
+      // Read again as archived: the detail behind reads only, without Edit.
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Edit", hidden: true }),
+        ).toBeNull(),
+      );
+      expect(screen.getByRole("dialog", { name: "Edit milestone" })).toBe(
+        sheet,
+      );
+      await user.type(
+        within(sheet).getByRole("textbox", { name: "Goal" }),
+        "Registered",
+      );
+      expect(
+        await within(sheet).findByText("It's archived", undefined, {
+          timeout: 3000,
+        }),
+      ).toBeTruthy();
+    } finally {
+      act(() => focusManager.setFocused(undefined));
+      setViewport(1024);
+    }
   });
 });

@@ -38,7 +38,7 @@
 | 層 | ファイル | 扱い |
 |---|---|---|
 | ソース（正） | `design-spec.md`・`screen_flow.mermaid`・`01_prd.md`・`02-01_system-design-doc.md`・`03_dev-setup.md`・`04_deployment-procedure.md`・`05_operation-runbook.md`・`06_design-tokens.json` | 事実ごとに正は1つ（下の所有権マップ）。変更のたびに更新する生きた文書 |
-| 派生 | ソースから生成・要約するもの（06 から `make tokens` で作るテーマと PWA のアイコン・マニフェスト `packages/ui-tokens`（vanilla-extract・react-pdf 用）、`make openapi` の書き出し、Phase 4 の実装準備で作る `CLAUDE.md`（リポジトリの直下。`AGENTS.md` はそのリンク）と `claude-code-prompts.md`） | 直接直さない。ソースを直してから作り直す（`claude-code-prompts.md` の `Status:` 行と、分けて足すステップは `/draft:implement` が書く） |
+| 派生 | ソースから生成・要約するもの（06 から `make tokens` で作るテーマと PWA のアイコン・マニフェスト `packages/ui-tokens`（vanilla-extract・react-pdf 用）、`make openapi` の書き出し、Phase 4 の実装準備で作る `CLAUDE.md`（リポジトリの直下。`AGENTS.md` はそのリンク）と `claude-code-prompts.md`、リポジトリの直下の `README.md`（入口。1行の説明は `01_prd.md` の冒頭の文と同じにし、ほかは読む先へのリンクだけを持つ）） | 直接直さない。ソースを直してから作り直す（`claude-code-prompts.md` の `Status:` 行と、分けて足すステップは `/draft:implement` が書く） |
 | アーカイブ | `concept.md`・`brainstorm-notes.md`・`drive-templates/`・`mockups/` | 決めた経緯の記録と、Drive の原本の写しと、合意した見た目のモックアップ。更新しない。今の正はソースを読む |
 
 ### 事実の所有権マップ

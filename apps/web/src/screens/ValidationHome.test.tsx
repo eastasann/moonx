@@ -4,7 +4,7 @@ import {
   keyMetricOf,
 } from "@moonx/domain";
 import type { Me, Role, ValidationHome } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import * as sentry from "../lib/sentry";
@@ -13,10 +13,14 @@ import {
   apiError,
   authError,
   type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
   renderApp,
   stubApi,
+  toastAfter,
 } from "../test/api";
 import { validationHome, workspaceId } from "../test/ideas";
+import { planHome } from "../test/plans";
 import { section01, section02 } from "../test/validation";
 
 // 13 Validation home (design-spec 6.1) and the input mechanism its Edit summary uses
@@ -663,6 +667,214 @@ describe("13's plans (design-spec 6.1・6.12)", () => {
       expect(screen.queryByRole("link", { name: "Add plan" })).toBeNull();
     },
   );
+});
+
+describe("13's M5 and Edit summary while they may not open (SDD 4章, design-spec 6.0.6)", () => {
+  afterEach(cleanupThenRestoreFocus);
+
+  const proceeded = validationHome({ latestDecision: "proceed" });
+
+  /**
+   * 13's API whose V1 answers `read()` each time (a promise holds it back), with the plans
+   * M5 reads and `write` for what is sent (a promise holds it back too).
+   */
+  function changingApi(
+    read: () => ValidationHome | Promise<ValidationHome>,
+    write: (call: Call) => Response | Promise<Response> | undefined = () =>
+      undefined,
+  ) {
+    return stubApi((call) => {
+      const { method, path: called } = call;
+      if (method === "GET" && called === "/api/v1/me") {
+        return Response.json(ana);
+      }
+      if (method === "PATCH" && called === "/api/v1/me") {
+        return Response.json(ana);
+      }
+      if (method === "GET" && called === `${ideaPath}/validation`) {
+        return (async () => Response.json(await read()))();
+      }
+      if (
+        method === "GET" &&
+        called === `${ideaPath}/plans?includeArchived=true`
+      ) {
+        return Response.json({ items: [] });
+      }
+      return write(call);
+    });
+  }
+
+  const reads = (calls: Call[]) =>
+    calls.filter(
+      ({ method, path: called }) =>
+        method === "GET" && called === `${ideaPath}/validation`,
+    ).length;
+
+  test("M5's URL before Proceed: nothing opens, and once 13 is read the URL drops it in place; a Proceed read later opens nothing", async () => {
+    let data = home;
+    changingApi(() => data);
+    const router = renderApp(`${path}?modal=create-plan`);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Bacolod Health Bowl",
+    });
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(router.history.length).toBe(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    data = proceeded;
+    readAgainOnFocus();
+    expect(await screen.findByRole("link", { name: "Add plan" })).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("19's Proceed: M5's URL over a cached 13 still without Proceed waits for 13 read again, and that read opens M5", async () => {
+    let read: () => ValidationHome | Promise<ValidationHome> = () => home;
+    changingApi(() => read());
+    const router = renderApp(path);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Bacolod Health Bowl",
+    });
+    let release = () => {};
+    const afterProceed = new Promise<ValidationHome>((resolve) => {
+      release = () => resolve(proceeded);
+    });
+    read = () => afterProceed;
+    readAgainOnFocus();
+    await act(() => router.navigate({ href: `${path}?modal=create-plan` }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(router.state.location.search).toEqual({ modal: "create-plan" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    release();
+    expect(
+      await screen.findByRole("dialog", { name: "Create plan draft" }),
+    ).toBeTruthy();
+    expect(router.state.location.search).toEqual({ modal: "create-plan" });
+  });
+
+  test("M5 opened, then 13 read again as archived: M5 stays until closed, and Create draft says why in it", async () => {
+    const user = userEvent.setup();
+    let data = proceeded;
+    const calls = changingApi(
+      () => data,
+      ({ method, path: called }) =>
+        method === "POST" && called === `${ideaPath}/plans`
+          ? apiError(409, "ARCHIVED")
+          : undefined,
+    );
+    const router = renderApp(`${path}?modal=create-plan`);
+    const dialog = await screen.findByRole("dialog", {
+      name: "Create plan draft",
+    });
+    await within(dialog).findByRole("textbox", { name: /Plan name/ });
+    data = validationHome({ latestDecision: "proceed", archived: true });
+    const before = reads(calls);
+    readAgainOnFocus();
+    await screen.findByText("This idea is archived");
+    expect(reads(calls)).toBeGreaterThan(before);
+    expect(screen.getByRole("dialog", { name: "Create plan draft" })).toBe(
+      dialog,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Create draft" }),
+    );
+    expect(await within(dialog).findByText("Couldn't save")).toBeTruthy();
+    expect(within(dialog).getByText("It's archived")).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(router.state.location.search).toEqual({});
+  });
+
+  /**
+   * Opens M5 from 13's Add plan, presses Create draft with P1 POST held, then Back.
+   * `answer` then answers it.
+   */
+  async function backFromM5() {
+    const user = userEvent.setup();
+    let release: (answer: () => Response) => void = () => {};
+    const sends: Call[] = [];
+    const calls = changingApi(
+      () => proceeded,
+      (call) => {
+        if (call.method !== "POST" || call.path !== `${ideaPath}/plans`) {
+          return undefined;
+        }
+        sends.push(call);
+        return new Promise<Response>((resolve) => {
+          release = (answer) => resolve(answer());
+        });
+      },
+    );
+    const router = renderApp(path);
+    await user.click(await screen.findByRole("link", { name: "Add plan" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Create plan draft",
+    });
+    await user.click(
+      await within(dialog).findByRole("button", { name: "Create draft" }),
+    );
+    await waitFor(() => expect(sends).toHaveLength(1));
+    act(() => router.history.back());
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    return {
+      calls,
+      sends,
+      router,
+      answer: (response: () => Response) => act(() => release(response)),
+    };
+  }
+
+  test("M5 closed by Back while Create draft is on its way: the draft it makes reads 13 again, and its 20 does not open", async () => {
+    const { calls, router, answer } = await backFromM5();
+    const before = reads(calls);
+    answer(() =>
+      Response.json(
+        planHome({
+          id: "3d6f0a2c-5b1e-4c8d-9a7f-2e4b6c8d0a40",
+          name: "Plan A",
+        }),
+        { status: 201 },
+      ),
+    );
+    await waitFor(() => expect(reads(calls)).toBeGreaterThan(before));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(router.state.location.pathname).toBe(path);
+    expect(router.state.location.search).toEqual({});
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("M5 closed by Back while Create draft is on its way, then the decision is no longer Proceed: its words alone, and 13 read again", async () => {
+    const { calls, sends, answer } = await backFromM5();
+    const before = reads(calls);
+    const toast = await toastAfter(
+      "The latest decision is no longer Proceed.",
+      async () => answer(() => apiError(409, "DECISION_NOT_PROCEED")),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() => expect(reads(calls)).toBeGreaterThan(before));
+    expect(sends).toHaveLength(1);
+  });
+
+  test("Edit summary opened, then 13 read again as archived: it stays, and what is typed is refused in it", async () => {
+    let data = home;
+    changingApi(
+      () => data,
+      ({ method, path: called }) =>
+        method === "PATCH" && called === ideaPath
+          ? apiError(409, "ARCHIVED")
+          : undefined,
+    );
+    renderApp(path);
+    const { user, sheet } = await openEditSummary();
+    data = validationHome({ archived: true });
+    readAgainOnFocus();
+    await screen.findByText("This idea is archived");
+    expect(screen.getByRole("dialog", { name: "Edit summary" })).toBe(sheet);
+    await user.type(concept(sheet), "!");
+    await user.tab();
+    expect(await within(sheet).findByText("It's archived")).toBeTruthy();
+  });
 });
 
 test("a lost session met by an action of ⋯ leaves for the sign-in screen (SDD 8.2)", async () => {

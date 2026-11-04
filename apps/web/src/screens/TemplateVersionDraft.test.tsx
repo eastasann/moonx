@@ -3,12 +3,21 @@ import type {
   TemplateCheckResult,
   TemplateVersionDetail,
 } from "@moonx/schemas";
+import { focusManager } from "@tanstack/react-query";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { TYPING_PAUSE_MS } from "../lib/autosave";
 import { operator } from "../test/admin";
-import { apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  apiError,
+  type Call,
+  readAgainOnFocus,
+  renderApp,
+  setViewport,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 
 // 27 Admin: Edit Template, a draft's editing (design-spec 6.17「下書きの編集」): each
 // node's fields saved as typed, the kind's settings, adding, deleting and reordering in
@@ -1176,6 +1185,470 @@ describe("27: adding, deleting and reordering in the tree (design-spec 6.17)", (
     expect(router.state.location.search.node).toMatch(/^1a2b3c4d/);
   });
 
+  /**
+   * Add section sent with 10 Judgment and Cancel pressed while it is on its way, its
+   * answer held until `answerAdd`: `first` answers it (null: no answer comes), and any
+   * Retry is answered by `later`, which makes it unless it answers itself.
+   */
+  async function cancelWhileAddingSection(
+    first: (draft: TemplateVersionDetail) => Response | null,
+    later: (draft: TemplateVersionDetail) => Response | undefined = () =>
+      undefined,
+  ) {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    let isFirst = true;
+    let draft = () => validation();
+    const api = draftApi(validation(), {
+      answer: (call) => {
+        if (call.method !== "POST" || !call.path.endsWith("/sections"))
+          return undefined;
+        if (!isFirst) return later(draft());
+        isFirst = false;
+        return new Promise<Response>((resolve, reject) => {
+          answerAdd = () => {
+            const answered = first(draft());
+            if (answered === null) reject(new TypeError("Failed to fetch"));
+            else resolve(answered);
+          };
+        });
+      },
+    });
+    draft = api.current;
+    const router = open();
+    await user.click(
+      await screen.findByRole("button", { name: "Add section" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Add section" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Key/ }),
+      "10",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Title/ }),
+      "Judgment",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add section" }),
+    );
+    const posts = () => sent(api.calls, "POST", "/sections");
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Add section" })).toBeNull(),
+    );
+    return { user, router, posts, answerAdd: async () => answerAdd() };
+  }
+
+  test("Cancel while Add section is on its way, and no answer comes: a toast says Couldn't save, and its Retry sends the same section, which joins the tree (6.0.6)", async () => {
+    const { user, router, posts, answerAdd } = await cancelWhileAddingSection(
+      () => null,
+    );
+    const toast = await toastAfter("Couldn't save", answerAdd);
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posts()).toHaveLength(2));
+    expect(posts()[1]?.body).toEqual({ key: "10", title: "Judgment" });
+    expect(await within(await treeOf()).findByText(/Judgment/)).toBeTruthy();
+    // Made, not chosen: the user is where they were.
+    expect(router.state.location.search).not.toHaveProperty("node");
+  });
+
+  test("Cancel while Add section is on its way, and the draft was published meanwhile: 27's words in a toast, without Retry, and 27 reads it as published", async () => {
+    const { user, answerAdd } = await cancelWhileAddingSection((draft) => {
+      draft.status = "published";
+      return apiError(409, "PUBLISHED_READ_ONLY");
+    });
+    const toast = await toastAfter(
+      "This version was already published",
+      answerAdd,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Add section" })).toBeNull(),
+    );
+    // Toasts outlive the test (test/api.tsx): the later ones look for these words too.
+    await user.click(within(toast).getByRole("button", { name: "Close" }));
+  });
+
+  test("Cancel while Add section is on its way, no answer comes, and the toast's Retry finds the draft published meanwhile: 27's words in a toast, and 27 reads it as published", async () => {
+    const { user, posts, answerAdd } = await cancelWhileAddingSection(
+      () => null,
+      (draft) => {
+        draft.status = "published";
+        return apiError(409, "PUBLISHED_READ_ONLY");
+      },
+    );
+    const toast = await toastAfter("Couldn't save", answerAdd);
+    const refused = await toastAfter("This version was already published", () =>
+      user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    expect(posts()).toHaveLength(2);
+    expect(within(refused).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Add section" })).toBeNull(),
+    );
+    // Toasts outlive the test (test/api.tsx): the later ones look for these words too.
+    await user.click(within(refused).getByRole("button", { name: "Close" }));
+  });
+
+  test("Cancel while Add section is on its way, and it fails unexpectedly (500): Something went wrong with its Ref and Retry, in a toast", async () => {
+    const { answerAdd } = await cancelWhileAddingSection(() =>
+      apiError(500, "INTERNAL"),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      answerAdd,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(
+      screen.queryByRole("alertdialog", { name: "Alert Something went wrong" }),
+    ).toBeNull();
+  });
+
+  test("Cancel while Add question is on its way, and the API is down: a toast with Couldn't save and its Ref; its Retry sends the same question", async () => {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    let isFirst = true;
+    let isFailing = true;
+    const { calls } = draftApi(validation(), {
+      answer: (call) => {
+        if (call.method !== "POST" || !call.path.endsWith("/questions"))
+          return undefined;
+        if (!isFirst)
+          return isFailing ? apiError(503, "UPSTREAM_UNAVAILABLE") : undefined;
+        isFirst = false;
+        return new Promise<Response>((resolve) => {
+          answerAdd = () => resolve(apiError(503, "UPSTREAM_UNAVAILABLE"));
+        });
+      },
+    });
+    open(secondId);
+    await screen.findByRole("heading", { level: 2, name: "Return" });
+    await user.click(
+      screen.getByRole("button", { name: "More actions for 08 Return" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Add question" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add a question to Return",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Question ID/ }),
+      "PAYBACK",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Title/ }),
+      "PAYBACK",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Question(?! ID)/ }),
+      "How soon does it pay back?",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add question" }),
+    );
+    const posts = () =>
+      sent(calls, "POST", `/template-sections/${secondId}/questions`);
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    const toast = await toastAfter("Couldn't save. Ref: 8f14e45f", async () =>
+      answerAdd(),
+    );
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posts()).toHaveLength(2));
+    expect(posts()[1]?.body).toEqual(posts()[0]?.body);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  /** Section 10 Judgment, made in `draft` as AD4 makes it, and the draft answered. */
+  const judgmentMade = (draft: TemplateVersionDetail) => {
+    draft.sections.push({
+      id: newId(),
+      key: "10",
+      title: "Judgment",
+      part: null,
+      subtitle: null,
+      guidance: null,
+      sortOrder: draft.sections.length,
+      questions: [],
+    });
+    return Response.json(draft, { status: 201 });
+  };
+
+  /** Lets what settles after an answer settle: a move it would make has been made. */
+  const settled = () =>
+    act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+
+  /** Where 27 is left for, mid-send: 26 on another template. */
+  const elsewhere = "/admin/templates?kind=self_analysis";
+
+  test("Cancel while Add section is on its way, and it goes through: the section joins the tree, unchosen, and the entry stays (6.0.6)", async () => {
+    const { router, answerAdd } = await cancelWhileAddingSection(judgmentMade);
+    const entries = router.history.length;
+    await answerAdd();
+    expect(await within(await treeOf()).findByText(/Judgment/)).toBeTruthy();
+    await settled();
+    expect(router.state.location.search).not.toHaveProperty("node");
+    expect(router.history.length).toBe(entries);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("27 left while Add section is on its way, and it goes through: the screen gone to takes no node", async () => {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    const api = draftApi(validation(), {
+      answer: (call) =>
+        call.method === "POST" && call.path.endsWith("/sections")
+          ? new Promise<Response>((resolve) => {
+              answerAdd = () => resolve(judgmentMade(api.current()));
+            })
+          : undefined,
+    });
+    const router = open();
+    await user.click(
+      await screen.findByRole("button", { name: "Add section" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Add section" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Key/ }),
+      "10",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Title/ }),
+      "Judgment",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add section" }),
+    );
+    await waitFor(() =>
+      expect(sent(api.calls, "POST", "/sections")).toHaveLength(1),
+    );
+    await act(() => router.navigate({ href: elsewhere }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Add section" })).toBeNull(),
+    );
+    const entries = router.history.length;
+    answerAdd();
+    await settled();
+    expect(router.state.location.href).toBe(elsewhere);
+    expect(router.history.length).toBe(entries);
+  });
+
+  test("Cancel while Add question is on its way, and it goes through: the question is made, and the node chosen stays", async () => {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    const api = draftApi(validation(), {
+      answer: (call) => {
+        if (call.method !== "POST" || !call.path.endsWith("/questions")) {
+          return undefined;
+        }
+        return new Promise<Response>((resolve) => {
+          answerAdd = () => {
+            const draft = api.current();
+            draft.sections[1]?.questions.push(
+              question(newId(), "V.08.PAYBACK", "PAYBACK", { hasFau: false }),
+            );
+            resolve(Response.json(draft, { status: 201 }));
+          };
+        });
+      },
+    });
+    const router = open(secondId);
+    await screen.findByRole("heading", { level: 2, name: "Return" });
+    await user.click(
+      screen.getByRole("button", { name: "More actions for 08 Return" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Add question" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add a question to Return",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Question ID/ }),
+      "PAYBACK",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Title/ }),
+      "PAYBACK",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Question(?! ID)/ }),
+      "How soon does it pay back?",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add question" }),
+    );
+    await waitFor(() =>
+      expect(
+        sent(api.calls, "POST", `/template-sections/${secondId}/questions`),
+      ).toHaveLength(1),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const entries = router.history.length;
+    answerAdd();
+    await settled();
+    expect(router.state.location.search).toEqual({ node: secondId });
+    expect(router.history.length).toBe(entries);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Return" }),
+    ).toBeTruthy();
+  });
+
+  /**
+   * Publish as v3 pressed and 27 left for {@link elsewhere} while it is on its way, its
+   * answer held until `answerPublish`: `first` answers it (null: no answer comes), and
+   * `later` any Retry.
+   */
+  async function leaveWhilePublishing(
+    first: () => Response | null,
+    later: () => Response = () => publishedNow(),
+  ) {
+    const user = userEvent.setup();
+    let answerPublish = () => {};
+    let isFirst = true;
+    const { calls } = draftApi(validation(), {
+      answer: (call) => {
+        if (
+          call.method !== "POST" ||
+          !call.path.endsWith(`${draftId}/publish`)
+        ) {
+          return undefined;
+        }
+        if (!isFirst) return later();
+        isFirst = false;
+        return new Promise<Response>((resolve, reject) => {
+          answerPublish = () => {
+            const answered = first();
+            if (answered === null) reject(new TypeError("Failed to fetch"));
+            else resolve(answered);
+          };
+        });
+      },
+    });
+    const router = open();
+    const publish = await screen.findByRole("button", {
+      name: "Publish as v3",
+    });
+    await waitFor(() =>
+      expect((publish as HTMLButtonElement).disabled).toBe(false),
+    );
+    await user.click(publish);
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", { name: "Publish as v3?" }),
+      ).getByRole("button", { name: "Publish" }),
+    );
+    const publishes = () => sent(calls, "POST", `${draftId}/publish`);
+    await waitFor(() => expect(publishes()).toHaveLength(1));
+    await act(() => router.navigate({ href: elsewhere }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Publish as v3" }),
+      ).toBeNull(),
+    );
+    return {
+      user,
+      router,
+      publishes,
+      answerPublish: async () => answerPublish(),
+    };
+  }
+
+  const publishedNow = () =>
+    Response.json({
+      versionNumber: 3,
+      publishedAt: "2026-10-22T02:00:00.000Z",
+    });
+
+  test("27 left while Publish is on its way, and it goes through: Validation v3 is published, and the user stays where they went (6.0.6)", async () => {
+    const { router, answerPublish } = await leaveWhilePublishing(publishedNow);
+    const entries = router.history.length;
+    await toastAfter("Validation v3 is published", answerPublish);
+    await settled();
+    expect(router.state.location.href).toBe(elsewhere);
+    expect(router.history.length).toBe(entries);
+  });
+
+  test("27 left while Publish is on its way, and no answer comes: a toast says Couldn't save, and its Retry publishes it, staying where the user went", async () => {
+    const { user, router, publishes, answerPublish } =
+      await leaveWhilePublishing(() => null);
+    const toast = await toastAfter("Couldn't save", answerPublish);
+    await toastAfter("Validation v3 is published", () =>
+      user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    expect(publishes()).toHaveLength(2);
+    await settled();
+    expect(router.state.location.href).toBe(elsewhere);
+  });
+
+  test("27 left while Publish is on its way, and the check finds problems: 27's words in a toast, without Retry", async () => {
+    const { user, answerPublish } = await leaveWhilePublishing(() =>
+      apiError(422, "TEMPLATE_INVALID"),
+    );
+    const toast = await toastAfter(
+      "This version has problems. Fix them on Check, then publish.",
+      answerPublish,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    // Toasts outlive the test (test/api.tsx): the later ones look for these words too.
+    await user.click(within(toast).getByRole("button", { name: "Close" }));
+  });
+
+  test("27 left while Publish is on its way, and it fails unexpectedly (500): Something went wrong with its Ref and Retry, in a toast", async () => {
+    const { user, answerPublish } = await leaveWhilePublishing(() =>
+      apiError(500, "INTERNAL"),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      answerPublish,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+    await user.click(within(toast).getByRole("button", { name: "Close" }));
+  });
+
+  test("27 left while Delete is on its way, and it goes through: the screen gone to keeps its URL", async () => {
+    const user = userEvent.setup();
+    let answerDelete = () => {};
+    draftApi(validation(), {
+      answer: (call) =>
+        call.method === "DELETE"
+          ? new Promise<Response>((resolve) => {
+              answerDelete = () => resolve(new Response(null, { status: 204 }));
+            })
+          : undefined,
+    });
+    const router = open(oceanId);
+    await screen.findByRole("heading", { level: 2, name: "OCEAN" });
+    await user.click(
+      screen.getByRole("button", { name: "More actions for V.01.OCEAN OCEAN" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Delete question" }),
+    );
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: "Delete V.01.OCEAN OCEAN?",
+        }),
+      ).getByRole("button", { name: "Delete" }),
+    );
+    await act(() => router.navigate({ href: elsewhere }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { level: 2, name: "OCEAN" }),
+      ).toBeNull(),
+    );
+    const entries = router.history.length;
+    answerDelete();
+    await settled();
+    expect(router.state.location.href).toBe(elsewhere);
+    expect(router.history.length).toBe(entries);
+  });
+
   test("Delete question asks, then deletes and closes its detail", async () => {
     const user = userEvent.setup();
     const { calls, current } = draftApi();
@@ -1437,18 +1910,36 @@ describe("27: adding, deleting and reordering in the tree (design-spec 6.17)", (
     }
   });
 
+  test("on a phone, Edit's sheet stays open when 27 reads the draft as published meanwhile, until it is closed (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    try {
+      const { current } = draftApi();
+      open(secondId);
+      await screen.findByRole("heading", { level: 2, name: "Return" });
+      await user.click(screen.getByRole("button", { name: "Edit" }));
+      const sheet = await screen.findByRole("dialog", { name: /^Edit / });
+      current().status = "published";
+      readAgainOnFocus();
+      // Read again as published: the detail behind has no Edit.
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Edit", hidden: true }),
+        ).toBeNull(),
+      );
+      expect(screen.getByRole("dialog", { name: /^Edit / })).toBe(sheet);
+      await user.keyboard("{Escape}");
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: /^Edit / })).toBeNull(),
+      );
+    } finally {
+      act(() => focusManager.setFocused(undefined));
+      setViewport(1024);
+    }
+  });
+
   test("a phone's floating + (Add section) opens the dialog online, and offline cannot be pressed (6.17)", async () => {
     const user = userEvent.setup();
-    const setViewport = (width: number) =>
-      act(() =>
-        (
-          window as unknown as {
-            happyDOM: {
-              setViewport: (size: { width: number; height: number }) => void;
-            };
-          }
-        ).happyDOM.setViewport({ width, height: 900 }),
-      );
     setViewport(390);
     const onLine = vi.spyOn(navigator, "onLine", "get");
     try {

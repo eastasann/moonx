@@ -12,9 +12,10 @@ import {
   Text,
 } from "@moonx/ui-web";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, unwrap } from "../lib/api";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import {
   commentsKey,
@@ -22,29 +23,33 @@ import {
   selfAnalysisKey,
   workspaceKey,
 } from "../lib/queries";
+import { useSendThrough } from "../lib/send";
+import { useFailureOnceClosed } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import { failureCode } from "./SendFailure";
 
-/** Whether the component is still on screen, for what settles after it may have gone. */
-function useIsOpen() {
-  const isOpen = useRef(true);
-  useEffect(() => {
-    isOpen.current = true;
-    return () => {
-      isOpen.current = false;
-    };
-  }, []);
-  return isOpen;
-}
-
 /** The refusals of S5 that say why in M6 (SDD 5.8): the self-analysis or a workspace changed. */
 const SHARE_REFUSALS = ["MUST_BE_DONE_TO_SHARE", "NOT_SHAREABLE"] as const;
+
+/** Which of {@link SHARE_REFUSALS} `error` is, if any. */
+const shareRefusalOf = (error: unknown) => {
+  const code = failureCode(error);
+  return SHARE_REFUSALS.find((refusal) => refusal === code);
+};
+
+/** What M6's Save sends (S5): the workspaces chosen, and those shared with as M6 read them. */
+interface SharesSend {
+  workspaceIds: string[];
+  shared: string[];
+}
 
 /**
  * M6 Share (design-spec 3.8・6.11): the team workspaces the user is an Owner or Member of,
  * the ones shared with ticked, and that their Owners and Members, not their Viewers, read
  * it. A workspace is added only once the self-analysis is done; one is taken off at any
  * time. Small; a tray on a phone. Without a team workspace it says to join one (6.0.6).
+ * Save on its way holds Cancel and Escape; Back still closes M6, and a Save that then
+ * fails says so in a toast (6.0.6「送っている間に閉じた送信の失敗」).
  */
 export function ShareDialog({
   home,
@@ -77,38 +82,56 @@ export function ShareDialog({
       workspaces.some((workspace) => workspace.id === id) &&
       (isDone || shared.includes(id)),
   );
-  const isOpen = useIsOpen();
-  const save = useMutation({
-    mutationFn: () =>
-      unwrap(
-        api().api.v1.me["self-analysis"].shares.put({ workspaceIds: chosen }),
+  const isOpen = useIsMounted();
+  // S5 writes no change history (SDD 5.8): no history panel to read again.
+  const sendThrough = useSendThrough({ readsHistoryAgain: false });
+  const share = async ({ workspaceIds, shared: before }: SharesSend) => {
+    const updated = await unwrap(
+      api().api.v1.me["self-analysis"].shares.put({ workspaceIds }),
+    );
+    queryClient.setQueryData(selfAnalysisHomeQuery().queryKey, updated);
+    // Who reads it, and whose comments the owner sees, changed in each workspace.
+    const changed = new Set([...before, ...workspaceIds]);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: selfAnalysisKey }),
+      queryClient.invalidateQueries({ queryKey: commentsKey }),
+      ...[...changed].map((id) =>
+        queryClient.invalidateQueries({ queryKey: workspaceKey(id) }),
       ),
-    onSuccess: async (updated) => {
-      queryClient.setQueryData(selfAnalysisHomeQuery().queryKey, updated);
-      // Who reads it, and whose comments the owner sees, changed in each workspace.
-      const changed = new Set([...shared, ...chosen]);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: selfAnalysisKey }),
-        queryClient.invalidateQueries({ queryKey: commentsKey }),
-        ...[...changed].map((id) =>
-          queryClient.invalidateQueries({ queryKey: workspaceKey(id) }),
-        ),
-      ]);
+    ]);
+  };
+  // Done, or a membership, changed since M6 opened: the choices as they are now.
+  const readAgain = () =>
+    void queryClient.invalidateQueries({
+      queryKey: selfAnalysisHomeQuery().queryKey,
+    });
+  // A refusal M6 no longer shows (Back closed it while Save was on its way): its words in
+  // a toast, as a row's send says a code the screen has words for (6.0.6), 10 read again.
+  // No Retry: the same choice is refused again until 10, read again, changes.
+  const failureOnceClosed = useFailureOnceClosed(
+    (input: SharesSend) => sendThrough(() => share(input)),
+    (error) => {
+      const refusal = shareRefusalOf(error);
+      if (refusal === undefined) return null;
+      readAgain();
+      return t(`errors:${refusal}`);
+    },
+  );
+  const save = useMutation({
+    mutationFn: share,
+    meta: { readsHistoryAgain: false },
+    onSuccess: () => {
       // Back closed M6 meanwhile: closing again would leave 10.
       if (isOpen.current) onClose();
     },
-    onError: (error) => {
-      // Done, or a membership, changed since M6 opened: the choices as they are now.
-      const code = failureCode(error);
-      if (SHARE_REFUSALS.some((refusal) => refusal === code)) {
-        void queryClient.invalidateQueries({
-          queryKey: selfAnalysisHomeQuery().queryKey,
-        });
-      }
+    onError: (error, input) => {
+      // Open, M6 says why; closed, the toast does and reads 10 again itself.
+      if (isOpen.current && shareRefusalOf(error) !== undefined) readAgain();
+      failureOnceClosed(error, input);
     },
   });
-  const code = failureCode(save.error);
-  const refusal = SHARE_REFUSALS.find((candidate) => candidate === code);
+  const send = () => save.mutate({ workspaceIds: chosen, shared });
+  const refusal = shareRefusalOf(save.error);
   return (
     <Dialog
       isOpen
@@ -131,7 +154,7 @@ export function ShareDialog({
           {workspaces.length > 0 && (
             <Button
               variant="primary"
-              onPress={() => save.mutate()}
+              onPress={send}
               isPending={save.isPending}
               isDisabled={!isOnline}
             >
@@ -175,7 +198,7 @@ export function ShareDialog({
           save.error !== null && (
             <ModalSendFailure
               error={save.error}
-              onRetry={() => save.mutate()}
+              onRetry={send}
               isRetryDisabled={save.isPending || !isOnline}
               onClose={onClose}
             />
@@ -189,7 +212,9 @@ export function ShareDialog({
 /**
  * The self-analysis's currency, from 10's ⋯ (design-spec 6.11「通貨」): the amounts of
  * Q15–17 are in it, and changing it converts none of them, as it says. A setting, saved
- * on Save without a history (SDD 5.8 S1 PATCH).
+ * on Save without a history (SDD 5.8 S1 PATCH). Save on its way holds Cancel and Escape;
+ * Back, which leaves 10 as the dialog is not in the URL, does not wait, and a Save that
+ * then fails says so in a toast (6.0.6「送っている間に閉じた送信の失敗」).
  */
 export function CurrencyDialog({
   home,
@@ -210,14 +235,24 @@ export function CurrencyDialog({
       })),
     [],
   );
+  // A setting without a history (SDD 5.8 S1 PATCH): no history panel to read again.
+  const sendThrough = useSendThrough({ readsHistoryAgain: false });
+  const change = async (to: string) => {
+    const updated = await unwrap(
+      api().api.v1.me["self-analysis"].patch({ currency: to }),
+    );
+    queryClient.setQueryData(selfAnalysisHomeQuery().queryKey, updated);
+    await queryClient.invalidateQueries({ queryKey: selfAnalysisKey });
+  };
+  // Left 10 while Save was on its way: its failure in a toast (6.0.6).
+  const failureOnceClosed = useFailureOnceClosed((to: string) =>
+    sendThrough(() => change(to)),
+  );
   const save = useMutation({
-    mutationFn: () =>
-      unwrap(api().api.v1.me["self-analysis"].patch({ currency })),
-    onSuccess: async (updated) => {
-      queryClient.setQueryData(selfAnalysisHomeQuery().queryKey, updated);
-      await queryClient.invalidateQueries({ queryKey: selfAnalysisKey });
-      onClose();
-    },
+    mutationFn: change,
+    meta: { readsHistoryAgain: false },
+    onSuccess: onClose,
+    onError: failureOnceClosed,
   });
   return (
     <Dialog
@@ -240,7 +275,7 @@ export function CurrencyDialog({
           </Button>
           <Button
             variant="primary"
-            onPress={() => save.mutate()}
+            onPress={() => save.mutate(currency)}
             isPending={save.isPending}
             isDisabled={!isOnline}
           >
@@ -266,7 +301,7 @@ export function CurrencyDialog({
         {save.error !== null && (
           <ModalSendFailure
             error={save.error}
-            onRetry={() => save.mutate()}
+            onRetry={() => save.mutate(currency)}
             isRetryDisabled={save.isPending || !isOnline}
             onClose={onClose}
           />

@@ -16,6 +16,7 @@ import {
   type EconomicsResult,
   economicsFieldSchema,
   type economicsSchema,
+  type FauState,
   numberTextSchema,
   operatingDaysSchema,
   percentToRate,
@@ -69,6 +70,7 @@ import {
   AnswerEvidenceSheet,
   AnswerFields,
   type AnswersCache,
+  type AnswerView,
   answerKey,
   moonOf,
   useAnswers,
@@ -102,6 +104,7 @@ import {
   dashboardHref,
   useModal,
   usePanel,
+  useSearchModalAbout,
   useWorkspace,
 } from "../components/workspace";
 import { api, inPath, unwrap } from "../lib/api";
@@ -128,6 +131,7 @@ import {
   economicsQuery,
   ideaKey,
   putSaved,
+  useIsValidationRead,
   validationHomeQuery,
   workspaceKey,
 } from "../lib/queries";
@@ -158,6 +162,11 @@ const SALES_FIELDS = [
 /** M2's `about` for a number (SDD 4章): the validation, keyed by the field. */
 const aboutOf = (validationId: string, field: EconomicsField) =>
   `economics_input:${validationId}:${field}`;
+
+/** What M2 is about on 18: a number, or the answer to WORTH. */
+type EvidenceTarget =
+  | { kind: "number"; view: NumberView }
+  | { kind: "worth"; view: AnswerView & { state: FauState } };
 
 /** Puts a number, as saved, in 18's data. */
 function putNumber(
@@ -862,6 +871,32 @@ function EconomicsBody({
       forFact: isFact,
     }),
   );
+  const worthView =
+    query.data === undefined ||
+    query.data.worthQuestion === null ||
+    query.data.worth.hidden
+      ? null
+      : answers.viewOf(query.data.worthQuestion, query.data.worth);
+
+  // M2 opens on a number, or on WORTH while it has F/A/U (6.0.3), for someone who may
+  // edit. One target for both: a call for each would take off the URL the other names.
+  const aboutNumber = numbers.find(
+    ({ input }) => aboutOf(validationId, input.fieldKey) === about,
+  );
+  const isEvidenceDecided = useIsValidationRead(home.idea.id, query);
+  const evidence = useSearchModalAbout<EvidenceTarget>(
+    modal,
+    "evidence",
+    aboutNumber !== undefined
+      ? { kind: "number", view: aboutNumber }
+      : about === `validation_answer:${validationId}:${WORTH}` &&
+          worthView !== null &&
+          worthView.state !== null
+        ? { kind: "worth", view: { ...worthView, state: worthView.state } }
+        : undefined,
+    canEdit,
+    isEvidenceDecided,
+  );
 
   // A link to a number (`?field=`) opens it, and one to the worth question (`?q=`) opens
   // and focuses it, once the numbers are read.
@@ -1071,10 +1106,6 @@ function EconomicsBody({
   );
 
   const { worth, worthQuestion } = query.data;
-  const worthView =
-    worthQuestion === null || worth.hidden
-      ? null
-      : answers.viewOf(worthQuestion, worth);
   const worthMode = !canEdit ? "open" : isWorthOpen ? "focused" : "quiet";
   const worthItem = {
     kind: "item",
@@ -1112,19 +1143,8 @@ function EconomicsBody({
 
   const sheetView = sheetField === null ? undefined : viewOf(sheetField);
   const evidenceNumber =
-    modal === "evidence" && canEdit
-      ? numbers.find(
-          ({ input }) => aboutOf(validationId, input.fieldKey) === about,
-        )
-      : undefined;
-  const evidenceWorth =
-    modal === "evidence" &&
-    canEdit &&
-    about === `validation_answer:${validationId}:${WORTH}` &&
-    worthView !== null &&
-    worthView.state !== null
-      ? { ...worthView, state: worthView.state }
-      : null;
+    evidence?.kind === "number" ? evidence.view : undefined;
+  const evidenceWorth = evidence?.kind === "worth" ? evidence.view : undefined;
 
   return (
     <>
@@ -1277,7 +1297,7 @@ function EconomicsBody({
           />
         </ModalBoundary>
       )}
-      {evidenceWorth !== null && worthQuestion !== null && (
+      {evidenceWorth !== undefined && (
         <ModalBoundary key="evidence" onClose={modals.close}>
           <AnswerEvidenceSheet
             ideaId={idea.id}
@@ -1286,9 +1306,9 @@ function EconomicsBody({
             label={[
               t("common:itemLabel.question", {
                 section: "08",
-                title: worthQuestion.title,
+                title: evidenceWorth.question.title,
               }),
-              worthQuestion.prompt,
+              evidenceWorth.question.prompt,
             ].join(t("app:separator"))}
             cache={cache}
             answers={answers}

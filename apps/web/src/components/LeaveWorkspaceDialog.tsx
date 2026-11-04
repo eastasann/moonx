@@ -6,10 +6,11 @@ import {
   ToastQueue,
 } from "@moonx/ui-web";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, unwrap } from "../lib/api";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import { membersQuery, meQuery, workspaceKey } from "../lib/queries";
 import { useSendThrough } from "../lib/send";
@@ -31,8 +32,12 @@ const TOAST_MS = 5000;
  * pressed while the leave is on its way waits for its answer: one that went through
  * closes the question as any leave does, and one that failed closes it and says so in a
  * toast, as a send from a row's button does (6.0.6: the only Owner's words, else by
- * the failure's kind, useToastFailure, whose Retry sends it again). A lost session shows
- * nothing: the app takes its way (M9 or the sign-in screen).
+ * the failure's kind, useToastFailure, whose Retry sends it again); so does one that failed
+ * once the screen was left meanwhile (Back). A leave that goes through once the question
+ * has gone (its screen left, or the toast's Retry) leaves the user where they went, unless
+ * that is a page of the workspace left, which could no longer open: then the personal 5
+ * opens (6.0.6「送っている間に閉じた送信の失敗」). A lost session shows nothing: the app
+ * takes its way (M9 or the sign-in screen).
  */
 export function LeaveWorkspaceDialog({
   workspace,
@@ -51,12 +56,15 @@ export function LeaveWorkspaceDialog({
   const isOnline = useIsOnline();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const router = useRouter();
   const sendThrough = useSendThrough();
   const toastFailure = useToastFailure();
   const [isSending, setSending] = useState(false);
   const busy = useRef(false);
   // Cancel pressed while the leave was on its way: its answer closes the question.
   const isCancelled = useRef(false);
+  // The question went with its screen (the user moved on) while the leave was on its way.
+  const isShown = useIsMounted();
   const [failure, setFailure] = useState<unknown>(null);
   const lastOwnerWords = t("errors:LAST_OWNER", { context: "leave" });
 
@@ -91,9 +99,20 @@ export function LeaveWorkspaceDialog({
       return { failure: cause };
     }
   };
+  const isInsideWorkspace = () => {
+    const { pathname } = router.state.location;
+    return (
+      pathname === `/w/${workspace.id}` ||
+      pathname.startsWith(`/w/${workspace.id}/`)
+    );
+  };
   const hasLeft = async () => {
-    if (isOpenNow) {
-      // Away first: the workspace's pages would otherwise say "You don't have access".
+    if (!isShown.current && !isInsideWorkspace()) {
+      // Gone with its screen: the user is left where they went (6.0.6).
+      await queryClient.invalidateQueries({ queryKey: meQuery().queryKey });
+    } else if (isOpenNow || !isShown.current) {
+      // Away first: the workspace's pages would otherwise say "You don't have access",
+      // also to a user who moved to another of them once the question was gone (6.0.6).
       await navigate({
         href: personalId === undefined ? "/" : `/w/${personalId}`,
       });
@@ -138,7 +157,7 @@ export function LeaveWorkspaceDialog({
     }
     busy.current = false;
     setSending(false);
-    if (isCancelled.current) {
+    if (isCancelled.current || !isShown.current) {
       onClose();
       toastOf(outcome.failure);
     } else {

@@ -1,7 +1,8 @@
 import type { Me } from "@moonx/schemas";
 import { ToastContainer, ToastQueue } from "@moonx/ui-web";
+import { focusManager } from "@tanstack/react-query";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 import { createAppRouter } from "../router";
 
@@ -72,6 +73,70 @@ export function stubApi(
   );
   return calls;
 }
+
+/**
+ * Holds the first `method` call to `path` until `release`, then answers it, and every
+ * one after it, with `answer` (a throw: no answer comes). Its `answer` goes to `stubApi`
+ * or a screen's stub, and answers undefined to every other call.
+ */
+export function holdFirst(
+  method: string,
+  path: string,
+  answer: () => Response,
+) {
+  let release = () => {};
+  let isFirst = true;
+  return {
+    answer: (call: Call): Response | Promise<Response> | undefined => {
+      if (call.method !== method || call.path !== path) return undefined;
+      if (!isFirst) return answer();
+      isFirst = false;
+      return new Promise<Response>((resolve, reject) => {
+        release = () => {
+          try {
+            resolve(answer());
+          } catch (cause) {
+            reject(cause);
+          }
+        };
+      });
+    },
+    release: async () => release(),
+  };
+}
+
+/**
+ * Takes the window's focus away and gives it back, so TanStack Query reads the mounted
+ * screen's stale queries again (refetch on focus). The focus stays set by hand until
+ * `focusManager.setFocused(undefined)` hands it back, as `cleanupThenRestoreFocus` does.
+ */
+export const readAgainOnFocus = () =>
+  act(() => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+
+/**
+ * Unmounts the screen, then hands the focus `readAgainOnFocus` set back to the document.
+ * In that order: handed back while the screen is still mounted, the focus would read
+ * its queries again from the network.
+ */
+export function cleanupThenRestoreFocus() {
+  cleanup();
+  act(() => focusManager.setFocused(undefined));
+}
+
+/** Sets happy-dom's viewport to `width` by 900, as a phone's or a desktop's window. */
+export const setViewport = (width: number) =>
+  act(() =>
+    (
+      window as unknown as {
+        happyDOM: {
+          setViewport: (size: { width: number; height: number }) => void;
+        };
+      }
+    ).happyDOM.setViewport({ width, height: 900 }),
+  );
 
 /** Better Auth's error body (SDD 8.1) with the given status. */
 export const authError = (

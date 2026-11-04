@@ -2,7 +2,14 @@ import type { HistoryEntry, Me, Role, UserRef } from "@moonx/schemas";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   answer,
@@ -695,6 +702,178 @@ describe("PNL-2 History (design-spec 6.0.5)", () => {
       expect(within(body).queryByRole("button", { name: "Retry" })).toBeNull();
       expect(
         screen.queryByRole("alertdialog", { name: /Something went wrong/ }),
+      ).toBeNull();
+    });
+  });
+
+  describe("a revert whose panel closed, or whose screen was left, while it was on its way (6.0.5・6.0.6)", () => {
+    const revertPath = `/api/v1/history/${manualId}/revert`;
+    const reverted = () =>
+      Response.json({
+        entry: null,
+        target: {
+          value: null,
+          deleted: false,
+          lockVersion: 3,
+          updatedAt: null,
+          updatedBy: null,
+        },
+      });
+
+    /**
+     * Opens the screen's changes, presses `button` and closes the panel (or leaves the
+     * screen) while the revert is held; `first` answers it (null: no answer comes), and
+     * `later` any Retry.
+     */
+    async function closeWhileReverting({
+      first,
+      later = () => undefined,
+      entries,
+      button = "Revert to this point, 01 WHO",
+      leave = false,
+    }: {
+      first: () => Response | null;
+      later?: () => Response | undefined;
+      entries?: HistoryEntry[];
+      button?: string | RegExp;
+      leave?: boolean;
+    }) {
+      const user = userEvent.setup();
+      let release = () => {};
+      let isFirst = true;
+      const calls = panelApi({
+        ...(entries === undefined ? {} : { entries }),
+        write: () => {
+          if (!isFirst) return later();
+          isFirst = false;
+          return new Promise<Response>((resolve, reject) => {
+            release = () => {
+              const answered = first();
+              if (answered === null) reject(new TypeError("Failed to fetch"));
+              else resolve(answered);
+            };
+          });
+        },
+      });
+      const router = renderApp(base);
+      await user.click(await screen.findByRole("button", { name: "History" }));
+      const body = await findPanel();
+      await user.click(
+        await within(body).findByRole("button", { name: button }),
+      );
+      const posts = () =>
+        calls.filter(
+          ({ method, path }) =>
+            method === "POST" && path.startsWith("/api/v1/history/"),
+        );
+      await waitFor(() => expect(posts()).toHaveLength(1));
+      if (leave) {
+        await router.navigate({ href: ideaPath });
+      } else {
+        await user.click(within(body).getByRole("button", { name: "Close" }));
+      }
+      await waitFor(() => expect(body.isConnected).toBe(false));
+      return { user, calls, router, posts, answer: async () => release() };
+    }
+
+    test("no answer comes: a toast says Couldn't save, and its Retry sends the same revert", async () => {
+      let isFailing = true;
+      const { user, posts, answer } = await closeWhileReverting({
+        first: () => null,
+        later: () => (isFailing ? undefined : reverted()),
+      });
+      const toast = await toastAfter("Couldn't save", answer);
+      isFailing = false;
+      await user.click(within(toast).getByRole("button", { name: "Retry" }));
+      await waitFor(() =>
+        expect(posts().map(({ path }) => path)).toEqual([
+          revertPath,
+          revertPath,
+        ]),
+      );
+    });
+
+    test("the screen left, then unexpected (500): Something went wrong with its Ref and Retry in a toast, not the small dialog", async () => {
+      const { user, router, answer } = await closeWhileReverting({
+        first: () => apiError(500, "INTERNAL"),
+        leave: true,
+      });
+      const toast = await toastAfter(
+        "Something went wrong. Ref: 8f14e45f",
+        answer,
+      );
+      expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+      expect(
+        screen.queryByRole("alertdialog", {
+          name: "Alert Something went wrong",
+        }),
+      ).toBeNull();
+      expect(router.state.location.pathname).toBe(ideaPath);
+      // Toasts outlive the test (test/api.tsx): the later ones look for these words too.
+      await user.click(within(toast).getByRole("button", { name: "Close" }));
+    });
+
+    test("undone elsewhere first: This was already undone in a toast, without Retry, and the screen read again", async () => {
+      const { user, calls, answer } = await closeWhileReverting({
+        first: () => apiError(409, "ALREADY_REVERTED"),
+      });
+      const questionReads = reads(calls, `${validationPath}/questions/01`);
+      const toast = await toastAfter("This was already undone", answer);
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      await waitFor(() =>
+        expect(reads(calls, `${validationPath}/questions/01`)).toBeGreaterThan(
+          questionReads,
+        ),
+      );
+      await user.click(within(toast).getByRole("button", { name: "Close" }));
+    });
+
+    test("a name taken: its words in a toast, without Retry", async () => {
+      const { user, answer } = await closeWhileReverting({
+        first: () => apiError(409, "NAME_TAKEN"),
+      });
+      const toast = await toastAfter("This name is already used", answer);
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      await user.click(within(toast).getByRole("button", { name: "Close" }));
+    });
+
+    test("Undo the whole operation meets another write: its words in a toast, without Retry", async () => {
+      const { user, posts, answer } = await closeWhileReverting({
+        entries: [row(manualId, { batchId, source: "ai_import" })],
+        button: /^Undo the whole operation/,
+        first: () => apiError(409, "BUSY"),
+      });
+      expect(posts()[0]?.path).toBe(
+        `/api/v1/history/batches/${batchId}/revert`,
+      );
+      const toast = await toastAfter(
+        "Something is being changed right now. Try again.",
+        answer,
+      );
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      await user.click(within(toast).getByRole("button", { name: "Close" }));
+    });
+
+    test("refused as archived, or as gone: Couldn't save with the reason in a toast, without Retry", async () => {
+      const archived = await closeWhileReverting({
+        first: () => apiError(409, "ARCHIVED"),
+      });
+      const toast = await toastAfter(
+        "Couldn't save. It's archived.",
+        archived.answer,
+      );
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      cleanup();
+      vi.unstubAllGlobals();
+      const gone = await closeWhileReverting({
+        first: () => apiError(404, "NOT_FOUND"),
+      });
+      const goneToast = await toastAfter(
+        "Couldn't save. It no longer exists.",
+        gone.answer,
+      );
+      expect(
+        within(goneToast).queryByRole("button", { name: "Retry" }),
       ).toBeNull();
     });
   });

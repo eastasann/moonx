@@ -1,11 +1,12 @@
 import type { Notification } from "@moonx/schemas";
-import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   ana,
   type Call,
   renderApp,
+  setViewport,
   stubApi,
   toastAfter,
   toastPlacements,
@@ -15,18 +16,6 @@ import { workspaceId } from "../test/ideas";
 import { home, validationId } from "../test/validation";
 
 // 8 Notifications and the navigation's unread count (design-spec 6.15・5章, SDD 5.11 N1–N3).
-
-/** happy-dom's window, whose viewport a test sets. */
-const setViewport = (width: number) =>
-  act(() =>
-    (
-      window as unknown as {
-        happyDOM: {
-          setViewport: (size: { width: number; height: number }) => void;
-        };
-      }
-    ).happyDOM.setViewport({ width, height: 900 }),
-  );
 
 afterEach(() => {
   vi.unstubAllGlobals();

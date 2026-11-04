@@ -3,21 +3,16 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { operator } from "../test/admin";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  renderApp,
+  setViewport,
+  stubApi,
+} from "../test/api";
 
 // 26 Admin: Templates (design-spec 6.17).
-
-/** happy-dom's window, whose viewport a test sets. */
-const setViewport = (width: number) =>
-  act(() =>
-    (
-      window as unknown as {
-        happyDOM: {
-          setViewport: (size: { width: number; height: number }) => void;
-        };
-      }
-    ).happyDOM.setViewport({ width, height: 900 }),
-  );
 
 afterEach(() => {
   vi.unstubAllGlobals();

@@ -53,7 +53,10 @@ import {
   type ScreenComments,
 } from "../components/CommentsPanel";
 import { ItemHistoryButton } from "../components/HistoryPanel";
-import { useToastFailure } from "../components/ideaActions";
+import {
+  useFailureOnceClosed,
+  useToastFailure,
+} from "../components/ideaActions";
 import { useKeepShownItem } from "../components/keepShownItem";
 import {
   inputOf,
@@ -83,7 +86,12 @@ import {
 } from "../components/states";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, usePanel, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useAskedOpen,
+  usePanel,
+  useWorkspace,
+} from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import type { SaveFields, SaveTarget } from "../lib/autosave";
 import { useAutosave, useSaveItem } from "../lib/autosave-react";
@@ -105,6 +113,7 @@ import {
   researchLogQuery,
   validationHomeQuery,
 } from "../lib/queries";
+import { useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
 import { ListSkeleton, ResearchLogSkeleton } from "./ResearchLogSkeleton";
 
@@ -608,7 +617,10 @@ function EntryDetail({
           </RowList>
         )}
       </Stack>
-      {isEditing && canEdit && (
+      {/* Only an editor opens it; once open it stays until closed, though the screen
+          read again no longer lets them edit, so a refused save shows in it
+          (design-spec 6.0.6's modals). */}
+      {isEditing && (
         <Dialog
           isOpen
           onOpenChange={(isOpen) => {
@@ -637,6 +649,8 @@ function EntryDetail({
  * A new entry (design-spec 6.10「+ Add entry」): the fields, the date today and the tags
  * the link asked for (SDD 4章 `presetSupports`), then Add entry, which records it and
  * shows it. In the detail's place from the tablet breakpoint up, in a sheet on a phone.
+ * Closed while Add entry is on its way (Cancel, the screen left), the entry is made all
+ * the same, and a send that fails says so in a toast (6.0.6), whose Retry sends it again.
  */
 function NewEntry({
   ideaId,
@@ -645,18 +659,15 @@ function NewEntry({
   isSheet,
   isReadOnly,
   onCreated,
-  onRefused,
   onCancel,
 }: {
   ideaId: string;
   validationId: string;
   presetSupports: readonly SupportsCheck[];
   isSheet: boolean;
-  /** The screen read again after a refusal reads only: what was typed stays, unsent. */
+  /** The screen read again no longer lets the user add one: what was typed stays, unsent. */
   isReadOnly: boolean;
   onCreated: (entry: ResearchLogEntry) => void;
-  /** Refused for good while the form is open (archived, no access, gone). */
-  onRefused: () => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation(["validation", "errors"]);
@@ -676,20 +687,27 @@ function NewEntry({
   >({});
   const latestOnCreated = useRef(onCreated);
   latestOnCreated.current = onCreated;
-  const latestOnRefused = useRef(onRefused);
-  latestOnRefused.current = onRefused;
   const oneAtATime = useOneAtATime();
   const readAgainWhenRefused = useReadAgainWhenRefused();
+  const sendThrough = useSendThrough();
+  const post = (input: ResearchLogValues) =>
+    unwrap(
+      api()
+        .api.v1.validations({ validationId: inPath(validationId) })
+        ["research-log"].post(inputOf(input)),
+    );
+  const readAgain = () =>
+    queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) });
+  const failOnceClosed = useFailureOnceClosed(
+    async (input: ResearchLogValues) => {
+      await sendThrough(() => post(input));
+      await readAgain();
+    },
+  );
   const create = useMutation({
-    mutationFn: (input: ResearchLogValues) =>
-      unwrap(
-        api()
-          .api.v1.validations({ validationId: inPath(validationId) })
-          ["research-log"].post(inputOf(input)),
-      ),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) }),
-    onError: readAgainWhenRefused,
+    mutationFn: post,
+    onSuccess: () => void readAgain(),
+    onError: failOnceClosed,
   });
   const failure = create.error;
   // Refused for good, the form sends no more (design-spec 6.10): at once, before the
@@ -720,10 +738,9 @@ function NewEntry({
             // Fires only while the form is still open: Cancel or leaving meanwhile keeps
             // the user where they went (the entry is made all the same).
             onSuccess: (entry) => latestOnCreated.current(entry),
-            // A failure shows from the mutation's state below.
-            onError: (error) => {
-              if (isRefusedForGood(error)) latestOnRefused.current();
-            },
+            // As does this: a failure shows from the mutation's state below. Once the
+            // form is closed, its toast reads the screen again instead.
+            onError: readAgainWhenRefused,
             onSettled: () => resolve(),
           });
         }),
@@ -901,12 +918,15 @@ function EntryRow({ entry }: { entry: ResearchLogEntry }) {
 
 function ResearchBody({
   home,
+  isDecided,
   search,
   onSearch,
   onOpen,
   onClose,
 }: {
   home: ValidationHome;
+  /** `home` has been read and is not being read again: whether the idea is archived. */
+  isDecided: boolean;
   search: ResearchSearch;
   /** Replaces the URL's search: filters, and what is beside the list. */
   onSearch: (next: ResearchSearch) => void;
@@ -936,14 +956,14 @@ function ResearchBody({
   const items = query.data ?? [];
   const isFiltered =
     search.supports !== undefined || search.source !== undefined;
-  // A new entry refused as archived or no longer allowed stays, read only, with what was
-  // typed and why, until it is closed (design-spec 6.10): the screen read again no
-  // longer lets the user add one.
-  const [isNewKept, setNewKept] = useState(false);
-  useEffect(() => {
-    if (search.new !== 1) setNewKept(false);
-  }, [search.new]);
-  const isNew = search.new === 1 && (canEdit || isNewKept);
+  // `new=1` opens the new entry as `?modal=` opens a modal (SDD 4章): once shown it stays
+  // until it is closed, read only once the screen read again no longer lets the user add
+  // one (refused as archived or no longer allowed, design-spec 6.10, or read so
+  // meanwhile), what was typed and why with it; for someone who may not add one it opens
+  // nothing and comes off the URL with its tags.
+  const isNew = useAskedOpen(search.new === 1, canEdit, isDecided, {
+    search: ({ new: _, presetSupports: __, ...rest }) => rest,
+  });
   const isPhone = useIsNarrow();
   const shownFirst =
     search.entry === undefined && isTwoColumns && !isNew
@@ -971,8 +991,10 @@ function ResearchBody({
     onClose({ ...search, new: undefined, presetSupports: undefined });
 
   let list: ReactNode;
-  if (query.isError) {
-    list = (
+  // A read again that failed leaves what was read on screen (as 13 does): only a list
+  // never read shows the failure.
+  if (query.data === undefined) {
+    list = query.isError ? (
       <FailureState
         error={query.error}
         onRetry={() => void query.refetch()}
@@ -980,9 +1002,7 @@ function ResearchBody({
         headingLevel={2}
         size="S"
       />
-    );
-  } else if (query.data === undefined) {
-    list = isSlow ? (
+    ) : isSlow ? (
       <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
     ) : (
       <ListSkeleton />
@@ -1060,7 +1080,6 @@ function ResearchBody({
       presetSupports={search.presetSupports ?? []}
       isSheet={isSheet}
       isReadOnly={!canEdit}
-      onRefused={() => setNewKept(true)}
       onCreated={(entry) =>
         onSearch({
           ...search,
@@ -1213,6 +1232,7 @@ export function ResearchLogScreen({
     body = (
       <ResearchBody
         home={data}
+        isDecided={!home.isFetching}
         search={search}
         // Filters and what is beside the list replace the entry: Back leaves the screen.
         onSearch={(next) => to(next, true)}

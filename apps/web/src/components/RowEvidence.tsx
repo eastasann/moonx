@@ -74,6 +74,7 @@ export function RowEvidenceSheet({
   saveKey,
   onChanged,
   onReload,
+  isGone,
   onClose,
 }: {
   ideaId: string;
@@ -89,6 +90,8 @@ export function RowEvidenceSheet({
   saveKey: string;
   onChanged: (change: { evidence: Evidence[]; lockVersion: number }) => void;
   onReload: () => void;
+  /** The row is no longer listed (deleted meanwhile), as EvidenceSheet's `isGone`. */
+  isGone?: boolean;
   onClose: () => void;
 }) {
   return (
@@ -115,6 +118,7 @@ export function RowEvidenceSheet({
         })
       }
       onReload={onReload}
+      isGone={isGone}
       onClose={onClose}
     />
   );

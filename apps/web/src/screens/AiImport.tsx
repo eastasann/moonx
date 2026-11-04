@@ -41,17 +41,26 @@ import {
   useFauLabel,
   Well,
 } from "@moonx/ui-web";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsFetching,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, FileCheck, FileUp } from "lucide-react";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type AiTarget, AiTargetScreen } from "../components/AiTargetScreen";
 import { answerKey, moonOf } from "../components/AnswerFields";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { EvidenceSheet } from "../components/EvidenceSheet";
+import { useFailureOnceClosed } from "../components/ideaActions";
 import { failureCode, rateLimitWords } from "../components/SendFailure";
-import { useModal, useWorkspace } from "../components/workspace";
+import {
+  useModal,
+  useSearchModalAbout,
+  useWorkspace,
+} from "../components/workspace";
 import { parseScope } from "../lib/ai";
 import {
   type BlockChoice,
@@ -72,9 +81,10 @@ import { rejectionReason } from "../lib/autosave";
 import { countingEvidence } from "../lib/evidence";
 import { isTransient, useUnexpectedReference } from "../lib/failure";
 import { readUtf8 } from "../lib/files";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import { importContextQuery } from "../lib/queries";
-import { isSessionLost } from "../lib/send";
+import { isSessionLost, useSendThrough } from "../lib/send";
 import {
   AiImportSkeleton,
   Header,
@@ -337,13 +347,7 @@ function ImportFlow({
   const [conflict, setConflict] = useState(false);
   // Whether 25 is still open when an apply settles, which may be later: a user who left
   // meanwhile is not taken back.
-  const isOpen = useRef(true);
-  useEffect(() => {
-    isOpen.current = true;
-    return () => {
-      isOpen.current = false;
-    };
-  }, []);
+  const isOpen = useIsMounted();
 
   const questions = new Map(
     context.questions.map((question) => [question.questionKey, question]),
@@ -354,34 +358,72 @@ function ImportFlow({
       title: question.title,
     });
 
+  const sendThrough = useSendThrough();
+  const sendApply = (changes: ImportChange[]) =>
+    unwrap(
+      api().api.v1.ai.import.apply.post({
+        target: { type: kind, ...(id === undefined ? {} : { id }) },
+        changes,
+      }),
+    );
+  /** What an apply that went through does, whether 25 is still open or not (6.7 ④). */
+  const sayApplied = ({
+    applied,
+    needsClassification,
+  }: {
+    applied: number;
+    needsClassification: number;
+  }) => {
+    // The answers show on many screens (13's checks and Next steps, 11, the
+    // dashboard's activity): everything is read again.
+    void queryClient.invalidateQueries();
+    const updated =
+      applied === 0
+        ? t("ai:import.applied.nothing")
+        : t("ai:import.applied.updated", { count: applied });
+    ToastQueue.neutral(
+      needsClassification === 0
+        ? updated
+        : [
+            updated,
+            t("ai:import.applied.needsFau", { count: needsClassification }),
+          ].join(t("app:separator")),
+      { timeout: TOAST_MS },
+    );
+  };
+  /**
+   * 25's words for a refusal of X3 once 25 is left (answers changed since ③ read them, a
+   * question hidden or gone): the toast says them without Retry, as the same changes
+   * would meet it again (6.0.6「送っている間に閉じた送信の失敗」); null for any other.
+   */
+  const importRefusalWords = (error: unknown) => {
+    const code = failureCode(error);
+    if (code === "CONFLICT_MULTI") {
+      return t("errors:CONFLICT_MULTI", { context: "import" });
+    }
+    return code === "NOT_IMPORTABLE" || code === "QUESTION_NOT_FOUND"
+      ? t("errors:NOT_IMPORTABLE", { context: "closed" })
+      : null;
+  };
+  const failureOnceLeft = useFailureOnceClosed(
+    async (changes: ImportChange[]) =>
+      sayApplied(await sendThrough(() => sendApply(changes))),
+    importRefusalWords,
+    "apply",
+  );
+
   const apply = useMutation({
-    mutationFn: (changes: ImportChange[]) =>
-      unwrap(
-        api().api.v1.ai.import.apply.post({
-          target: { type: kind, ...(id === undefined ? {} : { id }) },
-          changes,
-        }),
-      ),
-    onSuccess: ({ applied, needsClassification }) => {
-      // The answers show on many screens (13's checks and Next steps, 11, the
-      // dashboard's activity): everything is read again.
-      void queryClient.invalidateQueries();
-      const updated =
-        applied === 0
-          ? t("ai:import.applied.nothing")
-          : t("ai:import.applied.updated", { count: applied });
-      ToastQueue.neutral(
-        needsClassification === 0
-          ? updated
-          : [
-              updated,
-              t("ai:import.applied.needsFau", { count: needsClassification }),
-            ].join(t("app:separator")),
-        { timeout: TOAST_MS },
-      );
+    mutationFn: sendApply,
+    onSuccess: (result) => {
+      sayApplied(result);
       if (isOpen.current) void navigate({ href: target.returnHref });
     },
-    onError: (error) => {
+    onError: (error, changes) => {
+      if (!isOpen.current) {
+        // Left while it applied (Cancel, or another screen): nothing here shows it.
+        failureOnceLeft(error, changes);
+        return;
+      }
       if (!(error instanceof ApiError)) return;
       if (error.code === "CONFLICT_MULTI") setConflict(true);
       if (
@@ -396,14 +438,6 @@ function ImportFlow({
   });
 
   const header = <Header eyebrow={target.eyebrow} />;
-  if (target.archived !== null) {
-    // Nothing can be applied (X3 409 ARCHIVED): no field to paste into (6.7「状態」).
-    return (
-      <StepsPattern header={header} steps={<ImportSteps current="paste" />}>
-        <InlineAlert>{t(`ai:archived.${target.archived}`)}</InlineAlert>
-      </StepsPattern>
-    );
-  }
 
   const go = (next: Step) => {
     apply.reset();
@@ -720,26 +754,28 @@ function ImportFlow({
     };
   };
 
-  // M2 from Fact (6.0.3): what it attaches saves the answer as a Fact at once.
-  const evidenceFor = (() => {
-    if (
-      modal !== "evidence" ||
-      step !== "review" ||
-      !isValidation ||
-      !forFact
-    ) {
-      return null;
-    }
-    const prefix = `validation_answer:${id}:`;
-    if (about === undefined || !about.startsWith(prefix)) return null;
-    const item = changed.find(
-      (candidate) =>
-        candidate.question.questionKey === about.slice(prefix.length),
-    );
-    return item === undefined || !hasText(item.question.current.text)
-      ? null
-      : item;
-  })();
+  // M2 from Fact on ③ (6.0.3), on an answer with a value: what it attaches saves it as
+  // a Fact at once. An M2 its URL opens is not from Fact (SDD 4章), so it opens none.
+  const isContextFetching =
+    useIsFetching({ queryKey: contextKey, exact: true }) > 0;
+  const aboutPrefix = `validation_answer:${id}:`;
+  const aboutItem = about?.startsWith(aboutPrefix)
+    ? changed.find(
+        (candidate) =>
+          candidate.question.questionKey === about.slice(aboutPrefix.length),
+      )
+    : undefined;
+  const evidenceFor = useSearchModalAbout(
+    modal,
+    "evidence",
+    aboutItem,
+    step === "review" &&
+      isValidation &&
+      forFact &&
+      aboutItem !== undefined &&
+      hasText(aboutItem.question.current.text),
+    !isContextFetching,
+  );
   const putCurrent = (
     questionKey: string,
     change: (current: ContextQuestion["current"]) => ContextQuestion["current"],
@@ -756,6 +792,97 @@ function ImportFlow({
             ),
           },
     );
+
+  const evidenceSheet = evidenceFor !== undefined && id !== undefined && (
+    <ModalBoundary key="evidence" onClose={modals.close}>
+      <EvidenceSheet
+        ideaId={context.target.ideaId ?? ""}
+        validationId={id}
+        item={{
+          target: {
+            type: "validation_answer",
+            id,
+            key: evidenceFor.question.questionKey,
+          },
+          label: [
+            codeOf(evidenceFor.question),
+            evidenceFor.question.prompt,
+          ].join(t("app:separator")),
+          noun: t("ai:import.review.noun"),
+          evidence: evidenceFor.question.current.classification?.evidence ?? [],
+          state:
+            evidenceFor.question.current.classification?.state ??
+            "unclassified",
+          hasValue: true,
+        }}
+        lockVersionNow={() =>
+          queryClient
+            .getQueryData<ImportContext>(contextKey)
+            ?.questions.find(
+              (question) =>
+                question.questionKey === evidenceFor.question.questionKey,
+            )?.current.lockVersion ?? evidenceFor.question.current.lockVersion
+        }
+        saveKey={answerKey(id, evidenceFor.question.questionKey)}
+        forFact
+        onChanged={(result) => {
+          const { questionKey } = evidenceFor.question;
+          // Saved by the user: no "Updated by …" for it (6.7 ③).
+          putCurrent(questionKey, (current) => ({
+            ...current,
+            classification: result.classification,
+            lockVersion: result.lockVersion,
+            updatedAt: new Date().toISOString(),
+            updatedBy: {
+              id: me.id,
+              displayName: me.displayName,
+              avatarUrl: me.avatarUrl,
+              badge: null,
+            },
+          }));
+          // Evidence attached from Fact saved the answer as a Fact (V4 setFact);
+          // its last evidence removed again, it is not one any more (V5).
+          const isFact = result.classification.fau === "fact";
+          setDrafts((current) =>
+            current.map((draft) =>
+              draft.questionKey !== questionKey
+                ? draft
+                : isFact
+                  ? {
+                      ...draft,
+                      classification: { fau: "fact", confidence: null },
+                    }
+                  : draft.classification?.fau === "fact"
+                    ? { ...draft, classification: null }
+                    : draft,
+            ),
+          );
+          void queryClient.invalidateQueries({ queryKey: contextKey });
+        }}
+        onMarkFact={() =>
+          edit(evidenceFor.question.questionKey, {
+            classification: { fau: "fact", confidence: null },
+          })
+        }
+        onReload={() =>
+          void queryClient.invalidateQueries({ queryKey: contextKey })
+        }
+        onClose={modals.close}
+      />
+    </ModalBoundary>
+  );
+  if (target.archived !== null) {
+    // Nothing can be applied (X3 409 ARCHIVED): no field to paste into (6.7「状態」). An
+    // M2 open when the idea was archived stays until closed, saying why it is refused.
+    return (
+      <>
+        <StepsPattern header={header} steps={<ImportSteps current="paste" />}>
+          <InlineAlert>{t(`ai:archived.${target.archived}`)}</InlineAlert>
+        </StepsPattern>
+        {evidenceSheet}
+      </>
+    );
+  }
 
   let content: ReactNode;
   let actions: ReactNode;
@@ -1007,86 +1134,7 @@ function ImportFlow({
       >
         {content}
       </StepsPattern>
-      {evidenceFor !== null && id !== undefined && (
-        <ModalBoundary key="evidence" onClose={modals.close}>
-          <EvidenceSheet
-            ideaId={context.target.ideaId ?? ""}
-            validationId={id}
-            item={{
-              target: {
-                type: "validation_answer",
-                id,
-                key: evidenceFor.question.questionKey,
-              },
-              label: [
-                codeOf(evidenceFor.question),
-                evidenceFor.question.prompt,
-              ].join(t("app:separator")),
-              noun: t("ai:import.review.noun"),
-              evidence:
-                evidenceFor.question.current.classification?.evidence ?? [],
-              state:
-                evidenceFor.question.current.classification?.state ??
-                "unclassified",
-              hasValue: true,
-            }}
-            lockVersionNow={() =>
-              queryClient
-                .getQueryData<ImportContext>(contextKey)
-                ?.questions.find(
-                  (question) =>
-                    question.questionKey === evidenceFor.question.questionKey,
-                )?.current.lockVersion ??
-              evidenceFor.question.current.lockVersion
-            }
-            saveKey={answerKey(id, evidenceFor.question.questionKey)}
-            forFact
-            onChanged={(result) => {
-              const { questionKey } = evidenceFor.question;
-              // Saved by the user: no "Updated by …" for it (6.7 ③).
-              putCurrent(questionKey, (current) => ({
-                ...current,
-                classification: result.classification,
-                lockVersion: result.lockVersion,
-                updatedAt: new Date().toISOString(),
-                updatedBy: {
-                  id: me.id,
-                  displayName: me.displayName,
-                  avatarUrl: me.avatarUrl,
-                  badge: null,
-                },
-              }));
-              // Evidence attached from Fact saved the answer as a Fact (V4 setFact);
-              // its last evidence removed again, it is not one any more (V5).
-              const isFact = result.classification.fau === "fact";
-              setDrafts((current) =>
-                current.map((draft) =>
-                  draft.questionKey !== questionKey
-                    ? draft
-                    : isFact
-                      ? {
-                          ...draft,
-                          classification: { fau: "fact", confidence: null },
-                        }
-                      : draft.classification?.fau === "fact"
-                        ? { ...draft, classification: null }
-                        : draft,
-                ),
-              );
-              void queryClient.invalidateQueries({ queryKey: contextKey });
-            }}
-            onMarkFact={() =>
-              edit(evidenceFor.question.questionKey, {
-                classification: { fau: "fact", confidence: null },
-              })
-            }
-            onReload={() =>
-              void queryClient.invalidateQueries({ queryKey: contextKey })
-            }
-            onClose={modals.close}
-          />
-        </ModalBoundary>
-      )}
+      {evidenceSheet}
     </>
   );
 }

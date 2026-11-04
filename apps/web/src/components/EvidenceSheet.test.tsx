@@ -1,5 +1,5 @@
 import type { ResearchLogEntry } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
@@ -58,7 +58,7 @@ const attached = () =>
  * idea's research log (V6).
  */
 function m2Api(
-  evidence: (call: Call) => Response,
+  evidence: (call: Call) => Response | Promise<Response>,
   logs: ResearchLogEntry[] = [survey, prices],
 ) {
   return stubApi((call) => {
@@ -218,5 +218,61 @@ describe("M2's Search research (design-spec 6.0.3)", () => {
     await user.type(search, "bakery");
     expect(listed()).toEqual([]);
     expect(sheet.textContent).toContain("No entries match your search");
+  });
+});
+
+describe("M2 while New entry or URL is on its way (design-spec 6.0.3「送り方」)", () => {
+  test("Add and attach and Attach URL hold M2 open: Escape and its × wait until they are answered", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    const calls = m2Api(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(attached());
+        }),
+    );
+    // Back is held by the browser's history (useBlocker), which the memory history of
+    // these tests does not hold: Escape and × are what is pressed here.
+    const router = renderApp(
+      `/w/${workspaceId}/ideas/${home.idea.id}/questions/01?q=V.01.WHO`,
+    );
+    const card = await screen.findByRole("region", { name: "WHO" });
+    await user.click(within(card).getByRole("radio", { name: /Fact/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+
+    /** Presses `send`, then each way to close M2 while it is on its way. */
+    const holdsWhileSending = async (send: string, sent: number) => {
+      await user.click(within(sheet).getByRole("button", { name: send }));
+      await waitFor(() => expect(sends(calls)).toHaveLength(sent));
+      await user.keyboard("{Escape}");
+      await user.click(within(sheet).getByRole("button", { name: "Close" }));
+      expect(screen.getByRole("dialog", { name: "Evidence" })).toBe(sheet);
+      expect(router.state.location.search).toMatchObject({
+        modal: "evidence",
+      });
+      await act(release);
+      await waitFor(() =>
+        expect(
+          within(sheet).getByRole("button", { name: send }),
+        ).toHaveProperty("disabled", true),
+      );
+    };
+
+    await user.click(within(sheet).getByRole("radio", { name: "New entry" }));
+    await user.type(
+      within(sheet).getByRole("textbox", { name: /Topic/ }),
+      "Office survey",
+    );
+    await holdsWhileSending("Add and attach", 1);
+    await user.click(within(sheet).getByRole("radio", { name: "URL" }));
+    await user.type(
+      within(sheet).getByRole("textbox", { name: /URL/ }),
+      "https://psa.gov.ph/statistics",
+    );
+    await holdsWhileSending("Attach URL", 2);
+    expect(sends(calls).map(({ body }) => body)).toMatchObject([
+      { newResearchLog: { topic: "Office survey" } },
+      { url: "https://psa.gov.ph/statistics" },
+    ]);
   });
 });

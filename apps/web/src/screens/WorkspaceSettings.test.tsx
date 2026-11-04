@@ -1,12 +1,13 @@
 import { formatDate } from "@moonx/i18n";
 import type { Invitation, Me, Member, Role } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   ana,
   apiError,
   type Call,
+  holdFirst,
   renderApp,
   stubApi,
   toastAfter,
@@ -874,5 +875,415 @@ describe("9 Workspace Settings (design-spec 6.16)", () => {
       ),
     ).toBeNull();
     expect(screen.queryByText("Couldn't save")).toBeNull();
+  });
+});
+
+describe("9 left while a send is on its way (design-spec 6.0.6「送っている間に閉じた送信の失敗」)", () => {
+  /** 9 goes for 8, as a link would, while the held send waits. */
+  async function leave9(router: ReturnType<typeof renderApp>) {
+    await act(() => router.navigate({ to: "/notifications" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { level: 1, name: "Workspace Settings" }),
+      ).toBeNull(),
+    );
+  }
+
+  test("a role chosen, and no answer comes: Couldn't save in a toast, whose Retry sends the same role", async () => {
+    const user = userEvent.setup();
+    let isFailing = true;
+    const held = holdFirst("PATCH", `${membersPath}/${kenji.user.id}`, () => {
+      if (isFailing) throw new TypeError("Failed to fetch");
+      return Response.json({ ...kenji, role: "owner" });
+    });
+    const calls = settingsApi({ answer: held.answer });
+    const router = renderApp(base);
+    const list = await membersList();
+    await user.click(
+      within(list).getByRole("button", { name: /Role of Kenji Mori/ }),
+    );
+    await user.click(await screen.findByRole("option", { name: "Owner" }));
+    const patches = () => calls.filter(({ method }) => method === "PATCH");
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    await leave9(router);
+    const toast = await toastAfter("Couldn't save", held.release);
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(patches()).toHaveLength(2));
+    expect(patches().map(({ body }) => body)).toEqual([
+      { role: "owner" },
+      { role: "owner" },
+    ]);
+    expect(router.state.location.pathname).toBe("/notifications");
+  });
+
+  test("Remove refused for the personal workspace's owner: its words in a toast, without Retry", async () => {
+    const user = userEvent.setup();
+    const held = holdFirst("DELETE", `${membersPath}/${kenji.user.id}`, () =>
+      apiError(409, "PERSONAL_OWNER"),
+    );
+    const calls = settingsApi({ answer: held.answer });
+    const router = renderApp(base);
+    const list = await membersList();
+    await user.click(
+      within(list).getByRole("button", {
+        name: "Member actions of Kenji Mori",
+      }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Remove" }));
+    const question = await screen.findByRole("alertdialog", {
+      name: "Remove Kenji Mori?",
+    });
+    await user.click(within(question).getByRole("button", { name: "Remove" }));
+    await waitFor(() =>
+      expect(calls.some(({ method }) => method === "DELETE")).toBe(true),
+    );
+    await leave9(router);
+    const toast = await toastAfter(
+      "Owner of this personal workspace",
+      held.release,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  test("making oneself a Member that goes through once 9 was left: the user stays where they went", async () => {
+    const user = userEvent.setup();
+    const held = holdFirst("PATCH", `${membersPath}/${ana.id}`, () =>
+      Response.json({ ...anaMember, role: "member" }),
+    );
+    const calls = settingsApi({
+      members: [anaMember, { ...kenji, role: "owner" }],
+      answer: held.answer,
+    });
+    const router = renderApp(base);
+    const list = await membersList();
+    await user.click(
+      within(list).getByRole("button", { name: /Role of Ana Villanueva/ }),
+    );
+    await user.click(await screen.findByRole("option", { name: "Member" }));
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: "Make yourself Member?",
+        }),
+      ).getByRole("button", { name: "Change my role" }),
+    );
+    await waitFor(() =>
+      expect(calls.some(({ method }) => method === "PATCH")).toBe(true),
+    );
+    await leave9(router);
+    const reads = () =>
+      calls.filter(
+        ({ method, path }) => method === "GET" && path === "/api/v1/me",
+      ).length;
+    const before = reads();
+    await held.release();
+    // The user is read again (their role there changed), and nothing moves them.
+    await waitFor(() => expect(reads()).toBeGreaterThan(before));
+    expect(router.state.location.pathname).toBe("/notifications");
+  });
+
+  test("making oneself a Member whose toast's Retry goes through once the user is back on 9: 9 gives way to 5", async () => {
+    const user = userEvent.setup();
+    let isFailing = true;
+    const held = holdFirst("PATCH", `${membersPath}/${ana.id}`, () => {
+      if (isFailing) throw new TypeError("Failed to fetch");
+      return Response.json({ ...anaMember, role: "member" });
+    });
+    const calls = settingsApi({
+      members: [anaMember, { ...kenji, role: "owner" }],
+      answer: held.answer,
+    });
+    const router = renderApp(base);
+    const list = await membersList();
+    await user.click(
+      within(list).getByRole("button", { name: /Role of Ana Villanueva/ }),
+    );
+    await user.click(await screen.findByRole("option", { name: "Member" }));
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: "Make yourself Member?",
+        }),
+      ).getByRole("button", { name: "Change my role" }),
+    );
+    const patches = () => calls.filter(({ method }) => method === "PATCH");
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    await leave9(router);
+    const toast = await toastAfter("Couldn't save", held.release);
+    await act(() => router.navigate({ href: base }));
+    await membersList();
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(patches()).toHaveLength(2));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/w/${workspaceId}`),
+    );
+  });
+
+  /** How many times the user was read (U1 GET `me`). */
+  const meReads = (calls: Call[]) =>
+    calls.filter(
+      ({ method, path }) => method === "GET" && path === "/api/v1/me",
+    ).length;
+
+  /** Lets what settles after an answer settle: a read it would start has started. */
+  const settled = () =>
+    act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+
+  test("a role change refused for good (403) once 9 was left: the toast says so, and the user is read once", async () => {
+    const user = userEvent.setup();
+    const held = holdFirst("PATCH", `${membersPath}/${kenji.user.id}`, () =>
+      apiError(403, "FORBIDDEN"),
+    );
+    const calls = settingsApi({ answer: held.answer });
+    const router = renderApp(base);
+    const list = await membersList();
+    await user.click(
+      within(list).getByRole("button", { name: /Role of Kenji Mori/ }),
+    );
+    await user.click(await screen.findByRole("option", { name: "Owner" }));
+    await waitFor(() =>
+      expect(calls.some(({ method }) => method === "PATCH")).toBe(true),
+    );
+    await leave9(router);
+    const before = meReads(calls);
+    const toast = await toastAfter(
+      "Couldn't save. You don't have access to this.",
+      held.release,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() => expect(meReads(calls)).toBe(before + 1));
+    await settled();
+    expect(meReads(calls)).toBe(before + 1);
+  });
+
+  test("a Resend refused for good (403) once 9 was left: the toast says so, and the user is read once", async () => {
+    const user = userEvent.setup();
+    const resendPath = `/api/v1/invitations/${pending.id}/resend`;
+    const held = holdFirst("POST", resendPath, () =>
+      apiError(403, "FORBIDDEN"),
+    );
+    const calls = settingsApi({ answer: held.answer });
+    const router = renderApp(base);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Resend invitation to new.member@bcdx.example",
+      }),
+    );
+    await waitFor(() =>
+      expect(calls.some(({ path }) => path === resendPath)).toBe(true),
+    );
+    await leave9(router);
+    const before = meReads(calls);
+    await toastAfter(
+      "Couldn't save. You don't have access to this.",
+      held.release,
+    );
+    await waitFor(() => expect(meReads(calls)).toBe(before + 1));
+    await settled();
+    expect(meReads(calls)).toBe(before + 1);
+  });
+
+  test("a Resend whose toast's Retry is refused for good (403): the toast says so, and the user is read once", async () => {
+    const user = userEvent.setup();
+    const resendPath = `/api/v1/invitations/${pending.id}/resend`;
+    let isFailing = true;
+    const held = holdFirst("POST", resendPath, () => {
+      if (isFailing) throw new TypeError("Failed to fetch");
+      return apiError(403, "FORBIDDEN");
+    });
+    const calls = settingsApi({ answer: held.answer });
+    const router = renderApp(base);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Resend invitation to new.member@bcdx.example",
+      }),
+    );
+    await waitFor(() =>
+      expect(calls.some(({ path }) => path === resendPath)).toBe(true),
+    );
+    await leave9(router);
+    const toast = await toastAfter("Couldn't save", held.release);
+    isFailing = false;
+    await settled();
+    const before = meReads(calls);
+    await toastAfter("Couldn't save. You don't have access to this.", () =>
+      user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    await waitFor(() => expect(meReads(calls)).toBe(before + 1));
+    await settled();
+    expect(meReads(calls)).toBe(before + 1);
+  });
+
+  test("Leave that goes through once 9 was left: You left BCDX, and the user stays where they went", async () => {
+    const user = userEvent.setup();
+    const held = holdFirst(
+      "DELETE",
+      `${membersPath}/me`,
+      () => new Response(null, { status: 204 }),
+    );
+    const calls = settingsApi({
+      members: [anaMember, { ...kenji, role: "owner" }],
+      answer: held.answer,
+    });
+    const router = renderApp(base);
+    const list = await membersList();
+    await user.click(
+      within(list).getByRole("button", {
+        name: "Member actions of Ana Villanueva",
+      }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Leave" }));
+    const question = await screen.findByRole("alertdialog", {
+      name: "Leave BCDX?",
+    });
+    await user.click(within(question).getByRole("button", { name: "Leave" }));
+    await waitFor(() =>
+      expect(calls.some(({ method }) => method === "DELETE")).toBe(true),
+    );
+    await leave9(router);
+    await toastAfter("You left BCDX", held.release);
+    expect(router.state.location.pathname).toBe("/notifications");
+  });
+
+  test("Leave that goes through once 9 was left for another page of BCDX: the personal 5 opens, as that page would say no access", async () => {
+    const user = userEvent.setup();
+    const personal = {
+      id: "5a1b2c3d-4444-4444-8444-444444444444",
+      name: "Ana Villanueva's workspace",
+      isPersonal: true,
+      currency: "PHP",
+    };
+    const held = holdFirst(
+      "DELETE",
+      `${membersPath}/me`,
+      () => new Response(null, { status: 204 }),
+    );
+    const calls = settingsApi({
+      me: {
+        ...ana,
+        memberships: [
+          { workspace: personal, role: "owner" },
+          ...ana.memberships,
+        ],
+      },
+      members: [anaMember, { ...kenji, role: "owner" }],
+      answer: held.answer,
+    });
+    const router = renderApp(base);
+    const list = await membersList();
+    await user.click(
+      within(list).getByRole("button", {
+        name: "Member actions of Ana Villanueva",
+      }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Leave" }));
+    const question = await screen.findByRole("alertdialog", {
+      name: "Leave BCDX?",
+    });
+    await user.click(within(question).getByRole("button", { name: "Leave" }));
+    await waitFor(() =>
+      expect(calls.some(({ method }) => method === "DELETE")).toBe(true),
+    );
+    await act(() => router.navigate({ to: `/w/${workspaceId}/ideas` }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { level: 1, name: "Workspace Settings" }),
+      ).toBeNull(),
+    );
+    await toastAfter("You left BCDX", held.release);
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/w/${personal.id}`),
+    );
+  });
+
+  test.each([
+    {
+      refusal: "to a member's address",
+      answer: () => apiError(409, "ALREADY_MEMBER"),
+      words: "kenji@bcdx.example is already a member of this workspace",
+    },
+    {
+      refusal: "to an address the API refuses by its rule",
+      answer: () =>
+        apiError(422, "VALIDATION_FAILED", {
+          details: [{ path: "email", message: "invalid" }],
+        }),
+      words: "Couldn't save. Check the format.",
+    },
+  ])(
+    "Send invitation $refusal: its words in a toast, without Retry",
+    async ({ answer, words }) => {
+      const user = userEvent.setup();
+      const held = holdFirst("POST", invitationsPath, answer);
+      const calls = settingsApi({ answer: held.answer });
+      const router = renderApp(base);
+      await user.type(
+        await screen.findByRole("textbox", { name: "Email to invite" }),
+        "kenji@bcdx.example",
+      );
+      await user.click(screen.getByRole("button", { name: "Send invitation" }));
+      await waitFor(() =>
+        expect(
+          calls.find(
+            ({ method, path }) => method === "POST" && path === invitationsPath,
+          )?.body,
+        ).toEqual({ email: "kenji@bcdx.example", role: "member" }),
+      );
+      await leave9(router);
+      const toast = await toastAfter(words, held.release);
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    },
+  );
+
+  test("Resend failing unexpectedly (500): Something went wrong with its Ref and Retry, in a toast; Retry resends it", async () => {
+    const user = userEvent.setup();
+    let isFailing = true;
+    const resendPath = `/api/v1/invitations/${pending.id}/resend`;
+    const held = holdFirst("POST", resendPath, () =>
+      isFailing
+        ? apiError(500, "INTERNAL")
+        : Response.json({ invitation: pending }),
+    );
+    const calls = settingsApi({ answer: held.answer });
+    const router = renderApp(base);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Resend invitation to new.member@bcdx.example",
+      }),
+    );
+    const resends = () => calls.filter(({ path }) => path === resendPath);
+    await waitFor(() => expect(resends()).toHaveLength(1));
+    await leave9(router);
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      held.release,
+    );
+    isFailing = false;
+    await toastAfter("Invitation sent again to new.member@bcdx.example", () =>
+      user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    expect(resends()).toHaveLength(2);
+  });
+
+  test("Cancel of an invitation accepted meanwhile: Already accepted in a toast, without Retry", async () => {
+    const user = userEvent.setup();
+    const held = holdFirst("DELETE", `/api/v1/invitations/${pending.id}`, () =>
+      apiError(409, "INVITATION_ALREADY_ACCEPTED"),
+    );
+    const calls = settingsApi({ answer: held.answer });
+    const router = renderApp(base);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Cancel invitation to new.member@bcdx.example",
+      }),
+    );
+    await waitFor(() =>
+      expect(calls.some(({ method }) => method === "DELETE")).toBe(true),
+    );
+    await leave9(router);
+    const toast = await toastAfter("Already accepted", held.release);
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
   });
 });

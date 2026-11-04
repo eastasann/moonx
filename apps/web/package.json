@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@elysiajs/eden": "^1.4.9",
+    "@moonx/domain": "workspace:*",
     "@moonx/i18n": "workspace:*",
     "@moonx/schemas": "workspace:*",
     "@moonx/ui-tokens": "workspace:*",

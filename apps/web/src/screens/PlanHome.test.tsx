@@ -14,6 +14,8 @@ import {
   ana,
   apiError,
   type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
   renderApp,
   stubApi,
   toastAfter,
@@ -61,7 +63,7 @@ const goNoGoContext = {
 /**
  * The API of 20: `home` answers P2 GET (a version's when asked), `ideaPlans` P1 GET,
  * `write` the writes, `history` H1 and `threads` C1. `me` and `read` may change what U1
- * and P2 GET answer while the test runs.
+ * and P2 GET answer while the test runs; a promise from `read` holds P2 GET back.
  */
 function planApi({
   me = ana,
@@ -77,7 +79,7 @@ function planApi({
   me?: Me | (() => Me);
   home?: PlanHome;
   /** P2 GET of the plan as it is now, in place of `home` and its saves. */
-  read?: () => PlanHome;
+  read?: () => PlanHome | Promise<PlanHome>;
   version?: PlanHome;
   /** The idea's plans, the archived ones included (P1 GET `includeArchived=true`). */
   ideaPlans?: PlanSummary[];
@@ -113,7 +115,7 @@ function planApi({
       return Response.json({ items: ideaPlans });
     }
     if (method === "GET" && path === api) {
-      return Response.json(read?.() ?? current);
+      return (async () => Response.json((await read?.()) ?? current))();
     }
     if (method === "GET" && path === `${api}?versionId=${versionId}`) {
       return Response.json(version ?? home);
@@ -886,19 +888,24 @@ describe("M3, M4, M5 and Rename plan", () => {
     ).toEqual([{ name: "Plan C" }, { name: "Plan C " }]);
   });
 
-  test("M5 says why when the decision is no longer Proceed", async () => {
+  test("M5 says why when the decision is no longer Proceed; 20 reads it again behind M5, which stays until closed", async () => {
     const user = userEvent.setup();
+    let decision: PlanHome["latestDecision"] = "proceed";
     const calls = planApi({
-      write: (call) =>
-        call.path === `/api/v1/ideas/${ideaId}/plans`
-          ? apiError(409, "DECISION_NOT_PROCEED")
-          : undefined,
+      read: () => planHome({ latestDecision: decision }),
+      write: (call) => {
+        if (call.path !== `/api/v1/ideas/${ideaId}/plans`) return undefined;
+        // Hold recorded since 20 was read.
+        decision = "hold";
+        return apiError(409, "DECISION_NOT_PROCEED");
+      },
     });
     renderApp(planPath("?modal=create-plan"));
     const dialog = await screen.findByRole("dialog", {
       name: "Create plan draft",
     });
     await within(dialog).findByRole("textbox", { name: /Plan name/ });
+    const reads = sent(calls, "GET", api).length;
     await user.click(
       within(dialog).getByRole("button", { name: "Create draft" }),
     );
@@ -907,20 +914,18 @@ describe("M3, M4, M5 and Rename plan", () => {
         "The latest decision is no longer Proceed.",
       ),
     ).toBeTruthy();
-    // The screen reads the decision again only once M5 closes: read now, it would take
-    // M5 and its reason away.
-    const reads = calls.filter(({ path }) => path === api).length;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(
-      screen.getByText("The latest decision is no longer Proceed."),
-    ).toBeTruthy();
-    expect(calls.filter(({ path }) => path === api)).toHaveLength(reads);
-    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() =>
-      expect(calls.filter(({ path }) => path === api).length).toBeGreaterThan(
-        reads,
-      ),
+      expect(sent(calls, "GET", api).length).toBeGreaterThan(reads),
     );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByRole("dialog", { name: "Create plan draft" })).toBe(
+      dialog,
+    );
+    expect(
+      within(dialog).getByText("The latest decision is no longer Proceed."),
+    ).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   /** P1's plans by these names, the first being 20's, none archived. */
@@ -1057,10 +1062,7 @@ describe("M3, M4, M5 and Rename plan", () => {
     // The window's focus reads 20 again (TanStack Query's refetch on focus).
     meanwhile(home);
     try {
-      act(() => {
-        focusManager.setFocused(false);
-        focusManager.setFocused(true);
-      });
+      readAgainOnFocus();
       await waitFor(() => expect(shown()).toBe(true));
     } finally {
       act(() => focusManager.setFocused(undefined));
@@ -1249,6 +1251,505 @@ describe("M3, M4, M5 and Rename plan", () => {
       expect(sent(calls, "POST", `${api}/archive`)).toHaveLength(1),
     );
   });
+});
+
+const modalTitles = {
+  "save-version": "Save version",
+  "go-no-go": "Record Go / No-Go",
+  "create-plan": "Create plan draft",
+} as const;
+
+type User = ReturnType<typeof userEvent.setup>;
+
+/**
+ * How each of 20's dialogs that sends opens (by its button, as a person does) and sends,
+ * and what its send answers when it goes through.
+ */
+const dialogs = {
+  M3: {
+    title: "Save version",
+    open: async (user: User) => {
+      await user.click(
+        await screen.findByRole("button", { name: "Save version" }),
+      );
+    },
+    send: (user: User, dialog: HTMLElement) =>
+      user.click(within(dialog).getByRole("button", { name: "Save version" })),
+    method: "POST",
+    path: `${api}/versions`,
+    ok: (call: Call) =>
+      Response.json(
+        {
+          id: "3d6f0a2c-5b1e-4c8d-9a7f-2e4b6c8d0a21",
+          versionNumber: 2,
+          name: (call.body as { name: string }).name,
+          savedBy: anaRef,
+          savedAt: "2026-10-22T02:00:00.000Z",
+        },
+        { status: 201 },
+      ),
+    done: "v2 saved",
+  },
+  M4: {
+    title: "Record Go / No-Go",
+    open: async (user: User) => {
+      await user.click(
+        await screen.findByRole("button", { name: "Record Go / No-Go" }),
+      );
+      const dialog = await screen.findByRole("dialog", {
+        name: "Record Go / No-Go",
+      });
+      await user.click(within(dialog).getByRole("radio", { name: "Delay" }));
+      await user.type(
+        within(dialog).getByRole("textbox", { name: /Why\?/ }),
+        "Permits first.",
+      );
+    },
+    send: (user: User, dialog: HTMLElement) =>
+      user.click(within(dialog).getByRole("button", { name: "Record" })),
+    method: "POST",
+    path: `${api}/go-no-go`,
+    ok: () => Response.json({ entry: {}, stage: "planning" }, { status: 201 }),
+    done: "Go / No-Go recorded",
+  },
+  M5: {
+    title: "Create plan draft",
+    open: async (user: User) => {
+      await user.click(
+        await screen.findByRole("button", { name: "Switch plan" }),
+      );
+      await user.click(
+        within(screen.getByRole("menu")).getByRole("menuitem", {
+          name: "Add plan",
+        }),
+      );
+      const dialog = await screen.findByRole("dialog", {
+        name: "Create plan draft",
+      });
+      await within(dialog).findByRole("textbox", { name: /Plan name/ });
+    },
+    send: (user: User, dialog: HTMLElement) =>
+      user.click(within(dialog).getByRole("button", { name: "Create draft" })),
+    method: "POST",
+    path: `/api/v1/ideas/${ideaId}/plans`,
+    ok: () =>
+      Response.json(
+        planHome({
+          id: "3d6f0a2c-5b1e-4c8d-9a7f-2e4b6c8d0a40",
+          name: "Plan C",
+        }),
+        { status: 201 },
+      ),
+    done: null,
+  },
+  "Rename plan": {
+    title: "Rename plan",
+    open: async (user: User) => {
+      await user.click(
+        await screen.findByRole("button", { name: "More for Plan A" }),
+      );
+      await user.click(screen.getByRole("menuitem", { name: "Rename plan" }));
+      const dialog = await screen.findByRole("dialog", { name: "Rename plan" });
+      const name = within(dialog).getByRole("textbox", { name: /Plan name/ });
+      await user.clear(name);
+      await user.type(name, "Plan Z");
+    },
+    send: (user: User, dialog: HTMLElement) =>
+      user.click(within(dialog).getByRole("button", { name: "Save" })),
+    method: "PATCH",
+    path: api,
+    ok: () => Response.json(planHome({ name: "Plan Z", lockVersion: 5 })),
+    done: null,
+  },
+} as const;
+
+describe("20's modals of the URL and dialogs while they may not open (SDD 4章, design-spec 6.0.6)", () => {
+  afterEach(cleanupThenRestoreFocus);
+
+  test.each(["save-version", "go-no-go"] as const)(
+    "%s's URL on a saved version: nothing opens, and once 20 is read the URL drops it in place, keeping the version",
+    async (modal) => {
+      planApi({
+        version: planHome({ viewingVersion: planHome().latestVersion }),
+      });
+      const router = renderApp(
+        planPath(`?version=${versionId}&modal=${modal}`),
+      );
+      await screen.findByText("Viewing v1 For advisors (read only)");
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ version: versionId }),
+      );
+      expect(router.history.length).toBe(1);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
+
+  test.each(Object.entries(modalTitles))(
+    "%s's URL on an archived plan: nothing opens and the URL drops it; Restore then opens nothing",
+    async (modal, title) => {
+      const user = userEvent.setup();
+      let isArchived = true;
+      planApi({
+        read: () => planHome({ archived: isArchived }),
+        write: (call) => {
+          if (call.path !== `${api}/restore`) return undefined;
+          isArchived = false;
+          return Response.json({});
+        },
+      });
+      const router = renderApp(planPath(`?modal=${modal}`));
+      const restore = await screen.findByRole("button", { name: "Restore" });
+      await waitFor(() => expect(router.state.location.search).toEqual({}));
+      expect(router.history.length).toBe(1);
+      await user.click(restore);
+      // Read again as it is now: its tools are back, and no modal with them.
+      await screen.findByRole("button", { name: "Record Go / No-Go" });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.queryByRole("dialog", { name: title })).toBeNull();
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
+
+  test.each(Object.entries(modalTitles))(
+    "%s's URL while a cached read of 20 is read again: kept until that read answers, which then opens it",
+    async (modal, title) => {
+      let read: () => PlanHome | Promise<PlanHome> = () =>
+        planHome({ archived: true });
+      planApi({ read: () => read() });
+      const router = renderApp(planPath());
+      await screen.findByRole("button", { name: "Restore" });
+      let release = () => {};
+      const restored = new Promise<PlanHome>((resolve) => {
+        release = () => resolve(planHome());
+      });
+      read = () => restored;
+      readAgainOnFocus();
+      await act(() => router.navigate({ href: planPath(`?modal=${modal}`) }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(router.state.location.search).toEqual({ modal });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      release();
+      expect(await screen.findByRole("dialog", { name: title })).toBeTruthy();
+      expect(router.state.location.search).toEqual({ modal });
+    },
+  );
+
+  test.each(Object.keys(dialogs) as (keyof typeof dialogs)[])(
+    "%s opened, then 20 read again as archived: it stays until closed, and its send says why in it",
+    async (key) => {
+      const { title, open, send, method, path } = dialogs[key];
+      const user = userEvent.setup();
+      let isArchived = false;
+      planApi({
+        read: () => planHome({ archived: isArchived }),
+        write: (call) =>
+          call.method === method && call.path === path
+            ? apiError(409, "ARCHIVED")
+            : undefined,
+      });
+      renderApp(planPath());
+      await open(user);
+      const dialog = await screen.findByRole("dialog", { name: title });
+      isArchived = true;
+      readAgainOnFocus();
+      await screen.findByText("This plan is archived");
+      expect(screen.getByRole("dialog", { name: title })).toBe(dialog);
+      await send(user, dialog);
+      expect(await within(dialog).findByText("Couldn't save")).toBeTruthy();
+      expect(within(dialog).getByText("It's archived")).toBeTruthy();
+      await user.keyboard("{Escape}");
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: title })).toBeNull(),
+      );
+    },
+  );
+
+  test("M4 opened, then archived: its Save a version still opens M3, and closing M3 opens M4 again with its choice", async () => {
+    const user = userEvent.setup();
+    let isArchived = false;
+    planApi({ read: () => planHome({ archived: isArchived }) });
+    const router = renderApp(planPath());
+    await dialogs.M4.open(user);
+    const goNoGo = screen.getByRole("dialog", { name: "Record Go / No-Go" });
+    isArchived = true;
+    readAgainOnFocus();
+    await screen.findByText("This plan is archived");
+    await user.click(
+      await within(goNoGo).findByRole("link", { name: "Save a version" }),
+    );
+    const save = await screen.findByRole("dialog", { name: "Save version" });
+    expect(router.state.location.search).toEqual({ modal: "save-version" });
+    await user.click(within(save).getByRole("button", { name: "Cancel" }));
+    const again = await screen.findByRole("dialog", {
+      name: "Record Go / No-Go",
+    });
+    expect(router.state.location.search).toEqual({ modal: "go-no-go" });
+    expect(
+      (within(again).getByRole("radio", { name: "Delay" }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+  });
+});
+
+describe("a send of 20's dialogs that fails once Back closed it (design-spec 6.0.6「送っている間に閉じた送信の失敗」)", () => {
+  const failures = {
+    "a failure that may pass": {
+      fail: (): Response => {
+        throw new TypeError("Failed to fetch");
+      },
+      toast: "Couldn't save",
+      retries: true,
+    },
+    "refused as archived": {
+      fail: () => apiError(409, "ARCHIVED"),
+      toast: "Couldn't save. It's archived.",
+      retries: false,
+    },
+    unexpected: {
+      fail: () => apiError(500, "INTERNAL"),
+      toast: "Something went wrong. Ref: 8f14e45f",
+      retries: true,
+    },
+  } as const;
+
+  test.each(
+    (Object.keys(dialogs) as (keyof typeof dialogs)[]).flatMap((key) =>
+      (Object.keys(failures) as (keyof typeof failures)[]).map(
+        (failure) => [key, failure] as const,
+      ),
+    ),
+  )(
+    "%s, %s: a toast says so, and its Retry (where it may pass) sends the same again",
+    async (key, failure) => {
+      vi.spyOn(sentry, "reportError").mockReturnValue(null);
+      const { title, open, send, method, path, ok, done } = dialogs[key];
+      const { fail, toast, retries } = failures[failure];
+      const user = userEvent.setup();
+      let release = () => {};
+      const sends: Call[] = [];
+      const calls = planApi({
+        write: (call) => {
+          if (call.method !== method || call.path !== path) return undefined;
+          sends.push(call);
+          if (sends.length > 1) return ok(call);
+          return new Promise<Response>((resolve, reject) => {
+            release = () => {
+              try {
+                resolve(fail());
+              } catch (error) {
+                reject(error);
+              }
+            };
+          });
+        },
+      });
+      // From 13, so that Back from Rename plan, which has no entry of its own, leaves 20.
+      const router = renderApp(`/w/${workspaceId}/ideas/${ideaId}`);
+      await screen.findByRole("heading", { level: 1 });
+      await act(() => router.navigate({ href: planPath() }));
+      await open(user);
+      const dialog = await screen.findByRole("dialog", { name: title });
+      await send(user, dialog);
+      await waitFor(() => expect(sends).toHaveLength(1));
+      act(() => router.history.back());
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: title })).toBeNull(),
+      );
+      const reads = calls.filter((call) => call.method === "GET").length;
+      const shown = await toastAfter(toast, async () => {
+        act(release);
+      });
+      const retry = within(shown).queryByRole("button", { name: "Retry" });
+      if (!retries) {
+        expect(retry).toBeNull();
+        await waitFor(() =>
+          expect(
+            calls.filter((call) => call.method === "GET").length,
+          ).toBeGreaterThan(reads),
+        );
+        return;
+      }
+      expect(retry).not.toBeNull();
+      await user.click(retry as HTMLElement);
+      await waitFor(() => expect(sends).toHaveLength(2));
+      expect(sends[1]?.body).toEqual(sends[0]?.body);
+      if (done !== null) {
+        expect((await screen.findAllByText(done)).length).toBeGreaterThan(0);
+      }
+      expect(screen.queryByRole("dialog", { name: title })).toBeNull();
+    },
+  );
+});
+
+describe("what 20's M5 and Rename plan say and do once closed while they send (design-spec 6.0.6「送っている間に閉じた送信の失敗」)", () => {
+  const savedVersion = planHome({ viewingVersion: planHome().latestVersion });
+  const plansPath = `/api/v1/ideas/${ideaId}/plans`;
+  const paolo = { ...anaRef, id: crypto.randomUUID(), displayName: "Paolo" };
+
+  /**
+   * 20's API whose `method` `path` send is held until the test answers it (`answer`). These
+   * tests expect no second one (no Retry): it would fail unexpectedly.
+   */
+  function heldApi(method: string, path: string) {
+    let release: (answer: () => Response) => void = () => {};
+    const sends: Call[] = [];
+    const calls = planApi({
+      version: savedVersion,
+      write: (call) => {
+        if (call.method !== method || call.path !== path) return undefined;
+        sends.push(call);
+        if (sends.length > 1) return apiError(500, "INTERNAL");
+        return new Promise<Response>((resolve) => {
+          release = (answer) => resolve(answer());
+        });
+      },
+    });
+    return {
+      calls,
+      sends,
+      answer: (response: () => Response) => act(() => release(response)),
+    };
+  }
+
+  /** The reads of 20 (P2 GET): the plan as it is now, and the saved version. */
+  const planReads = (calls: Call[]) =>
+    calls.filter(
+      ({ method, path }) =>
+        method === "GET" &&
+        (path === api || path === `${api}?versionId=${versionId}`),
+    ).length;
+
+  /** Opens M5 from the plan switch, presses Create draft with P1 POST held, then Back. */
+  async function backFromM5(user: User) {
+    const held = heldApi("POST", plansPath);
+    const router = renderApp(planPath());
+    await dialogs.M5.open(user);
+    const dialog = screen.getByRole("dialog", { name: "Create plan draft" });
+    await dialogs.M5.send(user, dialog);
+    await waitFor(() => expect(held.sends).toHaveLength(1));
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Create plan draft" }),
+      ).toBeNull(),
+    );
+    return { ...held, router };
+  }
+
+  test("M5's Create draft that goes through after Back makes the draft and reads 20 again, but does not open the new plan's 20", async () => {
+    const user = userEvent.setup();
+    const { calls, router, answer } = await backFromM5(user);
+    const reads = planReads(calls);
+    answer(dialogs.M5.ok);
+    await waitFor(() => expect(planReads(calls)).toBeGreaterThan(reads));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(router.state.location.pathname).toBe(planPath());
+    expect(router.state.location.search).toEqual({});
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test.each([
+    ["a name in use", "NAME_TAKEN", "This name is already used", false],
+    [
+      "a decision no longer Proceed",
+      "DECISION_NOT_PROCEED",
+      "The latest decision is no longer Proceed.",
+      true,
+    ],
+    [
+      "no published plan template",
+      "TEMPLATE_NOT_PUBLISHED",
+      "Templates aren't ready yet. Ask your administrator.",
+      false,
+    ],
+  ] as const)(
+    "M5 closed by Back while Create draft is on its way, then %s: M5's words alone, without Retry",
+    async (_, code, words, readsAgain) => {
+      const user = userEvent.setup();
+      const { calls, sends, answer } = await backFromM5(user);
+      const reads = planReads(calls);
+      const toast = await toastAfter(words, async () =>
+        answer(() => apiError(409, code)),
+      );
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      if (readsAgain) {
+        await waitFor(() => expect(planReads(calls)).toBeGreaterThan(reads));
+      }
+      expect(sends).toHaveLength(1);
+    },
+  );
+
+  test("Rename plan closes when Back opens the saved version 20 came from, and Forward to the latest does not open it again", async () => {
+    const user = userEvent.setup();
+    planApi({ version: savedVersion });
+    const router = renderApp(planPath(`?version=${versionId}`));
+    await screen.findByText("Viewing v1 For advisors (read only)");
+    await act(() => router.navigate({ href: planPath() }));
+    await dialogs["Rename plan"].open(user);
+    act(() => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ version: versionId }),
+    );
+    await screen.findByText("Viewing v1 For advisors (read only)");
+    expect(screen.queryByRole("dialog", { name: "Rename plan" })).toBeNull();
+    act(() => router.history.forward());
+    await screen.findByRole("button", { name: "More for Plan A" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("dialog", { name: "Rename plan" })).toBeNull();
+  });
+
+  test.each([
+    [
+      "a name in use",
+      () => apiError(409, "NAME_TAKEN"),
+      "This name is already used",
+      false,
+    ],
+    [
+      "someone else's header saved first",
+      () =>
+        apiError(409, "CONFLICT", {
+          current: {
+            value: { name: "Plan T" },
+            lockVersion: 5,
+            updatedAt: new Date().toISOString(),
+            updatedBy: paolo,
+          },
+        }),
+      // The title of the question Rename plan would have asked (ConflictAlert).
+      "Paolo updated this plan header just now",
+      true,
+    ],
+  ] as const)(
+    "Rename plan's Save on its way when Back opens the saved version, then %s: those words alone, without Retry",
+    async (_, fail, words, readsAgain) => {
+      const user = userEvent.setup();
+      const { calls, sends, answer } = heldApi("PATCH", api);
+      const router = renderApp(planPath(`?version=${versionId}`));
+      await screen.findByText("Viewing v1 For advisors (read only)");
+      await act(() => router.navigate({ href: planPath() }));
+      await dialogs["Rename plan"].open(user);
+      await dialogs["Rename plan"].send(
+        user,
+        screen.getByRole("dialog", { name: "Rename plan" }),
+      );
+      await waitFor(() => expect(sends).toHaveLength(1));
+      act(() => router.history.back());
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "Rename plan" }),
+        ).toBeNull(),
+      );
+      const reads = planReads(calls);
+      const toast = await toastAfter(words, async () => answer(fail));
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      if (readsAgain) {
+        await waitFor(() => expect(planReads(calls)).toBeGreaterThan(reads));
+      }
+      expect(sends).toHaveLength(1);
+      expect(router.state.location.search).toEqual({ version: versionId });
+    },
+  );
 });
 
 describe("20's panels", () => {

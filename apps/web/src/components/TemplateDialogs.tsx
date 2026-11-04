@@ -1,4 +1,4 @@
-import { formatList } from "@moonx/i18n";
+import { formatList, i18n } from "@moonx/i18n";
 import {
   type AnswerType,
   answerTypeSchema,
@@ -30,9 +30,11 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, inPath, unwrap } from "../lib/api";
+import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
+import { templateVersionKey } from "../lib/queries";
 import { isSessionLost, useSendThrough } from "../lib/send";
 import {
   answerTypesFor,
@@ -45,6 +47,7 @@ import {
   suggestedQuestionKey,
   titleSchema,
 } from "../lib/template-drafts";
+import { useFailureOnceClosed } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import { metricLabel } from "./TemplateEditors";
 import { useWorkspace } from "./workspace";
@@ -55,9 +58,38 @@ import { useWorkspace } from "./workspace";
 const wordsOf = (version: TemplateVersionDetail) =>
   version.kind === "business_plan" ? "plan" : "other";
 
+const isPublishedMeanwhile = (error: unknown) =>
+  error instanceof ApiError && error.code === "PUBLISHED_READ_ONLY";
+
+/**
+ * Reads the version again once an Add finds it published meanwhile, as 27's Delete and
+ * Publish do: the screen then shows it published, read only (6.0.2). `wordsOf` is for an
+ * Add closed while on its way (and its toast's Retry): it says the refusal 27 has words
+ * for, as 27's Delete says it (design-spec 6.17), and reads the version again too; the
+ * other failures are a row's send's (useToastFailure).
+ */
+function useReadAgainIfPublished(versionId: string) {
+  const queryClient = useQueryClient();
+  const readAgain = (error: unknown) => {
+    if (!isPublishedMeanwhile(error)) return false;
+    void queryClient.invalidateQueries({
+      queryKey: templateVersionKey(versionId),
+    });
+    return true;
+  };
+  return {
+    readAgain,
+    wordsOf: (error: unknown) =>
+      readAgain(error) ? i18n.t("errors:PUBLISHED_READ_ONLY") : null,
+  };
+}
+
 /**
  * Add section (a plan's Add item): its key and title, the fields AD4 needs; the new
- * section goes last (AD4) and is chosen.
+ * section goes last (AD4) and is chosen. Cancel (or leaving 27) while it is on its way
+ * closes it: the section is made all the same if the send goes through, but not chosen,
+ * and a failure says so in a toast, whose Retry sends the same section again
+ * (6.0.6「送っている間に閉じた送信の失敗」).
  */
 export function AddSectionDialog({
   version,
@@ -77,6 +109,22 @@ export function AddSectionDialog({
   const rejections = useRejectedFields(["key", "title"] as const);
   const [failure, setFailure] = useState<unknown>(null);
   const words = wordsOf(version);
+  const add = async (input: { key: string; title: string }) => {
+    const updated = await sendThrough(() =>
+      unwrap(
+        api()
+          .api.v1.admin["template-versions"]({
+            versionId: inPath(version.id),
+          })
+          .sections.post(input),
+      ),
+    );
+    putVersion(queryClient, updated);
+    return updated;
+  };
+  const published = useReadAgainIfPublished(version.id);
+  const failedOnceClosed = useFailureOnceClosed(add, published.wordsOf);
+  const isOpen = useIsMounted();
   const form = useAppForm({
     defaultValues: { key: "", title: "" },
     listeners: {
@@ -86,23 +134,23 @@ export function AddSectionDialog({
       oneAtATime(async () => {
         setFailure(null);
         rejections.clear();
+        const input = { key: value.key, title: value.title };
         try {
-          const updated = await sendThrough(() =>
-            unwrap(
-              api()
-                .api.v1.admin["template-versions"]({
-                  versionId: inPath(version.id),
-                })
-                .sections.post({ key: value.key, title: value.title }),
-            ),
-          );
-          putVersion(queryClient, updated);
+          const updated = await add(input);
+          // Closed meanwhile (Cancel, or 27 left): the section joins the tree, unchosen,
+          // and no other screen's URL takes its node (6.0.6「送っている間に閉じた送信の失敗」).
+          if (!isOpen.current) return;
           const added = updated.sections.find(
             (section) => section.key === value.key,
           );
           if (added !== undefined) onAdded(added.id);
           onClose();
         } catch (error) {
+          // Closed meanwhile (Cancel while on its way): said in a toast instead, which
+          // reads the version again as below.
+          failedOnceClosed(error, input);
+          if (!isOpen.current) return;
+          published.readAgain(error);
           if (isSessionLost(error) || rejections.reject(error)) return;
           setFailure(error);
         }
@@ -181,6 +229,7 @@ export function AddSectionDialog({
  * Add question (a plan's Add prompt) to `section`: its ID, title, question and answer
  * type, the fields AD4 needs. The ID starts as the one after the section's last
  * (design-spec 6.17). The new question goes last in the section (AD4) and is chosen.
+ * Cancel while it is on its way closes it, as Add section does.
  */
 export function AddQuestionDialog({
   version,
@@ -203,6 +252,25 @@ export function AddQuestionDialog({
   const [failure, setFailure] = useState<unknown>(null);
   const words = wordsOf(version);
   const types = answerTypesFor(version.kind);
+  const add = async (input: {
+    key: string;
+    title: string;
+    prompt: string;
+    answerType: AnswerType;
+  }) => {
+    const updated = await sendThrough(() =>
+      unwrap(
+        api()
+          .api.v1.admin["template-sections"]({ id: inPath(section.id) })
+          .questions.post(input),
+      ),
+    );
+    putVersion(queryClient, updated);
+    return updated;
+  };
+  const published = useReadAgainIfPublished(version.id);
+  const failedOnceClosed = useFailureOnceClosed(add, published.wordsOf);
+  const isOpen = useIsMounted();
   const form = useAppForm({
     defaultValues: {
       key: suggestedQuestionKey(section),
@@ -219,26 +287,26 @@ export function AddQuestionDialog({
         rejections.clear();
         // The Picker offers only answer types.
         const answerType: AnswerType = answerTypeSchema.parse(value.answerType);
+        const input = {
+          key: value.key,
+          title: value.title,
+          prompt: value.prompt,
+          answerType,
+        };
         try {
-          const updated = await sendThrough(() =>
-            unwrap(
-              api()
-                .api.v1.admin["template-sections"]({ id: inPath(section.id) })
-                .questions.post({
-                  key: value.key,
-                  title: value.title,
-                  prompt: value.prompt,
-                  answerType,
-                }),
-            ),
-          );
-          putVersion(queryClient, updated);
+          const updated = await add(input);
+          // Closed meanwhile: made, unchosen, as Add section's.
+          if (!isOpen.current) return;
           const added = updated.sections
             .flatMap((entry) => entry.questions)
             .find((question) => question.key === value.key);
           if (added !== undefined) onAdded(added.id);
           onClose();
         } catch (error) {
+          // Closed meanwhile: in a toast, which reads the version again, as Add section's.
+          failedOnceClosed(error, input);
+          if (!isOpen.current) return;
+          published.readAgain(error);
           if (isSessionLost(error) || rejections.reject(error)) return;
           setFailure(error);
         }

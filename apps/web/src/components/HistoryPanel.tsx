@@ -31,6 +31,7 @@ import {
   isCreation,
   isUndoneCreation,
 } from "../lib/history-format";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import { formatPanelTarget, type PanelTarget } from "../lib/panel-target";
 import {
@@ -47,7 +48,7 @@ import {
   type ScreenComments,
   screenAccepts,
 } from "./CommentsPanel";
-import { useCreationUndo } from "./ideaActions";
+import { useCreationUndo, useFailureOnceClosed } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import { failureCode } from "./SendFailure";
 import {
@@ -390,6 +391,22 @@ export function HistoryPanelBody({
       queryClient.invalidateQueries({ queryKey: workspaceKey(workspace.id) }),
     ]);
 
+  // The panel closed (or the screen left) while a revert was on its way: its failure has
+  // no row left to show under, and says so in a toast (6.0.6「送っている間に閉じた送信の
+  // 失敗」), whose Retry sends the same revert again. A refusal the row has words for says
+  // them alone, the list read again when it was undone elsewhere first. Gone is 6.0.2's,
+  // which the toast says with "Couldn't save" and reads the screen again for.
+  const isOpen = useIsMounted();
+  const failedOnceClosed = useFailureOnceClosed(
+    (call: () => Promise<unknown>) => sendThrough(call).then(changed),
+    (error) => {
+      const code = failureCode(error);
+      if (!isRefusal(code) || code === "NOT_FOUND") return null;
+      if (code === "ALREADY_REVERTED") void changed();
+      return t(REFUSALS[code]);
+    },
+  );
+
   const send = async (
     key: string,
     entry: HistoryEntry,
@@ -403,7 +420,8 @@ export function HistoryPanelBody({
       await sendThrough(call);
       await changed();
     } catch (error) {
-      if (isSessionLost(error)) return;
+      failedOnceClosed(error, call);
+      if (!isOpen.current || isSessionLost(error)) return;
       const code = failureCode(error);
       if (error instanceof ApiError && code === "ARCHIVED") {
         setRefusedArchived(true);

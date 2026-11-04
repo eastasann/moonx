@@ -1,5 +1,9 @@
-import type { Me, SelfAnalysisHome } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import type {
+  Me,
+  SelfAnalysisHome,
+  TemplateMigrationPreview,
+} from "@moonx/schemas";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import * as sentry from "../lib/sentry";
@@ -7,6 +11,8 @@ import {
   ana,
   apiError,
   type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
   renderApp,
   stubApi,
   toastAfter,
@@ -17,6 +23,7 @@ import {
   incomeSection,
   otherTeam,
   personal,
+  sectionRead,
   selfAnalysisId,
   selfHome,
   viewerOfBcdx,
@@ -33,7 +40,21 @@ afterEach(() => {
 const path = `/w/${workspaceId}/self-analysis`;
 const api = "/api/v1/me/self-analysis";
 
-/** The API of 10: S1 answers `home`; `write` answers S1 PATCH, S4 and S5. */
+/** T1 of Ana's self-analysis, from v1 to v3 (SDD 5.12). */
+const preview: TemplateMigrationPreview = {
+  from: { versionNumber: 1 },
+  to: { versionId: "7d7d7d7d-0000-4000-8000-000000000003", versionNumber: 3 },
+  carried: 1,
+  hiddenQuestions: [],
+  addedQuestions: 0,
+  addedCostRows: [],
+};
+const previewPath = `/api/v1/template-migrations/preview?targetType=self_analysis&targetId=${selfAnalysisId}`;
+
+/**
+ * The API of 10: S1 answers `home` (or `read`, whose promise holds it back); `write`
+ * answers S1 PATCH, S4 and S5. The comments 10's 💬 lists are none, and T1 moves to v3.
+ */
 function homeApi({
   me = ana,
   home = selfHome(),
@@ -42,7 +63,7 @@ function homeApi({
 }: {
   me?: Me;
   home?: SelfAnalysisHome;
-  read?: () => Response;
+  read?: () => Response | Promise<Response>;
   /** Answers S1 PATCH, S4 and S5; a promise holds the answer back. */
   write?: (call: Call) => Response | Promise<Response> | undefined;
 } = {}) {
@@ -52,14 +73,29 @@ function homeApi({
     if (method === "PATCH" && url === "/api/v1/me") return Response.json(me);
     if (method === "GET" && url === api) return read?.() ?? Response.json(home);
     if (method === "GET" && url === `${api}/sections/WHY`) {
-      return Response.json({
-        section: whySection,
-        answers: whySection.questions.map(({ key }) => answer(key)),
-      });
+      return Response.json(
+        sectionRead(
+          whySection,
+          whySection.questions.map(({ key }) => answer(key)),
+        ),
+      );
     }
     if (url.startsWith(api)) return write(call);
+    if (method === "GET" && url.startsWith("/api/v1/comments?")) {
+      return Response.json({ threads: [], unresolvedCount: 0 });
+    }
+    if (method === "GET" && url === previewPath) return Response.json(preview);
     return undefined;
   });
+}
+
+/** A promise of nothing, and what lets it go. */
+function hold() {
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { held, release };
 }
 
 const sent = (calls: Call[], method: string, url: string) =>
@@ -784,5 +820,415 @@ describe("M6 Share (design-spec 3.8・6.11)", () => {
     // That line alone (6.11).
     expect(within(dialog).queryByText(/Owners and Members/)).toBeNull();
     expect(within(dialog).queryByRole("button", { name: "Save" })).toBeNull();
+  });
+});
+
+describe("M6's and M8's URLs on 10 (SDD 4章 ?modal=share・update-template)", () => {
+  afterEach(cleanupThenRestoreFocus);
+
+  const panel = {
+    panel: "comments",
+    target: `container:self_analysis:${selfAnalysisId}`,
+  };
+  const panelSearch = new URLSearchParams(panel).toString();
+
+  test("M6 before it is done, shared nowhere: nothing, and once 10 is read its URL goes in place of the entry, the panel kept; Mark as done then opens nothing", async () => {
+    const user = userEvent.setup();
+    const allAnswered = selfHome({
+      answered: 3,
+      firstUnanswered: null,
+      shares: [],
+    });
+    homeApi({
+      home: allAnswered,
+      write: (call) =>
+        call.path === `${api}/complete`
+          ? Response.json({ ...allAnswered, status: "done" })
+          : undefined,
+    });
+    const router = renderApp(`${path}?modal=share&${panelSearch}`);
+    await screen.findByText("In progress · 3 / 3 answered");
+    await waitFor(() => expect(router.state.location.search).toEqual(panel));
+    expect(router.history.length).toBe(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Mark as done" }));
+    expect(await screen.findByRole("button", { name: "Reopen" })).toBeTruthy();
+    // Share opens it now, but its URL is gone: nothing opens unasked.
+    expect(
+      screen.getByRole("button", { name: "Share" }).hasAttribute("disabled"),
+    ).toBe(false);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("M6 asked while a cached 10 is read again: the URL keeps it, and it opens once the read says done", async () => {
+    let current = selfHome({ shares: [] });
+    let read: Promise<void> | null = null;
+    const calls = homeApi({
+      read: () =>
+        read === null
+          ? Response.json(current)
+          : read.then(() => Response.json(current)),
+    });
+    const router = renderApp(`${path}/WHY`);
+    await screen.findByRole("textbox", { name: "Answer to Q1" });
+    const { held, release } = hold();
+    read = held;
+    // Marked as done in another tab.
+    current = selfHome({ status: "done", shares: [] });
+    const reads = sent(calls, "GET", api).length;
+    await act(() => router.navigate({ href: `${path}?modal=share` }));
+    await waitFor(() => expect(sent(calls, "GET", api).length).toBe(reads + 1));
+    // The cached 10 meanwhile: not done, shared nowhere.
+    expect(
+      await screen.findByText("In progress · 1 / 3 answered"),
+    ).toBeTruthy();
+    expect(router.state.location.search).toEqual({ modal: "share" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    release();
+    expect(await screen.findByRole("dialog", { name: "Share" })).toBeTruthy();
+  });
+
+  test("M6 open, then 10 read again reopened elsewhere and shared nowhere: it stays until closed", async () => {
+    const user = userEvent.setup();
+    let current = selfHome({ status: "done", shares: [] });
+    homeApi({ read: () => Response.json(current) });
+    const router = renderApp(`${path}?modal=share`);
+    const dialog = await screen.findByRole("dialog", { name: "Share" });
+    current = selfHome({ shares: [] });
+    readAgainOnFocus();
+    // M6 as 10 reads now: nothing to add before it is done again. A Save the API refuses
+    // meanwhile says why in it ("reopened elsewhere before Save", above).
+    expect(
+      await within(dialog).findByText(
+        "Mark your self analysis as done to share it with more workspaces.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Share" })).toBe(dialog);
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(router.state.location.search).toEqual({});
+  });
+
+  test.each([
+    { about: "without about", search: "modal=update-template" },
+    {
+      about: "about another self analysis",
+      search:
+        "modal=update-template&about=self_analysis:5a5a5a5a-0000-4000-8000-000000000009",
+    },
+  ])(
+    "M8 $about: nothing, and once 10 is read its URL goes in place of the entry, the panel kept",
+    async ({ search }) => {
+      const calls = homeApi();
+      const router = renderApp(`${path}?${search}&${panelSearch}`);
+      await screen.findByText("In progress · 1 / 3 answered");
+      await waitFor(() => expect(router.state.location.search).toEqual(panel));
+      expect(router.history.length).toBe(1);
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(sent(calls, "GET", previewPath)).toEqual([]);
+    },
+  );
+
+  test("M8 asked while 10 is first read: the URL keeps it, and it opens once 10 is read", async () => {
+    const { held, release } = hold();
+    const about = `self_analysis:${selfAnalysisId}`;
+    const calls = homeApi({
+      read: () =>
+        held.then(() =>
+          Response.json(
+            selfHome({
+              template: {
+                versionId: "7d7d7d7d-0000-4000-8000-000000000001",
+                versionNumber: 1,
+                newerVersion: {
+                  versionId: preview.to.versionId,
+                  versionNumber: 3,
+                },
+              },
+            }),
+          ),
+        ),
+    });
+    const router = renderApp(`${path}?modal=update-template&about=${about}`);
+    await waitFor(() => expect(sent(calls, "GET", api)).toHaveLength(1));
+    expect(router.state.location.search).toEqual({
+      modal: "update-template",
+      about,
+    });
+    release();
+    const dialog = await screen.findByRole("dialog", {
+      name: "Update template",
+    });
+    expect(
+      await within(dialog).findByText("Move from v1 to v3 of the template."),
+    ).toBeTruthy();
+  });
+
+  test.each([
+    { modal: "M6", search: "modal=share" },
+    {
+      modal: "M8",
+      search: `modal=update-template&about=self_analysis:${selfAnalysisId}`,
+    },
+  ])(
+    "no published template: $modal opens nothing, and its URL goes once that is read",
+    async ({ search }) => {
+      homeApi({ read: () => apiError(409, "TEMPLATE_NOT_PUBLISHED") });
+      const router = renderApp(`${path}?${search}`);
+      await screen.findByText(
+        "Templates aren't ready yet. Ask your administrator.",
+      );
+      await waitFor(() => expect(router.state.location.search).toEqual({}));
+      expect(router.history.length).toBe(1);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
+});
+
+describe("a Save of 10's dialogs on its way when Back closes them (design-spec 6.0.6)", () => {
+  const both = selfHome({
+    status: "done",
+    shares: [
+      {
+        workspace: { id: workspaceId, name: "BCDX" },
+        sharedAt: "2026-10-01T01:00:00Z",
+      },
+      { workspace: otherTeam, sharedAt: "2026-10-22T01:00:00Z" },
+    ],
+  });
+  const reopened = selfHome();
+
+  /**
+   * Opens M6 from Share on a done 10, adds Bacolod Makers and saves; Back closes M6
+   * while S5 is held. Let go, S5 answers `first` and S1 reads `then`; S5 answers `later`
+   * after, if given, else shares with both.
+   */
+  async function backWhileSharing(
+    first: () => Response,
+    then: SelfAnalysisHome = selfHome({ status: "done" }),
+    later?: () => Response,
+  ) {
+    const user = userEvent.setup();
+    let current = selfHome({ status: "done" });
+    const { held, release } = hold();
+    let attempts = 0;
+    const calls = homeApi({
+      read: () => Response.json(current),
+      write: (call) => {
+        if (call.path !== `${api}/shares`) return undefined;
+        attempts += 1;
+        if (attempts > 1) {
+          if (later !== undefined) return later();
+          current = both;
+          return Response.json(both);
+        }
+        return held.then(() => {
+          current = then;
+          return first();
+        });
+      },
+    });
+    const router = renderApp(path);
+    await user.click(await screen.findByRole("button", { name: "Share" }));
+    const dialog = await screen.findByRole("dialog", { name: "Share" });
+    await user.click(
+      within(dialog).getByRole("checkbox", { name: otherTeam.name }),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await act(async () => router.history.back());
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(router.state.location.pathname).toBe(path);
+    expect(router.state.location.search).toEqual({});
+    return { user, calls, router, release };
+  }
+
+  const shareSends = (calls: Call[]) =>
+    sent(calls, "PUT", `${api}/shares`).map(({ body }) => body);
+  const chosen = { workspaceIds: [workspaceId, otherTeam.id] };
+
+  test("M6: a Save that goes through shares, and neither opens M6 again nor leaves 10", async () => {
+    const { calls, router, release } = await backWhileSharing(
+      () => Response.json(both),
+      both,
+    );
+    release();
+    expect(await screen.findByText("BCDX, Bacolod Makers")).toBeTruthy();
+    expect(shareSends(calls)).toEqual([chosen]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(router.state.location.pathname).toBe(path);
+  });
+
+  test.each([
+    {
+      failure: "the network",
+      answer: (): Response => {
+        throw new TypeError("Failed to fetch");
+      },
+      words: "Couldn't save",
+    },
+    {
+      failure: "an API that is down, with its Ref",
+      answer: () => apiError(503, "UPSTREAM_UNAVAILABLE"),
+      words: "Couldn't save. Ref: 8f14e45f",
+    },
+    {
+      failure: "an unexpected 500",
+      answer: () => apiError(500, "INTERNAL"),
+      words: "Something went wrong. Ref: 8f14e45f",
+    },
+  ])(
+    "M6: $failure says so in a toast; Retry sends the same choice again and shares it",
+    async ({ answer, words }) => {
+      const { user, calls, release } = await backWhileSharing(answer);
+      const toast = await toastAfter(words, async () => release());
+      await user.click(within(toast).getByRole("button", { name: "Retry" }));
+      expect(await screen.findByText("BCDX, Bacolod Makers")).toBeTruthy();
+      expect(shareSends(calls)).toEqual([chosen, chosen]);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
+
+  test("M6: the toast's Retry refused as reopened meanwhile: its words in a toast without Retry, and 10 read again", async () => {
+    const { user, calls, release } = await backWhileSharing(
+      (): Response => {
+        throw new TypeError("Failed to fetch");
+      },
+      reopened,
+      () => apiError(422, "MUST_BE_DONE_TO_SHARE"),
+    );
+    const toast = await toastAfter("Couldn't save", async () => release());
+    const reads = sent(calls, "GET", api).length;
+    const refused = await toastAfter(
+      "Mark your self analysis as done before you share it with another workspace.",
+      () => user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    expect(within(refused).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() =>
+      expect(sent(calls, "GET", api).length).toBeGreaterThan(reads),
+    );
+    expect(
+      await screen.findByText("In progress · 1 / 3 answered"),
+    ).toBeTruthy();
+    expect(shareSends(calls)).toEqual([chosen, chosen]);
+  });
+
+  /** The failures a screen or a toast says, to tell a new one from those already shown. */
+  const failures = () =>
+    screen.queryAllByText(/^(Couldn't save|Something went wrong)/);
+
+  test("M6: the toast's Retry finds the session ended: the sign-in screen, and no failure of its own", async () => {
+    const { user, router, release } = await backWhileSharing(
+      (): Response => {
+        throw new TypeError("Failed to fetch");
+      },
+      undefined,
+      () => apiError(401, "UNAUTHENTICATED"),
+    );
+    const toast = await toastAfter("Couldn't save", async () => release());
+    const before = new Set(failures());
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+    expect(failures().filter((words) => !before.has(words))).toEqual([]);
+  });
+
+  test("M6: refused as reopened meanwhile, its words in a toast without Retry, and 10 read again", async () => {
+    const { calls, release } = await backWhileSharing(
+      () => apiError(422, "MUST_BE_DONE_TO_SHARE"),
+      reopened,
+    );
+    const reads = sent(calls, "GET", api).length;
+    const toast = await toastAfter(
+      "Mark your self analysis as done before you share it with another workspace.",
+      async () => release(),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() =>
+      expect(sent(calls, "GET", api).length).toBeGreaterThan(reads),
+    );
+    expect(
+      await screen.findByText("In progress · 1 / 3 answered"),
+    ).toBeTruthy();
+    expect(shareSends(calls)).toEqual([chosen]);
+  });
+
+  /**
+   * Opens Change currency on 10, come to from 11, chooses USD and saves; Back leaves 10
+   * while S1 PATCH is held. Let go, it answers `first`; `later` answers any after.
+   */
+  async function backWhileChangingCurrency(
+    first: () => Response,
+    later: () => Response = () => Response.json(selfHome({ currency: "USD" })),
+  ) {
+    const user = userEvent.setup();
+    const { held, release } = hold();
+    let attempts = 0;
+    const calls = homeApi({
+      write: (call) => {
+        if (call.method !== "PATCH") return undefined;
+        attempts += 1;
+        return attempts === 1 ? held.then(first) : later();
+      },
+    });
+    const router = renderApp(`${path}/WHY`);
+    await screen.findByRole("textbox", { name: "Answer to Q1" });
+    await act(() => router.navigate({ href: path }));
+    await user.click(
+      await screen.findByRole("button", {
+        name: "More for My Self Analysis",
+      }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Change currency" }));
+    const dialog = await screen.findByRole("dialog", { name: "Currency" });
+    await user.click(within(dialog).getByRole("button", { name: /Currency/ }));
+    await user.click(await screen.findByRole("option", { name: /^USD/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await act(async () => router.history.back());
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`${path}/WHY`),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    return { user, calls, router, release };
+  }
+
+  test.each([
+    {
+      failure: "the network",
+      answer: (): Response => {
+        throw new TypeError("Failed to fetch");
+      },
+      words: "Couldn't save",
+    },
+    {
+      failure: "an unexpected 500",
+      answer: () => apiError(500, "INTERNAL"),
+      words: "Something went wrong. Ref: 8f14e45f",
+    },
+  ])(
+    "Change currency, 10 left by Back: $failure says so in a toast; Retry sends the same currency again",
+    async ({ answer, words }) => {
+      const { user, calls, release } = await backWhileChangingCurrency(answer);
+      const toast = await toastAfter(words, async () => release());
+      await user.click(within(toast).getByRole("button", { name: "Retry" }));
+      await waitFor(() =>
+        expect(sent(calls, "PATCH", api).map(({ body }) => body)).toEqual([
+          { currency: "USD" },
+          { currency: "USD" },
+        ]),
+      );
+    },
+  );
+
+  test("Change currency, 10 left by Back: the toast's Retry finds the session ended: the sign-in screen, and no failure of its own", async () => {
+    const { user, router, release } = await backWhileChangingCurrency(
+      (): Response => {
+        throw new TypeError("Failed to fetch");
+      },
+      () => apiError(401, "UNAUTHENTICATED"),
+    );
+    const toast = await toastAfter("Couldn't save", async () => release());
+    const before = new Set(failures());
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+    expect(failures().filter((words) => !before.has(words))).toEqual([]);
   });
 });

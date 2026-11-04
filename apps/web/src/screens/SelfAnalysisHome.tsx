@@ -42,7 +42,12 @@ import {
   useTemplateBanner,
 } from "../components/TemplateUpdate";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { useModal, usePanel, useWorkspace } from "../components/workspace";
+import {
+  useModal,
+  usePanel,
+  useSearchModal,
+  useWorkspace,
+} from "../components/workspace";
 import { ApiError, api, unwrap } from "../lib/api";
 import { questionLabel } from "../lib/item-labels";
 import {
@@ -246,10 +251,13 @@ function SelfAnalysisHub({
   home,
   modal,
   about,
+  isRead,
 }: {
   home: SelfAnalysisHome;
   modal: string | undefined;
   about: string | undefined;
+  /** Whether `home` is the API's latest answer, not a cached one being read again. */
+  isRead: boolean;
 }) {
   const { t } = useTranslation(["selfAnalysis", "common"]);
   const { workspace } = useWorkspace();
@@ -262,17 +270,16 @@ function SelfAnalysisHub({
   const here = selfAnalysisHref(workspace.id);
   // Shared with nowhere yet, it is shared once done; a share is taken off at any time.
   const canShare = isDone || home.shares.length > 0;
-  // Whether M6 may open is decided as it opens: reopened elsewhere meanwhile, it stays to
-  // say why its Save was refused.
-  const [wasSharing, setSharing] = useState(false);
-  const isSharing = modal === "share" && (canShare || wasSharing);
-  if (isSharing !== wasSharing) setSharing(isSharing);
+  // Decided as it opens: reopened elsewhere meanwhile, it stays to say why its Save was
+  // refused.
+  const isSharing = useSearchModal(modal, "share", canShare, isRead);
   // The self-analysis here is always the user's own, which only they migrate (2.2).
   const isUpdatingTemplate = useIsTemplateUpdateOpen(
     modal,
     about,
     selfAnalysisTarget(home),
     true,
+    isRead,
   );
   return (
     <>
@@ -407,9 +414,20 @@ function SelfAnalysisHub({
 
 /**
  * 10 when no self-analysis can be made yet (design-spec 6.0.6): its title, and the words
- * in the place of Start, where the Status block would be.
+ * in the place of Start, where the Status block would be. With no self-analysis to share
+ * or migrate, `?modal=share` and `?modal=update-template` open nothing and come off the
+ * URL (SDD 4章).
  */
-function HomeNotReady() {
+function HomeNotReady({
+  modal,
+  isRead,
+}: {
+  modal: string | undefined;
+  /** Whether that answer is the API's latest, not a cached one being read again. */
+  isRead: boolean;
+}) {
+  useSearchModal(modal, "share", false, isRead);
+  useSearchModal(modal, "update-template", false, isRead);
   const { t } = useTranslation(["selfAnalysis", "errors"]);
   return (
     <HubPattern
@@ -478,10 +496,10 @@ export function SelfAnalysisHomeScreen({
   const { workspace } = useWorkspace();
   const panel = usePanel();
   const moves = useMovesToPersonal();
-  const { data: home } = useQuery({
-    ...selfAnalysisHomeQuery(),
-    enabled: !moves,
-  });
+  const homeQuery = useQuery({ ...selfAnalysisHomeQuery(), enabled: !moves });
+  const home = homeQuery.data;
+  // A cached 10 shows at once while it is read again (ADR-011); what it may open waits.
+  const isRead = !homeQuery.isFetching;
   // The self-analysis is always the user's own here: only its owner migrates it (2.2).
   const templateBanner = useTemplateBanner(
     home?.template,
@@ -539,10 +557,15 @@ export function SelfAnalysisHomeScreen({
       {moves ? null : (
         <SelfAnalysisBody
           skeleton={<SelfAnalysisHomeSkeleton />}
-          notReady={<HomeNotReady />}
+          notReady={<HomeNotReady modal={modal} isRead={isRead} />}
         >
           {(loaded) => (
-            <SelfAnalysisHub home={loaded} modal={modal} about={about} />
+            <SelfAnalysisHub
+              home={loaded}
+              modal={modal}
+              about={about}
+              isRead={isRead}
+            />
           )}
         </SelfAnalysisBody>
       )}

@@ -16,6 +16,7 @@ import {
   type QueryKey,
   queryOptions,
   skipToken,
+  useIsFetching,
 } from "@tanstack/react-query";
 import { scopeParam } from "./ai";
 import { ApiError, api, inPath, unwrap } from "./api";
@@ -270,6 +271,25 @@ export const validationHomeQuery = (ideaId: string) =>
           .validation.get(),
       ),
   });
+
+/**
+ * Whether what decides `?modal=evidence` over a validation screen's rows, numbers or
+ * answers has been read (SDD 4章, useSearchModalAbout's `isDecided`, which waits for the
+ * user's role itself): whether the idea is archived (V1) and `list`, where M2's `about`
+ * is looked for, each read and neither being read again. A read that brings stale cached
+ * data up to date (on opening the screen, after a change) may still let M2 open.
+ */
+export function useIsValidationRead(
+  ideaId: string,
+  list: { data: unknown; isFetching: boolean },
+): boolean {
+  const isHomeFetching =
+    useIsFetching({
+      queryKey: validationHomeQuery(ideaId).queryKey,
+      exact: true,
+    }) > 0;
+  return list.data !== undefined && !list.isFetching && !isHomeFetching;
+}
 
 /** P1 GET with the archived plans, which 13 lists once "Show" is pressed (6.1). */
 export const archivedPlansQuery = (ideaId: string) =>

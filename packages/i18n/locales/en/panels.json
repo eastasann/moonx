@@ -28,6 +28,8 @@
     "resolvedThread": "Resolved · {{name}}: {{excerpt}}",
     "resolvedDeleted": "Resolved · {{name}}",
     "couldNotPost": "Couldn't post",
+    "couldNotPostReason": "Couldn't post. {{reason}}.",
+    "couldNotPostRef": "Couldn't post. Ref: {{ref}}",
     "noCandidates": "Couldn't load who you can mention.",
     "archived": {
       "idea": "This idea is archived. Restore it to make changes.",

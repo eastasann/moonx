@@ -575,6 +575,8 @@
     "record": "Record decision",
     "recorded": "Decision recorded",
     "couldNotRecord": "Couldn't record",
+    "couldNotRecordReason": "Couldn't record. {{reason}}.",
+    "couldNotRecordRef": "Couldn't record. Ref: {{ref}}",
     "newer": {
       "record": "Record mine",
       "cancel": "Cancel"

@@ -32,8 +32,11 @@ import { useAutosave, useSaveItem } from "../lib/autosave-react";
 import { useAppForm, useOneAtATime, useRejectedFields } from "../lib/form";
 import { inputIssueMessage } from "../lib/input-issues";
 import { ideaHref } from "../lib/links";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import { ideaKey, validationHomeQuery, workspaceKey } from "../lib/queries";
+import { useSendThrough } from "../lib/send";
+import { useFailureOnceClosed } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import { SaveFailureNote } from "./SaveFeedback";
 import { failureCode } from "./SendFailure";
@@ -48,7 +51,8 @@ const solutionInputSchema = plainText(TEXT_LIMITS.long);
  * and opens its 13 in place of the dialog's history entry. Medium; a tray on a phone. A
  * failure keeps what was typed (6.0.6 モーダルの共通の決まり): no published template says
  * so where Create is; the rest as every modal's send (ModalSendFailure), whose small
- * dialog's Close closes M1.
+ * dialog's Close closes M1. Closed while Create is on its way, the idea is still made
+ * and listed, but 13 does not open (6.0.6「送っている間に閉じた送信の失敗」).
  */
 export function NewIdeaDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation(["ideas", "app", "errors"]);
@@ -57,20 +61,35 @@ export function NewIdeaDialog({ onClose }: { onClose: () => void }) {
   const formId = useId();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const isOpen = useIsMounted();
+  const post = (values: IdeaCreate) =>
+    unwrap(
+      api().api.v1.workspaces({ workspaceId: workspace.id }).ideas.post(values),
+    );
+  const listChanged = () =>
+    queryClient.invalidateQueries({ queryKey: workspaceKey(workspace.id) });
+  // Cancel, Escape and Back close M1 while Create is on its way: its failure then says so
+  // in a toast, whose Retry makes the idea from the same input and lists it. No published
+  // template says so alone, as sending again meets the same refusal.
+  const sendThrough = useSendThrough();
+  const failedOnceClosed = useFailureOnceClosed(
+    (values: IdeaCreate) => sendThrough(() => post(values)).then(listChanged),
+    (error) =>
+      failureCode(error) === "TEMPLATE_NOT_PUBLISHED"
+        ? t("errors:TEMPLATE_NOT_PUBLISHED")
+        : null,
+  );
   const create = useMutation({
-    mutationFn: (values: IdeaCreate) =>
-      unwrap(
-        api()
-          .api.v1.workspaces({ workspaceId: workspace.id })
-          .ideas.post(values),
-      ),
+    mutationFn: post,
     onSuccess: async (idea) => {
-      await queryClient.invalidateQueries({
-        queryKey: workspaceKey(workspace.id),
-      });
+      await listChanged();
+      // Closed meanwhile: the user stays where closing took them, and the entry they are
+      // on now is not replaced.
+      if (!isOpen.current) return;
       // In place of M1's entry: Back from 13 leads to the screen under it, not to M1.
       await navigate({ href: ideaHref(workspace.id, idea.id), replace: true });
     },
+    onError: (error, values) => failedOnceClosed(error, values),
   });
   // A second I1 POST would make a second idea: a second submit waits for the first.
   const oneAtATime = useOneAtATime();

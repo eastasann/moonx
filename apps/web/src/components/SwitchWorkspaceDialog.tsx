@@ -21,14 +21,14 @@ import { useTranslation } from "react-i18next";
 import { api, unwrap } from "../lib/api";
 import { useAppForm, useOneAtATime } from "../lib/form";
 import { useIsOnline } from "../lib/online";
+import { useSendThrough } from "../lib/send";
+import { useFailureOnceClosed } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import { refusedFieldsOf } from "./RowFields";
 import { useWorkspace } from "./workspace";
 
 /** W0's currency when the user picks none (design-spec 5章「ワークスペースの作成」). */
 const DEFAULT_CURRENCY = "PHP";
-
-const noop = () => {};
 
 /**
  * M7 Switch workspace (design-spec 3.8・5章): the workspaces the user belongs to, each
@@ -109,7 +109,10 @@ function WorkspaceList() {
  * that is down as "Couldn't save" and Retry in place, a name the API refuses as "Couldn't
  * save" with 6.0.2's reason and under the field too until it changes, and anything else
  * unexpected, in the small dialog with its Ref, whose Close closes M7. Either Retry sends
- * what is typed again.
+ * what is typed again. Cancel, or M7 closed, while Create is on its way: the workspace is
+ * made all the same if the send goes through, without opening it, and a failure says so
+ * in a toast, whose Retry sends the same name and currency again and opens nothing either
+ * (6.0.6「送っている間に閉じた送信の失敗」).
  */
 function NewWorkspaceForm({
   onCancel,
@@ -131,21 +134,43 @@ function NewWorkspaceForm({
       })),
     [],
   );
+  const sendThrough = useSendThrough();
+  const post = (values: WorkspaceCreate) =>
+    unwrap(api().api.v1.workspaces.post(values));
+  // W0 made the user its Owner and its last workspace (SDD 5.5): M7's list, if open,
+  // shows it.
+  const made = () => queryClient.invalidateQueries({ queryKey: ["me"] });
+  const failedOnceClosed = useFailureOnceClosed((values: WorkspaceCreate) =>
+    sendThrough(() => post(values)).then(made),
+  );
   const create = useMutation({
-    mutationFn: (values: WorkspaceCreate) =>
-      unwrap(api().api.v1.workspaces.post(values)),
-    onSuccess: async (workspace) => {
-      // W0 made the user its Owner and its last workspace (SDD 5.5).
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
-      await navigate({
-        to: "/w/$workspaceId",
-        params: { workspaceId: workspace.id },
-      });
-    },
+    mutationFn: post,
+    // Here, not in `mutate`'s: they run after Cancel pressed while it was on its way.
+    onSuccess: made,
+    onError: failedOnceClosed,
   });
   // A second W0 would make a second workspace: a second submit waits for the first, so
   // the form stays submitting (Create keeps its spinner).
   const oneAtATime = useOneAtATime();
+  const send = (values: WorkspaceCreate) =>
+    oneAtATime(
+      () =>
+        new Promise<void>((resolve) => {
+          create.mutate(values, {
+            // Fires only while the form is still open: made after Cancel, or after M7
+            // closed, the workspace does not open, and the user stays where they are
+            // (6.0.6「送っている間に閉じた送信の失敗」). Create stays pending until its
+            // 5 opens.
+            onSuccess: (workspace) =>
+              void navigate({
+                to: "/w/$workspaceId",
+                params: { workspaceId: workspace.id },
+              }).finally(resolve),
+            // The failure shows from the mutation's state below; a 401 has left the page.
+            onError: () => resolve(),
+          });
+        }),
+    );
   const failure = create.error;
   const isNameRefused = refusedFieldsOf(failure, ["name"]).length > 0;
   const form = useAppForm({
@@ -157,9 +182,7 @@ function NewWorkspaceForm({
         if (fieldApi.name === "name" && isNameRefused) create.reset();
       },
     },
-    onSubmit: ({ value }) =>
-      // The failure shows from the mutation's state below; a 401 has left the page.
-      oneAtATime(() => create.mutateAsync(value).then(noop, noop)),
+    onSubmit: ({ value }) => send(value),
   });
   return (
     <form.AppForm>

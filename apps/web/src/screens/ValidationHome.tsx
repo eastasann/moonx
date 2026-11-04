@@ -63,7 +63,12 @@ import {
 } from "../components/TemplateUpdate";
 import { UserName, userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  useSearchModal,
+  useWorkspace,
+} from "../components/workspace";
 import {
   decideHref,
   decisionsHref,
@@ -673,10 +678,17 @@ function ValidationHub({
   home,
   modal,
   about,
+  isDecided,
 }: {
   home: ValidationHome;
   modal: string | undefined;
   about: string | undefined;
+  /**
+   * Whether `home` is what V1 answers now, not a cached read being read again: what
+   * decides whether a modal of the URL may open (SDD 4章). 19's Proceed opens 13 with
+   * M5's URL while the 13 cached from before it still has no Proceed.
+   */
+  isDecided: boolean;
 }) {
   const { t } = useTranslation(["validation"]);
   const { workspace, role } = useWorkspace();
@@ -687,11 +699,18 @@ function ValidationHub({
   const canEdit = canWrite && !home.idea.archived;
   // M5 only after Proceed (design-spec 6.12「M5」, 6.1「操作」).
   const canAddPlan = canEdit && home.idea.latestDecision === "proceed";
+  const isCreatingPlan = useSearchModal(
+    modal,
+    "create-plan",
+    canAddPlan,
+    isDecided,
+  );
   const isUpdatingTemplate = useIsTemplateUpdateOpen(
     modal,
     about,
     validationTarget(home),
     canEdit,
+    isDecided,
   );
   const contents: HubBlockSpec[] = [
     { id: "next", column: "main", content: <NextSteps home={home} /> },
@@ -787,12 +806,13 @@ function ValidationHub({
         }
         blocks={blocks}
       />
-      {isEditing && canEdit && (
+      {/* Opened only while it may be; then until closed, so a refused save says why in it. */}
+      {isEditing && (
         <ModalBoundary onClose={() => setEditing(false)}>
           <EditSummaryDialog home={home} onClose={() => setEditing(false)} />
         </ModalBoundary>
       )}
-      {modal === "create-plan" && canAddPlan && (
+      {isCreatingPlan && (
         <ModalBoundary key={modal} onClose={modals.close}>
           <CreatePlanDialog ideaId={home.idea.id} onClose={modals.close} />
         </ModalBoundary>
@@ -828,7 +848,12 @@ function ValidationHomeBody({
   if (query.data !== undefined) {
     // Another workspace's idea under this one's URL (SDD 4章): its role is not this one's.
     return query.data.idea.workspaceId === workspace.id ? (
-      <ValidationHub home={query.data} modal={modal} about={about} />
+      <ValidationHub
+        home={query.data}
+        modal={modal}
+        about={about}
+        isDecided={!query.isFetching}
+      />
     ) : (
       <NoAccessState dashboardHref={dashboardHref(me)} />
     );

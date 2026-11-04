@@ -2,22 +2,21 @@ import type { Me, Role } from "@moonx/schemas";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import * as sentry from "../lib/sentry";
+import {
+  ana,
+  apiError,
+  type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
+  renderApp,
+  setViewport,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { ideaSummary, validationHome, workspaceId } from "../test/ideas";
 
 // 6 Ideas and M1 (design-spec 6.8・3.8).
-
-/** happy-dom's window, whose viewport a test sets. */
-const setViewport = (width: number) =>
-  act(() =>
-    (
-      window as unknown as {
-        happyDOM: {
-          setViewport: (size: { width: number; height: number }) => void;
-        };
-      }
-    ).happyDOM.setViewport({ width, height: 900 }),
-  );
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -42,13 +41,19 @@ function ideasApi({
   hidden = 1,
   create = () => apiError(500, "INTERNAL"),
 }: {
-  me?: Me;
+  /** U1's answer, or what gives it each time it is asked (a promise holds it back). */
+  me?: Me | (() => Me | Promise<Me>);
   items?: unknown[];
   hidden?: number;
-  create?: () => Response;
+  /** I1 POST's answer (a promise holds it back). */
+  create?: () => Response | Promise<Response>;
 } = {}) {
   return stubApi(({ method, path }) => {
-    if (path === "/api/v1/me") return Response.json(me);
+    if (path === "/api/v1/me") {
+      return typeof me === "function"
+        ? Promise.resolve(me()).then((read) => Response.json(read))
+        : Response.json(me);
+    }
     if (
       method === "GET" &&
       path.startsWith(`/api/v1/workspaces/${workspaceId}/ideas?`)
@@ -471,10 +476,204 @@ describe("M1 New idea (design-spec 3.8・6.8)", () => {
     expect(within(dialog).queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
-  test("a Viewer opening M1's URL sees no dialog", async () => {
-    ideasApi({ me: as("viewer") });
-    renderApp(`/w/${workspaceId}/ideas?modal=new-idea`);
-    await screen.findAllByRole("row");
-    expect(screen.queryByRole("dialog")).toBeNull();
+  describe("its URL (SDD 4章 ?modal=new-idea)", () => {
+    afterEach(cleanupThenRestoreFocus);
+
+    const meReads = (calls: Call[]) =>
+      calls.filter(
+        ({ method, path }) => method === "GET" && path === "/api/v1/me",
+      ).length;
+
+    test("a Viewer: no M1, and once the role is read its URL goes in place of the entry, the filters kept; the role read again as a Member opens nothing", async () => {
+      let me = as("viewer");
+      const calls = ideasApi({ me: () => me });
+      const router = renderApp(
+        `/w/${workspaceId}/ideas?stage=validation&modal=new-idea`,
+      );
+      await screen.findAllByRole("row");
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ stage: "validation" }),
+      );
+      expect(router.history.length).toBe(1);
+      expect(screen.queryByRole("dialog")).toBeNull();
+
+      me = as("member");
+      const read = meReads(calls);
+      readAgainOnFocus();
+      await waitFor(() => expect(meReads(calls)).toBe(read + 1));
+      expect(
+        (await screen.findAllByRole("button", { name: "New idea" })).length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    test("while the role is read again behind the cached one, the URL keeps M1, which opens once it reads Member", async () => {
+      let me: () => Me | Promise<Me> = () => as("viewer");
+      const calls = ideasApi({ me: () => me() });
+      const router = renderApp(`/w/${workspaceId}/ideas?stage=validation`);
+      await screen.findAllByRole("row");
+      let release: (read: Me) => void = () => {};
+      me = () =>
+        new Promise<Me>((resolve) => {
+          release = resolve;
+        });
+      const read = meReads(calls);
+      await act(() =>
+        router.navigate({
+          href: `/w/${workspaceId}/ideas?stage=validation&modal=new-idea`,
+        }),
+      );
+      await waitFor(() => expect(meReads(calls)).toBe(read + 1));
+      await screen.findAllByRole("row");
+      expect(router.state.location.search).toEqual({
+        stage: "validation",
+        modal: "new-idea",
+      });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      release(as("member"));
+      expect(
+        await screen.findByRole("dialog", { name: "New idea" }),
+      ).toBeTruthy();
+    });
+
+    test("open, then the role read again as a Viewer: M1 stays until closed, and Create shows the refusal in it", async () => {
+      let me = as("member");
+      const calls = ideasApi({
+        me: () => me,
+        create: () => apiError(403, "FORBIDDEN"),
+      });
+      const router = renderApp(`/w/${workspaceId}/ideas?modal=new-idea`);
+      const dialog = await screen.findByRole("dialog", { name: "New idea" });
+      me = as("viewer");
+      const read = meReads(calls);
+      readAgainOnFocus();
+      await waitFor(() => expect(meReads(calls)).toBe(read + 1));
+      // The screen under M1 is a Viewer's now: no New idea.
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "New idea", hidden: true }),
+        ).toBeNull(),
+      );
+      expect(screen.getByRole("dialog", { name: "New idea" })).toBe(dialog);
+      const user = await create(dialog);
+      expect(await within(dialog).findByText("Couldn't save")).toBeTruthy();
+      expect(
+        within(dialog).getByText("You don't have access to this"),
+      ).toBeTruthy();
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(router.state.location.search).toEqual({});
+    });
+  });
+
+  describe("Cancel while Create is on its way (design-spec 6.0.6「送っている間に閉じた送信の失敗」)", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    const ideasRead = (calls: Call[]) =>
+      calls.filter(
+        ({ method, path }) =>
+          method === "GET" &&
+          path.startsWith(`/api/v1/workspaces/${workspaceId}/ideas?`),
+      ).length;
+
+    const created = () =>
+      Response.json(
+        { ...bowl, id: "c1d2e3f4-0000-4000-8000-000000000013", name: "Taho" },
+        { status: 201 },
+      );
+
+    /**
+     * Opens M1 from its URL, presses Create with I1 POST held, and presses Cancel. `answer`
+     * then answers the held POST; a later POST (the toast's Retry) goes through.
+     */
+    async function cancelWhileHeld() {
+      vi.spyOn(sentry, "reportError").mockReturnValue(null);
+      let release: (answer: () => Response) => void = () => {};
+      let tries = 0;
+      const calls = ideasApi({
+        create: () => {
+          tries += 1;
+          if (tries > 1) return created();
+          return new Promise<Response>((resolve, reject) => {
+            release = (answer) => {
+              try {
+                resolve(answer());
+              } catch (error) {
+                reject(error);
+              }
+            };
+          });
+        },
+      });
+      const router = renderApp(`/w/${workspaceId}/ideas?modal=new-idea`);
+      const dialog = await screen.findByRole("dialog", { name: "New idea" });
+      const user = await create(dialog);
+      await waitFor(() => expect(posts(calls)).toHaveLength(1));
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "New idea" })).toBeNull(),
+      );
+      expect(router.state.location.search).toEqual({});
+      return {
+        user,
+        calls,
+        router,
+        answer: (response: () => Response) => act(() => release(response)),
+      };
+    }
+
+    /** Still on 6 as Cancel left it: the entry not replaced by the new idea's 13. */
+    const expectStillOnIdeas = async (router: ReturnType<typeof renderApp>) => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(router.state.location.pathname).toBe(`/w/${workspaceId}/ideas`);
+      expect(router.state.location.search).toEqual({});
+      expect(router.history.length).toBe(1);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    };
+
+    test("a failure that may pass: Couldn't save and Retry, which sends the same again and lists the idea without opening its 13", async () => {
+      const { user, calls, router, answer } = await cancelWhileHeld();
+      const toast = await toastAfter("Couldn't save", async () =>
+        answer(() => {
+          throw new TypeError("Failed to fetch");
+        }),
+      );
+      const reads = ideasRead(calls);
+      await user.click(within(toast).getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(posts(calls)).toHaveLength(2));
+      expect(posts(calls)[1]?.body).toEqual(posts(calls)[0]?.body);
+      await waitFor(() => expect(ideasRead(calls)).toBeGreaterThan(reads));
+      await expectStillOnIdeas(router);
+    });
+
+    test("no published template: its words alone, without Retry", async () => {
+      const { calls, answer } = await cancelWhileHeld();
+      const toast = await toastAfter(
+        "Templates aren't ready yet. Ask your administrator.",
+        async () => answer(() => apiError(409, "TEMPLATE_NOT_PUBLISHED")),
+      );
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      expect(posts(calls)).toHaveLength(1);
+    });
+
+    test("unexpected: Something went wrong with the Ref's first 8, and Retry sends the same again", async () => {
+      const { user, calls, answer } = await cancelWhileHeld();
+      const toast = await toastAfter(
+        "Something went wrong. Ref: 8f14e45f",
+        async () => answer(() => apiError(500, "INTERNAL")),
+      );
+      await user.click(within(toast).getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(posts(calls)).toHaveLength(2));
+      expect(posts(calls)[1]?.body).toEqual(posts(calls)[0]?.body);
+    });
+
+    test("a Create that goes through after Cancel lists the idea, and does not open its 13", async () => {
+      const { calls, router, answer } = await cancelWhileHeld();
+      const reads = ideasRead(calls);
+      answer(created);
+      await waitFor(() => expect(ideasRead(calls)).toBeGreaterThan(reads));
+      await expectStillOnIdeas(router);
+      expect(posts(calls)).toHaveLength(1);
+    });
   });
 });

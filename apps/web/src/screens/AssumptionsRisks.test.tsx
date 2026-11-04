@@ -1,22 +1,33 @@
 import type { Assumption, Me, Risk, Role } from "@moonx/schemas";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   ana,
   apiError,
   type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
   renderApp,
+  setViewport,
   stubApi,
   toastAfter,
 } from "../test/api";
 import { workspaceId } from "../test/ideas";
-import { assumption, home, risk, validationId } from "../test/validation";
+import {
+  assumption,
+  home,
+  risk,
+  survey,
+  validationId,
+} from "../test/validation";
 
 // 16 Assumptions & Risks (design-spec 6.10).
 
 afterEach(() => {
+  cleanupThenRestoreFocus();
   vi.unstubAllGlobals();
+  setViewport(1024);
 });
 
 const base = `/w/${workspaceId}/ideas/${home.idea.id}/assumptions`;
@@ -61,6 +72,11 @@ function listsApi({
   create,
   remove,
   order,
+  patch,
+  evidence,
+  holdMe,
+  holdAssumptions,
+  assumptionsFail,
 }: {
   /** A function is asked at each call: the user may change behind the screen. */
   me?: Me | (() => Me);
@@ -71,6 +87,16 @@ function listsApi({
   remove?: () => Response | undefined;
   /** Answers Save order, later when it is a promise; undefined orders the list. */
   order?: () => Response | Promise<Response> | undefined;
+  /** Answers a save of a row's fields; undefined saves them. */
+  patch?: () => Response | undefined;
+  /** V5's answer to an attachment. */
+  evidence?: () => Response;
+  /** While it returns a promise, U1 answers once the promise settles, as it is then. */
+  holdMe?: () => Promise<void> | undefined;
+  /** While it returns a promise, V10's assumptions answer once it settles, as they are then. */
+  holdAssumptions?: () => Promise<void> | undefined;
+  /** While it returns true, V10's assumptions fail unexpectedly (500). */
+  assumptionsFail?: () => boolean;
   assumptions?: Assumption[];
   risks?: Risk[];
 } = {}) {
@@ -79,8 +105,12 @@ function listsApi({
     typeof archived === "function" ? archived() : archived;
   return stubApi((call: Call) => {
     const { method, path } = call;
-    if (method === "GET" && path === "/api/v1/me")
-      return Response.json(meNow());
+    if (method === "GET" && path === "/api/v1/me") {
+      const hold = holdMe?.();
+      return hold === undefined
+        ? Response.json(meNow())
+        : hold.then(() => Response.json(meNow()));
+    }
     if (method === "PATCH" && path === "/api/v1/me") {
       return Response.json(meNow());
     }
@@ -93,8 +123,30 @@ function listsApi({
         idea: { ...home.idea, archived: archivedNow() },
       });
     }
+    if (
+      method === "GET" &&
+      path === listPath("assumptions") &&
+      assumptionsFail?.() === true
+    ) {
+      return apiError(500, "INTERNAL");
+    }
     if (method === "GET" && path === listPath("assumptions")) {
-      return Response.json({ items: assumptions });
+      const answerList = () => Response.json({ items: assumptions });
+      const hold = holdAssumptions?.();
+      return hold === undefined ? answerList() : hold.then(answerList);
+    }
+    if (
+      method === "GET" &&
+      path.startsWith(`/api/v1/validations/${validationId}/research-log`)
+    ) {
+      return Response.json({ items: [survey], nextCursor: null });
+    }
+    if (
+      method === "POST" &&
+      path === `/api/v1/validations/${validationId}/evidence` &&
+      evidence !== undefined
+    ) {
+      return evidence();
     }
     if (method === "GET" && path === listPath("risks")) {
       return Response.json({ items: risks });
@@ -156,6 +208,8 @@ function listsApi({
       return new Response(null, { status: 204 });
     }
     if (one !== null && method === "PATCH") {
+      const refused = patch?.();
+      if (refused !== undefined) return refused;
       const rows: (Assumption | Risk)[] =
         one[1] === "assumptions" ? assumptions : risks;
       const found = rows.find(({ id }) => id === one[2]);
@@ -953,5 +1007,343 @@ describe("16 Assumptions & Risks (design-spec 6.10)", () => {
       expect.stringContaining(believe.statement),
       expect.stringContaining(costs.statement),
     ]);
+  });
+
+  /** The reads of 16's assumptions (V10). */
+  const assumptionReads = (calls: Call[]) =>
+    calls.filter(
+      ({ method, path }) =>
+        method === "GET" && path === listPath("assumptions"),
+    ).length;
+
+  test("M2's URL for a Viewer opens nothing and comes off the URL in place once 16 is read; read again as a Member, it does not open (SDD 4章)", async () => {
+    let me = as("viewer");
+    listsApi({ me: () => me });
+    const router = renderApp(
+      `${base}?tab=risks&modal=evidence&about=assumption:${believe.id}`,
+    );
+    const entries = router.history.length;
+    await screen.findByRole("grid", { name: "Risks" });
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ tab: "risks" }),
+    );
+    expect(router.history.length).toBe(entries);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    me = ana;
+    readAgainOnFocus();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Add risk" })).toBeTruthy(),
+    );
+    expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull();
+  });
+
+  test("M2's URL about a risk, which takes no evidence, or an assumption not listed: nothing, and it comes off the URL", async () => {
+    for (const about of [
+      `risk:${rain.id}`,
+      "assumption:6a1b2c3d-0000-4000-8000-0000000000ff",
+    ]) {
+      listsApi();
+      const router = renderApp(`${base}?modal=evidence&about=${about}`);
+      await screen.findByRole("grid", { name: "Assumptions" });
+      await waitFor(() => expect(router.state.location.search).toEqual({}));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      cleanup();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("M2's URL keeps its modal while the assumptions are first read, apart from 13's data, then opens", async () => {
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls = listsApi({ holdAssumptions: () => held });
+    const router = renderApp(
+      `${base}?modal=evidence&about=assumption:${believe.id}`,
+    );
+    await waitFor(() => expect(assumptionReads(calls)).toBeGreaterThan(0));
+    // The risks and the screen's data are read; the assumptions are not yet.
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "09 Assumptions & Risks",
+    });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(router.state.location.search).toMatchObject({
+      modal: "evidence",
+      about: `assumption:${believe.id}`,
+    });
+    release();
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    expect(sheet.textContent).toContain(believe.statement);
+  });
+
+  test("a role being read again does not decide M2: the Viewer cached is read again as an Owner, and M2 opens", async () => {
+    let reads = 0;
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    listsApi({
+      me: () => (reads <= 1 ? as("viewer") : ana),
+      // The route reads U1 first; the screen's frame reads it again as it mounts.
+      holdMe: () => {
+        reads += 1;
+        return reads === 1 ? undefined : held;
+      },
+    });
+    const router = renderApp(
+      `${base}?modal=evidence&about=assumption:${believe.id}`,
+    );
+    await screen.findByRole("heading", { level: 2, name: believe.statement });
+    expect(screen.queryByRole("button", { name: /Add assumption/ })).toBeNull();
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(router.state.location.search).toMatchObject({ modal: "evidence" });
+    release();
+    expect(
+      await screen.findByRole("dialog", { name: "Evidence" }),
+    ).toBeTruthy();
+  });
+
+  test("M2 open stays once its assumption is deleted meanwhile, and an attachment shows the refusal in it", async () => {
+    const user = userEvent.setup();
+    const listed = [believe, costs];
+    listsApi({
+      assumptions: listed,
+      evidence: () => apiError(404, "NOT_FOUND"),
+    });
+    renderApp(`${base}?modal=evidence&about=assumption:${believe.id}`);
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    listed.splice(listed.indexOf(believe), 1);
+    readAgainOnFocus();
+    await waitFor(() =>
+      expect(
+        within(
+          screen.getByRole("grid", { name: "Assumptions", hidden: true }),
+        ).getAllByRole("row", { hidden: true }),
+      ).toHaveLength(1),
+    );
+    expect(sheet.isConnected).toBe(true);
+    expect(sheet.textContent).toContain(believe.statement);
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    await waitFor(() => expect(sheet.textContent).toContain("Couldn't save"));
+    expect(sheet.textContent).toContain("It no longer exists");
+  });
+
+  test("a phone's Edit assumption stays open once the idea is archived meanwhile, its refused save shown in it (design-spec 6.0.6)", async () => {
+    setViewport(390);
+    const user = userEvent.setup();
+    let archived = false;
+    listsApi({
+      archived: () => archived,
+      patch: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(`${base}?row=${believe.id}`);
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    const sheet = await screen.findByRole("dialog", {
+      name: "Edit assumption",
+    });
+    await user.type(
+      within(sheet).getByRole("textbox", { name: "Next Check" }),
+      "Trial week",
+    );
+    // Saved after the pause; refused, the screen reads again: archived, the detail
+    // behind has no Edit.
+    await waitFor(
+      () => expect(screen.queryByRole("button", { name: "Edit" })).toBeNull(),
+      { timeout: 3000 },
+    );
+    expect(sheet.isConnected).toBe(true);
+    expect(sheet.textContent).toContain("Couldn't save");
+    expect(sheet.textContent).toContain("It's archived");
+    expect(
+      (
+        within(sheet).getByRole("textbox", {
+          name: "Next Check",
+        }) as HTMLTextAreaElement
+      ).value,
+    ).toBe("Trial week");
+  });
+
+  /** Presses Cancel once the new row's Add is on its way: the form closes. */
+  const cancelWhileSending = async (
+    user: ReturnType<typeof userEvent.setup>,
+    calls: Call[],
+    heading: string,
+  ) => {
+    await waitFor(() =>
+      expect(calls.some(({ method }) => method === "POST")).toBe(true),
+    );
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: heading })).toBeNull(),
+    );
+  };
+
+  test("Cancel while a new assumption is on its way, then the network fails: Couldn't save and Retry in a toast; Retry sends it again and it is listed (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let fail = () => {};
+    let tries = 0;
+    const calls = listsApi({
+      create: () => {
+        tries += 1;
+        if (tries > 1) return undefined;
+        return new Promise<Response>((_resolve, reject) => {
+          fail = () => reject(new TypeError("Failed to fetch"));
+        });
+      },
+    });
+    const router = renderApp(`${base}?new=1`);
+    await addAssumption(user);
+    await cancelWhileSending(user, calls, "New assumption");
+    const toast = await toastAfter("Couldn't save", async () => fail());
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    const list = screen.getByRole("grid", { name: "Assumptions" });
+    await waitFor(() =>
+      expect(
+        within(list).getByRole("row", {
+          name: /Gift buyers come back monthly\./,
+        }),
+      ).toBeTruthy(),
+    );
+    const [first, again] = calls.filter(({ method }) => method === "POST");
+    expect(first?.body).toMatchObject({
+      statement: "Gift buyers come back monthly.",
+    });
+    expect(again?.body).toEqual(first?.body);
+    expect(router.state.location.search).not.toHaveProperty("row");
+  });
+
+  test("Cancel while a new assumption is on its way, then it is refused as archived: the reason in a toast without Retry, and 16 reads again", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    let archived = false;
+    const calls = listsApi({
+      archived: () => archived,
+      create: () =>
+        new Promise<Response>((resolve) => {
+          release = () => {
+            archived = true;
+            resolve(apiError(409, "ARCHIVED"));
+          };
+        }),
+    });
+    renderApp(`${base}?new=1`);
+    await addAssumption(user);
+    await cancelWhileSending(user, calls, "New assumption");
+    const toast = await toastAfter("Couldn't save. It's archived.", async () =>
+      release(),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Add assumption/ })).toBeNull();
+    expect(calls.filter(({ method }) => method === "POST")).toHaveLength(1);
+  });
+
+  test("Cancel while a new risk is on its way, then an unexpected failure: Something went wrong with its Ref in a toast, and Retry sends it again", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    let tries = 0;
+    const calls = listsApi({
+      create: () => {
+        tries += 1;
+        if (tries > 1) return undefined;
+        return new Promise<Response>((resolve) => {
+          release = () => resolve(apiError(500, "INTERNAL"));
+        });
+      },
+    });
+    renderApp(`${base}?tab=risks&new=1`);
+    await user.type(
+      await screen.findByRole("textbox", { name: /Risk/ }),
+      "The landlord raises the rent.",
+    );
+    await user.click(
+      screen.getAllByRole("button", { name: "Add risk" }).at(-1) as HTMLElement,
+    );
+    await cancelWhileSending(user, calls, "New risk");
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      async () => release(),
+    );
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(calls.filter(({ method }) => method === "POST")).toHaveLength(2),
+    );
+    const [first, again] = calls.filter(({ method }) => method === "POST");
+    expect(first?.path).toBe(listPath("risks"));
+    expect(again?.path).toBe(listPath("risks"));
+    expect(again?.body).toEqual(first?.body);
+  });
+
+  test("`new=1` for a Viewer: no new row, and it comes off the URL in place, the tab kept; read again as a Member, none opens (SDD 4章)", async () => {
+    let me = as("viewer");
+    listsApi({ me: () => me });
+    const router = renderApp(`${base}?tab=risks&new=1`);
+    const entries = router.history.length;
+    await screen.findByRole("grid", { name: "Risks" });
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ tab: "risks" }),
+    );
+    expect(router.history.length).toBe(entries);
+    expect(screen.queryByRole("heading", { name: "New risk" })).toBeNull();
+    me = ana;
+    readAgainOnFocus();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Add risk" })).toBeTruthy(),
+    );
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(screen.queryByRole("heading", { name: "New risk" })).toBeNull();
+  });
+
+  test("a role being read again does not decide `new=1`: the Viewer cached is read again as an Owner, and New assumption opens", async () => {
+    let reads = 0;
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    listsApi({
+      me: () => (reads <= 1 ? as("viewer") : ana),
+      // The route reads U1 first; the screen's frame reads it again as it mounts.
+      holdMe: () => {
+        reads += 1;
+        return reads === 1 ? undefined : held;
+      },
+    });
+    const router = renderApp(`${base}?new=1`);
+    await screen.findByRole("heading", { level: 2, name: believe.statement });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(router.state.location.search).toMatchObject({ new: 1 });
+    expect(
+      screen.queryByRole("heading", { name: "New assumption" }),
+    ).toBeNull();
+    release();
+    expect(
+      await screen.findByRole("heading", { name: "New assumption" }),
+    ).toBeTruthy();
+    expect(router.state.location.search).toMatchObject({ new: 1 });
+  });
+
+  test("a read again of the list that fails leaves the rows and the row shown, not the failure (as 13)", async () => {
+    let fails = false;
+    const calls = listsApi({ assumptionsFail: () => fails });
+    renderApp(base);
+    const list = await screen.findByRole("grid", { name: "Assumptions" });
+    await screen.findByRole("heading", { level: 2, name: believe.statement });
+    fails = true;
+    const reads = assumptionReads(calls);
+    readAgainOnFocus();
+    await waitFor(() => expect(assumptionReads(calls)).toBeGreaterThan(reads));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(screen.queryByText("Something went wrong")).toBeNull();
+    expect(screen.getByRole("grid", { name: "Assumptions" })).toBe(list);
+    expect(within(list).getAllByRole("row")).toHaveLength(2);
+    expect(
+      screen.getByRole("heading", { level: 2, name: believe.statement }),
+    ).toBeTruthy();
   });
 });

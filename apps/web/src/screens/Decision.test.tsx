@@ -1,3 +1,4 @@
+import { formatRelativeTime } from "@moonx/i18n";
 import type {
   DecisionContext,
   DecisionLogSummary,
@@ -9,7 +10,15 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { SLOW_LOADING_MS } from "../components/states";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  readAgainOnFocus,
+  renderApp,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { checks, workspaceId } from "../test/ideas";
 import { home } from "../test/validation";
 
@@ -140,10 +149,12 @@ function decisionApi({
   material?:
     | DecisionContext
     | (() => DecisionContext | Response | Promise<DecisionContext>);
-  record?: (call: Call) => Response | undefined;
+  record?: (call: Call) => Response | Promise<Response> | undefined;
   /** Answers 13's Edit summary (I2 PATCH). */
   patch?: () => Promise<Response>;
 } = {}) {
+  // What V1 answers as the idea's latest decision: the one recorded here, once it is.
+  let latestDecision = home.idea.latestDecision;
   return stubApi((call: Call) => {
     const { method, path } = call;
     if (method === "GET" && path === "/api/v1/me") return Response.json(me);
@@ -152,7 +163,10 @@ function decisionApi({
       method === "GET" &&
       path === `/api/v1/ideas/${home.idea.id}/validation`
     ) {
-      return Response.json({ ...home, idea: { ...home.idea, archived } });
+      return Response.json({
+        ...home,
+        idea: { ...home.idea, archived, latestDecision },
+      });
     }
     if (method === "GET" && path === contextPath) {
       return typeof material === "function"
@@ -168,6 +182,7 @@ function decisionApi({
       const answered = record?.(call);
       if (answered !== undefined) return answered;
       const body = call.body as { value: "proceed"; reason: string };
+      latestDecision = body.value;
       return Response.json(
         {
           entry: {
@@ -729,6 +744,120 @@ describe("19 Decision (design-spec 6.5)", () => {
     );
   });
 
+  /**
+   * Hold recorded with its reason and Cancel pressed while it is on its way, its answer
+   * held until `answerRecord`: `first` answers it (null: no answer comes), and any Retry
+   * records it.
+   */
+  async function cancelWhileRecording(first: () => Response | null) {
+    const user = userEvent.setup();
+    let answerRecord = () => {};
+    let isFirst = true;
+    const calls = decisionApi({
+      record: () => {
+        if (!isFirst) return undefined;
+        isFirst = false;
+        return new Promise<Response>((resolve, reject) => {
+          answerRecord = () => {
+            const answered = first();
+            if (answered === null) reject(new TypeError("Failed to fetch"));
+            else resolve(answered);
+          };
+        });
+      },
+    });
+    const router = renderApp(base);
+    await screen.findByText("Healthy bowls for office lunches.");
+    await user.click(screen.getByRole("radio", { name: /Hold/ }));
+    await user.type(screen.getByRole("textbox", { name: /Why\?/ }), "Later.");
+    await user.click(screen.getByRole("button", { name: "Record decision" }));
+    const posts = () => calls.filter(({ method }) => method === "POST");
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/w/${workspaceId}/ideas/${home.idea.id}`,
+      ),
+    );
+    return { user, calls, posts, answerRecord: async () => answerRecord() };
+  }
+
+  test("Cancel while Record is on its way, and no answer comes: 13 says Couldn't record in a toast, whose Retry records the same decision (6.0.6)", async () => {
+    const { user, posts, answerRecord } = await cancelWhileRecording(
+      () => null,
+    );
+    const toast = await toastAfter("Couldn't record", answerRecord);
+    await toastAfter("Decision recorded", () =>
+      user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    expect(posts()).toHaveLength(2);
+    expect(posts()[1]?.body).toEqual({
+      value: "hold",
+      reason: "Later.",
+      basedOnDecisionId: hold.id,
+    });
+    expect(posts()[1]?.body).toEqual(posts()[0]?.body);
+  });
+
+  test("Cancel while Record is on its way, and the idea was archived meanwhile: the reason in a toast, without Retry", async () => {
+    const { answerRecord } = await cancelWhileRecording(() =>
+      apiError(409, "ARCHIVED"),
+    );
+    const toast = await toastAfter(
+      "Couldn't record. It's archived.",
+      answerRecord,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  test("Cancel while Record is on its way, and someone recorded a newer decision meanwhile: who recorded what in a toast, without the question or Retry, and 13 read again", async () => {
+    const drop: DecisionLogSummary = {
+      ...hold,
+      id: "9b2c1e5a-3333-4333-8333-333333333333",
+      value: "drop",
+      recordedAt: "2026-10-21T02:00:00.000Z",
+    };
+    const { user, calls, posts, answerRecord } = await cancelWhileRecording(
+      () => apiError(409, "DECISION_CHANGED", { latest: drop }),
+    );
+    const homeReads = () =>
+      calls.filter(
+        ({ method, path }) =>
+          method === "GET" &&
+          path === `/api/v1/ideas/${home.idea.id}/validation`,
+      ).length;
+    await screen.findByRole("heading", { level: 1, name: home.idea.name });
+    await waitFor(() => expect(document.title).toContain(home.idea.name));
+    const readsBefore = homeReads();
+    const toast = await toastAfter(
+      `Couldn't record. Kenji Mori recorded Drop ${formatRelativeTime(
+        drop.recordedAt,
+        { timeZone: ana.timezone },
+      )}.`,
+      answerRecord,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    await waitFor(() => expect(homeReads()).toBeGreaterThan(readsBefore));
+    // No question to answer is left: 19 is gone, and nothing records it.
+    expect(screen.queryByRole("button", { name: "Record mine" })).toBeNull();
+    expect(posts()).toHaveLength(1);
+    // Toasts outlive the test (test/api.tsx): the later ones look for these words too.
+    await user.click(within(toast).getByRole("button", { name: "Close" }));
+  });
+
+  test("Cancel while Record is on its way, and it fails unexpectedly (500): Something went wrong with its Ref and Retry, in a toast", async () => {
+    const { user, answerRecord } = await cancelWhileRecording(() =>
+      apiError(500, "INTERNAL"),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      answerRecord,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+    // Toasts outlive the test (test/api.tsx): the later ones press 19's own Retry.
+    await user.click(within(toast).getByRole("button", { name: "Close" }));
+  });
+
   test("a read behind the material shown keeps Record and a failed record's Retry pressable, on the material shown", async () => {
     const user = userEvent.setup();
     let gate: Promise<void> = Promise.resolve();
@@ -757,10 +886,7 @@ describe("19 Decision (design-spec 6.5)", () => {
     const readsBefore = reads();
     try {
       // The window's focus reads the material again (TanStack Query's refetch on focus).
-      act(() => {
-        focusManager.setFocused(false);
-        focusManager.setFocused(true);
-      });
+      readAgainOnFocus();
       await waitFor(() => expect(reads()).toBe(readsBefore + 1));
       expect(pressable()).toEqual([true, true]);
       expect(material().textContent).toContain("Last decision: Hold");
@@ -816,10 +942,7 @@ describe("19 Decision (design-spec 6.5)", () => {
     // Read again behind it, and that read fails.
     readFails = true;
     try {
-      act(() => {
-        focusManager.setFocused(false);
-        focusManager.setFocused(true);
-      });
+      readAgainOnFocus();
       expect(
         await screen.findByRole("heading", {
           level: 2,

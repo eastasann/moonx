@@ -32,7 +32,7 @@ import {
 } from "@moonx/ui-web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArchivedIdeaAlert } from "../components/ArchivedIdeaAlert";
 import {
@@ -40,6 +40,7 @@ import {
   FauCounts,
   MissingCheckRows,
 } from "../components/decisionParts";
+import { useFailureOnceClosed } from "../components/ideaActions";
 import { rateLimitWords } from "../components/SendFailure";
 import {
   FailureState,
@@ -55,6 +56,7 @@ import { rejectionReason } from "../lib/autosave";
 import { isTransient, useUnexpectedReference } from "../lib/failure";
 import { inputIssueMessage } from "../lib/input-issues";
 import { decisionsHref, ideaHref, ideasHref } from "../lib/links";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import {
   decisionContextQuery,
@@ -62,7 +64,7 @@ import {
   validationHomeQuery,
   workspaceKey,
 } from "../lib/queries";
-import { isSessionLost } from "../lib/send";
+import { isSessionLost, useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
 import { DecisionSkeleton, MaterialSkeleton } from "./DecisionSkeleton";
 
@@ -229,6 +231,15 @@ function newerOf(error: unknown): DecisionLogSummary | null {
   return decisionLogSummarySchema.safeParse(error.detail.latest).data ?? null;
 }
 
+/** A record as V19 is sent it: the decision, why, and the one it is based on. */
+interface RecordInput {
+  chosen: DecisionValue;
+  /** Recorded over a decision someone recorded meanwhile, as asked (DECISION_CHANGED). */
+  confirmNewer: boolean;
+  reason: string;
+  basedOnDecisionId: string | null;
+}
+
 function DecisionBody({ home }: { home: ValidationHome }) {
   const { t } = useTranslation(["validation", "common", "errors", "app"]);
   const { me, workspace } = useWorkspace();
@@ -250,48 +261,76 @@ function DecisionBody({ home }: { home: ValidationHome }) {
   const toHome = () => void navigate({ href: ideaHref(workspace.id, idea.id) });
   // Whether 19 is still open when a record settles, which may be later: a user who left
   // meanwhile is not taken back to 13.
-  const isOpen = useRef(true);
-  useEffect(() => {
-    isOpen.current = true;
-    return () => {
-      isOpen.current = false;
-    };
-  }, []);
+  const isOpen = useIsMounted();
 
-  const record = useMutation({
-    mutationFn: ({
-      chosen,
-      confirmNewer,
-    }: {
-      chosen: DecisionValue;
-      confirmNewer: boolean;
-    }) =>
-      unwrap(
-        api()
-          .api.v1.ideas({ ideaId: inPath(idea.id) })
-          .decisions.post({
-            value: chosen,
-            reason,
-            basedOnDecisionId: context.data?.lastDecision?.id ?? null,
-            ...(confirmNewer ? { confirmNewer } : {}),
-          }),
-      ),
-    onSuccess: (_entry, { chosen }) => {
-      // 13's latest decision and history, the lists of ideas and the dashboard.
+  const post = (input: RecordInput) =>
+    unwrap(
+      api()
+        .api.v1.ideas({ ideaId: inPath(idea.id) })
+        .decisions.post({
+          value: input.chosen,
+          reason: input.reason,
+          basedOnDecisionId: input.basedOnDecisionId,
+          ...(input.confirmNewer ? { confirmNewer: true } : {}),
+        }),
+    );
+  const recorded = () => {
+    // 13's latest decision and history, the lists of ideas and the dashboard.
+    void queryClient.invalidateQueries({ queryKey: ideaKey(idea.id) });
+    void queryClient.invalidateQueries({
+      queryKey: workspaceKey(workspace.id),
+    });
+    ToastQueue.neutral(t("validation:decision.recorded"), {
+      timeout: TOAST_MS,
+    });
+  };
+  /** The question's title on someone's newer decision: who recorded what, and when. */
+  const newerTitle = (
+    latest: Pick<DecisionLogSummary, "recordedBy" | "recordedAt">,
+    value: NonNullable<DecisionLogSummary["value"]>,
+    // "closed": in a toast once 19 is gone, which has no question left to ask.
+    context?: "closed",
+  ) =>
+    t("errors:DECISION_CHANGED", {
+      context,
+      name: userNameText(latest.recordedBy),
+      value: t(`common:decision.${value}` as never),
+      when: formatRelativeTime(latest.recordedAt, { timeZone: me.timezone }),
+    });
+  const sendThrough = useSendThrough();
+  // Cancel pressed (or 19 left) while Record was on its way: a failure says so in a toast
+  // (design-spec 6.0.6「送っている間に閉じた送信の失敗」), whose Retry records it as it was
+  // sent, on the decision it was based on. Someone's newer decision has no question left
+  // to ask: its title says so alone, as recording the same again is refused the same,
+  // and what shows the last decision is read again.
+  const failedOnceClosed = useFailureOnceClosed(
+    (input: RecordInput) => sendThrough(() => post(input)).then(recorded),
+    (error) => {
+      const latest = newerOf(error);
+      if (latest === null || latest.value === null) return null;
       void queryClient.invalidateQueries({ queryKey: ideaKey(idea.id) });
       void queryClient.invalidateQueries({
         queryKey: workspaceKey(workspace.id),
       });
-      ToastQueue.neutral(t("validation:decision.recorded"), {
-        timeout: TOAST_MS,
-      });
+      return newerTitle(latest, latest.value, "closed");
+    },
+    "record",
+  );
+  const record = useMutation({
+    mutationFn: post,
+    onSuccess: (_entry, { chosen }) => {
+      recorded();
       if (!isOpen.current) return;
       if (chosen === "proceed") setAsksPlan(true);
       else toHome();
     },
-    onError: (error) => {
+    onError: (error, input) => {
       const latest = newerOf(error);
-      if (latest !== null) setNewer(latest);
+      if (latest !== null && isOpen.current) {
+        setNewer(latest);
+        return;
+      }
+      failedOnceClosed(error, input);
     },
   });
 
@@ -305,7 +344,12 @@ function DecisionBody({ home }: { home: ValidationHome }) {
   const send = (confirmNewer: boolean) => {
     setChecked(true);
     if (value === null || reasonIssue !== undefined) return;
-    record.mutate({ chosen: value, confirmNewer });
+    record.mutate({
+      chosen: value,
+      confirmNewer,
+      reason,
+      basedOnDecisionId: context.data?.lastDecision?.id ?? null,
+    });
   };
 
   const material = context.isError ? (
@@ -450,13 +494,7 @@ function DecisionBody({ home }: { home: ValidationHome }) {
           isOpen
           variant="confirmation"
           size="S"
-          title={t("errors:DECISION_CHANGED", {
-            name: userNameText(newer.recordedBy),
-            value: t(`common:decision.${newer.value}` as never),
-            when: formatRelativeTime(newer.recordedAt, {
-              timeZone: me.timezone,
-            }),
-          })}
+          title={newerTitle(newer, newer.value)}
           primaryActionLabel={t("validation:decision.newer.record")}
           cancelLabel={t("validation:decision.newer.cancel")}
           onPrimaryAction={() => {

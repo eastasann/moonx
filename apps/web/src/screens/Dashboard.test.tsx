@@ -5,7 +5,15 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { WorkspaceContext } from "../components/workspace";
 import { api, unwrap } from "../lib/api";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
+  renderApp,
+  stubApi,
+} from "../test/api";
 import { ideaSummary, workspaceId } from "../test/ideas";
 import { GettingStarted } from "./Dashboard";
 
@@ -181,21 +189,35 @@ function dashboardApi({
   moves: feed = moves,
   fail,
   write = () => new Response(null, { status: 204 }),
+  create = () => apiError(500, "INTERNAL"),
   firstIdeas,
 }: {
-  me?: Me;
+  /** U1's answer, or what gives it each time it is asked (a promise holds it back). */
+  me?: Me | (() => Me | Promise<Me>);
   ideas?: { items: unknown[]; droppedCount: number };
   due?: DueItem[];
   moves?: Activity[];
   fail?: "ideas" | "due-soon" | "self-analyses" | "activity";
   /** The answer to a change (N3, marking every notification read). */
   write?: () => Response | Promise<Response>;
+  /** The answer to M1's I1. */
+  create?: () => Response;
   /** What the first read of D1 waits for. */
   firstIdeas?: Promise<void>;
 } = {}) {
   let ideasRead = 0;
-  return stubApi(({ path }: Call) => {
-    if (path === "/api/v1/me") return Response.json(me);
+  return stubApi(({ method, path }: Call) => {
+    if (path === "/api/v1/me") {
+      return typeof me === "function"
+        ? Promise.resolve(me()).then((read) => Response.json(read))
+        : Response.json(me);
+    }
+    if (
+      method === "POST" &&
+      path === `/api/v1/workspaces/${workspaceId}/ideas`
+    ) {
+      return create();
+    }
     if (fail !== undefined && path === `${dashboard}/${fail}`) {
       return apiError(500, "INTERNAL");
     }
@@ -412,5 +434,92 @@ describe("5 Dashboard (design-spec 6.9)", () => {
     await waitFor(() => expect(asked()).toBe(2));
     await list("Ideas");
     release();
+  });
+});
+
+describe("M1's URL on 5 (SDD 4章 ?modal=new-idea)", () => {
+  afterEach(cleanupThenRestoreFocus);
+
+  const meReads = (calls: Call[]) =>
+    calls.filter(
+      ({ method, path }) => method === "GET" && path === "/api/v1/me",
+    ).length;
+  const memberLead =
+    "Ideas, self analyses and what is due across the workspace.";
+  const viewerLead = "Ideas and what is due across the workspace.";
+
+  test("a Viewer: no M1, and once the role is read its URL goes in place of the entry; the role read again as a Member opens nothing", async () => {
+    let me = as("viewer");
+    const calls = dashboardApi({ me: () => me });
+    const router = renderApp(`/w/${workspaceId}?modal=new-idea`);
+    await list("Ideas");
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(router.history.length).toBe(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    me = as("member");
+    const read = meReads(calls);
+    readAgainOnFocus();
+    await waitFor(() => expect(meReads(calls)).toBe(read + 1));
+    expect(await screen.findByText(memberLead)).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("while the role is read again behind the cached one, the URL keeps M1, which opens once it reads Member", async () => {
+    let me: () => Me | Promise<Me> = () => as("viewer");
+    const calls = dashboardApi({ me: () => me() });
+    const router = renderApp(`/w/${workspaceId}`);
+    await list("Ideas");
+    let release: (read: Me) => void = () => {};
+    me = () =>
+      new Promise<Me>((resolve) => {
+        release = resolve;
+      });
+    const read = meReads(calls);
+    await act(() =>
+      router.navigate({ href: `/w/${workspaceId}?modal=new-idea` }),
+    );
+    await waitFor(() => expect(meReads(calls)).toBe(read + 1));
+    await list("Ideas");
+    expect(router.state.location.search).toEqual({ modal: "new-idea" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    release(as("member"));
+    expect(
+      await screen.findByRole("dialog", { name: "New idea" }),
+    ).toBeTruthy();
+  });
+
+  test("open, then the role read again as a Viewer: M1 stays until closed, and Create shows the refusal in it", async () => {
+    const user = userEvent.setup();
+    let me = as("member");
+    const calls = dashboardApi({
+      me: () => me,
+      create: () => apiError(403, "FORBIDDEN"),
+    });
+    const router = renderApp(`/w/${workspaceId}?modal=new-idea`);
+    const dialog = await screen.findByRole("dialog", { name: "New idea" });
+    me = as("viewer");
+    const read = meReads(calls);
+    readAgainOnFocus();
+    await waitFor(() => expect(meReads(calls)).toBe(read + 1));
+    // The screen under M1 is a Viewer's now.
+    expect(await screen.findByText(viewerLead)).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "New idea" })).toBe(dialog);
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Name/ }),
+      "Taho",
+    );
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^One-line concept/ }),
+      "Taho by bike.",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Create" }));
+    expect(await within(dialog).findByText("Couldn't save")).toBeTruthy();
+    expect(
+      within(dialog).getByText("You don't have access to this"),
+    ).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(router.state.location.search).toEqual({});
   });
 });

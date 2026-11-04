@@ -677,7 +677,9 @@ export function PlanTableField({
           ].join(t("app:separator"))}
         </Text>
       )}
-      {sheet !== undefined && sheetRow !== null && canEdit && (
+      {/* Opened by an editor's row; it stays until closed, past a `canEdit` read again,
+          and its cells' saves say why they are refused. */}
+      {sheet !== undefined && sheetRow !== null && (
         <Dialog
           isOpen
           onOpenChange={(isOpen) => {

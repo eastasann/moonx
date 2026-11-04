@@ -13,6 +13,7 @@ import type {
 } from "@moonx/schemas";
 import {
   act,
+  cleanup,
   fireEvent,
   screen,
   waitFor,
@@ -21,7 +22,16 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { RETRY_DELAYS_MS } from "../lib/autosave";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
+  renderApp,
+  setViewport,
+  stubApi,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   answer,
@@ -38,19 +48,8 @@ import {
 
 // 11 Question form for a validation section and M2 Evidence (design-spec 6.2・6.0.3).
 
-/** happy-dom's window, whose viewport a test sets. */
-const setViewport = (width: number) =>
-  act(() =>
-    (
-      window as unknown as {
-        happyDOM: {
-          setViewport: (size: { width: number; height: number }) => void;
-        };
-      }
-    ).happyDOM.setViewport({ width, height: 900 }),
-  );
-
 afterEach(() => {
+  cleanupThenRestoreFocus();
   vi.unstubAllGlobals();
   setViewport(1024);
 });
@@ -116,11 +115,12 @@ function formApi({
   elsewhere = [],
   beforeSave,
   archived = false,
+  beforeHome,
   put,
   evidence = (_call: Call): Response | Promise<Response> | undefined =>
     undefined,
 }: {
-  me?: Me;
+  me?: Me | (() => Me);
   section?: TemplateSection;
   answers?: ValidationAnswer[];
   /** The version's other sections V2 reads too, their display conditions included. */
@@ -129,7 +129,9 @@ function formApi({
   elsewhere?: ValidationAnswer[];
   /** Holds a save back before the fake applies it, as a slow V3 would. */
   beforeSave?: () => Promise<void>;
-  archived?: boolean;
+  archived?: boolean | (() => boolean);
+  /** Holds V1's answer back, as a slow read would. */
+  beforeHome?: () => Promise<void> | undefined;
   put?: (call: Call) => Response;
   evidence?: (call: Call) => Response | Promise<Response> | undefined;
 } = {}) {
@@ -186,12 +188,26 @@ function formApi({
       saved.set(key, after);
       return Response.json(after);
     });
+  const meNow = () => (typeof me === "function" ? me() : me);
+  const archivedNow = () =>
+    typeof archived === "function" ? archived() : archived;
   return stubApi((call) => {
     const { method, path } = call;
-    if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return Response.json(me);
+    if (method === "GET" && path === "/api/v1/me") {
+      return Response.json(meNow());
+    }
+    if (method === "PATCH" && path === "/api/v1/me") {
+      return Response.json(meNow());
+    }
     if (method === "GET" && path === `${ideaPath}/validation`) {
-      return Response.json({ ...hub, idea: { ...hub.idea, archived } });
+      // Read as the answer goes out: a change while it is held shows in it.
+      const read = () =>
+        Response.json({
+          ...hub,
+          idea: { ...hub.idea, archived: archivedNow() },
+        });
+      const held = beforeHome?.();
+      return held === undefined ? read() : held.then(read);
     }
     const read = [section, ...others].find(
       ({ key }) => path === `${validationPath}/questions/${key}`,
@@ -1498,31 +1514,132 @@ describe("M2 Evidence (design-spec 6.0.3)", () => {
     );
   });
 
-  test("M2's URL about an item not on the screen opens nothing", async () => {
-    formApi();
-    renderApp(
-      `${base}/01?q=V.01.WHO&modal=evidence&about=validation_answer:${validationId}:V.02.OCEAN`,
+  test("M2's URL opens nothing and comes off it: a Viewer, an archived idea, an about 11 does not show, a question without F/A/U (6.0.3, SDD 4章)", async () => {
+    const noFau: TemplateSection = {
+      ...section01,
+      questions: section01.questions.map((question) =>
+        question.key === "V.01.PROOF"
+          ? { ...question, hasFau: false }
+          : question,
+      ),
+    };
+    const cases: [Parameters<typeof formApi>[0], string, string][] = [
+      [{ me: as("viewer") }, "01", "V.01.WHO"],
+      [{ archived: true }, "01", "V.01.WHO"],
+      // Another section's question, and one OCEAN hides while unanswered.
+      [{}, "01", "V.02.OCEAN"],
+      [{ section: section02 }, "02", "V.02.RED_1"],
+      [{ section: noFau }, "01", "V.01.PROOF"],
+    ];
+    for (const [api, sectionKey, questionKey] of cases) {
+      cleanup();
+      vi.unstubAllGlobals();
+      formApi(api);
+      const router = renderApp(
+        `${base}/${sectionKey}?q=${questionKey}&modal=evidence&about=validation_answer:${validationId}:${questionKey}`,
+      );
+      // In place of the entry, the question to focus kept: Back does not lead to it.
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ q: questionKey }),
+      );
+      expect(router.history.length).toBe(1);
+      expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+  });
+
+  test("M2's URL taken off is not opened by a Restore or a role read again later (SDD 4章)", async () => {
+    let archived = true;
+    let me = as("viewer");
+    formApi({
+      answers: [
+        withText("V.01.WHO"),
+        answer("V.01.PROBLEM"),
+        answer("V.01.PROOF"),
+      ],
+      archived: () => archived,
+      me: () => me,
+    });
+    const router = renderApp(
+      `${base}/01?q=V.01.WHO&modal=evidence&about=validation_answer:${validationId}:V.01.WHO`,
     );
-    // The editable form is in place: only then is "no dialog" an answer.
-    await screen.findByRole("textbox", { name: "Answer to WHO" });
+    await screen.findByText("This idea is archived");
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ q: "V.01.WHO" }),
+    );
+    archived = false;
+    me = ana;
+    readAgainOnFocus();
+    await screen.findByRole(
+      "textbox",
+      { name: "Answer to WHO" },
+      { timeout: 3000 },
+    );
+    expect(screen.queryByText("This idea is archived")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  test("M2's URL about a question without F/A/U opens nothing", async () => {
+  test("V1 read again when M2's URL comes keeps it: the Restore it reads opens M2 (SDD 4章)", async () => {
+    let archived = true;
+    let hold: Promise<void> | undefined;
+    let release = () => {};
     formApi({
-      section: {
-        ...section01,
-        questions: section01.questions.map((question) =>
-          question.key === "V.01.PROOF"
-            ? { ...question, hasFau: false }
-            : question,
-        ),
-      },
+      answers: [
+        withText("V.01.WHO"),
+        answer("V.01.PROBLEM"),
+        answer("V.01.PROOF"),
+      ],
+      archived: () => archived,
+      beforeHome: () => hold,
     });
-    renderApp(
-      `${base}/01?q=V.01.WHO&modal=evidence&about=validation_answer:${validationId}:V.01.PROOF`,
+    const router = renderApp(`${base}/01?q=V.01.WHO`);
+    await screen.findByText("This idea is archived");
+    // Restored elsewhere: the read that says so is on its way when the URL comes.
+    archived = false;
+    hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    readAgainOnFocus();
+    await act(() =>
+      router.navigate({
+        href: `${base}/01?q=V.01.WHO&modal=evidence&about=validation_answer:${validationId}:V.01.WHO`,
+      }),
     );
-    await screen.findByRole("textbox", { name: "Answer to WHO" });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(router.state.location.search).toMatchObject({ modal: "evidence" });
     expect(screen.queryByRole("dialog")).toBeNull();
+    release();
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    expect(sheet.textContent).toContain("01 WHO");
+  });
+
+  test("archived while M2 is open: it stays, says why a send is refused, and closing takes it off the URL (SDD 4章, 6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    formApi({
+      answers: [
+        withText("V.01.WHO"),
+        answer("V.01.PROBLEM"),
+        answer("V.01.PROOF"),
+      ],
+      archived: () => archived,
+      evidence: () => apiError(409, "ARCHIVED"),
+    });
+    const router = renderApp(openM2);
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    archived = true;
+    readAgainOnFocus();
+    expect(
+      await screen.findByText("This idea is archived", {}, { timeout: 3000 }),
+    ).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Evidence" })).toBe(sheet);
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(within(sheet).getByText("It's archived")).toBeTruthy();
+    await user.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(router.state.location.search).toEqual({ q: "V.01.WHO" });
   });
 });

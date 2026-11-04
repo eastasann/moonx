@@ -50,7 +50,8 @@ import { useOneAtATime } from "../lib/form";
 import { ruleErrorOf } from "../lib/input-issues";
 import { useIsOnline } from "../lib/online";
 import { membersQuery } from "../lib/queries";
-import { useToastFailure } from "./ideaActions";
+import { useSendThrough } from "../lib/send";
+import { useFailureOnceClosed, useToastFailure } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import {
   isRefusedForGood,
@@ -713,30 +714,28 @@ function createBody(
  * A new item of `type` (design-spec 6.13 "+ Add"): its fields, then Add, which makes it
  * last in its type. The first column is required (6.0.8). A dialog in every width (6.12・
  * 6.13), it says why a send failed as a modal does (6.0.6), and a refusal for a reason
- * 6.0.2 names reads the screen again.
+ * 6.0.2 names reads the screen again and locks the form, which keeps what was typed and
+ * why until it is closed. Cancel (or leaving the screen) while Add is on its way closes
+ * it: the item is made all the same if the send goes through, and a failure says so in a
+ * toast, whose Retry sends the same item again (6.0.6「送っている間に閉じた送信の失敗」).
+ *
+ * The caller keeps it open until it is closed or the item is made, though meanwhile the
+ * screen may read that the user can no longer add (archived, another role): Add then
+ * shows the refusal in it (SDD 4章).
  */
 export function NewExecutionItem({
   planId,
   type,
-  isReadOnly,
   onMade,
   onCreated,
-  onRefused,
   onCancel,
 }: {
   planId: string;
   type: ExecutionType;
-  /** The screen read again after a refusal reads only: what was typed stays, unsent. */
-  isReadOnly: boolean;
   /** The item is made: put it in the screen's data, even once the form is closed. */
   onMade: (item: ExecutionItem) => void;
   /** The item is made while the form is open: close it (22 shows the item). */
   onCreated: (item: ExecutionItem) => void;
-  /**
-   * Refused for good while the form is open (archived, no access, gone): keep it open,
-   * read only, past the screen's `canEdit` read again (design-spec 6.10・6.13).
-   */
-  onRefused: () => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation(["plans", "errors"]);
@@ -753,25 +752,28 @@ export function NewExecutionItem({
   latestOnCreated.current = onCreated;
   const latestOnMade = useRef(onMade);
   latestOnMade.current = onMade;
-  const latestOnRefused = useRef(onRefused);
-  latestOnRefused.current = onRefused;
   const oneAtATime = useOneAtATime();
   const readAgainWhenRefused = useReadAgainWhenRefused();
+  const sendThrough = useSendThrough();
+  const post = (body: ExecutionItemCreate) =>
+    unwrap(
+      api()
+        .api.v1.plans({ planId: inPath(planId) })
+        ["execution-items"].post(body),
+    );
+  const failedOnceClosed = useFailureOnceClosed((body: ExecutionItemCreate) =>
+    sendThrough(() => post(body)).then((item) => latestOnMade.current(item)),
+  );
   const create = useMutation({
-    mutationFn: (body: ExecutionItemCreate) =>
-      unwrap(
-        api()
-          .api.v1.plans({ planId: inPath(planId) })
-          ["execution-items"].post(body),
-      ),
+    mutationFn: post,
     // Here, not in `mutate`'s: they run after a Cancel pressed while Add was on its way.
     onSuccess: (item) => latestOnMade.current(item),
-    onError: readAgainWhenRefused,
+    onError: failedOnceClosed,
   });
   const failure = create.error;
   // Refused for good, the form sends no more (design-spec 6.10): at once, before the
   // screen read again shows why, and also where that read changes nothing (gone).
-  const isLocked = isReadOnly || isRefusedForGood(failure);
+  const isLocked = isRefusedForGood(failure);
   const fields = Object.keys(values) as (keyof ExecutionValues)[];
   const refusedFields = refusedFieldsOf(failure, fields);
   const errors = Object.fromEntries(
@@ -799,9 +801,8 @@ export function NewExecutionItem({
             // Fires only while the form is still open: Cancel meanwhile keeps the user
             // where they went (the item is made all the same).
             onSuccess: (item) => latestOnCreated.current(item),
-            onError: (error) => {
-              if (isRefusedForGood(error)) latestOnRefused.current();
-            },
+            // As does this. Once the form is closed, its toast reads the screen again.
+            onError: readAgainWhenRefused,
             onSettled: () => resolve(),
           });
         }),
@@ -1126,10 +1127,6 @@ export function ExecutionList({
   const isOnline = useIsOnline();
   const [openId, setOpenId] = useState<string | null>(null);
   const [isAdding, setAdding] = useState(false);
-  // New refused as archived or no longer allowed stays, read only, with what was typed
-  // and why, until it is closed (design-spec 6.10・6.13): the plan read again hides
-  // + Add.
-  const [isAddingKept, setAddingKept] = useState(false);
   const deletion = useDeleteExecutionItem(cache, onSaved);
   const open = items.find((item) => item.id === openId);
   const groups = executionGroups(
@@ -1219,24 +1216,17 @@ export function ExecutionList({
           )}
         </Dialog>
       )}
-      {isAdding && (canEdit || isAddingKept) && (
+      {/* Open until closed, past a `canEdit` read again meanwhile (NewExecutionItem). */}
+      {isAdding && (
         <NewExecutionItem
           planId={planId}
           type={type}
-          isReadOnly={!canEdit}
           onMade={(item) => {
             cache.put(item);
             onSaved();
           }}
-          onCreated={() => {
-            setAdding(false);
-            setAddingKept(false);
-          }}
-          onRefused={() => setAddingKept(true)}
-          onCancel={() => {
-            setAdding(false);
-            setAddingKept(false);
-          }}
+          onCreated={() => setAdding(false)}
+          onCancel={() => setAdding(false)}
         />
       )}
       {deletion.question}

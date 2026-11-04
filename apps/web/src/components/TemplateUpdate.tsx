@@ -26,11 +26,12 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, unwrap } from "../lib/api";
 import { useOneAtATime } from "../lib/form";
 import { questionLabel } from "../lib/item-labels";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import {
   aiKey,
@@ -40,9 +41,16 @@ import {
   workspaceKey,
 } from "../lib/queries";
 import type { WaitedQuery } from "../lib/query";
+import { useSendThrough } from "../lib/send";
+import { useFailureOnceClosed } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import { FailureState, LoadingBlock } from "./states";
-import { dashboardHref, useModal, useWorkspace } from "./workspace";
+import {
+  dashboardHref,
+  useModal,
+  useSearchModal,
+  useWorkspace,
+} from "./workspace";
 
 /** How long a toast without an action stays: the shortest 4.5 Toast allows. */
 const TOAST_MS = 5000;
@@ -72,23 +80,25 @@ function isAboutTarget(about: string | undefined, target: TemplateTarget) {
 /**
  * Whether M8 is open over the screen (SDD 4章): `?modal=update-template` about the
  * screen's own `target`, for someone who may migrate it (`canMigrate`); nothing for an
- * `about` missing or naming something else. Decided as it opens: once open it stays while
- * its URL does, so a refusal it gets (the idea archived meanwhile) shows in it, instead
- * of M8 going and leaving its URL to open it again on Restore.
+ * `about` missing or naming something else, and that URL comes off once `isDecided` (the
+ * screen's data that decides `canMigrate` is read, not being read again). Decided as it
+ * opens (useSearchModal): once open it stays until closed, so a refusal it gets (the idea
+ * archived meanwhile) shows in it, instead of M8 going and leaving its URL to open it
+ * again on Restore.
  */
 export function useIsTemplateUpdateOpen(
   modal: string | undefined,
   about: string | undefined,
   target: TemplateTarget,
   canMigrate: boolean,
+  isDecided: boolean,
 ): boolean {
-  const [wasOpen, setOpen] = useState(false);
-  const isOpen =
-    modal === "update-template" &&
-    isAboutTarget(about, target) &&
-    (canMigrate || wasOpen);
-  if (isOpen !== wasOpen) setOpen(isOpen);
-  return isOpen;
+  return useSearchModal(
+    modal,
+    "update-template",
+    isAboutTarget(about, target) && canMigrate,
+    isDecided,
+  );
 }
 
 const isCode = (error: unknown, code: string) =>
@@ -138,18 +148,6 @@ export function useTemplateBanner(
 export function useOpenTemplateUpdate(): (target: TemplateTarget) => void {
   const modals = useModal();
   return (target) => modals.open("update-template", { about: aboutOf(target) });
-}
-
-/** Whether the component is still on screen, for what settles after it may have gone. */
-function useIsOpen() {
-  const isOpen = useRef(true);
-  useEffect(() => {
-    isOpen.current = true;
-    return () => {
-      isOpen.current = false;
-    };
-  }, []);
-  return isOpen;
 }
 
 /**
@@ -269,7 +267,7 @@ export function TemplateUpdateDialog({
   const { me, workspace } = useWorkspace();
   const queryClient = useQueryClient();
   const isOnline = useIsOnline();
-  const isOpen = useIsOpen();
+  const isOpen = useIsMounted();
   const previewOptions = templateMigrationPreviewQuery(target.kind, target.id);
   const preview = useQuery(previewOptions);
   const changed = () =>
@@ -286,25 +284,50 @@ export function TemplateUpdateDialog({
         ),
       ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     );
+  const post = (toVersionId: string) =>
+    unwrap(
+      api().api.v1["template-migrations"].post({
+        targetType: target.kind,
+        targetId: target.id,
+        toVersionId,
+      }),
+    );
+  const moved = async ({ template }: Awaited<ReturnType<typeof post>>) => {
+    await changed();
+    ToastQueue.neutral(
+      t("app:templateUpdate.updated", { version: template.versionNumber }),
+      { timeout: TOAST_MS },
+    );
+  };
+  // Back closes M8 while Update template is on its way (Cancel and Escape wait for it):
+  // its failure then says so in a toast, whose Retry moves to the same version again.
+  // Moved by someone else first, or a newer version published and moved to meanwhile,
+  // says so alone in M8's words, with the screen and its band read again: sending the
+  // same version again meets the same refusal, and opening M8 again shows the move now.
+  const sendThrough = useSendThrough();
+  const failedOnceClosed = useFailureOnceClosed(
+    (toVersionId: string) => sendThrough(() => post(toVersionId)).then(moved),
+    (error) => {
+      const words = isCode(error, "ALREADY_LATEST")
+        ? t("errors:ALREADY_LATEST")
+        : isCode(error, "VALIDATION_FAILED")
+          ? t("errors:VALIDATION_FAILED", { context: "templateChanged" })
+          : null;
+      if (words !== null) void changed();
+      return words;
+    },
+  );
   const migrate = useMutation({
-    mutationFn: (toVersionId: string) =>
-      unwrap(
-        api().api.v1["template-migrations"].post({
-          targetType: target.kind,
-          targetId: target.id,
-          toVersionId,
-        }),
-      ),
-    onSuccess: async ({ template }) => {
-      await changed();
-      ToastQueue.neutral(
-        t("app:templateUpdate.updated", { version: template.versionNumber }),
-        { timeout: TOAST_MS },
-      );
+    mutationFn: post,
+    onSuccess: async (result) => {
+      await moved(result);
       // Back closed M8 meanwhile: closing again would leave the screen.
       if (isOpen.current) onClose();
     },
-    onError: (error) => {
+    onError: (error, toVersionId) => {
+      failedOnceClosed(error, toVersionId);
+      // Closed: the toast reads the screen again itself.
+      if (!isOpen.current) return;
       if (isCode(error, "ALREADY_LATEST") || isCode(error, "ARCHIVED")) {
         // Moved by someone else, or archived: the screen and its band follow.
         void changed();

@@ -1,13 +1,16 @@
 import { formatIsoDate } from "@moonx/i18n";
 import type { Me, ResearchLogEntry, Role } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   ana,
   apiError,
   type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
   renderApp,
+  setViewport,
   stubApi,
   toastAfter,
 } from "../test/api";
@@ -17,7 +20,9 @@ import { entry, home, prices, survey, validationId } from "../test/validation";
 // 14 Research log (design-spec 6.10・6.0.3).
 
 afterEach(() => {
+  cleanupThenRestoreFocus();
   vi.unstubAllGlobals();
+  setViewport(1024);
 });
 
 const base = `/w/${workspaceId}/ideas/${home.idea.id}/research`;
@@ -64,8 +69,12 @@ function logApi({
   archived = false,
   create,
   remove,
+  patch,
   hiddenUsageCount = 2,
   holdReads,
+  holdHome,
+  listFails,
+  restore,
 }: {
   /** A function is asked at each call: the user may change behind the screen. */
   me?: Me | (() => Me);
@@ -75,10 +84,18 @@ function logApi({
   /** Answers Add entry; undefined makes the entry and keeps it. */
   create?: (call: Call) => Response | Promise<Response> | undefined;
   remove?: () => Response | Promise<Response>;
+  /** Answers a save of an entry's fields; undefined saves them. */
+  patch?: () => Response | undefined;
   /** The answers hidden by a template update that cite the survey. */
   hiddenUsageCount?: number;
   /** While it returns true, every read waits for good: the screen is not read again. */
   holdReads?: () => boolean;
+  /** While it returns a promise, V1 answers once the promise settles, as it is then. */
+  holdHome?: () => Promise<void> | undefined;
+  /** While it returns true, V6 fails unexpectedly (500). */
+  listFails?: () => boolean;
+  /** Restores the idea (6.8's Restore). */
+  restore?: () => void;
 } = {}) {
   const held = [...entries];
   const meNow = () => (typeof me === "function" ? me() : me);
@@ -98,10 +115,28 @@ function logApi({
       method === "GET" &&
       path === `/api/v1/ideas/${home.idea.id}/validation`
     ) {
-      return Response.json({
-        ...home,
-        idea: { ...home.idea, archived: archivedNow() },
-      });
+      const answerHome = () =>
+        Response.json({
+          ...home,
+          idea: { ...home.idea, archived: archivedNow() },
+        });
+      const hold = holdHome?.();
+      return hold === undefined ? answerHome() : hold.then(answerHome);
+    }
+    if (
+      method === "POST" &&
+      path === `/api/v1/ideas/${home.idea.id}/restore` &&
+      restore !== undefined
+    ) {
+      restore();
+      return Response.json({ ...home.idea, archived: false });
+    }
+    if (
+      method === "GET" &&
+      path.startsWith(logPath) &&
+      listFails?.() === true
+    ) {
+      return apiError(500, "INTERNAL");
     }
     if (method === "GET" && path.startsWith(logPath)) {
       const query = new URL(path, "http://localhost").searchParams;
@@ -135,6 +170,8 @@ function logApi({
         });
       }
       if (method === "PATCH") {
+        const refused = patch?.();
+        if (refused !== undefined) return refused;
         const { lockVersion: _, ...fields } = call.body as Record<
           string,
           unknown
@@ -795,6 +832,174 @@ describe("14 Research log (design-spec 6.10)", () => {
     expect(screen.getByText("Can't be empty")).toBeTruthy();
   });
 
+  /**
+   * Types a topic into the new entry, presses Add entry, waits for the send and presses
+   * Cancel while it is on its way: the form closes.
+   */
+  const addThenCancel = async (
+    user: ReturnType<typeof userEvent.setup>,
+    calls: Call[],
+  ) => {
+    await addEntry(user);
+    await waitFor(() =>
+      expect(calls.some(({ method }) => method === "POST")).toBe(true),
+    );
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "New entry" })).toBeNull(),
+    );
+  };
+
+  test("Cancel while Add entry is on its way, then the network fails: Couldn't save and Retry in a toast; Retry sends it again and the entry is listed (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let fail = () => {};
+    let tries = 0;
+    const calls = logApi({
+      create: () => {
+        tries += 1;
+        if (tries > 1) return undefined;
+        return new Promise<Response>((_resolve, reject) => {
+          fail = () => reject(new TypeError("Failed to fetch"));
+        });
+      },
+    });
+    const router = renderApp(`${base}?new=1`);
+    await addThenCancel(user, calls);
+    const toast = await toastAfter("Couldn't save", async () => fail());
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    const list = screen.getByRole("grid", { name: "Research Log" });
+    await waitFor(() =>
+      expect(
+        within(list).getByRole("row", { name: /Asked the city hall/ }),
+      ).toBeTruthy(),
+    );
+    const [first, again] = calls.filter(({ method }) => method === "POST");
+    expect(first?.body).toMatchObject({ topic: "Asked the city hall" });
+    expect(again?.body).toEqual(first?.body);
+    // Made from the toast, it is listed; the user is not taken to it.
+    expect(router.state.location.search).not.toHaveProperty("entry");
+    expect(screen.queryByRole("heading", { name: "New entry" })).toBeNull();
+  });
+
+  test("Cancel while Add entry is on its way, then it is refused as archived: the reason in a toast without Retry, and 14 reads again", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    let archived = false;
+    const calls = logApi({
+      archived: () => archived,
+      create: () =>
+        new Promise<Response>((resolve) => {
+          release = () => {
+            archived = true;
+            resolve(apiError(409, "ARCHIVED"));
+          };
+        }),
+    });
+    renderApp(`${base}?new=1`);
+    await addThenCancel(user, calls);
+    const toast = await toastAfter("Couldn't save. It's archived.", async () =>
+      release(),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Add entry" })).toBeNull();
+    expect(calls.filter(({ method }) => method === "POST")).toHaveLength(1);
+  });
+
+  test("Cancel while Add entry is on its way, then an unexpected failure: Something went wrong with its Ref in a toast, and Retry sends it again", async () => {
+    const user = userEvent.setup();
+    let release = () => {};
+    let tries = 0;
+    const calls = logApi({
+      create: () => {
+        tries += 1;
+        if (tries > 1) return undefined;
+        return new Promise<Response>((resolve) => {
+          release = () => resolve(apiError(500, "INTERNAL"));
+        });
+      },
+    });
+    renderApp(`${base}?new=1`);
+    await addThenCancel(user, calls);
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      async () => release(),
+    );
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(calls.filter(({ method }) => method === "POST")).toHaveLength(2),
+    );
+    const [first, again] = calls.filter(({ method }) => method === "POST");
+    expect(again?.body).toEqual(first?.body);
+  });
+
+  test("a new entry the screen reads archived meanwhile stays, read only with what was typed, until Cancel", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    const calls = logApi({ archived: () => archived });
+    const router = renderApp(`${base}?new=1`);
+    const topic = await screen.findByRole("textbox", { name: /Topic/ });
+    await user.type(topic, "Asked the city hall");
+    archived = true;
+    readAgainOnFocus();
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "New entry" })).toBeTruthy();
+    const kept = screen.getByRole("textbox", { name: /Topic/ });
+    expect((kept as HTMLInputElement).value).toBe("Asked the city hall");
+    expect(kept.hasAttribute("readonly")).toBe(true);
+    expect(
+      screen
+        .getByRole("button", { name: "Add entry" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "New entry" })).toBeNull(),
+    );
+    expect(router.state.location.search).not.toHaveProperty("new");
+    expect(calls.some(({ method }) => method === "POST")).toBe(false);
+  });
+
+  test("a phone's Edit entry stays open once the idea is archived meanwhile, its refused save shown in it (design-spec 6.0.6)", async () => {
+    setViewport(390);
+    const user = userEvent.setup();
+    let archived = false;
+    logApi({
+      archived: () => archived,
+      patch: () => {
+        archived = true;
+        return apiError(409, "ARCHIVED");
+      },
+    });
+    renderApp(`${base}?entry=${prices.id}`);
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    const sheet = await screen.findByRole("dialog", { name: "Edit entry" });
+    await user.type(
+      within(sheet).getByRole("textbox", { name: "Observation" }),
+      "Busy at noon",
+    );
+    // Saved after the pause; refused, the screen reads again: archived, the detail
+    // behind has no Edit.
+    await waitFor(
+      () => expect(screen.queryByRole("button", { name: "Edit" })).toBeNull(),
+      { timeout: 3000 },
+    );
+    const kept = screen.getByRole("dialog", { name: "Edit entry" });
+    expect(kept.textContent).toContain("Couldn't save");
+    expect(kept.textContent).toContain("It's archived");
+    expect(
+      (
+        within(kept).getByRole("textbox", {
+          name: "Observation",
+        }) as HTMLTextAreaElement
+      ).value,
+    ).toBe("Busy at noon");
+    await user.click(within(kept).getByRole("button", { name: /Close/ }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Edit entry" })).toBeNull(),
+    );
+  });
+
   test("a Viewer with no entries: what 14 is for, and no Add entry", async () => {
     logApi({ me: as("viewer"), entries: [] });
     renderApp(base);
@@ -804,5 +1009,101 @@ describe("14 Research log (design-spec 6.10)", () => {
       }),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Add entry" })).toBeNull();
+  });
+
+  test("`new=1` with its tags for a Viewer: no New entry, and they come off the URL in place, the filter kept; read again as a Member, none opens (SDD 4章)", async () => {
+    let me = as("viewer");
+    logApi({ me: () => me });
+    const router = renderApp(
+      `${base}?supports=demand_signal&new=1&presetSupports=permits`,
+    );
+    const entries = router.history.length;
+    await screen.findByRole("heading", { level: 2, name: "Lunch survey" });
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        supports: "demand_signal",
+      }),
+    );
+    expect(router.history.length).toBe(entries);
+    expect(screen.queryByRole("heading", { name: "New entry" })).toBeNull();
+    me = ana;
+    readAgainOnFocus();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Add entry" })).toBeTruthy(),
+    );
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(screen.queryByRole("heading", { name: "New entry" })).toBeNull();
+  });
+
+  test("`new=1` on an archived idea: nothing, and it comes off the URL; Restore then opens no New entry", async () => {
+    const user = userEvent.setup();
+    let archived = true;
+    logApi({
+      archived: () => archived,
+      restore: () => {
+        archived = false;
+      },
+    });
+    const router = renderApp(`${base}?new=1`);
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(router.history.length).toBe(1);
+    expect(screen.queryByRole("heading", { name: "New entry" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Restore" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Add entry" })).toBeTruthy(),
+    );
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(screen.queryByRole("heading", { name: "New entry" })).toBeNull();
+  });
+
+  test("`new=1` while a cached read of an archived idea is read again: kept until that read answers, which then opens New entry with its tags", async () => {
+    let archived = true;
+    let hold: Promise<void> | undefined;
+    let release = () => {};
+    logApi({ archived: () => archived, holdHome: () => hold });
+    const router = renderApp(base);
+    expect(await screen.findByText("This idea is archived")).toBeTruthy();
+    hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    archived = false;
+    readAgainOnFocus();
+    act(() => {
+      void router.navigate({ href: `${base}?new=1&presetSupports=permits` });
+    });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(router.state.location.search).toMatchObject({
+      new: 1,
+      presetSupports: "permits",
+    });
+    expect(screen.queryByRole("heading", { name: "New entry" })).toBeNull();
+    hold = undefined;
+    release();
+    expect(
+      await screen.findByRole("heading", { name: "New entry" }),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("checkbox", { name: "Permits" }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    expect(router.state.location.search).toMatchObject({ new: 1 });
+  });
+
+  test("a read again of the list that fails leaves the entries listed, not the failure (as 13)", async () => {
+    let fails = false;
+    const calls = logApi({ listFails: () => fails });
+    renderApp(base);
+    const list = await screen.findByRole("grid", { name: "Research Log" });
+    fails = true;
+    const reads = listReads(calls);
+    readAgainOnFocus();
+    await waitFor(() => expect(listReads(calls)).toBeGreaterThan(reads));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(screen.queryByText("Something went wrong")).toBeNull();
+    expect(screen.getByRole("grid", { name: "Research Log" })).toBe(list);
+    expect(
+      within(list).getByRole("row", { name: /Lunch survey/ }),
+    ).toBeTruthy();
   });
 });

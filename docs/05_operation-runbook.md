@@ -22,7 +22,7 @@
 | DB | Neon のコンソール（Monitoring・Usage） | Neon のプランによる | 接続数・容量・計算時間 |
 | デプロイ・バックアップ・KPI のワークフローの実行記録 | GitHub Actions | 90日 | `deploy.yml`・`build.yml`・`db-backup.yml`・`kpi.yml` の記録 |
 
-リクエスト ID がどこに入るかは [SDD 8.3](02-01_system-design-doc.md#83-ログとの対応)。利用者からエラーの連絡を受けたら、画面に出た `Ref`・起きた時刻・ログインしていたアカウントのメールをもらい、4章のコマンドで追う。`Ref` はふつうリクエスト ID の先頭で、API の応答が無い画面の描画の失敗だけは `moonx-web` の Sentry のイベント ID の先頭になる（SDD 8.2「想定外のエラー」）。Cloud Logging で当たらない `Ref` は、4章「Sentry」の手順で探す。
+リクエスト ID がどこに入るかは [SDD 8.3](02-01_system-design-doc.md#83-ログとの対応)。利用者からエラーの連絡を受けたら、画面に出た `Ref`・起きた時刻・ログインしていたアカウントのメールをもらい、4章のコマンドで追う。`Ref` はふつうリクエスト ID の先頭で、API の答えが無い Web 自身の失敗（描画の失敗など）は `moonx-web` の Sentry のイベント ID の先頭になる（SDD 8.2「想定外のエラー」）。Cloud Logging で当たらない `Ref` は、4章「Sentry」の手順で探す。
 
 ### ログレベル
 
@@ -473,7 +473,7 @@ gcloud run services describe moonx-api-production --region=asia-southeast1 --for
 
 - プロジェクト（`moonx-web` / `moonx-api`）と environment（`staging` / `production`）で絞る
 - Issues の検索にリクエスト ID を入れて、Cloud Logging のログとつなげる（Sentry でのタグ名は SDD 11章）
-- Cloud Logging で当たらない `Ref`（Web の描画の失敗）: `moonx-web` を、もらった時刻と利用者の ID（`user.id:<USER_ID>`。Web はログインしている人の ID を Sentry の user に入れる。SDD 11章）で絞り、イベント ID の先頭8文字が `Ref` と同じイベントを開く。利用者の ID はメールから引く（Neon の SQL Editor で `select id from users where lower(email) = lower('<EMAIL>');`）。ログインしていない画面（1・2・招待のリンクの画面・29・30）の失敗は user を持たないので、時刻だけで絞る
+- Cloud Logging で当たらない `Ref`（API の答えが無い Web 自身の失敗。描画の失敗など）: `moonx-web` を、もらった時刻と利用者の ID（`user.id:<USER_ID>`。Web はログインしている人の ID を Sentry の user に入れる。SDD 11章）で絞り、イベント ID の先頭8文字が `Ref` と同じイベントを開く。利用者の ID はメールから引く（Neon の SQL Editor で `select id from users where lower(email) = lower('<EMAIL>');`）。ログインしていない画面（1・2・招待のリンクの画面・29・30）の失敗は user を持たないので、時刻だけで絞る
 
 ### その他
 

@@ -11,11 +11,21 @@ import type {
   Role,
   TemplateQuestion,
 } from "@moonx/schemas";
+import { focusManager } from "@tanstack/react-query";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { TYPING_PAUSE_MS } from "../lib/autosave";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  readAgainOnFocus,
+  renderApp,
+  setViewport,
+  stubApi,
+  toastAfter,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   anaRef,
@@ -403,8 +413,8 @@ function itemApi({
   home?: ReturnType<typeof planHome>;
   ideaArchived?: boolean;
   created?: ExecutionItem;
-  /** Answers P9 POST instead of `created`. */
-  create?: () => Response;
+  /** Answers P9 POST instead of `created`; a promise holds the answer back. */
+  create?: () => Response | Promise<Response>;
   history?: HistoryEntry[];
   /** Whether W2 answers; else it fails as not found. */
   members?: boolean;
@@ -976,6 +986,56 @@ describe("21's table sub-items (design-spec 6.12・6.0.8)", () => {
     );
   });
 
+  test("on a phone, a row's sheet stays open when 21 reads the plan as archived meanwhile, until it is closed; Restore does not open it again (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    try {
+      const home = planHome();
+      const item = ownership([
+        { name: "Ana", initial_ownership: 0.4, initial_capital: 50000 },
+      ]);
+      itemApi({ items: [item], home });
+      renderApp(itemPath(13));
+      const table = await screen.findByRole("region", {
+        name: "Ownership and capital",
+      });
+      const row = within(table)
+        .getAllByRole("row")
+        .find((each) => each.textContent?.includes("Ana"));
+      await user.click(row as HTMLElement);
+      const sheet = await screen.findByRole("dialog", { name: "Row 1" });
+      Object.assign(home, planHome({ archived: true }));
+      item.readOnly = true;
+      readAgainOnFocus();
+      // Read again as archived: the table behind reads only, without Add row.
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", {
+            name: "Add row to Ownership and capital",
+            hidden: true,
+          }),
+        ).toBeNull(),
+      );
+      expect(screen.getByRole("dialog", { name: "Row 1" })).toBe(sheet);
+      await user.keyboard("{Escape}");
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Row 1" })).toBeNull(),
+      );
+      Object.assign(home, planHome());
+      item.readOnly = false;
+      readAgainOnFocus();
+      expect(
+        await screen.findByRole("button", {
+          name: "Add row to Ownership and capital",
+        }),
+      ).toBeTruthy();
+      expect(screen.queryByRole("dialog")).toBeNull();
+    } finally {
+      act(() => focusManager.setFocused(undefined));
+      setViewport(1024);
+    }
+  });
+
   test("a % is shown as typed and kept as its rate; the totals under the table, no warning", async () => {
     const user = userEvent.setup();
     const calls = itemApi({
@@ -1257,6 +1317,182 @@ describe("21's execution sub-items (design-spec 6.12・6.13)", () => {
           method === "POST" && path === `${api}/execution-items`,
       ),
     ).toHaveLength(1);
+  });
+
+  const signed = milestone(
+    "5e0c0000-0000-4000-8000-000000000009",
+    "Sign the lease",
+    { fromPreset: false },
+  );
+
+  /**
+   * New milestone sent with Add and Cancel pressed while it is on its way, its answer
+   * held until `answerAdd`; then `answer` answers it, and any Retry.
+   */
+  async function cancelWhileAdding(answer: () => Response) {
+    const user = userEvent.setup();
+    let answerAdd = () => {};
+    let isFirst = true;
+    const calls = itemApi({
+      items: [milestones([])],
+      create: () => {
+        if (!isFirst) return answer();
+        isFirst = false;
+        return new Promise<Response>((resolve) => {
+          answerAdd = () => resolve(answer());
+        });
+      },
+    });
+    const router = renderApp(itemPath(23));
+    const card23 = await screen.findByRole("region", {
+      name: "Pre-launch Milestones",
+    });
+    await user.click(
+      within(card23).getByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Milestone/ }),
+      "Sign the lease",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    const posts = () => sent(calls, "POST", `${api}/execution-items`);
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "New milestone" }),
+      ).toBeNull(),
+    );
+    return { user, router, posts, answerAdd: async () => answerAdd() };
+  }
+
+  const isListed = () =>
+    within(screen.getByRole("grid", { name: "Milestones" })).queryByText(
+      "Sign the lease",
+    ) !== null;
+
+  test("Cancel while Add is on its way, and it goes through: the item is made, New stays closed, and the user stays where they are", async () => {
+    const { router, answerAdd } = await cancelWhileAdding(() =>
+      Response.json(signed, { status: 201 }),
+    );
+    const at = router.state.location.href;
+    const entries = router.history.length;
+    await answerAdd();
+    await waitFor(() => expect(isListed()).toBe(true));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(router.state.location.href).toBe(at);
+    expect(router.history.length).toBe(entries);
+  });
+
+  test("Cancel while Add is on its way, and the API is down: a toast with Couldn't save and its Ref; its Retry sends the same item, which is made (6.0.6)", async () => {
+    let isFailing = true;
+    const { user, posts, answerAdd } = await cancelWhileAdding(() =>
+      isFailing
+        ? apiError(503, "UPSTREAM_UNAVAILABLE")
+        : Response.json(signed, { status: 201 }),
+    );
+    const toast = await toastAfter("Couldn't save. Ref: 8f14e45f", answerAdd);
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posts()).toHaveLength(2));
+    expect(posts()[1]?.body).toEqual(posts()[0]?.body);
+    await waitFor(() => expect(isListed()).toBe(true));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("Cancel while Add is on its way, and it fails unexpectedly (500): Something went wrong with its Ref and Retry, in a toast", async () => {
+    const { answerAdd } = await cancelWhileAdding(() =>
+      apiError(500, "INTERNAL"),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      answerAdd,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(
+      screen.queryByRole("alertdialog", { name: "Alert Something went wrong" }),
+    ).toBeNull();
+  });
+
+  test("Cancel while Add is on its way, and it is refused as the plan is archived: the reason in a toast without Retry, and 21 reads as archived", async () => {
+    const user = userEvent.setup();
+    const home = planHome();
+    const item = milestones([]);
+    let answerAdd = () => {};
+    const calls = itemApi({
+      items: [item],
+      home,
+      create: () =>
+        new Promise<Response>((resolve) => {
+          answerAdd = () => {
+            Object.assign(home, planHome({ archived: true }));
+            item.readOnly = true;
+            resolve(apiError(409, "ARCHIVED"));
+          };
+        }),
+    });
+    renderApp(itemPath(23));
+    const card23 = await screen.findByRole("region", {
+      name: "Pre-launch Milestones",
+    });
+    await user.click(
+      within(card23).getByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Milestone/ }),
+      "Sign the lease",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    const planReads = () =>
+      calls.filter(({ method, path }) => method === "GET" && path === api)
+        .length;
+    const readsBefore = planReads();
+    const toast = await toastAfter("Couldn't save. It's archived.", async () =>
+      answerAdd(),
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // The toast reads the screen again, once: the closed form reads nothing itself.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(planReads()).toBe(readsBefore + 1);
+  });
+
+  test("New stays open when 21 reads the plan as archived meanwhile, and Add shows the refusal in it (SDD 4章)", async () => {
+    const user = userEvent.setup();
+    const home = planHome();
+    const item = milestones([]);
+    itemApi({
+      items: [item],
+      home,
+      create: () => apiError(409, "ARCHIVED"),
+    });
+    renderApp(itemPath(23));
+    const card23 = await screen.findByRole("region", {
+      name: "Pre-launch Milestones",
+    });
+    await user.click(
+      within(card23).getByRole("button", { name: "Add milestone" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /Milestone/ }),
+      "Sign the lease",
+    );
+    Object.assign(home, planHome({ archived: true }));
+    item.readOnly = true;
+    // The window's focus reads the plan again (TanStack Query's refetch on focus).
+    readAgainOnFocus();
+    expect(await screen.findByText("This plan is archived")).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "New milestone" })).toBe(dialog);
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toContain(
+      "It's archived",
+    );
+    act(() => focusManager.setFocused(undefined));
   });
 
   test("Nothing yet, then + Add makes one: Add waits for its first column", async () => {

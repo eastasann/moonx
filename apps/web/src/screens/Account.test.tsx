@@ -8,6 +8,7 @@ import {
   apiError,
   authError,
   type Call,
+  holdFirst,
   renderApp,
   stubApi,
   toastAfter,
@@ -682,6 +683,36 @@ describe("4 Account (design-spec 6.16)", () => {
     },
   );
 
+  test("4 left while Leave is on its way, and it fails for now (503): a toast says so on the screen moved to (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let answerLeave = () => {};
+    accountApi({
+      answer: ({ method, path }) =>
+        method === "DELETE" && path === leaveTeam
+          ? new Promise<Response>((resolve) => {
+              answerLeave = () =>
+                resolve(apiError(503, "UPSTREAM_UNAVAILABLE"));
+            })
+          : undefined,
+    });
+    const router = renderApp("/account");
+    const list = await workspaces();
+    await user.click(
+      within(list).getByRole("button", { name: `Leave ${team.name}` }),
+    );
+    const question = await screen.findByRole("alertdialog", {
+      name: `Leave ${team.name}?`,
+    });
+    await user.click(within(question).getByRole("button", { name: "Leave" }));
+    // As Back would: 4 goes, with the question.
+    await act(() => router.navigate({ to: "/notifications" }));
+    await waitFor(() => expect(leaveQuestion()).toBeNull());
+    const toast = await toastAfter("Couldn't save. Ref: 8f14e45f", async () =>
+      answerLeave(),
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+
   test("Cancel while Leave is on its way, and it is refused as the only Owner: the question closes, and a toast has its words", async () => {
     const { list, answerLeave } = await cancelWhileLeaving(() =>
       apiError(409, "LAST_OWNER"),
@@ -997,6 +1028,166 @@ describe("4 Account (design-spec 6.16)", () => {
     await waitFor(() => expect(deleteDialog()).toBeNull());
   });
 
+  test.each([
+    [
+      "no answer comes",
+      (): Response => {
+        throw new TypeError("Failed to fetch");
+      },
+      null,
+    ],
+    [
+      "the API is down (503)",
+      () =>
+        authError(503, "UPSTREAM_UNAVAILABLE", {
+          "x-request-id": "0a1b2c3d-1111",
+        }),
+      "Ref: 0a1b2c3d",
+    ],
+  ] as const)(
+    "Log in again inside Delete account that cannot start as %s: the small dialog, not Couldn't save, as it saves nothing (6.16 4)",
+    async (_, google, ref) => {
+      const { user, dialog } = await deleteAnswered(
+        () => apiError(403, "REAUTH_REQUIRED"),
+        { me: { ...anaHere, hasPassword: false }, google },
+      );
+      await user.click(
+        await within(dialog).findByRole("button", { name: "Log in again" }),
+      );
+      const small = await screen.findByRole("alertdialog", {
+        name: smallDialog,
+      });
+      expect(screen.queryByText("Couldn't save")).toBeNull();
+      if (ref === null) {
+        expect(small.textContent).not.toContain("Ref:");
+      } else {
+        expect(within(small).getByText(ref)).toBeTruthy();
+      }
+      expect(within(small).getByRole("button", { name: "Retry" })).toBeTruthy();
+      expect(within(small).getByRole("button", { name: "Close" })).toBeTruthy();
+    },
+  );
+
+  /**
+   * Delete account sent with the right email and password, and Cancel pressed while it
+   * is on its way, its answer held until `answerDelete`; `answer` answers it, and any
+   * Retry (undefined deletes).
+   */
+  async function cancelWhileDeleting(answer: () => Response | undefined) {
+    const user = userEvent.setup();
+    let answerDelete = () => {};
+    let isFirst = true;
+    const calls = accountApi({
+      answer: ({ method, path }) => {
+        if (method !== "POST" || path !== "/api/v1/me/delete") return undefined;
+        if (!isFirst) return answer();
+        isFirst = false;
+        return new Promise<Response>((resolve, reject) => {
+          answerDelete = () => {
+            try {
+              const answered = answer();
+              if (answered === undefined) {
+                reject(new Error("Held answers name their Response"));
+              } else {
+                resolve(answered);
+              }
+            } catch (cause) {
+              reject(cause);
+            }
+          };
+        });
+      },
+    });
+    const router = renderApp("/account");
+    await user.click(
+      await screen.findByRole("button", { name: "Delete account" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Delete your account?",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /^Your email/ }),
+      ana.email,
+    );
+    await user.type(
+      within(dialog).getByLabelText(/^Password/),
+      "moonx-demo-2026",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Delete account" }),
+    );
+    const deletes = () =>
+      calls.filter(({ path }) => path === "/api/v1/me/delete");
+    await waitFor(() => expect(deletes()).toHaveLength(1));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Delete your account?" }),
+      ).toBeNull(),
+    );
+    return {
+      user,
+      router,
+      deletes,
+      answerDelete: async () => answerDelete(),
+    };
+  }
+
+  test("Cancel while Delete account is on its way, and no answer comes: a toast says Couldn't save, and its Retry sends the same deletion, which opens 1 (6.0.6)", async () => {
+    let isFailing = true;
+    const { user, router, deletes, answerDelete } = await cancelWhileDeleting(
+      () => {
+        if (isFailing) throw new TypeError("Failed to fetch");
+        return undefined;
+      },
+    );
+    const toast = await toastAfter("Couldn't save", answerDelete);
+    expect(router.state.location.pathname).toBe("/account");
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    expect(deletes().map(({ body }) => body)).toEqual([
+      { confirmEmail: ana.email, password: "moonx-demo-2026" },
+      { confirmEmail: ana.email, password: "moonx-demo-2026" },
+    ]);
+  });
+
+  test.each([
+    [
+      "the password is wrong",
+      () => apiError(403, "INVALID_PASSWORD"),
+      "Password is incorrect",
+    ],
+    [
+      "the user is the only Owner of a team",
+      () =>
+        apiError(409, "LAST_OWNER", {
+          workspaces: [{ id: bcdx.id, name: bcdx.name }],
+        }),
+      "Make someone else Owner of BCDX first",
+    ],
+  ] as const)(
+    "Cancel while Delete account is on its way, and it is refused as %s: the dialog's words in a toast, without Retry",
+    async (_, answer, words) => {
+      const { router, answerDelete } = await cancelWhileDeleting(answer);
+      const toast = await toastAfter(words, answerDelete);
+      expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+      expect(router.state.location.pathname).toBe("/account");
+    },
+  );
+
+  test("Cancel while Delete account is on its way, and it fails unexpectedly (500): Something went wrong with its Ref and Retry, in a toast", async () => {
+    const { answerDelete } = await cancelWhileDeleting(() =>
+      apiError(500, "INTERNAL"),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      answerDelete,
+    );
+    expect(within(toast).getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(screen.queryByRole("alertdialog", { name: smallDialog })).toBeNull();
+  });
+
   test("a photo the API finds too large: its words under the photo", async () => {
     accountApi({
       answer: ({ method, path }) =>
@@ -1046,5 +1237,196 @@ describe("4 while its route loads (design-spec 6.0.6「ローディング」)", 
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("4 left while a send is on its way (design-spec 6.0.6「送っている間に閉じた送信の失敗」)", () => {
+  const passwords = {
+    currentPassword: "moonx-demo-2026",
+    newPassword: "a new password",
+    revokeOtherSessions: true,
+  };
+
+  /** Change password sent, its answer held, and 4 left for 8 as a link would. */
+  async function changeThenLeave(answer: () => Response) {
+    const user = userEvent.setup();
+    const held = holdFirst("POST", "/api/auth/change-password", answer);
+    const calls = accountApi({ answer: held.answer });
+    const router = renderApp("/account");
+    await user.type(
+      await screen.findByLabelText(/^Current password/),
+      passwords.currentPassword,
+    );
+    await user.type(
+      screen.getByLabelText(/^New password/),
+      passwords.newPassword,
+    );
+    await user.click(screen.getByRole("button", { name: "Change password" }));
+    const changes = () =>
+      calls.filter(({ path }) => path === "/api/auth/change-password");
+    await waitFor(() => expect(changes()).toHaveLength(1));
+    await act(() => router.navigate({ to: "/notifications" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("form", { name: "Password" })).toBeNull(),
+    );
+    return { user, router, calls, changes, release: held.release };
+  }
+
+  test("Change password, and no answer comes: Couldn't save in a toast, whose Retry sends the same passwords and says Password changed, on the screen moved to", async () => {
+    let isFailing = true;
+    const { user, router, changes, release } = await changeThenLeave(() => {
+      if (isFailing) throw new TypeError("Failed to fetch");
+      return Response.json({ token: null });
+    });
+    const toast = await toastAfter("Couldn't save", release);
+    isFailing = false;
+    await toastAfter("Password changed", () =>
+      user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    expect(changes().map(({ body }) => body)).toEqual([passwords, passwords]);
+    expect(router.state.location.pathname).toBe("/notifications");
+  });
+
+  test("Change password with a wrong current password: Password is incorrect in a toast, without Retry", async () => {
+    const { release } = await changeThenLeave(() =>
+      authError(400, "INVALID_PASSWORD"),
+    );
+    const toast = await toastAfter("Password is incorrect", release);
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  /** Set password sent for an account made with Google, its answer held, and 4 left. */
+  async function setThenLeave(answer: () => Response) {
+    const user = userEvent.setup();
+    const held = holdFirst("POST", "/api/v1/me/password", answer);
+    const calls = accountApi({
+      me: { ...anaHere, hasPassword: false },
+      answer: held.answer,
+    });
+    const router = renderApp("/account");
+    await user.type(
+      await screen.findByLabelText(/^New password/),
+      "a new password",
+    );
+    await user.click(screen.getByRole("button", { name: "Set password" }));
+    const sets = () =>
+      calls.filter(({ path }) => path === "/api/v1/me/password");
+    await waitFor(() => expect(sets()).toHaveLength(1));
+    await act(() => router.navigate({ to: "/notifications" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("form", { name: "Password" })).toBeNull(),
+    );
+    return { user, calls, sets, release: held.release };
+  }
+
+  test("Set password failing unexpectedly (500): Something went wrong with its Ref and Retry, in a toast; Retry sends the same password", async () => {
+    let isFailing = true;
+    const { user, sets, release } = await setThenLeave(() =>
+      isFailing
+        ? apiError(500, "INTERNAL")
+        : new Response(null, { status: 204 }),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      release,
+    );
+    isFailing = false;
+    await toastAfter("Password set. You can log in with your email too.", () =>
+      user.click(within(toast).getByRole("button", { name: "Retry" })),
+    );
+    expect(sets().map(({ body }) => body)).toEqual([
+      { newPassword: "a new password" },
+      { newPassword: "a new password" },
+    ]);
+  });
+
+  test("Set password refused by its rule (422): Couldn't save. Check the format. in a toast, without Retry", async () => {
+    const { release } = await setThenLeave(() =>
+      apiError(422, "VALIDATION_FAILED", {
+        details: [{ path: "newPassword", message: "too short" }],
+      }),
+    );
+    const toast = await toastAfter("Couldn't save. Check the format.", release);
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  test("Set password met by a password set meanwhile: no words, as on 4, and the user read again", async () => {
+    const { calls, release } = await setThenLeave(() =>
+      apiError(409, "PASSWORD_ALREADY_SET"),
+    );
+    const reads = () =>
+      calls.filter(
+        ({ method, path }) => method === "GET" && path === "/api/v1/me",
+      ).length;
+    const before = reads();
+    // Toasts of the tests before may still be up: only one this send brings counts.
+    const failures = () =>
+      screen.queryAllByText(/^(Something went wrong|Couldn't save)/);
+    const shown = new Set(failures());
+    await release();
+    await waitFor(() => expect(reads()).toBeGreaterThan(before));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(failures().filter((words) => !shown.has(words))).toEqual([]);
+  });
+
+  test("a photo the API finds too large, sent as 4 was left: its words in a toast, without Retry", async () => {
+    const held = holdFirst("PUT", "/api/v1/me/avatar", () =>
+      apiError(413, "PAYLOAD_TOO_LARGE"),
+    );
+    const calls = accountApi({ answer: held.answer });
+    const router = renderApp("/account");
+    await screen.findByRole("button", { name: "Add photo" });
+    const photo =
+      document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (photo === null) throw new Error("no file input");
+    await userEvent.upload(
+      photo,
+      new File(["small"], "a.png", { type: "image/png" }),
+    );
+    await waitFor(() =>
+      expect(calls.some(({ path }) => path === "/api/v1/me/avatar")).toBe(true),
+    );
+    await act(() => router.navigate({ to: "/notifications" }));
+    const toast = await toastAfter(
+      "This photo is too large. Use one under 5 MB.",
+      held.release,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  test("Remove photo, 4 left, and the API down (503): Couldn't save with its Ref, whose Retry removes it again", async () => {
+    const user = userEvent.setup();
+    let isFailing = true;
+    const held = holdFirst("DELETE", "/api/v1/me/avatar", () =>
+      isFailing
+        ? apiError(503, "UPSTREAM_UNAVAILABLE")
+        : new Response(null, { status: 204 }),
+    );
+    const calls = accountApi({
+      me: {
+        ...anaHere,
+        avatarUrl: "/api/avatars/0123456789abcdef0123456789abcdef.webp",
+      },
+      answer: held.answer,
+    });
+    const router = renderApp("/account");
+    await user.click(
+      await screen.findByRole("button", { name: "Remove photo" }),
+    );
+    const removals = () =>
+      calls.filter(
+        ({ method, path }) =>
+          method === "DELETE" && path === "/api/v1/me/avatar",
+      );
+    await waitFor(() => expect(removals()).toHaveLength(1));
+    await act(() => router.navigate({ to: "/notifications" }));
+    const toast = await toastAfter(
+      "Couldn't save. Ref: 8f14e45f",
+      held.release,
+    );
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(removals()).toHaveLength(2));
+    expect(router.state.location.pathname).toBe("/notifications");
   });
 });

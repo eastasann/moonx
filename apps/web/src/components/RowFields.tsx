@@ -56,9 +56,10 @@ export function isRefusedForGood(error: unknown): boolean {
 /**
  * Reads the screen again once a new row's send is {@link isRefusedForGood refused for
  * good}, as a refused save and a refused row action do (design-spec 6.0.6): the screen
- * then shows why, archived or read only. Call it from the mutation's own `onError`,
- * which runs after the form is closed too. The form itself stays, read only, until it is
- * closed (6.10): the screen keeps it open past the `canEdit` it read again.
+ * then shows why, archived or read only. Call it from `mutate`'s `onError`, which runs
+ * only while the form is open: once it is closed, its failure goes to a toast that reads
+ * the screen again itself (useFailureOnceClosed). The form itself stays, read only,
+ * until it is closed (6.10): the screen keeps it open past the `canEdit` it read again.
  */
 export function useReadAgainWhenRefused(): (error: unknown) => void {
   const queryClient = useQueryClient();

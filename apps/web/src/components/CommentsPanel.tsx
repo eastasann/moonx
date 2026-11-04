@@ -31,7 +31,17 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
 import { rejectionReason } from "../lib/autosave";
@@ -48,7 +58,8 @@ import {
   commentsQuery,
   mentionCandidatesQuery,
 } from "../lib/queries";
-import { isSessionLost } from "../lib/send";
+import { isSessionLost, useSendThrough } from "../lib/send";
+import { type SendKind, useFailureOnceClosed } from "./ideaActions";
 import { ModalSendFailure } from "./ModalFailure";
 import { failureCode } from "./SendFailure";
 import { FailureState, LoadingBlock } from "./states";
@@ -156,6 +167,54 @@ function useCommentsChanged(dataKey: QueryKey) {
 }
 
 /**
+ * A write of the panel's, and what its failure does once its box or the panel has gone
+ * (design-spec 6.0.4, 6.0.6「送っている間に閉じた送信の失敗」): Reply's or Edit's Cancel,
+ * the panel closed or the screen left while it was on its way. The write goes through
+ * the mutation's own callbacks, which run then too: a write that goes through reads the
+ * threads and the screen's counts again; one that fails says so in a toast, whose Retry
+ * sends the same write again (`kind` names it, "Couldn't post" or "Couldn't save") through
+ * the query client's mutations as the first did, so a lost session takes the app's way,
+ * and a refusal of a mention says its words alone. While the box is open, `onOpenFailure`, for
+ * `mutate`'s `onError`, which runs only then, reads them again instead, or on ARCHIVED
+ * turns the panel read-only: the box says why.
+ */
+function usePanelWrite<I>(
+  write: (input: I) => Promise<unknown>,
+  {
+    dataKey,
+    kind,
+    onArchived,
+  }: {
+    dataKey: QueryKey;
+    kind: SendKind;
+    onArchived: () => void;
+  },
+) {
+  const changed = useCommentsChanged(dataKey);
+  // Comments have no change history (SDD 6.5「論理削除」): no history panel to read again.
+  const sendThrough = useSendThrough({ readsHistoryAgain: false });
+  const failOnceClosed = useFailureOnceClosed(
+    (input: I) => sendThrough(() => write(input)).then(changed),
+    (error) =>
+      failureCode(error) === "INVALID_MENTION"
+        ? i18n.t("errors:INVALID_MENTION", { context: "closed" })
+        : null,
+    kind,
+  );
+  const mutation = useMutation({
+    mutationFn: write,
+    meta: { readsHistoryAgain: false },
+    onSuccess: changed,
+    onError: failOnceClosed,
+  });
+  const onOpenFailure = (error: unknown) => {
+    if (error instanceof ApiError && error.code === "ARCHIVED") onArchived();
+    else void changed();
+  };
+  return { mutation, onOpenFailure };
+}
+
+/**
  * Why a post failed (design-spec 6.0.4「書き込みに失敗したら」), the text left as typed: under
  * its box, "Couldn't post" and Retry for the network or an API that is down, with the
  * reason of a refusal for good (6.0.2) or of a mention refused; the wait of a rate limit;
@@ -243,7 +302,9 @@ function ActionFailure({
 /**
  * A box to write in with `@` mentions (MentionTextArea, design-spec 4.5) and its send:
  * Post is pressable once something is typed, and once only while it sends (6.0.6). A
- * failure leaves the text with Retry; ARCHIVED makes the panel read-only (6.0.4).
+ * failure leaves the text with Retry; ARCHIVED makes the panel read-only (6.0.4). Closed
+ * while it sends (Cancel, the panel closed, the screen left), a failure says so in a
+ * toast ({@link usePanelWrite}), and a post that goes through closes nothing else.
  */
 function CommentBox({
   label,
@@ -252,6 +313,7 @@ function CommentBox({
   initial,
   submitLabel,
   send,
+  dataKey,
   onDone,
   onCancel,
   onArchived,
@@ -265,8 +327,14 @@ function CommentBox({
   /** An edit starts from the comment's words and mentions. */
   initial?: { body: string; mentions: MentionCandidate[] };
   submitLabel: string;
+  /** The write itself (C1 POST or C2 PATCH): the box reads the threads again. */
   send: (body: string, mentionUserIds: string[]) => Promise<unknown>;
-  /** Sent: an edit or a reply closes its box; a new thread's box stays, emptied. */
+  /** The screen's data that counts the comments of its items (ScreenComments). */
+  dataKey: QueryKey;
+  /**
+   * Sent while open: an edit or a reply closes its box; a new thread's box stays,
+   * emptied.
+   */
   onDone?: () => void;
   onCancel?: () => void;
   onArchived: () => void;
@@ -288,31 +356,34 @@ function CommentBox({
   const candidates = useQuery(
     mentionCandidatesQuery(workspaceId, commentTarget(target)),
   );
-  const post = useMutation({
-    mutationFn: () =>
-      send(
-        text,
-        mentions.map(({ id }) => id),
-      ),
-    onSuccess: () => {
-      setText("");
-      setMentions([]);
-      onDone?.();
-    },
-    onError: (error) => {
-      if (error instanceof ApiError && error.code === "ARCHIVED") onArchived();
-      // Who can be mentioned changed: the list is read again for the next try.
-      if (error instanceof ApiError && error.code === "INVALID_MENTION") {
-        void candidates.refetch();
-      }
-    },
-  });
+  // The request as it was sent (the text, its mentions, where it goes): a toast's Retry
+  // sends the same once the box is gone.
+  const { mutation: post, onOpenFailure } = usePanelWrite(
+    (request: () => Promise<unknown>) => request(),
+    { dataKey, kind: "post", onArchived },
+  );
   // Empty is not wrong, only not ready: Post waits (6.0.6). Other rules say why.
   const isEmpty = text.trim() === "";
   const ruleError = isEmpty ? undefined : ruleErrorOf(commentBodySchema, text);
   const submit = () => {
     if (isEmpty || ruleError !== undefined || post.isPending) return;
-    post.mutate();
+    const body = text;
+    const mentionUserIds = mentions.map(({ id }) => id);
+    post.mutate(() => send(body, mentionUserIds), {
+      // These fire only while the box is open.
+      onSuccess: () => {
+        setText("");
+        setMentions([]);
+        onDone?.();
+      },
+      onError: (error) => {
+        onOpenFailure(error);
+        // Who can be mentioned changed: the list is read again for the next try.
+        if (error instanceof ApiError && error.code === "INVALID_MENTION") {
+          void candidates.refetch();
+        }
+      },
+    });
   };
   const failure =
     post.error === null ||
@@ -395,6 +466,25 @@ const commentCalls = (commentId: string) => {
  * One comment: its writer, when, "edited", and its words, or "deleted" (design-spec
  * 6.0.4). The writer's own ⋯ edits it in place or deletes it, asking first.
  */
+/**
+ * How a thread's comments tell it of the work under way in them (an Edit open, a Delete
+ * on its way or failed): a resolved thread stays unfolded while any is, so the box, what
+ * was typed and a failure stay in sight (design-spec 6.0.4).
+ */
+const ThreadWorkContext = createContext<
+  ((key: string, isAtWork: boolean) => void) | null
+>(null);
+
+/** Tells the thread around it whether work is under way here. */
+function useReportWork(isAtWork: boolean) {
+  const report = useContext(ThreadWorkContext);
+  const key = useId();
+  useEffect(() => {
+    report?.(key, isAtWork);
+    return () => report?.(key, false);
+  }, [report, key, isAtWork]);
+}
+
 function CommentEntry({
   comment,
   canWrite,
@@ -412,17 +502,17 @@ function CommentEntry({
   const { t } = useTranslation(["panels", "app"]);
   const { me } = useWorkspace();
   const isOnline = useIsOnline();
-  const changed = useCommentsChanged(dataKey);
   const [isEditing, setEditing] = useState(false);
   const [isDeleting, setDeleting] = useState(false);
   const calls = commentCalls(comment.id);
-  const remove = useMutation({
-    mutationFn: calls.remove,
-    onSettled: changed,
-    onError: (error) => {
-      if (error instanceof ApiError && error.code === "ARCHIVED") onArchived();
-    },
+  const { mutation: remove, onOpenFailure } = usePanelWrite(calls.remove, {
+    dataKey,
+    kind: "save",
+    onArchived,
   });
+  // `onError` fires only while the panel is open: once closed, the toast says why.
+  const sendRemove = () => remove.mutate(undefined, { onError: onOpenFailure });
+  useReportWork(isEditing || remove.isPending || remove.error !== null);
   const isOwn = comment.author.id === me.id && !comment.deleted;
   const meta = [
     formatRelativeTime(comment.createdAt, { timeZone: me.timezone }),
@@ -475,9 +565,8 @@ function CommentEntry({
               mentions: asCandidates(comment.mentions),
             }}
             submitLabel={t("panels:comments.save")}
-            send={(body, mentionUserIds) =>
-              calls.edit(body, mentionUserIds).finally(changed)
-            }
+            send={calls.edit}
+            dataKey={dataKey}
             onDone={() => setEditing(false)}
             onCancel={() => setEditing(false)}
             onArchived={onArchived}
@@ -489,7 +578,7 @@ function CommentEntry({
         {remove.error !== null && (
           <ActionFailure
             error={remove.error}
-            onRetry={() => remove.mutate()}
+            onRetry={sendRemove}
             isRetryDisabled={!isOnline || remove.isPending}
           />
         )}
@@ -505,7 +594,7 @@ function CommentEntry({
           cancelLabel={t("panels:comments.cancel")}
           onPrimaryAction={() => {
             setDeleting(false);
-            remove.mutate();
+            sendRemove();
           }}
           onCancel={() => setDeleting(false)}
         >
@@ -537,20 +626,40 @@ function ThreadView({
   const { t } = useTranslation(["panels"]);
   const { root, replies } = thread;
   const isOnline = useIsOnline();
-  const changed = useCommentsChanged(dataKey);
   const [isReplying, setReplying] = useState(false);
   const calls = commentCalls(root.id);
   const resolved = root.resolvedAt !== null;
   // Which it was is kept with the send: Retry sends the same one, whatever the thread
   // reads as once it is read again.
-  const toggle = useMutation({
-    mutationFn: (action: "resolve" | "reopen") => calls[action](),
-    onSettled: changed,
-    onError: (error) => {
-      if (error instanceof ApiError && error.code === "ARCHIVED") onArchived();
-    },
-  });
+  const { mutation: toggle, onOpenFailure } = usePanelWrite(
+    (action: "resolve" | "reopen") => calls[action](),
+    { dataKey, kind: "save", onArchived },
+  );
+  // `onError` fires only while the panel is open: once closed, the toast says why.
+  const sendToggle = (action: "resolve" | "reopen") =>
+    toggle.mutate(action, { onError: onOpenFailure });
   const failedAction = toggle.error === null ? undefined : toggle.variables;
+  const [atWork, setAtWork] = useState<ReadonlySet<string>>(() => new Set());
+  const reportWork = useCallback((key: string, isAtWork: boolean) => {
+    setAtWork((current) => {
+      if (current.has(key) === isAtWork) return current;
+      const next = new Set(current);
+      if (isAtWork) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
+  // Folded only with nothing under way in it: a re-read that resolves the thread (the
+  // user's own Resolve, or someone else's) keeps an open box, a send and its failure
+  // in sight until they are done.
+  const isAtWork =
+    atWork.size > 0 ||
+    isReplying ||
+    toggle.isPending ||
+    failedAction !== undefined;
+  const [isUnfolded, setUnfolded] = useState(false);
+  // Reopened, the fold starts closed again the next time the thread is resolved.
+  if (!resolved && isUnfolded) setUnfolded(false);
   const content = (
     <Stack gap="space-200">
       {label !== undefined && (
@@ -598,8 +707,9 @@ function ThreadView({
                     body,
                     mentionUserIds,
                   }),
-                ).finally(changed)
+                )
               }
+              dataKey={dataKey}
               onDone={() => setReplying(false)}
               onCancel={() => setReplying(false)}
               onArchived={onArchived}
@@ -622,7 +732,7 @@ function ThreadView({
                 isQuiet
                 size="S"
                 isPending={toggle.isPending}
-                onPress={() => toggle.mutate(resolved ? "reopen" : "resolve")}
+                onPress={() => sendToggle(resolved ? "reopen" : "resolve")}
               >
                 {resolved
                   ? t("panels:comments.reopen")
@@ -633,36 +743,96 @@ function ThreadView({
         {failedAction !== undefined && (
           <ActionFailure
             error={toggle.error}
-            onRetry={() => toggle.mutate(failedAction)}
+            onRetry={() => sendToggle(failedAction)}
             isRetryDisabled={!isOnline || toggle.isPending}
           />
         )}
       </CommentEntry>
     </Stack>
   );
-  if (!resolved) return content;
+  const { element, place, drawn } = useMovedContent(content);
+  const slot = <div ref={place} />;
+  // Folded while the focus was in it (the user's own Resolve): the focus goes to the
+  // fold's own button, not to a control the fold now hides.
+  const fold = useRef<HTMLDivElement>(null);
+  const isFolded = resolved && !(isUnfolded || isAtWork);
+  useEffect(() => {
+    const active = document.activeElement;
+    if (isFolded && active instanceof HTMLElement && element.contains(active)) {
+      fold.current?.querySelector("button")?.focus();
+    }
+  }, [isFolded, element]);
   return (
-    <Disclosure
-      isQuiet
-      size="S"
-      headingLevel={3}
-      title={
-        // Folded to one line, however long the comment (6.0.4).
-        <Text variant="label" maxLines={1}>
-          {root.deleted
-            ? t("panels:comments.resolvedDeleted", {
-                name: userNameText(root.author),
-              })
-            : t("panels:comments.resolvedThread", {
-                name: userNameText(root.author),
-                excerpt: root.body,
-              })}
-        </Text>
-      }
-    >
-      {content}
-    </Disclosure>
+    <>
+      {resolved ? (
+        <div ref={fold}>
+          <Disclosure
+            isQuiet
+            size="S"
+            headingLevel={3}
+            isExpanded={isUnfolded || isAtWork}
+            onExpandedChange={setUnfolded}
+            title={
+              // Folded to one line, however long the comment (6.0.4).
+              <Text variant="label" maxLines={1}>
+                {root.deleted
+                  ? t("panels:comments.resolvedDeleted", {
+                      name: userNameText(root.author),
+                    })
+                  : t("panels:comments.resolvedThread", {
+                      name: userNameText(root.author),
+                      excerpt: root.body,
+                    })}
+              </Text>
+            }
+          >
+            {slot}
+          </Disclosure>
+        </div>
+      ) : (
+        slot
+      )}
+      {/* After the slot, so the content is in the page by the time its own refs and
+          effects (a box's autoFocus) run. */}
+      <ThreadWorkContext.Provider value={reportWork}>
+        {drawn}
+      </ThreadWorkContext.Provider>
+    </>
   );
+}
+
+/**
+ * Draws `content` once, into an element of its own, which `place` (a ref) puts into the
+ * element it is given, as HubPattern moves its blocks between its columns. A thread's
+ * comments show under its fold while it is resolved and in the open thread else: a
+ * re-read that resolves or reopens it moves them, keeping their boxes, what is typed in
+ * them and their sends on their way, whose failure would otherwise be taken for one whose
+ * box had closed (useFailureOnceClosed). A browser takes focus from what leaves the page:
+ * it goes back to where it was once the content is in its new place.
+ */
+function useMovedContent(content: ReactNode) {
+  const [element] = useState(() => document.createElement("div"));
+  const focusedBeforeMove = useRef<HTMLElement | null>(null);
+  const place = useCallback(
+    (slot: HTMLDivElement) => {
+      if (element.parentElement !== slot) slot.append(element);
+      const focused = focusedBeforeMove.current;
+      focusedBeforeMove.current = null;
+      if (focused?.isConnected && focused !== document.activeElement) {
+        focused.focus();
+      }
+      // Called before React takes the old slot out of the page, with the content in it.
+      return () => {
+        const active = document.activeElement;
+        focusedBeforeMove.current =
+          active instanceof HTMLElement && element.contains(active)
+            ? active
+            : null;
+      };
+    },
+    [element],
+  );
+  return { element, place, drawn: createPortal(content, element) };
 }
 
 /**
@@ -682,7 +852,6 @@ export function CommentsPanelBody({
   const { me, workspace } = useWorkspace();
   const { idea, dataKey, fromWorkspaces } = comments;
   const queryClient = useQueryClient();
-  const changed = useCommentsChanged(dataKey);
   const options = commentsQuery(workspace.id, target);
   const query = useQuery(options);
   // A write the API refused as archived (the screen did not know): read-only from then on,
@@ -820,8 +989,9 @@ export function CommentsPanelBody({
                       body,
                       mentionUserIds,
                     }),
-                  ).finally(changed)
+                  )
                 }
+                dataKey={dataKey}
                 onArchived={onArchived}
               />
             </Stack>

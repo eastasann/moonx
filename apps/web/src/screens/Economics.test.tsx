@@ -10,7 +10,16 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ApiError } from "../lib/api";
 import * as sentry from "../lib/sentry";
-import { ana, apiError, type Call, renderApp, stubApi } from "../test/api";
+import {
+  ana,
+  apiError,
+  type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
+  renderApp,
+  setViewport,
+  stubApi,
+} from "../test/api";
 import { workspaceId } from "../test/ideas";
 import {
   answer,
@@ -28,19 +37,8 @@ import {
 
 // 18 Unit Economics & Scenarios (design-spec 6.4), on the numbers of 8.3.
 
-/** happy-dom's window, whose viewport a test sets. */
-const setViewport = (width: number) =>
-  act(() =>
-    (
-      window as unknown as {
-        happyDOM: {
-          setViewport: (size: { width: number; height: number }) => void;
-        };
-      }
-    ).happyDOM.setViewport({ width, height: 900 }),
-  );
-
 afterEach(() => {
+  cleanupThenRestoreFocus();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   setViewport(1024);
@@ -101,19 +99,28 @@ function economicsApi({
   inputs = economicsInputs(piayaNumbers),
   worth = answer("V.08.WORTH"),
   evidence,
-  recordLast = () => Response.json(me),
+  attach,
+  beforeData,
+  recordLast,
 }: {
-  me?: Me;
-  archived?: boolean;
+  me?: Me | (() => Me);
+  archived?: boolean | (() => boolean);
   costs?: CostItem[];
   inputs?: EconomicsInput[];
   worth?: ValidationAnswer;
   /** V5's answer to a removal of evidence. */
   evidence?: (call: Call) => Response;
+  /** V4's answer to evidence attached. */
+  attach?: (call: Call) => Response;
+  /** Holds V15's answer back, as a slow read would. */
+  beforeData?: () => Promise<void>;
   /** U2's answer to the record of the workspace last opened. */
   recordLast?: () => Response;
 } = {}) {
   const held = [...inputs];
+  const meNow = () => (typeof me === "function" ? me() : me);
+  const archivedNow = () =>
+    typeof archived === "function" ? archived() : archived;
   return stubApi((call: Call) => {
     const { method, path } = call;
     if (
@@ -125,22 +132,37 @@ function economicsApi({
     if (method === "DELETE" && path.startsWith("/api/v1/evidence/")) {
       return evidence?.(call);
     }
-    if (method === "GET" && path === "/api/v1/me") return Response.json(me);
-    if (method === "PATCH" && path === "/api/v1/me") return recordLast();
+    if (
+      method === "POST" &&
+      path === `/api/v1/validations/${validationId}/evidence`
+    ) {
+      return attach?.(call);
+    }
+    if (method === "GET" && path === "/api/v1/me") {
+      return Response.json(meNow());
+    }
+    if (method === "PATCH" && path === "/api/v1/me") {
+      return recordLast?.() ?? Response.json(meNow());
+    }
     if (
       method === "GET" &&
       path === `/api/v1/ideas/${home.idea.id}/validation`
     ) {
-      return Response.json({ ...home, idea: { ...home.idea, archived } });
+      return Response.json({
+        ...home,
+        idea: { ...home.idea, archived: archivedNow() },
+      });
     }
     if (method === "GET" && path === dataPath) {
-      return Response.json({
-        inputs: held,
-        worth,
-        worthQuestion,
-        result: resultOf(costs, held),
-        costItems: costs,
-      });
+      const read = () =>
+        Response.json({
+          inputs: held,
+          worth,
+          worthQuestion,
+          result: resultOf(costs, held),
+          costItems: costs,
+        });
+      return beforeData === undefined ? read() : beforeData().then(read);
     }
     const field = path.match(new RegExp(`^${dataPath}/(\\w+)$`))?.[1];
     if (method === "PUT" && field !== undefined) {
@@ -549,7 +571,7 @@ describe("18 Unit Economics & Scenarios (design-spec 6.4)", () => {
     );
   });
 
-  test("?modal=evidence opens nothing for a Viewer, an archived idea, or an about 18 does not hold (6.0.3)", async () => {
+  test("?modal=evidence opens nothing for a Viewer, an archived idea, or an about 18 does not hold, and comes off the URL (6.0.3, SDD 4章)", async () => {
     const price = `economics_input:${validationId}:selling_price`;
     const worth = `validation_answer:${validationId}:V.08.WORTH`;
     const cases: [Parameters<typeof economicsApi>[0], string][] = [
@@ -575,10 +597,137 @@ describe("18 Unit Economics & Scenarios (design-spec 6.4)", () => {
           classification: assumed(),
         }),
       });
-      renderApp(`${base}?modal=evidence&about=${about}`);
+      const router = renderApp(
+        `${base}?q=V.08.WORTH&modal=evidence&about=${about}`,
+      );
       await screen.findByRole("grid", { name: "Inputs" });
+      // In place of the entry: Back does not lead to it again.
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ q: "V.08.WORTH" }),
+      );
+      expect(router.history.length).toBe(1);
       expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull();
     }
+  });
+
+  test("M2's URL taken off is not opened by a Restore or a role read again later (SDD 4章)", async () => {
+    let archived = true;
+    let me = as("viewer");
+    economicsApi({ archived: () => archived, me: () => me });
+    const router = renderApp(
+      `${base}?modal=evidence&about=economics_input:${validationId}:selling_price`,
+    );
+    await screen.findByText("This idea is archived");
+    await waitFor(() =>
+      expect(router.state.location.search).not.toHaveProperty("modal"),
+    );
+    archived = false;
+    me = ana;
+    readAgainOnFocus();
+    await waitFor(
+      () => expect(screen.queryByText("This idea is archived")).toBeNull(),
+      { timeout: 3000 },
+    );
+    expect(
+      await screen.findByRole("button", { name: /^F\/A\/U of Price/ }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull();
+  });
+
+  test("while the numbers are still read, M2's URL about WORTH stays and M2 opens on it once they are (SDD 4章)", async () => {
+    let release = () => {};
+    const calls = economicsApi({
+      worth: answer("V.08.WORTH", {
+        text: "Yes, in a year.",
+        classification: assumed(),
+      }),
+      beforeData: () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    });
+    const router = renderApp(
+      `${base}?modal=evidence&about=validation_answer:${validationId}:V.08.WORTH`,
+    );
+    await waitFor(() =>
+      expect(calls.some(({ path }) => path === dataPath)).toBe(true),
+    );
+    expect(router.state.location.search).toMatchObject({
+      modal: "evidence",
+      about: `validation_answer:${validationId}:V.08.WORTH`,
+    });
+    release();
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    expect(sheet.textContent).toContain(
+      "08 Is the return worth the capital and effort?",
+    );
+  });
+
+  test("archived while M2 is open on a number: it stays, says why a send is refused, and closing takes it off the URL (SDD 4章, 6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    economicsApi({
+      archived: () => archived,
+      attach: () => apiError(409, "ARCHIVED"),
+    });
+    const router = renderApp(
+      `${base}?modal=evidence&about=economics_input:${validationId}:selling_price`,
+    );
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    archived = true;
+    readAgainOnFocus();
+    expect(
+      await screen.findByText("This idea is archived", {}, { timeout: 3000 }),
+    ).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Evidence" })).toBe(sheet);
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(within(sheet).getByText("It's archived")).toBeTruthy();
+    await user.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull(),
+    );
+    expect(router.state.location.search).not.toHaveProperty("modal");
+    expect(router.state.location.search).not.toHaveProperty("about");
+  });
+
+  test("a Viewer now while M2 is open on WORTH: it stays and says a send is refused (SDD 4章, 6.0.6)", async () => {
+    const user = userEvent.setup();
+    let me = ana;
+    economicsApi({
+      me: () => me,
+      worth: answer("V.08.WORTH", {
+        text: "Yes, in a year.",
+        classification: assumed(),
+      }),
+      attach: () => apiError(403, "FORBIDDEN"),
+    });
+    renderApp(
+      `${base}?modal=evidence&about=validation_answer:${validationId}:V.08.WORTH`,
+    );
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    me = as("viewer");
+    readAgainOnFocus();
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByRole("button", {
+            name: /^F\/A\/U of Price/,
+            hidden: true,
+          }),
+        ).toBeNull(),
+      { timeout: 3000 },
+    );
+    expect(screen.getByRole("dialog", { name: "Evidence" })).toBe(sheet);
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(
+      within(sheet).getByText("You don't have access to this"),
+    ).toBeTruthy();
   });
 
   test("on a phone a number's sheet closes before its 💬 or 🕘 opens the panel (6.0.4・6.0.5)", async () => {

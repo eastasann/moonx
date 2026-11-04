@@ -181,6 +181,8 @@
       "applyCount_one": "Apply {{count, integer}} change",
       "applyCount_other": "Apply {{count, integer}} changes",
       "couldNotApply": "Couldn't apply",
+      "couldNotApplyReason": "Couldn't apply. {{reason}}.",
+      "couldNotApplyRef": "Couldn't apply. Ref: {{ref}}",
       "code": "{{section}} · {{title}}",
       "hidden": "This question is hidden now",
       "fau": "Fact, Assumption or Unknown for {{question}}",

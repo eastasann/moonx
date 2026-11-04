@@ -71,7 +71,12 @@ import {
 } from "../components/TemplateUpdate";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  useSearchModal,
+  useWorkspace,
+} from "../components/workspace";
 import { aiExportHref, aiImportHref } from "../lib/ai";
 import { api, inPath, unwrap } from "../lib/api";
 import type { SaveTarget } from "../lib/autosave";
@@ -709,15 +714,30 @@ function PlanHub({
   home,
   modal,
   about,
+  isDecided,
 }: {
   home: PlanHome;
   modal: string | undefined;
   about: string | undefined;
+  /**
+   * Whether `home` is what P2 answers now, not a cached read being read again: what
+   * decides whether a modal of the URL may open (SDD 4章).
+   */
+  isDecided: boolean;
 }) {
   const { t } = useTranslation(["plans"]);
   const { role } = useWorkspace();
   const modals = useModal();
   const [isRenaming, setRenaming] = useState(false);
+  // Rename plan is the plan's as it is now, and lives in the hub, not in the entry: another
+  // entry of 20 (Back from the latest plan to a saved version, or the other way), which
+  // keeps the hub, closes it, rather than carrying it over onto that entry.
+  const viewing = home.viewingVersion?.id ?? null;
+  const [lastViewing, setLastViewing] = useState(viewing);
+  if (lastViewing !== viewing) {
+    setLastViewing(viewing);
+    setRenaming(false);
+  }
   // M4's choice and reason, kept while M3 opens from it (6.12 M4); emptied when Record
   // Go / No-Go opens M4 anew.
   const [goNoGoDraft, setGoNoGoDraft] = useState(emptyGoNoGoDraft);
@@ -734,11 +754,37 @@ function PlanHub({
     !home.ideaArchived &&
     !home.archived &&
     home.latestDecision === "proceed";
+  // M4's Save a version opens M3 over it, and closing M3 opens M4 again (6.12 M4). M4 stays
+  // until it is closed (SDD 4章), so while the user goes between the two, both open even
+  // if the plan can no longer be edited meanwhile; their sends then say why.
+  const [isFromGoNoGo, setFromGoNoGo] = useState(false);
+  if (isFromGoNoGo && modal !== "save-version" && modal !== "go-no-go") {
+    setFromGoNoGo(false);
+  }
+  const isSavingVersion = useSearchModal(
+    modal,
+    "save-version",
+    canEdit || isFromGoNoGo,
+    isDecided,
+  );
+  const isRecordingGoNoGo = useSearchModal(
+    modal,
+    "go-no-go",
+    canEdit || isFromGoNoGo,
+    isDecided,
+  );
+  const isCreatingPlan = useSearchModal(
+    modal,
+    "create-plan",
+    canAddPlan,
+    isDecided,
+  );
   const isUpdatingTemplate = useIsTemplateUpdateOpen(
     modal,
     about,
     planTarget(home),
     canEdit,
+    isDecided,
   );
   const [partA, partB] = [
     home.parts.find((part) => part.part === "a"),
@@ -839,12 +885,12 @@ function PlanHub({
         }
         blocks={blocks}
       />
-      {modal === "save-version" && canEdit && (
+      {isSavingVersion && (
         <ModalBoundary key={modal} onClose={modals.close}>
           <SaveVersionDialog home={home} onClose={modals.close} />
         </ModalBoundary>
       )}
-      {modal === "go-no-go" && canEdit && (
+      {isRecordingGoNoGo && (
         <ModalBoundary key={modal} onClose={modals.close}>
           <GoNoGoDialog
             home={home}
@@ -853,16 +899,20 @@ function PlanHub({
             // The draft is emptied when M4 is opened anew, not here: emptied before M4
             // has gone, it would show cleared for a moment.
             onClose={modals.close}
-            onSaveVersion={() => modals.open("save-version")}
+            onSaveVersion={() => {
+              setFromGoNoGo(true);
+              modals.open("save-version");
+            }}
           />
         </ModalBoundary>
       )}
-      {modal === "create-plan" && canAddPlan && (
+      {isCreatingPlan && (
         <ModalBoundary key={modal} onClose={modals.close}>
           <CreatePlanDialog ideaId={home.ideaId} onClose={modals.close} />
         </ModalBoundary>
       )}
-      {isRenaming && canEdit && (
+      {/* Opened only while it may be; then until closed, so a refused Save says why in it. */}
+      {isRenaming && (
         <ModalBoundary onClose={() => setRenaming(false)}>
           <RenamePlanDialog home={home} onClose={() => setRenaming(false)} />
         </ModalBoundary>
@@ -919,6 +969,7 @@ function PlanHomeBody({
         home={home.data}
         modal={modal}
         about={about}
+        isDecided={!home.isFetching}
       />
     );
   }

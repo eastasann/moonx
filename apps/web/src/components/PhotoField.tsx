@@ -14,6 +14,7 @@ import { api, unwrap } from "../lib/api";
 import { useIsOnline } from "../lib/online";
 import { meQuery } from "../lib/queries";
 import { isSessionLost, useSendThrough } from "../lib/send";
+import { useFailureOnceClosed } from "./ideaActions";
 import { failureCode, SendFailure } from "./SendFailure";
 
 /** What failed, and how to send it again with Retry. */
@@ -24,7 +25,10 @@ type PhotoFailure =
 /**
  * The profile photo (U3), saved as soon as it is chosen (design-spec 6.16 3・4): JPEG, PNG
  * or WebP up to 5 MB (6.0.8), checked here for its size before it is sent and by the API
- * for what it is. 4 can also remove it (U3 DELETE), leaving the initials.
+ * for what it is. 4 can also remove it (U3 DELETE), leaving the initials. A send whose
+ * screen was left while it was on its way says its failure in a toast, the photo's own
+ * words alone and anything else as a row's send does, whose Retry sends the same file or
+ * removal again (6.0.6「送っている間に閉じた送信の失敗」).
  */
 export function PhotoField({
   me,
@@ -44,6 +48,26 @@ export function PhotoField({
     queryClient.setQueryData(meQuery().queryKey, (previous: Me | undefined) =>
       previous === undefined ? previous : { ...previous, avatarUrl },
     );
+  /** Saves the file, or removes the photo for null, and shows it on the user. */
+  const save = async (file: File | null) => {
+    if (file === null) {
+      await sendThrough(() => unwrap(api().api.v1.me.avatar.delete()));
+      putAvatar(null);
+      return;
+    }
+    const { avatarUrl } = await sendThrough(() =>
+      unwrap(api().api.v1.me.avatar.put({ file })),
+    );
+    putAvatar(avatarUrl);
+  };
+  const failedOnceLeft = useFailureOnceClosed(save, (error, file) => {
+    if (file === null) return null;
+    const code = failureCode(error);
+    if (code === "PAYLOAD_TOO_LARGE") {
+      return t("errors:PAYLOAD_TOO_LARGE", { context: "photo" });
+    }
+    return code === "VALIDATION_FAILED" ? t("auth:photo.format") : null;
+  });
   const upload = async (file: File) => {
     setFailure(null);
     setProblem(null);
@@ -53,11 +77,9 @@ export function PhotoField({
     }
     setPending("upload");
     try {
-      const { avatarUrl } = await sendThrough(() =>
-        unwrap(api().api.v1.me.avatar.put({ file })),
-      );
-      putAvatar(avatarUrl);
+      await save(file);
     } catch (cause) {
+      failedOnceLeft(cause, file);
       const code = failureCode(cause);
       if (isSessionLost(cause)) return;
       if (code === "PAYLOAD_TOO_LARGE") setProblem("tooLarge");
@@ -72,9 +94,9 @@ export function PhotoField({
     setProblem(null);
     setPending("remove");
     try {
-      await sendThrough(() => unwrap(api().api.v1.me.avatar.delete()));
-      putAvatar(null);
+      await save(null);
     } catch (cause) {
+      failedOnceLeft(cause, null);
       if (!isSessionLost(cause)) setFailure({ error: cause, file: null });
     } finally {
       setPending(null);

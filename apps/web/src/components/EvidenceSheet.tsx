@@ -27,7 +27,6 @@ import {
   TextField,
 } from "@moonx/ui-web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useBlocker } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
@@ -46,6 +45,7 @@ import { isTransient, useUnexpectedReference } from "../lib/failure";
 import { inputIssueMessage } from "../lib/input-issues";
 import { useIsOnline } from "../lib/online";
 import { researchLogKey, researchLogQuery } from "../lib/queries";
+import { failsOnAbort, heldSendSignal, useHoldWhileSending } from "../lib/send";
 
 import {
   inputOf,
@@ -113,30 +113,6 @@ const isHeld = (status: SaveStatus | undefined) =>
 
 /** The item's own save failed before a change of M2 went out: the change waits for it. */
 class HeldSaveError extends Error {}
-
-/**
- * How long one change of M2 may take, its wait for the item's own save included. Cloud
- * Run answers within 60 seconds (SDD ADR-007), so a change still open after this lost the
- * network: it then fails as the network does ("Couldn't save" and Retry), and M2, held
- * open while a change is on its way, lets the user go.
- */
-const SEND_LIMIT_MS = 70_000;
-
-/** Rejects as the network does once `signal` aborts. */
-const onAbort = (signal: AbortSignal) =>
-  new Promise<never>((_, reject) => {
-    const fail = () =>
-      reject(
-        new ApiError({
-          status: null,
-          code: null,
-          requestId: null,
-          cause: signal.reason,
-        }),
-      );
-    if (signal.aborted) fail();
-    else signal.addEventListener("abort", fail, { once: true });
-  });
 
 /** Whether two new entries' fields hold the same. */
 const sameEntry = (a: ResearchLogValues, b: ResearchLogValues) =>
@@ -229,6 +205,12 @@ export interface EvidenceSheetProps {
   onMarkFact?: () => void;
   /** Someone saved the item first and the user loads theirs: the screen reads it again. */
   onReload: () => void;
+  /**
+   * The item is no longer on the screen (a row deleted meanwhile): M2 stays with it as
+   * it last was, so a removal V5 answers 404 for is refused for the item, not taken for
+   * evidence removed already, which the item read again would show.
+   */
+  isGone?: boolean;
   onClose: () => void;
 }
 
@@ -250,6 +232,7 @@ export function EvidenceSheet({
   onChanged,
   onMarkFact,
   onReload,
+  isGone = false,
   onClose,
 }: EvidenceSheetProps) {
   const { t } = useTranslation(["validation", "app", "errors"]);
@@ -304,8 +287,9 @@ export function EvidenceSheet({
       force: boolean;
       lockVersion?: number;
     }): Promise<EvidenceResult> => {
-      const signal = AbortSignal.timeout(SEND_LIMIT_MS);
-      await Promise.race([settled(autosave, saveKey), onAbort(signal)]);
+      // Its wait for the item's own save counts towards the limit too.
+      const signal = heldSendSignal();
+      await Promise.race([settled(autosave, saveKey), failsOnAbort(signal)]);
       const version = lockVersion ?? lockVersionNow();
       if (change.kind === "remove") {
         return unwrap(
@@ -380,8 +364,8 @@ export function EvidenceSheet({
           setConflict({ change, current: current.data });
         }
       } else if (error.code === "NOT_FOUND" && change.kind === "remove") {
-        // Removed already (in another tab, by someone else): read it as it is.
-        send.reset();
+        // Removed already (in another tab, by someone else), or the item gone: read it
+        // as it is. The failure shows for an item gone only (`isRemovedAlready`).
         onReload();
       }
     },
@@ -394,11 +378,7 @@ export function EvidenceSheet({
   // While a change is on its way M2 stays open (Done, ×, Esc, a tap outside and Back
   // alike): its failure or conflict shows here, and the answer's own save cannot go out
   // on the version this change is about to raise.
-  useBlocker({
-    shouldBlockFn: () => true,
-    disabled: !send.isPending,
-    enableBeforeUnload: false,
-  });
+  useHoldWhileSending(send.isPending);
 
   /** Sends one change at a time; a press while one is on its way does nothing. */
   const run = (change: Change) => {
@@ -464,7 +444,14 @@ export function EvidenceSheet({
   const [noteIssue] = shortTextSchema.safeParse(note).error?.issues ?? [];
 
   const failure = send.error;
-  const kind = failureKind(failure);
+  // V5 answers 404 for evidence removed already, which the item read again no longer
+  // lists, and for an item gone, which M2 keeps as it last was: only that one is refused.
+  const isRemovedAlready =
+    failure instanceof ApiError &&
+    failure.code === "NOT_FOUND" &&
+    send.variables?.change.kind === "remove" &&
+    !isGone;
+  const kind = isRemovedAlready ? "none" : failureKind(failure);
   const rateLimited = rateLimitWords(failure);
   const reason =
     kind === "rejected" && failure instanceof ApiError

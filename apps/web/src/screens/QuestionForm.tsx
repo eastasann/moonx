@@ -56,6 +56,7 @@ import {
   dashboardHref,
   useModal,
   usePanel,
+  useSearchModalAbout,
   useWorkspace,
 } from "../components/workspace";
 import { useAutosave } from "../lib/autosave-react";
@@ -100,6 +101,7 @@ function SectionForm({
   focusKey,
   modal,
   about,
+  isFetching,
 }: {
   home: ValidationHome;
   section: TemplateSection;
@@ -112,6 +114,8 @@ function SectionForm({
   focusKey: string | undefined;
   modal: string | undefined;
   about: string | undefined;
+  /** V1 or V2 is being read again: what M2 is about and who may open it may change. */
+  isFetching: boolean;
 }) {
   const { t } = useTranslation(["validation", "common", "app"]);
   const { workspace, role } = useWorkspace();
@@ -335,18 +339,22 @@ function SectionForm({
   const toHome = () => void navigate({ href: ideaHref(workspace.id, idea.id) });
   const go = (href: string) => void navigate({ href });
 
-  const evidenceView = (() => {
-    if (modal !== "evidence" || !canEdit || about === undefined) return null;
-    const prefix = `validation_answer:${validationId}:`;
-    if (!about.startsWith(prefix)) return null;
-    const questionKey = about.slice(prefix.length);
-    const view = shown.find(
-      (candidate) => candidate.question.key === questionKey,
-    );
-    return view === undefined || view.state === null
-      ? null
-      : { ...view, state: view.state };
-  })();
+  // M2 opens on a question shown here with F/A/U (6.0.3), for someone who may edit; once
+  // open it follows the answer, though OCEAN hides its question meanwhile.
+  const prefix = `validation_answer:${validationId}:`;
+  const aboutKey = about?.startsWith(prefix)
+    ? about.slice(prefix.length)
+    : undefined;
+  const aboutView = views.find((view) => view.question.key === aboutKey);
+  const evidenceView = useSearchModalAbout(
+    modal,
+    "evidence",
+    aboutView === undefined || aboutView.state === null
+      ? undefined
+      : { ...aboutView, state: aboutView.state },
+    canEdit && aboutKey !== undefined && shownIds.includes(aboutKey),
+    !isFetching,
+  );
 
   return (
     <>
@@ -467,7 +475,7 @@ function SectionForm({
           );
         }}
       />
-      {evidenceView !== null && (
+      {evidenceView !== undefined && (
         <ModalBoundary key="evidence" onClose={modals.close}>
           <AnswerEvidenceSheet
             ideaId={idea.id}
@@ -542,6 +550,7 @@ function QuestionFormBody({
         focusKey={focusKey}
         modal={modal}
         about={about}
+        isFetching={home.isFetching || questions.isFetching}
       />
     );
   }

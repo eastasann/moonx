@@ -44,7 +44,12 @@ import {
 } from "../components/states";
 import { UserName } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  useSearchModal,
+  useWorkspace,
+} from "../components/workspace";
 import {
   executionHref,
   executionTabOf,
@@ -529,6 +534,8 @@ export function DashboardScreen({ modal: openModal }: { modal?: string }) {
   const modal = useModal();
   useDocumentTitle(t("app:nav.dashboard"), workspace.name);
   const isViewer = role === "viewer";
+  // M1 is not a Viewer's (design-spec 2.2).
+  const isNewIdeaOpen = useSearchModal(openModal, "new-idea", !isViewer);
   const blocks: HubBlock[] = [
     {
       id: "ideas",
@@ -601,7 +608,7 @@ export function DashboardScreen({ modal: openModal }: { modal?: string }) {
         }
         blocks={blocks}
       />
-      {openModal === "new-idea" && !isViewer && (
+      {isNewIdeaOpen && (
         <ModalBoundary key={openModal} onClose={modal.close}>
           <NewIdeaDialog onClose={modal.close} />
         </ModalBoundary>

@@ -6,7 +6,10 @@ import {
   ana,
   apiError,
   type Call,
+  cleanupThenRestoreFocus,
+  readAgainOnFocus,
   renderApp,
+  setViewport,
   stubApi,
   toastAfter,
 } from "../test/api";
@@ -25,19 +28,8 @@ import {
 
 // 17 Costs (design-spec 6.3).
 
-/** happy-dom's window, whose viewport a test sets. */
-const setViewport = (width: number) =>
-  act(() =>
-    (
-      window as unknown as {
-        happyDOM: {
-          setViewport: (size: { width: number; height: number }) => void;
-        };
-      }
-    ).happyDOM.setViewport({ width, height: 900 }),
-  );
-
 afterEach(() => {
+  cleanupThenRestoreFocus();
   vi.unstubAllGlobals();
   setViewport(1024);
 });
@@ -94,6 +86,8 @@ function costsApi({
   archived = false,
   refuse,
   evidence,
+  listed = (rows) => rows,
+  beforeList,
 }: {
   me?: Me | (() => Me);
   items?: CostItem[];
@@ -102,6 +96,10 @@ function costsApi({
   refuse?: (call: Call) => Response | undefined;
   /** V5's answer to a removal of evidence. */
   evidence?: (call: Call) => Response;
+  /** The rows V13 lists of those held: fewer once one is deleted behind the screen. */
+  listed?: (rows: CostItem[]) => CostItem[];
+  /** Holds V13's answer back, as a slow read would. */
+  beforeList?: () => Promise<void>;
 } = {}) {
   const held = [...items];
   const meNow = () => (typeof me === "function" ? me() : me);
@@ -137,11 +135,15 @@ function costsApi({
       return evidence?.(call);
     }
     if (method === "GET" && path === listPath) {
-      return Response.json({
-        items: held,
-        result: resultOf(held, inputs),
-        economicsInputs: inputs,
-      });
+      const read = () => {
+        const rows = listed(held);
+        return Response.json({
+          items: rows,
+          result: resultOf(rows, inputs),
+          economicsInputs: inputs,
+        });
+      };
+      return beforeList === undefined ? read() : beforeList().then(read);
     }
     if (
       method === "POST" &&
@@ -620,7 +622,7 @@ describe("17 Costs (design-spec 6.3)", () => {
     );
   });
 
-  test("?modal=evidence opens nothing for a Viewer, an archived idea, or an about 17 does not hold (6.0.3)", async () => {
+  test("?modal=evidence opens nothing for a Viewer, an archived idea, or an about 17 does not hold, and comes off the URL (6.0.3, SDD 4章)", async () => {
     const cases: [Parameters<typeof costsApi>[0], string][] = [
       [{ me: as("viewer") }, `cost_item:${equipment.id}`],
       [{ archived: true }, `cost_item:${equipment.id}`],
@@ -632,10 +634,190 @@ describe("17 Costs (design-spec 6.3)", () => {
       cleanup();
       vi.unstubAllGlobals();
       costsApi(api);
-      renderApp(`${base}?modal=evidence&about=${about}`);
+      const router = renderApp(
+        `${base}?tab=monthly_fixed&modal=evidence&about=${about}`,
+      );
       await screen.findByRole("grid", { name: "Startup costs" });
+      // In place of the entry: Back does not lead to it again.
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ tab: "monthly_fixed" }),
+      );
+      expect(router.history.length).toBe(1);
       expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull();
     }
+  });
+
+  test("M2's URL taken off is not opened by a Restore or a role read again later (SDD 4章)", async () => {
+    let archived = true;
+    let me = as("viewer");
+    costsApi({ archived: () => archived, me: () => me });
+    const router = renderApp(
+      `${base}?modal=evidence&about=cost_item:${equipment.id}`,
+    );
+    await screen.findByText("This idea is archived");
+    await waitFor(() =>
+      expect(router.state.location.search).not.toHaveProperty("modal"),
+    );
+    archived = false;
+    me = ana;
+    readAgainOnFocus();
+    expect(
+      await screen.findAllByRole(
+        "button",
+        { name: "Add row" },
+        { timeout: 3000 },
+      ),
+    ).not.toHaveLength(0);
+    expect(screen.queryByText("This idea is archived")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull();
+  });
+
+  test("while the rows are still read, M2's URL stays and M2 opens once they are (SDD 4章)", async () => {
+    let release = () => {};
+    const calls = costsApi({
+      beforeList: () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    });
+    const router = renderApp(
+      `${base}?modal=evidence&about=cost_item:${equipment.id}`,
+    );
+    await waitFor(() =>
+      expect(calls.some(({ path }) => path === listPath)).toBe(true),
+    );
+    expect(router.state.location.search).toMatchObject({
+      modal: "evidence",
+      about: `cost_item:${equipment.id}`,
+    });
+    release();
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    expect(sheet.textContent).toContain("Equipment");
+  });
+
+  test("archived while M2 is open: it stays, says why a send is refused, and closing takes it off the URL (SDD 4章, 6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    const calls = costsApi({
+      archived: () => archived,
+      refuse: ({ method, path }) =>
+        method === "POST" && path.endsWith("/evidence")
+          ? apiError(409, "ARCHIVED")
+          : undefined,
+    });
+    const router = renderApp(
+      `${base}?modal=evidence&about=cost_item:${equipment.id}`,
+    );
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    archived = true;
+    readAgainOnFocus();
+    expect(
+      await screen.findByText("This idea is archived", {}, { timeout: 3000 }),
+    ).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Evidence" })).toBe(sheet);
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(within(sheet).getByText("It's archived")).toBeTruthy();
+    expect(
+      calls.filter(({ method }) => method === "POST").map(({ body }) => body),
+    ).toEqual([
+      {
+        target: { type: "cost_item", id: equipment.id, key: null },
+        lockVersion: 1,
+        researchLogEntryId: survey.id,
+      },
+    ]);
+    await user.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull(),
+    );
+    expect(router.state.location.search).not.toHaveProperty("modal");
+    expect(router.state.location.search).not.toHaveProperty("about");
+  });
+
+  test("its row deleted while M2 is open: M2 stays with it, and attaching or removing says It no longer exists (SDD 4章, 6.0.6)", async () => {
+    const user = userEvent.setup();
+    const link = evidenceOf("7d0f0000-0000-4000-8000-000000000012", prices);
+    let deleted = false;
+    const calls = costsApi({
+      items: [
+        {
+          ...equipment,
+          classification: { ...assumed("high"), evidence: [link] },
+        },
+        rent,
+      ],
+      listed: (rows) =>
+        deleted ? rows.filter(({ id }) => id !== equipment.id) : rows,
+      // V4 and V5 find no such item in this validation (SDD 5.7).
+      refuse: ({ method, path }) =>
+        method === "POST" && path.endsWith("/evidence")
+          ? apiError(404, "NOT_FOUND")
+          : undefined,
+      evidence: () => apiError(404, "NOT_FOUND"),
+    });
+    renderApp(`${base}?modal=evidence&about=cost_item:${equipment.id}`);
+    const sheet = await screen.findByRole("dialog", { name: "Evidence" });
+    deleted = true;
+    readAgainOnFocus();
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByRole("row", { name: /Equipment/, hidden: true }),
+        ).toBeNull(),
+      { timeout: 3000 },
+    );
+    expect(screen.getByRole("dialog", { name: "Evidence" })).toBe(sheet);
+    expect(sheet.textContent).toContain("Equipment");
+    await user.click(within(sheet).getByRole("button", { name: /Remove/ }));
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(within(sheet).getByText("It no longer exists")).toBeTruthy();
+    await user.click(
+      await within(sheet).findByRole("checkbox", { name: /Lunch survey/ }),
+    );
+    await waitFor(() =>
+      expect(calls.filter(({ method }) => method === "POST")).toHaveLength(1),
+    );
+    expect(await within(sheet).findByText("Couldn't save")).toBeTruthy();
+    expect(within(sheet).getByText("It no longer exists")).toBeTruthy();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  test("Reorder open when the idea is archived stays, and Save order says why it is refused (6.0.6)", async () => {
+    const user = userEvent.setup();
+    let archived = false;
+    costsApi({
+      archived: () => archived,
+      refuse: ({ method }) =>
+        method === "PUT" ? apiError(409, "ARCHIVED") : undefined,
+    });
+    renderApp(base);
+    await screen.findByRole("grid", { name: "Startup costs" });
+    await user.click(
+      screen.getByRole("button", { name: "Row actions for Equipment" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Reorder" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Reorder startup costs",
+    });
+    archived = true;
+    readAgainOnFocus();
+    expect(
+      await screen.findByText("This idea is archived", {}, { timeout: 3000 }),
+    ).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Reorder startup costs" })).toBe(
+      dialog,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Move Equipment down" }),
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Save order" }),
+    );
+    expect(await within(dialog).findByText("Couldn't save")).toBeTruthy();
+    expect(within(dialog).getByText("It's archived")).toBeTruthy();
   });
 
   test("on a phone the row's sheet closes before its ⋯ opens Comments or History in the panel (6.0.4・6.0.5)", async () => {

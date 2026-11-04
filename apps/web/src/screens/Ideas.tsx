@@ -48,7 +48,12 @@ import {
 } from "../components/states";
 import { userNameText } from "../components/UserName";
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
-import { dashboardHref, useModal, useWorkspace } from "../components/workspace";
+import {
+  dashboardHref,
+  useModal,
+  useSearchModal,
+  useWorkspace,
+} from "../components/workspace";
 import { inputIssueMessage } from "../lib/input-issues";
 import { ideaHref, ideasSearchSchema } from "../lib/links";
 import {
@@ -600,6 +605,8 @@ export function IdeasScreen({
   const modals = useModal();
   const navigate = useNavigate();
   useDocumentTitle(t("ideas:title"), workspace.name);
+  // M1 is not a Viewer's (design-spec 2.2).
+  const isNewIdeaOpen = useSearchModal(modal, "new-idea", role !== "viewer");
   const onSearch = (next: IdeasSearch) =>
     void navigate({
       to: ".",
@@ -622,7 +629,7 @@ export function IdeasScreen({
       }
     >
       <IdeasBody search={search} onSearch={onSearch} />
-      {modal === "new-idea" && role !== "viewer" && (
+      {isNewIdeaOpen && (
         <ModalBoundary key={modal} onClose={modals.close}>
           <NewIdeaDialog onClose={modals.close} />
         </ModalBoundary>

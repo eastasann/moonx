@@ -97,6 +97,7 @@ import {
   dashboardHref,
   useModal,
   usePanel,
+  useSearchModalAbout,
   useWorkspace,
 } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
@@ -111,11 +112,13 @@ import {
   ideasHref,
 } from "../lib/links";
 import { costGapText, costTotalText, metricText } from "../lib/metrics";
+import { useIsMounted } from "../lib/mounted";
 import { useIsOnline } from "../lib/online";
 import {
   costsQuery,
   ideaKey,
   putSaved,
+  useIsValidationRead,
   validationHomeQuery,
   workspaceKey,
 } from "../lib/queries";
@@ -1075,6 +1078,18 @@ function CostsBody({
   const [reordering, setReordering] = useState<CostCategory | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
+  // M2 opens on a row 17 lists, for someone who may edit; once open it stays with the
+  // row as it last was if the row is deleted meanwhile (`isEvidenceGone`).
+  const aboutRow = rows.find((view) => aboutOf(view.row.id) === about);
+  const isEvidenceDecided = useIsValidationRead(home.idea.id, query);
+  const evidenceView = useSearchModalAbout(
+    modal,
+    "evidence",
+    aboutRow,
+    canEdit,
+    isEvidenceDecided,
+  );
+  const isEvidenceGone = evidenceView !== undefined && aboutRow === undefined;
 
   const targetOf = (costItemId: string) =>
     costTarget(
@@ -1162,13 +1177,7 @@ function CostsBody({
   });
 
   // Whether 17 is still open when a delete settles, which may be later.
-  const isOpen = useRef(true);
-  useEffect(() => {
-    isOpen.current = true;
-    return () => {
-      isOpen.current = false;
-    };
-  }, []);
+  const isOpen = useIsMounted();
   const remove = useMutation({
     mutationFn: (costItemId: string) =>
       unwrap(
@@ -1471,10 +1480,6 @@ function CostsBody({
   const sheetView = sheetRowId === null ? undefined : viewOf(sheetRowId);
   const deletingView = deleting === null ? undefined : viewOf(deleting);
   const switchingView = switching === null ? undefined : viewOf(switching);
-  const evidenceView =
-    modal === "evidence" && canEdit
-      ? rows.find((view) => aboutOf(view.row.id) === about)
-      : undefined;
   const reorderItems = (category: CostCategory, items: readonly CostItem[]) =>
     items
       .filter((row) => row.category === category)
@@ -1508,7 +1513,7 @@ function CostsBody({
           onClose={() => setSheetRowId(null)}
         />
       )}
-      {reordering !== null && canEdit && (
+      {reordering !== null && (
         <ReorderDialog
           title={t(`validation:costs.reorderTitle.${reordering}`)}
           items={reorderItems(reordering, query.data.items)}
@@ -1584,11 +1589,23 @@ function CostsBody({
             saveKey={costKey(evidenceView.row.id)}
             forFact={forFact}
             onChanged={(change) =>
-              putCostRow(queryClient, list.queryKey, {
-                id: evidenceView.row.id,
-                classification: change.classification,
-                lockVersion: change.lockVersion,
-              })
+              // In its place only: a row deleted meanwhile is not listed again.
+              putSaved<CostList>(queryClient, list.queryKey, (data) =>
+                data === undefined
+                  ? undefined
+                  : {
+                      ...data,
+                      items: data.items.map((row) =>
+                        row.id === evidenceView.row.id
+                          ? {
+                              ...row,
+                              classification: change.classification,
+                              lockVersion: change.lockVersion,
+                            }
+                          : row,
+                      ),
+                    },
+              )
             }
             onMarkFact={() =>
               classify(evidenceView, { fau: "fact", confidence: null })
@@ -1596,6 +1613,7 @@ function CostsBody({
             onReload={() =>
               void queryClient.invalidateQueries({ queryKey: list.queryKey })
             }
+            isGone={isEvidenceGone}
             onClose={modals.close}
           />
         </ModalBoundary>

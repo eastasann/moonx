@@ -57,7 +57,10 @@ import {
 } from "../components/CommentsPanel";
 import { ModalBoundary } from "../components/ErrorBoundary";
 import { ItemHistoryButton } from "../components/HistoryPanel";
-import { useToastFailure } from "../components/ideaActions";
+import {
+  useFailureOnceClosed,
+  useToastFailure,
+} from "../components/ideaActions";
 import { useKeepShownItem } from "../components/keepShownItem";
 import { ReorderDialog } from "../components/ReorderDialog";
 import { RowEvidence, RowEvidenceSheet } from "../components/RowEvidence";
@@ -82,8 +85,10 @@ import {
 import { WorkspaceFrame } from "../components/WorkspaceFrame";
 import {
   dashboardHref,
+  useAskedOpen,
   useModal,
   usePanel,
+  useSearchModalAbout,
   useWorkspace,
 } from "../components/workspace";
 import { ApiError, api, inPath, unwrap } from "../lib/api";
@@ -104,8 +109,10 @@ import {
   ideaKey,
   putSaved,
   risksQuery,
+  useIsValidationRead,
   validationHomeQuery,
 } from "../lib/queries";
+import { useSendThrough } from "../lib/send";
 import { useDocumentTitle } from "../lib/title";
 import { AssumptionsSkeleton, ListSkeleton } from "./AssumptionsRisksSkeleton";
 
@@ -236,7 +243,8 @@ function RowEditor({
   tab: AssumptionsTab;
   row: Row;
   autoFocus?: boolean;
-  onOpenEvidence: () => void;
+  /** Opens M2; none once the screen, read again, no longer lets the user edit. */
+  onOpenEvidence: (() => void) | undefined;
 }) {
   const { t } = useTranslation(["validation"]);
   const queryClient = useQueryClient();
@@ -474,7 +482,10 @@ function RowDetail({
           )}
         </Stack>
       )}
-      {isEditing && canEdit && (
+      {/* Only an editor opens it; once open it stays until closed, though the screen
+          read again no longer lets them edit, so a refused save shows in it
+          (design-spec 6.0.6's modals). */}
+      {isEditing && (
         <Dialog
           isOpen
           onOpenChange={(isOpen) => {
@@ -490,7 +501,7 @@ function RowDetail({
             tab={tab}
             row={row}
             autoFocus
-            onOpenEvidence={onOpenEvidence}
+            onOpenEvidence={canEdit ? onOpenEvidence : undefined}
           />
         </Dialog>
       )}
@@ -500,8 +511,8 @@ function RowDetail({
 
 /**
  * A new row (design-spec 6.10「+ Add」): its fields, then Add, which makes it and shows it.
- * In the detail's place from the tablet breakpoint up, in a sheet on a phone; failures as
- * 14's new entry.
+ * In the detail's place from the tablet breakpoint up, in a sheet on a phone; failures,
+ * and a send that fails once the form is closed (in a toast, 6.0.6), as 14's new entry.
  */
 function NewRow({
   ideaId,
@@ -510,18 +521,15 @@ function NewRow({
   isSheet,
   isReadOnly,
   onCreated,
-  onRefused,
   onCancel,
 }: {
   ideaId: string;
   validationId: string;
   tab: AssumptionsTab;
   isSheet: boolean;
-  /** The screen read again after a refusal reads only: what was typed stays, unsent. */
+  /** The screen read again no longer lets the user add one: what was typed stays, unsent. */
   isReadOnly: boolean;
   onCreated: (row: Row) => void;
-  /** Refused for good while the form is open (archived, no access, gone). */
-  onRefused: () => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation(["validation", "errors"]);
@@ -535,22 +543,29 @@ function NewRow({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const latestOnCreated = useRef(onCreated);
   latestOnCreated.current = onCreated;
-  const latestOnRefused = useRef(onRefused);
-  latestOnRefused.current = onRefused;
   const oneAtATime = useOneAtATime();
   const readAgainWhenRefused = useReadAgainWhenRefused();
-  const create = useMutation({
-    mutationFn: async (input: AssumptionValues | RiskValues): Promise<Row> => {
-      const lists = api().api.v1.validations({
-        validationId: inPath(validationId),
-      });
-      return tab === "assumptions"
-        ? unwrap(lists.assumptions.post(input as AssumptionValues))
-        : unwrap(lists.risks.post(input as RiskValues));
+  const sendThrough = useSendThrough();
+  const post = async (input: AssumptionValues | RiskValues): Promise<Row> => {
+    const lists = api().api.v1.validations({
+      validationId: inPath(validationId),
+    });
+    return tab === "assumptions"
+      ? unwrap(lists.assumptions.post(input as AssumptionValues))
+      : unwrap(lists.risks.post(input as RiskValues));
+  };
+  const readAgain = () =>
+    queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) });
+  const failOnceClosed = useFailureOnceClosed(
+    async (input: AssumptionValues | RiskValues) => {
+      await sendThrough(() => post(input));
+      await readAgain();
     },
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ideaKey(ideaId) }),
-    onError: readAgainWhenRefused,
+  );
+  const create = useMutation({
+    mutationFn: post,
+    onSuccess: () => void readAgain(),
+    onError: failOnceClosed,
   });
   const failure = create.error;
   // Refused for good, the form sends no more (design-spec 6.10): at once, before the
@@ -579,9 +594,8 @@ function NewRow({
             // Fires only while the form is still open: Cancel or leaving meanwhile keeps
             // the user where they went (the row is made all the same).
             onSuccess: (row) => latestOnCreated.current(row),
-            onError: (error) => {
-              if (isRefusedForGood(error)) latestOnRefused.current();
-            },
+            // As does this. Once the form is closed, its toast reads the screen again.
+            onError: readAgainWhenRefused,
             onSettled: () => resolve(),
           });
         }),
@@ -711,6 +725,7 @@ function RowLine({ tab, row }: { tab: AssumptionsTab; row: Row }) {
 
 function AssumptionsBody({
   home,
+  isDecided,
   search,
   modal,
   about,
@@ -719,6 +734,8 @@ function AssumptionsBody({
   onClose,
 }: {
   home: ValidationHome;
+  /** `home` has been read and is not being read again: whether the idea is archived. */
+  isDecided: boolean;
   search: AssumptionsSearch;
   modal: string | undefined;
   about: string | undefined;
@@ -749,13 +766,10 @@ function AssumptionsBody({
   const [isReordering, setReordering] = useState(false);
   const [deleting, setDeleting] = useState<Row | null>(null);
   const items: Row[] = query.data?.items ?? [];
-  // A new row refused as archived or no longer allowed stays, read only, with what was
-  // typed and why, until it is closed (design-spec 6.10, as 14's new entry).
-  const [isNewKept, setNewKept] = useState(false);
-  useEffect(() => {
-    if (search.new !== 1) setNewKept(false);
-  }, [search.new]);
-  const isNew = search.new === 1 && (canEdit || isNewKept);
+  // `new=1` opens the new row as 14's opens its new entry (SDD 4章, design-spec 6.10).
+  const isNew = useAskedOpen(search.new === 1, canEdit, isDecided, {
+    search: ({ new: _, ...rest }) => rest,
+  });
   const shownFirst =
     search.row === undefined && isTwoColumns && !isNew
       ? items[0]?.id
@@ -826,18 +840,20 @@ function AssumptionsBody({
 
   const listFor = (list: AssumptionsTab): ReactNode => {
     const data = list === "assumptions" ? assumptions : risks;
-    if (data.isError) {
-      return (
-        <FailureState
-          error={data.error}
-          onRetry={() => void data.refetch()}
-          dashboardHref={dashboardHref(me)}
-          headingLevel={2}
-          size="S"
-        />
-      );
-    }
+    // A read again that failed leaves what was read on screen (as 13 does): only a list
+    // never read shows the failure.
     if (data.data === undefined) {
+      if (data.isError) {
+        return (
+          <FailureState
+            error={data.error}
+            onRetry={() => void data.refetch()}
+            dashboardHref={dashboardHref(me)}
+            headingLevel={2}
+            size="S"
+          />
+        );
+      }
       return isSlow ? (
         <SlowLoadingState headingLevel={2} size="S" onRetry={retrySlow} />
       ) : (
@@ -919,7 +935,6 @@ function AssumptionsBody({
       tab={tab}
       isSheet={isSheet}
       isReadOnly={!canEdit}
-      onRefused={() => setNewKept(true)}
       onCreated={(row) => {
         // In the list before it is shown: no "Not found" while the list is read again.
         putRow(queryClient, idea.id, validationId, tab, row);
@@ -959,10 +974,20 @@ function AssumptionsBody({
       />
     );
 
-  const evidenceRow =
-    modal === "evidence" && canEdit
-      ? assumptions.data?.items.find(({ id }) => aboutOf(id) === about)
-      : undefined;
+  const isEvidenceDecided = useIsValidationRead(idea.id, assumptions);
+  // M2 is an assumption's alone: a risk takes no evidence (design-spec 6.10).
+  const aboutRow = assumptions.data?.items.find(
+    ({ id }) => aboutOf(id) === about,
+  );
+  const evidenceRow = useSearchModalAbout(
+    modal,
+    "evidence",
+    aboutRow,
+    canEdit,
+    isEvidenceDecided,
+  );
+  // Open on an assumption no longer listed (deleted meanwhile), M2 stays with it as it was.
+  const isEvidenceGone = evidenceRow !== undefined && aboutRow === undefined;
   const title =
     home.sections.find(({ key }) => key === "09")?.title ??
     t("validation:assumptions.title");
@@ -1009,7 +1034,9 @@ function AssumptionsBody({
         onBack={() => onClose({ ...search, row: undefined, new: undefined })}
       />
       {isNew && isPhone && newRow(true)}
-      {isReordering && canEdit && (
+      {/* Opened from an editor's ⋯; once open it stays until closed, so a refused
+          Save order shows in it (design-spec 6.0.6's modals). */}
+      {isReordering && (
         <ReorderDialog
           title={t(`validation:assumptions.reorderTitle.${tab}`)}
           items={items.map(({ id, statement }) => ({ id, label: statement }))}
@@ -1094,6 +1121,7 @@ function AssumptionsBody({
                 queryKey: assumptionsQuery(idea.id, validationId).queryKey,
               })
             }
+            isGone={isEvidenceGone}
             onClose={modals.close}
           />
         </ModalBoundary>
@@ -1208,6 +1236,7 @@ export function AssumptionsScreen({
     body = (
       <AssumptionsBody
         home={data}
+        isDecided={!home.isFetching}
         search={search}
         modal={modal}
         about={about}

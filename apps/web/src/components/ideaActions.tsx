@@ -16,6 +16,7 @@ import { AuthError } from "../lib/auth";
 import { rejectionReason } from "../lib/autosave";
 import { isTransient, unexpectedReference } from "../lib/failure";
 import { ideaHref, ideasHref } from "../lib/links";
+import { useIsMounted } from "../lib/mounted";
 import {
   historyKey,
   ideaKey,
@@ -71,28 +72,68 @@ const UNDO_REFUSALS = new Set([
 ]);
 
 /**
+ * What a failed send says it could not do: "Couldn't save" (design-spec 6.0.6), or the
+ * screen's own verb: PNL-1's "Couldn't post" (6.0.4), 19's "Couldn't record" (6.5), 25's
+ * "Couldn't apply" (6.7).
+ */
+export type SendKind = "save" | "post" | "record" | "apply";
+
+/**
+ * The words a failure says by {@link SendKind}: alone (it may pass), with the Ref of the
+ * API's answer, and with a 6.0.2 reason.
+ */
+const transientWords = {
+  save: {
+    plain: () => i18n.t("app:state.couldNotSave"),
+    ref: (ref: string) => i18n.t("app:state.couldNotSaveRef", { ref }),
+    reason: (reason: string) =>
+      i18n.t("app:state.couldNotSaveReason", { reason }),
+  },
+  post: {
+    plain: () => i18n.t("panels:comments.couldNotPost"),
+    ref: (ref: string) => i18n.t("panels:comments.couldNotPostRef", { ref }),
+    reason: (reason: string) =>
+      i18n.t("panels:comments.couldNotPostReason", { reason }),
+  },
+  record: {
+    plain: () => i18n.t("validation:decision.couldNotRecord"),
+    ref: (ref: string) =>
+      i18n.t("validation:decision.couldNotRecordRef", { ref }),
+    reason: (reason: string) =>
+      i18n.t("validation:decision.couldNotRecordReason", { reason }),
+  },
+  apply: {
+    plain: () => i18n.t("ai:import.review.couldNotApply"),
+    ref: (ref: string) => i18n.t("ai:import.review.couldNotApplyRef", { ref }),
+    reason: (reason: string) =>
+      i18n.t("ai:import.review.couldNotApplyReason", { reason }),
+  },
+} as const;
+
+/**
  * Says why a send failed, in a toast (design-spec 6.0.6, SDD 8.2): the network or an API
  * that is down as "Couldn't save" and Retry, with the Ref of the API's answer when one
  * came (a 5xx, which the API reports itself); a refusal for good that 6.0.2 names
  * (archived, no access, gone) as "Couldn't save" with its reason and no Retry, the
  * screen's queries read again so it shows why (archived, read only), as for a refused
  * save; the rate limit's words and Retry; else "Something went wrong" with the Ref
- * someone asking for help quotes, and Retry. A lost session has its own way (M9 or the
- * sign-in screen) and says nothing here.
+ * someone asking for help quotes, and Retry. `kind` says the words in place of "Couldn't
+ * save" ({@link SendKind}). A lost session has its own way (M9 or the sign-in screen) and
+ * says nothing here.
  */
-export function useToastFailure(): (error: unknown, retry: () => void) => void {
+export function useToastFailure(
+  kind: SendKind = "save",
+): (error: unknown, retry: () => void) => void {
   const queryClient = useQueryClient();
   return useCallback(
     (error, retry) => {
       if (isSessionLost(error)) return;
+      const words = transientWords[kind];
       const reason = refusalReason(error);
       if (reason !== null) {
-        ToastQueue.neutral(
-          i18n.t("app:state.couldNotSaveReason", {
-            reason: i18n.t(`app:save.reason.${reason}`),
-          }),
-          { timeout: TOAST_MS },
-        );
+        ToastQueue.neutral(words.reason(i18n.t(`app:save.reason.${reason}`)), {
+          timeout: TOAST_MS,
+        });
         void queryClient.invalidateQueries();
         return;
       }
@@ -109,8 +150,8 @@ export function useToastFailure(): (error: unknown, retry: () => void) => void {
         rateLimited ??
           (transient
             ? ref === undefined
-              ? i18n.t("app:state.couldNotSave")
-              : i18n.t("app:state.couldNotSaveRef", { ref })
+              ? words.plain()
+              : words.ref(ref)
             : ref === undefined
               ? i18n.t("app:state.unexpected")
               : i18n.t("app:state.unexpectedRef", { ref })),
@@ -121,7 +162,67 @@ export function useToastFailure(): (error: unknown, retry: () => void) => void {
         },
       );
     },
-    [queryClient],
+    [queryClient, kind],
+  );
+}
+
+/**
+ * Says in a toast why a form's send failed once the form had closed while it was on its
+ * way (design-spec 6.0.6「送っている間に閉じた送信の失敗」: Cancel pressed, the form closed
+ * or the screen left, meanwhile), as a send from a row's button does (useToastFailure).
+ * The toast's Retry sends the same input again with `send`, which goes through the query
+ * client (useSendThrough, so a lost session takes the app's way and the change history
+ * reads again) and does what a send that goes through does (reading the screen again),
+ * and says so in a toast once more if it fails too. While the form is open it does
+ * nothing: the form shows its failure. Call it from where the send's failure lands once
+ * the form has gone: the mutation's own `onError` (unlike `mutate`'s), or the send's own
+ * `catch`.
+ *
+ * @param wordsOf The form's own words for a failure of `input` it has words for (6.0.6:
+ * "画面が文言を持つコード", such as 4's "Password is incorrect"), which the toast says alone,
+ * without Retry, as sending the same input again meets the same refusal; null for any
+ * other. A refusal of the format (6.0.2「Check the format」) reads "Couldn't save. Check
+ * the format." (in `kind`'s words) without Retry for every form.
+ * @param kind What the send does, for the words of a failure that may pass
+ * ({@link SendKind}).
+ */
+export function useFailureOnceClosed<I>(
+  send: (input: I) => Promise<unknown>,
+  wordsOf?: (error: unknown, input: I) => string | null,
+  kind: SendKind = "save",
+): (error: unknown, input: I) => void {
+  const toastFailure = useToastFailure(kind);
+  const isOpen = useIsMounted();
+  const latestSend = useRef(send);
+  latestSend.current = send;
+  const latestWordsOf = useRef(wordsOf);
+  latestWordsOf.current = wordsOf;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `isOpen` is useIsMounted's ref, read when the send settles, not a value of the render.
+  return useCallback(
+    (error, input) => {
+      if (isOpen.current) return;
+      const say = (cause: unknown) => {
+        const words = isSessionLost(cause)
+          ? null
+          : (latestWordsOf.current?.(cause, input) ?? null);
+        if (words !== null) {
+          ToastQueue.neutral(words, { timeout: TOAST_MS });
+          return;
+        }
+        // The API's last guard on the format (SDD 8.2): no field is left to show it under,
+        // and the same input would be refused again.
+        if (cause instanceof ApiError && rejectionReason(cause) === "format") {
+          ToastQueue.neutral(
+            transientWords[kind].reason(i18n.t("app:save.reason.format")),
+            { timeout: TOAST_MS },
+          );
+          return;
+        }
+        toastFailure(cause, () => void latestSend.current(input).catch(say));
+      };
+      say(error);
+    },
+    [toastFailure, kind],
   );
 }
 

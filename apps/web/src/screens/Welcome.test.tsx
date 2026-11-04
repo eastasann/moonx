@@ -1,11 +1,12 @@
 import type { InvitationPreview } from "@moonx/schemas";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   ana,
   apiError,
   authError,
+  holdFirst,
   renderApp,
   stubApi,
   toastAfter,
@@ -554,5 +555,161 @@ describe("Log out (design-spec 5章「共通ナビ」)", () => {
     );
     await user.click(await screen.findByRole("menuitem", { name: "Log out" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  });
+});
+
+describe("3 left while a send is on its way (design-spec 6.0.6「送っている間に閉じた送信の失敗」)", () => {
+  const bcdx = invitation.workspace?.id ?? "";
+  const member = { ...ana, email: invitation.email };
+  const acceptPath = `/api/v1/invitations/by-token/${TOKEN}/accept`;
+
+  /** Join of a new account (① ② ③) sent, its answer held, and 3 left for 8. */
+  async function joinThenLeave(answer: () => Response) {
+    const held = holdFirst("POST", acceptPath, answer);
+    const calls = stubApi((call) => {
+      const answered = held.answer(call);
+      if (answered !== undefined) return answered;
+      const { method, path } = call;
+      if (path === "/api/v1/me") {
+        return Response.json(
+          method === "PATCH" ? { ...member, lastWorkspaceId: bcdx } : member,
+        );
+      }
+      if (path === `/api/v1/invitations/by-token/${TOKEN}`) {
+        return Response.json(invitation);
+      }
+      return undefined;
+    });
+    const router = renderApp(`/welcome?step=invite&token=${TOKEN}&new=1`);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Join" }));
+    const accepts = () => calls.filter(({ path }) => path === acceptPath);
+    await waitFor(() => expect(accepts()).toHaveLength(1));
+    await act(() => router.navigate({ to: "/notifications" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Join" })).toBeNull(),
+    );
+    return { user, router, calls, accepts, release: held.release };
+  }
+
+  test("Join that goes through: the workspace recorded as the last one, and the user stays where they went, not on ②", async () => {
+    const { router, calls, release } = await joinThenLeave(() =>
+      Response.json({ workspaceId: bcdx, alreadyMember: false }),
+    );
+    await release();
+    await waitFor(() =>
+      expect(
+        calls.find(
+          ({ method, path }) => method === "PATCH" && path === "/api/v1/me",
+        )?.body,
+      ).toEqual({ lastWorkspaceId: bcdx }),
+    );
+    expect(router.state.location.pathname).toBe("/notifications");
+    expect(router.state.location.search).not.toHaveProperty("step");
+  });
+
+  test("Join, and no answer comes: Couldn't save in a toast, whose Retry joins again, staying where the user went", async () => {
+    let isFailing = true;
+    const { user, router, accepts, release } = await joinThenLeave(() => {
+      if (isFailing) throw new TypeError("Failed to fetch");
+      return Response.json({ workspaceId: bcdx, alreadyMember: false });
+    });
+    const toast = await toastAfter("Couldn't save", release);
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(accepts()).toHaveLength(2));
+    expect(accepts().map(({ body }) => body)).toEqual([null, null]);
+    expect(router.state.location.pathname).toBe("/notifications");
+  });
+
+  test("Join of an invitation accepted meanwhile: Already accepted in a toast, without Retry, and no 5 opens", async () => {
+    const { router, release } = await joinThenLeave(() =>
+      apiError(409, "INVITATION_ALREADY_ACCEPTED"),
+    );
+    const toast = await toastAfter("Already accepted", release);
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(router.state.location.pathname).toBe("/notifications");
+  });
+
+  /** ② Continue sent, its answer held, and 3 left for 8. */
+  async function continueThenLeave(answer: () => Response) {
+    const held = holdFirst("PATCH", "/api/v1/me", answer);
+    const calls = stubApi((call) => {
+      const answered = held.answer(call);
+      if (answered !== undefined) return answered;
+      return call.method === "GET" && call.path === "/api/v1/me"
+        ? Response.json(ana)
+        : undefined;
+    });
+    const router = renderApp("/welcome?step=profile");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Continue" }));
+    const saves = () => calls.filter(({ method }) => method === "PATCH");
+    await waitFor(() => expect(saves()).toHaveLength(1));
+    await act(() => router.navigate({ to: "/notifications" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Continue" })).toBeNull(),
+    );
+    return { user, router, saves, release: held.release };
+  }
+
+  test("Continue failing unexpectedly (500): Something went wrong with its Ref and Retry, in a toast; Retry saves the same name and zone, and ③ does not open", async () => {
+    let isFailing = true;
+    const { user, router, saves, release } = await continueThenLeave(() =>
+      isFailing ? apiError(500, "INTERNAL") : Response.json(ana),
+    );
+    const toast = await toastAfter(
+      "Something went wrong. Ref: 8f14e45f",
+      release,
+    );
+    isFailing = false;
+    await user.click(within(toast).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(saves()).toHaveLength(2));
+    expect(saves()[1]?.body).toEqual(saves()[0]?.body);
+    expect(router.state.location.pathname).toBe("/notifications");
+    expect(router.state.location.search).not.toHaveProperty("step");
+  });
+
+  test("Continue with a name the API refuses: Couldn't save. Check the format. in a toast, without Retry", async () => {
+    const { release } = await continueThenLeave(() =>
+      apiError(422, "VALIDATION_FAILED", {
+        details: [{ path: "displayName", code: "custom", message: "refused" }],
+      }),
+    );
+    const toast = await toastAfter("Couldn't save. Check the format.", release);
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  test("a photo the API cannot read as one, sent as 3 was left: its words in a toast, without Retry", async () => {
+    const held = holdFirst("PUT", "/api/v1/me/avatar", () =>
+      apiError(422, "VALIDATION_FAILED", {
+        details: [{ path: "file", code: "custom", message: "not an image" }],
+      }),
+    );
+    const calls = stubApi((call) => {
+      const answered = held.answer(call);
+      if (answered !== undefined) return answered;
+      return call.method === "GET" && call.path === "/api/v1/me"
+        ? Response.json(ana)
+        : undefined;
+    });
+    const router = renderApp("/welcome?step=profile");
+    await screen.findByRole("button", { name: "Continue" });
+    const photo =
+      document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (photo === null) throw new Error("no file input");
+    await userEvent.upload(
+      photo,
+      new File(["not a picture"], "a.png", { type: "image/png" }),
+    );
+    await waitFor(() =>
+      expect(calls.some(({ path }) => path === "/api/v1/me/avatar")).toBe(true),
+    );
+    await act(() => router.navigate({ to: "/notifications" }));
+    const toast = await toastAfter(
+      "Use a JPEG, PNG or WebP image.",
+      held.release,
+    );
+    expect(within(toast).queryByRole("button", { name: "Retry" })).toBeNull();
   });
 });

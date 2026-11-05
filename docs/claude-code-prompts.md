@@ -3366,6 +3366,51 @@ B. immutable_tags は使わず、ADR-007 のまま古いイメージを消す。
 
 ---
 
+## Step 41f: GitHub のランナーで ci.yml の E2E を通す
+
+Status:
+
+```
+PR #12（feature/infra）で、ci.yml が GitHub の上で初めて動き、make test-e2e で落ちた（実行 42009500685、2026-11-05。make install・
+db-check・lint・typecheck・test・build は通った）。手元の make test-e2e は同じコミットで 442 件すべて通る。原因を突き止め、ci.yml が
+GitHub のランナー（ubuntu-latest。4 vCPU・16 GB）で通るようにしてください。
+
+参照:
+- docs/02-01_system-design-doc.md 2章（make ターゲットの test-e2e・環境変数）・10章（テスト）・ADR-022
+- docs/04_deployment-procedure.md 2章（ci.yml）
+- docs/03_dev-setup.md 7章（テスト）
+
+分かっていること（実行のログ。gh run view 42009500685 --log-failed で読める）:
+- 258 件が通り、約 176 件が落ち、8 件が動かなかった（admin-publish と template-migration は chromium のプロジェクトに依存する）。
+  手元は約 14 分、CI は 34 分
+- 落ちたのはほとんどが components.spec.ts（/dev/components のギャラリー）で、openGallery の「heading Components（level 1）が
+  5 秒のうちに見えない」と、axe の evaluate が 30 秒のテストの時間を超えるもの。同じ spec の中で通るものと落ちるものが、実行の最初から
+  最後まで混ざっていて、通ったものも 6〜10 秒かかっている。ほかに mockup-screens.spec.ts:679 と validation.spec.ts:853 が1件ずつ
+- Playwright の workers は指定が無い（既定は CPU の数の半分）。ci.yml は失敗したときの test-results（トレース）を残さない
+
+やること:
+1. 原因を確かめる: ランナーと同じ条件（Linux、4 CPU・16 GB に絞ったコンテナ、CI=true、Vite の依存のキャッシュが無い状態）を手元に
+   作って make test-e2e を動かし、CI と同じ落ち方を再現する。ギャラリーを開くのに何が時間を使っているか（Vite の変換・依存の
+   最適化と読み込み直し・モジュールの数・ブラウザの解析・ワーカーの取り合い）を測って、根本の原因を書く
+2. 原因を直す。検査が確かめる中身（見えるもの・axe・振る舞い）は減らさない。待ち時間を延ばすのは、ページが正しく、遅いだけだと
+   測って示せたときに限り、どこで何秒にしたかと理由を書く。CI の時間（今は 34 分）が大きく延びる直し方なら、その理由も書く
+3. ci.yml で、E2E が落ちたときに test-results（トレースと error-context）をアーティファクトとして残す（保持は短く。秘密の値が
+   入らないことを確かめる）。04 2章の ci.yml の行に書く
+4. 手で ci.yml の手順（make install から make test-e2e まで）を、1 の条件でもう一度通しで動かし、すべて通ることを確かめる
+
+まだ作らないもの: Step 42〜44 の対象。GitHub への push はしない（ユーザーのセッションが行う）。
+
+1 の条件で ci.yml の手順が通しで通り、手元の make test・make test-e2e・make typecheck・make lint・make doc-lint も通る状態をゴールとする
+（make test-api には PostgreSQL 17 のクライアントが要る。03 1章。Homebrew の PostgreSQL 14 には触れない）。独立のレビューは観点ごとに
+分けて同時に起動する（/draft:implement）。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
 ## Step 42: 29 プライバシーポリシー・30 サポート
 
 Status:

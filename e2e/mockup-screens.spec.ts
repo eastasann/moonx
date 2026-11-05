@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { pageWidth } from "./fixtures";
 
 // The screens of docs/mockups rebuilt from the components (/dev/components?screen=, Step
 // 22e): the frame and the patterns A to J measured against the mockups' values (06
@@ -683,9 +684,10 @@ test.describe("the patterns are the mockups' (design-spec 4.1, 06 semantic.layou
     const list = page.getByRole("grid", { name: "Ideas" });
     const pane = list.locator("xpath=../..");
     const paneBox = await boxOf(pane);
-    // The body is 1440 − 236; the pane takes 5 of 5 + 6 (s06's grid).
+    // The body is the page's width (pageWidth: 1440 less the scrollbar's gutter) − 236; the
+    // pane takes 5 of 5 + 6 (s06's grid).
     expect(
-      Math.abs(paneBox.width - ((desktop.width - 236) * 5) / 11),
+      Math.abs(paneBox.width - (((await pageWidth(page)) - 236) * 5) / 11),
     ).toBeLessThanOrEqual(1);
     expect(await css(pane, "border-right-color")).toBe(light.hairline);
     const title = await boxOf(

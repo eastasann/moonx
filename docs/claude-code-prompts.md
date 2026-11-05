@@ -3029,7 +3029,7 @@ Leave）と同じ形にそろえると決めてある（2026-11-04）。
 
 ## Step 40: インフラ（Dockerfile と Terraform）
 
-Status:
+Status: done 2026-11-04
 
 ```
 Web と API を1つにしたイメージと、Google Cloud の資源を Terraform で作ってください。
@@ -3073,7 +3073,7 @@ make test・make typecheck・make lint が通る状態をゴールとする。{G
 
 ## Step 41: CI/CD（GitHub Actions と昇格の仕組み）
 
-Status:
+Status: done 2026-11-04
 
 ```
 docs/04_deployment-procedure.md 2章のワークフローと、昇格・ロールバックの仕組みを作ってください。
@@ -3088,19 +3088,321 @@ docs/04_deployment-procedure.md 2章のワークフローと、昇格・ロー�
 やること:
 1. .github/workflows/: ci.yml・build.yml・deploy.yml・db-backup.yml・kpi.yml を 04 2章のとおりに作る。
    ci.yml は promote-check が先で、deploy/ だけの PR はそこまで、ほかは make install の直後に make db-check（BASE は promote-check と同じ）。
-   build.yml の make test にも PostgreSQL 17 のサービスコンテナとクライアントを用意する。deploy.yml は検査のジョブとデプロイのジョブ、
+   build.yml の make test にも PostgreSQL 17 のサービスコンテナとクライアントを用意する。build.yml の make test は、id-token: write を
+   持たないジョブで動かす（04 2章の build.yml の行）。deploy.yml は検査のジョブとデプロイのジョブ、
    concurrency の queue: max、後の昇格が先に入ったときに終える処理、/api/health の版の確認。pull_request_target と workflow_run は使わない（ADR-027）
 2. make promote と make promote-check（scripts/ に TypeScript で。SDD 2章の決まりをすべて）。promote-check は make install の前に動くので、
    Bun に入っている機能だけを使う
 3. packages/db/queries/kpi.sql と make kpi（件数だけを数える。SDD 11章・PRD 5章）
 4. テスト: promote-check と promote の決まり（一時的な Git のリポジトリで、gh と gcloud は差し替える。正しい昇格・戻す・2つの環境・
    ほかのファイルとの混在・staging に無い SHA・その環境に無い戻し先・最初の昇格・省いた SHA で止まる場合・残っているブランチ）、
-   make kpi をテスト用の DB で動かすこと、ワークフローを actionlint（concurrency.queue を知っている版）で検査すること
+   make kpi をテスト用の DB で動かすこと、ワークフローを actionlint（本家の Docker のイメージ。concurrency の queue の値は deploy.yml を読むテストで確かめる。ADR-022）で検査すること
 
 まだ実際のクラウドには出さない（Step 43）。
 
 make test（scripts と kpi のテストを含む）が通り、make kpi がテスト用の DB で件数の表を出し、actionlint がワークフローに検出を出さず、
 make typecheck・make lint・make doc-lint が通る状態をゴールとする。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 41b: インフラと CI の段階の終わりの点検の直し
+
+Status: done 2026-11-05
+
+```
+インフラと CI の段階（Step 40・41）の終わりの点検で見つかったものを、1つのステップで閉じてください。点検は2つで行った: 段階全体の
+docs の差分とコミットの本文の監査（新しいサブエージェント1体）と、make lint・typecheck・doc-lint・db-check BASE=main・build・
+3つの envs の terraform fmt と validate・test・test-e2e（どれも通り、E2E は 438 件。make test-api のバックアップのテストは、03 1章の
+PostgreSQL 17 のクライアントを PATH に置いて通った）。1〜3 はユーザーが 2026-11-04 に決めた。
+
+参照:
+- docs/02-01_system-design-doc.md 2章（環境変数・make ターゲット・CI のシークレットと変数）・ADR-016・ADR-022・ADR-024・ADR-027・
+  ADR-028・6.5（論理削除）・11章（KPI の数え方）
+- docs/04_deployment-procedure.md 2章・4.1
+- docs/03_dev-setup.md 1章・5.4 K・10章
+- docs/05_operation-runbook.md 3.14・6.2
+- docs/01_prd.md 5章（KPI）
+
+直すもの:
+1. actionlint を本家にする（ユーザーの決定）: 今の @kjanat/actionlint（個人のフォーク）をやめ、本家 rhysd/actionlint の最新の
+   リリース（1.7.12）を、本家が配る公式の Docker イメージ rhysd/actionlint を digest で固定して make lint から動かす（ShellCheck も
+   イメージに入っているので、PATH に無くても毎回動く）。本家は concurrency.queue を知らない（Issue #654 は開いたまま）。その誤検出
+   だけを、そのキーの文だけに当たる狭い -ignore で外す。queue の値は actionlint が見なくなるので、deploy.yml の concurrency
+   （group と queue: max）をテストで確かめる（promote が読むジョブとステップの名前を deploy.yml と結ぶ既存のテストの隣）。
+   package.json と bun.lock から @kjanat/actionlint を消し、ADR-022・03 1章（make lint に Docker が要ること）・03 10章・SDD 2章の
+   lint の行と、Step 41 の本文の「concurrency.queue を知っている版」を今の形に書き直す（「保守のフォーク」という語も消える）。
+   本家が queue を知る版を出したら -ignore を外す、とどこに書くかも決めて書く
+2. Google Cloud のトークンを持つジョブで、依存のコードを動かさない（ユーザーの決定）: 04 2章の「make test は開発用の依存の
+   コードを動かすので、そこで Google Cloud のトークンを作れないようにする」と同じ理由が、build.yml のイメージのジョブ（認証の後に
+   make build-api-image が Vite とそのプラグイン・sentry-cli を動かす）と、deploy.yml のデプロイのジョブ（id-token: write のジョブ
+   で make install と make db-migrate を動かす）にも当たる。id-token: write はジョブのどのステップからでもトークンを作れるので、
+   ジョブを分ける:
+   - build.yml: トークンの無いジョブで、依存を入れて Web と API をビルドし、ソースマップを Sentry に上げ、イメージを作って成果物に
+     する。トークンを持つジョブは、そのイメージを Artifact Registry に push するだけにし、make install・bun・リポジトリの依存の
+     コードを動かさない（make のターゲットを build と push に分けてよい。Makefile はリポジトリのコードで、依存ではない）
+   - deploy.yml: マイグレーション（make install と make db-migrate）は id-token の無いジョブで動かし、gcloud run deploy と
+     /api/health の版の確認はトークンを持つ別のジョブにする。production に出す経路は、どれも GitHub の環境 production の承認を
+     通ったままにする（ジョブを分けても、再実行でも、承認を通らずにデプロイのジョブが動かないこと。どう守るかを 04 2章に書く）。
+     concurrency の queue: max と、後の昇格が先に入ったときに終える処理は、分けた後も同じに働かせる。deploy-api の中身（SDD 2章。
+     戻すときは戻し先の版の Makefile が動く）を変えるなら、その決まりとの関係を書く（まだどの環境にも出していない）
+   - db-backup.yml・kpi.yml・deploy.yml の check のジョブも同じ決まりで見直す（依存を動かしていなければそのまま）
+   - バックアップのバケットは、書くアカウントに作成だけを許す（削除を外す）。同じ日に取り直しても上書きにならないよう、
+     オブジェクトの名前に時刻（UTC）も入れる。ADR-028・SDD 2章の db-backup の行・05 3.14 と 6.2（戻すときは一番新しいものを選ぶ）・
+     Terraform・バックアップのテストを合わせる
+   - 04 2章と ADR-027 に、決まりを1つ書く（Google Cloud のトークンを作れるジョブでは、リポジトリの依存のコードを動かさない）
+3. API のイメージを NODE_ENV=production で動かす（ユーザーの決定）: Dockerfile で NODE_ENV=production にし、SDD 2章「環境変数」の
+   段落（設定しない理由）を書き直す。ビルドを返す E2E（ポート 3200 の API。test-e2e の PWA の検査と first-paint）と、イメージを
+   手元で動かす確かめも NODE_ENV=production で動かし、本番の分岐をテストが通るようにする。production で変わるもの（Bun.serve の
+   development、Elysia の入力の検査のエラー、Better Auth、PDF の React）が、docs の決まり（8章のエラーの形、ログイン、P13 の PDF）
+   どおりに動くことを確かめる。手元の http://localhost の E2E で production の分岐が Cookie などを変えるときは、決まりを弱めずに
+   合わせる方法を選び、書く
+4. KPI の確認用のワークスペース: SDD 11章は「登録（K-11・K-12）は、確認だけに使うアカウントも1人として数える」とするが、
+   その活動は数えないので、いつまでも「始めなかった登録」として数えられる。03 5.4 K と 04 6章を読み、確認に使うのが運営者（K-11・
+   K-12 からもう外れている）なら、その文を正す。確認だけのアカウントを別に作るなら、それも登録から外し、どう見分けるかを
+   書いてテストする。staging で make kpi を動かすときに CHECK_WORKSPACE_ID をどこから渡すかを書く。Step 44 に、CHECK_WORKSPACE_ID
+   を入れた後で kpi.yml を手で1回動かして成功を確かめることを足す（db-backup.yml と同じ形）
+5. 昇格の一覧（04 4.1）: deploy/{env}/version の履歴にあるのに、deploy.yml のデプロイの記録が見つからない版（実行が消えた・
+   読めない）を、promote が「出していない」と扱わないようにする。マイグレーションを当てたかもしれない版として扱い（両方の一覧に
+   入れる）、4.1 に書き、テストを足す（ADR-016: DB は戻せないので、分からないときは安全な側に倒す）
+6. Bun の版が2か所にある: apps/api/Dockerfile の FROM oven/bun:1.4.2-slim と、package.json の packageManager（03 1章・04 2章は
+   後者を正とする）。どちらかを変えたら食い違いが分かるよう、2つが同じ版であることをテストで確かめる。Dockerfile のベースの
+   イメージは digest でも固定する
+7. DB のパスワードをコマンドの引数に出さない: make db-backup と make kpi は、パスワードを含む DATABASE_URL_DIRECT を pg_dump と
+   psql の引数に渡している（Cloud Storage のトークンは Step 40 で引数から外した）。接続の情報を環境変数か権限 0600 の一時の
+   ファイルで渡し、引数に出さない。バックアップと KPI のテストを合わせる
+8. 語の衝突: ADR-024 と ADR-028 の「論理削除（soft delete）」は Cloud Storage の機能で、SDD 6.5 の論理削除（`deleted_at` の行）と
+   別のもの。Cloud Storage の機能だと分かる名前にする
+
+まだ作らないもの: Step 42〜44 の対象（直すものの 4 の Step 44 への書き足しは除く）。
+
+直すものの 1〜8 が閉じ、make test・make test-e2e・make typecheck・make lint（本家の actionlint で検出なし）・make doc-lint が通り、
+3つの envs で terraform fmt の検査と validate が通り、手元で作ったイメージが NODE_ENV=production で /・/api/health・
+/manifest.webmanifest を返し、写真と PDF が動く状態をゴールとする。make test-api のバックアップと KPI のテストには PostgreSQL 17 の
+クライアントが要る（03 1章）。この Mac の PATH の pg_dump は Homebrew の 14 なので、Step 41 と同じく 17 のクライアントを PATH の先に
+置いて動かす（Homebrew の PostgreSQL 14 には触れない）。独立のレビューは観点ごとに分けて同時に起動し（/draft:implement）、
+1〜8 のどれも漏らさない。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 41c: GitHub Actions の記録が90日で消えることへの対応
+
+Status: done 2026-11-05
+
+```
+Step 41b の独立レビュー（2026-11-05）で見つかった問題を、ユーザーの決定に沿って閉じてください。
+
+問題: GitHub の 2026-08-27 の changelog「Actions retention will cover checks, workflow runs, and statuses」のとおり、
+2026-10-01 から、check・workflow run・status は、リポジトリの Actions の保持期間（既定 90日。公開のリポジトリは最大 90日。
+非公開は組織と enterprise の上限まで）を過ぎると消える。それより前は保持期間に関わらず 400日以上残っていた。このリポジトリは
+公開で、保持期間は 90日（gh api repos/{owner}/{repo}/actions/permissions/artifact-and-log-retention）。make promote
+（scripts/promote.ts）は gh run list と実行のジョブで次を決めているので、90日より古いものは記録が無くなる:
+- 出す SHA の build.yml が成功したこと（SDD 2章 promote の行）。90日より前にビルドした SHA は、ADR-007 の決まりで
+  イメージが残っていても「build.yml has not run」で止まる（04 5.1 の戻す先も同じ）
+- production なら、その SHA を deploy/staging/version に書いたコミットの deploy.yml のデプロイのジョブが成功したこと。
+  staging への書き込みが 90日より古い SHA は、production に出すことも戻すこともできず、staging に出し直すよう求められる
+  （ADR-016「production を戻すときに staging を先に戻さなくてよい」と食い違う）
+- いちばん先まで出した版・直前の版・マイグレーションが当たったかもしれない版（04 4.1）。Step 41b で、記録が見つからない版は
+  マイグレーションが当たったかもしれない版とし、直前の版はたどる途中に記録の無い書き込みがあれば分からないとした（安全な側）。
+  その結果、90日昇格しなかった環境では、いちばん先まで出した版が「分からない」になり、どの昇格の本文もマイグレーションを
+  すべて出し、どの戻し方も 5.1 の 3 の確かめを求める
+
+決めた直し方（ユーザーが 2026-11-05 に決めた。消えない記録に替える）:
+- ビルド: 出す SHA を作れたことは、Artifact Registry にその SHA のイメージがあることで確かめる。build.yml の push のジョブだけが、
+  テストが通った後に上げる（Step 41b の形）ので、今の「build.yml が成功した」と同じ強さになる。ADR-007 の決まりで古いイメージが
+  消えた SHA は、今と同じく出せない
+- デプロイ: deploy.yml が Cloud Storage に記録を書く。マイグレーションを始める前に「当てたかもしれない」、/api/health の版の確認が
+  通った後に「出した」を、環境と SHA ごとに書く（前の記録が書けなければ、マイグレーションを始めない）。書くのは Google Cloud のトークンを持つジョブだけで、そのジョブでは依存のコードを
+  動かさない（Step 41b の決まり）。記録のバケットは Terraform で作り、書くアカウントには作成だけを許す（消せない・上書きできない）。
+  記録は自動では消さない（SHA と時刻だけで、個人情報を持たない）
+- make promote は、いちばん先まで出した版・直前の版・当てたかもしれない版（04 4.1）を、この記録から決める。人の gcloud で読む
+  （実装のセッションに本番の資格情報を渡さない。テストでは gcloud を差し替える）。記録が読めないときは止める
+- 使わないもの: GitHub の Deployments（保持期間の対象かが changelog に書かれていない）と、Cloud Run のリビジョンの履歴
+  （マイグレーションの後に失敗したデプロイが残らない）。理由を ADR-016 に書く
+- 同じ強さで確かめられることを ADR-016 と 04 4.1 に書く。まだどの環境にも出していないので、GitHub の実行の記録からの移し替えは要らない
+  （Step 41b が足した「記録が見つからない版」の扱いは、この記録が読めないときの扱いに置き換える）
+
+決まったら、SDD 2章（promote の行）・ADR-016・04 4.1・5.1・10章（昇格の行）と scripts/promote.ts・テストを合わせる。
+まだ作らないもの: Step 42〜44 の対象。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 41d: インフラと CI の直しの点検の直し
+
+Status: done 2026-11-05
+
+```
+Step 41b と 41c の docs の差分の監査（新しいサブエージェント1体）で見つかったものを、1つのステップで閉じてください。そのときの
+make lint・typecheck・doc-lint・db-check BASE=main・build・3つの envs の terraform fmt と validate・test-e2e（442 件）はどれも通った
+（make test-api は、PostgreSQL 17 のクライアントを PATH に置いて動かす。03 1章）。1 はユーザーが 2026-11-05 に決めた。デプロイ後の
+確認（04 6章）は今のとおり運営者のアカウントで行う（同じ日のユーザーの決定。変えない）。
+
+参照:
+- docs/02-01_system-design-doc.md 2章（make ターゲット・CI のシークレットと変数）・ADR-007・ADR-015・ADR-016・ADR-027・10章（昇格の行）
+- docs/04_deployment-procedure.md 2章（デプロイの記録・production の承認）・4.1・4.2・5.1
+- docs/03_dev-setup.md 5.4 H・5.4 K・9章（リリースフロー）
+- docs/05_operation-runbook.md 3章（3.7・3.8・3.12）
+- docs/README.md（所有権マップ）
+
+直すもの:
+1. production の承認を1回に戻す（ユーザーの決定）: 今の deploy.yml は migrate のジョブと deploy のジョブがどちらも環境を使うので、
+   1回の昇格と1回の戻しで2回の承認が要る。「マイグレーション中」の記録も承認の前に image のジョブが書くので、承認しなかった版まで
+   当たったかもしれない版に数えられる。次の形にする:
+   - マイグレーションは、環境を使う1つのデプロイのジョブの中で、別のコンテナで動かす。コンテナに渡すのは DB の接続だけにし、
+     OIDC のトークンを作る値（ACTIONS_ID_TOKEN_REQUEST_URL・ACTIONS_ID_TOKEN_REQUEST_TOKEN）も、google-github-actions/auth が書く
+     認証のファイルも、それを置いた作業ディレクトリも渡さない（Step 41b の決まり「Google Cloud のトークンを作れるジョブでは、依存の
+     コードを動かさない」は、依存のコードがトークンに届かないことで守る。ランナーの上では依存を動かさない）。コンテナのイメージは
+     digest で固定し、Bun の版は package.json の packageManager に合わせる（Step 41b の検査と同じ）
+   - 順番: 承認 → 「マイグレーション中」の記録 → マイグレーションのコンテナ → gcloud run deploy → /api/health の版の確認 →
+     「出した」の記録。記録が書けなければ、次へ進まない。承認しなかった実行・承認の前に後の昇格に追い越された実行は、記録を
+     残さない
+   - そのため「出した」の記録がある版は当たっている、「マイグレーション中」だけの版は分からない、と分けられる。Step 41c が消した
+     昇格の PR の本文の区別（当たっている / 分からない）を戻し、04 4.1・5.1 と ADR-016 を合わせる
+   - deploy のジョブだけを再実行しても、環境の承認を通る（今と同じ）。concurrency の queue: max と、後の昇格が先に入ったときに
+     終える処理も今と同じに働かせる
+   - 承認の回数を書いた所（ADR-027 のトレードオフ、04 2章「production の承認」・4.2・5.1、03 5.4 H・5.4 K・9章のリリース
+     フロー、05 3.7・3.8）を1回に直す
+   - テスト（workflows.test.ts）: マイグレーションのコンテナにトークンの値と認証のファイルが渡らないこと、トークンを持つジョブが
+     ランナーの上で bun・make install・依存のキャッシュを使わないこと、記録の順番
+2. 記録を読む確かめに、動かせるステップが無い: cfee381 は Step 43 の 4 と 03 5.4 K に「次の make promote がそれを読めること」を
+   足したが、Step 43 は staging の最初の昇格だけで、その昇格は記録を読まない。記録を実際に読む最初の機会は、Step 44 の
+   production の最初の昇格（staging の「出した」の記録を読む）。Step 43 の 4 と 03 5.4 K からその文を外し、Step 44 に、
+   make promote ENV=production が staging の記録を読んで PR を作れること（gcloud storage objects list の本物の出力で）を確かめる
+   項目を足す
+3. どの書き込みのものか分からない記録で promote が止まると、戻す手段が無い: 04 2章は、そのとき promote が止まるとし、記録は
+   「手でも消さない」とする。05 3章に、そのときの手順を足す（その記録を誰がいつ書いたかを Cloud Storage と deploy.yml の実行から
+   調べ、deploy.yml が書いたものでないと確かめたときだけ、運用の担当が自分のアカウントでその記録を消して、原因を直す。デプロイの
+   アカウントは今のとおり消せない）。04 2章の「手でも消さない」に、この手順のときだけを除くと書く
+4. （push のジョブの再実行で上書きしないことはこのステップで閉じ、immutable_tags と ADR-007 の両立は Step 41e に分けた）
+   ビルドの記録の強さ: ADR-016 は「人は Artifact Registry に手で上げない」とするが、リポジトリ moonx はタグを上書きできる
+   （envs/shared の main.tf に immutable_tags が無い）。immutable_tags を有効にし、build.yml の push のジョブを再実行したときに
+   その SHA のタグがもうあれば、上書きせずに止めるか、同じ digest なら成功とする（どちらにしたかを書く）。ADR-007 の古い
+   イメージを消す決まりと両立することを確かめる
+5. ADR-015 の shared の資源の並びに、デプロイの記録のバケットが無い（2章の表には足してある）。足す
+6. 同じ事実の重複（所有権マップ）: 記録をどのジョブがいつ書くかが ADR-016 の決定・SDD 2章の deploy-record の行・04 2章
+   「デプロイの記録」・04 4.1 に、記録の名前の形が 05「その他」にもある。持ち主を1つにし（CI のジョブの順番は 04 2章、決めた理由と
+   トレードオフは ADR-016、make ターゲットの中身は SDD 2章）、ほかはそこを指す。04 4.1 の設計の経緯の文（「前に読んでいた GitHub
+   の実行の記録と同じ強さで決められる」「その段が動いた実行を数えていた前より」）は ADR-016 に移すか消す
+7. 「書き込み」が定義の無い用語として使われている（コードの WRITE。その SHA を deploy/{env}/version に書いた main のコミット）。
+   記録を決める所で1回定義する。SDD 10章の「staging のいちばん新しい書き込みに出した記録があること」は、staging の書き込みの
+   中で一番新しいものとも読める。promote の行（その SHA を書いたいちばん新しいコミット）と同じ意味に書き直す
+8. 05 3.12 の curl は、printf で JSON を作るので、パスワードに " か \ があると壊れる。パスワードを引数と履歴に出さない今の決まり
+   （Step 41b）を保ったまま、どの文字でも正しい JSON になる作り方にする
+
+まだ作らないもの: Step 42〜44 の対象（直すものの 2 の Step 43・44 の書き直しは除く）。
+
+直すものの 1〜8 が閉じ、make test（PostgreSQL 17 のクライアントを PATH の先に置く。Homebrew の PostgreSQL 14 には触れない）・
+make test-e2e・make typecheck・make lint・make doc-lint が通り、3つの envs で terraform fmt の検査と validate が通る状態を
+ゴールとする。独立のレビューは観点ごとに分けて同時に起動し（/draft:implement）、1〜8 のどれも漏らさない。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 41e: Artifact Registry のタグの上書き（ADR-007 との両立）
+
+Status: done 2026-11-05
+決めたこと: B（ユーザーが 2026-11-05 に決めた。ADR-016 の状態・捨てた案・トレードオフに書いた）
+
+```
+Step 41d の直すものの 4 を切り出した。Step 41d の 4 は「immutable_tags を有効にし、build.yml の push のジョブを再実行したときに
+その SHA のタグがもうあれば、上書きせずに止めるか、同じ digest なら成功とする。ADR-007 の古いイメージを消す決まりと両立することを
+確かめる」だった。確かめると両立しない。
+
+見つけたこと（Google Cloud の Artifact Registry の docs、2026-11-05）:
+- https://docs.cloud.google.com/artifact-registry/docs/repositories/cleanup-policy:「If a repository has immutable tags enabled,
+  tagged artifacts can't be deleted.」（削除のポリシーの tagState の説明。create-repos の Terraform の TAG_STATE の説明にも同じ文）
+- https://docs.cloud.google.com/artifact-registry/docs/repositories/update-repo-settings: immutable tags のとき「Delete a tagged
+  image.」「Remove a tag from an image.」「Push an image with a tag that is already used by another version of the image」は
+  できない。消せるのはタグの無いイメージだけ（docs/docker/names）
+- 同じ digest を同じタグでもう一度 push したときの扱いは、どの docs にも書かれていない
+- moonx のイメージはどれも SHA のタグが付く（make push-api-image）ので、immutable_tags を有効にすると、ADR-007 の
+  「最新の30個と90日以内を残し、それより古いものを自動で消す」（envs/shared の cleanup_policies）は何も消さなくなる
+
+元の問題（Step 41d の監査）: ADR-016 は「人は Artifact Registry に手で上げない」とし、イメージがあることを build.yml が成功した
+ことの代わりにしているが、リポジトリ moonx はタグを上書きできる（同じ SHA のタグが別のイメージに移ると、staging で確かめた
+イメージと production に出すイメージが違うものになりうる。ADR-016「staging で確かめたイメージをそのまま production に出す」）。
+
+Step 41d で閉じたこと: make push-api-image は、push の前に Artifact Registry の API にその SHA のタグを尋ね、404 のときだけ上げる
+（タグがある・ほかの答えのときは上書きせずに失敗する。scripts/workflows.test.ts）。これで build.yml の push のジョブの再実行は
+上書きしない。残るのは、Artifact Registry に書ける人（プロジェクトのオーナーなど）の手の push で、これを Artifact Registry の
+設定で止めるかどうか。
+
+選択肢（ユーザーが決める）:
+A. immutable_tags を有効にし、ADR-007 の古いイメージを消す決まりをやめる。タグの付いたイメージは消えず、戻せる範囲（ADR-007 の
+   トレードオフ・04 5.1 の 1）は無期限になる。保存の費用は、イメージ1つの大きさ × main への取り込みの数で増え続ける（無料枠の
+   0.5 GB を超えた分）。cleanup_policies はタグの無いイメージだけを消すものに直す。管理者は immutable_tags を外せば上書きできる
+B. immutable_tags は使わず、ADR-007 のまま古いイメージを消す。人の push は ADR-016 の決まりで止めるだけにし、Artifact Registry に
+   書ける人は上書きできることを ADR-016 のトレードオフに書く
+（推すのは B。ADR-007 の費用と戻せる範囲の決まりを変えずに済み、CI が自分で上書きする経路は Step 41d で閉じた。A でも管理者は
+  immutable_tags を外して上書きできる）
+
+決まったら、A なら envs/shared の main.tf（docker_config の immutable_tags と cleanup_policies）・ADR-007・ADR-016・04 5.1 の 1・
+03 5.4 I、B なら ADR-016 のトレードオフを直す。どちらでも Step 43 で、build.yml の push のジョブを再実行して、上書きせずに止まる
+ことを本物の Artifact Registry で確かめる（Step 43 の 4 に書いた）。
+まだ作らないもの: Step 42〜44 の対象。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 41f: GitHub のランナーで ci.yml の E2E を通す
+
+Status: done 2026-11-05
+
+```
+PR #12（feature/infra）で、ci.yml が GitHub の上で初めて動き、make test-e2e で落ちた（実行 42009500685、2026-11-05。make install・
+db-check・lint・typecheck・test・build は通った）。手元の make test-e2e は同じコミットで 442 件すべて通る。原因を突き止め、ci.yml が
+GitHub のランナー（ubuntu-latest。4 vCPU・16 GB）で通るようにしてください。
+
+参照:
+- docs/02-01_system-design-doc.md 2章（make ターゲットの test-e2e・環境変数）・10章（テスト）・ADR-022
+- docs/04_deployment-procedure.md 2章（ci.yml）
+- docs/03_dev-setup.md 7章（テスト）
+
+分かっていること（実行のログ。gh run view 42009500685 --log-failed で読める）:
+- 258 件が通り、約 176 件が落ち、8 件が動かなかった（admin-publish と template-migration は chromium のプロジェクトに依存する）。
+  手元は約 14 分、CI は 34 分
+- 落ちたのはほとんどが components.spec.ts（/dev/components のギャラリー）で、openGallery の「heading Components（level 1）が
+  5 秒のうちに見えない」と、axe の evaluate が 30 秒のテストの時間を超えるもの。同じ spec の中で通るものと落ちるものが、実行の最初から
+  最後まで混ざっていて、通ったものも 6〜10 秒かかっている。ほかに mockup-screens.spec.ts:679 と validation.spec.ts:853 が1件ずつ
+- Playwright の workers は指定が無い（既定は CPU の数の半分）。ci.yml は失敗したときの test-results（トレース）を残さない
+
+やること:
+1. 原因を確かめる: ランナーと同じ条件（Linux、4 CPU・16 GB に絞ったコンテナ、CI=true、Vite の依存のキャッシュが無い状態）を手元に
+   作って make test-e2e を動かし、CI と同じ落ち方を再現する。ギャラリーを開くのに何が時間を使っているか（Vite の変換・依存の
+   最適化と読み込み直し・モジュールの数・ブラウザの解析・ワーカーの取り合い）を測って、根本の原因を書く
+2. 原因を直す。検査が確かめる中身（見えるもの・axe・振る舞い）は減らさない。待ち時間を延ばすのは、ページが正しく、遅いだけだと
+   測って示せたときに限り、どこで何秒にしたかと理由を書く。CI の時間（今は 34 分）が大きく延びる直し方なら、その理由も書く
+3. ci.yml で、E2E が落ちたときに test-results（トレースと error-context）をアーティファクトとして残す（保持は短く。秘密の値が
+   入らないことを確かめる）。04 2章の ci.yml の行に書く
+4. 手で ci.yml の手順（make install から make test-e2e まで）を、1 の条件でもう一度通しで動かし、すべて通ることを確かめる
+
+まだ作らないもの: Step 42〜44 の対象。GitHub への push はしない（ユーザーのセッションが行う）。
+
+1 の条件で ci.yml の手順が通しで通り、手元の make test・make test-e2e・make typecheck・make lint・make doc-lint も通る状態をゴールとする
+（make test-api には PostgreSQL 17 のクライアントが要る。03 1章。Homebrew の PostgreSQL 14 には触れない）。独立のレビューは観点ごとに
+分けて同時に起動する（/draft:implement）。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
@@ -3157,11 +3459,21 @@ docs/03_dev-setup.md 5.4 のチェックリストに沿って、staging に Web 
 - docs/02-01_system-design-doc.md 7.3（性能）・2章（プレースホルダ）
 
 やること:
-1. 始める前に、ユーザーが {GCP_PROJECT_ID} を決める。決まったら SDD 2章のプレースホルダの表に書く
+1. 始める前に、ユーザーが {GCP_PROJECT_ID} を決める。決まったら SDD 2章のプレースホルダの表に書く。
+   各 envs の terraform.tfvars（03 5.4 G・I）をコミットするかもユーザーが決める（アラートの通知先のメールと請求先アカウントの ID が
+   入るので、リポジトリを公開するならそれも公開になる。Step 40 は値の無いまま変数だけを作った）。決めたら 03 5.4 G に書く。
+   コミットしないと決めたら、変数だけの変更（I の bootstrap・api_image、J の uptime_check_enabled、K の mail_allowlist）は
+   03 5.2 の「PR に make infra-plan の結果を貼る」を通らないので、03 5.2 もそれに合わせて直す
 2. 5.4 の A〜K を staging について順に、ユーザーと一緒に進める（コマンドを示し、結果を確かめる）
-3. staging への最初の昇格（make promote ENV=staging）、運営者の作成、テンプレートの取り込みと公開、04 6章の確認
+3. staging への最初の昇格（make promote ENV=staging）、運営者の作成、テンプレートの取り込みと公開、04 6章の確認。
+   最初の昇格の後で make infra-plan ENV=staging に差分が無いことも確かめる（CI の gcloud run deploy が書き換えて Terraform が
+   戻してしまうものがあれば、modules/environment の lifecycle.ignore_changes に足し、ADR-015 の無視するものの一覧にも理由と一緒に
+   書く。Step 40 が入れたのは image・traffic・client・client_version と、gcloud がリビジョンに付ける nonce のラベル（template の labels））
 4. 手元で差し替えて確かめた外部の経路を本物で確かめる: Google ログイン、Resend のメール（許可リスト）、Cloud Storage の写真、
-   Web と API の Sentry（7.2 のとおり中身が削られて届くこと。release が SHA で、ソースマップが当たって元のソースの行で読めること）
+   Web と API の Sentry（7.2 のとおり中身が削られて届くこと。release が SHA で、ソースマップが当たって元のソースの行で読めること）、
+   deploy.yml が Cloud Storage に書くデプロイの記録（作成だけの権限で2つとも書けること。03 5.4 K）、
+   make push-api-image がタグを尋ねる Artifact Registry の API（build.yml の push のジョブを再実行して、タグがあると上書きせずに
+   失敗すること）
 5. 7.3 の性能の目安のうち本物の環境で測るもの（Cloud Run の0台からの起動・スマホの回線での表示）、PWA の実機での確認（03 3.5）。
    スマホの回線での表示は、ログインした画面（5 ダッシュボードなど）を初めて開いたときも測る。`load` の後に始まる Service Worker の
    事前のキャッシュ（日本語の書体を除くビルドのすべて）が、データを読む画面の表示と回線を取り合っていないかを見る（手元の
@@ -3199,13 +3511,23 @@ staging で確かめた版を production に公開してください。ユーザ
 やること:
 1. 29・30 の本文が入っていること（Step 42）を確かめる（無いまま production に出さない。04 4.1）
 2. 5.4 の production の分を、ユーザーと一緒に進める
-3. production への昇格（make promote ENV=production）、運営者の作成、テンプレートの取り込みと公開、04 6章の確認
-4. db-backup.yml を手で1回動かし、バックアップができることを確かめる（05 6.2）
-5. 手順どおりに進まなかった所は、03・04・05 の該当の手順を直す（合意の上で）
+3. production への昇格（make promote ENV=production）、運営者の作成、テンプレートの取り込みと公開、04 6章の確認。昇格では、本物の実行で
+   次を確かめる（ADR-016・ADR-027。03 5.4 K）: GitHub の環境 production の承認を求められるのが1回だけであること。承認を待っている
+   間は、その書き込みの記録が gs://{GCP_PROJECT_ID}-moonx-deploys/production/ に無いこと。承認の後に「マイグレーション中」
+   （-migrating）と「出した」（-deployed）の記録が1つずつできること
+4. make promote ENV=production が、staging のデプロイの記録を gcloud storage objects list の本物の出力で読み、止まらずに PR を作れる
+   ことを確かめる（記録を実際に読む最初の機会: Step 43 の staging の最初の昇格は記録を読まない。staging の記録が読めないときと、
+   その SHA を staging に書いたいちばん新しいコミットに出した記録が無いとき（the staging deployment of ... is not known to have
+   succeeded）は止まる。03 5.4 K）
+5. db-backup.yml を手で1回動かし、バックアップができることを確かめる（05 6.2）
+6. CHECK_WORKSPACE_ID を GitHub の環境 production-backup に入れた後で、kpi.yml を手で1回動かし、成功して実行の要約に件数の表が
+   出ることを確かめる（03 5.4 K。db-backup.yml と同じ形）
+7. 手順どおりに進まなかった所は、03・04・05 の該当の手順を直す（合意の上で）
 
 これで初期リリースのプロンプト集は終わる。このあとの変更は /draft:feature で行う。
 
-production で 04 6章のチェックリストがすべて通り、db-backup.yml の1回目が成功した状態をゴールとする。
+production で 04 6章のチェックリストがすべて通り、3 の承認と記録の確かめと 4 の記録の読み取りが期待どおりで、db-backup.yml と
+kpi.yml の1回目が成功した状態をゴールとする。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。

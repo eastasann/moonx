@@ -1,0 +1,129 @@
+# Every pull request (04_deployment-procedure.md 2章). Nothing here reaches Google Cloud
+# or a GitHub environment: both are open to workflows on main only (ADR-027).
+name: ci
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# GitHub runs bash with pipefail only when the shell is named.
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      # DATABASE_URL_TEST of .env.example points here. The role is a superuser, which the
+      # test database's recreation needs (SDD 2章「環境変数」).
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: moonx
+          POSTGRES_PASSWORD: moonx
+          POSTGRES_DB: moonx
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U moonx -d moonx"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # promote-check and db-check read the history from BASE.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      # The checkout is the pull request's merge commit; its first parent is the base
+      # branch the pull request is checked against.
+      - id: base
+        run: echo "sha=$(git rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+      # Before make install: it needs nothing but Bun.
+      - run: make promote-check BASE="$BASE"
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+      # A promotion pull request ends here: its code is unchanged, the version it deploys
+      # was tested by its own pull request and build.yml, and a rollback should not wait.
+      - id: scope
+        run: |
+          if git diff --quiet "$BASE" HEAD -- . ':(exclude)deploy'; then
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Only deploy/ changed: promote-check is the whole check."
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+      # PostgreSQL 17's psql, pg_dump and pg_restore first on PATH: the runner's own client
+      # is older, and an older pg_dump refuses a 17 server (SDD 10章).
+      - name: PostgreSQL 17 client
+        if: steps.scope.outputs.code == 'true'
+        run: |
+          sudo apt-get install --yes --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install --yes --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
+      - if: steps.scope.outputs.code == 'true'
+        run: make install
+      # The local values of .env.example, as make setup writes them.
+      - if: steps.scope.outputs.code == 'true'
+        run: make env-file
+      - if: steps.scope.outputs.code == 'true'
+        run: make db-check BASE="$BASE"
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+      - name: make tokens leaves the committed files as they are (ADR-018)
+        if: steps.scope.outputs.code == 'true'
+        run: |
+          make tokens
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+            git status --short --untracked-files=all
+            echo "::error::make tokens changed the generated files: run it and commit the result."
+            exit 1
+          fi
+      - name: make openapi leaves apps/api/openapi.json as committed
+        if: steps.scope.outputs.code == 'true'
+        run: |
+          make openapi
+          if ! git diff --exit-code -- apps/api/openapi.json; then
+            echo "::error::apps/api/openapi.json is out of date: run make openapi and commit it."
+            exit 1
+          fi
+      - if: steps.scope.outputs.code == 'true'
+        run: make lint
+      - if: steps.scope.outputs.code == 'true'
+        run: make typecheck
+      - if: steps.scope.outputs.code == 'true'
+        run: make test
+      - if: steps.scope.outputs.code == 'true'
+        run: make build
+      # make test-e2e fetches the browser; the libraries it needs come from apt.
+      - if: steps.scope.outputs.code == 'true'
+        run: bun --bun x --no-install playwright install-deps chromium
+      - id: e2e
+        if: steps.scope.outputs.code == 'true'
+        run: make test-e2e
+      # What Playwright keeps of each failed test (e2e/playwright.config.ts): its trace and
+      # error-context.md. Made with .env.example's local values; this workflow passes its
+      # steps no secret, variable or token of the repository, and the checkout keeps none
+      # of the default token it fetches with (scripts/workflows.test.ts).
+      - if: failure() && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-test-results
+          path: test-results/
+          # Playwright may fail before any test runs (a server that never starts).
+          if-no-files-found: warn
+          retention-days: 7

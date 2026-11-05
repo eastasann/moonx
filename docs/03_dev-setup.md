@@ -16,13 +16,14 @@
 |---|---|---|---|
 | Git | 最近の版 | ソースの取得 | 全員 |
 | make | OS 標準 | 実コマンドの入口（Windows は WSL2 を使う） | 全員 |
-| Bun | 1.2 以上（CI と同じ版にそろえる） | パッケージ管理・API・テスト | 全員 |
-| Docker（Docker Desktop・OrbStack など。Compose v2） | 最近の版 | ローカルの PostgreSQL 17（`make db-up`。開発用の DB `moonx` とテスト用の DB `moonx_test`） | 全員 |
+| Bun | `package.json` の `packageManager` の版（CI もこの版を入れる） | パッケージ管理・API・テスト | 全員 |
+| Docker（Docker Desktop・OrbStack など。Compose v2） | 最近の版 | ローカルの PostgreSQL 17（`make db-up`。開発用の DB `moonx` とテスト用の DB `moonx_test`）、`make lint` のワークフローの検査（actionlint の Docker のイメージを動かす。10章） | 全員 |
 | Playwright のブラウザ | リポジトリの Playwright に合う版 | `make test-e2e`（取得するターゲットは SDD 2章「make ターゲット」） | E2E を回す人 |
-| Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・`make promote`（イメージの確認）・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
+| Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・`make promote`（イメージの確認と、デプロイの記録（バケット `{GCP_PROJECT_ID}-moonx-deploys` を一覧する権限が要る。ADR-016）の読み取りと、前回のデプロイが済んでいないときに Cloud Run で動いている版。プロジェクトは `gcloud config` のもの）・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
 | Terraform | 1.x の最新 | `make infra-plan` / `make infra-apply` | インフラを触る人 |
 | GitHub CLI（gh） | 最新 | PR・`make promote`（昇格の PR の作成）・GitHub の環境の設定・ワークフローの確認 | デプロイ・運用をする人（ほかの人は任意） |
-| PostgreSQL のクライアント（psql・pg_dump・pg_restore） | 17（サーバーと同じ版。古い版の pg_dump は 17 のサーバーに使えない） | `make test-api` のバックアップのテスト、バックアップの復元の確認（05 6.2） | 全員 |
+| curl | 最近の版（7.76 以上） | `make db-backup`（`make test-api` のバックアップのテストも動かす） | 全員 |
+| PostgreSQL のクライアント（psql・pg_dump・pg_restore） | 17（サーバーと同じ版。古い版の pg_dump は 17 のサーバーに使えない） | `make test-api` のバックアップと KPI の集計のテスト、バックアップの復元の確認（05 6.2） | 全員 |
 
 ### アカウント（デプロイ時に必要。ローカル開発は GitHub だけでよい）
 
@@ -169,7 +170,7 @@ make admin-create EMAIL=<自分のメール>
 | DB を作り直したい（ローカルのデータは消える） | `make db-reset` |
 | 中身を見たい | `make db-studio` |
 | テストを動かす | `make test-api`・`make test-e2e`（テスト用の DB `DATABASE_URL_TEST` を使う。開発用の DB `moonx` のデータは消えない。7章） |
-| staging / production に当てる | 手では当てない。昇格のときに `deploy.yml` が `make deploy-api` の中でマイグレーションを当てる（04 2章） |
+| staging / production に当てる | 手では当てない。昇格のときに `deploy.yml` のデプロイのジョブが、API を出す前に、その SHA の `make db-migrate` を別のコンテナで当てる（`make deploy-migrate`。04 2章） |
 
 マイグレーションは「追加してから使い、使わなくなってから消す」の2段階で書く（ADR-016。04 4.1）。適用済みのマイグレーションの SQL は書き換えない。
 
@@ -196,7 +197,7 @@ make infra-apply ENV=staging    # 適用
 | 対象 | 誰が変えるか |
 |---|---|
 | `infra/terraform/`（`shared`・`staging`・`production`） | 人が PR に `make infra-plan` の結果を貼り、マージ後に `make infra-apply` を手で動かす。CI は Terraform を動かさない |
-| Cloud Run のイメージ（リビジョン）とトラフィック | イメージは CI（`deploy.yml` の `make deploy-api`）。トラフィックは、緊急時だけ人が `gcloud` で変える（04 5.2）。Terraform はどちらの変更も無視する（`lifecycle.ignore_changes`。ADR-015） |
+| Cloud Run のイメージ（リビジョン）とトラフィック | イメージは CI（`deploy.yml` の `make deploy-api`）。トラフィックは、緊急時だけ人が `gcloud` で変える（04 5.2）。Terraform はどちらの変更も無視する（`lifecycle.ignore_changes`。`gcloud run deploy` が書くほかの値も含めて、無視するものの一覧は ADR-015） |
 | Cloud Run のそれ以外の設定（環境変数・シークレットの参照・台数・メモリ） | Terraform。緊急で `gcloud` から変えたら、あとで Terraform にも同じ変更を入れる（入れないと次の apply で戻る） |
 | Web の静的ファイル | CI（`build.yml` の `make build-api-image` が Web もビルドして API のイメージに入れる。ADR-004） |
 | Cloud Run のドメインマッピング（`{DOMAIN}`・`stg.{DOMAIN}`） | Terraform（環境ごと。正は [SDD 2章「インフラ管理」](02-01_system-design-doc.md#インフラ管理)） |
@@ -268,7 +269,7 @@ make infra-apply ENV=staging    # 適用
 
 - [ ] 組織とプロジェクト `moonx-web` / `moonx-api` を作る（ADR-023）
 - [ ] 各プロジェクトの DSN を控える。どちらも Cloud Run の環境変数で、Terraform の変数として入れる（I）。`moonx-api` は API の DSN、`moonx-web` は API が画面に渡す Web の DSN（環境変数の名前の正は [SDD 2章「環境変数」](02-01_system-design-doc.md#環境変数)）
-- [ ] ソースマップのアップロード用の Auth Token を作る（`SENTRY_AUTH_TOKEN`。リポジトリのシークレット。H。置き場所の正は [SDD 2章「CI のシークレットと変数」](02-01_system-design-doc.md#環境変数)）
+- [ ] ソースマップのアップロード用の Auth Token を、組織の Auth Token（Organization Token）で作る（`SENTRY_AUTH_TOKEN`。リポジトリのシークレット。H。組織の名前はトークンに入っているので、`make build-api-image` は組織を渡さない。置き場所の正は [SDD 2章「CI のシークレットと変数」](02-01_system-design-doc.md#環境変数)）
 - [ ] 新しい issue のメール通知と、急増の抑制（Spike Protection）を ON にする
 
 #### E. Neon（コンソールで操作する）
@@ -285,10 +286,14 @@ make infra-apply ENV=staging    # 適用
 
 - [ ] production のブランチに、バックアップ用の読み取り専用のロールを作る（ADR-028。接続文字列は GitHub の環境 `production-backup` の `DATABASE_URL_DIRECT` に入れる。H）。Neon のコンソールの Roles で作ったロールは書き込みもできるので、SQL で作る。`moonx_backup_ro` はロールの名前（ここで決める）。上で控えた production の直接の接続（所有者のロール。マイグレーションを当てるロール）で実行する。`ALTER DEFAULT PRIVILEGES` は実行したロールがこれから作るもの（マイグレーションで作るスキーマ・テーブル・シーケンス）に効く
 
+  パスワードはコマンドの引数とシェルの履歴に出さない（コマンドの引数は同じ機械のほかの利用者からも見える）。接続はパスワードを除いた URL で書き、パスワードは `read -rs` で `PGPASSWORD` に入れ、新しいパスワードは標準入力の SQL で渡す。
+
   ```bash
+  # 所有者のロールのパスワード（上で控えた直接の接続のもの。貼り付けて Enter。画面には出ない）
+  read -rs PGPASSWORD; export PGPASSWORD
   ro_password="$(openssl rand -hex 24)"
-  psql "<production の直接の接続文字列>" -v ro_password="$ro_password" <<'SQL'
-  CREATE ROLE moonx_backup_ro WITH LOGIN PASSWORD :'ro_password';
+  psql "postgresql://<所有者のロール>@<直接の接続のホスト>/moonx?sslmode=require" <<SQL
+  CREATE ROLE moonx_backup_ro WITH LOGIN PASSWORD '${ro_password}';
   GRANT CONNECT ON DATABASE moonx TO moonx_backup_ro;
   GRANT USAGE ON SCHEMA public TO moonx_backup_ro;
   ALTER DEFAULT PRIVILEGES GRANT USAGE ON SCHEMAS TO moonx_backup_ro;
@@ -298,10 +303,11 @@ make infra-apply ENV=staging    # 適用
 
   # H で production-backup に入れる接続文字列（ホストは上の直接の接続と同じ）。控えたら変数を消す
   echo "postgresql://moonx_backup_ro:${ro_password}@<直接の接続のホスト>/moonx?sslmode=require"
-  unset ro_password
 
   # 書けないことを確かめる（permission denied になること）
-  psql "<上の接続文字列>" -c 'create table ro_check (x int)'
+  PGPASSWORD="$ro_password" psql "postgresql://moonx_backup_ro@<直接の接続のホスト>/moonx?sslmode=require" \
+    -c 'create table ro_check (x int)'
+  unset ro_password PGPASSWORD
   ```
 
   テーブルがすでにある DB に後から作るとき（05 6.2 の戻し方など）は、すでにあるものにも権限を付ける:
@@ -323,25 +329,29 @@ make infra-apply ENV=staging    # 適用
 
 `shared` が作るものは [SDD 2章「インフラ管理」](02-01_system-design-doc.md#インフラ管理)（Google Cloud の共有の資源）。環境ごとの Terraform（I）より先に動かす。
 
-- [ ] `infra/terraform/envs/shared/` の変数に、秘密でない値を入れる（`{GCP_PROJECT_ID}`・請求先アカウントの ID・アラートの通知先のメール・GitHub のリポジトリ `<org>/moonx` など）
+- [ ] `infra/terraform/envs/shared/terraform.tfvars`（Terraform が自動で読む）に、秘密でない値を書く。変数は同じディレクトリの `variables.tf`: `project_id`（`{GCP_PROJECT_ID}`）・`billing_account_id`（請求先アカウントの ID）・`alert_email`（アラートと予算の通知先のメール）・`github_repository`（`<org>/moonx`）
+- [ ] 請求先アカウントの通貨が米ドルであることを確かめる（`gcloud billing accounts describe <BILLING_ACCOUNT_ID> --format='value(currencyCode)'`）。予算は SDD 11章の米ドルの金額で作り、Budget の API は請求先アカウントと違う通貨を受け付けない。米ドルでなければ、金額をユーザーと決めて SDD 11章と Terraform を直す
 - [ ] `make infra-plan ENV=shared` で差分を読み、`make infra-apply ENV=shared`
 - [ ] できたものを確かめる
 
   ```bash
   gcloud artifacts repositories describe moonx --location=asia-southeast1
   gcloud storage buckets describe gs://{GCP_PROJECT_ID}-moonx-backups
+  gcloud storage buckets describe gs://{GCP_PROJECT_ID}-moonx-deploys
+  gcloud storage buckets get-iam-policy gs://{GCP_PROJECT_ID}-moonx-deploys
   gcloud billing budgets list --billing-account=<BILLING_ACCOUNT_ID>
 
   gcloud iam workload-identity-pools list --location=global
   gcloud iam workload-identity-pools providers list \
-    --workload-identity-pool=<POOL_ID> --location=global \
+    --workload-identity-pool=github --location=global \
     --format="value(name,attributeCondition)"
   gcloud iam service-accounts list --format="value(email)"
   ```
 
   - バックアップのバケットが公開されない設定になっていること（05 6.2）
+  - デプロイの記録のバケットが公開されない設定で、古いものを消す設定（lifecycle）が無く、デプロイ用のサービスアカウントには独自のロール `moonxDeployRecordWriter`（オブジェクトの作成だけ）しか付いていないこと（ADR-016。`make promote` を動かす人は、プロジェクトのオーナーなどの権限で一覧できる）
   - 予算アラートの金額が SDD 11章のとおりであること
-  - WIF の `attributeCondition` が、このリポジトリ（`<org>/moonx`）の `main` で動くワークフローに限っていること（`assertion.repository == '<org>/moonx' && assertion.ref == 'refs/heads/main'`。ADR-027）。プロバイダの `name` とデプロイ用のサービスアカウントのメールは、リポジトリの変数 `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` に入れる（H。鍵は作らない。ADR-027）
+  - WIF の `attributeCondition` が、このリポジトリ（`<org>/moonx`）の `main` で動くワークフローに限っていること（`assertion.repository == '<org>/moonx' && assertion.ref == 'refs/heads/main'`。ADR-027）。プロバイダの `name` とデプロイ用のサービスアカウントのメール（`make infra-apply ENV=shared` が最後に出す output の `workload_identity_provider`・`deploy_service_account`）は、リポジトリの変数 `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` に入れる（H。鍵は作らない。ADR-027）
 
 - [ ] Resend の画面でドメインの確認（Verify）が通ったことを確かめる
 
@@ -361,7 +371,7 @@ make infra-apply ENV=staging    # 適用
     --delete-branch-on-merge
   ```
 
-- [ ] Settings → Rules で `main` を守る（PR 必須・`ci.yml` の成功が必須・直接 push しない）
+- [ ] Settings → Rules で `main` を守る（PR 必須・`ci.yml` の成功が必須（チェックの名前は `ci`）・直接 push しない）
 - [ ] Dependabot のアラートを有効にする（ADR-027）
 - [ ] GitHub の環境を3つ作る（名前と役割は [SDD 2章「環境と命名」](02-01_system-design-doc.md#環境と命名) の「GitHub の環境」の行）。3つとも `main` からだけ使えるようにする。`production` はデプロイに承認を要する（1人で運用するときは自分を承認者にする）。`production-backup` は承認を付けない。環境・環境のシークレット・承認・ブランチの制限は、公開のリポジトリなら無料のプランで使える。非公開にすると、環境とそのシークレットとブランチの制限は Pro か Team 以上、承認は Enterprise のプランが要る（GitHub の「Deployments and environments」）
 
@@ -405,7 +415,7 @@ make infra-apply ENV=staging    # 適用
 
 初回は API のイメージとシークレットの値がまだ無いので、2回に分ける（ADR-015）。1回目でシークレットの入れ物などを作り、値とイメージを入れてから、2回目で Cloud Run を作る。
 
-1. - [ ] `infra/terraform/envs/staging/` の変数に、秘密でない値を入れる（`{GCP_PROJECT_ID}`・`{DOMAIN}`・`GOOGLE_CLIENT_ID`・API と Web の Sentry の DSN（D）・staging の `MAIL_ALLOWLIST` など）と、`bootstrap = true`
+1. - [ ] `infra/terraform/envs/staging/terraform.tfvars` に、秘密でない値を書く（変数は同じディレクトリの `variables.tf`: `project_id`（`{GCP_PROJECT_ID}`）・`domain`（`{DOMAIN}`。staging も `stg.` を付けない）・`google_client_id`・`sentry_dsn` と `web_sentry_dsn`（D）・staging だけ `mail_allowlist`）と、`bootstrap = true`。production は `uptime_check_enabled = false` も書く（6）
 2. - [ ] 1回目: `make infra-plan ENV=staging` で差分を読み、`make infra-apply ENV=staging`（シークレットの入れ物・サービスアカウント・写真のバケットができる。Cloud Run はまだ作らない）
 3. - [ ] シークレットの値を入れる（下の「シークレットの値」）
 4. - [ ] API のイメージがあることを確かめる。H のあとで `main` にマージすると、`build.yml` が作って Artifact Registry に置く（`build.yml` はリポジトリの変数の WIF で入る。H。production は staging と同じイメージを使う）
@@ -415,7 +425,7 @@ make infra-apply ENV=staging    # 適用
      asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api --include-tags
    ```
 
-5. - [ ] 2回目: `bootstrap = false` と、変数 `api_image` に 4 のイメージを入れて `make infra-apply ENV=staging`。Cloud Run `moonx-api-staging` と、ドメインマッピング `stg.{DOMAIN}`（production は `{DOMAIN}`）ができる。ドメインマッピングは、A で `dwnfrc.app` の所有を確かめたアカウントで動かす。以後のイメージは CI が出す（ADR-015）
+5. - [ ] 2回目: `bootstrap = false` と、変数 `api_image` に 4 のイメージを入れて `make infra-apply ENV=staging`。`api_image` は以後も消さない（Cloud Run があると、空なら plan が止まる。Terraform はイメージの変更を無視するので、値は最初のイメージのままでよい）。サービスを作り直すとき（04 5.5 など）は、今出ている版のイメージに書き換えてから apply する（最初のイメージは ADR-007 の決まりで消えていることがある）。Cloud Run `moonx-api-staging` と、ドメインマッピング `stg.{DOMAIN}`（production は `{DOMAIN}`）ができる。ドメインマッピングは、A で `dwnfrc.app` の所有を確かめたアカウントで動かす。以後のイメージは CI が出す（ADR-015）
 6. - [ ] アラートを付ける環境（SDD 11章）だけ: Terraform が作った稼働時間チェックとアラートが、G の通知のチャンネル（メール）に向いていることを Cloud Monitoring の画面で確かめる（05 2章）。稼働時間チェックはドメインを開くので、J で証明書ができるまでは失敗する。最初の構築では変数 `uptime_check_enabled = false` で作らずにおき、J のあとで有効にする
 
 **シークレットの値（Secret Manager）**
@@ -458,7 +468,13 @@ I の 5 でドメインマッピングができてから行う。最初の昇格
 
 - [ ] `build.yml` が API のイメージを作ったことを確かめる（I の 4）
 - [ ] staging の昇格の PR を出してマージする（04 4.2）
-- [ ] staging の運営者を作る。`make admin-create` は `DATABASE_URL` と `BETTER_AUTH_URL` を使うので、この2つを上書きして手元から動かす（リンクが staging の URL になっていることを確かめる）
+- [ ] `deploy.yml` がデプロイの記録を2つ書いたことを確かめる（04 2章「デプロイの記録」。手元では Cloud Storage を差し替えて確かめたので、本物のバケットと、作成だけの権限で書けることはここで確かめる）
+
+  ```bash
+  gcloud storage ls "gs://{GCP_PROJECT_ID}-moonx-deploys/staging/**"   # -migrating と -deployed の2つ
+  ```
+
+- [ ] staging の運営者を作る。運営者のメールは Google のアカウントのもの（Gmail か Google Workspace）にし、招待のリンクからメール＋パスワードで登録する（04 6章の確認を、メール＋パスワードと Google のログインの両方とも、この運営者のアカウントだけで行うため。メール＋パスワードで登録したアカウントには、同じメールの Google のログインがつながる。SDD 5.4 U5）。`make admin-create` は `DATABASE_URL` と `BETTER_AUTH_URL` を使うので、この2つを上書きして手元から動かす（リンクが staging の URL になっていることを確かめる）
 
   ```bash
   DATABASE_URL="$(gcloud secrets versions access latest --secret=moonx-staging-database-url)" \
@@ -467,10 +483,25 @@ I の 5 でドメインマッピングができてから行う。最初の昇格
   ```
 
 - [ ] 運営者でログインし、BCDX のテンプレートを取り込んで公開する（04 4.2「最初のリリースのあとで: テンプレートを入れる」）。公開するまで、その環境ではアイデアも自己分析も作れない
-- [ ] デプロイ後の確認（04 6章）だけに使うワークスペースを1つ作る（M7）。以後の確認は毎回このワークスペースで行う
-- [ ] staging の `MAIL_ALLOWLIST` に、確かめに使うメールを入れる（Terraform の変数。`make infra-apply ENV=staging`）
+- [ ] 運営者のアカウントで、デプロイ後の確認（04 6章）だけに使うワークスペースを1つ作る（M7）。以後の確認は毎回このワークスペースで行う。ID（画面の URL の `/w/<ID>`）を控える。KPI の集計（`make kpi`）がこのワークスペースを数えないように渡す ID になる（SDD 11章「KPI の数え方」）。staging で `make kpi` を動かすとき（集計を staging のデータで確かめるとき）は、手元から staging の ID を `CHECK_WORKSPACE_ID` に、Neon の staging のブランチの直接の接続（E）を `DATABASE_URL_DIRECT` に渡す（`kpi.yml` は production だけを集計し、GitHub の環境 `staging` のシークレットは読み出せないため）
+
+  ```bash
+  read -rs DATABASE_URL_DIRECT; export DATABASE_URL_DIRECT   # 貼り付けて Enter。画面には出ない
+  CHECK_WORKSPACE_ID='<staging の確認用のワークスペースの ID>' make kpi ENV=staging
+  unset DATABASE_URL_DIRECT
+  ```
+
+- [ ] staging の `MAIL_ALLOWLIST` に、確かめに使うメールを入れる（運営者のメールと、04 6章の招待のメールの確認に使う別のメール。Terraform の変数。`make infra-apply ENV=staging`）
 - [ ] デプロイ後の確認をする（04 6章）
-- [ ] production でも、昇格（GitHub の環境 `production` の承認が要る）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・テンプレートの取り込みと公開・確認用のワークスペースの作成・デプロイ後の確認をする
+- [ ] production でも、昇格（GitHub の環境 `production` の承認が、デプロイのジョブの前で1回要る。04 2章。承認を待っている間は、その書き込みの記録が `gs://{GCP_PROJECT_ID}-moonx-deploys/production/` に無く、承認の後に「マイグレーション中」と「出した」の記録が1つずつできることも確かめる。`make promote ENV=production` が staging のデプロイの記録を読んで止まらずに PR を作れることも確かめる。記録を実際に読む最初の機会で、staging の最初の昇格は記録を読まない）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・テンプレートの取り込みと公開・確認用のワークスペースの作成・デプロイ後の確認をする
+- [ ] production の確認用のワークスペースの ID（画面の URL の `/w/<ID>`）を、GitHub の環境 `production-backup` の変数 `CHECK_WORKSPACE_ID` に入れる（KPI の集計から外す。SDD 11章「KPI の数え方」。無いと `kpi.yml` が失敗する）。入れたら `kpi.yml` を手で1回動かし、成功して実行の要約に件数の表が出ることを確かめる
+
+  ```bash
+  gh variable set CHECK_WORKSPACE_ID --env production-backup --body '<確認用のワークスペースの ID>'
+  gh workflow run kpi.yml
+  gh run list --workflow=kpi.yml --limit=1
+  ```
+
 - [ ] production の最初のデプロイのあとで、`db-backup.yml` を手で1回動かし、バックアップができることを確かめる（GitHub の環境 `production-backup` の確認を兼ねる。05 6.2）
 
   ```bash
@@ -536,7 +567,7 @@ make typecheck
 
 **Makefile が実コマンドの唯一の正。** ターゲットの一覧と内容は [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット) にだけ書く（ここには書き写さない）。
 
-- ドキュメント・CI・実装の指示は、ターゲット名だけを書く
+- ドキュメント・CI・実装の指示は、ターゲット名だけを書く。CI のランナーに OS のパッケージを入れる手順（PostgreSQL 17 のクライアント、Chromium が要るライブラリ）は、リポジトリのコマンドではなくランナーの用意なので、ワークフローに書く（04 2章）
 - コマンドを変えるときは Makefile だけを直す
 - ターゲットを足すときは、Makefile と SDD 2章の表を同じ PR で直す
 - makeは macOS / Linux に標準で入っている。Windows では WSL2 を使う
@@ -569,7 +600,7 @@ fix/xxx     ──squash──▶   │
 
 ### リリースフロー（環境の昇格）
 
-1. `main` に squash マージ → `build.yml` がテストし、API のイメージ（タグ = コミット SHA）を Artifact Registry に置く（`make build-api-image`）
+1. `main` に squash マージ → `build.yml` がテストし、API のイメージ（タグ = コミット SHA）を作って（`make build-api-image`）Artifact Registry に置く（`make push-api-image`）
 2. `make promote ENV=staging` で、その SHA を `deploy/staging/version` に書いた昇格の PR を作ってマージ → `deploy.yml` が staging にデプロイする（マイグレーション → API。Web は同じイメージに入っている。ADR-004）
 3. staging で確かめたら、`make promote ENV=production` で同じ SHA を `deploy/production/version` に書いた昇格の PR を作ってマージ → GitHub の環境 `production` の承認のあと、production にデプロイする。staging に出していない SHA（`deploy/staging/version` に書かれたことの無いもの）は、CI（`make promote-check`）が通さない
 4. 戻すときは、`make promote ENV=<環境> SHA=<戻し先の SHA>` で戻し先の SHA を書いた昇格の PR を作ってマージする（revert はしない。戻せる範囲は 04 5.1）
@@ -603,6 +634,7 @@ fix/xxx     ──squash──▶   │
 | デザイントークンの生成物 | `packages/ui-tokens`（vanilla-extract・react-pdf のテーマと、PWA のアイコンとマニフェスト）が `docs/06_design-tokens.json` と合っているか | CI が `make tokens` を動かし、差分が出たら失敗（ADR-018） | — |
 | ルートの生成物（`apps/web/src/routeTree.gen.ts`） | TanStack Router の Vite プラグインが `src/routes/` から作る生成物。手で直さず、ルートを足したら作り直したもの（`make dev-web` か `make build-web` で作られる）をコミットする。古いままだと `make typecheck` が失敗する | `make dev-web` / `make build-web` | — |
 | API の仕様の書き出し | `apps/api/openapi.json` が API と合っているか。API を変えたら `make openapi` で作り直して同じ PR に含める | CI が `make openapi` を動かし、差分が出たら失敗（04 2章） | — |
+| GitHub Actions のワークフロー | `.github/workflows/` の構文・式・権限・`run:` のスクリプト（本家の actionlint を、本家が配る Docker のイメージ `rhysd/actionlint` で動かす。版と digest は Makefile の `ACTIONLINT_IMAGE` で固定し、ShellCheck もイメージに入っている。`concurrency` の `queue` の誤検出を外す `-ignore` と、その代わりのテスト、`-ignore` を外す時期は SDD ADR-022）。ステップは各ワークフローに直に書く（ローカルの composite action に置くと、actionlint はその入力しか確かめず、`run:` のスクリプトを読まない） | `make lint`（Docker が要る） | 既定の検査（設定のファイルは置かない） |
 | doc-lint | コミットの前: 先送りのマーカー・不要な `.gitkeep`・`.env` や既知の形式のトークン・ドキュメントの文体（本文の em dash・表の1列目の太字・長すぎる太字）。随時: ドキュメントと実体の食い違い（検査の中身は SDD 2章「make ターゲット」の `doc-lint`） | コミットのたびに `.githooks/pre-commit`（`make setup` が配線する）、随時 `make doc-lint` | `scripts/doc-lint.sh` |
 
 エディタは Biome の拡張を入れ、保存のときに整形する。

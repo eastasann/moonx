@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { pageWidth } from "./fixtures";
 
 // /dev/components (docs/03_dev-setup.md 3.3): every component of packages/ui-web, drawn in both
 // themes, both scales and the three widths of design-spec 4.3, with the axe check that
@@ -958,11 +959,11 @@ test.describe("dialogs, popovers and menus follow the width (design-spec 3.8・4
     await expect(dialog).toBeVisible();
     expect(await placement(dialog, "desktop")).toBe("floating");
     const box = await frameOf(dialog).boundingBox();
-    // 06 layout.dialog-max-width.M, centred.
+    // 06 layout.dialog-max-width.M, centred on the page.
     expect(box?.width).toBeLessThanOrEqual(480);
     expect(
       Math.abs(
-        (box?.x ?? 0) + (box?.width ?? 0) / 2 - widths.desktop.width / 2,
+        (box?.x ?? 0) + (box?.width ?? 0) / 2 - (await pageWidth(page)) / 2,
       ),
     ).toBeLessThanOrEqual(1);
     await expect(async () => {
@@ -2658,9 +2659,11 @@ test.describe("A, D, F and I beside a docked panel (design-spec 4.1・4.3)", () 
     const dialog = page.getByRole("dialog", { name: "Panel frame totals" });
     await expect(dialog).toBeVisible();
     await settled(dialog.locator("xpath=.."));
-    // The drawer from the right (4.1 F), over the docked panel.
+    // The drawer from the page's right (4.1 F), over the docked panel.
     const drawer = await boxOf(dialog.locator("xpath=.."));
-    expect(Math.round(drawer.x + drawer.width)).toBe(1024);
+    expect(Math.round(drawer.x + drawer.width)).toBe(
+      Math.round(await pageWidth(page)),
+    );
     expect(Math.round(drawer.width)).toBe(360);
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
@@ -2866,11 +2869,14 @@ test.describe("A, D, F and I beside a docked panel (design-spec 4.1・4.3)", () 
   test("I beside the panel at 1340px: the thumbnails while A has one column", async ({
     page,
   }) => {
-    // The body is 744px: under layout.two-column-min-width (788), over
-    // layout.presentation.two-column-min-width (704).
+    // The body is 744px, less the scrollbar's gutter (pageWidth): under
+    // layout.two-column-min-width (788), over layout.presentation.two-column-min-width (704).
     const frame = await openPanelFrame(page, 1340, "PresentationPattern");
     await openPanel(frame);
-    expect(Math.round((await boxOf(frame.getByRole("main"))).width)).toBe(744);
+    const gutter = 1340 - (await pageWidth(page));
+    expect(Math.round((await boxOf(frame.getByRole("main"))).width)).toBe(
+      Math.round(744 - gutter),
+    );
     const thumbnails = frame.getByRole("listbox", { name: "Slides" });
     await besideThumbnails(
       thumbnails,
@@ -3491,6 +3497,18 @@ test.describe("data parts match docs/mockups (Step 22d, design-spec 4.4・4.5)",
     expect(
       await groove.evaluate((node) => node.scrollWidth <= node.clientWidth),
     ).toBe(true);
+    // None is narrower than its label (design-spec 4.5): its moon and words stay inside it,
+    // where the buttons give back padding for a system that draws the text wider.
+    const labels = await groove.getByRole("radio").evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const words = document.createRange();
+        words.selectNodeContents(node);
+        const label = words.getBoundingClientRect();
+        const button = node.getBoundingClientRect();
+        return label.left >= button.left && label.right <= button.right;
+      }),
+    );
+    expect(labels).toEqual([true, true, true]);
     expect(
       Math.round((await box(groove.getByRole("radio").first())).height),
     ).toBe(32);

@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Me, Workspace } from "@moonx/schemas";
 import type { Browser, Page } from "@playwright/test";
-import { WEB_ORIGIN } from "./env";
+import { SLOWNESS, WEB_ORIGIN } from "./env";
 import {
   demo,
   expect,
@@ -31,7 +31,7 @@ async function expectNoAxeViolations(page: Page) {
     page.locator("[data-live-announcer] [aria-labelledby]"),
   ).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("main").locator("[inert]")).toHaveCount(0, {
-    timeout: 10_000,
+    timeout: 10_000 * SLOWNESS,
   });
   // At the page's end: a row cut by the fold half under a phone's sticky TabBar is
   // reported by axe's target-size rule wherever the fold falls. A page still growing
@@ -46,7 +46,7 @@ async function expectNoAxeViolations(page: Page) {
       return atEnd;
     });
     expect(atEnd).toBe(true);
-  }).toPass({ timeout: 10_000 });
+  }).toPass({ timeout: 10_000 * SLOWNESS });
   const { violations } = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();

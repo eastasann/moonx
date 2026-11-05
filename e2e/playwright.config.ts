@@ -10,6 +10,7 @@ import {
   PWA_PORT,
   PWA_SENTRY_DSN,
   PWA_WEB_DIR,
+  SLOWNESS,
   WEB_ORIGIN,
   WEB_PORT,
 } from "./env";
@@ -41,6 +42,11 @@ export default defineConfig({
   testMatch: "**/*.spec.ts",
   reporter: [["list"]],
   globalSetup: "./global-setup.ts",
+  // Playwright's 30 and 5 seconds, longer on CI (env.ts): /dev/components draws its
+  // heading 2.2 to 3 seconds after the load in the container SLOWNESS was measured on, so
+  // about 6 to 8 on the runner, past 5 though the page is right.
+  timeout: 30_000 * SLOWNESS,
+  expect: { timeout: 5_000 * SLOWNESS },
   use: { baseURL: WEB_ORIGIN, trace: "retain-on-failure" },
   projects: [
     {
@@ -50,17 +56,19 @@ export default defineConfig({
         "admin-publish.spec.ts",
         "template-migration.spec.ts",
         "pwa.spec.ts",
+        "production.spec.ts",
         "first-paint.spec.ts",
       ],
     },
-    // The PWA and the serving of ADR-004 and ADR-031 (SDD 10章): against the API that
-    // serves make build-web's output, which make test-e2e builds first. One test at a
-    // time, --repeat-each included: a test stands for a deploy by changing the sw.js of
-    // the one copy of the build that API serves to every test (pwa.spec.ts).
+    // The PWA and the serving of ADR-004 and ADR-031 (SDD 10章), and the API's production
+    // branches (production.spec.ts): against the API that serves make build-web's output,
+    // which make test-e2e builds first. One test at a time, --repeat-each included: a
+    // test stands for a deploy by changing the sw.js of the one copy of the build that API
+    // serves to every test (pwa.spec.ts).
     {
       name: "pwa",
       use: { ...devices["Desktop Chrome"], baseURL: PWA_ORIGIN },
-      testMatch: "pwa.spec.ts",
+      testMatch: ["pwa.spec.ts", "production.spec.ts"],
       workers: 1,
     },
     // A published template version is what every new self analysis, idea and plan takes
@@ -131,8 +139,10 @@ export default defineConfig({
       url: `${PWA_ORIGIN}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,
-      // SDD 2章「環境変数」: the PWA checks' values over the root .env.
+      // SDD 2章「環境変数」: the PWA checks' values over the root .env, with the image's
+      // NODE_ENV (apps/api/Dockerfile), so the tests take the libraries' production branches.
       env: {
+        NODE_ENV: "production",
         PORT: String(PWA_PORT),
         WEB_DIST_DIR: PWA_WEB_DIR,
         WEB_SENTRY_DSN: PWA_SENTRY_DSN,

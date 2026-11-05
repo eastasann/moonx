@@ -12,3 +12,9 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 .DS_Store
+# Terraform: providers stay local and the state lives in its bucket (docs/03_dev-setup.md
+# 5.3). Each env's .terraform.lock.hcl is committed.
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log

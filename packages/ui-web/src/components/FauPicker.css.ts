@@ -150,3 +150,15 @@ export const evidence = style({
 });
 
 export const toggleGlyph = style({ display: "inline-flex" });
+
+// With macOS's text the F/A/U labels fill the popover's groove to the pixel, and Linux's
+// Chromium rounds each letter's advance and draws them a little wider. The F/A/U buttons
+// (the ones with a moon) take their labels' widths and give back what is missing from
+// their padding, so the last one never sticks out of the groove; a label still never
+// overflows its button (components.spec.ts). The confidence groove keeps equal shares.
+// One step more specific than the justified groove's `flex: 1 1 0` (SegmentedControl.css),
+// whatever the order of the stylesheets.
+globalStyle(`${popoverBody} [role="radio"]:has(${toggleGlyph})`, {
+  flex: "1 1 auto",
+  minWidth: 0,
+});

@@ -1,0 +1,113 @@
+# Each push to main: test it, then the one image of ADR-004 tagged with its SHA
+# (04_deployment-procedure.md 2章). A push that changes only deploy/ is a promotion and
+# builds nothing; deploy.yml takes it. No GitHub environment is used, so only the
+# repository's variables and secrets are read.
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - deploy/**
+
+permissions:
+  contents: read
+
+# GitHub runs bash with pipefail only when the shell is named.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Without id-token: write. make test runs the development dependencies' code, which
+  # must not be able to mint a Google Cloud token: the one deploy account also deploys
+  # production (ADR-027).
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      # DATABASE_URL_TEST of .env.example points here (ci.yml has the same container).
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: moonx
+          POSTGRES_PASSWORD: moonx
+          POSTGRES_DB: moonx
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U moonx -d moonx"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      # PostgreSQL 17's psql, pg_dump and pg_restore first on PATH: the runner's own client
+      # is older, and an older pg_dump refuses a 17 server (SDD 10章).
+      - name: PostgreSQL 17 client
+        run: |
+          sudo apt-get install --yes --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install --yes --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
+      - run: make install
+      - run: make env-file
+      - run: make test
+
+  # Also without id-token: write: make install, the Web's build (Vite and its plugins) and
+  # sentry-cli run the dependencies' code. The image leaves the job as a file.
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: make install
+      # The source maps go to Sentry here, before the push job can push the image.
+      - run: make build-api-image SHA="$GITHUB_SHA"
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: api-image
+          path: .data/api-image.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  # The one job that can mint a Google Cloud token: it pushes the image file and runs no
+  # make install, no Bun and none of the dependencies' code (ADR-027). The Makefile is
+  # the repository's own.
+  push:
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: api-image
+          path: .data
+      # The project comes from the deploy account's e-mail; gcloud reads it from the
+      # environment the action sets.
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - run: make push-api-image SHA="$GITHUB_SHA"

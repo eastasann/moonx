@@ -306,6 +306,10 @@ export default defineConfig({
   // One .env at the repository root serves the API and the Web (SDD 2章「環境変数」).
   envDir: fileURLToPath(new URL("../..", import.meta.url)),
   build: {
+    // Source maps for Sentry only (SDD 11章「Web のエラー」): no file names its map, and
+    // make build-api-image uploads them and leaves them out of the image, so the served
+    // files never expose the source.
+    sourcemap: "hidden",
     // A font never becomes a data: URL, which the CSP's font-src 'self' refuses (SDD 7.2):
     // each stays its own woff2 (ADR-018). Other assets keep Vite's default.
     assetsInlineLimit: (file) => (file.endsWith(".woff2") ? false : undefined),
@@ -328,6 +332,16 @@ export default defineConfig({
       // such as /apix to the API, which ADR-004 serves as screens.
       "^/api/": `http://localhost:${process.env.PORT || "3000"}`,
     },
+  },
+  optimizeDeps: {
+    // The vanilla-extract plugin compiles each .css.ts into a module that imports these
+    // runtimes, which the dependency scan of the sources never sees. Found on the first
+    // page that uses them, they are optimized then and every open page reloads: on a
+    // fresh checkout (CI), that broke the E2E tests running at that moment.
+    include: [
+      "@moonx/ui-web > @vanilla-extract/recipes/createRuntimeFn",
+      "@moonx/ui-web > @vanilla-extract/sprinkles/createRuntimeSprinkles",
+    ],
   },
   plugins: [
     {

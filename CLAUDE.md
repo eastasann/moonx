@@ -13,7 +13,7 @@
 - CI/CD: GitHub Actions ＋ Workload Identity Federation（`main` で動くワークフローだけ）
 - Monorepo: Bun workspaces ＋ Makefile
 - Language: TypeScript（アプリ・パッケージ・スクリプトのすべて）
-- Test / Lint: Bun test・Vitest ＋ Testing Library・Playwright ＋ axe・Biome
+- Test / Lint: Bun test・Vitest ＋ Testing Library・Playwright ＋ axe・Biome・actionlint（ワークフロー）
 
 ## Structure
 
@@ -29,6 +29,7 @@
 - packages/ui-web: Web の部品（design-spec 4.5）とレイアウトのパターン A〜J
 - data/templates/bcdx/: BCDX のテンプレートのファイル（運営者が取り込む。シードも使う）
 - infra/terraform/: `modules/` と `envs/{shared,staging,production}/`
+- .github/: `workflows/`（CI/CD。`docs/04_deployment-procedure.md` 2章）と PR のテンプレート
 - deploy/{staging,production}/version: その環境に出すコミット SHA（`make promote` が書く）
 - e2e/: Playwright。docker/: ローカルの PostgreSQL の初期化 SQL。scripts/: doc-lint・画面の検査・db-check・promote・promote-check
 
@@ -48,7 +49,7 @@
 - `make dev`: API と Web を起動（`make dev-api`・`make dev-web` で片方だけ）
 - `make build`: 全パッケージの型チェックとビルド
 - `make test`: 単体・結合テスト（`make test-domain`・`make test-api`・`make test-web`）。E2E は `make test-e2e`
-- `make lint` / `make format` / `make typecheck`: Biome と画面の検査・整形・型チェック
+- `make lint` / `make format` / `make typecheck`: Biome と画面とワークフローの検査・整形・型チェック
 - `make db-up` / `make db-down`: ローカルの PostgreSQL の起動・停止
 - `make db-generate`: スキーマからマイグレーションを作る。`make db-check BASE=...` で足すだけになっているかを検査する
 - `make db-migrate`: マイグレーションを当てる
@@ -61,7 +62,7 @@
 - `make promote ENV=... [SHA=...]`: 昇格とロールバックの PR を作る（人が動かす）
 - `make doc-lint`: ドキュメントと実体の食い違いを検査する（コミット前の検査は pre-commit のフックが動かす）
 
-CI が使うターゲット（`install`・`build-web`・`build-api-image`・`deploy-api`・`promote-check`・`db-backup`・`kpi`）は SDD 2章と `docs/04_deployment-procedure.md` 2章。
+CI が使うターゲット（`install`・`env-file`・`build-web`・`build-api-image`・`push-api-image`・`db-migrate`・`deploy-migrate`・`deploy-api`・`deploy-record`・`promote-check`・`db-backup`・`kpi`）は SDD 2章と `docs/04_deployment-procedure.md` 2章。
 
 ## Docs
 

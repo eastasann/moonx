@@ -1,0 +1,185 @@
+# A merged promotion pull request deploys the SHA it wrote (04_deployment-procedure.md
+# 2章「deploy.yml の順番」, ADR-016). Rolling back is the same path with an older SHA.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/staging/version
+      - deploy/production/version
+
+permissions:
+  contents: read
+
+# GitHub runs bash with pipefail only when the shell is named.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Outside the GitHub environment, so that whoever approves production approves only a
+  # checked change. It runs main's latest code: the Makefile of the version rolled back
+  # to may have no promote-check. No id-token: write: the job runs Bun, and the image
+  # check that needs Google Cloud has a job of its own.
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      target: ${{ steps.target.outputs.target }}
+      sha: ${{ steps.target.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # promote-check reads deploy/'s history.
+          fetch-depth: 0
+          persist-credentials: false
+      # Bun from its release, not from the Actions cache: build.yml's jobs save that cache
+      # after running the dependencies' code, which could have replaced the binary, and
+      # this job decides what is deployed. It is the one job here that takes Bun.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+          no-cache: true
+      - id: target
+        run: |
+          changed="$(git diff --name-only "$BEFORE" HEAD -- deploy/staging/version deploy/production/version)"
+          case "$changed" in
+            deploy/staging/version) target=staging ;;
+            deploy/production/version) target=production ;;
+            *)
+              echo "::error::Expected exactly one of deploy/{staging,production}/version to change, got: ${changed:-none}"
+              exit 1
+              ;;
+          esac
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "sha=$(cat "deploy/$target/version")" >> "$GITHUB_OUTPUT"
+        env:
+          BEFORE: ${{ github.event.before }}
+      - run: make promote-check BASE="$BEFORE"
+        env:
+          BEFORE: ${{ github.event.before }}
+
+  # The check that needs Google Cloud, also before the environment's approval, so that the
+  # approval is of a version that can be deployed. It can mint a token, so it runs gcloud
+  # alone: no checkout, no Bun and no make (04 2章, ADR-027).
+  image:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - name: The image of the SHA exists
+        run: |
+          project="$(gcloud config get-value project)"
+          gcloud artifacts docker images describe \
+            "asia-southeast1-docker.pkg.dev/$project/moonx/api:$SHA" --format='value(image_summary.digest)'
+        env:
+          SHA: ${{ needs.check.outputs.sha }}
+
+  # The one job in the GitHub environment, so production is approved once a deployment, and
+  # a re-run of this job waits for the approval again. Nothing before the approval writes a
+  # record: a run that was not approved, or that a later promotion overtook, leaves none.
+  # The job can mint a Google Cloud token, so the SHA's dependencies run in a container
+  # that cannot (make deploy-migrate), and no Bun and none of the dependencies' code runs
+  # on the runner (ADR-027).
+  deploy:
+    needs: [check, image]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.check.outputs.target }}
+    # One deployment per environment at a time. The waiting ones run in order instead of
+    # the newest replacing the one already waiting, which is the default.
+    concurrency:
+      group: deploy-${{ needs.check.outputs.target }}
+      queue: max
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TARGET: ${{ needs.check.outputs.target }}
+      SHA: ${{ needs.check.outputs.sha }}
+    steps:
+      # A later promotion merged first (or this is an old run run again): migrating and
+      # deploying this SHA now would put an older version over the one main asks for. main
+      # is read as it is now, after the wait in the queue and for the approval.
+      - id: current
+        run: |
+          wanted="$(gh api --header 'Accept: application/vnd.github.raw' \
+            "repos/$GITHUB_REPOSITORY/contents/deploy/$TARGET/version?ref=main")"
+          if [ "$wanted" = "$SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main now asks for $wanted on $TARGET; not deploying $SHA."
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      # The SHA's code: its migrations and its Makefile's deploy-api, without Bun or
+      # dependencies on the runner. The checkout keeps no GitHub token.
+      - if: steps.current.outputs.current == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SHA }}
+          persist-credentials: false
+      # This commit's Makefile for the records and the migrations' container, not the
+      # SHA's: a rollback to an older version still writes the records make promote reads
+      # now, and still keeps the token from the dependencies.
+      - if: steps.current.outputs.current == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: write
+          persist-credentials: false
+      - if: steps.current.outputs.current == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      # The record make promote reads that this write's migrations started (ADR-016):
+      # without it, nothing below runs.
+      - name: Record that the migrations start
+        if: steps.current.outputs.current == 'true'
+        working-directory: write
+        run: make deploy-record ENV="$TARGET" SHA="$SHA" WRITE="$GITHUB_SHA" KIND=migrating
+      # The SHA's make install and make db-migrate in a container that gets the SHA's
+      # committed files and DATABASE_URL_DIRECT alone. The top folder is the SHA's checkout,
+      # where the auth step put its credentials file; the container does not get the
+      # folder.
+      - name: Migrate
+        if: steps.current.outputs.current == 'true'
+        working-directory: write
+        run: make deploy-migrate SOURCE="$GITHUB_WORKSPACE" SHA="$SHA"
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
+      # The new revision; the Web is in the same image.
+      - name: Deploy
+        if: steps.current.outputs.current == 'true'
+        run: make deploy-api ENV="$TARGET" SHA="$SHA"
+      # By the service's own URL, not the domain: the first deployment comes before the
+      # domain is ready (03 5.4 J). The version shows that traffic reached the new
+      # revision; /api/health/db that it reaches the migrated database (SDD 5.14 Z1, Z2).
+      - name: Check the deployment
+        if: steps.current.outputs.current == 'true'
+        run: |
+          base_url="$(gcloud run services describe "moonx-api-$TARGET" --region=asia-southeast1 --format='value(status.url)')"
+          # A failing /api/health stops here, before the version comparison: that one is
+          # a rollback (04 5.2), not traffic left on the old revision.
+          health="$(curl --fail --silent --show-error "$base_url/api/health")"
+          version="$(jq -r .version <<<"$health")"
+          if [ "$version" != "$SHA" ]; then
+            echo "::error::/api/health reports $version, not $SHA: traffic is not on the new revision (04 2章)."
+            exit 1
+          fi
+          curl --fail --silent --show-error "$base_url/api/health/db"
+      # The record make promote reads that this write deployed its SHA (ADR-016). The last
+      # step, so the job succeeds only with it: a deployed write goes unrecorded only when
+      # the job fails, as with a failed check, and running the job again records it.
+      - name: Record the deployment
+        if: steps.current.outputs.current == 'true'
+        working-directory: write
+        run: make deploy-record ENV="$TARGET" SHA="$SHA" WRITE="$GITHUB_SHA" KIND=deployed

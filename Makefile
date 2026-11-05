@@ -50,25 +50,30 @@ TS_PROJECTS := . $(patsubst %/tsconfig.json,%,$(wildcard apps/*/tsconfig.json pa
 require = $(if $($(1)),,$(error $(1) is required: make $@ $(1)=...))
 require-project = $(if $(GCP_PROJECT_ID),,$(error No Google Cloud project: run gcloud config set project, or make $@ GCP_PROJECT_ID=...))
 require-env = $(if $(and $(filter 1,$(words $(ENV))),$(filter $(1),$(ENV))),,$(error ENV must be one of: $(1)))
+# A value as one single-quoted shell word, in which the shell runs nothing.
+shell-quote = '$(subst ','\'',$(1))'
 
-.PHONY: install setup dev dev-api dev-web build build-web build-api-image \
+.PHONY: install setup env-file dev dev-api dev-web build build-web build-api-image \
 	test test-domain test-api test-web test-e2e coverage first-paint lint format \
 	typecheck db-up db-down db-generate db-check db-migrate db-seed db-reset \
 	db-studio tokens openapi kpi doc-lint admin-create infra-plan infra-apply \
-	deploy-api promote promote-check db-backup
+	push-api-image deploy-api deploy-record deploy-migrate promote promote-check db-backup
 
 install:
 	bun install --frozen-lockfile
 
 # Git hooks are wired right after .env, so they work even if a later step fails.
-setup: install
-	bun scripts/setup-env.ts
+setup: install env-file
 	git config core.hooksPath .githooks
 	$(MAKE) db-up
 	$(MAKE) db-migrate
 	$(MAKE) db-seed
 	$(MAKE) tokens
 	$(BUNX) playwright install chromium
+
+# CI uses it too, so tests there see the same local values as a developer's.
+env-file:
+	bun scripts/setup-env.ts
 
 dev:
 	$(MAKE) -j2 dev-api dev-web
@@ -79,25 +84,77 @@ dev-api:
 dev-web:
 	cd apps/web && $(BUNX) vite dev
 
+# Left out of the bundle, to load from node_modules as the tests do (apps/api/Dockerfile
+# installs them): sharp loads its native binary from beside its own package, and the
+# pdfkit inside react-pdf requires its standard fonts by its own package's imports map
+# at run time, which no bundle can resolve. React goes with react-pdf, so both use one.
+# bun build writes "development" for process.env.NODE_ENV unless told; the bundle runs
+# only in the image, whose NODE_ENV is production (SDD 2章「環境変数」).
+API_BUNDLE = cd apps/api && bun build src/index.ts --target=bun --sourcemap=linked \
+	--define='process.env.NODE_ENV="production"' \
+	--external=sharp --external=@react-pdf/renderer --external=react --outdir=dist
+
 build:
 	$(MAKE) typecheck
 	$(MAKE) build-web
-	cd apps/api && bun build src/index.ts --target=bun --sourcemap=linked --outdir=dist
+	$(API_BUNDLE)
 
+# The debug IDs let Sentry find each script's hidden map (apps/web/vite.config.ts) by
+# the script's content, so the tests run the scripts the image serves.
 build-web: SHA ?= dev
 build-web:
 	cd apps/web && MOONX_RELEASE=$(SHA) $(BUNX) vite build
+	$(BUNX) @sentry/cli sourcemaps inject apps/web/dist/client/assets >/dev/null
+
+# Bun marks its bundle with a debug ID but not with the code Sentry's SDK reads the ID
+# from, and sentry-cli leaves a marked file as it is: without the mark it injects both,
+# keeping the map's ID. The image leaves every source map out (.dockerignore). The maps
+# go up here, before push-api-image can push the image, so that no image goes up without
+# them; the token is an organization token, which names the organization (03_dev-setup.md
+# 5.4 D). The image leaves as a file: build.yml builds it where no Google Cloud token can
+# be minted and pushes it from a job that runs none of the dependencies' code (04 2章).
+API_IMAGE_ARCHIVE := .data/api-image.tar
 
 build-api-image:
 	$(call require,SHA)
-	$(call require-project)
+	$(if $(strip $(SENTRY_AUTH_TOKEN)),,$(error SENTRY_AUTH_TOKEN is required in the environment (SDD 2章「CI のシークレットと変数」)))
 	$(MAKE) build-web SHA=$(SHA)
-	cd apps/api && bun build src/index.ts --target=bun --sourcemap=linked --outdir=dist
+	$(API_BUNDLE)
+	sed -i.bak '/^\/\/# debugId=/d' apps/api/dist/index.js && rm apps/api/dist/index.js.bak
+	$(BUNX) @sentry/cli sourcemaps inject apps/api/dist >/dev/null
 	docker build --platform=linux/amd64 --file=apps/api/Dockerfile \
-		--build-arg=APP_VERSION=$(SHA) --tag=$(IMAGE):$(SHA) .
-	docker push $(IMAGE):$(SHA)
-	$(BUNX) @sentry/cli sourcemaps upload --project=moonx-web --release=$(SHA) apps/web/dist/client
+		--build-arg=APP_VERSION=$(SHA) --tag=moonx-api:$(SHA) .
+	$(BUNX) @sentry/cli sourcemaps upload --project=moonx-web --release=$(SHA) \
+		apps/web/dist/client/assets
 	$(BUNX) @sentry/cli sourcemaps upload --project=moonx-api --release=$(SHA) apps/api/dist
+	mkdir -p $(dir $(API_IMAGE_ARCHIVE))
+	docker save --output=$(API_IMAGE_ARCHIVE) moonx-api:$(SHA)
+
+# Docker, gcloud, curl and the file build-api-image wrote: no Bun and no dependency's code.
+# A SHA's image is pushed once and never replaced (ADR-016): make promote takes the image for
+# the build that passed its tests, and staging and production get the same one. So a re-run
+# asks Artifact Registry's API for the SHA's tag first and pushes only on its 404; the tag
+# already there, or any other answer, stops it. The tests point ARTIFACT_REGISTRY_URL
+# elsewhere.
+ARTIFACT_REGISTRY_URL := https://artifactregistry.googleapis.com
+push-api-image:
+	$(call require,SHA)
+	$(call require-project)
+	set -o errexit; sha=$(call shell-quote,$(SHA)); \
+	if [[ ! "$$sha" =~ ^[0-9a-f]{40}$$ ]]; then echo "SHA must be a full commit SHA" >&2; exit 1; fi; \
+	token="$$(gcloud auth print-access-token)"; \
+	status="$$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+		--header @<(printf 'Authorization: Bearer %s\n' "$$token") \
+		"$(ARTIFACT_REGISTRY_URL)/v1/projects/$(GCP_PROJECT_ID)/locations/$(REGION)/repositories/moonx/packages/api/tags/$$sha")"; \
+	case "$$status" in \
+		404) ;; \
+		200) echo "$(IMAGE):$$sha is in Artifact Registry already, and a SHA's image is never replaced (ADR-016): nothing pushed" >&2; exit 1 ;; \
+		*) echo "Artifact Registry answered $$status for the tag $$sha: nothing pushed" >&2; exit 1 ;; \
+	esac
+	docker load --input=$(API_IMAGE_ARCHIVE)
+	docker tag moonx-api:$(SHA) $(IMAGE):$(SHA)
+	gcloud auth configure-docker $(REGION)-docker.pkg.dev --quiet
+	docker push $(IMAGE):$(SHA)
 
 test: test-domain test-api test-web
 
@@ -135,9 +192,18 @@ first-paint:
 	MOONX_FIRST_PAINT=1 $(BUNX) playwright test --config=e2e/playwright.config.ts \
 		--project=first-paint
 
+# The workflows' checker from its author's image, pinned by digest, which carries the
+# ShellCheck it runs over the run: scripts (03_dev-setup.md 10章, ADR-022). 1.7.12 does
+# not know concurrency's queue (rhysd/actionlint#654), so that message alone is ignored;
+# scripts/workflows.test.ts checks deploy.yml's queue and group instead. Drop the -ignore
+# with the first release that knows queue (05_operation-runbook.md 6.1).
+ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+
 lint:
 	$(BUNX) biome check .
 	bun scripts/check-screens.ts apps/web/src
+	docker run --rm --volume="$(CURDIR):/repo:ro" --workdir=/repo $(ACTIONLINT_IMAGE) \
+		-ignore='^unexpected key "queue" for "concurrency" section\. '
 
 format:
 	$(BUNX) biome check --write --linter-enabled=false .
@@ -183,9 +249,38 @@ tokens:
 openapi:
 	bun apps/api/scripts/openapi.ts
 
+# pg_dump and psql get DATABASE_URL_DIRECT without its password, which libpq reads from
+# PGPASSWORD instead: a command's arguments are visible to every user of the machine
+# (ps), and the password is in the environment already, in DATABASE_URL_DIRECT. libpq
+# percent-decodes a URL's password, so PGPASSWORD gets it decoded (the x keeps a final
+# newline, which $$(...) would drop). Anything else that could put a password in the
+# arguments stops make: a string that is not a postgres:// or postgresql:// URL (the
+# key=value form), a password parameter (libpq decodes parameter names too), and a
+# user:password@ left over or split because the password holds a / ? # or @ unencoded.
+DIRECT_URL_WITHOUT_PASSWORD = url="$$DATABASE_URL_DIRECT"; \
+	re='^(postgres(ql)?://[^/?\#@:]*):([^/?\#@]*)@(.*)$$'; \
+	if [[ "$$url" =~ $$re ]]; then \
+		url="$${BASH_REMATCH[1]}@$${BASH_REMATCH[4]}"; \
+		password="$${BASH_REMATCH[3]//\\/\\\\}"; \
+		PGPASSWORD="$$(printf '%bx' "$${password//%/\\x}")"; \
+		PGPASSWORD="$${PGPASSWORD%x}"; \
+		export PGPASSWORD; \
+	fi; \
+	query="$${url\#*\?}"; [[ "$$url" == *\?* ]] || query=""; \
+	query="$${query//\\/\\\\}"; query="$$(printf '%b' "$${query//%/\\x}")"; \
+	url_re='^postgres(ql)?://([^/?\#@:]*@)?[^/?\#@]*([/?\#]|$$)'; \
+	leftover='^postgres(ql)?://[^@]*:[^@]*@'; \
+	if [[ ! "$$url" =~ $$url_re || "$$url" =~ $$leftover || "&$$query" == *\&password=* ]]; then \
+		echo "DATABASE_URL_DIRECT must be a postgres:// URL with any password in its user:password@ part, percent-encoded" >&2; \
+		exit 1; \
+	fi
+
 kpi:
 	$(call require-env,staging production)
-	psql "$$DATABASE_URL_DIRECT" --no-psqlrc --set=ON_ERROR_STOP=1 --file=packages/db/queries/kpi.sql
+	$(if $(CHECK_WORKSPACE_ID),,$(error CHECK_WORKSPACE_ID is required: the ID of the workspace kept for the post-deploy checks (03_dev-setup.md 5.4 K)))
+	set -o errexit; $(DIRECT_URL_WITHOUT_PASSWORD); \
+	psql "$$url" --no-psqlrc --quiet --set=ON_ERROR_STOP=1 \
+		--set=check_workspace_id="$$CHECK_WORKSPACE_ID" --file=packages/db/queries/kpi.sql
 
 doc-lint:
 	scripts/doc-lint.sh --docs
@@ -208,23 +303,105 @@ infra-apply:
 	terraform -chdir=infra/terraform/envs/$(ENV) init -backend-config="bucket=$(GCP_PROJECT_ID)-tfstate"
 	terraform -chdir=infra/terraform/envs/$(ENV) apply
 
+# Without the migrations: deploy.yml's deploy job runs the SHA's db-migrate first, in a
+# container that cannot mint a Google Cloud token (deploy-migrate below), and this one on
+# the runner, which runs none of the dependencies' code (04_deployment-procedure.md 2章).
 deploy-api:
 	$(call require-env,staging production)
 	$(call require,SHA)
 	$(call require-project)
-	$(MAKE) db-migrate
-	gcloud run deploy moonx-api-$(ENV) --image=$(IMAGE):$(SHA) --region=$(REGION) --quiet
+	gcloud run deploy moonx-api-$(ENV) --image=$(IMAGE):$(SHA) --project=$(GCP_PROJECT_ID) \
+		--region=$(REGION) --quiet
 
+# gcloud looks for the image, reads deploy.yml's records (deploy-record below) and, after a
+# failed deployment, the running version.
 promote:
 	$(call require-env,staging production)
-	bun scripts/promote.ts $(ENV) $(SHA)
+	$(call require-project)
+	GCP_PROJECT_ID=$(GCP_PROJECT_ID) bun scripts/promote.ts $(ENV) $(SHA)
 
+# Bun alone, before make install (ci.yml) or without it (deploy.yml's check job): without
+# node_modules Bun would fetch an import it cannot resolve, which --no-install fails.
 promote-check:
 	$(call require,BASE)
-	bun scripts/promote-check.ts $(BASE)
+	bun --no-install scripts/promote-check.ts $(BASE)
+
+# The dump goes up in one request to Cloud Storage's JSON API, as the API's photos do
+# (ADR-024), which takes only the permission to create an object (ADR-028). gcloud
+# storage cp reads the object first, with the permission that also reads backups, which
+# only the operators have (05_operation-runbook.md 6.2). The name holds the UTC time to
+# the second, so a second run on the same day makes a new object, and ifGenerationMatch=0
+# refuses to replace one. The dump is written to a file first, so a failed one uploads
+# nothing. The tests point STORAGE_URL elsewhere.
+STORAGE_URL := https://storage.googleapis.com
 
 db-backup:
 	$(call require-env,staging production)
 	$(call require-project)
-	set -o pipefail; pg_dump --format=custom "$$DATABASE_URL_DIRECT" \
-		| gcloud storage cp - "gs://$(GCP_PROJECT_ID)-moonx-backups/$(ENV)/$$(date -u +%Y-%m-%d).dump"
+	set -o errexit; dump="$$(mktemp)"; trap 'rm -f "$$dump"' EXIT; \
+	$(DIRECT_URL_WITHOUT_PASSWORD); \
+	pg_dump --format=custom --file="$$dump" "$$url"; \
+	token="$$(gcloud auth print-access-token)"; \
+	name="$(ENV)%2F$$(date -u +%Y-%m-%dT%H%M%SZ).dump"; \
+	curl --fail-with-body --silent --show-error --request POST --upload-file "$$dump" \
+		--header 'Content-Type: application/octet-stream' \
+		--header @<(printf 'Authorization: Bearer %s\n' "$$token") \
+		"$(STORAGE_URL)/upload/storage/v1/b/$(GCP_PROJECT_ID)-moonx-backups/o?uploadType=media&ifGenerationMatch=0&name=$$name"
+
+# The records make promote reads (ADR-016, 04_deployment-procedure.md 4.1): deploy.yml's
+# deploy job writes KIND=migrating right before the migrations start, and KIND=deployed in
+# its last step, once the deployment's check passed. A record is an empty object
+# whose name says it all: {ENV}/{SHA}/{WRITE}/{UTC time}-{KIND}, WRITE being the commit
+# that wrote SHA to deploy/{ENV}/version (the one deploy.yml runs for). The records are
+# kept for good and make promote reads every one ever written, so a new name must leave
+# the old ones readable. Uploaded as db-backup's dump is: the account can create objects
+# and nothing else, and ifGenerationMatch=0 refuses to replace one. SHA and WRITE reach
+# the shell in single quotes, so the shell checks them without running anything in them.
+# make itself still expands a $(...) in a value given on its command line, as in every
+# target; deploy.yml passes a SHA promote-check has read as 40 hex characters and its own
+# GITHUB_SHA. The name it prints last is how 05_operation-runbook.md 3.17 tells which run of
+# deploy.yml wrote a record.
+deploy-record:
+	$(call require-env,staging production)
+	$(call require,SHA)
+	$(call require,WRITE)
+	$(if $(and $(filter 1,$(words $(KIND))),$(filter migrating deployed,$(KIND))),,$(error KIND must be one of: migrating deployed))
+	$(call require-project)
+	set -o errexit; sha=$(call shell-quote,$(SHA)); write=$(call shell-quote,$(WRITE)); \
+	if [[ ! "$$sha" =~ ^[0-9a-f]{40}$$ || ! "$$write" =~ ^[0-9a-f]{40}$$ ]]; then \
+		echo "SHA and WRITE must be full commit SHAs" >&2; exit 1; \
+	fi; \
+	token="$$(gcloud auth print-access-token)"; \
+	record="$(ENV)/$$sha/$$write/$$(date -u +%Y-%m-%dT%H%M%SZ)-$(KIND)"; \
+	curl --fail-with-body --silent --show-error --request POST --data-binary '' \
+		--header 'Content-Type: application/octet-stream' \
+		--header @<(printf 'Authorization: Bearer %s\n' "$$token") \
+		"$(STORAGE_URL)/upload/storage/v1/b/$(GCP_PROJECT_ID)-moonx-deploys/o?uploadType=media&ifGenerationMatch=0&name=$${record//\//%2F}"; \
+	echo; echo "Recorded $$record"
+
+# The SHA's migrations, as deploy.yml's deploy job runs them (04_deployment-procedure.md
+# 2章, ADR-027). That job can mint a Google Cloud token, so the SHA's make install and make
+# db-migrate, which run its dependencies' code, run in a container that gets the SHA's
+# committed files on its standard input and DATABASE_URL_DIRECT, and nothing else of the
+# job: neither the variables that mint an OIDC token, nor the credentials file
+# google-github-actions/auth writes, nor the folder that file is in (SOURCE is that folder
+# in deploy.yml; git archive takes the commit's files alone). The image is the one the SHA's
+# API image starts from: the SHA's own Bun (scripts/image-versions.test.ts holds it to
+# packageManager), pinned by its digest, so going back runs an old version's migrations
+# with its own tools. Every Dockerfile deploy.yml may go back to must keep that first FROM
+# line. The image has no make, which apt installs first. DATABASE_URL_DIRECT is kept from
+# apt and make install, for the migrations alone.
+deploy-migrate:
+	$(call require,SOURCE)
+	$(call require,SHA)
+	set -o errexit -o pipefail; source=$(call shell-quote,$(SOURCE)); sha=$(call shell-quote,$(SHA)); \
+	if [[ ! "$$sha" =~ ^[0-9a-f]{40}$$ ]]; then echo "SHA must be a full commit SHA" >&2; exit 1; fi; \
+	if [ -z "$${DATABASE_URL_DIRECT:-}" ]; then echo "DATABASE_URL_DIRECT is required" >&2; exit 1; fi; \
+	image="$$(git -C "$$source" show "$$sha:apps/api/Dockerfile" | awk '$$1 == "FROM" && !found { print $$2; found = 1 }')"; \
+	pinned='^oven/bun:[0-9]+\.[0-9]+\.[0-9]+-slim@sha256:[0-9a-f]{64}$$'; \
+	if [[ ! "$$image" =~ $$pinned ]]; then \
+		echo "The API's Dockerfile at $$sha starts FROM '$$image', not a Bun image pinned by digest" >&2; exit 1; \
+	fi; \
+	git -C "$$source" archive --format=tar "$$sha" | \
+	docker run --rm --interactive --env DATABASE_URL_DIRECT "$$image" sh -c \
+		'set -e; mkdir /work; tar -x -f - -C /work; env -u DATABASE_URL_DIRECT sh -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -qq --yes --no-install-recommends make >/dev/null && cd /work && make install"; cd /work; make db-migrate'

@@ -1,0 +1,11 @@
+# apps/api/Dockerfile takes only the builds make build-api-image makes and the manifests
+# its dependencies install from.
+*
+!package.json
+!bun.lock
+!apps/*/package.json
+!packages/*/package.json
+!apps/api/dist/
+!apps/web/dist/client/
+# Source maps go to Sentry only, never into the image (SDD 11章「Web のエラー」).
+**/*.map

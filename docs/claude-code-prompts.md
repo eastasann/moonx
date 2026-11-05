@@ -3110,6 +3110,90 @@ make typecheck・make lint・make doc-lint が通る状態をゴールとする�
 
 ---
 
+## Step 41b: インフラと CI の段階の終わりの点検の直し
+
+Status:
+
+```
+インフラと CI の段階（Step 40・41）の終わりの点検で見つかったものを、1つのステップで閉じてください。点検は2つで行った: 段階全体の
+docs の差分とコミットの本文の監査（新しいサブエージェント1体）と、make lint・typecheck・doc-lint・db-check BASE=main・build・
+3つの envs の terraform fmt と validate・test・test-e2e（どれも通り、E2E は 438 件。make test-api のバックアップのテストは、03 1章の
+PostgreSQL 17 のクライアントを PATH に置いて通った）。1〜3 はユーザーが 2026-11-04 に決めた。
+
+参照:
+- docs/02-01_system-design-doc.md 2章（環境変数・make ターゲット・CI のシークレットと変数）・ADR-016・ADR-022・ADR-024・ADR-027・
+  ADR-028・6.5（論理削除）・11章（KPI の数え方）
+- docs/04_deployment-procedure.md 2章・4.1
+- docs/03_dev-setup.md 1章・5.4 K・10章
+- docs/05_operation-runbook.md 3.14・6.2
+- docs/01_prd.md 5章（KPI）
+
+直すもの:
+1. actionlint を本家にする（ユーザーの決定）: 今の @kjanat/actionlint（個人のフォーク）をやめ、本家 rhysd/actionlint の最新の
+   リリース（1.7.12）を、本家が配る公式の Docker イメージ rhysd/actionlint を digest で固定して make lint から動かす（ShellCheck も
+   イメージに入っているので、PATH に無くても毎回動く）。本家は concurrency.queue を知らない（Issue #654 は開いたまま）。その誤検出
+   だけを、そのキーの文だけに当たる狭い -ignore で外す。queue の値は actionlint が見なくなるので、deploy.yml の concurrency
+   （group と queue: max）をテストで確かめる（promote が読むジョブとステップの名前を deploy.yml と結ぶ既存のテストの隣）。
+   package.json と bun.lock から @kjanat/actionlint を消し、ADR-022・03 1章（make lint に Docker が要ること）・03 10章・SDD 2章の
+   lint の行と、Step 41 の本文の「concurrency.queue を知っている版」を今の形に書き直す（「保守のフォーク」という語も消える）。
+   本家が queue を知る版を出したら -ignore を外す、とどこに書くかも決めて書く
+2. Google Cloud のトークンを持つジョブで、依存のコードを動かさない（ユーザーの決定）: 04 2章の「make test は開発用の依存の
+   コードを動かすので、そこで Google Cloud のトークンを作れないようにする」と同じ理由が、build.yml のイメージのジョブ（認証の後に
+   make build-api-image が Vite とそのプラグイン・sentry-cli を動かす）と、deploy.yml のデプロイのジョブ（id-token: write のジョブ
+   で make install と make db-migrate を動かす）にも当たる。id-token: write はジョブのどのステップからでもトークンを作れるので、
+   ジョブを分ける:
+   - build.yml: トークンの無いジョブで、依存を入れて Web と API をビルドし、ソースマップを Sentry に上げ、イメージを作って成果物に
+     する。トークンを持つジョブは、そのイメージを Artifact Registry に push するだけにし、make install・bun・リポジトリの依存の
+     コードを動かさない（make のターゲットを build と push に分けてよい。Makefile はリポジトリのコードで、依存ではない）
+   - deploy.yml: マイグレーション（make install と make db-migrate）は id-token の無いジョブで動かし、gcloud run deploy と
+     /api/health の版の確認はトークンを持つ別のジョブにする。production に出す経路は、どれも GitHub の環境 production の承認を
+     通ったままにする（ジョブを分けても、再実行でも、承認を通らずにデプロイのジョブが動かないこと。どう守るかを 04 2章に書く）。
+     concurrency の queue: max と、後の昇格が先に入ったときに終える処理は、分けた後も同じに働かせる。deploy-api の中身（SDD 2章。
+     戻すときは戻し先の版の Makefile が動く）を変えるなら、その決まりとの関係を書く（まだどの環境にも出していない）
+   - db-backup.yml・kpi.yml・deploy.yml の check のジョブも同じ決まりで見直す（依存を動かしていなければそのまま）
+   - バックアップのバケットは、書くアカウントに作成だけを許す（削除を外す）。同じ日に取り直しても上書きにならないよう、
+     オブジェクトの名前に時刻（UTC）も入れる。ADR-028・SDD 2章の db-backup の行・05 3.14 と 6.2（戻すときは一番新しいものを選ぶ）・
+     Terraform・バックアップのテストを合わせる
+   - 04 2章と ADR-027 に、決まりを1つ書く（Google Cloud のトークンを作れるジョブでは、リポジトリの依存のコードを動かさない）
+3. API のイメージを NODE_ENV=production で動かす（ユーザーの決定）: Dockerfile で NODE_ENV=production にし、SDD 2章「環境変数」の
+   段落（設定しない理由）を書き直す。ビルドを返す E2E（ポート 3200 の API。test-e2e の PWA の検査と first-paint）と、イメージを
+   手元で動かす確かめも NODE_ENV=production で動かし、本番の分岐をテストが通るようにする。production で変わるもの（Bun.serve の
+   development、Elysia の入力の検査のエラー、Better Auth、PDF の React）が、docs の決まり（8章のエラーの形、ログイン、P13 の PDF）
+   どおりに動くことを確かめる。手元の http://localhost の E2E で production の分岐が Cookie などを変えるときは、決まりを弱めずに
+   合わせる方法を選び、書く
+4. KPI の確認用のワークスペース: SDD 11章は「登録（K-11・K-12）は、確認だけに使うアカウントも1人として数える」とするが、
+   その活動は数えないので、いつまでも「始めなかった登録」として数えられる。03 5.4 K と 04 6章を読み、確認に使うのが運営者（K-11・
+   K-12 からもう外れている）なら、その文を正す。確認だけのアカウントを別に作るなら、それも登録から外し、どう見分けるかを
+   書いてテストする。staging で make kpi を動かすときに CHECK_WORKSPACE_ID をどこから渡すかを書く。Step 44 に、CHECK_WORKSPACE_ID
+   を入れた後で kpi.yml を手で1回動かして成功を確かめることを足す（db-backup.yml と同じ形）
+5. 昇格の一覧（04 4.1）: deploy/{env}/version の履歴にあるのに、deploy.yml のデプロイの記録が見つからない版（実行が消えた・
+   読めない）を、promote が「出していない」と扱わないようにする。マイグレーションを当てたかもしれない版として扱い（両方の一覧に
+   入れる）、4.1 に書き、テストを足す（ADR-016: DB は戻せないので、分からないときは安全な側に倒す）
+6. Bun の版が2か所にある: apps/api/Dockerfile の FROM oven/bun:1.4.2-slim と、package.json の packageManager（03 1章・04 2章は
+   後者を正とする）。どちらかを変えたら食い違いが分かるよう、2つが同じ版であることをテストで確かめる。Dockerfile のベースの
+   イメージは digest でも固定する
+7. DB のパスワードをコマンドの引数に出さない: make db-backup と make kpi は、パスワードを含む DATABASE_URL_DIRECT を pg_dump と
+   psql の引数に渡している（Cloud Storage のトークンは Step 40 で引数から外した）。接続の情報を環境変数か権限 0600 の一時の
+   ファイルで渡し、引数に出さない。バックアップと KPI のテストを合わせる
+8. 語の衝突: ADR-024 と ADR-028 の「論理削除（soft delete）」は Cloud Storage の機能で、SDD 6.5 の論理削除（`deleted_at` の行）と
+   別のもの。Cloud Storage の機能だと分かる名前にする
+
+まだ作らないもの: Step 42〜44 の対象（直すものの 4 の Step 44 への書き足しは除く）。
+
+直すものの 1〜8 が閉じ、make test・make test-e2e・make typecheck・make lint（本家の actionlint で検出なし）・make doc-lint が通り、
+3つの envs で terraform fmt の検査と validate が通り、手元で作ったイメージが NODE_ENV=production で /・/api/health・
+/manifest.webmanifest を返し、写真と PDF が動く状態をゴールとする。make test-api のバックアップと KPI のテストには PostgreSQL 17 の
+クライアントが要る（03 1章）。この Mac の PATH の pg_dump は Homebrew の 14 なので、Step 41 と同じく 17 のクライアントを PATH の先に
+置いて動かす（Homebrew の PostgreSQL 14 には触れない）。独立のレビューは観点ごとに分けて同時に起動し（/draft:implement）、
+1〜8 のどれも漏らさない。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
 ## Step 42: 29 プライバシーポリシー・30 サポート
 
 Status:

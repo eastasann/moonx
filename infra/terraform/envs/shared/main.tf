@@ -60,20 +60,22 @@ resource "google_storage_bucket" "backups" {
     }
   }
 
-  # SDD 7.2「個人情報」: deleted information leaves the backups within 30 days. Soft delete
-  # would keep a deleted dump 7 more days.
+  # SDD 7.2「個人情報」: deleted information leaves the backups within 30 days. Cloud
+  # Storage's soft delete would keep a deleted dump 7 more days.
   soft_delete_policy {
     retention_duration_seconds = 0
   }
 }
 
-# make db-backup uploads with the JSON API, which needs create, and delete to replace the
-# day's <date>.dump when db-backup.yml runs again that day (05_operation-runbook.md 3.14).
-# get and list are left out, so only the operators can read the backups (05 6.2).
+# make db-backup uploads with the JSON API, which needs create alone: each dump's name
+# holds the time, so none replaces another, and without delete the account that writes
+# them cannot remove or overwrite one (ADR-028). get and list are left out, so only the
+# operators can read the backups (05_operation-runbook.md 6.2). The 30 days' deletion is
+# Cloud Storage's own (the lifecycle rule above).
 resource "google_project_iam_custom_role" "backup_writer" {
   role_id     = "moonxBackupWriter"
   title       = "moonx backup writer"
-  permissions = ["storage.objects.create", "storage.objects.delete"]
+  permissions = ["storage.objects.create"]
 }
 
 resource "google_storage_bucket_iam_member" "backups_deploy" {

@@ -62,7 +62,7 @@
 - `make promote ENV=... [SHA=...]`: 昇格とロールバックの PR を作る（人が動かす）
 - `make doc-lint`: ドキュメントと実体の食い違いを検査する（コミット前の検査は pre-commit のフックが動かす）
 
-CI が使うターゲット（`install`・`env-file`・`build-web`・`build-api-image`・`deploy-api`・`promote-check`・`db-backup`・`kpi`）は SDD 2章と `docs/04_deployment-procedure.md` 2章。
+CI が使うターゲット（`install`・`env-file`・`build-web`・`build-api-image`・`push-api-image`・`db-migrate`・`deploy-api`・`promote-check`・`db-backup`・`kpi`）は SDD 2章と `docs/04_deployment-procedure.md` 2章。
 
 ## Docs
 

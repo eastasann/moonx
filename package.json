@@ -12,7 +12,6 @@
     "@babel/parser": "^8.0.7",
     "@babel/types": "^8.0.6",
     "@biomejs/biome": "^2.5.15",
-    "@kjanat/actionlint": "1.17.0",
     "@moonx/schemas": "workspace:*",
     "@moonx/ui-tokens": "workspace:*",
     "@playwright/test": "^1.64.0",

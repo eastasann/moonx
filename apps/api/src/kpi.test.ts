@@ -1,4 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   changeHistory,
@@ -28,7 +37,8 @@ import { testFixtures, uniqueEmail } from "./test-fixtures";
 // on PATH, which must be PostgreSQL 17's (03_dev-setup.md 1章). The rows live in a
 // database of this file's own, so the counts see nothing else. Every measure gets a known
 // count with its edge cases beside it, and the same table must come out of a read-only
-// role made the way 03_dev-setup.md 5.4 E makes moonx_backup_ro.
+// role made the way 03_dev-setup.md 5.4 E makes moonx_backup_ro. psql runs through a
+// script that records its arguments, which must never hold the password.
 
 const repoRoot = join(import.meta.dir, "..", "..", "..");
 const TIMEOUT_MS = 60_000;
@@ -89,8 +99,20 @@ type Row = [kpi: string, period: string, measure: string, count: number];
 let connection: DatabaseConnection | undefined;
 let expected: Row[] = [];
 let checkWorkspaceId = "";
+/** Where make finds the recording psql first, and the file it writes to. */
+let bin = "";
+let psqlArgs = "";
 
 beforeAll(async () => {
+  bin = mkdtempSync(join(tmpdir(), "moonx-kpi-"));
+  psqlArgs = join(bin, "psql.args");
+  const real = Bun.which("psql");
+  if (real === null) throw new Error("No psql on PATH (03_dev-setup.md 1章)");
+  writeFileSync(
+    join(bin, "psql"),
+    `#!/bin/sh\nfor arg in "$@"; do printf '%s\\n' "$arg"; done >> '${psqlArgs}'\nexec '${real}' "$@"\n`,
+  );
+  chmodSync(join(bin, "psql"), 0o755);
   await prepareTestDatabase(kpiUrl);
   connection = connectDatabase(kpiUrl);
   let now = Date.now();
@@ -101,6 +123,7 @@ beforeAll(async () => {
 }, SETTLE_MS + TIMEOUT_MS);
 
 afterAll(async () => {
+  rmSync(bin, { recursive: true, force: true });
   await connection?.close();
   const admin = new URL(sourceUrl);
   admin.pathname = "/postgres";
@@ -123,10 +146,11 @@ async function kpi(
   args: string[],
   env: { DATABASE_URL_DIRECT?: string; CHECK_WORKSPACE_ID?: string } = {},
 ) {
+  rmSync(psqlArgs, { force: true });
   const child = Bun.spawn(["make", "--silent", "kpi", ...args], {
     cwd: repoRoot,
     env: {
-      PATH: process.env.PATH ?? "",
+      PATH: `${bin}:${process.env.PATH ?? ""}`,
       DATABASE_URL_DIRECT: kpiUrl,
       CHECK_WORKSPACE_ID: checkWorkspaceId,
       ...env,
@@ -141,6 +165,12 @@ async function kpi(
   ]);
   return { exitCode, stdout, stderr };
 }
+
+/** The arguments the last make kpi gave psql, one per line; none if it did not run. */
+const psqlArguments = () =>
+  existsSync(psqlArgs)
+    ? readFileSync(psqlArgs, "utf8").split("\n").slice(0, -1)
+    : [];
 
 /** The rows of psql's aligned table, which must be all there is on stdout. */
 function tableRows(stdout: string): Row[] {
@@ -983,6 +1013,52 @@ describe("make kpi", () => {
 
       expect(result).toMatchObject({ exitCode: 0, stderr: "" });
       expect(tableRows(result.stdout)).toEqual(expected);
+      // The URL without its password, which libpq took from PGPASSWORD.
+      const url = new URL(readerUrl);
+      const args = psqlArguments();
+      expect(args).toContain(
+        `${url.protocol}//${reader.role}@${url.host}${url.pathname}`,
+      );
+      for (const arg of args) expect(arg).not.toContain(reader.password);
+    },
+    TIMEOUT_MS,
+  );
+
+  test.each([
+    ["the key=value form", "host=localhost dbname=moonx_kpi_test password=x"],
+    [
+      "a password= parameter",
+      "postgresql://moonx@localhost/moonx_kpi_test?sslmode=disable&password=x",
+    ],
+    [
+      "a password parameter whose name is percent-encoded",
+      "postgresql://moonx@localhost/moonx_kpi_test?pass%77ord=secret",
+    ],
+    [
+      "the key=value form holding a URL",
+      "host=localhost dbname=moonx_kpi_test password=secret application_name=http://x",
+    ],
+    [
+      "a password with an unencoded @",
+      "postgresql://moonx:sec@ret@localhost/moonx_kpi_test",
+    ],
+    [
+      "a password with an unencoded slash",
+      "postgresql://moonx:sec/ret@localhost/moonx_kpi_test",
+    ],
+  ])(
+    "refuses a connection string in %s, whose password would be an argument",
+    async (_, databaseUrlDirect) => {
+      const result = await kpi(["ENV=production"], {
+        DATABASE_URL_DIRECT: databaseUrlDirect,
+      });
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain(
+        "DATABASE_URL_DIRECT must be a postgres:// URL with any password in its user:password@ part",
+      );
+      expect(result.stdout).toBe("");
+      expect(psqlArguments()).toEqual([]);
     },
     TIMEOUT_MS,
   );

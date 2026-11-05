@@ -21,7 +21,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { YAML } from "bun";
-import { DEPLOY_JOB, DEPLOY_STEP } from "./promote";
+import { DEPLOY_JOB, DEPLOY_STEP, MIGRATE_JOB, MIGRATE_STEP } from "./promote";
 
 // Each test runs promote, which spawns git dozens of times: slow runners need more than 5 s.
 setDefaultTimeout(30_000);
@@ -34,6 +34,11 @@ const IMAGE = `asia-southeast1-docker.pkg.dev/${PROJECT}/moonx/api`;
 const PR_URL = "https://github.com/example/moonx/pull/42";
 const UNDEPLOYED_NOTE = (file: string) =>
   `この PR の \`deploy.yml\` が検査で止まった・承認されなかった・失敗したときは、\`${file}\` が出ていない版を指したままになる。正しい SHA で新しい昇格の PR を出して直す（\`make promote\`。04_deployment-procedure.md 2章）。`;
+const ROLLBACK_REASON =
+  "<!-- 戻す理由と、出す版が直前の版でない・分からないときは 5.1 の 3 で確かめた結果を書く（04_deployment-procedure.md 5.1 の 4） -->";
+
+/** What gh prints when the jobs of a run deleted after gh listed it answer 404. */
+const NOT_FOUND = "gh: Not Found (HTTP 404)";
 
 // gh and gcloud stand-ins: each logs its argv to calls.log and answers from the files the
 // test writes under $FAKE_DIR.
@@ -61,8 +66,10 @@ case "$1 $2" in
   case "$#:$2:$3 $4 $5" in
   "5:repos/{owner}/{repo}/actions/runs/"*"/jobs?filter=all&per_page=100:--paginate --jq .jobs[]")
     id=\${2#'repos/{owner}/{repo}/actions/runs/'}
-    file="$FAKE_DIR/gh/run-jobs-\${id%%/*}.jsonl"
-    if [ -f "$file" ]; then cat "$file"; else echo "gh: Not Found (HTTP 404)" >&2; exit 1; fi ;;
+    file="$FAKE_DIR/gh/run-jobs-\${id%%/*}"
+    if [ -f "$file.jsonl" ]; then cat "$file.jsonl"
+    elif [ -f "$file.err" ]; then cat "$file.err" >&2; exit 1
+    else echo "${NOT_FOUND}" >&2; exit 1; fi ;;
   *)
     echo "fake gh: unexpected $*" >&2; exit 2 ;;
   esac ;;
@@ -87,6 +94,7 @@ if [ "$1 $2 $3 $4" = "artifacts docker images describe" ]; then
   echo "ERROR: (gcloud.artifacts.docker.images.describe) Image not found: $5" >&2; exit 1
 elif [ "$1 $2 $3" = "run services describe" ]; then
   if [ -f "$FAKE_DIR/gcloud/service-$4.json" ]; then cat "$FAKE_DIR/gcloud/service-$4.json"; exit 0; fi
+  if [ -f "$FAKE_DIR/gcloud/service-$4.stderr" ]; then cat "$FAKE_DIR/gcloud/service-$4.stderr" >&2; exit 1; fi
   echo "ERROR: (gcloud.run.services.describe) Cannot find service [$4]" >&2; exit 1
 elif [ "$1 $2 $3" = "run revisions describe" ]; then
   if [ -f "$FAKE_DIR/gcloud/revision-$4" ]; then cat "$FAKE_DIR/gcloud/revision-$4"; exit 0; fi
@@ -194,72 +202,162 @@ function buildRun(sha: string, conclusion = "success") {
   );
 }
 
-/** One attempt of a deploy.yml run: how its deploy job ended, and its Deploy step. */
-interface Attempt {
+/** A step of a fixture's job: completed and successful unless given. */
+interface StepState {
   status?: string;
-  conclusion?: string;
-  /** Completed and successful unless given; null when the job never started (no steps). */
-  step?: { status?: string; conclusion?: string } | null;
+  /** null while it has not finished, as the jobs API has it. */
+  conclusion?: string | null;
+}
+
+/** A job of a deploy.yml run, completed and successful unless given, and its Migrate or Deploy step. */
+interface JobState extends StepState {
+  /** null when the job never started (cancelled while it waited, say), so it lists no steps. */
+  step?: StepState | null;
+  /** The step's name when a run of another deploy.yml named it otherwise. */
+  stepName?: string;
+}
+
+/** One attempt of a deploy.yml run, as the jobs API lists its jobs. */
+interface Attempt {
+  /** The image job's check failed, so GitHub skipped the jobs after it. */
+  image?: "failure";
+  /** The migrate job and its Migrate step; skipped as a whole after a failed image job. */
+  migrate?: JobState;
+  /**
+   * The deploy job and its Deploy step; null for one the attempt does not list. Unless given,
+   * it follows the migrate job as deploy.yml's needs: and if: make it: not listed while that
+   * job has not completed, skipped as a whole (the jobs API lists it with no steps) when it
+   * did not succeed or skipped its Migrate step, and otherwise completed and successful.
+   */
+  deploy?: JobState | null;
+  /** A re-run of the deploy job alone: the attempt lists no check, image or migrate job. */
+  alone?: boolean;
+}
+
+/**
+ * A deploy.yml run: one attempt unless `attempts` is given. With `jobsError`, the jobs call
+ * fails and gh prints that ({@link NOT_FOUND} for a run deleted after gh listed it).
+ */
+type RunFixture = Attempt & { attempts?: Attempt[]; jobsError?: string };
+
+const concluded = (state: StepState) =>
+  state.conclusion === undefined ? "success" : state.conclusion;
+
+const skippedJob = (name: string, attempt: number) => ({
+  name,
+  run_attempt: attempt,
+  status: "completed",
+  conclusion: "skipped",
+  steps: [],
+});
+
+function jobOf(name: string, attempt: number, state: JobState, step: string) {
+  const inner = state.step === undefined ? {} : state.step;
+  return {
+    name,
+    run_attempt: attempt,
+    status: state.status ?? "completed",
+    conclusion: concluded(state),
+    steps:
+      inner === null
+        ? []
+        : [
+            { name: "Set up job", status: "completed", conclusion: "success" },
+            {
+              name: state.stepName ?? step,
+              status: inner.status ?? "completed",
+              conclusion: concluded(inner),
+            },
+          ],
+  };
+}
+
+function deployJobOf(attempt: Attempt): JobState | "skipped" | null {
+  if (attempt.deploy !== undefined) return attempt.deploy;
+  if (attempt.alone) return {};
+  if (attempt.image === "failure") return "skipped";
+  const migrate = attempt.migrate ?? {};
+  if ((migrate.status ?? "completed") !== "completed") return null;
+  const step = migrate.step === undefined ? {} : migrate.step;
+  return concluded(migrate) !== "success" ||
+    step === null ||
+    concluded(step) === "skipped"
+    ? "skipped"
+    : {};
 }
 
 /**
  * deploy.yml's runs for `commit`, newest first, as gh run list shows them, and the jobs of
- * each run's attempts as the jobs API lists them. A run without `attempts` has one attempt
- * that ends as the run does; gh run list shows the last attempt's state.
+ * each run's attempts as the jobs API lists them. gh run list shows the state of each job's
+ * latest attempt: still running while one is, else failed (or cancelled) when one did not
+ * succeed and was not skipped.
  */
-function deployRuns(
-  commit: string,
-  ...given: (Attempt & { attempts?: Attempt[] })[]
-): number[] {
+function deployRuns(commit: string, ...given: RunFixture[]): number[] {
   const listed = given.map((run) => {
     const databaseId = ++runId;
     const attempts = run.attempts ?? [run];
     const jobs = attempts.flatMap((attempt, index) => {
-      const status = attempt.status ?? "completed";
-      const conclusion = attempt.conclusion ?? "success";
-      const step = attempt.step === undefined ? {} : attempt.step;
+      const number = index + 1;
+      const deploy = deployJobOf(attempt);
       return [
-        {
-          name: "check",
-          run_attempt: index + 1,
-          status: "completed",
-          conclusion: "success",
-          steps: [
-            { name: "Check", status: "completed", conclusion: "success" },
-          ],
-        },
-        {
-          name: DEPLOY_JOB,
-          run_attempt: index + 1,
-          status,
-          conclusion,
-          steps:
-            step === null
-              ? []
-              : [
-                  {
-                    name: "Set up job",
-                    status: "completed",
-                    conclusion: "success",
-                  },
-                  {
-                    name: DEPLOY_STEP,
-                    status: step.status ?? "completed",
-                    conclusion: step.conclusion ?? "success",
-                  },
+        ...(attempt.alone
+          ? []
+          : [
+              {
+                name: "check",
+                run_attempt: number,
+                status: "completed",
+                conclusion: "success",
+                steps: [
+                  { name: "Check", status: "completed", conclusion: "success" },
                 ],
-        },
+              },
+              jobOf(
+                "image",
+                number,
+                {
+                  conclusion: attempt.image ?? "success",
+                  step: { conclusion: attempt.image ?? "success" },
+                },
+                "The image of the SHA exists",
+              ),
+              attempt.image === "failure"
+                ? skippedJob(MIGRATE_JOB, number)
+                : jobOf(
+                    MIGRATE_JOB,
+                    number,
+                    attempt.migrate ?? {},
+                    MIGRATE_STEP,
+                  ),
+            ]),
+        ...(deploy === null
+          ? []
+          : deploy === "skipped"
+            ? [skippedJob(DEPLOY_JOB, number)]
+            : [jobOf(DEPLOY_JOB, number, deploy, DEPLOY_STEP)]),
       ];
     });
-    fixture(
-      `gh/run-jobs-${databaseId}.jsonl`,
-      jobs.map((job) => `${JSON.stringify(job)}\n`).join(""),
-    );
-    const last = attempts.at(-1) ?? {};
+    if (run.jobsError === undefined) {
+      fixture(
+        `gh/run-jobs-${databaseId}.jsonl`,
+        jobs.map((job) => `${JSON.stringify(job)}\n`).join(""),
+      );
+    } else {
+      fixture(`gh/run-jobs-${databaseId}.err`, run.jobsError);
+    }
+    const latest = [...new Map(jobs.map((job) => [job.name, job])).values()];
+    const status =
+      latest.find((job) => job.status !== "completed")?.status ?? "completed";
     return {
       databaseId,
-      status: last.status ?? "completed",
-      conclusion: last.conclusion ?? "success",
+      status,
+      conclusion:
+        status !== "completed"
+          ? ""
+          : (latest.find(
+              (job) =>
+                job.conclusion !== "success" && job.conclusion !== "skipped",
+            )?.conclusion ?? "success"),
     };
   });
   fixture(`gh/run-list-deploy.yml-${commit}.json`, JSON.stringify(listed));
@@ -267,10 +365,25 @@ function deployRuns(
 }
 
 /** deploy.yml's one run for `commit`, with one attempt unless `attempts` is given. */
-const deployRun = (
-  commit: string,
-  run: Attempt & { attempts?: Attempt[] } = {},
-): number => deployRuns(commit, run)[0] ?? 0;
+const deployRun = (commit: string, run: RunFixture = {}): number =>
+  deployRuns(commit, run)[0] ?? 0;
+
+/**
+ * Makes deploy.yml's record of `commit` missing: no run listed, or a run whose jobs answer
+ * 404. Returns how the body describes it.
+ */
+function loseRecord(commit: string, kind: "none" | "unreadable"): string {
+  if (kind === "none") {
+    rmSync(join(fake, `gh/run-list-deploy.yml-${commit}.json`));
+    return `${short(commit)} の deploy.yml の実行が見つからない（まだ動いていないか、消された）`;
+  }
+  const id = deployRun(commit, { jobsError: NOT_FOUND });
+  return `${short(commit)} の deploy.yml（実行 ${id}）のジョブを gh で読めなかった（${NOT_FOUND}）`;
+}
+
+/** The body's 直前の版 section when the write of `sha` has a missing record that `says`. */
+const previousUnknown = (sha: string, says: string) =>
+  `## 直前の版\n\n出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）は分からない。\`${sha}\` を書いた ${says}ので、その版が出ていたかもしれない。04_deployment-procedure.md 5.1 の 3 のとおり、上のマイグレーションの一覧に contract（4.1 の表の右の列）が無いことを確かめる。新しい値を書き始めた変更はマイグレーションに出ないことがあるので、コミットの一覧でも確かめる。\n`;
 
 /** A merged promotion pull request whose deploy.yml deployed: main's commit writing `sha`. */
 function land(target: "staging" | "production", sha: string): string {
@@ -290,6 +403,7 @@ let c1: string;
 let c2: string;
 let c3: string;
 let c4: string;
+let s1: string;
 let s2: string;
 let s2Run: number;
 
@@ -314,7 +428,7 @@ beforeAll(() => {
   c0 = commit("chore: start");
   addMigration(["0000_one"]);
   c1 = commit("feat: one");
-  land("staging", c1);
+  s1 = land("staging", c1);
   addMigration(["0000_one", "0001_two"]);
   c2 = commit("feat: two");
   addMigration(["0000_one", "0001_two", "0002_three"]);
@@ -394,6 +508,25 @@ function originBranch(branch: string): string | undefined {
   ]);
   return result.exitCode === 0 ? result.stdout.trim() : undefined;
 }
+
+/** A job of a workflow, with the keys the tests read. */
+interface WorkflowJob {
+  name?: string;
+  needs?: string | string[];
+  if?: string;
+  environment?: unknown;
+  concurrency?: unknown;
+  permissions?: unknown;
+  outputs?: Record<string, string>;
+  steps?: { name?: string; if?: string; run?: string }[];
+}
+
+const deployWorkflow = async () =>
+  YAML.parse(
+    await Bun.file(
+      join(import.meta.dir, "..", ".github", "workflows", "deploy.yml"),
+    ).text(),
+  ) as { permissions?: unknown; jobs?: Record<string, WorkflowJob> };
 
 /** Asserts the run left the user on a clean main, with no branch and no pull request. */
 function expectNothingMade(branch: string) {
@@ -549,7 +682,7 @@ describe("promote", () => {
       `今の版に戻すときは \`make promote ENV=staging SHA=${short(c2)}\` を動かす。`,
     );
     expect(body).toContain(UNDEPLOYED_NOTE(STAGING));
-    expect(body).toContain("## 戻す理由\n");
+    expect(body).toContain(`## 戻す理由\n\n${ROLLBACK_REASON}\n`);
     expect(body).not.toContain("## staging での確認の結果");
   });
 
@@ -586,8 +719,26 @@ describe("promote", () => {
     );
   });
 
+  test.each(["none", "unreadable"] as const)(
+    "does not know the previous version when an older write of the furthest one lost its record (%s)",
+    (kind) => {
+      // c4 may have been deployed first by the write whose record is lost, when c2 ran.
+      const lost = land("staging", c4);
+      const says = loseRecord(lost, kind);
+      land("staging", c1);
+      land("staging", c4);
+      publish();
+      const result = run("staging", c1);
+
+      expect(result.exitCode).toBe(0);
+      const body = prBody();
+      expect(body).toContain(previousUnknown(c4, says));
+      expect(body).not.toContain("確かめなくてよい");
+    },
+  );
+
   test("skips a write deploy.yml did not deploy when it looks for the previous version", () => {
-    deployRun(land("staging", c3), { conclusion: "failure" });
+    deployRun(land("staging", c3), { deploy: { conclusion: "failure" } });
     land("staging", c4);
     publish();
     const result = run("staging", c2);
@@ -599,9 +750,27 @@ describe("promote", () => {
     );
   });
 
+  test.each(["none", "unreadable"] as const)(
+    "does not know the previous version past a write with a missing record (%s)",
+    (kind) => {
+      // c3's write may have deployed c3 just before c4, so c2 may not be the previous one.
+      const says = loseRecord(land("staging", c3), kind);
+      land("staging", c4);
+      publish();
+      const result = run("staging", c2);
+
+      expect(result.exitCode).toBe(0);
+      const body = prBody();
+      expect(body).not.toContain("[!CAUTION]");
+      expect(body).toContain(`- いちばん先まで出した版: \`${c4}\``);
+      expect(body).toContain(previousUnknown(c3, says));
+    },
+  );
+
   test("counts the furthest version as first deployed when its first write did not deploy", () => {
-    // c4's first write was not approved; c4's migrations reached the DB while c3 ran.
-    deployRun(land("staging", c4), { conclusion: "failure", step: null });
+    // c4's first write stopped at the image check; c4's migrations reached the DB while c3
+    // ran.
+    deployRun(land("staging", c4), { image: "failure" });
     land("staging", c3);
     land("staging", c4);
     publish();
@@ -614,9 +783,12 @@ describe("promote", () => {
   });
 
   test("takes the furthest version from what deploy.yml deployed, not from what was written", () => {
-    // X = c2 deployed, Y = c3 promoted but never approved, X promoted again; Z = c4.
+    // X = c2 deployed, Y = c3 promoted but cancelled before it migrated, X promoted again;
+    // Z = c4.
     const y = land("staging", c3);
-    const yRun = deployRun(y, { conclusion: "failure", step: null });
+    const yRun = deployRun(y, {
+      migrate: { conclusion: "cancelled", step: null },
+    });
     const again = land("staging", c2);
     const againRun = runId;
     publish();
@@ -648,8 +820,8 @@ describe("promote", () => {
     ]);
   });
 
-  describe("when a newer version's Deploy step ran and did not succeed", () => {
-    // X = c2 deployed, then Y = c5 failed in its Deploy step (its migrations may be in the
+  describe("when a newer version's Migrate step ran and did not succeed", () => {
+    // X = c2 deployed, then Y = c5 failed in its Migrate step (its migrations may be in the
     // DB), then X was promoted again. W = c1 is older, c3 lies between X and Y, Z = c6.
     let c5: string;
     let c6: string;
@@ -673,15 +845,14 @@ describe("promote", () => {
       }
       y = land("staging", c5);
       yRun = deployRun(y, {
-        conclusion: "failure",
-        step: { conclusion: "failure" },
+        migrate: { conclusion: "failure", step: { conclusion: "failure" } },
       });
       land("staging", c2);
       publish();
     });
 
     const caution = () =>
-      `> [!CAUTION]\n> \`${short(c5)}\` の deploy.yml（${short(y)} の実行 ${yRun}）は ${DEPLOY_STEP} のステップまで動いたが、そのステップが成功していない（failure）。\`${short(c5)}\` のマイグレーションが DB に当たったかは分からないので、下のマイグレーションの一覧は、当たっていても当たっていなくても漏れが無いように作った。\n\n## 昇格\n`;
+      `> [!CAUTION]\n> \`${short(c5)}\` の deploy.yml（${short(y)} の実行 ${yRun}）は ${MIGRATE_STEP} のステップまで動いたが、そのステップが成功していない（failure）。\`${short(c5)}\` のマイグレーションが DB に当たったかは分からないので、下のマイグレーションの一覧は、当たっていても当たっていなくても漏れが無いように作った。\n\n## 昇格\n`;
 
     test("rolling back to an older version lists the migrations up to the one that may have migrated", () => {
       const result = run("staging", c1);
@@ -692,7 +863,8 @@ describe("promote", () => {
       );
       const body = prBody();
       expect(body).toStartWith(caution());
-      expect(body).toContain(`- いちばん先まで出した版: \`${c2}\``);
+      // Y's record is there, so c2 stays the furthest version without a doubt about it.
+      expect(body).toContain(`- いちばん先まで出した版: \`${c2}\`\n`);
       expect(body).toContain(
         `- マイグレーションが当たったかもしれない版: \`${c5}\``,
       );
@@ -753,57 +925,85 @@ describe("promote", () => {
       );
     });
 
-    test.each([
+    test.each<[string, RunFixture, boolean]>([
       [
-        "a cancelled Deploy step",
-        { conclusion: "cancelled", step: { conclusion: "cancelled" } },
-        true,
-      ],
-      [
-        "a Deploy step still running",
+        "a cancelled Migrate step",
         {
-          status: "in_progress",
-          conclusion: "",
-          step: { status: "in_progress", conclusion: "" },
+          migrate: {
+            conclusion: "cancelled",
+            step: { conclusion: "cancelled" },
+          },
         },
         true,
       ],
-      ["a skipped Deploy step", { step: { conclusion: "skipped" } }, false],
       [
-        "a Deploy step still queued",
+        "a Migrate step still running",
         {
-          status: "in_progress",
-          conclusion: "",
-          step: { status: "queued", conclusion: "" },
+          migrate: {
+            status: "in_progress",
+            conclusion: null,
+            step: { status: "in_progress", conclusion: null },
+          },
+        },
+        true,
+      ],
+      [
+        "a skipped Migrate step, the deploy job skipped with it",
+        { migrate: { step: { conclusion: "skipped" } } },
+        false,
+      ],
+      [
+        "a Migrate step still queued",
+        {
+          migrate: {
+            status: "in_progress",
+            conclusion: null,
+            step: { status: "queued", conclusion: null },
+          },
         },
         false,
       ],
       [
-        "a deploy job that never started",
-        { conclusion: "failure", step: null },
+        "a migrate job skipped after a failed image check",
+        { image: "failure" },
         false,
       ],
       [
-        "a Deploy step that succeeded in a job that failed later",
-        { conclusion: "failure", step: { conclusion: "success" } },
+        "a migrate job cancelled before it started",
+        { migrate: { conclusion: "cancelled", step: null } },
+        false,
+      ],
+      [
+        "a Migrate step that succeeded before a deploy job that failed",
+        { deploy: { conclusion: "failure", step: { conclusion: "failure" } } },
         true,
       ],
       [
-        "a failed Deploy step re-run without approval",
+        "a failed Migrate step re-run and cancelled before it started",
         {
           attempts: [
-            { conclusion: "failure", step: { conclusion: "failure" } },
-            { conclusion: "failure", step: null },
+            {
+              migrate: {
+                conclusion: "failure",
+                step: { conclusion: "failure" },
+              },
+            },
+            { migrate: { conclusion: "cancelled", step: null } },
           ],
         },
         true,
       ],
       [
-        "a failed Deploy step re-run and skipped",
+        "a failed Migrate step re-run and skipped",
         {
           attempts: [
-            { conclusion: "failure", step: { conclusion: "failure" } },
-            { step: { conclusion: "skipped" } },
+            {
+              migrate: {
+                conclusion: "failure",
+                step: { conclusion: "failure" },
+              },
+            },
+            { migrate: { step: { conclusion: "skipped" } } },
           ],
         },
         true,
@@ -823,26 +1023,40 @@ describe("promote", () => {
         "この昇格で新しく当たるもの）\n\n- `0002_three`\n- `0003_five`\n- `0004_six`\n\n",
       );
     });
-    test("says the migrations are applied when the Deploy step succeeded and the job failed", () => {
-      const id = deployRun(y, {
-        conclusion: "failure",
-        step: { conclusion: "success" },
-      });
-      const result = run("staging", c6);
 
-      expect(result.exitCode).toBe(0);
-      expect(prBody()).toStartWith(
-        `> [!CAUTION]\n> \`${short(c5)}\` の deploy.yml（${short(y)} の実行 ${id}）は ${DEPLOY_STEP} のステップが成功したが、${DEPLOY_JOB} のジョブは成功していない（failure）。\`${short(c5)}\` のマイグレーションは DB に当たっている（その版のリビジョンにはトラフィックが流れていないことがある）ので、下のマイグレーションの一覧はこの版までを数えに入れた。\n\n## 昇格\n`,
-      );
-    });
+    test.each<[string, RunFixture]>([
+      [
+        "its deploy job failed",
+        { deploy: { conclusion: "failure", step: { conclusion: "failure" } } },
+      ],
+      [
+        "its deploy job skipped the Deploy step for a later promotion",
+        { deploy: { step: { conclusion: "skipped" } } },
+      ],
+    ])(
+      "says the migrations are applied when the Migrate step succeeded and %s",
+      (_, deploy) => {
+        const id = deployRun(y, deploy);
+        const result = run("staging", c6);
+
+        expect(result.exitCode).toBe(0);
+        const body = prBody();
+        expect(body).toStartWith(
+          `> [!CAUTION]\n> \`${short(c5)}\` の deploy.yml（${short(y)} の実行 ${id}）は ${MIGRATE_STEP} のステップが成功したが、${DEPLOY_JOB} のジョブはどの試行でもデプロイしていない。\`${short(c5)}\` のマイグレーションは DB に当たっている（その版のリビジョンにはトラフィックが流れていないことがある）ので、下のマイグレーションの一覧はこの版までを数えに入れた。\n\n## 昇格\n`,
+        );
+        // Applied, but not deployed: the furthest version stays c2.
+        expect(body).toContain(`- いちばん先まで出した版: \`${c2}\``);
+        expect(body).toContain(
+          `- マイグレーションが当たったかもしれない版: \`${c5}\``,
+        );
+      },
+    );
 
     test("lists the commits absent from a target older than what Cloud Run runs", () => {
-      // c5 written again; its Deploy step succeeded and its job failed, and it now serves.
+      // c5 written again; its Migrate and Deploy steps succeeded and the check after them
+      // failed, and it now serves.
       const written = land("staging", c5);
-      deployRun(written, {
-        conclusion: "failure",
-        step: { conclusion: "success" },
-      });
+      deployRun(written, { deploy: { conclusion: "failure" } });
       publish();
       fixture(
         "gcloud/service-moonx-api-staging.json",
@@ -900,14 +1114,13 @@ describe("promote", () => {
     });
 
     test("says the migrations are applied when an older write of the version applied them", () => {
-      // y's Deploy step succeeded and its job failed; c5's second write failed in Deploy.
+      // y's Migrate step succeeded and its deploy job failed; c5's second write failed in
+      // Migrate.
       const id = deployRun(y, {
-        conclusion: "failure",
-        step: { conclusion: "success" },
+        deploy: { conclusion: "failure", step: { conclusion: "failure" } },
       });
       deployRun(land("staging", c5), {
-        conclusion: "failure",
-        step: { conclusion: "failure" },
+        migrate: { conclusion: "failure", step: { conclusion: "failure" } },
       });
       land("staging", c2);
       publish();
@@ -915,7 +1128,7 @@ describe("promote", () => {
 
       expect(result.exitCode).toBe(0);
       expect(prBody()).toStartWith(
-        `> [!CAUTION]\n> \`${short(c5)}\` の deploy.yml（${short(y)} の実行 ${id}）は ${DEPLOY_STEP} のステップが成功したが、`,
+        `> [!CAUTION]\n> \`${short(c5)}\` の deploy.yml（${short(y)} の実行 ${id}）は ${MIGRATE_STEP} のステップが成功したが、`,
       );
       expect(prBody()).toContain(
         `\`${short(c5)}\` のマイグレーションは DB に当たっている`,
@@ -925,8 +1138,8 @@ describe("promote", () => {
     test("looks at every run gh lists for the commit", () => {
       deployRuns(
         y,
-        { conclusion: "failure", step: null },
-        { conclusion: "failure", step: { conclusion: "failure" } },
+        { image: "failure" },
+        { migrate: { conclusion: "failure", step: { conclusion: "failure" } } },
       );
       const result = run("staging", c6);
 
@@ -935,14 +1148,203 @@ describe("promote", () => {
         `- マイグレーションが当たったかもしれない版: \`${c5}\``,
       );
     });
+
+    test("counts a write as missing when a later run of it cannot be read", () => {
+      // The newer run skipped its Migrate step; the older one was deleted after the listing.
+      const [, deleted] = deployRuns(
+        y,
+        { migrate: { step: { conclusion: "skipped" } } },
+        { jobsError: NOT_FOUND },
+      );
+      const result = run("staging", c6);
+
+      expect(result.exitCode).toBe(0);
+      expect(prBody()).toStartWith(
+        `> [!CAUTION]\n> \`${short(c5)}\` の deploy.yml（${short(y)} の実行 ${deleted}）のジョブを gh で読めなかった（${NOT_FOUND}）。`,
+      );
+    });
+
+    test("says the migrations are applied when an earlier attempt applied them and a re-run failed", () => {
+      const id = deployRun(y, {
+        attempts: [
+          {
+            deploy: { conclusion: "failure", step: { conclusion: "failure" } },
+          },
+          {
+            migrate: { conclusion: "failure", step: { conclusion: "failure" } },
+          },
+        ],
+      });
+      const result = run("staging", c6);
+
+      expect(result.exitCode).toBe(0);
+      expect(prBody()).toStartWith(
+        `> [!CAUTION]\n> \`${short(c5)}\` の deploy.yml（${short(y)} の実行 ${id}）は ${MIGRATE_STEP} のステップが成功したが、${DEPLOY_JOB} のジョブはどの試行でもデプロイしていない。\`${short(c5)}\` のマイグレーションは DB に当たっている`,
+      );
+    });
+
+    // The DB cannot be rolled back, so a write whose record is missing may have migrated.
+    describe.each<[string, () => void, () => string, string, () => string]>([
+      [
+        "no deploy.yml run",
+        () => rmSync(join(fake, `gh/run-list-deploy.yml-${y}.json`)),
+        () =>
+          `\`${short(c5)}\` の deploy.yml（${short(y)} の実行）が見つからない（まだ動いていないか、消された）。`,
+        "見つからない",
+        () =>
+          `${short(y)} の deploy.yml の実行が見つからない（まだ動いていないか、消された）`,
+      ],
+      [
+        "a deploy.yml run whose jobs gh cannot read",
+        () => rmSync(join(fake, `gh/run-jobs-${yRun}.jsonl`)),
+        () =>
+          `\`${short(c5)}\` の deploy.yml（${short(y)} の実行 ${yRun}）のジョブを gh で読めなかった（gh: Not Found (HTTP 404)）。`,
+        "読めない",
+        () =>
+          `${short(y)} の deploy.yml（実行 ${yRun}）のジョブを gh で読めなかった（gh: Not Found (HTTP 404)）`,
+      ],
+    ])("when Y's write has %s", (_, lose, says, record, describes) => {
+      beforeEach(lose);
+
+      const missingCaution = () =>
+        `> [!CAUTION]\n> ${says()}\`${short(c5)}\` のマイグレーションが DB に当たったかは分からないので、下のマイグレーションの一覧は、当たっていても当たっていなくても漏れが無いように作った。\n\n## 昇格\n`;
+      // Y may have deployed c5, so c5 may be the furthest version.
+      const furthestLine = () =>
+        `- いちばん先まで出した版: \`${c2}\`（これより新しい \`${short(c5)}\` は deploy.yml の記録が${record}ので、出ていたかもしれない）\n`;
+
+      test("rolling back below it lists the commits and migrations up to it, and does not know the previous version", () => {
+        const result = run("staging", c1);
+
+        expect(result.exitCode).toBe(0);
+        const body = prBody();
+        expect(body).not.toContain("確かめなくてよい");
+        expect(body).toBe(
+          [
+            missingCaution(),
+            "- 環境: staging",
+            `- 今の版: \`${c2}\``,
+            `- 出す版: \`${c1}\``,
+            "- 向き: 戻す",
+            furthestLine().trimEnd(),
+            `- マイグレーションが当たったかもしれない版: \`${c5}\``,
+            "",
+            `## コミット（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。出す版に無いもの）`,
+            "",
+            `- ${abbrev(c5)} feat: five`,
+            `- ${abbrev(c4)} fix: four`,
+            `- ${abbrev(c3)} feat: three`,
+            `- ${abbrev(c2)} feat: two`,
+            "",
+            `## マイグレーション（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。DB に当たっているかもしれず、出す版に無いもの）`,
+            "",
+            "- `0001_two`",
+            "- `0002_three`",
+            "- `0003_five`",
+            "",
+            previousUnknown(c5, describes()).trimEnd(),
+            "",
+            "## 戻し方",
+            "",
+            `今の版に戻すときは \`make promote ENV=staging SHA=${short(c2)}\` を動かす。`,
+            "",
+            "## この PR のデプロイが済まなかったとき",
+            "",
+            UNDEPLOYED_NOTE(STAGING),
+            "",
+            "## 戻す理由",
+            "",
+            ROLLBACK_REASON,
+            "",
+          ].join("\n"),
+        );
+      });
+
+      test("promoting past it counts its migrations in", () => {
+        const result = run("staging", c6);
+
+        expect(result.exitCode).toBe(0);
+        const body = prBody();
+        expect(body).toStartWith(missingCaution());
+        expect(body).toContain(furthestLine());
+        expect(body).toContain(
+          `- マイグレーションが当たったかもしれない版: \`${c5}\``,
+        );
+        expect(body).toContain(
+          `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、出す版まで。この昇格で新しく当たるもの）\n\n- \`0002_three\`\n- \`0003_five\`\n- \`0004_six\`\n\nこの一覧には、\`${short(c5)}\` のデプロイで当たったかもしれないものも入っている。\n\n## 戻し方`,
+        );
+        expect(body).not.toContain("出す版に無いもの");
+      });
+    });
+
+    test.each(["none", "unreadable"] as const)(
+      "does not know the previous version past a write with a missing record (%s)",
+      (kind) => {
+        // c3's write may have deployed c3 just before c4, so c2 may not be the previous one.
+        const says = loseRecord(land("staging", c3), kind);
+        land("staging", c4);
+        publish();
+        const result = run("staging", c2);
+
+        expect(result.exitCode).toBe(0);
+        const body = prBody();
+        expect(body).toStartWith(caution());
+        expect(body).toContain(`- いちばん先まで出した版: \`${c4}\``);
+        expect(body).toContain(
+          `- マイグレーションが当たったかもしれない版: \`${c5}\``,
+        );
+        expect(body).toContain(previousUnknown(c3, says));
+      },
+    );
+
+    test("does not know the previous version when another newer version's record is missing", () => {
+      // Y's Migrate step failed; c3, also newer than c2, may have been deployed.
+      const says = loseRecord(land("staging", c3), "none");
+      land("staging", c2);
+      publish();
+      const result = run("staging", c1);
+
+      expect(result.exitCode).toBe(0);
+      const body = prBody();
+      expect(body).toStartWith(caution());
+      expect(body).toContain(
+        `- いちばん先まで出した版: \`${c2}\`（これより新しい \`${short(c3)}\` は deploy.yml の記録が見つからないので、出ていたかもしれない）\n`,
+      );
+      expect(body).toContain(
+        `- マイグレーションが当たったかもしれない版: \`${c5}\`\n`,
+      );
+      expect(body).toContain(previousUnknown(c3, says));
+      expect(body).not.toContain("確かめなくてよい");
+    });
   });
 
-  test.each(["staging", "production"] as const)(
-    "counts a version an earlier attempt deployed as deployed, after a skipped re-run (%s)",
-    (target) => {
-      deployRun(s2, {
-        attempts: [{}, { step: { conclusion: "skipped" } }],
-      });
+  describe.each<[string, RunFixture[]]>([
+    [
+      "an earlier attempt deployed it, before a skipped re-run",
+      [{ attempts: [{}, { migrate: { step: { conclusion: "skipped" } } }] }],
+    ],
+    [
+      "a re-run of its deploy job alone deployed it",
+      [
+        {
+          attempts: [
+            {
+              deploy: {
+                conclusion: "failure",
+                step: { conclusion: "failure" },
+              },
+            },
+            { alone: true },
+          ],
+        },
+      ],
+    ],
+    [
+      "an older run deployed it and gh cannot read the newer one's jobs",
+      [{ jobsError: NOT_FOUND }, {}],
+    ],
+  ])("counts a version as deployed when %s", (_, runs) => {
+    test.each(["staging", "production"] as const)("(%s)", (target) => {
+      deployRuns(s2, ...runs);
       const result = run(target, ...(target === "staging" ? [] : [c2]));
 
       expect(result.exitCode).toBe(0);
@@ -950,33 +1352,164 @@ describe("promote", () => {
       expect(prBody()).toContain(
         `- 出す版: \`${target === "staging" ? c4 : c2}\``,
       );
-    },
-  );
+    });
+  });
 
   test("counts a version as deployed when an older run deployed it", () => {
-    deployRuns(s2, { conclusion: "failure", step: null }, {});
+    deployRuns(s2, { image: "failure" }, {});
     const result = run("production");
 
     expect(result.exitCode).toBe(0);
     expect(prTitle()).toBe(`chore(deploy): promote production to ${short(c2)}`);
   });
 
-  test("counts a promotion without a deploy.yml run as not deployed", () => {
+  test.each<
+    [
+      string,
+      (written: string) => { warning: string; caution: string; record: string },
+    ]
+  >([
+    [
+      "no deploy.yml run",
+      (written) => {
+        rmSync(join(fake, `gh/run-list-deploy.yml-${written}.json`));
+        return {
+          warning: `${short(written)} の deploy.yml の実行が見つからない（まだ動いていないか、消された）`,
+          caution: `\`${short(c3)}\` の deploy.yml（${short(written)} の実行）が見つからない（まだ動いていないか、消された）。`,
+          record: "見つからない",
+        };
+      },
+    ],
+    [
+      "a deploy.yml run whose jobs gh cannot read",
+      (written) => {
+        const id = deployRun(written, { jobsError: NOT_FOUND });
+        return {
+          warning: `${short(written)} の deploy.yml（実行 ${id}）のジョブを gh で読めなかった（gh: Not Found (HTTP 404)）`,
+          caution: `\`${short(c3)}\` の deploy.yml（${short(written)} の実行 ${id}）のジョブを gh で読めなかった（gh: Not Found (HTTP 404)）。`,
+          record: "読めない",
+        };
+      },
+    ],
+  ])(
+    "counts the current version with %s as not deployed, but maybe migrated",
+    (_, lose) => {
+      const written = land("staging", c3);
+      const says = lose(written);
+      publish();
+      const result = run("staging");
+
+      expect(result.exitCode).toBe(0);
+      expect(prBody()).toBe(
+        [
+          "> [!WARNING]",
+          `> staging の前回の deploy.yml が今の版をデプロイしたかは分からない（${says.warning}）。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
+          ">",
+          "> Cloud Run の `moonx-api-staging` で動いている版を gcloud で読めなかった（gcloud run services describe: ERROR: (gcloud.run.services.describe) Cannot find service [moonx-api-staging]）。",
+          ">",
+          `> 下のコミットの一覧と戻し方は、書かれている今の版 \`${short(c3)}\` を起点にする。この版は Cloud Run で動いていないことがある。`,
+          "",
+          "> [!CAUTION]",
+          `> ${says.caution}\`${short(c3)}\` のマイグレーションが DB に当たったかは分からないので、下のマイグレーションの一覧は、当たっていても当たっていなくても漏れが無いように作った。`,
+          "",
+          "## 昇格",
+          "",
+          "- 環境: staging",
+          `- 今の版: \`${c3}\``,
+          `- 出す版: \`${c4}\``,
+          "- 向き: 進める",
+          `- いちばん先まで出した版: \`${c2}\`（これより新しい \`${short(c3)}\` は deploy.yml の記録が${says.record}ので、出ていたかもしれない）`,
+          `- マイグレーションが当たったかもしれない版: \`${c3}\``,
+          "",
+          `## コミット（今の版 \`${short(c3)}\` の次から、出す版まで）`,
+          "",
+          `- ${abbrev(c4)} fix: four`,
+          "",
+          `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、出す版まで。この昇格で新しく当たるもの）`,
+          "",
+          "- `0002_three`",
+          "",
+          `この一覧には、\`${short(c3)}\` のデプロイで当たったかもしれないものも入っている。`,
+          "",
+          "## 戻し方",
+          "",
+          `今の版に戻すときは \`make promote ENV=staging SHA=${short(c3)}\` を動かす。`,
+          "",
+          "## この PR のデプロイが済まなかったとき",
+          "",
+          UNDEPLOYED_NOTE(STAGING),
+          "",
+        ].join("\n"),
+      );
+    },
+  );
+
+  test.each<[string, "none" | "unreadable" | undefined, string, string]>([
+    [
+      "no write's record is missing",
+      undefined,
+      "なし（デプロイまで済んだ版が無い）",
+      "この昇格で新しく当たるもの",
+    ],
+    [
+      "a write has no deploy.yml run",
+      "none",
+      "分からない（deploy.yml の記録が見つからない・読めない版がある）",
+      "DB に当たっているかもしれないものも入る",
+    ],
+    [
+      "a write's deploy.yml run cannot be read",
+      "unreadable",
+      "分からない（deploy.yml の記録が見つからない・読めない版がある）",
+      "DB に当たっているかもしれないものも入る",
+    ],
+  ])(
+    "without a deployed version, says what it knows when %s",
+    (_, kind, furthest, title) => {
+      deployRun(s1, { image: "failure" });
+      if (kind === undefined) deployRun(s2, { image: "failure" });
+      else loseRecord(s2, kind);
+      const result = run("staging");
+
+      expect(result.exitCode).toBe(0);
+      const body = prBody();
+      expect(body).toContain(`- いちばん先まで出した版: ${furthest}\n`);
+      expect(body).toContain(
+        `## マイグレーション（出す版にあるすべて。${title}）\n\n- \`0000_one\`\n- \`0001_two\`\n- \`0002_three\`\n\n`,
+      );
+    },
+  );
+
+  test("puts gh's error on one line in the body", () => {
     const written = land("staging", c3);
-    rmSync(join(fake, `gh/run-list-deploy.yml-${written}.json`));
+    const id = deployRun(written, {
+      jobsError: `${NOT_FOUND}\n  https://docs.github.com/rest/actions/workflow-jobs\n`,
+    });
     publish();
     const result = run("staging");
 
     expect(result.exitCode).toBe(0);
-    const body = prBody();
-    expect(body).toContain(
-      `（${short(written)} の deploy.yml が動いていない）`,
-    );
-    expect(body).toContain(`- いちばん先まで出した版: \`${c2}\``);
-    expect(body).toContain(
-      "この昇格で新しく当たるもの）\n\n- `0002_three`\n\n",
+    expect(prBody()).toContain(
+      `> staging の前回の deploy.yml が今の版をデプロイしたかは分からない（${short(written)} の deploy.yml（実行 ${id}）のジョブを gh で読めなかった（${NOT_FOUND} https://docs.github.com/rest/actions/workflow-jobs））。`,
     );
   });
+
+  test.each([
+    "gh: Server Error (HTTP 500)",
+    "gh: Bad credentials (HTTP 401)\nTry authenticating with:  gh auth login",
+  ])(
+    "stops when gh cannot read a run's jobs for another reason than 404: %s",
+    (error) => {
+      const id = deployRun(s2, { jobsError: error });
+      const result = run("staging");
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain(
+        `promote: gh api repos/{owner}/{repo}/actions/runs/${id}/jobs?filter=all&per_page=100 --paginate --jq .jobs[] failed: ${error}`,
+      );
+      expectNothingMade(`promote/staging-${short(c4)}`);
+    },
+  );
 
   test("promotes a version between a rollback and the furthest version", () => {
     land("staging", c4);
@@ -1089,21 +1622,38 @@ describe("promote", () => {
     expect(body).toContain("## staging での確認の結果\n");
   });
 
-  test.each([
+  test.each<[string, RunFixture, string]>([
     [
       "was superseded, skipping the Deploy step",
-      { step: { conclusion: "skipped" } },
+      { deploy: { step: { conclusion: "skipped" } } },
       `skipped its ${DEPLOY_STEP} step (a later promotion reached main first), so it deployed nothing`,
     ],
-    ["failed", { conclusion: "failure" }, "ended with failure"],
+    [
+      "was superseded, skipping the Migrate step and the deploy job",
+      { migrate: { step: { conclusion: "skipped" } } },
+      `skipped its ${MIGRATE_STEP} step (a later promotion reached main first), so it deployed nothing`,
+    ],
+    [
+      "re-ran the deploy job alone after its Deploy step failed and was superseded then",
+      {
+        attempts: [
+          {
+            deploy: { conclusion: "failure", step: { conclusion: "failure" } },
+          },
+          { alone: true, deploy: { step: { conclusion: "skipped" } } },
+        ],
+      },
+      `skipped its ${DEPLOY_STEP} step (a later promotion reached main first), so it deployed nothing`,
+    ],
+    ["failed", { deploy: { conclusion: "failure" } }, "ended with failure"],
     [
       "is still running",
-      { status: "in_progress", conclusion: "" },
+      { deploy: { status: "in_progress", conclusion: null } },
       "is still in_progress",
     ],
     [
-      "has no Deploy step",
-      { step: null },
+      "has no Deploy step (a run of a deploy.yml that named it otherwise)",
+      { deploy: { stepName: "Roll out" } },
       `has no ${DEPLOY_STEP} step in a ${DEPLOY_JOB} job`,
     ],
   ])("refuses production when staging's deploy.yml %s", (_, deploy, reason) => {
@@ -1112,18 +1662,29 @@ describe("promote", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      `the staging deployment of ${short(c2)} did not succeed: deploy.yml run ${id} for ${short(s2)} ${reason}.`,
+      `the staging deployment of ${short(c2)} is not known to have succeeded: deploy.yml run ${id} for ${short(s2)} ${reason}.`,
     );
     expectNothingMade(`promote/production-${short(c2)}`);
   });
 
-  test("refuses production when deploy.yml has not run for staging's promotion", () => {
+  test("refuses production when no deploy.yml run is found for staging's promotion", () => {
     rmSync(join(fake, `gh/run-list-deploy.yml-${s2}.json`));
     const result = run("production");
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      `the staging deployment of ${short(c2)} did not succeed: deploy.yml has not run for ${short(s2)}.`,
+      `the staging deployment of ${short(c2)} is not known to have succeeded: no deploy.yml run was found for ${short(s2)} (it has not run yet, or its run was deleted).`,
+    );
+    expectNothingMade(`promote/production-${short(c2)}`);
+  });
+
+  test("refuses production when gh cannot read the jobs of staging's deploy.yml run, and says to run it again", () => {
+    const id = deployRun(s2, { jobsError: NOT_FOUND });
+    const result = run("production");
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      `the staging deployment of ${short(c2)} is not known to have succeeded: gh could not read the jobs of deploy.yml run ${id} for ${short(s2)} (${NOT_FOUND}). The run may have been deleted after gh listed it: run make promote ENV=production SHA=${short(c2)} again, and if no run of ${short(s2)} is left, promote it to staging again (make promote ENV=staging SHA=${short(c2)})`,
     );
     expectNothingMade(`promote/production-${short(c2)}`);
   });
@@ -1131,7 +1692,7 @@ describe("promote", () => {
   test("checks the newest staging promotion of the SHA", () => {
     land("staging", c4);
     const again = land("staging", c2);
-    const id = deployRun(again, { conclusion: "failure" });
+    const id = deployRun(again, { deploy: { conclusion: "failure" } });
     publish();
     const result = run("production");
 
@@ -1345,7 +1906,7 @@ describe("promote", () => {
   });
 
   test("warns at the top when deploy.yml did not deploy the version, with the split traffic of Cloud Run", () => {
-    const id = deployRun(s2, { conclusion: "failure", step: null });
+    const id = deployRun(s2, { image: "failure" });
     fixture(
       "gcloud/service-moonx-api-staging.json",
       JSON.stringify({
@@ -1424,7 +1985,7 @@ describe("promote", () => {
     expect(prBody()).toStartWith(
       [
         "> [!WARNING]",
-        `> staging の前回の deploy.yml は、今の版をデプロイしていない（${short(s2)} の deploy.yml が動いていない）。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
+        `> staging の前回の deploy.yml が今の版をデプロイしたかは分からない（${short(s2)} の deploy.yml の実行が見つからない（まだ動いていないか、消された））。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
         ">",
         "> Cloud Run の `moonx-api-staging` で動いている版を gcloud で読めなかった（gcloud run services describe: ERROR: (gcloud.run.services.describe) Cannot find service [moonx-api-staging]）。",
         ">",
@@ -1434,9 +1995,23 @@ describe("promote", () => {
     );
   });
 
+  test("keeps gcloud's message on one line of the warning's quote", () => {
+    rmSync(join(fake, `gh/run-list-deploy.yml-${s2}.json`));
+    fixture(
+      "gcloud/service-moonx-api-staging.stderr",
+      "ERROR: (gcloud.run.services.describe) There was a problem refreshing\n  your current auth tokens: reauthentication failed\n",
+    );
+    const result = run("staging");
+
+    expect(result.exitCode).toBe(0);
+    expect(prBody()).toContain(
+      "> Cloud Run の `moonx-api-staging` で動いている版を gcloud で読めなかった（gcloud run services describe: ERROR: (gcloud.run.services.describe) There was a problem refreshing your current auth tokens: reauthentication failed）。\n>\n",
+    );
+  });
+
   test("starts the commit list and the undo line from the one version Cloud Run runs", () => {
     const written = land("staging", c3);
-    const id = deployRun(written, { conclusion: "failure", step: null });
+    const id = deployRun(written, { image: "failure" });
     publish();
     fixture(
       "gcloud/service-moonx-api-staging.json",
@@ -1532,24 +2107,59 @@ describe("promote", () => {
     expect(originBranch(branch)).toBeDefined();
   });
 
-  test("names the job and step of deploy.yml that run make deploy-api", async () => {
-    const workflow = YAML.parse(
-      await Bun.file(
-        join(import.meta.dir, "..", ".github", "workflows", "deploy.yml"),
-      ).text(),
-    ) as {
-      jobs?: Record<
-        string,
-        { name?: string; steps?: { name?: string; run?: string }[] }
-      >;
-    };
-    const job = workflow.jobs?.[DEPLOY_JOB];
-    const step = job?.steps?.find(({ name }) => name === DEPLOY_STEP);
+  test.each([
+    [MIGRATE_JOB, MIGRATE_STEP, /^make db-migrate(\s|$)/],
+    [DEPLOY_JOB, DEPLOY_STEP, /^make deploy-api(\s|$)/],
+  ])(
+    "names the job %s of deploy.yml and its step %s that runs %p",
+    async (key, stepName, command) => {
+      const job = (await deployWorkflow()).jobs?.[key];
+      const step = job?.steps?.find(({ name }) => name === stepName);
 
-    expect(job).toBeDefined();
-    // The jobs API reports a job by its name:, which is its key only when name: is absent.
-    expect(job?.name ?? DEPLOY_JOB).toBe(DEPLOY_JOB);
-    expect(step?.run?.trim()).toStartWith("make deploy-api ");
+      expect(job).toBeDefined();
+      // The jobs API reports a job by its name:, which is its key only when name: is absent.
+      expect(job?.name ?? key).toBe(key);
+      expect(step?.run?.trim()).toMatch(command);
+    },
+  );
+
+  test("runs deploy.yml's migrate job before its deploy job, one deployment per environment at a time", async () => {
+    const workflow = await deployWorkflow();
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression
+    const target = "${{ needs.check.outputs.target }}";
+    const migrate = workflow.jobs?.[MIGRATE_JOB];
+    const deploy = workflow.jobs?.[DEPLOY_JOB];
+
+    for (const job of [migrate, deploy]) {
+      expect(job?.environment).toBe(target);
+      // actionlint is told to ignore queue:, which it does not know, so only this checks it.
+      expect(job?.concurrency).toEqual({
+        group: `deploy-${target}`,
+        queue: "max",
+      });
+    }
+    // The image check comes before the approval the migrate job waits for.
+    expect([migrate?.needs ?? []].flat()).toEqual(
+      expect.arrayContaining(["check", "image"]),
+    );
+    expect([deploy?.needs ?? []].flat()).toContain(MIGRATE_JOB);
+    expect(deploy?.if).toBe(`needs.${MIGRATE_JOB}.outputs.current == 'true'`);
+    expect(Object.keys(migrate?.outputs ?? {})).toContain("current");
+    // Each job reads main again first; a later promotion skips what would migrate or deploy.
+    for (const [job, name] of [
+      [migrate, MIGRATE_STEP],
+      [deploy, DEPLOY_STEP],
+      [deploy, "Check the deployment"],
+    ] as const) {
+      expect(job?.steps?.find((step) => step.name === name)?.if).toBe(
+        "steps.current.outputs.current == 'true'",
+      );
+    }
+    // The migrate job runs the SHA's dependencies, which must not mint a Google Cloud token.
+    // Without permissions: of its own it has the workflow's.
+    const permissions = migrate?.permissions ?? workflow.permissions;
+    expect(permissions).toBeObject();
+    expect(permissions).not.toHaveProperty("id-token");
   });
 
   test("keeps gh's JSON plain when the shell forces colour", () => {

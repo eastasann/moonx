@@ -216,13 +216,13 @@ gcloud logging read \
 | ログに出るもの | 原因 | 対処 |
 |---|---|---|
 | シークレットが見つからない・権限が無い | Secret Manager に値（有効な版）が無い、実行用のサービスアカウントの権限 | 値を入れる（03 5.4 I）。権限は Terraform で直す |
-| 起動のときの設定の検査で終了する | 新しい環境変数を Terraform に入れ忘れた | Terraform に入れて `make infra-apply` → `deploy.yml` を再実行（`gh run rerun <RUN_ID>`） |
+| 起動のときの設定の検査で終了する | 新しい環境変数を Terraform に入れ忘れた | Terraform に入れて `make infra-apply` → `deploy.yml` を再実行（`gh run rerun <RUN_ID>`。production では、再実行したマイグレーションのジョブとデプロイのジョブがまた承認を待つ。04 2章） |
 | `exec format error` | `make build-api-image`（linux/amd64 で作る）を通さずに作ったイメージ（Apple シリコンの `docker build` は既定で arm64 になる） | イメージは `build.yml` が作ったものだけを使う |
 | ポートで待ち受けていない | アプリが `PORT` を読んでいない | コードを直す |
 
 ### 3.8 DB のマイグレーションが失敗した
 
-**症状:** `deploy.yml` の最初の段（`make deploy-api` の中のマイグレーション）で失敗する。API と Web は前の版のまま。
+**症状:** `deploy.yml` のマイグレーションのジョブ（`make db-migrate` の段）で失敗する。デプロイのジョブは動かず、API と Web は前の版のまま。
 
 **確認:**
 
@@ -236,7 +236,7 @@ select id, hash, created_at from drizzle.__drizzle_migrations order by created_a
 ```
 
 **対処:**
-- Neon が休んでいた・一時的な接続の失敗なら、もう一度動かす: `gh run rerun <RUN_ID> --failed`
+- Neon が休んでいた・一時的な接続の失敗なら、もう一度動かす: `gh run rerun <RUN_ID> --failed`（production では、マイグレーションのジョブとデプロイのジョブがまた承認を待つ。04 2章）
 - SQL やデータが原因なら、当たったマイグレーションは書き換えず、直すマイグレーションを足して新しい SHA を昇格する（04 4.1 の expand / contract）
 
 ### 3.9 ドメインで繋がらない: ドメインマッピング・証明書・DNS
@@ -310,10 +310,13 @@ dig +short TXT _dmarc.{DOMAIN}
 | 全員が急にログアウトされた | `BETTER_AUTH_SECRET` が変わった | 意図した入れ替えなら仕様（3.14）。意図しない新しい版なら、その版を無効にして新しいリビジョンを作る |
 
 ```bash
-# Cookie が返るか（確認用のアカウントで）
-curl -sS -i -X POST https://{DOMAIN}/api/auth/sign-in/email \
-  -H 'content-type: application/json' -H 'origin: https://{DOMAIN}' \
-  -d '{"email":"<確認用のメール>","password":"<パスワード>"}' | grep -i '^set-cookie'
+# Cookie が返るか（デプロイ後の確認と同じ運営者のアカウントで。04 6章）。パスワードはコマンドの
+# 引数と履歴に出さない（read -rs で入れ、printf（シェルの組み込み）から標準入力で渡す）
+read -rs PASSWORD
+printf '{"email":"<運営者のメール>","password":"%s"}' "$PASSWORD" | \
+  curl -sS -i -X POST https://{DOMAIN}/api/auth/sign-in/email \
+    -H 'content-type: application/json' -H 'origin: https://{DOMAIN}' --data-binary @- | grep -i '^set-cookie'
+unset PASSWORD
 
 # Cloud Run の環境変数
 gcloud run services describe moonx-api-production --region=asia-southeast1 \
@@ -387,15 +390,17 @@ Cloud Run はシークレットを起動のときに読む。値を変えたら�
 **バックアップの読み取り専用のロールの入れ替え:**
 
 ```bash
+# 所有者のロールのパスワード（貼り付けて Enter。画面には出ない）。パスワードはコマンドの引数に出さない
+read -rs PGPASSWORD; export PGPASSWORD
 ro_password="$(openssl rand -hex 24)"
-psql "<production の直接の接続文字列（所有者のロール）>" -v ro_password="$ro_password" <<'SQL'
-ALTER ROLE moonx_backup_ro WITH PASSWORD :'ro_password';
+psql "postgresql://<所有者のロール>@<直接の接続のホスト>/moonx?sslmode=require" <<SQL
+ALTER ROLE moonx_backup_ro WITH PASSWORD '${ro_password}';
 SQL
 echo "postgresql://moonx_backup_ro:${ro_password}@<直接の接続のホスト>/moonx?sslmode=require"
-unset ro_password
+unset ro_password PGPASSWORD
 
 gh secret set DATABASE_URL_DIRECT --env production-backup   # 上の接続文字列を貼る
-gh workflow run db-backup.yml                               # 新しい値で取れることを確かめる（6.2）
+gh workflow run db-backup.yml                               # 新しい値で取れることを確かめる（6.2。取った時刻の名前の別のファイルになり、前のファイルを上書きしない）
 ```
 
 ### 3.15 停止した利用者がログインしたまま
@@ -528,7 +533,7 @@ gcloud run services describe moonx-api-production --region=asia-southeast1 --for
 
 | タスク | 頻度 | 手順 |
 |---|---|---|
-| 依存パッケージの更新 | 月1回 | 更新 → `make lint`・`make typecheck`・`make test` → PR → staging → production（04 4.2） |
+| 依存パッケージの更新 | 月1回 | 更新 → `make lint`・`make typecheck`・`make test` → PR → staging → production（04 4.2）。Makefile が digest で固定する actionlint のイメージ（`ACTIONLINT_IMAGE`）と `apps/api/Dockerfile` の Bun のイメージは Dependabot が見ないので、ここで本家のリリースを見て上げる（Bun は `package.json` の `packageManager` と同じ版にする。`scripts/image-versions.test.ts` が確かめる）。actionlint が `concurrency` の `queue` を知る版（rhysd/actionlint の Issue #654）を出したら、上げるときに Makefile の `-ignore` を外す（SDD ADR-022） |
 | Better Auth のセキュリティ修正 | 公開されたら数日以内 | GitHub で better-auth の Releases と Security advisories を Watch し、Dependabot alerts を ON にしておく。上げたら staging でログイン・招待・パスワード再設定を確かめる（ADR-010） |
 | DB のバックアップの確認 | 週1回 | `db-backup.yml` が毎回成功し、バケットにファイルが増えているか（6.2） |
 | バックアップを戻す練習 | 四半期に1回 | 6.2 の「戻す練習」 |
@@ -577,18 +582,20 @@ gcloud storage ls "gs://{GCP_PROJECT_ID}-moonx-backups/production/" | tail -n 3 
 
 失敗していたら `gh run view <RUN_ID> --log-failed` で原因を見る。接続で失敗しているなら、GitHub の環境 `production-backup` の `DATABASE_URL_DIRECT`（production の読み取り専用のロール。03 5.4 E・H）を確かめる（入れ替えは 3.14）。
 
-**バケットの設定を確かめる**（Terraform の `envs/shared`。03 5.4 G で最初に確かめ、変えたときにも見る）: 公開されていないこと（個人情報を含む）、書けるのはバックアップのワークフローが使うサービスアカウントだけで、読めるのは運用の担当だけであること、古いファイルを消す期間が ADR-028 のとおりであること。
+**バケットの設定を確かめる**（Terraform の `envs/shared`。03 5.4 G で最初に確かめ、変えたときにも見る）: 公開されていないこと（個人情報を含む）、書けるのはバックアップのワークフローが使うサービスアカウントだけで、そのアカウントはオブジェクトを作るだけ（消す・上書きする権限が無い。独自のロール `moonxBackupWriter`）であること、読めるのは運用の担当だけであること、古いファイルを消す期間が ADR-028 のとおりであること。
 
 ```bash
 gcloud storage buckets describe gs://{GCP_PROJECT_ID}-moonx-backups
 gcloud storage buckets get-iam-policy gs://{GCP_PROJECT_ID}-moonx-backups
 ```
 
+ファイルの名前には、取った時刻（UTC。`production/2026-11-05T181703Z.dump` の形）が入る。同じ日に取り直すと別のファイルが増え、前のファイルは上書きされない（バックアップを書くアカウントは作ることしかできない。ADR-028）。`gcloud storage ls` は名前の順、つまり古い順に並べるので、最後の行が一番新しい。
+
 **戻す練習**（頻度は 6.1。手元で行い、終わったら消す。ファイルの形式は SDD 2章「make ターゲット」の `db-backup`）:
 
 ```bash
 gcloud storage ls "gs://{GCP_PROJECT_ID}-moonx-backups/production/" | tail -n 3
-gcloud storage cp "<上で選んだファイルの gs:// の URL>" ./restore.dump
+gcloud storage cp "<上の最後の行（一番新しいもの）の gs:// の URL>" ./restore.dump
 
 make db-up
 psql "postgres://moonx:moonx@localhost:5432/moonx" -c 'create database moonx_restore'
@@ -603,7 +610,7 @@ rm ./restore.dump
 
 **本番に戻すとき（最後の手段）:** バックアップより後に書かれたデータは消える。
 
-1. Neon で新しいブランチを作って `pg_restore` し、中身を確かめる
+1. 戻すバックアップを選ぶ（ふつうは一番新しいもの。上の「戻す練習」の `gcloud storage ls` の最後の行）。Neon で新しいブランチを作って `pg_restore` し、中身を確かめる
 2. そのブランチのプール接続を `moonx-production-database-url` に入れ（3.14 の手順 1）、直接の接続（所有者のロール）を GitHub の環境 `production` の `DATABASE_URL_DIRECT` に入れる（`gh secret set DATABASE_URL_DIRECT --env production`）
 3. そのブランチに読み取り専用のロールが無ければ 03 5.4 E の SQL で作る。`pg_restore --no-privileges` では権限が戻らないので、すでにあるものへの権限を付ける SQL（03 5.4 E）も実行する。そのロールの直接の接続を GitHub の環境 `production-backup` の `DATABASE_URL_DIRECT` に入れる（`gh secret set DATABASE_URL_DIRECT --env production-backup`）。入れないと、次のバックアップは古いブランチを取る
 4. 新しいリビジョンを作る（3.14 の手順 2）。`gh workflow run db-backup.yml` で、新しいブランチからバックアップが取れることを確かめる

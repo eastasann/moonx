@@ -55,7 +55,7 @@ require-env = $(if $(and $(filter 1,$(words $(ENV))),$(filter $(1),$(ENV))),,$(e
 	test test-domain test-api test-web test-e2e coverage first-paint lint format \
 	typecheck db-up db-down db-generate db-check db-migrate db-seed db-reset \
 	db-studio tokens openapi kpi doc-lint admin-create infra-plan infra-apply \
-	deploy-api promote promote-check db-backup
+	push-api-image deploy-api promote promote-check db-backup
 
 install:
 	bun install --frozen-lockfile
@@ -86,7 +86,10 @@ dev-web:
 # installs them): sharp loads its native binary from beside its own package, and the
 # pdfkit inside react-pdf requires its standard fonts by its own package's imports map
 # at run time, which no bundle can resolve. React goes with react-pdf, so both use one.
+# bun build writes "development" for process.env.NODE_ENV unless told; the bundle runs
+# only in the image, whose NODE_ENV is production (SDD 2章「環境変数」).
 API_BUNDLE = cd apps/api && bun build src/index.ts --target=bun --sourcemap=linked \
+	--define='process.env.NODE_ENV="production"' \
 	--external=sharp --external=@react-pdf/renderer --external=react --outdir=dist
 
 build:
@@ -104,21 +107,33 @@ build-web:
 # Bun marks its bundle with a debug ID but not with the code Sentry's SDK reads the ID
 # from, and sentry-cli leaves a marked file as it is: without the mark it injects both,
 # keeping the map's ID. The image leaves every source map out (.dockerignore). The maps
-# go up before the image, so that no image goes up without them; the token is an
-# organization token, which names the organization (03_dev-setup.md 5.4 D).
+# go up here, before push-api-image can push the image, so that no image goes up without
+# them; the token is an organization token, which names the organization (03_dev-setup.md
+# 5.4 D). The image leaves as a file: build.yml builds it where no Google Cloud token can
+# be minted and pushes it from a job that runs none of the dependencies' code (04 2章).
+API_IMAGE_ARCHIVE := .data/api-image.tar
+
 build-api-image:
 	$(call require,SHA)
-	$(call require-project)
 	$(if $(strip $(SENTRY_AUTH_TOKEN)),,$(error SENTRY_AUTH_TOKEN is required in the environment (SDD 2章「CI のシークレットと変数」)))
 	$(MAKE) build-web SHA=$(SHA)
 	$(API_BUNDLE)
 	sed -i.bak '/^\/\/# debugId=/d' apps/api/dist/index.js && rm apps/api/dist/index.js.bak
 	$(BUNX) @sentry/cli sourcemaps inject apps/api/dist >/dev/null
 	docker build --platform=linux/amd64 --file=apps/api/Dockerfile \
-		--build-arg=APP_VERSION=$(SHA) --tag=$(IMAGE):$(SHA) .
+		--build-arg=APP_VERSION=$(SHA) --tag=moonx-api:$(SHA) .
 	$(BUNX) @sentry/cli sourcemaps upload --project=moonx-web --release=$(SHA) \
 		apps/web/dist/client/assets
 	$(BUNX) @sentry/cli sourcemaps upload --project=moonx-api --release=$(SHA) apps/api/dist
+	mkdir -p $(dir $(API_IMAGE_ARCHIVE))
+	docker save --output=$(API_IMAGE_ARCHIVE) moonx-api:$(SHA)
+
+# Docker, gcloud and the file build-api-image wrote: no Bun and no dependency's code.
+push-api-image:
+	$(call require,SHA)
+	$(call require-project)
+	docker load --input=$(API_IMAGE_ARCHIVE)
+	docker tag moonx-api:$(SHA) $(IMAGE):$(SHA)
 	gcloud auth configure-docker $(REGION)-docker.pkg.dev --quiet
 	docker push $(IMAGE):$(SHA)
 
@@ -158,12 +173,18 @@ first-paint:
 	MOONX_FIRST_PAINT=1 $(BUNX) playwright test --config=e2e/playwright.config.ts \
 		--project=first-paint
 
-# actionlint runs ShellCheck over the workflows' scripts when it is on PATH, as it is on
-# GitHub's runners (03_dev-setup.md 10章).
+# The workflows' checker from its author's image, pinned by digest, which carries the
+# ShellCheck it runs over the run: scripts (03_dev-setup.md 10章, ADR-022). 1.7.12 does
+# not know concurrency's queue (rhysd/actionlint#654), so that message alone is ignored;
+# scripts/promote.test.ts checks deploy.yml's queue and group instead. Drop the -ignore
+# with the first release that knows queue (05_operation-runbook.md 6.1).
+ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+
 lint:
 	$(BUNX) biome check .
 	bun scripts/check-screens.ts apps/web/src
-	$(BUNX) actionlint
+	docker run --rm --volume="$(CURDIR):/repo:ro" --workdir=/repo $(ACTIONLINT_IMAGE) \
+		-ignore='^unexpected key "queue" for "concurrency" section\. '
 
 format:
 	$(BUNX) biome check --write --linter-enabled=false .
@@ -209,10 +230,37 @@ tokens:
 openapi:
 	bun apps/api/scripts/openapi.ts
 
+# pg_dump and psql get DATABASE_URL_DIRECT without its password, which libpq reads from
+# PGPASSWORD instead: a command's arguments are visible to every user of the machine
+# (ps), and the password is in the environment already, in DATABASE_URL_DIRECT. libpq
+# percent-decodes a URL's password, so PGPASSWORD gets it decoded (the x keeps a final
+# newline, which $$(...) would drop). Anything else that could put a password in the
+# arguments stops make: a string that is not a postgres:// or postgresql:// URL (the
+# key=value form), a password parameter (libpq decodes parameter names too), and a
+# user:password@ left over or split because the password holds a / ? # or @ unencoded.
+DIRECT_URL_WITHOUT_PASSWORD = url="$$DATABASE_URL_DIRECT"; \
+	re='^(postgres(ql)?://[^/?\#@:]*):([^/?\#@]*)@(.*)$$'; \
+	if [[ "$$url" =~ $$re ]]; then \
+		url="$${BASH_REMATCH[1]}@$${BASH_REMATCH[4]}"; \
+		password="$${BASH_REMATCH[3]//\\/\\\\}"; \
+		PGPASSWORD="$$(printf '%bx' "$${password//%/\\x}")"; \
+		PGPASSWORD="$${PGPASSWORD%x}"; \
+		export PGPASSWORD; \
+	fi; \
+	query="$${url\#*\?}"; [[ "$$url" == *\?* ]] || query=""; \
+	query="$${query//\\/\\\\}"; query="$$(printf '%b' "$${query//%/\\x}")"; \
+	url_re='^postgres(ql)?://([^/?\#@:]*@)?[^/?\#@]*([/?\#]|$$)'; \
+	leftover='^postgres(ql)?://[^@]*:[^@]*@'; \
+	if [[ ! "$$url" =~ $$url_re || "$$url" =~ $$leftover || "&$$query" == *\&password=* ]]; then \
+		echo "DATABASE_URL_DIRECT must be a postgres:// URL with any password in its user:password@ part, percent-encoded" >&2; \
+		exit 1; \
+	fi
+
 kpi:
 	$(call require-env,staging production)
 	$(if $(CHECK_WORKSPACE_ID),,$(error CHECK_WORKSPACE_ID is required: the ID of the workspace kept for the post-deploy checks (03_dev-setup.md 5.4 K)))
-	psql "$$DATABASE_URL_DIRECT" --no-psqlrc --quiet --set=ON_ERROR_STOP=1 \
+	set -o errexit; $(DIRECT_URL_WITHOUT_PASSWORD); \
+	psql "$$url" --no-psqlrc --quiet --set=ON_ERROR_STOP=1 \
 		--set=check_workspace_id="$$CHECK_WORKSPACE_ID" --file=packages/db/queries/kpi.sql
 
 doc-lint:
@@ -236,11 +284,13 @@ infra-apply:
 	terraform -chdir=infra/terraform/envs/$(ENV) init -backend-config="bucket=$(GCP_PROJECT_ID)-tfstate"
 	terraform -chdir=infra/terraform/envs/$(ENV) apply
 
+# Without the migrations: deploy.yml runs db-migrate first, in a job that cannot mint a
+# Google Cloud token, and this one in a job that runs none of the dependencies' code
+# (04_deployment-procedure.md 2章).
 deploy-api:
 	$(call require-env,staging production)
 	$(call require,SHA)
 	$(call require-project)
-	$(MAKE) db-migrate
 	gcloud run deploy moonx-api-$(ENV) --image=$(IMAGE):$(SHA) --project=$(GCP_PROJECT_ID) \
 		--region=$(REGION) --quiet
 
@@ -250,25 +300,30 @@ promote:
 	$(call require-project)
 	GCP_PROJECT_ID=$(GCP_PROJECT_ID) bun scripts/promote.ts $(ENV) $(SHA)
 
+# Bun alone, before make install (ci.yml) or without it (deploy.yml's check job): without
+# node_modules Bun would fetch an import it cannot resolve, which --no-install fails.
 promote-check:
 	$(call require,BASE)
-	bun scripts/promote-check.ts $(BASE)
+	bun --no-install scripts/promote-check.ts $(BASE)
 
 # The dump goes up in one request to Cloud Storage's JSON API, as the API's photos do
-# (ADR-024), which takes only the permissions to create and replace an object (ADR-028).
-# gcloud storage cp reads the object first, with the permission that also reads backups,
-# which only the operators have (05_operation-runbook.md 6.2). The dump is written to a
-# file first, so a failed one uploads nothing. The tests point STORAGE_URL elsewhere.
+# (ADR-024), which takes only the permission to create an object (ADR-028). gcloud
+# storage cp reads the object first, with the permission that also reads backups, which
+# only the operators have (05_operation-runbook.md 6.2). The name holds the UTC time to
+# the second, so a second run on the same day makes a new object, and ifGenerationMatch=0
+# refuses to replace one. The dump is written to a file first, so a failed one uploads
+# nothing. The tests point STORAGE_URL elsewhere.
 STORAGE_URL := https://storage.googleapis.com
 
 db-backup:
 	$(call require-env,staging production)
 	$(call require-project)
 	set -o errexit; dump="$$(mktemp)"; trap 'rm -f "$$dump"' EXIT; \
-	pg_dump --format=custom --file="$$dump" "$$DATABASE_URL_DIRECT"; \
+	$(DIRECT_URL_WITHOUT_PASSWORD); \
+	pg_dump --format=custom --file="$$dump" "$$url"; \
 	token="$$(gcloud auth print-access-token)"; \
-	name="$(ENV)%2F$$(date -u +%Y-%m-%d).dump"; \
+	name="$(ENV)%2F$$(date -u +%Y-%m-%dT%H%M%SZ).dump"; \
 	curl --fail-with-body --silent --show-error --request POST --upload-file "$$dump" \
 		--header 'Content-Type: application/octet-stream' \
 		--header @<(printf 'Authorization: Bearer %s\n' "$$token") \
-		"$(STORAGE_URL)/upload/storage/v1/b/$(GCP_PROJECT_ID)-moonx-backups/o?uploadType=media&name=$$name"
+		"$(STORAGE_URL)/upload/storage/v1/b/$(GCP_PROJECT_ID)-moonx-backups/o?uploadType=media&ifGenerationMatch=0&name=$$name"

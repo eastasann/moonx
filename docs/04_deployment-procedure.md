@@ -34,14 +34,16 @@
 
 [main へ squash マージ]（deploy/ だけの変更は除く）
     └── build.yml（GitHub の環境は使わない）: make test → make build-api-image SHA=<SHA>
-                （Web もビルドして同じイメージに入れる）
+                （Web もビルドして同じイメージに入れ、ファイルにする）→ make push-api-image SHA=<SHA>
 
 [昇格の PR（deploy/{env}/version = SHA）をマージ]
     └── deploy.yml
-          検査のジョブ（GitHub の環境は使わない）: 環境を決め、make promote-check・イメージの確認
-          デプロイのジョブ（GitHub の環境 staging / production。production は承認を待つ）:
-            1. その SHA のコードで make install → make deploy-api ENV=$TARGET SHA=$SHA
-               （マイグレーションを含む。Web も同じイメージ）
+          検査のジョブ（GitHub の環境は使わない）: 環境を決め、make promote-check
+          イメージのジョブ（GitHub の環境は使わない）: その SHA のイメージがあるかを gcloud で確かめる
+          マイグレーションのジョブ（GitHub の環境 staging / production。production は承認を待つ）:
+            その SHA のコードで make install → make db-migrate
+          デプロイのジョブ（同じ環境。production はもう一度承認を待つ）:
+            1. make deploy-api ENV=$TARGET SHA=$SHA（Web も同じイメージ）
             2. デプロイ後の確認（サービスの URL で /api/health の版と /api/health/db）
         （戻す = 戻し先の SHA を書いた昇格の PR をマージ。5.1）
 
@@ -57,35 +59,48 @@
 | ワークフロー | きっかけ | やること |
 |---|---|---|
 | `ci.yml` | すべての PR | 初めに `make promote-check BASE=<PR を検査するマージのコミットの1つ目の親>` で `deploy/` の変更を検査する（依存を入れずに、`make install` の前に動く。`deploy/` を変えていない PR では何もしない）。`deploy/` の履歴を読むので、チェックアウトは全履歴（`fetch-depth: 0`）。`deploy/` だけを変える PR（昇格の PR）はここで終える（コードは変わらず、出す版はそれぞれの PR と `build.yml` でテスト済み。戻すときに待たないため）。ほかの PR は続けて `make install` → `make db-check BASE=<promote-check と同じ>` → `make lint` → `make typecheck` → `make test` → `make build` → `make test-e2e`。`DATABASE_URL_TEST` はサービスコンテナの PostgreSQL 17。`.env` は `make setup` と同じく `.env.example` から作る（`make env-file`。`DATABASE_URL_TEST` もこの値でサービスコンテナを指す）。`make test-e2e` の前に、Chromium が要るライブラリを入れる（`playwright install-deps chromium`。ブラウザは `make test-e2e` が取ってくる）。同じ PR に新しい push があれば、古い実行は取り消す。ランナーに PostgreSQL 17 のクライアント（`pg_dump`）を入れる（バックアップのテストが使う。古い版の `pg_dump` は 17 のサーバーに使えない）。`make tokens` で差分が出たら失敗（ADR-018）。`make openapi` で `apps/api/openapi.json` に差分が出たら失敗（API を変えた PR は、作り直した `openapi.json` を含める） |
-| `build.yml` | `main` への push（`deploy/**` だけの変更は除く） | `make test` → `make build-api-image SHA=<SHA>`（イメージの名前は SDD 2章「環境と命名」）。`make test` には `ci.yml` と同じく、`DATABASE_URL_TEST` のサービスコンテナの PostgreSQL 17 と、ランナーの PostgreSQL 17 のクライアントと、`.env` を用意する（バックアップと KPI の集計のテスト）。`make test` は `id-token: write` を持たないジョブで動かし、Workload Identity Federation で Google Cloud に入るのはイメージを作るジョブだけにする（`make test` は開発用の依存のコードを動かすので、そこで Google Cloud のトークンを作れないようにする。デプロイ用のサービスアカウントは1つで、production にも出せる。ADR-027）。E2E は PR の `ci.yml` で通っているので動かさない。`make build-api-image` は Web もビルドして同じイメージに入れ（ADR-004）、ソースマップを Sentry の `moonx-web` と `moonx-api` に上げる（`release` = SHA。`SENTRY_AUTH_TOKEN`）。GitHub の環境を使わないので、リポジトリの変数とシークレットだけを読む（3章） |
-| `deploy.yml` | `main` への push で `deploy/staging/version` か `deploy/production/version` が変わったとき | 下の「deploy.yml の順番」。2つのジョブに分ける。検査のジョブは GitHub の環境を使わずに動き、変わったファイルから環境を決めて、`make promote-check BASE=<push の前のコミット>` とイメージの確認をする（承認する人が検査済みの変更だけを承認するように、環境のジョブより先に動かす）。デプロイのジョブは GitHub の環境 `staging` / `production` で動き、`production` は承認されるまで待つ。環境ごとに同時に1つだけ動かし、待っているものは取り消さずに順に動かす（`concurrency` の `queue: max`。既定では待っているものが取り消される）。デプロイのジョブは初めに、`origin/main` の `deploy/$TARGET/version` がまだ `$SHA` かを確かめ、違えば（後の昇格が先に入った・古い実行を再実行した）何もせずに終える。チェックアウトは全履歴（`fetch-depth: 0`）。検査で止まった・承認されなかった・デプロイに失敗したときは、`deploy/{env}/version` が出ていない SHA を指したままになるので、正しい SHA で新しい昇格の PR を出して直す（`make promote` は本文にそのことを書く） |
+| `build.yml` | `main` への push（`deploy/**` だけの変更は除く） | 3つのジョブを順に動かす。テストのジョブ: `make test`。`ci.yml` と同じく、`DATABASE_URL_TEST` のサービスコンテナの PostgreSQL 17 と、ランナーの PostgreSQL 17 のクライアントと、`.env` を用意する（バックアップと KPI の集計のテスト）。E2E は PR の `ci.yml` で通っているので動かさない。イメージのジョブ: `make install` → `make build-api-image SHA=<SHA>`。Web もビルドして同じイメージに入れ（ADR-004）、ソースマップを Sentry の `moonx-web` と `moonx-api` に上げ（`release` = SHA。`SENTRY_AUTH_TOKEN`）、イメージをファイルにしてワークフローの成果物（artifact。1日で消える）に置く。push のジョブ: 成果物のイメージを `make push-api-image SHA=<SHA>` で Artifact Registry に上げる（イメージの名前は SDD 2章「環境と命名」）。Workload Identity Federation で Google Cloud に入るのは push のジョブだけで、テストとイメージのジョブは `id-token: write` を持たない（テスト・ビルド・sentry-cli は依存のコードを動かす。下の「Google Cloud のトークンを作れるジョブ」）。push のジョブは `make install` も Bun も動かさない。ソースマップはイメージのジョブで上がるので、ソースマップの無いイメージは上がらない。GitHub の環境を使わないので、リポジトリの変数とシークレットだけを読む（3章） |
+| `deploy.yml` | `main` への push で `deploy/staging/version` か `deploy/production/version` が変わったとき | 下の「deploy.yml の順番」。4つのジョブに分ける。検査のジョブとイメージのジョブは GitHub の環境を使わずに、環境のジョブより先に動く（承認する人が検査済みの変更だけを承認するように）。検査のジョブ（`id-token: write` なし）は、変わったファイルから環境を決めて `make promote-check BASE=<push の前のコミット>` を動かす（`promote-check` は履歴を読むので、チェックアウトは全履歴（`fetch-depth: 0`））。イメージのジョブ（Google Cloud に入る）は、その SHA のイメージが Artifact Registry にあるかを gcloud だけで確かめる（チェックアウトも Bun もしない）。マイグレーションのジョブ（`id-token: write` なし）とデプロイのジョブ（Google Cloud に入る）は、どちらも GitHub の環境 `staging` / `production` で動き、`production` はジョブごとに承認されるまで待つ（下の「production の承認」）。2つのジョブは同じ `concurrency` の group（`deploy-$TARGET`）を使い、環境ごとに同時に1つのジョブだけを動かし、待っているものは取り消さずに順に動かす（`queue: max`。既定では待っているものが取り消される）。どちらのジョブも初めに、`main` の今の `deploy/$TARGET/version` がまだ `$SHA` かを確かめ、違えば（後の昇格が先に入った・古い実行を再実行した）何もせずに終える。マイグレーションのジョブで終えれば、デプロイのジョブは動かない。マイグレーションのジョブの後で後の昇格が先に入ると、その版はマイグレーションが当たったまま出ずに終わる（いちばん先まで出した版より新しければ、4.1 の「マイグレーションが当たったかもしれない版」になる）。検査で止まった・承認されなかった・デプロイに失敗したときは、`deploy/{env}/version` が出ていない SHA を指したままになるので、正しい SHA で新しい昇格の PR を出して直す（`make promote` は本文にそのことを書く） |
 | `db-backup.yml` | 毎日（schedule）と、手で（`workflow_dispatch`。`gh workflow run db-backup.yml`） | GitHub の環境 `production-backup`（承認なし）で `make db-backup ENV=production`。`DATABASE_URL_DIRECT` は production の読み取り専用のロールの接続文字列（03 5.4 E・H）。`pg_dump` は PostgreSQL 17 のクライアントを使う（サーバーより古い版は使えない）。確かめ方と戻し方は 05 6.2 |
 | `kpi.yml` | 毎月1日（schedule）と、手で（`workflow_dispatch`。`gh workflow run kpi.yml`） | GitHub の環境 `production-backup`（承認なし）で、`db-backup.yml` と同じ読み取り専用の接続（`DATABASE_URL_DIRECT`）を使い、`make kpi ENV=production` で KPI の SQL（SDD 11章）を production に流す。デプロイ後の確認専用のワークスペースの ID は、同じ環境の変数 `CHECK_WORKSPACE_ID` から渡す（03 5.4 K）。件数だけを実行の要約（`$GITHUB_STEP_SUMMARY`）に出し、回答の中身は出さない。結果の見方は 05 6.1 |
 | （Terraform） | — | CI では動かさない。人が `make infra-plan` / `make infra-apply`（`ENV` は `shared` / `staging` / `production`）で動かす（03 5.2） |
 
 Google Cloud へは Workload Identity Federation で入る（ADR-027）。WIF の変数はリポジトリにあるので、`build.yml`・`deploy.yml`・`db-backup.yml` のどれからも読める。入れるのは `main` で動くワークフローだけ（3章）。
 
+**Google Cloud のトークンを作れるジョブ**: `id-token: write` を持つジョブでは、Bun もリポジトリの依存のコード（`make install` が入れるもの）も動かさない（ADR-027）。`id-token: write` はジョブのどのステップからでもトークンを作れ、デプロイ用のサービスアカウントは1つで production にも出せるため。依存を動かす作業（テスト・ビルド・ソースマップのアップロード・マイグレーション）と Bun を使う作業（`promote-check`）はトークンの無いジョブで行う。トークンを持つジョブが使う make のターゲットは、gcloud・Docker・curl・PostgreSQL のクライアントだけを使うもの（`push-api-image`・`deploy-api`・`db-backup`）に限る。トークンを持つジョブは `build.yml` の push・`deploy.yml` のイメージとデプロイ・`db-backup.yml` のジョブで、`scripts/workflows.test.ts` がこの決まりを確かめる（使う action と make のターゲットが決まったものだけで、そのターゲットのコマンドにも Bun と依存が出てこないこと）。
+
+**deploy.yml の Bun**: `deploy.yml` のジョブは、Bun を Actions のキャッシュから戻さず、Bun のリリースから入れる（setup-bun の `no-cache: true`）。`build.yml` のジョブは依存のコードを動かした後で Bun をキャッシュに保存するので、キャッシュの Bun は差し替えられているかもしれない。`deploy.yml` のジョブは何を出すかを決め（検査のジョブ）、環境のシークレットを持つ（マイグレーションのジョブ）ので、それを使わない。
+
+**production の承認**: GitHub は、環境を使うジョブごとに承認を求める。マイグレーションのジョブとデプロイのジョブはどちらも環境 `production` を使うので、production への1回の昇格で2回（マイグレーションの前とデプロイの前）承認する。再実行したときも、再実行したジョブがまた承認を待つ（デプロイのジョブだけを再実行しても同じ）。デプロイのジョブを環境の外に置くと、そのジョブだけの再実行が承認なしで production に出せてしまうので、環境を使う（マイグレーションのジョブも、production の `DATABASE_URL_DIRECT` を読むために環境を使う）。
+
 ### deploy.yml の順番
 
 DB → API の順。Web は API と同じイメージに入っているので、API の新しいリビジョンと一緒に切り替わる（ADR-004）。前の段が失敗したら、後の段は動かさない。
 
 ```bash
-# 検査のジョブ（GitHub の環境なし）。main の最新のコードで動かす（戻し先の古い版の Makefile には
-# promote-check が無いことがある）
+# 検査のジョブ（GitHub の環境なし。id-token: write なし）。main の最新のコードで動かす（戻し先の古い版の
+# Makefile には promote-check が無いことがある）
 TARGET=staging                       # 変わったファイルで決まる
 SHA="$(cat deploy/$TARGET/version)"
 make promote-check BASE=<push の前のコミットの SHA>
+
+# イメージのジョブ（GitHub の環境なし。Google Cloud に入る。チェックアウトも Bun もしない）
 gcloud artifacts docker images describe "asia-southeast1-docker.pkg.dev/{GCP_PROJECT_ID}/moonx/api:$SHA"
 
-# デプロイのジョブ（GitHub の環境 $TARGET。production は承認のあと）
+# マイグレーションのジョブ（GitHub の環境 $TARGET。production は承認のあと。id-token: write なし）
 # 後の昇格が先に入っていたら（古い実行の再実行も）、古い版を出さずに終える
 # （チェックアウトにトークンを残さないので、main の今のファイルは GitHub の API で読む）
 [ "$(gh api -H 'Accept: application/vnd.github.raw' "repos/$GITHUB_REPOSITORY/contents/deploy/$TARGET/version?ref=main")" = "$SHA" ] || exit 0
-
-# 1. その SHA のコードと依存（Bun もその SHA が指定する版）で、マイグレーションと API の新しいリビジョン
-#    （DATABASE_URL_DIRECT は環境のシークレット）
+# その SHA のコードと依存（Bun もその SHA が指定する版）で（DATABASE_URL_DIRECT は環境のシークレット）
 git checkout "$SHA"
 make install
+make db-migrate
+
+# デプロイのジョブ（同じ環境。production はもう一度承認のあと。Google Cloud に入る）
+# 待つ間に後の昇格が先に入っていたら、同じく終える
+[ "$(gh api -H 'Accept: application/vnd.github.raw' "repos/$GITHUB_REPOSITORY/contents/deploy/$TARGET/version?ref=main")" = "$SHA" ] || exit 0
+# 1. その SHA の Makefile で API の新しいリビジョン（Bun と依存は入れない）
+git checkout "$SHA"
 make deploy-api ENV=$TARGET SHA=$SHA
 
 # 2. デプロイ後の確認。新しい版にトラフィックが流れていることと、マイグレーションのあとで DB に繋がること
@@ -96,10 +111,10 @@ test "$(curl -fsS "$BASE_URL/api/health" | jq -r .version)" = "$SHA"
 curl -fsS "$BASE_URL/api/health/db"
 ```
 
-- **1. マイグレーション**（`make deploy-api` の中で API より先に動く）は「追加してから使い、使わなくなってから消す」で書いたものだけを流す（4.1）。これで、API を前のリビジョンに戻しても動く
-- **1. 依存**は、その SHA の lockfile で入れ直す（`make install`）。戻すときに、新しい版の依存（マイグレーションの道具など）で古い版を動かさないため
+- **マイグレーション**（マイグレーションのジョブ。デプロイのジョブより先に動く）は「追加してから使い、使わなくなってから消す」で書いたものだけを流す（4.1）。これで、API を前のリビジョンに戻しても動く。マイグレーションのジョブが失敗したら、デプロイのジョブは動かない
+- **依存**は、その SHA の lockfile で入れ直す（マイグレーションのジョブの `make install`）。戻すときに、新しい版の依存（マイグレーションの道具など）で古い版を動かさないため。戻すときも、マイグレーションとデプロイは戻し先の版の Makefile の `db-migrate` と `deploy-api` で動く
 - **1. API** の新しいリビジョンが起動しないときは、Cloud Run は前のリビジョンに流したままにする（05 3.7）
-- **2. 確認**: `/api/health` の `version` が `$SHA` でなければ、トラフィックが新しいリビジョンに流れていない（5.2 で前のリビジョンに固定したままなど）。新しいリビジョンが起動していることを確かめてから 5.2 の `--to-latest` で最新に戻し、`deploy.yml` を再実行する。`/api/health` が失敗したら 5.2 で戻す。`/api/health/db` が 503 なら、新しいリビジョンが DB に繋がっていない。05 3.1〜3.3 で切り分け、新しいリビジョンが原因なら 5.2 で戻す
+- **2. 確認**: `/api/health` の `version` が `$SHA` でなければ、トラフィックが新しいリビジョンに流れていない（5.2 で前のリビジョンに固定したままなど）。新しいリビジョンが起動していることを確かめてから 5.2 の `--to-latest` で最新に戻し、`deploy.yml` を再実行する（production では、再実行したジョブがまた承認を待つ）。`/api/health` が失敗したら 5.2 で戻す。`/api/health/db` が 503 なら、新しいリビジョンが DB に繋がっていない。05 3.1〜3.3 で切り分け、新しいリビジョンが原因なら 5.2 で戻す
 - **Web** は staging で確かめたイメージをそのまま production に出す（ADR-016）。環境ごとに違う値の渡し方は ADR-004
 
 ---
@@ -132,13 +147,13 @@ curl -fsS "$BASE_URL/api/health/db"
 - [ ] API の変更が、開いたままの古い画面（Service Worker が持っている前の版の画面を含む。ADR-031）を壊さない（項目の追加だけ。壊すなら `/api/v2`。ADR-006）
 - [ ] 新しい環境変数・シークレットがある場合: SDD 2章の表に足し、Terraform・Secret Manager・GitHub（SDD の表の置き場所。リポジトリか環境か）に、staging と production の両方で入れた
 - [ ] 環境変数・シークレットを消す・名前を変える場合: 新しい名前を先に足し、今その環境で動いている版と直前の版（下）の両方が古い名前を使わなくなってから（新しい名前だけを使う版の、次の昇格のあとで）、Terraform・Secret Manager・GitHub から消す
-- [ ] `make deploy-api` の引数や、それが読む環境変数・シークレットの名前を変える場合: 戻せる版の Makefile でも `deploy.yml` から動くように、段階を分けた（SDD 2章「make ターゲット」）
+- [ ] `make db-migrate`・`make deploy-api` の引数や、それらが読む環境変数・シークレットの名前を変える場合: 戻せる版の Makefile でも `deploy.yml` から動くように、段階を分けた（SDD 2章「make ターゲット」）
 - [ ] `infra/terraform/` の変更がある場合: 先に `make infra-apply ENV=$TARGET`（`shared` の変更なら `ENV=shared`）を済ませた
 - [ ] Better Auth の更新を含む場合: staging でログイン（メール・Google）・招待・パスワード再設定を確かめた
 - [ ] 29 プライバシーポリシーと 30 サポートの本文が入っている（BCDX が用意する。design-spec 9.2。本文が無いまま production に出さない）
 - [ ] staging でデプロイ後の確認（6章）が済んだ
 - [ ] 昇格の PR の本文（`make promote` が作る）を読み、production への昇格では staging での確認の結果（6章）を足した
-- [ ] production の昇格は、承認する人が `deploy.yml` を承認できる時間に出す
+- [ ] production の昇格は、承認する人が `deploy.yml` を2回（マイグレーションの前とデプロイの前。2章「production の承認」）承認できる時間に出す
 
 #### マイグレーションの書き方（expand / contract）
 
@@ -148,11 +163,17 @@ DB は戻せない（ADR-016）。1回の昇格で新しく当たるマイグレ
 - production には staging に出した版しか出せないので、staging でも段階ごとに別々の昇格で出す。
 - `make promote` の既定の SHA（最新）が、まだその環境に出ていない前の段階と次の段階をまとめて含むときは、`SHA=` で前の段階までの版を指定する（4.2）。
 
-こう書いていれば、直前の版には戻せる。いちばん先まで出した版より古い版を出すとき、それが直前の版でなければ、5.1 の 3 で確かめる。
+こう書いていれば、直前の版には戻せる。いちばん先まで出した版より古い版を出すとき、それが直前の版でなければ（直前の版が分からないときも）、5.1 の 3 で確かめる。
 
-- いちばん先まで出した版: その環境の `deploy/{env}/version` に書かれた SHA のうち、実際に出たもの（それを書いたコミットの `deploy.yml` のデプロイのジョブが、どれかの試行で成功した。デプロイの段を飛ばして終えたジョブは数えない。2章）で、`main` の履歴でいちばん新しいもの。DB には、この版までのマイグレーションが当たっている。書かれたが出なかった版（検査で止まった・承認されなかった・失敗した・後の昇格に追い越された）は数えない
-- 直前の版: いちばん先まで出した版を初めて出す前に、その環境に出ていた版（同じく、実際に出たもの）
-- マイグレーションが当たったかもしれない版: その環境に書かれた SHA のうち、`deploy.yml` のデプロイの段がどれかの試行で動いた（飛ばしていない）が、デプロイのジョブはどの試行でも成功しなかった（デプロイの段を飛ばして成功した試行は、成功に数えない）もので、いちばん先まで出した版より `main` の履歴で新しいもの。`make deploy-api` はマイグレーションを当ててから新しいリビジョンを出す（マイグレーションは版ごとにまとめて当たるか、まったく当たらないか）。デプロイの段が成功していればマイグレーションは当たっている（後の確認で失敗し、新しいリビジョンに流れていないことがある）。失敗した・取り消された・まだ動いているなら、当たったかどうか分からない。`make promote` は、出す版がこの版より古ければ、出す版に無いこの版までのマイグレーションを「DB に当たっているかもしれず、出す版に無いもの」として本文に出す
+- いちばん先まで出した版: その環境の `deploy/{env}/version` に書かれた SHA のうち、実際に出たもの（それを書いたコミットの `deploy.yml` のデプロイのジョブが、どれかの試行で成功した。`make deploy-api` の段を飛ばして終えたジョブは数えない。2章）で、`main` の履歴でいちばん新しいもの。DB には、この版までのマイグレーションが当たっている。書かれたが出なかった版（検査で止まった・承認されなかった・失敗した・後の昇格に追い越された）は数えない
+- 直前の版: いちばん先まで出した版を初めて出す前に、その環境に出ていた版（同じく、実際に出たもの）。いちばん先まで出した版を初めて出した書き込みから古い方へたどる途中に、`deploy.yml` の記録が見つからない・読めない書き込み（下）があれば、その版が出ていたかもしれないので、直前の版は分からないものとして扱う。いちばん先まで出した版より新しい版の記録が見つからない・読めないときも、その版が出ていた（本当のいちばん先まで出した版だった）かもしれないので、同じく分からないものとして扱う。`make promote` は分からないと本文に書き、直前の版でないときと同じく 5.1 の 3 で確かめるよう書く
+- マイグレーションが当たったかもしれない版: その環境に書かれた SHA のうち、いちばん先まで出した版より `main` の履歴で新しく、次のどちらかに当たるもの。DB は戻せないので、当たったか分からないときは当たったかもしれないものとして扱う（ADR-016）
+  - それを書いたコミットの `deploy.yml` のマイグレーションのジョブで、`make db-migrate` の段がどれかの試行で動いた（飛ばしていない）が、デプロイのジョブはどの試行でも成功しなかった（`make deploy-api` の段を飛ばして成功した試行は、成功に数えない）。マイグレーションは版ごとにまとめて当たるか、まったく当たらないか。`make db-migrate` の段が成功していれば当たっている（後のデプロイのジョブが失敗した・承認されなかった・後の昇格に追い越されて飛ばした・後の確認で失敗して新しいリビジョンに流れていないなど）。失敗した・取り消された・まだ動いているなら、当たったかどうか分からない
+  - それを書いたコミットの `deploy.yml` の記録が見つからない（実行が一覧に無い: まだ始まっていない・実行が消えた）か、読めない（一覧にあった実行のジョブを読もうとしたら、実行が消えていた。gh の HTTP 404。gh のほかの失敗では `make promote` は止まる）。当たったかどうか分からない
+
+  一覧にあって、`make db-migrate` の段がまだ始まっていない実行（承認や `concurrency` の順番を待っている）は、当てていないものとして数える。その実行は始まるときに `main` を読み直すので、後の昇格が先にマージされていれば当てずに終える。昇格の PR を出した後でその段が動いたら、PR の本文は古くなるので、`make promote` で作り直す
+
+  `make promote` は、出す版がこの版より古ければ、出す版に無いこの版までのマイグレーションを「DB に当たっているかもしれず、出す版に無いもの」として本文に出す
 
 | 変えたいこと | 1回目の昇格（expand） | 次以降の昇格（contract） |
 |---|---|---|
@@ -164,7 +185,7 @@ DB は戻せない（ADR-016）。1回の昇格で新しく当たるマイグレ
 
 ### 4.2 昇格の PR の手順
 
-昇格の PR は `make promote` で作る（確かめることと本文の中身は [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)）。手元に gh と gcloud のログインが要る（03 1章）。PR を作ったら、本文のマイグレーションの一覧を 4.1 の「expand / contract」と照らす。まだその環境に出ていない前の段階と次の段階が一緒に入っていたら、PR を閉じ、`SHA=` で前の段階までの版を指定して作り直す。出す版が、いちばん先まで出した版（4.1）より古く、直前の版でもないとき（戻したあとで、その間の版を出すときなど）は、5.1 の 3 と同じことを確かめる。
+昇格の PR は `make promote` で作る（確かめることと本文の中身は [SDD 2章「make ターゲット」](02-01_system-design-doc.md#make-ターゲット)）。手元に gh と gcloud のログインが要る（03 1章）。PR を作ったら、本文のマイグレーションの一覧を 4.1 の「expand / contract」と照らす。まだその環境に出ていない前の段階と次の段階が一緒に入っていたら、PR を閉じ、`SHA=` で前の段階までの版を指定して作り直す。出す版が、いちばん先まで出した版（4.1）より古く、直前の版でもないとき（戻したあとで、その間の版を出すときなど。直前の版が分からないときも）は、5.1 の 3 と同じことを確かめる。
 
 #### staging へ
 
@@ -192,7 +213,7 @@ gh run list --workflow=deploy.yml --limit=1
 gh run watch <RUN_ID>
 ```
 
-production の `deploy.yml` は、GitHub の環境 `production` の承認を待って止まる。GitHub の Actions のその実行の画面で「Review deployments」から承認する。`deploy.yml` が終わったら 6章の確認をする。
+production の `deploy.yml` は、GitHub の環境 `production` の承認を待って止まる。マイグレーションのジョブの前と、デプロイのジョブの前の2回止まる（2章「production の承認」）。どちらも GitHub の Actions のその実行の画面で「Review deployments」から承認する。`deploy.yml` が終わったら 6章の確認をする。
 
 #### 最初のリリースのあとで: テンプレートを入れる
 
@@ -221,11 +242,11 @@ production の `deploy.yml` は、GitHub の環境 `production` の承認を待�
    ```
 
 2. `make promote ENV=$TARGET SHA=<戻し先の短い SHA>` で PR を作る（件名は `roll back`）
-3. 戻し先が直前の版（4.1）でなければ、PR の本文のマイグレーションの一覧（DB に当たっていて、戻し先の版に無いもの）に contract（4.1 の表の右の列）が無いことを確かめる。あれば、戻し先の版は今の DB で動かないことがある。PR を閉じ、その contract より後の版に戻すか、直した版を出して前に進める。新しい値を書き始めた変更（4.1 の表の最後の行）はマイグレーションに出ないことがあるので、コミットの一覧でも確かめる
-4. PR の本文に、戻す理由と、3 で確かめた結果（直前の版でないとき）を書き、squash でマージする（production は `deploy.yml` の承認が要る）
+3. 戻し先が直前の版（4.1）でなければ（直前の版が分からないときも）、PR の本文のマイグレーションの一覧（DB に当たっていて、戻し先の版に無いもの）に contract（4.1 の表の右の列）が無いことを確かめる。あれば、戻し先の版は今の DB で動かないことがある。PR を閉じ、その contract より後の版に戻すか、直した版を出して前に進める。新しい値を書き始めた変更（4.1 の表の最後の行）はマイグレーションに出ないことがあるので、コミットの一覧でも確かめる
+4. PR の本文に、戻す理由と、3 で確かめた結果（直前の版でない・分からないとき）を書き、squash でマージする（production は `deploy.yml` の承認が、マイグレーションのジョブとデプロイのジョブで1回ずつ要る。2章「production の承認」）
 5. 6章の確認をする
 
-- マイグレーションは戻らない（新しい列などは残る）。戻し先の版のマイグレーションはすべて当たり済みなので、`make deploy-api` は DB を変えない
+- マイグレーションは戻らない（新しい列などは残る）。戻し先の版のマイグレーションはすべて当たり済みなので、マイグレーションのジョブの `make db-migrate` は何も当てず、DB を変えない
 - Web は API と同じイメージなので、一緒に戻る
 - production を戻しても staging はそのまま。直した版は、いつもどおり staging から出す。それまで、`make promote ENV=production` は `SHA` を省くと止まる（今の staging の版は、production で戻した版のため）
 
@@ -271,7 +292,7 @@ make infra-apply ENV=production
 
 ## 6. デプロイ後確認
 
-staging でも production でも同じことをする（URL とサービス名を読み替える）。
+staging でも production でも同じことをする（URL とサービス名を読み替える）。確認は、その環境の運営者のアカウント（03 5.4 K で作り、確認用のワークスペースを作ったアカウント）で行い、確認のためにほかのアカウントを作らない（登録の KPI（K-11・K-12）は運営者を数えないので、確認が登録の数に入らない。SDD 11章「KPI の数え方」）。
 
 ```bash
 BASE_URL=https://{DOMAIN}            # staging は https://stg.{DOMAIN}
@@ -309,9 +330,9 @@ gcloud logging read \
 - [ ] Web のトップ（ランディング）が出る。画面の HTML がマニフェストを指し、マニフェストと Service Worker のファイル（パスは ADR-031）が 200 で返る
 - [ ] セキュリティヘッダー（CSP・HSTS など。SDD 7.2）が画面の応答に付いている
 - [ ] メール＋パスワードでログインできる
-- [ ] Google でログインできる
+- [ ] Google でログインできる（運営者のメールの Google のアカウントで。招待から登録したアカウントには、同じメールの Google のログインがつながる。SDD 5.4 U5）
 - [ ] コアの流れが通る（確認専用のワークスペースで行う。03 5.4 K で環境ごとに1つ作り、毎回それを使う）: アイデアを作る → コストを入れる → 経済性（損益分岐など）を見る → 判断を記録する → プランを作る → Pitch Deck の PDF を出す（開ける・16:9・文字化けしない）。アイデアとプランは消せないので、終わったら作ったアイデアをアーカイブする
-- [ ] 招待のメールが届く（staging は `MAIL_ALLOWLIST` のメールで）
+- [ ] 招待のメールが届く: 確認用のワークスペースの 9 から自分の別のメールあてに招待を出し（staging は `MAIL_ALLOWLIST` のメールあて）、届いたら 9 で取り消す（受けない。受けると確認だけのアカウントができ、登録の KPI に入る）
 - [ ] スマホ（PWA）: ホーム画面に追加して開き、ログイン → アイデアを開く → PDF を開ける
 - [ ] staging だけ: 呼び出し元の IP の決め方（SDD 7.2）を確かめる。`X-Forwarded-For` の左側に偽の値を付けたリクエストを送り、API のログに記録された呼び出し元の IP が、偽の値ではなく自分の IP になっていること（初回と、Cloud Run の前に何かを置くように変えたとき）
 

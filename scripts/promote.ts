@@ -30,13 +30,23 @@ import {
 
 /**
  * The job of .github/workflows/deploy.yml that deploys, and its step that runs make
- * deploy-api. The job ends early with success, skipping that step, when a later promotion
- * reached main first, so only a successful step shows that the run put its SHA on the
+ * deploy-api. GitHub skips the whole job when the migrate job found a later promotion on
+ * main, and the job ends early with success, skipping that step, when one reached main
+ * while it waited, so only a successful step shows that the run put its SHA on the
  * environment.
  */
 export const DEPLOY_JOB = "deploy";
 /** The step of {@link DEPLOY_JOB} that runs make deploy-api. */
 export const DEPLOY_STEP = "Deploy";
+/**
+ * The job of .github/workflows/deploy.yml that applies the SHA's migrations before the
+ * deploy job, and its step that runs make db-migrate. The job skips that step when a later
+ * promotion reached main first. drizzle applies the pending migrations in one transaction,
+ * so a successful step applied them and one that started may have.
+ */
+export const MIGRATE_JOB = "migrate";
+/** The step of {@link MIGRATE_JOB} that runs make db-migrate. */
+export const MIGRATE_STEP = "Migrate";
 
 const REGION = "asia-southeast1";
 const JOURNAL = `${MIGRATIONS_DIR}/meta/_journal.json`;
@@ -77,12 +87,35 @@ interface ServiceStatus {
   }[];
 }
 
+/**
+ * Why deploy.yml's record of a commit cannot be found: gh lists no run for it (not run yet,
+ * or deleted), or a listed run's jobs answer 404 (the run was deleted after gh listed it).
+ */
+type Missing =
+  | { kind: "none" }
+  | { kind: "unreadable"; run: Run; error: string };
+
+/**
+ * Why a commit's migrations may be in the DB: an attempt's Migrate step succeeded, one
+ * started and did not succeed (`state` says how it ended or that it still runs), or the
+ * commit's record is missing.
+ */
+type Migration =
+  | { kind: "applied"; run: Run }
+  | { kind: "uncertain"; run: Run; state: string }
+  | Missing;
+
 /** What deploy.yml did for the commit that wrote a version. */
 type Deployment =
   | { kind: "deployed" }
-  | { kind: "none" }
+  | Missing
   | { kind: "unfinished" | "failed"; run: Run }
-  | { kind: "undeployed"; run: Run; step: string | undefined };
+  | {
+      kind: "undeployed";
+      run: Run;
+      /** The step that shows why, and how it ended; none without a Deploy step. */
+      step: { name: string; state: string } | undefined;
+    };
 
 type NotDeployed = Exclude<Deployment, { kind: "deployed" }>;
 
@@ -164,18 +197,31 @@ function runs(repo: string, workflow: string, commit: string): Run[] {
 }
 
 /**
- * The jobs of every attempt of a run. gh run view shows only the latest attempt, and a
- * re-run (of a run superseded by a later promotion, or of a failed one) hides what the
- * earlier attempts did.
+ * The jobs of every attempt of a run, or gh's error on one line when they answer 404: the
+ * run was deleted after gh listed it. Any other failure of gh (sign-in, rate limit, a 5xx)
+ * throws, as gh run list's does. gh run view shows only the latest attempt, and a re-run
+ * (of a run superseded by a later promotion, or of a failed one) hides what the earlier
+ * attempts did.
  */
-function runJobs(repo: string, runId: number): Job[] {
-  return gh(repo, [
+function runJobs(repo: string, runId: number): Job[] | string {
+  const command = [
+    "gh",
     "api",
     `repos/{owner}/{repo}/actions/runs/${runId}/jobs?filter=all&per_page=100`,
     "--paginate",
     "--jq",
     ".jobs[]",
-  ])
+  ];
+  const result = spawn(repo, command, GH_ENV);
+  if (result.exitCode !== 0) {
+    // gh ends an HTTP error's message with the status, as in "gh: Not Found (HTTP 404)".
+    if (!/\(HTTP 404\)/.test(result.stderr)) {
+      throw new Error(`${command.join(" ")} failed: ${result.stderr}`);
+    }
+    // The pull request's body quotes it inside a one-line blockquote.
+    return result.stderr.replace(/\s*\n\s*/g, " ");
+  }
+  return result.stdout
     .split("\n")
     .filter((line) => line !== "")
     .map((line) => {
@@ -189,15 +235,18 @@ function runJobs(repo: string, runId: number): Job[] {
     });
 }
 
-/** One attempt's deploy job and its Deploy step, and the run it belongs to. */
-interface DeployAttempt {
+/** One attempt of a job of a run, and the job's step that matters (Migrate or Deploy). */
+interface JobAttempt {
   run: Run;
   job: Job;
   step: Step | undefined;
 }
 
-const started = (step: Step | undefined) =>
-  step?.status === "in_progress" || step?.status === "completed";
+const ran = (
+  step: Step | undefined,
+): step is Step & { status: "in_progress" | "completed" } =>
+  (step?.status === "in_progress" || step?.status === "completed") &&
+  step.conclusion !== "skipped";
 
 /**
  * What deploy.yml did for the commits that wrote versions, over every run gh lists for a
@@ -209,21 +258,22 @@ interface Deployments {
   /** Some attempt's deploy job succeeded, its Deploy step included. */
   deployed(commit: string): boolean;
   /**
-   * Some attempt's Deploy step started and was not skipped, whatever its conclusion. The
-   * step runs make deploy-api, which applies all pending migrations in one transaction and
-   * then deploys: a successful step applied them, and a failed, cancelled or unfinished one
-   * may have.
+   * What shows best that the commit's migrations may be in the DB: an attempt whose Migrate
+   * step succeeded, else one whose step started and was not skipped, whatever its
+   * conclusion, else the commit's missing record ({@link Deployments.missing}); none when no
+   * attempt ran the step. The step runs make db-migrate, which applies all pending
+   * migrations in one transaction: a successful step applied them, and a failed, cancelled
+   * or unfinished one may have. A missing record may hide a step that ran, and the DB cannot
+   * be rolled back (ADR-016), so it counts too.
    */
-  mayHaveMigrated(commit: string): boolean;
-  /** Some attempt's Deploy step succeeded, so the version's migrations are applied. */
-  applied(commit: string): boolean;
-  /** The attempt that shows best that the commit's migrations ran: its Deploy step succeeded if one did. */
-  migratedIn(commit: string): DeployAttempt | undefined;
+  migration(commit: string): Migration | undefined;
+  /** Why the commit's record is missing: no run, or the newest run whose jobs answer 404. */
+  missing(commit: string): Missing | undefined;
 }
 
 function deployments(repo: string): Deployments {
   const runsOf = new Map<string, Run[]>();
-  const jobsOf = new Map<number, Job[]>();
+  const jobsOf = new Map<number, Job[] | string>();
   const listed = (commit: string) => {
     let found = runsOf.get(commit);
     if (found === undefined) {
@@ -232,27 +282,44 @@ function deployments(repo: string): Deployments {
     }
     return found;
   };
-  const jobs = (runId: number) => {
-    let found = jobsOf.get(runId);
+  const jobs = (run: Run) => {
+    let found = jobsOf.get(run.databaseId);
     if (found === undefined) {
-      found = runJobs(repo, runId);
-      jobsOf.set(runId, found);
+      found = runJobs(repo, run.databaseId);
+      jobsOf.set(run.databaseId, found);
     }
     return found;
   };
-  /** The deploy jobs of `run`, latest attempt first. */
-  const attempts = (run: Run): DeployAttempt[] =>
-    jobs(run.databaseId)
-      .filter((job) => job.name === DEPLOY_JOB)
+  const unreadable = (run: Run) => {
+    const found = jobs(run);
+    return typeof found === "string" ? found : undefined;
+  };
+  /**
+   * The attempts of `run`'s job `name` with its step `step`, latest first. A re-run of failed
+   * jobs makes an attempt that lists only those, so the jobs of one attempt need not include
+   * the migrate job.
+   */
+  const attempts = (run: Run, name: string, step: string): JobAttempt[] => {
+    const found = jobs(run);
+    if (typeof found === "string") return [];
+    return found
+      .filter((job) => job.name === name)
       .sort((a, b) => (b.run_attempt ?? 0) - (a.run_attempt ?? 0))
       .map((job) => ({
         run,
         job,
-        step: job.steps?.find((step) => step.name === DEPLOY_STEP),
+        step: job.steps?.find((each) => each.name === step),
       }));
-  const find = (commit: string, test: (attempt: DeployAttempt) => boolean) => {
+  };
+  const migrations = (run: Run) => attempts(run, MIGRATE_JOB, MIGRATE_STEP);
+  const deploys = (run: Run) => attempts(run, DEPLOY_JOB, DEPLOY_STEP);
+  const find = (
+    commit: string,
+    of: (run: Run) => JobAttempt[],
+    test: (attempt: JobAttempt) => boolean,
+  ) => {
     for (const run of listed(commit)) {
-      const match = attempts(run).find(test);
+      const match = of(run).find(test);
       if (match !== undefined) return match;
     }
     return undefined;
@@ -260,55 +327,85 @@ function deployments(repo: string): Deployments {
   const deployed = (commit: string) =>
     find(
       commit,
+      deploys,
       ({ job, step }) =>
         job.conclusion === "success" && step?.conclusion === "success",
     ) !== undefined;
-  const mayHaveMigrated = (commit: string) =>
-    find(
-      commit,
-      ({ step }) => started(step) && step?.conclusion !== "skipped",
-    ) !== undefined;
+  const missing = (commit: string): Missing | undefined => {
+    const found = listed(commit);
+    if (found.length === 0) return { kind: "none" };
+    for (const run of found) {
+      const error = unreadable(run);
+      if (error !== undefined) return { kind: "unreadable", run, error };
+    }
+    return undefined;
+  };
   return {
     deployed,
-    mayHaveMigrated,
-    applied: (commit) =>
-      find(commit, ({ step }) => step?.conclusion === "success") !== undefined,
-    migratedIn: (commit) =>
-      find(commit, ({ step }) => step?.conclusion === "success") ??
-      find(
+    missing,
+    migration: (commit) => {
+      const applied = find(
         commit,
-        ({ step }) => started(step) && step?.conclusion !== "skipped",
-      ),
+        migrations,
+        ({ step }) => step?.conclusion === "success",
+      );
+      if (applied !== undefined) return { kind: "applied", run: applied.run };
+      for (const run of listed(commit)) {
+        for (const { step } of migrations(run)) {
+          if (ran(step)) {
+            return {
+              kind: "uncertain",
+              run,
+              state: step.conclusion || step.status,
+            };
+          }
+        }
+      }
+      return missing(commit);
+    },
     outcome: (commit) => {
       if (deployed(commit)) return { kind: "deployed" };
       const latest = listed(commit)[0];
       if (latest === undefined) return { kind: "none" };
+      const error = unreadable(latest);
+      if (error !== undefined) {
+        return { kind: "unreadable", run: latest, error };
+      }
       if (latest.status !== "completed") {
         return { kind: "unfinished", run: latest };
       }
       if (latest.conclusion !== "success")
         return { kind: "failed", run: latest };
-      const deploy = attempts(latest)[0]?.step;
+      // A successful run that did not deploy skipped its steps for a later promotion: the
+      // Migrate step, and with it the whole deploy job, or the Deploy step. Each job's latest
+      // attempt is what the run shows, whichever attempt ran it last.
+      const migrate = migrations(latest)[0]?.step;
+      const deploy = deploys(latest)[0]?.step;
       return {
         kind: "undeployed",
         run: latest,
         step:
-          deploy === undefined
-            ? undefined
-            : deploy.conclusion || deploy.status || "unknown",
+          migrate?.conclusion === "skipped"
+            ? { name: MIGRATE_STEP, state: "skipped" }
+            : deploy === undefined
+              ? undefined
+              : {
+                  name: DEPLOY_STEP,
+                  state: deploy.conclusion || deploy.status || "unknown",
+                },
       };
     },
   };
 }
 
 function describeInEnglish(outcome: NotDeployed, commit: string): string {
-  const run =
-    outcome.kind === "none"
-      ? ""
-      : `deploy.yml run ${outcome.run.databaseId} for ${short(commit)}`;
+  if (outcome.kind === "none") {
+    return `no deploy.yml run was found for ${short(commit)} (it has not run yet, or its run was deleted)`;
+  }
+  const run = `deploy.yml run ${outcome.run.databaseId} for ${short(commit)}`;
   switch (outcome.kind) {
-    case "none":
-      return `deploy.yml has not run for ${short(commit)}`;
+    case "unreadable":
+      return `gh could not read the jobs of ${run} (${outcome.error})`;
     case "unfinished":
       return `${run} is still ${outcome.run.status}`;
     case "failed":
@@ -317,20 +414,20 @@ function describeInEnglish(outcome: NotDeployed, commit: string): string {
       if (outcome.step === undefined) {
         return `${run} has no ${DEPLOY_STEP} step in a ${DEPLOY_JOB} job`;
       }
-      return outcome.step === "skipped"
-        ? `${run} skipped its ${DEPLOY_STEP} step (a later promotion reached main first), so it deployed nothing`
-        : `${run} ended with its ${DEPLOY_STEP} step ${outcome.step}`;
+      return outcome.step.state === "skipped"
+        ? `${run} skipped its ${outcome.step.name} step (a later promotion reached main first), so it deployed nothing`
+        : `${run} ended with its ${outcome.step.name} step ${outcome.step.state}`;
   }
 }
 
 function describeInJapanese(outcome: NotDeployed, commit: string): string {
-  const run =
-    outcome.kind === "none"
-      ? ""
-      : `${short(commit)} の deploy.yml（実行 ${outcome.run.databaseId}）`;
+  if (outcome.kind === "none") {
+    return `${short(commit)} の deploy.yml の実行が見つからない（まだ動いていないか、消された）`;
+  }
+  const run = `${short(commit)} の deploy.yml（実行 ${outcome.run.databaseId}）`;
   switch (outcome.kind) {
-    case "none":
-      return `${short(commit)} の deploy.yml が動いていない`;
+    case "unreadable":
+      return `${run}のジョブを gh で読めなかった（${outcome.error}）`;
     case "unfinished":
       return `${run}がまだ終わっていない（${outcome.run.status}）`;
     case "failed":
@@ -339,9 +436,9 @@ function describeInJapanese(outcome: NotDeployed, commit: string): string {
       if (outcome.step === undefined) {
         return `${run}の ${DEPLOY_JOB} のジョブに ${DEPLOY_STEP} のステップが無い`;
       }
-      return outcome.step === "skipped"
-        ? `${run}は、後の昇格が先に main に入ったので ${DEPLOY_STEP} のステップを飛ばした`
-        : `${run}の ${DEPLOY_STEP} のステップが成功していない（${outcome.step}）`;
+      return outcome.step.state === "skipped"
+        ? `${run}は、後の昇格が先に main に入ったので ${outcome.step.name} のステップを飛ばした`
+        : `${run}の ${outcome.step.name} のステップが成功していない（${outcome.step.state}）`;
   }
 }
 
@@ -407,26 +504,45 @@ function defaultSha(
   return sha;
 }
 
+/**
+ * マイグレーションが当たったかもしれない版 (docs/04_deployment-procedure.md 4.1), the write
+ * of it that shows best that its migrations ran, and how.
+ */
+interface MayHaveMigrated {
+  sha: string;
+  writer: string;
+  migration: Migration;
+}
+
+/** A write whose deploy.yml record is missing, so it may have deployed its SHA. */
+interface Lost {
+  write: Written;
+  missing: Missing;
+}
+
 /** How far the environment's versions reached, from its written history. */
 interface Furthest {
   /** いちばん先まで出した版: the newest SHA in main whose write deploy.yml deployed. */
   deployed?: string;
   /**
-   * The newest SHA in main whose migrations may be in the DB: `deployed`, or a newer SHA
-   * whose write may have migrated (Deployments.mayHaveMigrated).
+   * Whether `deployed` is unknown: no write is known to have deployed, and the record of
+   * some write is missing, so it may have.
    */
-  migrated?: string;
+  unknown: boolean;
   /**
-   * The write of `migrated` that shows best that its migrations ran, when `migrated` is not
-   * `deployed`: one whose Deploy step succeeded if any did, else the newest that may have.
+   * The newest write of a SHA newer than `deployed` whose record is missing. That SHA may
+   * have been deployed, so it may be the furthest version, and the previous version worked
+   * out from `deployed` is not known.
    */
-  migratedBy?: string;
+  lost?: Lost;
+  /** The newest SHA in main newer than `deployed` whose write may have migrated. */
+  mayHaveMigrated?: MayHaveMigrated;
 }
 
 /**
  * The furthest versions (docs/04_deployment-procedure.md 4.1) among the SHAs `history`
  * holds that are in main. gh is asked from the newest SHA down, only until one deployed,
- * and then about the newer ones only until one may have migrated.
+ * and then about every write of the newer ones.
  */
 function furthestVersions(
   repo: string,
@@ -451,14 +567,45 @@ function furthestVersions(
     (sha) => writeOf(sha, deploys.deployed) !== undefined,
   );
   const deployed = index === -1 ? undefined : candidates[index];
-  for (const sha of index === -1 ? candidates : candidates.slice(0, index)) {
-    const mayHave = writeOf(sha, deploys.mayHaveMigrated);
-    if (mayHave !== undefined) {
-      const migratedBy = writeOf(sha, deploys.applied) ?? mayHave;
-      return { deployed, migrated: sha, migratedBy };
+  const unknown =
+    deployed === undefined &&
+    candidates.some(
+      (sha) =>
+        writeOf(sha, (commit) => deploys.missing(commit) !== undefined) !==
+        undefined,
+    );
+  const newer = index === -1 ? candidates : candidates.slice(0, index);
+  let lost: Lost | undefined;
+  if (deployed !== undefined) {
+    for (const write of newer.flatMap((sha) =>
+      history.filter((written) => written.sha === sha),
+    )) {
+      const missing = deploys.missing(write.commit);
+      if (missing !== undefined) {
+        lost = { write, missing };
+        break;
+      }
     }
   }
-  return { deployed, migrated: deployed };
+  for (const sha of newer) {
+    // A write whose Migrate step succeeded if any did, else the newest that may have.
+    let found: MayHaveMigrated | undefined;
+    for (const written of history) {
+      if (written.sha !== sha) continue;
+      const migration = deploys.migration(written.commit);
+      if (migration?.kind === "applied") {
+        found = { sha, writer: written.commit, migration };
+        break;
+      }
+      if (migration !== undefined) {
+        found ??= { sha, writer: written.commit, migration };
+      }
+    }
+    if (found !== undefined) {
+      return { deployed, unknown, lost, mayHaveMigrated: found };
+    }
+  }
+  return { deployed, unknown, lost };
 }
 
 /** Whether `sha` is older than `version` in main's history; never when `version` is none. */
@@ -477,19 +624,37 @@ function olderThan(
 }
 
 /**
+ * The previous version (none when no write deployed one), or the write whose missing record
+ * leaves it unknown.
+ */
+type Previous = { sha: string | undefined } | Lost;
+
+/**
  * The previous version (docs/04_deployment-procedure.md 4.1): what was deployed just before
- * the furthest version was first deployed, walking back from that write.
+ * the furthest version was first deployed, walking back from that write. A write on the way
+ * whose record is missing may have deployed its version, so then it is unknown.
  */
 function previousVersion(
   history: Written[],
   furthest: string,
-  deployed: (commit: string) => boolean,
-): string | undefined {
+  deploys: Deployments,
+): Previous {
   const first = history.findLastIndex(
-    (written) => written.sha === furthest && deployed(written.commit),
+    (written) => written.sha === furthest && deploys.deployed(written.commit),
   );
-  return history.slice(first + 1).find((written) => deployed(written.commit))
-    ?.sha;
+  // An older write of the furthest version whose record is lost may have been its first
+  // deployment, and then what ran before that write is the previous version.
+  for (const written of history.slice(first + 1)) {
+    if (written.sha !== furthest) continue;
+    const missing = deploys.missing(written.commit);
+    if (missing !== undefined) return { write: written, missing };
+  }
+  for (const written of history.slice(first + 1)) {
+    if (deploys.deployed(written.commit)) return { sha: written.sha };
+    const missing = deploys.missing(written.commit);
+    if (missing !== undefined) return { write: written, missing };
+  }
+  return { sha: undefined };
 }
 
 /** The migration tags of the journal at `commit`, in journal order; none without a journal. */
@@ -665,7 +830,10 @@ function inspectCurrent(
   };
 }
 
-/** The warning at the top of the body when deploy.yml did not deploy the current version. */
+/**
+ * The warning at the top of the body when deploy.yml did not deploy the current version, or
+ * its record of the version is missing.
+ */
 function warningLines(
   env: Environment,
   now: Current,
@@ -674,13 +842,16 @@ function warningLines(
   if (now.outcome.kind === "deployed") return [];
   const file = versionFile(env);
   const uses = listsFrom ? "コミットの一覧と戻し方" : "戻し方";
+  const missing =
+    now.outcome.kind === "none" || now.outcome.kind === "unreadable";
   return [
     "> [!WARNING]",
-    `> ${env} の前回の deploy.yml は、今の版をデプロイしていない（${describeInJapanese(now.outcome, now.writer)}）。\`${file}\` は、Cloud Run に出ていない版を指していることがある。`,
+    `> ${env} の前回の deploy.yml ${missing ? "が今の版をデプロイしたかは分からない" : "は、今の版をデプロイしていない"}（${describeInJapanese(now.outcome, now.writer)}）。\`${file}\` は、Cloud Run に出ていない版を指していることがある。`,
     ">",
     ...(typeof now.running === "string"
       ? [
-          `> Cloud Run の \`moonx-api-${env}\` で動いている版を gcloud で読めなかった（${now.running}）。`,
+          // gcloud's message can span lines, which would end the quote.
+          `> Cloud Run の \`moonx-api-${env}\` で動いている版を gcloud で読めなかった（${now.running.replace(/\s*\n\s*/g, " ")}）。`,
         ]
       : [
           `> Cloud Run の \`moonx-api-${env}\` で動いている版:`,
@@ -700,26 +871,33 @@ function warningLines(
 }
 
 /**
- * The note at the top of the body when a newer version than the furthest one ran its
- * Deploy step without its deploy job succeeding, so its migrations are or may be applied.
+ * The note at the top of the body when a newer version than the furthest one may have
+ * migrated: its Migrate step ran without a deploy job deploying it, so its migrations are or
+ * may be applied, or its deploy.yml record is missing, so they may be.
  */
-function cautionLines(
-  migrated: string,
-  migratedBy: string | undefined,
-  deploys: Deployments,
-): string[] {
-  const attempt =
-    migratedBy === undefined ? undefined : deploys.migratedIn(migratedBy);
-  const what =
-    migratedBy === undefined || attempt === undefined
-      ? "deploy.yml"
-      : `deploy.yml（${short(migratedBy)} の実行 ${attempt.run.databaseId}）`;
-  const version = `\`${short(migrated)}\``;
-  const text =
-    attempt?.step?.conclusion === "success"
-      ? `${version} の ${what}は ${DEPLOY_STEP} のステップが成功したが、${DEPLOY_JOB} のジョブは成功していない（${attempt.job.conclusion || attempt.job.status}）。${version} のマイグレーションは DB に当たっている（その版のリビジョンにはトラフィックが流れていないことがある）ので、下のマイグレーションの一覧はこの版までを数えに入れた。`
-      : `${version} の ${what}は ${DEPLOY_STEP} のステップまで動いたが、そのステップが成功していない（${attempt?.step?.conclusion || attempt?.step?.status || "不明"}）。${version} のマイグレーションが DB に当たったかは分からないので、下のマイグレーションの一覧は、当たっていても当たっていなくても漏れが無いように作った。`;
-  return ["> [!CAUTION]", `> ${text}`, ""];
+function cautionLines({ sha, writer, migration }: MayHaveMigrated): string[] {
+  const version = `\`${short(sha)}\``;
+  const what = `deploy.yml（${short(writer)} の実行${migration.kind === "none" ? "" : ` ${migration.run.databaseId}`}）`;
+  const unknown = `${version} のマイグレーションが DB に当たったかは分からないので、下のマイグレーションの一覧は、当たっていても当たっていなくても漏れが無いように作った。`;
+  const caution = (text: string) => ["> [!CAUTION]", `> ${text}`, ""];
+  switch (migration.kind) {
+    case "none":
+      return caution(
+        `${version} の ${what}が見つからない（まだ動いていないか、消された）。${unknown}`,
+      );
+    case "unreadable":
+      return caution(
+        `${version} の ${what}のジョブを gh で読めなかった（${migration.error}）。${unknown}`,
+      );
+    case "applied":
+      return caution(
+        `${version} の ${what}は ${MIGRATE_STEP} のステップが成功したが、${DEPLOY_JOB} のジョブはどの試行でもデプロイしていない。${version} のマイグレーションは DB に当たっている（その版のリビジョンにはトラフィックが流れていないことがある）ので、下のマイグレーションの一覧はこの版までを数えに入れた。`,
+      );
+    case "uncertain":
+      return caution(
+        `${version} の ${what}は ${MIGRATE_STEP} のステップまで動いたが、そのステップが成功していない（${migration.state}）。${unknown}`,
+      );
+  }
 }
 
 /** The pull request's body (SDD 2章「make ターゲット」の promote): Japanese, like the repo's PRs. */
@@ -734,11 +912,14 @@ function prBody(input: BodyInput): string {
   const from = now?.from;
   const {
     deployed: furthest,
-    migrated,
-    migratedBy,
+    unknown,
+    lost,
+    mayHaveMigrated,
   }: Furthest = current === undefined
-    ? {}
+    ? { unknown: false }
     : furthestVersions(repo, originMain, history, deploys);
+  // The newest SHA in main whose migrations may be in the DB.
+  const migrated = mayHaveMigrated?.sha ?? furthest;
   const behind = olderThan(repo, sha, furthest);
   const behindMigrated = olderThan(repo, sha, migrated);
   // A newer version than the furthest one may have migrated: each list counts it in.
@@ -756,7 +937,7 @@ function prBody(input: BodyInput): string {
 
   const lines = [
     ...(now === undefined ? [] : warningLines(env, now, forward)),
-    ...(doubt ? cautionLines(migrated, migratedBy, deploys) : []),
+    ...(mayHaveMigrated === undefined ? [] : cautionLines(mayHaveMigrated)),
     "## 昇格",
     "",
     `- 環境: ${env}`,
@@ -766,7 +947,15 @@ function prBody(input: BodyInput): string {
   ];
   if (current !== undefined) {
     lines.push(
-      `- いちばん先まで出した版: ${furthest === undefined ? "なし（デプロイまで済んだ版が無い）" : `\`${furthest}\``}`,
+      `- いちばん先まで出した版: ${
+        furthest === undefined
+          ? unknown
+            ? "分からない（deploy.yml の記録が見つからない・読めない版がある）"
+            : "なし（デプロイまで済んだ版が無い）"
+          : lost === undefined
+            ? `\`${furthest}\``
+            : `\`${furthest}\`（これより新しい \`${short(lost.write.sha)}\` は deploy.yml の記録が${lost.missing.kind === "none" ? "見つからない" : "読めない"}ので、出ていたかもしれない）`
+      }`,
     );
   }
   if (doubt) {
@@ -789,9 +978,12 @@ function prBody(input: BodyInput): string {
     const upTo = doubt
       ? doubtLabel
       : `いちばん先まで出した版 \`${short(furthest)}\``;
-    const previous = previousVersion(history, furthest, deploys.deployed);
+    // A newer version that may have been deployed may be the furthest one.
+    const previous = lost ?? previousVersion(history, furthest, deploys);
     const check =
       "04_deployment-procedure.md 5.1 の 3 のとおり、上のマイグレーションの一覧に contract（4.1 の表の右の列）が無いことを確かめる。";
+    const commitsToo =
+      "新しい値を書き始めた変更はマイグレーションに出ないことがあるので、コミットの一覧でも確かめる。";
     lines.push(
       `## コミット（出す版の次から、${upTo} まで。出す版に無いもの）`,
       "",
@@ -803,11 +995,13 @@ function prBody(input: BodyInput): string {
       "",
       "## 直前の版",
       "",
-      previous !== sha
-        ? `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）${previous === undefined ? "は無い" : `の \`${previous}\` でもない`}。${check}新しい値を書き始めた変更はマイグレーションに出ないことがあるので、コミットの一覧でも確かめる。`
-        : doubt
-          ? `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）の \`${previous}\` なので、\`${short(furthest)}\` までのマイグレーションは確かめなくてよい。\`${short(furthest)}\` の次から \`${short(migrated)}\` までのもの（当たったかもしれないもの）は、04_deployment-procedure.md 5.1 の 3 のとおり contract（4.1 の表の右の列）が無いことを確かめる。新しい値を書き始めた変更はマイグレーションに出ないことがあるので、コミットの一覧でも確かめる。`
-          : `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）の \`${previous}\` なので、5.1 の 3 で確かめなくてよい。`,
+      "missing" in previous
+        ? `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）は分からない。\`${previous.write.sha}\` を書いた ${describeInJapanese(previous.missing, previous.write.commit)}ので、その版が出ていたかもしれない。${check}${commitsToo}`
+        : previous.sha !== sha
+          ? `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）${previous.sha === undefined ? "は無い" : `の \`${previous.sha}\` でもない`}。${check}${commitsToo}`
+          : doubt
+            ? `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）の \`${previous.sha}\` なので、\`${short(furthest)}\` までのマイグレーションは確かめなくてよい。\`${short(furthest)}\` の次から \`${short(migrated)}\` までのもの（当たったかもしれないもの）は、04_deployment-procedure.md 5.1 の 3 のとおり contract（4.1 の表の右の列）が無いことを確かめる。${commitsToo}`
+            : `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）の \`${previous.sha}\` なので、5.1 の 3 で確かめなくてよい。`,
       "",
     );
   } else {
@@ -820,9 +1014,11 @@ function prBody(input: BodyInput): string {
       );
     }
     lines.push(
-      furthest === undefined
-        ? "## マイグレーション（出す版にあるすべて。この昇格で新しく当たるもの）"
-        : `## マイグレーション（いちばん先まで出した版 \`${short(furthest)}\` の次から、出す版まで。この昇格で新しく当たるもの）`,
+      furthest !== undefined
+        ? `## マイグレーション（いちばん先まで出した版 \`${short(furthest)}\` の次から、出す版まで。この昇格で新しく当たるもの）`
+        : unknown
+          ? "## マイグレーション（出す版にあるすべて。DB に当たっているかもしれないものも入る）"
+          : "## マイグレーション（出す版にあるすべて。この昇格で新しく当たるもの）",
       "",
       ...tags(furthest, sha),
       "",
@@ -865,7 +1061,7 @@ function prBody(input: BodyInput): string {
       "",
       "## 戻す理由",
       "",
-      "<!-- 戻す理由と、出す版が直前の版でないときは 5.1 の 3 で確かめた結果を書く（04_deployment-procedure.md 5.1 の 4） -->",
+      "<!-- 戻す理由と、出す版が直前の版でない・分からないときは 5.1 の 3 で確かめた結果を書く（04_deployment-procedure.md 5.1 の 4） -->",
     );
   }
   if (env === "production") {
@@ -993,8 +1189,13 @@ function promote(
     }
     const outcome = deployments(repo).outcome(writer.commit);
     if (outcome.kind !== "deployed") {
+      const again = `promote it to staging again (make promote ENV=staging SHA=${short(sha)})`;
       throw new Error(
-        `the staging deployment of ${short(sha)} did not succeed: ${describeInEnglish(outcome, writer.commit)}. Put it on staging first: wait for or rerun that run while ${versionFile("staging")} still holds it, otherwise promote it to staging again (make promote ENV=staging SHA=${short(sha)})`,
+        `the staging deployment of ${short(sha)} is not known to have succeeded: ${describeInEnglish(outcome, writer.commit)}. ${
+          outcome.kind === "unreadable"
+            ? `The run may have been deleted after gh listed it: run make promote ENV=production SHA=${short(sha)} again, and if no run of ${short(writer.commit)} is left, ${again}`
+            : `Put it on staging first: wait for or rerun that run while ${versionFile("staging")} still holds it, otherwise ${again}`
+        }`,
       );
     }
   }

@@ -17,14 +17,13 @@
 | Git | 最近の版 | ソースの取得 | 全員 |
 | make | OS 標準 | 実コマンドの入口（Windows は WSL2 を使う） | 全員 |
 | Bun | `package.json` の `packageManager` の版（CI もこの版を入れる） | パッケージ管理・API・テスト | 全員 |
-| Docker（Docker Desktop・OrbStack など。Compose v2） | 最近の版 | ローカルの PostgreSQL 17（`make db-up`。開発用の DB `moonx` とテスト用の DB `moonx_test`） | 全員 |
+| Docker（Docker Desktop・OrbStack など。Compose v2） | 最近の版 | ローカルの PostgreSQL 17（`make db-up`。開発用の DB `moonx` とテスト用の DB `moonx_test`）、`make lint` のワークフローの検査（actionlint の Docker のイメージを動かす。10章） | 全員 |
 | Playwright のブラウザ | リポジトリの Playwright に合う版 | `make test-e2e`（取得するターゲットは SDD 2章「make ターゲット」） | E2E を回す人 |
 | Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・`make promote`（イメージの確認と、前回のデプロイが済んでいないときに Cloud Run で動いている版。プロジェクトは `gcloud config` のもの）・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
 | Terraform | 1.x の最新 | `make infra-plan` / `make infra-apply` | インフラを触る人 |
 | GitHub CLI（gh） | 最新 | PR・`make promote`（昇格の PR の作成）・GitHub の環境の設定・ワークフローの確認 | デプロイ・運用をする人（ほかの人は任意） |
 | curl | 最近の版（7.76 以上） | `make db-backup`（`make test-api` のバックアップのテストも動かす） | 全員 |
 | PostgreSQL のクライアント（psql・pg_dump・pg_restore） | 17（サーバーと同じ版。古い版の pg_dump は 17 のサーバーに使えない） | `make test-api` のバックアップと KPI の集計のテスト、バックアップの復元の確認（05 6.2） | 全員 |
-| ShellCheck | 最近の版 | `make lint` の actionlint が、ワークフローの `run:` のスクリプトを検査するのに使う（PATH に無ければ、その検査だけを省く。GitHub のランナーには入っているので、CI では必ず動く） | ワークフローを触る人 |
 
 ### アカウント（デプロイ時に必要。ローカル開発は GitHub だけでよい）
 
@@ -171,7 +170,7 @@ make admin-create EMAIL=<自分のメール>
 | DB を作り直したい（ローカルのデータは消える） | `make db-reset` |
 | 中身を見たい | `make db-studio` |
 | テストを動かす | `make test-api`・`make test-e2e`（テスト用の DB `DATABASE_URL_TEST` を使う。開発用の DB `moonx` のデータは消えない。7章） |
-| staging / production に当てる | 手では当てない。昇格のときに `deploy.yml` が `make deploy-api` の中でマイグレーションを当てる（04 2章） |
+| staging / production に当てる | 手では当てない。昇格のときに `deploy.yml` のマイグレーションのジョブが `make db-migrate` で当てる（デプロイのジョブの前。04 2章） |
 
 マイグレーションは「追加してから使い、使わなくなってから消す」の2段階で書く（ADR-016。04 4.1）。適用済みのマイグレーションの SQL は書き換えない。
 
@@ -287,10 +286,14 @@ make infra-apply ENV=staging    # 適用
 
 - [ ] production のブランチに、バックアップ用の読み取り専用のロールを作る（ADR-028。接続文字列は GitHub の環境 `production-backup` の `DATABASE_URL_DIRECT` に入れる。H）。Neon のコンソールの Roles で作ったロールは書き込みもできるので、SQL で作る。`moonx_backup_ro` はロールの名前（ここで決める）。上で控えた production の直接の接続（所有者のロール。マイグレーションを当てるロール）で実行する。`ALTER DEFAULT PRIVILEGES` は実行したロールがこれから作るもの（マイグレーションで作るスキーマ・テーブル・シーケンス）に効く
 
+  パスワードはコマンドの引数とシェルの履歴に出さない（コマンドの引数は同じ機械のほかの利用者からも見える）。接続はパスワードを除いた URL で書き、パスワードは `read -rs` で `PGPASSWORD` に入れ、新しいパスワードは標準入力の SQL で渡す。
+
   ```bash
+  # 所有者のロールのパスワード（上で控えた直接の接続のもの。貼り付けて Enter。画面には出ない）
+  read -rs PGPASSWORD; export PGPASSWORD
   ro_password="$(openssl rand -hex 24)"
-  psql "<production の直接の接続文字列>" -v ro_password="$ro_password" <<'SQL'
-  CREATE ROLE moonx_backup_ro WITH LOGIN PASSWORD :'ro_password';
+  psql "postgresql://<所有者のロール>@<直接の接続のホスト>/moonx?sslmode=require" <<SQL
+  CREATE ROLE moonx_backup_ro WITH LOGIN PASSWORD '${ro_password}';
   GRANT CONNECT ON DATABASE moonx TO moonx_backup_ro;
   GRANT USAGE ON SCHEMA public TO moonx_backup_ro;
   ALTER DEFAULT PRIVILEGES GRANT USAGE ON SCHEMAS TO moonx_backup_ro;
@@ -300,10 +303,11 @@ make infra-apply ENV=staging    # 適用
 
   # H で production-backup に入れる接続文字列（ホストは上の直接の接続と同じ）。控えたら変数を消す
   echo "postgresql://moonx_backup_ro:${ro_password}@<直接の接続のホスト>/moonx?sslmode=require"
-  unset ro_password
 
   # 書けないことを確かめる（permission denied になること）
-  psql "<上の接続文字列>" -c 'create table ro_check (x int)'
+  PGPASSWORD="$ro_password" psql "postgresql://moonx_backup_ro@<直接の接続のホスト>/moonx?sslmode=require" \
+    -c 'create table ro_check (x int)'
+  unset ro_password PGPASSWORD
   ```
 
   テーブルがすでにある DB に後から作るとき（05 6.2 の戻し方など）は、すでにあるものにも権限を付ける:
@@ -461,7 +465,7 @@ I の 5 でドメインマッピングができてから行う。最初の昇格
 
 - [ ] `build.yml` が API のイメージを作ったことを確かめる（I の 4）
 - [ ] staging の昇格の PR を出してマージする（04 4.2）
-- [ ] staging の運営者を作る。`make admin-create` は `DATABASE_URL` と `BETTER_AUTH_URL` を使うので、この2つを上書きして手元から動かす（リンクが staging の URL になっていることを確かめる）
+- [ ] staging の運営者を作る。運営者のメールは Google のアカウントのもの（Gmail か Google Workspace）にし、招待のリンクからメール＋パスワードで登録する（04 6章の確認を、メール＋パスワードと Google のログインの両方とも、この運営者のアカウントだけで行うため。メール＋パスワードで登録したアカウントには、同じメールの Google のログインがつながる。SDD 5.4 U5）。`make admin-create` は `DATABASE_URL` と `BETTER_AUTH_URL` を使うので、この2つを上書きして手元から動かす（リンクが staging の URL になっていることを確かめる）
 
   ```bash
   DATABASE_URL="$(gcloud secrets versions access latest --secret=moonx-staging-database-url)" \
@@ -470,14 +474,23 @@ I の 5 でドメインマッピングができてから行う。最初の昇格
   ```
 
 - [ ] 運営者でログインし、BCDX のテンプレートを取り込んで公開する（04 4.2「最初のリリースのあとで: テンプレートを入れる」）。公開するまで、その環境ではアイデアも自己分析も作れない
-- [ ] デプロイ後の確認（04 6章）だけに使うワークスペースを1つ作る（M7）。以後の確認は毎回このワークスペースで行う
-- [ ] staging の `MAIL_ALLOWLIST` に、確かめに使うメールを入れる（Terraform の変数。`make infra-apply ENV=staging`）
+- [ ] 運営者のアカウントで、デプロイ後の確認（04 6章）だけに使うワークスペースを1つ作る（M7）。以後の確認は毎回このワークスペースで行う。ID（画面の URL の `/w/<ID>`）を控える。KPI の集計（`make kpi`）がこのワークスペースを数えないように渡す ID になる（SDD 11章「KPI の数え方」）。staging で `make kpi` を動かすとき（集計を staging のデータで確かめるとき）は、手元から staging の ID を `CHECK_WORKSPACE_ID` に、Neon の staging のブランチの直接の接続（E）を `DATABASE_URL_DIRECT` に渡す（`kpi.yml` は production だけを集計し、GitHub の環境 `staging` のシークレットは読み出せないため）
+
+  ```bash
+  read -rs DATABASE_URL_DIRECT; export DATABASE_URL_DIRECT   # 貼り付けて Enter。画面には出ない
+  CHECK_WORKSPACE_ID='<staging の確認用のワークスペースの ID>' make kpi ENV=staging
+  unset DATABASE_URL_DIRECT
+  ```
+
+- [ ] staging の `MAIL_ALLOWLIST` に、確かめに使うメールを入れる（運営者のメールと、04 6章の招待のメールの確認に使う別のメール。Terraform の変数。`make infra-apply ENV=staging`）
 - [ ] デプロイ後の確認をする（04 6章）
-- [ ] production でも、昇格（GitHub の環境 `production` の承認が要る）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・テンプレートの取り込みと公開・確認用のワークスペースの作成・デプロイ後の確認をする
-- [ ] production の確認用のワークスペースの ID（画面の URL の `/w/<ID>`）を、GitHub の環境 `production-backup` の変数 `CHECK_WORKSPACE_ID` に入れる（KPI の集計から外す。SDD 11章「KPI の数え方」。無いと `kpi.yml` が失敗する）
+- [ ] production でも、昇格（GitHub の環境 `production` の承認が、マイグレーションのジョブとデプロイのジョブで1回ずつ要る。04 2章）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・テンプレートの取り込みと公開・確認用のワークスペースの作成・デプロイ後の確認をする
+- [ ] production の確認用のワークスペースの ID（画面の URL の `/w/<ID>`）を、GitHub の環境 `production-backup` の変数 `CHECK_WORKSPACE_ID` に入れる（KPI の集計から外す。SDD 11章「KPI の数え方」。無いと `kpi.yml` が失敗する）。入れたら `kpi.yml` を手で1回動かし、成功して実行の要約に件数の表が出ることを確かめる
 
   ```bash
   gh variable set CHECK_WORKSPACE_ID --env production-backup --body '<確認用のワークスペースの ID>'
+  gh workflow run kpi.yml
+  gh run list --workflow=kpi.yml --limit=1
   ```
 
 - [ ] production の最初のデプロイのあとで、`db-backup.yml` を手で1回動かし、バックアップができることを確かめる（GitHub の環境 `production-backup` の確認を兼ねる。05 6.2）
@@ -578,7 +591,7 @@ fix/xxx     ──squash──▶   │
 
 ### リリースフロー（環境の昇格）
 
-1. `main` に squash マージ → `build.yml` がテストし、API のイメージ（タグ = コミット SHA）を Artifact Registry に置く（`make build-api-image`）
+1. `main` に squash マージ → `build.yml` がテストし、API のイメージ（タグ = コミット SHA）を作って（`make build-api-image`）Artifact Registry に置く（`make push-api-image`）
 2. `make promote ENV=staging` で、その SHA を `deploy/staging/version` に書いた昇格の PR を作ってマージ → `deploy.yml` が staging にデプロイする（マイグレーション → API。Web は同じイメージに入っている。ADR-004）
 3. staging で確かめたら、`make promote ENV=production` で同じ SHA を `deploy/production/version` に書いた昇格の PR を作ってマージ → GitHub の環境 `production` の承認のあと、production にデプロイする。staging に出していない SHA（`deploy/staging/version` に書かれたことの無いもの）は、CI（`make promote-check`）が通さない
 4. 戻すときは、`make promote ENV=<環境> SHA=<戻し先の SHA>` で戻し先の SHA を書いた昇格の PR を作ってマージする（revert はしない。戻せる範囲は 04 5.1）
@@ -612,7 +625,7 @@ fix/xxx     ──squash──▶   │
 | デザイントークンの生成物 | `packages/ui-tokens`（vanilla-extract・react-pdf のテーマと、PWA のアイコンとマニフェスト）が `docs/06_design-tokens.json` と合っているか | CI が `make tokens` を動かし、差分が出たら失敗（ADR-018） | — |
 | ルートの生成物（`apps/web/src/routeTree.gen.ts`） | TanStack Router の Vite プラグインが `src/routes/` から作る生成物。手で直さず、ルートを足したら作り直したもの（`make dev-web` か `make build-web` で作られる）をコミットする。古いままだと `make typecheck` が失敗する | `make dev-web` / `make build-web` | — |
 | API の仕様の書き出し | `apps/api/openapi.json` が API と合っているか。API を変えたら `make openapi` で作り直して同じ PR に含める | CI が `make openapi` を動かし、差分が出たら失敗（04 2章） | — |
-| GitHub Actions のワークフロー | `.github/workflows/` の構文・式・権限・`run:` のスクリプト（`concurrency` の `queue` を知っている保守のフォーク `@kjanat/actionlint`。開発用の依存で版を固定する。選んだ理由は SDD ADR-022）。ステップは各ワークフローに直に書く（ローカルの composite action に置くと、actionlint はその入力しか確かめず、`run:` のスクリプトを読まない） | `make lint` | 既定の検査（設定のファイルは置かない） |
+| GitHub Actions のワークフロー | `.github/workflows/` の構文・式・権限・`run:` のスクリプト（本家の actionlint を、本家が配る Docker のイメージ `rhysd/actionlint` で動かす。版と digest は Makefile の `ACTIONLINT_IMAGE` で固定し、ShellCheck もイメージに入っている。`concurrency` の `queue` の誤検出を外す `-ignore` と、その代わりのテスト、`-ignore` を外す時期は SDD ADR-022）。ステップは各ワークフローに直に書く（ローカルの composite action に置くと、actionlint はその入力しか確かめず、`run:` のスクリプトを読まない） | `make lint`（Docker が要る） | 既定の検査（設定のファイルは置かない） |
 | doc-lint | コミットの前: 先送りのマーカー・不要な `.gitkeep`・`.env` や既知の形式のトークン・ドキュメントの文体（本文の em dash・表の1列目の太字・長すぎる太字）。随時: ドキュメントと実体の食い違い（検査の中身は SDD 2章「make ターゲット」の `doc-lint`） | コミットのたびに `.githooks/pre-commit`（`make setup` が配線する）、随時 `make doc-lint` | `scripts/doc-lint.sh` |
 
 エディタは Biome の拡張を入れ、保存のときに整形する。

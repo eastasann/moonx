@@ -3096,7 +3096,7 @@ docs/04_deployment-procedure.md 2章のワークフローと、昇格・ロー�
 3. packages/db/queries/kpi.sql と make kpi（件数だけを数える。SDD 11章・PRD 5章）
 4. テスト: promote-check と promote の決まり（一時的な Git のリポジトリで、gh と gcloud は差し替える。正しい昇格・戻す・2つの環境・
    ほかのファイルとの混在・staging に無い SHA・その環境に無い戻し先・最初の昇格・省いた SHA で止まる場合・残っているブランチ）、
-   make kpi をテスト用の DB で動かすこと、ワークフローを actionlint（concurrency.queue を知っている版）で検査すること
+   make kpi をテスト用の DB で動かすこと、ワークフローを actionlint（本家の Docker のイメージ。concurrency の queue の値は deploy.yml を読むテストで確かめる。ADR-022）で検査すること
 
 まだ実際のクラウドには出さない（Step 43）。
 
@@ -3112,7 +3112,7 @@ make typecheck・make lint・make doc-lint が通る状態をゴールとする�
 
 ## Step 41b: インフラと CI の段階の終わりの点検の直し
 
-Status:
+Status: done 2026-11-05
 
 ```
 インフラと CI の段階（Step 40・41）の終わりの点検で見つかったものを、1つのステップで閉じてください。点検は2つで行った: 段階全体の
@@ -3186,6 +3186,49 @@ PostgreSQL 17 のクライアントを PATH に置いて通った）。1〜3 は
 クライアントが要る（03 1章）。この Mac の PATH の pg_dump は Homebrew の 14 なので、Step 41 と同じく 17 のクライアントを PATH の先に
 置いて動かす（Homebrew の PostgreSQL 14 には触れない）。独立のレビューは観点ごとに分けて同時に起動し（/draft:implement）、
 1〜8 のどれも漏らさない。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 41c: GitHub Actions の記録が90日で消えることへの対応
+
+Status: blocked 2026-11-05
+ユーザーの決定が要る: GitHub が 2026-10-01 から workflow run を保持期間（公開のリポジトリは最大90日）で消すので、make promote が頼る build.yml と deploy.yml の記録が90日で消える。どの直し方（非公開にして保持を延ばす・消えない記録に替える・90日の制限を ADR-016 に書く）も、費用か、確かめる中身の変更か、仕様を弱める変更になる。
+
+```
+Step 41b の独立レビュー（2026-11-05）で見つかった問題を、ユーザーの決定に沿って閉じてください。
+
+問題: GitHub の 2026-08-27 の changelog「Actions retention will cover checks, workflow runs, and statuses」のとおり、
+2026-10-01 から、check・workflow run・status は、リポジトリの Actions の保持期間（既定 90日。公開のリポジトリは最大 90日。
+非公開は組織と enterprise の上限まで）を過ぎると消える。それより前は保持期間に関わらず 400日以上残っていた。このリポジトリは
+公開で、保持期間は 90日（gh api repos/{owner}/{repo}/actions/permissions/artifact-and-log-retention）。make promote
+（scripts/promote.ts）は gh run list と実行のジョブで次を決めているので、90日より古いものは記録が無くなる:
+- 出す SHA の build.yml が成功したこと（SDD 2章 promote の行）。90日より前にビルドした SHA は、ADR-007 の決まりで
+  イメージが残っていても「build.yml has not run」で止まる（04 5.1 の戻す先も同じ）
+- production なら、その SHA を deploy/staging/version に書いたコミットの deploy.yml のデプロイのジョブが成功したこと。
+  staging への書き込みが 90日より古い SHA は、production に出すことも戻すこともできず、staging に出し直すよう求められる
+  （ADR-016「production を戻すときに staging を先に戻さなくてよい」と食い違う）
+- いちばん先まで出した版・直前の版・マイグレーションが当たったかもしれない版（04 4.1）。Step 41b で、記録が見つからない版は
+  マイグレーションが当たったかもしれない版とし、直前の版はたどる途中に記録の無い書き込みがあれば分からないとした（安全な側）。
+  その結果、90日昇格しなかった環境では、いちばん先まで出した版が「分からない」になり、どの昇格の本文もマイグレーションを
+  すべて出し、どの戻し方も 5.1 の 3 の確かめを求める
+
+決める直し方（ユーザーが選ぶ。組み合わせてもよい）:
+1. リポジトリを非公開にし、保持期間を延ばす。非公開では、GitHub の環境とそのシークレットとブランチの制限に Pro か Team 以上、
+   承認に Enterprise のプランが要る（03 5.4 H）。上限は組織と enterprise の設定による
+2. 消えない記録に替える。ビルド: Artifact Registry のイメージ（build.yml の push のジョブだけが、テストの後に上げる）。
+   デプロイ: GitHub の Deployments（環境のデプロイの記録。保持期間の対象かは changelog に書かれていないので、先に確かめる）、
+   Cloud Run のリビジョンの履歴（リビジョンごとのイメージの SHA）、または deploy.yml が結果を書く記録（Cloud Storage など）。
+   何を確かめるかが変わるので、同じ強さで確かめられるかを ADR-016 と 04 4.1 に書く
+3. 90日より古い記録に頼る昇格（古い SHA への戻し・90日昇格しなかった環境）の扱いを、ADR-016・04 4.1・5.1 に制限として書く
+   （仕様を弱める変更なので、ユーザーが決める）
+
+決まったら、SDD 2章（promote の行）・ADR-016・04 4.1・5.1・10章（昇格の行）と scripts/promote.ts・テストを合わせる。
+まだ作らないもの: Step 42〜44 の対象。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
@@ -3293,11 +3336,13 @@ staging で確かめた版を production に公開してください。ユーザ
 2. 5.4 の production の分を、ユーザーと一緒に進める
 3. production への昇格（make promote ENV=production）、運営者の作成、テンプレートの取り込みと公開、04 6章の確認
 4. db-backup.yml を手で1回動かし、バックアップができることを確かめる（05 6.2）
-5. 手順どおりに進まなかった所は、03・04・05 の該当の手順を直す（合意の上で）
+5. CHECK_WORKSPACE_ID を GitHub の環境 production-backup に入れた後で、kpi.yml を手で1回動かし、成功して実行の要約に件数の表が
+   出ることを確かめる（03 5.4 K。db-backup.yml と同じ形）
+6. 手順どおりに進まなかった所は、03・04・05 の該当の手順を直す（合意の上で）
 
 これで初期リリースのプロンプト集は終わる。このあとの変更は /draft:feature で行う。
 
-production で 04 6章のチェックリストがすべて通り、db-backup.yml の1回目が成功した状態をゴールとする。
+production で 04 6章のチェックリストがすべて通り、db-backup.yml と kpi.yml の1回目が成功した状態をゴールとする。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。

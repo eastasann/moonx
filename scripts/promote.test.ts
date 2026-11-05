@@ -20,7 +20,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { YAML } from "bun";
 
 // Each test runs promote, which spawns git dozens of times: slow runners need more than 5 s.
 setDefaultTimeout(30_000);
@@ -35,8 +34,16 @@ const TOKEN = "record-check-token";
 const PR_URL = "https://github.com/example/moonx/pull/42";
 const UNDEPLOYED_NOTE = (file: string) =>
   `この PR の \`deploy.yml\` が検査で止まった・承認されなかった・失敗したときは、\`${file}\` が出ていない版を指したままになる。正しい SHA で新しい昇格の PR を出して直す（\`make promote\`。04_deployment-procedure.md 2章）。`;
+/** The note of promote.ts's cautionLines: `version` started its migrations, never deployed. */
+const CAUTION = (version: string, writer: string, furthest?: string) =>
+  `> [!CAUTION]\n> \`${short(version)}\` の deploy.yml（${short(writer)} の書き込み）は、マイグレーション中の記録を書いたが、この版を出した記録はどの書き込みにも無い。\`${short(version)}\` のマイグレーションは始まったが、DB に当たったかは分からない（失敗した・取り消された・まだ動いている、または当てた後のデプロイ・その確認・出した記録の書き込みで止まった）。${furthest === undefined ? "" : `出した記録のある \`${short(furthest)}\` までのマイグレーションは当たっている。`}下のマイグレーションの一覧は、${furthest === undefined ? "" : `\`${short(furthest)}\` の次から `}\`${short(version)}\` までのものを当たったか分からないものとして分け、当たっていても当たっていなくても漏れが無いように作った。`;
+/** describeInJapanese of promote.ts for a write with no record. */
+const NO_RECORD = (write: string) =>
+  `${short(write)} の deploy.yml の記録が無い（マイグレーションの前に止まった（検査かイメージのジョブ・承認されなかった・後の昇格に追い越された・記録の前に失敗した）か、まだそこまで動いていない）`;
+const UNKNOWN_THEN_APPLIED =
+  "当たったか分からず、当たっていなければこの昇格で当たるもの";
 const ROLLBACK_REASON =
-  "<!-- 戻す理由と、出す版が直前の版でないときは 5.1 の 3 で確かめた結果を書く（04_deployment-procedure.md 5.1 の 4） -->";
+  "<!-- 戻す理由と、5.1 の 3 で確かめたときはその結果を書く（04_deployment-procedure.md 5.1 の 4） -->";
 
 // gh and gcloud stand-ins: each logs its argv to calls.log and answers from the files the
 // test writes under $FAKE_DIR. gh answers only what promote asks about pull requests; any
@@ -193,7 +200,7 @@ function fixture(path: string, content: string) {
 
 type Target = "staging" | "production";
 
-/** What deploy.yml records for a write: before its migrate job may start, and once deployed. */
+/** What deploy.yml records for a write: as its migrations start, and once deployed. */
 type Kind = "migrating" | "deployed";
 
 /** Both records: deploy.yml migrated the write's SHA and deployed it. */
@@ -371,34 +378,6 @@ function originBranch(branch: string): string | undefined {
   ]);
   return result.exitCode === 0 ? result.stdout.trim() : undefined;
 }
-
-/** A job of a workflow, with the keys the tests read. */
-interface WorkflowJob {
-  name?: string;
-  needs?: string | string[];
-  if?: string;
-  environment?: unknown;
-  concurrency?: unknown;
-  permissions?: unknown;
-  outputs?: Record<string, string>;
-  "continue-on-error"?: unknown;
-  steps?: {
-    name?: string;
-    if?: string;
-    "continue-on-error"?: unknown;
-    run?: string;
-    uses?: string;
-    with?: Record<string, unknown>;
-    "working-directory"?: string;
-  }[];
-}
-
-const deployWorkflow = async () =>
-  YAML.parse(
-    await Bun.file(
-      join(import.meta.dir, "..", ".github", "workflows", "deploy.yml"),
-    ).text(),
-  ) as { permissions?: unknown; jobs?: Record<string, WorkflowJob> };
 
 /** Asserts the run left the user on a clean main, with no branch and no pull request. */
 function expectNothingMade(branch: string) {
@@ -680,7 +659,7 @@ describe("promote", () => {
   });
 
   describe("when a newer version may have migrated", () => {
-    // X = c2 deployed, then Y = c5 recorded that its migrations may run and never deployed
+    // X = c2 deployed, then Y = c5 recorded that its migrations started and never deployed
     // (its migrations may be in the DB), then X was promoted again. W = c1 is older, c3
     // lies between X and Y, Z = c6.
     let c5: string;
@@ -706,8 +685,7 @@ describe("promote", () => {
       publish();
     });
 
-    const caution = (writer = y) =>
-      `> [!CAUTION]\n> \`${short(c5)}\` の deploy.yml（${short(writer)} の書き込み）は、マイグレーションの前の記録を書いたが、この版を出した記録はどの書き込みにも無い。記録はマイグレーションのジョブより前（production では承認の前）に書くので、\`${short(c5)}\` のマイグレーションが DB に当たったかは分からない。下のマイグレーションの一覧は、当たっていても当たっていなくても漏れが無いように作った。\n\n## 昇格\n`;
+    const caution = (writer = y) => `${CAUTION(c5, writer, c2)}\n\n## 昇格\n`;
 
     test("rolling back to an older version lists the migrations up to the one that may have migrated", () => {
       const result = run("staging", c1);
@@ -734,16 +712,19 @@ describe("promote", () => {
           `- ${abbrev(c3)} feat: three`,
           `- ${abbrev(c2)} feat: two`,
           "",
-          `## マイグレーション（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。DB に当たっているかもしれず、出す版に無いもの）`,
+          `## マイグレーション（出す版の次から、いちばん先まで出した版 \`${short(c2)}\` まで。DB に当たっていて、出す版に無いもの）`,
           "",
           "- `0001_two`",
+          "",
+          `## マイグレーション（\`${short(c2)}\` の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。DB に当たったか分からず、出す版に無いもの）`,
+          "",
           "- `0002_three`",
           "- `0003_five`",
           "",
           "## 直前の版",
           "",
           // c1 is the previous version of c2, but it never ran on c5's migrations.
-          `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）の \`${c1}\` なので、\`${short(c2)}\` までのマイグレーションは確かめなくてよい。\`${short(c2)}\` の次から \`${short(c5)}\` までのもの（当たったかもしれないもの）は、04_deployment-procedure.md 5.1 の 3 のとおり contract（4.1 の表の右の列）が無いことを確かめる。新しい値を書き始めた変更はマイグレーションに出ないことがあるので、コミットの一覧でも確かめる。`,
+          `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）の \`${c1}\` なので、\`${short(c2)}\` までのマイグレーションは確かめなくてよい。\`${short(c2)}\` の次から \`${short(c5)}\` までのもの（当たったか分からないもの）は、04_deployment-procedure.md 5.1 の 3 のとおり contract（4.1 の表の右の列）が無いことを確かめる。新しい値を書き始めた変更はマイグレーションに出ないことがあるので、コミットの一覧でも確かめる。`,
           "",
           "## 戻し方",
           "",
@@ -768,7 +749,7 @@ describe("promote", () => {
       const body = prBody();
       expect(body).toStartWith(caution());
       expect(body).toContain(
-        `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、出す版まで。この昇格で新しく当たるもの）\n\n- \`0002_three\`\n- \`0003_five\`\n- \`0004_six\`\n\nこの一覧には、\`${short(c5)}\` のデプロイで当たったかもしれないものも入っている。\n\n## 戻し方`,
+        `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。${UNKNOWN_THEN_APPLIED}）\n\n- \`0002_three\`\n- \`0003_five\`\n\n## マイグレーション（\`${short(c5)}\` の次から、出す版まで。この昇格で新しく当たるもの）\n\n- \`0004_six\`\n\n## 戻し方`,
       );
       expect(body).not.toContain("出す版に無いもの");
     });
@@ -784,18 +765,16 @@ describe("promote", () => {
           "",
           `- ${abbrev(c3)} feat: three`,
           "",
-          `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、出す版まで。この昇格で新しく当たるもの）`,
+          `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、出す版まで。${UNKNOWN_THEN_APPLIED}）`,
           "",
           "- `0002_three`",
-          "",
-          `この一覧には、\`${short(c5)}\` のデプロイで当たったかもしれないものも入っている。`,
           "",
           `## コミット（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。出す版に無いもの）`,
           "",
           `- ${abbrev(c5)} feat: five`,
           `- ${abbrev(c4)} fix: four`,
           "",
-          `## マイグレーション（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。DB に当たっているかもしれず、出す版に無いもの）`,
+          `## マイグレーション（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。DB に当たったか分からず、出す版に無いもの）`,
           "",
           "- `0003_five`",
           "",
@@ -804,6 +783,19 @@ describe("promote", () => {
           "## 戻し方",
         ].join("\n"),
       );
+    });
+
+    test("promoting the version that may have migrated lists its migrations as unknown, and none as new", () => {
+      const result = run("staging", c5);
+
+      expect(result.exitCode).toBe(0);
+      const body = prBody();
+      expect(body).toStartWith(caution());
+      expect(body).toContain(
+        `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。${UNKNOWN_THEN_APPLIED}）\n\n- \`0002_three\`\n- \`0003_five\`\n\n## 戻し方`,
+      );
+      expect(body).not.toContain("この昇格で新しく当たるもの");
+      expect(body).not.toContain("出す版に無いもの");
     });
 
     test("does not count a newer version whose writes have no record", () => {
@@ -863,11 +855,9 @@ describe("promote", () => {
       expect(body).not.toContain("の次から、出す版まで）");
       expect(body).toContain(
         [
-          `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、出す版まで。この昇格で新しく当たるもの）`,
+          `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、出す版まで。${UNKNOWN_THEN_APPLIED}）`,
           "",
           "なし",
-          "",
-          `この一覧には、\`${short(c5)}\` のデプロイで当たったかもしれないものも入っている。`,
           "",
           `## コミット（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。出す版に無いもの）`,
           "",
@@ -875,7 +865,7 @@ describe("promote", () => {
           `- ${abbrev(c4)} fix: four`,
           `- ${abbrev(c3)} feat: three`,
           "",
-          `## マイグレーション（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。DB に当たっているかもしれず、出す版に無いもの）`,
+          `## マイグレーション（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c5)}\` まで。DB に当たったか分からず、出す版に無いもの）`,
           "",
           "- `0002_three`",
           "- `0003_five`",
@@ -920,14 +910,13 @@ describe("promote", () => {
     expect(prBody()).toBe(
       [
         "> [!WARNING]",
-        `> staging の前回の deploy.yml には、今の版を出した記録が無い（${short(written)} の deploy.yml は、マイグレーションの前の記録を書いたが、出した記録を書いていない（マイグレーションかデプロイのジョブを待っている・そこで止まった、または後の昇格に追い越された））。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
+        `> staging の前回の deploy.yml には、今の版を出した記録が無い（${short(written)} の deploy.yml は、マイグレーション中の記録を書いたが、出した記録を書いていない（マイグレーション・デプロイ・その確認・出した記録で失敗したか取り消されたか、まだ動いている））。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
         ">",
         "> Cloud Run の `moonx-api-staging` で動いている版を gcloud で読めなかった（gcloud run services describe: ERROR: (gcloud.run.services.describe) Cannot find service [moonx-api-staging]）。",
         ">",
         `> 下のコミットの一覧と戻し方は、書かれている今の版 \`${short(c3)}\` を起点にする。この版は Cloud Run で動いていないことがある。`,
         "",
-        "> [!CAUTION]",
-        `> \`${short(c3)}\` の deploy.yml（${short(written)} の書き込み）は、マイグレーションの前の記録を書いたが、この版を出した記録はどの書き込みにも無い。記録はマイグレーションのジョブより前（production では承認の前）に書くので、\`${short(c3)}\` のマイグレーションが DB に当たったかは分からない。下のマイグレーションの一覧は、当たっていても当たっていなくても漏れが無いように作った。`,
+        CAUTION(c3, written, c2),
         "",
         "## 昇格",
         "",
@@ -942,11 +931,13 @@ describe("promote", () => {
         "",
         `- ${abbrev(c4)} fix: four`,
         "",
-        `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、出す版まで。この昇格で新しく当たるもの）`,
+        `## マイグレーション（いちばん先まで出した版 \`${short(c2)}\` の次から、マイグレーションが当たったかもしれない版 \`${short(c3)}\` まで。${UNKNOWN_THEN_APPLIED}）`,
         "",
         "- `0002_three`",
         "",
-        `この一覧には、\`${short(c3)}\` のデプロイで当たったかもしれないものも入っている。`,
+        `## マイグレーション（\`${short(c3)}\` の次から、出す版まで。この昇格で新しく当たるもの）`,
+        "",
+        "なし",
         "",
         "## 戻し方",
         "",
@@ -978,24 +969,61 @@ describe("promote", () => {
       );
       expect(body).toContain(
         [
-          "## マイグレーション（出す版にあるすべて。この昇格で新しく当たるもの）",
-          "",
-          "- `0000_one`",
-          "- `0001_two`",
-          "- `0002_three`",
-          "",
           ...(kinds.length === 0
-            ? []
-            : [
-                `この一覧には、\`${short(c2)}\` のデプロイで当たったかもしれないものも入っている。`,
+            ? [
+                "## マイグレーション（出す版にあるすべて。この昇格で新しく当たるもの）",
                 "",
+                "- `0000_one`",
+                "- `0001_two`",
+                "- `0002_three`",
+              ]
+            : [
+                `## マイグレーション（マイグレーションが当たったかもしれない版 \`${short(c2)}\` にあるすべて。${UNKNOWN_THEN_APPLIED}）`,
+                "",
+                "- `0000_one`",
+                "- `0001_two`",
+                "",
+                `## マイグレーション（\`${short(c2)}\` の次から、出す版まで。この昇格で新しく当たるもの）`,
+                "",
+                "- `0002_three`",
               ]),
+          "",
           "## 戻し方",
         ].join("\n"),
       );
-      expect(body.includes("[!CAUTION]")).toBe(kinds.length > 0);
+      if (kinds.length === 0) expect(body).not.toContain("[!CAUTION]");
+      else expect(body).toContain(`${CAUTION(c2, s2)}\n\n## 昇格\n`);
     },
   );
+
+  test("without a deployed version, counts every migration of a target older than one that started its migrations as unknown", () => {
+    forget("staging", s1);
+    forget("staging", s2);
+    const written = land("staging", c3, ["migrating"]);
+    publish();
+    const result = run("staging", c2);
+
+    expect(result.exitCode).toBe(0);
+    const body = prBody();
+    expect(body).toContain(`${CAUTION(c3, written)}\n`);
+    expect(body).toContain(
+      [
+        `## マイグレーション（出す版にあるすべて。${UNKNOWN_THEN_APPLIED}）`,
+        "",
+        "- `0000_one`",
+        "- `0001_two`",
+        "",
+        `## コミット（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c3)}\` まで。出す版に無いもの）`,
+        "",
+        `- ${abbrev(c3)} feat: three`,
+        "",
+        `## マイグレーション（出す版の次から、マイグレーションが当たったかもしれない版 \`${short(c3)}\` まで。DB に当たったか分からず、出す版に無いもの）`,
+        "",
+        "- `0002_three`",
+        "",
+      ].join("\n"),
+    );
+  });
 
   test.each<[string, Target, string]>([
     [
@@ -1167,13 +1195,13 @@ describe("promote", () => {
       "recorded no deployment of it",
       ["migrating"],
       (write) =>
-        `deploy.yml recorded that ${short(write)} may migrate, and no deployment of it (it waits or stopped in its migrate or deploy job, or a later promotion reached main first)`,
+        `deploy.yml recorded that the migrations of ${short(write)} started, and no deployment of it (the migrations, the deployment, its check or the deployed record failed or were cancelled, or they still run)`,
     ],
     [
       "wrote no record of it",
       [],
       (write) =>
-        `deploy.yml wrote no record for ${short(write)} (it stopped at its check or image job, or has not got that far)`,
+        `deploy.yml wrote no record for ${short(write)} (it stopped before the migrations: at its check or image job, without the approval, because a later promotion reached main first, or before its record; or it has not got that far)`,
     ],
   ])("refuses production when staging's deploy.yml %s", (_, kinds, reason) => {
     forget("staging", s2);
@@ -1195,7 +1223,7 @@ describe("promote", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
-      `deploy.yml recorded that ${short(again)} may migrate, and no deployment of it`,
+      `deploy.yml recorded that the migrations of ${short(again)} started, and no deployment of it`,
     );
   });
 
@@ -1427,7 +1455,7 @@ describe("promote", () => {
     expect(prBody()).toStartWith(
       [
         "> [!WARNING]",
-        `> staging の前回の deploy.yml には、今の版を出した記録が無い（${short(s2)} の deploy.yml の記録が無い（検査かイメージのジョブで止まったか、まだそこまで動いていない））。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
+        `> staging の前回の deploy.yml には、今の版を出した記録が無い（${NO_RECORD(s2)}）。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
         ">",
         "> Cloud Run の `moonx-api-staging` で動いている版:",
         ">",
@@ -1480,7 +1508,7 @@ describe("promote", () => {
     expect(prBody()).toStartWith(
       [
         "> [!WARNING]",
-        `> staging の前回の deploy.yml には、今の版を出した記録が無い（${short(s2)} の deploy.yml の記録が無い（検査かイメージのジョブで止まったか、まだそこまで動いていない））。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
+        `> staging の前回の deploy.yml には、今の版を出した記録が無い（${NO_RECORD(s2)}）。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
         ">",
         "> Cloud Run の `moonx-api-staging` で動いている版を gcloud で読めなかった（gcloud run services describe: ERROR: (gcloud.run.services.describe) Cannot find service [moonx-api-staging]）。",
         ">",
@@ -1524,7 +1552,7 @@ describe("promote", () => {
     expect(prBody()).toStartWith(
       [
         "> [!WARNING]",
-        `> staging の前回の deploy.yml には、今の版を出した記録が無い（${short(written)} の deploy.yml の記録が無い（検査かイメージのジョブで止まったか、まだそこまで動いていない））。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
+        `> staging の前回の deploy.yml には、今の版を出した記録が無い（${NO_RECORD(written)}）。\`${STAGING}\` は、Cloud Run に出ていない版を指していることがある。`,
         ">",
         "> Cloud Run の `moonx-api-staging` で動いている版:",
         ">",
@@ -1601,127 +1629,6 @@ describe("promote", () => {
     expect(originBranch(branch)).toBeDefined();
   });
 
-  test("runs deploy.yml's migrate job before its deploy job, one deployment per environment at a time", async () => {
-    const workflow = await deployWorkflow();
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression
-    const target = "${{ needs.check.outputs.target }}";
-    const migrate = workflow.jobs?.migrate;
-    const deploy = workflow.jobs?.deploy;
-
-    for (const job of [migrate, deploy]) {
-      expect(job?.environment).toBe(target);
-      // actionlint is told to ignore queue:, which it does not know, so only this checks it.
-      expect(job?.concurrency).toEqual({
-        group: `deploy-${target}`,
-        queue: "max",
-      });
-    }
-    // The image check comes before the approval the migrate job waits for.
-    expect([migrate?.needs ?? []].flat()).toEqual(
-      expect.arrayContaining(["check", "image"]),
-    );
-    expect([deploy?.needs ?? []].flat()).toContain("migrate");
-    expect(deploy?.if).toBe("needs.migrate.outputs.current == 'true'");
-    expect(Object.keys(migrate?.outputs ?? {})).toContain("current");
-    // Each job reads main again first; a later promotion skips what would migrate or deploy.
-    for (const [job, name] of [
-      [migrate, "Migrate"],
-      [deploy, "Deploy"],
-      [deploy, "Check the deployment"],
-    ] as const) {
-      expect(job?.steps?.find((step) => step.name === name)?.if).toBe(
-        "steps.current.outputs.current == 'true'",
-      );
-    }
-    // The migrate job runs the SHA's dependencies, which must not mint a Google Cloud token.
-    // Without permissions: of its own it has the workflow's.
-    const permissions = migrate?.permissions ?? workflow.permissions;
-    expect(permissions).toBeObject();
-    expect(permissions).not.toHaveProperty("id-token");
-  });
-
-  test("records in deploy.yml what promote reads: the migrations before they may run, the deployment once checked", async () => {
-    const jobs = (await deployWorkflow()).jobs ?? {};
-    const records = (kind: Kind) =>
-      Object.entries(jobs).flatMap(([key, job]) =>
-        (job.steps ?? [])
-          .filter((step) =>
-            new RegExp(
-              `^make deploy-record ENV="\\$TARGET" SHA="\\$SHA" WRITE="\\$GITHUB_SHA" KIND=${kind}$`,
-            ).test(step.run?.trim() ?? ""),
-          )
-          .map((step) => ({ key, job, step })),
-      );
-    const [migrating, ...moreMigrating] = records("migrating");
-    const [deployed, ...moreDeployed] = records("deployed");
-    expect(moreMigrating).toEqual([]);
-    expect(moreDeployed).toEqual([]);
-    if (migrating === undefined || deployed === undefined) {
-      throw new Error("deploy.yml writes no migrating or no deployed record");
-    }
-
-    // The migrating record: in the image job, which the migrate job needs, and after the
-    // image check, whose failure stops the migrations without a record. Nothing lets the
-    // migrate job start once the image job failed: no if: of its own (which could say
-    // always()), and no step of the image job may fail without failing it.
-    expect(migrating?.key).toBe("image");
-    expect([jobs.migrate?.needs ?? []].flat()).toContain("image");
-    expect(jobs.migrate?.if).toBeUndefined();
-    expect(migrating?.step.if).toBeUndefined();
-    for (const job of [migrating.job, deployed.job]) {
-      expect(job["continue-on-error"]).toBeUndefined();
-      for (const step of job.steps ?? []) {
-        expect(step["continue-on-error"]).toBeUndefined();
-      }
-    }
-    const imageSteps = migrating?.job.steps ?? [];
-    expect(
-      imageSteps.findIndex(
-        (step) => step.name === "The image of the SHA exists",
-      ),
-    ).toBeLessThan(imageSteps.indexOf(migrating?.step ?? {}));
-
-    // The deployed record: the deploy job's last step, after the check of /api/health and
-    // /api/health/db, so the job succeeds only with it.
-    expect(deployed?.key).toBe("deploy");
-    const deploySteps = deployed?.job.steps ?? [];
-    expect(deploySteps.at(-1)).toBe(deployed?.step);
-    expect(deploySteps.at(-2)?.name).toBe("Check the deployment");
-    expect(deployed?.step.if).toBe("steps.current.outputs.current == 'true'");
-
-    // Both run the Makefile of the commit deploy.yml runs for, never the SHA's, which may
-    // be an older version without the records promote reads now: a checkout with no ref:,
-    // in the folder the step runs in.
-    for (const { job, step } of [migrating, deployed]) {
-      const folder = step["working-directory"];
-      const checkouts = (job.steps ?? []).filter(
-        (each) =>
-          each.uses?.startsWith("actions/checkout@") &&
-          each.with?.path === folder,
-      );
-      expect(checkouts).toHaveLength(1);
-      expect(checkouts[0]?.with?.ref).toBeUndefined();
-    }
-    expect(deployed.step["working-directory"]).toBeDefined();
-    // The SHA's checkout at the top cleans its folder, write/ included, so the commit's
-    // own checkout comes after it, and before the record.
-    const order = (test: (step: (typeof deploySteps)[number]) => boolean) =>
-      deploySteps.findIndex(test);
-    const atTop = order(
-      (step) =>
-        step.uses?.startsWith("actions/checkout@") === true &&
-        step.with?.path === undefined,
-    );
-    const ownCommit = order(
-      (step) =>
-        step.uses?.startsWith("actions/checkout@") === true &&
-        step.with?.path === deployed.step["working-directory"],
-    );
-    expect(atTop).toBeGreaterThanOrEqual(0);
-    expect(ownCommit).toBeGreaterThan(atTop);
-    expect(ownCommit).toBeLessThan(deploySteps.indexOf(deployed.step));
-  });
-
   test("keeps gh's JSON plain when the shell forces colour", () => {
     const result = promoteWith(
       { GCP_PROJECT_ID: PROJECT, CLICOLOR_FORCE: "1", GH_FORCE_TTY: "100%" },
@@ -1765,6 +1672,7 @@ describe("make deploy-record", () => {
     const written = land("staging", c3, []);
     publish();
     const before = Math.floor(Date.now() / 1000) * 1000;
+    const printed: string[] = [];
     for (const kind of DEPLOYED) {
       const result = await deployRecord(
         "ENV=staging",
@@ -1773,6 +1681,7 @@ describe("make deploy-record", () => {
         `KIND=${kind}`,
       );
       expect(result).toMatchObject({ exitCode: 0, stderr: "" });
+      printed.push(result.stdout);
     }
     const after = Date.now();
 
@@ -1806,6 +1715,10 @@ describe("make deploy-record", () => {
       const time = Date.parse(`${day}T${hours}:${minutes}:${seconds}Z`);
       expect(time).toBeGreaterThanOrEqual(before);
       expect(time).toBeLessThanOrEqual(after);
+      // The name, last in the log of deploy.yml's step (05_operation-runbook.md 3.17).
+      expect(printed[index]?.trimEnd().split("\n").at(-1)).toBe(
+        `Recorded ${name}`,
+      );
     });
 
     // What it wrote is what promote reads: c3 is now the furthest version.

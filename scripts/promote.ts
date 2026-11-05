@@ -37,8 +37,8 @@ const JOURNAL = `${MIGRATIONS_DIR}/meta/_journal.json`;
 /**
  * The name of a record of deploy.yml, as make deploy-record writes it:
  * `{env}/{SHA}/{write}/{UTC time}-{kind}`, where the write is the commit of main that wrote
- * SHA to deploy/{env}/version (deploy.yml runs for it). `migrating` is written before the
- * migrate job may start, `deployed` after the deployment's check passed.
+ * SHA to deploy/{env}/version (deploy.yml runs for it). `migrating` is written right before
+ * the migrations start, after the approval, `deployed` after the deployment's check passed.
  */
 const RECORD_NAME =
   /^(staging|production)\/([0-9a-f]{40})\/([0-9a-f]{40})\/\d{4}-\d{2}-\d{2}T\d{6}Z-(migrating|deployed)$/;
@@ -65,8 +65,9 @@ interface Recorded {
 }
 
 /**
- * What deploy.yml did for a write, from its records: deployed the SHA, or recorded that
- * its migrations may run and no deployment, or wrote nothing.
+ * What deploy.yml did for a write, from its records: deployed the SHA, so its migrations
+ * are applied; or recorded that its migrations started and no deployment, so whether they
+ * are applied is unknown; or wrote nothing, so they never started.
  */
 type Deployment = "deployed" | "migrating" | "none";
 
@@ -134,7 +135,7 @@ interface Records {
   deployment(commit: string): Deployment;
   /** The records name this write's SHA as deployed. */
   deployed(commit: string): boolean;
-  /** The records name this write's SHA as one whose migrations may run, or deployed. */
+  /** The records name this write's SHA as one whose migrations started, or deployed. */
   migrating(commit: string): boolean;
 }
 
@@ -196,7 +197,7 @@ function readRecords(
   }
   const deployed = (commit: string) => found.get(commit)?.deployed === true;
   // Writing the deployed record follows the migrating one in every run, so either shows
-  // that the migrations may have run.
+  // that the migrations started.
   const migrating = (commit: string) => found.get(commit) !== undefined;
   return {
     deployed,
@@ -211,8 +212,8 @@ function describeInEnglish(
   commit: string,
 ): string {
   return deployment === "none"
-    ? `deploy.yml wrote no record for ${short(commit)} (it stopped at its check or image job, or has not got that far)`
-    : `deploy.yml recorded that ${short(commit)} may migrate, and no deployment of it (it waits or stopped in its migrate or deploy job, or a later promotion reached main first)`;
+    ? `deploy.yml wrote no record for ${short(commit)} (it stopped before the migrations: at its check or image job, without the approval, because a later promotion reached main first, or before its record; or it has not got that far)`
+    : `deploy.yml recorded that the migrations of ${short(commit)} started, and no deployment of it (the migrations, the deployment, its check or the deployed record failed or were cancelled, or they still run)`;
 }
 
 function describeInJapanese(
@@ -220,8 +221,8 @@ function describeInJapanese(
   commit: string,
 ): string {
   return deployment === "none"
-    ? `${short(commit)} の deploy.yml の記録が無い（検査かイメージのジョブで止まったか、まだそこまで動いていない）`
-    : `${short(commit)} の deploy.yml は、マイグレーションの前の記録を書いたが、出した記録を書いていない（マイグレーションかデプロイのジョブを待っている・そこで止まった、または後の昇格に追い越された）`;
+    ? `${short(commit)} の deploy.yml の記録が無い（マイグレーションの前に止まった（検査かイメージのジョブ・承認されなかった・後の昇格に追い越された・記録の前に失敗した）か、まだそこまで動いていない）`
+    : `${short(commit)} の deploy.yml は、マイグレーション中の記録を書いたが、出した記録を書いていない（マイグレーション・デプロイ・その確認・出した記録で失敗したか取り消されたか、まだ動いている）`;
 }
 
 /** The SHA make promote uses when SHA= is left out; stops when it would roll back. */
@@ -288,7 +289,7 @@ function defaultSha(
 
 /**
  * マイグレーションが当たったかもしれない版 (docs/04_deployment-procedure.md 4.1), and the
- * newest write of it whose migrating record shows that.
+ * newest write of it whose migrating record shows that its migrations started.
  */
 interface MayHaveMigrated {
   sha: string;
@@ -299,7 +300,7 @@ interface MayHaveMigrated {
 interface Furthest {
   /** いちばん先まで出した版: the newest SHA in main with a write deploy.yml deployed. */
   deployed?: string;
-  /** The newest SHA in main newer than `deployed` with a write that may have migrated. */
+  /** The newest SHA in main newer than `deployed` with a write whose migrations started. */
   mayHaveMigrated?: MayHaveMigrated;
 }
 
@@ -590,13 +591,18 @@ function warningLines(
 
 /**
  * The note at the top of the body when a newer version than the furthest one may have
- * migrated: deploy.yml recorded that its migrations may run, and never deployed it.
+ * migrated: deploy.yml recorded that its migrations started, and never deployed it. The
+ * migrations up to the furthest version are applied (it was deployed); the ones after it,
+ * up to this version, are unknown, and the lists say which is which.
  */
-function cautionLines({ sha, writer }: MayHaveMigrated): string[] {
+function cautionLines(
+  { sha, writer }: MayHaveMigrated,
+  furthest: string | undefined,
+): string[] {
   const version = `\`${short(sha)}\``;
   return [
     "> [!CAUTION]",
-    `> ${version} の deploy.yml（${short(writer)} の書き込み）は、マイグレーションの前の記録を書いたが、この版を出した記録はどの書き込みにも無い。記録はマイグレーションのジョブより前（production では承認の前）に書くので、${version} のマイグレーションが DB に当たったかは分からない。下のマイグレーションの一覧は、当たっていても当たっていなくても漏れが無いように作った。`,
+    `> ${version} の deploy.yml（${short(writer)} の書き込み）は、マイグレーション中の記録を書いたが、この版を出した記録はどの書き込みにも無い。${version} のマイグレーションは始まったが、DB に当たったかは分からない（失敗した・取り消された・まだ動いている、または当てた後のデプロイ・その確認・出した記録の書き込みで止まった）。${furthest === undefined ? "" : `出した記録のある \`${short(furthest)}\` までのマイグレーションは当たっている。`}下のマイグレーションの一覧は、${furthest === undefined ? "" : `\`${short(furthest)}\` の次から `}${version} までのものを当たったか分からないものとして分け、当たっていても当たっていなくても漏れが無いように作った。`,
     "",
   ];
 }
@@ -633,7 +639,9 @@ function prBody(input: BodyInput, records: () => Records): string {
 
   const lines = [
     ...(now === undefined ? [] : warningLines(env, now, forward)),
-    ...(mayHaveMigrated === undefined ? [] : cautionLines(mayHaveMigrated)),
+    ...(mayHaveMigrated === undefined
+      ? []
+      : cautionLines(mayHaveMigrated, furthest)),
     "## 昇格",
     "",
     `- 環境: ${env}`,
@@ -652,9 +660,13 @@ function prBody(input: BodyInput, records: () => Records): string {
   lines.push("");
 
   const startLabel = from === current ? "今の版" : "Cloud Run で動いている版";
+  const furthestLabel = (version: string) =>
+    `いちばん先まで出した版 \`${short(version)}\``;
   const doubtLabel = doubt
     ? `マイグレーションが当たったかもしれない版 \`${short(migrated)}\``
     : "";
+  const unknownThenApplied =
+    "当たったか分からず、当たっていなければこの昇格で当たるもの";
   if (from === undefined) {
     lines.push(
       "## マイグレーション（出す版にあるすべて。最初の昇格で当たるもの）",
@@ -663,9 +675,7 @@ function prBody(input: BodyInput, records: () => Records): string {
       "",
     );
   } else if (behind && furthest !== undefined && migrated !== undefined) {
-    const upTo = doubt
-      ? doubtLabel
-      : `いちばん先まで出した版 \`${short(furthest)}\``;
+    const upTo = doubt ? doubtLabel : furthestLabel(furthest);
     const previous = previousVersion(history, furthest, records());
     const check =
       "04_deployment-procedure.md 5.1 の 3 のとおり、上のマイグレーションの一覧に contract（4.1 の表の右の列）が無いことを確かめる。";
@@ -676,16 +686,26 @@ function prBody(input: BodyInput, records: () => Records): string {
       "",
       ...list(commitsBetween(repo, sha, migrated)),
       "",
-      `## マイグレーション（出す版の次から、${upTo} まで。DB に当たって${doubt ? "いるかもしれず" : "いて"}、出す版に無いもの）`,
+      `## マイグレーション（出す版の次から、${furthestLabel(furthest)} まで。DB に当たっていて、出す版に無いもの）`,
       "",
-      ...tags(sha, migrated),
+      ...tags(sha, furthest),
       "",
+    );
+    if (doubt) {
+      lines.push(
+        `## マイグレーション（\`${short(furthest)}\` の次から、${doubtLabel} まで。DB に当たったか分からず、出す版に無いもの）`,
+        "",
+        ...tags(furthest, migrated),
+        "",
+      );
+    }
+    lines.push(
       "## 直前の版",
       "",
       previous !== sha
         ? `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）${previous === undefined ? "は無い" : `の \`${previous}\` でもない`}。${check}${commitsToo}`
         : doubt
-          ? `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）の \`${previous}\` なので、\`${short(furthest)}\` までのマイグレーションは確かめなくてよい。\`${short(furthest)}\` の次から \`${short(migrated)}\` までのもの（当たったかもしれないもの）は、04_deployment-procedure.md 5.1 の 3 のとおり contract（4.1 の表の右の列）が無いことを確かめる。${commitsToo}`
+          ? `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）の \`${previous}\` なので、\`${short(furthest)}\` までのマイグレーションは確かめなくてよい。\`${short(furthest)}\` の次から \`${short(migrated)}\` までのもの（当たったか分からないもの）は、04_deployment-procedure.md 5.1 の 3 のとおり contract（4.1 の表の右の列）が無いことを確かめる。${commitsToo}`
           : `出す版は、いちばん先まで出した版より古く、直前の版（04_deployment-procedure.md 4.1）の \`${previous}\` なので、5.1 の 3 で確かめなくてよい。`,
       "",
     );
@@ -698,19 +718,35 @@ function prBody(input: BodyInput, records: () => Records): string {
         "",
       );
     }
-    lines.push(
-      furthest !== undefined
-        ? `## マイグレーション（いちばん先まで出した版 \`${short(furthest)}\` の次から、出す版まで。この昇格で新しく当たるもの）`
-        : "## マイグレーション（出す版にあるすべて。この昇格で新しく当たるもの）",
-      "",
-      ...tags(furthest, sha),
-      "",
-    );
-    if (doubt) {
+    if (!doubt || migrated === undefined) {
       lines.push(
-        `この一覧には、\`${short(migrated)}\` のデプロイで当たったかもしれないものも入っている。`,
+        furthest !== undefined
+          ? `## マイグレーション（${furthestLabel(furthest)} の次から、出す版まで。この昇格で新しく当たるもの）`
+          : "## マイグレーション（出す版にあるすべて。この昇格で新しく当たるもの）",
+        "",
+        ...tags(furthest, sha),
         "",
       );
+    } else {
+      // The target's migrations after the furthest version, up to the one that may have
+      // migrated, are unknown; the ones after that are new.
+      const unknownUpTo = absent ? sha : migrated;
+      lines.push(
+        furthest !== undefined
+          ? `## マイグレーション（${furthestLabel(furthest)} の次から、${absent ? "出す版まで" : `${doubtLabel} まで`}。${unknownThenApplied}）`
+          : `## マイグレーション（${absent ? "出す版にある" : `${doubtLabel} にある`}すべて。${unknownThenApplied}）`,
+        "",
+        ...tags(furthest, unknownUpTo),
+        "",
+      );
+      if (!absent && migrated !== sha) {
+        lines.push(
+          `## マイグレーション（\`${short(migrated)}\` の次から、出す版まで。この昇格で新しく当たるもの）`,
+          "",
+          ...tags(migrated, sha),
+          "",
+        );
+      }
     }
     if (absent && migrated !== undefined) {
       lines.push(
@@ -718,7 +754,7 @@ function prBody(input: BodyInput, records: () => Records): string {
         "",
         ...list(commitsBetween(repo, sha, migrated)),
         "",
-        `## マイグレーション（出す版の次から、${doubtLabel} まで。DB に当たっているかもしれず、出す版に無いもの）`,
+        `## マイグレーション（出す版の次から、${doubtLabel} まで。DB に当たったか分からず、出す版に無いもの）`,
         "",
         ...tags(sha, migrated),
         "",
@@ -744,7 +780,7 @@ function prBody(input: BodyInput, records: () => Records): string {
       "",
       "## 戻す理由",
       "",
-      "<!-- 戻す理由と、出す版が直前の版でないときは 5.1 の 3 で確かめた結果を書く（04_deployment-procedure.md 5.1 の 4） -->",
+      "<!-- 戻す理由と、5.1 の 3 で確かめたときはその結果を書く（04_deployment-procedure.md 5.1 の 4） -->",
     );
   }
   if (env === "production") {

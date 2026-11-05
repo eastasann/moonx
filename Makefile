@@ -57,7 +57,7 @@ shell-quote = '$(subst ','\'',$(1))'
 	test test-domain test-api test-web test-e2e coverage first-paint lint format \
 	typecheck db-up db-down db-generate db-check db-migrate db-seed db-reset \
 	db-studio tokens openapi kpi doc-lint admin-create infra-plan infra-apply \
-	push-api-image deploy-api deploy-record promote promote-check db-backup
+	push-api-image deploy-api deploy-record deploy-migrate promote promote-check db-backup
 
 install:
 	bun install --frozen-lockfile
@@ -130,10 +130,27 @@ build-api-image:
 	mkdir -p $(dir $(API_IMAGE_ARCHIVE))
 	docker save --output=$(API_IMAGE_ARCHIVE) moonx-api:$(SHA)
 
-# Docker, gcloud and the file build-api-image wrote: no Bun and no dependency's code.
+# Docker, gcloud, curl and the file build-api-image wrote: no Bun and no dependency's code.
+# A SHA's image is pushed once and never replaced (ADR-016): make promote takes the image for
+# the build that passed its tests, and staging and production get the same one. So a re-run
+# asks Artifact Registry's API for the SHA's tag first and pushes only on its 404; the tag
+# already there, or any other answer, stops it. The tests point ARTIFACT_REGISTRY_URL
+# elsewhere.
+ARTIFACT_REGISTRY_URL := https://artifactregistry.googleapis.com
 push-api-image:
 	$(call require,SHA)
 	$(call require-project)
+	set -o errexit; sha=$(call shell-quote,$(SHA)); \
+	if [[ ! "$$sha" =~ ^[0-9a-f]{40}$$ ]]; then echo "SHA must be a full commit SHA" >&2; exit 1; fi; \
+	token="$$(gcloud auth print-access-token)"; \
+	status="$$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+		--header @<(printf 'Authorization: Bearer %s\n' "$$token") \
+		"$(ARTIFACT_REGISTRY_URL)/v1/projects/$(GCP_PROJECT_ID)/locations/$(REGION)/repositories/moonx/packages/api/tags/$$sha")"; \
+	case "$$status" in \
+		404) ;; \
+		200) echo "$(IMAGE):$$sha is in Artifact Registry already, and a SHA's image is never replaced (ADR-016): nothing pushed" >&2; exit 1 ;; \
+		*) echo "Artifact Registry answered $$status for the tag $$sha: nothing pushed" >&2; exit 1 ;; \
+	esac
 	docker load --input=$(API_IMAGE_ARCHIVE)
 	docker tag moonx-api:$(SHA) $(IMAGE):$(SHA)
 	gcloud auth configure-docker $(REGION)-docker.pkg.dev --quiet
@@ -178,7 +195,7 @@ first-paint:
 # The workflows' checker from its author's image, pinned by digest, which carries the
 # ShellCheck it runs over the run: scripts (03_dev-setup.md 10章, ADR-022). 1.7.12 does
 # not know concurrency's queue (rhysd/actionlint#654), so that message alone is ignored;
-# scripts/promote.test.ts checks deploy.yml's queue and group instead. Drop the -ignore
+# scripts/workflows.test.ts checks deploy.yml's queue and group instead. Drop the -ignore
 # with the first release that knows queue (05_operation-runbook.md 6.1).
 ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
 
@@ -286,9 +303,9 @@ infra-apply:
 	terraform -chdir=infra/terraform/envs/$(ENV) init -backend-config="bucket=$(GCP_PROJECT_ID)-tfstate"
 	terraform -chdir=infra/terraform/envs/$(ENV) apply
 
-# Without the migrations: deploy.yml runs db-migrate first, in a job that cannot mint a
-# Google Cloud token, and this one in a job that runs none of the dependencies' code
-# (04_deployment-procedure.md 2章).
+# Without the migrations: deploy.yml's deploy job runs the SHA's db-migrate first, in a
+# container that cannot mint a Google Cloud token (deploy-migrate below), and this one on
+# the runner, which runs none of the dependencies' code (04_deployment-procedure.md 2章).
 deploy-api:
 	$(call require-env,staging production)
 	$(call require,SHA)
@@ -332,8 +349,8 @@ db-backup:
 		"$(STORAGE_URL)/upload/storage/v1/b/$(GCP_PROJECT_ID)-moonx-backups/o?uploadType=media&ifGenerationMatch=0&name=$$name"
 
 # The records make promote reads (ADR-016, 04_deployment-procedure.md 4.1): deploy.yml's
-# image job writes KIND=migrating before its migrate job may start, and the deploy job's
-# last step writes KIND=deployed once the deployment's check passed. A record is an empty object
+# deploy job writes KIND=migrating right before the migrations start, and KIND=deployed in
+# its last step, once the deployment's check passed. A record is an empty object
 # whose name says it all: {ENV}/{SHA}/{WRITE}/{UTC time}-{KIND}, WRITE being the commit
 # that wrote SHA to deploy/{ENV}/version (the one deploy.yml runs for). The records are
 # kept for good and make promote reads every one ever written, so a new name must leave
@@ -342,7 +359,8 @@ db-backup:
 # the shell in single quotes, so the shell checks them without running anything in them.
 # make itself still expands a $(...) in a value given on its command line, as in every
 # target; deploy.yml passes a SHA promote-check has read as 40 hex characters and its own
-# GITHUB_SHA.
+# GITHUB_SHA. The name it prints last is how 05_operation-runbook.md 3.17 tells which run of
+# deploy.yml wrote a record.
 deploy-record:
 	$(call require-env,staging production)
 	$(call require,SHA)
@@ -354,8 +372,36 @@ deploy-record:
 		echo "SHA and WRITE must be full commit SHAs" >&2; exit 1; \
 	fi; \
 	token="$$(gcloud auth print-access-token)"; \
-	name="$(ENV)%2F$$sha%2F$$write%2F$$(date -u +%Y-%m-%dT%H%M%SZ)-$(KIND)"; \
+	record="$(ENV)/$$sha/$$write/$$(date -u +%Y-%m-%dT%H%M%SZ)-$(KIND)"; \
 	curl --fail-with-body --silent --show-error --request POST --data-binary '' \
 		--header 'Content-Type: application/octet-stream' \
 		--header @<(printf 'Authorization: Bearer %s\n' "$$token") \
-		"$(STORAGE_URL)/upload/storage/v1/b/$(GCP_PROJECT_ID)-moonx-deploys/o?uploadType=media&ifGenerationMatch=0&name=$$name"
+		"$(STORAGE_URL)/upload/storage/v1/b/$(GCP_PROJECT_ID)-moonx-deploys/o?uploadType=media&ifGenerationMatch=0&name=$${record//\//%2F}"; \
+	echo; echo "Recorded $$record"
+
+# The SHA's migrations, as deploy.yml's deploy job runs them (04_deployment-procedure.md
+# 2章, ADR-027). That job can mint a Google Cloud token, so the SHA's make install and make
+# db-migrate, which run its dependencies' code, run in a container that gets the SHA's
+# committed files on its standard input and DATABASE_URL_DIRECT, and nothing else of the
+# job: neither the variables that mint an OIDC token, nor the credentials file
+# google-github-actions/auth writes, nor the folder that file is in (SOURCE is that folder
+# in deploy.yml; git archive takes the commit's files alone). The image is the one the SHA's
+# API image starts from: the SHA's own Bun (scripts/image-versions.test.ts holds it to
+# packageManager), pinned by its digest, so going back runs an old version's migrations
+# with its own tools. Every Dockerfile deploy.yml may go back to must keep that first FROM
+# line. The image has no make, which apt installs first. DATABASE_URL_DIRECT is kept from
+# apt and make install, for the migrations alone.
+deploy-migrate:
+	$(call require,SOURCE)
+	$(call require,SHA)
+	set -o errexit -o pipefail; source=$(call shell-quote,$(SOURCE)); sha=$(call shell-quote,$(SHA)); \
+	if [[ ! "$$sha" =~ ^[0-9a-f]{40}$$ ]]; then echo "SHA must be a full commit SHA" >&2; exit 1; fi; \
+	if [ -z "$${DATABASE_URL_DIRECT:-}" ]; then echo "DATABASE_URL_DIRECT is required" >&2; exit 1; fi; \
+	image="$$(git -C "$$source" show "$$sha:apps/api/Dockerfile" | awk '$$1 == "FROM" && !found { print $$2; found = 1 }')"; \
+	pinned='^oven/bun:[0-9]+\.[0-9]+\.[0-9]+-slim@sha256:[0-9a-f]{64}$$'; \
+	if [[ ! "$$image" =~ $$pinned ]]; then \
+		echo "The API's Dockerfile at $$sha starts FROM '$$image', not a Bun image pinned by digest" >&2; exit 1; \
+	fi; \
+	git -C "$$source" archive --format=tar "$$sha" | \
+	docker run --rm --interactive --env DATABASE_URL_DIRECT "$$image" sh -c \
+		'set -e; mkdir /work; tar -x -f - -C /work; env -u DATABASE_URL_DIRECT sh -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -qq --yes --no-install-recommends make >/dev/null && cd /work && make install"; cd /work; make db-migrate'

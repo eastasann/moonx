@@ -3243,7 +3243,7 @@ Step 41b の独立レビュー（2026-11-05）で見つかった問題を、ユ�
 
 ## Step 41d: インフラと CI の直しの点検の直し
 
-Status:
+Status: done 2026-11-05
 
 ```
 Step 41b と 41c の docs の差分の監査（新しいサブエージェント1体）で見つかったものを、1つのステップで閉じてください。そのときの
@@ -3287,7 +3287,8 @@ make lint・typecheck・doc-lint・db-check BASE=main・build・3つの envs の
    「手でも消さない」とする。05 3章に、そのときの手順を足す（その記録を誰がいつ書いたかを Cloud Storage と deploy.yml の実行から
    調べ、deploy.yml が書いたものでないと確かめたときだけ、運用の担当が自分のアカウントでその記録を消して、原因を直す。デプロイの
    アカウントは今のとおり消せない）。04 2章の「手でも消さない」に、この手順のときだけを除くと書く
-4. ビルドの記録の強さ: ADR-016 は「人は Artifact Registry に手で上げない」とするが、リポジトリ moonx はタグを上書きできる
+4. （push のジョブの再実行で上書きしないことはこのステップで閉じ、immutable_tags と ADR-007 の両立は Step 41e に分けた）
+   ビルドの記録の強さ: ADR-016 は「人は Artifact Registry に手で上げない」とするが、リポジトリ moonx はタグを上書きできる
    （envs/shared の main.tf に immutable_tags が無い）。immutable_tags を有効にし、build.yml の push のジョブを再実行したときに
    その SHA のタグがもうあれば、上書きせずに止めるか、同じ digest なら成功とする（どちらにしたかを書く）。ADR-007 の古い
    イメージを消す決まりと両立することを確かめる
@@ -3307,6 +3308,56 @@ make lint・typecheck・doc-lint・db-check BASE=main・build・3つの envs の
 直すものの 1〜8 が閉じ、make test（PostgreSQL 17 のクライアントを PATH の先に置く。Homebrew の PostgreSQL 14 には触れない）・
 make test-e2e・make typecheck・make lint・make doc-lint が通り、3つの envs で terraform fmt の検査と validate が通る状態を
 ゴールとする。独立のレビューは観点ごとに分けて同時に起動し（/draft:implement）、1〜8 のどれも漏らさない。
+
+完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
+仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
+完了報告とコミットの本文に、自分で決めたこと（決めたこと・理由・ほかの選択肢と採らなかった理由・読んだのに書かれていなかった docs の箇所）をすべて書く。
+```
+
+---
+
+## Step 41e: Artifact Registry のタグの上書き（ADR-007 との両立）
+
+Status: blocked 2026-11-05
+ユーザーの決定が要る: immutable_tags を有効にするとタグの付いたイメージを消せなくなり（クリーンアップのポリシーでも手でも）、ADR-007 の古いイメージを消す決まりと両立しない。どちらを取るかを決める
+
+```
+Step 41d の直すものの 4 を切り出した。Step 41d の 4 は「immutable_tags を有効にし、build.yml の push のジョブを再実行したときに
+その SHA のタグがもうあれば、上書きせずに止めるか、同じ digest なら成功とする。ADR-007 の古いイメージを消す決まりと両立することを
+確かめる」だった。確かめると両立しない。
+
+見つけたこと（Google Cloud の Artifact Registry の docs、2026-11-05）:
+- https://docs.cloud.google.com/artifact-registry/docs/repositories/cleanup-policy:「If a repository has immutable tags enabled,
+  tagged artifacts can't be deleted.」（削除のポリシーの tagState の説明。create-repos の Terraform の TAG_STATE の説明にも同じ文）
+- https://docs.cloud.google.com/artifact-registry/docs/repositories/update-repo-settings: immutable tags のとき「Delete a tagged
+  image.」「Remove a tag from an image.」「Push an image with a tag that is already used by another version of the image」は
+  できない。消せるのはタグの無いイメージだけ（docs/docker/names）
+- 同じ digest を同じタグでもう一度 push したときの扱いは、どの docs にも書かれていない
+- moonx のイメージはどれも SHA のタグが付く（make push-api-image）ので、immutable_tags を有効にすると、ADR-007 の
+  「最新の30個と90日以内を残し、それより古いものを自動で消す」（envs/shared の cleanup_policies）は何も消さなくなる
+
+元の問題（Step 41d の監査）: ADR-016 は「人は Artifact Registry に手で上げない」とし、イメージがあることを build.yml が成功した
+ことの代わりにしているが、リポジトリ moonx はタグを上書きできる（同じ SHA のタグが別のイメージに移ると、staging で確かめた
+イメージと production に出すイメージが違うものになりうる。ADR-016「staging で確かめたイメージをそのまま production に出す」）。
+
+Step 41d で閉じたこと: make push-api-image は、push の前に Artifact Registry の API にその SHA のタグを尋ね、404 のときだけ上げる
+（タグがある・ほかの答えのときは上書きせずに失敗する。scripts/workflows.test.ts）。これで build.yml の push のジョブの再実行は
+上書きしない。残るのは、Artifact Registry に書ける人（プロジェクトのオーナーなど）の手の push で、これを Artifact Registry の
+設定で止めるかどうか。
+
+選択肢（ユーザーが決める）:
+A. immutable_tags を有効にし、ADR-007 の古いイメージを消す決まりをやめる。タグの付いたイメージは消えず、戻せる範囲（ADR-007 の
+   トレードオフ・04 5.1 の 1）は無期限になる。保存の費用は、イメージ1つの大きさ × main への取り込みの数で増え続ける（無料枠の
+   0.5 GB を超えた分）。cleanup_policies はタグの無いイメージだけを消すものに直す。管理者は immutable_tags を外せば上書きできる
+B. immutable_tags は使わず、ADR-007 のまま古いイメージを消す。人の push は ADR-016 の決まりで止めるだけにし、Artifact Registry に
+   書ける人は上書きできることを ADR-016 のトレードオフに書く
+（推すのは B。ADR-007 の費用と戻せる範囲の決まりを変えずに済み、CI が自分で上書きする経路は Step 41d で閉じた。A でも管理者は
+  immutable_tags を外して上書きできる）
+
+決まったら、A なら envs/shared の main.tf（docker_config の immutable_tags と cleanup_policies）・ADR-007・ADR-016・04 5.1 の 1・
+03 5.4 I、B なら ADR-016 のトレードオフを直す。どちらでも Step 43 で、build.yml の push のジョブを再実行して、上書きせずに止まる
+ことを本物の Artifact Registry で確かめる（Step 43 の 4 に書いた）。
+まだ作らないもの: Step 42〜44 の対象。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。
@@ -3375,7 +3426,9 @@ docs/03_dev-setup.md 5.4 のチェックリストに沿って、staging に Web 
    書く。Step 40 が入れたのは image・traffic・client・client_version と、gcloud がリビジョンに付ける nonce のラベル（template の labels））
 4. 手元で差し替えて確かめた外部の経路を本物で確かめる: Google ログイン、Resend のメール（許可リスト）、Cloud Storage の写真、
    Web と API の Sentry（7.2 のとおり中身が削られて届くこと。release が SHA で、ソースマップが当たって元のソースの行で読めること）、
-   deploy.yml が Cloud Storage に書くデプロイの記録（作成だけの権限で2つとも書けること。次の make promote がそれを読めること。03 5.4 K）
+   deploy.yml が Cloud Storage に書くデプロイの記録（作成だけの権限で2つとも書けること。03 5.4 K）、
+   make push-api-image がタグを尋ねる Artifact Registry の API（build.yml の push のジョブを再実行して、タグがあると上書きせずに
+   失敗すること）
 5. 7.3 の性能の目安のうち本物の環境で測るもの（Cloud Run の0台からの起動・スマホの回線での表示）、PWA の実機での確認（03 3.5）。
    スマホの回線での表示は、ログインした画面（5 ダッシュボードなど）を初めて開いたときも測る。`load` の後に始まる Service Worker の
    事前のキャッシュ（日本語の書体を除くビルドのすべて）が、データを読む画面の表示と回線を取り合っていないかを見る（手元の
@@ -3414,10 +3467,14 @@ staging で確かめた版を production に公開してください。ユーザ
 1. 29・30 の本文が入っていること（Step 42）を確かめる（無いまま production に出さない。04 4.1）
 2. 5.4 の production の分を、ユーザーと一緒に進める
 3. production への昇格（make promote ENV=production）、運営者の作成、テンプレートの取り込みと公開、04 6章の確認
-4. db-backup.yml を手で1回動かし、バックアップができることを確かめる（05 6.2）
-5. CHECK_WORKSPACE_ID を GitHub の環境 production-backup に入れた後で、kpi.yml を手で1回動かし、成功して実行の要約に件数の表が
+4. make promote ENV=production が、staging のデプロイの記録を gcloud storage objects list の本物の出力で読み、止まらずに PR を作れる
+   ことを確かめる（記録を実際に読む最初の機会: Step 43 の staging の最初の昇格は記録を読まない。staging の記録が読めないときと、
+   その SHA を staging に書いたいちばん新しいコミットに出した記録が無いとき（the staging deployment of ... is not known to have
+   succeeded）は止まる。03 5.4 K）
+5. db-backup.yml を手で1回動かし、バックアップができることを確かめる（05 6.2）
+6. CHECK_WORKSPACE_ID を GitHub の環境 production-backup に入れた後で、kpi.yml を手で1回動かし、成功して実行の要約に件数の表が
    出ることを確かめる（03 5.4 K。db-backup.yml と同じ形）
-6. 手順どおりに進まなかった所は、03・04・05 の該当の手順を直す（合意の上で）
+7. 手順どおりに進まなかった所は、03・04・05 の該当の手順を直す（合意の上で）
 
 これで初期リリースのプロンプト集は終わる。このあとの変更は /draft:feature で行う。
 

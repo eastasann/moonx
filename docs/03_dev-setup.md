@@ -170,7 +170,7 @@ make admin-create EMAIL=<自分のメール>
 | DB を作り直したい（ローカルのデータは消える） | `make db-reset` |
 | 中身を見たい | `make db-studio` |
 | テストを動かす | `make test-api`・`make test-e2e`（テスト用の DB `DATABASE_URL_TEST` を使う。開発用の DB `moonx` のデータは消えない。7章） |
-| staging / production に当てる | 手では当てない。昇格のときに `deploy.yml` のマイグレーションのジョブが `make db-migrate` で当てる（デプロイのジョブの前。04 2章） |
+| staging / production に当てる | 手では当てない。昇格のときに `deploy.yml` のデプロイのジョブが、API を出す前に、その SHA の `make db-migrate` を別のコンテナで当てる（`make deploy-migrate`。04 2章） |
 
 マイグレーションは「追加してから使い、使わなくなってから消す」の2段階で書く（ADR-016。04 4.1）。適用済みのマイグレーションの SQL は書き換えない。
 
@@ -468,7 +468,7 @@ I の 5 でドメインマッピングができてから行う。最初の昇格
 
 - [ ] `build.yml` が API のイメージを作ったことを確かめる（I の 4）
 - [ ] staging の昇格の PR を出してマージする（04 4.2）
-- [ ] `deploy.yml` がデプロイの記録を2つ書いたことを確かめる（04 2章「デプロイの記録」。手元では Cloud Storage を差し替えて確かめたので、本物のバケットと、作成だけの権限で書けることはここで確かめる）。`make promote` がそれを読めることは、次の昇格（staging の2回目か production の最初）で確かめる
+- [ ] `deploy.yml` がデプロイの記録を2つ書いたことを確かめる（04 2章「デプロイの記録」。手元では Cloud Storage を差し替えて確かめたので、本物のバケットと、作成だけの権限で書けることはここで確かめる）
 
   ```bash
   gcloud storage ls "gs://{GCP_PROJECT_ID}-moonx-deploys/staging/**"   # -migrating と -deployed の2つ
@@ -493,7 +493,7 @@ I の 5 でドメインマッピングができてから行う。最初の昇格
 
 - [ ] staging の `MAIL_ALLOWLIST` に、確かめに使うメールを入れる（運営者のメールと、04 6章の招待のメールの確認に使う別のメール。Terraform の変数。`make infra-apply ENV=staging`）
 - [ ] デプロイ後の確認をする（04 6章）
-- [ ] production でも、昇格（GitHub の環境 `production` の承認が、マイグレーションのジョブとデプロイのジョブで1回ずつ要る。04 2章）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・テンプレートの取り込みと公開・確認用のワークスペースの作成・デプロイ後の確認をする
+- [ ] production でも、昇格（GitHub の環境 `production` の承認が、デプロイのジョブの前で1回要る。04 2章。`make promote ENV=production` が staging のデプロイの記録を読んで止まらずに PR を作れることも確かめる。記録を実際に読む最初の機会で、staging の最初の昇格は記録を読まない）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・テンプレートの取り込みと公開・確認用のワークスペースの作成・デプロイ後の確認をする
 - [ ] production の確認用のワークスペースの ID（画面の URL の `/w/<ID>`）を、GitHub の環境 `production-backup` の変数 `CHECK_WORKSPACE_ID` に入れる（KPI の集計から外す。SDD 11章「KPI の数え方」。無いと `kpi.yml` が失敗する）。入れたら `kpi.yml` を手で1回動かし、成功して実行の要約に件数の表が出ることを確かめる
 
   ```bash

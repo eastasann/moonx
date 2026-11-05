@@ -21,7 +21,7 @@
 | メール | Resend の管理画面（Emails） | Resend のプランの保持期間（短い） | 送信・配達・バウンス |
 | DB | Neon のコンソール（Monitoring・Usage） | Neon のプランによる | 接続数・容量・計算時間 |
 | デプロイ・バックアップ・KPI のワークフローの実行記録 | GitHub Actions | 90日 | `deploy.yml`・`build.yml`・`db-backup.yml`・`kpi.yml` の記録 |
-| デプロイの記録 | Cloud Storage `{GCP_PROJECT_ID}-moonx-deploys` | 消さない | 環境・版の SHA・それを書いたコミット・時刻と、「当てたかもしれない」か「出した」か（`make promote` が読む。04 2章「デプロイの記録」・ADR-016） |
+| デプロイの記録 | Cloud Storage `{GCP_PROJECT_ID}-moonx-deploys` | 消さない | 環境・版の SHA・書き込み・時刻と、「マイグレーション中」か「出した」か（`make promote` が読む。書き込みと記録は 04 2章「デプロイの記録」、名前の形は SDD 2章「make ターゲット」の `deploy-record`） |
 
 リクエスト ID がどこに入るかは [SDD 8.3](02-01_system-design-doc.md#83-ログとの対応)。利用者からエラーの連絡を受けたら、画面に出た `Ref`・起きた時刻・ログインしていたアカウントのメールをもらい、4章のコマンドで追う。`Ref` はふつうリクエスト ID の先頭で、API の答えが無い Web 自身の失敗（描画の失敗など）は `moonx-web` の Sentry のイベント ID の先頭になる（SDD 8.2「想定外のエラー」）。Cloud Logging で当たらない `Ref` は、4章「Sentry」の手順で探す。
 
@@ -217,13 +217,13 @@ gcloud logging read \
 | ログに出るもの | 原因 | 対処 |
 |---|---|---|
 | シークレットが見つからない・権限が無い | Secret Manager に値（有効な版）が無い、実行用のサービスアカウントの権限 | 値を入れる（03 5.4 I）。権限は Terraform で直す |
-| 起動のときの設定の検査で終了する | 新しい環境変数を Terraform に入れ忘れた | Terraform に入れて `make infra-apply` → `deploy.yml` を再実行（`gh run rerun <RUN_ID>`。production では、再実行したマイグレーションのジョブとデプロイのジョブがまた承認を待つ。04 2章） |
+| 起動のときの設定の検査で終了する | 新しい環境変数を Terraform に入れ忘れた | Terraform に入れて `make infra-apply` → `deploy.yml` を再実行（`gh run rerun <RUN_ID>`。production では、デプロイのジョブがまた承認を待つ。04 2章） |
 | `exec format error` | `make build-api-image`（linux/amd64 で作る）を通さずに作ったイメージ（Apple シリコンの `docker build` は既定で arm64 になる） | イメージは `build.yml` が作ったものだけを使う |
 | ポートで待ち受けていない | アプリが `PORT` を読んでいない | コードを直す |
 
 ### 3.8 DB のマイグレーションが失敗した
 
-**症状:** `deploy.yml` のマイグレーションのジョブ（`make db-migrate` の段）で失敗する。デプロイのジョブは動かず、API と Web は前の版のまま。
+**症状:** `deploy.yml` のデプロイのジョブの `Migrate` の段（`make deploy-migrate`。コンテナの中の `make db-migrate`）で失敗する。API は出さないので、API と Web は前の版のまま。この書き込みの記録はマイグレーション中だけになり、`make promote` はこの版のマイグレーションを当たったか分からないものとして扱う（04 4.1）。
 
 **確認:**
 
@@ -237,7 +237,8 @@ select id, hash, created_at from drizzle.__drizzle_migrations order by created_a
 ```
 
 **対処:**
-- Neon が休んでいた・一時的な接続の失敗なら、もう一度動かす: `gh run rerun <RUN_ID> --failed`（production では、マイグレーションのジョブとデプロイのジョブがまた承認を待つ。04 2章）
+- Neon が休んでいた・一時的な接続の失敗なら、もう一度動かす: `gh run rerun <RUN_ID> --failed`（production では、デプロイのジョブがまた承認を待つ。04 2章）。コンテナのイメージを Docker Hub から取れなかった・コンテナの中の `apt-get`（make を入れる）か `make install` で止まった（Debian や npm のパッケージの配布に届かない）ときも同じ
+- `The API's Dockerfile at <SHA> starts FROM ...` で止まったら、その SHA の `apps/api/Dockerfile` の最初の `FROM` が、digest で固定した Bun の slim のイメージではない（04 4.1 のチェックリスト）。再実行では直らないので、直した版を昇格する
 - SQL やデータが原因なら、当たったマイグレーションは書き換えず、直すマイグレーションを足して新しい SHA を昇格する（04 4.1 の expand / contract）
 
 ### 3.9 ドメインで繋がらない: ドメインマッピング・証明書・DNS
@@ -312,9 +313,11 @@ dig +short TXT _dmarc.{DOMAIN}
 
 ```bash
 # Cookie が返るか（デプロイ後の確認と同じ運営者のアカウントで。04 6章）。パスワードはコマンドの
-# 引数と履歴に出さない（read -rs で入れ、printf（シェルの組み込み）から標準入力で渡す）
-read -rs PASSWORD
-printf '{"email":"<運営者のメール>","password":"%s"}' "$PASSWORD" | \
+# 引数と履歴に出さない（IFS= read -rs で前後の空白も含めて入れ、printf（シェルの組み込み）から
+# 標準入力で渡す）。JSON は Bun の JSON.stringify で作るので、パスワードに " や \ があっても正しい
+IFS= read -rs PASSWORD
+printf '%s' "$PASSWORD" | \
+  bun -e 'process.stdout.write(JSON.stringify({ email: "<運営者のメール>", password: await Bun.stdin.text() }))' | \
   curl -sS -i -X POST https://{DOMAIN}/api/auth/sign-in/email \
     -H 'content-type: application/json' -H 'origin: https://{DOMAIN}' --data-binary @- | grep -i '^set-cookie'
 unset PASSWORD
@@ -426,6 +429,37 @@ gh workflow run db-backup.yml                               # 新しい値で取
 | iPhone で、ホーム画面のアプリと Safari でログインの状態が違う | iPhone では、ホーム画面のアプリと Safari でログインが別になる（2026-10-11 にユーザーが承知した仕様。ADR-031） | それぞれでログインしてもらう。招待のメールのリンクは Safari で開く |
 | ログインだけ失敗 | — | 3.11・3.12 |
 
+### 3.17 `make promote` が、どの書き込みのものか分からない記録で止まる
+
+**症状:** `make promote` が、デプロイの記録の1つを挙げて止まる（`the record <名前> belongs to <コミット>, which did not write ...`・`the record <名前> says <コミット> wrote <SHA> ..., but it wrote ...`・`... holds <名前>, which is not a record make deploy-record writes for ...`）。その環境（staging の記録なら production も）の昇格の PR を作れず、戻すこともできない。
+
+**原因:** `deploy.yml` は、自分が動いている書き込み（04 2章「デプロイの記録」）の記録だけを書く。`main` が PR の squash マージだけで変わるかぎり、どの記録もどれかの書き込みのものになる。そうならないのは、`make promote` が `origin` を読んだ後に昇格がマージされたとき（やり直せば通る）と、`main` の履歴が書き換わったときと、`deploy.yml` 以外の誰かがバケットに書いたとき。`make promote` が止まるのは、その記録がマイグレーションが当たった印かもしれないため（ADR-016）。
+
+**確認:** まず `git switch main && git pull` で `main` の最新にしてから `make promote` をやり直す（上のマージの後なら、これで通る。記録の名前の形を変えた版より古い `make promote` は、新しい形を読めない。名前の形は SDD 2章「make ターゲット」の `deploy-record`）。まだ止まるなら、その記録をいつどの実行が書いたかを、Cloud Storage と `deploy.yml` の実行から調べる。Cloud Storage は、オブジェクトを書いたアカウントを残さない（データアクセスの監査ログは有効にしていない）。実行のログに出る記録の名前（`make deploy-record` が最後に `Recorded <名前>` と出す）は、`deploy.yml` が書いた証拠になるが、ログに無くても書かなかったことにはならない（下の対処）。
+
+```bash
+NAME='<止まったときのメッセージの記録の名前>'   # 例: staging/<SHA>/<書き込み>/2026-11-05T181703Z-migrating
+# 1. いつ書かれたか（creation_time）
+gcloud storage objects describe "gs://{GCP_PROJECT_ID}-moonx-deploys/$NAME"
+# 2. 名前の書き込み（3つ目）が origin/main の履歴にあるか、そのコミットでの版のファイルの中身（名前の1つ目が環境、2つ目が SHA）
+WRITE="$(cut -d/ -f3 <<<"$NAME")"
+git fetch origin && git merge-base --is-ancestor "$WRITE" origin/main && echo "origin/main にある"
+git show "$WRITE:deploy/$(cut -d/ -f1 <<<"$NAME")/version"
+# 3. その書き込みの deploy.yml の実行（90日で消える）と、各実行のすべての試行のログ（再実行は試行が増え、
+#    gh run view --log は最後の試行だけを出す）
+gh run list --workflow=deploy.yml --commit="$WRITE" --json databaseId,attempt,createdAt,conclusion
+for N in $(seq 1 <その実行の attempt>); do gh run view <RUN_ID> --attempt "$N" --log | grep -F "Recorded $NAME"; done
+```
+
+**対処:** `deploy.yml` が書いたものでないと確かめられたときだけ消す。確かめられるのは、次の2つの場合だけ。
+
+- 名前の書き込みのコミットで、その環境の `deploy/{env}/version` の中身が名前の SHA と違う（ファイルが無いときも。2 の `git show`）: `deploy.yml` は、動いているコミット（書き込み）でのそのファイルの中身を記録の SHA に書くので、`deploy.yml` が書いたものではない
+- 名前が、どの版の `make deploy-record` も書かない形（`git log -p -- Makefile` で、`deploy-record` が書いてきた名前の形を見る）
+
+この2つのときは、運用の担当が自分のアカウントでその記録を消す（`gcloud storage rm "gs://{GCP_PROJECT_ID}-moonx-deploys/$NAME"`。デプロイのアカウントは作成しかできず消せない。消したものは7日のうちなら Cloud Storage の削除後の保持から戻せる）。書けたアカウントを、バケットとプロジェクトの IAM（`gcloud storage buckets get-iam-policy gs://{GCP_PROJECT_ID}-moonx-deploys`・`gcloud projects get-iam-policy {GCP_PROJECT_ID}`）から洗い出し、その人たちに確かめて原因（手で書いた・権限の付けすぎ）を直してから、`make promote` をやり直す。
+
+ほかの場合は消さない（名前の書き込みのコミットが手元にも GitHub にも無い、またはその書き込みで版のファイルが名前の SHA を持つ。後者で `make promote` が止まるのは、その書き込みが `origin/main` の履歴から消えたか、`main` に squash マージでない取り込み（いくつかのコミットの push など）があったとき）。どれかの実行のどれかの試行のログに `Recorded <その名前>` があれば、`deploy.yml` が書いたもので、原因は `main` の履歴なので、その書き込みが `origin/main` から消えた・squash マージでない形で入った理由を調べて直す（`main` の保護が外れていないかも確かめる。03 5.4 H）。ログに無くても、`deploy.yml` が書かなかったことにはならない（実行は90日で消え、production の承認を待つ間にも日がたつ。記録を書いた直後に取り消された試行は名前を出さない）。どちらのときも、直せなければ5章のエスカレーション
+
 ---
 
 ## 4. ログ確認方法
@@ -485,7 +519,7 @@ gcloud run services describe moonx-api-production --region=asia-southeast1 --for
 
 - GCP コンソールのログ エクスプローラ: https://console.cloud.google.com/logs
 - デプロイの実行: `gh run list --workflow=deploy.yml --limit=10`（90日で消える）
-- デプロイの記録（どの版をいつ出したか。消えない）: `gcloud storage ls "gs://{GCP_PROJECT_ID}-moonx-deploys/production/**"`（名前は `{env}/{SHA}/{書いたコミット}/<日時>-{migrating か deployed}`。04 2章「デプロイの記録」）
+- デプロイの記録（どの版をいつ出したか。自動では消えない）: `gcloud storage ls "gs://{GCP_PROJECT_ID}-moonx-deploys/production/**"`（いつ書くかは 04 2章「デプロイの記録」、名前の形は SDD 2章「make ターゲット」の `deploy-record`）
 
 ---
 

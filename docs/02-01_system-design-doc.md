@@ -465,7 +465,7 @@ Google Cloud を使うターゲット（`push-api-image`・`deploy-api`・`deplo
 
 ### ADR-016: staging と production の2環境。バージョン宣言ファイルで昇格する（ユーザー指定）
 
-**状態・日付:** 採用（2026-10-01。2026-10-03 に Web を API と同じイメージに入れた。ユーザーの決定。2026-10-11 にスマホの昇格を外した。2026-10-12 に、戻し方を revert から戻し先の SHA の昇格の PR に変え、production に書ける SHA を絞り、GitHub の環境と Google Cloud への入口を `main` に限り、昇格の PR を `make promote` で作るようにした。ユーザーの決定。2026-11-05 に、`make promote` が読むビルドとデプロイの記録を、期限で消える GitHub の実行の記録から、Artifact Registry のイメージと Cloud Storage のデプロイの記録に替えた。同じ日に、マイグレーション中の記録を承認の後に書くようにした（ADR-027 で production の承認を1回に戻したため）。どちらもユーザーの決定）
+**状態・日付:** 採用（2026-10-01。2026-10-03 に Web を API と同じイメージに入れた。ユーザーの決定。2026-10-11 にスマホの昇格を外した。2026-10-12 に、戻し方を revert から戻し先の SHA の昇格の PR に変え、production に書ける SHA を絞り、GitHub の環境と Google Cloud への入口を `main` に限り、昇格の PR を `make promote` で作るようにした。ユーザーの決定。2026-11-05 に、`make promote` が読むビルドとデプロイの記録を、期限で消える GitHub の実行の記録から、Artifact Registry のイメージと Cloud Storage のデプロイの記録に替えた。同じ日に、マイグレーション中の記録を承認の後に書くようにし（ADR-027 で production の承認を1回に戻したため）、イメージのタグを上書きできるまま（Artifact Registry の immutable tags を使わない）にした。どれもユーザーの決定）
 
 **決定:** 環境は staging と production（2章「環境と命名」）。環境ごとのブランチは作らない。ブランチは GitHub Flow で、マージは常に squash（ブランチの運用は 03_dev-setup.md 9章）。`main` に入ると CI がテストし、Web と API を入れたイメージ（タグはコミット SHA。両方の環境で同じイメージを使う）を作る。デプロイは `deploy/{env}/version` にコミット SHA を書いた PR（昇格の PR。`make promote` で作る）をマージしたときに GitHub Actions が行う（順番とワークフローの中身は 04_deployment-procedure.md 2章）。
 
@@ -489,6 +489,8 @@ Web は環境ごとの値をビルドに入れず、API が HTML の meta 要素
 - 90日より古い記録に頼る昇格（古い版への戻し・90日昇格しなかった環境）を制限として書く: 戻せる範囲と確かめられることが減り、仕様を弱める（ユーザーが選ばなかった）。
 - GitHub の Deployments（環境のデプロイの記録）: 保持期間で消えるものに入るかが、GitHub の changelog に書かれていない。
 - Cloud Run のリビジョンの履歴: マイグレーションの後で失敗したデプロイ（リビジョンを作る前に止まったもの）が残らず、マイグレーションが当たったかもしれない版を決められない。
+- Artifact Registry のリポジトリで immutable tags を有効にする: タグの付いたイメージを消せなくなり、ADR-007 の古いイメージを消す決まりが何も消さなくなる。消す決まりをやめると、保存の費用が main への取り込みのたびに増え続ける（ユーザーが選ばなかった）。
+- production には、staging に出したときのイメージの digest で出す（タグを付け替えられても、staging で確かめたものだけが出る）: ワークフローと `make promote` をもう一度作り直すことになる（ユーザーが選ばなかった）。
 
 **トレードオフ:**
 

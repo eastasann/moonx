@@ -493,7 +493,7 @@ I の 5 でドメインマッピングができてから行う。最初の昇格
 
 - [ ] staging の `MAIL_ALLOWLIST` に、確かめに使うメールを入れる（運営者のメールと、04 6章の招待のメールの確認に使う別のメール。Terraform の変数。`make infra-apply ENV=staging`）
 - [ ] デプロイ後の確認をする（04 6章）
-- [ ] production でも、昇格（GitHub の環境 `production` の承認が、デプロイのジョブの前で1回要る。04 2章。`make promote ENV=production` が staging のデプロイの記録を読んで止まらずに PR を作れることも確かめる。記録を実際に読む最初の機会で、staging の最初の昇格は記録を読まない）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・テンプレートの取り込みと公開・確認用のワークスペースの作成・デプロイ後の確認をする
+- [ ] production でも、昇格（GitHub の環境 `production` の承認が、デプロイのジョブの前で1回要る。04 2章。承認を待っている間は、その書き込みの記録が `gs://{GCP_PROJECT_ID}-moonx-deploys/production/` に無く、承認の後に「マイグレーション中」と「出した」の記録が1つずつできることも確かめる。`make promote ENV=production` が staging のデプロイの記録を読んで止まらずに PR を作れることも確かめる。記録を実際に読む最初の機会で、staging の最初の昇格は記録を読まない）・運営者の作成（`moonx-production-database-url`・`https://{DOMAIN}`）・テンプレートの取り込みと公開・確認用のワークスペースの作成・デプロイ後の確認をする
 - [ ] production の確認用のワークスペースの ID（画面の URL の `/w/<ID>`）を、GitHub の環境 `production-backup` の変数 `CHECK_WORKSPACE_ID` に入れる（KPI の集計から外す。SDD 11章「KPI の数え方」。無いと `kpi.yml` が失敗する）。入れたら `kpi.yml` を手で1回動かし、成功して実行の要約に件数の表が出ることを確かめる
 
   ```bash

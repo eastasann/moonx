@@ -3319,6 +3319,7 @@ make test-e2e・make typecheck・make lint・make doc-lint が通り、3つの e
 ## Step 41e: Artifact Registry のタグの上書き（ADR-007 との両立）
 
 Status: done 2026-11-05
+決めたこと: B（ユーザーが 2026-11-05 に決めた。ADR-016 の状態・捨てた案・トレードオフに書いた）
 
 ```
 Step 41d の直すものの 4 を切り出した。Step 41d の 4 は「immutable_tags を有効にし、build.yml の push のジョブを再実行したときに
@@ -3465,7 +3466,10 @@ staging で確かめた版を production に公開してください。ユーザ
 やること:
 1. 29・30 の本文が入っていること（Step 42）を確かめる（無いまま production に出さない。04 4.1）
 2. 5.4 の production の分を、ユーザーと一緒に進める
-3. production への昇格（make promote ENV=production）、運営者の作成、テンプレートの取り込みと公開、04 6章の確認
+3. production への昇格（make promote ENV=production）、運営者の作成、テンプレートの取り込みと公開、04 6章の確認。昇格では、本物の実行で
+   次を確かめる（ADR-016・ADR-027。03 5.4 K）: GitHub の環境 production の承認を求められるのが1回だけであること。承認を待っている
+   間は、その書き込みの記録が gs://{GCP_PROJECT_ID}-moonx-deploys/production/ に無いこと。承認の後に「マイグレーション中」
+   （-migrating）と「出した」（-deployed）の記録が1つずつできること
 4. make promote ENV=production が、staging のデプロイの記録を gcloud storage objects list の本物の出力で読み、止まらずに PR を作れる
    ことを確かめる（記録を実際に読む最初の機会: Step 43 の staging の最初の昇格は記録を読まない。staging の記録が読めないときと、
    その SHA を staging に書いたいちばん新しいコミットに出した記録が無いとき（the staging deployment of ... is not known to have
@@ -3477,7 +3481,8 @@ staging で確かめた版を production に公開してください。ユーザ
 
 これで初期リリースのプロンプト集は終わる。このあとの変更は /draft:feature で行う。
 
-production で 04 6章のチェックリストがすべて通り、db-backup.yml と kpi.yml の1回目が成功した状態をゴールとする。
+production で 04 6章のチェックリストがすべて通り、3 の承認と記録の確かめと 4 の記録の読み取りが期待どおりで、db-backup.yml と
+kpi.yml の1回目が成功した状態をゴールとする。
 
 完了の前に、参照した docs の決まりを節ごとに実装とテストに突き合わせ、合わない所は実装を直す（docs を実装に合わせて弱めない）。
 仕様を弱める変更は、無人ループでも自分で決めずに止める（blocked と理由）。弱めずに直せる docs の欠けや食い違いは CLAUDE.md と /draft:implement の決まりに従う。

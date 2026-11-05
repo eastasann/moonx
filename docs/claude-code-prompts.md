@@ -3318,8 +3318,7 @@ make test-e2e・make typecheck・make lint・make doc-lint が通り、3つの e
 
 ## Step 41e: Artifact Registry のタグの上書き（ADR-007 との両立）
 
-Status: blocked 2026-11-05
-ユーザーの決定が要る: immutable_tags を有効にするとタグの付いたイメージを消せなくなり（クリーンアップのポリシーでも手でも）、ADR-007 の古いイメージを消す決まりと両立しない。どちらを取るかを決める
+Status: done 2026-11-05
 
 ```
 Step 41d の直すものの 4 を切り出した。Step 41d の 4 は「immutable_tags を有効にし、build.yml の push のジョブを再実行したときに

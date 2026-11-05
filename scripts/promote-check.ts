@@ -181,10 +181,11 @@ export function versionHistory(
  * Checks the change to deploy/ from `base` to `head` and returns every problem, none when
  * the diff leaves deploy/ alone or is one valid promotion: exactly one changed file, which is
  * `deploy/staging/version` or `deploy/production/version`, added or modified, holding one
- * full SHA on one line. That SHA is a commit in main at `base`; when it is older than the
- * environment's version at `base` (a rollback), the environment's file held it at some commit
- * up to `base`; for production, `deploy/staging/version` held it at some commit up to
- * `base`.
+ * full SHA on one line. That SHA is a commit in main at `base` and is not the environment's
+ * version at `base` (a change that keeps the SHA would be deployed again); when it is older
+ * than the environment's version at `base` (a rollback), the environment's file held it at
+ * some commit up to `base`; for production, `deploy/staging/version` held it at some commit
+ * up to `base`.
  *
  * @throws {Error} when `base` or `head` is not a commit.
  */
@@ -264,6 +265,13 @@ export function checkPromotion(
       problems.push(`${path}: ${sha} is not in main at ${base}`);
     } else {
       const current = parseVersion(readFileAt(repoDir, baseCommit, path));
+      // deploy.yml would deploy it again and record the commit, which then is no write of
+      // the environment's history: make promote stops at such a record.
+      if (current === sha) {
+        problems.push(
+          `${path}: already holds ${sha} at ${base}; a promotion changes the version`,
+        );
+      }
       const rollsBack =
         current !== undefined &&
         current !== sha &&

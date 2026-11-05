@@ -21,6 +21,7 @@
 | メール | Resend の管理画面（Emails） | Resend のプランの保持期間（短い） | 送信・配達・バウンス |
 | DB | Neon のコンソール（Monitoring・Usage） | Neon のプランによる | 接続数・容量・計算時間 |
 | デプロイ・バックアップ・KPI のワークフローの実行記録 | GitHub Actions | 90日 | `deploy.yml`・`build.yml`・`db-backup.yml`・`kpi.yml` の記録 |
+| デプロイの記録 | Cloud Storage `{GCP_PROJECT_ID}-moonx-deploys` | 消さない | 環境・版の SHA・それを書いたコミット・時刻と、「当てたかもしれない」か「出した」か（`make promote` が読む。04 2章「デプロイの記録」・ADR-016） |
 
 リクエスト ID がどこに入るかは [SDD 8.3](02-01_system-design-doc.md#83-ログとの対応)。利用者からエラーの連絡を受けたら、画面に出た `Ref`・起きた時刻・ログインしていたアカウントのメールをもらい、4章のコマンドで追う。`Ref` はふつうリクエスト ID の先頭で、API の答えが無い Web 自身の失敗（描画の失敗など）は `moonx-web` の Sentry のイベント ID の先頭になる（SDD 8.2「想定外のエラー」）。Cloud Logging で当たらない `Ref` は、4章「Sentry」の手順で探す。
 
@@ -483,7 +484,8 @@ gcloud run services describe moonx-api-production --region=asia-southeast1 --for
 ### その他
 
 - GCP コンソールのログ エクスプローラ: https://console.cloud.google.com/logs
-- デプロイの記録: `gh run list --workflow=deploy.yml --limit=10`
+- デプロイの実行: `gh run list --workflow=deploy.yml --limit=10`（90日で消える）
+- デプロイの記録（どの版をいつ出したか。消えない）: `gcloud storage ls "gs://{GCP_PROJECT_ID}-moonx-deploys/production/**"`（名前は `{env}/{SHA}/{書いたコミット}/<日時>-{migrating か deployed}`。04 2章「デプロイの記録」）
 
 ---
 

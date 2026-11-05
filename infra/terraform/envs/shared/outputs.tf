@@ -18,6 +18,11 @@ output "backup_bucket" {
   value       = google_storage_bucket.backups.name
 }
 
+output "deploy_record_bucket" {
+  description = "Bucket of deploy.yml's records, which make promote reads (ADR-016)."
+  value       = google_storage_bucket.deploys.name
+}
+
 output "notification_channel" {
   description = "Mail channel of the alerts and the budget."
   value       = google_monitoring_notification_channel.email.name

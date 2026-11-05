@@ -62,15 +62,24 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
 
-  # The check that needs Google Cloud, also before the environment's approval. It can mint
-  # a token, so it runs gcloud alone: no checkout, no Bun and no make (04 2章, ADR-027).
+  # The check that needs Google Cloud, also before the environment's approval, and the
+  # record make promote reads that this write's migrations may run (ADR-016): written
+  # before the migrate job can start, whatever happens to it later, so a write without one
+  # migrated nothing. It can mint a token, so it runs gcloud, curl and the Makefile of this
+  # commit alone, without Bun or dependencies (04 2章, ADR-027).
   image:
     needs: check
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+    env:
+      TARGET: ${{ needs.check.outputs.target }}
+      SHA: ${{ needs.check.outputs.sha }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -80,8 +89,8 @@ jobs:
           project="$(gcloud config get-value project)"
           gcloud artifacts docker images describe \
             "asia-southeast1-docker.pkg.dev/$project/moonx/api:$SHA" --format='value(image_summary.digest)'
-        env:
-          SHA: ${{ needs.check.outputs.sha }}
+      - name: Record that the migrations may run
+        run: make deploy-record ENV="$TARGET" SHA="$SHA" WRITE="$GITHUB_SHA" KIND=migrating
 
   # Without id-token: write. make install and make db-migrate run the SHA's dependencies
   # (drizzle-kit among them), which must not be able to mint a Google Cloud token: the one
@@ -141,9 +150,6 @@ jobs:
         env:
           DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
 
-  # scripts/promote.ts reads the names of this job, the migrate job and their Migrate and
-  # Deploy steps: a successful run whose steps were skipped did not deploy (the checks
-  # below), and a Migrate step that ran may have applied the SHA's migrations.
   deploy:
     needs: [check, migrate]
     if: needs.migrate.outputs.current == 'true'
@@ -181,6 +187,13 @@ jobs:
         with:
           ref: ${{ env.SHA }}
           persist-credentials: false
+      # This commit's Makefile for the record at the end, not the SHA's: a rollback to an
+      # older version still writes the records make promote reads now.
+      - if: steps.current.outputs.current == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: write
+          persist-credentials: false
       - if: steps.current.outputs.current == 'true'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
@@ -206,3 +219,10 @@ jobs:
             exit 1
           fi
           curl --fail --silent --show-error "$base_url/api/health/db"
+      # The record make promote reads that this write deployed its SHA (ADR-016). The last
+      # step, so the job succeeds only with it: a deployed write goes unrecorded only when
+      # the job fails, as with a failed check, and running the job again records it.
+      - name: Record the deployment
+        if: steps.current.outputs.current == 'true'
+        working-directory: write
+        run: make deploy-record ENV="$TARGET" SHA="$SHA" WRITE="$GITHUB_SHA" KIND=deployed

@@ -25,6 +25,13 @@ const WORKFLOWS = join(ROOT, ".github", "workflows");
 const TOKEN_TARGETS: Record<string, string[]> = {
   "push-api-image": ["SHA=0123abc", "GCP_PROJECT_ID=check"],
   "deploy-api": ["ENV=staging", "SHA=0123abc", "GCP_PROJECT_ID=check"],
+  "deploy-record": [
+    "ENV=production",
+    `SHA=${"0".repeat(40)}`,
+    `WRITE=${"1".repeat(40)}`,
+    "KIND=migrating",
+    "GCP_PROJECT_ID=check",
+  ],
   "db-backup": ["ENV=production", "GCP_PROJECT_ID=check"],
 };
 /** The actions such a job may use: none runs the repository's code or Bun. */
@@ -57,10 +64,11 @@ interface Step {
   run?: string;
   shell?: string;
   with?: Record<string, unknown>;
+  "working-directory"?: string;
 }
 
 interface Defaults {
-  run?: { shell?: string };
+  run?: { shell?: string; "working-directory"?: string };
 }
 
 interface Job {
@@ -139,7 +147,28 @@ test.each(
   ]) {
     expect([undefined, "bash"]).toContain(shell);
   }
-  for (const step of job.steps ?? []) {
+  // make finds its Makefile in the folder a step runs in: only a checkout of this
+  // repository, at the commit the workflow runs for, may be that folder, and it must come
+  // before the step.
+  expect(workflow.defaults?.run?.["working-directory"]).toBeUndefined();
+  expect(job.defaults?.run?.["working-directory"]).toBeUndefined();
+  const steps = job.steps ?? [];
+  steps.forEach((step, index) => {
+    const folder = step["working-directory"];
+    if (folder === undefined) return;
+    expect(
+      steps
+        .slice(0, index)
+        .some(
+          (earlier) =>
+            earlier.uses?.startsWith("actions/checkout@") &&
+            earlier.with?.path === folder &&
+            earlier.with?.ref === undefined &&
+            earlier.with?.repository === undefined,
+        ),
+    ).toBe(true);
+  });
+  for (const step of steps) {
     if (step.uses !== undefined) {
       expect(
         TOKEN_ACTIONS.some((action) => step.uses?.startsWith(action)),

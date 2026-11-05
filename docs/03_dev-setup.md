@@ -19,7 +19,7 @@
 | Bun | `package.json` の `packageManager` の版（CI もこの版を入れる） | パッケージ管理・API・テスト | 全員 |
 | Docker（Docker Desktop・OrbStack など。Compose v2） | 最近の版 | ローカルの PostgreSQL 17（`make db-up`。開発用の DB `moonx` とテスト用の DB `moonx_test`）、`make lint` のワークフローの検査（actionlint の Docker のイメージを動かす。10章） | 全員 |
 | Playwright のブラウザ | リポジトリの Playwright に合う版 | `make test-e2e`（取得するターゲットは SDD 2章「make ターゲット」） | E2E を回す人 |
-| Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・`make promote`（イメージの確認と、前回のデプロイが済んでいないときに Cloud Run で動いている版。プロジェクトは `gcloud config` のもの）・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
+| Google Cloud CLI（gcloud） | 最新 | 初回のセットアップ・`make promote`（イメージの確認と、デプロイの記録（バケット `{GCP_PROJECT_ID}-moonx-deploys` を一覧する権限が要る。ADR-016）の読み取りと、前回のデプロイが済んでいないときに Cloud Run で動いている版。プロジェクトは `gcloud config` のもの）・ログの確認・緊急時の操作 | デプロイ・運用をする人 |
 | Terraform | 1.x の最新 | `make infra-plan` / `make infra-apply` | インフラを触る人 |
 | GitHub CLI（gh） | 最新 | PR・`make promote`（昇格の PR の作成）・GitHub の環境の設定・ワークフローの確認 | デプロイ・運用をする人（ほかの人は任意） |
 | curl | 最近の版（7.76 以上） | `make db-backup`（`make test-api` のバックアップのテストも動かす） | 全員 |
@@ -337,6 +337,8 @@ make infra-apply ENV=staging    # 適用
   ```bash
   gcloud artifacts repositories describe moonx --location=asia-southeast1
   gcloud storage buckets describe gs://{GCP_PROJECT_ID}-moonx-backups
+  gcloud storage buckets describe gs://{GCP_PROJECT_ID}-moonx-deploys
+  gcloud storage buckets get-iam-policy gs://{GCP_PROJECT_ID}-moonx-deploys
   gcloud billing budgets list --billing-account=<BILLING_ACCOUNT_ID>
 
   gcloud iam workload-identity-pools list --location=global
@@ -347,6 +349,7 @@ make infra-apply ENV=staging    # 適用
   ```
 
   - バックアップのバケットが公開されない設定になっていること（05 6.2）
+  - デプロイの記録のバケットが公開されない設定で、古いものを消す設定（lifecycle）が無く、デプロイ用のサービスアカウントには独自のロール `moonxDeployRecordWriter`（オブジェクトの作成だけ）しか付いていないこと（ADR-016。`make promote` を動かす人は、プロジェクトのオーナーなどの権限で一覧できる）
   - 予算アラートの金額が SDD 11章のとおりであること
   - WIF の `attributeCondition` が、このリポジトリ（`<org>/moonx`）の `main` で動くワークフローに限っていること（`assertion.repository == '<org>/moonx' && assertion.ref == 'refs/heads/main'`。ADR-027）。プロバイダの `name` とデプロイ用のサービスアカウントのメール（`make infra-apply ENV=shared` が最後に出す output の `workload_identity_provider`・`deploy_service_account`）は、リポジトリの変数 `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` に入れる（H。鍵は作らない。ADR-027）
 
@@ -465,6 +468,12 @@ I の 5 でドメインマッピングができてから行う。最初の昇格
 
 - [ ] `build.yml` が API のイメージを作ったことを確かめる（I の 4）
 - [ ] staging の昇格の PR を出してマージする（04 4.2）
+- [ ] `deploy.yml` がデプロイの記録を2つ書いたことを確かめる（04 2章「デプロイの記録」。手元では Cloud Storage を差し替えて確かめたので、本物のバケットと、作成だけの権限で書けることはここで確かめる）。`make promote` がそれを読めることは、次の昇格（staging の2回目か production の最初）で確かめる
+
+  ```bash
+  gcloud storage ls "gs://{GCP_PROJECT_ID}-moonx-deploys/staging/**"   # -migrating と -deployed の2つ
+  ```
+
 - [ ] staging の運営者を作る。運営者のメールは Google のアカウントのもの（Gmail か Google Workspace）にし、招待のリンクからメール＋パスワードで登録する（04 6章の確認を、メール＋パスワードと Google のログインの両方とも、この運営者のアカウントだけで行うため。メール＋パスワードで登録したアカウントには、同じメールの Google のログインがつながる。SDD 5.4 U5）。`make admin-create` は `DATABASE_URL` と `BETTER_AUTH_URL` を使うので、この2つを上書きして手元から動かす（リンクが staging の URL になっていることを確かめる）
 
   ```bash

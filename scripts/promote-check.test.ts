@@ -122,6 +122,16 @@ describe("checkPromotion", () => {
     expect(messages()).toEqual([]);
   });
 
+  test("fails a change of the version file that keeps its SHA", () => {
+    // Dropping the final newline changes the file, and deploy.yml would run for it.
+    write(STAGING, c2);
+    commit("promote");
+
+    expect(messages()).toEqual([
+      `${STAGING}: already holds ${c2} at ${base}; a promotion changes the version`,
+    ]);
+  });
+
   test("passes a rollback to a version the environment had", () => {
     land(STAGING, c1);
 

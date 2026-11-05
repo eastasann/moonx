@@ -84,6 +84,34 @@ resource "google_storage_bucket_iam_member" "backups_deploy" {
   member = google_service_account.deploy.member
 }
 
+# deploy.yml's records of what each promotion migrated and deployed, which make promote
+# reads (ADR-016). Unlike GitHub's workflow runs, they never expire: no lifecycle rule.
+# They hold SHAs and times, no personal information, so Cloud Storage's soft delete keeps
+# its default 7 days and can bring back a record deleted by hand.
+resource "google_storage_bucket" "deploys" {
+  name                        = "${var.project_id}-moonx-deploys"
+  location                    = local.region
+  storage_class               = "STANDARD"
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  force_destroy               = false
+}
+
+# make deploy-record creates each record with the JSON API, as make db-backup does, so the
+# account that writes them can neither remove nor replace one. make promote reads them
+# with the operator's own gcloud.
+resource "google_project_iam_custom_role" "deploy_record_writer" {
+  role_id     = "moonxDeployRecordWriter"
+  title       = "moonx deploy record writer"
+  permissions = ["storage.objects.create"]
+}
+
+resource "google_storage_bucket_iam_member" "deploys_deploy" {
+  bucket = google_storage_bucket.deploys.name
+  role   = google_project_iam_custom_role.deploy_record_writer.id
+  member = google_service_account.deploy.member
+}
+
 # ADR-027
 resource "google_iam_workload_identity_pool" "github" {
   workload_identity_pool_id = "github"

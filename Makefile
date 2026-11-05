@@ -50,12 +50,14 @@ TS_PROJECTS := . $(patsubst %/tsconfig.json,%,$(wildcard apps/*/tsconfig.json pa
 require = $(if $($(1)),,$(error $(1) is required: make $@ $(1)=...))
 require-project = $(if $(GCP_PROJECT_ID),,$(error No Google Cloud project: run gcloud config set project, or make $@ GCP_PROJECT_ID=...))
 require-env = $(if $(and $(filter 1,$(words $(ENV))),$(filter $(1),$(ENV))),,$(error ENV must be one of: $(1)))
+# A value as one single-quoted shell word, in which the shell runs nothing.
+shell-quote = '$(subst ','\'',$(1))'
 
 .PHONY: install setup env-file dev dev-api dev-web build build-web build-api-image \
 	test test-domain test-api test-web test-e2e coverage first-paint lint format \
 	typecheck db-up db-down db-generate db-check db-migrate db-seed db-reset \
 	db-studio tokens openapi kpi doc-lint admin-create infra-plan infra-apply \
-	push-api-image deploy-api promote promote-check db-backup
+	push-api-image deploy-api deploy-record promote promote-check db-backup
 
 install:
 	bun install --frozen-lockfile
@@ -294,7 +296,8 @@ deploy-api:
 	gcloud run deploy moonx-api-$(ENV) --image=$(IMAGE):$(SHA) --project=$(GCP_PROJECT_ID) \
 		--region=$(REGION) --quiet
 
-# gcloud looks for the image and, after a failed deployment, the running version.
+# gcloud looks for the image, reads deploy.yml's records (deploy-record below) and, after a
+# failed deployment, the running version.
 promote:
 	$(call require-env,staging production)
 	$(call require-project)
@@ -327,3 +330,32 @@ db-backup:
 		--header 'Content-Type: application/octet-stream' \
 		--header @<(printf 'Authorization: Bearer %s\n' "$$token") \
 		"$(STORAGE_URL)/upload/storage/v1/b/$(GCP_PROJECT_ID)-moonx-backups/o?uploadType=media&ifGenerationMatch=0&name=$$name"
+
+# The records make promote reads (ADR-016, 04_deployment-procedure.md 4.1): deploy.yml's
+# image job writes KIND=migrating before its migrate job may start, and the deploy job's
+# last step writes KIND=deployed once the deployment's check passed. A record is an empty object
+# whose name says it all: {ENV}/{SHA}/{WRITE}/{UTC time}-{KIND}, WRITE being the commit
+# that wrote SHA to deploy/{ENV}/version (the one deploy.yml runs for). The records are
+# kept for good and make promote reads every one ever written, so a new name must leave
+# the old ones readable. Uploaded as db-backup's dump is: the account can create objects
+# and nothing else, and ifGenerationMatch=0 refuses to replace one. SHA and WRITE reach
+# the shell in single quotes, so the shell checks them without running anything in them.
+# make itself still expands a $(...) in a value given on its command line, as in every
+# target; deploy.yml passes a SHA promote-check has read as 40 hex characters and its own
+# GITHUB_SHA.
+deploy-record:
+	$(call require-env,staging production)
+	$(call require,SHA)
+	$(call require,WRITE)
+	$(if $(and $(filter 1,$(words $(KIND))),$(filter migrating deployed,$(KIND))),,$(error KIND must be one of: migrating deployed))
+	$(call require-project)
+	set -o errexit; sha=$(call shell-quote,$(SHA)); write=$(call shell-quote,$(WRITE)); \
+	if [[ ! "$$sha" =~ ^[0-9a-f]{40}$$ || ! "$$write" =~ ^[0-9a-f]{40}$$ ]]; then \
+		echo "SHA and WRITE must be full commit SHAs" >&2; exit 1; \
+	fi; \
+	token="$$(gcloud auth print-access-token)"; \
+	name="$(ENV)%2F$$sha%2F$$write%2F$$(date -u +%Y-%m-%dT%H%M%SZ)-$(KIND)"; \
+	curl --fail-with-body --silent --show-error --request POST --data-binary '' \
+		--header 'Content-Type: application/octet-stream' \
+		--header @<(printf 'Authorization: Bearer %s\n' "$$token") \
+		"$(STORAGE_URL)/upload/storage/v1/b/$(GCP_PROJECT_ID)-moonx-deploys/o?uploadType=media&ifGenerationMatch=0&name=$$name"

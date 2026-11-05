@@ -3196,7 +3196,7 @@ PostgreSQL 17 のクライアントを PATH に置いて通った）。1〜3 は
 
 ## Step 41c: GitHub Actions の記録が90日で消えることへの対応
 
-Status:
+Status: done 2026-11-05
 
 ```
 Step 41b の独立レビュー（2026-11-05）で見つかった問題を、ユーザーの決定に沿って閉じてください。
@@ -3300,7 +3300,8 @@ docs/03_dev-setup.md 5.4 のチェックリストに沿って、staging に Web 
    戻してしまうものがあれば、modules/environment の lifecycle.ignore_changes に足し、ADR-015 の無視するものの一覧にも理由と一緒に
    書く。Step 40 が入れたのは image・traffic・client・client_version と、gcloud がリビジョンに付ける nonce のラベル（template の labels））
 4. 手元で差し替えて確かめた外部の経路を本物で確かめる: Google ログイン、Resend のメール（許可リスト）、Cloud Storage の写真、
-   Web と API の Sentry（7.2 のとおり中身が削られて届くこと。release が SHA で、ソースマップが当たって元のソースの行で読めること）
+   Web と API の Sentry（7.2 のとおり中身が削られて届くこと。release が SHA で、ソースマップが当たって元のソースの行で読めること）、
+   deploy.yml が Cloud Storage に書くデプロイの記録（作成だけの権限で2つとも書けること。次の make promote がそれを読めること。03 5.4 K）
 5. 7.3 の性能の目安のうち本物の環境で測るもの（Cloud Run の0台からの起動・スマホの回線での表示）、PWA の実機での確認（03 3.5）。
    スマホの回線での表示は、ログインした画面（5 ダッシュボードなど）を初めて開いたときも測る。`load` の後に始まる Service Worker の
    事前のキャッシュ（日本語の書体を除くビルドのすべて）が、データを読む画面の表示と回線を取り合っていないかを見る（手元の

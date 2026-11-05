@@ -3368,7 +3368,8 @@ B. immutable_tags は使わず、ADR-007 のまま古いイメージを消す。
 
 ## Step 41f: GitHub のランナーで ci.yml の E2E を通す
 
-Status:
+Status: blocked 2026-11-05
+直して確かめたが、16 GB の Linux が手元に無く、ランナーと同じワーカー2つの通しを確かめられない（Docker Desktop の VM は 4.8 GB で、ほかのプロジェクトのコンテナと共有。4 CPU・CI=true・依存のキャッシュ無しのコンテナでは、ワーカー1つで ci.yml の手順が通り E2E は 442 件すべて通った。型チェックと actionlint は手元）。feature/infra を push して PR #12 の ci.yml が通れば done にする（push はユーザー）
 
 ```
 PR #12（feature/infra）で、ci.yml が GitHub の上で初めて動き、make test-e2e で落ちた（実行 42009500685、2026-11-05。make install・

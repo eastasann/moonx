@@ -1,6 +1,6 @@
 import type { AdminTemplateList, Me, PlanSummary } from "@moonx/schemas";
 import type { Locator, Page } from "@playwright/test";
-import { WEB_ORIGIN } from "./env";
+import { SLOWNESS, WEB_ORIGIN } from "./env";
 import { demo, expect, test, workspaceOf } from "./fixtures";
 
 // What docs/screen_flow.mermaid leaves to its header comments, on every signed-in screen
@@ -625,7 +625,7 @@ test.describe("on a desktop", () => {
   }) => {
     // 23 screens loaded from the dev server, 23 items, 33 crumbs and 26 panels: about a
     // minute alone, longer beside the other specs.
-    test.setTimeout(240_000);
+    test.setTimeout(240_000 * SLOWNESS);
     const me = await signIn(demo.owner);
     await walkDesktop(page, me, await bcdxTour(page, me));
   });
@@ -675,7 +675,7 @@ test.describe("on a phone", () => {
   }) => {
     // 23 screens loaded from the dev server, More opened and an item pressed on each:
     // about a minute alone, longer beside the other specs.
-    test.setTimeout(240_000);
+    test.setTimeout(240_000 * SLOWNESS);
     const me = await signIn(demo.owner);
     await walkPhone(page, me, await bcdxTour(page, me));
   });

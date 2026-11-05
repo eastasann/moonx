@@ -278,6 +278,22 @@ test("deploy.yml takes Bun from its release, never from the Actions cache", () =
   for (const step of steps) expect(step.with?.["no-cache"]).toBe(true);
 });
 
+// ci.yml uploads what a failed make test-e2e leaves, traces included (04 2章): that holds
+// no secret only while the workflow passes its steps no secret, variable or token of the
+// repository, and its checkout keeps none of the default token it fetches with.
+test("ci.yml names no secret, variable or token, and its checkout keeps none", () => {
+  const ci = workflows.find(({ file }) => file === "ci.yml")?.workflow;
+  expect(ci).toBeDefined();
+  expect(JSON.stringify(ci)).not.toMatch(/\b(secrets|vars)\b|github\.token/);
+  const checkouts = Object.values(ci?.jobs ?? {})
+    .flatMap((job) => job.steps ?? [])
+    .filter((step) => step.uses?.startsWith("actions/checkout@"));
+  expect(checkouts.length).toBeGreaterThan(0);
+  for (const step of checkouts) {
+    expect(step.with?.["persist-credentials"]).toBe(false);
+  }
+});
+
 test("promote-check runs Bun's and Node's built-ins alone, and never installs", () => {
   const imports = new Bun.Transpiler({ loader: "ts" })
     .scanImports(

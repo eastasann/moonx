@@ -333,6 +333,16 @@ export default defineConfig({
       "^/api/": `http://localhost:${process.env.PORT || "3000"}`,
     },
   },
+  optimizeDeps: {
+    // The vanilla-extract plugin compiles each .css.ts into a module that imports these
+    // runtimes, which the dependency scan of the sources never sees. Found on the first
+    // page that uses them, they are optimized then and every open page reloads: on a
+    // fresh checkout (CI), that broke the E2E tests running at that moment.
+    include: [
+      "@moonx/ui-web > @vanilla-extract/recipes/createRuntimeFn",
+      "@moonx/ui-web > @vanilla-extract/sprinkles/createRuntimeSprinkles",
+    ],
+  },
   plugins: [
     {
       // The @fontsource stylesheets list a woff fallback after each woff2. Every browser

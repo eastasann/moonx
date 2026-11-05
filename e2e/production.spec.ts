@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IdeaSummary, Me, PitchDeck, PlanSummary } from "@moonx/schemas";
 import type { Page } from "@playwright/test";
-import { PWA_ORIGIN } from "./env";
+import { PWA_ORIGIN, SLOWNESS } from "./env";
 import { DEMO_PASSWORD, demo, expect, test } from "./fixtures";
 
 // The API that serves the build runs with NODE_ENV=production, as the image does
@@ -23,7 +23,7 @@ const pdfPages = (path: string) =>
     execFileSync(
       "bun",
       [fileURLToPath(new URL("./read-pdf.ts", import.meta.url)), path],
-      { timeout: 60_000 },
+      { timeout: 60_000 * SLOWNESS },
     ).toString(),
   ) as { text: string; footer: string }[];
 

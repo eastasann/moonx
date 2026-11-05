@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import type { Workspace } from "@moonx/schemas";
 import type { APIRequestContext, Page } from "@playwright/test";
-import { WEB_ORIGIN } from "./env";
+import { SLOWNESS, WEB_ORIGIN } from "./env";
 import {
   type Account,
   apiAs,
@@ -79,7 +79,7 @@ const pdfPages = (path: string) =>
     execFileSync(
       "bun",
       [fileURLToPath(new URL("./read-pdf.ts", import.meta.url)), path],
-      { timeout: 60_000 },
+      { timeout: 60_000 * SLOWNESS },
     ).toString(),
   ) as { text: string; footer: string }[];
 
@@ -189,7 +189,7 @@ test.describe("a team's core flow, then its Viewer, on a desktop", () => {
   }) => {
     // Ten screens and six overlays, each checked by axe once its announcements clear:
     // about 80 seconds alone, longer beside the other specs.
-    test.setTimeout(240_000);
+    test.setTimeout(240_000 * SLOWNESS);
 
     await test.step("2 → 5 → M7 → 5: logging in, then to the team's workspace (C-02, C-04)", async () => {
       await page.goto("/login");

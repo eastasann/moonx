@@ -3,6 +3,16 @@ import { fileURLToPath } from "node:url";
 // The e2e ports, apart from the development servers' (SDD 2章「環境変数」): Web 5273,
 // API 3100, and 3200 for the PWA checks, where the API serves the Web's build.
 
+/**
+ * How many times as long the time limits are on CI: ci.yml's runner (4 vCPUs, two
+ * workers) takes about 2.6 times as long for a test as a 4-CPU Linux container on an
+ * Apple M1 Max (SDD 10章). It multiplies playwright.config.ts's defaults and the limits
+ * the tests set on work the CPU does (a long flow, a page loading, a PDF read); the waits
+ * on timers (React Aria's 7-second announcement, retries, a tooltip's delay) stay as
+ * written, since a slower CPU does not stretch them.
+ */
+export const SLOWNESS = process.env.CI === "true" ? 3 : 1;
+
 export const WEB_PORT = 5273;
 export const API_PORT = 3100;
 export const WEB_ORIGIN = `http://localhost:${WEB_PORT}`;

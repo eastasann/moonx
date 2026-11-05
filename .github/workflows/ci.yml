@@ -112,5 +112,18 @@ jobs:
       # make test-e2e fetches the browser; the libraries it needs come from apt.
       - if: steps.scope.outputs.code == 'true'
         run: bun --bun x --no-install playwright install-deps chromium
-      - if: steps.scope.outputs.code == 'true'
+      - id: e2e
+        if: steps.scope.outputs.code == 'true'
         run: make test-e2e
+      # What Playwright keeps of each failed test (e2e/playwright.config.ts): its trace and
+      # error-context.md. Made with .env.example's local values; this workflow passes its
+      # steps no secret, variable or token of the repository, and the checkout keeps none
+      # of the default token it fetches with (scripts/workflows.test.ts).
+      - if: failure() && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-test-results
+          path: test-results/
+          # Playwright may fail before any test runs (a server that never starts).
+          if-no-files-found: warn
+          retention-days: 7

@@ -8,7 +8,7 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
-import { API_LOG, WEB_ORIGIN } from "./env";
+import { API_LOG, SLOWNESS, WEB_ORIGIN } from "./env";
 
 /** Every demo user's password (design-spec 8.1). */
 export const DEMO_PASSWORD = "moonx-demo-2026";
@@ -125,6 +125,32 @@ export async function expectRingAroundText(page: Page, link: Locator) {
 }
 
 /**
+ * The width a desktop page with AppFrame is laid out in: the window's, less the
+ * scrollbar's gutter AppFrame keeps there (AppFrame.css.ts). Linux's Chromium gives a
+ * classic scrollbar 15px, macOS's overlay one none. Read from the root element's box (the
+ * headless browser hides the scrollbar, so the root's `clientWidth` can give the window's
+ * width), and checked to fall short of the window by exactly this system's gutter, as
+ * an empty element keeping one measures it: a root narrowed by anything else fails.
+ */
+export async function pageWidth(page: Page) {
+  const { inner, root, gutter } = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.cssText =
+      "position: absolute; visibility: hidden; width: 100px; overflow: auto; scrollbar-gutter: stable";
+    document.body.append(probe);
+    const gutter = probe.offsetWidth - probe.clientWidth;
+    probe.remove();
+    return {
+      inner: window.innerWidth,
+      root: document.documentElement.getBoundingClientRect().width,
+      gutter,
+    };
+  });
+  expect(inner - root).toBe(gutter);
+  return root;
+}
+
+/**
  * The workspace of `me` named `name`, as the seed names them.
  *
  * @throws {Error} when the user belongs to none by that name.
@@ -172,7 +198,7 @@ export async function mailsTo(to: string): Promise<Mail[]> {
 /**
  * The link `pattern` finds in the latest mail to `to` that has one, once it is sent.
  *
- * @throws {Error} when no such mail comes within 10 seconds.
+ * @throws {Error} when no such mail comes within 10 seconds (longer on CI: SLOWNESS).
  */
 export async function linkMailedTo(to: string, pattern: RegExp): Promise<URL> {
   let link: string | undefined;
@@ -184,7 +210,7 @@ export async function linkMailedTo(to: string, pattern: RegExp): Promise<URL> {
           .findLast((found) => found !== undefined);
         return link;
       },
-      { timeout: 10_000 },
+      { timeout: 10_000 * SLOWNESS },
     )
     .toBeDefined();
   return new URL(link ?? "");

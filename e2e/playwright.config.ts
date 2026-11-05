@@ -10,6 +10,7 @@ import {
   PWA_PORT,
   PWA_SENTRY_DSN,
   PWA_WEB_DIR,
+  SLOWNESS,
   WEB_ORIGIN,
   WEB_PORT,
 } from "./env";
@@ -41,6 +42,11 @@ export default defineConfig({
   testMatch: "**/*.spec.ts",
   reporter: [["list"]],
   globalSetup: "./global-setup.ts",
+  // Playwright's 30 and 5 seconds, longer on CI (env.ts): /dev/components draws its
+  // heading 2.2 to 3 seconds after the load in the container SLOWNESS was measured on, so
+  // about 6 to 8 on the runner, past 5 though the page is right.
+  timeout: 30_000 * SLOWNESS,
+  expect: { timeout: 5_000 * SLOWNESS },
   use: { baseURL: WEB_ORIGIN, trace: "retain-on-failure" },
   projects: [
     {
